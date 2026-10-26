@@ -22,7 +22,7 @@
 ///   'nonignored_children_have_distinct_ids', and write-protected-folder
 ///   members have distinct IDs per
 ///   'partnerFolder_children_have_distinct_ids'. The defining folders
-///   (AliasFolder, SubscribeeFolder, OverriddenFolder) may contain
+///   (aliasFolder, subscribeeFolder, overriddenFolder) may contain
 ///   duplicates; emission dedups them silently.
 /// Collection performs no ancestry re-verification. On shapes that
 /// validation precludes, it stays total, emitting nothing rather
@@ -35,8 +35,8 @@
 /// save-eligible for itself but invisible to the folder's recorder.)
 /// .
 /// DEFINITION: a vognode is *in subscribee-as-such position* iff it
-/// is an occurrence member direct child of a SubscribeeFolder.
-/// A child of a SubscribeeFolder claiming nothing is not a member of the
+/// is an occurrence member direct child of a subscribeeFolder.
+/// A child of a subscribeeFolder claiming nothing is not a member of the
 /// folder, hence not shown *as* a subscribee: it is an ordinary
 /// self-writer that stands there claiming nothing.
 
@@ -79,7 +79,7 @@ fn visit (
         node_ref,
         Some ( DefiningFolderRecorder {
           // Carrying the ghost's or unknown's identity (write-protected,
-          // not save-eligible) keeps a SubscribeeFolder found under a
+          // not save-eligible) keeps a subscribeeFolder found under a
           // ghost meaningful: its children stay in
           // subscribee-as-such position, so their title edits bounce
           // via text claims instead of silently becoming real edits.
@@ -161,10 +161,10 @@ fn visit_occurrence (
               headline : headline . clone () } )) ?;
         if subscriber_is_editable {
           // The at-most-one-writer-per-ID guard: only the
-          // SubscribeeFolder under the editable instance of a
+          // subscribeeFolder under the editable instance of a
           // subscriber may write its hide edits. The same subscriber
           // can recur write-protected elsewhere with its own
-          // SubscribeeFolder; without this guard those could emit
+          // subscribeeFolder; without this guard those could emit
           // contradictory hide edits for one ID.
           collected . instructionMerge_fieldIntent (
             &headline,
@@ -411,7 +411,7 @@ fn dedup_members_by_gnid (
       result . push ((gnid, skgrepo)); }}
   result }
 
-/// This returns the members of an OverriddenFolder: its occurrence
+/// This returns the members of an overriddenFolder: its occurrence
 /// children that pass the partner folder membership predicate, silently
 /// deduplicated (by ID; see 'dedup_members_by_id'), preserving
 /// first-occurrence order. Each member is paired with its headline's
@@ -441,7 +441,7 @@ fn partnerFolder_members (
       _ => {}, }}
   dedup_members_by_gnid (members) }
 
-/// This returns the members of a SubscribeeFolder: its occurrence children
+/// This returns the members of a subscribeeFolder: its occurrence children
 /// that pass the partner folder membership predicate, deduplicated (by
 /// ID; see 'dedup_members_by_id'). Like 'content_members' (and for
 /// the same reason), a tombstone contributes nothing:

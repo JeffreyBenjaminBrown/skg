@@ -16,7 +16,7 @@ fn relationship_member_key (
   graph . relationship_member_key (gnid)
 }
 
-/// Goal list for a HiddenInSubscribeeFolder: the intersection of the
+/// Goal list for a hiddenInSubscribeeFolder: the intersection of the
 /// subscriber's hides-list and the subscribee's contains-list, in the
 /// order of the hides list.
 pub fn goal_list_for_hiddenInSubscribee_folder (
@@ -31,7 +31,7 @@ pub fn goal_list_for_hiddenInSubscribee_folder (
     . filter ( |gnid| contains_set . contains (&relationship_member_key (graph, gnid)) )
     . cloned () . collect () }
 
-/// Goal list for a HiddenOutsideOfSubscribeeFolder: the subscriber's
+/// Goal list for a hiddenOutsideOfSubscribeeFolder: the subscriber's
 /// hides-list minus everything contained by any subscribee.
 pub fn goal_list_for_hiddenOutsideOfSubscribee_folder (
   graph                : &InRustGraph,

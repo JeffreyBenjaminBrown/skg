@@ -81,8 +81,8 @@ pub enum BufferValidationError {
   },
   FlagEditOnForeignNode                 (ID, SkgrepoName),
   FlagEditOnUnknownNode                 (ID),
-  IDFolder_Edited                   (ID,       // recorder of the IDFolder
-                                  Vec<ID>,  // ids the buffer's IDFolder claims
+  IDFolder_Edited                   (ID,       // recorder of the idFolder
+                                  Vec<ID>,  // ids the buffer's idFolder claims
                                   Vec<ID>,  // the recorder's real ids (pid + extra_ids); empty if the recorder is not in the graph
                                   HeadlineName), // the recorder's occurrence
   OverridesHere_Mismatch         (Option<ID>, // the carrier's own ID

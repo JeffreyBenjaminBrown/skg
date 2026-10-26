@@ -612,7 +612,7 @@ pub fn group_matches_by_gnid (
 /// Builds a ViewForest representing the search results.
 /// Returns the viewforest and the ordered list of result IDs.
 ///
-/// Forest structure: each root is a search result, with AliasFolder +
+/// Forest structure: each root is a search result, with aliasFolder +
 /// Alias children if aliases matched.
 /// The result ids to drop from the top level because an owned
 /// result recursively overrides them; those it overrides directly
@@ -693,7 +693,7 @@ pub fn build_search_viewforest (
           title . clone (),
           true ) );
       if sorted_matches . len () > 1 {
-        // We bury all but the best match in an AliasFolder.
+        // We bury all but the best match in an aliasFolder.
         // PITFALL: The title might not be the best match,
         // in which case this makes it look like an alias.
         let aliasfolder_gnid : NodeId = {

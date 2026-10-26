@@ -323,7 +323,7 @@ fn validate_subscribeefolder (
       _ => false, }) )
     { errors . push("SubscribeeFolder Occurrence children must be members (no noClaim)."
                     . to_string() ); }
-  // There is no duplicate-member check here: SubscribeeFolder is a
+  // There is no duplicate-member check here: subscribeeFolder is a
   // defining folder, and duplicate members of defining folders are
   // silently deduplicated at emission rather than bouncing the save.
   errors }
@@ -370,7 +370,7 @@ fn validate_relation_folder (
                     if r == partnerFolder))
     { errors . push(format!("{} must be unique among its siblings.", label)); }
   if *partnerFolder != Folder::Overridden
-    // OverriddenFolder is a defining folder: duplicate members are silently
+    // overriddenFolder is a defining folder: duplicate members are silently
     // deduplicated at emission rather than bouncing the save. The
     // write-protected roles keep the check.
     && !partnerFolder_children_have_distinct_gnids(tree, treeid) {
@@ -588,9 +588,9 @@ fn validate_vognode_identity_and_structure (
   if !id_present {
     errors . push( format!("{} must have an ID.", label) ); }
   let is_subscribee_as_such : bool =
-    // A subscribee-as-such (vognode child of a SubscribeeFolder) is the
+    // A subscribee-as-such (vognode child of a subscribeeFolder) is the
     // one vognode position that legitimately carries a
-    // HiddenInSubscribeeFolder; rendering puts the folder there, so a
+    // hiddenInSubscribeeFolder; rendering puts the folder there, so a
     // saved buffer must round-trip it.
     tree . get (treeid)
     . and_then ( |n| n . parent () )

@@ -26,7 +26,7 @@ use std::collections::HashMap;
 /// with 'org_to_viewforest',
 /// which runs earlier and detects a few errors that this one can't,
 /// because this one acts on a tree of Viewnodes rather than raw text.
-/// (Namely, Alias and AliasFolder should not have body text.)
+/// (Namely, Alias and aliasFolder should not have body text.)
 ///
 /// Assumes the viewforest is as 'org_to_viewforest' makes it:
 /// every occurrence's ID is its PID when the graph knows it
@@ -48,7 +48,7 @@ pub fn find_buffer_errors_for_saving_in_graph (
   // they need to take the entire viewforest into account.
   // By contrast the second phase (local structure validation)
   // performs only local structural verifications:
-  // each ID belongs to an IDFolder, etc.
+  // each ID belongs to an idFolder, etc.
   let mut errors: Vec<BufferValidationError> = Vec::new();
   { // inconsistent instructions (deletion and defining containers)
     let (ambiguous_deletion_gnids,

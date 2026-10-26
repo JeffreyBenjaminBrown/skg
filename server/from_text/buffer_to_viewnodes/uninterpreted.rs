@@ -68,7 +68,7 @@ pub fn org_to_viewnode_tree (
 /// That function detects the majority of possible errors,
 /// but it can't detect them all because it uses a tree of Viewnodes,
 /// which permit fewer kinds of invalid state than the raw text.
-/// (For instance, Alias and AliasFolder cannot have bodies,
+/// (For instance, Alias and aliasFolder cannot have bodies,
 /// but they can in the raw text, and that's an error.)
 pub fn org_to_viewforest (
   input         : &str,

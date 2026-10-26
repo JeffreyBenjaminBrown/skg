@@ -56,11 +56,11 @@ where F: FnOnce(NodeMut<T>) -> R {
 /// If `preorder` is true, runs the function before descendants.
 /// If `preorder` is false, runs it after descendants.
 ///
-/// Example: Convert Occurrences to Aliases when parent is AliasFolder
+/// Example: Convert Occurrences to Aliases when parent is an alias folder
 /// ```ignore
 /// do_everywhere_in_tree_dfs(&mut tree, root_id, true, |mut node| {
 ///   if let Some(parent) = node.parent() {
-///     if matches!(parent.value(), Viewnode { kind: Scaff(AliasFolder), .. }) {
+///     if matches!(parent.value(), Viewnode { kind: ViewnodeKind::Folder (Folder::Alias), .. }) {
 ///       // Convert to Alias
 ///       let val = node.value();
 ///       // mutate val

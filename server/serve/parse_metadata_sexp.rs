@@ -18,7 +18,7 @@
 ///        [(viewRequests REQUEST...)]
 ///     where OBJECT is node, rel or all. A headline naming no kind is
 ///     a node.
-///   ghost (gnid ID) (skgRepos (nodeRepo REPO))
+///   ghost (gnid ID) (skgRepos (nodeRepo REPO)) [noClaim]
 ///         [(editRequest [restoreNode] [READINESS])]
 ///         [(viewRequests tombstone)]
 ///   unknown (gnid ID) [(skgRepos (relRepo REPO))] [noClaim]
@@ -36,8 +36,8 @@
 ///   bodyDiff, tombstone, forestRoot and the folders' bare atoms,
 ///   which carry nothing.
 /// READINESS is '(ready OBJECT...)' or '(unready OBJECT...)'.
-/// A node, an alias, an id and a flag may carry '(view ...)'; every
-/// kind that takes an editRequest may carry '(diff ...)'.
+/// A node, a ghost, an alias, an id and a flag may carry '(view ...)';
+/// every kind that takes an editRequest may carry '(diff ...)'.
 /// 'restoreRel' asks to restore a removed membership; where it may
 /// stand the save checks ('restoreRel_stands_where_it_may', local.rs),
 /// and the save drops one that names no relationship HEAD records. It

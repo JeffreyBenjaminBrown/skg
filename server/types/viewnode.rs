@@ -14,12 +14,12 @@ use std::collections::{BTreeSet, HashSet};
 use std::fmt;
 use std::str::FromStr;
 
-/// The diff view's facts about one viewnode, the parts of its
+/// The diff view's change facts about one viewnode, the parts of its
 /// '(diff ...)' form: the three kinds of change ('(node ...)',
 /// '(rel ...)', '(properties changed)'), which leaves a request on it
 /// may name ('(leaves ...)'), and which of its change-forest leaves
-/// are marked commit-ready ('(ready ...)'). Display facts: the view
-/// derives them, and a save reads nothing from them.
+/// are marked commit-ready ('(ready ...)'). Derived facts: the refresh
+/// derives them, and the parser skips them.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ChangeFacts {
   pub change   : DiffChange,
@@ -444,7 +444,7 @@ pub enum PropertyMember {
           relationshipEditRequest: Option<RelationshipEditRequest>,
           claimsMembership: bool,
           isWarranted: Warrant },
-  ID { gnid: ID, // an ID of grandparent (the parent being an IDFolder)
+  ID { gnid: ID, // an ID of grandparent (the parent being an idFolder)
        claimsMembership: bool,
        isWarranted: Warrant },
   /// A true file-level boolean flag of the node's grandparent.
@@ -506,10 +506,10 @@ pub enum Folder {
   Hider, // Collects nodes that hide its parent. Write-protected (editable from the other side of the relationship).
   // This folder is not itself hidden. Its children represent the nodes hidden
   // by the node represented by its parent. The relationships are write-protected
-  // here, but editable within the parent's SubscribeeFolder.
+  // here, but editable within the parent's subscribeeFolder.
   Hidden,
   HiddenInSubscribee, // Child of a subscribee-as-such. Collects children of the subscribee that the subscriber hides. Write-protected (but these relationships are editable by modifying the listed contents of the subscribee-as-such).
-  HiddenOutsideOfSubscribee, // Child of a SubscribeeFolder. Collects things hidden by the SubscribeeFolder's parent but absent from every subscribee's content. This compound partner folder is editable as an exclusive visible-outside subset; its hide skgrepos remain derived. Shown after all Subscribees, under the same SubscribeeFolder.
+  HiddenOutsideOfSubscribee, // Child of a subscribeeFolder. Collects things hidden by the subscribeeFolder's parent but absent from every subscribee's content. This compound partner folder is editable as an exclusive visible-outside subset; its hide skgrepos remain derived. Shown after all Subscribees, under the same subscribeeFolder.
   Container, // Collects nodes that contain its parent. Write-protected (editable from the other side of the relationship).
   Mentioner, // Collects nodes that link to its parent. Write-protected (a link lives in the linking node's text).
   // The diff view's two derived folders. Their membership comes from the extra IDs of the graph straddle's after-graph; both are save-inert.

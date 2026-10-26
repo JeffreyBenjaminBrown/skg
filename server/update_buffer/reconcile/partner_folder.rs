@@ -53,7 +53,7 @@ fn raw_outbound_members (
   if member_role . opposite_role () . is_first_role () {
     // Preserve an unresolved ID through this outbound surface.  The old
     // canonical-PID accessor is still right for inverse/write-protected folders, but
-    // would erase an Unknown from the writable OverriddenFolder.
+    // would erase an Unknown from the writable overriddenFolder.
     graph . outbound_member_keys_for_relation_gated (
       viewparent_pid, member_role . relation, skgrepo_restriction )
   } else { Vec::new () }}

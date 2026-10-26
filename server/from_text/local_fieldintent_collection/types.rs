@@ -22,20 +22,20 @@ pub enum LocalContext {
   TopLevel, // The node is a child of the BufferRoot.
   UnderVognode { // The node's parent is an occurrence, a ghost, an unknown, or a tombstone.
     parent_if_editable : Option<ID>, }, // This is Some iff the parent is save-eligible.
-  UnderDefiningFolder ( // The node is inside an AliasFolder, a SubscribeeFolder, or an OverriddenFolder.
+  UnderDefiningFolder ( // The node is inside an aliasFolder, a subscribeeFolder, or an overriddenFolder.
     DefiningFolderRecorder ),
-  SubscribeeAsSuchPosition { // The node is a direct child of a SubscribeeFolder.
+  SubscribeeAsSuchPosition { // The node is a direct child of a subscribeeFolder.
     subscriber               : ID,
     subscriber_is_editable   : bool, },
-  HiddenOutsidePosition { // The one derived-but-editable compound partner folder under a SubscribeeFolder.
+  HiddenOutsidePosition { // The one derived-but-editable compound partner folder under a subscribeeFolder.
     subscriber       : ID,
     is_saveEligible  : bool, },
-  UnderWriteProtectedFolder, // The node is inside one of the write-protected RoleFolders, an IDFolder, or a Property.
+  UnderWriteProtectedFolder, // The node is inside a write-protected partner folder, an idFolder, or a property member.
 }
 
 /// A DefiningFolderRecorder is what a defining folder knows about its recorder
 /// (the folder's parent). The id and editability are carried even
-/// when the recorder is not save-eligible, because a SubscribeeFolder's
+/// when the recorder is not save-eligible, because a subscribeeFolder's
 /// children need them for text claims, which outlive the visibility
 /// guard.
 #[derive(Clone, Debug, PartialEq, Eq)]
