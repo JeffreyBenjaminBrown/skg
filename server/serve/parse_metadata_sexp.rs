@@ -200,6 +200,7 @@ pub fn viewnode_from_metadata (
               relationshipEditRequest : metadata . unknown_relRepo_request . clone ()
                 . map (RelationshipEditRequest::RelRepo),
               claimsMembership : metadata . claimsMembership,
+              warrant : Warrant::ByGraph, // a derived fact: the refresh sets it
             } )),
           if body . is_some () || ! title . is_empty () {
             Some ( BufferValidationError::Other ( with_org_subheadlines (
@@ -220,7 +221,7 @@ pub fn viewnode_from_metadata (
             restoreNode_request :
               metadata . restore_request == Some (RestoreRequest::RestoreNode),
             claimsMembership : metadata . claimsMembership,
-            isWarranted : Warrant::ByGraph, // a derived fact: the refresh sets it
+            warrant : Warrant::ByGraph, // a derived fact: the refresh sets it
           } )), None, None )
       } else if let Some ( ref non_vognode ) = metadata . non_vognode {
         let is_flags_folder = matches! (non_vognode,
@@ -259,12 +260,12 @@ pub fn viewnode_from_metadata (
               relationshipEditRequest : metadata . property_relRepo_request . clone ()
                 . map (RelationshipEditRequest::RelRepo),
               claimsMembership : metadata . claimsMembership,
-              isWarranted : Warrant::ByGraph }),
+              warrant : Warrant::ByGraph }),
           ViewnodeKind::PropertyMember (PropertyMember::ID { .. }) =>
             ViewnodeKind::PropertyMember (PropertyMember::ID {
               gnid : title . clone () . into (),
               claimsMembership : metadata . claimsMembership,
-              isWarranted : Warrant::ByGraph }),
+              warrant : Warrant::ByGraph }),
           ViewnodeKind::PropertyMember (PropertyMember::Flag { flag, .. }) =>
             ViewnodeKind::PropertyMember (PropertyMember::flag (
               *flag, title . clone (), body . clone () )),

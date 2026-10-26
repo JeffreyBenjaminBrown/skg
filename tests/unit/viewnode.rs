@@ -72,7 +72,8 @@ fn consuming_edit_requests_covers_every_carrier_but_not_view_requests () {
         gnid : ID::from ("unknown"),
         relRepo : None,
         relationshipEditRequest : Some (RelationshipEditRequest::RelRepo (SkgrepoName::from ("private"))),
-        claimsMembership : true, }))) };
+        claimsMembership : true,
+        warrant : Warrant::ByGraph, }))) };
   unknown . consume_edit_request_after_save ();
   assert_eq! (unknown . readiness_request, None);
   let ViewnodeKind::Vognode (Vognode::Unknown (unknown)) = &unknown . kind
@@ -183,7 +184,7 @@ fn every_kind_prints_its_viewnode_id_first_and_parses_it_back () {
       Ghost { gnid : ID::from ("g"), home_skgrepo : SkgrepoName::from ("main"),
               title : "g" . into (), body : None,
               restoreNode_request : false,
-              claimsMembership : false, isWarranted : Warrant::ByHead } ))) ];
+              claimsMembership : false, warrant : Warrant::ByHead } ))) ];
   for (counter, kind) in kinds . into_iter () . enumerate () {
     let viewnode_id : ViewnodeId = ViewnodeId::from_counter (10 + counter as u64);
     let viewnode : Viewnode = Viewnode { viewnode_id : Some (viewnode_id . clone ()), .. kind };

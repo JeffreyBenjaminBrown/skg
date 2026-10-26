@@ -58,12 +58,12 @@ fn without_derived_facts (
   let mut node : Viewnode = Viewnode { change_facts : ChangeFacts::default (), .. node };
   match &mut node . kind {
     ViewnodeKind::PropertyMember (
-      PropertyMember::Alias { isWarranted, .. }
-      | PropertyMember::ID { isWarranted, .. }
-      | PropertyMember::Flag { isWarranted, .. } ) =>
-      *isWarranted = Warrant::ByGraph,
+      PropertyMember::Alias { warrant, .. }
+      | PropertyMember::ID { warrant, .. }
+      | PropertyMember::Flag { warrant, .. } ) =>
+      *warrant = Warrant::ByGraph,
     ViewnodeKind::Vognode (Vognode::Ghost (ghost)) =>
-      ghost . isWarranted = Warrant::ByGraph,
+      ghost . warrant = Warrant::ByGraph,
     _ => {}, }
   node }
 
@@ -146,13 +146,13 @@ fn ghost_warranted_aliases_and_ids_round_trip () {
                                               relRepo : None,
                                               relationshipEditRequest : None,
                                               claimsMembership : false,
-                                              isWarranted : Warrant::ByHead },
+                                              warrant : Warrant::ByHead },
                       removed . clone (), None ),
     "alias noClaim (view ghostWarrant) (diff (rel removed) (ready))" );
   assert_round_trip (
     property_member ( PropertyMember::ID { gnid : ID::from ("old-id"),
                                            claimsMembership : false,
-                                           isWarranted : Warrant::ByHead },
+                                           warrant : Warrant::ByHead },
                       removed, request_all () ),
     "id noClaim (editRequest (ready all)) (view ghostWarrant) (diff (rel removed) (ready))" ); }
 
@@ -164,7 +164,7 @@ fn a_ghost_round_trips () {
           gnid : ID::from ("gone"), home_skgrepo : SkgrepoName::from ("main"),
           title : "gone" . into (), body : Some ("its body\n" . into ()),
           restoreNode_request : false,
-          claimsMembership : true, isWarranted : Warrant::ByGraph } ))),
+          claimsMembership : true, warrant : Warrant::ByGraph } ))),
       ChangeFacts {
         change   : DiffChange { node : Some (Existence::Removed),
                                 rel  : Some (Existence::Removed),
@@ -215,7 +215,7 @@ fn a_ghost_round_trips_with_its_restore_request () {
           gnid : ID::from ("gone"), home_skgrepo : SkgrepoName::from ("main"),
           title : "gone" . into (), body : None,
           restoreNode_request : true,
-          claimsMembership : true, isWarranted : Warrant::ByGraph } ))),
+          claimsMembership : true, warrant : Warrant::ByGraph } ))),
       ChangeFacts {
         change : DiffChange { node : Some (Existence::Removed),
                               rel  : None,

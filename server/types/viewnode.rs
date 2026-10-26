@@ -236,6 +236,12 @@ pub struct Unknown {
   /// relationship HEAD alone warrants: a dangling partner the worktree
   /// lost.
   pub claimsMembership : bool,
+  /// Whether the truth relates it to its viewparent as its position
+  /// implies ('Warrant'), as the refresh set it. Never 'No': the ID
+  /// rule makes a headline an unknown only where its viewparent's goal
+  /// names the gnid. The printer writes none: the metadata grammar
+  /// gives an unknown no '(view ...)'.
+  pub warrant : Warrant,
 }
 
 /// A ghost: a node that the before-graph of the diff view's graph
@@ -280,7 +286,7 @@ pub struct Ghost {
   /// Whether the truth relates it to its viewparent as its position
   /// implies ('Warrant'), as the refresh set it. Only 'No' is written
   /// ('noWarrant'): the ghost kind is its own ghost-warrant herald.
-  pub isWarranted : Warrant,
+  pub warrant : Warrant,
 }
 
 /// A Viewnode that corresponds to a Graphnode.
@@ -382,13 +388,12 @@ pub struct GraphnodeStats {
 /// and independent of whether the viewnode claims membership.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Warrant {
-  /// The graph relates it so; also every root, and every viewnode
+  /// The truth relates it so; also every root, and every viewnode
   /// whose position implies no relationship.
   ByGraph,
   /// In the diff view, HEAD relates it so and the graph does not (a
   /// ghost warrant). On the wire: the atom 'ghostWarrant'. The
-  /// refresh ('server/refresh/') sets it; the stats pass of the old
-  /// walk does not.
+  /// refresh sets it ('set_warrants' in 'server/refresh/').
   ByHead,
   /// Neither does. On the wire: the atom 'noWarrant'.
   No,
@@ -396,17 +401,17 @@ pub enum Warrant {
 
 /// View-specific statistics about a node.
 /// These depend on the node's position in the current viewforest.
-/// `cycle` depends on ancestors; `isWarranted` depends on the specific parent.
+/// `cycle` depends on ancestors; `warrant` depends on the specific parent.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ViewnodeStats {
   pub cycle                 : bool,
   /// True if a root or if skgrepo differs from skgrepo of nearest
   /// occurrence ancestor. Written '(view repoBoundary)'.
   pub repoBoundary          : bool,
-  /// Computed by the stats pass ('set_warrant'); written as
-  /// '(view noWarrant)' when 'Warrant::No'. A derived fact: the
+  /// Set by the refresh ('set_warrants' in 'server/refresh/'); written
+  /// as '(view noWarrant)' when 'Warrant::No'. A derived fact: the
   /// parser skips '(view ...)'.
-  pub isWarranted           : Warrant,
+  pub warrant           : Warrant,
   /// The relationship heralds as the semantic sexp strings
   /// '(rels ...)', '(props ...)' and '(birth ...)'
   /// (server/herald_tokens.rs 'relationship_heralds_sexp'), written
@@ -443,7 +448,7 @@ pub struct ViewnodeStats {
 /// A member of a property folder: one alias, extra ID or true flag
 /// of the folder's viewparent.
 ///
-/// 'isWarranted' is set by the refresh's ladder and written
+/// 'warrant' is set by the refresh ('set_warrants') and written
 /// '(view noWarrant)' when 'Warrant::No'.
 ///
 /// In the diff view an alias, ID or flag the worktree lost since HEAD
@@ -458,16 +463,16 @@ pub enum PropertyMember {
           relRepo: Option<SkgrepoName>,
           relationshipEditRequest: Option<RelationshipEditRequest>,
           claimsMembership: bool,
-          isWarranted: Warrant },
+          warrant: Warrant },
   ID { gnid: ID, // an ID of grandparent (the parent being an idFolder)
        claimsMembership: bool,
-       isWarranted: Warrant },
+       warrant: Warrant },
   /// A true file-level boolean flag of the node's grandparent.
   Flag {
     flag : Flag,
     title    : String,
     body     : Option<String>,
-    isWarranted : Warrant, },
+    warrant : Warrant, },
 }
 
 /// A headline the diff view adds to describe a change. Display-only
@@ -810,7 +815,7 @@ impl PropertyMember {
   ) -> PropertyMember {
     PropertyMember::Alias { text, relRepo, relationshipEditRequest,
                             claimsMembership : true,
-                            isWarranted      : Warrant::ByGraph } }
+                            warrant      : Warrant::ByGraph } }
 
   /// An ID member, as 'alias' makes an alias member.
   pub fn id (
@@ -818,7 +823,7 @@ impl PropertyMember {
   ) -> PropertyMember {
     PropertyMember::ID { gnid,
                          claimsMembership : true,
-                         isWarranted      : Warrant::ByGraph } }
+                         warrant      : Warrant::ByGraph } }
 
   /// A flag member, warranted until the stats pass says otherwise.
   pub fn flag (
@@ -827,7 +832,7 @@ impl PropertyMember {
     body  : Option<String>,
   ) -> PropertyMember {
     PropertyMember::Flag { flag, title, body,
-                           isWarranted : Warrant::ByGraph } }
+                           warrant : Warrant::ByGraph } }
 }
 
 impl ChangeViewnode {
@@ -1221,7 +1226,7 @@ impl Default for ViewnodeStats {
     ViewnodeStats {
       cycle             : false,
       repoBoundary      : false,
-      isWarranted       : Warrant::ByGraph,
+      warrant       : Warrant::ByGraph,
       rel_heralds       : RelationshipHeralds::default (),
       omitted_body      : false,
       relRepo        : None,
@@ -1278,7 +1283,8 @@ pub fn mk_unknown_viewnode (
       gnid,
       relRepo         : None,
       relationshipEditRequest : None,
-      claimsMembership : true, } )) ) }
+      claimsMembership : true,
+      warrant : Warrant::ByGraph, } )) ) }
 
 /// Create a write-protected Viewnode from disk data.
 /// Body is always None since write-protected nodes don't have editable content.

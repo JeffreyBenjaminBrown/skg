@@ -376,7 +376,9 @@ fn set_warrants (
         None => continue, }};
     set_warrant (tree, child, warrant); }}
 
-/// Store 'warrant' on the child at 'treeid', where its kind keeps one.
+/// Store 'warrant' on the child at 'treeid': every vognode and
+/// property member keeps one; a folder, a change viewnode and a
+/// tombstone keep none.
 pub(crate) fn set_warrant (
   tree    : &mut Tree<Viewnode>,
   treeid  : NodeId,
@@ -384,14 +386,16 @@ pub(crate) fn set_warrant (
 ) {
   match &mut tree . get_mut (treeid) . unwrap () . value () . kind {
     ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =>
-      occurrence . viewStats . isWarranted = warrant,
+      occurrence . viewStats . warrant = warrant,
     ViewnodeKind::Vognode (Vognode::Ghost (ghost)) =>
-      ghost . isWarranted = warrant,
+      ghost . warrant = warrant,
+    ViewnodeKind::Vognode (Vognode::Unknown (unknown)) =>
+      unknown . warrant = warrant,
     ViewnodeKind::PropertyMember (
-      PropertyMember::Alias { isWarranted, .. }
-      | PropertyMember::ID { isWarranted, .. }
-      | PropertyMember::Flag { isWarranted, .. } ) =>
-      *isWarranted = warrant,
+      PropertyMember::Alias { warrant : stored, .. }
+      | PropertyMember::ID { warrant : stored, .. }
+      | PropertyMember::Flag { warrant : stored, .. } ) =>
+      *stored = warrant,
     _ => {}, }}
 
 //
@@ -563,7 +567,7 @@ fn draw_item (
           occurrence_from_truth (&pid, editable, claims, walk) ?;
         let mut viewnode : Viewnode = viewnode_of ( ViewnodeKind::Vognode (
           Vognode::Occurrence ( Occurrence {
-            viewStats : ViewnodeStats { isWarranted : item . warrant,
+            viewStats : ViewnodeStats { warrant : item . warrant,
                                         .. ViewnodeStats::default () },
             .. occurrence } )));
         if editable {
@@ -573,14 +577,15 @@ fn draw_item (
         ghost_from_head (&pid, walk) . map ( |ghost|
           viewnode_of ( ViewnodeKind::Vognode (Vognode::Ghost ( Ghost {
             claimsMembership : claims,
-            isWarranted      : item . warrant,
+            warrant      : item . warrant,
             .. ghost } )))),
       IdRuleAnswer::Unknown =>
         Some ( viewnode_of ( ViewnodeKind::Vognode ( Vognode::Unknown ( Unknown {
           gnid                   : gnid . clone (),
           relRepo                 : item . relRepo . clone (),
           relationshipEditRequest : None,
-          claimsMembership        : claims, } )))),
+          claimsMembership        : claims,
+          warrant                 : item . warrant, } )))),
       IdRuleAnswer::Tombstone => None, },
     GoalMember::Alias (text) =>
       Some ( viewnode_of ( ViewnodeKind::PropertyMember ( PropertyMember::Alias {
@@ -588,18 +593,18 @@ fn draw_item (
         relRepo                 : item . relRepo . clone (),
         relationshipEditRequest : None,
         claimsMembership        : claims,
-        isWarranted             : item . warrant, } ))),
+        warrant             : item . warrant, } ))),
     GoalMember::Id (id) =>
       Some ( viewnode_of ( ViewnodeKind::PropertyMember ( PropertyMember::ID {
         gnid            : id . clone (),
         claimsMembership : claims,
-        isWarranted      : item . warrant, } ))),
+        warrant      : item . warrant, } ))),
     GoalMember::Flag (flag) =>
       Some ( viewnode_of ( ViewnodeKind::PropertyMember ( PropertyMember::Flag {
         flag        : *flag,
         title       : String::new (),
         body        : None,
-        isWarranted : item . warrant, } ))), } ) }
+        warrant : item . warrant, } ))), } ) }
 
 //
 // 6. reorder
@@ -681,7 +686,7 @@ fn substitute_overriders (
       match &tree . get (child) . unwrap () . value () . kind {
         ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =>
           ( occurrence . gnid . clone (), occurrence . overridesHere . clone (),
-            occurrence . viewStats . isWarranted ),
+            occurrence . viewStats . warrant ),
         _ => continue, };
     match overridesHere {
       None => if warrant == Warrant::ByGraph {

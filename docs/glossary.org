@@ -265,7 +265,7 @@ it at HEAD. The warrant is a derived fact, recomputed at every
 refresh, and written in =(view ...)= as =noWarrant= (herald ⊥) or
 =ghostWarrant= (herald ᗣ), nothing meaning warranted by the truth; a
 root carries none, and a ghost no =ghostWarrant=, its kind being its
-own herald ('Warrant { ByGraph, ByHead, No }', 'isWarranted' in
+own herald ('Warrant { ByGraph, ByHead, No }', 'warrant' in
 code). 'Warrant::ByGraph' is the truth's warrant (see "the truth"):
 the graph as the skgrepo restriction lets it be seen; a root, whose
 position implies no relationship, carries it too, and the wire

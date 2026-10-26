@@ -244,14 +244,14 @@ fn propertyMember_metadata_to_string (
   request         : &Option<ReadinessRequest>,
 ) -> String {
   let mut parts : Vec < String > = foldAndFocus_atoms (foldAndFocus);
-  let isWarranted : Warrant = match member {
-    PropertyMember::Alias { isWarranted, .. }
-      | PropertyMember::ID { isWarranted, .. }
-      | PropertyMember::Flag { isWarranted, .. } => *isWarranted, };
+  let warrant : Warrant = match member {
+    PropertyMember::Alias { warrant, .. }
+      | PropertyMember::ID { warrant, .. }
+      | PropertyMember::Flag { warrant, .. } => *warrant, };
   let warrant_atom : Option<String> =
-    if isWarranted == Warrant::ByHead {
+    if warrant == Warrant::ByHead {
       Some ( "ghostWarrant" . to_string () ) }
-    else if isWarranted == Warrant::No { Some ( "noWarrant" . to_string () ) }
+    else if warrant == Warrant::No { Some ( "noWarrant" . to_string () ) }
     else { None };
   match member {
     PropertyMember::Alias { relRepo, relationshipEditRequest,
@@ -441,8 +441,8 @@ fn occurrence_metadata_to_string (
         // assembled in the viewnodestats pass
         // (server/herald_tokens.rs); emitted verbatim.
         stats . rel_heralds . forms () . cloned () . collect (),
-        atoms ( vec! [ ( stats . isWarranted == Warrant::ByHead, "ghostWarrant" ),
-                       ( stats . isWarranted == Warrant::No, "noWarrant" ),
+        atoms ( vec! [ ( stats . warrant == Warrant::ByHead, "ghostWarrant" ),
+                       ( stats . warrant == Warrant::No, "noWarrant" ),
                        ( stats . cycle,                       "cycle" ),
                        ( stats . repoBoundary,                "repoBoundary" ) ] ) ]
         . concat () }
@@ -516,7 +516,7 @@ fn ghost_metadata_to_string (
       ghost . restoreNode_request . then ( || "restoreNode" . to_string () ),
       request ))
     . chain ( view_form (
-      ( ghost . isWarranted == Warrant::No ) . then ( || "noWarrant" . to_string () )
+      ( ghost . warrant == Warrant::No ) . then ( || "noWarrant" . to_string () )
       . into_iter () . collect () ))
     . chain ( diff_form (change_facts) ) );
   parts . join (" ") }

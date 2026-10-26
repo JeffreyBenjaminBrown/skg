@@ -180,7 +180,8 @@ pub(crate) fn rekind_vognode (
           gnid                   : gnid . clone (),
           relRepo                 : goal_relRepo (parent_goal, &gnid),
           relationshipEditRequest : relationship_edit_request,
-          claimsMembership        : true, } ));
+          claimsMembership        : true,
+          warrant                 : Warrant::ByGraph, } )); // the warrant rung sets it
       if dropped {
         walk . corrections . record (tree, child, CorrectionKind::EditRequestDropped); }
       walk . corrections . record (tree, child, CorrectionKind::Rekinded (VognodeKind::Unknown)); },
@@ -286,7 +287,7 @@ fn refresh_ghost_in_place (
       &mut tree . get_mut (child) . unwrap () . value () . kind
     { *ghost_mut = Ghost { restoreNode_request : ghost . restoreNode_request,
                            claimsMembership    : ghost . claimsMembership,
-                           isWarranted         : ghost . isWarranted,
+                           warrant         : ghost . warrant,
                            .. fresh }; }}}
 
 /// An occurrence of 'pid' as the truth has it, editable (with its

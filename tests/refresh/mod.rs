@@ -194,7 +194,7 @@ fn describe (
       parts . push ( format! ("node {}", occurrence . gnid) );
       if occurrence . is_writeProtected () { parts . push ("wp" . into ()); }
       if ! occurrence . claimsMembership { parts . push ("noClaim" . into ()); }
-      parts . extend ( warrant_atom (occurrence . viewStats . isWarranted) );
+      parts . extend ( warrant_atom (occurrence . viewStats . warrant) );
       if let Some (original) = &occurrence . overridesHere {
         parts . push ( format! ("(overridesHere {})", original) ); }},
     ViewnodeKind::Vognode (Vognode::Ghost (ghost)) =>
@@ -211,10 +211,10 @@ fn describe (
         PropertyMember::Flag { flag, .. } => format! ("flag {}", flag . wire_name ()),
         _ => format! ("{} {}", member . repr_in_client (), member . title ()), } );
       let (claims, warrant) : (bool, Warrant) = match member {
-        PropertyMember::Alias { claimsMembership, isWarranted, .. }
-          | PropertyMember::ID { claimsMembership, isWarranted, .. } =>
-          (*claimsMembership, *isWarranted),
-        PropertyMember::Flag { isWarranted, .. } => (true, *isWarranted), };
+        PropertyMember::Alias { claimsMembership, warrant, .. }
+          | PropertyMember::ID { claimsMembership, warrant, .. } =>
+          (*claimsMembership, *warrant),
+        PropertyMember::Flag { warrant, .. } => (true, *warrant), };
       if ! claims { parts . push ("noClaim" . into ()); }
       parts . extend ( warrant_atom (warrant) ); },
     ViewnodeKind::ChangeViewnode (change) => {

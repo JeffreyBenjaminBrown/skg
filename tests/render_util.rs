@@ -112,7 +112,7 @@ fn test_metadata_ordering () {
 fn an_unwarranted_occurrence_says_noWarrant_and_the_parser_drops_it () {
   let t : Occurrence = Occurrence {
     viewStats : ViewnodeStats {
-      isWarranted : Warrant::No,
+      warrant : Warrant::No,
       cycle       : true,
       .. ViewnodeStats::default() },
     .. default_occurrence ( ID::from ("xyz"),
@@ -127,7 +127,7 @@ fn an_unwarranted_occurrence_says_noWarrant_and_the_parser_drops_it () {
     parse_metadata_to_viewnodemd (
       "(skg node (gnid xyz) (skgRepos (nodeRepo main)) (view noWarrant cycle))" )
     . expect ("noWarrant parses");
-  assert_eq! ( metadata . viewStats . isWarranted, Warrant::ByGraph ); }
+  assert_eq! ( metadata . viewStats . warrant, Warrant::ByGraph ); }
 
 #[test]
 fn test_rel_heralds_emitted () {

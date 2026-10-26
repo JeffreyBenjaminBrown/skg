@@ -930,7 +930,7 @@ fn viewstats_atoms () -> Vec<&'static str> {
     let ViewnodeStats {
       cycle : _,
       repoBoundary : _,     // -> the repoBoundary atom
-      isWarranted : _,      // -> the noWarrant atom
+      warrant : _,      // -> the noWarrant atom
       rel_heralds : _,      // -> the rels, props and birth forms
       omitted_body : _,     // -> the omittedBody atom
       relRepo : _,          // -> the relRepo atom and herald

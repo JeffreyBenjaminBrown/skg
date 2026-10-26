@@ -52,12 +52,13 @@ fn each_kind_prints_its_parts_beside_its_atom (
       gnid : ID::from ("g"), home_skgrepo : SkgrepoName::from ("main"),
       title : "g" . into (), body : None,
       restoreNode_request : true,
-      claimsMembership : true, isWarranted : Warrant::ByGraph } )))),
+      claimsMembership : true, warrant : Warrant::ByGraph } )))),
     "ghost (gnid g) (skgRepos (nodeRepo main)) (editRequest restoreNode)" );
   assert_eq! (
     rendered ( viewnode_of ( ViewnodeKind::Vognode ( Vognode::Unknown ( Unknown {
       gnid : ID::from ("u"), relRepo : Some ( SkgrepoName::from ("pub") ),
-      relationshipEditRequest : None, claimsMembership : true } )))),
+      relationshipEditRequest : None, claimsMembership : true,
+      warrant : Warrant::ByGraph } )))),
     "unknown (gnid u) (skgRepos (relRepo pub))" );
   assert_eq! (
     rendered ( viewnode_of ( ViewnodeKind::PropertyMember ( PropertyMember::alias ( "an alias" . into (), Some ( SkgrepoName::from ("pub") ), None ) ))),

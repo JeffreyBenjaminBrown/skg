@@ -224,7 +224,7 @@ pub(crate) fn subscriber_of_subscribee_as_such (
   let node : NodeRef<Viewnode> = tree . get (treeid) ?;
   let ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =
     &node . value () . kind else { return None; };
-  if occurrence . viewStats . isWarranted != Warrant::ByGraph { return None; }
+  if occurrence . viewStats . warrant != Warrant::ByGraph { return None; }
   let folder : NodeRef<Viewnode> = node . parent () ?;
   if ! matches! ( folder . value () . kind,
                   ViewnodeKind::Folder (Folder::Subscribee) ) {

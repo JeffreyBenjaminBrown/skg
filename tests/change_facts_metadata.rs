@@ -78,12 +78,12 @@ fn without_derived_facts (
   let mut node : Viewnode = Viewnode { change_facts : ChangeFacts::default (), .. node };
   match &mut node . kind {
     ViewnodeKind::PropertyMember (
-      PropertyMember::Alias { isWarranted, .. }
-      | PropertyMember::ID { isWarranted, .. }
-      | PropertyMember::Flag { isWarranted, .. } ) =>
-      *isWarranted = skg::types::viewnode::Warrant::ByGraph,
+      PropertyMember::Alias { warrant, .. }
+      | PropertyMember::ID { warrant, .. }
+      | PropertyMember::Flag { warrant, .. } ) =>
+      *warrant = skg::types::viewnode::Warrant::ByGraph,
     ViewnodeKind::Vognode (Vognode::Ghost (ghost)) =>
-      ghost . isWarranted = skg::types::viewnode::Warrant::ByGraph,
+      ghost . warrant = skg::types::viewnode::Warrant::ByGraph,
     _ => {}, }
   node }
 
@@ -136,7 +136,7 @@ fn ghosts_and_unknowns_round_trip_their_readiness_requests () {
           gnid : ID::from ("d"), home_skgrepo : SkgrepoName::from ("main"),
           title : "D" . into (), body : None,
           restoreNode_request : false,
-          claimsMembership : true, isWarranted : Warrant::ByGraph, } ))),
+          claimsMembership : true, warrant : Warrant::ByGraph, } ))),
       facts ( Some (Existence::Removed), None, Some (&[DiffObject::Node]) ),
       request (false, &[DiffObject::Node]) ),
     "ghost (gnid d) (skgRepos (nodeRepo main)) (editRequest (unready node)) (diff (node removed) (ready node))" );
@@ -144,7 +144,7 @@ fn ghosts_and_unknowns_round_trip_their_readiness_requests () {
     with_facts (
       viewnode_of ( ViewnodeKind::Vognode ( Vognode::Unknown ( Unknown {
           gnid : ID::from ("u"), relRepo : None, relationshipEditRequest : None,
-          claimsMembership : true, } ))),
+          claimsMembership : true, warrant : Warrant::ByGraph, } ))),
       facts ( None, Some (Existence::Added), None ),
       request (true, &[]) ),
     "unknown (gnid u) (editRequest (ready)) (diff (rel added))" ); }
@@ -181,7 +181,7 @@ fn a_ghost_warranted_property_member_claims_nothing () {
     viewnode_of ( ViewnodeKind::PropertyMember ( PropertyMember::ID {
       gnid : ID::from ("x"),
       claimsMembership : false,
-      isWarranted : skg::types::viewnode::Warrant::ByHead } )),
+      warrant : skg::types::viewnode::Warrant::ByHead } )),
     facts ( None, Some (Existence::Removed), None ),
     request (true, &[]) );
   assert_round_trip (

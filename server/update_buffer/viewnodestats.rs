@@ -148,7 +148,7 @@ fn stands_as_member (
     return t . claimsMembership; }
   match &parent . value () . kind {
     ViewnodeKind::BufferRoot => true,
-    ViewnodeKind::Folder (_) => t . viewStats . isWarranted == Warrant::ByGraph,
+    ViewnodeKind::Folder (_) => t . viewStats . warrant == Warrant::ByGraph,
     _ => false, } }
 
 /// What the occurrence at treeid is born of, and which ancestors to

@@ -118,7 +118,7 @@ pub fn mk_historical_viewnode (
         body         : before . body . clone (),
         restoreNode_request : false,
         claimsMembership    : false,
-        isWarranted         : Warrant::ByHead } ))) } ) }
+        warrant         : Warrant::ByHead } ))) } ) }
 
 /// Under 'parent' (the acquirer 'pid'), an "it acquired" folder of
 /// the ghosts of the nodes it acquired since HEAD. None
