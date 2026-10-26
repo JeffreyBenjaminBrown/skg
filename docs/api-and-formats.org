@@ -187,8 +187,10 @@ So far there are these endpoints:
        Each message names the headlines it concerns as subheadlines
        (see "How a message names a headline" below). A failed save
        sends one error, =NOTHING WAS SAVED=, whose validation errors
-       follow as =** Error N= headlines. A repair warning names the
-       repaired folder, one warning per folder occurrence.
+       follow as =** Error N= headlines. For a content view, each
+       correction the refresh made to the saved buffer is a warning
+       naming its headline; for a buffer of the diff view, a repair
+       warning names the repaired folder, one per folder occurrence.
        When the saved buffer is one of the diff view's, the response
        ends with =(readiness-summary (ready N) (changed M) (foreign F) (order-only O) (notEditable K))=:
        of the M changed files of the owned skgrepos (O of them changed only
@@ -883,7 +885,12 @@ if and only if it adheres to the following:
 On a node, the bare atom =noClaim= says the node
 takes no part in the membership represented by its viewparent: it is
 preserved and displayed but does not alter the parent's membership on
-save. A member carries nothing, and so does a view root.
+save. A member carries nothing, and so does a view root. The atom is
+meaningful only where the save reads the claims of the viewparent's
+children: under an editable occurrence, and under an editable folder
+(subscribee, overridden, hidden-outside, alias) of one. Under any
+other viewparent no child claims, whatever it carries, and the server
+writes no =noClaim= there.
 
 The atom =omittedBody= in =(view ...)= accompanies =writeProtected= on a
 write-protected node whose graphnode has a body — one the rendering
@@ -892,8 +899,9 @@ it; the view regenerates it.
 
 A chain node -- a node of the containerward chain under a member of a
 partner folder, a container of its viewparent (see "View requests"
-below) -- carries =writeProtected= and =noClaim=, and, being a
-non-member, no =(birth ...)= in its =(view ...)= (see "Stats metadata"
+below) -- carries =writeProtected=, no =noClaim= (it stands under a
+write-protected occurrence, where nothing claims), and, being no
+member, no =(birth ...)= in its =(view ...)= (see "Stats metadata"
 below). It is known by where it stands, so it is still one after a
 save. A chain node carries no change facts.
 
@@ -1466,7 +1474,8 @@ relationship to its viewparent, the relRepo written only when it
 differs from the default (a ghost has no relRepo; an unknown and an
 alias have only one). =noClaim= on a node, an alias, an ID or an
 unknown says the save does not read it as an entry of its
-viewparent's list; a claimant carries nothing.
+viewparent's list; a claimant carries nothing, and so does every
+child of a viewparent whose claims the save does not read.
 
 Every viewnode's metadata starts with its viewnode ID, =(vnid X)=, where
 X is one or more lowercase letters and digits: =(skg (vnid 0a) node
@@ -1635,12 +1644,14 @@ that =all= names every leaf a modified node records, so one gesture on
 it marks its file.
 
 *** The diff view's viewnodes
-**** =alias noClaim (view ghostWarrant)=, =id noClaim (view ghostWarrant)= with =(rel removed)= -- in an alias or ID folder: an alias or extra ID that HEAD has and the worktree lacks
+**** =alias noClaim (view ghostWarrant)=, =id (view ghostWarrant)= with =(rel removed)= -- in an alias or ID folder: an alias or extra ID that HEAD has and the worktree lacks
 Its headline is the alias or the ID: a member with a ghost warrant,
-which claims no membership. Saving reads no alias from it and does
-not count it among the node's IDs. A dangling partner the worktree
-lost, an unknown carrying =(rel removed)=, likewise carries
-=noClaim=.
+which claims no membership. Saving reads no alias from it, and the
+ID folder, whose claims the save never reads, carries no =noClaim=;
+the save's check of an ID folder refuses only one lacking an ID of
+the node. A dangling partner the worktree lost, an unknown carrying
+=(rel removed)=, likewise carries =noClaim= where its folder reads
+claims.
 **** =ghost (gnid ID) (skgRepos (nodeRepo REPO)) ...= -- a ghost
 It is a node HEAD has and the worktree lacks, with HEAD's title and
 body, drawn only in the diff view. Its ID is written =(gnid ID)= and

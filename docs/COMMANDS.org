@@ -355,8 +355,8 @@ containment is edited from the container. Its other side, the node's
 content, is shown without a folder. On a node nothing contains, nothing
 appears. Under each member of this folder, and of every other partner
 folder but the diff view's two acquisition folders, hangs its
-containerward chain: the member's containers as write-protected
-non-members, theirs under them, up to the roots or
+containerward chain: the member's containers, write-protected and
+claiming nothing, theirs under them, up to the roots or
 'max_roleTree_depth', a container met again on the way shown once
 more as a leaf. A request on a chain node draws that node's own
 containers folder. A fresh content view shows its root's containers
@@ -374,20 +374,22 @@ cannot contradict it, they are 'write-protected': Edits to them
 cannot affect the node they depict. One also has no content --
 the server extends none under it,
 in order to prevent the view from becoming redundant and huge --
-but it may keep children that are non-members (see below).
+but it may keep children, which claim nothing there (see below).
 
 A write-protected occurrence saves nothing of its own,
 so an edit to it refuses the whole save, and nothing is written:
 a changed title or home skgrepo;
-an alias folder, partner folder or flags folder
-that differs from the graph;
-or a member child.
+an alias folder lacking or reordering its aliases,
+or one with a relRepo request;
+or a flags folder that differs from the graph.
 The refusal names the occurrence and what differs.
+No child of a write-protected occurrence claims membership,
+whatever it carries: a child typed under one is a note,
+which the refresh shows unwarranted (⊥),
+and so is what stands in one of its folders.
 The way out is to make the edit at the node's editable occurrence
 instead, or to undo it, make this occurrence editable
 (C-c s d on it), save, and edit it then.
-A child that should stay there can instead be made a non-member:
-its metadata carries the bare atom 'noClaim'.
 *** PITFALL: Don't make something 'editable' by directly editing its metadata.
 Instead, use skg-set-editable, below.
 That's because Skg has to make other occurrences of it
@@ -398,15 +400,15 @@ Otherwise, two editable nodes could contradict each other.
 
 Making a node write-protected is likewise a request
 (skg-request-write-protected, below), which the server performs:
-it also makes the member children of the write-protected occurrence
-non-members, since a write-protected occurrence has no content.
+the children of the write-protected occurrence then claim nothing,
+since a write-protected occurrence has no content.
 *** C-c s d : skg-set-editable
 If you want to see the editable view of that node
 from a place where it is currently shown in a write-protected form,
 call this function. It will make the current editable view
 (if it exists) write-protected, keeping what it shows
-(though no longer as its content: each member child
-becomes a non-member), and then make an editable view here.
+(though no longer as its content: no child claims membership
+under a write-protected occurrence), and then make an editable view here.
 Moving editability back to that occurrence later
 makes those children its content again.
 Called on a node that is already editable,
@@ -419,8 +421,8 @@ Requests that this occurrence become write-protected,
 as described above. It does not save.
 At the next save, edits the occurrence carries are saved first;
 then the server makes it write-protected,
-resyncing its title from the graph,
-and makes each of its member children a non-member,
+resyncing its title from the graph;
+its children then claim nothing,
 so that edits to its title, body or children no longer affect it
   (although edits to its children still affect those children:
   they keep their own editability, and their own content).
@@ -432,7 +434,7 @@ and the save is refused.
 *** C-c s W : skg-request-write-protected-recursive
 The same, for the occurrence and its whole content subtree:
 every node in it becomes write-protected,
-and every member child under them becomes a non-member.
+and no child under them claims membership.
 *** C-c s s : skg-set-repo
 Changes the skgrepo of the node at point.
 The prompt starts with the current skgrepo as editable minibuffer text.

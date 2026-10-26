@@ -163,9 +163,11 @@ Each occurrence of an unrestricted vognode is either *editable* or
 *write-protected* ('Editability' in 'server/types/viewnode.rs'). Edits to
 an editable occurrence's title, body and children are saved; a
 write-protected occurrence shows no body and saves nothing of its own,
-so a save is refused if one differs from the graph (in its title,
-skgrepo, aliases, flags or partner folders) or has a member child.
-The server adds no such child under one. A buffer may hold at most one editable occurrence of a node,
+so a save is refused if one differs from the graph in its title,
+skgrepo, aliases (one lacked, reordered, or with a relRepo request) or
+flags. No child of a write-protected occurrence claims membership,
+whatever it carries: one the user types there is a note, which the
+refresh shows unwarranted. A buffer may hold at most one editable occurrence of a node,
 so that two occurrences cannot contradict each other. Make one
 editable with =skg-set-editable= (=C-c s d=), which writes a
 =editableView= view request; make one write-protected with
@@ -304,9 +306,10 @@ A write-protected set is a generated folder whose membership follows
 from graph facts rather than direct edits to that folder.  A view
 may preserve an order for the set locally, but adding or removing an
 item in the generated folder does not add or remove the underlying
-graph membership fact.  If a user puts a non-member inside such a set,
-the save treats that item as independent of the generated membership.
-If completion discovers that a real member is missing from the view, it
+graph membership fact.  No child of such a set claims membership, so
+the save reads nothing there: an item the user puts inside it is a
+note, which the refresh keeps and shows unwarranted (⊥).  If the
+refresh finds that a real member is missing from the view, it
 reinstates that member (see "reinstated").
 
 For instance, if nodes R and T subscribe to nodes N, the user might land
@@ -321,8 +324,8 @@ The subscriberFolder ("folder of subscribers") is a write-protected set.
 Thus the user could flip the order of R and T in the subscriberFolder,
 and this change would be respected in the display, but have no effect
 in the graph. The user could insert X under subscriberFolder,
-but because it is a write-protected set, X will be
-marked 'noClaim' (a non-member), and have no effect on N.
+but because it is a write-protected set, X claims nothing there: it
+is shown unwarranted (⊥), and has no effect on N.
 (If the user wants X to subscribe to N, they must modify X, not N.)
 The user could delete R, but it is reinstated as soon as they save,
 because, again, the subscriberFolder is a write-protected set.
@@ -426,12 +429,12 @@ makes of an unwarranted leaf or non-vognode.
 *** reinstated
 
 A member of a write-protected folder that is missing from the buffer
-(the user deleted its headline, say) is *reinstated*: the folder's
-reconciler draws it again, as a new viewnode, at the next
-completion, since its membership is a fact of the graph, edited from
-the other side of the relationship. After a save the warning
-"Repaired FOLDER under node X: reinstated N member(s): IDS" says so
-('RepairKind::ReinstatedMember' in 'server/update_buffer/warnings.rs').
+(the user deleted its headline, say) is *reinstated*: the refresh
+draws it again, as a new viewnode, since its membership is a fact of
+the graph, edited from the other side of the relationship. After a
+save the correction "Drew what the graph says belongs here." says so,
+naming the headline ('CorrectionKind::Reinstated' in
+'server/refresh/corrections.rs').
 "Reinstate" names only this; a non-member taken back as a member
 when its membership returns is adopted (see "adopt").
 
@@ -1043,8 +1046,8 @@ the save reads its membership:
   the hides' relRepos stay derived.
 
 Every other folder's goal is unordered: membership is generated from
-graph facts, the user's order is respected view-locally, and repairs
-warn.  See [[*write-protected set][write-protected set]].  These are
+graph facts, the user's order is respected view-locally, and the
+refresh reports its corrections.  See [[*write-protected set][write-protected set]].  These are
 the inbound folders =subscriberFolder=, =overriderFolder=,
 =hiderFolder= and =containerFolder= and =mentionerFolder= (the
 folders of =C-c l c= and =C-c l m=; the other side of each is the

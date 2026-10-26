@@ -1005,7 +1005,7 @@ the refresh is given records that X was P's once P is gone
 (only the deleted set did), so the stateless model cannot do
 it: the occurrence is entombstoned and the unknown X is drawn
 beside it, as slice 3 left it. The ID rule stands as written.
-** TODO Slice 9: content views on it
+** DONE Slice 9: content views on it
 'render_initial_view' and 'rerender_view' call
 'refresh_viewforest' in content-view mode. The content-view
 path of the old walk goes: 'complete.rs''s content dispatch,

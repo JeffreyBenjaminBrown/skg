@@ -928,3 +928,179 @@ under write-protected parents and in the ID folder, and the
 default folders kept as today (the plan had not mentioned them;
 the module drew none).
 
+
+** Slice 9: content views on it
+*** What's done
+'render_initial_view' refreshes a stub of the requested roots
+(each an editable occurrence asking for its containers folder and
+carrying an editable-view request; a repeated root is
+write-protected), and 'rerender_view' refreshes an open content
+view ('refresh_content_view'); a buffer of the diff view goes on
+through the old walk ('rerender_diffView_buffer'). The saved
+view's corrections reach its warnings as
+'CompletionWarning::Correction', one message each, naming the
+headline as a subtree. A fresh view reports none.
+The printer writes 'noClaim' only where the save reads claims
+('parent_reads_claims', moved to 'server/refresh/ancestry.rs').
+The refusal 'MemberChildOfWriteProtectedOccurrence', the
+comparison of a write-protected occurrence's partner folders and
+'is_in_containerward_chain' are gone; a chain node is known by
+position ('holds_containerward_chain',
+'stands_in_containerward_chain' in 'types/tree/forest.rs').
+A ghost met in a content view is re-kinded by the ID rule (an
+unknown when listed, else a tombstone). The round-trip test is
+a wire test ('the_new_viewnodes_cross_the_wire'). A subscribing
+root is drawn with both folders (test
+'a_subscribing_root_is_drawn_with_its_subscription_folders').
+'tests/idempotence' now holds
+'every_content_view_fixture_is_a_fixpoint_of_the_refresh': 341
+views over 48 fixture folders, each fresh view parsed and
+refreshed again, unchanged and uncorrected.
+Verified at the TCP surface before each commit
+('tests/results/slice9/verify.sh'): view, edit, save, the saved
+view, a collateral view, and a child typed under a
+write-protected occurrence kept unwarranted.
+*** What of the old walk went
+The content-view path: the subscribee folder's own reconciler
+('reconcile/subscribee_folder.rs'); the chains it reconciled
+under a content view's folder members; the default folders and
+the hidden-in folder it drew ('ensure_hiddenInFolder_...',
+'maybe_add_hiddenInSubscribeeFolder_branch' and two helpers);
+override substitution in the content reconciler; the
+content-view arm of 'reconcile_partnerFolder_children'; the
+'CompletionMode' methods that asked which view it was;
+'remove_id_folders'; 'stub_viewforest_from_root_skgids';
+'CompletionContext::for_content_view' and the two context
+fields only content views set; the 'RerenderOptions'
+constructors and fields only content views read.
+*** What stays for slice 11, and why
+The diff view's old walk still calls the rest, so it stays:
+'complete.rs' (the walk, its prune and its tail
+'finish_viewforest'), the content reconciler
+'extend_true_content_at_unrestrictedVognode' with
+'normalize_relationship_backed_content_unknowns', the partner,
+compound, alias, ID and flags folder reconcilers, the goal-list
+reconciler 'complete_managed_children' and 'KeptChildOrder',
+the 'convert_*' family (the shallow model uses
+'convert_unwarranted_child'), the editability helpers (its
+visit and its tail call every one), the de novo fillers
+'build_and_integrate_*' (its view requests and its stub roots,
+'append_plain_stub_root', use them), and
+'rewriteInPlace_viewnodes_whose_skgid_is_newly_extra' (now run
+for its buffers only). 'CompletionContext' keeps a
+'skgrepo_restriction' that is always None there. The goal
+computers the refresh reuses stay where they are.
+*** Deviations from the plan's "how"
+**** default folders ride on the editable-view request
+The correction asked for a '(folder subscribesTo)' request,
+fulfilled as any folder request. That would also draw the
+subscriber folder of a node with subscribers, which today needs
+an explicit request ('extend_partner_folder_member'). And today
+every occurrence a fresh render or a request extends gets its
+subscribee folder, not only the roots ('subscribee_folder'). So
+a request extends content shown write-protected (the cascade,
+see below), passes on to what it draws, and each occurrence it
+reaches shows its subscribee folder when it subscribes
+('add_default_folders'). An editable subscribee as such shows
+its hidden-in folder at every refresh, as today's 'ensure' did.
+The stub's roots carry the request. Not in the diff view.
+**** the save's checks of write-protected parents
+The ID folder reads no claims, so a lost ID in the diff view now
+carries no 'noClaim'. The ID check refuses only an ID folder
+lacking one of the node's IDs; an ID beyond them is a note. The
+alias check of a write-protected occurrence refuses an alias
+folder lacking or reordering the node's aliases or taking a
+relRepo request. The flags check passes over every vognode. The
+parse's structure checks read no claim where none is read: no
+duplicate refusal under a write-protected occurrence or folder,
+any occurrence may stand in the acquired folder, and one under
+an alias, an ID or a flag is a note.
+**** the old walk reads claims through an adapter
+Until slice 11, 'claims_as_the_old_walk_reads_them' marks the
+vognodes under a write-protected occurrence, a ghost, an unknown
+or a tombstone as claiming nothing before the diff view's walk,
+which reads those claims; the printer no longer writes them.
+**** the stats pass reads membership by position
+After a refresh, a child's birth facts and relRepo follow
+'stands_as_member': its claim where claims are read, its warrant
+in a write-protected folder, nothing under a write-protected
+occurrence. The old walk's pass still reads the claim.
+**** smaller choices
+- 'RerenderOptions' keeps 'ordinary' and the integrate request;
+  a skgrepo-set switch draws no default folders now.
+- Every correction of the saved view is a warning, a drawn
+  ("reinstated") item included.
+- The hidden folder's members take its goal's order (rung 6);
+  'Folder::goal_is_ordered' stays unmerged, since the diff view's
+  reconciler reads it.
+- Duplicate roots merge (rung 2), a fresh view's included.
+- The fixpoint test calls the refresh directly, not the save.
+*** Regressions in the module, found and fixed
+Each a failure no rule of the plan explains, fixed in
+'server/refresh/', with a unit test where none caught it:
+- of two editable occurrences a nodeMerge made one node's, the
+  one whose gnid was the pid kept editability; now the first in
+  level order does ('keep_the_first_editable_occurrence_...');
+- 'editableView' did not extend content shown write-protected
+  ('extend_requested_content');
+- a new compound folder was folded itself, which the clients
+  read as folding its parent; now its members are
+  ('Walk::newborn_folders');
+- the hidden-outside folder was drawn empty; now only when the
+  subscriber hides something there, as today;
+- folders added at one visit came in the order of a hash set;
+  now in a fixed order ('folder_request_rank');
+- a member drawn into an unordered folder went after the user's
+  notes; now it follows the last member.
+*** What's imperfect about what's done
+**** a deleted node's tombstone keeps what was drawn under it
+By the model a tombstone keeps its children, and a folder under
+it is unsayable, so is a tombstone too: deleting a node leaves
+its folders' members under two tombstones in every other view
+('collateral_delete',
+'save_collateral_delete_then_edit_under_it').
+The old walk dropped what it had drawn with the folder.
+**** a save can report many corrections
+Content drawn after a save (a node typed under an editable one,
+or extended) is reported as reinstated, one warning each, until
+slice 10 gives the corrections their own channel.
+*** Fixtures adapted, by the rule that changed them
+- no claim atom under a write-protected parent: 24 expectations
+  in 'pruned_change_view' (by
+  'tests/results/slice9/drop_noclaim_per_test.py', then 8 by
+  hand), and the chains of 'containerward_chain',
+  'partner_folder_matrix', 'hidden_from_subscriptions',
+  'collateral_partner_folder' and 4 cascade tests;
+- the save refuses nothing under a write-protected parent: 4
+  diff-view tests, the unit tests of 'write_protected_edits.rs',
+  2 validation tests;
+- unwarranted children kept, not entombstoned: 12 tests;
+- no yield, input editability kept, the budget bounding only
+  what is drawn: 6 tests;
+- the merge rung: 5 tests;
+- substitution in every refresh: 1 test ('fork');
+- corrections in place of the repair summary: 2 tests;
+- the hidden folder ordered: 1 scenario;
+- ID folders kept in content views: 1 test;
+- a content view keeps no ghost: 2 tests ('diff_view').
+Integration: 'containerward-view-request' (chain atom), the
+three 'save_collateral_*' tests (their helpers now know a chain
+node by position; 'break_cycle' and 'delete_then_edit' by the
+kept-unwarranted rule), both clients.
+*** Suite failures and their classification
+**** first failure: 2 tests after the save's readers changed
+Expected fixture adaptation: refusals that went.
+**** then 80 after the wiring
+First, 'collateral_delete': the stub made two editable roots of
+a node asked for twice, a regression of mine, fixed. The merge
+tests: rewriting newly-extra gnids before the refresh broke its
+one-editable-occurrence assertion (now the diff view's only),
+and the regression above. The rest as classified above.
+**** two tests, once each
+Unrelated: the "Directory not empty" cleanup flake hit
+'subscribee_folder_empty_persists' and, in the last full run,
+'save::extra_id_revocation'; each passed alone and in the other
+runs. The last full run: 993 of 994.
+**** integration: import-md-and-org
+Unrelated and pre-existing, as in slices 0 to 7, with either
+client.
