@@ -82,7 +82,7 @@ const OUT_FOLDERS : [Folder; 3] = [
 /// content and as its changed partner folders. A new aspect of a leaf
 /// is added here once, and C, the extension and readiness follow.
 #[derive(Debug, Default)]
-struct ChangedAspects {
+pub(crate) struct ChangedAspects {
   text         : bool,
   home_skgrepo : bool,
   aliases      : bool,
@@ -98,7 +98,7 @@ struct ChangedAspects {
 }
 
 impl ChangedAspects {
-  fn of_node (
+  pub(crate) fn of_node (
     leaves : &ChangeLeaves,
     pid    : &ID,
   ) -> ChangedAspects {
@@ -532,7 +532,7 @@ fn unmark_property_folders_except (
 /// flags folders that changed, and its content and relRepo markers,
 /// each as 'aspects' says; then, in the order-only buffer, its
 /// order-only marker.
-fn model_of_front_change_viewnodes (
+pub(crate) fn model_of_front_change_viewnodes (
   straddle   : &GraphStraddle,
   pid        : &ID,
   aspects    : &ChangedAspects,
@@ -572,19 +572,25 @@ fn changed_partner_folders (
   treeid  : NodeId,
   aspects : &ChangedAspects,
 ) -> Vec<NodeId> {
-  let mut folders : Vec<NodeId> = Vec::new ();
-  for kind in IN_FOLDERS . into_iter () . chain (OUT_FOLDERS) {
-    let relation : NodeRelation = kind . relation_member_role ()
-      . expect ("a relation folder has a member role") . relation;
-    let changed : bool =
-      if OUT_FOLDERS . contains (&kind) {
+  changed_partner_folder_kinds (aspects) . iter ()
+    . map ( |kind| child_folder_or_new (tree, treeid, kind) )
+    . collect () }
+
+/// The kinds of the node's partner folders whose membership changed,
+/// in the order 'changed_partner_folders' finds or creates them.
+pub(crate) fn changed_partner_folder_kinds (
+  aspects : &ChangedAspects,
+) -> Vec<Folder> {
+  IN_FOLDERS . into_iter () . chain (OUT_FOLDERS)
+    . filter ( |kind| {
+      let relation : NodeRelation = kind . relation_member_role ()
+        . expect ("a relation folder has a member role") . relation;
+      if OUT_FOLDERS . contains (kind) {
         aspects . recorded_changed (relation, RelationshipAspect::Existence)
         || aspects . recorded_changed (relation, RelationshipAspect::RelRepo) }
       else if relation == NodeRelation::LinksTo { aspects . mentioners }
-      else { aspects . recorders . contains (&relation) };
-    if changed {
-      folders . push ( child_folder_or_new (tree, treeid, &kind) ); }}
-  folders }
+      else { aspects . recorders . contains (&relation) } } )
+    . collect () }
 
 /// Tag each content member, and each non-member child whose node is
 /// content, with the three kinds of change of its node and its relationship,
@@ -805,7 +811,7 @@ fn append_changed_property_folders (
 /// The entries of the union of two lists, in the order of their
 /// interleaved diff, each added if only the new list holds it and
 /// removed if only the old one does.
-fn union_with_existence<T : Clone + Eq + Hash + Ord> (
+pub(crate) fn union_with_existence<T : Clone + Eq + Hash + Ord> (
   old : &[T],
   new : &[T],
 ) -> Vec<(T, Option<Existence>)> {

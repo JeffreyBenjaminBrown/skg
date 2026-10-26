@@ -361,7 +361,12 @@ pub enum Warrant {
   /// The graph relates it so; also every root, and every viewnode
   /// whose position implies no relationship.
   ByGraph,
-  /// The graph does not. On the wire: the atom 'noWarrant'.
+  /// In the diff view, HEAD relates it so and the graph does not (a
+  /// ghost warrant). On the wire: the atom 'ghostWarrant'. The
+  /// refresh ('server/refresh/') sets it; the stats pass of the old
+  /// walk does not.
+  ByHead,
+  /// Neither does. On the wire: the atom 'noWarrant'.
   No,
 }
 

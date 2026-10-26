@@ -22,6 +22,18 @@ const GRAPH_RELATIONS : [NodeRelation; 4] = [
   NodeRelation::SubscribesTo,
   NodeRelation::Overrides, ];
 
+/// Who sets the warrants, and the claims of the property members and
+/// unknowns, in a stats pass.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum WarrantsAndMemberClaims {
+  /// The stats pass, from the graph alone ('set_warrant',
+  /// 'set_member_claim_and_warrant'), as the old walk needs.
+  SetByTheStatsPass,
+  /// The refresh's ladder ('server/refresh/'), which knows what HEAD
+  /// warrants; the stats pass leaves them as they are.
+  AlreadySet,
+}
+
 pub fn set_viewnodestats_in_viewforest (
   viewforest            : &mut Tree<Viewnode>,
   graph                 : &InRustGraph,
@@ -29,6 +41,21 @@ pub fn set_viewnodestats_in_viewforest (
   content_to_containers : &HashMap<ID, HashSet<ID>>,
   config                : &SkgConfig,
   restriction           : Option<&SkgrepoRestriction>,
+) {
+  set_viewnodestats_in_viewforest_with (
+    viewforest, graph, container_to_contents, content_to_containers,
+    config, restriction, WarrantsAndMemberClaims::SetByTheStatsPass ); }
+
+/// 'set_viewnodestats_in_viewforest', with the warrants and member
+/// claims set as 'warrants' says.
+pub fn set_viewnodestats_in_viewforest_with (
+  viewforest            : &mut Tree<Viewnode>,
+  graph                 : &InRustGraph,
+  container_to_contents : &HashMap<ID, HashSet<ID>>,
+  content_to_containers : &HashMap<ID, HashSet<ID>>,
+  config                : &SkgConfig,
+  restriction           : Option<&SkgrepoRestriction>,
+  warrants              : WarrantsAndMemberClaims,
 ) {
   let multi_skgrepo : bool = config . skgrepos . len () > 1;
   let mut ancestor_skgids : HashSet<ID> = HashSet::new ();
@@ -40,6 +67,7 @@ pub fn set_viewnodestats_in_viewforest (
     Some (graph),
     config,
     restriction,
+    warrants,
     &mut ancestor_skgids,
     container_to_contents,
     content_to_containers ); }
@@ -51,10 +79,13 @@ fn set_viewnodestats_recursive (
   graph                 : Option<&InRustGraph>,
   config                : &SkgConfig,
   restriction           : Option<&SkgrepoRestriction>,
+  warrants              : WarrantsAndMemberClaims,
   ancestor_skgids       : &mut HashSet<ID>,
   container_to_contents : &HashMap<ID, HashSet<ID>>,
   content_to_containers : &HashMap<ID, HashSet<ID>>,
 ) {
+  let sets_warrants : bool =
+    warrants == WarrantsAndMemberClaims::SetByTheStatsPass;
   let opt_pid : Option<ID> =
     if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
       & tree . get (treeid) . unwrap () . value () . kind
@@ -68,10 +99,12 @@ fn set_viewnodestats_recursive (
         container_to_contents, content_to_containers );
       set_omitted_body (tree, treeid, &node_pid, graph);
       set_relRepo (tree, treeid, graph, config);
-      set_warrant (tree, treeid, graph, config, restriction);
+      if sets_warrants {
+        set_warrant (tree, treeid, graph, config, restriction); }
       Some (node_pid)
     } else {
-      set_member_claim_and_warrant (tree, treeid, graph, config, restriction);
+      if sets_warrants {
+        set_member_claim_and_warrant (tree, treeid, graph, config, restriction); }
       None };
   let was_new : bool =
     if let Some ( ref pid ) = opt_pid
@@ -88,6 +121,7 @@ fn set_viewnodestats_recursive (
       graph,
       config,
       restriction,
+      warrants,
       ancestor_skgids,
       container_to_contents,
       content_to_containers ); }

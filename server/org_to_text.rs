@@ -223,7 +223,8 @@ fn propertyMember_metadata_to_string (
       | PropertyMember::ID { isWarranted, .. }
       | PropertyMember::Flag { isWarranted, .. } => *isWarranted, };
   let warrant_atom : Option<String> = // a ghost warrant first: HEAD warrants it
-    if ghostWarranted { Some ( "ghostWarrant" . to_string () ) }
+    if ghostWarranted || isWarranted == Warrant::ByHead {
+      Some ( "ghostWarrant" . to_string () ) }
     else if isWarranted == Warrant::No { Some ( "noWarrant" . to_string () ) }
     else { None };
   match member {
@@ -410,7 +411,8 @@ fn unrestrictedVognode_metadata_to_string (
         // assembled in the viewnodestats pass
         // (server/herald_tokens.rs); emitted verbatim.
         stats . rel_heralds . forms () . cloned () . collect (),
-        atoms ( vec! [ ( stats . isWarranted == Warrant::No, "noWarrant" ),
+        atoms ( vec! [ ( stats . isWarranted == Warrant::ByHead, "ghostWarrant" ),
+                       ( stats . isWarranted == Warrant::No, "noWarrant" ),
                        ( stats . cycle,                       "cycle" ),
                        ( stats . repoBoundary,                "repoBoundary" ) ] ) ]
         . concat () }
