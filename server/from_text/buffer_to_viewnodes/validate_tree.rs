@@ -325,8 +325,7 @@ fn occurrences_requesting (
 /// A relRepo request describes the relationship from a node's view-parent
 /// to the node, so it is an instruction of the view-parent's, not of the
 /// node's. A write-protected occurrence may therefore carry one, and save
-/// collects it ('content_members', 'subscribeeFolder_members',
-/// 'partnerFolder_members' in
+/// collects it ('content_members', 'partnerFolder_members' in
 /// 'from_text/local_fieldintent_collection/traverse.rs'). But when no
 /// save-eligible node writes that relationship -- most often because the
 /// view-parent is itself write-protected -- the request would silently

@@ -315,7 +315,7 @@ fn visit_subscribee_folder (
           &recorder . headline,
           recorder . gnid . clone(),
           FieldIntent::SetSubscribesTo (
-            subscribeeFolder_members (node_ref) )) ?; }
+            partnerFolder_members (node_ref) )) ?; }
       for child in node_ref . children() {
         let child_context : LocalContext =
           match &child . value() . kind {
@@ -354,21 +354,17 @@ fn visit_hiddenOutside_folder (
     if *is_saveEligible {
       let mut members : Vec<ID> = Vec::new ();
       for child in node_ref . children() {
-        match &child . value() . kind {
-          ViewnodeKind::Vognode (Vognode::Occurrence (t))
-            if member_counts_for_partnerFolder (t) => {
-              if RelationshipEditRequest::relRepo_of (&t . relationshipEditRequest) . is_some () {
-                return Err ("HiddenOutsideOfSubscribee membership is editable, but hide relRepos are derived." . to_string ()); }
-              members . push (t . gnid . clone ()); },
-          ViewnodeKind::Vognode (Vognode::Unknown (unknown))
-            if unknown . claimsMembership => {
-            if RelationshipEditRequest::relRepo_of (&unknown . relationshipEditRequest) . is_some () {
-              return Err ("HiddenOutsideOfSubscribee membership is editable, but hide relRepos are derived." . to_string ()); }
-            members . push (unknown . gnid . clone ()); },
-          ViewnodeKind::Vognode (Vognode::Ghost (ghost))
-            if ghost . claimsMembership =>
-            members . push (ghost . gnid . clone ()),
-          _ => {}, }}
+        let member : Option<(ID, Option<SkgrepoName>)> =
+          match &child . value() . kind {
+            ViewnodeKind::Vognode (Vognode::Occurrence (t)) =>
+              member_counts_for_partnerFolder (t) . then ( || (
+                t . gnid . clone (),
+                RelationshipEditRequest::relRepo_of (&t . relationshipEditRequest) . cloned () )),
+            _ => claiming_unknown_or_ghost_member (child . value ()), };
+        if let Some ((gnid, relRepo_request)) = member {
+          if relRepo_request . is_some () {
+            return Err ("HiddenOutsideOfSubscribee membership is editable, but hide relRepos are derived." . to_string ()); }
+          members . push (gnid); }}
       collected . instructionMerge_fieldIntent (
         &node_ref . value () . headline_name (),
         subscriber . clone(),
@@ -411,15 +407,19 @@ fn dedup_members_by_gnid (
       result . push ((gnid, skgrepo)); }}
   result }
 
-/// This returns the members of an overriddenFolder: its occurrence
-/// children that pass the partner folder membership predicate, silently
-/// deduplicated (by ID; see 'dedup_members_by_id'), preserving
-/// first-occurrence order. Each member is paired with its headline's
-/// explicit '(editRequest (relRepo NAME))' request, if any (see
-/// 'FieldIntent').  (Hidden
-/// nodes are not members here: the overriddenFolder omits hidden
-/// members from display, and the set-difference merge preserves
-/// them at save; see the API doc's "Restricted-skgrepo nodes".)
+/// This returns the members of an overriddenFolder or a
+/// subscribeeFolder: its occurrence children that pass the partner
+/// folder membership predicate, and its claiming unknowns and ghosts
+/// ('claiming_unknown_or_ghost_member'), silently deduplicated (by
+/// ID; see 'dedup_members_by_gnid'), preserving first-occurrence
+/// order. Each member is paired with its headline's explicit
+/// '(editRequest (relRepo NAME))' request, if any (see 'FieldIntent').
+/// Hidden nodes and tombstones contribute nothing: the folder omits
+/// hidden members from display, and the save preserves them (the
+/// set-difference merge for overrides; for 'subscribesTo', which is
+/// order-meaningful, disk supplementation's weave restores them at
+/// their disk position; see the API doc's "Restricted-skgrepo
+/// nodes").
 fn partnerFolder_members (
   node_ref : NodeRef<Viewnode>,
 ) -> Vec<(ID, Option<SkgrepoName>)> {
@@ -430,46 +430,29 @@ fn partnerFolder_members (
         if member_counts_for_partnerFolder (t) =>
           members . push ((t . gnid . clone(),
                            RelationshipEditRequest::relRepo_of (&t . relationshipEditRequest) . cloned ())),
-      ViewnodeKind::Vognode (Vognode::Unknown (unknown))
-        if unknown . claimsMembership =>
-          members . push ((unknown . gnid . clone(),
-                           RelationshipEditRequest::relRepo_of (&unknown . relationshipEditRequest) . cloned ())),
-      ViewnodeKind::Vognode (Vognode::Ghost (ghost))
-        if ghost . claimsMembership =>
-          // As an unknown's: the list still names it.
-          members . push (( ghost . gnid . clone (), None )),
-      _ => {}, }}
+      _ => members . extend ( claiming_unknown_or_ghost_member (child . value ()) ), }}
   dedup_members_by_gnid (members) }
 
-/// This returns the members of a subscribeeFolder: its occurrence children
-/// that pass the partner folder membership predicate, deduplicated (by
-/// ID; see 'dedup_members_by_id'). Like 'content_members' (and for
-/// the same reason), a tombstone contributes nothing:
-/// 'subscribesTo' is order-meaningful, but disk supplementation (its weave)
-/// already restores invisible subscribees at their disk position.
-/// Each member is paired with its headline's explicit
-/// '(editRequest (relRepo NAME))' request, if any.
-#[allow(non_snake_case)]
-fn subscribeeFolder_members (
-  node_ref : NodeRef<Viewnode>,
-) -> Vec<(ID, Option<SkgrepoName>)> {
-  let mut members : Vec<(ID, Option<SkgrepoName>)> = Vec::new();
-  for child in node_ref . children() {
-    match &child . value() . kind {
-      ViewnodeKind::Vognode (Vognode::Occurrence (t))
-        if member_counts_for_partnerFolder (t) =>
-          members . push ((t . gnid . clone(),
-                           RelationshipEditRequest::relRepo_of (&t . relationshipEditRequest) . cloned ())),
-      ViewnodeKind::Vognode (Vognode::Unknown (unknown))
-        if unknown . claimsMembership =>
-          members . push ((unknown . gnid . clone(),
-                           RelationshipEditRequest::relRepo_of (&unknown . relationshipEditRequest) . cloned ())),
-      ViewnodeKind::Vognode (Vognode::Ghost (ghost))
-        if ghost . claimsMembership =>
-          // As an unknown's: the list still names it.
-          members . push (( ghost . gnid . clone (), None )),
-      _ => {}, }}
-  dedup_members_by_gnid (members) }
+/// A claiming unknown or ghost child, as a member of the list its
+/// position implies: its gnid, with an unknown's relRepo request. An
+/// unknown is save-inert as a node, but its raw ID is load-bearing
+/// membership data at a structured relationship position; a ghost the
+/// list still names (a dangling reference to a node HEAD has) keeps
+/// its gnid there as an unknown does, and carries no relRepo request.
+/// 'None' as the request asks disk supplementation to keep an
+/// existing destination skgrepo sticky. None for any other child.
+fn claiming_unknown_or_ghost_member (
+  viewnode : &Viewnode,
+) -> Option<(ID, Option<SkgrepoName>)> {
+  match &viewnode . kind {
+    ViewnodeKind::Vognode (Vognode::Unknown (unknown))
+      if unknown . claimsMembership =>
+      Some (( unknown . gnid . clone (),
+              RelationshipEditRequest::relRepo_of (&unknown . relationshipEditRequest) . cloned () )),
+    ViewnodeKind::Vognode (Vognode::Ghost (ghost))
+      if ghost . claimsMembership =>
+      Some (( ghost . gnid . clone (), None )),
+    _ => None, } }
 
 /// This returns the content of an editable vognode: its occurrence
 /// children that pass the contains predicate. It does not dedup,
@@ -499,19 +482,7 @@ fn content_members (
             // the original member it is shown in place of.
             t . collected_gnid (),
             RelationshipEditRequest::relRepo_of (&t . relationshipEditRequest) . cloned () )); }},
-      ViewnodeKind::Vognode (Vognode::Unknown (unknown))
-        if unknown . claimsMembership =>
-        // An Unknown is save-inert as a node, but its raw ID is load-bearing
-        // membership data at a structured relationship position. `None` asks
-        // disk supplementation to keep an existing destination skgrepo sticky.
-        contents . push (( unknown . gnid . clone(),
-                           RelationshipEditRequest::relRepo_of (&unknown . relationshipEditRequest) . cloned () )),
-      ViewnodeKind::Vognode (Vognode::Ghost (ghost))
-        if ghost . claimsMembership =>
-        // A ghost the list still names (a dangling reference to a node
-        // HEAD has) keeps its gnid there, as an unknown does.
-        contents . push (( ghost . gnid . clone (), None )),
-      _ => {}, }}
+      _ => contents . extend ( claiming_unknown_or_ghost_member (child . value ()) ), }}
   contents }
 
 /// This returns the children that the buffer presents as visible
@@ -531,11 +502,7 @@ fn visible_content_members (
           // collected_id: a shown overrider presents the original,
           // so hide/unhide inference must speak of the original.
           t . collected_gnid ()); },
-      ViewnodeKind::Vognode (Vognode::Unknown (unknown))
-        if unknown . claimsMembership =>
-        visible . push (unknown . gnid . clone ()),
-      ViewnodeKind::Vognode (Vognode::Ghost (ghost))
-        if ghost . claimsMembership =>
-        visible . push (ghost . gnid . clone ()),
-      _ => {}, }}
+      _ => visible . extend (
+        claiming_unknown_or_ghost_member (child . value ())
+        . map ( |(gnid, _)| gnid )), }}
   visible }
