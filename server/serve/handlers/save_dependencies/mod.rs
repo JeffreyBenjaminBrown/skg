@@ -116,7 +116,7 @@ pub(crate) fn dirty_view_conflicts (
       current, &buffer_snapshot . viewforest_id) ?);
     if let Some (registered) = views_state . open_views
         . viewforest_id_to_view (&buffer_snapshot . viewforest_id)
-    { dependencies . extend (dependencies_from_registered (registered)); }
+    { dependencies . extend (dependencies_from_viewforest (registered)); }
     // todo | PITFALL : Matching every reference is more conservative than
     // necessary, but much more convenient than classifying dependencies.
     // A save of A and a dirty view of B can conflict merely because both
@@ -147,37 +147,13 @@ fn dependencies_from_text (
       viewforest_id . repr_in_client (),
       errors . iter () . map (ToString::to_string)
         .collect::<Vec<String>> () . join ("; "))); }
-  let mut result : HashSet<ID> = dependencies_from_uninterpreted (&forest);
+  let mut result : HashSet<ID> = dependencies_from_viewforest (&forest);
   result . extend (links_from_text (text) . into_iter ()
     .map (|link| link . gnid));
   Ok (result)
 }
 
-fn dependencies_from_uninterpreted (
-  forest : &ViewForest,
-) -> HashSet<ID> {
-  let mut result : HashSet<ID> = HashSet::new ();
-  for node in forest . nodes () {
-    match &node . value () . kind {
-      ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) => {
-        result . insert (occurrence . gnid . clone ());
-        result . extend (occurrence . overridesHere . iter () . cloned ());
-        if let Editability::Editable {
-          edit_request : Some (NodeEditRequest::NodeMerge (target)), ..
-        } = &occurrence . editability
-        { result . insert (target . clone ()); }}
-      ViewnodeKind::Vognode (Vognode::Unknown (unknown)) => {
-        result . insert (unknown . gnid . clone ()); }
-      ViewnodeKind::Vognode (Vognode::Ghost (ghost)) => {
-        result . insert (ghost . gnid . clone ()); }
-      ViewnodeKind::PropertyMember (
-        PropertyMember::ID { gnid, .. }) => {
-        result . insert (gnid . clone ()); }
-      _ => {}, }}
-  result
-}
-
-fn dependencies_from_registered (
+fn dependencies_from_viewforest (
   forest : &ViewForest,
 ) -> HashSet<ID> {
   let mut result : HashSet<ID> = HashSet::new ();

@@ -419,13 +419,13 @@ fn mark_claims (
 ) {
   let is_root : bool = matches! ( tree . get (parent) . unwrap () . value () . kind,
                                   ViewnodeKind::BufferRoot );
-  let parent_is_editable : bool = parent_reads_claims (tree, parent);
+  let claims_are_read : bool = parent_reads_claims (tree, parent);
   for child in children_of (tree, parent) {
     let viewnode : &Viewnode = tree . get (child) . unwrap () . value ();
     let Some (claims) = claims_membership (viewnode) else { continue; };
     if is_root {
       if viewnode . is_occurrence () { set_claim (tree, child, true); }}
-    else if parent_is_editable {
+    else if claims_are_read {
       if claims && warrant_of_child (goal, viewnode) != Some (Warrant::ByGraph) {
         set_claim (tree, child, false);
         walk . buffer_corrections . record (tree, child, BufferCorrectionKind::MarkedNoClaim); }}
