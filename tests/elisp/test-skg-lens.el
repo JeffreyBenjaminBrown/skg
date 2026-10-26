@@ -283,6 +283,14 @@ stands in OBJECT, and fires once even if several do."
                   '(a (WHEN k m (b (ANY IT)))))
                  '("1"))))
 
+(ert-deftest test-skg-transform-sexp-flat-when-takes-no-style ()
+  "A WHEN takes no style: a styled WHEN is a rule labeled WHEN,
+which matches no element of OBJECT here."
+  (should (equal (skg-transform-sexp-flat
+                  '(a k (b 1))
+                  '(a (HIGH WHEN k (b (ANY IT)))))
+                 '())))
+
 (ert-deftest test-skg-transform-sexp-flat-when-skipped-if-no-label ()
   "A WHEN rule none of whose labels stands in OBJECT emits nothing,
 not even its literal prefix; a label found only deeper does not

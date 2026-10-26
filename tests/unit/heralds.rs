@@ -105,6 +105,17 @@ fn herald_rules_WHEN_names_only_kinds () {
   assert! ( sexp . contains ("(WHEN ghost ") );
   assert! ( sexp . contains ("(WHEN alias id flag oldText ") ); }
 
+// The grammar has a WHEN take no style ('RULE ::= WHEN-BODY |
+// [STYLE] ...'), as both lens engines parse it: a styled WHEN would
+// read there as a simple rule labeled WHEN.
+#[test]
+fn no_herald_rule_WHEN_is_styled () {
+  let styled : Vec<HeraldRule> = rules_in_rule_table () . into_iter ()
+    . filter ( |rule| ! rule . when . is_empty ()
+                      && rule . node_heralds_key . is_some () )
+    . collect ();
+  assert! ( styled . is_empty (), "styled WHEN rules: {:?}", styled ); }
+
 // The position glyphs stand first: the ghost's ᗣ and the warrant
 // glyphs are the table's first emitting rules, before every kind's.
 #[test]

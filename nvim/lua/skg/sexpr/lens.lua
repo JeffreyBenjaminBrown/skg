@@ -24,7 +24,8 @@
 -- kind. Its full semantics are in the docstring of
 -- 'skg-transform-sexp-flat' (elisp/skg-sexpr/skg-lens.el);
 -- 'docs/heralds.org' says how the table uses it, and the Rust
--- conformance test checks that each WHEN names only kind atoms.
+-- conformance tests check that each WHEN names only kind atoms and
+-- carries no style.
 
 local parse = require('skg.sexpr.parse')
 local compare = require('skg.sexpr.compare')

@@ -240,4 +240,9 @@ describe('skg.sexpr.lens WHEN', function ()
     assert.is_nil(lens.style_at(out[1], 1))
     assert.are.equal(sexpr.symbol('UGLY'), lens.style_at(out[1], 2))
   end)
+
+  it('takes no style: a styled WHEN is a rule labeled WHEN', function ()
+    assert.are.same({},
+      texts('(skg k (b 1))', '(skg (HIGH WHEN k (b (ANY IT))))'))
+  end)
 end)

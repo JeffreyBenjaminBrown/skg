@@ -14,7 +14,7 @@
 ///
 /// GRAMMAR (mirrored one-to-one by 'HeraldRule'; full display
 /// semantics are documented in skg-lens.el):
-///   RULE        ::= [STYLE] (INTERC-BODY | WHEN-BODY | SIMPLE-BODY)
+///   RULE        ::= WHEN-BODY | [STYLE] (INTERC-BODY | SIMPLE-BODY)
 ///   INTERC-BODY ::= INTERC SEP [LABEL] CHILDREN...
 ///   WHEN-BODY   ::= WHEN LABEL... CHILDREN...
 ///   SIMPLE-BODY ::= LABEL [ABUT] CHILDREN...
@@ -29,7 +29,9 @@
 /// nested forms and a '(diff ...)' reads differently by kind: a node's
 /// and a ghost's has two diff objects (∃+, ~+), an unknown's one
 /// relationship (~+), a property's or a change viewnode's one object
-/// (+). The conformance test checks that a WHEN names only kind atoms.
+/// (+). A WHEN emits nothing of its own, so it takes no style. The
+/// conformance tests check that a WHEN names only kind atoms and
+/// carries no style.
 ///
 /// Three heralds need what one headline's metadata cannot say, so the
 /// clients supply it before or instead of the lens: the label of a

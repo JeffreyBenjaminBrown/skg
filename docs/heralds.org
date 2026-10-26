@@ -270,7 +270,8 @@ a node or a ghost it has two diff objects (=∃+=, =~+=), on an unknown
 one relationship (=~+=), and on a property or a change viewnode one
 object (=+=). The lens engines ('elisp/skg-sexpr/skg-lens.el',
 'nvim/lua/skg/sexpr/lens.lua') document the directive, and the Rust
-conformance test checks that each WHEN names only kind atoms.
+conformance tests check that each WHEN names only kind atoms and
+carries no style.
 
 ** What the server serves, and what the clients add
 The server serves two tables over the "herald rules" endpoint

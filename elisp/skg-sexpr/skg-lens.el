@@ -13,8 +13,8 @@
 ;;; stand beside its kind atom, and a part such as '(diff ...)' reads
 ;;; differently by kind. Its full semantics are in the docstring of
 ;;; `skg-transform-sexp-flat'; 'docs/heralds.org' says how the table
-;;; uses it, and the Rust conformance test checks that each WHEN names
-;;; only kind atoms.
+;;; uses it, and the Rust conformance tests check that each WHEN names
+;;; only kind atoms and carries no style.
 
 (require 'cl-lib)
 (require 'skg-shared)
@@ -199,7 +199,7 @@ Keys:
                recurse into.
 
 Grammar handled:
-  RULE        ::= [STYLE] (INTERC-BODY | WHEN-BODY | SIMPLE-BODY)
+  RULE        ::= WHEN-BODY | [STYLE] (INTERC-BODY | SIMPLE-BODY)
   INTERC-BODY ::= INTERC SEP [LABEL] CHILDREN...
   WHEN-BODY   ::= WHEN LABEL... CHILDREN...
   SIMPLE-BODY ::= LABEL [ABUT] CHILDREN...
@@ -231,7 +231,8 @@ list; `any-leaf' if label is ANY (and it's a leaf);
          (setq label (car tail))
          (setq tail (cdr tail)))
        (setq children tail))
-      ((eq (car-safe tail) 'WHEN)
+      ((and (null style) ; a WHEN takes no style
+            (eq (car-safe tail) 'WHEN))
        (setq kind 'when)
        (setq tail (cdr tail))
        (while (and (consp tail)
