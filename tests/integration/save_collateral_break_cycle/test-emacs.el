@@ -3,7 +3,7 @@
 ;;; Opens two buffers over a containment cycle (a contains b, b contains a),
 ;;; removes 'a' from b's children and saves. The collateral a-view keeps
 ;;; the now-unwarranted 'a' underneath 'b', claiming nothing: the refresh
-;;; never detaches.
+;;; never removes a child.
 ;;;
 ;;; This test does not exercise DeletedNode — no nodes are deleted from disk,
 ;;; only a containment relationship is modified.

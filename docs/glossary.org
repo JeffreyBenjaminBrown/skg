@@ -269,7 +269,7 @@ own herald ('Warrant { ByGraph, ByHead, No }', 'isWarranted' in
 code). Claim and warrant are independent: a note the user puts under
 a write-protected parent is unwarranted and carries no =noClaim=,
 since nothing claims there. The refresh keeps an unwarranted child
-where it stands; it never detaches one.
+where it stands; it never removes a child.
 
 *** partner folder
 

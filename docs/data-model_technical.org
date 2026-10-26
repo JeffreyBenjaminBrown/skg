@@ -235,7 +235,7 @@ the next save makes every claim warranted. They differ only for what
 the user typed since the last save: a new child claims and is not yet
 warranted, and a child the user marked =noClaim= to detach it is
 warranted and claims nothing (a *pending detachment*, herald
-"detach"). The refresh never detaches a child and sets no claim but a
+"detach"). The refresh never removes a child and sets no claim but a
 root's: the user's claims are the user's to make.
 
 *** The goal

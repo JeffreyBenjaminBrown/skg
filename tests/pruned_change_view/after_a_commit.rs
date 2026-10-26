@@ -1,7 +1,7 @@
 // What a commit's rerender leaves of the change viewnodes
 // ('docs/diff-view.org', "Rendering a buffer"): the refresh
 // entombstones a change viewnode whose change is gone, keeps an
-// unwarranted child, claiming nothing, and never detaches.
+// unwarranted child, claiming nothing, and never removes a child.
 //
 // The 'commit_leftovers' fixture is 'removed_partners' (b, d and e
 // drop x or c from their content; s drops its subscribee s2) with p,

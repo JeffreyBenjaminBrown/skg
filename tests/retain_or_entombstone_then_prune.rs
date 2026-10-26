@@ -2,7 +2,7 @@
 //
 // What the refresh keeps of what the graph no longer warrants
 // ('docs/data-model_technical.org', "The refresh: how a view follows
-// the graph"): it never detaches. A child the graph no longer
+// the graph"): it never removes a child. A child the graph no longer
 // warrants stays where it stands, unwarranted ('noWarrant'), and,
 // where its parent reads claims, claiming nothing ('noClaim'); it
 // keeps its editability and its subtree. Siblings standing for one

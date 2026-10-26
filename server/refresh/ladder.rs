@@ -238,7 +238,7 @@ fn vognode_member (
     _ => None, } }
 
 /// Merge 'merged_sibling' into 'result', a duplicate earlier among
-/// its siblings, and detach it. The result is folded only if both
+/// its siblings, and remove it. The result is folded only if both
 /// were, and so is its body; it is focused if either was, claims
 /// membership if either did, carries the requests of both
 /// ('merge_requests'), and is editable if either was

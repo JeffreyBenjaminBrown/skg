@@ -303,7 +303,7 @@ whose node was deleted becomes its ghost and back); siblings standing
 for one gnid are joined by a viewnode merge, so a copy the user pasted
 beside a member is joined to it. A child the goal does not name is kept, unwarranted
 and, under an editable parent, claiming nothing; the refresh never
-detaches. A tombstone keeps its children, and is pruned when it holds
+removes a child. A tombstone keeps its children, and is pruned when it holds
 nothing; so is a folder the prune leaves empty. The server sets a fold
 state only on a viewnode it draws (a context node's body and a
 container folder start folded, the rest open).
