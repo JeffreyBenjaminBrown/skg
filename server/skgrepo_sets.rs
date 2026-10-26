@@ -1,7 +1,6 @@
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use crate::dbs::filesystem::not_nodes::load_config_with_overrides;
 use crate::dbs::init::create_empty_tantivy_index;
-use crate::types::env::find_skgrepo_with_optional_tantivy;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::misc::{ID, SkgConfig, SkgrepoName, TantivyIndex};
 pub use crate::types::misc::SkgrepoSetName;
@@ -52,16 +51,10 @@ impl SkgrepoRestriction {
 
   pub fn gnid_skgrepo_is_unrestricted (
     &self,
-    graph  : &InRustGraph,
-    config : &SkgConfig,
-    gnid     : &ID,
-  ) -> Result<bool, Box<dyn Error>> {
-    if self . is_all () {
-      return Ok (true); }
-    Ok ( match find_skgrepo_with_optional_tantivy (
-      graph, gnid, None, config ) {
-      Some (skgrepo) => self . contains_skgrepo (&skgrepo),
-      None          => false } ) }
+    graph : &InRustGraph,
+    gnid  : &ID,
+  ) -> bool {
+    ! graph . restriction_keeps_out (gnid, Some (self)) }
 }
 
 /// Refuses unless the restriction is 'all'. 'what' is the refused

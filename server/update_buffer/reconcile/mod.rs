@@ -3,13 +3,15 @@
 pub mod content;
 pub mod partner_folder;
 
+use crate::dbs::in_rust_graph::InRustGraph;
 use crate::skgrepo_sets::SkgrepoRestriction;
-use crate::types::misc::{ID, SkgrepoName};
+use crate::types::misc::ID;
 
 /// Under a skgrepo restriction (the API doc's "Restricted-skgrepo nodes"): rendering omits every
 /// restricted member from goal lists (no placeholders are created).  A
-/// member whose skgrepo cannot be resolved is omitted too: it might be
-/// private, and rendering must not leak; saving preserves it
+/// member the graph cannot resolve is omitted too: it might be private,
+/// and rendering must not leak ('InRustGraph::restriction_keeps_out');
+/// saving preserves it
 /// regardless (the weave / set-difference merge treat unresolvable as
 /// invisible).  A tombstone standing where a now-restricted node was (one
 /// kept because it hosts visible descendants after a skgrepo-set
@@ -17,16 +19,10 @@ use crate::types::misc::{ID, SkgrepoName};
 /// keeps it while it holds anything, and its tail prunes it once it
 /// holds nothing.
 pub fn omit_restricted_members (
-  goal     : Vec<ID>,
+  goal        : Vec<ID>,
+  graph       : &InRustGraph,
   restriction : Option<&SkgrepoRestriction>,
-  resolve  : impl Fn (&ID) -> Option<SkgrepoName>,
 ) -> Vec<ID> {
-  match restriction . filter ( |a| ! a . is_all () ) {
-    None => goal,
-    Some (a) =>
-      goal . into_iter ()
-      . filter ( |gnid|
-          resolve (gnid)
-          . map ( |src| a . contains_skgrepo (&src) )
-          . unwrap_or (false) )
-      . collect (), }}
+  goal . into_iter ()
+    . filter ( |gnid| ! graph . restriction_keeps_out (gnid, restriction) )
+    . collect () }

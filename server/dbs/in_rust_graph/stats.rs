@@ -219,13 +219,7 @@ fn pid_skgrepo_is_unrestricted (
   restriction : Option<&SkgrepoRestriction>,
   pid    : &ID,
 ) -> bool {
-  match restriction {
-    None => true,
-    Some (restriction) if restriction . is_all () => true,
-    Some (restriction) =>
-      graph . nodes . get (pid)
-      . map ( |node| restriction . contains_skgrepo (&node . home_skgrepo) )
-      . unwrap_or (false), } }
+  ! graph . restriction_keeps_out (pid, restriction) }
 
 #[cfg(test)]
 mod tests {

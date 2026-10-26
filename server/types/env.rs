@@ -192,18 +192,3 @@ impl SkgEnv {
     { return Some (src); }
     home_from_disk (gnid, &runtime . config) }
 }
-
-/// Repo lookup against one explicit graph snapshot, with optional Tantivy
-/// and disk fallbacks for out-of-band nodes.
-pub fn find_skgrepo_with_optional_tantivy (
-  graph                          : &InRustGraph,
-  gnid                          : &ID,
-  tantivy_index                  : Option<&TantivyIndex>,
-  config                         : &SkgConfig,
-) -> Option<SkgrepoName> {
-  if let Some ((_pid, src)) = graph . pid_and_skgrepo (gnid)
-    { return Some (src); }
-  if let Some (idx) = tantivy_index {
-    if let Some ((_title, src)) = title_and_skgrepo_by_gnid (idx, gnid)
-    { return Some (src); } }
-  home_from_disk (gnid, config) }

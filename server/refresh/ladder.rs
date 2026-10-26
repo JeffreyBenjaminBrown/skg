@@ -136,7 +136,7 @@ fn add_default_folders (
     else { return; };
   if walk . had_editableView_request . contains (&parent)
      && partnerFolder_members_in_graph (
-          walk . truth . graph, walk . truth . config, &pid, &Folder::Subscribee,
+          walk . truth . graph, &pid, &Folder::Subscribee,
           walk . truth . restriction )
         . is_some_and ( |members| ! members . is_empty () )
   { let had_one : bool = child_folder (tree, parent, &Folder::Subscribee) . is_some ();

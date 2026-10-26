@@ -1,8 +1,7 @@
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
-use crate::types::misc::{ID, RelPartner, RelationshipMemberKey, SkgConfig, SkgrepoName};
+use crate::types::misc::{ID, RelPartner, RelationshipMemberKey};
 use crate::skgrepo_sets::SkgrepoRestriction;
-use crate::types::disk_home::home_from_disk;
 use crate::update_buffer::reconcile::omit_restricted_members;
 use crate::types::viewnode::Folder;
 
@@ -14,7 +13,6 @@ use crate::types::viewnode::Folder;
 /// folder in a content view ('server/refresh/goal.rs').
 pub fn partnerFolder_members_in_graph (
   graph               : &InRustGraph,
-  config              : &SkgConfig,
   viewparent_pid      : &ID,
   kind                : &Folder,
   skgrepo_restriction : Option<&SkgrepoRestriction>,
@@ -22,10 +20,6 @@ pub fn partnerFolder_members_in_graph (
   let member_role : RelationRole = kind . relation_member_role () ?;
   let recorder_role : RelationRole =
     member_role . opposite_role ();
-  let skgrepo_resolver = |gnid : &ID| -> Option<SkgrepoName> {
-    graph . pid_and_skgrepo (gnid)
-      . map ( |(_pid, src)| src )
-      . or_else ( || home_from_disk (gnid, config) ) };
   let members : Vec<ID> =
     if recorder_role . is_first_role () { // the folder shows a list in the recorder's file
       raw_outbound_members (graph, viewparent_pid, member_role, skgrepo_restriction)
@@ -39,7 +33,7 @@ pub fn partnerFolder_members_in_graph (
          // stays while it holds anything; the refresh's tail prunes it
          // once it holds nothing.
     omit_restricted_members (
-      members, skgrepo_restriction, skgrepo_resolver )) }
+      members, graph, skgrepo_restriction )) }
 
 /// The viewparent's partners in the member role's relation, as its file
 /// lists them, each tagged by whether the graph resolves it, if the

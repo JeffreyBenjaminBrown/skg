@@ -3,9 +3,8 @@
 /// ordered list of children the folder should contain.
 
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
-use crate::types::misc::{ID, RelationshipMemberKey, SkgConfig, SkgrepoName, members_of};
-use crate::types::disk_home::home_from_disk;
+use crate::dbs::node_lookup::graphnode_from_graph;
+use crate::types::misc::{ID, RelationshipMemberKey, members_of};
 
 use std::collections::HashSet;
 
@@ -37,16 +36,11 @@ pub fn goal_list_for_hiddenOutsideOfSubscribee_folder (
   graph                : &InRustGraph,
   wt_subscriber_hides  : &[ID],
   wt_subscribees       : &[ID],
-  config               : &SkgConfig,
 ) -> Vec<ID> {
   let wt_subscribee_content_of = | pid : &ID | -> Vec<ID> {
-    match graph_skgrepo (graph, pid, config) {
-      Some (src) =>
-        graphnode_graphFirst_by_pid_and_skgrepo ( graph, config, pid, &src )
-          . ok ()
-          . map ( |skg| members_of (& skg . contains) )
-          . unwrap_or_default (),
-      None => Vec::new () } };
+    graphnode_from_graph (graph, pid)
+      . map ( |skg| members_of (& skg . contains) )
+      . unwrap_or_default () };
   let wt_all_subscribee_content : HashSet<RelationshipMemberKey> =
     wt_subscribees . iter ()
       . flat_map ( |pid| wt_subscribee_content_of (pid) )
@@ -56,17 +50,3 @@ pub fn goal_list_for_hiddenOutsideOfSubscribee_folder (
     . filter ( |gnid| ! wt_all_subscribee_content
               . contains (&relationship_member_key (graph, gnid)) )
     . cloned () . collect () }
-
-/// Resolve a node's skgrepo: try the in-Rust graph snapshot first,
-/// fall back to scanning skgrepo directories for the matching '.skg'
-/// file. The disk fallback handles nodes absent from the current
-/// graph snapshot.
-fn graph_skgrepo (
-  graph  : &InRustGraph,
-  pid    : &ID,
-  config : &SkgConfig,
-) -> Option<SkgrepoName> {
-  if let Some (s) =
-    graph . pid_and_skgrepo (pid) . map ( |(_, s)| s )
-  { return Some (s); }
-  home_from_disk (pid, config) }

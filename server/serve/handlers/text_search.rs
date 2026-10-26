@@ -446,8 +446,7 @@ fn override_relatives (
       graph . inbound_pids_for_relation_gated (
         hit, NodeRelation::Overrides, Some (restriction) ), };
   relatives . into_iter ()
-    . filter ( |relative| graph . nodes . get (relative)
-      . is_some_and ( |node| restriction . contains_skgrepo (&node . home_skgrepo) ))
+    . filter ( |relative| ! graph . restriction_keeps_out (relative, Some (restriction)) )
     . collect () }
 
 /// Build the tagged s-exp for a search enrichment payload.

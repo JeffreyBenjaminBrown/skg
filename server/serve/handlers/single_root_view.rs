@@ -42,35 +42,21 @@ pub fn handle_single_root_view_request (
     viewforest_id_from_request (request);
   match node_gnid_from_single_root_view_request (request) {
     Ok (gnid) => {
-      match skgrepo_restriction . gnid_skgrepo_is_unrestricted (
-        &runtime . graph, &runtime . config, &gnid ) {
-        Ok (true) => {},
-        Ok (false) => {
-          let response_sexp : String =
-            format_buffer_response_sexp (
-              &String::new (),
-              &vec! [format! (
-                "Node {} is not in skgrepo restriction {}",
-                gnid,
-                skgrepo_restriction . name )],
-              &[] );
-          send_response_with_length_prefix (
-            stream,
-            & tag_sexp_response (
-              TcpToClient::ContentView, &response_sexp ));
-          return; },
-        Err (e) => {
-          let response_sexp : String =
-            format_buffer_response_sexp (
-              &String::new (),
-              &vec! [format! (
-                "Error checking repo-set visibility: {}", e )],
-              &[] );
-          send_response_with_length_prefix (
-            stream,
-            & tag_sexp_response (
-              TcpToClient::ContentView, &response_sexp ));
-          return; }}
+      if ! skgrepo_restriction . gnid_skgrepo_is_unrestricted (
+        &runtime . graph, &gnid ) {
+        let response_sexp : String =
+          format_buffer_response_sexp (
+            &String::new (),
+            &vec! [format! (
+              "Node {} is not in skgrepo restriction {}",
+              gnid,
+              skgrepo_restriction . name )],
+            &[] );
+        send_response_with_length_prefix (
+          stream,
+          & tag_sexp_response (
+            TcpToClient::ContentView, &response_sexp ));
+        return; }
       if let Some (existing_viewforest_id)
         = views_state . open_views
           . content_viewforest_id_for_root_gnid ( &gnid )

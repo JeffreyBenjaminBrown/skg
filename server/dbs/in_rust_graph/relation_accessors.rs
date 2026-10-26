@@ -247,6 +247,23 @@ impl InRustGraph {
           GnidPresence::Restricted,
         _ => GnidPresence::Present, }, }}
 
+  /// Whether the skgrepo restriction keeps 'gnid' out of a view: the
+  /// graph has its node and the restriction excludes its home, or,
+  /// under a restriction other than 'all', the graph has no node it
+  /// names, which might be private. The graph holds every node on
+  /// disk, so it alone answers; every render-side question of the
+  /// restriction about a gnid asks here.
+  pub fn restriction_keeps_out (
+    &self,
+    gnid        : &ID,
+    restriction : Option<&crate::skgrepo_sets::SkgrepoRestriction>,
+  ) -> bool {
+    match self . gnid_presence_gated (gnid, restriction) {
+      GnidPresence::Present    => false,
+      GnidPresence::Restricted => true,
+      GnidPresence::Absent     =>
+        restriction . is_some_and ( |set| ! set . is_all () ), } }
+
   /// Stored outbound members for one relationship. Unlike the PID-oriented
   /// accessors, this preserves an unresolved raw ID and its relRepo.
   /// Callers that require a current graphnode should keep using the existing

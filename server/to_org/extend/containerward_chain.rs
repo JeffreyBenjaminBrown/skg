@@ -20,7 +20,6 @@ use crate::graph_straddle::types::GraphStraddle;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::to_org::util::graphnode_and_viewnode_from_gnid;
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::disk_home::home_from_disk;
 use crate::types::viewnode::{ Viewnode, ViewnodeKind, Vognode, mk_unknown_viewnode, mk_writeProtected_noClaim_from_viewnode };
 
 use ego_tree::{NodeId, Tree};
@@ -131,12 +130,8 @@ fn prepend_containerward_chain_node (
   restriction : Option<&SkgrepoRestriction>,
 ) -> Result<Option<NodeId>, Box<dyn Error>> {
   if let Some (restriction) = restriction {
-    if ! restriction . is_all () {
-      if let Some (skgrepo) = graph . pid_and_skgrepo (container)
-        . map ( |(_, skgrepo)| skgrepo )
-        . or_else ( || home_from_disk (container, config) )
-      { if ! restriction . contains_skgrepo (&skgrepo)
-        { return Ok (None); }} }
+    if graph . restriction_keeps_out (container, Some (restriction))
+    { return Ok (None); }
     let parent_gnid : Option<ID> =
       tree . get (parent) . and_then ( |node| match &node . value () . kind {
         ViewnodeKind::Vognode (Vognode::Occurrence (t)) => Some (t . gnid . clone ()),

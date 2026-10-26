@@ -234,7 +234,7 @@ pub(crate) fn content_goal_gnids (
   let contents : Vec<ID> = members . iter ()
     . map ( |member| member . member . id () . clone () )
     . collect ();
-  omit_restricted_by_graph (
+  omit_restricted_members (
     match subscriber {
       None => contents,
       Some (subscriber) => less_what_the_subscriber_integrates (
@@ -317,7 +317,7 @@ fn folder_goal (
         diff_view::folder_goal (kind, &described, member_role, walk)
       { return Some (goal); }
       let members : Vec<ID> = partnerFolder_members_in_graph (
-        graph, walk . truth . config, &described, kind, walk . truth . restriction ) ?;
+        graph, &described, kind, walk . truth . restriction ) ?;
       let relRepos : HashMap<ID, SkgrepoName> =
         if member_role . opposite_role () . is_first_role () {
           // The folder shows a list in the described node's own file.
@@ -359,8 +359,7 @@ pub(crate) fn hidden_outside_of_subscribees (
     &graph . outbound_gnids_for_relation_gated (
       subscriber, NodeRelation::HidesFromSubs, walk . truth . restriction ),
     &graph . outbound_gnids_for_relation_gated (
-      subscriber, NodeRelation::SubscribesTo, walk . truth . restriction ),
-    walk . truth . config );
+      subscriber, NodeRelation::SubscribesTo, walk . truth . restriction ));
   resolve_all ( omit_restricted (goal, walk), graph ) }
 
 /// A property folder's goal: the node's aliases (in order, each with
@@ -431,19 +430,10 @@ fn resolve_all (
     . collect () }
 
 /// 'gnids' less the members the skgrepo restriction keeps out
-/// ('omit_restricted_members', given the truth's resolver).
+/// ('omit_restricted_members').
 fn omit_restricted (
   gnids : Vec<ID>,
   walk  : &Walk,
 ) -> Vec<ID> {
-  omit_restricted_by_graph (gnids, walk . truth . graph, walk . truth . restriction) }
-
-fn omit_restricted_by_graph (
-  gnids       : Vec<ID>,
-  graph       : &InRustGraph,
-  restriction : Option<&SkgrepoRestriction>,
-) -> Vec<ID> {
-  omit_restricted_members (
-    gnids, restriction,
-    |gnid : &ID| graph . pid_and_skgrepo (gnid) . map ( |(_, home)| home )) }
+  omit_restricted_members (gnids, walk . truth . graph, walk . truth . restriction) }
 
