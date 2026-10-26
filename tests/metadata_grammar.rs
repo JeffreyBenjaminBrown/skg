@@ -101,7 +101,12 @@ fn the_retired_spellings_are_refused_naming_the_grammar (
     "(skg restrictedNode)", ] {
     let refusal : String = parse_metadata_to_viewnodemd (retired) . unwrap_err ();
     assert! ( refusal . contains ("retired") && refusal . contains (METADATA_GRAMMAR),
-              "{} was refused with {:?}", retired, refusal ); }}
+              "{} was refused with {:?}", retired, refusal ); }
+  { // The compound form 'restrictedNode' also took is no key at all.
+    let compound : &str =
+      "(skg (restrictedNode (gnid hidden) (skgRepos (nodeRepo private))))";
+    assert! ( parse_metadata_to_viewnodemd (compound) . is_err (),
+              "{} must be refused", compound ); }}
 
 #[test]
 fn each_kind_takes_only_its_own_parts (

@@ -115,20 +115,6 @@ fn test_org_to_uninterpreted_nodes2_with_metadata() {
 }
 
 #[test]
-fn test_org_to_uninterpreted_nodes2_restrictedNode_is_refused() {
-  // A node the skgrepo restriction hides is drawn as a tombstone; the
-  // atom 'restrictedNode' is no longer part of the metadata, in either
-  // of the forms it once took.
-  for input in [ "* (skg restrictedNode)\n",
-                 "* (skg (restrictedNode (gnid hidden) (skgRepos (nodeRepo private))))\n" ] {
-    let parsed = org_to_viewnode_tree (input, IdResolution::AsWritten);
-    let refused : bool = match &parsed {
-      Err (_) => true,
-      Ok ((_, errors)) => ! errors . is_empty (), };
-    assert! ( refused, "{:?} must be refused: {:?}", input, parsed . map ( |p| p . 1 )); }
-}
-
-#[test]
 fn test_org_to_uninterpreted_nodes2_default_values() {
   let input: &str =
     indoc! {"
