@@ -315,7 +315,9 @@ fn filter_match_groups_to_unrestricted_skgrepos (
 /// unless the search included them, the occurrences of
 /// overPrivateText nodes are entombstoned, after the refresh, so that
 /// the members it drew are covered too, and the childless tombstones
-/// pruned. Returns the buffer's text, rendered once, after all that.
+/// pruned. Returns the buffer's text, rendered after all that. (The
+/// refresh renders the buffer too, before the fold; that text goes
+/// unused.)
 pub fn draw_search_buffer (
   viewforest         : &mut ViewForest,
   viewnode_id_record : &mut ViewnodeIdRecord,

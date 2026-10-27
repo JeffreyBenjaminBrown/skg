@@ -167,8 +167,8 @@ returns the buffer's text and the list of what it corrected
 editable occurrence per requested node, asking for its containers
 folder and to be the node's editable occurrence); a rerender, the
 saved view and every collateral view are refreshes of what the
-buffer holds (=rerender_view=); the search enrichment is the refresh
-of the search buffer as a stub (=enrich_search_viewforest=); the diff
+buffer holds (=rerender_view=); the search buffer is the refresh of
+a stub built from the hits (=draw_search_buffer=); the diff
 view's buffers are refreshes in diff-view mode (=docs/diff-view.org=,
 "Rendering a buffer").
 

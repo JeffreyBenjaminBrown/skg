@@ -55,53 +55,56 @@ So far there are these endpoints:
       list is deliberate: a pre-query decision must not disclose which
       overPrivateText node might match. The retry uses ="include"= or ="exclude"=.
       Exclusion is applied inside the Tantivy query, before matching,
-      and remains in force through asynchronous enrichment. The choice
+      and to what the enrichment draws, after it: the occurrences of
+      overPrivateText nodes there become tombstones, and childless
+      tombstones are pruned. The choice
       is request-scoped. Skgrepo-set =all= needs no choice and returns a
       warning if the results include overPrivateText telescopes.
 
-  - Phase 1, immediate: Server sends LP =((response-type
-    search-results) (content "ORG") (warnings ("..." ...)))=.
-    Results are ordinary write-protected occurrences, the roots of the
-    search buffer (not special non-vognode kinds). A no-match or error response has the same
-    response type and a single =content= field.
-
-  - Every =search-results= is followed by exactly one
-    =search-enrichment=, which is what releases the client's stream
-    guard. (The overPrivateText challenge above sends neither.) When no
-    enrichment is coming, that message omits =content=:
-    =((response-type search-enrichment) (terms "TERMS") (warnings (...)))=.
-    The client then leaves the search buffer alone and shows any
-    warnings. This happens immediately after a no-match or error
-    response; when the client closes the search view (=close view= of
-    =search:TERMS=) before enrichment arrives, after the close-view
-    response; and when the server cannot enrich a buffer snapshot, with the
-    reason as a warning.
-
-  - Phase 2, enrichment: A three-message sequence:
-    1. Rust sends LP response-type "request-snapshot" with =(("content" "TERMS"))= — asking Emacs for a snapshot of the search buffer matching those terms.
-    2. Emacs replies with =((request . "snapshot response") (terms . "TERMS"))\n= followed by =Content-Length: N\r\n\r\n<buffer text>= — the current buffer contents, dirty or not. Emacs sets the buffer to readonly before sending.
-    3. Rust parses the buffer snapshot and refreshes it as a stub
-       ('enrich_search_viewforest'): each hit, a write-protected
-       occurrence, asks for its containers folder ('(folder
-       containers)'), and holds an empty overrider and overridden
-       folder when it has such relatives; the refresh fills the
-       folders and draws each member's containerward chain. Rust then
-       sends LP response-type "search-enrichment" with =(("terms"
-       "TERMS") ("content" "ORG") ("warnings" (...)))=. Emacs replaces
-       the buffer and exits readonly. A refresh shows each hit with
-       its node's title, so a hit that matched by an alias shows the
-       alias in the first phase and the title in the second.
-    - Enrichment uses the same skgrepo restriction as the original
+  - Response: one LP =((response-type search-results) (content
+    "ORG") (warnings ("..." ...)))=, whose content is the search
+    buffer, enriched: each hit, and what the enrichment draws under
+    it. A no-match or error response has the same response type and
+    a single =content= field, a message to the user. (The
+    overPrivateText challenge above is sent instead of it.) No other
+    message follows; the search buffer is an ordinary view from
+    then on, and closing it is an ordinary =close view= of
+    =search:TERMS=.
+    - The hits are the roots of the search buffer, ordinary
+      write-protected occurrences (not special non-vognode kinds),
+      best first. Each shows its node's title.
+    - The enrichment is a refresh of a stub built from the hits
+      ('draw_search_buffer'), the same code every view is drawn
+      with: each hit asks for its containers folder ('(folder
+      containers)'), and holds an empty overrider and overridden
+      folder when that folder's goal has members, and an empty
+      alias folder when an alias of its node matched; the refresh
+      fills the folders and draws each containers folder member's
+      containerward chain.
+    - Under each hit hang its containers folder, whose members carry
+      the containerward chain; its overrider folder, the visible
+      nodes that override it; and its overridden folder, the visible
+      nodes it overrides. A folder with no member is not drawn. The
+      members are write-protected. Everything under a hit is folded,
+      so that the hit shows collapsed; but a hit found through an
+      alias shows its folders, each collapsed except its alias
+      folder, which shows all of the node's aliases, the matching one
+      among them. A matching node recursively overridden by an owned result
+      is suppressed at the top level; if the owned result overrides
+      it directly, it reappears in that result's overridden folder.
+    - The enrichment uses the same skgrepo restriction as the
       search. The containerward chain stops before restricted
       containers.
-    - Under each result hang, folded, its containers folder, whose
-      members carry the containerward chain; its overrider folder,
-      the visible nodes that override it; and its overridden folder,
-      the visible nodes it overrides. A folder with no member is not
-      drawn. The members are write-protected. A matching node
-      recursively overridden by an owned result is suppressed at the
-      top level; if the owned result overrides it directly, it
-      reappears in that result's overridden folder.
+    - The search takes no hit cap and no node budget. The refresh's
+      node budget exists, and the stub could be given one; that is
+      left unmade.
+    - Note: the search once answered in two phases: the hits at once,
+      then, after the server asked for a snapshot of the search
+      buffer, the enriched buffer. That protocol showed the hits a
+      tenth to a quarter of a second earlier for a search of hundreds
+      of hits, and was removed for its complexity
+      ('TODO/simplify-refresh/bench-search-enrichment.org' holds the
+      measurements).
 
 ** Single-root content view from ID
   - Request: =((request . "single root content view")
@@ -339,11 +342,6 @@ So far there are these endpoints:
     =overPrivateText-telescope-confirmation= is sent as the terminal response to
     one save attempt.
   - If the server errors before sending the early lock message (e.g. malformed request), only one message is sent: the error response in the save-result format.
-
-** Snapshot response (part of search enrichment; see "Text search" above)
-  - Request: First =((request . "snapshot response") (terms . "TERMS"))\n=, then =Content-Length: N\r\n\r\n<buffer text>=.
-  - Initiated by the client in response to a "request-snapshot" message from the server.
-  - Response: LP response-type "search-enrichment" with enriched buffer content and an explicit =warnings= list. If enrichment fails, the response omits =content= and gives the reason in =warnings=.
 
 ** Get file path
   - Request: ((request . "get file path") (id . "THE_ID") (repo . "THE_REPO"))
@@ -829,14 +827,15 @@ one automatically.
   - Behavior: The skgrepo restriction is per Emacs TCP connection. It
     defaults from =skgconfig.toml=, resets on reconnect, and is not
     written back to the config. Changing it requires confirmation in
-    Emacs, re-renders (not closes) all active Skg buffers for that
-    connection, and cancels any in-flight search enrichment.
+    Emacs, and re-renders (not closes) all active Skg buffers for that
+    connection.
   - Refusal: the endpoint's error paths (missing or unknown set
     name) answer in the normal skgrepo-restriction response-type,
     carrying the explanatory text as =content= and the unchanged set
     as =restriction=, followed by an empty rerender stream (a
     rerender-lock naming no views, then rerender-done), so the
-    client's preemptive buffer locks and stream guard unwind.
+    client's preemptive buffer locks and its stream-in-progress guard
+    unwind.
   - Rerender authorization precedes both the set change and release of
     view text. If the proposed set would render an overPrivateText telescope, the
     first reply is LP =overPrivateText-telescope-confirmation= with

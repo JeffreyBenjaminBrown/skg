@@ -47,7 +47,7 @@ two override folders, which search results also show.
 
 ** Override folders in search results
 
-Search hits begin as raw, write-protected, non-content roots.  During
+Search hits are raw, write-protected, non-content roots.  In the
 search enrichment, each result N gains, folded, its overridden folder
 (the nodes N overrides) and its overrider folder (the nodes that
 override N), each drawn only when it has a member.  The members are
@@ -305,7 +305,7 @@ not perform interactive override substitution.
 - [[file:../server/types/viewnode.rs][folder rules and =overridesHere= collection]]
 - [[file:../server/refresh/ladder.rs][on-demand folder construction ('fulfill_view_requests')]]
 - [[file:../server/serve/handlers/text_search.rs][search suppression]]
-- [[file:../server/serve/handlers/text_search.rs][the search results' folders ('enrich_search_viewforest')]]
+- [[file:../server/serve/handlers/text_search.rs][the search results' folders ('draw_search_buffer')]]
 - [[file:../server/from_text/fork.rs][implicit and explicit fork construction]]
 - [[file:../server/nodeMerge/nodeMergeInstructionTriple.rs][merge list combination]]
 - [[file:../server/dbs/in_rust_graph/prepared_update.rs][merge collision diagnostics]]

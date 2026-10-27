@@ -1,13 +1,9 @@
--- Integration test: search enrichment (background partner folders +
--- graphnodestats), nvim client. The Lua mirror of test-emacs.el in this
--- directory.
+-- Integration test: a search is answered in one message, nvim client.
+-- The Lua mirror of test-emacs.el in this directory.
 --
--- Searches for "bravo" (matches leaf-b).
--- Phase 1: search results appear immediately (no folders).
--- Phase 2: after background enrichment, the buffer should show
--- leaf-b's containers folder, folded, holding container-a
--- (i.e. "container alpha" appears in the buffer).
--- Phase 3: the enriched leaf-b line carries node relationship stats.
+-- Searches for "bravo" (matches leaf-b). The search buffer, when it
+-- first appears, already shows leaf-b's containers folder, folded,
+-- holding container-a, and leaf-b's node relationship stats.
 
 local T = dofile('../test-nvim-lib.lua')
 T.arm_timeout(45)
@@ -35,47 +31,29 @@ end
 ---special-origin birth facts (false / content / linksToParent):
 ---a plain search result should just be a content-type root.
 ---@param buf integer
----@param phase string for failure messages
-local function assert_leaf_b_root_is_content (buf, phase)
+local function assert_leaf_b_root_is_content (buf)
   local line = search_root_line(buf)
-  T.check(line ~= nil,
-    'leaf-b search root found during ' .. phase)
+  T.check(line ~= nil, 'leaf-b search root found')
   T.check(not line:find('noClaim', 1, true),
-    'leaf-b search root is not false during ' .. phase)
+    'leaf-b search root is not false')
   T.check(not line:find(
             'noClaim writeProtected (view (rels (contains (out 1 (ancestors 1)))) (birth (contains out 1))', 1, true),
-    'leaf-b search root is not content-birthed during ' .. phase)
+    'leaf-b search root is not content-birthed')
   T.check(not line:find(
             'noClaim writeProtected (view (rels (linksTo (out (ancestors 1)))) (birth (linksTo out 1))', 1, true),
-    'leaf-b search root is not linksToParent-birthed during ' .. phase)
+    'leaf-b search root is not linksToParent-birthed')
 end
 
-print('=== SKG Search Enrichment Integration Test ===')
+print('=== SKG Search In One Message Integration Test ===')
 
--- PHASE 1: search and verify results appear.
-print("=== PHASE 1: search for 'bravo' ===")
+print("=== search for 'bravo' ===")
 search.request_text_search('bravo', false, false, false)
 
 local buf = T.wait_for_buffer(buffer.search_buffer_name('bravo'))
 T.check(buf ~= nil, 'search buffer never created')
-assert_leaf_b_root_is_content(buf, 'immediate search results')
+assert_leaf_b_root_is_content(buf)
 T.check(T.buffer_text(buf):find('(skgRepos (nodeRepo "Mr Cheese"))', 1, true) ~= nil,
-  'spaced repo name is quoted in phase 1')
-print('search buffer created')
-
--- PHASE 2: wait for enrichment to add "container alpha".
-print('=== PHASE 2: waiting for containerward path enrichment ===')
-local found = T.wait_for(function ()
-  return T.buffer_text(buf):find('container alpha', 1, true) ~= nil
-end, 30)
-
-local content = T.buffer_text(buf)
-if not found then
-  T.fail(string.format(
-    "containerward path 'container alpha' not found after 30s. "
-    .. 'Buffer content:\n%s', content))
-end
-assert_leaf_b_root_is_content(buf, 'enriched search results')
+  'spaced repo name is quoted')
 do -- leaf-b's first child is its folded containers folder, holding container-a.
   local lines = vim.split(
     T.without_viewnode_ids(table.concat(
@@ -93,19 +71,19 @@ do -- leaf-b's first child is its folded containers folder, holding container-a.
           and lines[root + 2]:find(
                 '*** (skg node (gnid container-a) (skgRepos (nodeRepo "Mr Cheese")) writeProtected ',
                 1, true) == 1,
-          "leaf-b's folded containers folder holds container-a. Buffer content:\n"
+          "the first search buffer holds leaf-b's folded containers folder,"
+          .. ' holding container-a. Buffer content:\n'
           .. T.buffer_text(buf))
 end
-print('containerward path enrichment arrived')
 
--- PHASE 3: verify node relationship stats in enriched results. leaf-b
--- is a root with 1 content, so its line should include (rels (contains (in 1))).
-content = T.buffer_text(buf)
+-- leaf-b has one container, so its line should include
+-- (rels (contains (in 1))).
+local content = T.buffer_text(buf)
 if content:find('(rels (contains (in 1)))', 1, true) then
-  print('node relationship stats present in enriched search results')
+  print('node relationship stats present in the search buffer')
   print('Buffer content:\n' .. content)
   T.pass('PASS: Integration test successful!')
 else
-  T.fail('node relationship stats not found in enriched search results.'
+  T.fail('node relationship stats not found in the search buffer.'
         .. ' Buffer content:\n' .. content)
 end

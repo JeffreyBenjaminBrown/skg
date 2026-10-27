@@ -1075,7 +1075,7 @@ states the rule.
 *** tests
 The suites with every script; the ten runs above.
 
-** TODO Slice 6: the search in one phase
+** DONE Slice 6: the search in one phase
 Read the agreed behavior's two search items, the pitfalls on
 the search, and 'bench-search-enrichment.org' beside this plan
 first.

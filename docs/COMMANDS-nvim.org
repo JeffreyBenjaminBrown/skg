@@ -49,9 +49,7 @@ or register the archive as a live view.
 When a save is refused, archive the relevant dirty views, close those live
 views, save the remaining view, reopen fresh views, and manually reapply
 the intended edits. Do not save an entire stale archived copy over the
-newer graph. If dirty search results were enriched, the archive labels that
-the diff also includes enrichment presentation and is not a semantic patch
-of user intent alone.
+newer graph.
 ** <localleader>dd : deletion
 ***     <localleader>dd : :SkgDelete
 Marks the node at point for deletion from the graph.
@@ -94,9 +92,19 @@ phrase and operator syntax.
 Under a restricted skgrepo-set, if the search index contains any overPrivateText
 telescope (one whose selected title or body lies below home), Skg asks
 whether to include or exclude overPrivateText telescopes before running the query.
-Exclude filters them in Tantivy before matching; Include is permission
+Exclude filters them in Tantivy before matching, and from what is drawn
+under each hit; Include is permission
 for this search only. Under skgrepo-set =all= they are included without a
 prompt and the result carries a warning.
+
+The hits come best first, each a write-protected headline showing
+its node's title. Under each hang, folded, its containers folder,
+whose members carry their own containers up to the roots, and,
+when there are any, a folder of the nodes that override it and one
+of the nodes it overrides. A hit found through an alias shows those
+folders collapsed and its alias folder open, holding all of the
+node's aliases, the matching one among them. The search buffer
+arrives whole, in one answer, and is an ordinary view.
 
 Run 'Goto' (<localleader>gg, below) from one of the links in the
 search results to open the view from that node.

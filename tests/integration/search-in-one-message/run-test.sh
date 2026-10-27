@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# Integration test: search enrichment (background containerward paths + graphnodestats)
-# Searches for "leaf bravo", verifies the search buffer appears,
-# then waits for the background enrichment to add the containerward
-# path from leaf-b back to container-a, with graphnodestats.
+# Integration test: a search is answered in one message.
+# Searches for "bravo" and verifies that the search buffer, when it
+# first appears, already holds what the enrichment draws: leaf-b's
+# containers folder, holding container-a, and the node stats.
 
 set -e
 
@@ -12,7 +12,7 @@ PROJECT_ROOT="$(cd "$TEST_DIR/../../.." && pwd)"
 
 source "$TEST_DIR/../test-lib.sh"
 
-echo "=== SKG Search Enrichment Integration Test ==="
+echo "=== SKG Search In One Message Integration Test ==="
 echo "Test directory: $TEST_DIR"
 echo "Project root: $PROJECT_ROOT"
 

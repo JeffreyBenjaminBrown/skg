@@ -466,8 +466,10 @@ role tree but the contentward one is foldered, and is
 write-protected throughout. A folder request ('(folder containers)'
 and its siblings, the =C-c l= commands) draws one; a fresh content
 view draws a containers folder on each root; the search enrichment
-draws a containers folder under each hit, and its two override
-folders when it has such relatives.
+(what a text search draws under each hit, in the one message that
+answers it) draws a containers folder under each hit, its two
+override folders when it has such relatives, and its alias folder
+when an alias of its node matched.
 
 The *containerward chain* is the one tree that goes on below a
 folder. Under each member of a partner folder, of any kind but the
@@ -1481,9 +1483,8 @@ A /graph snapshot/ is one immutable state of the in-Rust graph
 ('GraphSnapshot'). A /git snapshot/ is one of HEAD, the git index or
 the worktree; 'server/git_ops/git_snapshot.rs' reads HEAD and the
 worktree (the graph straddle's before-graph reads HEAD). A /buffer snapshot/ is a
-buffer's text as a client sends it: for search enrichment, or for a
-dirty view in the save envelope. The wire atoms 'request-snapshot' and
-'snapshot response' predate the rule and mean buffer snapshots.
+buffer's text as a client sends it, for a dirty view in the save
+envelope.
 
 *** "index" is always qualified: search, git or graph index
 
