@@ -14,7 +14,6 @@
 //!   collateral ones, streaming each to the client.
 
 pub mod reconcile;
-pub mod util;
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::refresh::{Refreshed, Truth, refresh_content_viewforest};

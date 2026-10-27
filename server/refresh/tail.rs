@@ -12,15 +12,15 @@ use crate::refresh::{Truth, Walk};
 use crate::refresh::visit::folder_goes_when_empty;
 use crate::types::misc::ID;
 use crate::types::tree::forest::ViewForest;
-use crate::types::tree::generic::do_everywhere_in_tree_dfs_readonly;
+use crate::types::tree::generic::{
+  do_everywhere_in_tree_dfs_readonly, with_node_mut, write_at_ancestor_in_tree};
 use crate::types::viewnode::{Viewnode, ViewnodeKind};
 use crate::types::views_state::ViewnodeIdRecord;
 use crate::refresh::mode::RefreshMode;
 use crate::refresh::graphnodestats::set_graphnodestats_in_viewforest;
-use crate::update_buffer::util::detach_viewnode_transferring_focus;
 use crate::refresh::viewnodestats::set_viewnodestats_in_viewforest;
 
-use ego_tree::{NodeId, Tree};
+use ego_tree::{NodeId, NodeRef, Tree};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 
@@ -83,3 +83,39 @@ pub(crate) fn prune_childless_tombstones (
     if tree . get (treeid) . unwrap () . children () . next () . is_none () {
       detach_viewnode_transferring_focus (tree, treeid) ?; }}
   Ok (( )) }
+
+/// Detach a viewnode, transferring focus to its parent first if the
+/// detached subtree contained the focused node. The refresh's prune
+/// uses it.
+fn detach_viewnode_transferring_focus (
+  tree : &mut Tree<Viewnode>,
+  node : NodeId,
+) -> Result<(), Box<dyn Error>> {
+  let has_focus : bool =
+    subtree_satisfies ( tree, node, &|n : &Viewnode| n . foldAndFocus . focused ) ?;
+  if has_focus {
+    write_at_ancestor_in_tree (
+      tree, node, 1,
+      |vn : &mut Viewnode| { vn . foldAndFocus . focused = true; } )
+      . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?; }
+  with_node_mut ( tree, node,
+                  |mut n| { n . detach (); } )
+    . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
+  Ok (()) }
+
+/// Returns true if this node or any descendant satisfies the predicate.
+fn subtree_satisfies<Node, Predicate> (
+  tree      : &Tree<Node>,
+  treeid     : NodeId,
+  predicate : &Predicate,
+) -> Result<bool, String>
+where Predicate: Fn (&Node) -> bool {
+  let node_ref : NodeRef<Node> =
+    tree . get (treeid)
+    . ok_or ("subtree_satisfies: node not found")?;
+  if predicate( node_ref . value() ) {
+    return Ok (true); }
+  for child_ref in node_ref . children() {
+    if subtree_satisfies( tree, child_ref . id(), predicate )? {
+      return Ok (true); } }
+  Ok (false) }
