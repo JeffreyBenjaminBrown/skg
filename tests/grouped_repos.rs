@@ -24,8 +24,8 @@ mod leak_battery;
 #[path = "move_repo.rs"]
 mod move_skgrepo;
 
-#[path = "search_enrichment_terminal.rs"]
-mod search_enrichment_terminal;
+#[path = "search_in_one_message.rs"]
+mod search_in_one_message;
 
 #[path = "readiness_requests.rs"]
 mod readiness_requests;

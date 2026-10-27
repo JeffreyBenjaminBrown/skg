@@ -13,7 +13,6 @@ use skg::metadata_canon::{viewnode_id_atom_of, with_viewnode_id_atom, without_vi
 use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::serve::handlers::skgrepo_sets::handle_skgrepo_set_request;
-use skg::serve::handlers::text_search::SearchEnrichmentPayload;
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::test_utils::{
   cleanup_test_tantivy, copy_dir_all, extract_string_field_from_sexp,
@@ -33,8 +32,6 @@ use std::fs;
 use std::io::BufReader;
 use std::net::TcpStream;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::AtomicBool;
-use std::sync::{Arc, Mutex};
 use tempfile::TempDir;
 
 pub struct Fixture {
@@ -245,15 +242,11 @@ pub fn switch_skgrepo_set (
   view        : &str,
 ) -> Result<(String, String), Box<dyn Error>> {
   let env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
-  let enrichment_slot : Arc<Mutex<Option<SearchEnrichmentPayload>>> =
-    Arc::new (Mutex::new (None));
-  let search_cancelled : Arc<AtomicBool> = Arc::new (AtomicBool::new (false));
   let (mut stream, read_end) : (TcpStream, TcpStream) = mk_test_tcp_stream_pair ();
   handle_skgrepo_set_request (
     &mut stream,
     &format! ("((request . \"set skgrepo restriction\") (name . \"{}\"))\n", name),
-    &env, &mut f . views_state, restriction,
-    &enrichment_slot, &search_cancelled );
+    &env, &mut f . views_state, restriction );
   drop (stream);
   let messages : Vec<String> = read_all_lp_messages ( &mut BufReader::new (read_end) );
   let rerendered : Option<String> = messages . iter ()

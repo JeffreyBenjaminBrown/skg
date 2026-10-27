@@ -9,7 +9,7 @@ use ego_tree::{NodeId, Tree};
 use skg::dbs::filesystem::not_nodes::load_config;
 use skg::serve::ViewsState;
 use skg::serve::handlers::skgrepo_sets::handle_skgrepo_set_request;
-use skg::serve::handlers::text_search::SearchEnrichmentPayload;
+use skg::serve::handlers::text_search::TitleOrAlias;
 use skg::skgrepo_sets::{
   SkgrepoRestriction,
   SkgrepoSetName,
@@ -34,8 +34,6 @@ use skg::types::views_state::{OpenViews, ViewState, ViewforestId, ViewnodeIdReco
 use std::collections::{BTreeSet, HashSet};
 use std::error::Error;
 use std::net::{TcpListener, TcpStream};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
 use skg::metadata_canon::without_viewnode_ids;
 
 #[test]
@@ -45,8 +43,8 @@ fn all_tests
   run_with_shared_test_stores (
     "skg-test-repo-sets",
     |s| Box::pin ( async move {
-      s . reset ("repo_set_switch_rerenders_views_and_cancels_stale_search_enrichment", fixtures) ?;
-      skgrepo_set_switch_rerenders_views_and_cancels_stale_search_enrichment (
+      s . reset ("repo_set_switch_rerenders_views", fixtures) ?;
+      skgrepo_set_switch_rerenders_views (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("content_view_omits_restricted_contained_nodes", fixtures) ?;
       content_view_omits_restricted_contained_nodes (
@@ -140,11 +138,6 @@ fn override_substitute_across_skgrepo_switch_anonymizes_and_keeps_original (
                     pids       : HashSet::new (),
                     diffView_buffer_kind : None,
                     viewnode_id_record : ViewnodeIdRecord::default () });
-      let enrichment_slot
-        : Arc<Mutex<Option<SearchEnrichmentPayload>>> =
-        Arc::new (Mutex::new (None));
-      let search_cancelled : Arc<AtomicBool> =
-        Arc::new (AtomicBool::new (false));
       let (mut server_stream, _client_stream) =
         connected_tcp_stream_pair ()?;
       std::thread::scope ( |scope| {
@@ -152,8 +145,7 @@ fn override_substitute_across_skgrepo_switch_anonymizes_and_keeps_original (
           handle_skgrepo_set_request (
             &mut server_stream,
             "((request . \"set skgrepo restriction\") (name . \"public\"))",
-            &env, &mut views_state, &mut restriction,
-            &enrichment_slot, &search_cancelled); } ); } );
+            &env, &mut views_state, &mut restriction); } ); } );
 
       // 3. The re-rendered view: N shown directly, R anonymized.
       let view_public : String = {
@@ -276,7 +268,7 @@ fn config_rejects_reserved_all_skgrepo_and_skgrepo_set_names (
 	    "a config still defining the retired [[repo_sets]] must be rejected" );
 }
 
-async fn skgrepo_set_switch_rerenders_views_and_cancels_stale_search_enrichment (
+async fn skgrepo_set_switch_rerenders_views (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -304,14 +296,6 @@ async fn skgrepo_set_switch_rerenders_views_and_cancels_stale_search_enrichment 
           pids       : HashSet::from ([ID::from ("active-search-hit")]),
           diffView_buffer_kind : None,
           viewnode_id_record : ViewnodeIdRecord::default (), });
-      let enrichment_slot : Arc<Mutex<Option<SearchEnrichmentPayload>>> =
-        Arc::new (Mutex::new (Some (SearchEnrichmentPayload {
-          runtime        : env . runtime_snapshot (),
-          terms          : "shared ranking term" . to_string (),
-          search_results : vec![ID::from ("active-search-hit")],
-          include_overPrivateText_telescopes : false, })));
-      let search_cancelled : Arc<AtomicBool> =
-        Arc::new (AtomicBool::new (false));
       let (mut server_stream, _client_stream) =
         connected_tcp_stream_pair ()?;
       std::thread::scope ( |scope| {
@@ -324,9 +308,7 @@ async fn skgrepo_set_switch_rerenders_views_and_cancels_stale_search_enrichment 
             "((request . \"set skgrepo restriction\") (name . \"all\"))",
             &env,
             &mut views_state,
-            &mut restriction,
-            &enrichment_slot,
-            &search_cancelled); } ); } );
+            &mut restriction); } ); } );
       assert_eq! (
         restriction . name,
         SkgrepoSetName::from ("all"),
@@ -335,12 +317,6 @@ async fn skgrepo_set_switch_rerenders_views_and_cancels_stale_search_enrichment 
         views_state . open_views . views . contains_key (&viewforest_id),
         "repo-set switch should KEEP registered views (re-rendered \
          in place), not close them" );
-      assert! (
-        enrichment_slot . lock () . unwrap () . is_none (),
-        "repo-set switch should drop stale search enrichment payloads" );
-      assert! (
-        search_cancelled . load (Ordering::SeqCst),
-        "repo-set switch should cancel in-flight search enrichment" );
       Ok (( )) }
 
 async fn content_view_omits_restricted_contained_nodes (
@@ -575,7 +551,7 @@ fn search_enrichment_omits_the_restricted_containers (
   matches_by_gnid . insert (
     ID::from ("active-search-hit"),
     ( SkgrepoName::from ("public"),
-      vec![(1.0, "unrestricted search hit" . to_string ())] ));
+      vec![ (1.0, TitleOrAlias::Title ("unrestricted search hit" . to_string ())) ] ));
   let rendered : String =
     skg::serve::handlers::text_search
       ::enriched_search_buffer_for_skgrepo_set_for_test (

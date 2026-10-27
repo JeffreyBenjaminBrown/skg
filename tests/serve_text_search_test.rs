@@ -13,14 +13,15 @@ use skg::serve::handlers::text_search::{
 
 use std::collections::HashMap;
 use std::path::Path;
-use skg::types::viewnode::PropertyMember;
-use skg::types::viewnode::ViewnodeKind;
+use skg::types::viewnode::{Folder, ViewnodeKind};
 
 #[test]
 fn test_text_search_org_format (
 ) -> Result < (), Box < dyn std::error::Error >> {
-  // This test verifies that the text-search response
-  // returns org-mode formatted results with grouped IDs.
+  // This test verifies that the stub of the search buffer holds one
+  // root per matching ID, titled by its title, and an alias folder
+  // under each root that some alias matched. (The refresh fills the
+  // alias folder; 'tests/search_in_one_message.rs' tests that.)
 
   /* PITFALL: This is easiest to understand by reading just the definitions of the nodes and the assertions. The logic between those two portions, though necessary for *running* the test, is not particularly helpful for understanding the test. */
 
@@ -87,36 +88,28 @@ fn test_text_search_org_format (
       let lines : Vec < &str > =
         result . lines () . collect ();
 
-      // Parse each line with headline_to_triple.
-      // Collect level-1 Occurrence headlines and alias groups.
+      // Parse each line with headline_to_triple. Collect the level-1
+      // Occurrence headlines, and the gnids of those holding an alias
+      // folder.
       let mut level1_headlines : Vec < (String, String) > =
         Vec::new ();
-      let mut aliases_under_current : Vec < String > =
+      let mut gnids_with_alias_folder : Vec < String > =
         Vec::new ();
-      let mut all_alias_groups : Vec < Vec < String > > =
-        Vec::new ();
-
       for line in &lines {
         if let Ok (( level, metadata, title ))
           = headline_to_triple (line)
         { match level {
             1 => {
-              if ! aliases_under_current . is_empty () {
-                all_alias_groups . push (
-                  aliases_under_current . clone () );
-                aliases_under_current . clear (); }
               if let Some (md) = metadata {
                 if let Some (gnid) = md . gnid {
                   level1_headlines . push (
                     ( gnid . to_string (), title ) ); }} },
             _ => {
               if let Some (md) = metadata {
-                if let Some ( ViewnodeKind::PropertyMember (
-                  PropertyMember::Alias { .. } ) )
+                if let Some ( ViewnodeKind::Folder (Folder::Alias) )
                   = md . non_vognode
-                  { aliases_under_current . push (title); }} }, }} }
-      if ! aliases_under_current . is_empty () {
-        all_alias_groups . push (aliases_under_current); }
+                  { gnids_with_alias_folder . push (
+                      level1_headlines . last () . unwrap () . 0 . clone () ); }} }, }} }
 
       // Verify the structure
       assert_eq! ( level1_headlines . len (), 2,
@@ -134,19 +127,9 @@ fn test_text_search_org_format (
       assert_eq! ( level1_headlines [ 1 ] . 1, "cheese makes me happy",
                    "Second level-1 should be 'cheese makes me happy'" );
 
-      // First level-1 should have 2 alias children
-      assert_eq! ( all_alias_groups . len (), 1,
-                   "Should have exactly 1 group of aliases (second level-1 should have none)" );
-      assert_eq! ( all_alias_groups [ 0 ] . len (), 2,
-                   "First level-1 should have exactly 2 alias children" );
-
-      // Verify the alias texts under first level-1
-      assert! ( all_alias_groups [ 0 ] . contains (
-                  &"bear cheese" . to_string () ),
-                "Should have 'bear cheese' as an alias" );
-      assert! ( all_alias_groups [ 0 ] . contains (
-                  &"the cheese" . to_string () ),
-                "Should have 'the cheese' as an alias" );
+      // Only the first level-1 was found through an alias.
+      assert_eq! ( gnids_with_alias_folder, vec! [ "id_1" . to_string () ],
+                   "Only id_1, which its aliases matched too, holds an alias folder" );
 
       println! ("✓ Org-mode format verified successfully");
       Ok ( () )

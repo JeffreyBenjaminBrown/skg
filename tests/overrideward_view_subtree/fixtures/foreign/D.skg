@@ -1,0 +1,4 @@
+pid: D
+title: dangling overrider
+overrides:
+  - gone

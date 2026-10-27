@@ -6,7 +6,8 @@
 // Fixture (tests/overrideward_view_subtree/fixtures): owned skgrepo
 // "main" holds U, which overrides foreign F, which overrides foreign
 // G; foreign M1 and M2 mutually override; foreign B overrides foreign
-// E. Ownership is by location -- "main" lives under owned/, so it is
+// E; foreign D overrides "gone", which no file defines. Ownership is
+// by location -- "main" lives under owned/, so it is
 // owned; "foreign" is not.
 
 use std::collections::HashSet;
@@ -16,7 +17,7 @@ use ego_tree::{NodeRef, Tree};
 
 use skg::dbs::in_rust_graph::InRustGraph;
 use skg::serve::handlers::text_search::{
-  MatchGroups, build_search_viewforest, enrich_search_viewforest,
+  MatchGroups, TitleOrAlias, build_search_viewforest, draw_search_buffer,
   suppressed_result_gnids};
 use skg::skgrepo_sets::{SkgrepoRestriction, SkgrepoSetName};
 use skg::test_utils::{graph_handle_from_config, run_with_shared_test_stores};
@@ -28,10 +29,10 @@ use skg::types::views_state::ViewnodeIdRecord;
 /// One search hit, as a MatchGroups entry.
 fn hit (
   gnid : &str, skgrepo : &str, title : &str,
-) -> (ID, (SkgrepoName, Vec<(f32, String)>)) {
+) -> (ID, (SkgrepoName, Vec<(f32, TitleOrAlias)>)) {
   ( ID::from (gnid),
     ( SkgrepoName::from (skgrepo),
-      vec![ (1.0_f32, title . to_string ()) ] ) ) }
+      vec![ (1.0_f32, TitleOrAlias::Title (title . to_string ())) ] ) ) }
 
 #[test]
 fn all_tests () -> Result<(), Box<dyn Error>> {
@@ -52,11 +53,13 @@ fn all_tests () -> Result<(), Box<dyn Error>> {
         &graph, &s . config, &restriction ) ?;
       end_to_end_render_shows_a_suppressed_node_in_a_folder_with_heralds (
         &graph, &s . config, &restriction ) ?;
+      a_hit_overriding_an_absent_node_shows_it_in_a_folder (
+        &graph, &s . config, &restriction ) ?;
       Ok (( )) } )) }
 
-/// End-to-end: replay production's phase 1 (suppression, then the
-/// top-level viewforest) and phase 2 (the enrichment, a refresh of the
-/// hits as a stub) and check the rendered buffer. The suppressed F is
+/// End-to-end: replay production's search (suppression, the hits as a
+/// stub, then the enrichment, a refresh of the stub) and check the
+/// rendered buffer. The suppressed F is
 /// absent from the top level and reappears in U's overridden folder,
 /// carrying its override heralds -- U, two levels up, overrides it.
 /// G, which F overrides, is not shown: the search buffer's override
@@ -72,7 +75,7 @@ fn end_to_end_render_shows_a_suppressed_node_in_a_folder_with_heralds (
     hit ("F", "foreign", "cooking, forked once"),
     hit ("G", "foreign", "cooking, the original"),
   ] . into_iter () . collect ();
-  // Phase 1: suppression, then build the top-level viewforest.
+  // Suppression, then the stub of the hits.
   let suppressed : HashSet<ID> =
     suppressed_result_gnids ( &matches, &graph, config, restriction );
   let (mut viewforest, search_results)
@@ -81,8 +84,8 @@ fn end_to_end_render_shows_a_suppressed_node_in_a_folder_with_heralds (
   assert_eq! (
     search_results, vec![ ID::from ("U") ],
     "F and G are suppressed, so only U is a top-level result" );
-  // Phase 2: the enrichment.
-  let buffer : String = enrich_search_viewforest (
+  // The enrichment.
+  let buffer : String = draw_search_buffer (
     &mut viewforest, &mut ViewnodeIdRecord::default (), graph, config,
     &search_results, restriction, false ) ?;
 
@@ -150,7 +153,7 @@ fn a_hit_shows_the_nodes_it_overrides_in_a_folder (
     . into_iter () . collect ();
   let (mut viewforest, results) =
     build_search_viewforest ( "cooking", &matches, &HashSet::new () );
-  enrich_search_viewforest (
+  draw_search_buffer (
     &mut viewforest, &mut ViewnodeIdRecord::default (), graph, config,
     &results, restriction, false ) ?;
   let tree : Tree<Viewnode> = viewforest . into_internal_tree ();
@@ -187,7 +190,7 @@ fn a_hit_shows_the_nodes_that_override_it_in_a_folder (
     . into_iter () . collect ();
   let (mut viewforest, results) =
     build_search_viewforest ( "exciting", &matches, &HashSet::new () );
-  enrich_search_viewforest (
+  draw_search_buffer (
     &mut viewforest, &mut ViewnodeIdRecord::default (), graph, config,
     &results, restriction, false ) ?;
   let tree : Tree<Viewnode> = viewforest . into_internal_tree ();
@@ -203,6 +206,40 @@ fn a_hit_shows_the_nodes_that_override_it_in_a_folder (
             "E's one folder is its overrider folder, folded" );
   assert! ( find_child ( folders [0], "B" ) . is_some (),
             "B (which overrides E) is in the folder" );
+  Ok (( )) }
+
+/// D overrides "gone", which is on disk, in D's file, but not in the
+/// graph. The stub asks the overridden folder's own goal, the one the
+/// refresh fills it from, whether the folder has members, so D's
+/// overridden folder is drawn, holding the unknown that stands for
+/// "gone".
+fn a_hit_overriding_an_absent_node_shows_it_in_a_folder (
+  graph       : &InRustGraph,
+  config      : &SkgConfig,
+  restriction : &SkgrepoRestriction,
+) -> Result<(), Box<dyn Error>> {
+  let matches : MatchGroups =
+    [ hit ("D", "foreign", "dangling overrider") ]
+    . into_iter () . collect ();
+  let (mut viewforest, results) =
+    build_search_viewforest ( "dangling", &matches, &HashSet::new () );
+  draw_search_buffer (
+    &mut viewforest, &mut ViewnodeIdRecord::default (), graph, config,
+    &results, restriction, false ) ?;
+  let tree : Tree<Viewnode> = viewforest . into_internal_tree ();
+  let d : NodeRef<Viewnode> =
+    find_result_root ( &tree, "D" ) . expect ("D is a result root");
+  let folder : NodeRef<Viewnode> = d . children ()
+    . find ( |c| matches! ( &c . value () . kind,
+                            ViewnodeKind::Folder (Folder::Overridden) ))
+    . expect ("D's overridden folder is drawn");
+  let members : Vec<NodeRef<Viewnode>> = folder . children () . collect ();
+  assert_eq! ( members . len (), 1, "one member, for \"gone\"" );
+  assert! ( matches! ( &members [0] . value () . kind,
+                       ViewnodeKind::Vognode (Vognode::Unknown (unknown))
+                       if unknown . gnid == ID::from ("gone") ),
+            "the member is the unknown \"gone\": {:?}",
+            members [0] . value () . kind );
   Ok (( )) }
 
 fn find_result_root<'a> (

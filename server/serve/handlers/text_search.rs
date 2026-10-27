@@ -15,10 +15,11 @@ use crate::dbs::tantivy::search::{
   SearchOptions, has_overPrivateText_telescope, search_index};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
-use crate::types::env::{RuntimeGeneration, SkgEnv};
+use crate::types::env::SkgEnv;
 use crate::org_to_text::viewforest_to_string;
 use crate::refresh::{Truth, refresh_content_viewforest};
 use crate::refresh::buffer_corrections::BufferCorrectionPolicy;
+use crate::refresh::prune_childless_tombstones;
 use crate::serve::ViewsState;
 use crate::serve::handlers::text_release::{
   TextReleaseDecision,
@@ -28,22 +29,21 @@ use crate::serve::handlers::text_release::{
   search_challenge_response,
   search_choice_from_request};
 use crate::serve::protocol::TcpToClient;
-use crate::serve::util::{ send_response_with_length_prefix, sexp_to_client_string, tag_text_response};
-use crate::types::views_state::{ViewforestId, ViewnodeIdRecord};
+use crate::serve::util::{ send_response_with_length_prefix, tag_text_response};
+use crate::types::views_state::{ViewforestId, ViewnodeIdRecord, pids_from_viewforest};
 use crate::types::misc::{TantivyIndex, SkgConfig, ID, SkgrepoName};
 use crate::skgrepo_sets::{SkgrepoRestriction, search_gnids_for_skgrepo_set_for_test as search_ids_for_skgrepo_set_for_test_impl};
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
 use crate::types::tree::forest::ViewForest;
-use crate::types::viewnode::{ FoldAndFocus, Viewnode, ViewnodeKind, mk_writeProtected_viewnode};
-use crate::types::viewnode::{Folder, FolderRelation, PropertyMember, ViewRequest, Vognode, viewnode_of};
+use crate::types::viewnode::{ Viewnode, ViewnodeKind, mk_writeProtected_viewnode};
+use crate::types::viewnode::{Folder, FolderRelation, ViewRequest, Vognode, viewnode_of};
+use crate::update_buffer::reconcile::partner_folder::partnerFolder_members_in_graph;
 
 use ego_tree::{NodeId, NodeMut};
 use sexp::{Sexp, Atom};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::net::TcpStream;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, MutexGuard};
 use tantivy::{TantivyDocument, Searcher};
 use tantivy::schema::document::Value;
 
@@ -55,8 +55,30 @@ use tantivy::schema::document::Value;
 /// Non-origins keep their raw score (multiplier = 1).
 pub type MatchGroups =
   HashMap < ID, ( SkgrepoName,
-                  Vec < ( f32,           // score (after multiplier)
-                          String ) >) >; // title or alias
+                  Vec < ( f32,             // score (after multiplier)
+                          TitleOrAlias ) >) >;
+
+/// The text a search document matched: the node's title, or one of
+/// its aliases. (The search index holds one document per title or
+/// alias, its field 'title_or_alias'.)
+#[derive(Clone, Debug, PartialEq)]
+pub enum TitleOrAlias {
+  Title (String),
+  Alias (String),
+}
+
+impl TitleOrAlias {
+  pub fn text (
+    &self,
+  ) -> &str {
+    match self {
+      TitleOrAlias::Title (text) | TitleOrAlias::Alias (text) => text, } }
+
+  pub fn is_alias (
+    &self,
+  ) -> bool {
+    matches! ( self, TitleOrAlias::Alias (_) ) }
+}
 
 pub fn search_gnids_for_skgrepo_set_for_test (
   tantivy_index : &TantivyIndex,
@@ -77,44 +99,25 @@ pub fn enriched_search_buffer_for_skgrepo_set_for_test (
 ) -> Result<String, Box<dyn Error>> {
   let (mut viewforest, search_results) : (ViewForest, Vec<ID>) =
     build_search_viewforest (terms, matches_by_gnid, &HashSet::new ());
-  enrich_search_viewforest (
+  draw_search_buffer (
     &mut viewforest, &mut ViewnodeIdRecord::default (), graph, config,
     &search_results, restriction, false ) }
 
-/// What the enrichment of a search buffer needs besides its snapshot
-/// ('enrich_search_viewforest'), passed through the slot.
-pub struct SearchEnrichmentPayload {
-  pub runtime                           : Arc<RuntimeGeneration>,
-  pub terms                             : String,
-  pub search_results                    : Vec<ID>,
-  /// Load-bearing across the asynchronous buffer-snapshot exchange: enrichment
-  /// must not broaden a preflight decision to exclude overPrivateText telescopes.
-  pub include_overPrivateText_telescopes : bool,
-}
-
-/// Provides two responses, one fast and one slow.
-/// The slower one is 'enriched' with partner folders at each search
-/// hit ('enrich_search_viewforest'), once the client has sent the
-/// buffer snapshot the idle loop asks for when the payload is ready
-/// -- the user need not await it.
-///
-/// Every 'search-results' is eventually followed by exactly one
-/// 'search-enrichment', because that is what releases the client's
-/// stream guard. When there is nothing to enrich (no matches, or an
-/// error), that message follows at once, without content. Otherwise it
-/// is owed: this returns the search terms, and the caller must see that
-/// the enrichment, or a contentless stand-in, is eventually sent.
-/// The overPrivateText challenge is the exception: it sends neither
-/// message, and the client releases its guard on receiving it.
+/// Answers a text search with one 'search-results' message, whose
+/// content is the search buffer: the hits, and what the enrichment
+/// draws under each ('draw_search_buffer'). The exceptions: a search
+/// with no hits, or one that fails, answers with a 'search-results'
+/// whose content is a message to the user; and a search that might
+/// reveal overPrivateText telescopes, before the user has chosen
+/// whether to include them, answers with the overPrivateText
+/// challenge instead.
 pub fn handle_text_search_request (
   stream           : &mut TcpStream,
   request          : &str,
   env              : &SkgEnv,
-  enrichment_slot  : &Arc<Mutex<Option<SearchEnrichmentPayload>>>,
-  search_cancelled : &Arc<AtomicBool>,
-  views_state       : &mut ViewsState,
+  views_state      : &mut ViewsState,
   restriction      : &SkgrepoRestriction,
-) -> Option<String> {
+) {
   let parsed_sexp : Result < Sexp, String > =
     sexp::parse (request)
     . map_err ( |e| format! (
@@ -123,19 +126,16 @@ pub fn handle_text_search_request (
     Ok (s) => s,
     Err (err) => {
       tracing::error! ( "{}", err );
-      send_search_results_without_enrichment (stream, "", &err);
-      return None; } };
+      send_search_results_text (stream, &err);
+      return; } };
   let search_terms : Result < String, String > =
     extract_v_from_kv_pair_in_sexp ( &sexp, "terms" );
   let search_choice : Option<SearchOverPrivateTextChoice> =
     match search_choice_from_request (&sexp) {
       Ok (choice) => choice,
       Err (error) => {
-        send_search_results_without_enrichment (
-          stream,
-          search_terms . as_deref () . unwrap_or (""),
-          &error );
-        return None; }};
+        send_search_results_text (stream, &error);
+        return; }};
   match search_terms {
     Ok (search_terms) => {
       // Wait for any in-flight background search-index writes to tantivy-commit, so
@@ -146,17 +146,16 @@ pub fn handle_text_search_request (
         match has_overPrivateText_telescope (&runtime . tantivy_index) {
           Ok (has_overPrivateText) => has_overPrivateText,
           Err (error) => {
-            send_search_results_without_enrichment (
+            send_search_results_text (
               stream,
-              &search_terms,
               &format! ("Error checking search privacy: {}", error) );
-            return None; }};
+            return; }};
       if ! restriction . is_all ()
          && index_has_overPrivateText
          && search_choice . is_none () {
         send_response_with_length_prefix (
           stream, &search_challenge_response () );
-        return None; }
+        return; }
       let include_overPrivateText_telescopes : bool =
         restriction . is_all ()
         || search_choice == Some (SearchOverPrivateTextChoice::Include);
@@ -166,15 +165,13 @@ pub fn handle_text_search_request (
         operators : bool_key ( &sexp, "operators" ),
         exclude_overPrivateText_telescope : ! include_overPrivateText_telescopes,
       };
-      // --- Phase 1: immediate results without paths ---
       match search_index ( &runtime . tantivy_index,
                            &search_terms,
                            &search_opts ) {
         Ok (( best_matches, searcher )) => {
           if best_matches . is_empty () {
-            send_search_results_without_enrichment (
-              stream, &search_terms, "No matches found." );
-            return None; }
+            send_search_results_text (stream, "No matches found.");
+            return; }
           let matches_by_gnid : MatchGroups =
             filter_match_groups_to_unrestricted_skgrepos (
               group_matches_by_gnid (
@@ -186,9 +183,8 @@ pub fn handle_text_search_request (
               Some (restriction) ),
               restriction );
           if matches_by_gnid . is_empty () {
-            send_search_results_without_enrichment (
-              stream, &search_terms, "No matches found." );
-            return None; }
+            send_search_results_text (stream, "No matches found.");
+            return; }
           let suppressed : HashSet<ID> =
             suppressed_result_gnids (
               &matches_by_gnid,
@@ -200,101 +196,88 @@ pub fn handle_text_search_request (
               &search_terms,
               &matches_by_gnid,
               &suppressed );
-          let approved : HashSet<ID> =
-            if include_overPrivateText_telescopes {
-              search_results . iter () . cloned () . collect ()
-            } else { HashSet::new () };
-          let release = decide_text_release (
-            "text-search", restriction, &search_results,
-            &runtime . graph, &approved );
           if matches! (
-            release, TextReleaseDecision::Challenge { .. } ) {
+            release_decision (
+              &search_results, restriction, &runtime . graph,
+              include_overPrivateText_telescopes ),
+            TextReleaseDecision::Challenge { .. } ) {
             send_response_with_length_prefix (
               stream, &search_challenge_response () );
-            return None; }
-          let warnings : Vec<String> = match release {
-            TextReleaseDecision::AllowWithWarning { warning } =>
-              vec! [warning],
-            _ => Vec::new (), };
-          ViewnodeIdRecord::default () // 'register_view' reads it back from the forest
-            . assign_viewnode_ids (&mut viewforest);
-          let rendered : String =
-            // Render first, before register_view moves the viewforest
-            viewforest_to_string ( &viewforest, &runtime . config )
-            . expect ("search viewforest rendering never fails");
+            return; }
+          let drawn : Result<String, Box<dyn Error>> =
+            draw_search_buffer (
+              &mut viewforest, &mut ViewnodeIdRecord::default (),
+              &runtime . graph, &runtime . config,
+              &search_results, restriction,
+              include_overPrivateText_telescopes );
+          let rendered : String = match drawn {
+            Ok (rendered) => rendered,
+            Err (error) => {
+              send_search_results_text (
+                stream,
+                & format! ("Error drawing the search buffer: {}", error) );
+              return; }};
+          let drawn_pids : Vec<ID> =
+            pids_from_viewforest (&viewforest) . into_iter () . collect ();
+          let warnings : Vec<String> =
+            match release_decision (
+              &drawn_pids, restriction, &runtime . graph,
+              include_overPrivateText_telescopes )
+            { TextReleaseDecision::AllowWithWarning { warning } =>
+                vec! [warning],
+              TextReleaseDecision::Challenge { .. } => {
+                // The challenge before the query, and the exclusion in
+                // 'draw_search_buffer', make this unreachable. Fail
+                // closed rather than serialize if a change violates either.
+                send_search_results_text (
+                  stream,
+                  "The search buffer reached the release boundary without approval." );
+                return; },
+              TextReleaseDecision::Allow => Vec::new (), };
           let viewforest_id : ViewforestId =
             ViewforestId::SearchView ( search_terms . clone () );
           if views_state . open_views . views . contains_key (&viewforest_id) {
             // Replace prior search with the same terms.
             views_state . open_views . unregister_view (&viewforest_id); }
           views_state . open_views . register_view (
-            &runtime . graph, viewforest_id, viewforest, &search_results );
+            &runtime . graph, viewforest_id, viewforest, &drawn_pids );
           send_response_with_length_prefix (
-            // phase 1 (unenriched) tagged LP response
             stream,
-            & mk_search_results_sexp (&rendered, &warnings) );
-          spawn_enrichment_thread (
-            // phase 2 (enriched) search results, backgrounded
-            enrichment_slot, search_cancelled,
-            runtime . clone (),
-            &search_terms, &search_results,
-            include_overPrivateText_telescopes );
-          Some (search_terms) },
+            & mk_search_results_sexp (&rendered, &warnings) ); },
         Err (e) => {
-          send_search_results_without_enrichment (
+          send_search_results_text (
             stream,
-            &search_terms,
-            & format! ("Error querying the search index: {}", e) );
-          None }} },
+            & format! ("Error querying the search index: {}", e) ); }} },
     Err (err) => {
       let error_msg : String =
         format! (
           "Error extracting search terms: {}", err );
       tracing::error! ( "{}", error_msg ) ;
-      send_search_results_without_enrichment (
-        stream, "", &error_msg );
-      None }} }
+      send_search_results_text (stream, &error_msg); }} }
 
-/// Sends TEXT as the phase-1 'search-results', then at once the
-/// contentless 'search-enrichment' that tells the client no
-/// enrichment is coming.
-fn send_search_results_without_enrichment (
-  stream       : &mut TcpStream,
-  search_terms : &str,
-  text         : &str,
+/// Sends TEXT, a message to the user, as the 'search-results'.
+fn send_search_results_text (
+  stream : &mut TcpStream,
+  text   : &str,
 ) {
   send_response_with_length_prefix (
     stream,
-    & tag_text_response (TcpToClient::SearchResults, text) );
-  send_response_with_length_prefix (
-    stream,
-    & mk_search_enrichment_sexp (search_terms, None, &[]) ); }
+    & tag_text_response (TcpToClient::SearchResults, text) ); }
 
-/// For when the client closes a search buffer whose enrichment is
-/// still owed. The client can then no longer answer the buffer-snapshot
-/// request, so without this the enrichment would never be sent and
-/// the client's stream guard would never be released.
-pub fn abandon_search_enrichment (
-  stream           : &mut TcpStream,
-  search_terms     : &str,
-  enrichment_slot  : &Arc<Mutex<Option<SearchEnrichmentPayload>>>,
-  search_cancelled : &Arc<AtomicBool>,
-) {
-  cancel_search_enrichment (enrichment_slot, search_cancelled);
-  send_response_with_length_prefix (
-    stream,
-    & mk_search_enrichment_sexp (search_terms, None, &[]) ); }
-
-/// Stops any running enrichment thread and discards any payload it
-/// already wrote. The thread checks the flag while holding the slot's
-/// lock, so once this returns the slot stays empty.
-pub fn cancel_search_enrichment (
-  enrichment_slot  : &Arc<Mutex<Option<SearchEnrichmentPayload>>>,
-  search_cancelled : &Arc<AtomicBool>,
-) {
-  search_cancelled . store (true, Ordering::SeqCst);
-  if let Ok (mut slot) = enrichment_slot . lock () {
-    *slot = None; }}
+/// Whether the search may release the text of 'pids': each of them
+/// approved when the search includes overPrivateText telescopes,
+/// none otherwise.
+fn release_decision (
+  pids        : &[ID],
+  restriction : &SkgrepoRestriction,
+  graph       : &InRustGraph,
+  include_overPrivateText_telescopes : bool,
+) -> TextReleaseDecision {
+  let approved : HashSet<ID> =
+    if include_overPrivateText_telescopes {
+      pids . iter () . cloned () . collect ()
+    } else { HashSet::new () };
+  decide_text_release ("text-search", restriction, pids, graph, &approved) }
 
 /// Read a boolean axis flag from the request sexp. Absent, empty, or
 /// any non-"true" string is treated as false.
@@ -317,56 +300,23 @@ fn filter_match_groups_to_unrestricted_skgrepos (
       restriction . contains_skgrepo (skgrepo) )
     . collect () }
 
-/// Spawn a background thread to write the enrichment's payload to the
-/// shared slot, where the idle loop finds it and asks the client for
-/// the buffer snapshot. Clears any stale enrichment and resets the
-/// cancellation flag before spawning.
-fn spawn_enrichment_thread (
-  enrichment_slot  : &Arc<Mutex<Option<SearchEnrichmentPayload>>>,
-  search_cancelled : &Arc<AtomicBool>,
-  runtime          : Arc<RuntimeGeneration>,
-  search_terms     : &str,
-  search_results   : &[ID],
-  include_overPrivateText_telescopes : bool,
-) {
-  { // Clear stale enrichment before spawning.
-    // todo ? Instead, permit multiple enrichments for different search result buffers to coexist.
-    let mut guard : MutexGuard<Option<SearchEnrichmentPayload>> =
-      enrichment_slot . lock () . unwrap ();
-    *guard = None; }
-  search_cancelled . store (false, Ordering::SeqCst);
-  let slot_clone    : Arc<Mutex<Option<SearchEnrichmentPayload>>> =
-    Arc::clone (enrichment_slot);
-  let cancel_clone  : Arc<AtomicBool>   = Arc::clone (search_cancelled);
-  let terms_clone   : String            = search_terms . to_string ();
-  let ids_clone     : Vec<ID>           = search_results . to_vec ();
-  std::thread::spawn ( move || {
-    let mut guard : MutexGuard<Option<SearchEnrichmentPayload>> =
-      slot_clone . lock () . unwrap ();
-    if cancel_clone . load (Ordering::SeqCst) {
-      // Checked under the lock, so that 'cancel_search_enrichment'
-      // cannot clear the slot between this check and the write.
-      tracing::info! ("search enrichment: cancelled");
-      return; }
-    tracing::info! ("search enrichment: writing payload to slot");
-    *guard = Some ( SearchEnrichmentPayload {
-      runtime,
-      terms          : terms_clone,
-      search_results : ids_clone,
-      include_overPrivateText_telescopes } ); } ); }
-
-/// The search buffer's enrichment ('docs/api-and-formats.org', "Text
-/// search"): the refresh, in content-view mode under 'restriction', of
-/// a stub made of the search buffer. Each hit (a root standing for one
-/// of 'search_results') is a write-protected occurrence asking for its
+/// Draw the search buffer ('docs/api-and-formats.org', "Text search"):
+/// the refresh, in content-view mode under 'restriction', of a stub
+/// made of the hits ('build_search_viewforest'), the same code every
+/// view is drawn with. Each hit (a root standing for one of
+/// 'search_results') is a write-protected occurrence asking for its
 /// containers folder, and holds the folder of the nodes that override
 /// it and the folder of the nodes it overrides, each only when it
-/// would have members ('stub_root_of_hit'); the refresh fills the
-/// folders, each member with its containerward chain. What the refresh
-/// drew under a hit is then folded, so that the hit shows collapsed,
-/// and unless the search included them, the occurrences of
-/// overPrivateText nodes are entombstoned. Returns the buffer's text.
-pub fn enrich_search_viewforest (
+/// would have members ('stub_root_of_hit'), and, when it was found
+/// through an alias, its alias folder; the refresh fills the folders,
+/// each member of the containers folder with its containerward chain,
+/// and titles each hit from the graph. What the refresh drew under
+/// each hit is then folded ('fold_what_was_drawn_under_hit'), and,
+/// unless the search included them, the occurrences of
+/// overPrivateText nodes are entombstoned, after the refresh, so that
+/// the members it drew are covered too, and the childless tombstones
+/// pruned. Returns the buffer's text, rendered once, after all that.
+pub fn draw_search_buffer (
   viewforest         : &mut ViewForest,
   viewnode_id_record : &mut ViewnodeIdRecord,
   graph              : &InRustGraph,
@@ -382,8 +332,6 @@ pub fn enrich_search_viewforest (
                    if search_results . contains (&occurrence . gnid) ))
     . map ( |root| root . id () )
     . collect ();
-  let drawn_before : HashSet<NodeId> =
-    viewforest . nodes () . map ( |node| node . id () ) . collect ();
   for hit in &hits {
     stub_root_of_hit (viewforest, *hit, graph, restriction); }
   refresh_content_viewforest (
@@ -391,22 +339,19 @@ pub fn enrich_search_viewforest (
     &Truth { graph, config, restriction : Some (restriction) },
     &BufferCorrectionPolicy::default () ) ?;
   for hit in &hits {
-    let drawn : Vec<NodeId> =
-      viewforest . get (*hit) . unwrap () . children ()
-      . map ( |child| child . id () )
-      . filter ( |child| ! drawn_before . contains (child) )
-      . collect ();
-    for child in drawn { // In the clients' encoding, folding a hit's children collapses it.
-      viewforest . get_mut (child) . unwrap () . value () . foldAndFocus . folded = true; }}
+    fold_what_was_drawn_under_hit (viewforest, *hit); }
   if ! include_overPrivateText_telescopes {
-    exclude_overPrivateText_nodes_from_viewforest (viewforest, graph); }
+    exclude_overPrivateText_nodes_from_viewforest (
+      viewforest . as_internal_tree_mut (), graph);
+    prune_childless_tombstones (viewforest . as_internal_tree_mut ()) ?; }
   viewforest_to_string (viewforest, config) }
 
 /// Make the hit at 'hit' a root of the enrichment's stub: a
 /// write-protected occurrence asking for its containers folder,
-/// holding first an empty folder of the nodes that override it and
-/// then one of the nodes it overrides, each only when the restriction
-/// lets it show some.
+/// holding, after any alias folder it has, a folder of the nodes that
+/// override it and then one of the nodes it overrides, each only when
+/// the folder's own goal, the one the refresh fills it from, has
+/// members.
 fn stub_root_of_hit (
   viewforest  : &mut ViewForest,
   hit         : NodeId,
@@ -422,66 +367,39 @@ fn stub_root_of_hit (
     occurrence . view_requests . insert (
       ViewRequest::Folder (FolderRelation::Containers) );
     occurrence . gnid . clone () };
-  for folder in [ Folder::Overridden, Folder::Overrider ] {
-    // Prepended last-first, so that they stand in the order named.
-    if ! override_relatives (graph, &gnid, &folder, restriction) . is_empty () {
+  for folder in [ Folder::Overrider, Folder::Overridden ] {
+    if partnerFolder_members_in_graph (graph, &gnid, &folder, Some (restriction))
+       . is_some_and ( |members| ! members . is_empty () ) {
       viewforest . get_mut (hit) . unwrap ()
-        . prepend ( viewnode_of ( ViewnodeKind::Folder (folder) )); }}}
+        . append ( viewnode_of ( ViewnodeKind::Folder (folder) )); }}}
 
-/// The IDs of the hit's override relatives that a folder of 'kind'
-/// shows: the nodes that override it (the overrider folder) or that it
-/// overrides (the overridden folder), less those whose override
-/// relationship or own skgrepo is restricted.
-fn override_relatives (
-  graph       : &InRustGraph,
-  hit         : &ID,
-  kind        : &Folder,
-  restriction : &SkgrepoRestriction,
-) -> Vec<ID> {
-  let relatives : Vec<ID> = match kind {
-    Folder::Overridden =>
-      graph . outbound_pids_for_relation_gated (
-        hit, NodeRelation::Overrides, Some (restriction) ),
-    _ =>
-      graph . inbound_pids_for_relation_gated (
-        hit, NodeRelation::Overrides, Some (restriction) ), };
-  relatives . into_iter ()
-    . filter ( |relative| ! graph . restriction_keeps_out (relative, Some (restriction)) )
-    . collect () }
-
-/// Build the tagged s-exp for a search enrichment payload.
-/// Format: (("response-type" "search-enrichment")
-///          ("terms" "TERMS") ("content" "ORG") ("warnings" ()))
-/// Without CONTENT the "content" pair is omitted. That tells the
-/// client no enrichment is coming: it releases its stream guard,
-/// shows any warnings, and leaves the search buffer alone.
-pub fn mk_search_enrichment_sexp (
-  terms    : &str,
-  content  : Option<&str>,
-  warnings : &[String],
-) -> String {
-  let mut fields : Vec<Sexp> = vec! [
-    Sexp::List ( vec! [
-      Sexp::Atom ( Atom::S ( "response-type" . to_string () )),
-      Sexp::Atom ( Atom::S ( TcpToClient::SearchEnrichment
-                             . repr_in_client () . to_string () )), ] ),
-    Sexp::List ( vec! [
-      Sexp::Atom ( Atom::S ( "terms"   . to_string () )),
-      Sexp::Atom ( Atom::S ( terms     . to_string () )), ] ), ];
-  if let Some (content) = content {
-    fields . push (
-      Sexp::List ( vec! [
-        Sexp::Atom ( Atom::S ( "content" . to_string () )),
-        Sexp::Atom ( Atom::S ( content   . to_string () )), ] )); }
-  fields . push (
-    Sexp::List ( vec! [
-      Sexp::Atom ( Atom::S ( "warnings" . to_string () )),
-      Sexp::List (
-        warnings . iter ()
-        . map ( |warning|
-          Sexp::Atom ( Atom::S (warning . clone ()) ) )
-        . collect () ), ] ));
-  sexp_to_client_string ( &Sexp::List (fields) ) }
+/// Fold what the refresh drew under the hit at 'hit', so that it
+/// shows collapsed. (In the clients' encoding, a viewnode marked
+/// folded is hidden inside a folded viewparent.) A hit with an alias
+/// folder shows its folders instead, the alias folder open, so that
+/// the matching alias is seen, and each other folder collapsed.
+fn fold_what_was_drawn_under_hit (
+  viewforest : &mut ViewForest,
+  hit        : NodeId,
+) {
+  let is_alias_folder : &dyn Fn (&NodeId) -> bool =
+    &|treeid : &NodeId| -> bool {
+      matches! ( viewforest . get (*treeid) . unwrap () . value () . kind,
+                 ViewnodeKind::Folder (Folder::Alias) ) };
+  let children : Vec<NodeId> =
+    viewforest . get (hit) . unwrap () . children ()
+    . map ( |child| child . id () )
+    . collect ();
+  let to_fold : Vec<NodeId> =
+    if children . iter () . any (is_alias_folder) {
+      children . iter ()
+        . filter ( |child| ! is_alias_folder (child) )
+        . flat_map ( |child| viewforest . get (*child) . unwrap () . children ()
+                             . map ( |grandchild| grandchild . id () ) )
+        . collect ()
+    } else { children };
+  for treeid in to_fold {
+    viewforest . get_mut (treeid) . unwrap () . value () . foldAndFocus . folded = true; }}
 
 fn mk_search_results_sexp (
   content  : &str,
@@ -551,17 +469,24 @@ pub fn group_matches_by_gnid (
         // `[[id:X][label]]` in search results. For alias-doc hits
         // raw_title is empty/absent, so fall back to
         // title_or_alias, which holds the alias literal.
-        let title_opt : Option < String > = {
+        let title_opt : Option < TitleOrAlias > = {
           let raw : Option<String> =
             retrieved_doc
               . get_first ( tantivy_index . raw_title_field )
               . and_then ( |v| v . as_str () )
               . map ( |s| s . to_string () )
               . filter ( |s| ! s . is_empty () );
+          let is_title : bool =
+            retrieved_doc
+              . get_first ( tantivy_index . is_title_field )
+              . and_then ( |v| v . as_str () )
+              == Some ("true");
           raw . or_else ( || retrieved_doc
             . get_first ( tantivy_index . title_or_alias_field )
             . and_then ( |v| v . as_str() )
-            . map ( |s| s . to_string() )) };
+            . map ( |s| s . to_string() ))
+            . map ( |text| if is_title { TitleOrAlias::Title (text) }
+                           else { TitleOrAlias::Alias (text) } ) };
         // Read title_or_alias separately for coverage counting --
         // it's the field the search index actually matched against.
         let searchable_title : String =
@@ -608,11 +533,6 @@ pub fn group_matches_by_gnid (
         "Error retrieving document: {}", e ); }} }
   result_acc }
 
-/// Builds a ViewForest representing the search results.
-/// Returns the viewforest and the ordered list of result IDs.
-///
-/// Forest structure: each root is a search result, with aliasFolder +
-/// Alias children if aliases matched.
 /// The result ids to drop from the top level because an owned
 /// result recursively overrides them; those it overrides directly
 /// reappear in its overridden folder (the API doc's "Text search"). A
@@ -650,6 +570,13 @@ pub fn suppressed_result_gnids (
         stack . push (target); }} }
   suppressed }
 
+/// Builds the stub of the search buffer ('draw_search_buffer'): one
+/// root per hit, best first, each a write-protected occurrence titled
+/// by the best match of its title, or else of an alias (the refresh
+/// titles it from the graph). A hit found through an alias holds an
+/// empty alias folder, unfolded, which the refresh fills with all of
+/// the node's aliases. Returns the viewforest and the ordered list of
+/// result IDs.
 pub fn build_search_viewforest (
   _search_terms    : &str,
   matches_by_gnid : &MatchGroups,
@@ -659,7 +586,7 @@ pub fn build_search_viewforest (
     ViewForest::new ();
   let mut id_entries : Vec < ( &ID,
                                &SkgrepoName,
-                               &Vec < ( f32, String ) > ) > =
+                               &Vec < ( f32, TitleOrAlias ) > ) > =
     matches_by_gnid . iter ()
     . map ( |(gnid, (skgrepo, matches))| // flatten
              (gnid, skgrepo, matches) )
@@ -678,34 +605,24 @@ pub fn build_search_viewforest (
         . filter ( |entry| ! suppressed . contains (entry . 0) )
         . take (SEARCH_DISPLAY_LIMIT)
     { search_results . push ( (*gnid) . clone () );
-      let mut sorted_matches : Vec < &(f32, String) > =
+      let mut sorted_matches : Vec < &(f32, TitleOrAlias) > =
         // We borrow from matches_by_id.
-        // Sort matches by score descending for display.
+        // Sort matches by score descending.
         matches . iter () . collect ();
       sorted_matches . sort_by ( |a, b|
         b . 0 . partial_cmp (&a . 0) . unwrap () );
-      let (_score, title) : &(f32, String) = sorted_matches [0];
+      let title : &str =
+        sorted_matches . iter ()
+        . find ( |(_score, matched)| ! matched . is_alias () )
+        . unwrap_or (&sorted_matches [0])
+        . 1 . text ();
       let result_treeid : NodeId =
         viewforest . append_root ( mk_writeProtected_viewnode (
           (*gnid) . clone (),
           (*skgrepo) . clone (),
-          title . clone (),
+          title . to_string (),
           true ) );
-      if sorted_matches . len () > 1 {
-        // We bury all but the best match in an aliasFolder.
-        // PITFALL: The title might not be the best match,
-        // in which case this makes it look like an alias.
-        let aliasfolder_gnid : NodeId = {
-          let mut result_mut : NodeMut<Viewnode> =
-            viewforest . get_mut (result_treeid) . unwrap ();
-          result_mut . append ( Viewnode {
-            foldAndFocus : FoldAndFocus { folded : true, .. FoldAndFocus::default () },
-            .. viewnode_of ( ViewnodeKind::Folder (Folder::Alias) ) } )
-          . id () };
-        for (_score, title) in sorted_matches . iter () . skip (1) {
-          let mut aliasfolder_mut : NodeMut<Viewnode> =
-            viewforest . get_mut (aliasfolder_gnid) . unwrap ();
-          aliasfolder_mut . append ( viewnode_of (
-            ViewnodeKind::PropertyMember ( PropertyMember::alias (
-              title . clone (), None, None ))) ); }} }
+      if sorted_matches . iter () . any ( |(_score, matched)| matched . is_alias () ) {
+        viewforest . get_mut (result_treeid) . unwrap ()
+          . append ( viewnode_of ( ViewnodeKind::Folder (Folder::Alias) )); }}
   (viewforest, search_results) }

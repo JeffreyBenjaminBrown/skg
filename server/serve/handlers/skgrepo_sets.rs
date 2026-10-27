@@ -7,8 +7,6 @@ use crate::serve::rerender_stream::{
   stream_empty_rerender,
   stream_prepared_rerenders};
 use crate::serve::handlers::text_release::approved_pids_from_request;
-use crate::serve::handlers::text_search::{
-  SearchEnrichmentPayload, cancel_search_enrichment};
 use crate::serve::protocol::{RequestType, TcpToClient};
 use crate::serve::util::{
   request_type_from_request,
@@ -22,8 +20,7 @@ use crate::types::misc::SkgConfig;
 use crate::update_buffer::RerenderOptions;
 
 use std::net::TcpStream;
-use std::sync::atomic::AtomicBool;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 pub fn handle_skgrepo_set_request (
   stream           : &mut TcpStream,
@@ -31,8 +28,6 @@ pub fn handle_skgrepo_set_request (
   env              : &SkgEnv,
   views_state      : &mut ViewsState,
   skgrepo_restriction : &mut SkgrepoRestriction,
-  enrichment_slot  : &Arc<Mutex<Option<SearchEnrichmentPayload>>>,
-  search_cancelled : &Arc<AtomicBool>,
 ) {
   let runtime = env . runtime_snapshot ();
   match request_type_from_request (request) {
@@ -43,11 +38,12 @@ pub fn handle_skgrepo_set_request (
     Ok (RequestType::SetSkgrepoRestriction) =>
       set_skgrepo_restriction (
         stream, request, env, runtime, views_state,
-        skgrepo_restriction, enrichment_slot, search_cancelled ),
+        skgrepo_restriction ),
     Ok (_) =>
       // Reachable only from malformed requests no current client
-      // sends, but Emacs may have locked buffers and set its stream
-      // guard before any repo-set request, so even these paths
+      // sends, but Emacs may have locked buffers and set its
+      // stream-in-progress guard ('skg--stream-in-progress') before
+      // any repo-set request, so even these paths
       // answer in the unwinding shape.
       refuse_unwinding (
         stream, skgrepo_restriction, "not a repo-set request"),
@@ -71,8 +67,6 @@ fn set_skgrepo_restriction (
   runtime          : Arc<RuntimeGeneration>,
   views_state      : &mut ViewsState,
   skgrepo_restriction : &mut SkgrepoRestriction,
-  enrichment_slot  : &Arc<Mutex<Option<SearchEnrichmentPayload>>>,
-  search_cancelled : &Arc<AtomicBool>,
 ) {
   let name : SkgrepoSetName =
     match value_from_request_sexp ("name", request) {
@@ -98,7 +92,6 @@ fn set_skgrepo_restriction (
     "repo-set-switch-rerender",
     &approved_pids_from_request (request) ) {
     return; }
-  cancel_search_enrichment (enrichment_slot, search_cancelled);
   *skgrepo_restriction = restriction;
   send_skgrepo_restriction_response (stream, skgrepo_restriction);
   stream_prepared_rerenders (stream, views_state, prepared); }
@@ -147,10 +140,10 @@ fn send_skgrepo_restriction_response (
 /// The unwinding refusal shape (the quiet shape): the endpoint's
 /// normal skgrepo-restriction response-type carrying explanatory text
 /// and the unchanged skgrepo restriction, followed by an empty rerender
-/// stream.  Emacs locks all Skg buffers and sets its stream guard
-/// before sending a switch request; a response-type it has no
-/// handler for would leave it wedged, so refusals and errors alike
-/// must answer in this shape.
+/// stream.  Emacs locks all Skg buffers and sets its
+/// stream-in-progress guard before sending a switch request; a
+/// response-type it has no handler for would leave it wedged, so
+/// refusals and errors alike must answer in this shape.
 fn refuse_unwinding (
   stream : &mut TcpStream,
   restriction : &SkgrepoRestriction,

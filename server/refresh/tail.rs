@@ -65,7 +65,7 @@ fn set_derived_facts (
 /// tombstones: nested tombstones after a deletion are by design.
 /// Collapsing them into one was considered and rejected, because it
 /// could confuse the user about what stood where.
-fn prune_childless_tombstones (
+pub(crate) fn prune_childless_tombstones (
   tree : &mut Tree<Viewnode>,
 ) -> Result<(), Box<dyn Error>> {
   let mut prunable : Vec<NodeId> = Vec::new ();

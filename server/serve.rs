@@ -1,19 +1,9 @@
-/// === Concurrency, Mutexes and Atomicity ===
-///
-/// An atomic bool is a CPU-level integer (typically 1 machine word) that supports read/modify/write operations guaranteed to be indivisible — no other thread can see a half-written value, even without a mutex.
-///
-/// In this module, Arc<AtomicBool> is used as the search cancellation flag. The connection thread sets it to true when a new search arrives; the background enrichment  thread checks it before writing to the slot. store and load with Ordering::Relaxed (or SeqCst) are the typical operations — no lock, no blocking, just a single instruction.
-///
-/// The advantage over Arc<Mutex<bool>>: no lock contention, no possibility of deadlock, and much cheaper (a few nanoseconds vs. potentially microseconds for mutex acquire/release). The tradeoff: atomics only work for simple values — you can't atomically update a String or a struct, which is why the enrichment payload itself uses Arc<Mutex<Option<SearchEnrichmentPayload>>>.
-
 pub mod handlers;
 pub mod parse_metadata_sexp;
 pub mod protocol;
 pub mod rerender_stream;
 pub mod util;
 
-use crate::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewnode_tree;
-use crate::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
 use crate::graph_straddle::types::GraphStraddle;
 use crate::serve::handlers::close_view::handle_close_view_request;
 use crate::serve::handlers::delete_references_to_absent_node::handle_delete_references_to_absent_node_request;
@@ -29,35 +19,27 @@ use crate::serve::handlers::rebuild_session_lifetime_stores::handle_rebuild_sess
 use crate::serve::handlers::rerender_all_views::handle_rerender_all_views_request;
 use crate::serve::handlers::save_buffer::handle_save_buffer_request;
 use crate::serve::handlers::server_warnings::handle_server_warnings_request;
-use crate::serve::handlers::text_release::{
-  TextReleaseDecision,
-  decide as decide_text_release};
 use crate::serve::handlers::single_root_view::handle_single_root_view_request;
 use crate::serve::handlers::skgrepo_sets::handle_skgrepo_set_request;
 use crate::serve::handlers::integrate_unshown_changes::handle_integrate_unshown_changes_request;
 use crate::serve::handlers::stage_and_commit::handle_stage_and_commit_request;
 use crate::serve::handlers::strip_body_whitespace::handle_strip_body_whitespace_request;
-use crate::serve::handlers::text_search::{ abandon_search_enrichment, enrich_search_viewforest, handle_text_search_request, SearchEnrichmentPayload, mk_search_enrichment_sexp};
+use crate::serve::handlers::text_search::handle_text_search_request;
 use crate::serve::handlers::titles_by_gnids::handle_titles_by_gnids_request_with_skgrepo_set;
 use crate::serve::handlers::diff_view::handle_diffView_request;
 use crate::serve::handlers::link_statuses::handle_link_statuses_request;
 use crate::serve::protocol::{RequestType, TcpToClient};
-use crate::serve::util::{ read_length_prefixed_content, request_type_from_request, send_response_with_length_prefix, tag_text_response, value_from_request_sexp};
+use crate::serve::util::{ request_type_from_request, send_response_with_length_prefix, tag_text_response};
 use crate::types::env::SkgEnv;
-use crate::types::errors::BufferValidationError;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::SkgrepoSetName;
-use crate::types::tree::forest::ViewForest;
-use crate::types::viewnode::Viewnode;
-use crate::types::views_state::{OpenViews, ViewforestId, ViewnodeIdRecord};
+use crate::types::views_state::OpenViews;
 
-use ego_tree::Tree;
 use std::io::{BufRead, BufReader};
 use std::net::SocketAddr;
 use std::net::TcpListener;
 use std::net::TcpStream; // handles two-way communication
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
@@ -114,14 +96,6 @@ fn handle_emacs (
           SkgrepoSetName::from ("all"))
         . expect ("reserved repo-set all should always resolve") });
 
-  let enrichment_slot // To update search results once the 'enrichment' (containerward role trees + graphnodestats) has been computed.
-    : Arc<Mutex<Option<SearchEnrichmentPayload>>> =
-    Arc::new ( Mutex::new (None) );
-  let search_cancelled : Arc<AtomicBool> =
-    Arc::new ( AtomicBool::new (false) );
-  let mut buffer_snapshot_requested : bool = false;
-  let mut search_enrichment_owed_for_terms // Some while a search awaits its terminal 'search-enrichment'. See 'handle_text_search_request'.
-    : Option<String> = None;
   let mut pending_import : Option<PendingImport> = None;
 
   let peer : SocketAddr =
@@ -160,51 +134,22 @@ fn handle_emacs (
               &mut env,
               &mut views_state,
               &skgrepo_restriction ),
-          Ok (RequestType::CloseView) => {
-            let closed_viewforest_id : Option<ViewforestId> =
-              handle_close_view_request (
-                &mut stream,
-                &request_header,
-                &mut views_state );
-            if closed_viewforest_id . is_some ()
-               && closed_viewforest_id == ( search_enrichment_owed_for_terms . clone ()
-                                  . map (ViewforestId::SearchView) ) {
-              // The client closed the search buffer before its
-              // enrichment arrived, so it cannot answer a buffer snapshot
-              // request.
-              buffer_snapshot_requested = false;
-              if let Some (terms) = search_enrichment_owed_for_terms . take () {
-                abandon_search_enrichment (
-                  &mut stream, &terms,
-                  &enrichment_slot, &search_cancelled ); }} }
+          Ok (RequestType::CloseView) =>
+            handle_close_view_request (
+              &mut stream,
+              &request_header,
+              &mut views_state ),
           Ok (RequestType::DeleteReferencesToAbsentNode) =>
             handle_delete_references_to_absent_node_request (
               &mut stream, &request_header, &mut env, &mut views_state,
               &skgrepo_restriction ),
-          Ok (RequestType::SnapshotResponse) => {
-            buffer_snapshot_requested = false;
-            search_enrichment_owed_for_terms = None;
-            handle_snapshot_response (
-              &mut reader,
+          Ok (RequestType::TextSearch) =>
+            handle_text_search_request (
               &mut stream,
               &request_header,
-              &enrichment_slot,
               &env,
               &mut views_state,
-              &skgrepo_restriction ); }
-          Ok (RequestType::TextSearch) => {
-            // Cancel any in-flight background search
-            search_cancelled . store (true, Ordering::SeqCst);
-            buffer_snapshot_requested = false;
-            search_enrichment_owed_for_terms =
-              handle_text_search_request (
-                &mut stream,
-                &request_header,
-                &env,
-                &enrichment_slot,
-                &search_cancelled,
-                &mut views_state,
-                &skgrepo_restriction ); }
+              &skgrepo_restriction ),
           Ok (RequestType::VerifyConnection) =>
             handle_verify_connection_request (
               &mut stream ),
@@ -244,9 +189,7 @@ fn handle_emacs (
               &request_header,
               &env,
               &mut views_state,
-              &mut skgrepo_restriction,
-              &enrichment_slot,
-              &search_cancelled ),
+              &mut skgrepo_restriction ),
           Ok (RequestType::DiffView) =>
             handle_diffView_request (
               &mut stream, &request_header, &env, &mut views_state,
@@ -298,142 +241,10 @@ fn handle_emacs (
       Err (ref e)
         if e . kind () == std::io::ErrorKind::WouldBlock
         || e . kind () == std::io::ErrorKind::TimedOut =>
-      { // Idle timeout — if enrichment is ready, ask Emacs
-        // for a buffer snapshot of the search buffer so we can integrate
-        // the partner folders without losing user edits.
-        if ! buffer_snapshot_requested {
-          if let Ok (guard) = enrichment_slot . try_lock () {
-            if guard . is_some () {
-              // Peek at the terms without taking the payload yet.
-              // The payload stays in the slot until the buffer snapshot arrives.
-              let terms : String =
-                guard . as_ref () . unwrap () . terms . clone ();
-              drop (guard); // release the lock
-              tracing::debug! ("slot drain: requesting snapshot for '{}'", terms);
-              send_response_with_length_prefix (
-                &mut stream,
-                & tag_text_response (
-                  TcpToClient::RequestSnapshot,
-                  &terms ));
-              buffer_snapshot_requested = true; }} }}
+        {}, // The read timed out; no request has arrived yet.
       Err (_) => break, // real error
     }}
   tracing::info!(peer = %peer, "Emacs disconnected"); }
-
-/// Handle the buffer snapshot that Emacs sent back.
-/// Parses the buffer text, refreshes it as the enrichment's stub
-/// ('enrich_search_viewforest'), and sends the enriched result to Emacs.
-/// Always sends exactly one 'search-enrichment', because that is what
-/// releases the client's stream guard. If enrichment fails, it has no
-/// content, and carries the failure as a warning.
-/// Emacs to Rust message format:
-///   ((request . "buffer snapshot response") (terms . "TERMS"))
-///   Content-Length: N\r\n\r\n<buffer text>
-fn handle_snapshot_response (
-  reader          : &mut BufReader<TcpStream>,
-  stream          : &mut TcpStream,
-  request         : &str,
-  enrichment_slot : &Arc<Mutex<Option<SearchEnrichmentPayload>>>,
-  _env            : &SkgEnv,
-  views_state      : &mut ViewsState,
-  skgrepo_restriction : &SkgrepoRestriction,
-) {
-  let terms_result : Result<String, String> =
-    value_from_request_sexp ("terms", request);
-  let buffer_text_result : Result<String, String> =
-    // Read even if the terms are bad, to stay in step with the stream.
-    read_length_prefixed_content (reader)
-    . map_err ( |e| format! ("failed to read content: {}", e) );
-  let terms : String =
-    terms_result . clone () . unwrap_or_default ();
-  let enrichment_result : Result<String, String> =
-    terms_result
-    . map_err ( |e| format! ("bad terms: {}", e) )
-    . and_then ( |terms| {
-      let buffer_text : String = buffer_text_result ?;
-      enrich_search_buffer_snapshot (
-        &terms, &buffer_text, enrichment_slot,
-        views_state, skgrepo_restriction ) } );
-  let response : String = match enrichment_result {
-    Ok (enriched_sexp) => {
-      tracing::debug! (bytes = enriched_sexp . len (),
-                       "snapshot response: sending enrichment");
-      enriched_sexp },
-    Err (reason) => {
-      tracing::error! ("snapshot response: {}", reason);
-      mk_search_enrichment_sexp (
-        &terms, None,
-        &[ format! ("Search results could not be enriched: {}",
-                    reason ) ] ) }};
-  send_response_with_length_prefix (
-    stream, &response ); }
-
-/// Returns the 'search-enrichment' s-exp for the buffer snapshot,
-/// or why it could not be made.
-fn enrich_search_buffer_snapshot (
-  terms              : &str,
-  buffer_text        : &str,
-  enrichment_slot    : &Arc<Mutex<Option<SearchEnrichmentPayload>>>,
-  views_state        : &mut ViewsState,
-  skgrepo_restriction : &SkgrepoRestriction,
-) -> Result<String, String> {
-  let payload : SearchEnrichmentPayload = {
-    let mut guard : MutexGuard<Option<SearchEnrichmentPayload>> =
-      enrichment_slot . lock () . unwrap ();
-    match guard . take () {
-      Some (p) => p,
-      None => return Err ( "no enrichment payload" . to_string () ), }};
-  let runtime = payload . runtime . clone ();
-  if payload . terms != terms {
-    return Err ( format! ("terms mismatch ('{}' vs '{}')",
-                          payload . terms, terms )); }
-  let parse_result : Result<(Tree<Viewnode>,
-                             Vec<BufferValidationError>), String>
-    = org_to_viewnode_tree (buffer_text, IdResolution::ThroughGraph (&runtime . graph));
-  let mut viewforest : ViewForest = match parse_result {
-    Ok (( viewforest, _errors )) => ViewForest::from_internal_tree (viewforest),
-    Err (e) => {
-      return Err ( format! ("parse failed: {}", e )); }};
-  let viewforest_id : ViewforestId =
-    ViewforestId::SearchView ( terms . to_string () );
-  let mut viewnode_id_record : ViewnodeIdRecord =
-    views_state . open_views . viewnode_id_record_of (&viewforest_id);
-  viewnode_id_record . drop_unknown_viewnode_ids_in_parsed_viewforest (&mut viewforest);
-  let enriched : String = enrich_search_viewforest (
-    &mut viewforest, &mut viewnode_id_record, &runtime . graph, &runtime . config,
-    &payload . search_results, skgrepo_restriction,
-    payload . include_overPrivateText_telescopes )
-    . map_err ( |e| format! ("refresh failed: {}", e) ) ?;
-  let rendered_pids : Vec<_> =
-    viewforest . nodes ()
-    . filter_map ( |node| match &node . value () . kind {
-      crate::types::viewnode::ViewnodeKind::Vognode (
-        crate::types::viewnode::Vognode::Occurrence (occurrence)) =>
-          Some (occurrence . gnid . clone ()),
-      _ => None, } )
-    . collect ();
-  let approved : std::collections::HashSet<_> =
-    if payload . include_overPrivateText_telescopes {
-      rendered_pids . iter () . cloned () . collect ()
-    } else { std::collections::HashSet::new () };
-  let release = decide_text_release (
-    "search-enrichment", skgrepo_restriction, &rendered_pids,
-    &runtime . graph, &approved );
-  if matches! (release, TextReleaseDecision::Challenge { .. }) {
-    // Preflight and the load-bearing payload should make this unreachable.
-    // Fail closed rather than serialize if a future change violates either.
-    return Err (
-      "search enrichment reached the release boundary without approval"
-      . to_string () ); }
-  let release_warnings : Vec<String> = match release {
-    TextReleaseDecision::AllowWithWarning { warning } => vec! [warning],
-    _ => Vec::new (), };
-  let enriched_sexp : String =
-    mk_search_enrichment_sexp (
-      terms, Some (&enriched), &release_warnings );
-  views_state . open_views . update_view ( // the enriched viewforest
-    &runtime . graph, &viewforest_id, viewforest, viewnode_id_record );
-  Ok (enriched_sexp) }
 
 fn handle_verify_connection_request (
   stream: &mut std::net::TcpStream) {

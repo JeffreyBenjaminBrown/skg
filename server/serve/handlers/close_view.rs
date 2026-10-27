@@ -4,16 +4,14 @@ use crate::serve::util::{
   viewforest_id_from_request,
   send_response_with_length_prefix,
   tag_text_response};
-use crate::types::views_state::ViewforestId;
 
 use std::net::TcpStream;
 
-/// Returns the closed view's view ID, if the request named one.
 pub fn handle_close_view_request (
   stream     : &mut TcpStream,
   request    : &str,
   views_state : &mut ViewsState,
-) -> Option<ViewforestId> {
+) {
   match viewforest_id_from_request (request) {
     Ok (viewforest_id) => {
       views_state . open_views . unregister_view (&viewforest_id);
@@ -23,11 +21,9 @@ pub fn handle_close_view_request (
       send_response_with_length_prefix (
         stream,
         & tag_text_response (
-          TcpToClient::CloseView, "view closed" ));
-      Some (viewforest_id) },
+          TcpToClient::CloseView, "view closed" )); },
     Err (_) => {
       send_response_with_length_prefix (
         stream,
         & tag_text_response (
-          TcpToClient::CloseView, "Error: missing view-id" ));
-      None }} }
+          TcpToClient::CloseView, "Error: missing view-id" )); }} }

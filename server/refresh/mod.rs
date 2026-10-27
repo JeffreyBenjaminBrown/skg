@@ -27,6 +27,8 @@ mod id_rule;
 mod ladder;
 mod tail;
 
+pub(crate) use tail::prune_childless_tombstones;
+
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::GnidPresence;
 use crate::skgrepo_sets::SkgrepoRestriction;

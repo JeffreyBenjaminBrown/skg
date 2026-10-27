@@ -9,7 +9,6 @@ pub enum RequestType {
   SaveBuffer,
   CloseView,
   TextSearch,
-  SnapshotResponse,
   VerifyConnection,
   Shutdown,
   GetFilePath,
@@ -43,7 +42,6 @@ impl RequestType {
       "save buffer"              => Ok (RequestType::SaveBuffer),
       "close view"               => Ok (RequestType::CloseView),
       "text search"              => Ok (RequestType::TextSearch),
-      "snapshot response"        => Ok (RequestType::SnapshotResponse),
       "verify connection"        => Ok (RequestType::VerifyConnection),
       "shutdown"                 => Ok (RequestType::Shutdown),
       "get file path"            => Ok (RequestType::GetFilePath),
@@ -86,9 +84,7 @@ pub enum TcpToClient {
   OverPrivateTextTelescopeConfirmation, // A textual response would expose title/body selected below home under a restricted skgrepo-set. Carries only the operation, affected pids, and a prompt; the client may retry with an explicit per-pid approval.
   CollateralView, // One streamed collateral-view update during save. Sent per-view between SaveLock and SaveResult.
   CloseView,
-  SearchResults, // computed fast
-  SearchEnrichment, // replaces SearchResults, once it's computed. Includes each hit's partner folders and graphnodestats.
-  RequestSnapshot, // Asks Emacs for a snapshot of one buffer (the search buffer matching the given terms), so that Rust can integrate enrichment data into the user's current edits.
+  SearchResults, // The search buffer: the hits, each with what the enrichment draws under it. Or a message to the user, when there are no hits or the search failed.
   GetFilePath,
   HeraldRules,
   VerifyConnection,
@@ -137,8 +133,6 @@ impl TcpToClient {
       TcpToClient::CollateralView   => "collateral-view",
       TcpToClient::CloseView        => "close-view",
       TcpToClient::SearchResults    => "search-results",
-      TcpToClient::SearchEnrichment => "search-enrichment",
-      TcpToClient::RequestSnapshot  => "request-snapshot",
       TcpToClient::GetFilePath      => "get-file-path",
       TcpToClient::HeraldRules      => "herald-rules",
       TcpToClient::VerifyConnection => "verify-connection",
