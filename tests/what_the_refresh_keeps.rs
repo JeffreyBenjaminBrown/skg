@@ -1,4 +1,4 @@
-// cargo nextest run --test grouped_overrides -E 'test(retain_or_entombstone_then_prune::)'
+// cargo nextest run --test grouped_overrides -E 'test(what_the_refresh_keeps::)'
 //
 // What the refresh keeps of what the graph no longer warrants
 // ('docs/data-model_technical.org', "The refresh: how a view follows
@@ -41,7 +41,7 @@ use skg::types::views_state::{OpenViews, ViewforestId};
 #[test]
 fn all_tests
   () -> Result<(), Box<dyn Error>> {
-  let main : &str = "tests/retain_or_entombstone_then_prune/fixtures/main";
+  let main : &str = "tests/what_the_refresh_keeps/fixtures/main";
   run_with_shared_test_stores (
     "skg-test-retain-or-entombstone-then-prune",
     |s| Box::pin ( async move {

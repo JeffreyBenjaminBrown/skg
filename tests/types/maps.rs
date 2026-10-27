@@ -1,4 +1,4 @@
-// Tests for to_org complete contents functions
+// Tests for 'add_v_to_map_if_absent' ('server/types/maps.rs')
 
 use skg::types::maps::add_v_to_map_if_absent;
 use skg::types::nodes::complete::{empty_graphnode, Graphnode};

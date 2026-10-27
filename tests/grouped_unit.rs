@@ -83,8 +83,5 @@ mod links;
 #[path = "titles_by_ids.rs"]
 mod titles_by_gnids;
 
-#[path = "to_org.rs"]
-mod to_org;
-
 #[path = "types.rs"]
 mod types;

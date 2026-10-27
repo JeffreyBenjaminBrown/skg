@@ -27,8 +27,8 @@ mod collateral_delete;
 #[path = "fork.rs"]
 mod fork;
 
-#[path = "retain_or_entombstone_then_prune.rs"]
-mod retain_or_entombstone_then_prune;
+#[path = "what_the_refresh_keeps.rs"]
+mod what_the_refresh_keeps;
 
 #[path = "collateral_repo_move.rs"]
 mod collateral_skgrepo_move;
