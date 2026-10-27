@@ -2964,3 +2964,20 @@ expectations adapted as classified above.
 Nothing of slice 7.
 *** Headline
 DONE.
+
+** Orchestrator's notes after slice 7 (2026-10-27)
+Launched 00:37 UTC, reported 00:54 UTC: seventeen minutes. No
+correction inserted. The deviations are sound and two improve
+on the plan: both editors now order a headline's parts by a
+'parts' list added to 'shared/metadata-fields.json', which a
+new Rust conformance test checks against the printer, so an
+editor opened and closed without a change sends back exactly
+what the server wrote; and the editors' org conversion now
+accepts a list holding one atom, so a headline carrying
+'(ready)' can be opened, which neither client could do before.
+Suites: nextest 982 of 982, Emacs 405 of 405 (eight tests went
+with what they tested, two came), Neovim 399, integration 34
+of 35 with the pre-existing failure, both clients. Jeff began
+editing 'coding-advice/code-reviews.org' during the slice; the
+agent left it alone, as the next ones will.
+
