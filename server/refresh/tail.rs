@@ -16,9 +16,9 @@ use crate::types::tree::generic::do_everywhere_in_tree_dfs_readonly;
 use crate::types::viewnode::{Viewnode, ViewnodeKind};
 use crate::types::views_state::ViewnodeIdRecord;
 use crate::refresh::mode::RefreshMode;
-use crate::update_buffer::graphnodestats::set_graphnodestats_in_viewforest;
+use crate::refresh::graphnodestats::set_graphnodestats_in_viewforest;
 use crate::update_buffer::util::detach_viewnode_transferring_focus;
-use crate::update_buffer::viewnodestats::set_viewnodestats_in_viewforest;
+use crate::refresh::viewnodestats::set_viewnodestats_in_viewforest;
 
 use ego_tree::{NodeId, Tree};
 use std::collections::{HashMap, HashSet};

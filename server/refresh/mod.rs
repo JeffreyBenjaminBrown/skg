@@ -23,9 +23,11 @@ pub mod buffer_corrections;
 mod diff_view;
 mod extent;
 pub(crate) mod goal;
+pub mod graphnodestats;
 mod id_rule;
 pub mod mode;
 mod tail;
+pub mod viewnodestats;
 mod visit;
 
 pub(crate) use tail::prune_childless_tombstones;

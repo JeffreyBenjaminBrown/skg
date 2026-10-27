@@ -1095,7 +1095,7 @@ What the save does with the two restore requests is described in
 The derived facts of a headline's position stand in one form,
 =(view FACT...)=, after its declared parts and before its =(diff
 ...)=. The server computes them at every rendering (the stats pass,
-=server/update_buffer/viewnodestats.rs=); nobody reads them back:
+=server/refresh/viewnodestats.rs=); nobody reads them back:
 the parser skips =(view ...)= whole, so editing them changes
 nothing. A headline with none carries no =(view ...)=, and =(view)=
 is never written. On a node, in the order written:
@@ -1176,7 +1176,7 @@ for a node shown in place of a node it overrides, which carries
 viewparent carries none: where the viewparent's claims are read, one
 claiming nothing; in a write-protected folder, one the folder's
 relation does not warrant; under a write-protected occurrence, every
-child ('stands_as_member' in =server/update_buffer/viewnodestats.rs=).
+child ('stands_as_member' in =server/refresh/viewnodestats.rs=).
 
 | Birth                            | Facts                                                        |
 |----------------------------------+--------------------------------------------------------------|

@@ -294,7 +294,7 @@ top of the buffer it always does; in a folder that reads no claims
 (a container folder, say, or any folder of a write-protected
 occurrence), it does when the truth warrants it;
 anywhere else (under a write-protected occurrence, say) it does not
-('stands_as_member' in 'server/update_buffer/viewnodestats.rs').
+('stands_as_member' in 'server/refresh/viewnodestats.rs').
 It is a third notion beside the claim and the warrant, since it is
 neither: a warranted member of a write-protected folder claims
 nothing but stands as a member, and a warranted child of an editable

@@ -34,7 +34,7 @@ use skg::to_org::render::content_view::multi_root_view_with_skgrepo_set;
 use skg::types::misc::ID;
 use skg::types::nodes::complete::Graphnode;
 use skg::types::viewnode::{RelationCounts, Viewnode, ViewnodeKind, Vognode};
-use skg::update_buffer::viewnodestats::set_viewnodestats_in_viewforest;
+use skg::refresh::viewnodestats::set_viewnodestats_in_viewforest;
 
 use std::collections::HashMap;
 

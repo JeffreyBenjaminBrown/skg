@@ -4,8 +4,6 @@ use crate::types::misc::{ID, SkgConfig, SkgrepoName};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::viewnode::{Viewnode, mk_editable_viewnode};
 
-use ego_tree::Tree;
-use ego_tree::iter::Edge;
 use std::error::Error;
 use std::io;
 
@@ -65,16 +63,3 @@ fn graphnode_and_viewnode_from_pid_and_skgrepo (
     title,
     graphnode . body . clone () );
   Ok (( graphnode, viewnode )) }
-
-/// The gnids of the occurrences in 'tree', in preorder, each as often
-/// as it occurs: the nodes whose graph stats the stats pass sets.
-pub fn gnids_that_can_have_graphnodestats (
-  tree : &Tree<Viewnode>,
-) -> Vec < ID > {
-  let mut gnids : Vec < ID > = Vec::new ();
-  for edge in tree . root () . traverse () {
-    if let Edge::Open (node_ref) = edge {
-      if let Some (gnid) =
-        node_ref . value () . occurrence_gnid ()
-      { gnids . push ( gnid . clone () ); }}}
-  gnids }

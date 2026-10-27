@@ -3,7 +3,6 @@ use crate::dbs::in_rust_graph::stats::{
   graphnodestats_for_pid,
   AllGraphnodeStats};
 use crate::skgrepo_sets::SkgrepoRestriction;
-use crate::to_org::util::gnids_that_can_have_graphnodestats;
 use crate::types::misc::{ID, SkgConfig};
 use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
 use crate::dbs::in_rust_graph::InRustGraph;
@@ -14,6 +13,7 @@ use crate::types::viewnode::Vognode;
 use std::collections::{HashSet, HashMap};
 use std::error::Error;
 use ego_tree::{NodeId, Tree};
+use ego_tree::iter::Edge;
 
 /// Enrich all nodes in a viewforest with statistics from the captured
 /// graph, as the skgrepo restriction lets it be seen. Also fetches and
@@ -81,3 +81,16 @@ pub fn set_metadata_relationships_in_node_recursive (
       graph,
       stats,
       config ); } }
+
+/// The gnids of the occurrences in 'tree', in preorder, each as often
+/// as it occurs: the nodes whose graph stats the stats pass sets.
+fn gnids_that_can_have_graphnodestats (
+  tree : &Tree<Viewnode>,
+) -> Vec < ID > {
+  let mut gnids : Vec < ID > = Vec::new ();
+  for edge in tree . root () . traverse () {
+    if let Edge::Open (node_ref) = edge {
+      if let Some (gnid) =
+        node_ref . value () . occurrence_gnid ()
+      { gnids . push ( gnid . clone () ); }}}
+  gnids }

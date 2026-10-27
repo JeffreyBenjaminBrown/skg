@@ -14,12 +14,7 @@
 //!   collateral ones, streaming each to the client.
 
 pub mod reconcile;
-pub mod graphnodestats;
 pub mod util;
-pub mod viewnodestats;
-
-pub use graphnodestats::set_graphnodestats_in_viewforest;
-pub use viewnodestats::set_viewnodestats_in_viewforest;
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::refresh::{Refreshed, Truth, refresh_content_viewforest};
