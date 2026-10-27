@@ -2833,3 +2833,29 @@ Nothing of slice 6. Noticed: the refresh's own render, unused
 here, could be skipped if the refresh took the fold; not asked.
 *** Headline
 DONE.
+
+** Orchestrator's notes after slice 6 (2026-10-27)
+Launched 00:13 UTC, reported 00:34 UTC: twenty-one minutes.
+No correction inserted. Two deviations are for the review's
+eye rather than a correction: the 'overPrivateText' exclusion
+stays after the refresh, since excluding before it would
+release the text of folder members the refresh draws, so the
+handler still renders a second time after the refresh's own
+render (the plan's pitfall expected one render; a refresh
+option to skip rendering would remove the second, left
+unmade); and a search during a save is no longer refused,
+since the guard that refused it served the two phases, so a
+search now behaves as a content-view request does mid-save,
+with the same message-reader hazard that request already has.
+The rest is sound: the alias folder of an alias-found hit stays
+open by folding the other folders' members rather than the
+hit's children; the index's 'is_title' field tells a title
+match from an alias match; the override folder's own goal now
+draws an unknown for an override target on disk but not in
+the graph, with a test. The grep's one remaining hit is the
+doc's citation of the benchmark report, which the plan
+requires. Suites: nextest 981 of 981, Emacs 411, Neovim 396,
+integration 34 of 35 with the pre-existing failure, both
+clients; the timing ran on the small fixture graph (19 hits,
+11 ms median), which says nothing about hundreds of hits.
+
