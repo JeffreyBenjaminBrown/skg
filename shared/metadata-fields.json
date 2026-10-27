@@ -49,6 +49,13 @@
         { "name": "editRequest", "shape": "one", "default": "none",
           "values": [ { "value": "relRepo",
                         "arguments": [ { "of": "skgrepo" } ] } ] } ] },
+    { "kind": "restricted", "atoms": [ "restricted" ],
+      "fields": [
+        { "name": "noClaim", "shape": "atom", "default": "false",
+          "values": [ { "value": "true" } ] },
+        { "name": "editRequest", "shape": "one", "default": "none",
+          "values": [ { "value": "relRepo",
+                        "arguments": [ { "of": "skgrepo" } ] } ] } ] },
     { "kind": "alias", "atoms": [ "alias" ],
       "fields": [
         { "name": "noClaim", "shape": "atom", "default": "false",

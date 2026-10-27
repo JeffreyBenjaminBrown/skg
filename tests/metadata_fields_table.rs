@@ -91,7 +91,7 @@ fn every_kind_atom (
         | Folder::HiddenOutsideOfSubscribee
         | Folder::Container | Folder::Mentioner
         | Folder::AcquiredBy | Folder::Acquired => (), } }
-  [ "node", "ghost", "unknown",
+  [ "node", "ghost", "unknown", "restricted",
     "tombstone", "forestRoot" ]
     . iter () . map ( |atom| atom . to_string () )
     . chain ( members . iter ()
@@ -160,6 +160,7 @@ fn example_of_kind (
     "node"                 => "(skg node (gnid a) (skgRepos (nodeRepo r)))" . to_string (),
     "ghost"                => "(skg ghost (gnid a) (skgRepos (nodeRepo r)))" . to_string (),
     "unknown"              => "(skg unknown (gnid a))" . to_string (),
+    "restricted"           => "(skg restricted (gnid a))" . to_string (),
     "flag"                 => "(skg (flag noSearchMatching))" . to_string (),
     "oldText"              => "(skg (oldText title))" . to_string (),
     "homeSkgrepoMove" | "relRepoMove" =>

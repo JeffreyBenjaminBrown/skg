@@ -188,6 +188,28 @@
 ---- readiness request: (ready rel)
 ---- with the readiness request: (skg unknown (gnid u) (skgRepos (relRepo pub)) noClaim (editRequest (ready rel)))
 
+==== restricted
+---- metadata: (skg (vnid 0r) restricted (gnid h) (skgRepos (relRepo pub)))
+---- fill-in:
+* skg
+** vnid
+*** 0r
+** restricted
+** gnid
+*** h
+** skgRepos
+*** relRepo
+**** pub
+** noClaim
+*** false (default)
+** editRequest
+*** none (default)
+---- strip: (skg (vnid 0r) restricted (gnid h) (skgRepos (relRepo pub)))
+---- edit request: (relRepo main)
+---- with the edit request: (skg (vnid 0r) restricted (gnid h) (skgRepos (relRepo pub)) (editRequest (relRepo main)))
+---- readiness request: (ready rel)
+---- with the readiness request: (skg (vnid 0r) restricted (gnid h) (skgRepos (relRepo pub)) (editRequest (ready rel)))
+
 ==== alias: a readiness request naming no object
 ---- metadata: (skg alias (skgRepos (relRepo pub)) (editRequest (ready)) (view ghostWarrant) (diff (rel added) (leaves 1)))
 ---- fill-in:

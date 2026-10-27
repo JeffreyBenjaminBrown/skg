@@ -232,6 +232,14 @@
 (skg unknown (gnid gone))
 ---- text: Reference to unknown node.
 ---- styles: message*26
+==== placeholders: Restricted vognode
+(skg restricted (gnid hidden))
+---- text: restricted
+---- styles: message*10
+==== placeholders: Restricted vognode, its record's relRepo and a relRepo request
+(skg restricted (gnid hidden) (skgRepos (relRepo pub)) (editRequest (relRepo priv)))
+---- text: restricted ~pub request:~priv
+---- styles: message*10 -*1 ugly*4 -*1 nonstandard*13
 ==== placeholders: tombstone
 (skg tombstone)
 ---- text: something stood here

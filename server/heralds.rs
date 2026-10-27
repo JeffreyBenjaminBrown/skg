@@ -27,8 +27,9 @@
 /// stands beside the kind at the top level of '(skg ...)'. The WHEN
 /// directive stays because '(view ...)' and '(diff ...)' are the only
 /// nested forms and a '(diff ...)' reads differently by kind: a node's
-/// and a ghost's has two diff objects (∃+, ~+), an unknown's one
-/// relationship (~+), a property's or a change viewnode's one object
+/// and a ghost's has two diff objects (∃+, ~+), an unknown's and a
+/// Restricted vognode's one relationship (~+), a property's or a
+/// change viewnode's one object
 /// (+). A WHEN emits nothing of its own, so it takes no style. The
 /// conformance tests check that a WHEN names only kind atoms and
 /// carries no style.
@@ -298,7 +299,7 @@ fn readiness_request_rules (
       readiness_request_rule ("unreadyRequest", "unready", "request:unready") ]) ] }
 
 /// The same for a leaf with a single diff object (a property member, an
-/// unknown), whose '(ready)' names no object, or
+/// unknown, a Restricted vognode), whose '(ready)' names no object, or
 /// 'all' on a changeset marker. 'added' and 'removed' render its
 /// existence, whichever object it names.
 fn change_fact_rules_for_one_object (
@@ -493,19 +494,10 @@ pub fn herald_rule_table () -> HeraldRule {
       // here: a node a save deleted, or one the skgrepo restriction
       // now hides.
       crule ("tombstone", vec! [ s ("something stood here") ]),
-      when ( &[ "unknown" ], [
-        vec! [
-          leaf ("unknown", "Reference to unknown node."),
-          vac ("gnid"),
-          rule ("skgRepos", vec! [
-            crule ("relRepo", vec! [
-              any (vec! [ s ("~"), RuleChild::It ]) ]) ]),
-          pending_detachment_rule (),
-          rule ("editRequest", vec! [
-            crule_styled_as ("editRequest_relRepo", "relRepo", vec! [
-              any (vec! [ s ("request:~"), RuleChild::It ]) ]) ]) ],
-        change_fact_rules_for_one_object ("~+", "~-"),
-        readiness_request_rules () ] . concat () ),
+      gnid_only_vognode_rule ("unknown", "Reference to unknown node."),
+      // A node the skgrepo restriction keeps out, which a visible
+      // record names: nothing of it shows but this.
+      gnid_only_vognode_rule ("restricted", "restricted"),
       // A ghost is write-protected: its ☮ abuts its ᗣ. Its two
       // objects are its existence (∃-) and its relationship to its
       // viewparent.
@@ -601,10 +593,34 @@ pub fn herald_rule_table () -> HeraldRule {
         readiness_request_rules () ] . concat ()) ] ] . concat (),
   }}
 
+/// The rules of a vognode that shows only a gnid, an unknown or a
+/// Restricted vognode, whose kind atom is KIND: HERALD for the kind,
+/// the relRepo of its record, a pending detachment, a relRepo
+/// request, and, in the diff view, the change facts of its one
+/// object, its relationship to its viewparent.
+fn gnid_only_vognode_rule (
+  kind   : &'static str,
+  herald : &'static str,
+) -> RuleChild {
+  when ( &[ kind ], [
+    vec! [
+      leaf (kind, herald),
+      vac ("gnid"),
+      rule ("skgRepos", vec! [
+        crule ("relRepo", vec! [
+          any (vec! [ s ("~"), RuleChild::It ]) ]) ]),
+      pending_detachment_rule (),
+      rule ("editRequest", vec! [
+        crule_styled_as ("editRequest_relRepo", "relRepo", vec! [
+          any (vec! [ s ("request:~"), RuleChild::It ]) ]) ]) ],
+    change_fact_rules_for_one_object ("~+", "~-"),
+    readiness_request_rules () ] . concat () ) }
+
 /// The kinds whose '(diff ...)' renders a single diff object: the
 /// property members and the diff view's change viewnodes but the body
-/// diff, which carries none. A node's, a ghost's and an unknown's have
-/// rules of their own; a folder carries none.
+/// diff, which carries none. A node's, a ghost's, an unknown's and a
+/// Restricted vognode's have rules of their own; a folder carries
+/// none.
 fn kinds_whose_diff_has_one_object (
 ) -> Vec<&'static str> {
   property_and_change_kind_atoms () . into_iter ()
@@ -813,7 +829,7 @@ pub fn emittable_metadata_atoms () -> std::collections::HashSet<&'static str> {
     // The viewnode ID that starts every wrapper; its value is value position.
     "vnid",
     // Kind atoms, from org_to_text.rs:
-    "node", "unknown",
+    "node", "unknown", "restricted",
     "tombstone", "ghost",
     // The parts beside them:
     "gnid", "skgRepos", "nodeRepo",
@@ -855,7 +871,7 @@ fn client_computed_atoms () -> Vec<&'static str> {
 
 /// Every kind atom the server writes: the kinds a WHEN may name.
 pub fn emittable_kind_atoms () -> HashSet<&'static str> {
-  [ "node", "ghost", "unknown", "tombstone" ] . into_iter ()
+  [ "node", "ghost", "unknown", "restricted", "tombstone" ] . into_iter ()
     . chain ( property_and_change_kind_atoms () )
     . chain ( Folder::all () . iter () . map ( |folder| folder . repr_in_client () ))
     . collect () }
@@ -961,8 +977,8 @@ fn viewstats_atoms () -> Vec<&'static str> {
          "ghostWarrant" ] }
 
 /// The claim atom the serializer can emit: 'noClaim' on an occurrence,
-/// an alias, an id or an unknown that does not claim membership (one
-/// that claims carries nothing).
+/// an alias, an id, an unknown or a Restricted vognode that does not
+/// claim membership (one that claims carries nothing).
 fn claim_emitted_atoms () -> Vec<&'static str> {
   vec! [ "noClaim" ] }
 

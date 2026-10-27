@@ -65,6 +65,7 @@
     "viewRequests":                    "nonstandard",
     "tombstone":                       "message",
     "unknown":                         "message",
+    "restricted":                      "message",
     "aliasFolder":                     "message",
     "alias":                           "message",
     "idFolder":                        "message",
