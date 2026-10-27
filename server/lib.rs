@@ -22,7 +22,6 @@ pub mod serve;
 pub mod sexp_string;
 pub mod skgrepo_sets;
 pub mod test_utils;
-pub mod to_org;
 pub mod types;
 pub mod update_buffer;
 pub mod util;

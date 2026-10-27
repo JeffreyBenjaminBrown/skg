@@ -15,7 +15,7 @@ use crate::git_fixture_helpers::mk_test_tcp_stream_pair;
 
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::test_utils::update_from_and_rerender_buffer_test;
-use skg::to_org::render::content_view::multi_root_view;
+use skg::test_utils::multi_root_view;
 use skg::types::errors::{BufferValidationError, SaveError};
 use skg::types::misc::ID;
 use skg::types::views_state::ViewforestId;

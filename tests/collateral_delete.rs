@@ -19,7 +19,7 @@ use skg::test_utils::{
   run_with_test_stores, graph_handle_from_config,
   read_all_lp_messages};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
-use skg::to_org::render::content_view::{
+use skg::test_utils::{
   multi_root_view, single_root_view};
 use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;

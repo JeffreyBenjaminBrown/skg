@@ -29,7 +29,7 @@ use skg::test_utils::{graph_handle_from_config, run_with_shared_test_stores};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::test_utils::update_from_and_rerender_buffer_with_fork_approval_test;
 use skg::test_utils::update_from_and_rerender_buffer_with_fork_skgrepos_test;
-use skg::to_org::render::content_view::single_root_view;
+use skg::test_utils::single_root_view;
 use skg::types::errors::{BufferValidationError, SaveError};
 use skg::types::misc::{ID, SkgConfig, SkgrepoName, TantivyIndex, members_of};
 use skg::types::nodes::complete::Graphnode;

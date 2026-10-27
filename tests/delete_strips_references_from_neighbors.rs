@@ -40,7 +40,7 @@ use skg::serve::ViewsState;
 use skg::serve::handlers::delete_references_to_absent_node::
   handle_delete_references_to_absent_node_request;
 use skg::skgrepo_sets::SkgrepoRestriction;
-use skg::to_org::render::content_view::single_root_view;
+use skg::test_utils::single_root_view;
 use skg::types::env::SkgEnv;
 use skg::types::views_state::{OpenViews, ViewforestId};
 use skg::types::misc::{ID, SkgConfig, TantivyIndex, SkgrepoName, members_of, members_msv};

@@ -343,7 +343,7 @@ impl ViewnodeIdRecord {
 /// descendants register themselves). Ghosts and unknowns
 /// are excluded too: they are not graph members. The single source of
 /// which kinds count: update_view derives its pids through it, and the de-novo
-/// caller (multi_root_view_via_env) computes the pids it passes to register_view
+/// caller (multi_root_view_via_runtime) computes the pids it passes to register_view
 /// through it too.
 pub fn pids_from_viewforest (
   viewforest : &ViewForest,

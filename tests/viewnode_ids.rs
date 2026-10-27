@@ -19,7 +19,7 @@ use skg::test_utils::{
   extract_string_field_from_sexp, graph_handle_from_config,
   read_all_lp_messages, run_with_test_stores};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
-use skg::to_org::render::content_view::multi_root_view;
+use skg::test_utils::multi_root_view;
 use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 use skg::types::viewnode::{
   Folder, ViewnodeId, Viewnode, viewforest_root_viewnode,

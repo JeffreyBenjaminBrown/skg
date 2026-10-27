@@ -4,7 +4,7 @@ use indoc::indoc;
 use skg::assert_metadata_eq;
 use skg::dbs::filesystem::not_nodes::load_config_with_overrides;
 use skg::test_utils::remove_test_dir;
-use skg::to_org::render::content_view::single_root_view;
+use skg::test_utils::single_root_view;
 use skg::types::misc::{SkgConfig, ID};
 
 use futures::executor::block_on;

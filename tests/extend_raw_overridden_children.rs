@@ -14,7 +14,7 @@
 use std::error::Error;
 
 use skg::test_utils::run_with_test_stores;
-use skg::to_org::render::content_view::multi_root_view;
+use skg::test_utils::multi_root_view;
 use skg::types::misc::ID;
 use ego_tree::Tree;
 use skg::types::viewnode::Viewnode;

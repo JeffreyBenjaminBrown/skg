@@ -1,5 +1,5 @@
 use skg::dbs::filesystem::not_nodes::load_config_with_overrides;
-use skg::to_org::render::content_view::single_root_view;
+use skg::test_utils::single_root_view;
 use skg::types::misc::{ID, SkgConfig};
 use std::error::Error;
 

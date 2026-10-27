@@ -17,7 +17,7 @@ use skg::test_utils::{
   extract_string_field_from_sexp,
   read_all_lp_messages,
   update_from_and_rerender_buffer_test as update_from_and_rerender_buffer};
-use skg::to_org::render::content_view::multi_root_view;
+use skg::test_utils::multi_root_view;
 use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 use skg::types::nodes::complete::Graphnode;
 use skg::types::views_state::{OpenViews, ViewforestId};

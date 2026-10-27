@@ -22,7 +22,7 @@ use skg::test_utils::save_and_rerender;
 use std::error::Error;
 
 use skg::test_utils::run_with_test_stores;
-use skg::to_org::render::content_view::multi_root_view;
+use skg::test_utils::multi_root_view;
 use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 
 use skg::dbs::filesystem::not_nodes::load_config_with_overrides;

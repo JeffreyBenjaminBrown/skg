@@ -31,7 +31,7 @@ use crate::serve::protocol::TcpToClient;
 use crate::serve::rerender_stream::write_graph_straddle_back;
 use crate::serve::util::{ format_single_view_sexp, send_response_with_length_prefix, tag_sexp_response};
 use crate::skgrepo_sets::SkgrepoRestriction;
-use crate::types::views_state::{DiffViewBufferKind, ViewforestId, ViewnodeIdRecord};
+use crate::types::views_state::{DiffViewBufferKind, ViewforestId, ViewnodeIdRecord, pids_from_viewforest};
 use crate::types::misc::ID;
 use crate::types::save::ForkSpec;
 use crate::types::tree::forest::ViewForest;
@@ -39,7 +39,7 @@ use crate::types::viewnode::{
   Editability, Viewnode, ViewnodeKind, mk_editable_viewnode, mk_unknown_viewnode};
 use crate::types::viewnode::{FolderRelation, Vognode, ViewRequest};
 
-use ego_tree::NodeId;
+use ego_tree::{NodeId, Tree};
 use std::collections::HashSet;
 use std::error::Error;
 use std::sync::Arc;
@@ -291,6 +291,27 @@ pub(crate) fn rerender_open_view (
     buffer_corrections : refreshed . buffer_corrections,
     viewforest,
     viewnode_id_record, } ) }
+
+/// The text of a fresh content view of 'root_gnids', the pids the
+/// caller registers for it, and its viewforest: the roots' content,
+/// their containers folders and their default folders. The de-novo
+/// render ('render_initial_view') is the refresh of a stub forest of
+/// the requested roots, each asking for its containers folder, which
+/// is drawn with the containerward chain.
+pub(crate) fn multi_root_view_via_runtime (
+  runtime            : &RuntimeGeneration,
+  root_gnids        : &[ID],
+  skgrepo_restriction : Option<&SkgrepoRestriction>,
+) -> Result < (String, Vec<ID>, Tree<Viewnode>), Box<dyn Error> > {
+  let (viewforest, buffer_content) : (ViewForest, String) =
+    render_initial_view ( runtime, root_gnids, skgrepo_restriction ) ?;
+  // The pids the caller registers for this view -- its occurrences,
+  // via the one shared skgrepo of which-kinds-count
+  // (views_state::pids_from_viewforest), the same helper update_view uses post-save.
+  let pids : Vec<ID> =
+    pids_from_viewforest (&viewforest)
+      . into_iter () . collect ();
+  Ok ((buffer_content, pids, viewforest . into_internal_tree ())) }
 
 /// Render a fresh content view: the refresh of a stub
 /// ('stub_of_fresh_content_view') in content-view mode, which draws

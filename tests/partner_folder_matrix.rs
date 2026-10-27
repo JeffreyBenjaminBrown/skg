@@ -29,7 +29,7 @@ use skg::skgrepo_sets::{
   SkgrepoRestriction, SkgrepoSetName, run_with_skgrepo_set_test_db};
 use skg::test_utils::graph_handle_from_config;
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
-use skg::to_org::render::content_view::{
+use skg::test_utils::{
   multi_root_view, multi_root_view_with_skgrepo_set};
 use skg::refresh::buffer_corrections::BufferCorrectionKind;
 use skg::serve::ViewsState;

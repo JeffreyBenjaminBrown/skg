@@ -14,7 +14,7 @@ use skg::dbs::in_rust_graph::{
   InRustGraphHandle};
 use skg::test_utils::{run_with_test_stores, graph_handle_from_config};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
-use skg::to_org::render::content_view::multi_root_view;
+use skg::test_utils::multi_root_view;
 use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::types::views_state::OpenViews;

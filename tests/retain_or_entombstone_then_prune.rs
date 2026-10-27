@@ -32,7 +32,7 @@ use skg::test_utils::{
   extract_string_field_from_sexp, graph_handle_from_config,
   read_all_lp_messages, run_with_shared_test_stores, skg_env_from_parts};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
-use skg::to_org::render::content_view::single_root_view;
+use skg::test_utils::single_root_view;
 use skg::types::env::SkgEnv;
 use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 use skg::types::viewnode::Viewnode;

@@ -12,7 +12,7 @@ use skg::test_utils::{
   read_all_lp_messages, run_with_test_stores,
   update_from_and_rerender_buffer_with_snapshots_test,
 };
-use skg::to_org::render::content_view::single_root_view;
+use skg::test_utils::single_root_view;
 use skg::types::misc::ID;
 use skg::types::errors::SaveError;
 use skg::types::save::format_save_error_as_org;

@@ -19,7 +19,7 @@ use skg::serve::handlers::save_buffer::{
 use skg::test_utils::{
   cleanup_test_tantivy, copy_dir_all, extract_string_field_from_sexp,
   read_all_lp_messages, skg_env_from_parts};
-use skg::to_org::render::content_view::multi_root_view;
+use skg::test_utils::multi_root_view;
 use skg::types::env::SkgEnv;
 use skg::types::misc::{ID, SkgConfig, SkgrepoName, TantivyIndex};
 use skg::types::nodes::complete::Graphnode;

@@ -18,7 +18,7 @@ use std::error::Error;
 use std::net::TcpStream;
 
 use skg::assert_metadata_eq;
-use skg::to_org::render::content_view::single_root_view;
+use skg::test_utils::single_root_view;
 use skg::test_utils::run_with_shared_test_stores;
 use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;

@@ -24,7 +24,7 @@ use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::diff_view::change_viewnodes::{
   mk_acquired_folder_viewnode, mk_body_diff_viewnode, mk_changeset_marker_viewnode,
   mk_historical_viewnode, mk_old_text_viewnode, mk_relRepo_move_viewnode};
-use skg::to_org::render::content_view::multi_root_view;
+use skg::test_utils::multi_root_view;
 use skg::types::misc::{ID, SkgrepoChange, SkgrepoName};
 use skg::types::nodes::rust::GraphnodeInRust;
 use skg::types::tree::moves::{move_before, move_to_first_child};

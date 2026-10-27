@@ -18,7 +18,7 @@ use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::test_utils::{graph_handle_from_config, run_with_test_stores};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
-use skg::to_org::render::content_view::multi_root_view;
+use skg::test_utils::multi_root_view;
 use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 use skg::types::viewnode::Viewnode;
 use skg::types::views_state::{OpenViews, ViewforestId};

@@ -29,7 +29,7 @@ use skg::skgrepo_sets::{SkgrepoRestriction, SkgrepoSetName};
 use skg::test_utils::{
   run_with_shared_test_stores,
   graph_handle_from_config};
-use skg::to_org::render::content_view::{
+use skg::test_utils::{
   multi_root_view, multi_root_view_with_skgrepo_set};
 use skg::types::errors::{BufferValidationError, SaveError};
 use skg::types::misc::{ID, SkgConfig, SkgrepoName, TantivyIndex, members_of};

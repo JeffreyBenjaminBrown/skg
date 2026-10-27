@@ -3,7 +3,7 @@
 use indoc::indoc;
 use std::error::Error;
 
-use skg::to_org::render::content_view::multi_root_view;
+use skg::test_utils::multi_root_view;
 use skg::assert_metadata_eq;
 use skg::test_utils::run_with_shared_test_stores;
 use skg::types::misc::{ID, SkgConfig, TantivyIndex};

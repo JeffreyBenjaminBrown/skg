@@ -16,7 +16,7 @@ use skg::test_utils::{
   read_all_lp_messages,
   run_with_shared_test_stores,
   update_from_and_rerender_buffer_test as update_from_and_rerender_buffer };
-use skg::to_org::render::content_view::single_root_view;
+use skg::test_utils::single_root_view;
 use skg::types::misc::{SkgConfig, ID, TantivyIndex, members_of};
 use skg::types::nodes::complete::Graphnode;
 

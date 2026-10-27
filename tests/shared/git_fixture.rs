@@ -18,7 +18,7 @@ use skg::test_utils::{
   cleanup_test_tantivy, copy_dir_all, extract_string_field_from_sexp,
   graph_handle_from_config, read_all_lp_messages, skg_env_from_parts,
   update_from_and_rerender_buffer_test};
-use skg::to_org::render::content_view::{multi_root_view, multi_root_view_with_skgrepo_set};
+use skg::test_utils::{multi_root_view, multi_root_view_with_skgrepo_set};
 use skg::types::env::SkgEnv;
 use skg::types::misc::{ID, SkgConfig, Skgrepo, SkgrepoName, TantivyIndex};
 use skg::types::viewnode::Viewnode;

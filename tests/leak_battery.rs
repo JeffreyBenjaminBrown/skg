@@ -30,7 +30,7 @@ use skg::skgrepo_sets::{SkgrepoRestriction, SkgrepoSetName, run_with_skgrepo_set
 use skg::test_utils::graph_handle_from_config;
 use skg::refresh::chain::{
   ContainerwardChainPartners, attach_containerward_chains_under_members};
-use skg::to_org::render::content_view::multi_root_view_with_skgrepo_set;
+use skg::test_utils::multi_root_view_with_skgrepo_set;
 use skg::types::misc::ID;
 use skg::types::nodes::complete::Graphnode;
 use skg::types::viewnode::{RelationCounts, Viewnode, ViewnodeKind, Vognode};
