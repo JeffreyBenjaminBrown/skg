@@ -7,7 +7,7 @@
 //!
 //! And the node budget, which bounds how many occurrences the refresh
 //! makes editable: each occurrence whose content is drawn charges it
-//! once ('CompletionMode::charges_node_budget'). Among the
+//! once ('RefreshMode::charges_node_budget'). Among the
 //! occurrences the refresh draws, the first of a node is editable only
 //! when its parent is editable content and the budget allows; a repeat
 //! is write-protected. In the diff view the pruned change view decides
@@ -21,7 +21,7 @@ use crate::refresh::{Walk, write_protect_occurrence};
 use crate::types::misc::ID;
 use crate::types::tree::forest::{holds_containerward_chain, in_content_position};
 use crate::types::viewnode::{Viewnode, ViewnodeKind, Vognode};
-use crate::update_buffer::completion_mode::CompletionMode;
+use crate::refresh::mode::RefreshMode;
 
 use ego_tree::{NodeId, NodeRef, Tree};
 
@@ -55,8 +55,8 @@ pub(crate) fn drawn_occurrence_is_editable (
   children_are_editable_content (tree, parent, walk)
   && ! walk . editable_gnids . contains (pid)
   && match walk . mode {
-    CompletionMode::ContentView => walk . node_budget > 0,
-    CompletionMode::DiffView { straddle, buffer_kind, .. } =>
+    RefreshMode::ContentView => walk . node_budget > 0,
+    RefreshMode::DiffView { straddle, buffer_kind, .. } =>
       prunedChangeView_sets_of_buffer (straddle, buffer_kind) . u
         . contains (pid)
       || ( walk . had_editableView_request . contains (&parent)

@@ -46,7 +46,7 @@ use crate::types::views_state::DiffViewBufferKind;
 use crate::types::viewnode::{
   ChangeViewnode, ChangesetMarkerKind, DiffChange, Existence, Folder,
   Viewnode, ViewnodeKind, Vognode, Warrant, viewnode_of};
-use crate::update_buffer::completion_mode::CompletionMode;
+use crate::refresh::mode::RefreshMode;
 
 use ego_tree::{NodeId, NodeMut, NodeRef, Tree};
 use std::collections::{HashMap, HashSet};
@@ -478,5 +478,5 @@ fn diff_view_of<'a> (
   walk : &Walk<'a>,
 ) -> Option<(&'a GraphStraddle, DiffViewBufferKind)> {
   match walk . mode {
-    CompletionMode::DiffView { straddle, buffer_kind, .. } => Some ((straddle, buffer_kind)),
-    CompletionMode::ContentView => None, } }
+    RefreshMode::DiffView { straddle, buffer_kind, .. } => Some ((straddle, buffer_kind)),
+    RefreshMode::ContentView => None, } }

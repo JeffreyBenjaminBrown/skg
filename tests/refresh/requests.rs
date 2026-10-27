@@ -81,7 +81,7 @@ fn editableView_extends_content_shown_write_protected_within_the_budget () {
     ", occurrence_metadata ("p", "(viewRequests editableView)"),
        occurrence_metadata ("c", "writeProtected"),
        occurrence_metadata ("d", "writeProtected") );
-  assert_eq! ( run_asserting_fixpoint_in ( &input, &family (), None, CompletionMode::ContentView, 2 )
+  assert_eq! ( run_asserting_fixpoint_in ( &input, &family (), None, RefreshMode::ContentView, 2 )
                . outline (), "\
 node p
   node c

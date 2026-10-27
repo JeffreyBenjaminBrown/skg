@@ -15,7 +15,7 @@ use crate::types::tree::forest::ViewForest;
 use crate::types::tree::generic::do_everywhere_in_tree_dfs_readonly;
 use crate::types::viewnode::{Viewnode, ViewnodeKind};
 use crate::types::views_state::ViewnodeIdRecord;
-use crate::update_buffer::completion_mode::CompletionMode;
+use crate::refresh::mode::RefreshMode;
 use crate::update_buffer::graphnodestats::set_graphnodestats_in_viewforest;
 use crate::update_buffer::util::detach_viewnode_transferring_focus;
 use crate::update_buffer::viewnodestats::set_viewnodestats_in_viewforest;
@@ -49,7 +49,7 @@ fn set_derived_facts (
     viewforest . as_internal_tree_mut (), truth . graph,
     &container_to_contents, &content_to_containers,
     truth . config, truth . restriction );
-  if let CompletionMode::DiffView { straddle, buffer_kind, readiness_store } = walk . mode {
+  if let RefreshMode::DiffView { straddle, buffer_kind, readiness_store } = walk . mode {
     set_diffView_facts_in_viewforest (
       viewforest, straddle, buffer_kind, readiness_store, truth . graph ); }
   Ok (( )) }

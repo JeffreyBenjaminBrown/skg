@@ -25,7 +25,7 @@ use crate::types::viewnode::{
   ChangeFacts, Editability, Ghost, NodeEditRequest, PropertyMember, RelationshipEditRequest,
   Unknown, Occurrence, Viewnode, ViewnodeKind, Vognode, VognodeKind, Warrant,
   default_occurrence};
-use crate::update_buffer::completion_mode::CompletionMode;
+use crate::refresh::mode::RefreshMode;
 
 use ego_tree::{NodeId, NodeMut, NodeRef, Tree};
 use std::error::Error;
@@ -51,8 +51,8 @@ pub(crate) fn id_rule (
   walk        : &Walk,
 ) -> IdRuleAnswer {
   let head : Option<&GraphStraddle> = match walk . mode {
-    CompletionMode::DiffView { straddle, .. } => Some (straddle),
-    CompletionMode::ContentView => None, };
+    RefreshMode::DiffView { straddle, .. } => Some (straddle),
+    RefreshMode::ContentView => None, };
   if walk . truth . graph . gnid_presence_gated (gnid, walk . truth . restriction )
      == GnidPresence::Present {
     let pid : ID = walk . truth . graph . pid_of (gnid)
@@ -326,7 +326,7 @@ pub(crate) fn ghost_from_head (
   pid  : &ID,
   walk : &Walk,
 ) -> Option<Ghost> {
-  let CompletionMode::DiffView { straddle, .. } : CompletionMode = walk . mode
+  let RefreshMode::DiffView { straddle, .. } : RefreshMode = walk . mode
     else { return None; };
   match mk_historical_viewnode (straddle, pid, None) ? . kind {
     ViewnodeKind::Vognode (Vognode::Ghost (ghost)) => Some (ghost),

@@ -25,6 +25,7 @@ mod extent;
 pub(crate) mod goal;
 mod id_rule;
 mod ladder;
+pub mod mode;
 mod tail;
 
 pub(crate) use tail::prune_childless_tombstones;
@@ -38,7 +39,7 @@ use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
   Editability, ViewRequest, Viewnode, ViewnodeKind, Vognode};
 use crate::types::views_state::ViewnodeIdRecord;
-use crate::update_buffer::completion_mode::CompletionMode;
+use crate::refresh::mode::RefreshMode;
 use buffer_corrections::{BufferCorrectionPolicy, BufferCorrection, BufferCorrectionKind, BufferCorrectionLog};
 
 use ego_tree::{NodeId, NodeRef, Tree};
@@ -81,7 +82,7 @@ pub fn refresh_content_viewforest (
   buffer_correction_policy : &BufferCorrectionPolicy,
 ) -> Result<Refreshed, Box<dyn Error>> {
   refresh_viewforest (
-    viewforest, viewnode_id_record, truth, CompletionMode::ContentView,
+    viewforest, viewnode_id_record, truth, RefreshMode::ContentView,
     truth . config . initial_node_limit, buffer_correction_policy ) }
 
 /// Refresh 'viewforest' against 'truth', in 'mode', drawing at most
@@ -94,7 +95,7 @@ pub fn refresh_viewforest (
   viewforest               : &mut ViewForest,
   viewnode_id_record       : &mut ViewnodeIdRecord,
   truth                    : &Truth,
-  mode                     : CompletionMode,
+  mode                     : RefreshMode,
   node_budget              : usize,
   buffer_correction_policy : &BufferCorrectionPolicy,
 ) -> Result<Refreshed, Box<dyn Error>> {
@@ -115,7 +116,7 @@ pub fn refresh_viewforest (
 /// What the walk carries from one parent to the next.
 pub(crate) struct Walk<'a> {
   pub truth          : &'a Truth<'a>,
-  pub mode           : CompletionMode<'a>,
+  pub mode           : RefreshMode<'a>,
   /// How many more editable occurrences may have their content drawn.
   pub node_budget    : usize,
   /// The gnids that have an editable occurrence: at most one each.
@@ -146,7 +147,7 @@ pub(crate) struct Walk<'a> {
 impl<'a> Walk<'a> {
   fn new (
     truth             : &'a Truth<'a>,
-    mode              : CompletionMode<'a>,
+    mode              : RefreshMode<'a>,
     node_budget       : usize,
     buffer_correction_policy : &'a BufferCorrectionPolicy,
   ) -> Walk<'a> {
@@ -162,7 +163,7 @@ impl<'a> Walk<'a> {
   pub fn is_diff_view (
     &self,
   ) -> bool {
-    matches! ( self . mode, CompletionMode::DiffView { .. } ) }
+    matches! ( self . mode, RefreshMode::DiffView { .. } ) }
 
   /// Let an occurrence of 'gnid' hold the gnid's one editability,
   /// unless another already does ('editable_gnids'). Whether it may.

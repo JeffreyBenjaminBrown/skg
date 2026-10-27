@@ -47,7 +47,7 @@ node p
 fn once_the_budget_is_spent_what_is_drawn_is_write_protected () {
   let run : Run = run_asserting_fixpoint_in (
     &format! ("* {} p\n", occurrence_metadata ("p", "")), &two_levels (),
-    None, CompletionMode::ContentView, 2 );
+    None, RefreshMode::ContentView, 2 );
   assert_eq! ( run . outline (), "\
 node p
   node a
@@ -145,7 +145,7 @@ fn a_folder_omits_the_restricted_members () {
     ", occurrence_metadata ("p", "") );
   let restriction : SkgrepoRestriction = main_only ();
   let run : Run = run_asserting_fixpoint_in ( &input, &graph, Some (&restriction),
-                           CompletionMode::ContentView, 100 );
+                           RefreshMode::ContentView, 100 );
   assert_eq! ( run . outline (), "\
 node p
   containerFolder
@@ -205,7 +205,7 @@ fn a_buffer_of_many_kinds_is_a_fixpoint () {
        occurrence_metadata ("q", "writeProtected"),
        occurrence_metadata ("s", "(viewRequests (folder subscribesTo))"),
        occurrence_metadata ("c1", "(viewRequests writeProtectedSubtreeView)") );
-  let run : Run = run_asserting_fixpoint_in ( &input, &graph, None, CompletionMode::ContentView, 3 );
+  let run : Run = run_asserting_fixpoint_in ( &input, &graph, None, RefreshMode::ContentView, 3 );
   assert_eq! ( run . outline (), "\
 node p
   containerFolder

@@ -145,9 +145,9 @@ either graph and their containerward chains
 A buffer of the diff view is drawn, and redrawn after every save,
 rerender and commit, by the one refresh every view uses
 ('refresh_viewforest', 'server/refresh/'), in diff-view mode: the
-mode is 'CompletionMode::DiffView', which carries the straddle, the
+mode is 'RefreshMode::DiffView', which carries the straddle, the
 buffer kind and the readiness store, from which the refresh reads
-its readiness facts ('server/update_buffer/completion_mode.rs')
+its readiness facts ('server/refresh/mode.rs')
 ('complete_viewforest_with_graph_straddle' and
 'rerender_diffView_buffer' in 'server/diff_view/completion.rs').
 The diff-view mode ('server/refresh/diff_view.rs') changes the
@@ -374,7 +374,7 @@ content keeps its own editability), and passes on to its content:
 each member it shows or draws whose node has no editable occurrence
 is editable while the budget allows, and passes it on in turn. Only
 the extension of a node outside U that a request reached is charged
-to 'initial_node_limit' ('CompletionMode::charges_node_budget'); a
+to 'initial_node_limit' ('RefreshMode::charges_node_budget'); a
 node of U is never charged, whether the rule above or a request made
 it editable. A request adds no default folders, since the diff view
 draws none.

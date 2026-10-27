@@ -22,7 +22,7 @@ use crate::types::misc::ID;
 use crate::types::tree::forest::ViewForest;
 use crate::types::views_state::{DiffViewBufferKind, ViewnodeIdRecord};
 use crate::update_buffer::{DiffViewRerender, RerenderPassContext};
-use crate::update_buffer::completion_mode::CompletionMode;
+use crate::refresh::mode::RefreshMode;
 
 use std::collections::BTreeSet;
 use std::error::Error;
@@ -33,7 +33,7 @@ use std::sync::{Arc, MutexGuard};
 /// 'store'. The goal holds what HEAD alone warrants, the change
 /// viewnodes are recomputed in place, and the buffer's sets choose
 /// what is editable and what an extension charges to the node budget
-/// ('CompletionMode::charges_node_budget'). The diff view requires the
+/// ('RefreshMode::charges_node_budget'). The diff view requires the
 /// skgrepo set 'all', so nothing is restricted there.
 /// 'buffer_correction_policy' says which changes are no buffer corrections.
 pub fn complete_viewforest_with_graph_straddle (
@@ -48,7 +48,7 @@ pub fn complete_viewforest_with_graph_straddle (
 ) -> Result<Refreshed, Box<dyn Error>> {
   refresh_viewforest (
     viewforest, viewnode_id_record, &Truth::of_runtime (runtime, restriction),
-    CompletionMode::DiffView { straddle,
+    RefreshMode::DiffView { straddle,
                                buffer_kind     : diffView_buffer_kind,
                                readiness_store : store },
     runtime . config . initial_node_limit, buffer_correction_policy ) }

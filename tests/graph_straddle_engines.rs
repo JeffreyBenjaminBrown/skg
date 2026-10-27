@@ -22,7 +22,7 @@ use skg::refresh::{Truth, refresh_viewforest};
 use skg::refresh::buffer_corrections::BufferCorrectionPolicy;
 use skg::types::tree::forest::ViewForest;
 use skg::types::views_state::ViewnodeIdRecord;
-use skg::update_buffer::completion_mode::CompletionMode;
+use skg::refresh::mode::RefreshMode;
 
 use ego_tree::{NodeId, NodeRef, Tree};
 use std::collections::HashMap;
@@ -106,7 +106,7 @@ fn a_container_folder_from_a_graph_straddle_holds_both_graphs_containers (
     &Truth { graph       : &f . runtime . graph,
              config      : &f . runtime . config,
              restriction : None },
-    CompletionMode::DiffView { straddle        : &f . straddle,
+    RefreshMode::DiffView { straddle        : &f . straddle,
                                buffer_kind     : DiffViewBufferKind::AllChanges,
                                readiness_store : &ReadinessStore::default () },
     100,

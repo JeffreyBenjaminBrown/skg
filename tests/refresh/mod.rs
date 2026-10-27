@@ -124,7 +124,7 @@ pub(super) fn run_asserting_fixpoint (
   graph : &InRustGraph,
 ) -> Run {
   run_asserting_fixpoint_in (
-    text, graph, None, CompletionMode::ContentView, 100 ) }
+    text, graph, None, RefreshMode::ContentView, 100 ) }
 
 /// Refresh 'text' over 'graph' in 'mode' with 'budget', then assert
 /// the fixpoint: its output, refreshed again, comes back as it was,
@@ -133,7 +133,7 @@ pub(super) fn run_asserting_fixpoint_in (
   text        : &str,
   graph       : &InRustGraph,
   restriction : Option<&SkgrepoRestriction>,
-  mode        : CompletionMode,
+  mode        : RefreshMode,
   budget      : usize,
 ) -> Run {
   let config : SkgConfig = config ();
@@ -165,7 +165,7 @@ pub(super) fn refresh_once (
   let truth : Truth = Truth { graph, config : &config, restriction : None };
   refresh_viewforest (
     forest, &mut ViewnodeIdRecord::default (), &truth,
-    CompletionMode::ContentView, 100, policy )
+    RefreshMode::ContentView, 100, policy )
     . unwrap () }
 
 pub(super) fn parse (

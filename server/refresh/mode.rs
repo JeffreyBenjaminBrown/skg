@@ -11,7 +11,7 @@ use crate::types::misc::ID;
 use crate::types::views_state::DiffViewBufferKind;
 
 #[derive(Clone, Copy)]
-pub enum CompletionMode<'a> {
+pub enum RefreshMode<'a> {
   /// The refresh of a content view, from the live graph.
   ContentView,
   /// The refresh of the buffer of kind 'buffer_kind' of the diff view,
@@ -24,7 +24,7 @@ pub enum CompletionMode<'a> {
              readiness_store : &'a ReadinessStore },
 }
 
-impl<'a> CompletionMode<'a> {
+impl<'a> RefreshMode<'a> {
   /// Whether this extension of 'pid' is charged to the node budget
   /// ('server/refresh/extent.rs'). In a content view, every extension
   /// is. The diff view deviates ('docs/diff-view.org', "Editability in
@@ -38,8 +38,8 @@ impl<'a> CompletionMode<'a> {
     had_editableViewRequest  : bool,
   ) -> bool {
     match self {
-      CompletionMode::ContentView => true,
-      CompletionMode::DiffView { straddle, buffer_kind, .. } =>
+      RefreshMode::ContentView => true,
+      RefreshMode::DiffView { straddle, buffer_kind, .. } =>
         had_editableViewRequest
         && ! prunedChangeView_sets_of_buffer (straddle, *buffer_kind)
              . u . contains (pid), } }

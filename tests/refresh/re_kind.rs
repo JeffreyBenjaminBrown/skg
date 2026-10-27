@@ -69,7 +69,7 @@ fn a_restricted_node_becomes_a_tombstone_whatever_its_parent_lists () {
        occurrence_metadata ("c", "") );
   let restriction : SkgrepoRestriction = main_only ();
   let run : Run = run_asserting_fixpoint_in ( &input, &graph, Some (&restriction),
-                           CompletionMode::ContentView, 100 );
+                           RefreshMode::ContentView, 100 );
   assert_eq! ( run . outline (), "\
 node p
   tombstone

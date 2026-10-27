@@ -1222,8 +1222,8 @@ the graph straddle.
 
 *** mode
 
-Which kind of view a refresh refreshes ('CompletionMode' in
-'server/update_buffer/completion_mode.rs'): 'ContentView', or
+Which kind of view a refresh refreshes ('RefreshMode' in
+'server/refresh/mode.rs'): 'ContentView', or
 'DiffView', which carries the graph straddle and the buffer kind. It
 decides whether a parent's goal includes what HEAD alone warrants,
 whether ghosts and change viewnodes are drawn, and what the node
@@ -1304,7 +1304,7 @@ old content where content stands); none of it, beyond what the buffer
 already shows, for a write-protected occurrence's content and for the
 containerward chain. An *extension* is one editable occurrence's
 content drawn whole; the *node budget* ('initial_node_limit') counts
-them, each charging it once ('CompletionMode::charges_node_budget'),
+them, each charging it once ('RefreshMode::charges_node_budget'),
 and once it is spent the occurrences the refresh draws are
 write-protected. A folder fills its members without spending any. The
 module comment of 'server/refresh/extent.rs' states the rule. The
@@ -1544,7 +1544,7 @@ How the diff view ('docs/diff-view.org') is computed.
 Which of the four buffers of the diff view a buffer is
 ('DiffViewBufferKind'). A buffer of the diff view is refreshed over
 the graph straddle; the straddle and the buffer kind are the two
-parts of the refresh's diff-view mode ('CompletionMode::DiffView').
+parts of the refresh's diff-view mode ('RefreshMode::DiffView').
 
 **** graph straddle, before-graph, after-graph
 
