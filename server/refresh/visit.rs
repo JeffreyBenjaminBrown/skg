@@ -48,7 +48,7 @@ use crate::refresh::id_rule::{
 use crate::refresh::{Walk, write_protect_occurrence};
 use crate::refresh::ancestry::{is_unsayable, parent_reads_claims};
 use crate::refresh::diff_view;
-use crate::to_org::extend::containerward_chain::{
+use crate::refresh::chain::{
   ContainerwardChainPartners, attach_containerward_chains_under_members};
 use crate::types::misc::ID;
 use crate::types::tree::moves::{move_after, move_to_first_child, move_to_last_child};

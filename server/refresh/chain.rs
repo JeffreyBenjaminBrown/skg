@@ -15,16 +15,18 @@
 
 use crate::dbs::in_rust_graph::containerward_role_tree::{ ContainerwardRoleTree, containerward_role_trees_by_gnid_from_gnids, containers_in_inRustGraph};
 use crate::dbs::in_rust_graph::InRustGraph;
+use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
 use crate::dbs::in_rust_graph::relation_accessors::{NodeRelation, RelationRole};
 use crate::graph_straddle::types::GraphStraddle;
 use crate::skgrepo_sets::SkgrepoRestriction;
-use crate::to_org::util::graphnode_and_viewnode_from_gnid;
-use crate::types::misc::{ID, SkgConfig};
-use crate::types::viewnode::{ Viewnode, ViewnodeKind, Vognode, mk_unknown_viewnode, mk_writeProtected_noClaim_from_viewnode };
+use crate::types::misc::{ID, SkgConfig, SkgrepoName};
+use crate::types::nodes::complete::Graphnode;
+use crate::types::viewnode::{ Viewnode, ViewnodeKind, Vognode, mk_editable_viewnode, mk_unknown_viewnode, mk_writeProtected_noClaim_from_viewnode };
 
 use ego_tree::{NodeId, Tree};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
+use std::io;
 
 /// Where the chain finds a node's containers: in the live graph, or in
 /// the union of a graph straddle. Viewnodes are built from the live
@@ -152,3 +154,55 @@ fn prepend_containerward_chain_node (
               . prepend (viewnode)
               . id () )) }
 
+/// Fetch a Graphnode from the in-Rust graph or disk. Resolves id→(pid,skgrepo)
+/// via 'InRustGraph::pid_and_skgrepo', then reads. Makes a Viewnode with
+/// validated title. Returns both.
+/// Returns Ok(None) when GNID has no record anywhere -- not as a
+/// primary pid or extra_id in the captured graph.
+/// Callers should substitute a Unknown. A real
+/// query error still surfaces as Err.
+fn graphnode_and_viewnode_from_gnid (
+  graph  : &InRustGraph,
+  config : &SkgConfig,
+  gnid  : &ID,
+) -> Result < Option<( Graphnode, Viewnode )>, Box<dyn Error> > {
+  let resolved : Option<(ID, SkgrepoName)> =
+    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+        "graphnode_and_viewnode_from_id" ). entered();
+      graph . pid_and_skgrepo (gnid) };
+  match resolved {
+    None => Ok (None),
+    Some ((pid_resolved, skgrepo)) =>
+      match graphnode_and_viewnode_from_pid_and_skgrepo (
+        graph, config, &pid_resolved, &skgrepo ) {
+        Ok (node) => Ok ( Some (node) ),
+        // A graph member can be dangling when its file is absent. This is not
+        // a render failure: callers turn `None` into Unknown.
+        Err (e) if e . downcast_ref::<io::Error> ()
+          . is_some_and (|io_error| io_error . kind () == io::ErrorKind::NotFound)
+          => Ok (None),
+        Err (e) => Err (e), } } }
+
+/// Fetch a Graphnode from the in-Rust graph or disk given PID and skgrepo.
+/// Makes an Viewnode with validated title. Returns both.
+fn graphnode_and_viewnode_from_pid_and_skgrepo (
+  graph   : &InRustGraph,
+  config  : &SkgConfig,
+  pid     : &ID,
+  skgrepo : &SkgrepoName,
+) -> Result < ( Graphnode, Viewnode ), Box<dyn Error> > {
+  let graphnode : Graphnode =
+    graphnode_graphFirst_by_pid_and_skgrepo (
+      graph, config, pid, skgrepo )?;
+  let title : String = graphnode . title . replace ( '\n', " " );
+  if title . is_empty () {
+    return Err ( Box::new ( io::Error::new (
+      io::ErrorKind::InvalidData,
+      format! ( "Graphnode with ID {} has an empty title",
+                 pid ), )) ); }
+  let viewnode : Viewnode = mk_editable_viewnode (
+    pid . clone (),
+    skgrepo . clone (),
+    title,
+    graphnode . body . clone () );
+  Ok (( graphnode, viewnode )) }

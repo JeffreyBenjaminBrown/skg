@@ -1,7 +1,7 @@
 // cargo nextest run --test grouped_views -E 'test(containerward_chain::)'
 //
 // The containers folder and the containerward chain
-// ('server/to_org/extend/containerward_chain.rs'): a fresh content
+// ('server/refresh/chain.rs'): a fresh content
 // view puts a containers folder on each root, and a '(folder
 // containers)' request draws one anywhere; under each member hangs
 // the chain, write-protected, claiming nothing, up to the roots, a node met

@@ -20,6 +20,7 @@
 
 pub mod ancestry;
 pub mod buffer_corrections;
+pub mod chain;
 mod diff_view;
 mod extent;
 pub(crate) mod goal;

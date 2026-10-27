@@ -8,7 +8,7 @@
 use skg::dbs::in_rust_graph::InRustGraph;
 use skg::dbs::init::create_empty_tantivy_index;
 use skg::graph_straddle::types::GraphStraddle;
-use skg::to_org::extend::containerward_chain::{
+use skg::refresh::chain::{
   ContainerwardChainPartners, attach_containerward_chains_under_members};
 use skg::types::env::{RuntimeGeneration, SkgEnv};
 use skg::types::misc::{ID, RelPartner, SkgConfig, Skgrepo, SkgrepoName};

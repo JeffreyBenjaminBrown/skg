@@ -1184,7 +1184,7 @@ could add something ('folder_goes_when_empty' in
 When the refresh draws a member of a folder whose members carry the
 chain, it hangs the member's chain under it
 ('attach_containerward_chains_under_members' in
-'server/to_org/extend/containerward_chain.rs'), walking the member's
+'server/refresh/chain.rs'), walking the member's
 containers breadth-first over the live graph or, in the diff view,
 over the union of the straddle. The extent of a chain is none, so a
 chain node is never reinstated: a chain that stays keeps its

@@ -1,7 +1,7 @@
 // cargo nextest run --test grouped_saves -E 'test(attach_containerward_chain::)'
 
 use indoc::indoc;
-use skg::to_org::extend::containerward_chain::{
+use skg::refresh::chain::{
   ContainerwardChainPartners, attach_containerward_chains_under_members};
 use skg::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewnode_tree;

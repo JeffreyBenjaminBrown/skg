@@ -28,7 +28,7 @@ use skg::dbs::in_rust_graph::{InRustGraph};
 use skg::org_to_text::viewforest_to_string;
 use skg::skgrepo_sets::{SkgrepoRestriction, SkgrepoSetName, run_with_skgrepo_set_test_db};
 use skg::test_utils::graph_handle_from_config;
-use skg::to_org::extend::containerward_chain::{
+use skg::refresh::chain::{
   ContainerwardChainPartners, attach_containerward_chains_under_members};
 use skg::to_org::render::content_view::multi_root_view_with_skgrepo_set;
 use skg::types::misc::ID;

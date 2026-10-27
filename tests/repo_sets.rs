@@ -20,7 +20,7 @@ use skg::test_utils::{set_skgrepo_retagging_relRepos, graph_handle_from_config};
 use skg::test_utils::run_with_shared_test_stores;
 use skg::from_text::buffer_to_validated_saveplan;
 use skg::org_to_text::viewforest_to_string;
-use skg::to_org::extend::containerward_chain::{
+use skg::refresh::chain::{
   ContainerwardChainPartners, attach_containerward_chains_under_members};
 use skg::to_org::render::content_view::multi_root_view_with_skgrepo_set;
 use skg::types::misc::{ID, MSV, SkgConfig, SkgrepoName, TantivyIndex, members_of, rel_partners_at_relRepo, rel_partners_at_relRepo_msv};
