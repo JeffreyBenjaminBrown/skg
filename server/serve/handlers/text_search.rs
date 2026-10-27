@@ -37,7 +37,7 @@ use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{ Viewnode, ViewnodeKind, mk_writeProtected_viewnode};
 use crate::types::viewnode::{Folder, FolderRelation, ViewRequest, Vognode, viewnode_of};
-use crate::update_buffer::reconcile::partner_folder::partnerFolder_members_in_graph;
+use crate::refresh::goal::partnerFolder_members_in_graph;
 
 use ego_tree::{NodeId, NodeMut};
 use sexp::{Sexp, Atom};

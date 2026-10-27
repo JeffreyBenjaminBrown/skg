@@ -40,7 +40,7 @@ use crate::refresh::goal::{
   Goal, GoalItem, GoalMember, goal_of_parent, hidden_in_subscribee,
   hidden_outside_of_subscribees, member_of_child,
   subscriber_of_subscribee_as_such};
-use crate::update_buffer::reconcile::partner_folder::partnerFolder_members_in_graph;
+use crate::refresh::goal::partnerFolder_members_in_graph;
 use crate::refresh::id_rule::{
   EditabilityAndClaim, IdRuleAnswer, entombstone, entombstone_gone_change,
   ghost_from_head, id_rule, occurrence_from_truth, point_occurrence_at,
