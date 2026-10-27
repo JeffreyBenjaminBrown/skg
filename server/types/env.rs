@@ -4,10 +4,8 @@
 //!
 
 use crate::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle};
-use crate::dbs::tantivy::title_and_skgrepo_by_gnid;
 use crate::diff_view::readiness_store::ReadinessStore;
-use crate::types::misc::{ID, SkgConfig, SkgrepoName, TantivyIndex};
-use crate::types::disk_home::home_from_disk;
+use crate::types::misc::{SkgConfig, TantivyIndex};
 
 use std::sync::{Arc, OnceLock};
 use std::sync::Mutex as SyncMutex;
@@ -169,26 +167,4 @@ impl SkgEnv {
   pub fn mutation_gate (&self) -> MutationGate {
     self . runtime . mutation_gate . clone ()
   }
-
-  /// Resolve an ID to its skgrepo by checking, in order:
-  ///
-  /// 1. The in-Rust graph snapshot (freshest; reflects in-flight
-  ///    edits before they reach the indexed DBs or disk).
-  /// 2. Tantivy (in-process indexed lookup; ~6us at p50).
-  /// 3. Disk scan (slow last resort; covers nodes that were created
-  ///    out-of-band since the last search-index sync).
-  ///
-  /// Tantivy is only an optimization here: the graph is authoritative for
-  /// identity and skgrepo lookup, and this helper stays synchronous.
-  pub fn find_skgrepo_in_generation (
-    runtime : &RuntimeGeneration,
-    gnid : &ID,
-  ) -> Option<SkgrepoName> {
-    if let Some ((_pid, src)) =
-      runtime . graph . pid_and_skgrepo (gnid)
-    { return Some (src); }
-    if let Some ((_title, src)) =
-      title_and_skgrepo_by_gnid (&runtime . tantivy_index, gnid)
-    { return Some (src); }
-    home_from_disk (gnid, &runtime . config) }
 }

@@ -85,6 +85,23 @@ pub fn required_ancestor_of (
     return None; }
   node . ancestors () . nth (i) . map ( |ancestor| ancestor . id () ) }
 
+/// The node the folder at 'folder' describes, whose relationships,
+/// properties or hides it shows: for the folder of what a subscriber
+/// hides in a subscribee, that subscribee; for the folder of what it
+/// hides outside its subscribees, the subscriber; for any other
+/// folder, its viewparent. None if 'folder' is no folder, or stands
+/// where its ancestry is missing.
+pub fn described_node (
+  tree   : &Tree<Viewnode>,
+  folder : NodeId,
+) -> Option<NodeId> {
+  let ViewnodeKind::Folder (kind) : &ViewnodeKind =
+    &tree . get (folder) ? . value () . kind else { return None; };
+  let index : usize = match compound_folder_parties (kind) {
+    Some (parties) => parties . subscribee . unwrap_or (parties . subscriber),
+    None => 0, };
+  required_ancestor_of (tree, folder, index) }
+
 /// A compound folder's two parties, as indices into its required
 /// ancestry (0 = its viewparent; 'required_ancestor_of'): the
 /// subscriber whose hides it shows, and, for the folder of what the
@@ -109,23 +126,6 @@ pub fn compound_folder_parties (
     Folder::HiddenOutsideOfSubscribee =>
       Some ( CompoundFolderParties { subscriber : 1, subscribee : None } ),
     _ => None, } }
-
-/// The node the folder at 'folder' describes, whose relationships,
-/// properties or hides it shows: for the folder of what a subscriber
-/// hides in a subscribee, that subscribee; for the folder of what it
-/// hides outside its subscribees, the subscriber; for any other
-/// folder, its viewparent. None if 'folder' is no folder, or stands
-/// where its ancestry is missing.
-pub fn described_node (
-  tree   : &Tree<Viewnode>,
-  folder : NodeId,
-) -> Option<NodeId> {
-  let ViewnodeKind::Folder (kind) : &ViewnodeKind =
-    &tree . get (folder) ? . value () . kind else { return None; };
-  let index : usize = match compound_folder_parties (kind) {
-    Some (parties) => parties . subscribee . unwrap_or (parties . subscriber),
-    None => 0, };
-  required_ancestor_of (tree, folder, index) }
 
 /// Whether the save reads the claims of the children of 'parent': an
 /// editable occurrence, or an editable folder whose node is an
