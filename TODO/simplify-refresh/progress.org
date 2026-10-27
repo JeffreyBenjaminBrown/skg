@@ -3280,3 +3280,21 @@ records are restricted: one with a visible record is drawn as a
 Restricted vognode, which counts as visible content.
 *** Headline
 DONE.
+
+** Orchestrator's notes after slice 9 (2026-10-27)
+Launched 01:06 UTC, reported 01:40 UTC: thirty-four minutes.
+No correction inserted. One finding filed in
+'TODO/problems.org' for the review's probes: a requested hidden
+folder holding a dangling hide, now kept as an unknown, may be
+refused at save, since validation accepts an unknown only in
+the overridden folder (read, not run). The deviations are
+sound, and one is a save of data: a Restricted vognode's
+children came back 'noClaim' when the restriction widened, so
+the next save would have dropped them; the agent found it with
+a test and fixed it before committing. Two fixtures now record
+their omitted members in private sections so that the tests
+go on testing omission rather than the new kind, which is
+right. Suites: nextest 991 of 991, Emacs 406, Neovim 399,
+integration 34 of 35 with the pre-existing failure, both
+clients; the fixpoint sweeps pass under each restriction.
+
