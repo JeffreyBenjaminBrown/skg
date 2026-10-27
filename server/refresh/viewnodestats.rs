@@ -1,7 +1,7 @@
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::stats::mentioner_is_substantive;
 use crate::dbs::in_rust_graph::relation_accessors::{
-  BinaryRolePosition, NodeRelation, RelationRole };
+  BinaryRolePosition, GnidPresence, NodeRelation, RelationRole };
 use crate::herald_tokens::{
   AncestorFlags, BirthFact, RelationshipHeralds, Side, relationship_heralds_sexp };
 use crate::skgrepo_sets::SkgrepoRestriction;
@@ -208,8 +208,9 @@ fn set_herald_strings_in_viewnode (
         restriction )
       { flags . record (NodeRelation::HidesFromSubs, true, 3); }}}
   let unintegrated : Option<usize> =
-    // A subscribee as such counts the nodes its content goal draws:
-    // nodes, as the count of its contents is ('RelationCounts').
+    // A subscribee as such counts the nodes its content goal draws as
+    // occurrences: nodes the restriction shows, as the count of its
+    // contents is ('RelationCounts').
     if stands_as_member_here {
       subscriber_of_subscribee_as_such (tree, treeid) . map ( |subscriber| {
         let members : HashSet<ID> = content_goal_gnids (
@@ -218,7 +219,8 @@ fn set_herald_strings_in_viewnode (
             node_pid, NodeRelation::Contains, restriction ),
           Some (&subscriber) )
           . into_iter ()
-          . filter ( |gnid| graph . pid_of (gnid) . is_some () )
+          . filter ( |gnid| graph . gnid_presence_gated (gnid, restriction)
+                            == GnidPresence::Present )
           . collect ();
         for (gnid, generation) in &ancestors {
           if members . contains (gnid)

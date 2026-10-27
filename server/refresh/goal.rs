@@ -7,17 +7,24 @@
 //! folder, the node's aliases, IDs or true flags. In the diff view the
 //! goal also holds what HEAD alone warrants ('diff_view.rs'). Each
 //! item names a gnid or a property value. A parent whose position
-//! implies no relationship (the buffer root, a tombstone, an unknown)
-//! has no goal.
+//! implies no relationship (the buffer root, a tombstone, an unknown,
+//! a Restricted vognode) has no goal.
+//!
+//! Under a skgrepo restriction (the API doc's "Restricted-skgrepo
+//! nodes") a goal omits each member whose record the restriction
+//! keeps out: the gated accessors leave it out of every list read
+//! here. It keeps each member whose record is visible: a node the
+//! restriction keeps out, which the ID rule entombstones, and a gnid
+//! nothing answers to, an unknown, as under no restriction.
 //!
 //! 'partnerFolder_members_in_graph' serves the search's enrichment
 //! too.
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::node_lookup::graphnode_from_graph;
-use crate::dbs::in_rust_graph::relation_accessors::{NodeRelation, RelationRole};
+use crate::dbs::in_rust_graph::relation_accessors::{GnidPresence, NodeRelation, RelationRole};
 use crate::graph_straddle::types::Partner;
-use crate::refresh::Walk;
+use crate::refresh::{Truth, Walk};
 use crate::refresh::ancestry::{
   CompoundFolderParties, compound_folder_parties, described_node, required_ancestor_of};
 use crate::refresh::diff_view;
@@ -52,8 +59,9 @@ pub(crate) struct GoalItem {
   /// 'ByGraph' when the truth's part of the goal names it, 'ByHead'
   /// when only HEAD's part does.
   pub warrant : Warrant,
-  /// For a gnid nothing answers to: its relationship's relRepo, when
-  /// that differs from the recorder's home (the unknown's herald).
+  /// For a gnid nothing answers to, or a restricted one: its
+  /// relationship's relRepo, when that differs from the recorder's
+  /// home (the unknown's herald, the Restricted vognode's).
   pub relRepo : Option<SkgrepoName>,
   /// In the diff view, the item's existence change in its list.
   pub rel     : Option<Existence>,
@@ -177,17 +185,13 @@ fn chain_goal (
 ) -> Goal {
   if let Some (goal) = diff_view::chain_goal (pid, walk) {
     return goal; }
-  let graph : &InRustGraph = walk . truth . graph;
-  let containers : Vec<ID> = omit_restricted (
-    graph . inbound_pids_for_relation_gated (
-      pid, NodeRelation::Contains, walk . truth . restriction ),
-    walk );
-  Goal::unordered ( containers . into_iter ()
-                    . map ( |gnid| GoalItem::by_graph (GoalMember::Gnid (gnid)) )
-                    . collect () ) }
+  let containers : Vec<ID> =
+    walk . truth . graph . inbound_pids_for_relation_gated (
+      pid, NodeRelation::Contains, walk . truth . restriction );
+  Goal::unordered ( gnid_items (containers, &HashMap::new (), walk . truth )) }
 
 /// An occurrence's content ('content_goal_gnids'), with the relRepo
-/// of each unknown member.
+/// of each unknown or restricted member.
 fn content_goal (
   tree   : &Tree<Viewnode>,
   parent : NodeId,
@@ -208,17 +212,18 @@ fn content_goal (
     graph . outbound_member_keys_for_relation_gated (
       pid, NodeRelation::Contains, restriction );
   let relRepos : HashMap<ID, SkgrepoName> =
-    unknown_members_relRepos (graph, pid, &members);
+    unknown_or_restricted_members_relRepos (graph, restriction, pid, &members);
   Goal::ordered ( gnid_items (
     content_goal_gnids ( graph, restriction, &members, subscriber . as_ref () ),
-    &relRepos )) }
+    &relRepos, walk . truth )) }
 
 /// The content an occurrence shows outside the diff view: the members
-/// of its 'contains' list ('members', a raw ID where nothing answers),
-/// less what 'subscriber' hides or contains when the occurrence is a
-/// subscribee as such, less the restricted members. The stats pass
-/// counts a subscribee's unintegrated content from it, so that the
-/// count is what is drawn.
+/// of its 'contains' list whose records the restriction shows
+/// ('members', gated, a raw ID where nothing answers), less what
+/// 'subscriber' hides or contains when the occurrence is a subscribee
+/// as such. The restricted members among them are drawn as Restricted
+/// vognodes. The stats pass counts a subscribee's unintegrated content
+/// from it, so that the count is what is drawn.
 pub(crate) fn content_goal_gnids (
   graph       : &InRustGraph,
   restriction : Option<&SkgrepoRestriction>,
@@ -228,12 +233,10 @@ pub(crate) fn content_goal_gnids (
   let contents : Vec<ID> = members . iter ()
     . map ( |member| member . member . id () . clone () )
     . collect ();
-  omit_restricted_members (
-    match subscriber {
-      None => contents,
-      Some (subscriber) => less_what_the_subscriber_integrates (
-        graph, restriction, subscriber, &contents ), },
-    graph, restriction ) }
+  match subscriber {
+    None => contents,
+    Some (subscriber) => less_what_the_subscriber_integrates (
+      graph, restriction, subscriber, &contents ), } }
 
 /// 'contents' less what 'subscriber' hides or contains, as the truth
 /// has it ('unintegrated_content_gnids'): what a subscribee as such
@@ -316,13 +319,13 @@ fn folder_goal (
         hidden_in_subscribee (
           &party_pid (parties . subscribee ?) ?,
           &party_pid (parties . subscriber) ?, walk ),
-        &HashMap::new () ))) },
+        &HashMap::new (), walk . truth ))) },
     Folder::HiddenOutsideOfSubscribee => {
       let parties : CompoundFolderParties = compound_folder_parties (kind) ?;
       Some ( Goal::ordered ( gnid_items (
         hidden_outside_of_subscribees (
           &party_pid (parties . subscriber) ?, walk ),
-        &HashMap::new () ))) },
+        &HashMap::new (), walk . truth ))) },
     Folder::Subscribee | Folder::Subscriber
       | Folder::Overridden | Folder::Overrider
       | Folder::Hider | Folder::Hidden
@@ -337,20 +340,20 @@ fn folder_goal (
       let relRepos : HashMap<ID, SkgrepoName> =
         if member_role . opposite_role () . is_first_role () {
           // The folder shows a list in the described node's own file.
-          unknown_members_relRepos (
-            graph, &described,
+          unknown_or_restricted_members_relRepos (
+            graph, walk . truth . restriction, &described,
             &graph . outbound_member_keys_for_relation_gated (
               &described, member_role . relation, walk . truth . restriction ))
         } else { HashMap::new () };
-      Some ( Goal::with_order ( gnid_items (members, &relRepos),
+      Some ( Goal::with_order ( gnid_items (members, &relRepos, walk . truth ),
                                 kind . goal_is_ordered () )) }, } }
 
 /// The members a folder of this kind under the viewparent should hold,
-/// from 'graph': its partners in the folder's relation, each extra ID
-/// resolved to its node's pid (an unresolved ID kept as it is), less
-/// the restricted members. In graph order. None if
-/// the kind has no relation member role. The goal of such a folder in
-/// a content view ('folder_goal').
+/// from 'graph': its partners in the folder's relation whose records
+/// the skgrepo restriction shows, each extra ID resolved to its node's
+/// pid (an unresolved ID kept as it is). In graph order. None if the
+/// kind has no relation member role. The goal of such a folder in a
+/// content view ('folder_goal').
 pub(crate) fn partnerFolder_members_in_graph (
   graph               : &InRustGraph,
   viewparent_pid      : &ID,
@@ -368,12 +371,7 @@ pub(crate) fn partnerFolder_members_in_graph (
         . collect ()
     } else { graph . other_member_pids_gated (
       viewparent_pid, recorder_role, skgrepo_restriction ) };
-  Some ( // Under a skgrepo restriction (the API doc's "Restricted-skgrepo nodes"): these folders omit
-         // restricted members. A tombstone child already in the folder
-         // stays while it holds anything; the refresh's tail prunes it
-         // once it holds nothing.
-    omit_restricted_members (
-      members, graph, skgrepo_restriction )) }
+  Some (members) }
 
 /// The viewparent's partners in the member role's relation, as its file
 /// lists them, each tagged by whether the graph resolves it, if the
@@ -393,9 +391,9 @@ fn raw_outbound_members (
       viewparent_pid, member_role . relation, skgrepo_restriction )
   } else { Vec::new () }}
 
-/// What 'subscriber' hides in the content of 'subscribee', less the
-/// restricted members: the goal of the compound folder
-/// 'HiddenInSubscribee' under the subscribee as such.
+/// What 'subscriber' hides in the content of 'subscribee', by the
+/// records the skgrepo restriction shows: the goal of the compound
+/// folder 'HiddenInSubscribee' under the subscribee as such.
 pub(crate) fn hidden_in_subscribee (
   subscribee : &ID,
   subscriber : &ID,
@@ -408,7 +406,7 @@ pub(crate) fn hidden_in_subscribee (
       subscribee, NodeRelation::Contains, walk . truth . restriction ),
     &graph . outbound_gnids_for_relation_gated (
       subscriber, NodeRelation::HidesFromSubs, walk . truth . restriction ));
-  resolve_all ( omit_restricted (goal, walk), graph ) }
+  resolve_all (goal, graph) }
 
 /// Goal list for a hiddenInSubscribeeFolder: the intersection of the
 /// subscriber's hides-list and the subscribee's contains-list, in the
@@ -425,9 +423,9 @@ fn goal_list_for_hiddenInSubscribee_folder (
     . filter ( |gnid| contains_set . contains (&relationship_member_key (graph, gnid)) )
     . cloned () . collect () }
 
-/// What 'subscriber' hides outside the content of its subscribees,
-/// less the restricted members: the goal of its compound folder
-/// 'HiddenOutsideOfSubscribee', in the order of its hides list.
+/// What 'subscriber' hides outside the content of its subscribees, by
+/// the records the skgrepo restriction shows: the goal of its compound
+/// folder 'HiddenOutsideOfSubscribee', in the order of its hides list.
 pub(crate) fn hidden_outside_of_subscribees (
   subscriber : &ID,
   walk       : &Walk,
@@ -439,7 +437,7 @@ pub(crate) fn hidden_outside_of_subscribees (
       subscriber, NodeRelation::HidesFromSubs, walk . truth . restriction ),
     &graph . outbound_gnids_for_relation_gated (
       subscriber, NodeRelation::SubscribesTo, walk . truth . restriction ));
-  resolve_all ( omit_restricted (goal, walk), graph ) }
+  resolve_all (goal, graph) }
 
 /// Goal list for a hiddenOutsideOfSubscribeeFolder: the subscriber's
 /// hides-list minus everything contained by any subscribee.
@@ -500,6 +498,7 @@ fn property_goal (
 fn gnid_items (
   gnids    : Vec<ID>,
   relRepos : &HashMap<ID, SkgrepoName>,
+  _truth   : &Truth,
 ) -> Vec<GoalItem> {
   gnids . into_iter ()
     . map ( |gnid| GoalItem {
@@ -507,17 +506,25 @@ fn gnid_items (
       .. GoalItem::by_graph ( GoalMember::Gnid (gnid) ) } )
     . collect () }
 
-/// The relRepos of the members of 'recorder''s list that resolve to no
-/// node, where they differ from the recorder's home.
-fn unknown_members_relRepos (
-  graph    : &InRustGraph,
-  recorder : &ID,
-  members  : &[RelPartner<RelationshipMemberKey>],
+/// The relRepos of the members of 'recorder''s list that no
+/// occurrence stands for, where they differ from the recorder's home:
+/// those that resolve to no node, and those the skgrepo restriction
+/// keeps out.
+fn unknown_or_restricted_members_relRepos (
+  graph       : &InRustGraph,
+  restriction : Option<&SkgrepoRestriction>,
+  recorder    : &ID,
+  members     : &[RelPartner<RelationshipMemberKey>],
 ) -> HashMap<ID, SkgrepoName> {
   let home : Option<SkgrepoName> =
     graph . get (recorder) . map ( |node| node . home_skgrepo . clone () );
+  let drawn_without_a_node : &dyn Fn (&RelationshipMemberKey) -> bool =
+    &|member : &RelationshipMemberKey| -> bool {
+      member . is_unresolved ()
+      || graph . gnid_presence_gated (member . id (), restriction)
+         == GnidPresence::Restricted };
   members . iter ()
-    . filter ( |member| member . member . is_unresolved ()
+    . filter ( |member| drawn_without_a_node (&member . member)
                         && Some (&member . relRepo) != home . as_ref () )
     . map ( |member| ( member . member . id () . clone (),
                        member . relRepo . clone () ))
@@ -531,32 +538,4 @@ fn resolve_all (
 ) -> Vec<ID> {
   gnids . into_iter ()
     . map ( |gnid| graph . relationship_member_key (&gnid) . into_id () )
-    . collect () }
-
-/// 'gnids' less the members the skgrepo restriction keeps out
-/// ('omit_restricted_members').
-fn omit_restricted (
-  gnids : Vec<ID>,
-  walk  : &Walk,
-) -> Vec<ID> {
-  omit_restricted_members (gnids, walk . truth . graph, walk . truth . restriction) }
-
-/// Under a skgrepo restriction (the API doc's "Restricted-skgrepo nodes"): rendering omits every
-/// restricted member from goal lists (no placeholders are created).  A
-/// member the graph cannot resolve is omitted too: it might be private,
-/// and rendering must not leak ('InRustGraph::restriction_keeps_out');
-/// saving preserves it
-/// regardless (the weave / set-difference merge treat unresolvable as
-/// invisible).  A tombstone standing where a now-restricted node was (one
-/// kept because it hosts visible descendants after a skgrepo-set
-/// reduction) does not come back through the goal list: the refresh
-/// keeps it while it holds anything, and its tail prunes it once it
-/// holds nothing.
-fn omit_restricted_members (
-  goal        : Vec<ID>,
-  graph       : &InRustGraph,
-  restriction : Option<&SkgrepoRestriction>,
-) -> Vec<ID> {
-  goal . into_iter ()
-    . filter ( |gnid| ! graph . restriction_keeps_out (gnid, restriction) )
     . collect () }

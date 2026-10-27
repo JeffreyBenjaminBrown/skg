@@ -1,6 +1,7 @@
 // The unit suite of the refresh ('server/refresh/'): a file per rung
 // of the refresh, and one each for the ancestry rows, the diff view,
-// the tail and the buffer corrections ('buffer_corrections.rs'). Each
+// the tail, the buffer corrections ('buffer_corrections.rs') and the
+// skgrepo restriction ('restricted.rs'). Each
 // test builds a small graph and an input buffer, refreshes it, and
 // asserts the output, as an outline ('outline'). A refresh is checked
 // for the fixpoint, that refreshing its output again changes nothing
@@ -35,6 +36,7 @@ mod re_kind;
 mod reinstate;
 mod reorder;
 mod requests;
+mod restricted;
 mod substitution;
 mod tail;
 mod warrant;

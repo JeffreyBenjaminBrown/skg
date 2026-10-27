@@ -53,8 +53,9 @@ pub(crate) fn id_rule (
   let head : Option<&GraphStraddle> = match walk . mode {
     RefreshMode::DiffView { straddle, .. } => Some (straddle),
     RefreshMode::ContentView => None, };
-  if walk . truth . graph . gnid_presence_gated (gnid, walk . truth . restriction )
-     == GnidPresence::Present {
+  let presence : GnidPresence =
+    walk . truth . graph . gnid_presence_gated (gnid, walk . truth . restriction );
+  if presence == GnidPresence::Present {
     let pid : ID = walk . truth . graph . pid_of (gnid)
       . expect ("a present gnid resolves");
     let acquired_since_head : bool =
@@ -63,6 +64,9 @@ pub(crate) fn id_rule (
            straddle . before . nodes . contains_key (gnid) );
     if ! acquired_since_head {
       return IdRuleAnswer::Occurrence (pid); }}
+  if presence == GnidPresence::Restricted {
+    // A restricted node is never a ghost, nor an unknown.
+    return IdRuleAnswer::Tombstone; }
   if let Some (straddle) = head {
     if let Some (pid) = straddle . before . pid_of (gnid) {
       if ! straddle . after . nodes . contains_key (&pid) {
