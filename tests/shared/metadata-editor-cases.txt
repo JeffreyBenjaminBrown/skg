@@ -1,0 +1,286 @@
+# How each client's metadata editor (C-c v m, <localleader>vm) shows a
+# headline's '(skg ...)' metadata, what it saves, where a command
+# writing a request puts it, and how the buffer corrections are shown.
+# One contract, two implementations, each tested against these cases:
+#   Emacs:  elisp/skg-sexpr-edit.el, elisp/skg-sexpr/skg-metadata-fields.el,
+#           elisp/skg-metadata.el, elisp/skg-request-server-warnings.el
+#           (tests/elisp/test-skg-metadata-editor-cases.el)
+#   Neovim: nvim/lua/skg/metadata_edit.lua,
+#           nvim/lua/skg/sexpr/metadata_fields.lua,
+#           nvim/lua/skg/readiness.lua, nvim/lua/skg/server_warnings.lua
+#           (tests/nvim/metadata_editor_cases_spec.lua)
+# Both read the fields and the order of the parts from
+# shared/metadata-fields.json.
+#
+# Format: a case begins with a line '==== NAME'. Each of its fields is
+# a line '---- KEY: VALUE', or a line '---- KEY:' followed by the
+# lines of a block, which run to the next '---- ' or '==== ' line.
+# Lines before the first case are comments.
+#
+# A case of the editor gives:
+#   metadata: a headline's metadata as the server writes it, one kind
+#     of headline the fields table knows per case or more (a buffer
+#     root is never written, so it has none);
+#   title (optional): the headline's title, which the editor shows,
+#     read-only, above an occurrence's metadata;
+#   fill-in (a block): what the editor shows, in order;
+#   strip: what applying the editor sends back when nothing was
+#     changed;
+#   edit request and with the edit request (optional): the metadata
+#     after a command makes REQUEST its edit request;
+#   readiness request and with the readiness request (optional): the
+#     metadata after a gesture makes REQUEST its readiness request.
+# A case of the buffer corrections gives:
+#   corrections: the (corrections ...) field of a save-result, for a
+#     view no buffer shows;
+#   display (a block): the org text appended to the server-warnings
+#     buffer.
+
+==== occurrence: a member at every default, with its title
+---- metadata: (skg (vnid 0a) node (gnid x) (skgRepos (nodeRepo main)))
+---- title: a title
+---- fill-in:
+* title
+** a title
+* skg
+** vnid
+*** 0a
+** node
+** gnid
+*** x
+** skgRepos
+*** nodeRepo
+**** main
+** noClaim
+*** false (default)
+** writeProtected
+*** false (default)
+** editRequest
+*** none (default)
+** viewRequests
+*** none (default)
+---- strip: (skg (vnid 0a) node (gnid x) (skgRepos (nodeRepo main)))
+---- edit request: delete
+---- with the edit request: (skg (vnid 0a) node (gnid x) (skgRepos (nodeRepo main)) (editRequest delete))
+---- readiness request: (ready node)
+---- with the readiness request: (skg (vnid 0a) node (gnid x) (skgRepos (nodeRepo main)) (editRequest (ready node)))
+
+==== occurrence: every part the printer writes
+---- metadata: (skg (vnid 0b) focused folded node (gnid n) (skgRepos (nodeRepo main) (relRepo pub)) noClaim writeProtected (overridesHere o) (editRequest (relRepo pub)) (viewRequests editableView) (view cycle) (diff (rel added) (leaves 1 rel)))
+---- fill-in:
+* skg
+** vnid
+*** 0b
+** focused
+** folded
+** node
+** gnid
+*** n
+** skgRepos
+*** nodeRepo
+**** main
+*** relRepo
+**** pub
+** noClaim
+*** true
+** writeProtected
+*** true
+** overridesHere
+*** o
+** editRequest
+*** relRepo
+**** pub
+** viewRequests
+*** editableView
+** view
+*** cycle
+** diff
+*** rel
+**** added
+*** leaves
+**** 1
+**** rel
+---- strip: (skg (vnid 0b) focused folded node (gnid n) (skgRepos (nodeRepo main) (relRepo pub)) noClaim writeProtected (overridesHere o) (editRequest (relRepo pub)) (viewRequests editableView) (view cycle) (diff (rel added) (leaves 1 rel)))
+---- edit request: (merge m)
+---- with the edit request: (skg (vnid 0b) focused folded node (gnid n) (skgRepos (nodeRepo main) (relRepo pub)) noClaim writeProtected (overridesHere o) (editRequest (merge m)) (viewRequests editableView) (view cycle) (diff (rel added) (leaves 1 rel)))
+---- readiness request: (ready rel)
+---- with the readiness request: (skg (vnid 0b) focused folded node (gnid n) (skgRepos (nodeRepo main) (relRepo pub)) noClaim writeProtected (overridesHere o) (editRequest (relRepo pub) (ready rel)) (viewRequests editableView) (view cycle) (diff (rel added) (leaves 1 rel)))
+
+==== occurrence: a readiness request alone
+---- metadata: (skg node (gnid r) (skgRepos (nodeRepo main)) (editRequest (ready node rel)) (diff (node added) (leaves 2 node rel)))
+---- fill-in:
+* skg
+** node
+** gnid
+*** r
+** skgRepos
+*** nodeRepo
+**** main
+** noClaim
+*** false (default)
+** writeProtected
+*** false (default)
+** editRequest
+*** none (default)
+*** ready
+**** node
+**** rel
+** viewRequests
+*** none (default)
+** diff
+*** node
+**** added
+*** leaves
+**** 2
+**** node
+**** rel
+---- strip: (skg node (gnid r) (skgRepos (nodeRepo main)) (editRequest (ready node rel)) (diff (node added) (leaves 2 node rel)))
+---- edit request: delete
+---- with the edit request: (skg node (gnid r) (skgRepos (nodeRepo main)) (editRequest delete (ready node rel)) (diff (node added) (leaves 2 node rel)))
+---- readiness request: (unready node)
+---- with the readiness request: (skg node (gnid r) (skgRepos (nodeRepo main)) (editRequest (unready node)) (diff (node added) (leaves 2 node rel)))
+
+==== ghost
+---- metadata: (skg ghost (gnid g) (skgRepos (nodeRepo main)) (view noWarrant) (diff (node removed) (leaves 1 node)))
+---- fill-in:
+* skg
+** ghost
+** gnid
+*** g
+** skgRepos
+*** nodeRepo
+**** main
+** noClaim
+*** false (default)
+** editRequest
+*** none (default)
+** view
+*** noWarrant
+** diff
+*** node
+**** removed
+*** leaves
+**** 1
+**** node
+---- strip: (skg ghost (gnid g) (skgRepos (nodeRepo main)) (view noWarrant) (diff (node removed) (leaves 1 node)))
+---- edit request: restoreNode
+---- with the edit request: (skg ghost (gnid g) (skgRepos (nodeRepo main)) (editRequest restoreNode) (view noWarrant) (diff (node removed) (leaves 1 node)))
+---- readiness request: (ready node)
+---- with the readiness request: (skg ghost (gnid g) (skgRepos (nodeRepo main)) (editRequest (ready node)) (view noWarrant) (diff (node removed) (leaves 1 node)))
+
+==== unknown
+---- metadata: (skg unknown (gnid u) (skgRepos (relRepo pub)) noClaim)
+---- fill-in:
+* skg
+** unknown
+** gnid
+*** u
+** skgRepos
+*** relRepo
+**** pub
+** noClaim
+*** true
+** editRequest
+*** none (default)
+---- strip: (skg unknown (gnid u) (skgRepos (relRepo pub)) noClaim)
+---- edit request: (relRepo main)
+---- with the edit request: (skg unknown (gnid u) (skgRepos (relRepo pub)) noClaim (editRequest (relRepo main)))
+---- readiness request: (ready rel)
+---- with the readiness request: (skg unknown (gnid u) (skgRepos (relRepo pub)) noClaim (editRequest (ready rel)))
+
+==== alias: a readiness request naming no object
+---- metadata: (skg alias (skgRepos (relRepo pub)) (editRequest (ready)) (view ghostWarrant) (diff (rel added) (leaves 1)))
+---- fill-in:
+* skg
+** alias
+** skgRepos
+*** relRepo
+**** pub
+** noClaim
+*** false (default)
+** editRequest
+*** none (default)
+*** (ready)
+** view
+*** ghostWarrant
+** diff
+*** rel
+**** added
+*** leaves
+**** 1
+---- strip: (skg alias (skgRepos (relRepo pub)) (editRequest (ready)) (view ghostWarrant) (diff (rel added) (leaves 1)))
+---- edit request: (relRepo main)
+---- with the edit request: (skg alias (skgRepos (relRepo pub)) (editRequest (relRepo main) (ready)) (view ghostWarrant) (diff (rel added) (leaves 1)))
+---- readiness request: (unready)
+---- with the readiness request: (skg alias (skgRepos (relRepo pub)) (editRequest (unready)) (view ghostWarrant) (diff (rel added) (leaves 1)))
+
+==== ID
+---- metadata: (skg id noClaim (view noWarrant) (diff (rel removed) (leaves 1) (ready)))
+---- fill-in:
+* skg
+** id
+** noClaim
+*** true
+** view
+*** noWarrant
+** diff
+*** rel
+**** removed
+*** leaves
+**** 1
+*** (ready)
+---- strip: (skg id noClaim (view noWarrant) (diff (rel removed) (leaves 1) (ready)))
+---- readiness request: (unready)
+---- with the readiness request: (skg id noClaim (editRequest (unready)) (view noWarrant) (diff (rel removed) (leaves 1) (ready)))
+
+==== flag
+---- metadata: (skg (flag noSearchMatching) (view noWarrant))
+---- fill-in:
+* skg
+** flag
+*** noSearchMatching
+** view
+*** noWarrant
+---- strip: (skg (flag noSearchMatching) (view noWarrant))
+---- readiness request: (ready rel)
+---- with the readiness request: (skg (flag noSearchMatching) (editRequest (ready rel)) (view noWarrant))
+
+==== a change viewnode
+---- metadata: (skg folded (relRepoMove (old main) (new pub)) (diff (leaves 1)))
+---- fill-in:
+* skg
+** folded
+** relRepoMove
+*** old
+**** main
+*** new
+**** pub
+** diff
+*** leaves
+**** 1
+---- strip: (skg folded (relRepoMove (old main) (new pub)) (diff (leaves 1)))
+---- readiness request: (ready)
+---- with the readiness request: (skg folded (relRepoMove (old main) (new pub)) (editRequest (ready)) (diff (leaves 1)))
+
+==== folder
+---- metadata: (skg containerFolder)
+---- fill-in:
+* skg
+** containerFolder
+---- strip: (skg containerFolder)
+
+==== tombstone
+---- metadata: (skg folded tombstone)
+---- fill-in:
+* skg
+** folded
+** tombstone
+---- strip: (skg folded tombstone)
+
+==== buffer corrections: one message
+---- corrections: (("content-view:5" "Drew what the graph says belongs here.\n*** new child\n- viewnode ID: 0d."))
+---- display:
+* Buffer corrections in content-view:5
+** Drew what the graph says belongs here.
+*** new child
+- viewnode ID: 0d.

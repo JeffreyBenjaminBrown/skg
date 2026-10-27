@@ -7,19 +7,22 @@
 // every kind the parser knows; each value it offers parses where it
 // offers it, under the conditions it states and no others (but
 // 'removedMember', which the save checks, by where the headline
-// stands); nothing it does not offer parses; and its values name every
-// edit request and view request the parser knows.
+// stands); nothing it does not offer parses; its values name every
+// edit request and view request the parser knows; and its 'parts' stand
+// in the order the printer ('viewnode_to_string') writes them.
 
+use skg::org_to_text::viewnode_to_string;
 use skg::serve::parse_metadata_sexp::{
   RestoreRequest, ViewnodeMetadata, parse_metadata_to_viewnodemd, viewnode_from_metadata};
-use skg::types::misc::{ID, SkgrepoChange, SkgrepoName};
+use skg::types::misc::{ID, SkgConfig, SkgrepoChange, SkgrepoName};
 use skg::types::nodes::complete::Flag;
 use skg::types::viewnode::{
-  ChangesetMarkerKind, FolderRelation, NodeEditRequest,
-  Folder, PropertyMember, ChangeViewnode, ViewRequest};
+  ChangesetMarkerKind, DiffChange, Existence, FolderRelation, NodeEditRequest,
+  Folder, PropertyMember, ChangeViewnode, ViewRequest, Viewnode, ViewnodeKind, Vognode};
 
 use serde_json::Value;
-use std::collections::BTreeSet;
+use sexp::Sexp;
+use std::collections::{BTreeSet, HashMap};
 
 /// The parsed table.
 fn metadata_fields_table (
@@ -401,3 +404,42 @@ fn each_node_value_parses_to_what_it_names () {
             . collect::<Vec<&str>> (),
           vec! [ written . value . as_str () ] ),
         other => panic! ( "unknown field {}", other ), } } } }
+
+/// The table's 'parts' are the parts of '(skg ...)' in the order the
+/// printer writes them: an occurrence carrying every part prints each
+/// where the table puts it, and each kind's fields stand in that order.
+#[test]
+fn the_printer_writes_the_parts_in_the_tables_order () {
+  let table : Value = metadata_fields_table ();
+  let parts : Vec<String> = strings_of (&table ["parts"]);
+  for kind in kinds (&table) {
+    let field_names : Vec<String> = fields_of (kind) . iter ()
+      . map ( |field| field ["name"] . as_str () . unwrap () . to_string () )
+      . collect ();
+    let in_parts_order : Vec<String> = parts . iter ()
+      . filter ( |part| field_names . contains (part) ) . cloned () . collect ();
+    assert_eq! ( field_names, in_parts_order, "{}", kind ["kind"] ); }
+  let metadata : ViewnodeMetadata = parse_cleanly (
+    "(skg (vnid 1a) focused folded bodyFolded node (gnid n) \
+     (skgRepos (nodeRepo main) (relRepo pub)) noClaim writeProtected \
+     (overridesHere o) (editRequest (relRepo pub) (ready node)) \
+     (viewRequests editableView))" ) . unwrap ();
+  let (mut viewnode, _, _) : (Viewnode, _, _) =
+    viewnode_from_metadata (&metadata, "n" . to_string (), None);
+  if let ViewnodeKind::Vognode (Vognode::Occurrence (occurrence))
+    = &mut viewnode . kind {
+    occurrence . viewStats . cycle = true; }
+  viewnode . change_facts . change = DiffChange {
+    node : Some (Existence::Added), rel : None, properties : false };
+  let printed : String = viewnode_to_string (
+    &viewnode, &SkgConfig::dummyFromSkgrepos (HashMap::new ()) ) . unwrap ();
+  let Sexp::List (elements) = sexp::parse (&format! ("(skg {})", printed))
+    . unwrap () else { panic! ("{}", printed) };
+  let printed_parts : Vec<String> = elements [1..] . iter ()
+    . map ( |element| {
+      let head : String = match element {
+        Sexp::List (items) => items [0] . to_string (),
+        atom => atom . to_string (), };
+      if head == "node" { "KIND" . to_string () } else { head } } )
+    . collect ();
+  assert_eq! ( printed_parts, parts, "{}", printed ); }
