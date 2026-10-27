@@ -275,15 +275,16 @@ Returns a plist (:recorder RECORDER-ID :member MEMBER-ID :relation NAME):
 for a content child, the viewparent contains the node at point; for
 a writable-folder member, the folder's anchor (the folder's viewparent) owns
 the folder's relation toward the node at point. Signals `user-error'
-when point represents no writable relationship: not on an occurrence or Unknown
-headline, on a root headline (no viewparent, so no relationship), on a
-member of a write-protected folder, or with an ID missing."
+when point represents no writable relationship: not on an occurrence,
+an unknown or a Restricted vognode, on a root headline (no viewparent,
+so no relationship), on a member of a write-protected folder, or with
+an ID missing."
   (unless (org-at-heading-p)
     (user-error "Not on a headline"))
   (let ((member-sexp (skg--metadata-sexp-at-point-or-nil)))
     (unless (or (skg--occurrence-sexp-p member-sexp)
-                (skg--unknown-headline-p member-sexp))
-      (user-error "Not on an occurrence or Unknown headline"))
+                (skg--gnid-only-vognode-p member-sexp))
+      (user-error "Not on an occurrence, an unknown or a Restricted vognode"))
     (let ((member-gnid (skg--relationship-member-id member-sexp))
           (parent-sexp (save-excursion
                          (and (org-up-heading-safe)
@@ -402,7 +403,7 @@ next save will do with the relationship."
     (progn
       (cond
        ((or (skg--alias-headline-p)
-            (skg--unknown-headline-p
+            (skg--gnid-only-vognode-p
              (skg--metadata-sexp-at-point-or-nil)))
         (skg--write-edit-request `(relRepo ,(intern choice))))
        (t
@@ -627,7 +628,7 @@ command, but does not edit anything."
                 (if (skg--relRepo-prune-below-p meta)
                     (skg--goto-next-headline-after-subtree)
                   (outline-next-heading))))
-             ((skg--unknown-headline-p meta)
+             ((skg--gnid-only-vognode-p meta)
               (when (skg--relationship-kind-matches-p kind)
                 (push (copy-marker (line-beginning-position)) targets))
               (outline-next-heading))
@@ -638,7 +639,8 @@ command, but does not edit anything."
       (nreverse targets))))
 
 (defun skg--relationship-kind-matches-p (kind)
-  "Non-nil iff the headline at point is a true occurrence or Unknown whose
+  "Non-nil iff the headline at point is a true occurrence, an unknown
+or a Restricted vognode whose
 relationship to its view-parent is of KIND, writable-and-collected
 from this position: for `content', the view-parent must be a
 editable occurrence not in subscribee-as-such position (an
@@ -649,7 +651,7 @@ the matching writable folder with a editable anchor."
   (let ((meta (skg--metadata-sexp-at-point-or-nil)))
     (and (or (and (skg--occurrence-sexp-p meta)
                   (skg--node-member-p meta))
-             (skg--unknown-headline-p meta))
+             (skg--gnid-only-vognode-p meta))
          (save-excursion
            (and (org-up-heading-safe)
                 (let ((parent-sexp (skg--metadata-sexp-at-point-or-nil)))
@@ -1083,11 +1085,11 @@ read. Finds END by counting parentheses (`skg-find-sexp-end'; see
 
 (defun skg--vognode-sexp-p (metadata-sexp)
   "Non-nil iff METADATA-SEXP is a vognode's: an occurrence,
-a ghost or an unknown."
+a ghost, an unknown or a Restricted vognode."
   (and (consp metadata-sexp)
        (or (skg--occurrence-sexp-p metadata-sexp)
            (skg--ghost-sexp-p metadata-sexp)
-           (skg--unknown-headline-p metadata-sexp))))
+           (skg--gnid-only-vognode-p metadata-sexp))))
 
 (defun skg--ghost-sexp-p (metadata-sexp)
   "Non-nil iff METADATA-SEXP is a ghost's: a node of the diff view that
@@ -1219,10 +1221,25 @@ METADATA-SEXP is not an occurrence's)."
   (and metadata-sexp
        (skg-sexp-subtree-p metadata-sexp '(skg unknown))))
 
+(defun skg--restricted-headline-p (metadata-sexp)
+  "Return non-nil when METADATA-SEXP is a Restricted vognode's: one
+standing for a node the skgrepo restriction keeps out, which a visible
+record names."
+  (and metadata-sexp
+       (skg-sexp-subtree-p metadata-sexp '(skg restricted))))
+
+(defun skg--gnid-only-vognode-p (metadata-sexp)
+  "Return non-nil when METADATA-SEXP is a vognode's that shows only
+its gnid: an unknown's or a Restricted vognode's. Either takes a
+relRepo request, as a relationship member."
+  (or (skg--unknown-headline-p metadata-sexp)
+      (skg--restricted-headline-p metadata-sexp)))
+
 (defun skg--relationship-member-id (metadata-sexp)
-  "Return the raw member ID for an occurrence or Unknown headline."
+  "Return the raw member ID for an occurrence, an unknown or a
+Restricted vognode."
   (and (or (skg--occurrence-sexp-p metadata-sexp)
-           (skg--unknown-headline-p metadata-sexp))
+           (skg--gnid-only-vognode-p metadata-sexp))
        (skg--metadata-gnid metadata-sexp)))
 
 (defun skg--unknown-node-id-at-point ()

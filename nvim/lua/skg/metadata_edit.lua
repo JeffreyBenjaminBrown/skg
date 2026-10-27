@@ -338,7 +338,8 @@ end
 ---Whether the save can give the headline at LINE_NUMBER a skgrepo by
 ---inheritance, as the server's walk rootward decides
 ---('skgrepo_of_nearest_occurrence_ancestor'): it passes through
----unknowns, ghosts and folders, and through headlines without
+---unknowns, Restricted vognodes, ghosts and folders, and through
+---headlines without
 ---metadata, which inherit the same way; the first other ancestor must
 ---be an occurrence. A root cannot inherit, nor can a
 ---headline whose walk ends at a tombstone or a property.
@@ -356,6 +357,7 @@ function M.headline_can_inherit_skgrepo_p (line_number)
     local kind_name = kind and kind.kind
     if kind_name == 'occurrence' then return true end
     if not (kind_name == nil or kind_name == 'unknown'
+            or kind_name == 'restricted'
             or kind_name == 'ghost' or kind_name == 'folder') then
       return false end
   end

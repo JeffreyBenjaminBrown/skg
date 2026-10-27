@@ -182,7 +182,12 @@ asserts this over every content-view and diff-view fixture.
 A *vognode* stands for a gnid (=Vognode=): an *occurrence*, of a node
 the truth has, editable or write-protected; a *ghost*, in the diff
 view only, of a node HEAD has and the worktree lacks; an *unknown*,
-of a gnid its viewparent's list names and no node answers to. A
+of a gnid its viewparent's list names and no node answers to; a
+*Restricted vognode*, of a node the skgrepo restriction keeps out
+that a visible record names (a record is a relationship as one
+node's file states it, in one skgrepo's section, visible when the
+restriction holds that skgrepo), showing nothing of the node but the
+record's gnid and relRepo. A
 *descriptor* describes its viewparent: a folder, a property member
 (an alias, an ID or a flag in its property folder) or a change
 viewnode. A *tombstone* says only that something stood there, and
@@ -193,17 +198,25 @@ was considered and rejected because it could confuse the user. The
 buffer root holds the roots.
 
 *** The ID rule
-What a headline standing for a gnid becomes is decided by four
+What a headline standing for a gnid becomes is decided by five
 questions, the first yes winning (=id_rule= in
 =server/refresh/id_rule.rs=). Does the truth have the node? Then it is
-an occurrence of the node's pid. Otherwise, in the diff view, does
-HEAD have it? Then it is the node's ghost. Otherwise, does its
-viewparent's list name the gnid? Then it is an unknown. Otherwise it
-is a tombstone. A restricted node (one the skgrepo restriction keeps
-out) answers no to all four (the truth answers =Restricted=,
-=GnidPresence=, and the gated lists name no restricted member), so
-its headline becomes a tombstone,
-which reveals nothing of it. In the diff view, a gnid that HEAD had
+an occurrence of the node's pid. Otherwise, does the truth say the
+node is restricted (=Restricted=, =GnidPresence=: the skgrepo
+restriction keeps out its home)? Then, if its viewparent's goal names
+the gnid, marked restricted (its record is visible), it is a
+Restricted vognode; if not, a tombstone. Either reveals nothing of
+the node, and a restricted node is never a ghost. Otherwise, in the
+diff view, does HEAD have it? Then it is the node's ghost. Otherwise,
+does its viewparent's list name the gnid? Then it is an unknown.
+Otherwise it is a tombstone. So an occurrence of a node the
+restriction newly keeps out becomes a Restricted vognode in place
+where its record is visible, and an occurrence again when the
+restriction widens; after a change of the restriction neither re-kind
+is a buffer correction. When an unknown or a Restricted vognode
+becomes an occurrence, each of its children claims again, as the
+text of its view, which writes no =noClaim= under it, would say, and
+the claims rung marks those the truth does not warrant there. In the diff view, a gnid that HEAD had
 as a node and that a nodeMerge has since made an extra ID of another
 node stays that node's ghost. The headline is re-kinded where it
 stands, keeping its viewnode ID, its fold state, its children and,
@@ -214,7 +227,7 @@ Each child of a vognode or a folder has two flags. It *claims
 membership* when the save will read it as a member of its
 viewparent's list. That is declared: the bare atom =noClaim= says no,
 its absence yes (=claimsMembership= on the occurrence, the ghost, the
-unknown, the alias and the ID). The save reads claims only under an
+unknown, the Restricted vognode, the alias and the ID). The save reads claims only under an
 editable occurrence, and under an editable folder (subscribee,
 overridden, hidden-outside-of-subscribee, alias) of one
 (=parent_reads_claims= in =server/refresh/ancestry.rs=); under any
@@ -254,8 +267,19 @@ hidden-outside-of-subscribee folders: =Folder::goal_is_ordered=), and
 unordered elsewhere. In the diff view the goal is the union
 of the parent's lists in the two graphs of the straddle, an item only
 HEAD's list holds being warranted by HEAD. A parent whose position
-implies no relationship (the buffer root, a tombstone, an unknown)
-has no goal.
+implies no relationship (the buffer root, a tombstone, an unknown, a
+Restricted vognode) has no goal.
+
+Under a skgrepo restriction a goal omits each member whose record is
+restricted: the gated accessors of the in-Rust graph leave it out.
+It keeps each member whose record is visible: a node the restriction
+keeps out, marked restricted (=GoalItem::restricted=), which the ID
+rule answers with a Restricted vognode; and a gnid nothing answers
+to, an unknown, as under no restriction. The save is its mirror: it
+restores to a list only the members whose records are restricted,
+which the buffer could not show (=preserve_invisible_members= and
+=server/from_text/weave.rs=), so a Restricted vognode keeps its member
+while it claims, and deleting its line removes the record.
 
 *** The walk and the refresh's rungs
 Before the walk, every editable-view request is fulfilled: its
@@ -365,8 +389,9 @@ readiness facts from the store and the home skgrepo moves; every
 childless tombstone is pruned, postorder and roots included, so a
 buffer may end with no roots, and so is a folder the pruning leaves
 empty that goes when empty; an editable folder stays even when
-empty, since the user can add to it, so one the skgrepo restriction
-empties stays and fills again when the restriction widens; every
+empty, since the user can add to it, so one whose every member's
+record the skgrepo restriction keeps out stays, empty, and fills again
+when the restriction widens; every
 viewnode that lacks a viewnode ID gets one; and the viewforest is
 rendered.
 
@@ -383,7 +408,8 @@ drawn or gone, since those describe the straddle. Nor is a change
 the buffer was not wrong about, which the caller names
 (=BufferCorrectionPolicy=): a tombstone left where the saving user's
 own save deleted the node, and, after a change of the skgrepo
-restriction, a member drawn or a headline entombstoned. So a fresh
+restriction, a member drawn, a headline entombstoned, or a headline
+re-kinded to a Restricted vognode or back. So a fresh
 view and a plain save report nothing. The callers tag each view's buffer corrections
 with its view ID (=ViewCorrections=), the =save-result= and
 =rerender-done= responses carry them, and both clients append them to

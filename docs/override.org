@@ -107,9 +107,10 @@ content, it automatically includes a nonempty folder for content hidden
 there.
 
 Under a restricted skgrepo-set, both override folders omit relationships
-whose relRepo is restricted and partners whose home skgrepo is restricted.
-Saving the visible subset preserves memberships stored in hidden
-telescope sections.
+whose relRepo is restricted, and show a partner whose home skgrepo is
+restricted, where its relationship's relRepo is not, as a Restricted
+vognode, which shows nothing of it. Saving the visible subset
+preserves memberships stored in restricted telescope sections.
 
 ** Automatic override substitution
 

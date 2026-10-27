@@ -716,12 +716,12 @@ function M.partner_folder_atom (metadata_sexp)
 end
 
 ---@param metadata_sexp any
----@return boolean is it a vognode's: an occurrence, an unknown
----or a ghost?
+---@return boolean is it a vognode's: an occurrence, an unknown,
+---a Restricted vognode or a ghost?
 function M.vognode_sexp_p (metadata_sexp)
   if not sexpr.is_list(metadata_sexp) then return false end
   if M.occurrence_sexp_p(metadata_sexp) then return true end
-  for _, head in ipairs({ 'unknown', 'ghost' }) do
+  for _, head in ipairs({ 'unknown', 'restricted', 'ghost' }) do
     if compare.subtree_p(metadata_sexp,
                          { SKG, sexpr.symbol(head) }) then
       return true end

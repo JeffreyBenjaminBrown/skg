@@ -504,8 +504,9 @@ shown as "something stood here", left where a headline stood that can
 stand there for nothing, and holding that headline's children. The
 refresh *entombstones* a headline (makes it one) when its gnid names
 nothing the view may show (a node a save deleted, which in the diff
-view becomes its ghost instead, or a node the skgrepo restriction now
-hides), when it describes its viewparent from where it cannot (see
+view becomes its ghost instead, or a restricted node that no record
+the restriction shows names, which elsewhere becomes a Restricted
+vognode), when it describes its viewparent from where it cannot (see
 "the refresh's rungs, unsayable" among the terms of the implementation), when
 the change it described is gone, when it is a folder left with
 nothing in it that the user could add to, and when the user asks it
@@ -561,6 +562,34 @@ membership, since removing it would edit the list.
 The "investigate unknown node" request says what git history knows of
 it, and the delete-references-to-absent-node command removes the
 references.
+
+*** record, Restricted vognode
+
+A *record* is a relationship as one node's file states it, in one
+skgrepo's section (see "recorder, carrier" and "privacy order and
+relRepo"); its skgrepo is its relRepo. A record is *restricted* when
+the skgrepo restriction keeps its relRepo out, and *visible*
+otherwise. A member of a goal is visible when its record and its
+node's home are both unrestricted.
+
+A *Restricted vognode* ('Vognode::Restricted' in
+'server/types/viewnode.rs', on the wire =restricted (gnid ID)
+[(skgRepos (relRepo REPO))] [noClaim] [(editRequest ...)]=) stands
+where a visible record names a restricted node. It carries the
+record's gnid and relRepo and nothing of the node: no title, no body,
+no home skgrepo, no stats; its herald is "restricted", and text typed
+on its line is refused, as on an unknown's. A goal keeps such a
+member, marked restricted, and omits only members whose records are
+restricted; the ID rule answers it (see "the ID rule"). An occurrence
+of a node the restriction newly keeps out becomes one in place,
+keeping its viewnode ID, fold state and children, and an occurrence
+again when the restriction widens. It claims membership as an
+unknown does: a save keeps its gnid in the list it claims a place
+in, and deleting its line removes the record; the save restores to a
+list only the members whose records are restricted, which the buffer
+could not show. It takes a relRepo request and a readiness request.
+The retired placeholder 'restrictedNode', which stood for nothing,
+is a different thing, and the parser refuses its spelling.
 
 *** ancestor generation
 
@@ -621,8 +650,12 @@ restriction. A skgrepo inside it is *unrestricted*, one outside it
 *restricted*, and so are their nodes and occurrences: the gated
 graph answers 'restricted' for such a node, as distinct from
 'present' and 'absent' ('GnidPresence'), and the view shows nothing
-of it. "Hidden" is reserved for hides-from-subscriptions. Where an occurrence of it stood when the restriction
-tightened, a tombstone stands, holding the occurrence's children.
+of it but, where a visible record names it, a Restricted vognode
+(see "record, Restricted vognode"). "Hidden" is reserved for
+hides-from-subscriptions. Where an occurrence of it stood when the
+restriction tightened, a Restricted vognode stands in its place
+where its record is visible, and a tombstone where it is not, either
+holding the occurrence's children.
 
 *** owned, foreign
 
@@ -1100,12 +1133,15 @@ neighborhood independently in the before and after graph snapshots.
 *** vognode, non-vognode
 
 A *vognode* is a viewnode standing for a gnid ('Vognode' in
-'server/types/viewnode.rs'), of one of three kinds: an *occurrence*,
+'server/types/viewnode.rs'), of one of four kinds: an *occurrence*,
 of a node the truth has; a *ghost*, in the diff view only, of a node
 HEAD has and the worktree lacks; an *unknown*, of a gnid its
-viewparent's list names and no node answers to. An occurrence of a
-node the skgrepo restriction keeps out (a restricted node) becomes a
-tombstone.
+viewparent's list names and no node answers to; a *Restricted
+vognode*, of a node the skgrepo restriction keeps out (a restricted
+node) that a visible record names (see "record, Restricted
+vognode"). An occurrence of a restricted node becomes a Restricted
+vognode where its record is visible, and a tombstone where it is
+not.
 
 The other viewnodes are *non-vognodes*: the *descriptors* -- folders,
 property members and change viewnodes, which describe their
@@ -1127,7 +1163,9 @@ request is "single-root".
 A relationship is recorded in the .skg file of one of its two nodes, its
 *recorder*: the node playing the relation's first role (the container,
 the mentioner, the subscriber, the hider, the overrider). The other node
-is a member of the recorder's list.
+is a member of the recorder's list. The relationship as the
+recorder's file states it, in one of its sections, is a *record* (see
+"record, Restricted vognode").
 
 The node that has an ID, as its PID or as an extra ID, is that ID's
 *carrier*. (Not "owner": the user *owns* skgrepos.)
@@ -1238,11 +1276,13 @@ ID ("vnid") names a viewnode, not a node.
 
 *** the ID rule
 
-What a headline standing for a gnid becomes, by four questions in
+What a headline standing for a gnid becomes, by five questions in
 order, the first yes winning ('id_rule' in 'server/refresh/id_rule.rs'):
-does the truth have the node (an occurrence); in the diff view, does
-HEAD (a ghost); does its viewparent's list name the gnid (an
-unknown); else a tombstone. A restricted node answers no to all four. The
+does the truth have the node (an occurrence); does the truth say the
+node is restricted (a Restricted vognode where its viewparent's goal
+names it, and otherwise a tombstone, never a ghost); in the diff
+view, does HEAD (a ghost); does its viewparent's list name the gnid
+(an unknown); else a tombstone. The
 refresh *re-kinds* a headline by it where it stands, keeping its
 viewnode ID, fold state, children and, for an occurrence, its
 editability.
@@ -1258,7 +1298,10 @@ two graphs of the straddle. Each *goal item* names a gnid or a
 property value ('GoalItem', 'GoalMember'). The goal decides each
 child's warrant, what is reinstated and, where it is ordered, the
 children's order. A parent whose position implies no relationship
-(the buffer root, a tombstone, an unknown) has none.
+(the buffer root, a tombstone, an unknown, a Restricted vognode) has
+none. Under a skgrepo restriction a goal omits the members whose
+records are restricted and keeps the others, a restricted node's
+marked so.
 
 *** the refresh's rungs, unsayable
 

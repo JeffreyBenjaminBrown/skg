@@ -327,6 +327,23 @@ relRepo request, as a delete does."
                              (test--buffer-line 2)))
      (should-not (string-match-p "editRequest" (test--buffer-line 2))))))
 
+(ert-deftest test-apply-relRepo-on-a-restricted-vognode-keeps-fact-separate ()
+  "A Restricted vognode stores intent under its own editRequest, as an
+unknown does."
+  (test--with-skg-content-view
+   (concat
+    "* (skg node (gnid recorder) (skgRepos (nodeRepo public))) recorder\n"
+    "** (skg restricted (gnid h) (skgRepos (relRepo private)))\n")
+   test--config-public-private-trusted
+   (lambda ()
+     (goto-char (point-min))
+     (forward-line 1)
+     (should (equal (plist-get (skg--rel-at-point) :member) "h"))
+     (skg--apply-relRepo-choice "trusted")
+     (should (string-match-p
+              "restricted (gnid h) (skgRepos (relRepo private)) (editRequest (relRepo trusted))"
+              (test--buffer-line 2))))))
+
 (ert-deftest test-recursive-relRepo-preflights-edit-conflicts ()
   "A delete/merge target aborts the recursive operation before any write."
   (test--with-skg-content-view

@@ -282,7 +282,8 @@ buffer.  (The full metadata view is reserved for an explicit
   "Whether the save can give the headline at point a skgrepo by
 inheritance, as the server's walk rootward decides
 ('skgrepo_of_nearest_occurrence_ancestor'): it passes through
-ghosts, unknowns and folders, and through headlines without
+ghosts, unknowns, Restricted vognodes and folders, and through
+headlines without
 metadata, which inherit the same way; the first other ancestor must
 be an occurrence.  A root cannot inherit, nor can a headline whose
 walk ends at a tombstone or a property."
@@ -292,7 +293,7 @@ walk ends at a tombstone or a property."
         (let (( kind (alist-get 'kind (skg-metadata-fields-kind-of-sexp
                                       (skg--metadata-sexp-at-point-or-nil))) ))
           (cond ((equal kind "occurrence") (throw 'answer t))
-                ((member kind '(nil "ghost" "unknown" "folder")))
+                ((member kind '(nil "ghost" "unknown" "restricted" "folder")))
                 (t (throw 'answer nil)))))
       nil)))
 

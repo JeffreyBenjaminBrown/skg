@@ -3116,3 +3116,167 @@ which is his to change. Suites: nextest 982 of 982, Emacs 405,
 Neovim 399, integration 34 of 35 with the pre-existing
 failure, both clients.
 
+
+** Slice 9
+*** The commits
+**** 27e2c66b
+The goal computers omit only members whose records are restricted:
+'omit_restricted_members' goes; an unknown with a visible record
+stays under a restriction (closing the problems entry); the stats
+pass counts only the nodes the restriction shows.
+**** 87e59abd
+The Restricted vognode: 'Vognode::Restricted', the goal's mark
+('GoalItem::restricted'), the ID rule's answer, the re-kinds both
+ways, the claims, warrants and viewnode merge, the printer and the
+parser, validation in every partner folder, the save's collection of
+its claim, the containerward chain; the refresh tests; the fixtures
+and tests that expected omission.
+**** e2833112
+The save restores only the records the buffer could not show
+('relationship_member_is_visible' is the record's relRepo alone);
+the hidden-outside folder's replaceable hides; the hides inferred
+from a removal; the deletion tests.
+**** dd0803e0
+The wire: the herald rule, its style, the fields table, the
+conformance tests, the rendering and editor cases, the pinned rule
+table regenerated.
+**** this record's commit
+Both clients treat a Restricted vognode as they treat an unknown;
+the docs (glossary, technical data model, API, heralds, the commands
+docs, override.org, coding-advice/architecture.md); the problems
+entry moved; this record; the slice's DONE.
+*** The suites
+**** cargo check --all-targets
+Clean, no warnings.
+**** bash/nextest.sh
+991 of 991 passed (982 before: seven tests in the new
+'tests/refresh/restricted.rs', two new in 'tests/hidden_nodes.rs').
+The fixpoint sweeps of 'tests/idempotence.rs' pass, the
+content-view sweep under each restriction included.
+***** failures met, classified
+After the kind: nine, every one an expected fixture adaptation,
+tests that asserted the omission or the tombstone where the plan now
+draws a Restricted vognode: 're_kind::a_restricted_node_becomes_a_
+tombstone_whatever_its_parent_lists', 'reinstate::a_folder_omits_
+the_restricted_members', five of 'tests/hidden_nodes.rs',
+'skgrepo_sets::all_tests', 'override_substitution::all_tests',
+'viewnode_id_stability::...', and 'partner_folder_matrix::
+relationship_matrix'. Then one new failure, my own, caught by a
+widened exact buffer before any commit: see "the claims after a
+widening" below. Nothing else failed at any point; no flake.
+**** bash/emacs-tests.sh
+406 of 406 (405 before; one new relRepo test; the inheritance test
+gained a case).
+**** bash/nvim-tests.sh
+399 passed, none failed, no errors (the inheritance spec gained a
+case inside an existing test).
+**** bash/integration-tests.sh
+Emacs: 34 of 35. Neovim ('SKG_TEST_CLIENT=nvim'): 34 of 35. The one
+failure each time is 'import-md-and-org', pre-existing, not
+investigated.
+**** the isolated instance (the verify skill)
+A scratch server on port 1759, scratch data, stopped and removed
+after ('tests/results/06/slice9/live/run.py', its log beside it). r
+(public) contains a and h, subscribes to hs, hides hh and hv in its
+public file and hp in its private section; h, hs, hh, hp private. In
+one connection: drawn under "all"; switched to "public", hs, hh and h
+stood as Restricted vognodes with their vnids, h holding s1, hp not
+shown, '(corrections ())'; saved with r retitled, every hide and
+member kept on disk; saved again with hh's line deleted, only the
+hide of hh went, the private section untouched; switched to "all",
+each Restricted vognode an occurrence again with its vnid.
+*** Deviations from the plan's "how"
+**** the record's test is the gated accessors'
+Every list the goal computers read is already gated by the record's
+relRepo, so the split needed no new omission: the home test of
+'omit_restricted_members' goes, and 'gnid_items' marks restricted
+the members the truth says are. The ID rule reads the mark.
+**** the commit boundaries
+The kind could not exist without the printer (an exhaustive match)
+nor be tested without the parser, so both rode in the kind's commit,
+with the save's collection of its claim and validation; the wire's
+commit holds the herald table, the fields table and the cases. The
+first commit's ID rule entombstones a member marked restricted,
+which the second makes a Restricted vognode. The intermediate
+commits compile clean; the suites ran at the end.
+**** the claims after a widening (a defect found and fixed)
+Under a Restricted vognode, as under an unknown, the claims rung
+marks every child as claiming nothing, and the printer writes no
+'noClaim' there. A view kept between refreshes (a switch's rerender)
+kept that state, so after narrowing and widening, h's child s1 was
+drawn 'noClaim' under the editable h, and a save would have removed
+it from h's contents. When an unknown or a Restricted vognode becomes
+an occurrence, its children now claim again, as its text parsed
+would say ('reset_the_claims_of_children', 'id_rule.rs'), and the
+claims rung marks the unwarranted ones. A unit test failed without
+the fix ('the_children_of_a_restricted_vognode_claim_again_...').
+**** no buffer correction for a re-kind across the restriction
+After a restriction change, an occurrence becoming a Restricted
+vognode and the reverse are the restriction's doing, as slice 1
+held of tombstones and reinstatements
+('reports_rekind_across_the_restriction').
+**** a re-kind to Restricted keeps the claim
+The re-kind to an unknown sets the claim; the one to a Restricted
+vognode keeps the occurrence's, so a detached occurrence stays
+detached. The two share the relRepo-request filter
+('EditRequests::the_relRepo_request_only').
+**** the containerward chain
+The chain's builder stops at a restricted container whose
+relationship is visible by drawing a Restricted vognode there, as the
+chain's goal now names it; it drew nothing before.
+**** the hidden-outside folder's inside
+The plan makes the replaceable hides those with a visible record.
+What counts as inside a subscribee was the visible part of its
+content; it is now its whole content, as the folder's goal subtracts
+('goal_list_for_hiddenOutsideOfSubscribee_folder'), so that no hide
+the folder did not draw becomes replaceable.
+**** the hides inferred from a removal
+'infer_hides_from_contains_removals' counted a removal only of a
+member whose home the restriction shows; it now counts one whose
+record is visible, so deleting a Restricted vognode from a
+subscriber's content hides it as deleting an occurrence would
+(test 'deleting_a_restricted_vognode_from_a_subscribers_content_
+hides_it').
+**** 'relationship_member_is_visible' lost two parameters
+It is the record's relRepo alone; the graph and the config went, and
+'preserve_invisible_members' lost its config.
+**** the save's helper renamed
+'claiming_unknown_or_ghost_member' is
+'claiming_unknown_ghost_or_restricted_member', since it collects the
+new kind too.
+**** 'metadata_canon.rs' needed nothing
+It orders the parts of any '(skg ...)' form without knowing kinds.
+**** the clients beyond the readers
+Neither client needed a change to read or render the kind. Where
+they treat an unknown as a vognode or a relationship member, they
+now treat a Restricted vognode alike: the skgrepo inheritance walk
+(as the server's 'skgrepo_of_nearest_occurrence_ancestor' does,
+also changed), the vognode predicates, and Emacs's relRepo commands
+('skg--gnid-only-vognode-p'). Neovim has no relRepo command.
+**** docs beyond the plan's list
+'docs/override.org' (the override folders under a restriction) and
+'coding-advice/architecture.md' (its vognode grammar) were stale.
+*** Fixtures changed
+'tests/repo_sets/fixtures': root and ovr-owner record private-a and
+ovr-inactive in new private sections, so that the tests of omission
+and of the weave keep testing members whose records are restricted.
+'tests/partner_folder_matrix/fixtures': a private section of
+omWsub-owner subscribing to the new omWsub-unseen, for the same
+reason, beside omWsub-inactive, now a Restricted vognode.
+'tests/hidden_nodes.rs' writes a private section of r (hc, hp) for
+two tests. The shared case files gain the kind;
+'tests/shared/herald-rules.sexp' is regenerated.
+*** Left unfinished
+Nothing of slice 9. Noticed, read and not run:
+**** an unknown in a write-protected hides folder
+'validate_relation_folder' admits an unknown only in the overridden
+folder, but the hidden folder's goal keeps an unresolved hide (its
+list is the viewparent's own), so a buffer showing a requested
+hiddenFolder with a dangling hide might be refused at save.
+**** the subscribee-as-such hide misfire
+The 'TODO/problems.org' entry "Subscribee-as-such hides may misfire
+under a restricted skgrepo-set" now concerns only members whose
+records are restricted: one with a visible record is drawn as a
+Restricted vognode, which counts as visible content.
+*** Headline
+DONE.

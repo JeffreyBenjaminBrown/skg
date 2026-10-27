@@ -760,6 +760,19 @@ and S-Left / S-Right cycling. After confirmation it tells the server
 to use that skgrepo-set and rerenders open Skg buffers in place. Choose
 =all= to remove the restriction.
 
+Under a restriction, a node in a skgrepo outside the set shows
+nothing of itself. Where a relationship recorded in a skgrepo the set
+holds names such a node (say a public node contains a private one),
+the view shows a headline with no title, heralded =restricted=,
+standing for it: a Restricted vognode. It keeps the relationship as
+it was when you save, and deleting its line removes the relationship,
+as deleting an unknown's does; its metadata view offers its relRepo
+request. A relationship recorded in a skgrepo outside the set shows
+nothing at all, and a save keeps it. Narrowing the set turns an open
+view's headline of such a node into a Restricted vognode (or, where
+nothing the set shows names it, a tombstone) in place, its children
+kept, and widening it turns the Restricted vognode back.
+
 If the proposed set would rerender overPrivateText telescope text, Skg asks before
 changing the skgrepo restriction or any view. Declining leaves both unchanged and
 an empty rerender stream releases the client's preemptive locks.

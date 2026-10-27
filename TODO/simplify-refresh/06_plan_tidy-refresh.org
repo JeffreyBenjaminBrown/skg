@@ -1219,7 +1219,7 @@ sentence:
     server tests --glob '!target'
 #+end_example
 
-** TODO Slice 9: the Restricted vognode
+** DONE Slice 9: the Restricted vognode
 Read "Under a skgrepo restriction" in the agreed behavior,
 the two pitfalls on the goal computers and the weave, and
 '06_1_prepass-experiment.org' first. This slice runs after

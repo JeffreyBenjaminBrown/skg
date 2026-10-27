@@ -1,3 +1,31 @@
+* Problems found while planning plan 06 (2026-10-26; fixed 2026-10-27)
+** An unknown recorded in a visible skgrepo vanishes under a restriction
+  Seen by the same experiment, with and without the phase: the
+  unknown 'missing-pub' of its fixture, recorded by r in public,
+  is drawn under "all" and gone under "public". Not explained.
+  Plan 06, slice 1, finds the cause and records it.
+  Cause (slice 1 of 'TODO/simplify-refresh/06_plan_tidy-refresh.org',
+  confirmed by a throwaway test): 'omit_restricted_members'
+  ('server/update_buffer/reconcile/mod.rs') keeps a member only when
+  its resolver names a home skgrepo the restriction holds, and an
+  unknown resolves to no node, hence no home, so every unknown is
+  omitted under any restriction but "all", whatever skgrepo records
+  it; the parent's goal then names no such gnid, and the ID rule
+  entombstones the headline. Its doc comment makes that deliberate
+  ("it might be private, and rendering must not leak"). The goal
+  computers ('omit_hidden' in 'server/refresh/goal.rs',
+  'partnerFolder_members_in_graph') hand it bare IDs, having dropped
+  each member's relRepo, so the fix is not one line: carry the
+  relRepo into the omission and keep an unresolved member whose
+  record the restriction holds, as the save's
+  'relationship_member_is_visible' ('server/from_text/weave.rs')
+  already does. Left as it is.
+  Fixed by slice 9 of 'TODO/simplify-refresh/06_plan_tidy-refresh.org':
+  the goal computers omit only a member whose record is restricted
+  (the gated accessors already leave it out); a member whose record
+  is visible and that resolves to no node stays, an unknown, as under
+  no restriction ('server/refresh/goal.rs'; tests in
+  'tests/refresh/restricted.rs').
 * Problems noticed while executing plan 04.1, slice 6 (2026-10-26; fixed 2026-10-27)
 ** Flaky "Directory not empty" at a test's cleanup under the parallel run
   During plan 04.1 one Rust test per full run (a different one each

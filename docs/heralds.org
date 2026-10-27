@@ -72,7 +72,7 @@ assumes 'termguicolors', since the styles are given as RGB colors.
 |                      | go          | =✓= commit-ready                                                              |
 |                      | normal      | the skgrepo names in =⌂ -OLD +NEW= and =relationship moved from OLD to NEW=   |
 | diff labels          | message     | =old title=, =body diff=, =its content changed=, =its X changed (this file)=  |
-| unknowns, tombstones | message     | =Reference to unknown node.=, =something stood here=                          |
+| unknowns, tombstones | message     | =Reference to unknown node.=, =restricted=, =something stood here=            |
 | link annotations     | normal      | a resolved target's =[⌂:pub]=                                                 |
 |                      | ugly        | =[⌂:restricted]=, =[⌂:…]=, =[⌂:lookup failed]=, a dangling link's label           |
 
@@ -204,10 +204,16 @@ overloaded during org-roam import=, and =no search matching= when true.
 or =request:search matching=, and in the diff view =restore membership=
 and =restore node=, are save requests.
 
-An unknown node is labeled =Reference to unknown node.=. =something
-stood here= marks a tombstone: a viewnode that stands where a node a
-save deleted, or a node the skgrepo restriction now hides, stood,
-which reveals no node title or skgrepo, nor which of the two it was.
+An unknown node is labeled =Reference to unknown node.=. A
+Restricted vognode, standing where a record the skgrepo restriction
+shows names a node the restriction keeps out, is labeled
+=restricted=, with its record's relRepo (=~NAME=) where that differs
+from the default, and reveals no node title or home skgrepo.
+=something stood here= marks a tombstone: a viewnode that stands
+where a node a save deleted stood, or where a node the skgrepo
+restriction now keeps out stood and no record it shows names that
+node, which reveals no node title or skgrepo, nor which of the two
+it was.
 
 ** Diff heralds
 In the diff view (see the glossary's "Terms a user meets in the
@@ -221,7 +227,7 @@ those. A folder member shows them as a content member does, so a
 modified write-protected member reads =☮ M=; its =~+= or =~-= is its
 relationship, of the folder's kind, to the folder's viewparent. On an alias, ID or
 flag member, which has one diff object, the same change facts read =+= and
-=-=, and an unknown's one object reads =~+= or =~-=. A =✓= after a diff object's change facts says its
+=-=, and the one object of an unknown or a Restricted vognode reads =~+= or =~-=. A =✓= after a diff object's change facts says its
 changes are marked commit-ready, so =∃+✓ ~+= is a new node, approved,
 in a new relationship that is not; =M✓= is a modified node every
 change of whose file is marked. A commit readiness aggregate (a
@@ -267,7 +273,8 @@ differently by kind sits under a WHEN directive,
 =(WHEN KIND... RULE...)=, whose rules apply to a headline only when
 one of its elements is one of the KINDs. A =(diff ...)= needs it: on
 a node or a ghost it has two diff objects (=∃+=, =~+=), on an unknown
-one relationship (=~+=), and on a property or a change viewnode one
+or a Restricted vognode one relationship (=~+=), and on a property or
+a change viewnode one
 object (=+=). The lens engines ('elisp/skg-sexpr/skg-lens.el',
 'nvim/lua/skg/sexpr/lens.lua') document the directive, and the Rust
 conformance tests check that each WHEN names only kind atoms and

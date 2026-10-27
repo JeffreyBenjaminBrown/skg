@@ -43,13 +43,15 @@ Viewnodes are not all graphnodes:
 ```
 viewnode = vognode | folder | propertyMember | changeViewnode
          | bufferRoot | tombstone
-vognode  = occurrence | ghost | unknown
+vognode  = occurrence | ghost | unknown | restricted
 ```
 
 A vognode stands for a graphnode's ID, which need not name a current
 graphnode. An occurrence stands for a node the graph has; a ghost,
 only in the diff view, for a node HEAD has and the worktree lacks; an
-unknown, for a reference that resolves to nothing. Folders carry
+unknown, for a reference that resolves to nothing; a Restricted
+vognode, for a node the skgrepo restriction keeps out that a visible
+record names. Folders carry
 relationships or a node's aliases, IDs and flags, as their members;
 property members are those aliases, IDs and flags; change viewnodes
 describe a change the diff view shows.

@@ -107,6 +107,7 @@ describe('the skgrepo prompt after inserting a headline', function ()
         { '** (skg subscribeeFolder)', false },
         { '** (skg ghost (gnid d) (skgRepos (nodeRepo public))) d', false },
         { '** (skg unknown (gnid u))', false },
+        { '** (skg restricted (gnid h))', false },
         { '** (skg bodyFolded node (gnid m) (skgRepos (nodeRepo public))) m', false },
         { '** (skg (gnid n) (skgRepos (nodeRepo public))) n', false },
         { '** (skg tombstone)', true } }) do
