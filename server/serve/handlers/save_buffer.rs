@@ -709,7 +709,7 @@ fn backfill_parse_warnings (
 /// COMPLEX:
 /// - Validation must happen at many stages.
 /// - NodeMerges must follow the execution of other nodeInstructions, because the user may have updated one of the nodes to be merged.
-/// - The rerender is a refresh of each view ('refresh_viewforest', 'server/refresh/'): one level-order walk that runs the ladder at each parent, then a tail that sets the derived facts and prunes the childless tombstones.
+/// - The rerender is a refresh of each view ('refresh_viewforest', 'server/refresh/'): one level-order walk that runs the refresh's rungs at each parent, then a tail that sets the derived facts and prunes the childless tombstones.
 pub async fn update_from_and_rerender_buffer (
   stream                      : &mut TcpStream,
   org_buffer_text             : &str,

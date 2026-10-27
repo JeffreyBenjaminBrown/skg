@@ -6,7 +6,7 @@
 /// A node the walk met before (a cycle or a diamond) is shown once
 /// more, as a leaf ('ContainerwardRoleTree::Repeated').
 /// The refresh draws the chain under a member it draws into such a
-/// folder ('after_drawing' in 'server/refresh/ladder.rs'), and never
+/// folder ('after_drawing' in 'server/refresh/visit.rs'), and never
 /// reinstates a chain node once drawn; no request extends a chain,
 /// and a request on a chain node for its containers draws a
 /// containers folder under it like any other. A chain node carries no

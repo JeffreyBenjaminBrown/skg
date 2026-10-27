@@ -257,7 +257,7 @@ HEAD's list holds being warranted by HEAD. A parent whose position
 implies no relationship (the buffer root, a tombstone, an unknown)
 has no goal.
 
-*** The walk and the ladder
+*** The walk and the refresh's rungs
 Before the walk, every editable-view request is fulfilled: its
 occurrence becomes the node's editable one and any other editable
 occurrence of the node is write-protected
@@ -271,10 +271,11 @@ re-check.
 
 The walk then visits every parent in level order from the buffer
 root, a parent's own kind settled before its children are visited.
-At each parent P (=visit_parent= in =server/refresh/ladder.rs=) it
+At each parent P (=visit_parent= in =server/refresh/visit.rs=) it
 settles the node budget (below), lets an editable-view request extend
 the content P already shows, adds P's default folders, computes P's
-goal, and runs the *ladder*, its rungs in order, weakest first:
+goal, and runs the *refresh's rungs* in order, weakest first (older
+text calls them the ladder):
 1. re-kind: each vognode child becomes what the ID rule says; each
    descriptor whose position the ancestry table forbids, or, for a
    change viewnode, whose change is gone, is *unsayable* and becomes a
@@ -314,7 +315,7 @@ goal, and runs the *ladder*, its rungs in order, weakest first:
    and reported.
 In the diff view, between rungs 5 and 6, the change viewnodes P
 should hold are drawn or kept, and each child is tagged with its
-change (=server/refresh/diff_view.rs=). After the ladder, a folder
+change (=server/refresh/diff_view.rs=). After the rungs, a folder
 left with no child is entombstoned, unless the save reads its
 membership or it is the flags folder, where the user could add
 something.

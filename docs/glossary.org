@@ -369,7 +369,7 @@ editable-view request extends -- a fresh content view's roots, and
 the editable content the request draws under them -- gets its
 nonempty =subscribeeFolder= automatically, and a fresh content view a
 =containerFolder= on each root that has containers ('add_default_folders' in
-'server/refresh/ladder.rs'). The other relation folders require an
+'server/refresh/visit.rs'). The other relation folders require an
 explicit folder request (the =C-c l= commands), even when their
 herald counts say they would be nonempty. The same rule applies when
 a member of any partner folder is extended as editable. An editable
@@ -506,7 +506,7 @@ refresh *entombstones* a headline (makes it one) when its gnid names
 nothing the view may show (a node a save deleted, which in the diff
 view becomes its ghost instead, or a node the skgrepo restriction now
 hides), when it describes its viewparent from where it cannot (see
-"the ladder, unsayable" among the terms of the implementation), when
+"the refresh's rungs, unsayable" among the terms of the implementation), when
 the change it described is gone, when it is a folder left with
 nothing in it that the user could add to, and when the user asks it
 to of a ghost. The refresh prunes a childless tombstone before the
@@ -1177,7 +1177,7 @@ folder atom. The editable folders carry none.
 A folder left with no child is entombstoned, and so pruned, unless the
 save reads its membership or it is the flags folder, where the user
 could add something ('folder_goes_when_empty' in
-'server/refresh/ladder.rs').
+'server/refresh/visit.rs').
 
 *** the containerward chain, as drawn
 
@@ -1260,24 +1260,24 @@ child's warrant, what is reinstated and, where it is ordered, the
 children's order. A parent whose position implies no relationship
 (the buffer root, a tombstone, an unknown) has none.
 
-*** the ladder, unsayable
+*** the refresh's rungs, unsayable
 
 The fixed order of rungs the refresh applies at each parent to its
 children, weakest first: re-kind, viewnode merge, warrant,
 claims, reinstate, reorder, override substitution, view requests
-('server/refresh/ladder.rs'; 'docs/data-model_technical.org', "The
-walk and the ladder"). A descriptor -- a folder, a property member, a
+('server/refresh/visit.rs'; 'docs/data-model_technical.org', "The
+walk and the refresh's rungs"). A descriptor -- a folder, a property member, a
 change viewnode -- whose ancestors are not those the ancestry table
 requires of its kind ('required_ancestry' in
 'server/refresh/ancestry.rs') is *unsayable* there, and is
 entombstoned, its children staying under the tombstone. An occurrence
-is never unsayable. (This ladder is not the privacy ladder, the
-skgrepos in privacy order.)
+is never unsayable. (Older text calls the rungs the ladder; they are not the privacy
+ladder, the skgrepos in privacy order.)
 
 *** viewnode merge, duplicate viewnode siblings
 
 *Duplicate viewnode siblings* are siblings standing for one gnid
-under one parent. The ladder's second rung ('merge_siblings') makes
+under one parent. The refresh's second rung ('merge_siblings') makes
 each set of them one viewnode, by a *viewnode merge*. The result
 stands where the first of them stood and has a fresh viewnode ID.
 It is folded only if every sibling was, and its body is folded only

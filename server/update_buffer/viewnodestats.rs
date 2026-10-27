@@ -53,7 +53,7 @@ impl RelRepoLookup {
 
 /// The stats of each occurrence (its rels, props, birth, 'cycle',
 /// 'repoBoundary', 'omittedBody', relRepo). The warrants and the
-/// claims are the refresh's ladder's ('server/refresh/'); this pass
+/// claims are the refresh's rungs' ('server/refresh/'); this pass
 /// leaves them as they are.
 pub fn set_viewnodestats_in_viewforest (
   viewforest            : &mut Tree<Viewnode>,

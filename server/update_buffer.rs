@@ -322,7 +322,7 @@ pub fn render_initial_view (
 /// asking for its containers folder ('(folder containers)') and to be
 /// the node's editable occurrence ('editableView'), which extends its
 /// content and gives each occurrence that extension draws editable its
-/// default folders ('add_default_folders' in 'server/refresh/ladder.rs'),
+/// default folders ('add_default_folders' in 'server/refresh/visit.rs'),
 /// as a fresh view always has. A node requested twice is editable at
 /// its first root only. A gnid no node answers to is an unknown, which
 /// the refresh entombstones.

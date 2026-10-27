@@ -4,12 +4,12 @@
 //! readiness facts and the home skgrepo moves), prune every childless
 //! tombstone, roots included (so a buffer may end with no roots), give
 //! a vnid to every viewnode that lacks one, and render. The warrants
-//! the ladder set are kept: the stats pass does not recompute them.
+//! the refresh's rungs set are kept: the stats pass does not recompute them.
 
 use crate::diff_view::pruned_change_view::set_diffView_facts_in_viewforest;
 use crate::org_to_text::viewforest_to_string;
 use crate::refresh::{Truth, Walk};
-use crate::refresh::ladder::folder_goes_when_empty;
+use crate::refresh::visit::folder_goes_when_empty;
 use crate::types::misc::ID;
 use crate::types::tree::forest::ViewForest;
 use crate::types::tree::generic::do_everywhere_in_tree_dfs_readonly;

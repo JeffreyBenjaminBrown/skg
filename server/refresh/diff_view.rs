@@ -36,7 +36,7 @@ use crate::refresh::extent::is_chain_parent;
 use crate::refresh::goal::{
   Goal, GoalItem, GoalMember, member_of_child};
 use crate::refresh::id_rule::entombstone_gone_change;
-use crate::refresh::ladder::children_of;
+use crate::refresh::visit::children_of;
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::nodes::complete::Flag;
 use crate::types::nodes::rust::GraphnodeInRust;

@@ -11,7 +11,7 @@ The vocabulary (graph straddle, the three kinds of change, C, R, U,
 D, change-forest leaf, mark, changeset marker, ...) is the
 glossary's "Terms a user meets in the diff view" and "Terms of the
 diff view's implementation" ('docs/glossary.org'); the refresh's
-words (the ID rule, goal, warrant, the ladder, extent) are among its
+words (the ID rule, goal, warrant, the refresh's rungs, extent) are among its
 "Terms of the implementation", and ghost, tombstone and claims
 membership among its "Terms a user meets". A buffer of the diff view
 is drawn by the refresh every view uses, whose model is

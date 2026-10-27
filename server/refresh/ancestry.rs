@@ -3,7 +3,7 @@
 //! viewparent rather than standing for a gnid: a folder, a property
 //! member or a change viewnode. A descriptor whose ancestors are not
 //! the kinds its row requires is unsayable, and the refresh
-//! entombstones it ('ladder.rs', "re-kind"); its children stay under
+//! entombstones it ('visit.rs', "re-kind"); its children stay under
 //! the tombstone. A vognode has no row: an occurrence is never
 //! unsayable.
 //!

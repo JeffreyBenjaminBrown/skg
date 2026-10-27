@@ -1,5 +1,5 @@
 // The unit suite of the refresh ('server/refresh/'): a file per rung
-// of the ladder, and one each for the ancestry rows, the diff view,
+// of the refresh, and one each for the ancestry rows, the diff view,
 // the tail and the buffer corrections ('buffer_corrections.rs'). Each
 // test builds a small graph and an input buffer, refreshes it, and
 // asserts the output, as an outline ('outline'). A refresh is checked

@@ -954,7 +954,7 @@ save. A chain node carries no change facts.
 =(viewRequests ...)= carries client→server requests for viewbranches
 (unlike =(view ...)= and the stats below, which are server→client). On save
 the refresh fulfills each request and then drops the atom, so a
-request is transient (the request rung of the ladder, in
+request is transient (the refresh's request rung, in
 =docs/data-model_technical.org=, "The refresh: how a view follows
 the graph"). Request forms:
 
@@ -1231,7 +1231,7 @@ content view, and an owned overrider R of N is visible under the
 skgrepo restriction, the refresh shows R instead -- transitively (an
 owned chain D overrides C overrides N is legal and resolves to the
 last visible link), cycle-guarded, and never in the diff view
-('substitute_overriders' in =server/refresh/ladder.rs=). The refresh
+('substitute_overriders' in =server/refresh/visit.rs=). The refresh
 substitutes at every refresh, a member already shown raw included,
 since it decides from the buffer and the graph as they are now. Only
 content substitutes: partner folder members, view roots, search

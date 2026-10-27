@@ -6,12 +6,12 @@
 //!
 //! The walk is level order from the roots. A parent's own kind is
 //! settled before its children are visited: at each parent, the
-//! ladder ('ladder.rs') re-kinds its children by the ID rule
-//! ('id_rule.rs'), merges duplicate viewnode siblings, sets each
-//! child's warrant against the parent's goal ('goal.rs'), marks the
-//! claims, reinstates what the goal names and no child stands for
-//! (as far as the extent allows, 'extent.rs'), reorders, substitutes
-//! overriders, and fulfills the children's view requests. In the diff
+//! refresh's rungs ('visit.rs') re-kind its children by the ID rule
+//! ('id_rule.rs'), merge duplicate viewnode siblings, set each
+//! child's warrant against the parent's goal ('goal.rs'), mark the
+//! claims, reinstate what the goal names and no child stands for
+//! (as far as the extent allows, 'extent.rs'), reorder, substitute
+//! overriders, and fulfill the children's view requests. In the diff
 //! view the goal also holds what HEAD alone warrants, and change
 //! viewnodes are recomputed in place ('diff_view.rs'). After the
 //! walk, the tail ('tail.rs') computes the derived facts, prunes the
@@ -24,9 +24,9 @@ mod diff_view;
 mod extent;
 pub(crate) mod goal;
 mod id_rule;
-mod ladder;
 pub mod mode;
 mod tail;
+mod visit;
 
 pub(crate) use tail::prune_childless_tombstones;
 
@@ -210,7 +210,7 @@ impl<'a> Walk<'a> {
 }
 
 /// Visit every parent in level order, starting at the buffer root:
-/// each visit runs the ladder over its children, which are then
+/// each visit runs the refresh's rungs over its children, which are then
 /// visited after every parent already queued.
 fn walk_in_level_order (
   tree : &mut Tree<Viewnode>,
@@ -219,7 +219,7 @@ fn walk_in_level_order (
   let mut queue : VecDeque<NodeId> =
     VecDeque::from ([ tree . root () . id () ]);
   while let Some (parent) = queue . pop_front () {
-    ladder::visit_parent (tree, parent, walk) ?;
+    visit::visit_parent (tree, parent, walk) ?;
     queue . extend ( tree . get (parent) . unwrap () . children ()
                      . map ( |child| child . id () )); }
   Ok (( )) }

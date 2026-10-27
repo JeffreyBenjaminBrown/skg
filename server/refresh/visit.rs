@@ -1,6 +1,6 @@
-//! The ladder: the rungs the refresh applies at each parent P
-//! to its children, in order ('docs/data-model_technical.org', "The
-//! walk and the ladder"):
+//! The visit of a parent: the refresh's rungs, applied at each
+//! parent P to its children, in order ('docs/data-model_technical.org',
+//! "The walk and the refresh's rungs"):
 //!  1. re-kind: each child that stands for a gnid becomes what the ID
 //!     rule says, where it stands; each descriptor (folder, property
 //!     member, change viewnode) whose position the ancestry table
@@ -62,7 +62,7 @@ use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::mem::discriminant;
 
-/// Run the ladder at 'parent', whose own kind is settled.
+/// Run the refresh's rungs at 'parent', whose own kind is settled.
 pub(crate) fn visit_parent (
   tree   : &mut Tree<Viewnode>,
   parent : NodeId,
@@ -928,7 +928,7 @@ fn write_protect_content_subtree (
       . map ( |child| child . id () )); }}
 
 //
-// after the ladder
+// after the rungs
 //
 
 /// A folder left childless is entombstoned, so that the tail prunes
