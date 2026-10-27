@@ -54,8 +54,8 @@ Now the first buffer should look like:
   ** subee-1
 #+end_example
 
-That "tricky" line happens because subee gets completed
-(via "complete_viewtree") when the buffer is saved.
+That "tricky" line happens because the refresh draws subee's
+content when the buffer is saved.
 
 And now we go a step further:
 We make an edit from the view with deleted nodes.
@@ -89,7 +89,7 @@ After saving that, the other buffer should now read:
 And finally, we re-save the first buffer with a new node
 (new-root) inserted as a sibling of subee under the
 tombstone. This exercises the round-trip: tombstones are parsed back from text, pass through
-completion, and render unchanged. The new node gets a UUID.
+the refresh, and render unchanged. The new node gets a UUID.
 
 #+begin_example
   * 1

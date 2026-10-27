@@ -62,8 +62,8 @@ Now the first buffer should look like:
   ** subee-1
 #+end_example
 
-That "tricky" line happens because subee gets completed
-(via "complete_viewtree") when the buffer is saved.
+That "tricky" line happens because the refresh draws subee's
+content when the buffer is saved.
 
 And now we go a step further:
 We make an edit from the view with deleted nodes.
@@ -105,12 +105,12 @@ This integration test exercises:
    collateral buffer adds a new child node, and the other buffer
    picks up the change.
 3. Re-saving a buffer containing =Deleted= / =Tombstone= nodes:
-   they round-trip through parse → completion → render unchanged,
+   they round-trip through parse → refresh → render unchanged,
    and a new node created under a =Tombstone= gets a UUID.
 
 All existing collateral tests deal only with containment changes.
 This is the first to exercise the =DeletedNode= / =Tombstone=
-degradation path in =complete_viewtree=.
+degradation path in the refresh.
 
 * Fixtures
 
@@ -229,12 +229,12 @@ Buffer content before save:
   ** (skg node (gnid subee-1) (skgRepos (nodeRepo main))) subee-1
 #+end_example
 
-After saving, the server completes the tree and sends back the
+After saving, the server refreshes the tree and sends back the
 response. Since 11 is writeProtected it generates no save
 instructions. subee and subee-1 are editable and match the
 fixtures, so it's a no-op.
 
-The save response replaces the buffer with the completed view.
+The save response replaces the buffer with the refreshed view.
 Assert: headline-titles include "11", "subee", "subee-1".
 
 * Phase 3: Delete 11 from buffer 2
@@ -248,7 +248,7 @@ The server:
 1. Generates =NodeInstruction::Delete= for 11
 2. Deletes =11.skg= from disk
 3. Re-renders buffer 2 with =deleted_by_this_save_pids = {11}=
-4. Completes collateral buffer 1 with =deleted_by_this_save_pids = {11}=
+4. Refreshes collateral buffer 1 with =deleted_by_this_save_pids = {11}=
 
 ** Expected buffer 2 after save
 
@@ -274,7 +274,7 @@ which the postorder pass detaches. So aliasFolder and its
 alias disappear entirely.
 
 subee is an Occurrence under the (now =Tombstone=)
-subscribeeFolder. =complete_viewtree= completes it normally,
+subscribeeFolder. The refresh draws it normally,
 adding subee-1 as a real child. This is the "tricky" line.
 
 Expected headline-titles (approximately):
@@ -282,8 +282,8 @@ Expected headline-titles (approximately):
 ((1 . "1")
  (2 . "11")           ;; DeletedNode
  (3 . "")             ;; Tombstone (was subscribeeFolder)
- (4 . "subee")        ;; Occurrence, completed
- (5 . "subee-1")      ;; child from completion
+ (4 . "subee")        ;; Occurrence, refreshed
+ (5 . "subee-1")      ;; child the refresh drew
  (5 . "")             ;; Tombstone (was hiddenInSubscribeeFolder)
  (6 . "subee-1")      ;; hidden node preserved
  (4 . "")             ;; Tombstone (was hiddenOutsideOfSubscribeeFolder)
@@ -308,7 +308,7 @@ titles at the right depths.
 
 Edit buffer 1 (the one with deleted structure):
 - Navigate to the =subee= headline
-- Position after =subee-1= (the completed child, at depth 5)
+- Position after =subee-1= (the child the refresh drew, at depth 5)
 - Insert =****** subee-2= (a bare headline with no metadata)
 - Save
 
@@ -321,21 +321,21 @@ and updates subee's =contains= to include it.
 Same structure as before, but with subee-2 inserted as a child
 of subee. subee-2 gets a UUID and metadata from the server.
 The standalone subee root also gains subee-2 as a child
-(it's completed normally from the updated =subee.skg=).
+(the refresh draws it from the updated =subee.skg=).
 
 Expected headline-titles (approximately):
 #+begin_example
 ((1 . "1")
  (2 . "11")           ;; DeletedNode, still present
  (3 . "")             ;; Tombstone
- (4 . "subee")        ;; Occurrence, completed
+ (4 . "subee")        ;; Occurrence, refreshed
  (5 . "subee-1")      ;; existing child
  (5 . "subee-2")      ;; new child (now has UUID + metadata)
  (5 . "")             ;; Tombstone
  (6 . "subee-1")      ;; hidden node preserved
  (4 . "")             ;; Tombstone
  (5 . "also-hidden")  ;; hidden node preserved
- (1 . "subee")        ;; standalone root, completed
+ (1 . "subee")        ;; standalone root, refreshed
  (2 . "subee-1")
  (2 . "subee-2"))     ;; also gains subee-2
 #+end_example
@@ -344,7 +344,7 @@ Expected headline-titles (approximately):
 
 After fixing =build_child_creation_data= (see Rust code fix
 section below), the collateral update for buffer 2 succeeds.
-=complete_viewtree= re-processes =subee=, reads the updated
+The refresh re-processes =subee=, reads the updated
 =subee.skg= (which now lists =subee-2= in =contains=), and
 creates subee-2 as a new Occurrence child.
 
@@ -365,7 +365,7 @@ metadata must be supplied explicitly (=(skgRepos (nodeRepo main))=) because
 
 This exercises:
 - =Deleted= / =Tombstone= round-tripping through the save
-  pipeline (parse → completion → render) without disruption.
+  pipeline (parse → refresh → render) without disruption.
 - Creating a new node under a =Tombstone=: the node gets a
   UUID and is saved to disk, but no parent claims it in its
   =contains= (the =Tombstone= generates no save instructions).
@@ -560,8 +560,8 @@ The prompt's expected outputs are correct.
 
 When buffer 1 is saved with the new =subee-2= node, the server
 creates =subee-2.skg= on disk and updates subee's =contains=.
-Then the collateral update for buffer 2 re-completes its stored
-forest.
+Then the collateral update for buffer 2 refreshes its stored
+forest again.
 
 Currently =build_child_creation_data= fails for =subee-2=
 because it's not in =child_repos= (existing tree children).
@@ -600,7 +600,7 @@ I should verify that these work before relying on them in the test.
 ** Sleep durations
 
 The server's save pipeline includes filesystem writes, graph swap-in, and
-Tantivy reindex, merge, and collateral completion. The containerward
+Tantivy reindex, nodeMerge, and collateral refresh. The containerward
 test needed 2.0s sleeps. This test has TWO save-and-verify cycles,
 so the total test time will be significant. Timeout should be at
 least 30s, possibly 40s.
