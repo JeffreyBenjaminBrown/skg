@@ -3407,3 +3407,20 @@ not check").
 tracked (slice 6's note on the retired two-phase protocol).
 *** Headline
 DONE.
+
+** Orchestrator's notes after slice 10 (2026-10-27)
+Launched 01:42 UTC, reported 01:59 UTC: seventeen minutes. No
+correction inserted; the plan is complete, every slice DONE.
+Two findings for the review: the integration test
+'save_collateral_delete_then_edit_under_it' never edits under a
+tombstone, only beside them, so its name overpromises; and
+'docs/api-and-formats.org' cites 'bench-search-enrichment.org'
+under 'TODO/', which is untracked and Jeff's to commit. The
+agent renamed "claimant" and "herald label" to "claiming child"
+and "skgrepo label" rather than define synonyms; right. The
+two-question check: every word of the plan is in the glossary
+and the code with the plan's meaning; no code cites 'TODO/'.
+Suites: 'bash/all-tests.sh' green but the pre-existing
+'import-md-and-org' failure, both clients: Emacs 406, Neovim
+399, nextest 991, doctests, integration 34 of 35.
+
