@@ -1,5 +1,6 @@
 -- PURPOSE: Lock skg buffers against edits during a save-in-progress,
--- and the single-flight stream guard. The Lua port of
+-- and the single-flight guard on streaming requests
+-- ('stream_in_progress'). The Lua port of
 -- elisp/skg-request-save/skg-lock-buffers.el.
 --
 -- The elisp locked with whole-buffer overlays carrying

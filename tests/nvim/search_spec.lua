@@ -1,6 +1,5 @@
--- Coverage for skg.search's three-message flow (search-results ->
--- request-snapshot -> search-enrichment) against the loopback fake
--- server, plus skg.search_make_link's finish paths, mirroring
+-- Coverage for skg.search's one message (search-results, carrying
+-- the search buffer) against the loopback fake server, plus skg.search_make_link's finish paths, mirroring
 -- tests/elisp/test-skg-search-make-link.el (the finish-at-link,
 -- finish-at-headline and no-target cases; the label-reduction cases
 -- are in id_search_spec.lua).
@@ -11,10 +10,8 @@ local helpers = dofile(
 local buffer = require('skg.buffer')
 local client = require('skg.client')
 local lock = require('skg.lock')
-local save = require('skg.save')
 local search = require('skg.search')
 local search_make_link = require('skg.search_make_link')
-local sexpr = require('skg.sexpr.parse')
 local state = require('skg.state')
 
 describe('skg.search', function ()
@@ -57,19 +54,17 @@ describe('skg.search', function ()
       '(overPrivateText-telescopes . "exclude")', 1, true))
   end)
 
-  it('a pending search blocks save before save locks are taken', function ()
+  it('a search leaves the stream-in-progress guard alone', function ()
     server = helpers.connect_to_fake_server(function () end)
-    search.request_text_search('still enriching', false, false, false)
-    local buf = buffer.open_org_buffer_from_text(
-      '* (skg node (gnid a)) a', 'skg://a', 'view_id-a')
-    local ok, err = pcall(save.request_save_buffer)
-    assert.is_false(ok)
-    assert.is_truthy(tostring(err):find(
-      'search enrichment already in progress', 1, true))
-    assert.is_true(vim.bo[buf].modifiable)
+    lock.begin_stream('save')
+    search.request_text_search('while saving', false, false, false)
+    assert.are.equal('save', lock.stream_in_progress)
+    lock.end_stream()
+    search.request_text_search('then', false, false, false)
+    assert.is_nil(lock.stream_in_progress)
   end)
 
-  it('local send failure unwinds search handlers and stream state', function ()
+  it('local send failure unwinds search handlers', function ()
     local original_send = client.send_string
     client.send_string = function () error('synthetic send failure') end
     local ok, err = pcall(
@@ -77,78 +72,39 @@ describe('skg.search', function ()
     client.send_string = original_send
     assert.is_false(ok)
     assert.is_truthy(tostring(err):find('synthetic send failure', 1, true))
-    assert.is_nil(lock.stream_in_progress)
     assert.are.equal(0, state.lp_pending_count)
     for _, response_type in ipairs({
-        'search-results', 'search-enrichment', 'request-snapshot',
-        'overPrivateText-telescope-confirmation' }) do
+        'search-results', 'overPrivateText-telescope-confirmation' }) do
       assert.is_nil(state.response_handler_map[response_type])
     end
   end)
 
-  it('opens results, snapshots on request, and applies enrichment',
-     function ()
-    local snapshot = nil
+  it('opens the search buffer from one message, clean', function ()
     server = helpers.connect_to_fake_server(function (line, respond)
       if line:find('"text search"', 1, true) then
         respond(helpers.framed(
           '((response-type search-results)'
           .. ' (content "* (skg node (gnid r1)) first result'
-          .. '\\n* (skg node (gnid r2)) second result"))'))
-        -- Immediately ask for the snapshot, as the server does.
-        respond(helpers.framed(
-          '((response-type request-snapshot)'
-          .. ' (content "dog"))'))
-      elseif line:find('snapshot response', 1, true) then
-        snapshot = line
-        respond(helpers.framed(
-          '((response-type search-enrichment) (terms "dog")'
-          .. ' (content "* (skg node (gnid r1)) first result'
-          .. ' enriched\\n* (skg node (gnid r2)) second result'
-          .. ' enriched") (warnings ()))'))
+          .. '\\n** (skg folded containerFolder)'
+          .. '\\n* (skg node (gnid r2)) second result")'
+          .. ' (warnings ()))'))
       end
     end)
     search.search('dog')
     local buf = nil
     vim.wait(3000, function ()
       buf = buffer.find_buffer_by_view_id('search:dog')
-      if not buf then return false end
-      local first =
-        vim.api.nvim_buf_get_lines(buf, 0, 1, false)[1] or ''
-      return first:find('enriched', 1, true) ~= nil
+      return buf ~= nil
     end, 10)
     assert.is_truthy(buf)
     assert.are.equal('skg://?dog', vim.api.nvim_buf_get_name(buf))
-    assert.is_truthy(snapshot)
     local text = table.concat(
       vim.api.nvim_buf_get_lines(buf, 0, -1, false), '\n')
-    assert.is_truthy(text:find('first result enriched', 1, true))
-    -- Read-only was dropped again after enrichment.
+    assert.is_truthy(text:find('second result', 1, true))
     assert.is_true(vim.bo[buf].modifiable)
-  end)
-
-  it('dirty enrichment preserves the clean baseline and dirty flag',
-     function ()
-    local buf = buffer.open_org_buffer_from_text(
-      '* clean\n', buffer.search_buffer_name('dirty'), 'search:dirty')
-    local baseline = vim.b[buf].skg_clean_baseline
-    vim.api.nvim_buf_set_lines(buf, 1, 1, false, { 'user edit' })
-    vim.b[buf].skg_search_buffer_snapshot_was_dirty = true
-    search.display_search_enrichment(sexpr.read(
-      '((terms "dirty") (content "* enriched\\nuser edit") (warnings ()))'))
-    assert.is_true(vim.bo[buf].modified)
-    assert.are.equal(baseline, vim.b[buf].skg_clean_baseline)
-    assert.is_true(vim.b[buf].skg_search_enrichment_includes_user_edits)
-  end)
-
-  it('clean enrichment establishes a new clean baseline', function ()
-    local buf = buffer.open_org_buffer_from_text(
-      '* clean\n', buffer.search_buffer_name('clean'), 'search:clean')
-    vim.b[buf].skg_search_buffer_snapshot_was_dirty = false
-    search.display_search_enrichment(sexpr.read(
-      '((terms "clean") (content "* enriched") (warnings ()))'))
     assert.is_false(vim.bo[buf].modified)
-    assert.are.equal('* enriched\n', vim.b[buf].skg_clean_baseline)
+    assert.are.equal(text, vim.b[buf].skg_clean_baseline)
+    assert.is_nil(state.response_handler_map['search-results'])
   end)
 
   it('search_make_link finish inserts a link at the recorded spot',

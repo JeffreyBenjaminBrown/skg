@@ -63,7 +63,8 @@ function M.request_save_buffer (approved_forks, fork_skgrepos,
     error(err) end
 end
 
----Serialize and send a save after the stream guard and locks are held.
+---Serialize and send a save once 'lock.stream_in_progress' is set and
+---the buffers are locked.
 function M.send_save_buffer (save_buf, saved_view_id, approved_forks, fork_skgrepos,
                              approved_hoist_pids, text_approved_pids,
                              strandeds_review)

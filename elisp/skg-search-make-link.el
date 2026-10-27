@@ -84,7 +84,7 @@ this buffer at the position point currently has."
 
 (defun skg--maybe-activate-link-from-search-mode ()
   "If a `skg-search-make-link' was pending, configure this buffer for it.
-Called from `skg--display-search-phase1' immediately after the
+Called from `skg--display-search-results' immediately after the
 search buffer is set up. Sets the buffer-local target and turns
 on `skg-search-make-link-mode'; clears the pending var so a later
 plain search doesn't accidentally inherit the state."

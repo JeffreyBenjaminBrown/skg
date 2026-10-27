@@ -52,11 +52,6 @@ With OVERWRITE non-nil, replace an existing PATH without prompting."
      (format "- Captured UTC: %s\n"
              (format-time-string "%Y-%m-%dT%H:%M:%SZ" nil t))
      "- Repo-set: unavailable to this client\n"
-     (if skg--search-enrichment-includes-user-edits
-         (concat "- Search enrichment: current text includes both unsaved "
-                 "edits and enrichment presentation; the diff is not a "
-                 "semantic patch of user intent alone.\n")
-       "- Search enrichment: no dirty enrichment recorded\n")
      (if baseline-available
          "- Baseline: verified client clean baseline\n"
        (concat "- Baseline: unavailable (the current text is still preserved, "

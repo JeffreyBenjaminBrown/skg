@@ -138,14 +138,6 @@ an edit command typed via M-x keeps the approval."
   "Context recorded with `skg-clean-baseline'.")
 (put 'skg-clean-baseline-context 'permanent-local t)
 
-(defvar-local skg--search-enrichment-includes-user-edits nil
-  "Non-nil when enrichment replaced a dirty search-buffer snapshot.")
-(put 'skg--search-enrichment-includes-user-edits 'permanent-local t)
-
-(defvar-local skg--search-buffer-snapshot-was-dirty nil
-  "Whether the buffer snapshot currently being enriched contained unsaved edits.")
-(put 'skg--search-buffer-snapshot-was-dirty 'permanent-local t)
-
 (defvar-local skg-contentView-initialRoot-repo nil
   "Repo of the initial first root in this skg content view.
 Captured when the view opens and retained only to disambiguate its
@@ -162,8 +154,7 @@ view-forest edits do not change it.")
   (setq skg-clean-baseline
         (buffer-substring-no-properties (point-min) (point-max)))
   (setq skg-clean-baseline-context
-        (list :repo-set "unavailable"))
-  (setq skg--search-enrichment-includes-user-edits nil))
+        (list :repo-set "unavailable")))
 
 (defun skg-content-view-buffer-name (org-text)
   "Generate buffer name for content view from ORG-TEXT."

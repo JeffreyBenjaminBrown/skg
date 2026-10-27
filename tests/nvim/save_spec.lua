@@ -13,7 +13,6 @@ local folds = require('skg.folds')
 local lock = require('skg.lock')
 local metadata = require('skg.metadata')
 local save = require('skg.save')
-local search = require('skg.search')
 local sexpr = require('skg.sexpr.parse')
 local state = require('skg.state')
 
@@ -530,23 +529,11 @@ describe('skg.save pipeline', function ()
     assert.is_false(ok)
     -- Like Emacs, the buffer lock rejects first (there the message
     -- was skg's own; here it is vim's modifiable error -- the
-    -- documented deviation); the stream guard is the second line of
-    -- defense.
+    -- documented deviation); the stream-in-progress guard is the
+    -- second line of defense.
     local message = tostring(err)
     assert.is_truthy(message:find('already in progress')
                      or message:find('modifiable'))
-  end)
-
-  it('a pending save blocks search until terminal cleanup', function ()
-    server = helpers.connect_to_fake_server(function () end)
-    open_view('* (skg node (gnid a)) a', 'skg://guard-search',
-              'view_id-guard-search')
-    save.request_save_buffer()
-    local ok, err = pcall(
-      search.request_text_search, 'blocked', false, false, false)
-    assert.is_false(ok)
-    assert.is_truthy(tostring(err):find(
-      'save already in progress', 1, true))
   end)
 
   it('refuses to save a buffer with no view ID', function ()

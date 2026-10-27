@@ -144,7 +144,6 @@ function M.capture_clean_baseline (buf)
   vim.b[buf].skg_clean_baseline = M.text(buf)
   vim.b[buf].skg_clean_baseline_context =
     'repo-set unavailable'
-  vim.b[buf].skg_search_enrichment_includes_user_edits = false
 end
 
 -- ── lifecycle ──────────────────────────────────────────────────────

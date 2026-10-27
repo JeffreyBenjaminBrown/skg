@@ -65,11 +65,15 @@ headline documenting `skg-search-interactive'."
   "Serialize B as the wire-format \"true\" or \"false\"."
   (if b "true" "false"))
 
+;; A search is answered by one 'search-results' message, whose content
+;; is the search buffer: the hits, each with what the enrichment draws
+;; under it (docs/api-and-formats.org, "Text search"). The search
+;; buffer is an ordinary view from that message on.
+
 (defun skg--request-text-search (search-terms regex body operators
                                               &optional overPrivateText-choice)
   "Request a text search from the Rust server.
 REGEX, BODY, OPERATORS are booleans; sent as \"true\"/\"false\"."
-  (skg--begin-stream "search enrichment")
   (condition-case err
       (skg--send-text-search-request
        search-terms regex body operators overPrivateText-choice)
@@ -79,7 +83,7 @@ REGEX, BODY, OPERATORS are booleans; sent as \"true\"/\"false\"."
 
 (defun skg--send-text-search-request (search-terms regex body operators
                                                    overPrivateText-choice)
-  "Register handlers and send one guarded text-search request."
+  "Register handlers and send one text-search request."
   (let* ((tcp-proc (skg-tcp-connect-to-rust))
          (clean-terms (if (stringp search-terms)
                           (substring-no-properties search-terms)
@@ -96,69 +100,47 @@ REGEX, BODY, OPERATORS are booleans; sent as \"true\"/\"false\"."
                       `((overPrivateText-telescopes . ,overPrivateText-choice)))))
                   "\n")))
     (skg-register-response-handler
-     ;; Register phase 1 handler (one-shot)
      'search-results
      (lambda (_tcp-proc payload)
        (setq skg-response-handler-map
              (assoc-delete-all 'overPrivateText-telescope-confirmation
                                skg-response-handler-map))
-       (skg--display-search-phase1 payload clean-terms))
+       (skg--display-search-results payload clean-terms))
      t)
-    (skg-register-response-handler
-     ;; Register phase 2 handler for search results 'enriched' with partner folders and graphnodestats. Persists until fired or replaced.
-     'search-enrichment
-     (lambda (_tcp-proc payload)
-       (unwind-protect
-           (skg--display-search-enrichment payload)
-         (skg--end-stream)))
-     t)
-    (skg-register-response-handler
-     ;; Rust asks for a buffer snapshot of the search buffer so it can
-     ;; integrate partner folders without losing user edits.
-     'request-snapshot
-     (lambda (tcp-proc payload)
-       (skg--handle-buffer-snapshot-request tcp-proc payload))
-     nil) ;; persistent, not one-shot
     (skg-register-response-handler
      'overPrivateText-telescope-confirmation
      (lambda (_tcp-proc payload)
        (setq skg-response-handler-map
              (assoc-delete-all 'overPrivateText-telescope-confirmation
                                skg-response-handler-map))
-       (dolist (response-type '(search-results search-enrichment))
-         (when (assoc response-type skg-response-handler-map)
-           (setq skg-response-handler-map
-                 (assoc-delete-all response-type
-                                   skg-response-handler-map))
-           (setq skg-lp--pending-count
-                 (max 0 (1- skg-lp--pending-count)))))
-       (setq skg-response-handler-map
-             (assoc-delete-all 'request-snapshot
-                               skg-response-handler-map))
+       (skg--forget-search-results-handler)
        (let* ((response (read payload))
               (prompt (format "%s" (cadr (assoc 'prompt response))))
               (choice (if (y-or-n-p
                            (concat prompt " (No means exclude.) "))
                           "include"
                         "exclude")))
-         (skg--end-stream)
          (skg--request-text-search
           clean-terms regex body operators choice)))
      nil)
     (skg-lp-reset)
     (process-send-string tcp-proc request-s-exp)))
 
-(defun skg--cancel-locally-failed-search ()
-  "Unwind search handlers and stream state after a local send failure."
-  (dolist (response-type '(search-results search-enrichment))
-    (when (assoc response-type skg-response-handler-map)
-      (setq skg-lp--pending-count (max 0 (1- skg-lp--pending-count)))))
-  (dolist (response-type
-           '(search-results search-enrichment request-snapshot
-             overPrivateText-telescope-confirmation))
+(defun skg--forget-search-results-handler ()
+  "Drop the one-shot `search-results' handler, if it is still waiting,
+and the response it was counted as."
+  (when (assoc 'search-results skg-response-handler-map)
     (setq skg-response-handler-map
-          (assoc-delete-all response-type skg-response-handler-map)))
-  (skg--end-stream))
+          (assoc-delete-all 'search-results skg-response-handler-map))
+    (setq skg-lp--pending-count
+          (max 0 (1- skg-lp--pending-count)))))
+
+(defun skg--cancel-locally-failed-search ()
+  "Unwind the search handlers after a local send failure."
+  (skg--forget-search-results-handler)
+  (setq skg-response-handler-map
+        (assoc-delete-all 'overPrivateText-telescope-confirmation
+                          skg-response-handler-map)))
 
 (defvar skg--search-buffer-setup-hook nil
   "Hook run inside a freshly populated search buffer.
@@ -166,8 +148,8 @@ Each function is called with no arguments, with the search buffer
 as `current-buffer'. Used by `skg-search-make-link' to upgrade the
 buffer to link-creation mode.")
 
-(defun skg--display-search-phase1 (payload search-terms)
-  "Display phase 1 search results (without paths).
+(defun skg--display-search-results (payload search-terms)
+  "Display the search buffer.
 Sets skg-view-id to \"search:TERMS\" and registers a
 kill-buffer-hook to send close-view to the server."
   (let* ((response (read payload))
@@ -200,80 +182,15 @@ kill-buffer-hook to send close-view to the server."
         ((null value) nil)
         (t (format "%s" value))))
 
-(defun skg--display-search-enrichment (payload)
-  "Replace search buffer with results
-'enriched' with partner folders and graphnodestats.
-PAYLOAD contains response-type, terms, and content.
-Exits readonly after replacing content."
-  (let* ((response (read payload))
-         (terms   (skg--as-string (cadr (assoc 'terms   response))))
-         (content (skg--as-string (cadr (assoc 'content response))))
-         (warnings (cadr (assoc 'warnings response))))
-    (when (and terms content)
-      (let ((buf (get-buffer (skg-search-buffer-name terms))))
-        (when (buffer-live-p buf)
-          (with-current-buffer buf
-            (let ((old-point (point))
-                  (buffer-snapshot-was-dirty
-                   skg--search-buffer-snapshot-was-dirty))
-              (skg--replace-search-content content buffer-snapshot-was-dirty)
-              (goto-char (min old-point (point-max))))
-            (setq buffer-read-only nil)
-            (message "Search results enriched.") )) ))
-    (when warnings
-      (skg-big-nonfatal-message
-       "*SKG Search Warnings*"
-       "Search enrichment completed with warnings"
-       (skg-errors-and-warnings-to-org-string nil warnings)))))
-
-(defun skg--handle-buffer-snapshot-request (tcp-proc payload)
-  "Handle a request from the server for a buffer snapshot of a search buffer.
-- Server sends the search terms.
-- Client looks up the corresponding search buffer by name.
-- Client makes that buffer readonly.
-- Client sends its text back to the server for 'enrichment'."
-  (let* ((response (read payload))
-         (terms (skg--as-string (cadr (assoc 'content response))))
-         (buf (when terms
-                (get-buffer (skg-search-buffer-name terms)))))
-    (when (and buf (buffer-live-p buf))
-      (with-current-buffer buf
-        (setq skg--search-buffer-snapshot-was-dirty (buffer-modified-p))
-        (setq buffer-read-only t)
-        (message "Enriching search results...")
-        (let* ((buffer-contents (buffer-string))
-               (request-s-exp
-                (concat (prin1-to-string
-                         `((request . "snapshot response")
-                           (terms . ,terms)))
-                        "\n"))
-               (content-bytes
-                (encode-coding-string buffer-contents 'utf-8))
-               (content-length (length content-bytes))
-               (header (format "Content-Length: %d\r\n\r\n"
-                               content-length)))
-          (process-send-string tcp-proc request-s-exp)
-          (process-send-string tcp-proc header)
-          (process-send-string tcp-proc buffer-contents))))))
-
-(defun skg--replace-search-content (content &optional preserve-modified)
-  "Replace current buffer text with CONTENT, trimmed, with trailing newline.
-PRESERVE-MODIFIED keeps the prior clean baseline and marks the enriched
-buffer snapshot dirty because it contains unsaved user edits.
-Callers that do additional buffer work (e.g. org-mode setup)
-should bind inhibit-read-only themselves, since the buffer
-may already be read-only from a previous search."
+(defun skg--replace-search-content (content)
+  "Replace current buffer text with CONTENT, trimmed, with trailing
+newline, and leave the buffer unmodified."
   (let ((inhibit-read-only t)
         (skg--inhibit-dirty-view-confirmation t))
     (erase-buffer)
     (insert (string-trim content))
     (when (> (length content) 0)
       (insert "\n")))
-  (if preserve-modified
-      (progn
-        (setq skg--search-enrichment-includes-user-edits t)
-        (set-buffer-modified-p t))
-    (set-buffer-modified-p nil)
-    (skg--capture-clean-baseline)))
+  (set-buffer-modified-p nil))
 
 (provide 'skg-request-text-search)

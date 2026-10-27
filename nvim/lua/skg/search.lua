@@ -1,12 +1,11 @@
--- PURPOSE: Text search: the request, the immediate results buffer,
--- and the three-message enrichment flow (search-results ->
--- request-snapshot -> search-enrichment). The Lua port of
--- elisp/skg-request-text-search.el.
+-- PURPOSE: Text search: the request, and the search buffer, which
+-- one 'search-results' message carries, each hit with what the
+-- enrichment draws under it (docs/api-and-formats.org, "Text
+-- search"). The Lua port of elisp/skg-request-text-search.el.
 
 local buffer = require('skg.buffer')
 local client = require('skg.client')
 local heralds = require('skg.heralds')
-local lock = require('skg.lock')
 local messages = require('skg.messages')
 local payload = require('skg.payload')
 local sexpr = require('skg.sexpr.parse')
@@ -83,7 +82,6 @@ end
 ---@param operators boolean
 function M.request_text_search (search_terms, regex, body, operators,
                                 overPrivateText_choice)
-  lock.begin_stream('search enrichment')
   local ok, err = pcall(
     M.send_text_search_request, search_terms, regex, body, operators,
     overPrivateText_choice)
@@ -92,7 +90,7 @@ function M.request_text_search (search_terms, regex, body, operators,
     error(err) end
 end
 
----Register handlers and send one guarded text-search request.
+---Register handlers and send one text-search request.
 function M.send_text_search_request (search_terms, regex, body, operators,
                                      overPrivateText_choice)
   local request_form = {
@@ -109,36 +107,16 @@ function M.send_text_search_request (search_terms, regex, body, operators,
   state.register_response_handler('search-results',
     function (_payload_text, response)
       state.response_handler_map['overPrivateText-telescope-confirmation'] = nil
-      M.display_search_phase1(response, search_terms)
+      M.display_search_results(response, search_terms)
     end, true)
-  state.register_response_handler('search-enrichment',
-    function (_payload_text, response)
-      local ok, err = pcall(M.display_search_enrichment, response)
-      lock.end_stream()
-      if not ok then error(err) end
-    end, true)
-  state.register_response_handler('request-snapshot',
-    function (_payload_text, response)
-      -- The server asks for a buffer snapshot of the search buffer so it
-      -- can integrate partner folders without losing user edits.
-      M.handle_buffer_snapshot_request(response)
-    end, false) -- persistent, not one-shot
   state.register_response_handler('overPrivateText-telescope-confirmation',
     function (_payload_text, response)
       state.response_handler_map['overPrivateText-telescope-confirmation'] = nil
-      for _, response_type in ipairs(
-          { 'search-results', 'search-enrichment' }) do
-        if state.response_handler_map[response_type] then
-          state.response_handler_map[response_type] = nil
-          state.lp_pending_count = math.max(0, state.lp_pending_count - 1)
-        end
-      end
-      state.response_handler_map['request-snapshot'] = nil
+      M.forget_search_results_handler()
       local prompt = payload.field_text(response, 'prompt') or
         'Include overPrivateText telescopes in this search?'
       local choice = vim.fn.confirm(
         prompt, '&Include\n&Exclude', 2) == 1 and 'include' or 'exclude'
-      lock.end_stream()
       M.request_text_search(
         search_terms, regex, body, operators, choice)
     end, false)
@@ -146,25 +124,25 @@ function M.send_text_search_request (search_terms, regex, body, operators,
   client.send_string(request)
 end
 
-function M.cancel_locally_failed_search ()
-  for _, response_type in ipairs(
-      { 'search-results', 'search-enrichment' }) do
-    if state.response_handler_map[response_type] then
-      state.lp_pending_count = math.max(0, state.lp_pending_count - 1) end
-  end
-  for _, response_type in ipairs({
-      'search-results', 'search-enrichment', 'request-snapshot',
-      'overPrivateText-telescope-confirmation' }) do
-    state.response_handler_map[response_type] = nil
-  end
-  lock.end_stream()
+---Drop the one-shot 'search-results' handler, if it is still waiting,
+---and the response it was counted as.
+function M.forget_search_results_handler ()
+  if state.response_handler_map['search-results'] then
+    state.response_handler_map['search-results'] = nil
+    state.lp_pending_count = math.max(0, state.lp_pending_count - 1) end
 end
 
----Display the immediate results: a search view buffer registered
----under the view_id 'search:TERMS'.
+---Unwind the search handlers after a local send failure.
+function M.cancel_locally_failed_search ()
+  M.forget_search_results_handler()
+  state.response_handler_map['overPrivateText-telescope-confirmation'] = nil
+end
+
+---Display the search buffer: a view buffer registered under the
+---view_id 'search:TERMS'.
 ---@param response any
 ---@param search_terms string
-function M.display_search_phase1 (response, search_terms)
+function M.display_search_results (response, search_terms)
   local content = payload.field_text(response, 'content')
   if not content then return end
   local buf = buffer.open_org_buffer_from_text(
@@ -178,49 +156,6 @@ function M.display_search_phase1 (response, search_terms)
   M.display_warnings(response, 'Search completed with warnings')
 end
 
----Replace the search buffer with the enriched results and exit
----read-only.
----@param response any
-function M.display_search_enrichment (response)
-  local terms = payload.field_text(response, 'terms')
-  local content = payload.field_text(response, 'content')
-  if not terms or not content then
-    -- No enrichment is coming; the server may say why.
-    M.display_warnings(
-      response, 'Search enrichment completed with warnings')
-    return end
-  local buf = buffer.find_buffer_by_view_id('search:' .. terms)
-  if not buf then return end
-  vim.bo[buf].modifiable = true
-  local buffer_snapshot_was_dirty =
-    vim.b[buf].skg_search_buffer_snapshot_was_dirty == true
-  local cursor_saved = nil
-  for _, win in ipairs(vim.api.nvim_list_wins()) do
-    if vim.api.nvim_win_get_buf(win) == buf then
-      cursor_saved = { win, vim.api.nvim_win_get_cursor(win) }
-      break end
-  end
-  vim.api.nvim_buf_set_lines(buf, 0, -1, false,
-    vim.split(vim.trim(content) .. '\n', '\n'))
-  if cursor_saved then
-    local line_count = vim.api.nvim_buf_line_count(buf)
-    local cursor = cursor_saved[2]
-    pcall(vim.api.nvim_win_set_cursor, cursor_saved[1],
-          { math.min(cursor[1], line_count), cursor[2] })
-  end
-  if buffer_snapshot_was_dirty then
-    vim.b[buf].skg_search_enrichment_includes_user_edits = true
-    vim.bo[buf].modified = true
-  else
-    vim.bo[buf].modified = false
-    buffer.capture_clean_baseline(buf)
-  end
-  heralds.enable(buf)
-  vim.notify('Search results enriched.')
-  M.display_warnings(
-    response, 'Search enrichment completed with warnings')
-end
-
 function M.display_warnings (response, headline)
   local warnings = payload.string_list(payload.field(response, 'warnings'))
   if #warnings > 0 then
@@ -228,26 +163,6 @@ function M.display_warnings (response, headline)
       'skg://messages/search', headline,
       messages.errors_and_warnings_to_org_string({}, warnings))
   end
-end
-
----Freeze the search buffer read-only and send its text back for
----enrichment.
----@param response any
-function M.handle_buffer_snapshot_request (response)
-  local terms = payload.field_text(response, 'content')
-  local buf = terms and buffer.find_buffer_by_view_id('search:' .. terms)
-  if not buf then return end
-  vim.b[buf].skg_search_buffer_snapshot_was_dirty = vim.bo[buf].modified
-  vim.bo[buf].modifiable = false
-  vim.notify('Enriching search results...')
-  local contents = table.concat(
-    vim.api.nvim_buf_get_lines(buf, 0, -1, false), '\n')
-  client.send_string(sexpr.to_string({
-    sexpr.pair(sexpr.symbol('request'), 'snapshot response'),
-    sexpr.pair(sexpr.symbol('terms'), terms) }) .. '\n')
-  client.send_string(string.format('Content-Length: %d\r\n\r\n',
-                                   #contents))
-  client.send_string(contents)
 end
 
 return M

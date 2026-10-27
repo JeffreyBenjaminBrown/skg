@@ -22,11 +22,6 @@ function M.document (buf)
   local baseline = vim.b[buf].skg_clean_baseline
   local baseline_available = type(baseline) == 'string'
   local current = buffer.text(buf)
-  local enrichment_note =
-    vim.b[buf].skg_search_enrichment_includes_user_edits == true
-    and ('current text includes both unsaved edits and enrichment presentation;'
-         .. ' the diff is not a semantic patch of user intent alone')
-    or 'no dirty enrichment recorded'
   return table.concat({
     '#+TITLE: Skg unsaved changes recovery',
     '',
@@ -41,7 +36,6 @@ function M.document (buf)
     '- View ID: ' .. tostring(vim.b[buf].skg_view_id),
     '- Captured UTC: ' .. os.date('!%Y-%m-%dT%H:%M:%SZ'),
     '- Repo-set: unavailable to this client',
-    '- Search enrichment: ' .. enrichment_note,
     baseline_available
       and '- Baseline: verified client clean baseline'
       or ('- Baseline: unavailable (the current text is still preserved,'

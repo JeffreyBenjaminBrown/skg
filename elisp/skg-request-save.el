@@ -61,7 +61,8 @@ reviewed the relationships a home skgrepo move strands (see
                                             approved-hoist-pids
                                             text-approved-pids
                                             strandeds-review)
-  "Serialize and send a save after the stream guard and locks are held."
+  "Serialize and send a save once `skg--stream-in-progress' is set and
+the buffers are locked."
   (when (org-before-first-heading-p)
     ;; Rather than complain, save as if point were at the first headline.
     (goto-char (point-min))
