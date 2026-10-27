@@ -103,9 +103,8 @@ fn a_save_under_a_restriction_keeps_the_members_its_restricted_vognodes_stand_fo
 /// r hides hh (private) and hv (public) from its subscribers in its
 /// public file, and hp (private) in its private section, which also
 /// records that r contains hc (private). A view of r drawn under "all"
-/// and switched to "public" shows, where the experiment
-/// ('TODO/simplify-refresh/06_1_prepass-experiment.org') saw empty
-/// folders, Restricted vognodes: hs in the subscribee folder, hh beside
+/// and switched to "public" shows Restricted vognodes, not empty
+/// folders: hs in the subscribee folder, hh beside
 /// hv in the folder of what r hides outside its subscribees; and h in
 /// r's content. Of hp and hc, whose records are restricted, it shows
 /// nothing. Saved with an edit, it keeps every hide and every member.

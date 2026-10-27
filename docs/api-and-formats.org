@@ -129,6 +129,19 @@ So far there are these endpoints:
     search results' override folders and in explicitly requested
     override folders.
 
+** Close view
+  - Request: =((request . "close view") (view-id . "VIEW_ID"))=. Each
+    client sends it when a buffer showing a view is killed ('skg-send-close-view'
+    on Emacs's 'kill-buffer-hook'; 'send_close_view' on Neovim's
+    BufDelete and BufWipeout), and waits for no answer.
+  - Response: LP =((response-type close-view) (content "view closed"))=,
+    or =(content "Error: missing view-id")= when the request names no
+    view ('server/serve/handlers/close_view.rs').
+  - The server forgets the view: its viewforest and viewnode IDs go,
+    and no later save rerenders it. Closing the last open buffer of the
+    diff view also drops the graph straddle, which the diff view's
+    buffers share; the next diff view builds it anew.
+
 ** Save buffer
   - Request: First =((request . "save buffer") (view-id . "VIEW_ID") (point-lines-below-focused-headline . "N") (point-column . "C") (point-screen-lines-below-window-start . "M"))\n=, then one UTF-8 length-prefixed S-expression envelope:
     #+begin_src lisp
@@ -269,7 +282,7 @@ So far there are these endpoints:
     every prepared write/delete identity independently in the before and
     candidate graphs. Other registered views containing an affected unrestricted ID
     are rerendered. For every dirty client view, the server parses and unions
-    dependencies from its clean baseline, current text, and registered forest
+    dependencies from its clean baseline, current text, and registered viewforest
     when present. Any intersection refuses the save conservatively; malformed
     or missing dirty dependency data also refuses. A refusal returns
     =save-result= with nil content and actionable errors naming view IDs and
@@ -363,7 +376,7 @@ So far there are these endpoints:
     in the grammar =elisp/skg-sexpr/skg-lens.el= interprets. Inside it,
     strings are always double-quoted and match atoms are bare symbols;
     the distinction is load-bearing for the lens engine.
-    =skgrepoLabels= names each configured skgrepo with its herald label
+    =skgrepoLabels= names each configured skgrepo with its skgrepo label
     (its =abbreviation=, or else its name). A client renders a node's
     =repoBoundary= as "⌂:LABEL", LABEL looked up by the node's
     =nodeRepo= (the =nodeRepo= itself when the table lacks it), so no
@@ -445,7 +458,7 @@ since the command searches the current buffer.
               ("ID" restricted) ("ID" missing) ...)))=.
     Results follow the requested IDs. =PID= is the resolved primary ID,
     including resolution from an extra ID. =REPO-LABEL= is the visible
-    target's home-repo herald label, not the link's relRepo. Restricted
+    target's home skgrepo's skgrepo label, not the link's relRepo. Restricted
     and missing rows return neither title nor skgrepo. The lookup reads the
     current in-Rust graph snapshot and skgrepo restriction, independently
     of Tantivy title-index commits. =request-id= associates asynchronous
@@ -726,7 +739,7 @@ one automatically.
     =3d9aa9be-d95a-48bc-b362-33f9e7ebdf6f= and a body yielding a
     =target_filepath= (a tolerant ~key = value~ parse; the value may
     be bare or quoted, but a bare value with whitespace is refused).
-    The marker child is omitted from output. A nested export root is
+    The export marker is omitted from output. A nested export root is
     rendered as a link to its own file, not inlined. Links whose
     dest is not exported under =NAME= point to the export of
     =9ff04e25-01e8-4634-8aa5-f5849bc1eb81= ("Some links might be
@@ -829,7 +842,9 @@ one automatically.
     defaults from =skgconfig.toml=, resets on reconnect, and is not
     written back to the config. Changing it requires confirmation in
     Emacs, and re-renders (not closes) all active Skg buffers for that
-    connection.
+    connection. The rerender starts from each view as the server last
+    stored it, and the clients replace each buffer's text with the
+    result, so an unsaved edit in an open buffer is lost.
   - Refusal: the endpoint's error paths (missing or unknown set
     name) answer in the normal skgrepo-restriction response-type,
     carrying the explanatory text as =content= and the unchanged set
@@ -1240,9 +1255,9 @@ results, chain nodes and ghosts show the raw node.
 
 The buffer whose approved save creates a fork is the post-save exception. A
 root named by one of that save's exact =ForkSpec=s is rewritten from original F
-to clone K, and an existing recursive-content occurrence in the saved forest
+to clone K, and an existing recursive-content occurrence in the saved viewforest
 may likewise be replaced by its newly visible substitute. Both carry
-=(overridesHere F)=. The refreshed forest remains under the same view ID, and
+=(overridesHere F)=. The refreshed viewforest remains under the same view ID, and
 the open-view root index is recomputed from it, so that buffer is thereafter
 registered as rooted at K. Collateral rerenders do not replace roots;
 their content occurrences substitute as any refresh's do. A later
@@ -1445,7 +1460,7 @@ Fields:
 - =title=: A string, no newlines. Present in the home section only.
 - =pid=: The node's primary ID. Must equal the filename stem. Present
   in every section.
-- =extra_ids=: Optional list of additional IDs (from node merges).
+- =extra_ids=: Optional list of additional IDs (from nodeMerges).
   Home section only, by convention.
 - =body=: An optional string, perhaps with newlines. Home only.
 - =aliases=: Optional list of strings. Each section may contribute
@@ -1539,8 +1554,8 @@ Restricted vognode and an alias have only one). A Restricted vognode
 carries no title, and text typed on its line is refused, as on an
 unknown's. =noClaim= on a node, a ghost, an alias, an ID, an unknown
 or a Restricted vognode says the save does not read it as a member of its
-viewparent's list; a claimant carries nothing, and so does every
-child of a viewparent whose claims the save does not read. A lost
+viewparent's list; a claiming child carries nothing, and so does every
+child of a viewparent whose claims the save does not read. A removed
 alias and a dangling partner the worktree lost (an unknown carrying
 =(rel removed)=) carry =noClaim= where their viewparent's claims are
 read, so that the save, which skips the =(diff ...)= saying they were
@@ -1564,7 +1579,7 @@ gets a fresh one; a headline carrying one the view does not know
 gets a fresh one too, and the counter does not move past it. The
 clients show nothing for it and save it back untouched. The view's
 record of its viewnode IDs, with the counter and the viewnode IDs of
-the forest as last rendered, is 'ViewnodeIdRecord' in
+the viewforest as last rendered, is 'ViewnodeIdRecord' in
 =server/types/views_state.rs=.
 
 The parser refuses, with a message naming the grammar, the retired
@@ -1638,7 +1653,7 @@ folder it is the relationship, of the folder's kind, between the
 member and the folder's viewparent (the two compound partner folders
 carry none). On an alias, id or flag member, the single diff object
 is written =(rel added)= or =(rel removed)=: the member's existence
-in its list. A lost alias or ID (below) carries =(rel removed)=.
+in its list. A removed alias or ID (below) carries =(rel removed)=.
 **** =(properties changed)= -- the node's other properties
 The node is in both graphs and its file records a change ("modified",
 herald =M=), on a member, a removed member, a folder member or a
@@ -1807,7 +1822,7 @@ its line. A member whose record the set shows and that resolves to
 no node at all is an unknown, as under no restriction.
 
 Saving preserves what rendering omitted: a member whose record is
-restricted cannot be deleted (or even seen), so the save merges the
+restricted cannot be deleted (or even seen), so the save combines the
 buffer's visible lists with the disk lists -- order-preserving (the
 anchored weave) for =contains= and =subscribesTo=, set-difference
 for =overrides= -- restoring only the members whose records are

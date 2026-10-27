@@ -19,7 +19,7 @@
 //! membership changed; a write-protected occurrence holds none. A
 //! member whose relationship moved to another skgrepo holds its
 //! relRepo move. The children are tagged with the three kinds of
-//! change; the tail reads the readiness facts from the store.
+//! change; the tail reads the '(ready ...)' change facts from the store.
 
 use crate::diff_view::change_viewnodes::{
   mk_body_diff_viewnode, mk_relRepo_move_viewnode};

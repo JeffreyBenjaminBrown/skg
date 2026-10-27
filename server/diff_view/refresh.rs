@@ -1,7 +1,7 @@
 //! Rendering and rerendering a whole buffer of the diff view
 //! ('docs/diff-view.org', "Rendering a buffer"). Each is a refresh in
 //! diff-view mode ('refresh_viewforest', 'server/refresh/'), over the
-//! graph straddle, with the readiness facts read from the store: the
+//! graph straddle, with the '(ready ...)' change facts read from the store: the
 //! first rendering refreshes a stub of the buffer's roots
 //! ('diffView_buffer_viewforest' in 'pruned_change_view.rs'); a
 //! rerender ('rerender_view' in 'server/update_buffer.rs') brings the
@@ -29,7 +29,7 @@ use std::error::Error;
 use std::sync::{Arc, MutexGuard};
 
 /// Refresh 'viewforest', a buffer of kind 'diffView_buffer_kind' of
-/// the diff view, over 'straddle', with the readiness facts from
+/// the diff view, over 'straddle', with the '(ready ...)' change facts from
 /// 'store'. The goal holds what HEAD alone warrants, the change
 /// viewnodes are recomputed in place, and the buffer's sets choose
 /// what is editable and what an extension charges to the node budget

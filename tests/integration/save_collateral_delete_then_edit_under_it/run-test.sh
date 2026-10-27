@@ -1,11 +1,12 @@
 #!/bin/bash
 
-# Integration test for delete-then-edit-under-deleted collateral updates
+# Integration test: a save deletes a node another buffer shows, and that
+# buffer, now holding tombstones, is edited and saved (README/detail.org)
 # This script:
 # - Backs up and resets test data (five .skg fixtures) to clean state
 # - Starts an independent skg server with test config
-# - Uses Emacs to test node deletion via editRequest and subsequent
-#   editing under a DeletedNode across two collateral buffers
+# - Uses a client to test node deletion via editRequest and the saves
+#   of the buffer the deletion left holding tombstones
 # - Cleans up test artifacts and restores original state
 
 set -e  # Exit on any error

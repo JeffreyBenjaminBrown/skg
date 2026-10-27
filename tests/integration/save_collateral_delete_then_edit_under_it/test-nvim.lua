@@ -1,20 +1,18 @@
--- Integration test for delete-then-edit-under-deleted collateral
--- updates, nvim client. The Lua mirror of test-emacs.el in this
--- directory.
+-- Integration test, nvim client: a save deletes a node another buffer
+-- shows, and that buffer, now holding tombstones, is edited and saved.
+-- The Lua mirror of test-emacs.el in this directory.
 --
--- Buffer 1: multi-root view (placed under a non-vognode "1" + standalone subee root).
--- Buffer 2: manually constructed (write-protected 11 + subee + subee-1).
+-- Buffer 1: a view of node 1, plus a second root, subee.
+-- Buffer 2: written by hand (write-protected 11, subee, subee-1).
 --
--- Phase 4: delete 11 from buffer 2 -> 11 becomes DeletedNode,
---   non-vognodes become Tombstone in collateral buffer 1.
--- Phase 6: add subee-2 under subee in buffer 1 -> collateral buffer 2
---   picks up subee-2.
--- Phase 8: add new-root under a tombstone in buffer 1 ->
---   Deleted/Tombstone round-trip harmlessly through save.
+-- Phase 4: delete 11 from buffer 2; in buffer 1 its occurrence and its
+--   folders become tombstones, keeping what stood under them.
+-- Phase 6: add subee-2 under buffer 1's root subee; buffer 2 shows it
+--   too.
+-- Phase 8: add a root, new-root, to buffer 1; its tombstones
+--   round-trip through the save unchanged.
 --
--- Exercises DeletedNode / Tombstone degradation path in
--- complete_viewtree, editing under a DeletedNode, and re-saving a
--- buffer containing Deleted/Tombstone nodes.
+-- README/detail.org says what each phase checks.
 
 local T = dofile('../test-nvim-lib.lua')
 T.arm_timeout(40)
@@ -289,14 +287,10 @@ assert_headline_types_and_titles(buf2,
     { 2, 'node', 'subee-2' } },
   'phase 7: buffer 2 after updating collateral view')
 
-print('=== PHASE 8: Add new-root under tombstone in buffer 1 ===')
--- Add new-root as a sibling of the standalone subee in buffer 1.
--- Originally this exercised inserting a node under a tombstone;
--- after the delete pipeline started cleaning up references to the
--- deleted node, buffer 1 no longer contains a tombstone, so this
--- phase now exercises adding a top-level root via metadata-only
--- insertion (the BufferRoot, like a tombstone, supplies no skgrepo
--- to inherit, so explicit (skgRepos (nodeRepo main)) is still required).
+print('=== PHASE 8: Add new-root in buffer 1 ===')
+-- Add new-root as a root after the standalone subee in buffer 1, and
+-- save the buffer, tombstones and all. A root inherits no skgrepo, so
+-- the headline carries (skgRepos (nodeRepo main)).
 vim.api.nvim_set_current_buf(buf1)
 do
   local subee_row = nth_line_with_title(buf1, 'subee', 2)

@@ -1,4 +1,4 @@
-//! What a refresh changed ('refresh_viewforest'): one buffer
+//! What a refresh changed ('refresh_viewforest'): one
 //! buffer correction per change, each naming its headline as a subtree is
 //! named, by vnid and title. A buffer correction is a change the
 //! refresh made to what a buffer said because the buffer was wrong
@@ -80,7 +80,7 @@ impl BufferCorrection {
       &[ HeadlineName::of ( self . vnid . as_ref (), None, &self . title ) ] ) }
 }
 
-/// What the caller of a refresh knows that makes a change no buffer
+/// What the caller of a refresh knows that makes a change no
 /// buffer correction (see the module comment). The default, which every
 /// caller but two passes, reports every change.
 #[derive(Clone, Debug, Default)]

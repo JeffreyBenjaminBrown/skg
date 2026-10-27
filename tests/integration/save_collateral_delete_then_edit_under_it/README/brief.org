@@ -1,4 +1,14 @@
-The initial data looks like this:
+A save in one buffer deletes a node that another buffer shows, and
+that other buffer, now holding tombstones, is then edited and saved
+twice. 'detail.org' says what each phase checks.
+
+The data (titles equal IDs, as usual in tests): node 1 contains 11;
+11 subscribes to subee, hides subee-1 and also-hidden, and has the
+alias "eleven"; subee contains subee-1; also-hidden is related to
+nothing else.
+
+Buffer 1, a view of 1 with 11's alias folder requested, and a second
+root, subee, appended by hand:
 
 #+begin_example
   * 1
@@ -7,99 +17,36 @@ The initial data looks like this:
   **** (alias) eleven
   *** (subscribeeFolder)
   **** subee
-  ***** (HiddenInSubscribeeFolder)
-  ****** subee-1
   **** (hiddenOutsideOfSubscribeeFolder)
   ***** also-hidden
   * subee
   ** subee-1
 #+end_example
 
-That is:
-- as usual for tests, all nodes have titles equal to their IDs
-- node 1 has a single child, 11
-- 11 subscribes to subee
-- subee has a child subee-1, and 11 hides it
-- 11 also hides the node called "also-hidden", which is a node with
-  no other connection to anything, just its ID and title
-- 11 has an alias, "eleven"
-
-Notice that subee appears twice in that buffer:
-Once as a subscribee, and once as a standalone root.
-
-In a second buffer we have just two roots, 11 and subee,
-with none of the non-vognode viewnodes:
+Buffer 2, written by hand:
 
 #+begin_example
-  * (writeProtected) 11 ;; indefinite to avoid seeing its content
+  * (writeProtected) 11
   * subee
   ** subee-1
 #+end_example
 
-From that buffer we remove 'writeProtected' from 11's metadata,
-add a delete request to 11, and save.
-Now the first buffer should look like:
+Buffer 2 makes 11 editable, asks to delete it, and saves. Buffer 2
+loses its root 11, a childless tombstone, which the refresh prunes.
+Buffer 1, rerendered after the save, reads:
 
 #+begin_example
   * 1
-  ** (tombstone)
-  *** (tombstone)
+  ** (tombstone)        ;; where 11 stood
+  *** (tombstone)       ;; where its subscribee folder stood
   **** subee
-  ***** subee-1  ;; tricky!
-  ***** (tombstone)
-  ****** subee-1
-  **** (tombstone)
+  **** (tombstone)      ;; where its hidden-outside folder stood
   ***** also-hidden
   * subee
   ** subee-1
 #+end_example
 
-That "tricky" line happens because the refresh draws subee's
-content when the buffer is saved.
-
-And now we go a step further:
-We make an edit from the view with deleted nodes.
-In particular, let's add a new node with the title subee-2
-to subee:
-
-#+begin_example
-  * 1
-  ** (tombstone)
-  *** (tombstone)
-  **** subee
-  ***** subee-1
-  ***** subee-2 ;; NEW
-  ***** (tombstone)
-  ****** subee-1
-  **** (tombstone)
-  ***** also-hidden
-  * subee
-  ** subee-1
-  ** subee-2
-#+end_example
-
-After saving that, the other buffer should now read:
-
-#+begin_example
-  * subee
-  ** subee-1
-  ** subee-2
-#+end_example
-
-And finally, we re-save the first buffer with a new node
-(new-root) inserted as a sibling of subee under the
-tombstone. This exercises the round-trip: tombstones are parsed back from text, pass through
-the refresh, and render unchanged. The new node gets a UUID.
-
-#+begin_example
-  * 1
-  ** (tombstone)
-  *** (tombstone)
-  **** subee
-  **** new-root ;; NEW, now has a UUID
-  **** (tombstone)
-  ***** also-hidden
-  * subee
-  ** subee-1
-  ** subee-2
-#+end_example
+Then buffer 1 adds subee-2 under its root subee and saves; both
+buffers show subee-2 under their subee root. Last, buffer 1 adds a
+root, new-root, and saves; the tombstones come back unchanged, and
+new-root gets an ID.

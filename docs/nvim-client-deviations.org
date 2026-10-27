@@ -28,6 +28,14 @@
   command-line-mode mappings '<C-x>i', '<C-x>l', '<C-x>I', '<C-x>L'.
   The Emacs shell-mode linkstack bindings have no terminal-mode
   equivalent here; paste the id from a buffer instead.
+- Emacs binds a few keys outside its content views: search, go-to-ID
+  and the skgrepo-set switch in every buffer, and go-to-node and
+  id-next/prev in magit. Neovim binds no key globally and none in
+  neogit; every ':Skg*' command works from any buffer instead. Its
+  .skg file buffers and report buffers get the same subsets Emacs
+  gives them (docs/COMMANDS-nvim.org, "keys outside content views").
+- Emacs also binds 'C-c C-o' to skg-goto, in place of org's
+  open-at-point; Neovim has only '<localleader>gg'.
 - The skgrepo prompts cycle with S-Left/S-Right and complete with TAB,
   as in Emacs; the 'C-?' show-all-skgrepos helper key inside the prompt
   is dropped (terminals rarely deliver C-?); ':SkgViewRepoList'
@@ -88,6 +96,18 @@
 - Readable-ids shortens UUIDs by concealing the tail to an ellipsis
   and renders titles as inline virtual text; same behavior, same
   server round-trip, different mechanism.
+- The buffer corrections a save or a rerender reports are appended to
+  'skg://messages/server-warnings', shown in a split, with the cursor
+  left where it was; Emacs moves point in '*SKG Server Warnings*' to
+  what it appended.
+- Server messages name Emacs chords. The client rewrites those it
+  has a binding for ('neovim_bindings_of_emacs_chords' in
+  nvim/lua/skg/messages.lua: C-c s d, C-c s w, C-c s s, C-c g RET,
+  C-c g v). It leaves the others as they are: 'C-c s r', in the
+  leak-shaped membership warnings, names a command Neovim lacks (see
+  "Commands not ported"), and the fork-confirmation buffer's 'C-c C-c'
+  and 'C-c C-k' are '<localleader>cc' and '<localleader>ck' here, as
+  the notification that opens it says.
 - View buffers are named 'skg://TITLE' (search: 'skg://?TERMS');
   Emacs used '*TITLE*'. Message/report buffers live under
   'skg://messages/...', 'skg://unknown-node', 'skg://diff-view: ...',

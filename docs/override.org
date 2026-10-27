@@ -164,7 +164,7 @@ substitute =K= at any refresh, as substitution always does.
 
 Both carry =(overridesHere F)=.  The root case is not ordinary
 recursive-content substitution; it is the one-time identity transition of the
-view which performed the fork.  After refreshing that forest, the server
+view which performed the fork.  After refreshing that viewforest, the server
 stores it under the same view ID and recomputes the open-view root index, so
 the buffer is thereafter registered as rooted at =K= rather than =F=.
 

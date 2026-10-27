@@ -64,7 +64,7 @@ assumes 'termguicolors', since the styles are given as RGB colors.
 |                      | crucial     | =☮= write-protected, =⊥= unwarranted, =ĥ= overrides here                      |
 |                      | high        | =B= omitted body                                                              |
 |                      | medium      | =⟳= cycle                                                                     |
-| home-repo heralds    | normal      | =⌂:LABEL=                                                                     |
+| home skgrepo heralds | normal      | =⌂:LABEL=                                                                     |
 |                      | ugly        | =~NAME=, a relRepo more private than the default                              |
 | labels               | message     | folder labels, =alias=, =ID=, flag rows                                       |
 | requests             | nonstandard | =delete=, =merge:...=, =detach=, =restore node=, =restore membership=, =request:~NAME=, =request:...= flags, =req:...= views, =request:ready...= |
@@ -169,8 +169,8 @@ The position glyphs stand first among a headline's heralds, the ☮
 riding the glyph before it, as in =⊥☮B= or =ᗣ☮=.
 =ᗣ= marks a ghost (a node the worktree lacks, shown in the diff view
 with HEAD's text) and, in the diff view, what HEAD alone warrants
-(the atom =ghostWarrant= in =(view ...)=), such as an alias the
-worktree lost. =⊥= marks an unwarranted position (the atom
+(the atom =ghostWarrant= in =(view ...)=), such as a removed alias.
+=⊥= marks an unwarranted position (the atom
 =noWarrant= in =(view ...)=): the graph does not relate the node to
 its viewparent as the position implies -- content its parent does not
 contain, a folder member the folder's relation does not hold for, a
@@ -187,7 +187,7 @@ next save takes it out of its parent's list. The client sees that
 from the parent, since the child's own metadata cannot say it.
 
 =⌂:LABEL= marks a node's home skgrepo boundary (the atom
-=repoBoundary= in =(view ...)=). LABEL is the skgrepo's herald label,
+=repoBoundary= in =(view ...)=). LABEL is the skgrepo's skgrepo label,
 its =abbreviation= in the config or else its name, from the label
 table the server sends beside the herald rules. A =~NAME= immediately
 before it reports a relationship stored at a more private relRepo than
@@ -209,11 +209,22 @@ Restricted vognode, standing where a record the skgrepo restriction
 shows names a node the restriction keeps out, is labeled
 =restricted=, with its record's relRepo (=~NAME=) where that differs
 from the default, and reveals no node title or home skgrepo.
-=something stood here= marks a tombstone: a viewnode that stands
-where a node a save deleted stood, or where a node the skgrepo
-restriction now keeps out stood and no record it shows names that
-node, which reveals no node title or skgrepo, nor which of the two
-it was.
+=something stood here= marks a tombstone: a headline with no title,
+left where a headline stood that can stand there for nothing, and
+holding that headline's children. The refresh leaves one where a
+node stood that the graph lacks and its viewparent's list does not
+name, such as one a save deleted (in the diff view, its ghost stands
+there instead); where a node the skgrepo restriction now keeps out
+stood and no record the restriction shows names it; where a folder,
+a property member or a change viewnode stood in a place its kind
+cannot stand; where a change viewnode stood whose change is gone;
+and where a folder stood that was left holding nothing, unless the
+save reads its membership or it is the flags folder. A text search
+that excludes overPrivateText telescopes leaves one where the
+enrichment would have drawn such a node. A tombstone reveals no node
+title or skgrepo, nor which of these it was. The save discards text
+typed on its line, and no child of a tombstone claims membership. A
+tombstone that holds nothing is pruned before the buffer is shown.
 
 ** Diff heralds
 In the diff view (see the glossary's "Terms a user meets in the
@@ -248,7 +259,7 @@ per diff object, so a =✓= follows its own object whatever the raw
 order of the parts.
 
 A ghost (a node the worktree lacks, shown with HEAD's
-text) reads =ᗣ☮=. The properties the view adds are labels: =old title
+text) reads =ᗣ☮=. The change viewnodes the view adds are labels: =old title
 and body= (or =old title=, =old body=) with its =body diff=, =⌂ -OLD
 +NEW= for a home skgrepo move, =relationship moved from OLD to NEW=, and the
 changeset markers =its content changed=, =some content relationships

@@ -951,7 +951,7 @@ fn write_protect_content_subtree (
 //
 
 /// A folder left childless is entombstoned, so that the tail prunes
-/// it, unless the user could add something there
+/// it, unless it is one that stays when empty
 /// ('folder_goes_when_empty').
 fn entombstone_if_an_empty_folder (
   tree   : &mut Tree<Viewnode>,
@@ -966,8 +966,9 @@ fn entombstone_if_an_empty_folder (
       . replace_kind (ViewnodeKind::Tombstone); }}
 
 /// Whether the viewnode is a folder that goes when it holds nothing:
-/// any but one whose membership the save reads, or a flags folder,
-/// where the user could add something.
+/// any but one whose membership the save reads, where the user could
+/// add something, or a flags folder, which shows that the node has no
+/// true flag.
 pub(crate) fn folder_goes_when_empty (
   viewnode : &Viewnode,
 ) -> bool {

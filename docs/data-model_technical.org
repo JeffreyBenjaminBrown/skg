@@ -341,8 +341,8 @@ In the diff view, between rungs 5 and 6, the change viewnodes P
 should hold are drawn or kept, and each child is tagged with its
 change (=server/refresh/diff_view.rs=). After the rungs, a folder
 left with no child is entombstoned, unless the save reads its
-membership or it is the flags folder, where the user could add
-something.
+membership or it is the flags folder, which stays visible when empty
+('folder_goes_when_empty').
 
 A content view draws some folders unasked, as it always has
 (=add_default_folders=): an occurrence that an editable-view request
@@ -385,7 +385,8 @@ After the walk, once (=server/refresh/tail.rs=): the derived facts are
 computed, the stats of each occurrence (its relationship facts,
 property counts and birth, =cycle=, =repoBoundary=, =omittedBody=, its
 relRepo where it differs from the default), and in the diff view the
-readiness facts from the store and the home skgrepo moves; every
+'(ready ...)' change facts, from the readiness store, and the home
+skgrepo moves; every
 childless tombstone is pruned, postorder and roots included, so a
 buffer may end with no roots, and so is a folder the pruning leaves
 empty that goes when empty; an editable folder stays even when
@@ -411,7 +412,7 @@ own save deleted the node, and, after a change of the skgrepo
 restriction, a member drawn, a headline entombstoned, or a headline
 re-kinded to a Restricted vognode or back. So a fresh
 view and a plain save report nothing. The callers tag each view's buffer corrections
-with its view ID (=ViewCorrections=), the =save-result= and
+with its view ID (=ViewBufferCorrections=), the =save-result= and
 =rerender-done= responses carry them, and both clients append them to
 their warnings buffer, under one headline per view
 (=docs/api-and-formats.org=, "Save buffer").

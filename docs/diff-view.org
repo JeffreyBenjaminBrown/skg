@@ -147,7 +147,7 @@ rerender and commit, by the one refresh every view uses
 ('refresh_viewforest', 'server/refresh/'), in diff-view mode: the
 mode is 'RefreshMode::DiffView', which carries the straddle, the
 buffer kind and the readiness store, from which the refresh reads
-its readiness facts ('server/refresh/mode.rs')
+the marks ('server/refresh/mode.rs')
 ('refresh_diffView_viewforest' and
 'rerender_diffView_buffer' in 'server/diff_view/refresh.rs').
 The diff-view mode ('server/refresh/diff_view.rs') changes the
@@ -181,7 +181,7 @@ of its content, what 'model_of_front_change_viewnodes'
 move, its "it acquired" folder, its alias, ID and flags folders whose
 list changed; then its partner folders whose membership changed;
 then its changeset markers; and in the order-only buffer, its
-order-only marker. Each is kept while its change exists, drawn when
+order-only changeset marker. Each is kept while its change exists, drawn when
 missing (after the one before it, or first), and entombstoned when
 its change is gone; the tombstone holds whatever stood under it.
 A change viewnode describes the straddle, so drawing one or
@@ -218,10 +218,11 @@ it and it records at least one leaf
 Every label is a herald rule on a metadata atom; 'docs/heralds.org'
 lists them, and the API doc's "Metadata of the diff view" the atoms.
 *** text
-A changed title or body adds an old-text property under the node,
-"old title and body", "old title" or "old body" (its headline the old
-title, its body the old body), with a "body diff" property under it
-holding the line diff when the body changed. The text change is one
+A changed title or body adds an old text under the node, a change
+viewnode labelled "old title and body", "old title" or "old body"
+(its headline the old title, its body the old body), with a "body
+diff" change viewnode under it holding the line diff when the body
+changed. The text change is one
 leaf, marked on the old-text headline.
 *** content
 Content has no folder. The members are the node's children, each
@@ -257,7 +258,7 @@ member's relationship moved to another skgrepo, hangs that move.
 The alias, ID and flags folders, drawn when their list changed,
 hold the union of the two lists in the order of their interleaved
 diff, each member tagged '(rel added)' (+) or '(rel removed)' (-),
-its existence in the list. A lost alias or ID is an alias or ID
+its existence in the list. A removed alias or ID is an alias or ID
 member with a ghost warrant ('Warrant::ByHead', written
 'ghostWarrant'), claiming nothing ('noClaim'), so the save never
 reads it. Each is one leaf.
@@ -269,10 +270,10 @@ from its goal, the union of the two lists: its members tagged while
 the lists differ, and untagged after. A member a commit made lost
 for good stays, unwarranted and claiming nothing.
 *** home skgrepo and relRepo moves
-A home skgrepo move is one property under the node, "⌂ -OLD +NEW",
-one leaf. A relRepo move is a property under the member whose
-relationship moved, "relationship moved from X to Y", one leaf keyed
-by the relationship, so the same move seen from either end is the
+A home skgrepo move is one change viewnode under the node, "⌂ -OLD
++NEW", one leaf. A relRepo move is a change viewnode under the member
+whose relationship moved, "relationship moved from X to Y", one leaf
+keyed by the relationship, so the same move seen from either end is the
 same mark. The relRepo changeset marker, "some content relationships
 changed skgrepo", sits under the recorder when a content relationship
 moved. Mentions have no relRepo.

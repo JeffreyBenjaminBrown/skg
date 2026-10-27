@@ -1,18 +1,17 @@
-;;; Integration test for delete-then-edit-under-deleted collateral updates
+;;; Integration test: a save deletes a node another buffer shows, and
+;;; that buffer, now holding tombstones, is edited and saved.
 ;;;
-;;; Buffer 1: multi-root view (placed under a non-vognode "1" + standalone subee root).
-;;; Buffer 2: manually constructed (write-protected 11 + subee + subee-1).
+;;; Buffer 1: a view of node 1, plus a second root, subee.
+;;; Buffer 2: written by hand (write-protected 11, subee, subee-1).
 ;;;
-;;; Phase 4: delete 11 from buffer 2 → 11 becomes DeletedNode,
-;;;   non-vognodes become Tombstone in collateral buffer 1.
-;;; Phase 6: add subee-2 under subee in buffer 1 → collateral
-;;;   buffer 2 picks up subee-2.
-;;; Phase 8: add new-root under a tombstone in buffer 1 →
-;;;   Deleted/Tombstone round-trip harmlessly through save.
+;;; Phase 4: delete 11 from buffer 2; in buffer 1 its occurrence and
+;;;   its folders become tombstones, keeping what stood under them.
+;;; Phase 6: add subee-2 under buffer 1's root subee; buffer 2 shows
+;;;   it too.
+;;; Phase 8: add a root, new-root, to buffer 1; its tombstones
+;;;   round-trip through the save unchanged.
 ;;;
-;;; Exercises DeletedNode / Tombstone degradation path in
-;;; complete_viewtree, editing under a DeletedNode, and
-;;; re-saving a buffer containing Deleted/Tombstone nodes.
+;;; README/detail.org says what each phase checks.
 
 ;; Load the project elisp configuration
 (load-file "../../../elisp/skg-init.el")
@@ -256,15 +255,11 @@ which takes priority over subee.skg on disk."
        (2 node "subee-2"))
      "phase 7: buffer 2 after updating collateral view")))
 
-(defun phase-8-add-new-root-under-deleted-scaff ()
-  "Add new-root as a sibling of the standalone subee in buffer 1.
-Originally this exercised inserting a node under a tombstone;
-after the delete pipeline started cleaning up references to the
-deleted node, buffer 1 no longer contains a tombstone, so the
-phase now exercises adding a top-level root via metadata-only
-insertion (the BufferRoot, like a tombstone, supplies no repo
-to inherit, so explicit (skgRepos (nodeRepo main)) is still required)."
-  (message "=== PHASE 8: Add new-root under tombstone in buffer 1 ===")
+(defun phase-8-add-new-root ()
+  "Add new-root as a root after the standalone subee in buffer 1, and
+save the buffer, tombstones and all. A root inherits no skgrepo, so
+the headline carries (skgRepos (nodeRepo main))."
+  (message "=== PHASE 8: Add new-root in buffer 1 ===")
   (setq integration-test-phase "phase-8-add-new-root")
   (with-current-buffer "*1*"
     (when (goto-nth-headline-with-title "subee" 2)
@@ -293,12 +288,12 @@ to inherit, so explicit (skgRepos (nodeRepo main)) is still required)."
   (skg-test-wait-for-response))
 
 (defun phase-9-verify-after-new-root ()
-  "Verify both buffers after saving with new-root under a tombstone."
+  "Verify buffer 1 after saving it with new-root."
   (message "=== PHASE 9: Verify both buffers after new-root ===")
   (setq integration-test-phase "phase-9-verify-after-new-root")
 
-  ;; Verify buffer 1: new-root appears at depth 4 under tombstone,
-  ;; everything else unchanged from phase 7.
+  ;; Verify buffer 1: new-root appears at the top level, everything
+  ;; else unchanged from phase 7.
   (let ((buf1 (get-buffer "*1*")))
     (unless buf1
       (message "✗ FAIL [phase 9]: Buffer 1 no longer exists")
@@ -340,7 +335,7 @@ to inherit, so explicit (skgRepos (nodeRepo main)) is still required)."
   (phase-5-verify-after-delete)
   (phase-6-add-subee-2-from-buffer-1)
   (phase-7-verify-after-add)
-  (phase-8-add-new-root-under-deleted-scaff)
+  (phase-8-add-new-root)
   (phase-9-verify-after-new-root)
 
   (message "✓ PASS: All phases completed successfully!")

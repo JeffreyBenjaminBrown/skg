@@ -1,606 +1,95 @@
-No ghost stands outside the diff view: an occurrence whose node a save deleted
-becomes a tombstone, which the prune removes when childless, view
-roots included. Where this file says =DeletedNode= or =(deleted ...)=,
-read a tombstone; buffer 2 no longer shows 11 ('brief.org').
+What the test checks, phase by phase. 'test-emacs.el' and
+'test-nvim.lua' run the same phases, one per client; 'run-test.sh'
+resets the five fixtures under 'data/owned/skg-data/', removes any
+node a previous run created, and starts a server of its own.
 
-* Prompt (verbatim)
+* How the buffers are checked
+Each check lists, for every headline that carries metadata, its
+depth, its kind and its title ('assert-headline-types-and-titles' in
+'../save_collateral_break_cycle/test-helpers.el', and its Lua port in
+'test-nvim.lua'). A folder and a tombstone carry no title, so they
+are checked by kind and depth. Viewnode IDs and the derived facts
+vary from run to run and are not checked.
 
-Here's the original data. (So this will need a more complex set of
-fixtures than the earlir two similarly-named integration tests.)
-
-#+begin_example
-  * 1
-  ** 11
-  *** (aliasFolder)
-  **** (alias) eleven
-  *** (subscribeeFolder)
-  **** subee
-  ***** (HiddenInSubscribeeFolder)
-  ****** subee-1
-  **** (hiddenOutsideOfSubscribeeFolder)
-  ***** also-hidden
-  * subee
-  ** subee-1
-#+end_example
-
-That is:
-- as usual for tests, all nodes have titles equal to their IDs
-- node 1 has a single child, 11
-- 11 subscribes to subee
-- subee has a child subee-1, and 11 hides it
-- 11 also hides the node called "also-hidden", which is a node with
-  no other connection to anything, just its ID and title
-- 11 has an alias, "eleven"
-
-Notice that subee appears twice in that buffer:
-Once as a subscribee, and once as a standalone root.
-
-In a second buffer we have just two roots, 11 and subee,
-with none of the non-vognode viewnodes.
+* Phases 1 and 2: buffer 1
+Phase 1 opens the content view of node 1. Phase 2 asks for 11's
+alias folder, appends a second root, subee with its child subee-1,
+and saves, so that the server registers both roots. The appended
+root is editable, so the save writes subee's content as the buffer
+shows it; that is why subee-1 is typed in too. The check after the
+save:
 
 #+begin_example
-  * (writeProtected) 11
-  * subee
-  ** subee-1
+  1 node "1"
+  2 node "11"
+  3 aliasFolder
+  4 alias "eleven"
+  3 subscribeeFolder
+  4 node "subee"
+  4 hiddenOutsideOfSubscribeeFolder
+  5 node "also-hidden"
+  1 node "subee"
+  2 node "subee-1"
 #+end_example
 
-From that buffer we remove 'writeProtected' from 11's metadata,
-add a delete request to that metadata, and save.
-Now the first buffer should look like:
+* Phase 3: buffer 2
+A buffer written by hand: 11, write-protected, and subee with
+subee-1, both roots. Its save registers it as a view and changes
+nothing on disk. The check: the three headlines, as written.
+
+* Phases 4 and 5: the delete
+Phase 4 removes 'writeProtected' from 11 in buffer 2, adds
+'(editRequest delete)', and saves. 11's file is deleted, and 1's
+contents lose 11.
+
+Phase 5 checks both buffers. In buffer 2, 11's root became a
+tombstone, which held nothing, so the refresh pruned it:
 
 #+begin_example
-  * 1
-  ** (deleted)
-  *** (tombstone)
-  **** subee
-  ***** subee-1  ;; tricky!
-  ***** (tombstone)
-  ****** subee-1
-  **** (tombstone)
-  ***** also-hidden
-  * subee
-  ** subee-1
+  1 node "subee"
+  2 node "subee-1"
 #+end_example
 
-That "tricky" line happens because the refresh draws subee's
-content when the buffer is saved.
-
-And now we go a step further:
-We make an edit from the view with deleted nodes.
-In particular, let's add a new node with the title subee-2
-to subee:
+Buffer 1 is a collateral view of that save. Where 11 stood stands a
+tombstone, which keeps what stood under it. Its subscribee folder
+and hidden-outside folder cannot stand under a tombstone, so each
+became a tombstone too, holding the occurrences drawn in it. The
+alias folder and its alias became tombstones that held nothing, and
+were pruned:
 
 #+begin_example
-  * 1
-  ** (deleted)
-  *** (tombstone)
-  **** subee
-  ***** subee-1
-  ***** subee-2
-  ***** (tombstone)
-  ****** subee-1
-  **** (tombstone)
-  ***** also-hidden
-  * subee
-  ** subee-1
-  ** subee-2
+  1 node "1"
+  2 tombstone
+  3 tombstone
+  4 node "subee"
+  4 tombstone
+  5 node "also-hidden"
+  1 node "subee"
+  2 node "subee-1"
 #+end_example
 
-After saving that, the other buffer should now read:
+* Phases 6 and 7: an edit in the buffer holding tombstones
+Phase 6 adds a headline subee-2, with no metadata, as the last child
+of buffer 1's root subee (the second headline titled subee), and
+saves buffer 1, tombstones and all. The save creates subee-2 and
+adds it to subee's contents. Phase 7 checks that buffer 1 shows it
+under its root subee and is otherwise as in phase 5, and that buffer
+2, rerendered as a collateral view, shows it too:
 
 #+begin_example
-  * (deleted) 11
-  * subee
-  ** subee-1
-  ** subee-2
+  1 node "subee"
+  2 node "subee-1"
+  2 node "subee-2"
 #+end_example
 
-* Context
-
-This integration test exercises:
-1. Node deletion via =(editRequest delete)=: a save from one buffer
-   deletes a =.skg= file, and the collateral buffer degrades the
-   node to =DeletedNode= with non-vognodes becoming =Tombstone=.
-2. Editing under a =DeletedNode=: a subsequent save from the
-   collateral buffer adds a new child node, and the other buffer
-   picks up the change.
-3. Re-saving a buffer containing =Deleted= / =Tombstone= nodes:
-   they round-trip through parse → refresh → render unchanged,
-   and a new node created under a =Tombstone= gets a UUID.
-
-All existing collateral tests deal only with containment changes.
-This is the first to exercise the =DeletedNode= / =Tombstone=
-degradation path in the refresh.
-
-* Fixtures
-
-Five =.skg= files under =data/owned/skg-data/=:
-
-** =1.skg=
-
-#+begin_src yaml
-title: "1"
-ids:
-  - "1"
-contains:
-  - "11"
-#+end_src
-
-** =11.skg=
-
-#+begin_src yaml
-title: "11"
-ids:
-  - "11"
-aliases:
-  - eleven
-subscribesTo:
-  - subee
-hidesFromSubs:
-  - subee-1
-  - also-hidden
-#+end_src
-
-** =subee.skg=
-
-#+begin_src yaml
-title: subee
-ids:
-  - subee
-contains:
-  - subee-1
-#+end_src
-
-** =subee-1.skg=
-
-#+begin_src yaml
-title: subee-1
-ids:
-  - subee-1
-#+end_src
-
-** =also-hidden.skg=
-
-#+begin_src yaml
-title: also-hidden
-ids:
-  - also-hidden
-#+end_src
-
-* Buffer 1: multi-root view (placed under a non-vognode "1" + standalone subee)
-
-Constructed in two steps:
-
-1. Request =skg-request-single-root-content-view-from-id "1"=.
-   The server renders all non-vognode viewnodes for node 11 (subscribeeFolder,
-   hiddenInSubscribeeFolder, hiddenOutsideOfSubscribeeFolder).
-   This gives us a single-root view with root "1".
-
-2. Add an aliases view request to node 11 via
-   =skg-edit-metadata-at-point=, append two org lines for the
-   standalone subee root:
-
-#+begin_example
-  * (skg node (gnid subee) (skgRepos (nodeRepo main))) subee
-  ** (skg node (gnid subee-1) (skgRepos (nodeRepo main))) subee-1
-#+end_example
-
-   Then save to register the multi-root view with the server.
-   After the save response, the buffer is complete (including
-   the aliasFolder and alias for node 11).
-
-** Expected initial structure (titles)
-
-Non-vognode rendering uses fixed titles ("it subscribes to these",
-=server/types/viewnode.rs=. Non-vognode folder headlines no
-longer carry explanatory titles; the client herald rules explain them.
-The expected =headline-titles= output is approximately:
-
-#+begin_example
-((1 . "1")
- (2 . "11")
- (3 . "")
- (4 . "eleven")
- (3 . "it subscribes to these")
- (4 . "subee")
- (5 . "hidden from this subscription")
- (6 . "subee-1")
- (4 . "hidden from all subscriptions")
- (5 . "also-hidden")
- (1 . "subee")
- (2 . "subee-1"))
-#+end_example
-
-The exact metadata (graphStats, viewStats, etc.) is unpredictable.
-Assert on headline-titles and headline-structure instead.
-
-* Buffer 2: manually constructed multi-root view
-
-There is no multi-root view request handler in the server. Follow
-the pattern from =containerward-view-request/test-emacs.el=: create
-a buffer with =get-buffer-create=, insert the org content manually,
-and call =skg-request-save-buffer= to register the view.
-
-Buffer content before save:
-
-#+begin_example
-  * (skg node (gnid 11) (skgRepos (nodeRepo main)) writeProtected) 11
-  * (skg node (gnid subee) (skgRepos (nodeRepo main))) subee
-  ** (skg node (gnid subee-1) (skgRepos (nodeRepo main))) subee-1
-#+end_example
-
-After saving, the server refreshes the tree and sends back the
-response. Since 11 is writeProtected it generates no save
-instructions. subee and subee-1 are editable and match the
-fixtures, so it's a no-op.
-
-The save response replaces the buffer with the refreshed view.
-Assert: headline-titles include "11", "subee", "subee-1".
-
-* Phase 3: Delete 11 from buffer 2
-
-Edit buffer 2:
-- Remove =writeProtected= from 11's metadata
-- Add =(editRequest delete)= to 11's metadata
-- Save
-
-The server:
-1. Generates =NodeInstruction::Delete= for 11
-2. Deletes =11.skg= from disk
-3. Re-renders buffer 2 with =deleted_by_this_save_pids = {11}=
-4. Refreshes collateral buffer 1 with =deleted_by_this_save_pids = {11}=
-
-** Expected buffer 2 after save
-
-11 becomes a =DeletedNode=. subee is unaffected.
-
-Expected headline-titles (approximately):
-#+begin_example
-((1 . "11")
- (1 . "subee")
- (2 . "subee-1"))
-#+end_example
-
-Line 1 metadata should contain =(deleted (id 11) ...)=.
-
-** Expected collateral buffer 1 after deletion
-
-Node 11 degrades to =DeletedNode=. Its non-vognodes
-(subscribeeFolder, hiddenInSubscribeeFolder,
-hiddenOutsideOfSubscribeeFolder) become =Tombstone=. The
-aliasFolder also becomes =Tombstone=; its leaf child
-(the =alias= non-vognode) becomes a childless =Tombstone=
-which the postorder pass detaches. So aliasFolder and its
-alias disappear entirely.
-
-subee is an Occurrence under the (now =Tombstone=)
-subscribeeFolder. The refresh draws it normally,
-adding subee-1 as a real child. This is the "tricky" line.
-
-Expected headline-titles (approximately):
-#+begin_example
-((1 . "1")
- (2 . "11")           ;; DeletedNode
- (3 . "")             ;; Tombstone (was subscribeeFolder)
- (4 . "subee")        ;; Occurrence, refreshed
- (5 . "subee-1")      ;; child the refresh drew
- (5 . "")             ;; Tombstone (was hiddenInSubscribeeFolder)
- (6 . "subee-1")      ;; hidden node preserved
- (4 . "")             ;; Tombstone (was hiddenOutsideOfSubscribeeFolder)
- (5 . "also-hidden")  ;; hidden node preserved
- (1 . "subee")        ;; standalone root, unaffected
- (2 . "subee-1"))     ;; its child
-#+end_example
-
-Note: Childless DeletedNode stays in the tree (the postorder
-handler is a no-op for Deleted; only childless Tombstone
-is detached). The aliasFolder becomes Tombstone;
-its leaf child (the =alias= non-vognode) also becomes childless
-Tombstone and IS detached. So aliasFolder and its alias
-disappear entirely.
-
-Tombstone has no title (renders as empty). The assertion
-should check for the presence of the right number of
-empty-titled headlines at the right depths, and the Occurrence
-titles at the right depths.
-
-* Phase 4: Add subee-2 from buffer 1
-
-Edit buffer 1 (the one with deleted structure):
-- Navigate to the =subee= headline
-- Position after =subee-1= (the child the refresh drew, at depth 5)
-- Insert =****** subee-2= (a bare headline with no metadata)
-- Save
-
-Deleted and Tombstone nodes are save-inert (generate no save
-instructions). The save pipeline creates a new node for subee-2
-and updates subee's =contains= to include it.
-
-** Expected buffer 1 after save
-
-Same structure as before, but with subee-2 inserted as a child
-of subee. subee-2 gets a UUID and metadata from the server.
-The standalone subee root also gains subee-2 as a child
-(the refresh draws it from the updated =subee.skg=).
-
-Expected headline-titles (approximately):
-#+begin_example
-((1 . "1")
- (2 . "11")           ;; DeletedNode, still present
- (3 . "")             ;; Tombstone
- (4 . "subee")        ;; Occurrence, refreshed
- (5 . "subee-1")      ;; existing child
- (5 . "subee-2")      ;; new child (now has UUID + metadata)
- (5 . "")             ;; Tombstone
- (6 . "subee-1")      ;; hidden node preserved
- (4 . "")             ;; Tombstone
- (5 . "also-hidden")  ;; hidden node preserved
- (1 . "subee")        ;; standalone root, refreshed
- (2 . "subee-1")
- (2 . "subee-2"))     ;; also gains subee-2
-#+end_example
-
-** Expected collateral buffer 2
-
-After fixing =build_child_creation_data= (see Rust code fix
-section below), the collateral update for buffer 2 succeeds.
-The refresh re-processes =subee=, reads the updated
-=subee.skg= (which now lists =subee-2= in =contains=), and
-creates subee-2 as a new Occurrence child.
-
-Expected headline-titles:
-#+begin_example
-((1 . "11")           ;; DeletedNode, still present
- (1 . "subee")
- (2 . "subee-1")
- (2 . "subee-2"))     ;; new child from collateral update
-#+end_example
-
-* Phase 5: Add new-root under tombstone in buffer 1
-
-Insert =new-root= as a sibling of =subee= under the depth-3
-=Tombstone= (formerly =subscribeeFolder=) in buffer 1. Repo
-metadata must be supplied explicitly (=(skgRepos (nodeRepo main))=) because
-=Tombstone= has no repo to inherit from.
-
-This exercises:
-- =Deleted= / =Tombstone= round-tripping through the save
-  pipeline (parse → refresh → render) without disruption.
-- Creating a new node under a =Tombstone=: the node gets a
-  UUID and is saved to disk, but no parent claims it in its
-  =contains= (the =Tombstone= generates no save instructions).
-
-** Expected buffer 1 after save
-
-Same as before, but =new-root= appears at depth 4 with a UUID.
-
-Expected headline-titles (approximately):
-#+begin_example
-((1 . "1")
- (2 . "11")           ;; DeletedNode
- (3 . "")             ;; Tombstone
- (4 . "subee")        ;; Occurrence (writeProtected)
- (4 . "new-root")     ;; new Occurrence (now has UUID)
- (4 . "")             ;; Tombstone
- (5 . "also-hidden")  ;; hidden node preserved
- (1 . "subee")        ;; standalone root, unchanged
- (2 . "subee-1")
- (2 . "subee-2"))
-#+end_example
-
-* Rust code fix: =build_child_creation_data= disk fallback
-
-=server/update_buffer/complete_parent_first/truenode.rs=,
-function =build_child_creation_data= (around line 450).
-
-Currently, for a child that is neither a ghost nor an unknown, not already in the tree,
-the function errors: "no repo for X (not in map, not a child)".
-This prevents collateral updates from picking up new children
-created by another buffer's save.
-
-The fix: when =child_repos.get(id)= returns =None=, fall back
-to =home_from_disk(id, config)= (defined in
-=server/types/disk_home.rs=). This mirrors the fallback chain
-that file once used for a ghost's skgrepo.
-
-Current code (lines ~451-455):
-
-#+begin_example
-} else {
-  let child_repo : &RepoName = child_repos.get( id )
-    .ok_or( format!(
-      "build_child_creation_data: \
-       no repo for {} (not in map, not a child)",
-      id.0 )) ?;
-#+end_example
-
-Replacement — follow the same chain as that file's former
-ghost-skgrepo lookup, which did
-=existing_children → deleted_since_head_pid_src_map → map → disk=.
-All four parameters are already available in
-=build_child_creation_data=:
-
-#+begin_example
-} else {
-  let child_repo : RepoName =
-    child_repos.get( id ).cloned()
-    .or_else( || deleted_since_head_pid_src_map.get( id ).cloned() )
-    .or_else( || map.get( id ).map( |n| n.repo.clone() ) )
-    .or_else( || home_from_disk( id, config ) )
-    .ok_or( format!(
-      "build_child_creation_data: \
-       no repo for {}",
-      id.0 )) ?;
-#+end_example
-
-Note: the variable changes from =&RepoName= to =RepoName=
-(owned). The subsequent line that uses =child_repo= (passed to
-=graphnode_from_map_or_disk=) takes =&RepoName=, so use
-=&child_repo= there.
-
-Import =home_from_disk= at the top of the file from
-=crate::types::disk_home::home_from_disk=.
-
-* Files to create
-
-All under =tests/integration/save_collateral_delete_then_edit_under_it/=.
-
-| File                               | Purpose                       |
-|------------------------------------+-------------------------------|
-| =README.org=                       | This document                 |
-| =run-test.sh=                      | Shell orchestrator            |
-| =test-emacs.el=                    | ELisp test logic              |
-| =data/owned/skg-data/1.skg=             | Fixture: node 1               |
-| =data/owned/skg-data/11.skg=            | Fixture: node 11              |
-| =data/owned/skg-data/subee.skg=         | Fixture: node subee           |
-| =data/owned/skg-data/subee-1.skg=       | Fixture: node subee-1         |
-| =data/owned/skg-data/also-hidden.skg=   | Fixture: node also-hidden     |
-| =data/.index.tantivy/.gitkeep=     | Empty Tantivy index directory |
-
-=run-test.sh= follows existing pattern. Differences:
-- Five fixture files to back up / restore
-- UUID files to clean up (subee-2 is a new node)
-
-=test-emacs.el= loads =skg-init.el= and
-=save_collateral_break_cycle/test-helpers.el= for shared helpers.
-
-* Assertion strategy
-
-Use =assert-headline-titles= for structural checks. For
-specific lines (e.g., "line 2 is a DeletedNode"), decompose
-with =skg-split-as-stars-metadata-title= and check the
-metadata sexp itself — e.g., that it contains =(deleted ...)=
-rather than =(node ...)=.
-
-For =Tombstone= lines, check that metadata contains
-=tombstone=.
-
-* Reusable tools
-
-| Tool                                              | Repo                                              |
-|---------------------------------------------------+-----------------------------------------------------|
-| =test-lib.sh= helpers                             | =tests/integration/test-lib.sh=                     |
-| =skg-request-single-root-content-view-from-id=    | =elisp/skg-request-single-root-content-view.el=     |
-| =skg-request-save-buffer=                         | =elisp/skg-request-save.el=                         |
-| =skg-edit-metadata-at-point=                      | =elisp/skg-metadata.el= (for editing 11's metadata) |
-| =skg--extract-id-from-metadata-sexp=              | =elisp/skg-id-search.el=                            |
-| =headline-titles=, =assert-headline-titles=       | =save_collateral_break_cycle/test-helpers.el=       |
-| =headline-structure=, =assert-headline-structure= | =save_collateral_break_cycle/test-helpers.el=       |
-| =skg-split-as-stars-metadata-title=               | =elisp/skg-metadata.el=                             |
-
-* Verification
-
-#+begin_example
-cargo build
-cargo nextest run                    ;; Rust unit tests (check fix doesn't break anything)
-bash tests/integration/save_collateral_delete_then_edit_under_it/run-test.sh
-bash tests/integration/save_collateral_add_content_and_modify_text/run-test.sh  ;; also benefits from fix
-bash tests/integration/run-all-tests.sh
-#+end_example
-
-* Problems
-
-** Multi-root buffer 1 (resolved)
-
-Buffer 1 has two roots: the placed under a non-vognode "1" tree and a standalone
-=subee= root. Built by requesting single-root view from "1",
-appending two lines for standalone =subee= + =subee-1=, and
-saving to register. The two-root structure is needed so that
-the standalone subee root reflects collateral updates (e.g.,
-gains subee-2 after phase 4's save).
-
-** Tombstone title rendering
-
-=Tombstone= nodes render via =deleted_scaff_metadata_to_string=
-(=server/org_to_text.rs=) which produces =(skg tombstone)=
-with NO title. The non-vognodes they replaced (subscribeeFolder, etc.)
-had titles like "it subscribes to these". After degradation,
-=tombstone= is an opaque tombstone — it renders as:
-
-#+begin_example
-  *** (skg tombstone)
-#+end_example
-
-This means =skg-split-as-stars-metadata-title= will return an
-empty title for =Tombstone= lines. The assertion strategy
-needs to account for this: check depths and the count of
-empty-titled lines, not their original non-vognode names.
-
-However, I should verify whether =skg-split-as-stars-metadata-title=
-can parse =(skg tombstone)= at all. It might fail if it
-expects =(skg node ...)= structure.
-
-** The notation in the prompt (resolved)
-
-The prompt uses shorthand throughout: =** (deleted)= means a
-=DeletedNode=, =*** (tombstone)= means =Tombstone=,
-=* (writeProtected) 11= means a write-protected Occurrence, etc. None of these
-are the literal org-mode rendering.
-
-The actual rendering would be:
-- =(deleted)= → =(skg (deleted (gnid 11) (skgRepos (nodeRepo main)))) 11=
-- =(tombstone)= → =(skg tombstone)= (no title)
-- =(writeProtected) 11= → =(skg node (gnid 11) (skgRepos (nodeRepo main)) writeProtected) 11=
-
-** Childless DeletedNode stays in tree (resolved)
-
-=* 11= in the final buffer 2 expected output is a =DeletedNode=.
-It has no children in buffer 2, but it stays in the tree.
-
-Confirmed from code: in =complete_postorder_with_limited_recursion=
-(=server/update_buffer/complete.rs= line ~194), =DeletedNode= is
-a no-op ("Deleted nodes are inert"). Only =Tombstone= checks
-for childlessness and detaches. So:
-- Childless =Tombstone= → detached (removed from tree)
-- Childless =DeletedNode= → stays (save-inert, no-op)
-
-The prompt's expected outputs are correct.
-
-** Collateral update with new node (resolved — fix needed)
-
-When buffer 1 is saved with the new =subee-2= node, the server
-creates =subee-2.skg= on disk and updates subee's =contains=.
-Then the collateral update for buffer 2 refreshes its stored
-forest again.
-
-Currently =build_child_creation_data= fails for =subee-2=
-because it's not in =child_repos= (existing tree children).
-This is the same limitation from the
-=save_collateral_add_content_and_modify_text= test.
-
-Fix: add a =home_from_disk= fallback to
-=build_child_creation_data= (see "Rust code fix" section above).
-After the fix, the collateral update succeeds: =complete_viewtree=
-processes =subee=, reads the updated =subee.skg=, finds =subee-2=
-in =contains=, looks up its repo from disk, and creates it as
-a new Occurrence child. Buffer 2 gains =subee-2= under =subee=.
-
-This also fixes the known limitation in the
-=save_collateral_add_content_and_modify_text= test. After applying
-the fix, that test's phase-4 assertion for collateral buffer A
-could be upgraded to expect the new child "c" to appear.
-
-** =skg-edit-metadata-at-point= for editing 11's metadata
-
-In buffer 2, we need to:
-1. Remove =writeProtected= from 11's metadata
-2. Add =(editRequest delete)= to 11's metadata
-
-=skg-edit-metadata-at-point= merges sexp structures. It can ADD
-fields but it's unclear if it can REMOVE =writeProtected= (a bare
-atom, not a key-value pair). We may need to use =(DELETE writeProtected)=
-syntax (like =skg-remove-focused-metadata= uses =(DELETE focused)=).
-
-So the two calls would be:
-1. =(skg-edit-metadata-at-point '(skg (DELETE writeProtected)))=
-2. =(skg-edit-metadata-at-point '(skg node (editRequest delete)))=
-
-I should verify that these work before relying on them in the test.
-
-** Sleep durations
-
-The server's save pipeline includes filesystem writes, graph swap-in, and
-Tantivy reindex, nodeMerge, and collateral refresh. The containerward
-test needed 2.0s sleeps. This test has TWO save-and-verify cycles,
-so the total test time will be significant. Timeout should be at
-least 30s, possibly 40s.
+* Phases 8 and 9: tombstones round-trip
+Phase 8 adds a root, new-root, after buffer 1's root subee and its
+children, and saves. A root has no viewparent to inherit a skgrepo
+from, so the headline carries '(skgRepos (nodeRepo main))'. Phase 9
+checks that the save gave new-root an ID and kept the buffer's
+tombstones as they were: buffer 1 is as in phase 7, with
+'1 node "new-root"' last.
+
+* What it does not check
+No phase edits under a tombstone, nor under the subee drawn beneath
+one: subee-2 and new-root are added beside the tombstones.

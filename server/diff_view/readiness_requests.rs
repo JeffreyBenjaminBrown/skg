@@ -1,4 +1,4 @@
-//! Readiness requests, readiness facts and a buffer's readiness
+//! Readiness requests, '(ready ...)' change facts and a buffer's readiness
 //! summary ('docs/diff-view.org', "Readiness"), the places where the
 //! readiness store meets a viewforest. The first two rest on one
 //! rule, 'leaves_named_at': which change-forest leaves a headline

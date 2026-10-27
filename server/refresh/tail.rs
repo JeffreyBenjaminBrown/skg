@@ -1,7 +1,7 @@
 //! The tail of a refresh, once, after the walk: compute the derived
 //! facts (the stats of each occurrence: its props, rels and birth,
 //! 'cycle', 'repoBoundary', 'omittedBody'; in the diff view the
-//! readiness facts and the home skgrepo moves), prune every childless
+//! '(ready ...)' change facts and the home skgrepo moves), prune every childless
 //! tombstone, roots included (so a buffer may end with no roots), give
 //! a vnid to every viewnode that lacks one, and render. The warrants
 //! the refresh's rungs set are kept: the stats pass does not recompute them.
