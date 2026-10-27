@@ -9,6 +9,8 @@
 use super::errors::HeadlineName;
 use super::misc::{ID, SkgrepoChange, SkgrepoName};
 use super::nodes::complete::Flag;
+use crate::dbs::in_rust_graph::relation_accessors::{
+  BinaryRolePosition, NodeRelation, RelationRole};
 use crate::herald_tokens::RelationshipHeralds;
 use std::collections::{BTreeSet, HashSet};
 use std::fmt;
@@ -785,6 +787,49 @@ impl Folder {
     match self {
       Folder::Flags { body, .. } => body . as_ref (),
       _ => None, } }
+
+  /// The role its members play in the relation the folder shows, of
+  /// which the node it describes plays the other; None for a folder that shows no
+  /// one relation.
+  pub fn relation_member_role (
+    &self,
+  ) -> Option<RelationRole> {
+    match self {
+      Folder::Subscribee =>
+        Some (RelationRole::new (
+          NodeRelation::SubscribesTo, BinaryRolePosition::Second)),
+      Folder::Subscriber =>
+        Some (RelationRole::new (
+          NodeRelation::SubscribesTo, BinaryRolePosition::First)),
+      Folder::Overridden =>
+        Some (RelationRole::new (
+          NodeRelation::Overrides, BinaryRolePosition::Second)),
+      Folder::Overrider =>
+        Some (RelationRole::new (
+          NodeRelation::Overrides, BinaryRolePosition::First)),
+      Folder::Hider =>
+        Some (RelationRole::new (
+          NodeRelation::HidesFromSubs, BinaryRolePosition::First)),
+      Folder::Hidden =>
+        Some (RelationRole::new (
+          NodeRelation::HidesFromSubs, BinaryRolePosition::Second)),
+      Folder::Container =>
+        Some (RelationRole::new (
+          NodeRelation::Contains, BinaryRolePosition::First)),
+      Folder::Mentioner =>
+        Some (RelationRole::new (
+          NodeRelation::LinksTo, BinaryRolePosition::First)),
+      Folder::HiddenInSubscribee |
+      Folder::HiddenOutsideOfSubscribee =>
+        None,
+      // A nodeMerge is no relation: these come from extra IDs.
+      Folder::AcquiredBy |
+      Folder::Acquired =>
+        None,
+      // A property is no relation.
+      Folder::Alias | Folder::ID | Folder::Flags { .. } =>
+        None,
+    } }
 }
 
 impl PropertyMember {
