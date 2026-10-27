@@ -920,7 +920,7 @@ fn multi_root_view_inner (
 /// The de-novo view (render_initial_view). Takes a SkgEnv (carries
 /// the shared runtime: config, graph and Tantivy index) and refreshes a stub forest of the
 /// requested roots.
-pub fn multi_root_view_via_env (
+fn multi_root_view_via_env (
   env                : &SkgEnv,
   root_gnids        : &[ID],
   skgrepo_restriction : Option<&SkgrepoRestriction>,

@@ -741,7 +741,7 @@ end
 ---vognode claiming nothing under a member of a partner folder whose members
 ---carry the chain (every one but the two acquisition folders), or under
 ---another such node ('is_in_containerward_chain',
----server/to_org/extend/containerward_chain.rs)?
+---server/refresh/chain.rs)?
 ---@param line_number integer
 ---@return boolean
 function M.containerward_chain_node_p (line_number)

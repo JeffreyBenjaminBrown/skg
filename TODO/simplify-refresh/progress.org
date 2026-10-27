@@ -2981,3 +2981,121 @@ of 35 with the pre-existing failure, both clients. Jeff began
 editing 'coding-advice/code-reviews.org' during the slice; the
 agent left it alone, as the next ones will.
 
+
+** Slice 8
+*** The commits
+**** 31ecd88a
+The corrections carried from slice 3: the dead
+'SkgEnv::find_skgrepo_in_generation' goes (and its two imports);
+'described_node' precedes 'compound_folder_parties'.
+**** 14a5a991
+'update_buffer/completion_mode.rs' is 'refresh/mode.rs';
+'CompletionMode' is 'RefreshMode'.
+**** 2710a8a4
+'refresh/ladder.rs' is 'refresh/visit.rs'; "the refresh's rungs"
+replaces "the ladder" in comments, the glossary, the technical
+data model, the diff-view and API docs; the glossary and the data
+model each keep one sentence saying the old word.
+**** 7468cc90
+'graphnodestats.rs' and 'viewnodestats.rs' under 'refresh/';
+'gnids_that_can_have_graphnodestats' beside its one caller.
+**** 92675372
+'update_buffer/util.rs' ('detach_viewnode_transferring_focus',
+'subtree_satisfies') into 'refresh/tail.rs', its one caller.
+**** c6ab38d0
+The goal computers of 'update_buffer/reconcile/' and
+'to_org/complete/partner_folder/goal_list.rs' into
+'refresh/goal.rs' (562 lines, so one file), each after its caller.
+**** a7bc2c3a
+'to_org/extend/containerward_chain.rs' is 'refresh/chain.rs';
+'graphnode_and_viewnode_from_gnid', the rest of 'to_org/util.rs',
+follows it.
+**** f29b2c3a
+'Folder::relation_member_role' into the 'impl Folder' of
+'types/viewnode.rs'; 'to_org/complete/' goes.
+**** 5e63e592
+'multi_root_view_via_runtime' into 'update_buffer.rs'; the test
+shims into 'test_utils.rs'; 'server/to_org/' goes.
+**** 0bb920f1
+'diff_view/completion.rs' is 'diff_view/refresh.rs';
+'complete_viewforest_with_graph_straddle' is
+'refresh_diffView_viewforest'.
+**** 05691360
+'tests/retain_or_entombstone_then_prune.rs' (and its fixtures) is
+'tests/what_the_refresh_keeps.rs';
+'tests/pruned_change_view/adoption_by_key.rs' is
+'one_child_per_key.rs'; 'tests/to_org.rs' and
+'tests/to_org/complete/contents.rs' are 'tests/types/maps.rs'.
+**** this record's commit
+A comment's path in 'nvim/lua/skg/metadata.lua'; the test-only
+'multi_root_view_via_env' private; this record; the slice's DONE.
+*** The suites
+**** cargo check --all-targets
+Clean, no warnings, after every move.
+**** bash/nextest.sh
+982 of 982 passed (as before the slice).
+**** bash/emacs-tests.sh
+405 of 405.
+**** bash/nvim-tests.sh
+399 passed, none failed, no errors.
+**** bash/integration-tests.sh
+Emacs: 34 of 35. Neovim ('SKG_TEST_CLIENT=nvim'): 34 of 35. The
+one failure each time is 'import-md-and-org', pre-existing, not
+investigated. No other failure met at any point.
+**** the plan's grep
+One hit: 'server/serve.rs:12',
+'handlers::export_to_org::handle_export_to_org_request', where
+'to_org::' is the tail of the export handler's module name, not
+the deleted module. "rg -n '\bto_org::' server tests" is empty,
+as are 'CompletionMode' and 'update_buffer::reconcile'.
+*** Deviations from the plan's "how"
+**** the grep's one hit stays
+Renaming the export handler's module to quiet a substring match
+would rename a sound name for nothing; the hit is reported above.
+**** 'update_buffer.rs' keeps its name
+It keeps the rerender passes, so it is not 'refresh/rerender.rs',
+as the plan allows. 'server/update_buffer/' is gone.
+**** a module the plan did not list
+'update_buffer/util.rs' had to leave for the directory to go; its
+one caller is the tail, so it went there, and its comment no
+longer names the switch's prune, gone since slice 1.
+**** the view shims split by caller
+'multi_root_view_via_runtime', the one production entry, sits
+beside 'render_initial_view' in 'update_buffer.rs'. The report's
+second production entry, 'multi_root_view_via_env', has no
+production caller now, so it went to 'test_utils.rs' with the
+shims. Their "see file header" comments became docs of their own.
+**** the diff view's refresh entry renamed
+The vocabulary report's item 5 names
+'complete_viewforest_with_graph_straddle' among the retired
+words; it is 'refresh_diffView_viewforest', after
+'refresh_content_viewforest'.
+**** a third test renamed
+'tests/to_org.rs' grouped one test of 'add_v_to_map_if_absent'
+('server/types/maps.rs') under 'to_org' and held the grep's
+pattern in its comment; it joins 'tests/types.rs' as 'maps.rs'.
+**** the headers of two renamed tests
+'one_child_per_key.rs' said "adopted" and "retained or
+entombstoned"; it now says siblings of one key are joined by a
+viewnode merge, as 'docs/diff-view.org' does.
+**** visibility narrowed
+What moved beside its only caller lost 'pub':
+'gnids_that_can_have_graphnodestats', the two detach helpers,
+'omit_restricted_members', 'unintegrated_content_gnids', the two
+compound folders' goal lists, 'graphnode_and_viewnode_from_gnid'
+and 'multi_root_view_via_env'. 'partnerFolder_members_in_graph'
+is 'pub(crate)' (the search and the visit call it).
+**** three alignments
+The rename to 'RefreshMode' shifted three struct-literal
+continuations; they are realigned.
+*** Fixtures changed
+None of the fixture data; 'tests/retain_or_entombstone_then_prune/'
+moved whole to 'tests/what_the_refresh_keeps/'. Tests changed only
+in their imports, for the moved paths.
+*** Left unfinished
+Nothing of slice 8. Stale paths outside the slice's reach stay:
+'TODO.org' and an integration test's README name files deleted
+long before this plan, and the untracked
+'forking-and-privacy.org' names 'update_buffer/reconcile/'.
+*** Headline
+DONE.

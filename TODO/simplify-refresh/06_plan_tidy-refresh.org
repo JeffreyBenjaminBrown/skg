@@ -1173,7 +1173,7 @@ one only by seeing it.
 'bash/integration-tests.sh' green; 'tests/metadata_fields_
 table.rs' green.
 
-** TODO Slice 8: the refresh's parts under refresh/
+** DONE Slice 8: the refresh's parts under refresh/
 Read the readability report's item 1 and the vocabulary
 report's items 5, 7 and 16 first. The move is mechanical; no
 behavior changes, and every test passes before and after.
