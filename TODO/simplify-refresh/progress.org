@@ -2658,3 +2658,24 @@ Nothing of slice 5. Noticed: the integration test notes named
 above still describe retired code in their history sections.
 *** Headline
 DONE.
+
+** Orchestrator's notes after slice 5 (2026-10-27)
+Launched 23:41 UTC on the 26th, reported 00:10 UTC:
+twenty-nine minutes, the ten harness runs included. One correction
+inserted, under slice 10, from the agent's finding: an
+integration test's README whose history describes retired
+code. The flake's cause was not the one the plan guessed:
+Tantivy's file-watcher thread outlives a dropped index by one
+poll and can create a lock file while the folder is removed; a
+probe of 16,000 removals measured it, and the fix drops the
+index first, keeps the placeholder index in memory, retries
+once, and gives the folders the process ID; ten runs of the
+Rust suite passed, 980 of 980 each. The other deviations are
+sound; the fixpoint helper lives in 'server/test_utils.rs'
+because the refresh's unit tests are in the library. The
+agent added a sentence to 'coding-advice/common-gotchas.md'
+on the watcher thread, in a slice commit; kept. Suites: nextest
+980 of 980, Emacs 412, Neovim 399, integration 34 of 35 with
+the pre-existing failure, and 'bash/all-tests.sh' once, which
+kept 'tests/results/06/' as the slice made it.
+

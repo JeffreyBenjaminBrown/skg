@@ -1294,7 +1294,12 @@ the suites with every script.
 
 ** TODO Slice 10: the user docs and the glossary
 Read the user-docs report first; its items 1 to 15 locate every
-sentence. Items 1 (the ghost commands) and 5 (the search) are
+sentence.
+*** Corrections carried from slice 5
+The history sections of 'tests/integration/
+save_collateral_delete_then_edit_under_it/README/detail.org'
+still describe retired code; rewrite them to say what the test
+checks today, or delete the history if nothing of it holds. Items 1 (the ghost commands) and 5 (the search) are
 slices 1's and 6's; this slice checks that nothing of them
 remains.
 *** the commands docs
