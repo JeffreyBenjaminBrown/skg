@@ -738,12 +738,10 @@ Kills both buffers after."
 
 (defun test-skg--cycle-values-of-shown-field (field)
   "The cycle values of FIELD in the current edit buffer, which must
-show FIELD with its value on the next line."
+show FIELD."
   (goto-char (point-min))
   (should (re-search-forward (concat "^\\*+ " field "$") nil t))
-  (forward-line 1)
-  (skg-sexp-edit--cycle-values-for-field
-   field (string-trim (org-get-heading t t t t))))
+  (skg-sexp-edit--cycle-values-for-field field))
 
 (ert-deftest test-skg-metadata-editor-offers-each-kind-its-fields ()
   "The metadata editor, opened on each kind of headline, shows the

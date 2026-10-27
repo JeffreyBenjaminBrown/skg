@@ -1323,11 +1323,6 @@ checks\" entry in PITFALLs.org."
 readiness request, '(ready OBJECT...)' or '(unready OBJECT...)'."
   (memq (car-safe part) '(ready unready)))
 
-(defun skg--readiness-request-of (metadata-sexp)
-  "The readiness request in METADATA-SEXP's '(editRequest ...)', or nil."
-  (seq-find #'skg--readiness-request-p
-            (cdr (assq 'editRequest (cdr metadata-sexp)))))
-
 (defun skg--metadata-with-readiness-request (metadata-sexp request)
   "METADATA-SEXP with REQUEST as the readiness request of its
 '(editRequest ...)' (`skg--metadata-with-editRequest-parts'): any
@@ -1351,8 +1346,8 @@ the form the edit request comes before the readiness request, as the
 server writes them. A nil REQUEST removes the replaced parts, and with
 them an '(editRequest ...)' left empty. A headline without
 '(editRequest ...)' gets one where the server writes it
-\('occurrence_metadata_to_string', server/org_to_text.rs): before
-its '(viewRequests ...)' and its derived facts."
+\(`skg-shared-metadata-parts'): before its '(viewRequests ...)' and
+its derived facts."
   (let* ((parts (cdr metadata-sexp))
          (old (assq 'editRequest parts))
          (requests (append (seq-remove replaced-p (cdr old))
@@ -1368,13 +1363,20 @@ its '(viewRequests ...)' and its derived facts."
                 (new (let ((after-it ;; the parts the server writes after it
                             (seq-drop-while
                              (lambda (part)
-                               (not (memq (car-safe part)
-                                          '(viewRequests view diff))))
+                               (not (skg--part-written-after-editRequest-p
+                                     part)))
                              parts)))
                        (append (butlast parts (length after-it))
                                (list new)
                                after-it)))
                 (t parts)))))
+
+(defun skg--part-written-after-editRequest-p (part)
+  "Whether the server writes PART, a part of '(skg ...)', after
+'(editRequest ...)' (`skg-shared-metadata-parts')."
+  (and (consp part) (symbolp (car part))
+       (member (symbol-name (car part))
+               (cdr (member "editRequest" skg-shared-metadata-parts)))))
 
 (defun skg--write-edit-request (request &optional kind)
   "Make REQUEST the edit request of the headline at point, keeping the
@@ -1382,17 +1384,17 @@ readiness request its '(editRequest ...)' holds
 \(`skg--metadata-with-edit-request'). A nil REQUEST removes the edit
 request. KIND, when given, is the kind atom a headline without
 metadata gets."
-  (skg--write-editRequest-parts
-   (lambda (part) (not (skg--readiness-request-p part)))
-   request kind))
+  (skg--rewrite-metadata-at-point
+   (lambda (metadata-sexp)
+     (skg--metadata-with-edit-request metadata-sexp request))
+   kind))
 
-(defun skg--write-editRequest-parts (replaced-p request &optional kind)
-  "Rewrite the metadata of the headline at point as
-`skg--metadata-with-editRequest-parts' gives it for REPLACED-P and
-REQUEST, so that the '(editRequest ...)' stands where the server
-writes it. KIND, when given, is the kind atom a headline without
-metadata gets. Off a headline, does nothing. Routes the rewrite
-through `skg-replace-current-line' (see 'elisp/PITFALLs.org')."
+(defun skg--rewrite-metadata-at-point (rewrite &optional kind)
+  "Rewrite the metadata of the headline at point as REWRITE, a function
+of the metadata sexp, gives it. KIND, when given, is the kind atom a
+headline without metadata gets. Off a headline, does nothing. Routes
+the rewrite through `skg-replace-current-line' (see
+'elisp/PITFALLs.org')."
   (when (org-at-heading-p)
     (let* ((split (skg-split-as-stars-metadata-title
                    (skg-get-current-headline-text)))
@@ -1404,8 +1406,7 @@ through `skg-replace-current-line' (see 'elisp/PITFALLs.org')."
        (skg-format-headline
         (nth 0 split)
         (substring-no-properties
-         (format "%S" (skg--metadata-with-editRequest-parts
-                       metadata-sexp replaced-p request)))
+         (format "%S" (funcall rewrite metadata-sexp)))
         (nth 2 split))))))
 
 (defun skg--derived-facts-last (metadata-sexp)

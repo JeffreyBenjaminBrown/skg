@@ -55,7 +55,19 @@
 ** child3
 *** deep
 **** nested"
-     "complex structure"))
+     "complex structure")
+
+    ((a (b) c)
+"* a
+** (b)
+** c"
+     "an atom in parens")
+
+    ((a (b (c)))
+"* a
+** b
+*** (c)"
+     "an atom in parens, deeper"))
   "Test cases where sexp <-> org conversion is bijective.
 Each element is (SEXP ORG-TEXT DESCRIPTION).")
 
@@ -167,10 +179,6 @@ DESCRIPTION is used in error messages."
   "Non-atom-headed input should signal an error: ((a) b)"
   (should-error (sexp-to-org '((a) b)) :type 'error))
 
-(ert-deftest test-sexp-to-org-rejects-non-paren-terse ()
-  "Non-paren-terse input should signal an error: (a (b) c)"
-  (should-error (sexp-to-org '(a (b) c)) :type 'error))
-
 ;;
 ;; Error cases for org-to-sexp
 ;;
@@ -231,30 +239,6 @@ DESCRIPTION is used in error messages."
 (ert-deftest test-atom-headed-p-fails-nested-list-head ()
   "(a ((b) a)) is not atom-headed."
   (should-not (sexp-atom-headed-p '(a ((b) a)))))
-
-(ert-deftest test-paren-terse-p-simple ()
-  "(a) is paren-terse."
-  (should (sexp-paren-terse-p '(a))))
-
-(ert-deftest test-paren-terse-p-two-elements ()
-  "(a b) is paren-terse."
-  (should (sexp-paren-terse-p '(a b))))
-
-(ert-deftest test-paren-terse-p-nested ()
-  "(a (b c) d) is paren-terse."
-  (should (sexp-paren-terse-p '(a (b c) d))))
-
-(ert-deftest test-paren-terse-p-complex ()
-  "(a (b (c d)) e (f g)) is paren-terse."
-  (should (sexp-paren-terse-p '(a (b (c d)) e (f g)))))
-
-(ert-deftest test-paren-terse-p-fails-single-atom-sublist ()
-  "(a (b) c) is not paren-terse because (b) wraps single atom."
-  (should-not (sexp-paren-terse-p '(a (b) c))))
-
-(ert-deftest test-paren-terse-p-fails-deeply-nested-single-atom ()
-  "(a (b (c))) is not paren-terse because (c) wraps single atom."
-  (should-not (sexp-paren-terse-p '(a (b (c))))))
 
 (provide 'test-sexp-org-bijection)
 ;;; test-sexp-org-bijection.el ends here

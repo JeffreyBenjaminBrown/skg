@@ -6,8 +6,10 @@
 ;;; their defaults and their values come from
 ;;; 'shared/metadata-fields.json', whose comments describe them.
 ;;; After sexp-to-org, filling in inserts each missing field at its
-;;; default; before org-to-sexp, stripping removes each field at its
-;;; default and writes a value that took arguments as a list.
+;;; default, every part where the server writes it; before org-to-sexp,
+;;; stripping removes each field at its default and writes a value that
+;;; took arguments as a list. Both clients pass the cases of
+;;; 'tests/shared/metadata-editor-cases.txt'.
 ;;; The Neovim analog is nvim/lua/skg/sexpr/metadata_fields.lua.
 ;;;
 ;;; ENTRY POINTS:
@@ -60,6 +62,14 @@ Nil when SEXP is no '(skg ...)'."
   (member (string-trim text)
           (list (alist-get 'default field)
                 (skg-metadata-fields--shown-default field))))
+
+(defun skg-metadata-fields--part-rank (name)
+  "Where the server writes the part NAME of '(skg ...)': its position
+in `skg-shared-metadata-parts', a kind's atom standing at \"KIND\"'s.
+A part the table does not list ranks after every part it lists."
+  (or (cl-position (if (skg-shared-metadata-kind name) "KIND" name)
+                   skg-shared-metadata-parts :test #'equal)
+      (length skg-shared-metadata-parts)))
 
 (defun skg-metadata-fields--value-entry (field word)
   "The entry of FIELD's values whose value is WORD, or nil."
@@ -160,8 +170,9 @@ CHILDREN is a list of headline groups, one per child."
 (defun skg-metadata-fields-fillIn-defaults-in-org
     (org-text kind &optional display-title)
   "ORG-TEXT, the metadata of a headline of KIND as org text, with each
-field KIND's headlines may set shown: in canonical order, a missing
-one at its default, a bare atom with a 'true' child.
+field KIND's headlines may set shown: every part where the server
+writes it, a missing field at its default, a bare atom with a 'true'
+child.
 If DISPLAY-TITLE is non-nil and non-empty, prepend a read-only
 title display group."
   (let* (( headlines (org-to-sexp--extract-headlines
@@ -188,63 +199,80 @@ title display group."
 
 (defun skg-metadata-fields--fillIn-and-reorder
     (children child-level kind)
-  "CHILDREN (headline groups at CHILD-LEVEL) in canonical order, flat,
-each of KIND's fields filled in: the children that say what the
-headline is (`skg-metadata-fields--leading-child-p': the markers, the
-kind's atom, the gnid and the skgRepos) lead, in their order; the
-fields follow, in the table's order; the other children close, in
-their order."
-  (let* (( canonical (skg-metadata-fields-field-names kind) )
-         ( field-map (mapcar (lambda (group)
-                               (cons (string-trim (cdr (car group))) group))
-                             children) )
-         ( filledIn
-           (apply #'append
-                  (mapcar (lambda (name)
-                            (skg-metadata-fields--fillIn-one
-                             name (cdr (assoc name field-map))
-                             child-level kind))
-                          canonical)) )
-         ( others-shown (cl-remove-if (lambda (entry)
-                                        (member (car entry) canonical))
-                                      field-map) ))
-    (append (apply #'append
-                   (mapcar #'cdr
-                           (cl-remove-if-not
-                            #'skg-metadata-fields--leading-child-p
-                            others-shown)))
-            filledIn
-            (apply #'append
-                   (mapcar #'cdr
-                           (cl-remove-if
-                            #'skg-metadata-fields--leading-child-p
-                            others-shown))))))
+  "CHILDREN (headline groups at CHILD-LEVEL), each of KIND's fields
+filled in (`skg-metadata-fields--fillIn-one'), flat, every part where
+the server writes it (`skg-metadata-fields--part-rank'): a missing
+field at its default, a part the table does not list last, parts of
+one rank in their order. A second group for a field is dropped."
+  (let* (( field-names (skg-metadata-fields-field-names kind) )
+         ( groups-shown ;; CHILDREN but a second group for a field
+           (let (( names-seen nil ))
+             (cl-remove-if
+              (lambda (group)
+                (let (( name (skg-metadata-fields--group-name group) ))
+                  (prog1 (and (member name field-names)
+                              (member name names-seen))
+                    (push name names-seen))))
+              children)) )
+         ( names-shown (mapcar #'skg-metadata-fields--group-name
+                               groups-shown) )
+         ( ranked ;; (RANK . HEADLINES), one per part shown
+           (mapcar (lambda (name-and-group)
+                     (cons (skg-metadata-fields--part-rank
+                            (car name-and-group))
+                           (skg-metadata-fields--fillIn-one
+                            (car name-and-group) (cdr name-and-group)
+                            child-level kind)))
+                   (append (cl-mapcar #'cons names-shown groups-shown)
+                           (mapcar #'list
+                                   (cl-remove-if
+                                    (lambda (name) (member name names-shown))
+                                    field-names)))) ))
+    (apply #'append
+           (mapcar #'cdr (sort ranked #'car-less-than-car)))))
 
-(defun skg-metadata-fields--leading-child-p (entry)
-  "Whether ENTRY, a (NAME . GROUP) child of the root, says what the
-headline is, and so leads it: a marker, a kind's atom, the gnid or
-the skgRepos."
-  (let (( name (car entry) ))
-    (or (member name '("vnid" "focused" "folded" "bodyFolded"
-                       "gnid" "skgRepos"))
-        (skg-shared-metadata-kind name))))
+(defun skg-metadata-fields--group-name (group)
+  "The name of the child whose headline group is GROUP: its first
+headline's text."
+  (string-trim (cdr (car group))))
 
 (defun skg-metadata-fields--fillIn-one
     (name group child-level kind)
   "The headlines that show the child NAME of KIND, whose group is GROUP
-or nil when absent: a missing field at its default, a bare atom with a
-'true' child."
+or nil when absent: a missing field at its default; an editRequest
+holding nothing but a readiness request with the other request at its
+default before it; a bare atom with a 'true' child."
   (let (( field (skg-metadata-fields--field kind name) ))
     (cond
      ((and field (null group))
       (list (cons child-level name)
             (cons (1+ child-level)
                   (skg-metadata-fields--shown-default field))))
+     ((and field (equal name "editRequest")
+           (skg-metadata-fields--only-readiness-requests-p
+            group child-level))
+      (append (list (car group)
+                    (cons (1+ child-level)
+                          (skg-metadata-fields--shown-default field)))
+              (cdr group)))
      ((and field (= (length group) 1)
            (equal (alist-get 'shape field) "atom"))
       (list (car group)
             (cons (1+ child-level) "true")))
      (t group))))
+
+(defun skg-metadata-fields--only-readiness-requests-p (group child-level)
+  "Whether GROUP, an editRequest at CHILD-LEVEL, holds nothing but a
+readiness request, '(ready ...)' or '(unready ...)', which the
+readiness commands set and the editor shows. Its fill-in then shows
+the other request at its default beside it."
+  (let (( value-groups (car (skg-metadata-fields--group-children
+                             (cdr group) (1+ child-level))) ))
+    (and value-groups
+         (cl-every (lambda (value-group)
+                     (member (skg-metadata-fields--group-name value-group)
+                             '("ready" "unready" "(ready)" "(unready)")))
+                   value-groups))))
 
 ;;
 ;; Strip
@@ -309,16 +337,18 @@ nil for a field at its default."
         (when values
           (cons (cons child-level name) values))))
      ((string= name "skgRepos")
-      (when (cdr group)
-        (cons (car group)
-              (mapcar (lambda (hl)
-                        (if (= (car hl) (+ 2 child-level))
-                            (cons (car hl)
-                                  (skg-metadata-fields--strip-default-suffix
-                                   (cdr hl)))
-                          hl))
-                      (cdr group)))))
+      (skg-metadata-fields--skgRepos-as-saved group child-level))
      (t group))))
+
+(defun skg-metadata-fields--skgRepos-as-saved (group child-level)
+  "GROUP, a skgRepos at CHILD-LEVEL, as it saves: a skgrepo with no
+value dropped, and nil when none is left."
+  (let (( repo-groups
+          (cl-remove-if-not #'cdr
+                            (car (skg-metadata-fields--group-children
+                                  (cdr group) (1+ child-level)))) ))
+    (when repo-groups
+      (cons (car group) (apply #'append repo-groups)))))
 
 (defun skg-metadata-fields--value-as-saved (value-group field)
   "VALUE-GROUP, one value of FIELD, as it saves: a value that takes
@@ -359,13 +389,6 @@ link's id."
                         (list (if (equal (alist-get 'of (car arguments)) "id")
                                   (skg-metadata-fields--extract-id-from-text rest)
                                 rest))))))))))
-
-(defun skg-metadata-fields--strip-default-suffix (text)
-  "Strip ' (default)' suffix from TEXT if present."
-  (let ((trimmed (string-trim text)))
-    (if (string-suffix-p " (default)" trimmed)
-        (substring trimmed 0 (- (length trimmed) (length " (default)")))
-      trimmed)))
 
 (defun skg-metadata-fields--extract-id-from-text (text)
   "Extract an ID from TEXT, handling org links like [[id:X][label]].

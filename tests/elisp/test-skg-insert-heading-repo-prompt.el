@@ -252,10 +252,10 @@ open the sexp-edit buffer (not prompt in minibuffer)."
          (should (get-text-property (point) 'read-only)))
        (kill-buffer edit-buf)))))
 
-(ert-deftest test-edit-metadata-keeps-a-readiness-request ()
-  "The metadata editor does not show a readiness request in the
-headline's '(editRequest ...)', and applying keeps it, beside the
-other request or alone."
+(ert-deftest test-edit-metadata-shows-a-readiness-request ()
+  "The metadata editor shows a readiness request in the headline's
+'(editRequest ...)', and applying keeps it, beside the other request
+or alone; deleting it there clears it."
   (dolist (case '(("(skg node (gnid x) (skgRepos (nodeRepo public)) (editRequest delete (ready node)) (diff (node added) (leaves 1 node))) x"
                    . "(skg node (gnid x) (skgRepos (nodeRepo public)) (editRequest delete (ready node)) (diff (node added) (leaves 1 node))) x")
                   ("(skg alias (editRequest (unready)) (diff (rel added) (leaves 1)))"
@@ -273,15 +273,34 @@ other request or alone."
                  (buffer-list))))
            (should edit-buf)
            (with-current-buffer edit-buf
-             (should-not (string-match-p
-                          "^\\*+ \\(un\\)?ready$"
-                          (buffer-substring-no-properties
-                           (point-min) (point-max))))
+             (should (string-match-p
+                      "^\\*+ (?\\(un\\)?ready)?$"
+                      (buffer-substring-no-properties
+                       (point-min) (point-max))))
              (skg-sexp-edit--apply)))
          (with-current-buffer source-buffer
            (should (equal (buffer-substring-no-properties
                            (point-min) (point-max))
-                          (concat "* " (cdr case) "\n")))))))))
+                          (concat "* " (cdr case) "\n"))))))))
+  (test--with-skg-content-view
+   "* (skg node (gnid x) (skgRepos (nodeRepo public)) (editRequest delete (ready node))) x\n"
+   test--config-public-and-private
+   (lambda ()
+     (let ((source-buffer (current-buffer)))
+       (skg-view-metadata)
+       (with-current-buffer
+           (cl-find-if (lambda (b)
+                         (buffer-local-value 'skg-sexp-edit--source-buffer b))
+                       (buffer-list))
+         (goto-char (point-min))
+         (re-search-forward "^\\*\\*\\* ready$")
+         (delete-region (line-beginning-position)
+                        (progn (forward-line 2) (point)))
+         (skg-sexp-edit--apply))
+       (with-current-buffer source-buffer
+         (should (equal (buffer-substring-no-properties
+                         (point-min) (point-max))
+                        "* (skg node (gnid x) (skgRepos (nodeRepo public)) (editRequest delete)) x\n")))))))
 
 (ert-deftest test-view-repo-list-includes-all-repos ()
   "skg-view-repo-list should list every configured repo and path."
@@ -398,8 +417,8 @@ and shows the title under a `title' group."
                      (2 . "skgRepos")
                      (3 . "nodeRepo")
                      (4 . "only")
-                     (2 . "writeProtected")
                      (2 . "noClaim")
+                     (2 . "writeProtected")
                      (2 . "editRequest")
                      (2 . "viewRequests"))))))
 

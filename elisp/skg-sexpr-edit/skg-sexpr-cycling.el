@@ -50,9 +50,8 @@ there, cycling starts at index 0."
 ;; Cycle values per field
 ;;
 
-(defun skg-sexp-edit--cycle-values-for-field (field-name field-value)
+(defun skg-sexp-edit--cycle-values-for-field (field-name)
   "Return the list of values to cycle through for FIELD-NAME.
-FIELD-VALUE is the current headline text, needed for repo defaulting.
 Every field but the nodeRepo of '(skgRepos ...)' cycles as 'shared/metadata-fields.json' says for
 the kind of the headline being edited: a value offered only to an
 editable headline is left out when the edit buffer sets writeProtected
@@ -61,7 +60,7 @@ metadata lacks '(diff (rel removed))'. The diff view's restore
 requests are described in 'docs/diff-view.org', \"Restoring what a
 change removed\". Returns nil if the field is not cycleable."
   (if (string= field-name "nodeRepo") ;; from the config
-      (skg-sexp-edit--repo-cycle-values field-value)
+      (skg--owned-repos)
     (skg-metadata-fields-cycle-values
      skg-sexp-edit--kind
      field-name
@@ -77,20 +76,6 @@ not set its writeProtected field to true."
               (let ((level (length (match-string 1))))
                 (forward-line 1)
                 (looking-at (format "^\\*\\{%d\\} true$" (1+ level))))))))
-
-(defun skg-sexp-edit--repo-cycle-values (field-value)
-  "Return repo names from config as a cycle list.
-If FIELD-VALUE has a ' (default)' suffix, prepend it so cycling
-starts there rather than jumping to a bare repo name."
-  (let ((skgrepos (skg--owned-repos)))
-    (when skgrepos
-      (if (string-suffix-p " (default)" field-value)
-          (cons field-value
-                (remove (substring field-value 0
-                                   (- (length field-value)
-                                      (length " (default)")))
-                        skgrepos))
-        skgrepos))))
 
 (defun skg-sexp-edit--read-argument (value argument)
   "Prompt for ARGUMENT of the field value VALUE, as
@@ -131,8 +116,7 @@ Dispatch is based on the parent headline text."
          (parent (skg-sexp-edit--parent-headline-text)))
     (unless parent
       (user-error "Cannot determine parent field"))
-    (let ((values (skg-sexp-edit--cycle-values-for-field
-                   parent field-value)))
+    (let ((values (skg-sexp-edit--cycle-values-for-field parent)))
       (cond
        (values
         (let* ((new-val (skg-sexp-edit--cycle-through

@@ -88,7 +88,7 @@ CORRECTIONS is the (corrections ...) field of a save-result or a
 rerender-done, the buffer corrections: one entry (VIEW-ID MESSAGE
 ...) per view the server corrected. Each view becomes a level-1
 headline, \"Buffer corrections in\" and its name (see
-`skg--corrected-view-name'), and each of its messages a level-2
+`skg--corrections-to-org-string'), and each of its messages a level-2
 headline under it. What the buffer already held stays.
 Does nothing when CORRECTIONS is empty."
   (when (skg--message-list-nonempty-p corrections)
@@ -105,29 +105,24 @@ Does nothing when CORRECTIONS is empty."
                skg-server-warnings-buffer-name)))))
 
 (defun skg--corrections-to-org-string (corrections)
-  "Org text for CORRECTIONS: per view, a level-1 headline naming it
-\"Buffer corrections in\" the view's name,
-and under it each message as a level-2 headline. A message's own
-subheadlines are already level 3, so the message is inserted as it is."
+  "Org text for CORRECTIONS: per view, a level-1 headline, \"Buffer
+corrections in\" and the name of the buffer whose `skg-view-id' is
+the view's ID, or the ID itself when no buffer has it; under it each
+message as a level-2 headline. A message's own subheadlines are
+already level 3, so the message is inserted as it is. The view ID may
+be a symbol or a string."
   (mapconcat
    (lambda (view-entry)
-     (concat "* Buffer corrections in "
-             (skg--corrected-view-name (car view-entry)) "\n"
-             (mapconcat (lambda (correction)
-                          (let ((headline (concat "** " correction)))
-                            (if (string-suffix-p "\n" headline)
-                                headline
-                              (concat headline "\n"))))
-                        (cdr view-entry) "")))
+     (let* ((view-id (format "%s" (car view-entry)))
+            (view-buffer (skg-find-buffer-by-view-id view-id)))
+       (concat "* Buffer corrections in "
+               (if view-buffer (buffer-name view-buffer) view-id) "\n"
+               (mapconcat (lambda (correction)
+                            (let ((headline (concat "** " correction)))
+                              (if (string-suffix-p "\n" headline)
+                                  headline
+                                (concat headline "\n"))))
+                          (cdr view-entry) ""))))
    corrections ""))
-
-(defun skg--corrected-view-name (view-id)
-  "The name of the buffer whose `skg-view-id' is VIEW-ID, or, when no
-buffer has it, VIEW-ID itself. VIEW-ID may be a symbol or a string."
-  (let* ((view-id-string (format "%s" view-id))
-         (buffer (skg-find-buffer-by-view-id view-id-string)))
-    (if buffer
-        (buffer-name buffer)
-      view-id-string)))
 
 (provide 'skg-request-server-warnings)

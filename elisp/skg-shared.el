@@ -32,10 +32,20 @@ with symbol keys, and arrays become lists."
   (alist-get 'relations (skg-shared--read-json "relations.json"))
   "The relations in 'shared/relations.json', in the file's order.")
 
+(defconst skg-shared-metadata-fields
+  (skg-shared--read-json "metadata-fields.json")
+  "The parsed 'shared/metadata-fields.json'.")
+
 (defconst skg-shared-metadata-kinds
-  (alist-get 'kinds (skg-shared--read-json "metadata-fields.json"))
+  (alist-get 'kinds skg-shared-metadata-fields)
   "The headline kinds in 'shared/metadata-fields.json', each with the
 fields a user may set on it.")
+
+(defconst skg-shared-metadata-parts
+  (alist-get 'parts skg-shared-metadata-fields)
+  "The parts of '(skg ...)' in the order the server writes them, from
+'shared/metadata-fields.json': strings, \"KIND\" standing for a kind's
+atom.")
 
 (defun skg-shared-styles ()
   "The herald styles: an alist from style name (a symbol) to its look."

@@ -207,12 +207,12 @@ member, 'true' on a child claiming nothing."
     (should (equal result sexp))))
 
 ;;
-;; Canonical ordering: what says what the headline is (kind atom, gnid,
-;; skgRepos) first, editable fields, write-protected stats last
+;; Ordering: every part where the server writes it ('parts' in
+;; 'shared/metadata-fields.json'), a missing field among them
 ;;
 
 (ert-deftest test-canonical-ordering ()
-  "Fields appear in canonical order after filling in."
+  "Parts appear in the order the server writes them after filling in."
   (let* ((sexp '(skg node (skgRepos (nodeRepo jeff)) (view cycle) (gnid abc) writeProtected))
          (org-text (sexp-to-org sexp))
          (filledIn (skg-metadata-fields-fillIn-defaults-in-org org-text test--node-kind))
@@ -222,10 +222,8 @@ member, 'true' on a child claiming nothing."
                           (cl-remove-if-not
                            (lambda (hl) (= (car hl) 2))
                            headlines))))
-    ;; Order should be: node, skgRepos, gnid, write-protected,
-    ;; noClaim, editRequest, viewRequests, view
     (should (equal level-2
-                   '("node" "skgRepos" "gnid" "writeProtected" "noClaim"
+                   '("node" "gnid" "skgRepos" "noClaim" "writeProtected"
                      "editRequest" "viewRequests" "view")))))
 
 ;;
@@ -327,22 +325,16 @@ is dropped key-and-all, leaving (skg node (skgRepos (nodeRepo only)))."
          (result (org-to-sexp stripped)))
     (should (equal result '(skg node (skgRepos (nodeRepo only)))))))
 
-;;
-;; A nodeRepo marked '(default)'
-;;
-
-(ert-deftest test-strip-repo-with-default-suffix ()
-  "Stripping repo with '(default)' suffix removes the suffix."
-  (let* ((org-text (concat "* skg\n"
-                           "** node\n"
-                           "** gnid\n"
-                           "*** abc\n"
-                           "** skgRepos\n"
-                           "*** nodeRepo\n"
-                           "**** jeff (default)"))
-         (stripped (skg-metadata-fields-strip-defaults-from-org org-text test--node-kind))
-         (result (org-to-sexp stripped)))
-    (should (equal result '(skg node (gnid abc) (skgRepos (nodeRepo jeff)))))))
+(ert-deftest test-strip-drops-a-repo-without-a-value ()
+  "Stripping drops a skgrepo given no value, and a skgRepos left empty."
+  (dolist (case '(("**** bob\n*** relRepo" . (skg node (gnid abc) (skgRepos (nodeRepo bob))))
+                  ("" . (skg node (gnid abc)))))
+    (should (equal (org-to-sexp
+                    (skg-metadata-fields-strip-defaults-from-org
+                     (concat "* skg\n** node\n** gnid\n*** abc\n"
+                             "** skgRepos\n*** nodeRepo\n" (car case))
+                     test--node-kind))
+                   (cdr case)))))
 
 (ert-deftest test-strip-repo-bare-value ()
   "Stripping repo without '(default)' keeps the value as-is."

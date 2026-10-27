@@ -257,10 +257,12 @@ OBJECTS)' or '(unready OBJECTS)', the last part of the headline's
 '(editRequest ...)', which stands at the top level of its metadata,
 whatever its kind. The headline's other edit request stays. A
 headline without '(editRequest ...)' gets one where the server writes
-it (`skg--metadata-with-editRequest-parts')."
+it (`skg--metadata-with-readiness-request')."
   (skg--current-headline-metadata-sexp) ;; refuses a headline without
-  (skg--write-editRequest-parts #'skg--readiness-request-p
-                                (cons (if ready 'ready 'unready) objects)))
+  (skg--rewrite-metadata-at-point
+   (lambda (metadata-sexp)
+     (skg--metadata-with-readiness-request
+      metadata-sexp (cons (if ready 'ready 'unready) objects)))))
 
 ;;; Moving between headlines with change facts
 ;;; A headline with change facts is one whose metadata carries a

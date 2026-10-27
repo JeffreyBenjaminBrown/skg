@@ -1,15 +1,13 @@
 ;;; -*- lexical-binding: t; -*-
 ;;;
 ;;; PURPOSE: Roughly-bijective transformations between
-;;; atom-headed paren-terse sexps and org text.
+;;; atom-headed sexps and org text.
 ;;;
 ;;; INPUT REQUIREMENTS
 ;;; - An input sexp must be:
 ;;;   - A non-empty list
 ;;;   - "Atom-headed": every list (and sublist) has a bare atom
 ;;;     as its first member, including at the top-level.
-;;;   - "Paren-terse": no proper sub-sexp
-;;;     wraps a single atom in parens.
 ;;; - Input org text must have:
 ;;;   - At least one headline
 ;;;   - Exactly one root (level-1) headline
@@ -20,7 +18,10 @@
 ;;; TRANSFORMATION NOTES
 ;;; - Body text in org is discarded (hence "roughly" bijective).
 ;;; - Multi-word headlines become symbols with spaces.
-;;; - Childless non-root headlines become bare atoms, not lists.
+;;; - Childless non-root headlines become bare atoms, not lists,
+;;;   but for one whose text is '(ATOM)': a proper sub-sexp that wraps
+;;;   a single atom in parens, such as the readiness request '(ready)',
+;;;   is that headline.
 ;;;
 ;;; ENTRY POINTS:
 ;;;   sexp-to-org
@@ -34,7 +35,7 @@
 
 (defun sexp-to-org (sexp)
   "Convert SEXP to org-mode text.
-SEXP must be a list that is both atom-headed and paren-terse.
+SEXP must be an atom-headed list.
 Signals an error if validation fails."
   (unless (listp sexp)
     (error "sexp-to-org: input must be a list, got %S" sexp))
@@ -42,8 +43,6 @@ Signals an error if validation fails."
     (error "sexp-to-org: input must be a non-empty list"))
   (unless (sexp-atom-headed-p sexp)
     (error "sexp-to-org: input is not atom-headed: %S" sexp))
-  (unless (sexp-paren-terse-p sexp)
-    (error "sexp-to-org: input is not paren-terse: %S" sexp))
   (sexp-to-org--convert sexp 1))
 
 (defun sexp-atom-headed-p (sexp)
@@ -55,21 +54,6 @@ has a bare atom as its first member."
    ((null sexp) nil)
    ((not (atom (car sexp))) nil)
    (t (cl-every #'sexp-atom-headed-p (cdr sexp)))))
-
-(defun sexp-paren-terse-p (sexp)
-  "Return t if SEXP is paren-terse.
-No proper sub-sexp may put parens around a single atom."
-  (cond
-   ((atom sexp) t)
-   (t (cl-every #'sexp-paren-terse-p--proper-subsexp (cdr sexp)))))
-
-(defun sexp-paren-terse-p--proper-subsexp (elem)
-  "Check paren-terseness for ELEM as a proper subsexp.
-A proper subsexp cannot be a list containing a single atom."
-  (cond
-   ((atom elem) t)
-   ((and (= (length elem) 1) (atom (car elem))) nil)
-   (t (cl-every #'sexp-paren-terse-p--proper-subsexp (cdr elem)))))
 
 ;;
 ;; org-to-sexp
@@ -143,20 +127,28 @@ Assumes SEXP has already been validated."
          (headline (sexp-to-org--make-headline level head))
          (children (mapcar
                     (lambda (elem)
-                      (if (listp elem)
-                          (sexp-to-org--convert elem (1+ level))
-                        (sexp-to-org--make-headline (1+ level) elem)))
+                      (cond ((atom elem)
+                             (sexp-to-org--make-headline (1+ level) elem))
+                            ((cdr elem)
+                             (sexp-to-org--convert elem (1+ level)))
+                            (t ;; one atom in parens
+                             (sexp-to-org--make-headline
+                              (1+ level)
+                              (concat "(" (sexp-to-org--atom-text (car elem))
+                                      ")")))))
                     tail)))
     (mapconcat #'identity (cons headline children) "\n")))
 
 (defun sexp-to-org--make-headline (level text)
   "Create an org headline at LEVEL with TEXT.
 TEXT can be a symbol, string, or number."
-  (let ((text-str (cond
-                   ((stringp text) text)
-                   ((numberp text) (number-to-string text))
-                   (t (symbol-name text)))))
-    (concat (make-string level ?*) " " text-str)))
+  (concat (make-string level ?*) " " (sexp-to-org--atom-text text)))
+
+(defun sexp-to-org--atom-text (atom)
+  "ATOM, a symbol, string, or number, as headline text."
+  (cond ((stringp atom) atom)
+        ((numberp atom) (number-to-string atom))
+        (t (symbol-name atom))))
 
 (defun org-to-sexp--text-to-atom (text)
   "Convert TEXT to an atom, preserving numbers as integers.
@@ -173,7 +165,8 @@ Otherwise return it as a symbol."
 (defun org-to-sexp--build-tree (headlines expected-level)
   "Build a sexp tree from HEADLINES starting at EXPECTED-LEVEL.
 Returns (SEXP . REMAINING-HEADLINES).
-For non-root headlines with no children, returns just the symbol.
+For non-root headlines with no children, returns just the symbol, or,
+for text '(ATOM)', the list of that atom.
 For root or headlines with children, returns a list."
   (when (and headlines (= (caar headlines) expected-level))
     (let* ((head-hl (car headlines))
@@ -191,6 +184,9 @@ For root or headlines with children, returns a list."
       (let ((sexp (cond
                    (children (cons head-atom (nreverse children)))
                    ((= expected-level 1) (list head-atom))
+                   ((string-match "\\`(\\([^() ]+\\))\\'" head-text)
+                    (list (org-to-sexp--text-to-atom
+                           (match-string 1 head-text))))
                    (t head-atom))))
         (cons sexp rest)))))
 

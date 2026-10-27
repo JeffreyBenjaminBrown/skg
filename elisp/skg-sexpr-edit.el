@@ -34,12 +34,6 @@
   "The kind of the headline being edited, from
 'shared/metadata-fields.json', or nil.")
 
-(defvar-local skg-sexp-edit--readiness-request nil
-  "The readiness request, '(ready ...)' or '(unready ...)', that the
-'(editRequest ...)' of the headline being edited carried, or nil. The
-readiness commands set it, so the edit buffer does not show it, and
-applying writes it back.")
-
 ;;
 ;; Minor mode for the edit buffer
 ;;
@@ -61,19 +55,9 @@ Kill the buffer to cancel without saving."
 (defun skg-sexp-edit--apply ()
   "Save changes from sexp-edit buffer back to the repo sexp."
   (interactive)
-  (let* ((org-text (buffer-substring-no-properties
-                    (point-min) (point-max)))
-         (final-org ;; last version of the org text in the sexp-edit buffer
-          (if skg-sexp-edit--kind
-              (skg-metadata-fields-strip-defaults-from-org
-               org-text skg-sexp-edit--kind)
-            org-text))
-         (new-sexp (if skg-sexp-edit--readiness-request
-                       (skg--metadata-with-readiness-request
-                        (org-to-sexp final-org)
-                        skg-sexp-edit--readiness-request)
-                     (org-to-sexp final-org)))
-         (new-text (prin1-to-string new-sexp))
+  (let* ((new-text (skg-sexp-edit--metadata-text-to-save
+                    (buffer-substring-no-properties (point-min) (point-max))
+                    skg-sexp-edit--kind))
          (source-buffer skg-sexp-edit--source-buffer)
          (start skg-sexp-edit--start)
          (end skg-sexp-edit--end))
@@ -83,19 +67,27 @@ Kill the buffer to cancel without saving."
     (delete-region start end)
     (insert new-text)))
 
+(defun skg-sexp-edit--metadata-text-to-save (org-text kind)
+  "The metadata text that applying the edit buffer's ORG-TEXT writes
+into the source headline: ORG-TEXT stripped of the fields of KIND (a
+kind from 'shared/metadata-fields.json', or nil) at their defaults,
+as a sexp."
+  (prin1-to-string
+   (org-to-sexp (if kind
+                    (skg-metadata-fields-strip-defaults-from-org
+                     org-text kind)
+                  org-text))))
+
 (defconst skg-edit--help-text
   "Press C-c C-c to save, C-x k to cancel, S-left/S-right to cycle values.\n\n"
   "Help text shown at the top of the edit buffer.")
 
 
 (defun skg-sexp-edit--open-edit-buffer (org-text source-buffer
-                                       sexp-start sexp-end kind
-                                       &optional readiness-request)
+                                       sexp-start sexp-end kind)
   "Open a sexp-edit buffer with ORG-TEXT from SOURCE-BUFFER.
 SEXP-START and SEXP-END delimit the sexp in SOURCE-BUFFER. KIND is the
-headline's kind from 'shared/metadata-fields.json', or nil.
-READINESS-REQUEST is the readiness request ORG-TEXT leaves out (see
-`skg-sexp-edit--readiness-request'), or nil."
+headline's kind from 'shared/metadata-fields.json', or nil."
   (let (( edit-buffer (generate-new-buffer "*skg-metadata-edit*") ))
     (switch-to-buffer edit-buffer)
     (insert skg-edit--help-text)
@@ -115,8 +107,7 @@ READINESS-REQUEST is the readiness request ORG-TEXT leaves out (see
     (setq-local skg-sexp-edit--source-buffer source-buffer)
     (setq-local skg-sexp-edit--start sexp-start)
     (setq-local skg-sexp-edit--end sexp-end)
-    (setq-local skg-sexp-edit--kind kind)
-    (setq-local skg-sexp-edit--readiness-request readiness-request)))
+    (setq-local skg-sexp-edit--kind kind)))
 
 (defun skg-sexp-edit--decorate-with-heralds ()
   "Append, per headline, the herald its metadata path produces:
@@ -321,8 +312,8 @@ If the headline has no metadata, populates a minimal
 \(skg node (skgRepos (nodeRepo X)))
 in place and opens the empty-node view over it -- repo pre-filled, the
 other editable fields childless (see `skg-view-metadata--open-empty-node-view').
-A readiness request in its '(editRequest ...)' is not shown, and
-saving keeps it.
+A readiness request in its '(editRequest ...)' is shown beside the
+other request, so that deleting it there clears it.
 Use C-c C-c to save changes back to the source buffer.
 Kill the buffer to cancel without saving."
   (interactive)
@@ -337,27 +328,26 @@ Kill the buffer to cancel without saving."
       (if no-metadata
           (skg-view-metadata--open-empty-node-view (caddr split))
         (let* (( source-buffer (current-buffer) )
-               ( readiness-request (skg--readiness-request-of
-                                    (read metadata-str)) )
-               (sexp (if readiness-request
-                         (skg--metadata-with-readiness-request
-                          (read metadata-str) nil)
-                       (read metadata-str)) )
-               (kind (skg-metadata-fields-kind-of-sexp sexp) )
+               (sexp (read metadata-str))
                (sexp-start (+ (line-beginning-position)
                               (length (car split))) )
-               (sexp-end (+ sexp-start (length metadata-str)) )
-               (title (caddr split))
-               (org-text (let ((sexp-as-org (sexp-to-org sexp)))
-                           (if kind
-                               (skg-metadata-fields-fillIn-defaults-in-org
-                                sexp-as-org kind
-                                (when (skg--occurrence-sexp-p sexp)
-                                  title))
-                             sexp-as-org)) ))
+               (sexp-end (+ sexp-start (length metadata-str)) ))
           (skg-sexp-edit--open-edit-buffer
-           org-text source-buffer sexp-start sexp-end kind
-           readiness-request)
+           (skg-sexp-edit--org-text-to-show sexp (caddr split))
+           source-buffer sexp-start sexp-end
+           (skg-metadata-fields-kind-of-sexp sexp))
           (skg-sexp-edit--goto-field-value "nodeRepo"))))))
+
+(defun skg-sexp-edit--org-text-to-show (metadata-sexp title)
+  "The org text the edit buffer shows for METADATA-SEXP, a headline's
+metadata, whose title is TITLE: each field its kind may set filled in,
+under a read-only title group when it is an occurrence's."
+  (let (( kind (skg-metadata-fields-kind-of-sexp metadata-sexp) )
+        ( sexp-as-org (sexp-to-org metadata-sexp) ))
+    (if kind
+        (skg-metadata-fields-fillIn-defaults-in-org
+         sexp-as-org kind
+         (when (skg--occurrence-sexp-p metadata-sexp) title))
+      sexp-as-org)))
 
 (provide 'skg-sexpr-edit)
