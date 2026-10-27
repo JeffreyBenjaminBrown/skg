@@ -17,6 +17,7 @@
 // - S: public home ("leak-battery-S"); a private section
 //   (owned/private/S.skg, no title) holds `subscribesTo: - C`.
 
+use crate::parse_helpers::{first_root, occurrence_children_gnids, viewnode_tree_as_written};
 use ego_tree::{NodeId, Tree};
 use std::collections::BTreeSet;
 use std::error::Error;
@@ -24,8 +25,6 @@ use std::error::Error;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use skg::dbs::in_rust_graph::relation_accessors::{NodeRelation, RelationRole};
 use skg::dbs::in_rust_graph::{InRustGraph};
-use skg::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
-use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewnode_tree;
 use skg::org_to_text::viewforest_to_string;
 use skg::skgrepo_sets::{SkgrepoRestriction, SkgrepoSetName, run_with_skgrepo_set_test_db};
 use skg::test_utils::graph_handle_from_config;
@@ -38,27 +37,6 @@ use skg::types::viewnode::{RelationCounts, Viewnode, ViewnodeKind, Vognode};
 use skg::update_buffer::viewnodestats::set_viewnodestats_in_viewforest;
 
 use std::collections::HashMap;
-
-fn viewforest_from_org (
-  input : &str,
-) -> Result<Tree<Viewnode>, Box<dyn Error>> {
-  Ok ( org_to_viewnode_tree (input, IdResolution::AsWritten)? . 0 ) }
-
-fn first_child_gnid (
-  tree : &Tree<Viewnode>,
-) -> NodeId {
-  tree . root () . first_child () . unwrap () . id () }
-
-fn true_child_gnids (
-  tree         : &Tree<Viewnode>,
-  parent_gnid : NodeId,
-) -> BTreeSet<ID> {
-  tree . get (parent_gnid) . unwrap () . children ()
-    . filter_map ( |child| match &child . value () . kind {
-      ViewnodeKind::Vognode ( Vognode::Occurrence (node) )
-        => Some (node . gnid . clone ()),
-      _ => None, })
-    . collect () }
 
 #[test]
 fn content_view_of_N_gates_privately_contained_C (
@@ -141,13 +119,13 @@ fn inbound_containerward_data_hides_N_at_public (
       let graph = graph_handle . load_full ();
       {
         let mut viewforest : Tree<Viewnode> =
-          viewforest_from_org (
-            "* (skg node (gnid C) (skgRepos (nodeRepo public))) leak-battery-C\n" )?;
-        let c_gnid : NodeId = first_child_gnid (&viewforest);
+          viewnode_tree_as_written (
+            "* (skg node (gnid C) (skgRepos (nodeRepo public))) leak-battery-C\n" );
+        let c_gnid : NodeId = first_root (&viewforest);
         attach_containerward_chains_under_members (
           &mut viewforest, &[c_gnid], &graph, config, Some (&public),
           ContainerwardChainPartners::LiveGraph ) ?;
-        let ancestors : BTreeSet<ID> = true_child_gnids (&viewforest, c_gnid);
+        let ancestors : BTreeSet<ID> = occurrence_children_gnids (&viewforest, c_gnid);
         assert! (
           ! ancestors . contains (&ID::from ("N")),
           "the rendered containerward chain must not show N at \
@@ -160,13 +138,13 @@ fn inbound_containerward_data_hides_N_at_public (
       }
       {
         let mut viewforest : Tree<Viewnode> =
-          viewforest_from_org (
-            "* (skg node (gnid C) (skgRepos (nodeRepo public))) leak-battery-C\n" )?;
-        let c_gnid : NodeId = first_child_gnid (&viewforest);
+          viewnode_tree_as_written (
+            "* (skg node (gnid C) (skgRepos (nodeRepo public))) leak-battery-C\n" );
+        let c_gnid : NodeId = first_root (&viewforest);
         attach_containerward_chains_under_members (
           &mut viewforest, &[c_gnid], &graph, config, Some (&all),
           ContainerwardChainPartners::LiveGraph ) ?;
-        let ancestors : BTreeSet<ID> = true_child_gnids (&viewforest, c_gnid);
+        let ancestors : BTreeSet<ID> = occurrence_children_gnids (&viewforest, c_gnid);
         assert! (
           ancestors . contains (&ID::from ("N")),
           "under 'all' the rendered containerward chain shows \
@@ -274,9 +252,9 @@ fn ancestor_heralds_gate_privately_recorded_relations (
       let herald_of_S = | restriction : &SkgrepoRestriction |
       -> Result<Option<String>, Box<dyn Error>> {
         let mut viewforest : Tree<Viewnode> =
-          viewforest_from_org (
+          viewnode_tree_as_written (
             "* (skg node (gnid C) (skgRepos (nodeRepo public))) leak-battery-C\n\
-             ** (skg node (gnid S) (skgRepos (nodeRepo public))) leak-battery-S\n" )?;
+             ** (skg node (gnid S) (skgRepos (nodeRepo public))) leak-battery-S\n" );
         for value in viewforest . values_mut () {
           // Give every node counts so the herald pass does not
           // early-return before the ancestor flags (its "no stats ->
@@ -293,7 +271,7 @@ fn ancestor_heralds_gate_privately_recorded_relations (
           & HashMap::new (),
           config,
           Some (restriction) );
-        let c_treeid : NodeId = first_child_gnid (&viewforest);
+        let c_treeid : NodeId = first_root (&viewforest);
         let s_ref = viewforest . get (c_treeid) . unwrap ()
           . first_child () . unwrap ();
         let ViewnodeKind::Vognode (Vognode::Occurrence (t)) =

@@ -7,35 +7,24 @@
 /// "new recursion surface" are the deliberate behavior changes.
 
 use skg::from_text::buffer_to_viewnodes::add_missing_info::EnrichmentProvenance;
-use ego_tree::Tree;
 use indoc::indoc;
 use skg::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
-use skg::from_text::buffer_to_viewnodes::uninterpreted::{
-  org_to_viewnode_tree,
-  org_to_viewforest };
+use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewforest;
 use skg::from_text::local_fieldintent_collection::{
   extract_nonmergeSavePlan_locally, NonmergeSavePlan };
 use skg::nodeMerge::nodeMergeInstructionTriple::nodeMerge_instructions_from_pairs;
 use skg::test_utils::{run_with_shared_test_stores, graph_handle_from_config, graph_from_config};
 use skg::types::errors::BufferValidationError;
-use skg::types::viewnode::{
-  Viewnode };
 use skg::types::misc::{ID, MSV, SkgConfig, TantivyIndex, members_of, members_msv};
 use skg::types::nodes::complete::Graphnode;
 use skg::types::save::{NodeInstruction, NodeMerge, SaveNode, DeleteNode};
 use skg::types::tree::forest::ViewForest;
 use std::error::Error;
 
+use crate::parse_helpers::viewforest_as_written;
+
 const SUBSCRIBEE_EDIT_CONFIG : &str =
   "tests/hidden_from_subscriptions/fixtures-subscribee-edit/skgconfig.toml";
-
-fn placed_forest_from_org (
-  input : &str,
-) -> ViewForest {
-  let viewforest : Tree<Viewnode> =
-    org_to_viewnode_tree (input, IdResolution::AsWritten) . unwrap() . 0;
-  ViewForest::from_internal_tree (
-    viewforest ) }
 
 /// This parses the way production does, supplying ids and repos
 /// from the graph on disk. Orgs that mention on-disk nodes need it.
@@ -129,7 +118,7 @@ async fn pipeline_basic_mixed_tree (
       let (plan, nodeMerge_acquisitions)
         : (NonmergeSavePlan, Vec<(ID, ID)>) =
         extract_nonmergeSavePlan_locally (
-          &placed_forest_from_org (input), config, None)?;
+          &viewforest_as_written (input), config, None)?;
       assert_eq!(
         save_gnids (&plan . node_instructions),
         vec![ ID::from ("root"), ID::from ("child"),
@@ -208,7 +197,7 @@ async fn pipeline_write_protected_folder_member_edits (
             "};
       let (plan, _) =
         extract_nonmergeSavePlan_locally (
-          &placed_forest_from_org (input), config, None)?;
+          &viewforest_as_written (input), config, None)?;
       assert_eq!(
         save_gnids (&plan . node_instructions),
         vec![ ID::from ("recorder"), ID::from ("intruder"),
@@ -233,7 +222,7 @@ async fn pipeline_restricted_subtree (
             "};
       let (plan, _) =
         extract_nonmergeSavePlan_locally (
-          &placed_forest_from_org (input), config, None)?;
+          &viewforest_as_written (input), config, None)?;
       assert_eq!(
         save_gnids (&plan . node_instructions),
         // stowaway is on the new recursion surface.
@@ -256,7 +245,7 @@ async fn pipeline_ghost_subtree (
             ** (skg ghost (gnid fading) (skgRepos (nodeRepo main)) noClaim) fading
             *** (skg node (gnid underneath) (skgRepos (nodeRepo main))) underneath
             "};
-      let forest : ViewForest = placed_forest_from_org (input);
+      let forest : ViewForest = viewforest_as_written (input);
       let (plan, _) =
         extract_nonmergeSavePlan_locally (
           &forest, config, None)?;

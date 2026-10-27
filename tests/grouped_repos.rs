@@ -5,6 +5,10 @@
 #[path = "shared/git_fixture_helpers.rs"]
 mod git_fixture_helpers;
 
+#[path = "shared/parse_helpers.rs"]
+#[allow(dead_code)] // This target uses only some of the helpers.
+mod parse_helpers;
+
 #[path = "shared/git_fixture.rs"]
 mod git_fixture;
 

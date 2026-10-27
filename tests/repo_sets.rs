@@ -2,6 +2,7 @@
 //
 // Tests of skgrepo-sets ('docs/api-and-formats.org', "skgrepo-sets").
 
+use crate::parse_helpers::{first_root, occurrence_children_gnids, viewnode_tree_as_written};
 use indoc::indoc;
 use ego_tree::{NodeId, Tree};
 
@@ -18,8 +19,6 @@ use skg::to_org::render::content_view::multi_root_view;
 use skg::test_utils::{set_skgrepo_retagging_relRepos, graph_handle_from_config};
 use skg::test_utils::run_with_shared_test_stores;
 use skg::from_text::buffer_to_validated_saveplan;
-use skg::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
-use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewnode_tree;
 use skg::org_to_text::viewforest_to_string;
 use skg::to_org::extend::containerward_chain::{
   ContainerwardChainPartners, attach_containerward_chains_under_members};
@@ -29,9 +28,7 @@ use skg::types::nodes::complete::Graphnode;
 use skg::types::save::{NodeInstruction, SaveNode};
 use skg::types::viewnode::{
   Viewnode,
-  ViewnodeKind,
   viewforest_root_viewnode};
-use skg::types::viewnode::Vognode;
 use skg::types::views_state::{OpenViews, ViewState, ViewforestId, ViewnodeIdRecord};
 
 use std::collections::{BTreeSet, HashSet};
@@ -231,27 +228,6 @@ fn saved_or_graph_node_by_gnid (
     . or_else (|| graphnode_from_graph (graph, &ID::from (gnid)))
     . unwrap_or_else (|| panic! ("Node not found in plan or graph: {}", gnid))
 }
-
-fn viewforest_from_org (
-  input : &str,
-) -> Result<Tree<Viewnode>, Box<dyn Error>> {
-  Ok ( org_to_viewnode_tree (input, IdResolution::AsWritten)? . 0 ) }
-
-fn first_child_gnid (
-  tree : &Tree<Viewnode>,
-) -> NodeId {
-  tree . root () . first_child () . unwrap () . id () }
-
-fn true_child_gnids (
-  tree         : &Tree<Viewnode>,
-  parent_gnid : NodeId,
-) -> BTreeSet<ID> {
-  tree . get (parent_gnid) . unwrap () . children ()
-    . filter_map ( |child| match &child . value () . kind {
-      ViewnodeKind::Vognode ( Vognode::Occurrence (node) )
-        => Some (node . gnid . clone ()),
-      _ => None, })
-    . collect () }
 
 fn connected_tcp_stream_pair (
 ) -> Result<(TcpStream, TcpStream), Box<dyn Error>> {
@@ -524,10 +500,10 @@ async fn the_containerward_chain_stops_before_a_restricted_container (
           &config,
           SkgrepoSetName::from ("public"))?;
       let mut viewforest : Tree<Viewnode> =
-        viewforest_from_org (indoc! {"
+        viewnode_tree_as_written (indoc! {"
           * (skg node (gnid child-for-backpath) (skgRepos (nodeRepo public))) child-for-backpath
-        "})?;
-      let child_gnid : NodeId = first_child_gnid (&viewforest);
+        "});
+      let child_gnid : NodeId = first_root (&viewforest);
       attach_containerward_chains_under_members (
         &mut viewforest,
         &[child_gnid],
@@ -536,7 +512,7 @@ async fn the_containerward_chain_stops_before_a_restricted_container (
         Some (&restriction),
         ContainerwardChainPartners::LiveGraph ) ?;
       let child_children : BTreeSet<ID> =
-        true_child_gnids (&viewforest, child_gnid);
+        occurrence_children_gnids (&viewforest, child_gnid);
       assert_eq! (
         child_children,
         BTreeSet::from ([ID::from ("active-container")]),

@@ -6,6 +6,10 @@
 #[allow(dead_code)] // This target uses only some of the helpers.
 mod git_fixture_helpers;
 
+#[path = "shared/parse_helpers.rs"]
+#[allow(dead_code)] // This target uses only some of the helpers.
+mod parse_helpers;
+
 #[path = "dangling_reference_renders_unknown_node.rs"]
 mod dangling_reference_renders_unknown_node;
 

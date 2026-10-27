@@ -3,6 +3,7 @@
 // expectations were carried over from the old extraction path; the
 // ones that changed (the new recursion surface) say so in comments.
 
+use crate::parse_helpers::viewnode_tree_as_written;
 use skg::from_text::buffer_to_viewnodes::add_missing_info::EnrichmentProvenance;
 use indoc::indoc;
 use ego_tree::Tree;
@@ -49,13 +50,6 @@ fn saved_node_by_gnid<'a> (
         return node; }}}
   panic! ("SaveNode not found: {}", gnid) }
 
-fn checked_viewforest_from_org (
-  input : &str,
-) -> Tree<Viewnode> {
-  let viewforest : Tree<Viewnode> =
-    org_to_viewnode_tree (input, IdResolution::AsWritten) . unwrap() . 0;
-  viewforest }
-
 /// This runs collection plus lowering, with no disk involved: the
 /// pure half of extraction.
 fn nodeInstructions_from_tree (
@@ -87,7 +81,7 @@ fn visibility_pairs_from_org (
   input : &str,
 ) -> Vec<(ID, SubscribeeVisibility)> {
   visibility_pairs_from_tree (
-    checked_viewforest_from_org (input) ) }
+    viewnode_tree_as_written (input) ) }
 
 fn hiddenoutside_edits_from_tree (
   viewforest : Tree<Viewnode>,
@@ -110,7 +104,7 @@ fn unknown_members_write_their_editable_relationship_recorders_only () {
     ** (skg overriddenFolder)
     *** (skg unknown (gnid overridden-unknown))
   "};
-  let instructions = nodeInstructions_from_tree (checked_viewforest_from_org (input))
+  let instructions = nodeInstructions_from_tree (viewnode_tree_as_written (input))
     . expect ("Unknown relationship members are valid in a save");
   assert_eq! (save_gnids (&instructions), vec! [ID::from ("recorder")],
               "an Unknown must not create a node save, delete, merge, or fork instruction");
@@ -120,7 +114,7 @@ fn unknown_members_write_their_editable_relationship_recorders_only () {
               MSV::Specified (vec! [ID::from ("subscribee-unknown")]));
   assert_eq! (members_msv (&recorder . overrides),
               MSV::Specified (vec! [ID::from ("overridden-unknown")]));
-  assert_eq! (hiddenoutside_edits_from_tree (checked_viewforest_from_org (input)),
+  assert_eq! (hiddenoutside_edits_from_tree (viewnode_tree_as_written (input)),
               vec! [(ID::from ("recorder"),
                     skg::from_text::local_fieldintent_collection::types::HiddenOutsideEdit {
                       members: vec! [ID::from ("hiddenoutside-unknown")] })],
@@ -272,7 +266,7 @@ fn tombstones_emit_neither_savenode_nor_contains () {
             ** (skg node (gnid active-b) (skgRepos (nodeRepo main))) unrestricted B
         "};
   let viewforest : Tree<Viewnode> =
-    checked_viewforest_from_org (input);
+    viewnode_tree_as_written (input);
   let instructions : Vec<NodeInstruction> =
     nodeInstructions_from_tree (viewforest) . unwrap ();
 
@@ -627,7 +621,7 @@ fn subscribee_hiderel_intent_excludes_non_content_delete_and_ghost_children (
             **** (skg ghost (gnid gone) (skgRepos (nodeRepo main)) noClaim) gone
             "};
   let viewforest : Tree<Viewnode> =
-    checked_viewforest_from_org (input);
+    viewnode_tree_as_written (input);
   let intents : Vec<(ID, SubscribeeVisibility)> =
     visibility_pairs_from_tree (viewforest);
 
@@ -1060,7 +1054,7 @@ fn idfolder_resident_occurrence_saves_itself_but_is_not_content (
             "};
 
   let viewforest : Tree<Viewnode> =
-    checked_viewforest_from_org (input);
+    viewnode_tree_as_written (input);
   let instructions: Vec<NodeInstruction> =
     nodeInstructions_from_tree (viewforest) . unwrap();
 
@@ -1347,7 +1341,7 @@ fn toDelete_member_is_excluded_from_subscribees (
             *** (skg node (gnid doomed) (skgRepos (nodeRepo main)) (editRequest delete)) doomed
         "};
   let viewforest : Tree<Viewnode> =
-    checked_viewforest_from_org (input);
+    viewnode_tree_as_written (input);
   let instructions : Vec<NodeInstruction> =
     nodeInstructions_from_tree (viewforest) . unwrap ();
   assert_eq!(
@@ -1365,7 +1359,7 @@ fn toDelete_member_is_excluded_from_overriddens (
             *** (skg node (gnid doomed) (skgRepos (nodeRepo main)) (editRequest delete)) doomed
         "};
   let viewforest : Tree<Viewnode> =
-    checked_viewforest_from_org (input);
+    viewnode_tree_as_written (input);
   let instructions : Vec<NodeInstruction> =
     nodeInstructions_from_tree (viewforest) . unwrap ();
   assert_eq!(
@@ -1383,7 +1377,7 @@ fn independent_member_is_excluded_from_overriddens (
             *** (skg node (gnid bystander) (skgRepos (nodeRepo main)) noClaim) bystander
         "};
   let viewforest : Tree<Viewnode> =
-    checked_viewforest_from_org (input);
+    viewnode_tree_as_written (input);
   let instructions : Vec<NodeInstruction> =
     nodeInstructions_from_tree (viewforest) . unwrap ();
   assert_eq!(
@@ -1412,7 +1406,7 @@ fn duplicate_members_of_defining_folders_are_silently_deduplicated (
             *** (skg node (gnid o1) (skgRepos (nodeRepo main)) writeProtected) o1
         "};
   let viewforest : Tree<Viewnode> =
-    checked_viewforest_from_org (input);
+    viewnode_tree_as_written (input);
   let instructions : Vec<NodeInstruction> =
     nodeInstructions_from_tree (viewforest) . unwrap ();
   let recorder : &Graphnode =
@@ -1450,7 +1444,7 @@ fn reordering_subscribees_reorders_subscribesTo (
             *** (skg node (gnid b) (skgRepos (nodeRepo main))) b
         "};
   let viewforest : Tree<Viewnode> =
-    checked_viewforest_from_org (input);
+    viewnode_tree_as_written (input);
   let instructions : Vec<NodeInstruction> =
     nodeInstructions_from_tree (viewforest) . unwrap ();
   assert_eq!(
@@ -1471,7 +1465,7 @@ fn removing_one_subscribee_keeps_the_rest (
             *** (skg node (gnid c) (skgRepos (nodeRepo main))) c
         "};
   let viewforest : Tree<Viewnode> =
-    checked_viewforest_from_org (input);
+    viewnode_tree_as_written (input);
   let instructions : Vec<NodeInstruction> =
     nodeInstructions_from_tree (viewforest) . unwrap ();
   assert_eq!(
@@ -1492,7 +1486,7 @@ fn reordering_overridden_folder_is_harmless (
             *** (skg node (gnid a) (skgRepos (nodeRepo main))) a
         "};
   let viewforest : Tree<Viewnode> =
-    checked_viewforest_from_org (input);
+    viewnode_tree_as_written (input);
   let instructions : Vec<NodeInstruction> =
     nodeInstructions_from_tree (viewforest) . unwrap ();
   let recorder : &Graphnode =
@@ -1524,7 +1518,7 @@ fn deleting_from_hiddenFolder_emits_no_hide_change (
             *** (skg node (gnid hidden) (skgRepos (nodeRepo main))) hidden
         "};
   let viewforest : Tree<Viewnode> =
-    checked_viewforest_from_org (input);
+    viewnode_tree_as_written (input);
   let instructions : Vec<NodeInstruction> =
     nodeInstructions_from_tree (viewforest) . unwrap ();
   assert_eq!(

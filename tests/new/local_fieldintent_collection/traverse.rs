@@ -3,17 +3,13 @@
 /// (server/from_text/local_fieldintent_collection/traverse.rs).
 /// The traversal is pure and synchronous, so these tests need no db.
 
-use ego_tree::Tree;
+use crate::parse_helpers::viewforest_as_written;
 use indoc::indoc;
-use skg::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
-use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewnode_tree;
 use skg::from_text::local_fieldintent_collection::traverse::collect_instructions_locally;
 use skg::types::errors::HeadlineName;
 use skg::from_text::local_fieldintent_collection::types::{
   CollectedFieldIntents, FieldIntentsForOneId, SubscribeeTextClaim,
   SubscribeeVisibility };
-use skg::types::viewnode::{
-  Viewnode };
 use skg::types::misc::{ID, SkgrepoName};
 use skg::types::nodes::complete::Flag;
 use skg::types::tree::forest::ViewForest;
@@ -22,15 +18,7 @@ fn collected_from_org (
   input : &str,
 ) -> CollectedFieldIntents {
   collect_instructions_locally (
-    &forest_from_org (input) ) . unwrap() }
-
-fn forest_from_org (
-  input : &str,
-) -> ViewForest {
-  let viewforest : Tree<Viewnode> =
-    org_to_viewnode_tree (input, IdResolution::AsWritten) . unwrap() . 0;
-  ViewForest::from_internal_tree (
-    viewforest ) }
+    &viewforest_as_written (input) ) . unwrap() }
 
 fn entry<'a> (
   collected : &'a CollectedFieldIntents,
@@ -224,7 +212,7 @@ fn editable_node_inside_ghost_subtree_emits () {
       ** (skg ghost (gnid fading) (skgRepos (nodeRepo main)) noClaim) fading
       *** (skg node (gnid underneath) (skgRepos (nodeRepo main))) underneath
       "};
-  let forest : ViewForest = forest_from_org (input);
+  let forest : ViewForest = viewforest_as_written (input);
   let collected : CollectedFieldIntents =
     collect_instructions_locally (&forest) . unwrap();
   assert!( collected . by_pid . get (&ID::from ("fading")) . is_none(),
@@ -249,7 +237,7 @@ fn a_ghost_that_claims_keeps_its_gnid_in_its_parents_list () {
       ** (skg ghost (gnid dropped) (skgRepos (nodeRepo main)) noClaim) dropped
       ** (skg node (gnid after) (skgRepos (nodeRepo main)) writeProtected) after
       "};
-  let forest : ViewForest = forest_from_org (input);
+  let forest : ViewForest = viewforest_as_written (input);
   let collected : CollectedFieldIntents =
     collect_instructions_locally (&forest) . unwrap();
   assert!( collected . by_pid . get (&ID::from ("named")) . is_none(),
