@@ -9,10 +9,12 @@
 // under c its containerward tree has two branches, b and d.
 
 use skg::metadata_canon::without_viewnode_ids;
-use crate::git_fixture::{Fixture, save_cleanly};
+use crate::git_fixture::save_cleanly;
 use crate::pruned_change_view::common::{
   all_changes_buffer, all_changes_view, assert_lines_in_order,
-  integrate_unshown_changes, open_all_changes_buffer, with_fixture};
+  assert_saves_back_unchanged, integrate_unshown_changes,
+  open_all_changes_buffer, with_fixture};
+use skg::types::views_state::DiffViewBufferKind;
 
 use std::error::Error;
 
@@ -22,16 +24,6 @@ const B_UNDER_C : &str =
   "***** (skg node (gnid b) (skgRepos (nodeRepo main)) writeProtected";
 const D_UNDER_C : &str =
   "***** (skg node (gnid d) (skgRepos (nodeRepo main)) writeProtected";
-
-/// Save 'buffer' as the "all changes" buffer, and require that it
-/// comes back as it went.
-fn assert_saves_back_unchanged (
-  f      : &mut Fixture,
-  buffer : &str,
-) -> Result<(), Box<dyn Error>> {
-  let saved : String = save_cleanly (f, &all_changes_view (), buffer) ? . saved_view;
-  assert_eq! ( saved, buffer, "the buffer must save back unchanged" );
-  Ok (( )) }
 
 /// The branches b and d stand in ID order, and the buffer saves back
 /// unchanged, as it stands and as "integrate unshown changes"
@@ -44,11 +36,11 @@ fn a_two_container_role_tree_saves_back_unchanged (
     let buffer : String = open_all_changes_buffer (f) ?;
     assert_lines_in_order ( &buffer, &[ C_IN_THE_FOLDER, B_UNDER_C, D_UNDER_C ] );
     for _ in 0 .. 5 {
-      assert_saves_back_unchanged (f, &buffer) ?; }
+      assert_saves_back_unchanged (f, DiffViewBufferKind::AllChanges, &buffer) ?; }
     for _ in 0 .. 5 {
       let (shown, _) : (String, usize) = integrate_unshown_changes (f) ?;
       assert_eq! ( shown, buffer, "integrating changes nothing here" );
-      assert_saves_back_unchanged (f, &shown) ?; }
+      assert_saves_back_unchanged (f, DiffViewBufferKind::AllChanges, &shown) ?; }
     Ok (( )) }) }
 
 /// The user puts d above b; a save keeps that order, and the result
@@ -69,7 +61,7 @@ fn a_role_tree_reordered_by_the_user_keeps_that_order_through_a_save (
     let saved : String = save_cleanly (f, &all_changes_view (), &swapped) ? . saved_view;
     assert_lines_in_order ( &saved, &[ C_IN_THE_FOLDER, D_UNDER_C, B_UNDER_C ] );
     assert_eq! ( saved, swapped, "the reordered buffer must save back unchanged" );
-    assert_saves_back_unchanged (f, &saved) ?;
+    assert_saves_back_unchanged (f, DiffViewBufferKind::AllChanges, &saved) ?;
     Ok (( )) }) }
 
 /// The first render of a fixture's "all changes" buffer, ten times

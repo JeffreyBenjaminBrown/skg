@@ -143,7 +143,7 @@ pub fn all_changes_view (
 
 /// The round-trip invariant for a buffer of the diff view:
 /// saved unchanged, it changes no file, reports no error, and is
-/// refreshed to itself.
+/// refreshed to itself ('assert_saves_back_unchanged').
 pub fn saves_back_unchanged (
   case                 : &str,
   skgrepos             : &[&str],
@@ -152,17 +152,27 @@ pub fn saves_back_unchanged (
   with_fixture (case, skgrepos, |f| {
     let text : String = open_buffer (f, diffView_buffer_kind) ?
       . ok_or ("the fixture's buffer is empty") ?;
-    let files_before : BTreeMap<String, String> = skg_files (f) ?;
-    let response : SaveResponse = save_buffer (f, diffView_buffer_kind, &text) ?;
-    assert! ( response . errors . is_empty (),
-              "the buffer must save without errors, got {:?}\n\nbuffer:\n{}",
-              response . errors, text );
-    assert_eq! ( skg_files (f) ?, files_before,
-                 "saving the buffer unchanged must not change the graph:\n{}",
-                 text );
-    assert_eq! ( response . saved_view, text,
-                 "the refreshed buffer must be the buffer saved" );
-    Ok (( )) }) }
+    assert_saves_back_unchanged (f, diffView_buffer_kind, &text) }) }
+
+/// Save 'text' as the buffer of 'diffView_buffer_kind', and require
+/// that it reports no error, changes no file, and comes back as it
+/// went.
+pub fn assert_saves_back_unchanged (
+  f                    : &mut Fixture,
+  diffView_buffer_kind : DiffViewBufferKind,
+  text                 : &str,
+) -> Result<(), Box<dyn Error>> {
+  let files_before : BTreeMap<String, String> = skg_files (f) ?;
+  let response : SaveResponse = save_buffer (f, diffView_buffer_kind, text) ?;
+  assert! ( response . errors . is_empty (),
+            "the buffer must save without errors, got {:?}\n\nbuffer:\n{}",
+            response . errors, text );
+  assert_eq! ( skg_files (f) ?, files_before,
+               "saving the buffer unchanged must not change the graph:\n{}",
+               text );
+  assert_eq! ( response . saved_view, text,
+               "the refreshed buffer must be the buffer saved" );
+  Ok (( )) }
 
 pub fn ids (
   list : &[&str],
@@ -405,8 +415,10 @@ pub fn note (
   format! ( "{} (skg node noClaim) {}",
             "*" . repeat (stars), title ) }
 
-/// Save 'buffer', then save what the save rendered: both without errors,
-/// and the second rendering the same as the first. Returns it.
+/// Save 'buffer' as the "all changes" buffer, then save what the save
+/// rendered: both without errors, and the second changing no file and
+/// rendering the same as the first ('assert_saves_back_unchanged').
+/// Returns it.
 pub fn saved_and_rerendered (
   f      : &mut Fixture,
   buffer : &str,
@@ -414,13 +426,9 @@ pub fn saved_and_rerendered (
   let first : SaveResponse = save (f, buffer) ?;
   assert! ( first . errors . is_empty (),
             "the save must succeed, got {:?}\n{}", first . errors, buffer );
-  let second : SaveResponse = save (f, &first . saved_view) ?;
-  assert! ( second . errors . is_empty (),
-            "the second save must succeed, got {:?}\n{}",
-            second . errors, first . saved_view );
-  assert_eq! ( second . saved_view, first . saved_view,
-               "a rerender keeps what the first rendered" );
-  Ok (second . saved_view) }
+  assert_saves_back_unchanged (
+    f, DiffViewBufferKind::AllChanges, &first . saved_view ) ?;
+  Ok (first . saved_view) }
 
 /// The headline of the parent of the one line whose title is 'title'.
 pub fn parent_line_of (
