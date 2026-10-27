@@ -342,7 +342,8 @@ end
 ---headlines without
 ---metadata, which inherit the same way; the first other ancestor must
 ---be an occurrence. A root cannot inherit, nor can a
----headline whose walk ends at a tombstone or a property.
+---headline whose walk ends at a tombstone, an alias, an ID, a flag or
+---a change viewnode.
 ---Mirrors skg--headline-can-inherit-skgrepo-p.
 ---@param line_number integer
 ---@return boolean

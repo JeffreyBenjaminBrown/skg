@@ -286,7 +286,8 @@ ghosts, unknowns, Restricted vognodes and folders, and through
 headlines without
 metadata, which inherit the same way; the first other ancestor must
 be an occurrence.  A root cannot inherit, nor can a headline whose
-walk ends at a tombstone or a property."
+walk ends at a tombstone, an alias, an ID, a flag or a change
+viewnode."
   (save-excursion
     (catch 'answer
       (while (org-up-heading-safe)

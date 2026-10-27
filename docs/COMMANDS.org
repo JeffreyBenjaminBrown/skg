@@ -4,7 +4,8 @@ Each time you save, your view is rebuilt.
 This is because you can put 'requests' into your view,
 in which you request more data,
 such as a node's ancestors, or the nodes that link to it.
-Since views can overlap, saving one open view can change another.
+Since views can overlap, saving one open view can change another
+(see "what a save does to other views" below).
 You may edit several views at once, but if your first edit to a view
 would dirty it while another view already has unsaved edits, Emacs
 pauses that edit and asks; yes makes the edit, no cancels it. On save, Skg checks the other dirty
@@ -26,6 +27,63 @@ a successful save under a restricted skgrepo-set would rerender text from
 an overPrivateText telescope, Skg asks for a second, request-scoped approval. Decline
 leaves the save skgsave-committed but sends no new view text and changes no
 open-view registry entry.
+*** what a save does to other views
+A save rerenders every other open view that shows what it changed,
+and corrects what that view now says wrongly (see "buffer
+corrections" below). A child that one view's save removed from its
+parent's content stays where it stands in another view, marked
+=noClaim= and shown unwarranted (⊥), so that saving that other view
+does not put it back; delete it there, or attach it (C-c s a) to put
+the relationship back at that view's next save. A member that one
+view's save added is drawn into every other view that shows its
+list. A headline standing for a node the save deleted becomes a
+tombstone ("something stood here") in every view, holding whatever
+stood under it; a tombstone that holds nothing goes.
+*** buffer corrections
+A save or a rerender that finds a buffer saying something the graph
+contradicts corrects the buffer, and says so: each such change is a
+buffer correction. A buffer correction is not an error, and writes
+nothing to disk; it tells you what changed in a view, which may be
+one you are not looking at. Emacs appends them to the buffer
+=*SKG Server Warnings*=, under a headline "Buffer corrections in" and
+the view's buffer name, each buffer correction a headline under it
+naming the headline it concerns (C-c g v finds it), shows that
+buffer, and moves point to what it appended. The buffer keeps what
+it held: the server's startup warnings, under "Startup warnings", and
+the buffer corrections of earlier saves and rerenders. A buffer
+correction says one of these six things:
+- "Drew what the graph says belongs here." The graph has a member
+  the view lacked: one another view's save added, say, or one you
+  deleted from a write-protected folder.
+- "Entombstoned a headline that can stand here for nothing." The
+  headline became a tombstone, keeping its children: its node is
+  gone, or it describes its viewparent from a place where it cannot.
+- "Marked noClaim a child the graph does not relate to its parent."
+  A child of an editable parent that the graph does not put there,
+  such as one another view's save removed: it stays, shown ⊥, and the
+  next save leaves it out of the parent's list.
+- "Merged duplicate viewnode siblings into this one." Two or more
+  siblings stood for one node under one parent (a pasted copy, say);
+  they became one headline, holding all their children.
+- "Made a headline an unknown, as the graph has it." (or an
+  occurrence, a ghost, a Restricted vognode). The headline is now
+  the kind of headline the graph says it is: an unknown where no node
+  answers to its ID, say.
+- "Dropped an edit request its headline has no slot for." After such
+  a change of kind, a request the new kind cannot carry was dropped.
+What the server draws because you asked for it (the content of a
+node you made editable, a folder you requested) is no buffer
+correction, nor is a tombstone where your own save deleted a node,
+nor what a change of the skgrepo-set (C-c v l) draws or hides.
+*** where a save's warnings go
+A save's own warnings and errors go to a buffer of their own,
+replaced at each save that has any: =*SKG Save Warnings*=,
+=*SKG Save Errors - Inconsistencies Found*= when the save was
+refused, or =*SKG Save Errors and Warnings*= when it has both. One
+such warning names each orphan the save created: a node that nothing
+contains, made from a headline typed under a parent whose
+membership the save does not read (see "first some vocab" under
+C-c s).
 ** C-a : skg-beginning-of-line
 On a headline, moves point to the start of its title, after the stars
 and the metadata; pressed again, to the true start of the line. On
@@ -49,7 +107,7 @@ but from the graph itself.
 *** C-u C-c <backspace> : skg-delete-recursive
 Same as skg-delete, but also marks every occurrence viewdescendant
 of the node at point. Descendent headlines that are not occurrences
-(ghosts, unknowns, aliasFolder, id-folder, etc.) are skipped.
+(ghosts, unknowns, aliasFolder, idFolder, etc.) are skipped.
 
 Prefix-arg variant of skg-delete; callable directly via M-x
 as skg-delete-recursive.
@@ -262,6 +320,10 @@ If you're not sure whether the cursor is on something visitable
 (a link or a node's metadata),
 use skg-id-next and skg-id-prev
 to identify where those are.
+*** M-x skg-request-single-root-content-view-from-id
+Prompts for a node ID and opens a content view of that node, as
+skg-goto does from an ID at point. It has no key; skg-goto and
+skg-goto-by-id are usually more convenient.
 *** C-c G RET : skg-goto-and-close-this
 Like skg-goto, but also closes the buffer it was called from.
 *** C-c g b   : skg-goto-biggest-branch
@@ -392,9 +454,11 @@ or one with a relRepo request;
 or a flags folder that differs from the graph.
 The refusal names the occurrence and what differs.
 No child of a write-protected occurrence claims membership,
-whatever it carries: a child typed under one is a note,
-which the refresh shows unwarranted (⊥),
-and so is what stands in one of its folders.
+whatever it carries, and nothing in one of its folders does.
+A child the user typed under it, which stays unwarranted (⊥),
+since no save reads claims there, is still saved as a node of its
+own: an orphan, a node that nothing contains, of which the save
+warns.
 The way out is to make the edit at the node's editable occurrence
 instead, or to undo it, make this occurrence editable
 (C-c s d on it), save, and edit it then.
@@ -509,13 +573,13 @@ and what it means to do that.)
 Run this from the acquirer node.
 It prompts for the acquiree, accepting either a bare ID
 or an org link like =[[id:ID][label]]=,
-and edits the acquirer's metadata to request a merge.
+and edits the acquirer's metadata to request a nodeMerge.
 
 The command only edits the node's metadata in the current buffer.
-Save the view afterward to apply the merge.
+Save the view afterward to apply the nodeMerge.
 *** C-c s n : skg-restore-deleted-node
 In a buffer of the diff view, on a ghost (a node deleted since HEAD,
-shown =☮ ∃-=), requests that the save write the node back
+shown =ᗣ☮ ∃-=), requests that the save write the node back
 as HEAD had it: its file in its home skgrepo, its own relationships
 included, and its place in each list that recorded it at HEAD (at its
 index there, in the skgrepo that recorded it), unless that recorder is
@@ -532,13 +596,14 @@ a partner folder whose relationship to the folder's viewparent was removed
 one relationship as HEAD recorded it. The headline shows =restore
 membership= until the save. On a ghost it refuses with
 "This node is deleted; restore it first (skg-restore-deleted-node)",
-and on any other headline likewise at once. It does not save. Save the view
-afterward to apply it. A relationship whose other end is still deleted
+and on any other headline that is not a removed membership with
+"Only a removed membership can be restored", at once. It does not
+save. Save the view afterward to apply it. A relationship whose other end is still deleted
 is not restored; the save says so.
 *** C-c s r : skg-set-relRepo
 Sets the relRepo of the relationship instance the headline at
 point represents -- =contains= for a content child, the folder's
-relation for a writable PartnerFolder member, or the alias membership
+relation for a member of an editable partner folder, or the alias membership
 for an alias headline. An unknown in one of those writable
 positions is supported too: it carries only its raw relationship member ID,
 never a node edit. (Formerly
@@ -629,7 +694,7 @@ subscribee-as-such members (their viewchildren's relationships are not
 collected at save), and prunes write-protected folders and other non-vognodes
 entirely.
 
-This is the gesture for republicizing a subtree's relationship
+This is the gesture for republicizing a subtree's
 relationships after 'skg-set-repo-recursive' moved its nodes to a more
 public skgrepo: the sticky rule keeps each relationship at its old, more
 private skgrepo, so the contains relationships stay behind until explicitly
@@ -637,7 +702,7 @@ moved to the new default.
 
 The command only edits metadata in the current buffer.
 Save the view afterward to apply the changes.
-** C-c r : commit readiness and ghosts, in the diff view
+** C-c r : commit readiness, in the diff view
 *** preamble
 In a buffer of the diff view (C-c v d), each change can be
 marked commit-ready. A mark approves the change as it is now: editing
@@ -816,6 +881,10 @@ A field left at its default is dropped when the edit is applied
 A readiness request the diff view's gestures wrote
 (see C-c r) is shown in the edit request field, beside the other
 request; deleting it there clears it.
+Metadata edited by hand, here or in the view itself, is checked
+against the metadata grammar when you save: a headline whose metadata
+breaks it refuses the save, and the refusal names the part that
+breaks it.
 Note that some properties don't make sense to edit,
 like the count of how many contents it has.
 (If you want to change how much content a node has,
@@ -837,7 +906,9 @@ changes" and "diff-view: order-only changes", skipping any that would
 be empty. It refuses unless the skgrepo restriction is 'all', and
 when an owned skgrepo is not in a git repository or has no HEAD
 commit (the refusal names the skgrepo). A
-buffer keeps its roots until you close it, and saving it (or
+buffer keeps its roots until you close it, but for a ghost root
+whose deletion a commit records: it becomes a tombstone, which keeps
+what stood under it and goes when it holds nothing. Saving it (or
 committing) keeps what you folded. A save (of it or of another view)
 decides what it adds anew by what changed: a new member that changed,
 or leads to a change, is editable with its content, and any other new
@@ -875,9 +946,11 @@ order of a list, each with its content in the new order.
 Opens a blank Skg content view in which to create new nodes.
 **** why
 Creating a headline through Skg's commands prompts for any skgrepo it
-cannot inherit: a headline inherits one from the nearest node above it,
-passing through folders, ghosts and unknowns, so a root, or a headline below a
-tombstone or a property, prompts.  Save
+cannot inherit: a headline inherits one from the nearest occurrence
+above it, passing through folders, ghosts, unknowns and Restricted
+vognodes, so a root prompts, and so does a headline whose walk up
+meets a tombstone, an alias, an ID, a flag or a change viewnode
+first.  Save
 validation also catches a node whose skgrepo was omitted when the
 headline was entered as plain text.
 *** C-c v h : skg-view-heralds-mode
@@ -912,8 +985,16 @@ as deleting an unknown's does; =C-c s r= sets its relRepo. A
 relationship recorded in a skgrepo outside the set shows nothing at
 all, and a save keeps it. Narrowing the set turns an open view's
 headline of such a node into a Restricted vognode (or, where nothing
-the set shows names it, a tombstone) in place, its children kept, and
-widening it turns the Restricted vognode back.
+the set shows names it, a tombstone, "something stood here") in
+place, its children kept, and widening it turns the Restricted
+vognode back. Where a tombstone took the node's place, widening
+draws the node anew where the graph puts it, and the tombstone stays
+beside it, holding what stood under the old headline, until nothing
+is left under it. None of this is reported as a buffer correction.
+
+The re-render redraws each open buffer from the view the server last
+saved or rendered for it, so an unsaved edit in an open buffer is
+lost: save every view, or revert it, before switching.
 
 If the proposed set would rerender overPrivateText telescope text, Skg asks before
 changing the skgrepo restriction or any view. Declining leaves both unchanged and
@@ -1020,6 +1101,28 @@ but also removes the node from the stack.
 **** C-c v s : skg-view-linkstack
 repeated here; described earlier in this doc.
 In the linkstack buffer, =C-x C-s= saves your edits to the stack.
+** keys outside content views
+Most keys above are bound only in a content view, a buffer showing
+part of the graph. A few work elsewhere:
+- Anywhere, in any buffer: C-c f RET, C-c f i and C-c f l (search),
+  C-c g i (go to a typed ID) and C-c v l (restrict the skgrepo-set).
+- In magit: C-c g RET and C-c G RET (go to the node whose ID is at
+  point), and C-c i n and C-c i p (move among IDs). Magit buffers
+  cannot be written to, so the linkstack keys are absent.
+- In the minibuffer and in M-x shell: C-c o i, C-c o l, C-c O i and
+  C-c O l (paste or pop an ID or a link from the linkstack).
+- In a buffer visiting a .skg file (skg-file-minor-mode, on by
+  itself): C-c g RET, C-c G RET, C-c i n, C-c i p, and the linkstack's
+  paste and pop keys (C-c o i, C-c o l, C-c o n, C-c O i, C-c O l,
+  C-c O n).
+- In a read-only report (an unknown node's investigation, the import
+  result; skg-report-mode): search (C-c f RET, C-c f i), C-c C-o and
+  the C-c g / C-c G keys but C-c g b and C-c g v, C-c v e, C-c v l,
+  C-c v s, C-c i n, C-c i p, and the linkstack keys (C-c u, C-c o i,
+  C-c o l, C-c o n, C-c O i, C-c O l, C-c O n).
+- In the metadata editor (C-c v m): C-c C-c applies the edit, and
+  S-left / S-right cycle a field's value.
+- In the linkstack's buffer (C-c v s): C-x C-s saves the stack.
 ** import and export
 *** skg-import-md-and-org : additive mixed-document import
 :PROPERTIES:
@@ -1252,14 +1355,14 @@ It asks two things:
 Nothing is exported unless you mark
 it. To make node N into an exported file,
 make N contain a child node, called an /export marker/, such that:
-- The marker's title contains a link to the ID
+- The export marker's title contains a link to the ID
   =3d9aa9be-d95a-48bc-b362-33f9e7ebdf6f=.
   That ID is a fixed constant that the exporter looks for.
   The node it names only documents this feature.
   The link works even if your skgrepos do not contain that node.
   The link's label is up to you, for example:
   : [[id:3d9aa9be-d95a-48bc-b362-33f9e7ebdf6f][Skg exports this document to org.]]
-- The marker's body contains a line saying where to write the file,
+- The export marker's body contains a line saying where to write the file,
   relative to the output directory and without the =.org= extension:
   : target_filepath = docs/setup
   Quote the path if it contains whitespace
@@ -1274,16 +1377,16 @@ stripped of Skg metadata. The export marker itself is left out of the file.
 N's position does not matter; it can be anywhere in the graph.
 But N must belong to a skgrepo included in the export;
 otherwise it is skipped, with a warning.
-If N has several markers, the first one is used, with a warning.
+If N has several export markers, the first one is used, with a warning.
 If two nodes claim the same path, only one of them is exported, with a warning.
 
 A node whose title links to that ID but whose body has no =target_filepath=
-line is not a marker. It is exported as ordinary content, so you can
+line is not an export marker. It is exported as ordinary content, so you can
 mention the feature in your notes without triggering it.
 If the =target_filepath= is malformed, the node is dropped from the
 export, N is not exported, and you get a warning.
 
-[[#import-md-and-org][skg-import-md-and-org]] adds a marker to each
+[[#import-md-and-org][skg-import-md-and-org]] adds an export marker to each
 imported document automatically.
 
 **** links and overlap
@@ -1306,8 +1409,9 @@ and are not duplicated into the first.
 The first instead gets a headline linking to the second file.
 
 A link whose dest
-is not exported under the chosen set points to a "some links
-might be broken" note.
+is not exported under the chosen set points to the export of the
+node "Some links might be broken.", or, when that node is not
+exported either, becomes its plain label.
 **** privacy
 If a restricted export would include overPrivateText telescope text, Skg asks for
 approval for each such ID before writing any file. Skgrepo-set =all= exports

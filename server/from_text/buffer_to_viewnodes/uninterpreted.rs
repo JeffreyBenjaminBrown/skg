@@ -285,7 +285,7 @@ fn linecol_to_viewnode(
           changes  : vec!["added body text" . to_string ()],
           headline : viewnode . headline_name (), },
         None => BufferValidationError::Other ( with_org_subheadlines (
-          "A write-protected node has body text, which saving would discard. Add an ID and edit a editable occurrence instead.",
+          "A write-protected node has body text, which saving would discard. Add an ID and edit an editable occurrence instead.",
           &[ viewnode . headline_name () ] )), })
     } else { None } );
   Ok ( ( level, viewnode, error_opt, warning_opt ) ) }

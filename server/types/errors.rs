@@ -259,7 +259,7 @@ impl std::fmt::Display for BufferValidationError {
       BufferValidationError::IDFolder_Edited(recorder, buffer_gnids, real_gnids, headline) =>
         write!(f, "The idFolder under node {:?} ({}) was edited (buffer claims {:?}; real ids are {:?}). Reordering is fine, but IDs cannot be added, removed or edited through the buffer; edit the .skg file directly.", recorder, headline, buffer_gnids, real_gnids),
       BufferValidationError::EditRequestOnWriteProtectedOccurrence (gnid, headline) =>
-        write!(f, "Edit request on write-protected node {:?} ({}). Ghosts and unknowns are write-protected; write-protected nodes cannot carry write instructions. Visit a editable view of the node first (C-c g RET).", gnid, headline),
+        write!(f, "Edit request on write-protected node {:?} ({}). Ghosts and unknowns are write-protected; write-protected nodes cannot carry write instructions. Visit an editable view of the node first (C-c g RET).", gnid, headline),
       BufferValidationError::EditedWriteProtectedOccurrence {
         gnid, title, changes, headline } =>
         write!(f, "The write-protected occurrence of node {:?} ({:?}, {}) differs from the graph ({}). A write-protected occurrence saves nothing of its own; edit an editable occurrence instead, or request this one editable (C-c s d).",

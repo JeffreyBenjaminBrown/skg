@@ -13,7 +13,8 @@ This is because you can put 'requests' into your view,
 in which you request more data,
 such as a node's ancestors, or the nodes that link to it.
 Since views can overlap,
-saving one open view can change another.
+saving one open view can change another
+(see "what a save does to other views" below).
 You may edit several views at once, but Neovim asks when an edit
 first dirties a view while another view already has unsaved edits;
 choosing Cancel restores the view's last clean text. On save, Skg checks the other dirty
@@ -39,6 +40,63 @@ a successful save under a restricted skgrepo-set would rerender text from
 an overPrivateText telescope, Skg asks for a second, request-scoped approval. Decline
 leaves the save skgsave-committed but sends no new view text and changes no
 open-view registry entry.
+*** what a save does to other views
+A save rerenders every other open view that shows what it changed,
+and corrects what that view now says wrongly (see "buffer
+corrections" below). A child that one view's save removed from its
+parent's content stays where it stands in another view, marked
+=noClaim= and shown unwarranted (⊥), so that saving that other view
+does not put it back; delete it there, or attach it (<localleader>sa)
+to put the relationship back at that view's next save. A member that
+one view's save added is drawn into every other view that shows its
+list. A headline standing for a node the save deleted becomes a
+tombstone ("something stood here") in every view, holding whatever
+stood under it; a tombstone that holds nothing goes.
+*** buffer corrections
+A save or a rerender that finds a buffer saying something the graph
+contradicts corrects the buffer, and says so: each such change is a
+buffer correction. A buffer correction is not an error, and writes
+nothing to disk; it tells you what changed in a view, which may be
+one you are not looking at. Neovim appends them to the buffer
+=skg://messages/server-warnings=, under a headline "Buffer corrections
+in" and the view's buffer name, each buffer correction a headline
+under it naming the headline it concerns (<localleader>gv finds it),
+and shows that buffer in a split, leaving the cursor where it was.
+The buffer keeps what it held: the server's startup warnings, under
+"Startup warnings", and the buffer corrections of earlier saves and
+rerenders. A buffer correction says one of these six things:
+- "Drew what the graph says belongs here." The graph has a member
+  the view lacked: one another view's save added, say, or one you
+  deleted from a write-protected folder.
+- "Entombstoned a headline that can stand here for nothing." The
+  headline became a tombstone, keeping its children: its node is
+  gone, or it describes its viewparent from a place where it cannot.
+- "Marked noClaim a child the graph does not relate to its parent."
+  A child of an editable parent that the graph does not put there,
+  such as one another view's save removed: it stays, shown ⊥, and the
+  next save leaves it out of the parent's list.
+- "Merged duplicate viewnode siblings into this one." Two or more
+  siblings stood for one node under one parent (a pasted copy, say);
+  they became one headline, holding all their children.
+- "Made a headline an unknown, as the graph has it." (or an
+  occurrence, a ghost, a Restricted vognode). The headline is now
+  the kind of headline the graph says it is: an unknown where no node
+  answers to its ID, say.
+- "Dropped an edit request its headline has no slot for." After such
+  a change of kind, a request the new kind cannot carry was dropped.
+What the server draws because you asked for it (the content of a
+node you made editable, a folder you requested) is no buffer
+correction, nor is a tombstone where your own save deleted a node,
+nor what a change of the skgrepo-set (<localleader>vl) draws or
+hides.
+*** where a save's warnings go
+A save's own warnings and errors go to a buffer of their own,
+replaced at each save that has any: =skg://messages/save-warnings=,
+=skg://messages/save-errors= when the save was refused, or
+=skg://messages/save-errors-and-warnings= when it has both. One such
+warning names each orphan the save created: a node that nothing
+contains, made from a headline typed under a parent whose membership
+the save does not read (see "first some vocab" under <localleader>s).
 ** :SkgShowUnsavedChanges : archive edits for manual recovery
 Prompts for a local Org file, writes a detached recovery document, opens
 it, and reports its actual path. The document contains context, lossless
@@ -58,7 +116,7 @@ but from the graph itself.
 *** <localleader>dR : :SkgDeleteRecursive
 Same as Delete, but also marks every occurrence viewdescendant
 of the node at point. Descendent headlines that are not occurrences
-(ghosts, unknowns, aliasFolder, id-folder, etc.) are skipped.
+(ghosts, unknowns, aliasFolder, idFolder, etc.) are skipped.
 
 Its own binding, not a prefix-arg variant -- nvim has no prefix-arg
 protocol to reuse here the way Emacs's C-u did. Call it directly as
@@ -379,9 +437,11 @@ or one with a relRepo request;
 or a flags folder that differs from the graph.
 The refusal names the occurrence and what differs.
 No child of a write-protected occurrence claims membership,
-whatever it carries: a child typed under one is a note,
-which the refresh shows unwarranted (⊥),
-and so is what stands in one of its folders.
+whatever it carries, and nothing in one of its folders does.
+A child the user typed under it, which stays unwarranted (⊥),
+since no save reads claims there, is still saved as a node of its
+own: an orphan, a node that nothing contains, of which the save
+warns.
 The way out is to make the edit at the node's editable occurrence
 instead, or to undo it, make this occurrence editable
 (<localleader>sd on it), save, and edit it then.
@@ -500,13 +560,13 @@ and what it means to do that.)
 Run this from the acquirer node.
 It prompts for the acquiree, accepting either a bare ID
 or an org link like =[[id:ID][label]]=,
-and edits the acquirer's metadata to request a merge.
+and edits the acquirer's metadata to request a nodeMerge.
 
 The command only edits the node's metadata in the current buffer.
-Save the view afterward to apply the merge.
+Save the view afterward to apply the nodeMerge.
 *** <localleader>sn : :SkgRestoreDeletedNode
 In a buffer of the diff view, on a ghost (a node deleted since HEAD,
-shown =☮ ∃-=), requests that the save write the node back
+shown =ᗣ☮ ∃-=), requests that the save write the node back
 as HEAD had it: its file in its home skgrepo, its own relationships
 included, and its place in each list that recorded it at HEAD (at its
 index there, in the skgrepo that recorded it), unless that recorder is
@@ -521,8 +581,9 @@ a partner folder whose relationship to the folder's viewparent was removed
 one relationship as HEAD recorded it. The headline shows =restore
 membership= until the save. On a ghost it refuses with
 "This node is deleted; restore it first (skg-restore-deleted-node)",
-and on any other headline likewise at once. It does not save. Save with =:w=
-afterward to apply it. A relationship whose other end is still deleted
+and on any other headline that is not a removed membership with
+"Only a removed membership can be restored", at once. It does not
+save. Save with =:w= afterward to apply it. A relationship whose other end is still deleted
 is not restored; the save says so.
 ** <localleader>r : commit readiness, in the diff view
 In a buffer of the diff view (<localleader>vd), each change can
@@ -650,7 +711,7 @@ Refuses if the buffer has unsaved changes ("Save the buffer
 before forking."), so the clone's saved state matches what you see.
 Otherwise it stamps the node and auto-saves; the server returns
 the usual fork-confirmation buffer (=skg://fork-confirmation=).
-There you must set the clone's repo with 'SetRepo'
+There you must set the clone's skgrepo with 'SetRepo'
 (<localleader>ss) (it starts as the placeholder PICK-A-REPO,
 with your config-first owned skgrepo suggested above it), then
 approve with <localleader>cc; or decline with <localleader>ck
@@ -690,8 +751,10 @@ the context needed to understand it. It opens up to four buffers,
 and "...: order-only changes", skipping any that would be empty. It
 refuses unless the skgrepo restriction is 'all', and when an owned
 skgrepo is not in a git repository or has no HEAD commit (the refusal
-names the skgrepo). A buffer keeps its roots until you close it, and
-saving it (or committing) keeps what you folded. A save (of it or of
+names the skgrepo). A buffer keeps its roots until you close it, but
+for a ghost root whose deletion a commit records: it becomes a
+tombstone, which keeps what stood under it and goes when it holds
+nothing. Saving it (or committing) keeps what you folded. A save (of it or of
 another view) decides what it adds anew by what changed: a new member
 that changed, or leads to a change, is editable with its content, and
 any other new member is a write-protected member shown without its
@@ -731,9 +794,10 @@ order of a list, each with its content in the new order.
 Opens a blank Skg content view in which to create new nodes.
 **** why
 Every node needs a skgrepo.
-A headline inherits one from the nearest node above it,
-passing through folders, ghosts and unknowns;
-a root, or a headline below a tombstone or a property,
+A headline inherits one from the nearest occurrence above it,
+passing through folders, ghosts, unknowns and Restricted vognodes;
+a root, or a headline whose walk up meets a tombstone, an alias, an
+ID, a flag or a change viewnode first,
 needs its skgrepo chosen explicitly.
 nvim-orgmode's insert-heading actions (org_meta_return and
 org_insert_heading_respect_content) prompt for it when the new
@@ -770,8 +834,16 @@ as deleting an unknown's does; its metadata view offers its relRepo
 request. A relationship recorded in a skgrepo outside the set shows
 nothing at all, and a save keeps it. Narrowing the set turns an open
 view's headline of such a node into a Restricted vognode (or, where
-nothing the set shows names it, a tombstone) in place, its children
-kept, and widening it turns the Restricted vognode back.
+nothing the set shows names it, a tombstone, "something stood here")
+in place, its children kept, and widening it turns the Restricted
+vognode back. Where a tombstone took the node's place, widening draws
+the node anew where the graph puts it, and the tombstone stays beside
+it, holding what stood under the old headline, until nothing is left
+under it. None of this is reported as a buffer correction.
+
+The rerender redraws each open buffer from the view the server last
+saved or rendered for it, so an unsaved edit in an open buffer is
+lost: save every view, or revert it, before switching.
 
 If the proposed set would rerender overPrivateText telescope text, Skg asks before
 changing the skgrepo restriction or any view. Declining leaves both unchanged and
@@ -786,7 +858,7 @@ this switches to a view of the metadata of that node,
 with one field per org branch. ':w' (or <localleader>cc) applies
 the edited tree back into the source headline; ':bd!' cancels;
 S-Left / S-Right cycle a field's value (writeProtected, noClaim,
-editRequest, viewRequests, skgrepo, ...).
+editRequest, viewRequests, nodeRepo, ...).
 Each field a user may set on the headline's kind is shown,
 at its default when it is absent, and cycles through the values
 that kind takes, as 'shared/metadata-fields.json' lists them:
@@ -799,6 +871,10 @@ A field left at its default is dropped when the edit is applied.
 A readiness request the diff view's gestures wrote
 (see <localleader>r) is shown in the edit request field, beside
 the other request; deleting it there clears it.
+Metadata edited by hand, here or in the view itself, is checked
+against the metadata grammar when you save: a headline whose metadata
+breaks it refuses the save, and the refusal names the part that
+breaks it.
 It's easy to edit this way.
 Note that some properties don't make sense to edit,
 like the count of how many contents it has.
@@ -818,8 +894,10 @@ only the first 8 characters of the ID are shown (the rest is
 concealed to an ellipsis, though the underlying text -- and
 copy-paste -- still has the full ID),
 and they are followed by the title of the node with that ID,
-if Skg can figure it out. Works in .skg file buffers and in
-git-status / git-diff buffers alike.
+if Skg can figure it out. It works in .skg file buffers and in
+git-status / git-diff buffers alike, but the key is bound only in
+content views: elsewhere, run ':SkgReadableIdsToggle'. A .skg file
+buffer starts with it on.
 (It doesn't yet know how to read the git history
 to find titles for deleted files.)
 *** <localleader>vs : :SkgViewLinkstack
@@ -908,6 +986,24 @@ Like PasteNode,
 but also removes the node from the stack.
 **** <localleader>vs : :SkgViewLinkstack
 repeated here; described earlier in this doc
+** keys outside content views
+Most keys above are bound only in a content view, a buffer showing
+part of the graph. A few work elsewhere; every ':Skg' command works
+anywhere.
+- In a buffer reading a .skg file: <localleader>gg and
+  <localleader>GG, ]i and [i (also <localleader>in and
+  <localleader>ip), and the linkstack's paste and pop keys
+  (<localleader>oi, ol, on, Oi, Ol, On).
+- In a read-only report (an unknown node's investigation, the import
+  result): <localleader>ff and fi, the <localleader>g / G keys but
+  gb and gv, <localleader>ve, vl and vs, <localleader>in and ip, and
+  the linkstack keys (<localleader>u, oi, ol, on, Oi, Ol, On).
+- In a command-line prompt: <C-x>i, <C-x>l, <C-x>I and <C-x>L (see
+  "the linkstack").
+- In the metadata editor (<localleader>vm): ':w' or <localleader>cc
+  applies the edit, and S-Left / S-Right cycle a field's value.
+- In the fork-confirmation buffer: <localleader>cc approves and
+  <localleader>ck declines.
 ** buffer mechanics with no Emacs-chord counterpart
 These are defined directly in =attach_content_view=
 (nvim/lua/skg/keymaps.lua) rather than translated from a =C-c=
@@ -991,7 +1087,7 @@ export-instruction node and that child's body gives a
 =target_filepath= (TOML-ish: =target_filepath = docs/setup=,
 quoted if it contains whitespace). That parent is written to
 =<output-dir>/<target_filepath>.org= as a recursive content view,
-stripped of skg metadata. The marker child is omitted.
+stripped of skg metadata. The export marker is omitted.
 
 Links are rewritten to relative org links, except examples in text
 Org shows literally (verbatim, code, fixed-width lines, blocks and
@@ -1002,8 +1098,9 @@ node points deep, via =[[./file.org::*Headline][label]]=, or via
 or repeats an earlier headline's text in its file
 (the headline then gets a =:CUSTOM_ID: ID= property). A nested
 export root is shown as a link, not inlined. A link whose dest
-is not exported under the chosen set points to a "some links
-might be broken" note.
+is not exported under the chosen set points to the export of the
+node "Some links might be broken.", or, when that node is not
+exported either, becomes its plain label.
 
 Existing files in the output dir are overwritten in place; other
 files there are left untouched.

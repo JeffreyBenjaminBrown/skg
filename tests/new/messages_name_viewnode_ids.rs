@@ -81,7 +81,7 @@ fn messages_about_one_headline_name_it_as_a_subheadline_at_parse_time () {
   let org_form : String = org_form_of (&errors);
   assert! ( org_form . starts_with ("NOTHING WAS SAVED\n"), "{}", org_form );
   assert! ( org_form . contains ( &format! (
-              "- To delete or merge this node, visit a editable view of it first (C-c g RET).\n{}",
+              "- To delete or merge this node, visit an editable view of it first (C-c g RET).\n{}",
               subheadline ("gone", "gone", "0b") )),
             "the subheadline follows the error's own lines:\n{}", org_form );
   assert! ( org_form . contains (
