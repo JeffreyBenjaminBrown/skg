@@ -206,4 +206,23 @@ fn a_buffer_of_many_kinds_is_a_fixpoint () {
        occurrence_metadata ("s", "(viewRequests (folder subscribesTo))"),
        occurrence_metadata ("c1", "(viewRequests writeProtectedSubtreeView)") );
   let run : Run = run_asserting_fixpoint_in ( &input, &graph, None, CompletionMode::ContentView, 3 );
-  assert! ( run . outline () . contains ("unknown x"), "{}", run . outline () ); }
+  assert_eq! ( run . outline (), "\
+node p
+  containerFolder
+    node q wp noClaim
+      node top wp noClaim
+  overriddenFolder
+  flagsFolder
+  aliasFolder
+    alias gone noClaim ⊥
+    alias alias
+  node c wp
+    node q wp noClaim ⊥
+  node o (overridesHere n)
+  unknown x
+  node s
+    subscribeeFolder
+      node e wp
+      hiddenOutsideOfSubscribeeFolder
+        node away wp folded
+node c1 wp" ); }

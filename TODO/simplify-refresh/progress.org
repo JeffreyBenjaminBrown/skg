@@ -2477,3 +2477,184 @@ metadata only. Suites: Emacs 412 of 412, Neovim 399, nextest
 969 of 969 on the second run (the cleanup flake once, passing
 alone), integration 34 of 35 with the pre-existing failure.
 
+
+** Slice 5
+*** The commits
+**** 3e310282
+The harness's temporary directories: a shared session's placeholder
+index in RAM; an index dropped before its folder goes;
+'remove_test_dir' retrying once on "Directory not empty"; the
+process ID in the temporary fixture and shared index folders.
+**** 5c81aa98
+'bash/all-tests.sh' keeps the subdirectories of 'tests/results/'
+named for a plan number; 'tests/USAGE.md' states the rule.
+**** 8eff3f8f
+One fixpoint helper, 'refresh_reaches_fixpoint', taking the refresh
+as a closure; 'refresh_once'; 'run', 'run_in', 'diff_run' and 'occ'
+renamed; "idempotent" made "fixpoint".
+**** b20ea980
+The outline prints a ghost's claim and warrant; tests of a
+dangling reference's ghost claiming, the four drop paths of the
+edit request, a gone change viewnode's tombstone keeping what the
+user wrote; field checks for substring checks.
+**** 15a56876
+Tests of the deep ancestry rows, an occurrence never unsayable, the
+editable ordered folders' order, an unreported substitution and
+emptied folder, the diff view's default folders; the content-view
+sweep under each restriction.
+**** 44790339
+The "main" test config built once ('main_skgrepo_config').
+**** f11d22fb
+One 'save_and_rerender'.
+**** fc27c197
+The restrictedNode refusal tested once.
+**** 9fbc9198
+'assert_round_trip' and 'without_derived_facts' once.
+**** eda65fba
+The copied harnesses of 'tests/hidden_nodes.rs' shared.
+**** d6ba3b47
+The parse helpers in 'tests/shared/parse_helpers.rs'.
+**** 2be6abda
+The diff view's save-back helpers folded.
+**** 8282664a
+'edit_line' in 'editing.rs'; the restore test checks gd's claim
+from the parsed buffer.
+**** f2edaba4
+An integration test's notes say refresh, not completion.
+**** this record's commit
+The many-kinds and many-changes buffers pin their outlines; it
+carries this record, the two problems entries moved to
+'TODO/DONE/problems.org', a sentence in
+'coding-advice/common-gotchas.md', and the slice's DONE.
+*** The suites
+**** cargo check --all-targets
+Clean, no warnings.
+**** bash/nextest.sh
+980 of 980 passed, ten times in a row (below). Before the slice
+969; twelve tests came, one went (the copy of the restrictedNode
+refusal).
+**** bash/emacs-tests.sh
+412 of 412 passed.
+**** bash/nvim-tests.sh
+399 passed, 0 failed, 0 errors.
+**** bash/integration-tests.sh
+34 of 35 passed. The one failure, 'import-md-and-org', is
+pre-existing, as the plan says; not investigated.
+**** bash/all-tests.sh
+Run once at the end, to confirm the rule of the plan logs: it
+cleared 'tests/results/' but for 'tests/results/06/', whose 120
+files stayed (its own log, written there, made 121). Emacs, Neovim,
+nextest (980 of 980, one job) and the doctests passed; the
+integration tests passed but 'import-md-and-org' with both clients,
+also on retry: pre-existing.
+**** failures met during the slice
+Only of the slice's own new or changed tests, while writing them:
+expected outlines guessed wrong and corrected to what the refresh
+draws, after checking each was right (the fresh stub's outline;
+c1, not in the buffer, not drawn under a write-protected c; e's
+hidden child shown in the folder of what s hides in e, with its
+containerward chain; a recorder's folder keeping an unwarranted
+member). Three diff-view outlines changed when the outline began
+printing a ghost's claim and warrant: expected adaptation of the
+test helper's own output. The compound 'restrictedNode' form is
+refused as an unknown key, not as retired, so it is asserted apart
+from the retired list. No suite failed after a change.
+*** The ten harness runs
+'bash/nextest.sh --no-fail-fast', ten runs in a row after the
+harness fix and every other change of the slice: each 980 of 980,
+in 7.5 to 8.1 s; no "Directory not empty", no failure. Logs in
+'tests/results/06/slice5/ten-runs/'. No temporary folder was left
+in '/tmp' after them.
+*** Deviations from the plan's "how"
+**** the race was Tantivy's meta-file watcher
+The flake was no two processes sharing a path. Tantivy's reader
+watches 'meta.json' from a thread that polls it, outlives a
+dropped index by up to one poll, and on a change (or at its first
+poll) reloads, creating '.tantivy-meta.lock' in the index's folder.
+A removal racing it fails with "Directory not empty". A shared
+session built its placeholder index on disk, so the watcher's first
+poll raced the first reset's removal of the same folder: the three
+logged failures all died at their first sub-test, in 10 to 15 ms. A
+throwaway probe ('tests/results/06/slice5/race-probe/', eight
+processes of 2000 create-and-remove cycles each) measured it: 12 of
+16000 removals failed with the index alive, 6 with it dropped
+first, none with it dropped and one retry after 50 ms (7 retried).
+So beyond the plan's three measures, the placeholder index is in
+RAM, a reset drops the old index before removing its folder, the
+shared session's index folder carries the process ID too,
+'cleanup_test_tantivy' uses the one retry in place of its 20, and
+the two tests that removed an index folder themselves
+('serve_text_search_test.rs', 'subscribee_folder.rs') use
+'remove_test_dir'. 'coding-advice/common-gotchas.md' says so beside
+its Tantivy note.
+**** the fixpoint helper lives in the library
+'refresh_reaches_fixpoint' is in 'server/test_utils.rs', since the
+refresh's unit tests are in the library and the sweeps in an
+integration target. 'run_asserting_fixpoint_in' now parses the
+second pass with a fresh viewnode ID record, as the sweeps did,
+rather than the first pass's.
+**** refresh_once serves five tests
+The report's four were three by now (the diff-view one no longer
+hand-rolls); slice 1 added two buffer-correction tests that refresh
+once under a policy.
+**** the names
+'run_asserting_fixpoint', 'run_asserting_fixpoint_in',
+'diff_run_asserting_fixpoint', 'occurrence_metadata'. "Fixpoint"
+won over "idempotent" ('rerender_is_a_fixpoint',
+'save_roundtrips_to_original_and_is_a_fixpoint'); the file
+'tests/idempotence.rs' and its fixture folder keep their names,
+since this plan and later slices cite the path.
+**** the comment lines saying completion or reconciler
+No Rust test comment said either any more (earlier slices rewrote
+them); the remaining lines were in the notes of the integration
+test 'save_collateral_delete_then_edit_under_it' ('README/'), and
+the ones describing the refresh now say refresh. Its history
+sections still name retired code ('complete_viewtree',
+'build_child_creation_data', 'DeletedNode'); left.
+**** the outline prints a ghost's claim and warrant
+As the report asked. The dangling-reference case is
+'an_occurrence_re_kinded_to_a_ghost_claims_where_the_list_still_names_it'.
+**** the drop paths
+Four tests: what becomes a tombstone, a write-protected occurrence
+(a subtree view request), an occurrence (restoreNode on a ghost
+whose node is back) and a ghost (a delete).
+**** the gone change viewnode's note
+The user's note is a saved node under the old text: a headline
+without metadata under it becomes a tombstone itself and is pruned,
+but the refresh only meets such a headline after the save made it
+a node.
+**** the sweep under a restriction
+In the content-view sweep: under each restriction through a skgrepo
+but the most private, for each node it shows; 517 views over 48
+fixture folders, 9 of them with several skgrepos.
+**** the copies
+'assert_round_trip' and 'without_derived_facts' went to
+'tests/shared/git_fixture_helpers.rs' beside 'with_facts'; the round
+trip now asserts no warning for the change facts' tests too. The
+parse helpers went to a new 'tests/shared/parse_helpers.rs' (as
+'viewnode_tree_as_written', 'viewforest_as_written', 'first_root',
+'occurrence_children_gnids'); 'tests/refresh/mod.rs''s 'parse'
+stays, being in the library and resolving through a graph. The
+shared switch is 'switch_skgrepo_set' with 'open_content_view' and
+'write_unchanged_skgrepos' in 'tests/shared/git_fixture.rs'.
+'main_skgrepo_config' applies 'prefer_owned_subdir' in the two
+resets that did not; no test's outcome changed. Folding the
+save-back helpers made the second save of 'saved_and_rerendered'
+check that no file changed.
+**** raw text pinned
+Beyond the cheap field checks, the many-kinds and many-changes
+buffers pin their whole outlines, as the report suggested.
+**** the plan-number rule
+'bash/all-tests.sh' keeps a subdirectory whose name matches
+'[0-9]+([._][0-9]+)*', so '04_1' or '04.1' would count too.
+*** Fixtures changed
+No fixture folder. Expected outlines: three diff-view tests print
+the ghost's 'noClaim ᗣ'; 'a_fresh_view_reports_nothing' pins the
+stub's outline in place of two substrings. The graph of
+'a_root_and_a_folder_member_are_shown_raw' gained v, overriding the
+folder member q, so the name's promise is tested.
+*** Left unfinished
+Nothing of slice 5. Noticed: the integration test notes named
+above still describe retired code in their history sections.
+*** Headline
+DONE.

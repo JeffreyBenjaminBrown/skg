@@ -1,3 +1,34 @@
+* Problems noticed while executing plan 04.1, slice 6 (2026-10-26; fixed 2026-10-27)
+** Flaky "Directory not empty" at a test's cleanup under the parallel run
+  During plan 04.1 one Rust test per full run (a different one each
+  time: 'rebuild::complete_aliasfolder', 'save::id_folder_outside_diff_view',
+  'dangling_reference_renders_unknown_node') failed at cleanup with
+  "Directory not empty" and passed alone. Fixed per-test temp paths
+  collide under nextest's parallelism. Fix: a per-test unique
+  directory, or a serialized cleanup.
+  Fixed by slice 5 of 'TODO/simplify-refresh/06_plan_tidy-refresh.org':
+  the race was Tantivy's meta-file watcher, which outlives a dropped
+  index by up to one poll and, reloading, creates '.tantivy-meta.lock'
+  in the folder being removed. A shared session's placeholder index is
+  in RAM; the harness drops an index before removing its folder, and
+  'remove_test_dir' ('server/test_utils.rs') retries once on
+  "Directory not empty"; the temporary folders carry the process ID.
+  Ten full 'bash/nextest.sh' runs in a row passed.
+* Problems noticed while executing the herald-colors renames (2026-10-04; fixed 2026-10-27)
+** Intermittent 'DirectoryNotEmpty' in Rust test cleanup
+  In full 'bash/nextest.sh' runs, a different save test fails now and
+  then with 'Os { code: 39, kind: DirectoryNotEmpty }' (seen in
+  'save::none_node_fields_are_noops' and
+  'dangling_reference_renders_unknown_node'); each passes alone.
+  Probably a cleanup race with a background writer.
+  Fixed by slice 5 of 'TODO/simplify-refresh/06_plan_tidy-refresh.org':
+  the race was Tantivy's meta-file watcher, which outlives a dropped
+  index by up to one poll and, reloading, creates '.tantivy-meta.lock'
+  in the folder being removed. A shared session's placeholder index is
+  in RAM; the harness drops an index before removing its folder, and
+  'remove_test_dir' ('server/test_utils.rs') retries once on
+  "Directory not empty"; the temporary folders carry the process ID.
+  Ten full 'bash/nextest.sh' runs in a row passed.
 * Problems noticed while executing plan 04.1, slice 6 (2026-10-26; fixed 2026-10-26)
 ** Emacs: a readiness request blocks skg-set-relRepo
   Found by the same review ('05_1_review-reports/duplication.org',

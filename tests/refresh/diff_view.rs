@@ -346,4 +346,41 @@ fn a_buffer_of_many_changes_is_a_fixpoint () {
        occurrence_metadata ("b", ""), occurrence_metadata ("d", ""),
        occurrence_metadata ("m", ""), occurrence_metadata ("q", "") );
   let run : Run = diff_run_asserting_fixpoint (&input, &straddle);
-  assert! ( run . outline () . contains ("ghost d"), "{}", run . outline () ); }
+  assert_eq! ( run . outline (), "\
+node p
+  oldText
+  containerFolder
+    node top wp noClaim
+  flagsFolder
+    flag noSearchMatching
+  changesetMarker content
+  changesetMarker relRepo
+  aliasFolder
+    alias one noClaim ᗣ
+    alias two
+  ghost b noClaim ᗣ
+    acquiredByFolder
+      node a wp noClaim
+  ghost d noClaim ᗣ
+    node d1 noClaim ᗣ
+      containerFolder
+        ghost d noClaim ᗣ
+  node m noClaim ᗣ
+    containerFolder
+      node p wp noClaim ᗣ
+        node top wp noClaim
+  node a
+    acquiredFolder
+      ghost b noClaim ᗣ
+    idFolder
+      id a noClaim
+      id b noClaim
+    containerFolder
+      node p wp noClaim
+        node top wp noClaim
+  node new
+    containerFolder
+      node p wp noClaim
+        node top wp noClaim
+  node q
+    relRepoMove" ); }

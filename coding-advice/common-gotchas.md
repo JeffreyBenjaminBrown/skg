@@ -47,7 +47,12 @@ Otherwise the read races the background commit and the test flakes ---
 typically a Tantivy read that returns 'None' or stale data
 intermittently, while passing in isolation and failing only in the full
 suite. ('test_utils' already drains the worker before per-test cleanup,
-so leftover index files don't trip 'remove_dir_all'.)
+so leftover index files don't trip 'remove_dir_all'. A test that removes
+a search index's folder itself should drop the index first and remove
+the folder with 'remove_test_dir', which retries once: Tantivy's
+meta-file watcher outlives the index by up to one poll and can create a
+lock file in the folder mid-removal, failing it with "Directory not
+empty".)
 
 This does NOT affect the re-rendered view a save returns: that is built
 from the in-Rust graph, not from Tantivy. Only direct Tantivy reads are

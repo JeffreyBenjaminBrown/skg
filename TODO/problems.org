@@ -42,14 +42,6 @@
   record the restriction holds, as the save's
   'relationship_member_is_visible' ('server/from_text/weave.rs')
   already does. Left as it is.
-* Problems noticed while executing plan 04.1, slice 6 (2026-10-26)
-** FIX PLANNED: Flaky "Directory not empty" at a test's cleanup under the parallel run
-  During plan 04.1 one Rust test per full run (a different one each
-  time: 'rebuild::complete_aliasfolder', 'save::id_folder_outside_diff_view',
-  'dangling_reference_renders_unknown_node') failed at cleanup with
-  "Directory not empty" and passed alone. Fixed per-test temp paths
-  collide under nextest's parallelism. Fix: a per-test unique
-  directory, or a serialized cleanup.
 * Problems noticed while executing plan 19, slice 12 (2026-10-24)
 ** Emacs's relRepo info request always sends a nil recorder
   'skg-set-relRepo' asks the server which skgrepos a relationship may
@@ -123,12 +115,6 @@ gap too. Details, options and questions:
   ("Import preview cannot be applied"), while the test expects that
   line to be imported as escaped body text. Either the fixture or the
   test's expectation is stale.
-** FIX PLANNED: Intermittent 'DirectoryNotEmpty' in Rust test cleanup
-  In full 'bash/nextest.sh' runs, a different save test fails now and
-  then with 'Os { code: 39, kind: DirectoryNotEmpty }' (seen in
-  'save::none_node_fields_are_noops' and
-  'dangling_reference_renders_unknown_node'); each passes alone.
-  Probably a cleanup race with a background writer.
 ** Parallel Neovim test runs share one ShaDa file
   'bash/nvim-tests.sh' and the Neovim integration runs start Neovims
   that all write '~/.local/state/nvim/shada/main.shada'. Interrupted

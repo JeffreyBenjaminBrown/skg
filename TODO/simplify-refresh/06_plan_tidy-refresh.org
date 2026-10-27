@@ -1021,7 +1021,7 @@ functions the report locates.
 'bash/integration-tests.sh' green; 'bash/nextest.sh' for the
 rendering cases.
 
-** TODO Slice 5: the tests and the harness
+** DONE Slice 5: the tests and the harness
 Read the tests report and the duplication report's item 13
 first.
 *** the untested behaviors
