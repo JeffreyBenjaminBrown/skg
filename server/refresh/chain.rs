@@ -16,12 +16,14 @@
 use crate::dbs::in_rust_graph::containerward_role_tree::{ ContainerwardRoleTree, containerward_role_trees_by_gnid_from_gnids, containers_in_inRustGraph};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
-use crate::dbs::in_rust_graph::relation_accessors::{NodeRelation, RelationRole};
+use crate::dbs::in_rust_graph::relation_accessors::{GnidPresence, NodeRelation, RelationRole};
 use crate::graph_straddle::types::GraphStraddle;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::{ID, SkgConfig, SkgrepoName};
 use crate::types::nodes::complete::Graphnode;
-use crate::types::viewnode::{ Viewnode, ViewnodeKind, Vognode, mk_editable_viewnode, mk_unknown_viewnode, mk_writeProtected_noClaim_from_viewnode };
+use crate::types::viewnode::{
+  Restricted, Viewnode, ViewnodeKind, Vognode, Warrant, mk_editable_viewnode,
+  mk_unknown_viewnode, mk_writeProtected_noClaim_from_viewnode, viewnode_of };
 
 use ego_tree::{NodeId, Tree};
 use std::collections::{HashMap, HashSet};
@@ -118,11 +120,13 @@ fn insert_containerward_chain_recursive (
 
 /// Prepend 'container' under 'parent', which it contains, write-protected and
 /// claiming nothing, or an unknown if no graph
-/// knows it. None, and nothing prepended, when the container or the
-/// relationship is restricted: the
-/// containment is recorded by the container, perhaps in a more
-/// private skgrepo than either node's home ('docs/telescopes.org',
-/// "What lives where").
+/// knows it. None, and nothing prepended, when the relationship is
+/// restricted: the containment is recorded by the container, perhaps
+/// in a more private skgrepo than either node's home
+/// ('docs/telescopes.org', "What lives where"). When the relationship
+/// is visible and the container restricted, a Restricted vognode
+/// claiming nothing is prepended, and None returned: the chain stops
+/// there.
 fn prepend_containerward_chain_node (
   tree        : &mut Tree<Viewnode>,
   parent      : NodeId,
@@ -132,8 +136,6 @@ fn prepend_containerward_chain_node (
   restriction : Option<&SkgrepoRestriction>,
 ) -> Result<Option<NodeId>, Box<dyn Error>> {
   if let Some (restriction) = restriction {
-    if graph . restriction_keeps_out (container, Some (restriction))
-    { return Ok (None); }
     let parent_gnid : Option<ID> =
       tree . get (parent) . and_then ( |node| match &node . value () . kind {
         ViewnodeKind::Vognode (Vognode::Occurrence (t)) => Some (t . gnid . clone ()),
@@ -143,7 +145,21 @@ fn prepend_containerward_chain_node (
         graph . relRepo (container, NodeRelation::Contains, &parent_gnid)
         . map ( |skgrepo| restriction . contains_skgrepo (&skgrepo) )
         . unwrap_or (false);
-      if ! relationship_unrestricted { return Ok (None); }} }
+      if ! relationship_unrestricted { return Ok (None); }}
+    if graph . gnid_presence_gated (container, Some (restriction))
+       == GnidPresence::Restricted {
+      tree . get_mut (parent)
+        . ok_or ("prepend_containerward_chain_node: parent not found") ?
+        . prepend ( viewnode_of ( ViewnodeKind::Vognode (
+          Vognode::Restricted ( Restricted {
+            gnid                    : container . clone (),
+            relRepo                 : None,
+            relationshipEditRequest : None,
+            claimsMembership        : false,
+            warrant                 : Warrant::ByGraph, } ))));
+      return Ok (None); }
+    if graph . restriction_keeps_out (container, Some (restriction))
+    { return Ok (None); }}
   let viewnode : Viewnode = match
     graphnode_and_viewnode_from_gnid (graph, config, container) ? {
       Some ((_graphnode, viewnode)) =>

@@ -10,8 +10,9 @@
 //             x contains r; s1.
 //   private : s ("s secret") contains s1.
 // The view of r shows x in a containers folder once it is requested,
-// and d in c's subscribee folder. Under the restriction "public", s is
-// a tombstone holding s1.
+// and d in c's subscribee folder. Under the restriction "public", s,
+// which r records in its public file, is a Restricted vognode holding
+// s1, and an occurrence again, with its viewnode ID, back under "all".
 
 use crate::git_fixture::{
   Fixture, OwnedSkgrepos, open_content_view, save_cleanly, switch_skgrepo_set,
@@ -62,11 +63,14 @@ fn viewnode_ids_survive_a_save_a_request_and_a_switch (
           . map ( |(viewnode_id, _)| viewnode_id ) . unwrap ();
         assert_eq! ( headline_labels (&switched) . get (&s_viewnode_id)
                      . map (String::as_str),
-                     Some ("** tombstone"),
-                     "s's tombstone keeps its viewnode ID:\n{}", switched );
+                     Some ("** (gnid s)"),
+                     "s's Restricted vognode keeps its viewnode ID:\n{}", switched );
         switched };
       let all : String = switch (f, &mut restriction, "all") ?;
-      assert_every_viewnode_id_kept ("a switch back to all", &public, &all, &[]);
+      assert_every_viewnode_id_kept (
+        "a switch back to all", &public, &all, &["(gnid s)"] );
+      assert_every_viewnode_id_kept (
+        "a switch to public and back", &requested, &all, &[] );
       Ok (( )) } ) }
 
 //

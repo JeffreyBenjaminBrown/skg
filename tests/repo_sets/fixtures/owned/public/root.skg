@@ -2,5 +2,4 @@ pid: root
 title: root
 contains:
 - active-a
-- private-a
 - active-b

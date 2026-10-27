@@ -2,4 +2,3 @@ pid: ovr-owner
 title: ovr-owner
 overrides:
 - ovr-visible
-- ovr-inactive

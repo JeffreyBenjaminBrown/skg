@@ -383,7 +383,8 @@ async fn tombstone_in_buffer_does_not_drive_contains (
   // container's contains are owned by the disk merge (weave), not the
   // buffer. So moving the tombstone cannot move its disk member.
   // (Disk root.contains = [active-a, private-a, active-b]; private-a's
-  // skgrepo is restricted under the "public" set.)
+  // skgrepo, and the section of root that records it, are restricted
+  // under the "public" set.)
       let restriction : SkgrepoRestriction =
         SkgrepoRestriction::named (
           config, SkgrepoSetName ("public" . to_string ())) ?;
@@ -741,7 +742,8 @@ async fn restricted_save_preserves_invisible_override_targets (
   // The pipeline-level half of the second named regression
   // ('docs/api-and-formats.org', "Restricted-skgrepo nodes: omission,
   // retention, and save preservation"): a node overrides [ovr-visible,
-  // ovr-inactive] where ovr-inactive's skgrepo is restricted. Rendering
+  // ovr-inactive] where ovr-inactive's skgrepo, and the section of
+  // ovr-owner that records it, are restricted. Rendering
   // restricted shows only ovr-visible; the set-difference merge must keep
   // ovr-inactive across a restricted save, even when the visible member is
   // deleted.

@@ -176,7 +176,8 @@ pub fn complete_occurrence_skgrepo (
   did_inherit }
 
 /// The skgrepo of the nearest occurrence at or above 'node'.
-/// The walk rootward passes through ghosts, unknowns and folders,
+/// The walk rootward passes through ghosts, unknowns, Restricted
+/// vognodes and folders,
 /// which carry no home skgrepo of their own (and never show the home
 /// herald), so a new headline below a ghost or in a partner folder
 /// inherits from the occurrence above them. Any other kind ends the
@@ -196,7 +197,8 @@ fn skgrepo_of_nearest_occurrence_ancestor (
           writeProtected_skgrepos_after_save . get (&at . gnid) . cloned ()
           . unwrap_or_else ( || at . home_skgrepo . clone () )
         } else { at . home_skgrepo . clone () } ),
-      ViewnodeKind::Vognode (Vognode::Ghost (_) | Vognode::Unknown (_))
+      ViewnodeKind::Vognode (
+        Vognode::Ghost (_) | Vognode::Unknown (_) | Vognode::Restricted (_))
         | ViewnodeKind::Folder (_) => continue,
       ViewnodeKind::PropertyMember (_)
         | ViewnodeKind::ChangeViewnode (_)

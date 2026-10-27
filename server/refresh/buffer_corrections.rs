@@ -91,7 +91,8 @@ pub struct BufferCorrectionPolicy {
   pub deleted_by_the_save          : HashSet<ID>,
   /// Set by the skgrepo-set switch when the restriction changed.
   /// Every open view was up to date before the switch, so what its
-  /// rerender draws (a widening) or entombstones (a narrowing) is the
+  /// rerender draws (a widening) or entombstones (a narrowing), and
+  /// what it makes a Restricted vognode or an occurrence again, is the
   /// restriction's doing, not the buffer's.
   pub follows_a_restriction_change : bool,
 }
@@ -113,6 +114,13 @@ impl BufferCorrectionPolicy {
       follows_a_restriction_change : restriction_changed, } }
 
   pub(crate) fn reports_reinstatement (
+    &self,
+  ) -> bool {
+    ! self . follows_a_restriction_change }
+
+  /// Whether re-kinding a headline to a Restricted vognode, or from
+  /// one to an occurrence, is a buffer correction.
+  pub(crate) fn reports_rekind_across_the_restriction (
     &self,
   ) -> bool {
     ! self . follows_a_restriction_change }

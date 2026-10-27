@@ -14,8 +14,9 @@
 //! nodes") a goal omits each member whose record the restriction
 //! keeps out: the gated accessors leave it out of every list read
 //! here. It keeps each member whose record is visible: a node the
-//! restriction keeps out, which the ID rule entombstones, and a gnid
-//! nothing answers to, an unknown, as under no restriction.
+//! restriction keeps out, marked restricted ('GoalItem::restricted'),
+//! and a gnid nothing answers to, an unknown, as under no
+//! restriction.
 //!
 //! 'partnerFolder_members_in_graph' serves the search's enrichment
 //! too.
@@ -63,6 +64,10 @@ pub(crate) struct GoalItem {
   /// relationship's relRepo, when that differs from the recorder's
   /// home (the unknown's herald, the Restricted vognode's).
   pub relRepo : Option<SkgrepoName>,
+  /// Whether the node it names is restricted: its record is visible
+  /// and the skgrepo restriction keeps out the node's home. The ID
+  /// rule answers it with a Restricted vognode.
+  pub restricted : bool,
   /// In the diff view, the item's existence change in its list.
   pub rel     : Option<Existence>,
   /// In the diff view, the partner the item is, over the straddle.
@@ -82,7 +87,8 @@ impl GoalItem {
     member : GoalMember,
   ) -> GoalItem {
     GoalItem { member, warrant : Warrant::ByGraph,
-               relRepo : None, rel : None, partner : None } }
+               relRepo : None, restricted : false,
+               rel : None, partner : None } }
 }
 
 impl Goal {
@@ -133,8 +139,8 @@ impl Goal {
 
 /// What a child stands for in its parent's goal, if anything: an
 /// occurrence stands for the gnid its parent's list would hold (the
-/// original of a shown overrider), a ghost or an unknown for its gnid,
-/// a property member for its value.
+/// original of a shown overrider), a ghost, an unknown or a
+/// Restricted vognode for its gnid, a property member for its value.
 pub(crate) fn member_of_child (
   viewnode : &Viewnode,
 ) -> Option<GoalMember> {
@@ -145,6 +151,8 @@ pub(crate) fn member_of_child (
       Some ( GoalMember::Gnid ( ghost . gnid . clone () )),
     ViewnodeKind::Vognode (Vognode::Unknown (unknown)) =>
       Some ( GoalMember::Gnid ( unknown . gnid . clone () )),
+    ViewnodeKind::Vognode (Vognode::Restricted (restricted)) =>
+      Some ( GoalMember::Gnid ( restricted . gnid . clone () )),
     ViewnodeKind::PropertyMember (PropertyMember::Alias { text, .. }) =>
       Some ( GoalMember::Alias ( text . clone () )),
     ViewnodeKind::PropertyMember (PropertyMember::ID { gnid, .. }) =>
@@ -494,15 +502,18 @@ fn property_goal (
         . map ( |flag| GoalItem::by_graph (GoalMember::Flag (flag)) )
         . collect () ), } ) }
 
-/// Goal items of gnids, each warranted by the truth.
+/// Goal items of gnids, each warranted by the truth, and marked
+/// restricted where the truth says its node is.
 fn gnid_items (
   gnids    : Vec<ID>,
   relRepos : &HashMap<ID, SkgrepoName>,
-  _truth   : &Truth,
+  truth    : &Truth,
 ) -> Vec<GoalItem> {
   gnids . into_iter ()
     . map ( |gnid| GoalItem {
-      relRepo : relRepos . get (&gnid) . cloned (),
+      relRepo    : relRepos . get (&gnid) . cloned (),
+      restricted : truth . graph . gnid_presence_gated (&gnid, truth . restriction)
+                   == GnidPresence::Restricted,
       .. GoalItem::by_graph ( GoalMember::Gnid (gnid) ) } )
     . collect () }
 

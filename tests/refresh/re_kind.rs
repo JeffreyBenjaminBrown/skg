@@ -56,9 +56,16 @@ node p
   assert_eq! ( run . count (BufferCorrectionKind::Entombstoned), 2 ); }
 
 #[test]
-fn a_restricted_node_becomes_a_tombstone_whatever_its_parent_lists () {
+fn a_restricted_node_its_parent_lists_in_a_restricted_record_becomes_a_tombstone () {
+  // p lists h in its 'private' section, which the restriction keeps
+  // out: no record the restriction shows names h. (Where one does, h
+  // becomes a Restricted vognode: 'restricted.rs'.)
   let graph : InRustGraph = graph (&[
-    p_lists (&["h", "c"]), node ("c"), node ("k"),
+    Graphnode { contains : [ rel_partners_at_relRepo (
+                               &SkgrepoName::from ("private"), vec! [ ID::from ("h") ] ),
+                             ids (&["c"]) ] . concat (),
+                .. node ("p") },
+    node ("c"), node ("k"),
     Graphnode { home_skgrepo : SkgrepoName::from ("private"), .. node ("h") } ]);
   let input : String = formatdoc! ("
     * {} p

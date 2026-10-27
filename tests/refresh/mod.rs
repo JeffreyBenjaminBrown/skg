@@ -230,6 +230,10 @@ fn describe (
     ViewnodeKind::Vognode (Vognode::Unknown (unknown)) => {
       parts . push ( format! ("unknown {}", unknown . gnid) );
       if ! unknown . claimsMembership { parts . push ("noClaim" . into ()); }},
+    ViewnodeKind::Vognode (Vognode::Restricted (restricted)) => {
+      parts . push ( format! ("restricted {}", restricted . gnid) );
+      if ! restricted . claimsMembership { parts . push ("noClaim" . into ()); }
+      parts . extend ( warrant_atom (restricted . warrant) ); },
     ViewnodeKind::Tombstone => parts . push ("tombstone" . into ()),
     ViewnodeKind::BufferRoot => parts . push ("root" . into ()),
     ViewnodeKind::Folder (folder) =>

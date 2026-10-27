@@ -1,11 +1,12 @@
-//! The ID rule: what a headline that stands for a gnid becomes. Four
+//! The ID rule: what a headline that stands for a gnid becomes. Five
 //! questions, in order, the first yes deciding. Does the truth have
-//! the node? Then an occurrence. Otherwise, is the mode the diff view,
-//! and does HEAD have the node? Then a ghost. Otherwise, does the list
-//! of the headline's parent name this gnid? Then an unknown.
-//! Otherwise a tombstone. A restricted node answers no to every
-//! question: the truth answers 'Restricted', and the gated goal names
-//! no restricted member.
+//! the node? Then an occurrence. Otherwise, does the truth say the
+//! node is restricted? Then a Restricted vognode, if the goal of the
+//! headline's parent names the gnid (its record is visible), and
+//! otherwise a tombstone: a restricted node is never a ghost.
+//! Otherwise, is the mode the diff view, and does HEAD have the node?
+//! Then a ghost. Otherwise, does the list of the headline's parent
+//! name this gnid? Then an unknown. Otherwise a tombstone.
 //!
 //! The headline is re-kinded where it stands, keeping its vnid, its
 //! fold state, its children and, for an occurrence, its editability.
@@ -18,12 +19,13 @@ use crate::graph_straddle::types::GraphStraddle;
 use crate::refresh::{Walk, write_protect_occurrence};
 use crate::refresh::buffer_corrections::BufferCorrectionKind;
 use crate::refresh::extent::drawn_occurrence_is_editable;
+use crate::refresh::visit::{children_of, set_claim};
 use crate::refresh::goal::{Goal, GoalMember};
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::nodes::rust::GraphnodeInRust;
 use crate::types::viewnode::{
   ChangeFacts, Editability, Ghost, NodeEditRequest, PropertyMember, RelationshipEditRequest,
-  Unknown, Occurrence, Viewnode, ViewnodeKind, Vognode, VognodeKind, Warrant,
+  Restricted, Unknown, Occurrence, Viewnode, ViewnodeKind, Vognode, VognodeKind, Warrant,
   default_occurrence};
 use crate::refresh::mode::RefreshMode;
 
@@ -38,6 +40,9 @@ pub(crate) enum IdRuleAnswer {
   /// The ghost of the node HEAD had under this pid.
   Ghost (ID),
   Unknown,
+  /// A Restricted vognode: the truth says the node is restricted, and
+  /// the parent's goal names it, marked so.
+  Restricted,
   Tombstone,
 }
 
@@ -65,8 +70,11 @@ pub(crate) fn id_rule (
     if ! acquired_since_head {
       return IdRuleAnswer::Occurrence (pid); }}
   if presence == GnidPresence::Restricted {
-    // A restricted node is never a ghost, nor an unknown.
-    return IdRuleAnswer::Tombstone; }
+    let named_restricted : bool = parent_goal
+      . and_then ( |goal| goal . item_for ( &GoalMember::Gnid ( gnid . clone () )))
+      . is_some_and ( |item| item . restricted );
+    return if named_restricted { IdRuleAnswer::Restricted }
+           else { IdRuleAnswer::Tombstone }; }
   if let Some (straddle) = head {
     if let Some (pid) = straddle . before . pid_of (gnid) {
       if ! straddle . after . nodes . contains_key (&pid) {
@@ -97,7 +105,24 @@ impl EditRequests {
         .. EditRequests::default () },
       Vognode::Unknown (unknown) => EditRequests {
         relationship_edit_request : unknown . relationshipEditRequest . clone (),
+        .. EditRequests::default () },
+      Vognode::Restricted (restricted) => EditRequests {
+        relationship_edit_request : restricted . relationshipEditRequest . clone (),
         .. EditRequests::default () }, } }
+
+  /// What an unknown or a Restricted vognode keeps of these requests:
+  /// a relRepo request, the one request either takes; and whether it
+  /// drops any other.
+  fn the_relRepo_request_only (
+    &self,
+  ) -> (Option<RelationshipEditRequest>, bool) {
+    let kept : Option<RelationshipEditRequest> =
+      self . relationship_edit_request . clone ()
+      . filter ( |request| matches! ( request, RelationshipEditRequest::RelRepo (_) ));
+    let dropped : bool =
+      self . node_edit_request . is_some () || self . restore_node
+      || kept != self . relationship_edit_request;
+    (kept, dropped) }
 
   fn any (
     &self,
@@ -127,7 +152,11 @@ pub(crate) fn rekind_vognode (
       let requests : EditRequests = EditRequests::of (&other);
       let claims : bool = match &other {
         Vognode::Unknown (unknown) => unknown . claimsMembership,
+        Vognode::Restricted (restricted) => restricted . claimsMembership,
         _ => true, };
+      let quiet : bool = // the restriction widened
+        matches! ( other, Vognode::Restricted (_) )
+        && ! walk . buffer_correction_policy . reports_rekind_across_the_restriction ();
       let editable : bool =
         drawn_occurrence_is_editable (tree, parent, &pid, walk);
       let occurrence : Occurrence =
@@ -137,21 +166,21 @@ pub(crate) fn rekind_vognode (
         relationshipEditRequest : requests . relationship_edit_request . clone (),
         .. occurrence };
       set_vognode_keeping_readiness (tree, child, Vognode::Occurrence (occurrence));
+      if matches! ( other, Vognode::Unknown (_) | Vognode::Restricted (_) ) {
+        reset_the_claims_of_children (tree, child); }
       if editable {
         walk . hold_editability (&pid);
         walk . drawn_editable . insert (child); }
       if requests . restore_node {
         walk . buffer_corrections . record (tree, child, BufferCorrectionKind::EditRequestDropped); }
-      walk . buffer_corrections . record (tree, child, BufferCorrectionKind::Rekinded (VognodeKind::Occurrence)); },
+      if ! quiet {
+        walk . buffer_corrections . record (tree, child, BufferCorrectionKind::Rekinded (VognodeKind::Occurrence)); }},
     ( IdRuleAnswer::Ghost (pid), Vognode::Ghost (ghost) ) =>
       refresh_ghost_in_place (tree, child, ghost, &pid, walk),
     ( IdRuleAnswer::Ghost (pid), other ) => {
       let requests : EditRequests = EditRequests::of (&other);
       forget_editable_occurrence (&other, child, walk);
-      let carried_claim : bool = match &other {
-        Vognode::Occurrence (occurrence) => occurrence . claimsMembership,
-        Vognode::Unknown (unknown) => unknown . claimsMembership,
-        Vognode::Ghost (ghost) => ghost . claimsMembership, };
+      let carried_claim : bool = claim_of (&other);
       let named_by_the_list : bool =
         parent_goal . and_then ( |goal| goal . item_for ( &GoalMember::Gnid ( pid . clone () )))
         . is_some_and ( |item| item . warrant == Warrant::ByGraph );
@@ -171,15 +200,9 @@ pub(crate) fn rekind_vognode (
         &mut tree . get_mut (child) . unwrap () . value () . kind
       { unknown_mut . relRepo = relRepo . or ( unknown . relRepo ); }},
     ( IdRuleAnswer::Unknown, other ) => {
-      let requests : EditRequests = EditRequests::of (&other);
+      let (relationship_edit_request, dropped) : (Option<RelationshipEditRequest>, bool) =
+        EditRequests::of (&other) . the_relRepo_request_only ();
       forget_editable_occurrence (&other, child, walk);
-      let relationship_edit_request : Option<RelationshipEditRequest> =
-        // An unknown takes a relRepo request only.
-        requests . relationship_edit_request . clone ()
-        . filter ( |request| matches! ( request, RelationshipEditRequest::RelRepo (_) ));
-      let dropped : bool =
-        requests . node_edit_request . is_some () || requests . restore_node
-        || relationship_edit_request != requests . relationship_edit_request;
       set_vognode_keeping_readiness (
         tree, child, Vognode::Unknown ( Unknown {
           gnid                   : gnid . clone (),
@@ -190,10 +213,72 @@ pub(crate) fn rekind_vognode (
       if dropped {
         walk . buffer_corrections . record (tree, child, BufferCorrectionKind::EditRequestDropped); }
       walk . buffer_corrections . record (tree, child, BufferCorrectionKind::Rekinded (VognodeKind::Unknown)); },
+    ( IdRuleAnswer::Restricted, Vognode::Restricted (restricted) ) => {
+      let relRepo : Option<SkgrepoName> = goal_relRepo (parent_goal, &gnid);
+      if let ViewnodeKind::Vognode (Vognode::Restricted (restricted_mut)) =
+        &mut tree . get_mut (child) . unwrap () . value () . kind
+      { restricted_mut . relRepo = relRepo . or ( restricted . relRepo ); }},
+    ( IdRuleAnswer::Restricted, other ) =>
+      rekind_to_restricted (tree, child, &gnid, other, parent_goal, walk),
     ( IdRuleAnswer::Tombstone, other ) => {
       forget_editable_occurrence (&other, child, walk);
       entombstone (tree, child, walk); }, }
   Ok (( )) }
+
+/// Make the vognode 'other' at 'child' a Restricted vognode for 'gnid',
+/// where it stands, keeping its claim, its relRepo request (an edit
+/// request of another kind it drops, and reports) and its readiness
+/// request. Its re-kind is no buffer correction after a change of the
+/// restriction, which made its node restricted
+/// ('BufferCorrectionPolicy').
+fn rekind_to_restricted (
+  tree        : &mut Tree<Viewnode>,
+  child       : NodeId,
+  gnid        : &ID,
+  other       : Vognode,
+  parent_goal : Option<&Goal>,
+  walk        : &mut Walk,
+) {
+  let (relationship_edit_request, dropped) : (Option<RelationshipEditRequest>, bool) =
+    EditRequests::of (&other) . the_relRepo_request_only ();
+  forget_editable_occurrence (&other, child, walk);
+  set_vognode_keeping_readiness (
+    tree, child, Vognode::Restricted ( Restricted {
+      gnid                    : gnid . clone (),
+      relRepo                 : goal_relRepo (parent_goal, gnid),
+      relationshipEditRequest : relationship_edit_request,
+      claimsMembership        : claim_of (&other),
+      warrant                 : Warrant::ByGraph, } )); // the warrant rung sets it
+  if dropped {
+    walk . buffer_corrections . record (tree, child, BufferCorrectionKind::EditRequestDropped); }
+  if walk . buffer_correction_policy . reports_rekind_across_the_restriction () {
+    walk . buffer_corrections . record (tree, child, BufferCorrectionKind::Rekinded (VognodeKind::Restricted)); }}
+
+/// Each child of the headline at 'treeid', which stood as an unknown
+/// or a Restricted vognode and is now an occurrence, claims membership
+/// again. Under such a parent the save reads no claim, so the claims
+/// rung ('mark_claims') marked every child as claiming nothing, and
+/// the printer wrote no 'noClaim': the buffer's text, parsed, says
+/// each child claims, while a view kept between refreshes (a switch's
+/// rerender) said none did, which a save would read as the removal
+/// of every member. Each claims, as parsed text would; the claims
+/// rung then marks 'noClaim' those the truth does not warrant.
+fn reset_the_claims_of_children (
+  tree   : &mut Tree<Viewnode>,
+  treeid : NodeId,
+) {
+  for grandchild in children_of (tree, treeid) {
+    set_claim (tree, grandchild, true); }}
+
+/// Whether the vognode claims membership.
+fn claim_of (
+  vognode : &Vognode,
+) -> bool {
+  match vognode {
+    Vognode::Occurrence (occurrence) => occurrence . claimsMembership,
+    Vognode::Unknown (unknown)       => unknown . claimsMembership,
+    Vognode::Ghost (ghost)           => ghost . claimsMembership,
+    Vognode::Restricted (restricted) => restricted . claimsMembership, } }
 
 /// Make the headline at 'treeid' a tombstone, keeping its children,
 /// and report it, and any edit request it carried. Its entombstoning

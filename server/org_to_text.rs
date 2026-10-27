@@ -1,11 +1,11 @@
 use crate::refresh::ancestry::parent_reads_claims;
 use crate::serve::util::sexp_to_client_string;
-use crate::types::misc::{SkgConfig, SkgrepoName};
+use crate::types::misc::{ID, SkgConfig, SkgrepoName};
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
   ChangeFacts, FoldAndFocus, ReadinessRequest,
   Viewnode, ViewnodeKind, Vognode, PropertyMember, ChangeViewnode, Occurrence,
-  Ghost, Unknown, NodeEditRequest,
+  Ghost, NodeEditRequest,
   RelationshipEditRequest,
   Warrant,
 };
@@ -210,8 +210,23 @@ fn viewnode_to_string_without_viewnode_id (
       Ok ( occurrence_metadata_to_string (
         viewnode . foldAndFocus, occurrence, claims_are_read, change_facts, request )),
     ViewnodeKind::Vognode (Vognode::Unknown (unknown_node)) =>
-      Ok ( unknown_metadata_to_string (
-        viewnode . foldAndFocus, unknown_node, claims_are_read, change_facts, request )),
+      Ok ( gnid_only_vognode_metadata_to_string (
+        viewnode . foldAndFocus,
+        GnidOnlyVognode { kind_atom               : "unknown",
+                          gnid                    : &unknown_node . gnid,
+                          relRepo                 : unknown_node . relRepo . as_ref (),
+                          relationshipEditRequest : unknown_node . relationshipEditRequest . as_ref (),
+                          claimsMembership        : unknown_node . claimsMembership },
+        claims_are_read, change_facts, request )),
+    ViewnodeKind::Vognode (Vognode::Restricted (restricted)) =>
+      Ok ( gnid_only_vognode_metadata_to_string (
+        viewnode . foldAndFocus,
+        GnidOnlyVognode { kind_atom               : "restricted",
+                          gnid                    : &restricted . gnid,
+                          relRepo                 : restricted . relRepo . as_ref (),
+                          relationshipEditRequest : restricted . relationshipEditRequest . as_ref (),
+                          claimsMembership        : restricted . claimsMembership },
+        claims_are_read, change_facts, request )),
     ViewnodeKind::Vognode (Vognode::Ghost (ghost)) =>
       Ok ( ghost_metadata_to_string (
         viewnode . foldAndFocus, ghost, claims_are_read, change_facts, request )), } }
@@ -521,26 +536,38 @@ fn ghost_metadata_to_string (
     . chain ( diff_form (change_facts) ) );
   parts . join (" ") }
 
-/// Render metadata for an unknown:
-///   [focused] [folded] [bodyFolded] unknown (gnid X)
+/// What the printer writes of a vognode that shows only a gnid: an
+/// unknown, or a Restricted vognode.
+struct GnidOnlyVognode<'a> {
+  kind_atom               : &'static str,
+  gnid                    : &'a ID,
+  relRepo                 : Option<&'a SkgrepoName>,
+  relationshipEditRequest : Option<&'a RelationshipEditRequest>,
+  claimsMembership        : bool,
+}
+
+/// Render metadata for an unknown or a Restricted vognode, KIND being
+/// 'unknown' or 'restricted':
+///   [focused] [folded] [bodyFolded] KIND (gnid X)
 ///   [(skgRepos (relRepo R))] [noClaim]
 ///   [(editRequest [(relRepo R)] [READINESS])] [(diff ...)]
-/// Triggered when a referenced ID resolved to nothing in any db.
-fn unknown_metadata_to_string (
+/// An unknown stands where a referenced ID resolved to nothing in any
+/// db; a Restricted vognode, where a visible record names a node the
+/// skgrepo restriction keeps out.
+fn gnid_only_vognode_metadata_to_string (
   foldAndFocus    : FoldAndFocus,
-  unknown_node    : &Unknown,
+  vognode         : GnidOnlyVognode,
   claims_are_read : bool,
   change_facts    : &ChangeFacts,
   request         : &Option<ReadinessRequest>,
 ) -> String {
   let mut parts : Vec < String > = foldAndFocus_atoms (foldAndFocus);
-  parts . push ( "unknown" . to_string () );
-  parts . push ( format! ("(gnid {})", unknown_node . gnid . 0) );
-  parts . extend ( skgRepos_form ( None, unknown_node . relRepo . as_ref () ));
-  parts . extend ( noClaim_atom (unknown_node . claimsMembership, claims_are_read) );
+  parts . push ( vognode . kind_atom . to_string () );
+  parts . push ( format! ("(gnid {})", vognode . gnid . 0) );
+  parts . extend ( skgRepos_form ( None, vognode . relRepo ));
+  parts . extend ( noClaim_atom (vognode . claimsMembership, claims_are_read) );
   parts . extend ( editRequest_form (
-    unknown_node . relationshipEditRequest . as_ref ()
-      . map (relationshipEditRequest_element),
+    vognode . relationshipEditRequest . map (relationshipEditRequest_element),
     request ));
   parts . extend ( diff_form (change_facts) );
   parts . join (" ") }

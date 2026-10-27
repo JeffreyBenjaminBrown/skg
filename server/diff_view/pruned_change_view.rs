@@ -464,6 +464,8 @@ pub fn ensure_editableOccurrences_exist (
           occurrence . claimsMembership = true,
         ViewnodeKind::Vognode (Vognode::Unknown (unknown)) =>
           unknown . claimsMembership = true,
+        ViewnodeKind::Vognode (Vognode::Restricted (restricted)) =>
+          restricted . claimsMembership = true,
         ViewnodeKind::Vognode (Vognode::Ghost (ghost)) =>
           ghost . claimsMembership = true,
         _ => {}, }}}}

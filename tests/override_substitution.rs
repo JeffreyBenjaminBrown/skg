@@ -316,14 +316,16 @@ async fn ownership_and_visibility_gate_substitution (
         let marked : Vec<&str> = marked_lines (&view, "N2");
         assert_eq! ( marked . len (), 1, "{}", view );
         assert! ( marked [0] . contains ("(gnid R2)"), "{}", view ); }
-      { // Omission beats substitution: restricted original, unrestricted
-        // overrider -> neither is shown.
+      { // The restriction beats substitution: restricted original,
+        // recorded in an unrestricted section, unrestricted overrider
+        // -> the original stands as a Restricted vognode, and the
+        // overrider is not shown in its place.
         let (view, _pids, _tree) =
           multi_root_view_with_skgrepo_set (
             config, None,
             &[ ID::from ("P3") ], &restriction ) ?;
-        assert! ( ! view . contains ("(gnid N3)"),
-          "the restricted original is omitted:\n{}", view );
+        assert! ( view . contains ("restricted (gnid N3)"),
+          "the restricted original stands as a Restricted vognode:\n{}", view );
         assert! ( ! view . contains ("(gnid R3)"),
           "its overrider must not be shown in its place (the \
            fact would name a restricted node):\n{}", view ); }

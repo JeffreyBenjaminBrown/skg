@@ -220,6 +220,7 @@ fn partner_item (
     warrant : if partner . existence == Some (Existence::Removed) {
                 Warrant::ByHead } else { Warrant::ByGraph },
     relRepo : None,
+    restricted : false, // the diff view runs under no restriction
     rel     : partner . existence,
     partner : Some ( partner . clone () ), } }
 
@@ -412,7 +413,7 @@ pub(crate) fn tag_children (
           Some ( DiffChange { node : Some (Existence::Removed),
                               rel  : if is_root { None } else { rel },
                               properties : false } ),
-        ViewnodeKind::Vognode (Vognode::Unknown (_))
+        ViewnodeKind::Vognode (Vognode::Unknown (_) | Vognode::Restricted (_))
           | ViewnodeKind::PropertyMember (_) =>
           Some ( DiffChange { rel, .. DiffChange::default () } ),
         _ => None, };

@@ -719,9 +719,11 @@ async fn hiddenFolder_delete_does_not_unhide (
   Ok (( )) }
 
 //////////////////////////////////////////////////////////////
-// Omission under a restricted skgrepo-set: a restricted-skgrepo member
-// beside an unrestricted one is omitted from the render (no placeholder);
-// for the editable folder, the save weaves the omitted member back.
+// Omission under a restricted skgrepo-set: a member whose record is
+// restricted is omitted from the render (no placeholder), and one whose
+// record is visible and whose node is restricted stands as a Restricted
+// vognode; for the editable folder, the save keeps the Restricted
+// vognode's member and weaves the omitted one back.
 //////////////////////////////////////////////////////////////
 
 async fn omission_scenarios (
@@ -738,18 +740,23 @@ async fn omission_scenarios (
     fails . want_absent (s, &buf, "subscriberFolder");
     fails . want_absent (s, &buf, "omSub-active");
     fails . want_absent (s, &buf, "omSub-inactive"); }
-  { // editable subscribeeFolder: restricted omitted from render, but the
-    // restricted save weaves it back into subscribesTo.
+  { // editable subscribeeFolder: omWsub-inactive, private, recorded in
+    // the owner's public section, stands as a Restricted vognode;
+    // omWsub-unseen, recorded in its private section, is omitted from
+    // the render, and the restricted save weaves it back into
+    // subscribesTo.
     let s : &str = "subscribeeFolder/omission";
     let (buf, _p, _t) : (String, Vec<ID>, Tree<Viewnode>) =
       multi_root_view_with_skgrepo_set (
         config, None, &[ID::from ("omWsub-owner")], &restriction ) ?;
     fails . want_contains (s, &buf, "(gnid omWsub-active)");
-    fails . want_absent (s, &buf, "omWsub-inactive");
-    // Delete the only visible subscribee and save under the restricted
-    // set: the weave must still preserve the invisible omWsub-inactive
-    // (a restricted save cannot delete what it cannot see), while the
-    // deleted unrestricted member is removed. So subscribesTo = [restricted].
+    fails . want_contains (s, &buf, "restricted (gnid omWsub-inactive)");
+    fails . want_absent (s, &buf, "omWsub-unseen");
+    // Delete the only unrestricted subscribee and save under the
+    // restricted set: the Restricted vognode keeps omWsub-inactive, the
+    // weave preserves the invisible omWsub-unseen (a restricted save
+    // cannot delete what it cannot see), and the deleted unrestricted
+    // member is removed.
     let unrestricted_line : String =
       line_containing (&buf, "(gnid omWsub-active)") . to_string ();
     let edited : String =
@@ -761,6 +768,10 @@ async fn omission_scenarios (
           MSV::Specified (gnids) => members_of (gnids),
           MSV::Unspecified => Vec::new (), };
         if ! subs . contains (&ID::from ("omWsub-inactive")) {
+          fails . record (s, format! (
+            "restricted save dropped the Restricted vognode's subscribee: {:?}",
+            subs)); }
+        if ! subs . contains (&ID::from ("omWsub-unseen")) {
           fails . record (s, format! (
             "restricted save dropped the invisible subscribee: {:?}",
             subs)); }

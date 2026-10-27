@@ -133,11 +133,18 @@ node s
      subscriber hides in it" ); }
 
 #[test]
-fn a_folder_omits_the_restricted_members () {
+fn a_folder_omits_the_members_whose_records_are_restricted () {
+  // 'secret' and 'hush' are private. secret records its containment
+  // of p in 'main', which the restriction shows, so it stands as a
+  // Restricted vognode; hush records it in 'private', so nothing
+  // stands for it.
   let graph : InRustGraph = graph (&[
     Graphnode { contains : ids (&["p"]), .. node ("q") },
     Graphnode { contains : ids (&["p"]),
                 home_skgrepo : SkgrepoName::from ("private"), .. node ("secret") },
+    Graphnode { contains : rel_partners_at_relRepo (
+                  &SkgrepoName::from ("private"), vec! [ ID::from ("p") ] ),
+                home_skgrepo : SkgrepoName::from ("private"), .. node ("hush") },
     node ("p"), ]);
   let input : String = formatdoc! ("
     * {} p
@@ -149,8 +156,9 @@ fn a_folder_omits_the_restricted_members () {
   assert_eq! ( run . outline (), "\
 node p
   containerFolder
-    node q wp noClaim" );
-  assert! ( ! run . text . contains ("secret"), "{}", run . text ); }
+    node q wp noClaim
+    restricted secret noClaim" );
+  assert! ( ! run . text . contains ("hush"), "{}", run . text ); }
 
 #[test]
 fn the_hidden_in_subscribee_folder_holds_what_the_subscriber_hides_of_the_subscribees_content () {

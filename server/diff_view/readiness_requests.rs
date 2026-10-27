@@ -213,7 +213,8 @@ fn relationship_aspect_name (
 
 /// The leaves that a request naming the diff objects 'objects' at
 /// 'node' names. No objects on a vognode means both of its objects
-/// (only 'rel' on an unknown); a property member has one object.
+/// (only 'rel' on an unknown or a Restricted vognode); a property
+/// member has one object.
 /// None for a viewnode that names no leaf, among them a node of the
 /// containerward chain, which shows no change.
 fn leaves_named_at (
@@ -230,8 +231,8 @@ fn leaves_named_at (
       return None,
     ViewnodeKind::Vognode (vognode) => {
       let pid : ID = vognode_leaf_pid (node . value (), pid_of) ?;
-      let is_unknown : bool =
-        matches! (vognode, Vognode::Unknown (_));
+      let is_unknown : bool = // or Restricted: no node it shows, one relationship
+        matches! (vognode, Vognode::Unknown (_) | Vognode::Restricted (_));
       let objects : Vec<DiffObject> =
         if ! objects . is_empty () {
           objects . iter () . copied () . collect ()
@@ -359,7 +360,7 @@ pub fn set_ready_facts_in_viewforest (
               . collect ();
             ( ! objects . is_empty () ) . then_some (objects) },
           ViewnodeKind::Vognode (
-            Vognode::Unknown (_) ) =>
+            Vognode::Unknown (_) | Vognode::Restricted (_) ) =>
             object_is_ready (node, &[]) . then (BTreeSet::new),
           ViewnodeKind::ChangeViewnode ( ChangeViewnode::ChangesetMarker { kind } ) =>
             ( *kind == ChangesetMarkerKind::OrderOnly

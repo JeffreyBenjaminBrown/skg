@@ -53,7 +53,8 @@ use crate::refresh::chain::{
 use crate::types::misc::ID;
 use crate::types::tree::moves::{move_after, move_to_first_child, move_to_last_child};
 use crate::types::viewnode::{
-  Editability, FoldAndFocus, Folder, FolderRelation, Ghost, PropertyMember, Unknown, Occurrence,
+  Editability, FoldAndFocus, Folder, FolderRelation, Ghost, PropertyMember, Restricted,
+  Unknown, Occurrence,
   ViewRequest, Viewnode, ViewnodeKind, ViewnodeStats, Vognode, Warrant, viewnode_of};
 use crate::refresh::mode::RefreshMode;
 
@@ -292,9 +293,10 @@ fn merge_fold_and_focus (
   result . focused    = result . focused    || merged_sibling . focused; }
 
 /// The result carries the union of the view requests, and the
-/// relationship request of whichever carried one; on a ghost, the
-/// restoreNode request, if either carried it. The node edit request
-/// rides with the editability ('merge_editability').
+/// relationship request of whichever carried one (an unknown's or a
+/// Restricted vognode's too); on a ghost, the restoreNode request, if
+/// either carried it. The node edit request rides with the
+/// editability ('merge_editability').
 fn merge_requests (
   result         : &mut ViewnodeKind,
   merged_sibling : &ViewnodeKind,
@@ -310,6 +312,10 @@ fn merge_requests (
       result . restoreNode_request |= merged . restoreNode_request; },
     ( ViewnodeKind::Vognode (Vognode::Unknown (result)),
       ViewnodeKind::Vognode (Vognode::Unknown (merged)) ) => {
+      if result . relationshipEditRequest . is_none () {
+        result . relationshipEditRequest = merged . relationshipEditRequest . clone (); }},
+    ( ViewnodeKind::Vognode (Vognode::Restricted (result)),
+      ViewnodeKind::Vognode (Vognode::Restricted (merged)) ) => {
       if result . relationshipEditRequest . is_none () {
         result . relationshipEditRequest = merged . relationshipEditRequest . clone (); }},
     _ => {}, }}
@@ -394,6 +400,8 @@ pub(crate) fn set_warrant (
       ghost . warrant = warrant,
     ViewnodeKind::Vognode (Vognode::Unknown (unknown)) =>
       unknown . warrant = warrant,
+    ViewnodeKind::Vognode (Vognode::Restricted (restricted)) =>
+      restricted . warrant = warrant,
     ViewnodeKind::PropertyMember (
       PropertyMember::Alias { warrant : stored, .. }
       | PropertyMember::ID { warrant : stored, .. }
@@ -441,6 +449,8 @@ fn claims_membership (
       Some (occurrence . claimsMembership),
     ViewnodeKind::Vognode (Vognode::Unknown (unknown)) =>
       Some (unknown . claimsMembership),
+    ViewnodeKind::Vognode (Vognode::Restricted (restricted)) =>
+      Some (restricted . claimsMembership),
     ViewnodeKind::Vognode (Vognode::Ghost (ghost)) =>
       Some (ghost . claimsMembership),
     ViewnodeKind::PropertyMember (
@@ -459,6 +469,8 @@ pub(crate) fn set_claim (
       occurrence . claimsMembership = claims,
     ViewnodeKind::Vognode (Vognode::Unknown (unknown)) =>
       unknown . claimsMembership = claims,
+    ViewnodeKind::Vognode (Vognode::Restricted (restricted)) =>
+      restricted . claimsMembership = claims,
     ViewnodeKind::Vognode (Vognode::Ghost (ghost)) =>
       ghost . claimsMembership = claims,
     ViewnodeKind::PropertyMember (
@@ -588,6 +600,13 @@ fn draw_item (
       IdRuleAnswer::Unknown =>
         Some ( viewnode_of ( ViewnodeKind::Vognode ( Vognode::Unknown ( Unknown {
           gnid                   : gnid . clone (),
+          relRepo                 : item . relRepo . clone (),
+          relationshipEditRequest : None,
+          claimsMembership        : claims,
+          warrant                 : item . warrant, } )))),
+      IdRuleAnswer::Restricted =>
+        Some ( viewnode_of ( ViewnodeKind::Vognode ( Vognode::Restricted ( Restricted {
+          gnid                    : gnid . clone (),
           relRepo                 : item . relRepo . clone (),
           relationshipEditRequest : None,
           claimsMembership        : claims,

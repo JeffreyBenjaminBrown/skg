@@ -77,7 +77,7 @@ pub fn validate_local_structure (
       ViewnodeKind::PropertyMember (PropertyMember::Flag { .. }) =>
           validate_flag (tree, treeid),
       ViewnodeKind::Tombstone => Vec::new(),
-      ViewnodeKind::Vognode (Vognode::Unknown (_))
+      ViewnodeKind::Vognode (Vognode::Unknown (_) | Vognode::Restricted (_))
         => Vec::new(),
       ViewnodeKind::Vognode (Vognode::Ghost (_))
         => validate_ghost (tree, treeid),
@@ -218,16 +218,17 @@ fn validate_hiddenInSubscribee_folder (
     tree, treeid, 1, true,
     tombstone_or (|node| node . is_occurrence ()
            || matches! ( &node . kind,
-                         ViewnodeKind::Vognode (Vognode::Unknown (_)) )))
+                         ViewnodeKind::Vognode (
+                           Vognode::Unknown (_) | Vognode::Restricted (_) ))))
     { errors . push(
-        "HiddenInSubscribeeFolder's children can only be Occurrences or unknowns (to hide)."
+        "HiddenInSubscribeeFolder's children can only be Occurrences, unknowns or Restricted vognodes (to hide)."
         . to_string()); }
   if !generation_includes_only(
     tree, treeid, 1, true,
     tombstone_or (|node| match &node . kind {
       ViewnodeKind::Vognode (Vognode::Occurrence (t))
         => t . claimsMembership,
-      ViewnodeKind::Vognode (Vognode::Unknown (_))
+      ViewnodeKind::Vognode (Vognode::Unknown (_) | Vognode::Restricted (_))
         => true,
       _ => false, }) )
     { errors . push(
@@ -263,14 +264,15 @@ fn validate_hiddenOutsideOfSubscribee_folder (
     tree, treeid, 1, true,
     tombstone_or (|node| node . is_occurrence ()
            || matches! ( &node . kind,
-                         ViewnodeKind::Vognode (Vognode::Unknown (_)) )))
-    { errors . push("HiddenOutsideOfSubscribeeFolder's children must include only Occurrences or unknowns." . to_string()); }
+                         ViewnodeKind::Vognode (
+                           Vognode::Unknown (_) | Vognode::Restricted (_) ))))
+    { errors . push("HiddenOutsideOfSubscribeeFolder's children must include only Occurrences, unknowns or Restricted vognodes." . to_string()); }
   if !generation_includes_only(
     tree, treeid, 1, true,
     tombstone_or (|node| match &node . kind {
       ViewnodeKind::Vognode (Vognode::Occurrence (t))
         => t . claimsMembership,
-      ViewnodeKind::Vognode (Vognode::Unknown (_))
+      ViewnodeKind::Vognode (Vognode::Unknown (_) | Vognode::Restricted (_))
         => true,
       _ => false, }) )
     { errors . push(
@@ -304,16 +306,17 @@ fn validate_subscribeefolder (
     tombstone_or (|node| node . is_occurrence ()
            || matches!(&node . kind,
                     ViewnodeKind::Vognode (Vognode::Unknown (_))
+                      | ViewnodeKind::Vognode (Vognode::Restricted (_))
                       | ViewnodeKind::Vognode (Vognode::Ghost (_)) // a former member, in the diff view; save-inert
                       | ViewnodeKind::Folder (
                           Folder::HiddenOutsideOfSubscribee) )))
-    { errors . push( "SubscribeeFolder's children must include only Occurrences, tombstones, Unknown or historical vognodes, or HiddenOutsideOfSubscribeeFolder." . to_string()); }
+    { errors . push( "SubscribeeFolder's children must include only Occurrences, tombstones, unknowns, Restricted vognodes, ghosts, or HiddenOutsideOfSubscribeeFolder." . to_string()); }
   if !generation_includes_only(
     tree, treeid, 1, true,
     tombstone_or (|node| match &node . kind {
       ViewnodeKind::Vognode (Vognode::Occurrence (t)) =>
         t . claimsMembership,
-      ViewnodeKind::Vognode (Vognode::Unknown (_)) =>
+      ViewnodeKind::Vognode (Vognode::Unknown (_) | Vognode::Restricted (_)) =>
         true,
       ViewnodeKind::Vognode (Vognode::Ghost (_)) =>
         true,
@@ -348,9 +351,13 @@ fn validate_relation_folder (
            || ( *partnerFolder == Folder::Overridden
                 && matches! ( &node . kind,
                               ViewnodeKind::Vognode (Vognode::Unknown (_)) ))
-           || matches!(&node . kind, // a former member, in the diff view; save-inert
-                       ViewnodeKind::Vognode (Vognode::Ghost (_)))))
-    { errors . push(format!("{}'s children must include only Occurrences, tombstones, ghosts, or (for OverriddenFolder) unknowns.", label)); }
+           || matches!(&node . kind,
+                       // a former member, in the diff view; save-inert
+                       ViewnodeKind::Vognode (Vognode::Ghost (_))
+                       // a member a visible record names and the
+                       // restriction keeps out
+                       | ViewnodeKind::Vognode (Vognode::Restricted (_)))))
+    { errors . push(format!("{}'s children must include only Occurrences, tombstones, ghosts, Restricted vognodes, or (for OverriddenFolder) unknowns.", label)); }
   if !generation_includes_only(
     tree, treeid, 1, true,
     tombstone_or (|node| match &node . kind {
@@ -358,7 +365,7 @@ fn validate_relation_folder (
         => t . claimsMembership,
       ViewnodeKind::Vognode (Vognode::Unknown (_))
         if *partnerFolder == Folder::Overridden => true,
-      ViewnodeKind::Vognode (Vognode::Ghost (_))
+      ViewnodeKind::Vognode (Vognode::Ghost (_) | Vognode::Restricted (_))
         => true,
       _ => false, }) )
     { errors . push(format!(
@@ -705,6 +712,9 @@ pub fn claiming_children_have_distinct_gnids (
           => Some (t . collected_gnid ()),
         ViewnodeKind::Vognode (Vognode::Unknown (u)) =>
           Some (u . gnid . clone()),
+        ViewnodeKind::Vognode (Vognode::Restricted (r))
+          if r . claimsMembership =>
+          Some (r . gnid . clone()),
         // A tombstone is not a content member (where it stands for a
         // restricted node, disk supplementation owns that membership), so
         // it does not participate in content-id distinctness.
@@ -736,6 +746,9 @@ fn partnerFolder_children_have_distinct_gnids (
           Some (t . gnid . clone()),
         ViewnodeKind::Vognode (Vognode::Unknown (u)) =>
           Some (u . gnid . clone()),
+        ViewnodeKind::Vognode (Vognode::Restricted (r))
+          if r . claimsMembership =>
+          Some (r . gnid . clone()),
         _ => None,
       })
     else { continue; };

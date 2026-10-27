@@ -165,15 +165,19 @@ impl ViewnodeKind {
 /// A viewnode that stands for a gnid: an occurrence, for a node the
 /// gated graph has; a ghost, only in the diff view, for a node HEAD
 /// has and the worktree lacks; an unknown, for a gnid its parent's
-/// list names and no node answers to. A restricted node has no
-/// vognode: the refresh entombstones its occurrence (the ID rule,
-/// 'server/refresh/id_rule.rs'), as it does the occurrence of a node
-/// that vanished, unless the diff view can show it as a ghost.
+/// list names and no node answers to; a Restricted vognode, for a
+/// node the skgrepo restriction keeps out that a visible record
+/// names. Where no record the restriction shows names a restricted
+/// node, it has no vognode: the refresh entombstones its occurrence
+/// (the ID rule, 'server/refresh/id_rule.rs'), as it does the
+/// occurrence of a node that vanished, unless the diff view can show
+/// it as a ghost.
 #[derive( Debug, Clone, PartialEq )]
 pub enum Vognode {
   Occurrence   (Occurrence),
   Ghost        (Ghost),
   Unknown      (Unknown),
+  Restricted   (Restricted),
 }
 
 /// The kind of a vognode, without its payload.
@@ -182,18 +186,20 @@ pub enum VognodeKind {
   Occurrence,
   Ghost,
   Unknown,
+  Restricted,
 }
 
 impl VognodeKind {
   /// The kind as a message names it, with its article: "an
-  /// occurrence", "a ghost", "an unknown".
+  /// occurrence", "a ghost", "an unknown", "a Restricted vognode".
   pub fn with_article (
     &self,
   ) -> &'static str {
     match self {
       VognodeKind::Occurrence => "an occurrence",
       VognodeKind::Ghost      => "a ghost",
-      VognodeKind::Unknown    => "an unknown", } }
+      VognodeKind::Unknown    => "an unknown",
+      VognodeKind::Restricted => "a Restricted vognode", } }
 }
 
 /// A reference that resolves to nothing: a gnid that its parent's
@@ -238,6 +244,42 @@ pub struct Unknown {
   /// names the gnid. The printer writes none: the metadata grammar
   /// gives an unknown no '(view ...)'.
   pub warrant : Warrant,
+}
+
+/// A Restricted vognode: where a record the skgrepo restriction shows
+/// names a node it keeps out, it stands for that node, by the
+/// record's gnid, and shows nothing of the node ('docs/glossary.org',
+/// "Restricted vognode").
+///
+/// ARISES: from the ID rule ('server/refresh/id_rule.rs'), for a gnid
+/// the truth says is restricted that its parent's goal names: drawn
+/// for a goal item marked restricted, or re-kinded in place from an
+/// occurrence whose node the restriction newly keeps out (and back to
+/// an occurrence when the restriction widens). Never in the diff view,
+/// which runs under no restriction.
+///
+/// USED: as an unknown is. It claims membership as an unknown does:
+/// when it claims, the save keeps its gnid in its viewparent's list;
+/// deleting its line removes the record. It takes a relRepo request
+/// and a readiness request. Text on its line is refused. It has no
+/// goal, so what stands under it is no member of it.
+///
+/// DISTINCT INFO: the record's gnid and relRepo; nothing of the node,
+/// neither its title, its body, its home skgrepo nor its stats.
+#[derive( Debug, Clone, PartialEq )]
+pub struct Restricted {
+  pub gnid                    : ID,
+  /// Display-only: the record's relRepo, where it differs from the
+  /// recorder's home.
+  pub relRepo                 : Option<SkgrepoName>,
+  /// A pending relRepo change of the record, consumed only by save.
+  pub relationshipEditRequest : Option<RelationshipEditRequest>,
+  /// Whether the save reads its gnid into its viewparent's list.
+  pub claimsMembership        : bool,
+  /// Whether the truth relates it to its viewparent as its position
+  /// implies ('Warrant'), as the refresh set it. The printer writes
+  /// none, as for an unknown.
+  pub warrant                 : Warrant,
 }
 
 /// A ghost: a node that the before-graph of the diff view's graph
@@ -938,10 +980,12 @@ impl Vognode {
       Vognode::Occurrence (t) => &t . gnid,
       Vognode::Ghost        (g) => &g . gnid,
       Vognode::Unknown      (u) => &u . gnid,
+      Vognode::Restricted   (r) => &r . gnid,
     } }
 
   /// The id and home skgrepo of the node it stands for; None for an
-  /// unknown, which knows no skgrepo.
+  /// unknown, which knows no skgrepo, and for a Restricted vognode,
+  /// which shows none.
   pub fn pid_and_skgrepo (
     &self,
   ) -> Option<(&ID, &SkgrepoName)> {
@@ -949,6 +993,7 @@ impl Vognode {
       Vognode::Occurrence (t) => Some ((&t . gnid, &t . home_skgrepo)),
       Vognode::Ghost        (g) => Some ((&g . gnid, &g . home_skgrepo)),
       Vognode::Unknown      (_) => None,
+      Vognode::Restricted   (_) => None,
     } }
 }
 
@@ -1129,6 +1174,8 @@ impl Viewnode {
         if restored (&unknown . relationshipEditRequest) {
           unknown . claimsMembership = true; }
         unknown . relationshipEditRequest = None },
+      ViewnodeKind::Vognode (Vognode::Restricted (restricted)) =>
+        restricted . relationshipEditRequest = None,
       ViewnodeKind::Vognode (Vognode::Ghost (ghost)) =>
         ghost . restoreNode_request = false,
       ViewnodeKind::PropertyMember (PropertyMember::Alias {
@@ -1148,7 +1195,8 @@ impl Viewnode {
       ViewnodeKind::Folder (folder) => folder . title (),
       ViewnodeKind::BufferRoot
         | ViewnodeKind::Tombstone
-        | ViewnodeKind::Vognode (Vognode::Unknown (_)) =>
+        | ViewnodeKind::Vognode (Vognode::Unknown (_))
+        | ViewnodeKind::Vognode (Vognode::Restricted (_)) =>
         "",
     }}
 
@@ -1184,7 +1232,9 @@ impl Viewnode {
       ViewnodeKind::Tombstone =>
         "tombstone" . to_string (),
       ViewnodeKind::Vognode (Vognode::Unknown (u)) =>
-        format!("unknown:{}", u . gnid . 0), }}
+        format!("unknown:{}", u . gnid . 0),
+      ViewnodeKind::Vognode (Vognode::Restricted (r)) =>
+        format!("restricted:{}", r . gnid . 0), }}
 
   /// Reasonable for both Occurrences and Non-vognodes.
   pub fn body (&self) -> Option < &String > {
@@ -1195,6 +1245,7 @@ impl Viewnode {
       ViewnodeKind::PropertyMember (member) => member . body (),
       ViewnodeKind::ChangeViewnode (change) => change . body (),
       ViewnodeKind::Vognode (Vognode::Unknown (_))
+        | ViewnodeKind::Vognode (Vognode::Restricted (_))
         | ViewnodeKind::BufferRoot
         | ViewnodeKind::Tombstone => None,
     }}

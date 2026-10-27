@@ -167,6 +167,8 @@ fn dependencies_from_viewforest (
         { result . insert (target . clone ()); }}
       ViewnodeKind::Vognode (Vognode::Unknown (unknown)) => {
         result . insert (unknown . gnid . clone ()); }
+      ViewnodeKind::Vognode (Vognode::Restricted (restricted)) => {
+        result . insert (restricted . gnid . clone ()); }
       ViewnodeKind::Vognode (Vognode::Ghost (ghost)) => {
         result . insert (ghost . gnid . clone ()); }
       ViewnodeKind::PropertyMember (
