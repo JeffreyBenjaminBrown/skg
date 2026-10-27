@@ -3099,3 +3099,20 @@ long before this plan, and the untracked
 'forking-and-privacy.org' names 'update_buffer/reconcile/'.
 *** Headline
 DONE.
+
+** Orchestrator's notes after slice 8 (2026-10-27)
+Launched 00:57 UTC, reported 01:05 UTC: eight minutes. No
+correction inserted. The move went as the plan said, with
+'git mv' and a check between moves; 'update_buffer.rs' keeps
+its name for the rerender passes, 'server/update_buffer/' and
+'server/to_org/' are gone, and the grep's one hit is the export
+handler's module name ending in "to_org", which is not the
+deleted module. Three stale paths the agent noticed lie
+outside the plan: 'TODO.org' and an integration test's README
+name files deleted long before this plan (slice 10's
+correction covers that README), and Jeff's untracked
+'forking-and-privacy.org' names 'update_buffer/reconcile/',
+which is his to change. Suites: nextest 982 of 982, Emacs 405,
+Neovim 399, integration 34 of 35 with the pre-existing
+failure, both clients.
+
