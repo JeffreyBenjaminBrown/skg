@@ -161,7 +161,7 @@ comments.
 ** buffer correction
 A buffer correction is a change the refresh made to what a
 buffer said because the buffer was wrong about the graph; the
-term is "buffer corrections", never bare "buffer corrections", in
+term is "buffer corrections", never bare "corrections", in
 prose, docs and the server's names (slice 2). Two things are
 not buffer corrections and are not reported: a tombstone the
 refresh leaves where the saving user's own save deleted the
