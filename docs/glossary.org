@@ -57,6 +57,8 @@ say "viewforest" rather than "viewtree" or "forest". The buffer as a
 whole is named by its viewforest id (see "viewnode ID, vnid,
 viewforest id").
 
+A *view root* is a root of a viewforest: a level-one headline.
+
 A *viewbranch* is any subtree of a viewforest: a viewnode with all its
 descendants. A view request asks the server to add viewbranches: a
 folder (with its members' chains), the flags folder. A
@@ -185,8 +187,9 @@ write-protected occurrence shows no body and saves nothing of its own,
 so a save is refused if one differs from the graph in its title,
 skgrepo, aliases (one lacked, reordered, or with a relRepo request) or
 flags. No child of a write-protected occurrence claims membership,
-whatever it carries: one the user types there is a note, which the
-refresh shows unwarranted. A buffer may hold at most one editable occurrence of a node,
+whatever it carries: a child the user typed under it, which stays
+unwarranted, since no save reads claims there, is saved as an orphan
+(see "claims membership"). A buffer may hold at most one editable occurrence of a node,
 so that two occurrences cannot contradict each other. Make one
 editable with =skg-set-editable= (=C-c s d=), which writes a
 =editableView= view request; make one write-protected with
@@ -218,12 +221,13 @@ or flags ('PropertyMember' in code).
 A *membership* is the relationship that causes a node to be drawn
 as a member of a list or folder; the member is the node.
 
-*** claims membership, 'noClaim', pending detachment, detach, attach
+*** claims membership, 'noClaim', pending detachment, detach, attach, orphan
 
 A child *claims membership* when the save will read it as a member
-of its viewparent's list. That is a declared part: the bare atom
-=noClaim= says no, its absence yes ('claimsMembership' in code, on an
-occurrence, a ghost, an unknown, an alias or an ID;
+of its viewparent's list; it is then a *claiming child*. That is a
+declared part: the bare atom =noClaim= says no, its absence yes
+('claimsMembership' in code, on an occurrence, a ghost, an unknown, a
+Restricted vognode, an alias or an ID;
 'docs/api-and-formats.org', "Content view"). It means something
 only where the save reads the claims of its viewparent's children:
 under an editable occurrence, and under an editable folder
@@ -248,7 +252,10 @@ save in another view removed, a removed member in the diff view, a
 child a viewnode merge moved there. A child the graph does relate
 there and that claims nothing is one the user marked =noClaim= to
 detach it: a *pending detachment*, herald "detach", which the next
-save takes out of the list. 'docs/data-model_technical.org', "The
+save takes out of the list. No wire says it; each client sees it and
+writes the atom =pendingDetachment= into the metadata it hands the
+herald rules ('docs/heralds.org', "What the server serves, and what
+the clients add"). 'docs/data-model_technical.org', "The
 refresh: how a view follows the graph", says how claims and warrants
 move.
 
@@ -279,10 +286,11 @@ own herald ('Warrant { ByGraph, ByHead, No }', 'warrant' in
 code). 'Warrant::ByGraph' is the truth's warrant (see "the truth"):
 the graph as the skgrepo restriction lets it be seen; a root, whose
 position implies no relationship, carries it too, and the wire
-writes nothing for it. Claim and warrant are independent: a note the user puts under
-a write-protected parent is unwarranted and carries no =noClaim=,
-since nothing claims there. The refresh keeps an unwarranted child
-where it stands; it never removes a child.
+writes nothing for it. Claim and warrant are independent: a child
+the user typed under a write-protected parent, which stays
+unwarranted, since no save reads claims there, carries no =noClaim=.
+The refresh keeps an unwarranted child where it stands; it never
+removes a child.
 
 *** stands as a member
 
@@ -319,9 +327,9 @@ as do the last two. The subscriber subscribes to the two subscribees.
 The second viewnode, though, corresponds to nothing in the graph.
 It exists only to name the relationship between its children and its parent.
 
-A *partner folder* is the general concept ('Folder' in code, one enum
-with the three property folders; see "Folder, and its per-kind
-rules").
+A *partner folder* is the general concept. In code it is a variant of
+'Folder', an enum that also holds the three property folders (see
+"Folder, and its per-kind rules").
 Recall that there are five relations in the graph:
 containment, link, subscription, hiding, and overriding.
 Because a node can be on either side of each relationship --
@@ -367,9 +375,11 @@ same sense ☮ (=writeProtected=) carries on a node.
 *Default presentation is intentionally narrow.* An occurrence that an
 editable-view request extends -- a fresh content view's roots, and
 the editable content the request draws under them -- gets its
-nonempty =subscribeeFolder= automatically, and a fresh content view a
-=containerFolder= on each root that has containers ('add_default_folders' in
-'server/refresh/visit.rs'). The other relation folders require an
+nonempty =subscribeeFolder= automatically ('add_default_folders' in
+'server/refresh/visit.rs'), and a fresh content view a
+=containerFolder= on each root that has containers, which the view's
+stub asks for ('stub_of_fresh_content_view' in
+'server/update_buffer.rs'). The other relation folders require an
 explicit folder request (the =C-c l= commands), even when their
 herald counts say they would be nonempty. The same rule applies when
 a member of any partner folder is extended as editable. An editable
@@ -401,8 +411,9 @@ from graph facts rather than direct edits to that folder.  A view
 may preserve an order for the set locally, but adding or removing an
 item in the generated folder does not add or remove the underlying
 graph membership fact.  No child of such a set claims membership, so
-the save reads nothing there: an item the user puts inside it is a
-note, which the refresh keeps and shows unwarranted (⊥).  If the
+the save reads nothing there: an item the user typed inside it,
+which stays unwarranted (⊥), since no save reads claims there, is
+kept where it stands.  If the
 refresh finds that a real member is missing from the view, it
 reinstates that member (see "reinstated").
 
@@ -497,6 +508,21 @@ of the implementation), which keeps what the user put in it. Org
 folding keeps the words "fold" and "unfold"; drawing more of a view
 is not called unfolding.
 
+*** text search, search view, enrichment
+
+A *text search* (=C-c f=) answers with one message, which opens a
+*search view*: an ordinary view, named by its query (=search:TERMS=),
+whose roots are the hits, best first, each a write-protected
+occurrence of its node. The *enrichment* (the search enrichment) is
+what the search draws under each hit, with the refresh every view is
+drawn with: its containers folder, whose members carry the
+containerward chain; its overrider and overridden folders, when it
+has such relatives; and, for a hit found through an alias, its alias
+folder, the one folder not folded. Under a skgrepo restriction that
+excludes overPrivateText telescopes, what the enrichment would draw
+of such a node is a tombstone. See 'docs/api-and-formats.org', "Text
+search".
+
 *** tombstone, entombstone
 
 A *tombstone* is a viewnode with no title, no ID and no change facts,
@@ -508,10 +534,12 @@ view becomes its ghost instead, or a restricted node that no record
 the restriction shows names, which elsewhere becomes a Restricted
 vognode), when it describes its viewparent from where it cannot (see
 "the refresh's rungs, unsayable" among the terms of the implementation), when
-the change it described is gone, when it is a folder left with
-nothing in it that the user could add to, and when the user asks it
-to of a ghost. The refresh prunes a childless tombstone before the
-buffer is rendered, a root included, so a user sees one only where it
+the change it described is gone, and when it is a folder left with
+nothing in it that the save does not read and that is not the flags
+folder. A text search leaves one where it excludes an
+overPrivateText node (see "text search, search view, enrichment").
+The refresh prunes a childless tombstone before the buffer is
+rendered, a root included, so a user sees one only where it
 holds something. The save discards anything typed on its line, and no
 child of a tombstone claims membership; every folder accepts one
 among its children. In code the kind is 'ViewnodeKind::Tombstone',
@@ -558,7 +586,9 @@ An *unknown node* is an ID that some node's contains, subscribesTo,
 hidesFromSubs or overrides list names but that no node of the graph
 answers to, as primary or extra ID; such an ID is *dangling*. A view
 shows it as an unknown ("Reference to unknown node."), which claims
-membership, since removing it would edit the list.
+membership, since removing it would edit the list. A *dangling
+partner* is a member of a list whose ID is dangling; in the diff
+view, one the worktree lost is an unknown carrying '(rel removed)'.
 The "investigate unknown node" request says what git history knows of
 it, and the delete-references-to-absent-node command removes the
 references.
@@ -624,6 +654,12 @@ the position that always shows the original; its editable
 extension applies neither the recorder's hides nor substitution to
 its immediate children.
 
+A node is *shown raw* where it stands as itself, not replaced by its
+effective overrider. Only content substitutes, so a view root, a
+member of a partner folder, a search hit, a chain node and a ghost
+are shown raw, and so, one level down, are the children of most
+overridden nodes shown raw ('docs/api-and-formats.org', "Override
+substitution and the overridesHere part").
 An ordinary single-root visit always opens the requested node itself,
 shown raw. In enriched search results, each result shows its override
 folders, holding its visible direct override relatives in both
@@ -644,6 +680,17 @@ two cannot be confused. ("relRepo" is a single coined term, so it keeps
 the short form.) Code says 'skgrepo' and 'gitrepo' too ('SkgrepoName',
 'home_skgrepo'); a skgrepo's config entry is the 'Skgrepo' type.
 
+The wire coins four more atoms, each one term, which keep their
+spelling: =skgRepos=, the metadata form that holds a headline's
+skgrepos; =nodeRepo= in it, the node's home skgrepo, and =relRepo=,
+its relationship's; =repoBoundary=, the derived fact that an
+occurrence is a root or that its node's home skgrepo differs from
+that of the nearest occurrence above it (herald =⌂:LABEL=); and
+=skgrepoLabels=, the table of skgrepo labels the herald rules come
+with. A skgrepo's *skgrepo label* is the short name its heralds
+show: its =abbreviation= in the config, or else its name
+('herald_label' in code).
+
 The *skgrepo restriction* ('SkgrepoRestriction') is the skgrepo-set a
 connection currently shows; the skgrepo-set =all= means no
 restriction. A skgrepo inside it is *unrestricted*, one outside it
@@ -663,7 +710,7 @@ A skgrepo is *owned* iff its directory lies under the config's
 =owned_folder= (default =owned/=); every other skgrepo is *foreign*.
 Only owned sections are ever written. A real edit to a foreign node is
 read as a request to fork it (see "clone, and the fork operation").
-Say "owned" rather than "owned", and "foreign" rather than
+Say "owned" rather than "editable", and "foreign" rather than
 "write-protected", when speaking of skgrepos: write-protection is a
 property of a viewnode occurrence (see "editable, write-protected").
 
@@ -723,8 +770,8 @@ A *home skgrepo move* is a change of a node's home skgrepo (=C-c s s=,
 then a save); a *relRepo move* is a change of a relationship's relRepo
 (=C-c s r=, or a save that resets or raises it). The diff view shows
 each move since HEAD as one change-forest leaf: a home skgrepo move as
-the property "⌂ -OLD +NEW" under the node, a relRepo move as the
-property "relationship moved from OLD to NEW" under the member, keyed
+the change viewnode "⌂ -OLD +NEW" under the node, a relRepo move as the
+change viewnode "relationship moved from OLD to NEW" under the member, keyed
 by the relationship, so the same move seen from either end is the
 same leaf. A relRepo move puts only the recorder in C. The
 skgrepo-changes buffer of the diff view shows the nodes whose home
@@ -881,7 +928,8 @@ A headline's *change facts* are the parts of its '(diff ...)' form
 that the server writes: the three kinds of change, the '(leaves
 ...)' count of its change-forest leaves, the '(ready ...)' readiness,
 its commit-readiness marker, and in the skgrepo-changes buffer its
-home skgrepo move ('ChangeFacts' in 'server/types/viewnode.rs'). A
+home skgrepo move and its moved-like-ancestor fact ('ChangeFacts' in
+'server/types/viewnode.rs'). A
 readiness request, in the headline's '(editRequest ...)', is the
 user's, not a change fact. The words are never shortened to
 "facts".
@@ -935,8 +983,9 @@ described: "the nodes to extend contentward (U; see
 The *change-forest* is the picture of everything commit-readiness can
 be asked about, built from the graph straddle, independent of any
 view: its roots are the changed graphnodes; under each come its
-changed aspects; its leaves, the *change-forest leaves*, are the
-individual changes a user marks. The type 'ChangeLeaves'
+changed aspects; its leaves, the *change-forest leaves* (*change
+leaves* for short, as in 'ChangeLeaves'), are the individual changes
+a user marks. The type 'ChangeLeaves'
 ('server/diff_view/change_leaves.rs') holds every leaf, keyed by its recorder,
 its aspect and, for a relationship, the relationship ('LeafKey'). The
 *recorder* of a leaf is the node whose file records the change, and
@@ -998,8 +1047,8 @@ name the node by its membership's fate.
 The change viewnode ('(oldText ASPECT)') under a node whose title or
 body changed since HEAD: labelled "old title and body", "old title" or
 "old body", its headline is the old title and its body the old body.
-When the body changed, a "body diff" property under it holds the line
-diff. The text change is one change-forest leaf, marked on the old
+When the body changed, a "body diff" change viewnode under it holds
+the line diff. The text change is one change-forest leaf, marked on the old
 text.
 
 **** changed folder
@@ -1040,7 +1089,7 @@ removed))', where the LCS of the two lists puts it, with the '-'
 herald. The save reads no alias from it, since it claims nothing; the
 ID folder, whose claims the save never reads, carries no 'noClaim',
 and the save's check of an ID folder refuses only one lacking an ID of
-the node. Marking it marks the leaf of the lost alias or ID.
+the node. Marking it marks the leaf of the removed alias or ID.
 
 **** readiness summary
 
@@ -1105,6 +1154,29 @@ A headline whose metadata carries a '(leaves ...)' change fact. It
 is ready when its '(ready ...)' names every object its '(leaves ...)' lists,
 and otherwise unready. The navigation commands (C-c r n c and its
 kin) move between headlines with change facts.
+
+**** tag
+
+To *tag* a headline of the diff view with its change is to give it
+the change facts of its change: the refresh tags each member of a
+list with the three kinds of change. Elsewhere "tag" has its
+ordinary sense (the callers of the refresh tag each view's buffer
+corrections with the view's ID).
+
+**** interleaved diff
+
+The order in which a buffer of the diff view shows a list that
+changed: the worktree's list, each member HEAD alone had placed
+before the next member of HEAD's order that the worktree kept, or
+last ('interleaved_diff_without_reorders'). A reorder alone shows
+nothing.
+
+**** context node
+
+An occurrence the diff view draws only to show where a change sits:
+its node is not among the changed nodes (not in C; see "C, R, U, D,
+content origin"). The server draws a context node with its body
+folded.
 
 **** in, out, "(this file)", "(other files)"
 
@@ -1213,9 +1285,9 @@ its own: which folders are write-protected is already known from the
 folder atom. The editable folders carry none.
 
 A folder left with no child is entombstoned, and so pruned, unless the
-save reads its membership or it is the flags folder, where the user
-could add something ('folder_goes_when_empty' in
-'server/refresh/visit.rs').
+save reads its membership, so that the user could add to it, or it is
+the flags folder, which stays to show that the node has no true flag
+('folder_goes_when_empty' in 'server/refresh/visit.rs').
 
 *** the containerward chain, as drawn
 
@@ -1248,6 +1320,23 @@ are now, and is a *fixpoint*: refreshing its own output changes and
 corrects nothing, up to the viewnode IDs it assigns
 ('tests/idempotence.rs'). 'docs/data-model_technical.org', "The
 refresh: how a view follows the graph", states the whole model.
+
+A view that does not exist yet is drawn from a *stub*, a viewforest
+of little more than its roots, which the refresh fills: for a fresh
+content view, one editable occurrence per requested node, asking for
+its containers folder and its extension ('stub_of_fresh_content_view'
+in 'server/update_buffer.rs'); for a search, the hits
+('draw_search_buffer'); for a buffer of the diff view, one *stub
+root* per member of D ('docs/diff-view.org', "Stub roots").
+
+The refresh walks the viewforest, visiting each parent once and
+applying its rungs there (see "the refresh's rungs, unsayable"); its
+*tail* is what it does once, after the walk ('server/refresh/tail.rs'):
+the *stats pass*, which computes every occurrence's derived facts
+('viewnodestats.rs', 'graphnodestats.rs' beside it); in the diff
+view, the '(ready ...)' change facts and the home skgrepo moves; the
+pruning of childless tombstones, and of folders the pruning empties;
+a viewnode ID for each viewnode lacking one; and the rendering.
 
 *** the truth
 
@@ -1310,9 +1399,12 @@ children, weakest first: re-kind, viewnode merge, warrant,
 claims, reinstate, reorder, override substitution, view requests
 ('server/refresh/visit.rs'; 'docs/data-model_technical.org', "The
 walk and the refresh's rungs"). A descriptor -- a folder, a property member, a
-change viewnode -- whose ancestors are not those the ancestry table
+change viewnode -- whose ancestors are not those the *ancestry table*
 requires of its kind ('required_ancestry' in
-'server/refresh/ancestry.rs') is *unsayable* there, and is
+'server/refresh/ancestry.rs', the table of the ancestors each kind of
+descriptor may stand under, nearest first;
+'docs/data-model_technical.org', "The ancestry table") is
+*unsayable* there, and is
 entombstoned, its children staying under the tombstone. An occurrence
 is never unsayable. (Older text calls the rungs the ladder; they are not the privacy
 ladder, the skgrepos in privacy order.)
@@ -1333,7 +1425,8 @@ and the edit request and relationship request of whichever sibling
 carried one. It holds every sibling's children in sibling order,
 each marked =noClaim= unless the graph warrants it there. So a copy
 pasted beside a member is joined to it. The buffer correction
-"merged" names the result. A viewnode merge is neither a nodeMerge,
+"Merged duplicate viewnode siblings into this one." names the
+result. A viewnode merge is neither a nodeMerge,
 which joins two graphnodes, nor an instructionMerge, and is never
 called a bare "merge". Both terms are coined by plan 06 ("tidy the
 refresh").
@@ -1402,8 +1495,8 @@ text).
 
 A viewnode is *save-inert* if it emits no fieldIntents: tombstones,
 change viewnodes, the diff view's acquisition folders, a ghost that
-claims nothing, and an alias or ID member that claims nothing (a lost
-alias or ID among them). Its descendants may still emit them, so save
+claims nothing, and an alias or ID member that claims nothing (a
+removed alias or ID among them). Its descendants may still emit them, so save
 extraction still visits them.
 
 *** MSV = maybe specified vector
@@ -1515,8 +1608,9 @@ How the server's startup warnings reach the user: 'load_config'
 returns warnings beside the config, 'main' records them once on the
 runtime ('record_startup_warnings' in 'server/types/env.rs'), the
 server serves them on request ("server warnings"), and each client
-appends them on connect to its '*SKG Server Warnings*' buffer, under
-a headline "Startup warnings". The same buffer receives the buffer
+appends them on connect to its warnings buffer ('*SKG Server
+Warnings*' in Emacs, 'skg://messages/server-warnings' in Neovim),
+under a headline "Startup warnings". The same buffer receives the buffer
 corrections a save or a rerender reports, under a headline per view;
 neither erases what the buffer holds.
 

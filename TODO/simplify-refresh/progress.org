@@ -3298,3 +3298,112 @@ right. Suites: nextest 991 of 991, Emacs 406, Neovim 399,
 integration 34 of 35 with the pre-existing failure, both
 clients; the fixpoint sweeps pass under each restriction.
 
+** Slice 10
+*** The commits
+**** aed30caa
+The commands docs: in both COMMANDS docs, what a save does to other
+views, the buffer corrections and their six messages, where a save's
+warnings go and the orphan warning, the ghost's herald, the
+skgrepo-set switch's tombstones and lost unsaved edits, the grammar
+check of hand-edited metadata, the keys outside content views, the
+retired words, the smaller misdescriptions; the single-root command
+in COMMANDS.org; two client docstrings and three server messages.
+**** 52cc7756
+The other docs: the tombstone's legend in heralds.org, a "close
+view" section in api-and-formats.org, the omitted Neovim deviations,
+the words the glossary rules out in the technical docs and five code
+comments; the integration test's README and script comments; a test
+comment's citation of TODO/ removed.
+**** this record's commit
+The glossary; the slice's DONE; this record.
+*** The suites
+**** cargo check --all-targets
+Clean, no warnings.
+**** bash/all-tests.sh
+Emacs 406 of 406; Neovim 399 passed, none failed, no errors;
+nextest 991 of 991; doctests pass; integration 34 of 35 with each
+client (Emacs, then Neovim). The one failure each time, retried once
+and failing again, is 'import-md-and-org': pre-existing, not
+investigated. No other failure at any point; no flake. Log:
+'tests/results/06/slice10/all-tests.log'.
+**** the plan's greps
+'rg -n -i "non-ignored|survivor|enrichment thread|phase 2" docs'
+and 'rg -n "\bnote\b"' over the glossary, COMMANDS.org and the
+technical data model: both empty. There is no doc build.
+*** The two-question check
+**** what terms did this plan's code coin or reuse
+Every word of the plan's "Words this plan uses" is now in the
+glossary and in the code as the plan defines it: duplicate viewnode
+siblings and viewnode merge, orphan, detach and attach, restricted
+and record, the Restricted vognode, claiming (the glossary now says
+"claiming child"), buffer correction, RefreshMode, the rungs and
+'visit.rs'. The retired words are gone from the code and the docs:
+"non-ignored", "survivor", "prepass", "pre-pass", "CompletionMode",
+"enrichment thread", "request-snapshot", "stream guard" (none);
+"ladder" names only the privacy ladder; "phase 1" and "phase 2"
+remain only in 'server/save.rs', for the two passes of the delete
+cleanup, unrelated to the search. One synonym: the plan's "change
+leaf" is the glossary's "change-forest leaf", and the code already
+said "change leaves" ('ChangeLeaves', and several comments); the
+glossary now gives "change leaves" as the short form. "readiness
+facts", a coinage the glossary does not have, stood in five code
+comments and two docs; they say "the '(ready ...)' change facts"
+now.
+**** does its code cite anything under TODO/
+'rg -n "TODO/" server elisp nvim shared --glob "!target"' finds
+nothing. Under 'tests/', one comment slice 9 added in
+'tests/hidden_nodes.rs' cited
+'TODO/simplify-refresh/06_1_prepass-experiment.org', an untracked
+file; it now cites nothing. 'bash/run-plan-slices.sh' names the plan
+it runs, as it must.
+*** Deviations from the plan's "how"
+**** claimant and herald label: renamed, not defined
+Defining "claimant" and "herald label" would make synonyms of
+"claiming child" and of the skgrepo label. The API doc's one
+"claimant" says "claiming child", which the glossary defines under
+"claims membership"; "herald label" says "skgrepo label", which the
+glossary defines in the skgrepo entry beside the coined atoms.
+**** the integration test beyond its README
+The test's two scripts and 'run-test.sh' described the same retired
+code in their header comments ('DeletedNode', 'complete_viewtree'),
+and phase 8's comment said buffer 1 held no tombstone, which it
+does; they now say what the phases do, and the Emacs phase-8
+function is 'phase-8-add-new-root'. 'brief.org' showed buffers the
+test no longer asserts; it shows the ones it does.
+**** code touched for the docs' words
+Item 10's user-visible messages ("Visit a editable view", and two
+more with "a editable") and the client docstrings' "a tombstone or
+a property"; the doubled "buffer buffer correction" in two comments
+of 'buffer_corrections.rs'; the flags folder's reason in
+'folder_goes_when_empty' ("where the user could add something",
+which contradicts the folder refusing every edit). One test asserted
+the message and changed with it.
+**** the export's "marker" and "note"
+The export docs' "marker" is the export marker, a third sense the
+glossary's rule on "marker" does not list; they now say "export
+marker". COMMANDS.org's "some links might be broken" note, which the
+plan's grep found, now names the node.
+**** the owned pair
+The glossary's 'Say "owned" rather than "owned"' had lost its pair
+since b97ae20d; it now says "rather than "editable"", the pair that
+matches "foreign rather than write-protected". A guess from context.
+*** Claims run and claims traced
+The doc claims about other views and the buffer corrections rest on
+existing tests ('tests/refresh/claims.rs',
+'tests/corrections_channel.rs', 'tests/refresh/buffer_corrections.rs').
+That a skgrepo-set switch loses an open buffer's unsaved edits was
+traced, not run: the rerender starts from the view the server
+stored, and the client erases the buffer before inserting it.
+*** Left unfinished
+Nothing of slice 10. Noticed:
+**** the test no longer edits under a tombstone
+'save_collateral_delete_then_edit_under_it' adds subee-2 and
+new-root beside the tombstones, never under them, so its name
+promises more than it checks ('README/detail.org', "What it does
+not check").
+**** a user doc cites an untracked file
+'docs/api-and-formats.org', "Text search", cites
+'TODO/simplify-refresh/bench-search-enrichment.org', which is not
+tracked (slice 6's note on the retired two-phase protocol).
+*** Headline
+DONE.
