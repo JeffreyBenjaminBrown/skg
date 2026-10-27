@@ -36,7 +36,7 @@ use std::sync::{Arc, MutexGuard};
 /// ('RefreshMode::charges_node_budget'). The diff view requires the
 /// skgrepo set 'all', so nothing is restricted there.
 /// 'buffer_correction_policy' says which changes are no buffer corrections.
-pub fn complete_viewforest_with_graph_straddle (
+pub fn refresh_diffView_viewforest (
   runtime              : &RuntimeGeneration,
   straddle             : &GraphStraddle,
   diffView_buffer_kind : DiffViewBufferKind,
@@ -49,8 +49,8 @@ pub fn complete_viewforest_with_graph_straddle (
   refresh_viewforest (
     viewforest, viewnode_id_record, &Truth::of_runtime (runtime, restriction),
     RefreshMode::DiffView { straddle,
-                               buffer_kind     : diffView_buffer_kind,
-                               readiness_store : store },
+                            buffer_kind     : diffView_buffer_kind,
+                            readiness_store : store },
     runtime . config . initial_node_limit, buffer_correction_policy ) }
 
 /// Rerender a buffer of the diff view: bring the straddle in the
@@ -85,7 +85,7 @@ pub fn rerender_diffView_buffer (
   if integrate_unshown_changes {
     ensure_editableOccurrences_exist (&straddle, diffView_buffer_kind, viewforest); }
   let store : MutexGuard<ReadinessStore> = context . env . runtime . lock_readiness_store ();
-  let refreshed : Refreshed = complete_viewforest_with_graph_straddle (
+  let refreshed : Refreshed = refresh_diffView_viewforest (
     runtime, &straddle, diffView_buffer_kind, &store, restriction,
     buffer_correction_policy, viewforest, viewnode_id_record ) ?;
   if ! integrate_unshown_changes { return Ok (refreshed); }
@@ -96,7 +96,7 @@ pub fn rerender_diffView_buffer (
     else {
       append_contentOrigins_to_buffer (
         runtime, &straddle, diffView_buffer_kind, viewforest, &new_roots ) ?;
-      complete_viewforest_with_graph_straddle (
+      refresh_diffView_viewforest (
         runtime, &straddle, diffView_buffer_kind, &store, restriction,
         buffer_correction_policy, viewforest, viewnode_id_record ) ? . text };
   Ok ( Refreshed { text, buffer_corrections : Vec::new () } ) }

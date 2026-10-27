@@ -16,8 +16,8 @@ fn diff_run_asserting_fixpoint (
   let readiness_store : ReadinessStore = ReadinessStore::default ();
   run_asserting_fixpoint_in ( text, &straddle . after, None,
            RefreshMode::DiffView { straddle,
-                                      buffer_kind : DiffViewBufferKind::AllChanges,
-                                      readiness_store : &readiness_store },
+                                   buffer_kind : DiffViewBufferKind::AllChanges,
+                                   readiness_store : &readiness_store },
            100 ) }
 
 #[test]

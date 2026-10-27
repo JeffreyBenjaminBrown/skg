@@ -37,7 +37,7 @@ use skg::types::tree::forest::ViewForest;
 use skg::update_buffer::render_initial_view;
 
 use crate::git_fixture::{OwnedSkgrepos, git_fixture, graph_straddle};
-use skg::diff_view::completion::complete_viewforest_with_graph_straddle;
+use skg::diff_view::refresh::refresh_diffView_viewforest;
 use skg::diff_view::pruned_change_view::RenderedDiffViewBuffer;
 use skg::diff_view::readiness_store::ReadinessStore;
 use skg::graph_straddle::types::GraphStraddle;
@@ -270,7 +270,7 @@ fn diff_view_buffer_refreshes_unchanged (
 ) -> Result<(), String> {
   refresh_reaches_fixpoint (
     text, &runtime . graph,
-    |forest, record| complete_viewforest_with_graph_straddle (
+    |forest, record| refresh_diffView_viewforest (
       runtime, straddle, buffer_kind, store, None,
       &BufferCorrectionPolicy::default (), forest, record )) }
 

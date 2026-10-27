@@ -107,8 +107,8 @@ fn a_container_folder_from_a_graph_straddle_holds_both_graphs_containers (
              config      : &f . runtime . config,
              restriction : None },
     RefreshMode::DiffView { straddle        : &f . straddle,
-                               buffer_kind     : DiffViewBufferKind::AllChanges,
-                               readiness_store : &ReadinessStore::default () },
+                            buffer_kind     : DiffViewBufferKind::AllChanges,
+                            readiness_store : &ReadinessStore::default () },
     100,
     &BufferCorrectionPolicy::default () ) ?;
   let both : DiffChange = DiffChange::default ();

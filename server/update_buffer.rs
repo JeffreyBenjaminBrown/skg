@@ -1,7 +1,7 @@
 //! Bringing views up to date with the graph. Every view is refreshed
 //! ('refresh_viewforest', 'server/refresh/'): a content view in
 //! content-view mode, a buffer of the diff view in diff-view mode,
-//! over the graph straddle ('server/diff_view/completion.rs'):
+//! over the graph straddle ('server/diff_view/refresh.rs'):
 //! - 'render_initial_view' renders a new content view, the refresh of
 //!   a stub of its roots, each asking for its containers folder;
 //! - 'diffView_buffer_viewforest'
@@ -18,7 +18,7 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::refresh::{Refreshed, Truth, refresh_content_viewforest};
 use crate::refresh::buffer_corrections::{BufferCorrectionPolicy, BufferCorrection, ViewBufferCorrections};
 use crate::diff_view::change_leaves::BufferReadinessSummary;
-use crate::diff_view::completion::rerender_diffView_buffer;
+use crate::diff_view::refresh::rerender_diffView_buffer;
 use crate::diff_view::readiness_requests::buffer_readiness_summary_for;
 use crate::graph_straddle::types::GraphStraddle;
 use crate::types::env::{RuntimeGeneration, SkgEnv};

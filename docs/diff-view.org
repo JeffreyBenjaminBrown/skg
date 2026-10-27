@@ -148,8 +148,8 @@ rerender and commit, by the one refresh every view uses
 mode is 'RefreshMode::DiffView', which carries the straddle, the
 buffer kind and the readiness store, from which the refresh reads
 its readiness facts ('server/refresh/mode.rs')
-('complete_viewforest_with_graph_straddle' and
-'rerender_diffView_buffer' in 'server/diff_view/completion.rs').
+('refresh_diffView_viewforest' and
+'rerender_diffView_buffer' in 'server/diff_view/refresh.rs').
 The diff-view mode ('server/refresh/diff_view.rs') changes the
 refresh so:
 - a parent's goal is the union of its lists in the two graphs

@@ -34,7 +34,7 @@ use crate::types::viewnode::{
   ChangeFacts, Editability, Existence, FoldAndFocus, Folder, Viewnode, ViewnodeKind,
   Vognode, mk_editable_viewnode, viewnode_of};
 use crate::types::views_state::{DiffViewBufferKind, ViewnodeIdRecord, pids_from_viewforest};
-use crate::diff_view::completion::complete_viewforest_with_graph_straddle;
+use crate::diff_view::refresh::refresh_diffView_viewforest;
 use crate::refresh::buffer_corrections::BufferCorrectionPolicy;
 
 use ego_tree::{NodeId, NodeRef};
@@ -218,7 +218,7 @@ pub fn diffView_buffer_viewforest (
 ) -> Result<RenderedDiffViewBuffer, Box<dyn Error>> {
   let mut viewforest : ViewForest =
     stub_viewforest_of_roots (runtime, straddle, diffView_buffer_kind, roots) ?;
-  let refreshed : Refreshed = complete_viewforest_with_graph_straddle (
+  let refreshed : Refreshed = refresh_diffView_viewforest (
     runtime, straddle, diffView_buffer_kind, store, None,
     &BufferCorrectionPolicy::default (), &mut viewforest,
     // A new buffer's first viewnode IDs; 'register_view' reads the record
