@@ -174,7 +174,7 @@ fn supplement_nodeSaveIntent_from_disk (
           match skgrepo_restriction {
             None => supplemented,
             Some (restriction) => preserve_invisible_members (
-              supplemented, &disk_node, graph, config, restriction ) };
+              supplemented, &disk_node, graph, restriction ) };
         apply_sticky_relRepos_in_graph_with_prospective_homes (
           supplemented, &disk_node, &requested_relRepos,
           graph, config, prospective_homes )
@@ -197,7 +197,6 @@ fn preserve_invisible_members (
   mut supplemented : Graphnode,
   disk_node        : &Graphnode,
   graph            : &InRustGraph,
-  config           : &SkgConfig,
   restriction      : &SkgrepoRestriction,
 ) -> Graphnode {
   let member_key = |gnid : &ID| -> RelationshipMemberKey {
@@ -206,17 +205,17 @@ fn preserve_invisible_members (
     disk_node . contains . iter ()
       . find (|member| &member . member == gnid)
       . is_some_and (|member| relationship_member_is_visible (
-        graph, member, config, restriction)) };
+        member, restriction)) };
   let subscribes_visible = |gnid : &ID| -> bool {
     disk_node . subscribesTo . or_default () . iter ()
       .find (|member| &member . member == gnid)
       .is_some_and (|member| relationship_member_is_visible (
-        graph, member, config, restriction)) };
+        member, restriction)) };
   let overrides_visible = |gnid : &ID| -> bool {
     disk_node . overrides . or_default () . iter ()
       .find (|member| &member . member == gnid)
       .is_some_and (|member| relationship_member_is_visible (
-        graph, member, config, restriction)) };
+        member, restriction)) };
   // Rendering may canonicalize a resolvable extra ID to its primary PID.  The
   // comparison key says that is the same relationship, but the disk spelling
   // is load-bearing: restore it before the weave so an untouched round trip

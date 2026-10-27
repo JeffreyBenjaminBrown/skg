@@ -140,6 +140,71 @@ fn a_save_under_a_restriction_keeps_every_hide_and_member (
       assert_r_keeps_its_members (f);
       Ok (( )) } ) }
 
+/// As above, but the line of the Restricted vognode hh is deleted
+/// before the save: that one hide goes, and the records the
+/// restriction keeps out (r's hide of hp, its containment of hc) stay
+/// as they were.
+#[test]
+fn deleting_a_restricted_vognodes_line_removes_its_record_alone (
+) -> Result<(), Box<dyn Error>> {
+  let case : tempfile::TempDir = tempfile::TempDir::new () ?;
+  write_fixture_where_r_hides (case . path (), &["hh", "hv"], PrivateSectionOfR::Written) ?;
+  with_git_fixture (
+    case . path (), OwnedSkgrepos::Named (&["public", "private"]), &[],
+    |f| {
+      let public : SkgrepoRestriction =
+        SkgrepoRestriction::named (&f . config, "public" . into ()) ?;
+      let switched : String = switched_to_public (f) ?;
+      let hh_line : String = switched . lines ()
+        . find ( |line| line . contains ("restricted (gnid hh)") )
+        . unwrap_or_else ( || panic! ( "hh stands as a Restricted vognode:\n{}", switched ))
+        . to_string ();
+      let edited : String = switched . replacen ( &format! ("{}\n", hh_line), "", 1 );
+      assert_ne! ( edited, switched );
+      save_under (f, &edited, &public) ?;
+      let r : GraphnodeInRust = node_in_graph (f, "r");
+      assert_eq! ( sorted ( members_of ( r . hidesFromSubs . or_default () )),
+                   vec! [ ID::from ("hp"), ID::from ("hv") ],
+                   "the hide of hh goes; that of hp, recorded in r's private \
+                    section, stays" );
+      assert_r_keeps_its_members (f);
+      Ok (( )) } ) }
+
+/// r contains x, private, and subscribes to e, which contains x too;
+/// r records both in its public file. Under "public" x stands in r's
+/// content as a Restricted vognode; its line deleted and the view
+/// saved, r no longer contains x, and, x being content of a node r
+/// subscribes to, r hides x from its subscriptions, as it would an
+/// occurrence's removal.
+#[test]
+fn deleting_a_restricted_vognode_from_a_subscribers_content_hides_it (
+) -> Result<(), Box<dyn Error>> {
+  let case : tempfile::TempDir = tempfile::TempDir::new () ?;
+  write_unchanged_skgrepos (case . path (), &[
+    ( "public", &[
+      ("r", "pid: r\ntitle: r\ncontains:\n- x\nsubscribesTo:\n- e\n"),
+      ("e", "pid: e\ntitle: e\ncontains:\n- x\n") ] ),
+    ( "private", &[ ("x", "pid: x\ntitle: x secret\n") ] ) ]) ?;
+  with_git_fixture (
+    case . path (), OwnedSkgrepos::Named (&["public", "private"]), &[],
+    |f| {
+      let public : SkgrepoRestriction =
+        SkgrepoRestriction::named (&f . config, "public" . into ()) ?;
+      let opened : String = open_view_of_r (f, Some (&public)) ?;
+      assert_restricted_vognodes_alone_stand_for ("the view", &opened, &["x"]);
+      let x_line : String = opened . lines ()
+        . find ( |line| line . starts_with ("** ")
+                        && line . contains ("restricted (gnid x)") )
+        . unwrap_or_else ( || panic! ( "x stands in r's content:\n{}", opened ))
+        . to_string ();
+      save_under (f, &opened . replacen ( &format! ("{}\n", x_line), "", 1 ),
+                  &public) ?;
+      let r : GraphnodeInRust = node_in_graph (f, "r");
+      assert_eq! ( members_of (&r . contains), Vec::<ID>::new () );
+      assert_eq! ( members_of ( r . hidesFromSubs . or_default () ),
+                   vec! [ ID::from ("x") ] );
+      Ok (( )) } ) }
+
 /// A view of r drawn under "all", switched to "public": h's occurrence
 /// is a Restricted vognode, in place, holding s1, and nothing shows h's
 /// text. Switched back to "all", it is h's occurrence again, with the

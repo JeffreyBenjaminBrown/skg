@@ -3,17 +3,18 @@
 /// see (the API doc's "Restricted-skgrepo nodes").
 ///
 /// VOCABULARY (shared by both functions):
-/// - A disk member is visible iff its relRepo is unrestricted
-///   and, when it resolves, its node home is unrestricted too.  An
-///   unresolvable raw member has no home, so an unrestricted relationship
-///   skgrepo makes it visible as an Unknown and lets the user delete it.
+/// - A disk member is visible iff its record is: its relRepo is
+///   unrestricted ('relationship_member_is_visible'). A visible member
+///   has a headline the user could delete: an occurrence, an unknown
+///   (an unresolvable raw member) or a Restricted vognode (a member
+///   whose node the restriction keeps out).
 /// - A disk member is positioned iff it appears in the buffer list.
-///   Only visible members ever do: save extraction never puts an
-///   restricted (invisible) member into a container's list (see
-///   'content_members' / 'partnerFolder_members' in
-///   local_fieldintent_collection/traverse.rs), so every invisible
-///   disk member is non-positioned and the weave alone decides its
-///   presence and position.
+///   Only visible members ever do: save extraction never puts a
+///   member whose record is restricted (an invisible one) into a
+///   container's list (see 'content_members' /
+///   'partnerFolder_members' in local_fieldintent_collection/
+///   traverse.rs), so every invisible disk member is non-positioned
+///   and the weave alone decides its presence and position.
 /// - A visible disk member absent from the buffer was deleted by
 ///   the user; an invisible one absent from the buffer was omitted
 ///   by rendering and must survive.
@@ -44,23 +45,16 @@ pub fn member_is_visible (
     Some (src) => restriction . contains_skgrepo (&src),
     None       => false, }}
 
-/// Visibility of a structured relationship occurrence.  Its relRepo
-/// gates first.  A resolved member also needs an unrestricted home; an unresolved
-/// raw member has no home and is deliberately visible whenever its relationship
-/// skgrepo is unrestricted, so the user can retain or remove the Unknown occurrence.
+/// Whether a record (a relationship as its recorder's file states it)
+/// is visible under the restriction: its relRepo is unrestricted.
+/// Whatever its member is, the buffer could show it: as an
+/// occurrence, as an unknown when nothing resolves it, or as a
+/// Restricted vognode when the restriction keeps out its node's home.
 pub fn relationship_member_is_visible (
-  graph  : &InRustGraph,
-  member : &RelPartner<ID>,
-  config : &SkgConfig,
+  member      : &RelPartner<ID>,
   restriction : &SkgrepoRestriction,
 ) -> bool {
-  if ! restriction . contains_skgrepo (&member . relRepo) { return false; }
-  let home : Option<SkgrepoName> = graph
-    . pid_and_skgrepo (&member . member)
-    . map (|(_pid, skgrepo)| skgrepo)
-    . or_else (|| home_from_disk (&member . member, config));
-  home . map_or (true, |skgrepo| restriction . contains_skgrepo (&skgrepo))
-}
+  restriction . contains_skgrepo (&member . relRepo) }
 
 /// The anchored weave, for order-meaningful lists ('contains',
 /// 'subscribesTo').  Invisible disk members cling to the visible
