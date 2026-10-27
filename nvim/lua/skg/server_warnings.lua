@@ -60,82 +60,50 @@ end
 ---Append CORRECTIONS, the parsed value of a response's 'corrections'
 ---field (the buffer corrections), to M.buffer_name, and show it. Each
 ---view gets a level-1 headline, 'Buffer corrections in' and its name
----(its buffer's name, or its view ID when no buffer has it), and each of its messages a level-2 headline. Nil or
----an empty list does nothing.
+---(see M.corrections_to_org_string), and each of its messages a
+---level-2 headline. Nil or an empty list does nothing.
 ---@param corrections any
 function M.show_corrections (corrections)
-  local corrected_views = M.corrected_views(corrections)
-  if #corrected_views == 0 then return end
+  if corrections == nil or not sexpr.is_list(corrections)
+     or #corrections == 0 then
+    return end
   local headline_count = 0
-  for _, corrected_view in ipairs(corrected_views) do
-    headline_count = headline_count + #corrected_view.messages end
+  for _, view_entry in ipairs(corrections) do
+    headline_count = headline_count + #view_entry - 1 end
   messages.big_nonfatal_message_appended(
     M.buffer_name,
     string.format(
       'skg: the server corrected %d headline%s in %d view%s - see %s',
       headline_count, headline_count == 1 and '' or 's',
-      #corrected_views, #corrected_views == 1 and '' or 's',
+      #corrections, #corrections == 1 and '' or 's',
       M.buffer_name),
-    M.corrected_views_to_org_string(corrected_views))
+    M.corrections_to_org_string(corrections))
 end
 
----CORRECTIONS as a Lua list of { view_id = ..., messages = {...} },
----skipping any entry without messages. The view ID may arrive as a
----symbol or a string; both become text.
+---Org text for CORRECTIONS, one (VIEW_ID MESSAGE ...) entry per view:
+---per view, a level-1 headline, 'Buffer corrections in' and the name
+---of the buffer whose view ID is the view's, or the ID itself when no
+---buffer has it; under it each message as a level-2 headline. A
+---message's own subheadline lines (level 3) stay as they are; its
+---trailing newlines go, and the Emacs chords it names become Neovim
+---bindings. The view ID may be a symbol or a string.
 ---@param corrections any
----@return table[]
-function M.corrected_views (corrections)
-  local corrected_views = {}
-  if corrections == nil or not sexpr.is_list(corrections) then
-    return corrected_views end
-  for _, entry in ipairs(corrections) do
-    if sexpr.is_list(entry) and #entry >= 2
-       and not sexpr.is_list(entry[1]) then
-      local entry_messages = {}
-      for index = 2, #entry do
-        if not sexpr.is_list(entry[index]) then
-          table.insert(entry_messages, sexpr.atom_text(entry[index]))
-        end
-      end
-      if #entry_messages > 0 then
-        table.insert(corrected_views,
-                     { view_id = sexpr.atom_text(entry[1]),
-                       messages = entry_messages }) end
-    end
-  end
-  return corrected_views
-end
-
----CORRECTED_VIEWS as org text: per view, a level-1 headline naming it
----('Buffer corrections in' the view's name)
----and a level-2 headline per message. A message's own subheadline
----lines (level 3) stay as they are; its trailing newlines go, and the
----Emacs chords it names become Neovim bindings.
----@param corrected_views table[]
 ---@return string
-function M.corrected_views_to_org_string (corrected_views)
+function M.corrections_to_org_string (corrections)
   local lines = {}
-  for _, corrected_view in ipairs(corrected_views) do
-    table.insert(lines,
-                 '* Buffer corrections in '
-                   .. M.corrected_view_name(corrected_view.view_id))
-    for _, message in ipairs(corrected_view.messages) do
+  for _, view_entry in ipairs(corrections) do
+    local view_id = sexpr.atom_text(view_entry[1])
+    local view_buf = buffer.find_buffer_by_view_id(view_id)
+    table.insert(lines, '* Buffer corrections in '
+                          .. (view_buf and vim.api.nvim_buf_get_name(view_buf)
+                              or view_id))
+    for index = 2, #view_entry do
       table.insert(lines,
                    '** ' .. messages.with_neovim_bindings(
-                     (message:gsub('\n+$', '')) ))
+                     (sexpr.atom_text(view_entry[index]):gsub('\n+$', '')) ))
     end
   end
   return table.concat(lines, '\n')
-end
-
----The name of the buffer whose view ID is VIEW_ID, or VIEW_ID itself
----when no buffer has it.
----@param view_id string
----@return string
-function M.corrected_view_name (view_id)
-  local buf = buffer.find_buffer_by_view_id(view_id)
-  if buf then return vim.api.nvim_buf_get_name(buf) end
-  return view_id
 end
 
 return M

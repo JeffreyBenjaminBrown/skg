@@ -1139,7 +1139,7 @@ message) run once against an isolated copy of the test
 fixtures' largest graph, its numbers recorded in
 'progress.org'.
 
-** TODO Slice 7: align the clients' metadata editors
+** DONE Slice 7: align the clients' metadata editors
 Read the readability report's item 6 and the duplication
 report's items 11 and 12 first. The printer's placement of the
 forms ('org_to_text.rs', 'viewnode_to_string') is the

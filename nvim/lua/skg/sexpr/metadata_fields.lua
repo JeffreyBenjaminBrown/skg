@@ -3,9 +3,11 @@
 -- field's cycle runs through. The fields of each kind of headline,
 -- their defaults and their values come from
 -- 'shared/metadata-fields.json', whose comments describe them. After
--- sexp_to_org, filling in inserts each missing field at its default;
--- before org_to_sexp, stripping removes each field at its default and
--- writes a value that took arguments as a list. The Lua port of
+-- sexp_to_org, filling in inserts each missing field at its default,
+-- every part where the server writes it; before org_to_sexp, stripping
+-- removes each field at its default and writes a value that took
+-- arguments as a list. Both clients pass the cases of
+-- 'tests/shared/metadata-editor-cases.txt'. The Lua port of
 -- elisp/skg-sexpr/skg-metadata-fields.el.
 --
 -- ENTRY POINTS: kind_of_sexp, fillIn_defaults_in_org,
@@ -76,6 +78,19 @@ end
 function M.default_p (field, text)
   local trimmed = vim.trim(text)
   return trimmed == field.default or trimmed == M.shown_default(field)
+end
+
+---Where the server writes the part NAME of '(skg ...)': its position in
+---shared.metadata_parts, a kind's atom standing at 'KIND''s. A part the
+---table does not list ranks after every part it lists.
+---@param name string
+---@return integer
+function M.part_rank (name)
+  local part = shared.metadata_kind(name) and 'KIND' or name
+  for index, listed in ipairs(shared.metadata_parts) do
+    if listed == part then return index end
+  end
+  return #shared.metadata_parts + 1
 end
 
 ---@param field table|nil
@@ -169,13 +184,12 @@ function M.group_children (headlines, child_level)
   return children, vim.list_slice(headlines, index)
 end
 
----The index in HEADLINES of the headline whose children are KIND's
----fields: the root, '(skg ...)', since every kind's fields stand
----beside its atom at the top level.
+---The index in HEADLINES of the root, '(skg ...)', whose children are
+---KIND's fields, beside the kind's atom.
 ---@param headlines table[]
 ---@param kind table
 ---@return integer
-function M.container_index (headlines, kind)
+function M.root_index (headlines, kind)
   for index, headline in ipairs(headlines) do
     if headline.level == 1 then return index end
   end
@@ -191,7 +205,7 @@ end
 ---@param transform fun(children: table[][], child_level: integer): table[]
 ---@return table[]
 function M.map_fields (headlines, kind, transform)
-  local index = M.container_index(headlines, kind)
+  local index = M.root_index(headlines, kind)
   local child_level = headlines[index].level + 1
   local children, remainder =
     M.group_children(vim.list_slice(headlines, index + 1), child_level)
@@ -203,8 +217,9 @@ end
 -- ── Fill in ────────────────────────────────────────────────────────
 
 ---ORG_TEXT, the metadata of a headline of KIND as org text, with each
----field KIND's headlines may set shown: in canonical order, a missing
----one at its default, a bare atom with a 'true' child. If
+---field KIND's headlines may set shown: every part where the server
+---writes it, a missing field at its default, a bare atom with a 'true'
+---child. If
 ---DISPLAY_TITLE is given and non-empty, prepend a display-only title
 ---group.
 ---@param org_text string
@@ -234,53 +249,53 @@ function M.maybe_prepend_title (headlines, display_title)
   return headlines
 end
 
----CHILDREN (headline groups at CHILD_LEVEL) in canonical order, flat,
----each of KIND's fields filled in. The canonical order is the order the
----server writes: what precedes the kind's atom (the viewnode ID and the
----markers) and the atom itself, which say what the headline is; then
----its gnid and skgRepos; then KIND's fields; then the other children,
----in the order they came.
+---CHILDREN (headline groups at CHILD_LEVEL), each of KIND's fields
+---filled in (M.fillIn_one), flat, every part where the server writes
+---it (M.part_rank): a missing field at its default, a part the table
+---does not list last, parts of one rank in their order. A second
+---group for a field is dropped.
 ---@param children table[][]
 ---@param child_level integer
 ---@param kind table
 ---@return table[]
 function M.fillIn_and_reorder (children, child_level, kind)
-  local leading_count = 0
-  for index, group in ipairs(children) do
-    if vim.tbl_contains(kind.atoms, vim.trim(group[1].text)) then
-      leading_count = index
-      break end
+  local field_names = M.field_names(kind)
+  local ranked = {} -- { rank, order, headlines }, one per part shown
+  local names_shown = {}
+  local function add (name, group)
+    table.insert(ranked, { M.part_rank(name), #ranked + 1,
+                           M.fillIn_one(name, group, child_level, kind) })
   end
-  local canonical = { 'gnid', 'skgRepos' }
-  for _, name in ipairs(M.field_names(kind)) do
-    table.insert(canonical, name) end
-  local leading = {}
-  local group_by_name = {}
-  local others = {}
-  for index, group in ipairs(children) do
-    local name = vim.trim(group[1].text)
-    if index <= leading_count then
-      for _, headline in ipairs(group) do
-        table.insert(leading, headline) end
-    elseif vim.tbl_contains(canonical, name) then
-      if group_by_name[name] == nil then group_by_name[name] = group end
-    else
-      for _, headline in ipairs(group) do
-        table.insert(others, headline) end
-    end
+  for _, group in ipairs(children) do
+    local name = M.group_name(group)
+    if not (names_shown[name] and vim.tbl_contains(field_names, name)) then
+      names_shown[name] = true
+      add(name, group) end
   end
-  local filledIn = {}
-  for _, name in ipairs(canonical) do
-    for _, headline in ipairs(
-        M.fillIn_one(name, group_by_name[name], child_level, kind)) do
-      table.insert(filledIn, headline) end
+  for _, name in ipairs(field_names) do
+    if not names_shown[name] then add(name, nil) end
   end
-  return M.concatenated(leading, filledIn, others)
+  table.sort(ranked, function (a, b)
+    if a[1] ~= b[1] then return a[1] < b[1] end
+    return a[2] < b[2] end)
+  local result = {}
+  for _, entry in ipairs(ranked) do
+    for _, headline in ipairs(entry[3]) do table.insert(result, headline) end
+  end
+  return result
+end
+
+---@param group table[]
+---@return string the name of the child whose headline group is GROUP:
+---its first headline's text
+function M.group_name (group)
+  return vim.trim(group[1].text)
 end
 
 ---The headlines that show the child NAME of KIND, whose group is GROUP
----or nil when absent: a missing field at its default, a bare atom with a
----'true' child.
+---or nil when absent: a missing field at its default; an editRequest
+---holding nothing but a readiness request with the other request at
+---its default before it; a bare atom with a 'true' child.
 ---@param name string
 ---@param group table[]|nil
 ---@param child_level integer
@@ -304,7 +319,7 @@ end
 
 ---Whether GROUP, an editRequest at CHILD_LEVEL, holds nothing but a
 ---readiness request, '(ready ...)' or '(unready ...)', which the
----readiness commands set and the editor keeps. Its fill-in then shows
+---readiness commands set and the editor shows. Its fill-in then shows
 ---the other request at its default beside it.
 ---@param group table[]
 ---@param child_level integer
@@ -314,8 +329,9 @@ function M.only_readiness_requests_p (group, child_level)
     M.group_children(vim.list_slice(group, 2), child_level + 1)
   if #value_groups == 0 then return false end
   for _, value_group in ipairs(value_groups) do
-    local text = vim.trim(value_group[1].text)
-    if text ~= 'ready' and text ~= 'unready' then return false end
+    if not vim.tbl_contains({ 'ready', 'unready', '(ready)', '(unready)' },
+                            M.group_name(value_group)) then
+      return false end
   end
   return true
 end
@@ -395,9 +411,8 @@ function M.strip_one (group, child_level, kind)
   return group
 end
 
----GROUP, a skgRepos at CHILD_LEVEL, as it saves: each skgrepo without
----a '(default)' suffix, one with no value dropped, and nil when none is
----left.
+---GROUP, a skgRepos at CHILD_LEVEL, as it saves: a skgrepo with no
+---value dropped, and nil when none is left.
 ---@param group table[]
 ---@param child_level integer
 ---@return table[]|nil
@@ -406,12 +421,8 @@ function M.skgRepos_as_saved (group, child_level)
   for _, repo_group in ipairs(
       M.group_children(vim.list_slice(group, 2), child_level + 1)) do
     if #repo_group > 1 then
-      table.insert(result, repo_group[1])
-      table.insert(result,
-        { level = repo_group[2].level,
-          text = M.strip_default_suffix(repo_group[2].text) })
-      for i = 3, #repo_group do
-        table.insert(result, repo_group[i]) end
+      for _, headline in ipairs(repo_group) do
+        table.insert(result, headline) end
     end
   end
   if #result == 1 then return nil end
@@ -462,14 +473,6 @@ function M.value_as_saved (value_group, field)
   for _, argument_text in ipairs(argument_texts) do
     table.insert(result, { level = level + 1, text = argument_text }) end
   return result
-end
-
----@param text string
----@return string TEXT without a trailing ' (default)'
-function M.strip_default_suffix (text)
-  local trimmed = vim.trim(text)
-  local without = trimmed:match('^(.*) %(default%)$')
-  return without or trimmed
 end
 
 ---An ID from TEXT, handling org links like [[id:X][label]].

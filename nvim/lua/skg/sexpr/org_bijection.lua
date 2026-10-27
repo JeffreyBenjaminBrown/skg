@@ -1,5 +1,5 @@
 -- PURPOSE: Roughly-bijective transformations between atom-headed
--- paren-terse sexps and org text.
+-- sexps and org text.
 -- The Lua port of elisp/skg-sexpr/skg-sexpr-org-bijection.el.
 --
 -- INPUT REQUIREMENTS
@@ -7,7 +7,6 @@
 --   - A non-empty list
 --   - "Atom-headed": every list (and sublist) has a bare atom as its
 --     first member, including at the top level.
---   - "Paren-terse": no proper sub-sexp wraps a single atom in parens.
 -- - Input org text must have:
 --   - At least one headline
 --   - Exactly one root (level-1) headline
@@ -20,7 +19,10 @@
 -- - Multi-word headlines become symbols with spaces (constructed
 --   programmatically; such symbols cannot round-trip through the
 --   sexp reader, but the edit-buffer pipeline never needs them to).
--- - Childless non-root headlines become bare atoms, not lists.
+-- - Childless non-root headlines become bare atoms, not lists, but
+--   for one whose text is '(ATOM)': a proper sub-sexp that wraps a
+--   single atom in parens, such as the readiness request '(ready)', is
+--   that headline.
 --
 -- ENTRY POINTS: sexp_to_org, org_to_sexp.
 
@@ -38,8 +40,8 @@ end
 
 -- ── sexp to org ────────────────────────────────────────────────────
 
----Convert SEXP to org-mode text. SEXP must be a list that is both
----atom-headed and paren-terse; errors otherwise.
+---Convert SEXP to org-mode text. SEXP must be an atom-headed list;
+---errors otherwise.
 ---@param sexp any
 ---@return string
 function M.sexp_to_org (sexp)
@@ -50,9 +52,6 @@ function M.sexp_to_org (sexp)
     error('sexp_to_org: input must be a non-empty list') end
   if not M.atom_headed_p(sexp) then
     error('sexp_to_org: input is not atom-headed: '
-          .. parse.to_string(sexp)) end
-  if not M.paren_terse_p(sexp) then
-    error('sexp_to_org: input is not paren-terse: '
           .. parse.to_string(sexp)) end
   return M.convert_sexp(sexp, 1)
 end
@@ -71,32 +70,6 @@ function M.atom_headed_p (sexp)
   return true
 end
 
----Is SEXP paren-terse? (No proper sub-sexp puts parens around a
----single atom.)
----@param sexp any
----@return boolean
-function M.paren_terse_p (sexp)
-  if is_atom(sexp) then return true end
-  for i = 2, #sexp do
-    if not M.paren_terse_proper_subsexp_p(sexp[i]) then return false end
-  end
-  return true
-end
-
----Paren-terseness for a proper subsexp: it cannot be a list
----containing a single atom.
----@param element any
----@return boolean
-function M.paren_terse_proper_subsexp_p (element)
-  if is_atom(element) then return true end
-  if #element == 1 and is_atom(element[1]) then return false end
-  for i = 2, #element do
-    if not M.paren_terse_proper_subsexp_p(element[i]) then
-      return false end
-  end
-  return true
-end
-
 ---Convert validated SEXP to org text starting at headline LEVEL.
 ---@param sexp any[]
 ---@param level integer
@@ -105,10 +78,13 @@ function M.convert_sexp (sexp, level)
   local lines = { M.make_headline(level, sexp[1]) }
   for i = 2, #sexp do
     local element = sexp[i]
-    if parse.is_list(element) and not parse.is_nil(element) then
-      table.insert(lines, M.convert_sexp(element, level + 1))
+    if is_atom(element) then
+      table.insert(lines, M.make_headline(level + 1, element))
+    elseif #element == 1 then -- one atom in parens
+      table.insert(lines, string.rep('*', level + 1)
+                            .. ' (' .. parse.atom_text(element[1]) .. ')')
     else
-      table.insert(lines, M.make_headline(level + 1, element)) end
+      table.insert(lines, M.convert_sexp(element, level + 1)) end
   end
   return table.concat(lines, '\n')
 end
@@ -203,8 +179,9 @@ end
 
 ---Build a sexp tree from HEADLINES[INDEX...] at EXPECTED_LEVEL.
 ---Returns the sexp and the index of the first unconsumed headline.
----A non-root headline with no children becomes a bare atom; the root
----or any headline with children becomes a list.
+---A non-root headline with no children becomes a bare atom, or, for
+---text '(ATOM)', the list of that atom; the root or any headline with
+---children becomes a list.
 ---@param headlines table[]
 ---@param index integer
 ---@param expected_level integer
@@ -229,6 +206,8 @@ function M.build_tree (headlines, index, expected_level)
     for _, child in ipairs(children) do table.insert(sexp, child) end
     return sexp, i end
   if expected_level == 1 then return { head_atom }, i end
+  local wrapped = headlines[index].text:match('^%(([^() ]+)%)$')
+  if wrapped then return { M.text_to_atom(wrapped) }, i end
   return head_atom, i
 end
 

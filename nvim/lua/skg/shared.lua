@@ -22,9 +22,13 @@ end
 
 M.herald_styles = read_json('herald-styles.json')
 M.relations = read_json('relations.json').relations
+local metadata_fields = read_json('metadata-fields.json')
 ---The headline kinds in 'shared/metadata-fields.json', each with the
 ---fields a user may set on it.
-M.metadata_kinds = read_json('metadata-fields.json').kinds
+M.metadata_kinds = metadata_fields.kinds
+---The parts of '(skg ...)' in the order the server writes them, from
+---'shared/metadata-fields.json', 'KIND' standing for a kind's atom.
+M.metadata_parts = metadata_fields.parts
 
 ---The style names, sorted.
 ---@return string[]

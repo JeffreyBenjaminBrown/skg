@@ -2859,3 +2859,108 @@ integration 34 of 35 with the pre-existing failure, both
 clients; the timing ran on the small fixture graph (19 hits,
 11 ms median), which says nothing about hundreds of hits.
 
+** Slice 7
+*** The commits
+**** cafdf1af
+The case file 'tests/shared/metadata-editor-cases.txt' (twelve
+cases of the editor, one of the buffer corrections); the fields
+table gains 'parts', the printer's order of the parts of
+'(skg ...)', and lists the occurrence's fields in it (noClaim
+before writeProtected); a conformance test
+('the_printer_writes_the_parts_in_the_tables_order') checks both
+against 'viewnode_to_string'.
+**** b1b73876
+Emacs passes the cases: the editor shows a readiness request; the
+fill-in by the table's parts; 'only-readiness-requests-p' and
+'skgRepos-as-saved' ported; the "(default)" nodeRepo handling
+gone; the bijection carries a one-atom list; the writers go
+through the pure functions, placing by the parts; the buffer
+corrections display in two functions;
+'tests/elisp/test-skg-metadata-editor-cases.el'.
+**** this record's commit
+Neovim passes the cases: the same fill-in and names
+('container_index' became 'root_index'), the "(default)" nodeRepo
+handling gone, the bijection, placement by the parts, the buffer
+corrections display in two functions, the editor's two pure
+helpers; 'tests/nvim/metadata_editor_cases_spec.lua'; the
+COMMANDS docs; this record; the slice's DONE.
+*** The suites
+**** cargo check --all-targets
+Clean, no warnings.
+**** bash/nextest.sh
+982 of 982 passed (981 before; the new conformance test).
+**** bash/emacs-tests.sh
+405 of 405 (411 before: the "(default)" suffix test, the
+non-paren-terse rejection and the six paren-terse predicate tests
+went; the shared cases and the valueless skgrepo test came).
+***** failures met, classified
+After the Emacs changes, before their test edits: four, each an
+expected fixture adaptation. 'test-canonical-ordering' and
+'test-empty-node-org-text-with-title' expected writeProtected
+before noClaim; 'test-strip-repo-with-default-suffix' tested the
+handling the plan deletes; 'test-edit-metadata-keeps-a-readiness-
+request' expected the request hidden (now
+'test-edit-metadata-shows-a-readiness-request', which also
+deletes one in the editor).
+'test-insert-heading-prompts-for-repo' failed only after that one,
+from the edit buffer it left open; it passed once the other did.
+**** bash/nvim-tests.sh
+399 passed, none failed (396 before). The first run failed two,
+both expected fixture adaptations: the field order, and the
+"(default)" suffix test, now a test of the valueless skgrepo.
+**** bash/integration-tests.sh
+Emacs: 34 of 35. Neovim ('SKG_TEST_CLIENT=nvim'): 34 of 35. The
+one failure each time is 'import-md-and-org', pre-existing, not
+investigated.
+*** Deviations from the plan's "how"
+**** the printer's order, from the table
+The plan reconciles 'leading-child-p' with Neovim's leading by
+position. Neither places every part as the printer does (each put
+'overridesHere' after the fields, and the table listed
+writeProtected before noClaim), so both now sort the parts by
+the table's new 'parts' list, which a conformance test checks
+against the printer; 'leading-child-p' went. A missing field
+lands where the server would write it, and an untouched save
+sends back exactly what the server wrote. The two request writers
+place a new '(editRequest ...)' by the same list rather than by
+their own lists of the forms after it.
+**** a one-atom list in the editor
+The server writes a readiness request naming no object as
+'(ready)', and '(diff ... (ready))' for a single-object leaf. The
+org bijection refused any one-atom list ("paren-terse"), so the
+editor could not open such a headline in either client, and
+showing readiness requests in Emacs would have made it refuse
+'(editRequest (ready))' too. The bijection now writes such a list
+as a headline '(ATOM)' and reads it back; only the editor uses
+the bijection. The paren-terse predicate and its tests went.
+**** the editor's two pure helpers
+Each client's editor now builds what it shows and what it saves
+through 'skg-sexp-edit--org-text-to-show' /
+'skg-sexp-edit--metadata-text-to-save' and
+'org_text_to_show' / 'metadata_text_to_save', so the cases test
+the editor's own path.
+**** the readiness writer in Emacs
+'skg--write-editRequest-parts' became
+'skg--rewrite-metadata-at-point', taking the rewrite; the two
+writers call 'skg--metadata-with-edit-request' and
+'skg--metadata-with-readiness-request', which had lost their
+callers. 'skg--readiness-request-of' went with the hiding.
+**** the cycle values take no current value
+It served only the "(default)" nodeRepo; both clients'
+'cycle-values-for-field' take the field name alone.
+**** the buffer corrections display
+Two functions in each: 'skg-show-corrections-in-server-warnings'
+and 'skg--corrections-to-org-string'; 'show_corrections' and
+'corrections_to_org_string'. Neovim no longer skips malformed
+entries, as Emacs never did.
+**** Neovim's chords
+Neovim still rewrites the Emacs chords a message names; the
+case's message names none.
+*** Fixtures changed
+'shared/metadata-fields.json' (the parts, the occurrence's field
+order); 'tests/shared/metadata-editor-cases.txt' (new). The
+expectations adapted as classified above.
+*** Left unfinished
+Nothing of slice 7.
+*** Headline
+DONE.

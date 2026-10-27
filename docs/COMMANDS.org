@@ -813,6 +813,9 @@ A value that needs more (merge's target, relRepo's skgrepo,
 a flag and its value, a folder's relation) prompts for it.
 A field left at its default is dropped when the edit is applied
 (C-c C-c).
+A readiness request the diff view's gestures wrote
+(see C-c r) is shown in the edit request field, beside the other
+request; deleting it there clears it.
 Note that some properties don't make sense to edit,
 like the count of how many contents it has.
 (If you want to change how much content a node has,

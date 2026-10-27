@@ -30,7 +30,9 @@ M.help_text =
 ---populates a minimal (skg node (skgRepos (nodeRepo X))) in place and
 ---opens the
 ---empty-node view over it: skgrepo pre-filled, the other editable
----fields childless, so an untouched apply yields just the skgrepo.
+---fields childless, so an untouched apply yields just the skgrepo. A
+---readiness request in its '(editRequest ...)' is shown beside the
+---other request, so that deleting it there clears it.
 function M.edit_metadata ()
   if not metadata.at_headline_p() then error('Not on a headline') end
   local source_buf = vim.api.nvim_get_current_buf()
@@ -42,15 +44,26 @@ function M.edit_metadata ()
     M.open_empty_node_view(source_buf, line_number, split)
     return end
   local sexp = sexpr.read(split.metadata)
-  local kind = fields.kind_of_sexp(sexp)
-  local org_text = bijection.sexp_to_org(sexp)
-  if kind then
-    org_text = fields.fillIn_defaults_in_org(
-      org_text, kind,
-      metadata.occurrence_sexp_p(sexp) and split.title or nil) end
-  M.open_edit_buffer(org_text, source_buf, line_number,
-                     #split.stars, #split.metadata, kind)
+  M.open_edit_buffer(M.org_text_to_show(sexp, split.title),
+                     source_buf, line_number,
+                     #split.stars, #split.metadata,
+                     fields.kind_of_sexp(sexp))
   M.goto_field_value('nodeRepo')
+end
+
+---The org text the edit buffer shows for METADATA_SEXP, a headline's
+---metadata, whose title is TITLE: each field its kind may set filled
+---in, under a display-only title group when it is an occurrence's.
+---@param metadata_sexp any
+---@param title string|nil
+---@return string
+function M.org_text_to_show (metadata_sexp, title)
+  local kind = fields.kind_of_sexp(metadata_sexp)
+  local org_text = bijection.sexp_to_org(metadata_sexp)
+  if not kind then return org_text end
+  return fields.fillIn_defaults_in_org(
+    org_text, kind,
+    metadata.occurrence_sexp_p(metadata_sexp) and title or nil)
 end
 
 ---Populate minimal metadata on the metadata-less headline, then open
@@ -160,14 +173,10 @@ function M.apply (buf)
   local length = vim.b[buf].skg_edit_length
   if not source_buf or not vim.api.nvim_buf_is_valid(source_buf) then
     error('The buffer this metadata came from is no longer open') end
-  local org_text = table.concat(
-    vim.api.nvim_buf_get_lines(buf, 0, -1, false), '\n')
   local kind_atom = vim.b[buf].skg_edit_kind_atom
-  if kind_atom then
-    org_text = fields.strip_defaults_from_org(
-      org_text, shared.metadata_kind(kind_atom)) end
-  local new_sexp = bijection.org_to_sexp(org_text)
-  local new_text = sexpr.to_string(new_sexp)
+  local new_text = M.metadata_text_to_save(
+    table.concat(vim.api.nvim_buf_get_lines(buf, 0, -1, false), '\n'),
+    kind_atom and shared.metadata_kind(kind_atom) or nil)
   vim.bo[buf].modified = false
   vim.api.nvim_buf_delete(buf, { force = true })
   vim.api.nvim_set_current_buf(source_buf)
@@ -177,11 +186,23 @@ function M.apply (buf)
   vim.api.nvim_win_set_cursor(0, { line_number, start_col })
 end
 
+---The metadata text that applying the edit buffer's ORG_TEXT writes
+---into the source headline: ORG_TEXT stripped of the fields of KIND (a
+---kind from 'shared/metadata-fields.json', or nil) at their defaults,
+---as a sexp.
+---@param org_text string
+---@param kind table|nil
+---@return string
+function M.metadata_text_to_save (org_text, kind)
+  if kind then org_text = fields.strip_defaults_from_org(org_text, kind) end
+  return sexpr.to_string(bijection.org_to_sexp(org_text))
+end
+
 -- ── value cycling ──────────────────────────────────────────────────
 
 ---The values to cycle through for FIELD_NAME, or nil when the field
----is not cycleable. FIELD_VALUE matters for skgrepo defaulting. Every
----field but the skgrepo cycles as 'shared/metadata-fields.json' says
+---is not cycleable. The nodeRepo cycles through the owned skgrepos;
+---every other field cycles as 'shared/metadata-fields.json' says
 ---for the kind of the headline being edited: a value offered only to
 ---an editable headline is left out when the edit buffer sets
 ---writeProtected to true, and one offered only to a removed member when
@@ -189,11 +210,12 @@ end
 ---restore requests are described in 'docs/diff-view.org', "Restoring
 ---what a change removed". Mirrors skg-sexp-edit--cycle-values-for-field.
 ---@param field_name string
----@param field_value string
 ---@return string[]|nil
-function M.cycle_values_for_field (field_name, field_value)
-  if field_name == 'nodeRepo' then
-    return M.repo_cycle_values(field_value) end
+function M.cycle_values_for_field (field_name)
+  if field_name == 'nodeRepo' then -- from the config
+    local skgrepos = config.owned_repos()
+    if skgrepos and #skgrepos > 0 then return skgrepos end
+    return nil end
   return fields.cycle_values(M.edit_buffer_kind(), field_name,
                              M.editable_p(),
                              metadata.removed_membership_p(M.source_sexp()))
@@ -255,24 +277,6 @@ function M.source_sexp ()
   return nil
 end
 
----Owned skgrepo names as a cycle list; a ' (default)'-suffixed current
----value leads, so cycling starts there.
----@param field_value string
----@return string[]|nil
-function M.repo_cycle_values (field_value)
-  local skgrepos = config.owned_repos()
-  if not skgrepos or #skgrepos == 0 then return nil end
-  if field_value:match(' %(default%)$') then
-    local bare = field_value:gsub(' %(default%)$', '')
-    local values = { field_value }
-    for _, name in ipairs(skgrepos) do
-      if name ~= bare then table.insert(values, name) end
-    end
-    return values
-  end
-  return skgrepos
-end
-
 ---Cycle the headline value at point by DIRECTION (1 or -1); dispatch
 ---is based on the parent headline text. Choosing a value that takes
 ---arguments prompts for each. FIELD_VALUE is found among the values
@@ -290,7 +294,7 @@ function M.cycle (direction)
   if not parent_line then error('Cannot determine parent field') end
   local parent = vim.trim(metadata.split_as_stars_metadata_title(
     metadata.line_text(parent_line)).title)
-  local values = M.cycle_values_for_field(parent, field_value)
+  local values = M.cycle_values_for_field(parent)
   if values then
     local index = nil
     for i, value in ipairs(values) do

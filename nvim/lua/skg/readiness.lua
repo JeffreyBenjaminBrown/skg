@@ -471,9 +471,16 @@ end
 -- ── the gestures ───────────────────────────────────────────────────
 
 ---The heads of the top-level forms the server writes after
----'(editRequest ...)'; a new one is placed before the first of them.
-local FORMS_AFTER_EDIT_REQUEST = { viewRequests = true, view = true,
-                                   diff = true }
+---'(editRequest ...)' (shared.metadata_parts); a new one is placed
+---before the first of them.
+local FORMS_AFTER_EDIT_REQUEST = {}
+do
+  local after = false
+  for _, part in ipairs(shared.metadata_parts) do
+    if after then FORMS_AFTER_EDIT_REQUEST[part] = true end
+    if part == 'editRequest' then after = true end
+  end
+end
 
 ---@param request any a part of an '(editRequest ...)'
 ---@return boolean is it a readiness request, '(ready OBJECT...)' or

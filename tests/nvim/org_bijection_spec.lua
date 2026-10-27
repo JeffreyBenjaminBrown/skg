@@ -22,7 +22,10 @@ local bijective_cases = {
                .. ' (child3 (deep nested)))'),
     '* root\n** child1\n*** grandchild1\n*** grandchild2\n** child2'
     .. '\n** child3\n*** deep\n**** nested',
-    'complex structure' } }
+    'complex structure' },
+  { sexpr.read('(a (b) c)'), '* a\n** (b)\n** c', 'an atom in parens' },
+  { sexpr.read('(a (b (c)))'), '* a\n** b\n*** (c)',
+    'an atom in parens, deeper' } }
 
 describe('skg.sexpr.org_bijection bijective cases', function ()
   for _, case in ipairs(bijective_cases) do
@@ -64,10 +67,6 @@ describe('skg.sexpr.org_bijection sexp_to_org rejections', function ()
       bijection.sexp_to_org(sexpr.read('((a) b)')) end)
   end)
 
-  it('rejects non-paren-terse input: (a (b) c)', function ()
-    assert.has_error(function ()
-      bijection.sexp_to_org(sexpr.read('(a (b) c)')) end)
-  end)
 end)
 
 describe('skg.sexpr.org_bijection org_to_sexp rejections', function ()
@@ -111,17 +110,6 @@ describe('skg.sexpr.org_bijection validation helpers', function ()
     assert.is_false(bijection.atom_headed_p(sexpr.read('((a) b)')))
     assert.is_false(bijection.atom_headed_p(
       sexpr.read('(a ((b) a))')))
-  end)
-
-  it('paren_terse_p accepts and rejects correctly', function ()
-    assert.is_true(bijection.paren_terse_p(sexpr.read('(a)')))
-    assert.is_true(bijection.paren_terse_p(sexpr.read('(a b)')))
-    assert.is_true(bijection.paren_terse_p(sexpr.read('(a (b c) d)')))
-    assert.is_true(bijection.paren_terse_p(
-      sexpr.read('(a (b (c d)) e (f g))')))
-    assert.is_false(bijection.paren_terse_p(sexpr.read('(a (b) c)')))
-    assert.is_false(bijection.paren_terse_p(
-      sexpr.read('(a (b (c)))')))
   end)
 end)
 

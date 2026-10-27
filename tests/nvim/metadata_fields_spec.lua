@@ -99,7 +99,7 @@ describe('skg.sexpr.metadata_fields filling in', function ()
     end
   end)
 
-  it('orders fields canonically', function ()
+  it('puts every part where the server writes it', function ()
     local headlines = filledIn_headlines(
       '(skg node (skgRepos (nodeRepo jeff)) (view cycle) (gnid abc) writeProtected)')
     local level_2 = {}
@@ -108,7 +108,7 @@ describe('skg.sexpr.metadata_fields filling in', function ()
         table.insert(level_2, headline.text) end
     end
     assert.are.same(
-      { 'node', 'gnid', 'skgRepos', 'writeProtected', 'noClaim',
+      { 'node', 'gnid', 'skgRepos', 'noClaim', 'writeProtected',
         'editRequest', 'viewRequests', 'view' },
       level_2)
   end)
@@ -215,12 +215,17 @@ describe('skg.sexpr.metadata_fields stripping', function ()
   end)
 end)
 
-describe('skg.sexpr.metadata_fields a nodeRepo marked (default)', function ()
-  it('strips the (default) suffix from a repo value', function ()
-    assert.are.same(sexpr.read('(skg node (gnid abc) (skgRepos (nodeRepo jeff)))'),
+describe('skg.sexpr.metadata_fields a skgRepos', function ()
+  it('drops a skgrepo without a value, and a skgRepos left empty',
+     function ()
+    assert.are.same(sexpr.read('(skg node (gnid abc) (skgRepos (nodeRepo bob)))'),
       strip_to_sexp(table.concat({
-        '* skg', '** node', '** gnid', '*** abc',
-        '** skgRepos', '*** nodeRepo', '**** jeff (default)' }, '\n')))
+        '* skg', '** node', '** gnid', '*** abc', '** skgRepos',
+        '*** nodeRepo', '**** bob', '*** relRepo' }, '\n')))
+    assert.are.same(sexpr.read('(skg node (gnid abc))'),
+      strip_to_sexp(table.concat({
+        '* skg', '** node', '** gnid', '*** abc', '** skgRepos',
+        '*** nodeRepo' }, '\n')))
   end)
 
   it('keeps a bare repo value as-is', function ()

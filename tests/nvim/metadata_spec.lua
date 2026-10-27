@@ -448,10 +448,8 @@ describe('skg.metadata commands', function ()
       with_metadata_editor_on(case[1], function (source)
         for field, values in pairs(case[2]) do
           assert.is_true(goto_value_of(field), case[1] .. ' ' .. field)
-          local value = vim.trim(metadata.line_text(
-            metadata.current_line_number()):gsub('^%*+', ''))
           assert.are.same(values,
-            metadata_edit.cycle_values_for_field(field, value),
+            metadata_edit.cycle_values_for_field(field),
             case[1] .. ' ' .. field)
         end
         if next(case[2]) == nil then
