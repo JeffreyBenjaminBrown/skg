@@ -16,20 +16,34 @@
 // a removed member (g, historical, in gc's container folder), and t
 // with g in its subscribee folder.
 
-use skg::metadata_canon::without_viewnode_ids;
 use crate::pruned_change_view::common::{
   assert_lines_in_order, open_all_changes_buffer, save, saved_and_rerendered, with_fixture};
 use crate::git_fixture::{edit_line, skg_files};
+use crate::parse_helpers::viewnode_tree_as_written;
 
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::types::errors::SaveError;
+use skg::types::misc::ID;
 use skg::types::save::format_save_error_as_org;
+use skg::types::viewnode::{Ghost, ViewnodeKind, Vognode};
 use skg::serve::parse_metadata_sexp::{
   RESTORE_NODE_ON_A_NODE_NOT_DELETED, RESTORE_REL_ON_A_DELETED_NODE,
   RESTORE_REL_WITHOUT_A_REMOVED_MEMBERSHIP};
 
 use std::collections::BTreeMap;
 use std::error::Error;
+
+/// The ghosts of 'gnid' in 'buffer', read as written.
+fn ghosts_of (
+  buffer : &str,
+  gnid   : &str,
+) -> Vec<Ghost> {
+  viewnode_tree_as_written (buffer) . nodes ()
+    . filter_map ( |node| match &node . value () . kind {
+      ViewnodeKind::Vognode (Vognode::Ghost (ghost))
+        if ghost . gnid == ID::from (gnid) => Some (ghost . clone ()),
+      _ => None, } )
+    . collect () }
 
 const X_REMOVED_FROM_B : &str =
   "** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim (view (rels";
@@ -155,8 +169,8 @@ fn restoring_a_deleted_node () -> Result<(), Box<dyn Error>> {
     assert! ( ! rerendered . contains ("ghost (gnid g)"),
               "g is no longer deleted:\n{}", rerendered );
     assert! ( ! rerendered . contains ("restoreNode"), "{}", rerendered );
-    assert! ( without_viewnode_ids (rerendered) . contains (
-                "*** (skg ghost (gnid gd) (skgRepos (nodeRepo main)) (diff (node removed)" ),
+    let gd : Vec<Ghost> = ghosts_of (rerendered, "gd");
+    assert! ( gd . len () == 1 && gd [0] . claimsMembership,
               "g's out-link to gd, still deleted, shows as gd's ghost, claiming:\n{}",
               rerendered );
     saved_and_rerendered (f, rerendered) ?;

@@ -4,7 +4,7 @@
 // fixture: r overrides n, and p, which contains n, is retitled.
 
 use skg::metadata_canon::without_viewnode_ids;
-use crate::git_fixture::{Fixture, skg_files};
+use crate::git_fixture::{Fixture, edit_line, skg_files};
 use crate::pruned_change_view::common::{
   insert_after_line_starting, open_all_changes_buffer, save, viewforest_id_of,
   with_fixture, without_subtree_starting};
@@ -245,10 +245,9 @@ fn the_diff_views_buffer_corrections_ride_the_save_response (
     assert! ( plain . errors . is_empty (), "{:?}", plain . errors );
     assert! ( plain . buffer_corrections . is_empty (),
               "a plain save corrects nothing: {:?}", plain . buffer_corrections );
-    let retitled : SaveResponse = save ( f, &plain . saved_view . replacen (
-      "(skgRepos (nodeRepo main)) (view (rels (contains (out 1)))) (diff (properties changed) (leaves 1 all))) x\n",
-      "(skgRepos (nodeRepo main)) (view (rels (contains (out 1)))) (diff (properties changed) (leaves 1 all))) x, retitled\n",
-      1 )) ?;
+    let retitled : SaveResponse = save ( f, &edit_line (
+      &plain . saved_view, "* (skg node (gnid x) (skgRepos (nodeRepo main))",
+      |line| format! ("{}, retitled", line) )) ?;
     assert! ( retitled . errors . is_empty (), "{:?}", retitled . errors );
     assert! ( without_viewnode_ids (&retitled . saved_view) . contains ("x, retitled\n"),
               "{}", retitled . saved_view );
