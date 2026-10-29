@@ -3810,3 +3810,22 @@ be saved as an orphan graphnode. No new behavior was designed.
 Tested in 'tests/hidden_nodes.rs'.
 *** Headline
 DONE.
+
+** Orchestrator's notes after slice 2 (2026-10-29)
+Launched 17:43 UTC, reported 17:53 UTC: ten minutes; 199k
+agent tokens over 88 tool uses. No correction carried. The
+deviations are sound: the folder validators' 'noClaim' check
+went whole, since the children it read already left
+non-claimants out, so it never fired; both clients' inheritance
+walks pass through a tombstone as the server's does, and
+typing under a tombstone no longer prompts for a skgrepo; the
+orphan warning names the title and gnid only. The headline
+typed under the tombstone that replaced a restricted root's
+containers folder is refused for want of a skgrepo, tested
+and recorded, no new behavior. Suites: nextest 1007 of 1007
+(four new), Emacs 406, Neovim 399, integration 34 of 35 with
+the pre-existing failure. Two pitfalls go to slice 3's brief:
+a refused save is an Err of 'BufferValidationErrors', not a
+response; an orphan under a write-protected occurrence is
+drawn with '(view noWarrant)' and one under a tombstone is
+not, existing behavior that no buffer correction reports.
