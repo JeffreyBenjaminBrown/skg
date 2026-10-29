@@ -5,7 +5,8 @@
 // ('docs/diff-view.org', "The readiness summary").
 
 use skg::metadata_canon::without_viewnode_ids;
-use crate::git_fixture::{Fixture, edit_line, save_cleanly};
+use crate::git_fixture::{
+  Fixture, OwnedSkgrepos, edit_line, save_cleanly, with_git_fixture};
 use crate::git_fixture_helpers::without_lines_containing;
 use crate::pruned_change_view::common::{
   all_changes_view, insert_after_line_starting, integrate_unshown_changes,
@@ -18,6 +19,8 @@ use skg::serve::util::sexp_to_client_string;
 use skg::types::views_state::DiffViewBufferKind;
 
 use std::error::Error;
+use std::fs;
+use std::path::PathBuf;
 
 /// A headline that names change-forest leaves says which, in
 /// '(diff (leaves N OBJECT...))'. With ctx removed from ct in the buffer
@@ -153,6 +156,36 @@ fn marking_a_removed_entry_marks_its_leaf (
     assert! ( ! without_viewnode_ids (&saved) . contains ("(editRequest"),
               "the requests were consumed:\n{}", saved );
     Ok (( )) }) }
+
+/// The worktree's p contains nowhere, an ID that names no node, which
+/// HEAD's p did not: the diff view draws an unknown carrying the
+/// relationship's change. A readiness request on its line is applied
+/// by the save: the unknown shows ready, and the request is consumed.
+#[test]
+fn a_readiness_request_on_an_unknown_marks_its_leaf (
+) -> Result<(), Box<dyn Error>> {
+  let case : tempfile::TempDir = tempfile::TempDir::new () ?;
+  for (side, p) in [ ("head",     "pid: p\ntitle: p\n"),
+                     ("worktree", "pid: p\ntitle: p\ncontains:\n- nowhere\n") ] {
+    let folder : PathBuf = case . path () . join ("main") . join (side);
+    fs::create_dir_all (&folder) ?;
+    fs::write ( folder . join ("p.skg"), p ) ?; }
+  with_git_fixture (
+    case . path (), OwnedSkgrepos::Named (&["main"]), &[],
+    |f| {
+      let buffer : String = open_all_changes_buffer (f) ?;
+      let unknown : &str = "unknown (gnid nowhere) (diff (rel added) (leaves 1)))";
+      let marked : String = buffer . replacen (
+        unknown, "unknown (gnid nowhere) (editRequest (ready)) (diff (rel added) (leaves 1)))", 1 );
+      assert_ne! ( marked, buffer, "the unknown carries the change:\n{}", buffer );
+      let saved : String = without_viewnode_ids (
+        & save_cleanly (f, &all_changes_view (), &marked) ? . saved_view );
+      assert! ( saved . lines () . any ( |line|
+                  line == "** (skg unknown (gnid nowhere) (diff (rel added) (leaves 1) (ready)))" ),
+                "the unknown is ready:\n{}", saved );
+      assert! ( ! saved . contains ("(editRequest"),
+                "the request was consumed:\n{}", saved );
+      Ok (( )) }) }
 
 /// A mark approves one version of a change. Editing the node changes
 /// the change, and the mark lapses.

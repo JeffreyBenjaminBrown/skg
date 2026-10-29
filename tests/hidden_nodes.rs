@@ -31,7 +31,7 @@ use skg::serve::handlers::save_buffer::{
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::test_utils::skg_env_from_parts;
 use skg::types::env::SkgEnv;
-use skg::types::misc::{ID, members_of};
+use skg::types::misc::{ID, RelPartner, SkgrepoName, members_of};
 use skg::types::nodes::rust::GraphnodeInRust;
 use skg::types::views_state::ViewforestId;
 
@@ -203,6 +203,44 @@ fn deleting_a_restricted_vognode_from_a_subscribers_content_hides_it (
       assert_eq! ( members_of (&r . contains), Vec::<ID>::new () );
       assert_eq! ( members_of ( r . hidesFromSubs . or_default () ),
                    vec! [ ID::from ("x") ] );
+      Ok (( )) } ) }
+
+/// Under "public", h stands in r's content as a restricted headline,
+/// recorded in r's public file. A request on its line to record the
+/// relationship in 'private' is applied by the save: r still contains
+/// h, now recorded in its private section, and the view, under
+/// "public", shows no headline for h, whose record it cannot show.
+#[test]
+fn a_relRepo_request_on_a_restricted_headline_moves_its_record (
+) -> Result<(), Box<dyn Error>> {
+  let case : tempfile::TempDir = tempfile::TempDir::new () ?;
+  write_fixture (case . path ()) ?;
+  with_git_fixture (
+    case . path (), OwnedSkgrepos::Named (&["public", "private"]), &[],
+    |f| {
+      let public : SkgrepoRestriction =
+        SkgrepoRestriction::named (&f . config, "public" . into ()) ?;
+      let opened : String = open_view_of_r (f, Some (&public)) ?;
+      let requested : String = opened . replacen (
+        "restricted (gnid h)", "restricted (gnid h) (editRequest (relRepo private))", 1 );
+      assert_ne! ( requested, opened, "h stands in r's content:\n{}", opened );
+      let saved : SaveResponse = save_under (f, &requested, &public) ?;
+      assert! ( ! saved . saved_view . contains ("(gnid h)"),
+                "the record went where the restriction hides it:\n{}",
+                saved . saved_view );
+      let r : GraphnodeInRust = node_in_graph (f, "r");
+      let h : &RelPartner<ID> = r . contains . iter ()
+        . find ( |partner| partner . member == ID::from ("h") )
+        . unwrap_or_else ( || panic! ("r still contains h: {:?}", r . contains) );
+      assert_eq! ( h . relRepo, SkgrepoName::from ("private") );
+      let files : BTreeMap<PathBuf, String> = skg_files_on_disk (f) ?;
+      let r_file = |skgrepo : &str| -> String {
+        files . iter ()
+          . find ( |(path, _)| path . ends_with ( Path::new (skgrepo) . join ("r.skg") ))
+          . map ( |(_, text)| text . clone () ) . unwrap_or_default () };
+      assert! ( r_file ("private") . contains ("- h\n")
+                && ! r_file ("public") . contains ("- h\n"),
+                "public:\n{}\nprivate:\n{}", r_file ("public"), r_file ("private") );
       Ok (( )) } ) }
 
 /// A view of r drawn under "all", switched to "public": h's occurrence

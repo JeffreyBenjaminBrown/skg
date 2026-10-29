@@ -7,7 +7,8 @@
 // Fixture (tests/search_buffer/fixtures, one skgrepo): "nest
 // of birds" contains "kestrel feather" and "osprey", whose aliases are
 // "kestrel cousin" and "fish hawk". A search for "kestrel" finds the
-// first by its title and the second through an alias.
+// first by its title and the second through an alias; one for
+// "osprey" finds the second by its title.
 
 use indoc::indoc;
 use std::collections::HashSet;
@@ -50,6 +51,9 @@ fn all_tests
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("a_search_answers_with_the_search_buffer_in_one_message", fixtures) ?;
       a_search_answers_with_the_search_buffer_in_one_message (
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("a_title_hit_with_aliases_draws_no_alias_folder", fixtures) ?;
+      a_title_hit_with_aliases_draws_no_alias_folder (
         &s . config, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
 
@@ -139,6 +143,34 @@ async fn a_search_answers_with_the_search_buffer_in_one_message (
                [ "kestrel", "osprey", "nest" ] . into_iter ()
                . map (ID::from) . collect::<HashSet<ID>> (),
                "the view knows every node it shows" );
+  Ok (( )) }
+
+/// A hit found by its title draws no alias folder, though its node has
+/// aliases: osprey, found as "osprey", shows collapsed, as the title
+/// hit above does.
+async fn a_title_hit_with_aliases_draws_no_alias_folder (
+  config  : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  { // The session's search index starts empty.
+    let tantivy_nodes : Vec<GraphnodeInTantivy> =
+      read_all_skg_files_from_skgrepos (config)?
+      . iter () . map (GraphnodeInTantivy::from) . collect ();
+    update_index_with_nodes (&tantivy_nodes, tantivy)?; }
+  let (messages, _views_state) : (Vec<String>, ViewsState) =
+    search (config, tantivy, "osprey") ?;
+  assert_eq! ( messages . len (), 1, "{:?}", messages );
+  let content : String =
+    extract_string_field_from_sexp (&messages [0], "content")
+    . expect ("the search results carry content");
+  assert_eq! (
+    without_viewnode_ids (&content),
+    indoc! {"
+      * (skg node (gnid osprey) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 1))) (props (aliases 2)))) osprey
+      ** (skg folded containerFolder)
+      *** (skg node (gnid nest) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 2 (ancestors 2)))) (birth (contains out 2)))) nest of birds
+    "},
+    "the title hit, with no alias folder:\n{}", content );
   Ok (( )) }
 
 /// The subtree of each hit, as text. (The two hits tie in score, so

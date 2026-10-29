@@ -337,3 +337,43 @@ node r
   assert! ( ! narrowed . text . contains ("secret"), "{}", narrowed . text );
   assert_eq! ( narrowed . buffer_corrections, Vec::new (),
                "what the restriction takes is no buffer correction" ); }
+
+#[test]
+fn an_editable_folder_a_narrowing_empties_stays_and_fills_again_on_widening () {
+  // s, in 'main', subscribes to e, in 'private', recording it in its
+  // 'private' section, so that under 'main' alone nothing stands for
+  // e. One forest, kept between refreshes as a view is: narrowed, then
+  // widened.
+  let config : SkgConfig = config ();
+  let graph : InRustGraph = graph (&[
+    Graphnode { subscribesTo : MSV::Specified ( rel_partners_at_relRepo (
+                  &SkgrepoName::from ("private"), vec! [ ID::from ("e") ] )),
+                .. node ("s") },
+    Graphnode { home_skgrepo : SkgrepoName::from ("private"), .. node ("e") } ]);
+  let restriction : SkgrepoRestriction = main_only ();
+  let input : String = formatdoc! ("
+    * {} s
+    ** (skg subscribeeFolder)
+    *** {} e
+    ", occurrence_metadata ("s", ""),
+       "(skg node (gnid e) (skgRepos (nodeRepo private)))" );
+  let mut forest : ViewForest = parse (&input, IdResolution::ThroughGraph (&graph));
+  let mut record : ViewnodeIdRecord = ViewnodeIdRecord::of_viewforest (&forest);
+  let mut outlines : Vec<String> = Vec::new ();
+  for restriction in [ Some (&restriction), None ] {
+    let refreshed : Refreshed = refresh_and_render (
+      &mut forest, &mut record,
+      &Truth { graph : &graph, config : &config, restriction },
+      RefreshMode::ContentView, 100, &BufferCorrectionPolicy::AfterRestrictionChange )
+      . unwrap ();
+    assert_eq! ( refreshed . buffer_corrections, Vec::new (),
+                 "what the restriction empties or fills is no buffer correction" );
+    outlines . push ( outline (&forest) ); }
+  assert_eq! ( outlines, vec! [ "\
+node s
+  subscribeeFolder" . to_string (), "\
+node s
+  subscribeeFolder
+    node e wp" . to_string () ],
+    "the editable folder stays, empty, where a save would read it, and \
+     the widening fills it again, claiming" ); }

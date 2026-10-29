@@ -105,6 +105,19 @@ fn the_retired_spellings_are_refused_naming_the_grammar (
     assert! ( parse_metadata_to_viewnodemd (compound) . is_err (),
               "{} must be refused", compound ); }}
 
+/// The ghost-tombstone view request, '(viewRequests tombstone)', is
+/// retired: the parse refuses it as an atom it does not know, on a
+/// ghost as on a node.
+#[test]
+fn the_retired_tombstone_view_request_is_refused (
+) {
+  assert_eq! ( parse_metadata_to_viewnodemd (
+                 "(skg node (gnid n) (viewRequests tombstone))" ),
+               Err ( "Invalid view request atom: tombstone" . to_string () ));
+  assert! ( parse_metadata_to_viewnodemd (
+              "(skg ghost (gnid g) (skgRepos (nodeRepo main)) (viewRequests tombstone))" )
+            . is_err () ); }
+
 #[test]
 fn each_kind_takes_only_its_own_parts (
 ) {
