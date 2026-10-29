@@ -42,8 +42,14 @@ rest of the session -- the user then sees \"Heralds disabled: no
 herald rule table from the server\" on every `heralds-minor-mode'
 toggle, even though the server is fine. `unwind-protect' restores
 the table whether or not the reload itself succeeds; the reload
-error still propagates so the user can fix it."
+error still propagates so the user can fix it.
+
+The open connection to the server is closed first
+\(`skg-connection-end'), so that the reloaded client does not leave
+the old one open beside the one it makes on its next request."
   (interactive)
+  (when (fboundp 'skg-connection-end)
+    (skg-connection-end))
   (let* ((herald-rules (and (boundp 'heralds--transform-rules)
                             heralds--transform-rules))
          (skgrepo-labels (and (boundp 'heralds--skgrepo-labels)

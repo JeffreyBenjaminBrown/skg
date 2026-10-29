@@ -834,6 +834,28 @@ the value as a list; an untouched default is stripped on every kind."
                         (string-trim (buffer-string)))
                       (nth 3 case)))))))
 
+(ert-deftest test-skg-edit-metadata-at-point-places-new-parts-by-rank ()
+  "A part the edit adds lands where the server writes it
+\(`skg--metadata-with-part-at-its-rank'): a focus or fold atom before
+the kind atom, '(viewRequests ...)' before the derived facts. A part
+the headline had keeps its place."
+  (cl-flet ((edit (line edits)
+              (with-temp-buffer
+                (org-mode)
+                (insert line "\n")
+                (goto-char (point-min))
+                (skg-edit-metadata-at-point edits)
+                (car (split-string (buffer-string) "\n" t)))))
+    (should (equal (edit "* (skg (vnid 1) node (gnid k) (view cycle) (diff (node added))) k"
+                         '(skg focused (viewRequests editableView)))
+                   "* (skg (vnid 1) focused node (gnid k) (viewRequests editableView) (view cycle) (diff (node added))) k"))
+    (should (equal (edit "* (skg node (gnid k) (viewRequests editableView) (view cycle)) k"
+                         '(skg (viewRequests definitiveView)))
+                   "* (skg node (gnid k) (viewRequests editableView definitiveView) (view cycle)) k"))
+    (should (equal (edit "* (skg node (gnid k) (editRequest delete) (diff (node added))) k"
+                         '(skg noClaim))
+                   "* (skg node (gnid k) noClaim (editRequest delete) (diff (node added))) k"))))
+
 (ert-deftest test-skg-write-edit-request-places-it-as-the-server-does ()
   "An edit request goes first in the headline's '(editRequest ...)',
 before its readiness request, and a new '(editRequest ...)' stands

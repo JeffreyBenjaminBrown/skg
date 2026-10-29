@@ -296,7 +296,7 @@ no occurrence."
                                         metadata)) ))
           (cond ((equal kind "occurrence") (throw 'answer t))
                 ((or (member kind '(nil "ghost" "tombstone" "folder"))
-                     (skg--gnid-only-vognode-p metadata)))
+                     (skg--gnid-only-vognode-sexp-p metadata)))
                 (t (throw 'answer nil)))))
       nil)))
 

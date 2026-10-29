@@ -39,4 +39,28 @@ plain parens. Fields producing no herald get none."
       ;; The buffer text is untouched: applying must not see hints.
       (should-not (string-match-p "(\u262e)" (buffer-string))))))
 
+(ert-deftest test-sexp-edit-untouched-round-trip-sends-back-what-the-server-wrote ()
+  "Opening the metadata editor on a headline the server wrote and
+applying it untouched leaves the headline as it was."
+  (let ((headline (concat "** (skg (vnid 0b) focused folded node (gnid n)"
+                          " (skgRepos (nodeRepo main) (relRepo pub)) noClaim writeProtected"
+                          " (overridesHere o) (editRequest (relRepo pub) (ready node))"
+                          " (viewRequests editableView) (view cycle)"
+                          " (diff (rel added) (leaves 1 rel))) a title"))
+        (source (generate-new-buffer "*test-sexp-edit-source*")))
+    (unwind-protect
+        (progn
+          (switch-to-buffer source)
+          (insert "* (skg node (gnid p)) p\n" headline "\n")
+          (org-mode)
+          (goto-char (point-min))
+          (forward-line 1)
+          (skg-view-metadata)
+          (should-not (eq (current-buffer) source))
+          (skg-sexp-edit--apply)
+          (should (eq (current-buffer) source))
+          (should (equal (buffer-string)
+                         (concat "* (skg node (gnid p)) p\n" headline "\n"))))
+      (kill-buffer source))))
+
 (provide 'test-skg-metadata-editing)

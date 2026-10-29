@@ -257,7 +257,7 @@ Creates one overlay (at most) and pushes it onto `heralds-overlays`."
           (eol (line-end-position)))
       (goto-char bol)
       (when (search-forward "(skg" eol t)
-        (let ((metadata (skg--metadata-from (- (point) 4))))
+        (let ((metadata (skg--metadata-on-line (- (point) 4))))
           (when metadata
             (let* ((start (nth 0 metadata))
                    (end (nth 1 metadata))

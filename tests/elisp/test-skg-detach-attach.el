@@ -43,6 +43,18 @@ showed, or (error . MESSAGE) when it signaled a `user-error'."
              "^\\*\\* (skg node (gnid c) (skgRepos (nodeRepo r)) noClaim (view (rels (contains (in 1))))) c$"
              (cdr result)))))
 
+(ert-deftest test-skg-detach-writes-noClaim-at-its-rank ()
+  "'noClaim' lands where the server writes it: after the skgrepos and
+before '(editRequest ...)' and '(viewRequests ...)'."
+  (let ((result (test-skg-detach-attach--run
+                 (concat test-skg-detach-attach--editable-parent
+                         "** (skg node (gnid c) (skgRepos (nodeRepo r)) (editRequest (merge m)) (viewRequests editableView) (view (rels (contains (in 1))))) c\n")
+                 2 #'skg-detach)))
+    (should (string-prefix-p "Detached" (car result)))
+    (should (string-match-p
+             (regexp-quote "** (skg node (gnid c) (skgRepos (nodeRepo r)) noClaim (editRequest (merge m)) (viewRequests editableView) (view (rels (contains (in 1))))) c")
+             (cdr result)))))
+
 (ert-deftest test-skg-attach-removes-noClaim ()
   (let ((result (test-skg-detach-attach--run
                  (concat test-skg-detach-attach--editable-parent

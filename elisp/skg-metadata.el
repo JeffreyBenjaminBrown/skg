@@ -4,6 +4,7 @@
 
 (require 'org)
 (require 'org-fold-core)
+(require 'seq)
 (require 'skg-config)
 (require 'skg-metadata-fields)
 (require 'skg-sexpr-search)
@@ -283,7 +284,7 @@ an ID missing."
     (user-error "Not on a headline"))
   (let ((member-sexp (skg--metadata-sexp-at-point-or-nil)))
     (unless (or (skg--occurrence-sexp-p member-sexp)
-                (skg--gnid-only-vognode-p member-sexp))
+                (skg--gnid-only-vognode-sexp-p member-sexp))
       (user-error "Not on an occurrence, an unknown or a Restricted vognode"))
     (let ((member-gnid (skg--relationship-member-id member-sexp))
           (parent-sexp (save-excursion
@@ -409,7 +410,7 @@ next save will do with the relationship."
     (progn
       (cond
        ((or (skg--alias-headline-p)
-            (skg--gnid-only-vognode-p
+            (skg--gnid-only-vognode-sexp-p
              (skg--metadata-sexp-at-point-or-nil)))
         (skg--write-edit-request `(relRepo ,(intern choice))))
        (t
@@ -634,7 +635,7 @@ command, but does not edit anything."
                 (if (skg--relRepo-prune-below-p meta)
                     (skg--goto-next-headline-after-subtree)
                   (outline-next-heading))))
-             ((skg--gnid-only-vognode-p meta)
+             ((skg--gnid-only-vognode-sexp-p meta)
               (when (skg--relationship-kind-matches-p kind)
                 (push (copy-marker (line-beginning-position)) targets))
               (outline-next-heading))
@@ -657,7 +658,7 @@ the matching writable folder with a editable anchor."
   (let ((meta (skg--metadata-sexp-at-point-or-nil)))
     (and (or (and (skg--occurrence-sexp-p meta)
                   (skg--node-member-p meta))
-             (skg--gnid-only-vognode-p meta))
+             (skg--gnid-only-vognode-sexp-p meta))
          (save-excursion
            (and (org-up-heading-safe)
                 (let ((parent-sexp (skg--metadata-sexp-at-point-or-nil)))
@@ -1063,31 +1064,28 @@ when the line is no headline."
     (when (looking-at "\\(\\*+\\)\\(?: \\|$\\)")
       (length (match-string 1)))))
 
-(defun skg--metadata-on-line ()
-  "The '(skg ...)' metadata of the headline on the line at point, as
-`skg--metadata-from' gives it, or nil when the line is no headline or
-its headline carries none. Reads the headline by its stars, so it
-works in any buffer."
+(defun skg--metadata-on-line (&optional start)
+  "The '(skg ...)' metadata on the line at point: (START END SEXP),
+END the position after its closing parenthesis and SEXP what it reads
+as; or nil when there is none, its parentheses do not close on that
+line, or it does not read. Without START, it is the metadata of the
+headline on the line, read by its stars, so it works in any buffer;
+with START, the '(skg ...)' that begins there. Finds END by counting
+parentheses (`skg-find-sexp-end'; see 'elisp/PITFALLs.org')."
   (save-excursion
-    (beginning-of-line)
-    (when (looking-at "\\*+ +(skg[ )]")
-      (skg--metadata-from (- (match-end 0) 5)))))
-
-(defun skg--metadata-from (start)
-  "The '(skg ...)' that begins at START: (START END SEXP), END the
-position after its closing parenthesis and SEXP what it reads as; or
-nil when its parentheses do not close on that line or it does not
-read. Finds END by counting parentheses (`skg-find-sexp-end'; see
-'elisp/PITFALLs.org')."
-  (let* ((text (buffer-substring-no-properties
-                start (save-excursion (goto-char start)
-                                      (line-end-position))))
-         (end (skg-find-sexp-end text))
-         (sexp (and end
-                    (ignore-errors
-                      (car (read-from-string (substring text 0 end)))))))
-    (when sexp
-      (list start (+ start end) sexp))))
+    (unless start
+      (beginning-of-line)
+      (when (looking-at "\\*+ +(skg[ )]")
+        (setq start (- (match-end 0) 5))))
+    (when start
+      (let* ((text (buffer-substring-no-properties
+                    start (progn (goto-char start) (line-end-position))))
+             (end (skg-find-sexp-end text))
+             (sexp (and end
+                        (ignore-errors
+                          (car (read-from-string (substring text 0 end)))))))
+        (when sexp
+          (list start (+ start end) sexp))))))
 
 (defun skg--vognode-sexp-p (metadata-sexp)
   "Non-nil iff METADATA-SEXP is a vognode's: an occurrence,
@@ -1095,7 +1093,7 @@ a ghost, an unknown or a Restricted vognode."
   (and (consp metadata-sexp)
        (or (skg--occurrence-sexp-p metadata-sexp)
            (skg--ghost-sexp-p metadata-sexp)
-           (skg--gnid-only-vognode-p metadata-sexp))))
+           (skg--gnid-only-vognode-sexp-p metadata-sexp))))
 
 (defun skg--ghost-sexp-p (metadata-sexp)
   "Non-nil iff METADATA-SEXP is a ghost's: a node of the diff view that
@@ -1234,7 +1232,7 @@ record names."
   (and metadata-sexp
        (skg-sexp-subtree-p metadata-sexp '(skg restricted))))
 
-(defun skg--gnid-only-vognode-p (metadata-sexp)
+(defun skg--gnid-only-vognode-sexp-p (metadata-sexp)
   "Return non-nil when METADATA-SEXP is a vognode's that shows only
 its gnid: an unknown's or a Restricted vognode's. Either takes a
 relRepo request, as a relationship member."
@@ -1245,7 +1243,7 @@ relRepo request, as a relationship member."
   "Return the raw member ID for an occurrence, an unknown or a
 Restricted vognode."
   (and (or (skg--occurrence-sexp-p metadata-sexp)
-           (skg--gnid-only-vognode-p metadata-sexp))
+           (skg--gnid-only-vognode-sexp-p metadata-sexp))
        (skg--metadata-gnid metadata-sexp)))
 
 (defun skg--unknown-node-id-at-point ()
@@ -1307,7 +1305,9 @@ atom does not silently re-fork on the next save."
 
 (defun skg-edit-metadata-at-point (edits)
   "Use EDITS to edit the metadata of the headline at point.
-If there is metadata, merges it with existing metadata.
+If there is metadata, merges it with existing metadata; a part the
+merge adds lands where the server writes it
+\(`skg--metadata-with-new-parts-at-their-ranks').
 If there is no metadata, creates new metadata from EDITS.
 If the current line is not a headline, no effect.
 Routes the rewrite through `skg-replace-current-line' so that editing
@@ -1325,9 +1325,9 @@ checks\" entry in PITFALLs.org."
                  (metadata-sexp (nth 1 match-result))
                  (title (nth 2 match-result))
                  (host-sexp (read metadata-sexp))
-                 (merged-sexp (skg--derived-facts-last
-                               (skg-edit-nested-sexp
-                                host-sexp edits))))
+                 (merged-sexp (skg--metadata-with-new-parts-at-their-ranks
+                               host-sexp
+                               (skg-edit-nested-sexp host-sexp edits))))
             (let ((new-metadata-sexp (substring-no-properties
                                       (format "%S" merged-sexp))))
               (skg-replace-current-line
@@ -1383,23 +1383,9 @@ its derived facts."
           (cond ((and old new)
                  (mapcar (lambda (part) (if (eq part old) new part)) parts))
                 (old (remq old parts))
-                (new (let ((after-it ;; the parts the server writes after it
-                            (seq-drop-while
-                             (lambda (part)
-                               (not (skg--part-written-after-editRequest-p
-                                     part)))
-                             parts)))
-                       (append (butlast parts (length after-it))
-                               (list new)
-                               after-it)))
+                (new (cdr (skg--metadata-with-part-at-its-rank
+                           metadata-sexp new)))
                 (t parts)))))
-
-(defun skg--part-written-after-editRequest-p (part)
-  "Whether the server writes PART, a part of '(skg ...)', after
-'(editRequest ...)' (`skg-shared-metadata-parts')."
-  (and (consp part) (symbolp (car part))
-       (member (symbol-name (car part))
-               (cdr (member "editRequest" skg-shared-metadata-parts)))))
 
 (defun skg--write-edit-request (request &optional kind)
   "Make REQUEST the edit request of the headline at point, keeping the
@@ -1432,21 +1418,54 @@ the rewrite through `skg-replace-current-line' (see
          (format "%S" (funcall rewrite metadata-sexp)))
         (nth 2 split))))))
 
-(defun skg--derived-facts-last (metadata-sexp)
-  "METADATA-SEXP with its derived facts, '(view ...)' then '(diff ...)',
-after every other part, as the server writes them, so that a part an
-edit appends lands before them. The other parts keep their order."
-  (if (not (and (consp metadata-sexp) (eq (car metadata-sexp) 'skg)))
-      metadata-sexp
-    (let ((derived-fact-p (lambda (part)
-                            (and (consp part)
-                                 (memq (car part) '(view diff))))))
-      (cons 'skg
-            (append (seq-remove derived-fact-p (cdr metadata-sexp))
-                    (seq-filter (lambda (part) (eq (car-safe part) 'view))
-                                (cdr metadata-sexp))
-                    (seq-filter (lambda (part) (eq (car-safe part) 'diff))
-                                (cdr metadata-sexp)))))))
+(defun skg--metadata-part-rank (part)
+  "The position in `skg-shared-metadata-parts' of the name
+'shared/metadata-fields.json' gives PART, a part of '(skg ...)': a
+list's head, an atom's name, or \"KIND\" for a kind's atom. Nil when
+the list does not name it."
+  (let ((name (cond ((consp part)
+                     (and (symbolp (car part)) (symbol-name (car part))))
+                    ((symbolp part)
+                     (if (skg-shared-metadata-kind (symbol-name part))
+                         "KIND"
+                       (symbol-name part))))))
+    (and name (seq-position skg-shared-metadata-parts name))))
+
+(defun skg--metadata-with-part-at-its-rank (metadata-sexp part)
+  "METADATA-SEXP with PART, a part of '(skg ...)' it lacks, where the
+server writes it (`skg-shared-metadata-parts'): before the first part
+the server writes after it, else last. The one placement every writer
+of a part uses."
+  (let* ((rank (skg--metadata-part-rank part))
+         (after-it ;; the parts the server writes after it
+          (and rank
+               (seq-drop-while
+                (lambda (element)
+                  (let ((element-rank (skg--metadata-part-rank element)))
+                    (not (and element-rank (> element-rank rank)))))
+                (cdr metadata-sexp)))))
+    (cons (car metadata-sexp)
+          (append (butlast (cdr metadata-sexp) (length after-it))
+                  (list part)
+                  after-it))))
+
+(defun skg--metadata-with-new-parts-at-their-ranks (host-sexp edited-sexp)
+  "EDITED-SEXP, an edit of HOST-SEXP, with each part HOST-SEXP lacked
+moved to where the server writes it
+\(`skg--metadata-with-part-at-its-rank'), since the edit appends a
+part it adds. A part HOST-SEXP had keeps its place, and so does an
+element 'shared/metadata-fields.json' does not name."
+  (let* ((host-ranks (delq nil (mapcar #'skg--metadata-part-rank
+                                       (cdr-safe host-sexp))))
+         (new-part-p (lambda (element)
+                       (let ((rank (skg--metadata-part-rank element)))
+                         (and rank (not (memql rank host-ranks)))))))
+    (if (not (consp edited-sexp))
+        edited-sexp
+      (seq-reduce #'skg--metadata-with-part-at-its-rank
+                  (seq-filter new-part-p (cdr edited-sexp))
+                  (cons (car edited-sexp)
+                        (seq-remove new-part-p (cdr edited-sexp)))))))
 
 (defun skg-replace-current-line (new-content)
   "Replace the current line with NEW-CONTENT.

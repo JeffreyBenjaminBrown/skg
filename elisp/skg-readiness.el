@@ -90,13 +90,13 @@ its move. Works on write-protected occurrences too."
           (save-excursion
             (goto-char (car move))
             (if (not recursive)
-                (list (skg--readiness-request-here ready nil))
+                (list (skg--readiness-request-at-point ready nil))
               (org-up-heading-safe)
               (skg--readiness-walk-subtree
                (lambda (metadata-sexp)
                  (when (equal (skg--readiness-homeSkgrepo-move metadata-sexp)
                               (cdr move))
-                   (skg--readiness-request-here ready nil))))))))
+                   (skg--readiness-request-at-point ready nil))))))))
     (when (skg--readiness-write-requests-if-confirmed requests)
       (if ready
           (message "Marked %d home skgrepo move(s) ready." (length requests))
@@ -191,7 +191,7 @@ in buffer order."
          (leaves (skg--readiness-leaves metadata-sexp)))
     (cond
      (leaves
-      (list (skg--readiness-request-here
+      (list (skg--readiness-request-at-point
              (not (skg--readiness-objects-ready-p metadata-sexp (cdr leaves)))
              (cdr leaves))))
      ((skg--folder-change-readiness-at-point)
@@ -200,7 +200,7 @@ in buffer order."
          (lambda (child-sexp)
            (let ((child-leaves (skg--readiness-leaves-below child-sexp)))
              (when child-leaves
-               (skg--readiness-request-here ready (cdr child-leaves)))))))))))
+               (skg--readiness-request-at-point ready (cdr child-leaves)))))))))))
 
 (defun skg--readiness-requests-for-subtree ()
   "The requests of the recursive gesture on the headline at point: one
@@ -215,9 +215,9 @@ unless the headline at point is ready."
                          (skg--readiness-leaves headline-sexp)
                        (skg--readiness-leaves-below headline-sexp))))
          (when leaves
-           (skg--readiness-request-here ready (cdr leaves))))))))
+           (skg--readiness-request-at-point ready (cdr leaves))))))))
 
-(defun skg--readiness-request-here (ready objects)
+(defun skg--readiness-request-at-point (ready objects)
   "A request that marks (READY non-nil) or unmarks the leaves on OBJECTS
 of the headline at point, with how many leaves it touches as the
 server counts them: N of the headline's '(leaves N OBJECT...)' when

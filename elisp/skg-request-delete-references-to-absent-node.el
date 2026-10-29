@@ -13,10 +13,7 @@
   (let ((gnid (skg--unknown-node-id-at-point)))
     (unless gnid
       (user-error "Point must be on an Unknown headline"))
-    (when (cl-some (lambda (buf)
-                     (and (buffer-local-value 'skg-view-id buf)
-                          (buffer-modified-p buf)))
-                   (buffer-list))
+    (when (skg--unsaved-view-buffers)
       (user-error "Save or revert every skg view before global reference cleanup"))
     (skg--delete-absent-send gnid nil)))
 

@@ -33,15 +33,16 @@
       (let*
           ((expected
             ;; Every sibling of a folded node should be folded.
-            ;; folded is now a top-level bare atom (appended at end by elisp merge).
+            ;; 'folded' is a top-level bare atom, written where the
+            ;; server writes it: before the kind atom.
             "* 1
 1 body
 ** 11
-*** (skg node (gnid 1) folded) 111
-*** (skg node (gnid 2) writeProtected folded) 112
+*** (skg folded node (gnid 1)) 111
+*** (skg folded node (gnid 2) writeProtected) 112
 ** 12
 12 body
-*** (skg node (gnid 3) folded) 121
+*** (skg folded node (gnid 3)) 121
 121 body
 *** (skg folded) 122
 ** 13")
