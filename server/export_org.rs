@@ -15,7 +15,7 @@
 
 use crate::skgrepo_sets::{SkgrepoRestriction, SkgrepoSetName};
 use crate::types::misc::SkgConfig;
-use crate::types::misc::{ID, RelPartner};
+use crate::types::misc::ID;
 use crate::types::nodes::complete::Graphnode;
 use crate::types::links::org_literal_ranges::org_literal_ranges;
 use crate::types::links::{
@@ -344,7 +344,7 @@ fn discover_roots (
   for parent in &sorted {
     let marker_children : Vec<String> =
       parent . contains . iter ()
-      . filter ( |m| relRepo_is_unrestricted (m, restriction) )
+      . filter ( |m| SkgrepoRestriction::record_is_visible (restriction, &m . relRepo) )
       . map ( |m| &m . member )
       . filter_map ( |cid|
         marker_target . get (
@@ -358,7 +358,7 @@ fn discover_roots (
         "node {} has more than one export-marker child; using the \
          first ({:?})",
         parent . pid, target ) ); }
-    if ! node_unrestricted (parent, restriction) {
+    if SkgrepoRestriction::node_is_restricted (restriction, &parent . home_skgrepo) {
       warnings . push ( format! (
         "export root {} is in repo {} which is restricted under \
          repo-set {}; skipping",
@@ -475,7 +475,7 @@ fn collect_events (
     // pop (and thus render) in forward order.
     let mut kids : Vec<ID> = Vec::new ();
     for member in node . contains . iter () {
-      if ! relRepo_is_unrestricted (member, restriction) { continue; } // the relationship's
+      if ! SkgrepoRestriction::record_is_visible (restriction, &member . relRepo) { continue; } // the relationship's
         // skgrepo is restricted: the visible composition omits it, even when
         // the child's home is unrestricted.
       let cpid : ID = resolve_pid (&member . member, alias_to_pid);
@@ -483,7 +483,7 @@ fn collect_events (
       let child : &Graphnode = match by_pid . get (&cpid) {
         Some (c) => c,
         None     => continue, }; // dangling contains entry: silently skip
-      if ! node_unrestricted (child, restriction) { continue; } // omit restricted (recursive)
+      if SkgrepoRestriction::node_is_restricted (restriction, &child . home_skgrepo) { continue; } // omit restricted (recursive)
       kids . push (cpid); }
     for cpid in kids . into_iter () . rev () {
       stack . push ( (cpid, depth + 1, false) ); }}
@@ -739,21 +739,6 @@ fn resolve_pid (
   alias_to_pid : &HashMap<ID, ID>,
 ) -> ID {
   alias_to_pid . get (gnid) . cloned () . unwrap_or_else (|| gnid . clone ()) }
-
-fn node_unrestricted (
-  node   : &Graphnode,
-  restriction : &SkgrepoRestriction,
-) -> bool {
-  restriction . is_all () || restriction . contains_skgrepo (&node . home_skgrepo) }
-
-/// Whether an relationship is visible under the skgrepo restriction: its recorded
-/// relRepo must be unrestricted. (The visible composition = unrestricted
-/// sections' lists only.)
-fn relRepo_is_unrestricted (
-  member : &RelPartner<ID>,
-  restriction : &SkgrepoRestriction,
-) -> bool {
-  restriction . is_all () || restriction . contains_skgrepo (&member . relRepo) }
 
 fn title_has_link (
   node : &Graphnode,

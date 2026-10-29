@@ -26,7 +26,6 @@ use crate::dbs::node_lookup::opt_graphnode_by_gnid;
 use crate::from_text::local_fieldintent_collection::lower::LoweredNodeIntents;
 use crate::from_text::local_fieldintent_collection::types::{
   HiddenOutsideEdit, SubscribeeVisibility };
-use crate::from_text::weave::relationship_member_is_visible;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::errors::BufferValidationError;
 use crate::types::misc::{ID, MSV, RelPartner, SkgConfig, members_of};
@@ -102,8 +101,8 @@ pub fn resolve_visibility (
 /// whose records are restricted, and members inside a subscribee, remain owned
 /// by the graph and survive an edit of this compound partner folder. A hide is
 /// visible, and so replaceable, when the restriction holds its relRepo
-/// ('relationship_member_is_visible'): the folder as drawn showed its member,
-/// as an occurrence, an unknown or a Restricted vognode, so the submitted
+/// ('SkgrepoRestriction::record_is_visible'): the folder as drawn showed its
+/// member, as an occurrence or a gnid-only vognode, so the submitted
 /// folder is the whole set of hides with a visible record outside the
 /// subscribees, and a folder saved under a restriction never unhides a
 /// member it could not show. What counts as inside is what the folder's goal
@@ -131,9 +130,8 @@ fn apply_hiddenoutside_edits (
     let key = |gnid : &ID| -> ID {
       graph . pid_of (gnid) . unwrap_or_else (|| gnid . clone ()) };
     let is_visible = |member : &RelPartner<ID>| -> bool {
-      skgrepo_restriction . map_or (
-        true, |restriction| relationship_member_is_visible (
-          member, restriction )) };
+      SkgrepoRestriction::record_is_visible (
+        skgrepo_restriction, &member . relRepo ) };
     let subscribee_gnids : Vec<ID> =
       lowered . subscriber_subscribes_after_save (&subscriber_from_disk);
     let mut inside : HashSet<ID> = HashSet::new ();
@@ -191,9 +189,10 @@ fn apply_hiddenoutside_edits (
 /// contains drops a stale hide of it by F. Details:
 /// - Members whose records the restricted skgrepo-set keeps out were
 ///   omitted from the buffer, not removed, so they never count as
-///   removals ('relationship_member_is_visible'). A member with a
-///   visible record had a headline (a Restricted vognode, where the
-///   restriction keeps out its node), so its absence is a removal.
+///   removals ('SkgrepoRestriction::record_is_visible'). A member
+///   with a visible record had a headline (a restricted headline,
+///   where the restriction keeps out its node), so its absence is a
+///   removal.
 /// - A child the same save explicitly shows through one of F's
 ///   subscriptions (a subscribee-as-such signal) is not hidden here:
 ///   the explicit subscription-view gesture wins. This runs before
@@ -218,8 +217,8 @@ fn infer_hides_from_contains_removals (
       members_of (&subscriber_from_disk . contains);
     let visible_contains : HashSet<&ID> =
       subscriber_from_disk . contains . iter ()
-      . filter ( |member| skgrepo_restriction . map_or (
-          true, |restriction| relationship_member_is_visible (member, restriction) ))
+      . filter ( |member| SkgrepoRestriction::record_is_visible (
+          skgrepo_restriction, &member . relRepo ))
       . map ( |member| &member . member )
       . collect ();
     let removed : Vec<ID> = {

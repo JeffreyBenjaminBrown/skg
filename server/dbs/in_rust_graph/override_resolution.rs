@@ -148,10 +148,8 @@ fn followable_overriders_of (
         . map ( |sc| sc . owned )
         . unwrap_or (false);
       let home_visible : bool =
-        restriction
-        . map ( |a| a . is_all ()
-                || a . contains_skgrepo (&overrider_node . home_skgrepo) )
-        . unwrap_or (true);
+        ! SkgrepoRestriction::node_is_restricted (
+          restriction, &overrider_node . home_skgrepo );
       if owned && home_visible {
         result . push (overrider); }} }
   result }

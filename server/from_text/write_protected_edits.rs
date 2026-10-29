@@ -68,8 +68,8 @@ fn writeProtected_differences_from_graph (
   if let Some (aliases_in_view) = aliases_of_occurrence (node) {
     let aliases_in_graph : Vec<String> =
       graphnode . aliases . or_default () . iter ()
-      . filter ( |alias| restriction . is_none_or (
-        |set| set . is_all () || set . contains_skgrepo (&alias . relRepo) ))
+      . filter ( |alias| SkgrepoRestriction::record_is_visible (
+        restriction, &alias . relRepo ))
       . map ( |alias| alias . member . clone () )
       . collect ();
     let differs : bool =

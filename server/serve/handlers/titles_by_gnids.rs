@@ -92,15 +92,13 @@ pub fn handle_titles_by_gnids_request_with_skgrepo_set (
     add_deleted_node_titles_by_gnids (
       &mut title_map, &gnids, skgrepo_diffs ); }
   title_map . retain ( |gnid, _| {
-    if restriction . is_all () {
-      true
-    } else {
-      graph . pid_and_skgrepo (gnid) . map (|(_, skgrepo)| skgrepo)
-      . or_else (|| crate::dbs::tantivy::title_and_skgrepo_by_gnid (
-        tantivy_index, gnid ) . map (|(_, skgrepo)| skgrepo))
-      . or_else (|| home_from_disk (gnid, config))
-      . map ( |skgrepo| restriction . contains_skgrepo (&skgrepo) )
-      . unwrap_or (false) } } );
+    restriction . is_all () // a gnid no store resolves (a deleted node's) keeps its title
+    || graph . pid_and_skgrepo (gnid) . map (|(_, skgrepo)| skgrepo)
+       . or_else (|| crate::dbs::tantivy::title_and_skgrepo_by_gnid (
+         tantivy_index, gnid ) . map (|(_, skgrepo)| skgrepo))
+       . or_else (|| home_from_disk (gnid, config))
+       . is_some_and ( |home| ! SkgrepoRestriction::node_is_restricted (
+         restriction, &home )) } );
   let requested : HashSet<ID> = gnids . iter () . cloned () . collect ();
   let mut overPrivateText_pids : Vec<ID> = gnids . iter ()
     . filter_map ( |gnid| graph . pid_of (gnid) )

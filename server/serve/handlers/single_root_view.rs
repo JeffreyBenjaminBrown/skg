@@ -42,8 +42,13 @@ pub fn handle_single_root_view_request (
     viewforest_id_from_request (request);
   match node_gnid_from_single_root_view_request (request) {
     Ok (gnid) => {
-      if ! skgrepo_restriction . gnid_skgrepo_is_unrestricted (
-        &runtime . graph, &gnid ) {
+      let kept_out : bool =
+        match runtime . graph . pid_and_skgrepo (&gnid) {
+          Some ((_pid, home)) =>
+            SkgrepoRestriction::node_is_restricted (skgrepo_restriction, &home),
+          None => // the graph has no such node: refused under any restriction
+            ! skgrepo_restriction . is_all (), };
+      if kept_out {
         let response_sexp : String =
           format_buffer_response_sexp (
             &String::new (),

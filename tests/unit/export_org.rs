@@ -3,6 +3,7 @@
 //! so `super::*` reaches the module's private items.
 
 use super::*;
+use crate::types::misc::RelPartner;
 use crate::skgrepo_sets::{SkgrepoRestriction, SkgrepoSetName};
 use crate::types::misc::{ID, SkgrepoName, rel_partners_at_relRepo};
 use crate::types::nodes::complete::empty_graphnode;

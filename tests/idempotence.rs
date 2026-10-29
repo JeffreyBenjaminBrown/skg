@@ -45,6 +45,7 @@ use skg::serve::handlers::diff_view::diffView_buffer;
 use skg::test_utils::cleanup_test_tantivy;
 use skg::types::views_state::{DiffViewBufferKind, ViewnodeIdRecord};
 use skg::dbs::in_rust_graph::InRustGraph;
+use skg::dbs::in_rust_graph::relation_accessors::GnidPresence;
 use skg::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewforest;
 
@@ -119,7 +120,8 @@ fn every_content_view_fixture_is_a_fixpoint_of_the_refresh (
     for restriction in restrictions_of (&runtime . config) {
       if restriction . is_some () { restricted_folders . insert (folder . clone ()); }
       for pid in &pids {
-        if runtime . graph . restriction_keeps_out (pid, restriction . as_ref ()) {
+        if runtime . graph . gnid_presence_gated (pid, restriction . as_ref ())
+           == GnidPresence::Restricted {
           continue; }
         views += 1;
         if let Err (failure) = refreshes_unchanged (&runtime, pid, restriction . as_ref ()) {

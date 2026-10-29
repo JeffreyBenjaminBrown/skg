@@ -267,3 +267,54 @@ fn gnid_presence_gated_tells_hidden_from_absent () {
   assert_eq! ( presence ("private", None), GnidPresence::Present );
   assert_eq! ( presence ("nowhere", Some (&only_main)), GnidPresence::Absent );
   assert_eq! ( presence ("nowhere", None), GnidPresence::Absent ); }
+
+// A record is visible when the restriction holds its relRepo, whatever
+// its member: the buffer shows an unresolvable member as a reference
+// to an unknown node, and a member whose home is restricted as a
+// restricted headline.
+#[test]
+fn a_record_is_visible_when_the_restriction_holds_its_relRepo () {
+  let only_main : SkgrepoRestriction = SkgrepoRestriction {
+    name     : SkgrepoSetName ("main" . to_string ()),
+    skgrepos : BTreeSet::from ([ SkgrepoName::from ("main") ]) };
+  assert! ( SkgrepoRestriction::record_is_visible (
+    &only_main, &SkgrepoName::from ("main") ));
+  assert! ( ! SkgrepoRestriction::record_is_visible (
+    &only_main, &SkgrepoName::from ("private") ));
+  assert! ( SkgrepoRestriction::record_is_visible (
+    None, &SkgrepoName::from ("private") ));
+  assert! ( SkgrepoRestriction::node_is_restricted (
+    &only_main, &SkgrepoName::from ("private") ));
+  assert! ( ! SkgrepoRestriction::node_is_restricted (
+    Some (&only_main), &SkgrepoName::from ("main") ));
+  assert! ( ! SkgrepoRestriction::node_is_restricted (
+    None, &SkgrepoName::from ("private") )); }
+
+// Under 'all', a record in a skgrepo the config does not name is
+// visible, and a node homed there is not restricted, on both sides:
+// the render side's gated lists ('outbound_rel_partners_for_relation_gated')
+// and the save's weave ('SkgrepoRestriction::record_is_visible') answer
+// alike. The set 'all' here names no skgrepo at all.
+#[test]
+fn an_unnamed_relRepo_under_all_answers_alike_on_both_sides () {
+  let mut recorder : Graphnode = node ("recorder", &[], &[], &[], &[]);
+  recorder . contains = vec! [ RelPartner::at_relRepo (
+    SkgrepoName::from ("unnamed"), ID::from ("member") ) ];
+  let mut member : Graphnode = node ("member", &[], &[], &[], &[]);
+  member . home_skgrepo = SkgrepoName::from ("unnamed");
+  let graph : InRustGraph = InRustGraph::from_graphnodes (&[ recorder, member ]);
+  let all : SkgrepoRestriction = SkgrepoRestriction {
+    name     : SkgrepoSetName ("all" . to_string ()),
+    skgrepos : BTreeSet::new () };
+  let shown_by_the_render : bool =
+    graph . outbound_rel_partners_for_relation_gated (
+      &ID::from ("recorder"), NodeRelation::Contains, Some (&all) )
+    . iter () . any ( |partner| partner . member == ID::from ("member") );
+  let visible_to_the_save : bool =
+    SkgrepoRestriction::record_is_visible (&all, &SkgrepoName::from ("unnamed"));
+  assert! (shown_by_the_render);
+  assert_eq! (shown_by_the_render, visible_to_the_save);
+  assert_eq! ( graph . gnid_presence_gated (&ID::from ("member"), Some (&all)),
+               GnidPresence::Present );
+  assert! ( ! SkgrepoRestriction::node_is_restricted (
+    &all, &SkgrepoName::from ("unnamed") )); }

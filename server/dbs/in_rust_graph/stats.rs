@@ -12,7 +12,7 @@
 /// operations used by the uniform-herald grammar.
 
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
+use crate::dbs::in_rust_graph::relation_accessors::{GnidPresence, NodeRelation};
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::ID;
 use crate::types::nodes::complete::Graphnode;
@@ -49,8 +49,8 @@ pub fn graphnodestats_for_pid (
   let aliases : usize =
     graphnode
     . map ( |n| n . aliases . or_default () . iter ()
-                . filter ( |alias| restriction . is_none_or (
-                  |set| set . is_all () || set . contains_skgrepo (&alias . relRepo) ))
+                . filter ( |alias| SkgrepoRestriction::record_is_visible (
+                  restriction, &alias . relRepo ))
                 . count () )
     . unwrap_or (0);
   let extra_ids : usize =
@@ -117,13 +117,13 @@ fn fetch_all_graphnodestats_in_rust (
     let inbound_count = | relation : NodeRelation | -> usize {
       graph . inbound_pids_for_relation_gated (pid, relation, restriction)
       . iter ()
-      . filter ( |p| pid_skgrepo_is_unrestricted (graph, restriction, p) )
+      . filter ( |p| node_is_shown (graph, restriction, p) )
       . collect::<HashSet<_>> () . len () };
     // Outbound counts: gated partners, further repo-filtered.
     let outbound_count = | relation : NodeRelation | -> usize {
       graph . outbound_pids_for_relation_gated (pid, relation, restriction)
       . iter ()
-      . filter ( |p| pid_skgrepo_is_unrestricted (graph, restriction, p) )
+      . filter ( |p| node_is_shown (graph, restriction, p) )
       . collect::<HashSet<_>> () . len () };
     let containers : usize = inbound_count (NodeRelation::Contains);
     let contents : usize = outbound_count (NodeRelation::Contains);
@@ -140,7 +140,7 @@ fn fetch_all_graphnodestats_in_rust (
       graph . inbound_pids_for_relation_gated (
         pid, NodeRelation::LinksTo, restriction )
       . into_iter ()
-      . filter (|mentioner| pid_skgrepo_is_unrestricted (graph, restriction, mentioner))
+      . filter (|mentioner| node_is_shown (graph, restriction, mentioner))
       . collect ();
     let link_total : usize = mentioners . len ();
     let link_substantive : usize = mentioners . iter ()
@@ -164,7 +164,7 @@ fn fetch_all_graphnodestats_in_rust (
           pid, NodeRelation::Contains, restriction )
         . into_iter ()
         . filter ( |p| pid_set . contains (p) )
-        . filter ( |p| pid_skgrepo_is_unrestricted (graph, restriction, p) )
+        . filter ( |p| node_is_shown (graph, restriction, p) )
         . collect ();
       if ! intersected . is_empty () {
         container_to_contents . insert ( pid . clone (),
@@ -175,7 +175,7 @@ fn fetch_all_graphnodestats_in_rust (
           pid, NodeRelation::Contains, restriction )
         . into_iter ()
         . filter ( |p| pid_set . contains (p) )
-        . filter ( |p| pid_skgrepo_is_unrestricted (graph, restriction, p) )
+        . filter ( |p| node_is_shown (graph, restriction, p) )
         . collect ();
       if ! intersected . is_empty () {
         content_to_containers . insert ( pid . clone (),
@@ -193,7 +193,7 @@ fn link_facts_for_mentioner (
   restriction : Option<&SkgrepoRestriction>,
   pid    : &ID,
 ) -> (HashSet<ID>, bool) {
-  if ! pid_skgrepo_is_unrestricted (graph, restriction, pid) {
+  if ! node_is_shown (graph, restriction, pid) {
     return (HashSet::new (), false); }
   let Some (node) = graph . nodes . get (pid) else {
     return (HashSet::new (), false); };
@@ -201,14 +201,14 @@ fn link_facts_for_mentioner (
     graph . outbound_pids_for_relation_gated (
       pid, NodeRelation::LinksTo, restriction )
     . into_iter ()
-    . filter (|target| pid_skgrepo_is_unrestricted (graph, restriction, target))
+    . filter (|target| node_is_shown (graph, restriction, target))
     . collect ();
   let has_body : bool = node . body . as_ref ()
     . is_some_and (|body| ! body . trim () . is_empty ());
   let has_content : bool = graph . outbound_pids_for_relation_gated (
       pid, NodeRelation::Contains, restriction )
     . iter ()
-    . any (|member| pid_skgrepo_is_unrestricted (graph, restriction, member));
+    . any (|member| node_is_shown (graph, restriction, member));
   let substantive : bool = has_body || has_content || targets . len () > 1;
   (targets, substantive) }
 
@@ -219,12 +219,14 @@ pub(crate) fn mentioner_is_substantive (
 ) -> bool {
   link_facts_for_mentioner (graph, restriction, pid) . 1 }
 
-fn pid_skgrepo_is_unrestricted (
-  graph  : &InRustGraph,
+/// Whether the graph has the node 'pid' names and the skgrepo
+/// restriction shows it.
+fn node_is_shown (
+  graph       : &InRustGraph,
   restriction : Option<&SkgrepoRestriction>,
-  pid    : &ID,
+  pid         : &ID,
 ) -> bool {
-  ! graph . restriction_keeps_out (pid, restriction) }
+  graph . gnid_presence_gated (pid, restriction) == GnidPresence::Present }
 
 #[cfg(test)]
 mod tests {

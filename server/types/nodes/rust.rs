@@ -79,8 +79,8 @@ impl GraphnodeInRust {
     restriction : Option<&SkgrepoRestriction>,
   ) -> Vec<(String, Option<SkgrepoName>)> {
     self . aliases . or_default () . iter ()
-      . filter ( |alias| restriction . is_none_or (
-        |set| set . is_all () || set . contains_skgrepo (&alias . relRepo) ))
+      . filter ( |alias| SkgrepoRestriction::record_is_visible (
+        restriction, &alias . relRepo ))
       . map ( |alias| ( alias . member . clone (),
                         ( alias . relRepo != self . home_skgrepo )
                           . then ( || alias . relRepo . clone () ) ))

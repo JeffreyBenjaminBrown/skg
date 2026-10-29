@@ -32,6 +32,7 @@ use crate::types::viewnode::{
   PropertyMember, RelationshipEditRequest, Occurrence, Viewnode, ViewnodeKind, Vognode,
   VognodeKind, Warrant, default_occurrence};
 use crate::refresh::mode::RefreshMode;
+use crate::skgrepo_sets::SkgrepoRestriction;
 
 use ego_tree::{NodeId, NodeMut, NodeRef, Tree};
 use std::error::Error;
@@ -88,9 +89,10 @@ pub(crate) fn id_rule (
   if let Some (straddle) = head {
     if let Some (pid) = straddle . before . pid_of (gnid) {
       if ! straddle . after . nodes . contains_key (&pid) {
-        let restricted_at_head : bool =
-          straddle . before . gnid_presence_gated (gnid, walk . truth . restriction )
-          == GnidPresence::Restricted;
+        let restricted_at_head : bool = // by HEAD's home, the worktree lacking the node
+          straddle . before . pid_and_skgrepo (gnid) . is_some_and (
+            |(_pid, home)| SkgrepoRestriction::node_is_restricted (
+              walk . truth . restriction, &home ));
         return if restricted_at_head { restricted_answer () }
                else { IdRuleAnswer::Ghost (pid) }; }}}
   if parent_goal . is_some_and ( |goal| goal . names_gnid (gnid) ) {

@@ -305,7 +305,6 @@ fn a_lowered_relationship_is_governed_by_its_new_level (
   // sets that include that skgrepo, while a sibling relationship still more
   // private than its default stays hidden. Lowering to the default cannot
   // leak: by definition both endpoints' homes are at least as public as it.
-  use skg::dbs::in_rust_graph::relation_accessors::BinaryRolePosition;
   use skg::types::misc::{RelPartner, SkgrepoName};
   use skg::types::nodes::complete::empty_graphnode;
   let node_at = |pid : &str, skgrepo : &str| -> Graphnode {
@@ -328,17 +327,13 @@ fn a_lowered_relationship_is_governed_by_its_new_level (
     name    : SkgrepoSetName::from ("public"),
     skgrepos : [ SkgrepoName::from ("public") ]
       . into_iter () . collect () };
-  let member_role : RelationRole = RelationRole::new (
-    NodeRelation::Contains, BinaryRolePosition::Second );
-  assert! ( graph . relation_membership_is_visible (
-    & ID::from ("recorder"), & ID::from ("lowered"), member_role,
-    Some (&public) ),
+  let contents_under = |restriction : Option<&SkgrepoRestriction>| -> Vec<ID> {
+    graph . outbound_pids_for_relation_gated (
+      & ID::from ("recorder"), NodeRelation::Contains, restriction ) };
+  assert! ( contents_under (Some (&public)) . contains (& ID::from ("lowered")),
     "an relationship lowered to its default renders under the set that \
      includes that default" );
-  assert! ( ! graph . relation_membership_is_visible (
-    & ID::from ("recorder"), & ID::from ("kept"), member_role,
-    Some (&public) ),
+  assert! ( ! contents_under (Some (&public)) . contains (& ID::from ("kept")),
     "a sibling relationship still above its default stays gated" );
-  assert! ( graph . relation_membership_is_visible (
-    & ID::from ("recorder"), & ID::from ("kept"), member_role, None ),
+  assert! ( contents_under (None) . contains (& ID::from ("kept")),
     "the full fold sees everything" ); }

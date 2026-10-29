@@ -29,7 +29,7 @@ use crate::diff_view::changes::{
 use crate::diff_view::pruned_change_view::{
   PrunedChangeViewSets, prunedChangeView_sets_of_buffer};
 use crate::graph_straddle::types::{GraphStraddle, Partner};
-use crate::dbs::in_rust_graph::relation_accessors::{GnidPresence, RelationRole};
+use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::refresh::Walk;
 use crate::refresh::ancestry::described_node;
 use crate::refresh::extent::is_chain_parent;
@@ -228,19 +228,14 @@ fn partner_items<'a> (
 ) -> Vec<GoalItem> {
   let restriction : Option<&SkgrepoRestriction> = walk . truth . restriction;
   let record_is_visible = |partner : &Partner| -> bool {
-    match ( restriction,
-            partner . relRepo_after . as_ref ()
-            . or ( partner . relRepo_before . as_ref () )) {
-      ( Some (set), Some (relRepo) ) =>
-        set . is_all () || set . contains_skgrepo (relRepo),
-      _ => true, } };
+    partner . relRepo_after . as_ref ()
+      . or ( partner . relRepo_before . as_ref () )
+      . is_none_or ( |relRepo| SkgrepoRestriction::record_is_visible (
+        restriction, relRepo )) };
   let node_is_restricted = |gnid : &ID| -> bool {
-    match walk . truth . graph . gnid_presence_gated (gnid, restriction) {
-      GnidPresence::Restricted => true,
-      GnidPresence::Present    => false,
-      GnidPresence::Absent     =>
-        straddle . before . gnid_presence_gated (gnid, restriction)
-        == GnidPresence::Restricted, } };
+    straddle . home_in_worktree_or_head (gnid)
+      . is_some_and ( |home| SkgrepoRestriction::node_is_restricted (
+        restriction, &home )) };
   partners
     . filter ( |partner| record_is_visible (partner) )
     . map ( |partner| GoalItem {

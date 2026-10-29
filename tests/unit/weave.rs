@@ -23,25 +23,6 @@ fn sdm (disk : &[&str], buffer : &[&str]) -> Vec<&'static str> {
       Box::leak ( s . to_string () . into_boxed_str () ) } ) . collect ();
   set_difference_merge ( &disk, vis, &buffer ) }
 
-/// A record is visible when its relRepo is unrestricted, whatever its
-/// member: the buffer shows an unresolvable member as an unknown, and
-/// a member whose home is restricted as a Restricted vognode.
-#[test]
-fn a_record_is_visible_when_its_relRepo_is_unrestricted () {
-  use crate::skgrepo_sets::{SkgrepoRestriction, SkgrepoSetName};
-  use crate::types::misc::{ID, RelPartner, SkgrepoName};
-  use std::collections::BTreeSet;
-  let restriction = SkgrepoRestriction {
-    name: SkgrepoSetName::from ("main"),
-    skgrepos: BTreeSet::from ([SkgrepoName::from ("main")]) };
-  let recorded_at_main = RelPartner::at_relRepo (
-    SkgrepoName::from ("main"), ID::from ("absent-or-private"));
-  let recorded_at_private = RelPartner::at_relRepo (
-    SkgrepoName::from ("private"), ID::from ("absent-or-private"));
-  assert! (relationship_member_is_visible (&recorded_at_main, &restriction));
-  assert! (! relationship_member_is_visible (&recorded_at_private, &restriction));
-}
-
 #[test]
 fn weave_identity_when_all_visible () {
   assert_eq! ( w (&["a","b","c"], &["a","b","c"]),

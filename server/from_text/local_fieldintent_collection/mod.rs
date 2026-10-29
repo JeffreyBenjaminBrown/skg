@@ -26,7 +26,6 @@ use crate::from_text::supplement_from_disk::{
   build_diskSupplemented_nodeInstructions,
   NodeInstructions_with_Repomoves };
 use crate::from_text::validate::{buffernode_differs_from_disknode, suppress_writes_to_restricted_nodes};
-use crate::from_text::weave::member_is_visible;
 use crate::refresh::ancestry::parent_reads_claims;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::{ID, SkgConfig};
@@ -100,14 +99,18 @@ pub fn extract_nonmergeSavePlan_locally_in_graph (
         None => (nodeMerge_acquisitions, false),
         Some (restriction) => {
           // A nodeMerge writes both nodes' files; under a restricted
-          // set it is suppressed unless both sides are provably
-          // unrestricted (the API doc's "Restricted-skgrepo nodes").
+          // set it is suppressed unless the graph has both nodes and
+          // neither is restricted (the API doc's "Restricted-skgrepo
+          // nodes").
+          let shown = |gnid : &ID| -> bool {
+            graph . pid_and_skgrepo (gnid) . is_some_and (
+              |(_pid, home)| ! SkgrepoRestriction::node_is_restricted (
+                restriction, &home )) };
           let before : usize = nodeMerge_acquisitions . len ();
           let kept : Vec<(ID, ID)> =
             nodeMerge_acquisitions . into_iter ()
             . filter ( |(acquirer, acquiree)|
-                member_is_visible (graph, acquirer, config, restriction)
-                && member_is_visible (graph, acquiree, config, restriction) )
+                shown (acquirer) && shown (acquiree) )
             . collect ();
           let suppressed : bool = kept . len () < before;
           (kept, suppressed) }};

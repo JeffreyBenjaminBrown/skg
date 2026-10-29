@@ -27,8 +27,9 @@ pub fn classify_link_gnids (
   gnids . iter () . map (|gnid| {
     let status : LinkStatus = match graph . pid_and_skgrepo (gnid) {
       None => LinkStatus::Missing,
-      Some ((_pid, skgrepo)) if ! restriction . is_all ()
-        && ! restriction . contains_skgrepo (&skgrepo) => LinkStatus::Restricted,
+      Some ((_pid, skgrepo))
+        if SkgrepoRestriction::node_is_restricted (restriction, &skgrepo) =>
+        LinkStatus::Restricted,
       Some ((pid, skgrepo)) => {
         let skgrepo_label : String = config . skgrepos . get (&skgrepo)
           .map (|s| s . herald_label () . to_string ())

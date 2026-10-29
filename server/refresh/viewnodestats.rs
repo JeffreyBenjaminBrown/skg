@@ -202,10 +202,9 @@ fn set_herald_strings_in_viewnode (
     if let Some (subscriber_pid) =
       tree . get (treeid) . unwrap () . parent ()
       . and_then ( |parent| subscriber_of_subscribee_as_such (tree, parent . id ()) )
-    { if graph . relation_membership_is_visible (
-        node_pid, &subscriber_pid,
-        RelationRole::new (NodeRelation::HidesFromSubs, BinaryRolePosition::First),
-        restriction )
+    { if relationship_is_visible (
+        graph, restriction, relRepos, node_pid, &subscriber_pid,
+        RelationRole::new (NodeRelation::HidesFromSubs, BinaryRolePosition::First) )
       { flags . record (NodeRelation::HidesFromSubs, true, 3); }}}
   let unintegrated : Option<usize> =
     // A subscribee as such counts the nodes its content goal draws as
@@ -295,12 +294,10 @@ fn flag_ancestor_relations (
   generation            : usize,
 ) {
   let mut contains_rel_is_visible = |recorder : &ID, target : &ID| -> bool {
-    match restriction {
-      Some (a) if ! a . is_all () =>
-        relRepos . relRepo (graph, recorder, NodeRelation::Contains, target)
-          . map ( |skgrepo| a . contains_skgrepo (&skgrepo) )
-          . unwrap_or (false),
-      _ => true }};
+    restriction . is_none ()
+    || relRepos . relRepo (graph, recorder, NodeRelation::Contains, target)
+       . is_some_and ( |relRepo| SkgrepoRestriction::record_is_visible (
+         restriction, &relRepo )) };
   // Contains, via the maps. inbound: ancestor contains node.
   if content_to_containers . get (node_pid)
     . map_or (false, |s| s . contains (anc_pid))
@@ -313,18 +310,38 @@ fn flag_ancestor_relations (
     flags . record (NodeRelation::Contains, false, generation); }
   for rel in GRAPH_RELATIONS {
     // inbound: ancestor R's node (ancestor plays the first role).
-    if graph . relation_membership_is_visible (
-      node_pid, anc_pid,
-      RelationRole::new (rel, BinaryRolePosition::First), restriction ) {
+    if relationship_is_visible (
+      graph, restriction, relRepos, node_pid, anc_pid,
+      RelationRole::new (rel, BinaryRolePosition::First) ) {
       flags . record (rel, true, generation);
       if rel == NodeRelation::LinksTo
         && mentioner_is_substantive (graph, restriction, anc_pid) {
         flags . links_substantive_in . push (generation); } }
     // outbound: node R's ancestor (ancestor plays the second role).
-    if graph . relation_membership_is_visible (
-      node_pid, anc_pid,
-      RelationRole::new (rel, BinaryRolePosition::Second), restriction ) {
+    if relationship_is_visible (
+      graph, restriction, relRepos, node_pid, anc_pid,
+      RelationRole::new (rel, BinaryRolePosition::Second) ) {
       flags . record (rel, false, generation); } } }
+
+/// Whether 'member' plays 'member_role' to 'node' in a relationship
+/// whose record the skgrepo restriction shows. The record is the
+/// list of whichever of the two plays the relation's first role.
+fn relationship_is_visible (
+  graph       : &InRustGraph,
+  restriction : Option<&SkgrepoRestriction>,
+  relRepos    : &mut RelRepoLookup,
+  node        : &ID,
+  member      : &ID,
+  member_role : RelationRole,
+) -> bool {
+  let (recorder, target) : (&ID, &ID) =
+    if member_role . is_first_role () { (member, node) }
+    else { (node, member) };
+  graph . relation_membership_is_real (node, member, member_role)
+  && ( restriction . is_none ()
+       || relRepos . relRepo (graph, recorder, member_role . relation, target)
+          . is_some_and ( |relRepo| SkgrepoRestriction::record_is_visible (
+            restriction, &relRepo )) ) }
 
 /// The birth facts -- which relations explain this occurrence, on which
 /// side of it, accounting for which ancestor -- read from the kind of

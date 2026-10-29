@@ -103,6 +103,17 @@ impl GraphStraddle {
     &self,
   ) -> &BTreeSet<ID> {
     self . change_leaves () . order_only_pids () }
+
+  /// The home skgrepo of the node 'gnid' names: the worktree's, or
+  /// HEAD's when the worktree lacks the node. What the diff view asks
+  /// of the restriction about a node ('node_is_restricted').
+  pub fn home_in_worktree_or_head (
+    &self,
+    gnid : &ID,
+  ) -> Option<SkgrepoName> {
+    self . after . pid_and_skgrepo (gnid)
+      . or_else ( || self . before . pid_and_skgrepo (gnid) )
+      . map ( |(_pid, home)| home ) }
 }
 
 /// The existence change of an item of the union of the straddle's

@@ -364,7 +364,7 @@ pub fn suppress_writes_to_restricted_nodes (
         let skgrepo : &SkgrepoName = match instruction {
           NodeInstruction::Save (SaveNode (node)) => &node . home_skgrepo,
           NodeInstruction::Delete (d)             => &d . home_skgrepo };
-        let keep : bool = restriction . contains_skgrepo (skgrepo);
+        let keep : bool = ! SkgrepoRestriction::node_is_restricted (restriction, skgrepo);
         if ! keep { suppressed = true; }
         keep } )
     . collect ();
@@ -372,8 +372,8 @@ pub fn suppress_writes_to_restricted_nodes (
     skgrepo_moves . into_iter ()
     . filter ( |mv| {
         let keep : bool =
-          restriction . contains_skgrepo (&mv . skgrepo_change . old)
-          && restriction . contains_skgrepo (&mv . skgrepo_change . new);
+          ! SkgrepoRestriction::node_is_restricted (restriction, &mv . skgrepo_change . old)
+          && ! SkgrepoRestriction::node_is_restricted (restriction, &mv . skgrepo_change . new);
         if ! keep { suppressed = true; }
         keep } )
     . collect ();

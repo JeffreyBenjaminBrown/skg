@@ -1,7 +1,6 @@
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use crate::dbs::filesystem::not_nodes::load_config_with_overrides;
 use crate::dbs::init::create_empty_tantivy_index;
-use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::misc::{ID, SkgConfig, SkgrepoName, TantivyIndex};
 pub use crate::types::misc::SkgrepoSetName;
 use crate::types::nodes::complete::Graphnode;
@@ -49,12 +48,33 @@ impl SkgrepoRestriction {
   ) -> bool {
     self . name . 0 == "all" }
 
-  pub fn gnid_skgrepo_is_unrestricted (
-    &self,
-    graph : &InRustGraph,
-    gnid  : &ID,
+  /// Whether a record (a relationship as one node's file states it,
+  /// in the section of the skgrepo 'relRepo') is visible: the
+  /// restriction holds its skgrepo. No restriction, and the set
+  /// 'all', hold every skgrepo, even one the config does not name.
+  /// The restriction is taken as the caller holds it, bare or as an
+  /// 'Option' (None for no restriction).
+  pub fn record_is_visible<'a> (
+    restriction : impl Into<Option<&'a SkgrepoRestriction>>,
+    relRepo     : &SkgrepoName,
   ) -> bool {
-    ! graph . restriction_keeps_out (gnid, Some (self)) }
+    match restriction . into () {
+      None => true,
+      Some (restriction) => restriction . is_all ()
+                            || restriction . contains_skgrepo (relRepo), } }
+
+  /// Whether a node whose home skgrepo is 'home' is restricted: the
+  /// restriction keeps its home out. No restriction, and the set
+  /// 'all', restrict no node. The restriction is taken as the caller
+  /// holds it, bare or as an 'Option' (None for no restriction).
+  pub fn node_is_restricted<'a> (
+    restriction : impl Into<Option<&'a SkgrepoRestriction>>,
+    home        : &SkgrepoName,
+  ) -> bool {
+    match restriction . into () {
+      None => false,
+      Some (restriction) => ! restriction . is_all ()
+                            && ! restriction . contains_skgrepo (home), } }
 }
 
 /// Refuses unless the restriction is 'all'. 'what' is the refused
@@ -79,7 +99,7 @@ pub fn titles_for_skgrepo_set_for_test (
     gnids . iter () . cloned () . collect ();
   let mut result : HashMap<ID, String> = HashMap::new ();
   for node in nodes {
-    if restriction . contains_skgrepo (&node . home_skgrepo)
+    if ! SkgrepoRestriction::node_is_restricted (restriction, &node . home_skgrepo)
     && wanted . contains (&node . pid) {
       result . insert (node . pid, node . title); }}
   Ok (result) }
@@ -94,7 +114,7 @@ pub fn search_gnids_for_skgrepo_set_for_test (
   let mut hits : Vec<ID> =
     read_all_skg_files_from_skgrepos (config)?
     . into_iter ()
-    . filter ( |n| restriction . contains_skgrepo (&n . home_skgrepo) )
+    . filter ( |n| ! SkgrepoRestriction::node_is_restricted (restriction, &n . home_skgrepo) )
     . filter ( |n| {
       n . title . contains (terms)
       || n . aliases . or_default () . iter () . any ( |a|

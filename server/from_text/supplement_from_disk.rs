@@ -10,7 +10,7 @@
 
 use crate::from_text::local_fieldintent_collection::lower::{
   RequestedRelRepos, NodeIntent, NodeSaveIntent };
-use crate::from_text::weave::{relationship_member_is_visible, set_difference_merge, weave};
+use crate::from_text::weave::{set_difference_merge, weave};
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::errors::BufferValidationError;
 use crate::dbs::in_rust_graph::InRustGraph;
@@ -205,18 +205,18 @@ fn preserve_invisible_members (
   let contains_visible = |gnid : &ID| -> bool {
     disk_node . contains . iter ()
       . find (|member| &member . member == gnid)
-      . is_some_and (|member| relationship_member_is_visible (
-        member, restriction)) };
+      . is_some_and (|member| SkgrepoRestriction::record_is_visible (
+        restriction, &member . relRepo)) };
   let subscribes_visible = |gnid : &ID| -> bool {
     disk_node . subscribesTo . or_default () . iter ()
       .find (|member| &member . member == gnid)
-      .is_some_and (|member| relationship_member_is_visible (
-        member, restriction)) };
+      .is_some_and (|member| SkgrepoRestriction::record_is_visible (
+        restriction, &member . relRepo)) };
   let overrides_visible = |gnid : &ID| -> bool {
     disk_node . overrides . or_default () . iter ()
       .find (|member| &member . member == gnid)
-      .is_some_and (|member| relationship_member_is_visible (
-        member, restriction)) };
+      .is_some_and (|member| SkgrepoRestriction::record_is_visible (
+        restriction, &member . relRepo)) };
   // Rendering may canonicalize a resolvable extra ID to its primary PID.  The
   // comparison key says that is the same relationship, but the disk spelling
   // is load-bearing: restore it before the weave so an untouched round trip
@@ -269,8 +269,8 @@ fn preserve_invisible_members (
     let alias_visible = |text : &String| -> bool {
       disk_node . aliases . or_default () . iter ()
         . find ( |alias| &alias . member == text )
-        . is_some_and ( |alias| restriction . is_all ()
-                                || restriction . contains_skgrepo (&alias . relRepo) ) };
+        . is_some_and ( |alias| SkgrepoRestriction::record_is_visible (
+          restriction, &alias . relRepo )) };
     let submitted_aliases : Vec<String> =
       members_of (supplemented . aliases . or_default ());
     let merged : Vec<String> = weave (
