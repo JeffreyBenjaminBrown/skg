@@ -11,17 +11,12 @@ use skg::org_to_text::viewnode_to_string;
 use skg::serve::parse_metadata_sexp::{
   GnidOnlyMetadata, METADATA_GRAMMAR, MetadataKind, ViewnodeMetadata,
   parse_metadata_to_viewnodemd, viewnode_from_metadata};
-use skg::types::misc::{ID, SkgConfig, SkgrepoName};
+use skg::types::misc::{ID, SkgrepoName};
 use skg::types::viewnode::{
   Ghost, GnidOnlyKind, GnidOnlyVognode, PropertyMember, Viewnode, ViewnodeId, ViewnodeKind,
   Vognode, Warrant,
   mk_editable_viewnode, mk_writeProtected_viewnode, viewnode_of};
 
-use std::collections::HashMap;
-
-fn config (
-) -> SkgConfig {
-  SkgConfig::dummyFromSkgrepos (HashMap::new ()) }
 
 /// An editable node n of 'main' whose relationship to its viewparent
 /// is recorded in 'pub', and which stands for the original o.
@@ -40,7 +35,7 @@ fn node_with_its_declared_parts (
 fn each_kind_prints_its_parts_beside_its_atom (
 ) {
   let rendered = |viewnode : Viewnode| -> String {
-    viewnode_to_string (&viewnode, &config ()) . unwrap () };
+    viewnode_to_string (&viewnode) . unwrap () };
   assert_eq! (
     rendered ( Viewnode { viewnode_id : Some ( ViewnodeId::from_counter (10) ),
                           .. node_with_its_declared_parts () } ),

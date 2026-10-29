@@ -15,8 +15,9 @@
 //! view the goal also holds what HEAD alone warrants, and change
 //! viewnodes are recomputed in place ('diff_view.rs'). After the
 //! walk, the tail ('tail.rs') computes the derived facts, prunes the
-//! childless tombstones, gives every viewnode a vnid and renders.
-//! The refresh returns what it changed ('buffer_corrections.rs').
+//! childless tombstones and gives every viewnode a vnid. The refresh
+//! returns what it changed ('buffer_corrections.rs'); it renders
+//! nothing, and its caller renders the forest once it is done with it.
 
 pub mod ancestry;
 pub mod buffer_corrections;
@@ -59,14 +60,6 @@ pub struct Truth<'a> {
   pub restriction : Option<&'a SkgrepoRestriction>,
 }
 
-/// What a refresh returns besides the corrected viewforest.
-pub struct Refreshed {
-  /// The buffer's text.
-  pub text        : String,
-  /// What the refresh changed, in walk order.
-  pub buffer_corrections : Vec<BufferCorrection>,
-}
-
 impl<'a> Truth<'a> {
   /// The truth of a runtime generation, under 'restriction'.
   pub fn of_runtime (
@@ -84,7 +77,7 @@ pub fn refresh_content_viewforest (
   viewnode_id_record       : &mut ViewnodeIdRecord,
   truth                    : &Truth,
   buffer_correction_policy : &BufferCorrectionPolicy,
-) -> Result<Refreshed, Box<dyn Error>> {
+) -> Result<Vec<BufferCorrection>, Box<dyn Error>> {
   refresh_viewforest (
     viewforest, viewnode_id_record, truth, RefreshMode::ContentView,
     truth . config . initial_node_limit, buffer_correction_policy ) }
@@ -94,7 +87,8 @@ pub fn refresh_content_viewforest (
 /// ('extent.rs'). 'viewnode_id_record' assigns the vnids of the
 /// viewnodes the refresh draws. 'buffer_correction_policy' says which
 /// changes are no buffer corrections. Edit requests pass through
-/// untouched; view requests are fulfilled and dropped.
+/// untouched; view requests are fulfilled and dropped. Returns what the
+/// refresh changed, in walk order.
 pub fn refresh_viewforest (
   viewforest               : &mut ViewForest,
   viewnode_id_record       : &mut ViewnodeIdRecord,
@@ -102,7 +96,7 @@ pub fn refresh_viewforest (
   mode                     : RefreshMode,
   node_budget              : usize,
   buffer_correction_policy : &BufferCorrectionPolicy,
-) -> Result<Refreshed, Box<dyn Error>> {
+) -> Result<Vec<BufferCorrection>, Box<dyn Error>> {
   let mut walk : Walk = Walk::new (truth, mode, node_budget, buffer_correction_policy);
   { let tree : &mut Tree<Viewnode> = viewforest . as_internal_tree_mut ();
     debug_assert! ( at_most_one_editable_occurrence_per_gnid (tree),
@@ -111,15 +105,7 @@ pub fn refresh_viewforest (
     keep_the_first_editable_occurrence_of_each_node (tree, &mut walk);
     walk . editable_gnids = editable_gnids_in (tree);
     walk_in_level_order (tree, &mut walk) ?; }
-  let text : String = tail::finish (
-    viewforest, viewnode_id_record, &walk ) ?;
-  let buffer_corrections : Vec<BufferCorrection> =
-    if buffer_correction_policy . is_read () {
-      walk . buffer_corrections . into_buffer_corrections (
-        viewforest . as_internal_tree_mut (),
-        buffer_correction_policy . reports_what_the_tail_pruned () ) }
-    else { Vec::new () };
-  Ok ( Refreshed { text, buffer_corrections } ) }
+  tail::finish (viewforest, viewnode_id_record, walk) }
 
 /// What the walk carries from one parent to the next.
 pub(crate) struct Walk<'a> {

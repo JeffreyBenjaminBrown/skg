@@ -1162,7 +1162,7 @@ async fn test_retained_content_node_is_shown_once (
         let viewforest : &ViewForest =
           views_state . open_views . viewforest_id_to_view (&viewforest_id)
           . expect ("the first view is registered");
-        viewforest_to_string (viewforest, &config) ? };
+        viewforest_to_string (viewforest) ? };
       println! ("The first view after the other's save:\n{}", collateral);
       let thirteens : Vec<&str> = lines_starting (&collateral, "** (skg node (gnid 13) ");
       assert! ( thirteens . len () == 1

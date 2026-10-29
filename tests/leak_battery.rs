@@ -132,7 +132,7 @@ fn inbound_containerward_data_hides_N_at_public (
           ! ancestors . contains (&ID::from ("N")),
           "the rendered containerward chain must not show N at \
            public: {:?}", ancestors );
-        let rendered : String = viewforest_to_string (&viewforest, config)?;
+        let rendered : String = viewforest_to_string (&viewforest)?;
         assert! (
           ! rendered . contains ("leak-battery-N"),
           "N's title must not leak via the rendered chain at \

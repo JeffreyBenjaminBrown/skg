@@ -865,7 +865,7 @@ async fn fork_collateral_rerender_substitutes_too (
   let collateral = views_state . open_views
     . viewforest_id_to_view (&collateral_viewforest_id)
     .ok_or ("the collateral view must remain open") ?;
-  let collateral_text : String = viewforest_to_string (collateral, config) ?;
+  let collateral_text : String = viewforest_to_string (collateral) ?;
   assert! ( collateral_text . contains ("(overridesHere N)")
             && ! collateral_text . contains ("(gnid N)"),
     "the collateral view must substitute the clone:\n{}", collateral_text );

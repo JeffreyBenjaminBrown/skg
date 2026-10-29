@@ -697,10 +697,8 @@ fn relrepo_fact_and_request_round_trip_separately (
   t . relationshipEditRequest = Some ( RelationshipEditRequest::RelRepo ( SkgrepoName::from ("secret") ));
   let viewnode : Viewnode =
     viewnode_of ( ViewnodeKind::Vognode ( Vognode::Occurrence (t) ));
-  let config : SkgConfig =
-    config_with_order ( & ["public", "private"] );
   let rendered : String =
-    viewnode_to_string (&viewnode, &config) . unwrap ();
+    viewnode_to_string (&viewnode) . unwrap ();
   assert! ( rendered . contains ("(relRepo private)"),
             "expected a relRepo atom in: {}", rendered );
   assert! ( rendered . contains (
@@ -765,8 +763,7 @@ fn flag_requests_parse_round_trip_and_reject_write_protected_flags (
     let mut node : Viewnode =
       viewnode_of ( ViewnodeKind::Vognode (
         Vognode::Occurrence (occurrence) ));
-    let config : SkgConfig = config_with_order (&["public"]);
-    let rendered : String = viewnode_to_string (&node, &config) . unwrap ();
+    let rendered : String = viewnode_to_string (&node) . unwrap ();
     assert! ( rendered . contains (&format! (
       "(editRequest (flag noSearchMatching {}))", value)) );
     let parsed = parse_metadata_to_viewnodemd (
@@ -802,8 +799,7 @@ fn unknown_relrepo_fact_and_request_round_trip_separately (
     u . relRepo = Some ( SkgrepoName::from ("private") );
     u . relationshipEditRequest = Some ( RelationshipEditRequest::RelRepo ( SkgrepoName::from ("secret") ));
   } else { unreachable! (); }
-  let config : SkgConfig = config_with_order ( & ["public", "private"] );
-  let rendered : String = viewnode_to_string (&unknown, &config) . unwrap ();
+  let rendered : String = viewnode_to_string (&unknown) . unwrap ();
   assert! ( rendered . contains (
     "unknown (gnid absent-raw) (skgRepos (relRepo private)) (editRequest (relRepo secret))"),
             "Unknown facts and requests must serialize in stable order: {}", rendered );

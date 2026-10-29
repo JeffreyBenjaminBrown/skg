@@ -1,6 +1,6 @@
 use crate::refresh::ancestry::parent_reads_claims;
 use crate::serve::util::sexp_to_client_string;
-use crate::types::misc::{SkgConfig, SkgrepoName};
+use crate::types::misc::SkgrepoName;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
   ChangeFacts, FoldAndFocus, ReadinessRequest,
@@ -26,7 +26,7 @@ pub(crate) fn metadata_value_atom (
 /// PURPOSE: Render a view forest to org-mode text.
 /// Each forest root starts at level 1.
 ///
-/// ASSUMES: metadata has already been enriched with relationship data.
+/// ASSUMES: the refresh's tail has computed the derived facts.
 pub trait ViewForestRenderRoots {
   fn render_roots<'a> (
     &'a self,
@@ -60,17 +60,15 @@ impl ViewForestRenderRoots for Tree<Viewnode> {
 
 pub fn viewforest_to_string <R> (
   viewforest : &R,
-  config : &SkgConfig,
 ) -> Result < String, Box<dyn Error> >
 where R : ViewForestRenderRoots + ?Sized {
   render_view_roots_to_string (
-    viewforest . render_roots () ?, config ) }
+    viewforest . render_roots () ? ) }
 
 /// Compatibility helper for callers that still hold the old
 /// single-tree representation with an internal BufferRoot.
 pub fn viewforest_tree_to_string (
   viewforest : &Tree<Viewnode>,
-  config : &SkgConfig,
 ) -> Result < String, Box<dyn Error> > {
   let root_ref : NodeRef<Viewnode> = viewforest . root ();
   let is_viewforest_root : bool =
@@ -81,16 +79,14 @@ pub fn viewforest_tree_to_string (
     return Err (
       "viewforest_tree_to_string: root is not a BufferRoot" . into() ); }
   render_view_roots_to_string (
-    root_ref . children (), config ) }
+    root_ref . children () ) }
 
 fn render_view_roots_to_string <'a> (
   roots  : impl Iterator<Item = NodeRef<'a, Viewnode>>,
-  config : &SkgConfig,
 ) -> Result < String, Box<dyn Error> > {
   fn render_node_subtree_to_org (
     node_ref : NodeRef < Viewnode >,
     level    : usize,
-    config   : &SkgConfig,
   ) -> Result < String, Box<dyn Error> > {
     let claims_are_read : bool = // under any other parent no child claims
       node_ref . parent () . is_some_and ( |parent|
@@ -102,14 +98,13 @@ fn render_view_roots_to_string <'a> (
       out . push_str (
         & render_node_subtree_to_org (
           child,
-          level + 1,
-          config )? ); }
+          level + 1 )? ); }
     Ok (out) }
   let mut result : String =
     String::new ();
   for child in roots {
     result . push_str (
-      & render_node_subtree_to_org ( child, 1, config )? ); }
+      & render_node_subtree_to_org ( child, 1 )? ); }
   Ok (result) }
 
 /// Renders an Viewnode as org-mode formatted text.
@@ -119,7 +114,6 @@ fn render_view_roots_to_string <'a> (
 pub fn viewnode_to_text (
   level    : usize,
   viewnode : &Viewnode,
-  _config  : &SkgConfig,
 ) -> Result < String, Box<dyn Error> > {
   viewnode_to_text_where_it_stands (level, viewnode, true) }
 
@@ -169,7 +163,6 @@ fn viewnode_to_text_where_it_stands (
 /// read.
 pub fn viewnode_to_string (
   viewnode : &Viewnode,
-  _config  : &SkgConfig,
 ) -> Result < String, Box<dyn Error> > {
   viewnode_to_string_where_it_stands (viewnode, true) }
 

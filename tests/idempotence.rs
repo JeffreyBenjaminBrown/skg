@@ -27,6 +27,7 @@ use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 
 use skg::dbs::filesystem::not_nodes::load_config_with_overrides;
 use skg::dbs::init::empty_in_ram_tantivy_index;
+use skg::org_to_text::viewforest_to_string;
 use skg::refresh::{Truth, refresh_content_viewforest};
 use skg::refresh::buffer_corrections::BufferCorrectionPolicy;
 use skg::test_utils::{graph_from_config, main_skgrepo_config, refresh_reaches_fixpoint};
@@ -300,8 +301,9 @@ fn diff_view_buffer_refreshes_unchanged (
       refresh_diffView_viewforest (
         runtime, straddle, buffer_kind, store, restriction,
         &BufferCorrectionPolicy::after_a_switch (true), &mut forest, &mut record )
-        . map_err ( |e| format! ("the switch's refresh failed: {}", e) ) ?
-        . text }, };
+        . map_err ( |e| format! ("the switch's refresh failed: {}", e) ) ?;
+      viewforest_to_string (&forest)
+        . map_err ( |e| format! ("the switch's render failed: {}", e) ) ? }, };
   refresh_reaches_fixpoint (
     &switched, &runtime . graph,
     |forest, record| refresh_diffView_viewforest (

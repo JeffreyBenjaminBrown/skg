@@ -4,11 +4,9 @@ use skg::assert_metadata_eq;
 use skg::org_to_text::viewnode_to_text;
 use skg::herald_tokens::RelationshipHeralds;
 use skg::serve::parse_metadata_sexp::{ViewnodeMetadata, parse_metadata_to_viewnodemd};
-use skg::types::misc::{ID, SkgConfig, Skgrepo, SkgrepoName};
+use skg::types::misc::{ID, SkgrepoName};
 use skg::types::viewnode::{ Viewnode, ViewnodeKind, Vognode, Occurrence, Editability, ViewnodeStats, default_occurrence };
 use skg::types::viewnode::{Folder, Warrant, viewnode_of};
-use std::collections::HashMap;
-use std::path::PathBuf;
 
 #[test]
 fn test_viewnode_to_text_no_metadata () {
@@ -17,7 +15,7 @@ fn test_viewnode_to_text_no_metadata () {
                          SkgrepoName::from ("main"),
                          "Test Title" . to_string() ))));
   let result : String =
-    viewnode_to_text ( 1, &node, &SkgConfig::dummyFromSkgrepos (HashMap::new ()) )
+    viewnode_to_text ( 1, &node )
     . expect ("Occurrence rendering never fails");
   assert_metadata_eq! ( result, "* (skg node (gnid test) (skgRepos (nodeRepo main))) Test Title\n" ); }
 
@@ -32,7 +30,7 @@ fn test_viewnode_to_text_with_body () {
                           "Test Title" . to_string() ) };
   let node : Viewnode = viewnode_of (ViewnodeKind::Vognode (Vognode::Occurrence (t)));
   let result : String =
-    viewnode_to_text ( 2, &node, &SkgConfig::dummyFromSkgrepos (HashMap::new ()) )
+    viewnode_to_text ( 2, &node )
     . expect ("Occurrence rendering never fails");
   assert_metadata_eq! ( result, "** (skg node (gnid test) (skgRepos (nodeRepo main))) Test Title\nTest body content\n" ); }
 
@@ -42,7 +40,7 @@ fn test_viewnode_to_text_with_metadata () {
       Folder::Alias));
   node . foldAndFocus . folded = true;
   let result : String =
-    viewnode_to_text ( 1, &node, &SkgConfig::dummyFromSkgrepos (HashMap::new ()) )
+    viewnode_to_text ( 1, &node )
     . expect ("AliasFolder rendering never fails");
   assert_metadata_eq! ( result, "* (skg folded aliasFolder)\n" ); }
 
@@ -55,7 +53,7 @@ fn test_viewnode_to_text_with_gnid_metadata () {
                           "Test Title" . to_string() ) };
   let node : Viewnode = viewnode_of (ViewnodeKind::Vognode (Vognode::Occurrence (t)));
   let result : String =
-    viewnode_to_text ( 3, &node, &SkgConfig::dummyFromSkgrepos (HashMap::new ()) )
+    viewnode_to_text ( 3, &node )
     . expect ("Occurrence rendering never fails");
   assert_metadata_eq! ( result, "*** (skg node (gnid test123) (skgRepos (nodeRepo main)) writeProtected) Test Title\n" ); }
 
@@ -70,14 +68,8 @@ fn skgrepo_name_with_whitespace_is_one_round_trippable_atom () {
   let node : Viewnode =
     viewnode_of ( ViewnodeKind::Vognode (
       Vognode::Occurrence (occurrence) ));
-  let config = SkgConfig::dummyFromSkgrepos (HashMap::from ([
-    ( skgrepo . clone (), Skgrepo {
-        name         : skgrepo,
-        abbreviation : None,
-        path         : PathBuf::from ("cheese"),
-        owned        : false } ) ]));
   let rendered : String =
-    viewnode_to_text (1, &node, &config)
+    viewnode_to_text (1, &node)
     . expect ("Occurrence rendering never fails");
   assert_eq! (
     rendered,
@@ -104,7 +96,7 @@ fn test_metadata_ordering () {
                           "Test" . to_string() ) };
   let node : Viewnode = viewnode_of (ViewnodeKind::Vognode (Vognode::Occurrence (t)));
   let result : String =
-    viewnode_to_text ( 1, &node, &SkgConfig::dummyFromSkgrepos (HashMap::new ()) )
+    viewnode_to_text ( 1, &node )
     . expect ("Occurrence rendering never fails");
   assert_metadata_eq! ( result, "* (skg node (gnid xyz) (skgRepos (nodeRepo main)) (view cycle)) Test\n" ); }
 
@@ -120,7 +112,7 @@ fn an_unwarranted_occurrence_says_noWarrant_and_the_parser_drops_it () {
                           "Test" . to_string() ) };
   let node : Viewnode = viewnode_of (ViewnodeKind::Vognode (Vognode::Occurrence (t)));
   let result : String =
-    viewnode_to_text ( 1, &node, &SkgConfig::dummyFromSkgrepos (HashMap::new ()) )
+    viewnode_to_text ( 1, &node )
     . expect ("Occurrence rendering never fails");
   assert_metadata_eq! ( result, "* (skg node (gnid xyz) (skgRepos (nodeRepo main)) (view noWarrant cycle)) Test\n" );
   let metadata : ViewnodeMetadata =
@@ -143,7 +135,7 @@ fn test_rel_heralds_emitted () {
                             "N" . to_string () ) };
     let node = viewnode_of (ViewnodeKind::Vognode (Vognode::Occurrence (t)));
     viewnode_to_text (
-      1, &node, &SkgConfig::dummyFromSkgrepos (HashMap::new ()) )
+      1, &node )
       . unwrap () };
   let with_rels : String = mk ( RelationshipHeralds {
     rels  : Some ("(rels (contains (in 2 (ancestors 1)) (out 1)))" . to_string ()),

@@ -14,7 +14,7 @@ use crate::diff_view::pruned_change_view::{
 use crate::diff_view::readiness_store::ReadinessStore;
 use crate::graph_straddle::build::current_graph_straddle_in_slot;
 use crate::graph_straddle::types::GraphStraddle;
-use crate::refresh::{Refreshed, Truth, refresh_viewforest};
+use crate::refresh::{Truth, refresh_viewforest};
 use crate::refresh::buffer_corrections::{BufferCorrection, BufferCorrectionPolicy};
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::env::RuntimeGeneration;
@@ -49,7 +49,7 @@ pub fn refresh_diffView_viewforest (
   buffer_correction_policy    : &BufferCorrectionPolicy,
   viewforest           : &mut ViewForest,
   viewnode_id_record   : &mut ViewnodeIdRecord,
-) -> Result<Refreshed, Box<dyn Error>> {
+) -> Result<Vec<BufferCorrection>, Box<dyn Error>> {
   refresh_viewforest (
     viewforest, viewnode_id_record, &Truth::of_runtime (runtime, restriction),
     RefreshMode::DiffView { straddle,
@@ -79,7 +79,7 @@ pub fn rerender_diffView_buffer (
   rerender           : DiffViewRerender,
   viewforest         : &mut ViewForest,
   viewnode_id_record : &mut ViewnodeIdRecord,
-) -> Result<Refreshed, Box<dyn Error>> {
+) -> Result<Vec<BufferCorrection>, Box<dyn Error>> {
   let DiffViewRerender { buffer_kind : diffView_buffer_kind,
                          integrate_unshown_changes } : DiffViewRerender = rerender;
   let runtime : &RuntimeGeneration = &context . runtime;
@@ -95,38 +95,35 @@ pub fn rerender_diffView_buffer (
   if integrate_unshown_changes {
     ensure_editableOccurrences_exist (&straddle, diffView_buffer_kind, viewforest); }
   let store : MutexGuard<ReadinessStore> = context . env . runtime . lock_readiness_store ();
-  let refreshed : Refreshed = refresh_diffView_viewforest (
+  let buffer_corrections : Vec<BufferCorrection> = refresh_diffView_viewforest (
     runtime, &straddle, diffView_buffer_kind, &store, restriction,
     if integrate_unshown_changes { &BufferCorrectionPolicy::Unread }
     else { buffer_correction_policy },
     viewforest, viewnode_id_record ) ?;
-  if ! integrate_unshown_changes { return Ok (refreshed); }
+  if ! integrate_unshown_changes { return Ok (buffer_corrections); }
   let new_roots : Vec<ID> = contentOrigins_missing_from_buffer (
     &straddle, diffView_buffer_kind, viewforest, &standing_roots );
-  if new_roots . is_empty () { return Ok (refreshed); }
+  if new_roots . is_empty () { return Ok (buffer_corrections); }
   let appended_roots : Vec<NodeId> = append_contentOrigins_to_buffer (
     runtime, &straddle, diffView_buffer_kind, viewforest, &new_roots ) ?;
-  let refreshed_again : Refreshed = refresh_diffView_viewforest (
+  let buffer_corrections_again : Vec<BufferCorrection> = refresh_diffView_viewforest (
     runtime, &straddle, diffView_buffer_kind, &store, restriction,
     buffer_correction_policy, viewforest, viewnode_id_record ) ?;
-  Ok ( outside_the_appended_roots (refreshed_again, viewforest, &appended_roots) ) }
+  Ok ( outside_the_appended_roots (buffer_corrections_again, viewforest, &appended_roots) ) }
 
-/// 'refreshed' without the buffer corrections of headlines in the
-/// subtrees of 'appended_roots'.
+/// 'buffer_corrections' without those of headlines in the subtrees of
+/// 'appended_roots'.
 fn outside_the_appended_roots (
-  refreshed      : Refreshed,
-  viewforest     : &ViewForest,
-  appended_roots : &[NodeId],
-) -> Refreshed {
+  buffer_corrections : Vec<BufferCorrection>,
+  viewforest         : &ViewForest,
+  appended_roots     : &[NodeId],
+) -> Vec<BufferCorrection> {
   let appended_vnids : HashSet<&ViewnodeId> = appended_roots . iter ()
     . filter_map ( |root| viewforest . get (*root) )
     . flat_map ( |root| root . descendants () )
     . filter_map ( |node| node . value () . viewnode_id . as_ref () )
     . collect ();
-  let buffer_corrections : Vec<BufferCorrection> =
-    refreshed . buffer_corrections . iter ()
+  buffer_corrections . into_iter ()
     . filter ( |buffer_correction| ! buffer_correction . vnid . as_ref ()
                . is_some_and ( |vnid| appended_vnids . contains (vnid) ))
-    . cloned ()
-    . collect ();
-  Refreshed { buffer_corrections, .. refreshed } }
+    . collect () }

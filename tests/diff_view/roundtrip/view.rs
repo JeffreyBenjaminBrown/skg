@@ -174,7 +174,7 @@ fn buffer_with_every_new_viewnode (
     append_ghost (
       &mut tree, root, &straddle, &ID::from ("acquired"), None )
       . expect ("'acquired' is in the before-graph only"); }
-  Ok ( viewforest_tree_to_string (&tree, &f . config) ? ) }
+  Ok ( viewforest_tree_to_string (&tree) ? ) }
 
 /// The diff view's viewnodes cross the wire: the buffer parses
 /// without errors, and printing what was parsed gives a text that
@@ -212,7 +212,7 @@ fn the_new_viewnodes_cross_the_wire (
       let (forest, errors, _warnings, _provenance) =
         org_to_viewforest (text, IdResolution::ThroughGraph (&graph)) . unwrap ();
       assert! ( errors . is_empty (), "{:?}\n\nbuffer:\n{}", errors, text );
-      viewforest_to_string (&forest, &f . config) . unwrap () };
+      viewforest_to_string (&forest) . unwrap () };
     let printed : String = across_the_wire (&buffer);
     for atom in atoms {
       assert! ( without_viewnode_ids (&printed) . contains (atom),

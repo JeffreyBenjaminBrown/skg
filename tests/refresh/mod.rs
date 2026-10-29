@@ -10,6 +10,7 @@
 
 use super::*;
 use crate::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewforest;
+use crate::org_to_text::viewforest_to_string;
 use crate::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
 use crate::diff_view::readiness_store::ReadinessStore;
 use crate::graph_straddle::types::GraphStraddle;
@@ -93,6 +94,27 @@ pub(super) fn straddle (
   GraphStraddle::new ( Arc::new (graph (before)), Arc::new (graph (after)),
                        "head" . to_string (), 0 ) }
 
+/// What a refresh gives back in these tests: its buffer corrections,
+/// and the forest's text, rendered after it as every caller of the
+/// refresh renders it ('refresh_and_render').
+pub(super) struct Refreshed {
+  pub text               : String,
+  pub buffer_corrections : Vec<BufferCorrection>,
+}
+
+/// 'refresh_viewforest', then the render of the forest.
+pub(super) fn refresh_and_render (
+  forest                   : &mut ViewForest,
+  record                   : &mut ViewnodeIdRecord,
+  truth                    : &Truth,
+  mode                     : RefreshMode,
+  budget                   : usize,
+  buffer_correction_policy : &BufferCorrectionPolicy,
+) -> Result<Refreshed, Box<dyn Error>> {
+  let buffer_corrections : Vec<BufferCorrection> = refresh_viewforest (
+    forest, record, truth, mode, budget, buffer_correction_policy ) ?;
+  Ok ( Refreshed { text : viewforest_to_string (forest) ?, buffer_corrections } ) }
+
 /// What one refresh made.
 pub(super) struct Run {
   pub forest      : ViewForest,
@@ -143,7 +165,7 @@ pub(super) fn run_asserting_fixpoint_in (
   let truth : Truth = Truth { graph, config : &config, restriction };
   let mut forest : ViewForest = parse (text, IdResolution::ThroughGraph (graph));
   let mut record : ViewnodeIdRecord = ViewnodeIdRecord::of_viewforest (&forest);
-  let first : Refreshed = refresh_viewforest (
+  let first : Refreshed = refresh_and_render (
     &mut forest, &mut record, &truth, mode, budget,
     &BufferCorrectionPolicy::ReportAll )
     . unwrap ();
@@ -166,7 +188,7 @@ pub(super) fn refresh_once (
 ) -> Refreshed {
   let config : SkgConfig = config ();
   let truth : Truth = Truth { graph, config : &config, restriction : None };
-  refresh_viewforest (
+  refresh_and_render (
     forest, &mut ViewnodeIdRecord::default (), &truth,
     RefreshMode::ContentView, 100, policy )
     . unwrap () }

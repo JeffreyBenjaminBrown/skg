@@ -7,7 +7,6 @@
 // 'tests/grouped_saves.rs'.
 
 use git2::Repository;
-use std::collections::HashMap;
 use std::error::Error;
 use std::fs;
 use std::net::TcpStream;
@@ -21,7 +20,6 @@ use skg::types::nodes::fs::GraphnodeOnDisk;
 use skg::org_to_text::viewnode_to_string;
 use skg::serve::parse_metadata_sexp::{
   ViewnodeMetadata, parse_metadata_to_viewnodemd, viewnode_from_metadata};
-use skg::types::misc::SkgConfig;
 use skg::types::viewnode::{
   ChangeFacts, PropertyMember, ReadinessRequest, Viewnode, ViewnodeKind, Vognode, Warrant};
 
@@ -114,8 +112,7 @@ pub fn assert_round_trip (
   node     : Viewnode,
   expected : &str,
 ) {
-  let config : SkgConfig = SkgConfig::dummyFromSkgrepos (HashMap::new ());
-  let rendered : String = viewnode_to_string (&node, &config) . unwrap ();
+  let rendered : String = viewnode_to_string (&node) . unwrap ();
   assert_eq! ( rendered, expected );
   let metadata : ViewnodeMetadata =
     parse_metadata_to_viewnodemd ( &format! ("(skg {})", rendered) )

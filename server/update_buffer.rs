@@ -15,7 +15,8 @@
 
 
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::refresh::{Refreshed, Truth, refresh_content_viewforest};
+use crate::org_to_text::viewforest_to_string;
+use crate::refresh::{Truth, refresh_content_viewforest};
 use crate::refresh::buffer_corrections::{BufferCorrectionPolicy, BufferCorrection, ViewBufferCorrections};
 use crate::diff_view::change_leaves::BufferReadinessSummary;
 use crate::diff_view::refresh::rerender_diffView_buffer;
@@ -154,7 +155,7 @@ pub fn update_views_after_save (
       &context . runtime . graph, text_approved_pids );
     if matches! (release, TextReleaseDecision::Challenge { .. }) {
       return Ok ( SaveResponse::text_release_challenge (&release) ); }}
-  let saved : Refreshed =
+  let saved_buffer_corrections : Vec<BufferCorrection> =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "rerender_view (saved)" ). entered();
       rerender_view ( // saved view first; collateral ones later
@@ -162,6 +163,7 @@ pub fn update_views_after_save (
         &mut saved_viewnode_id_record,
         &mut context,
         RerenderOptions::ordinary (saved_diffView_buffer_kind) ) } ?;
+  let saved_text : String = viewforest_to_string (&saved_view_mut) ?;
   let readiness_summary : Option<BufferReadinessSummary> =
     saved_diffView_buffer_kind . and ( context . graph_straddle . as_ref () )
     . map ( |straddle| buffer_readiness_summary_for (
@@ -194,7 +196,7 @@ pub fn update_views_after_save (
   write_graph_straddle_back (views_state, context . graph_straddle . take ());
   let mut buffer_corrections : Vec<ViewBufferCorrections> = Vec::new ();
   if let Ok (viewforest_id) = viewforest_id_from_request_result {
-    buffer_corrections . extend ( ViewBufferCorrections::of (viewforest_id, saved . buffer_corrections) );
+    buffer_corrections . extend ( ViewBufferCorrections::of (viewforest_id, saved_buffer_corrections) );
     views_state . open_views . update_view (
       &context . runtime . graph, viewforest_id, saved_view_mut, saved_viewnode_id_record );
     for rendered in collateral_views {
@@ -211,7 +213,7 @@ pub fn update_views_after_save (
           & format_single_view_sexp (
             &rendered . viewforest_id, &rendered . text) )); }}
   Ok ( SaveResponse::saved (
-    saved . text, context . errors, context . warnings,
+    saved_text, context . errors, context . warnings,
     readiness_summary, buffer_corrections )) }
 
 fn occurrence_gnids_in_viewforest (
@@ -281,14 +283,17 @@ pub(crate) fn rerender_open_view (
     views_state . open_views . viewnode_id_record_of (viewforest_id);
   let options : RerenderOptions = rerender_options (
     views_state . open_views . diffView_buffer_kind_of_view (viewforest_id) );
-  let refreshed : Refreshed = rerender_view (
+  let in_the_view = |e : Box<dyn Error>| -> String {
+    format! ( "View {}: {}", viewforest_id . repr_in_client (), e ) };
+  let buffer_corrections : Vec<BufferCorrection> = rerender_view (
     &mut viewforest, &mut viewnode_id_record, context, options )
-    . map_err ( |e| format! ( "View {}: {}",
-                              viewforest_id . repr_in_client (), e )) ?;
+    . map_err (in_the_view) ?;
+  let text : String = viewforest_to_string (&viewforest)
+    . map_err (in_the_view) ?;
   Ok ( RerenderedView {
-    viewforest_id      : viewforest_id . clone (),
-    text               : refreshed . text,
-    buffer_corrections : refreshed . buffer_corrections,
+    viewforest_id : viewforest_id . clone (),
+    text,
+    buffer_corrections,
     viewforest,
     viewnode_id_record, } ) }
 
@@ -327,11 +332,12 @@ pub fn render_initial_view (
 ) -> Result<(ViewForest, String), Box<dyn Error>> {
   let mut viewforest : ViewForest = stub_of_fresh_content_view (
     root_gnids, &runtime . graph );
-  let refreshed : Refreshed = refresh_content_viewforest (
+  refresh_content_viewforest (
     &mut viewforest, &mut ViewnodeIdRecord::default (),
     &Truth::of_runtime (runtime, restriction),
     &BufferCorrectionPolicy::Unread ) ?;
-  Ok (( viewforest, refreshed . text )) }
+  let text : String = viewforest_to_string (&viewforest) ?;
+  Ok (( viewforest, text )) }
 
 /// One root per requested node: an editable occurrence of the node
 /// asking for its containers folder ('(folder containers)') and to be
@@ -409,8 +415,8 @@ impl RerenderOptions {
         DiffViewRerender { buffer_kind, integrate_unshown_changes } ), } }
 }
 
-/// Bring an open view up to date with the graph and render it,
-/// returning its text and its buffer corrections. It is refreshed
+/// Bring an open view up to date with the graph, returning its buffer
+/// corrections; the caller renders it. It is refreshed
 /// ('refresh_viewforest'), from what it holds and the graph as they
 /// are now: a content view in content-view mode; a buffer of the diff
 /// view in diff-view mode, over the graph straddle, brought up to date
@@ -421,11 +427,11 @@ pub fn rerender_view (
   viewnode_id_record : &mut ViewnodeIdRecord, // the view's, which assigns the viewnode IDs its new viewnodes get
   context       : &mut RerenderPassContext<'_>,
   options       : RerenderOptions,
-) -> Result<Refreshed, Box<dyn Error>> {
+) -> Result<Vec<BufferCorrection>, Box<dyn Error>> {
   let t_rerender : Instant = Instant::now ();
   let _span : tracing::span::EnteredSpan = tracing::info_span!(
     "refresh_viewforest" ). entered();
-  let result : Refreshed = match options {
+  let result : Vec<BufferCorrection> = match options {
     RerenderOptions::ContentView => refresh_content_view (
       viewforest, viewnode_id_record, context ) ?,
     RerenderOptions::DiffView (diffView_rerender) => rerender_diffView_buffer (
@@ -439,7 +445,7 @@ fn refresh_content_view (
   viewforest         : &mut ViewForest,
   viewnode_id_record : &mut ViewnodeIdRecord,
   context            : &mut RerenderPassContext<'_>,
-) -> Result<Refreshed, Box<dyn Error>> {
+) -> Result<Vec<BufferCorrection>, Box<dyn Error>> {
   refresh_content_viewforest (
     viewforest, viewnode_id_record,
     &Truth::of_runtime (&context . runtime, context . skgrepo_restriction),

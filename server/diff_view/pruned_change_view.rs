@@ -25,7 +25,7 @@ use crate::prominence::climb_containerward_to_content_origins_via;
 use crate::diff_view::readiness_store::ReadinessStore;
 use crate::diff_view::readiness_requests::set_ready_facts_in_viewforest;
 use crate::diff_view::change_viewnodes::mk_historical_viewnode;
-use crate::refresh::Refreshed;
+use crate::org_to_text::viewforest_to_string;
 use crate::types::env::RuntimeGeneration;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::misc::{ID, SkgrepoChange};
@@ -218,15 +218,16 @@ pub fn diffView_buffer_viewforest (
 ) -> Result<RenderedDiffViewBuffer, Box<dyn Error>> {
   let mut viewforest : ViewForest =
     stub_viewforest_of_roots (runtime, straddle, diffView_buffer_kind, roots) ?;
-  let refreshed : Refreshed = refresh_diffView_viewforest (
+  refresh_diffView_viewforest (
     runtime, straddle, diffView_buffer_kind, store, None,
     &BufferCorrectionPolicy::Unread, &mut viewforest,
     // A new buffer's first viewnode IDs; 'register_view' reads the record
     // back from the forest.
     &mut ViewnodeIdRecord::default () ) ?;
+  let text : String = viewforest_to_string (&viewforest) ?;
   let pids : Vec<ID> =
     pids_from_viewforest (&viewforest) . into_iter () . collect ();
-  Ok ( RenderedDiffViewBuffer { text : refreshed . text, pids, viewforest } ) }
+  Ok ( RenderedDiffViewBuffer { text, pids, viewforest } ) }
 
 /// What a buffer of the diff view gets in the refresh's tail:
 /// its '(ready ...)' facts, and in the skgrepo-changes buffer each

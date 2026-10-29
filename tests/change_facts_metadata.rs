@@ -11,14 +11,14 @@ use crate::git_fixture_helpers::{assert_round_trip, with_facts};
 use skg::org_to_text::viewnode_to_string;
 use skg::serve::parse_metadata_sexp::{
   ViewnodeMetadata, parse_metadata_to_viewnodemd};
-use skg::types::misc::{ID, SkgConfig, SkgrepoName};
+use skg::types::misc::{ID, SkgrepoName};
 use skg::types::nodes::complete::Flag;
 use skg::types::viewnode::{
   ChangeFacts, DiffChange, Existence, Ghost, GnidOnlyKind, GnidOnlyVognode, LeavesFact, PropertyMember, DiffObject, ReadinessRequest, Viewnode,
   ViewnodeKind, Vognode, Warrant, mk_editable_viewnode,
   mk_writeProtected_viewnode, viewnode_of};
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::BTreeSet;
 
 fn objects (
   objects : &[DiffObject],
@@ -155,7 +155,6 @@ fn a_ghost_warranted_property_member_claims_nothing () {
 /// skips the whole '(diff ...)'.
 #[test]
 fn the_leaves_fact_renders_and_the_parser_skips_it () {
-  let config : SkgConfig = SkgConfig::dummyFromSkgrepos (HashMap::new ());
   let mut change_facts : ChangeFacts =
     facts ( None, Some (Existence::Added), Some (&[DiffObject::Rel]) );
   change_facts . leaves = Some ( LeavesFact {
@@ -164,7 +163,7 @@ fn the_leaves_fact_renders_and_the_parser_skips_it () {
     mk_editable_viewnode (
       ID::from ("a"), SkgrepoName::from ("main"), "A" . into (), None ),
     change_facts, None );
-  let rendered : String = viewnode_to_string (&node, &config) . unwrap ();
+  let rendered : String = viewnode_to_string (&node) . unwrap ();
   assert_eq! ( rendered,
                "node (gnid a) (skgRepos (nodeRepo main)) (diff (rel added) (leaves 2 node rel) (ready rel))" );
   let marker : &str = "(skg (changesetMarker content) (editRequest (ready all)) (diff (leaves 3 all)))";
@@ -175,7 +174,6 @@ fn the_leaves_fact_renders_and_the_parser_skips_it () {
 /// with nothing to say carries no '(diff ...)'.
 #[test]
 fn each_part_of_the_diff_form_renders_together_and_alone () {
-  let config : SkgConfig = SkgConfig::dummyFromSkgrepos (HashMap::new ());
   let mut change_facts : ChangeFacts =
     facts ( Some (Existence::Added), Some (Existence::Added), Some (&[DiffObject::Node]) );
   change_facts . leaves = Some ( LeavesFact {
@@ -184,7 +182,7 @@ fn each_part_of_the_diff_form_renders_together_and_alone () {
     mk_editable_viewnode (
       ID::from ("a"), SkgrepoName::from ("main"), "A" . into (), None ),
     change_facts, request (true, &[DiffObject::Rel]) );
-  let rendered : String = viewnode_to_string (&node, &config) . unwrap ();
+  let rendered : String = viewnode_to_string (&node) . unwrap ();
   assert_eq! ( rendered,
                "node (gnid a) (skgRepos (nodeRepo main)) (editRequest (ready rel)) (diff (node added) (rel added) (leaves 2 node rel) (ready node))" );
   let alias = || viewnode_of ( ViewnodeKind::PropertyMember ( PropertyMember::alias (

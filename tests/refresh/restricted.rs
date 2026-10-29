@@ -149,7 +149,7 @@ fn after_a_restriction_change_the_re_kinds_across_it_are_no_buffer_corrections (
   let refresh_after_a_switch = |text : &str, truth : &Truth| -> Refreshed {
     let mut forest : ViewForest = parse (text, IdResolution::ThroughGraph (&graph));
     let mut record : ViewnodeIdRecord = ViewnodeIdRecord::of_viewforest (&forest);
-    refresh_viewforest (
+    refresh_and_render (
       &mut forest, &mut record, truth, RefreshMode::ContentView, 100,
       &BufferCorrectionPolicy::after_a_switch (true) )
       . unwrap () };
@@ -264,7 +264,7 @@ fn the_children_of_a_restricted_root_claim_again_when_it_becomes_an_occurrence (
   let mut record : ViewnodeIdRecord = ViewnodeIdRecord::of_viewforest (&forest);
   let mut texts : Vec<String> = Vec::new ();
   for restriction in [ Some (&restriction), None ] {
-    let refreshed : Refreshed = refresh_viewforest (
+    let refreshed : Refreshed = refresh_and_render (
       &mut forest, &mut record,
       &Truth { graph : &graph, config : &config, restriction },
       RefreshMode::ContentView, 100, &BufferCorrectionPolicy::after_a_switch (true) )
@@ -325,7 +325,7 @@ fn a_switch_takes_from_a_view_the_alias_whose_record_it_makes_restricted () {
     ", occurrence_metadata ("r", "") );
   let mut forest : ViewForest = parse (&shown, IdResolution::ThroughGraph (&graph));
   let mut record : ViewnodeIdRecord = ViewnodeIdRecord::of_viewforest (&forest);
-  let narrowed : Refreshed = refresh_viewforest (
+  let narrowed : Refreshed = refresh_and_render (
     &mut forest, &mut record,
     &Truth { graph : &graph, config : &config, restriction : Some (&restriction) },
     RefreshMode::ContentView, 100, &BufferCorrectionPolicy::after_a_switch (true) )

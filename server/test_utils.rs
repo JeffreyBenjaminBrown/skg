@@ -12,7 +12,8 @@ use crate::update_buffer::multi_root_view_via_runtime;
 use crate::from_text::strandeds::StrandedsReview;
 use crate::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
 use crate::from_text::buffer_to_viewnodes::uninterpreted::{headline_to_triple, HeadlineInfo, org_to_viewforest};
-use crate::refresh::Refreshed;
+use crate::org_to_text::viewforest_to_string;
+use crate::refresh::buffer_corrections::BufferCorrection;
 use crate::serve::ViewsState;
 use crate::serve::handlers::save_buffer::{
   ClientViewSnapshot, SaveResponse,
@@ -319,7 +320,7 @@ where
   result }
 
 /// Whether 'text', parsed over 'graph' and refreshed again by
-/// 'refresh', comes back as it was, correcting nothing: the fixpoint
+/// 'refresh' and rendered, comes back as it was, correcting nothing: the fixpoint
 /// of the refresh. Err says how not. The refresh's unit tests
 /// ('tests/refresh/mod.rs') and the sweeps over the fixtures
 /// ('tests/idempotence.rs') each pass their own refresh.
@@ -330,7 +331,7 @@ pub fn refresh_reaches_fixpoint<R> (
 ) -> Result<(), String>
 where
   R : FnOnce (&mut ViewForest, &mut ViewnodeIdRecord)
-              -> Result<Refreshed, Box<dyn Error>>,
+              -> Result<Vec<BufferCorrection>, Box<dyn Error>>,
 {
   let (mut forest, errors, _warnings, _provenance) =
     org_to_viewforest (text, IdResolution::ThroughGraph (graph))
@@ -338,13 +339,15 @@ where
   if ! errors . is_empty () {
     return Err ( format! ( "the parse refused it: {:?}\n{}", errors, text )); }
   let mut record : ViewnodeIdRecord = ViewnodeIdRecord::of_viewforest (&forest);
-  let again : Refreshed = refresh (&mut forest, &mut record)
+  let buffer_corrections : Vec<BufferCorrection> = refresh (&mut forest, &mut record)
     . map_err ( |e| format! ("the second refresh failed: {}", e) ) ?;
-  if again . text != text {
+  let again : String = viewforest_to_string (&forest)
+    . map_err ( |e| format! ("the render failed: {}", e) ) ?;
+  if again != text {
     return Err ( format! ( "changed:\n--- first ---\n{}--- second ---\n{}",
-                           text, again . text )); }
-  if ! again . buffer_corrections . is_empty () {
-    return Err ( format! ( "corrected: {:?}", again . buffer_corrections )); }
+                           text, again )); }
+  if ! buffer_corrections . is_empty () {
+    return Err ( format! ( "corrected: {:?}", buffer_corrections )); }
   Ok (( )) }
 
 /// Recursively copy a directory and its contents.

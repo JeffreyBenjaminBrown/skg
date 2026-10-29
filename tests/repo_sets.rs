@@ -153,7 +153,7 @@ fn override_substitute_across_skgrepo_switch_anonymizes_and_keeps_original (
         let forest = views_state . open_views
           . viewforest_id_to_view (&viewforest_id)
           . expect ("the switched view should still be registered");
-        viewforest_to_string (forest, config) ? };
+        viewforest_to_string (forest) ? };
       assert! ( view_public . contains ("tombstone"),
         "the overrider should become a tombstone:\n{}",
         view_public );
@@ -495,7 +495,7 @@ async fn the_containerward_chain_stops_before_a_restricted_container (
         "the containerward chain should keep the unrestricted prefix and \
          stop before the restricted container" );
       let rendered : String =
-        viewforest_to_string (&viewforest, config)?;
+        viewforest_to_string (&viewforest)?;
       assert! (
         ! rendered . contains ("private-container"),
         "restricted container should not render as a placeholder or \

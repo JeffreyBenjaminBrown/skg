@@ -403,13 +403,13 @@ fn diff_view_narrowed_by_a_switch (
   let graph : &InRustGraph = &straddle . after;
   let mut forest : ViewForest = parse (text, IdResolution::ThroughGraph (graph));
   let mut record : ViewnodeIdRecord = ViewnodeIdRecord::of_viewforest (&forest);
-  let opened : Refreshed = refresh_viewforest (
+  let opened : Refreshed = refresh_and_render (
     &mut forest, &mut record,
     &Truth { graph, config : &config, restriction : None },
     mode, 100, &BufferCorrectionPolicy::ReportAll ) . unwrap ();
   let narrowed_truth : Truth = Truth { graph, config : &config,
                                        restriction : Some (&restriction) };
-  let narrowed : Refreshed = refresh_viewforest (
+  let narrowed : Refreshed = refresh_and_render (
     &mut forest, &mut record, &narrowed_truth, mode, 100,
     &BufferCorrectionPolicy::after_a_switch (true) ) . unwrap ();
   if let Err (failure) = refresh_reaches_fixpoint (
@@ -451,7 +451,7 @@ node p
   let mut forest : ViewForest = forest;
   let config : SkgConfig = config ();
   let readiness_store : ReadinessStore = ReadinessStore::default ();
-  let widened : Refreshed = refresh_viewforest (
+  let widened : Refreshed = refresh_and_render (
     &mut forest, &mut ViewnodeIdRecord::default (),
     &Truth { graph : &straddle . after, config : &config, restriction : None },
     RefreshMode::DiffView { straddle : &straddle,

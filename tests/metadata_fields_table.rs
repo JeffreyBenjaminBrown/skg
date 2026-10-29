@@ -14,7 +14,7 @@
 use skg::org_to_text::viewnode_to_string;
 use skg::serve::parse_metadata_sexp::{
   RestoreRequest, ViewnodeMetadata, parse_metadata_to_viewnodemd, viewnode_from_metadata};
-use skg::types::misc::{ID, SkgConfig, SkgrepoChange, SkgrepoName};
+use skg::types::misc::{ID, SkgrepoChange, SkgrepoName};
 use skg::types::nodes::complete::Flag;
 use skg::types::viewnode::{
   ChangesetMarkerKind, DiffChange, Existence, FolderRelation, NodeEditRequest,
@@ -22,7 +22,7 @@ use skg::types::viewnode::{
 
 use serde_json::Value;
 use sexp::Sexp;
-use std::collections::{BTreeSet, HashMap};
+use std::collections::BTreeSet;
 
 /// The parsed table.
 fn metadata_fields_table (
@@ -433,7 +433,7 @@ fn the_printer_writes_the_parts_in_the_tables_order () {
   viewnode . change_facts . change = DiffChange {
     node : Some (Existence::Added), rel : None, properties : false };
   let printed : String = viewnode_to_string (
-    &viewnode, &SkgConfig::dummyFromSkgrepos (HashMap::new ()) ) . unwrap ();
+    &viewnode ) . unwrap ();
   let Sexp::List (elements) = sexp::parse (&format! ("(skg {})", printed))
     . unwrap () else { panic! ("{}", printed) };
   let printed_parts : Vec<String> = elements [1..] . iter ()

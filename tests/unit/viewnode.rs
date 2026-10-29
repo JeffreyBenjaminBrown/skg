@@ -6,9 +6,7 @@ use crate::org_to_text::viewnode_to_string;
 use crate::serve::parse_metadata_sexp::{ViewnodeMetadata, parse_metadata_to_viewnodemd, viewnode_from_metadata};
 use crate::types::errors::BufferValidationError;
 use crate::types::viewnode::Viewnode;
-use crate::types::misc::SkgConfig;
 use crate::types::tree::forest::{ViewForest, editable_occurrences};
-use std::collections::HashMap;
 
 // 'Folder::goal_is_ordered', 'Folder::is_editable' and
 // 'Folder::members_are_properties' are the per-kind rules that the
@@ -167,7 +165,6 @@ fn viewnode_ids_are_base_36_and_at_least_two_characters_long () {
 // '(skg ...)' wrapper, and the parser reads it back.
 #[test]
 fn every_kind_prints_its_viewnode_id_first_and_parses_it_back () {
-  let config : SkgConfig = SkgConfig::dummyFromSkgrepos (HashMap::new ());
   let kinds : Vec<Viewnode> = vec! [
     mk_editable_viewnode ( ID::from ("n"), SkgrepoName::from ("main"),
                            "n" . into (), None ),
@@ -186,7 +183,7 @@ fn every_kind_prints_its_viewnode_id_first_and_parses_it_back () {
   for (counter, kind) in kinds . into_iter () . enumerate () {
     let viewnode_id : ViewnodeId = ViewnodeId::from_counter (10 + counter as u64);
     let viewnode : Viewnode = Viewnode { viewnode_id : Some (viewnode_id . clone ()), .. kind };
-    let rendered : String = viewnode_to_string (&viewnode, &config) . unwrap ();
+    let rendered : String = viewnode_to_string (&viewnode) . unwrap ();
     assert! ( rendered . starts_with (&format! ("(vnid {}) ", viewnode_id)), "{}", rendered );
     let metadata : ViewnodeMetadata =
       parse_metadata_to_viewnodemd (&format! ("(skg {})", rendered)) . unwrap ();

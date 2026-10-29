@@ -59,7 +59,7 @@ fn a_chain_branches_and_shows_a_repeat_as_a_leaf (
   let expected_trees : Tree<Viewnode> =
     org_to_viewnode_tree (expected, IdResolution::AsWritten) ? . 0;
   assert_metadata_eq! (
-    viewforest_to_string (&viewforest, config) ?,
-    viewforest_to_string (&expected_trees, config) ?,
+    viewforest_to_string (&viewforest) ?,
+    viewforest_to_string (&expected_trees) ?,
     "the chain under a11" );
   Ok (( )) }

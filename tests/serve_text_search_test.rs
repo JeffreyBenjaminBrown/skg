@@ -5,14 +5,13 @@ use skg::from_text::buffer_to_viewnodes::uninterpreted::headline_to_triple;
 use skg::serve::parse_metadata_sexp::MetadataKind;
 use skg::org_to_text::viewforest_to_string;
 use skg::skgrepo_sets::SkgrepoRestriction;
-use skg::types::misc::{ID, MSV, RelPartner, SkgConfig, SkgrepoName, SkgrepoSetName, TantivyIndex, rel_partners_at_relRepo_msv};
+use skg::types::misc::{ID, MSV, RelPartner, SkgrepoName, SkgrepoSetName, TantivyIndex, rel_partners_at_relRepo_msv};
 use skg::types::nodes::complete::{Graphnode, empty_graphnode};
 use skg::dbs::init::wipe_then_init_tantivy_db;
 use skg::test_utils::remove_test_dir;
 use skg::serve::handlers::text_search::{
   group_matches_by_gnid, build_search_viewforest};
 
-use std::collections::HashMap;
 use std::path::Path;
 use skg::types::viewnode::{Folder, ViewnodeKind};
 
@@ -81,10 +80,8 @@ fn test_text_search_org_format (
           search_terms,
           &matches_by_gnid,
           &std::collections::HashSet::new () );
-      let dummy_config : SkgConfig =
-        SkgConfig::dummyFromSkgrepos (HashMap::new ());
       let result : String =
-        viewforest_to_string ( &viewforest, &dummy_config )
+        viewforest_to_string ( &viewforest )
         . expect ("search viewforest rendering never fails");
       let lines : Vec < &str > =
         result . lines () . collect ();
@@ -187,10 +184,8 @@ fn test_search_results_preserve_links_in_title (
         "science", &SearchOptions::default (), None );
       let (viewforest, _ids) = build_search_viewforest (
         "science", &matches_by_gnid, &std::collections::HashSet::new () );
-      let dummy_config : SkgConfig =
-        SkgConfig::dummyFromSkgrepos (HashMap::new ());
       let result : String =
-        viewforest_to_string ( &viewforest, &dummy_config )
+        viewforest_to_string ( &viewforest )
         . expect ("search viewforest rendering never fails");
       println! ("Rendered search results:\n{}", result);
 
