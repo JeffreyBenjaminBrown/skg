@@ -36,10 +36,10 @@ use skg::types::nodes::rust::GraphnodeInRust;
 use skg::types::views_state::ViewforestId;
 
 use futures::executor::block_on;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::error::Error;
 use std::net::TcpStream;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 const VIEW : &str = "view of r";
 const VIEW_OF_H : &str = "view of h";
@@ -456,6 +456,98 @@ fn an_alias_recorded_in_a_restricted_section_is_shown_only_under_all (
                 "widened, r shows and counts every alias:\n{}", widened );
       Ok (( )) } ) }
 
+/// A view rooted at h, which is private, drawn under "all" and
+/// switched to "public": its root is a restricted headline. Saved as
+/// it is, under "public", it saves, and nothing on disk changes. A
+/// headline typed under the tombstone the narrowing left in place of
+/// h's containers folder has no occurrence above it to take a skgrepo
+/// from, so the save refuses it for want of one, and nothing on disk
+/// changes either.
+#[test]
+fn a_save_of_a_view_whose_root_is_a_restricted_headline_changes_nothing (
+) -> Result<(), Box<dyn Error>> {
+  let case : tempfile::TempDir = tempfile::TempDir::new () ?;
+  write_fixture (case . path ()) ?;
+  with_git_fixture (
+    case . path (), OwnedSkgrepos::Named (&["public", "private"]), &[],
+    |f| {
+      let mut restriction : SkgrepoRestriction =
+        SkgrepoRestriction::named (&f . config, "all" . into ()) ?;
+      open_content_view (f, "h", VIEW_OF_H, None) ?;
+      let narrowed : String =
+        switch_skgrepo_set (f, &mut restriction, "public", VIEW_OF_H) ? . 0;
+      assert_eq! ( narrowed, VIEW_OF_H_SWITCHED_TO_PUBLIC );
+      let before : BTreeMap<PathBuf, String> = skg_files_on_disk (f) ?;
+      let saved : SaveResponse =
+        save_view_under (f, VIEW_OF_H, &narrowed, &restriction) ?;
+      assert! ( saved . errors . is_empty (), "{:?}", saved . errors );
+      assert_eq! ( saved . saved_view, narrowed,
+                   "the saved view is the view as it was" );
+      assert_eq! ( skg_files_on_disk (f) ?, before,
+                   "the save of the restricted root changes nothing on disk" );
+      let typed : String = narrowed . replacen (
+        ") r\n", ") r\n*** typed under the tombstone\n", 1 );
+      assert_ne! ( typed, narrowed );
+      let refusal : String =
+        match save_view_under (f, VIEW_OF_H, &typed, &restriction) {
+          Ok (response) => format! ("{:?}", response . errors),
+          Err (error)   => format! ("{:?}", error), };
+      assert! ( refusal . contains ("Occurrence must have a repo that exists in the config.")
+                && refusal . contains ("typed under the tombstone"),
+                "a headline with no occurrence above it is refused for want of a skgrepo: {}",
+                refusal );
+      assert_eq! ( skg_files_on_disk (f) ?, before,
+                   "the refused save changes nothing on disk" );
+      Ok (( )) } ) }
+
+/// r (public) subscribes to s and hides s1 and 'nowhere' from its
+/// subscribers, a hide of a gnid that resolves to no node, recorded in
+/// r's public file. Under "all" and under "public", the folder of what
+/// r hides, once requested, holds a reference to the unknown node
+/// 'nowhere' beside s1; the buffer saved unchanged saves, and r keeps
+/// both hides.
+#[test]
+fn a_requested_hidden_folder_holding_a_dangling_hide_saves (
+) -> Result<(), Box<dyn Error>> {
+  let case : tempfile::TempDir = tempfile::TempDir::new () ?;
+  write_unchanged_skgrepos ( case . path (), &[
+    ( "public", &[
+      ("r",  "pid: r\ntitle: r\ncontains:\n- c1\nsubscribesTo:\n- s\nhidesFromSubs:\n- s1\n- nowhere\n"),
+      ("c1", "pid: c1\ntitle: c1\n"),
+      ("s",  "pid: s\ntitle: s\ncontains:\n- s1\n"),
+      ("s1", "pid: s1\ntitle: s1\n") ] ),
+    ( "private", &[
+      ("hh", "pid: hh\ntitle: hh secret\n") ] ) ]) ?;
+  with_git_fixture (
+    case . path (), OwnedSkgrepos::Named (&["public", "private"]), &[],
+    |f| {
+      for name in ["all", "public"] {
+        let restriction : SkgrepoRestriction =
+          SkgrepoRestriction::named (&f . config, name . into ()) ?;
+        let opened : String = open_view_of_r (f, Some (&restriction)) ?;
+        let requested : String = save_under (
+          f, &opened . replacen (
+            "node (gnid r)", "node (gnid r) (viewRequests (folder hidesFromSubs))", 1 ),
+          &restriction ) ? . saved_view;
+        let hidden_folder_children : Vec<&str> = requested . lines ()
+          . skip_while ( |line| ! line . contains ("hiddenFolder") )
+          . skip (1)
+          . take_while ( |line| line . starts_with ("***") )
+          . filter ( |line| line . starts_with ("*** ") )
+          . collect ();
+        assert! ( hidden_folder_children . len () == 2
+                  && hidden_folder_children [0] . contains ("node (gnid s1)")
+                  && hidden_folder_children [1] . contains (" unknown (gnid nowhere))"),
+                  "under {} the hidden folder holds s1 and the unknown 'nowhere':\n{}",
+                  name, requested );
+        let saved : SaveResponse = save_under (f, &requested, &restriction) ?;
+        assert_eq! ( saved . saved_view, requested,
+                     "under {} the buffer saves as it was", name );
+        assert_eq! ( members_of ( node_in_graph (f, "r") . hidesFromSubs . or_default () ),
+                     vec! [ ID::from ("s1"), ID::from ("nowhere") ],
+                     "under {} r keeps both hides", name ); }
+      Ok (( )) } ) }
+
 /// Nothing in 'buffer' shows the text of a private node, and each of
 /// 'gnids' stands only as a Restricted vognode.
 fn assert_restricted_vognodes_alone_stand_for (
@@ -587,19 +679,40 @@ fn save_under (
   text        : &str,
   restriction : &SkgrepoRestriction,
 ) -> Result<SaveResponse, Box<dyn Error>> {
-  let (mut stream, _read_end) : (TcpStream, TcpStream) = mk_test_tcp_stream_pair ();
-  let mut env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
-  let response : SaveResponse = block_on (
-    update_from_and_rerender_buffer_with_approvals (
-      &mut stream, text, &mut env,
-      &Ok ( ViewforestId::ContentView (VIEW . into ()) ),
-      &mut f . views_state, Some (restriction),
-      true, &HashMap::new (), &HashSet::new (), &HashSet::new (),
-      &StrandedsReview::NotReviewed, &[] )) ?;
+  let response : SaveResponse = save_view_under (f, VIEW, text, restriction) ?;
   assert! ( response . errors . is_empty (),
             "the buffer must save without errors, got {:?}\n\nbuffer:\n{}",
             response . errors, text );
   Ok (response) }
+
+/// Save 'text' as 'view' under 'restriction', whatever the response.
+fn save_view_under (
+  f           : &mut Fixture,
+  view        : &str,
+  text        : &str,
+  restriction : &SkgrepoRestriction,
+) -> Result<SaveResponse, Box<dyn Error>> {
+  let (mut stream, _read_end) : (TcpStream, TcpStream) = mk_test_tcp_stream_pair ();
+  let mut env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
+  Ok ( block_on (
+    update_from_and_rerender_buffer_with_approvals (
+      &mut stream, text, &mut env,
+      &Ok ( ViewforestId::ContentView (view . into ()) ),
+      &mut f . views_state, Some (restriction),
+      true, &HashMap::new (), &HashSet::new (), &HashSet::new (),
+      &StrandedsReview::NotReviewed, &[] )) ? ) }
+
+/// Every '.skg' file of every skgrepo, by path, with its text.
+fn skg_files_on_disk (
+  f : &Fixture,
+) -> Result<BTreeMap<PathBuf, String>, Box<dyn Error>> {
+  let mut files : BTreeMap<PathBuf, String> = BTreeMap::new ();
+  for skgrepo in f . config . skgrepos . values () {
+    for entry in std::fs::read_dir (&skgrepo . path) ? {
+      let path : PathBuf = entry ? . path ();
+      if path . extension () . is_some_and ( |extension| extension == "skg" ) {
+        files . insert ( path . clone (), std::fs::read_to_string (&path) ? ); }}}
+  Ok (files) }
 
 fn node_in_graph (
   f   : &Fixture,

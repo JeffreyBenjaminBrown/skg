@@ -220,19 +220,8 @@ fn validate_hiddenInSubscribee_folder (
            || matches! ( &node . kind,
                          ViewnodeKind::Vognode (Vognode::GnidOnly (_)) )))
     { errors . push(
-        "HiddenInSubscribeeFolder's children can only be Occurrences, unknowns or Restricted vognodes (to hide)."
+        "HiddenInSubscribeeFolder's children can only be Occurrences, tombstones, restricted headlines or references to unknown nodes (to hide)."
         . to_string()); }
-  if !generation_includes_only(
-    tree, treeid, 1, true,
-    tombstone_or (|node| match &node . kind {
-      ViewnodeKind::Vognode (Vognode::Occurrence (t))
-        => t . claimsMembership,
-      ViewnodeKind::Vognode (Vognode::GnidOnly (_))
-        => true,
-      _ => false, }) )
-    { errors . push(
-        "HiddenInSubscribeeFolder Occurrence children must be members (no noClaim)."
-      . to_string()); }
   if !siblings_cannot_include(
     tree, treeid,
     |node| matches!(&node . kind,
@@ -264,18 +253,7 @@ fn validate_hiddenOutsideOfSubscribee_folder (
     tombstone_or (|node| node . is_occurrence ()
            || matches! ( &node . kind,
                          ViewnodeKind::Vognode (Vognode::GnidOnly (_)) )))
-    { errors . push("HiddenOutsideOfSubscribeeFolder's children must include only Occurrences, unknowns or Restricted vognodes." . to_string()); }
-  if !generation_includes_only(
-    tree, treeid, 1, true,
-    tombstone_or (|node| match &node . kind {
-      ViewnodeKind::Vognode (Vognode::Occurrence (t))
-        => t . claimsMembership,
-      ViewnodeKind::Vognode (Vognode::GnidOnly (_))
-        => true,
-      _ => false, }) )
-    { errors . push(
-        "HiddenOutsideOfSubscribeeFolder Occurrence children must be members (no noClaim)."
-        . to_string()); }
+    { errors . push("HiddenOutsideOfSubscribeeFolder's children must include only Occurrences, tombstones, restricted headlines or references to unknown nodes." . to_string()); }
   if !siblings_cannot_include(
     tree, treeid,
     |node| matches!(&node . kind,
@@ -307,22 +285,7 @@ fn validate_subscribeefolder (
                       | ViewnodeKind::Vognode (Vognode::Ghost (_)) // a former member, in the diff view; save-inert
                       | ViewnodeKind::Folder (
                           Folder::HiddenOutsideOfSubscribee) )))
-    { errors . push( "SubscribeeFolder's children must include only Occurrences, tombstones, unknowns, Restricted vognodes, ghosts, or HiddenOutsideOfSubscribeeFolder." . to_string()); }
-  if !generation_includes_only(
-    tree, treeid, 1, true,
-    tombstone_or (|node| match &node . kind {
-      ViewnodeKind::Vognode (Vognode::Occurrence (t)) =>
-        t . claimsMembership,
-      ViewnodeKind::Vognode (Vognode::GnidOnly (_)) =>
-        true,
-      ViewnodeKind::Vognode (Vognode::Ghost (_)) =>
-        true,
-      ViewnodeKind::Folder (
-        Folder::HiddenOutsideOfSubscribee)
-        => true,
-      _ => false, }) )
-    { errors . push("SubscribeeFolder Occurrence children must be members (no noClaim)."
-                    . to_string() ); }
+    { errors . push( "SubscribeeFolder's children must include only Occurrences, tombstones, ghosts, restricted headlines, references to unknown nodes, or HiddenOutsideOfSubscribeeFolder." . to_string()); }
   // There is no duplicate-member check here: subscribeeFolder is a
   // defining folder, and duplicate members of defining folders are
   // silently deduplicated at emission rather than bouncing the save.
@@ -352,16 +315,6 @@ fn validate_relation_folder (
                        // restriction keeps out
                        | ViewnodeKind::Vognode (Vognode::GnidOnly (_)))))
     { errors . push(format!("{}'s children must include only Occurrences, tombstones, ghosts, restricted headlines or references to unknown nodes.", label)); }
-  if !generation_includes_only(
-    tree, treeid, 1, true,
-    tombstone_or (|node| match &node . kind {
-      ViewnodeKind::Vognode (Vognode::Occurrence (t))
-        => t . claimsMembership,
-      ViewnodeKind::Vognode (Vognode::Ghost (_) | Vognode::GnidOnly (_))
-        => true,
-      _ => false, }) )
-    { errors . push(format!(
-        "{} Occurrence children must be members (no noClaim).", label)); }
   if !siblings_cannot_include(
     tree, treeid,
     |node| matches!(&node . kind,

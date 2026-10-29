@@ -917,6 +917,51 @@ fn a_gnid_only_vognode_counts_in_the_distinctness_checks_when_it_claims () {
                      "{} beside an occurrence of its gnid in {}, '{}': {:?}",
                      kind, checked, claim, result ); }}}}
 
+/// A relation folder, the subscribee folder and the two compound
+/// hidden folders refuse a child of a kind they do not admit (here an
+/// alias folder) by naming the kinds they admit, and say nothing of
+/// 'noClaim', which no such child carries.
+#[test]
+fn a_folder_refusing_a_childs_kind_says_nothing_of_noClaim () {
+  let config : SkgConfig = validation_config ();
+  let input : &str =
+    indoc! {"
+      * (skg node (gnid r) (skgRepos (nodeRepo main))) r
+      ** (skg hiddenFolder)
+      *** (skg aliasFolder)
+      ** (skg subscribeeFolder)
+      *** (skg aliasFolder)
+      *** (skg node (gnid s) (skgRepos (nodeRepo main)) writeProtected) s
+      **** (skg hiddenInSubscribeeFolder)
+      ***** (skg aliasFolder)
+      *** (skg hiddenOutsideOfSubscribeeFolder)
+      **** (skg aliasFolder)
+    "};
+  let (viewforest, parsing_errors, _warnings, _provenance)
+    : (ViewForest, Vec<BufferValidationError>, Vec<String>, EnrichmentProvenance)
+    = org_to_viewforest (input, IdResolution::AsWritten) . unwrap ();
+  assert_eq! ( parsing_errors . len (), 0, "{:?}", parsing_errors );
+  let folders : Vec<NodeId> = viewforest . nodes ()
+    . filter ( |node_ref| matches! ( node_ref . value () . kind,
+                                     ViewnodeKind::Folder (_) )
+                          && node_ref . children () . any ( |child|
+                               child . value () . title () . is_empty ()
+                               && matches! ( child . value () . kind,
+                                             ViewnodeKind::Folder (_) )))
+    . map ( |node_ref| node_ref . id () )
+    . collect ();
+  assert_eq! ( folders . len (), 4 );
+  for folder in folders {
+    let message : String =
+      validate_local_structure (&viewforest, folder, &config)
+      . expect_err ("an alias folder is no child of these folders")
+      . message;
+    assert! ( message . contains ("children")
+              && message . contains ("restricted headlines")
+              && message . contains ("references to unknown nodes")
+              && ! message . contains ("noClaim"),
+              "{}", message ); }}
+
 fn partner_folder_treeids (
   viewforest : &ViewForest,
 ) -> Vec<ego_tree::NodeId> {
