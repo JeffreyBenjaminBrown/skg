@@ -110,6 +110,25 @@ I'd rather have simpler code.
   gnid, without "not yet saved". A headline with no occurrence
   above it (under the tombstone of a restricted root's folder) is
   still refused for want of a skgrepo.
+** Corrections a user's own gesture causes
+  Run. A nodeMerge reports four buffer corrections (the viewnode
+  merge of the acquirer's two occurrences, and three "Drew what
+  the graph says belongs here"), all caused by the user's own
+  request; the policy exempts only a deletion and a widening. A
+  Restricted vognode in the hidden folder that loses its hide is
+  reported "Entombstoned" by vnid, and the same refresh prunes
+  it, so the correction names a headline no longer in the
+  buffer. After a switch a member whose record alone is
+  restricted stays drawn and is reported "Marked noClaim".
+  Fixed by slice 3 of
+  'TODO/simplify-refresh/08_plan_restriction-and-tidy.org': the
+  buffer correction policy is an enum of the situations a refresh
+  is called in. A save's rerender ('AfterSave') passes the gnids
+  its nodeMerge requests touched, which silences the viewnode
+  merge of their occurrences and the members drawn under them,
+  and drops the buffer corrections of headlines the tail pruned;
+  after a switch ('AfterRestrictionChange') the marking of
+  'noClaim' is quiet. A first drawing ('Unread') reports nothing.
 * Problems found while planning plan 06 (2026-10-26; fixed 2026-10-27)
 ** An unknown recorded in a visible skgrepo vanishes under a restriction
   Seen by the same experiment, with and without the phase: the

@@ -62,9 +62,9 @@ pub struct RerenderPassContext<'a> {
   /// connection's, and keeps what it becomes.
   pub graph_straddle                 : Option<Arc<GraphStraddle>>,
   /// Which changes the rerenders report as no buffer corrections: a
-  /// save's rerender sets the nodes it deleted, a skgrepo-set switch
-  /// whether the restriction changed; every other rerender reports
-  /// every change.
+  /// save's rerender says what the save deleted and merged, a
+  /// skgrepo-set switch whether the restriction changed; every other
+  /// rerender reports every change.
   pub buffer_correction_policy       : BufferCorrectionPolicy,
 }
 
@@ -99,8 +99,8 @@ pub(crate) struct RerenderedView {
 /// for each view affected by the save.
 /// Starts with the saved view itself, not the collateral ones,
 /// to minimize any freeze the user might experience.
-/// A headline standing for a node in 'deleted_by_the_save' that the
-/// rerender entombstones is no buffer correction.
+/// What follows from the save's own gestures is no buffer correction
+/// ('buffer_correction_policy', 'BufferCorrectionPolicy::AfterSave').
 /// .
 /// ASSUMES:
 /// the graph was already updated. The reverse order would be bad.
@@ -115,12 +115,12 @@ pub fn update_views_after_save (
   skgrepo_restriction         : Option<&SkgrepoRestriction>,
   text_approved_pids        : &HashSet<ID>,
   fork_specs                  : &[ForkSpec],
-  deleted_by_the_save         : HashSet<ID>,
+  buffer_correction_policy    : BufferCorrectionPolicy,
 ) -> Result<SaveResponse, Box<dyn Error>> {
   let mut context : RerenderPassContext = RerenderPassContext::new (
     env, runtime, skgrepo_restriction,
     views_state . graph_straddle . clone (),
-    BufferCorrectionPolicy::after_a_save_deleting (deleted_by_the_save) );
+    buffer_correction_policy );
   let saved_diffView_buffer_kind : Option<DiffViewBufferKind> =
     viewforest_id_from_request_result . as_ref () . ok ()
     . and_then ( |viewforest_id| views_state . open_views . diffView_buffer_kind_of_view (viewforest_id) );
@@ -317,8 +317,9 @@ pub(crate) fn multi_root_view_via_runtime (
 /// ('stub_of_fresh_content_view') in content-view mode, which draws
 /// each root's content within the node budget and fulfils the stub's
 /// folder requests. Returns the viewforest and its text, with every
-/// viewnode given a vnid from a new record. A fresh view reports no
-/// buffer correction: there was nothing the user could have made otherwise.
+/// viewnode given a vnid from a new record. A fresh view's buffer
+/// corrections go unread ('BufferCorrectionPolicy::Unread'): there
+/// was nothing the user could have made otherwise.
 pub fn render_initial_view (
   runtime     : &RuntimeGeneration,
   root_gnids : &[ID],
@@ -329,7 +330,7 @@ pub fn render_initial_view (
   let refreshed : Refreshed = refresh_content_viewforest (
     &mut viewforest, &mut ViewnodeIdRecord::default (),
     &Truth::of_runtime (runtime, restriction),
-    &BufferCorrectionPolicy::default () ) ?;
+    &BufferCorrectionPolicy::Unread ) ?;
   Ok (( viewforest, refreshed . text )) }
 
 /// One root per requested node: an editable occurrence of the node

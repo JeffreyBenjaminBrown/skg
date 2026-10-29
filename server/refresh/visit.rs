@@ -230,39 +230,43 @@ fn alias_whose_record_is_restricted (
 /// for one gnid) into one viewnode, the result, which stands where
 /// the first of them stood ('merge_into' says how the result is
 /// made). The result's vnid is cleared, so that the tail mints a
-/// fresh one, and the "merged" buffer correction names it.
+/// fresh one, and the "merged" buffer correction names it, unless the
+/// policy says the merge is no buffer correction
+/// ('BufferCorrectionPolicy'): after a save's nodeMerge, the
+/// acquirer's occurrences merge by the user's own request.
 fn merge_siblings (
   tree   : &mut Tree<Viewnode>,
   parent : NodeId,
   walk   : &mut Walk,
 ) -> Result<(), Box<dyn Error>> {
-  for duplicates in duplicate_viewnode_siblings (tree, parent) {
+  for (gnid, duplicates) in duplicate_viewnode_siblings (tree, parent) {
     let result : NodeId = duplicates [0];
     for merged_sibling in &duplicates [1..] {
       merge_into (tree, result, *merged_sibling, walk) ?; }
     tree . get_mut (result) . unwrap () . value () . viewnode_id = None;
-    walk . buffer_corrections . record (tree, result, BufferCorrectionKind::SiblingsMerged); }
+    if walk . buffer_correction_policy . reports_viewnode_merge (&gnid) {
+      walk . buffer_corrections . record (tree, result, BufferCorrectionKind::SiblingsMerged); }}
   Ok (( )) }
 
 /// The children of 'parent' grouped by the gnid they stand for, each
-/// group in sibling order, the groups in order of their first member;
-/// only the groups of more than one.
+/// group in sibling order and with its gnid, the groups in order of
+/// their first member; only the groups of more than one.
 fn duplicate_viewnode_siblings (
   tree   : &Tree<Viewnode>,
   parent : NodeId,
-) -> Vec<Vec<NodeId>> {
-  let mut groups : Vec<Vec<NodeId>> = Vec::new ();
+) -> Vec<(ID, Vec<NodeId>)> {
+  let mut groups : Vec<(ID, Vec<NodeId>)> = Vec::new ();
   let mut group_of_gnid : HashMap<ID, usize> = HashMap::new ();
   for child in children_of (tree, parent) {
     let Some (GoalMember::Gnid (gnid)) : Option<GoalMember> =
       vognode_member (tree . get (child) . unwrap () . value ())
       else { continue; };
     match group_of_gnid . get (&gnid) {
-      Some (group) => groups [*group] . push (child),
-      None => { group_of_gnid . insert (gnid, groups . len ());
-                groups . push ( vec! [child] ); }, }}
+      Some (group) => groups [*group] . 1 . push (child),
+      None => { group_of_gnid . insert (gnid . clone (), groups . len ());
+                groups . push ( (gnid, vec! [child]) ); }, }}
   groups . into_iter ()
-    . filter ( |group| group . len () > 1 )
+    . filter ( |(_, group)| group . len () > 1 )
     . collect () }
 
 /// What a vognode stands for; None for any other kind.
@@ -444,7 +448,9 @@ fn mark_claims (
 
 /// Where the save reads claims: the child at 'treeid', if it claims
 /// and its warrant is not 'ByGraph', is marked 'noClaim', and that is
-/// reported.
+/// reported, unless the policy says the marking is no buffer
+/// correction ('BufferCorrectionPolicy'): after a narrowing, a member
+/// whose record alone the restriction now keeps out loses its claim.
 fn mark_noClaim_unless_warranted (
   tree    : &mut Tree<Viewnode>,
   treeid  : NodeId,
@@ -454,7 +460,8 @@ fn mark_noClaim_unless_warranted (
   if tree . get (treeid) . unwrap () . value () . claims () == Some (true)
      && warrant != Some (Warrant::ByGraph) {
     tree . get_mut (treeid) . unwrap () . value () . set_claim (false);
-    walk . buffer_corrections . record (tree, treeid, BufferCorrectionKind::MarkedNoClaim); }}
+    if walk . buffer_correction_policy . reports_marking_noClaim () {
+      walk . buffer_corrections . record (tree, treeid, BufferCorrectionKind::MarkedNoClaim); }}}
 
 //
 // 5. reinstate

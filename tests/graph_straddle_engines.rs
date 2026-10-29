@@ -109,7 +109,7 @@ fn a_container_folder_from_a_graph_straddle_holds_both_graphs_containers (
                             buffer_kind     : DiffViewBufferKind::AllChanges,
                             readiness_store : &ReadinessStore::default () },
     100,
-    &BufferCorrectionPolicy::default () ) ?;
+    &BufferCorrectionPolicy::ReportAll ) ?;
   let both : DiffChange = DiffChange::default ();
   assert_eq! ( children_with_change (forest . get (folder) . unwrap ()), vec! [
     ( "c1" . to_string (), both ),

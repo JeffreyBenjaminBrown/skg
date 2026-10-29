@@ -84,7 +84,7 @@ fn stream_rerender_views_excluding (
 ) {
   let mut prepared : PreparedRerenders = prepare_rerender_views (
     env, views_state, Some (skgrepo_restriction),
-    BufferCorrectionPolicy::default (), RerenderOptions::ordinary );
+    BufferCorrectionPolicy::ReportAll, RerenderOptions::ordinary );
   prepared . viewforest_ids . retain (|viewforest_id| ! excluded . contains (viewforest_id));
   prepared . views . retain (|view| ! excluded . contains (&view . viewforest_id));
   if ! authorize_prepared_rerenders (

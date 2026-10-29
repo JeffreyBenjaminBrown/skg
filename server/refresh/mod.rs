@@ -43,6 +43,7 @@ use crate::types::viewnode::{
   Editability, ViewRequest, Viewnode, ViewnodeKind, Vognode};
 use crate::types::views_state::ViewnodeIdRecord;
 use crate::refresh::mode::RefreshMode;
+use crate::refresh::ancestry::described_node;
 use buffer_corrections::{BufferCorrectionPolicy, BufferCorrection, BufferCorrectionKind, BufferCorrectionLog};
 
 use ego_tree::{NodeId, NodeRef, Tree};
@@ -113,7 +114,11 @@ pub fn refresh_viewforest (
   let text : String = tail::finish (
     viewforest, viewnode_id_record, &walk ) ?;
   let buffer_corrections : Vec<BufferCorrection> =
-    walk . buffer_corrections . into_buffer_corrections (viewforest . as_internal_tree_mut ());
+    if buffer_correction_policy . is_read () {
+      walk . buffer_corrections . into_buffer_corrections (
+        viewforest . as_internal_tree_mut (),
+        buffer_correction_policy . reports_what_the_tail_pruned () ) }
+    else { Vec::new () };
   Ok ( Refreshed { text, buffer_corrections } ) }
 
 /// What the walk carries from one parent to the next.
@@ -199,8 +204,10 @@ impl<'a> Walk<'a> {
   /// Report the headline drawn at 'drawn', under 'parent', as
   /// reinstated, unless drawing it is extent ('draws_first_under'):
   /// a reinstatement is a buffer correction only where a list already drawn
-  /// was missing a member, and the restriction did not just widen
-  /// ('BufferCorrectionPolicy').
+  /// was missing a member, and only when the policy says so of the
+  /// node whose list it is ('BufferCorrectionPolicy'): the restriction
+  /// did not just widen, nor a nodeMerge the save requested give that
+  /// node the member.
   pub(crate) fn record_drawn (
     &mut self,
     tree   : &Tree<Viewnode>,
@@ -208,9 +215,23 @@ impl<'a> Walk<'a> {
     drawn  : NodeId,
   ) {
     if ! self . draws_first_under (parent)
-       && self . buffer_correction_policy . reports_reinstatement () {
+       && self . buffer_correction_policy . reports_reinstatement (
+            gnid_whose_list_is_drawn_under (tree, parent) ) {
       self . buffer_corrections . record (tree, drawn, BufferCorrectionKind::Reinstated); }}
 }
+
+/// The gnid of the node whose list the children of 'parent' are
+/// drawn from: an occurrence's own, or, under a folder, that of the
+/// node the folder describes ('described_node'). None under any other
+/// parent.
+fn gnid_whose_list_is_drawn_under (
+  tree   : &Tree<Viewnode>,
+  parent : NodeId,
+) -> Option<&ID> {
+  let holder : NodeId = match &tree . get (parent) ? . value () . kind {
+    ViewnodeKind::Folder (_) => described_node (tree, parent) ?,
+    _ => parent, };
+  tree . get (holder) ? . value () . occurrence_gnid () }
 
 /// Visit every parent in level order, starting at the buffer root:
 /// each visit runs the refresh's rungs over its children, which are then

@@ -762,7 +762,7 @@ headline under a tombstone is refused, not saved" to
 The suites, with 'bash/emacs-tests.sh', 'bash/nvim-tests.sh'
 and 'bash/integration-tests.sh'.
 
-** TODO Slice 3: the policy and the two questions
+** DONE Slice 3: the policy and the two questions
 Read the two sections of the agreed behavior, the pitfalls on
 the four callers and the save's knowledge, and the awkwardness
 report's items 2 and 12 first.

@@ -339,7 +339,7 @@ pub fn draw_search_buffer (
   refresh_content_viewforest (
     viewforest, viewnode_id_record,
     &Truth { graph, config, restriction : Some (restriction) },
-    &BufferCorrectionPolicy::default () ) ?;
+    &BufferCorrectionPolicy::Unread ) ?;
   for hit in &hits {
     fold_what_was_drawn_under_hit (viewforest, *hit); }
   if ! include_overPrivateText_telescopes {

@@ -145,13 +145,13 @@ pub(super) fn run_asserting_fixpoint_in (
   let mut record : ViewnodeIdRecord = ViewnodeIdRecord::of_viewforest (&forest);
   let first : Refreshed = refresh_viewforest (
     &mut forest, &mut record, &truth, mode, budget,
-    &BufferCorrectionPolicy::default () )
+    &BufferCorrectionPolicy::ReportAll )
     . unwrap ();
   if let Err (failure) = refresh_reaches_fixpoint (
     &first . text, graph,
     |again, again_record| refresh_viewforest (
       again, again_record, &truth, mode, budget,
-      &BufferCorrectionPolicy::default () )) {
+      &BufferCorrectionPolicy::ReportAll )) {
     panic! ( "the refresh of a refresh's output is no fixpoint: {}", failure ); }
   Run { forest, text : first . text, buffer_corrections : first . buffer_corrections } }
 

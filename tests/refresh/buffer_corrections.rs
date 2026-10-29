@@ -4,9 +4,12 @@
 // first requested, or what stands under the roots of a stub is
 // extent, which it does not report; a reinstatement is reported only
 // where a list already drawn was missing a member. Nor does it report
-// what its caller's policy says the buffer was not wrong about: a
-// tombstone the saving user's own save left, or a member drawn after
-// a change of the skgrepo restriction.
+// what its caller's policy says the buffer was not wrong about
+// ('BufferCorrectionPolicy'): a tombstone the saving user's own save
+// left, what a save's nodeMerge merged and drew, or a member drawn
+// after a change of the skgrepo restriction. A buffer nobody reads
+// the buffer corrections of is corrected as always, and nobody is
+// told ('BufferCorrectionPolicy::Unread').
 
 use super::*;
 use crate::update_buffer::stub_of_fresh_content_view;
@@ -29,7 +32,7 @@ fn a_fresh_view_reports_nothing () {
   let mut forest : ViewForest = stub_of_fresh_content_view (
     &[ ID::from ("p"), ID::from ("b") ], &graph );
   let refreshed : Refreshed =
-    refresh_once (&mut forest, &graph, &BufferCorrectionPolicy::default ());
+    refresh_once (&mut forest, &graph, &BufferCorrectionPolicy::ReportAll);
   assert_eq! ( outline (&forest), "\
 node p
   containerFolder
@@ -49,6 +52,33 @@ node b
     "the stub drew its roots' content and containers" );
   assert! ( refreshed . buffer_corrections . is_empty (),
             "{:?}", refreshed . buffer_corrections ); }
+
+/// p's list lacks b and does not name x, which no node answers to.
+/// Refreshed for a reader, b is drawn and x entombstoned and pruned,
+/// each reported; refreshed unread, the buffer comes out the same and
+/// nothing is reported.
+#[test]
+fn an_unread_refresh_corrects_as_always_and_reports_nothing () {
+  let graph : InRustGraph = family ();
+  let input : String = formatdoc! ("
+    * {} p
+    ** {} a
+    *** {} a1
+    ** {} x
+    ", occurrence_metadata ("p", ""), occurrence_metadata ("a", ""),
+       occurrence_metadata ("a1", ""), occurrence_metadata ("x", "") );
+  let refresh_under = |policy : &BufferCorrectionPolicy| -> Refreshed {
+    let mut forest : ViewForest = parse (&input, IdResolution::ThroughGraph (&graph));
+    refresh_once (&mut forest, &graph, policy) };
+  let read : Refreshed = refresh_under (&BufferCorrectionPolicy::ReportAll);
+  let unread : Refreshed = refresh_under (&BufferCorrectionPolicy::Unread);
+  assert_eq! ( read . buffer_corrections . iter () . map ( |c| c . kind ) . collect::<Vec<_>> (),
+               vec! [ BufferCorrectionKind::Entombstoned, BufferCorrectionKind::Reinstated ] );
+  assert! ( read . text . contains ("(gnid b)") && ! read . text . contains ("(gnid x)"),
+            "{}", read . text );
+  assert_eq! ( unread . text, read . text );
+  assert! ( unread . buffer_corrections . is_empty (),
+            "{:?}", unread . buffer_corrections ); }
 
 #[test]
 fn the_members_of_a_folder_first_requested_are_not_reported () {
@@ -131,8 +161,8 @@ fn a_tombstone_the_save_left_is_not_reported () {
        occurrence_metadata ("k", "") );
   let mut forest : ViewForest = parse (&input, IdResolution::ThroughGraph (&graph));
   let policy : BufferCorrectionPolicy =
-    BufferCorrectionPolicy::after_a_save_deleting (
-      HashSet::from ([ ID::from ("x") ]) );
+    BufferCorrectionPolicy::after_a_save (
+      HashSet::from ([ ID::from ("x") ]), HashSet::new () );
   let refreshed : Refreshed = refresh_once (&mut forest, &graph, &policy);
   assert_eq! ( outline (&forest), "\
 node p

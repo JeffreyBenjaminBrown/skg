@@ -406,7 +406,7 @@ fn diff_view_narrowed_by_a_switch (
   let opened : Refreshed = refresh_viewforest (
     &mut forest, &mut record,
     &Truth { graph, config : &config, restriction : None },
-    mode, 100, &BufferCorrectionPolicy::default () ) . unwrap ();
+    mode, 100, &BufferCorrectionPolicy::ReportAll ) . unwrap ();
   let narrowed_truth : Truth = Truth { graph, config : &config,
                                        restriction : Some (&restriction) };
   let narrowed : Refreshed = refresh_viewforest (
@@ -416,7 +416,7 @@ fn diff_view_narrowed_by_a_switch (
     &narrowed . text, graph,
     |again, again_record| refresh_viewforest (
       again, again_record, &narrowed_truth, mode, 100,
-      &BufferCorrectionPolicy::default () )) {
+      &BufferCorrectionPolicy::ReportAll )) {
     panic! ( "the narrowed diff view is no fixpoint: {}", failure ); }
   (opened . text, narrowed, forest) }
 

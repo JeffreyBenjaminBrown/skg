@@ -410,7 +410,10 @@ made editable its body and draws its content list; then each content
 origin of D that the buffer shows nowhere is appended as a stub root,
 in ID order, with the standing roots pinned, and the buffer is
 refreshed again ('rerender_diffView_buffer'). What the request draws
-is what the user asked for, so it reports no buffer correction. The answer
+is what the user asked for, so the first refresh's buffer
+corrections go unread, as a first rendering's do; the second reports
+what the buffer got wrong, but for what it draws under the roots it
+appended, a first rendering of them. The answer
 is the readiness summary, and the rerender stream carries the buffer.
 It does not matter who write-protected an occurrence: the user asked
 for every change.

@@ -30,16 +30,6 @@
   '(editRequest (ready ...))' as if it held an edit request: the
   bug slice 4 fixed for 'skg-set-relRepo', in a second place.
   Fix: one predicate per client that skips readiness parts.
-** FIX PLANNED: Corrections a user's own gesture causes
-  Run. A nodeMerge reports four buffer corrections (the viewnode
-  merge of the acquirer's two occurrences, and three "Drew what
-  the graph says belongs here"), all caused by the user's own
-  request; the policy exempts only a deletion and a widening. A
-  Restricted vognode in the hidden folder that loses its hide is
-  reported "Entombstoned" by vnid, and the same refresh prunes
-  it, so the correction names a headline no longer in the
-  buffer. After a switch a member whose record alone is
-  restricted stays drawn and is reported "Marked noClaim".
 * Problems noticed while executing plan 06, slice 1 (2026-10-26)
 ** FIX PLANNED: Under a restriction, the graphnode stats are quadratic in a list's length
   Slice 1 of 'TODO/simplify-refresh/06_plan_tidy-refresh.org' made

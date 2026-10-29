@@ -109,7 +109,7 @@ fn an_occurrence_whose_gnid_became_an_extra_id_stands_for_its_node () {
     ** {} b
     ", occurrence_metadata ("p", ""), occurrence_metadata ("b", "writeProtected") );
   let mut forest : ViewForest = parse (&input, IdResolution::AsWritten);
-  refresh_once (&mut forest, &graph, &BufferCorrectionPolicy::default ());
+  refresh_once (&mut forest, &graph, &BufferCorrectionPolicy::ReportAll);
   assert_eq! ( outline (&forest), "\
 node p
   node a wp" ); }
@@ -129,7 +129,7 @@ fn of_two_editable_occurrences_a_nodeMerge_made_one_nodes_the_first_stays_editab
     ** {} a
     ", occurrence_metadata ("b", ""), occurrence_metadata ("a", "") );
   let mut forest : ViewForest = parse (&input, IdResolution::AsWritten);
-  refresh_once (&mut forest, &graph, &BufferCorrectionPolicy::default ());
+  refresh_once (&mut forest, &graph, &BufferCorrectionPolicy::ReportAll);
   assert_eq! ( outline (&forest), "\
 node a
   node a wp

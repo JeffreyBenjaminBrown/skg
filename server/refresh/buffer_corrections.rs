@@ -2,12 +2,20 @@
 //! buffer correction per change, each naming its headline as a subtree is
 //! named, by vnid and title. A buffer correction is a change the
 //! refresh made to what a buffer said because the buffer was wrong
-//! about the graph. Two changes are not buffer corrections, and are
-//! not reported, since the buffer was not wrong: a tombstone the
-//! refresh leaves where the saving user's own save deleted the node,
-//! and a member the refresh draws because the skgrepo restriction was
-//! widened. The refresh learns both from its caller
-//! ('BufferCorrectionPolicy'). The refresh reports buffer corrections;
+//! about the graph. The caller of a refresh says which situation it is
+//! called in ('BufferCorrectionPolicy'), and so which changes are not
+//! buffer corrections, the buffer not having been wrong:
+//! - 'ReportAll': none; every change is reported;
+//! - 'AfterSave': a save's rerender. A tombstone left where the save
+//!   deleted the node; for the nodes its nodeMerge requests touched,
+//!   the viewnode merge of their occurrences and the members drawn
+//!   under them; and whatever left the buffer, pruned by the tail;
+//! - 'AfterRestrictionChange': a skgrepo-set switch's rerender, after
+//!   which what the refresh draws, entombstones, marks 'noClaim' or
+//!   re-kinds across the restriction is the restriction's doing;
+//! - 'Unread': a buffer nobody reads the buffer corrections of (a
+//!   first drawing); it is corrected as always, and nobody is told.
+//! The refresh reports buffer corrections;
 //! it does not warn. Whoever calls it tags them with the view they
 //! belong to ('ViewBufferCorrections'), and the save and rerender responses
 //! carry them to the client, which shows each view's under a headline
@@ -23,7 +31,7 @@ use sexp::{Atom, Sexp};
 use std::collections::HashSet;
 use std::iter::once;
 
-use ego_tree::{NodeId, Tree};
+use ego_tree::{NodeId, NodeRef, Tree};
 
 /// The kinds of buffer correction.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -50,7 +58,8 @@ pub enum BufferCorrectionKind {
 pub struct BufferCorrection {
   pub kind  : BufferCorrectionKind,
   /// The headline's vnid: the one it carried, or the one the tail
-  /// gave it. None for a headline the tail pruned before it had one.
+  /// gave it. None for a headline that left the buffer before it had
+  /// one.
   pub vnid  : Option<ViewnodeId>,
   /// Its title when the buffer correction was made.
   pub title : String,
@@ -80,50 +89,123 @@ impl BufferCorrection {
       &[ HeadlineName::of ( self . vnid . as_ref (), None, &self . title ) ] ) }
 }
 
-/// What the caller of a refresh knows that makes a change no
-/// buffer correction (see the module comment). The default, which every
-/// caller but two passes, reports every change.
-#[derive(Clone, Debug, Default)]
-pub struct BufferCorrectionPolicy {
-  /// The IDs of the nodes the save being rerendered deleted, set by
-  /// the save's rerender. A headline standing for one of them that
-  /// the refresh entombstones is the saving user's own doing.
-  pub deleted_by_the_save          : HashSet<ID>,
-  /// Set by the skgrepo-set switch when the restriction changed.
-  /// Every open view was up to date before the switch, so what its
-  /// rerender draws (a widening) or entombstones (a narrowing), and
-  /// what it makes a Restricted vognode or an occurrence again, is the
-  /// restriction's doing, not the buffer's.
-  pub follows_a_restriction_change : bool,
+/// The situation a refresh is called in, which says which changes are
+/// no buffer corrections (see the module comment). Each question below
+/// is one match on it.
+#[derive(Clone, Debug)]
+pub enum BufferCorrectionPolicy {
+  /// Every change is a buffer correction.
+  ReportAll,
+  /// The rerender of a save. What follows from the save's own
+  /// gestures is no buffer correction: a headline entombstoned because
+  /// it stood for a node the save deleted; for the nodes its nodeMerge
+  /// requests touched, the viewnode merge of their occurrences and the
+  /// members drawn under them; and what the tail pruned.
+  AfterSave {
+    /// Every ID of each node the save deleted.
+    deleted    : HashSet<ID>,
+    /// The acquirer and the acquiree of each nodeMerge request.
+    nodeMerged : HashSet<ID>, },
+  /// The rerender of a skgrepo-set switch that changed the
+  /// restriction. Every open view was up to date before the switch,
+  /// so what its rerender draws (a widening), entombstones or marks
+  /// 'noClaim' (a narrowing), and what it makes a restricted headline
+  /// or an occurrence or a ghost again, is the restriction's doing,
+  /// not the buffer's.
+  AfterRestrictionChange,
+  /// The refresh of a buffer whose buffer corrections nobody reads:
+  /// a first drawing (a fresh content view, a buffer of the diff
+  /// view, the search buffer, the first refresh of the "integrate
+  /// unshown changes" request). The word is coined here: the refresh
+  /// corrects as always, and nobody is told.
+  Unread,
 }
 
 impl BufferCorrectionPolicy {
   /// The policy of a save's rerender.
-  pub fn after_a_save_deleting (
-    deleted_by_the_save : HashSet<ID>,
+  pub fn after_a_save (
+    deleted    : HashSet<ID>,
+    nodeMerged : HashSet<ID>,
   ) -> BufferCorrectionPolicy {
-    BufferCorrectionPolicy { deleted_by_the_save,
-                             follows_a_restriction_change : false } }
+    BufferCorrectionPolicy::AfterSave { deleted, nodeMerged } }
 
   /// The policy of a skgrepo-set switch's rerender.
   pub fn after_a_switch (
     restriction_changed : bool,
   ) -> BufferCorrectionPolicy {
-    BufferCorrectionPolicy {
-      deleted_by_the_save          : HashSet::new (),
-      follows_a_restriction_change : restriction_changed, } }
+    if restriction_changed { BufferCorrectionPolicy::AfterRestrictionChange }
+    else { BufferCorrectionPolicy::ReportAll } }
 
-  pub(crate) fn reports_reinstatement (
+  /// Whether anyone reads the refresh's buffer corrections.
+  pub(crate) fn is_read (
     &self,
   ) -> bool {
-    ! self . follows_a_restriction_change }
+    match self {
+      BufferCorrectionPolicy::Unread => false,
+      _ => true, } }
 
-  /// Whether re-kinding a headline to a Restricted vognode, or from
+  /// Whether drawing a goal item no child stood for, under a parent
+  /// that stands for 'parent_gnid' (None for a parent that stands for
+  /// no gnid), is a buffer correction.
+  pub(crate) fn reports_reinstatement (
+    &self,
+    parent_gnid : Option<&ID>,
+  ) -> bool {
+    match self {
+      BufferCorrectionPolicy::ReportAll => true,
+      BufferCorrectionPolicy::AfterSave { nodeMerged, .. } =>
+        ! parent_gnid . is_some_and ( |gnid| nodeMerged . contains (gnid) ),
+      BufferCorrectionPolicy::AfterRestrictionChange
+        | BufferCorrectionPolicy::Unread => false, } }
+
+  /// Whether merging duplicate viewnode siblings standing for 'gnid'
+  /// is a buffer correction.
+  pub(crate) fn reports_viewnode_merge (
+    &self,
+    gnid : &ID,
+  ) -> bool {
+    match self {
+      BufferCorrectionPolicy::ReportAll
+        | BufferCorrectionPolicy::AfterRestrictionChange => true,
+      BufferCorrectionPolicy::AfterSave { nodeMerged, .. } =>
+        ! nodeMerged . contains (gnid),
+      BufferCorrectionPolicy::Unread => false, } }
+
+  /// Whether marking 'noClaim' a child that claimed membership and
+  /// that the truth does not warrant is a buffer correction.
+  pub(crate) fn reports_marking_noClaim (
+    &self,
+  ) -> bool {
+    match self {
+      BufferCorrectionPolicy::ReportAll
+        | BufferCorrectionPolicy::AfterSave { .. } => true,
+      BufferCorrectionPolicy::AfterRestrictionChange
+        | BufferCorrectionPolicy::Unread => false, } }
+
+  /// Whether re-kinding a headline to a restricted headline, or from
   /// one to an occurrence or a ghost, is a buffer correction.
   pub(crate) fn reports_rekind_across_the_restriction (
     &self,
   ) -> bool {
-    ! self . follows_a_restriction_change }
+    match self {
+      BufferCorrectionPolicy::ReportAll
+        | BufferCorrectionPolicy::AfterSave { .. } => true,
+      BufferCorrectionPolicy::AfterRestrictionChange
+        | BufferCorrectionPolicy::Unread => false, } }
+
+  /// Whether a buffer correction of a headline the tail then pruned
+  /// is reported, named by the vnid it held. After a save, or a change
+  /// of the restriction, what left the buffer went by the user's own
+  /// doing, and its buffer correction would name a headline the buffer
+  /// no longer holds.
+  pub(crate) fn reports_what_the_tail_pruned (
+    &self,
+  ) -> bool {
+    match self {
+      BufferCorrectionPolicy::ReportAll => true,
+      BufferCorrectionPolicy::AfterSave { .. }
+        | BufferCorrectionPolicy::AfterRestrictionChange
+        | BufferCorrectionPolicy::Unread => false, } }
 
   /// Whether entombstoning a headline that stood for 'gnid' (None for
   /// a headline that stands for no gnid) is a buffer correction.
@@ -131,8 +213,12 @@ impl BufferCorrectionPolicy {
     &self,
     gnid : Option<&ID>,
   ) -> bool {
-    ! self . follows_a_restriction_change
-    && ! gnid . is_some_and ( |gnid| self . deleted_by_the_save . contains (gnid) ) }
+    match self {
+      BufferCorrectionPolicy::ReportAll => true,
+      BufferCorrectionPolicy::AfterSave { deleted, .. } =>
+        ! gnid . is_some_and ( |gnid| deleted . contains (gnid) ),
+      BufferCorrectionPolicy::AfterRestrictionChange
+        | BufferCorrectionPolicy::Unread => false, } }
 }
 
 /// The buffer corrections of one refreshed view, tagged with the view.
@@ -195,20 +281,28 @@ impl BufferCorrectionLog {
                    title : viewnode . title () . to_string () },
       treeid )); }
 
-  /// The buffer corrections, each headline named by the vnid it holds now,
-  /// or, if it holds none (the tail pruned it), by the one it held
-  /// when the buffer correction was made: a headline drawn by the walk gets
-  /// its vnid from the tail, and the result of a viewnode merge a
-  /// fresh one. Call after the tail has assigned the vnids.
+  /// The buffer corrections, each headline named by the vnid it holds
+  /// now: a headline drawn by the walk gets its vnid from the tail, and
+  /// the result of a viewnode merge a fresh one. A headline no longer
+  /// in the buffer (the tail pruned it, or a viewnode merge removed it)
+  /// keeps the vnid it held, if 'keep_what_left_the_buffer'
+  /// ('BufferCorrectionPolicy::reports_what_the_tail_pruned'); else
+  /// its buffer corrections are dropped. Call after the tail has
+  /// assigned the vnids.
   pub(crate) fn into_buffer_corrections (
     self,
-    tree : &Tree<Viewnode>,
+    tree                      : &Tree<Viewnode>,
+    keep_what_left_the_buffer : bool,
   ) -> Vec<BufferCorrection> {
+    let root : NodeId = tree . root () . id ();
     self . entries . into_iter ()
-      . map ( |(buffer_correction, treeid)| {
-        let vnid_now : Option<ViewnodeId> = tree . get (treeid)
-          . and_then ( |node| node . value () . viewnode_id . clone () );
-        BufferCorrection { vnid : vnid_now . or (buffer_correction . vnid),
-                     .. buffer_correction } } )
+      . filter_map ( |(buffer_correction, treeid)| {
+        let node : NodeRef<Viewnode> = tree . get (treeid) ?;
+        let in_the_buffer : bool =
+          node . ancestors () . any ( |ancestor| ancestor . id () == root );
+        ( in_the_buffer || keep_what_left_the_buffer ) . then ( || BufferCorrection {
+          vnid : node . value () . viewnode_id . clone ()
+                 . or (buffer_correction . vnid),
+          .. buffer_correction } ) } )
       . collect () }
 }

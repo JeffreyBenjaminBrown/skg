@@ -155,7 +155,7 @@ fn refreshes_unchanged (
     &text, &runtime . graph,
     |forest, record| refresh_content_viewforest (
       forest, record, &Truth::of_runtime (runtime, restriction),
-      &BufferCorrectionPolicy::default () )) }
+      &BufferCorrectionPolicy::ReportAll )) }
 
 /// No restriction, then the restriction through each skgrepo but the
 /// most private (through which it would be no restriction).
@@ -306,7 +306,7 @@ fn diff_view_buffer_refreshes_unchanged (
     &switched, &runtime . graph,
     |forest, record| refresh_diffView_viewforest (
       runtime, straddle, buffer_kind, store, restriction,
-      &BufferCorrectionPolicy::default (), forest, record )) }
+      &BufferCorrectionPolicy::ReportAll, forest, record )) }
 
 /// 'text' parsed over 'graph', as a buffer the sweep refreshes.
 fn parse_for_the_sweep (

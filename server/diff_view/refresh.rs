@@ -15,16 +15,18 @@ use crate::diff_view::readiness_store::ReadinessStore;
 use crate::graph_straddle::build::current_graph_straddle_in_slot;
 use crate::graph_straddle::types::GraphStraddle;
 use crate::refresh::{Refreshed, Truth, refresh_viewforest};
-use crate::refresh::buffer_corrections::BufferCorrectionPolicy;
+use crate::refresh::buffer_corrections::{BufferCorrection, BufferCorrectionPolicy};
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::env::RuntimeGeneration;
 use crate::types::misc::ID;
 use crate::types::tree::forest::ViewForest;
+use crate::types::viewnode::ViewnodeId;
 use crate::types::views_state::{DiffViewBufferKind, ViewnodeIdRecord};
 use crate::update_buffer::{DiffViewRerender, RerenderPassContext};
 use crate::refresh::mode::RefreshMode;
 
-use std::collections::BTreeSet;
+use ego_tree::NodeId;
+use std::collections::{BTreeSet, HashSet};
 use std::error::Error;
 use std::sync::{Arc, MutexGuard};
 
@@ -63,9 +65,15 @@ pub fn refresh_diffView_viewforest (
 /// without an editable occurrence becomes editable at its first
 /// content occurrence; after it, the content origins of the recomputed
 /// D that the buffer shows nowhere are appended as stub roots, and the
-/// buffer is refreshed again. Its standing roots stay. What that
-/// request draws is what the user asked for, as a fresh view's is, so
-/// it reports no buffer corrections.
+/// buffer is refreshed again. Its standing roots stay. The first
+/// refresh's buffer corrections go unread
+/// ('BufferCorrectionPolicy::Unread'): what it draws under the
+/// occurrences it made editable is what the user asked for, as a
+/// fresh view's is. The second refresh reports by the context's
+/// policy, so that what the user's buffer got wrong is still told,
+/// but for what it draws under the roots it appended, which is a first
+/// rendering of them, and unread as a first rendering is
+/// ('outside_the_appended_roots').
 pub fn rerender_diffView_buffer (
   context            : &mut RerenderPassContext<'_>,
   rerender           : DiffViewRerender,
@@ -89,16 +97,36 @@ pub fn rerender_diffView_buffer (
   let store : MutexGuard<ReadinessStore> = context . env . runtime . lock_readiness_store ();
   let refreshed : Refreshed = refresh_diffView_viewforest (
     runtime, &straddle, diffView_buffer_kind, &store, restriction,
-    buffer_correction_policy, viewforest, viewnode_id_record ) ?;
+    if integrate_unshown_changes { &BufferCorrectionPolicy::Unread }
+    else { buffer_correction_policy },
+    viewforest, viewnode_id_record ) ?;
   if ! integrate_unshown_changes { return Ok (refreshed); }
   let new_roots : Vec<ID> = contentOrigins_missing_from_buffer (
     &straddle, diffView_buffer_kind, viewforest, &standing_roots );
-  let text : String =
-    if new_roots . is_empty () { refreshed . text }
-    else {
-      append_contentOrigins_to_buffer (
-        runtime, &straddle, diffView_buffer_kind, viewforest, &new_roots ) ?;
-      refresh_diffView_viewforest (
-        runtime, &straddle, diffView_buffer_kind, &store, restriction,
-        buffer_correction_policy, viewforest, viewnode_id_record ) ? . text };
-  Ok ( Refreshed { text, buffer_corrections : Vec::new () } ) }
+  if new_roots . is_empty () { return Ok (refreshed); }
+  let appended_roots : Vec<NodeId> = append_contentOrigins_to_buffer (
+    runtime, &straddle, diffView_buffer_kind, viewforest, &new_roots ) ?;
+  let refreshed_again : Refreshed = refresh_diffView_viewforest (
+    runtime, &straddle, diffView_buffer_kind, &store, restriction,
+    buffer_correction_policy, viewforest, viewnode_id_record ) ?;
+  Ok ( outside_the_appended_roots (refreshed_again, viewforest, &appended_roots) ) }
+
+/// 'refreshed' without the buffer corrections of headlines in the
+/// subtrees of 'appended_roots'.
+fn outside_the_appended_roots (
+  refreshed      : Refreshed,
+  viewforest     : &ViewForest,
+  appended_roots : &[NodeId],
+) -> Refreshed {
+  let appended_vnids : HashSet<&ViewnodeId> = appended_roots . iter ()
+    . filter_map ( |root| viewforest . get (*root) )
+    . flat_map ( |root| root . descendants () )
+    . filter_map ( |node| node . value () . viewnode_id . as_ref () )
+    . collect ();
+  let buffer_corrections : Vec<BufferCorrection> =
+    refreshed . buffer_corrections . iter ()
+    . filter ( |buffer_correction| ! buffer_correction . vnid . as_ref ()
+               . is_some_and ( |vnid| appended_vnids . contains (vnid) ))
+    . cloned ()
+    . collect ();
+  Refreshed { buffer_corrections, .. refreshed } }

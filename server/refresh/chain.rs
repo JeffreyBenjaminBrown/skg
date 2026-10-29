@@ -45,7 +45,7 @@ pub fn attach_containerward_chains_under_members (
   truth   : &Truth,
   mode    : RefreshMode,
 ) -> Result<(), Box<dyn Error>> {
-  let policy : BufferCorrectionPolicy = BufferCorrectionPolicy::default ();
+  let policy : BufferCorrectionPolicy = BufferCorrectionPolicy::Unread;
   let walk : Walk = Walk::new (truth, mode, 0, &policy);
   for member in members {
     attach_containerward_chain (tree, *member, &walk) ?; }

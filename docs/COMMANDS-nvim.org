@@ -85,10 +85,11 @@ rerenders. A buffer correction says one of these six things:
 - "Dropped an edit request its headline has no slot for." After such
   a change of kind, a request the new kind cannot carry was dropped.
 What the server draws because you asked for it (the content of a
-node you made editable, a folder you requested) is no buffer
-correction, nor is a tombstone where your own save deleted a node,
-nor what a change of the skgrepo-set (<localleader>vl) draws or
-hides.
+node you made editable, a folder you requested, a new view) is no
+buffer correction, nor is what your own save did: a tombstone where
+it deleted a node, what a merge it asked for joined or drew, a
+headline it took out of the view; nor what a change of the
+skgrepo-set (<localleader>vl) draws, hides or marks noClaim.
 *** where a save's warnings go
 A save's own warnings and errors go to a buffer of their own,
 replaced at each save that has any: =skg://messages/save-warnings=,

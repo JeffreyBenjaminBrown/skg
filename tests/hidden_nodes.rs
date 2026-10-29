@@ -384,6 +384,94 @@ fn a_switch_reports_no_buffer_corrections (
                   name, done, view ); }
       Ok (( )) } ) }
 
+/// r, public, contains a in its public file and pc, public, in its
+/// private section. Narrowed to "public", pc's record is restricted
+/// while pc is not: pc stays drawn, marked 'noClaim', and the switch
+/// reports no buffer correction, for the narrowing did it
+/// ('BufferCorrectionPolicy::AfterRestrictionChange').
+#[test]
+fn a_narrowing_marks_noClaim_quietly_a_member_whose_record_alone_is_restricted (
+) -> Result<(), Box<dyn Error>> {
+  let case : tempfile::TempDir = tempfile::TempDir::new () ?;
+  write_unchanged_skgrepos ( case . path (), &[
+    ( "public", &[
+      ("r",  "pid: r\ntitle: r\ncontains:\n- a\n"),
+      ("a",  "pid: a\ntitle: a\n"),
+      ("pc", "pid: pc\ntitle: pc\n") ] ),
+    ( "private", &[
+      ("r",  "pid: r\ncontains:\n- pc\n") ] ) ]) ?;
+  with_git_fixture (
+    case . path (), OwnedSkgrepos::Named (&["public", "private"]), &[],
+    |f| {
+      let mut restriction : SkgrepoRestriction =
+        SkgrepoRestriction::named (&f . config, "all" . into ()) ?;
+      let opened : String = open_view_of_r (f, None) ?;
+      assert! ( opened . contains ("node (gnid pc)") && ! opened . contains ("noClaim"),
+                "under all pc is r's member:\n{}", opened );
+      let (view, done) : (String, String) =
+        switch_reporting (f, &mut restriction, "public") ?;
+      assert! ( view . lines () . any ( |line| line . contains ("node (gnid pc)")
+                                               && line . contains (" noClaim ") ),
+                "narrowed, pc stays, marked noClaim:\n{}", view );
+      assert! ( done . contains ("(corrections ())"),
+                "the narrowing reports no buffer correction: {}\n\nview:\n{}",
+                done, view );
+      Ok (( )) } ) }
+
+/// r hides s1 and hh, private, from its subscribers, recording both in
+/// its public file. Under "public", with the folder of what r hides
+/// requested, hh stands as a restricted headline there and in the
+/// folder of what r hides outside its subscribees. Its line deleted
+/// from the second and the view saved, r no longer hides hh, and the
+/// first folder's restricted headline goes: the save's own doing,
+/// which reports nothing, and names no headline the buffer no longer
+/// holds ('BufferCorrectionPolicy::reports_what_the_tail_pruned').
+#[test]
+fn a_restricted_headline_whose_record_a_save_removed_goes_quietly (
+) -> Result<(), Box<dyn Error>> {
+  let case : tempfile::TempDir = tempfile::TempDir::new () ?;
+  write_unchanged_skgrepos ( case . path (), &[
+    ( "public", &[
+      ("r",  "pid: r\ntitle: r\ncontains:\n- c1\nsubscribesTo:\n- s\nhidesFromSubs:\n- s1\n- hh\n"),
+      ("c1", "pid: c1\ntitle: c1\n"),
+      ("s",  "pid: s\ntitle: s\ncontains:\n- s1\n"),
+      ("s1", "pid: s1\ntitle: s1\n") ] ),
+    ( "private", &[
+      ("hh", "pid: hh\ntitle: hh secret\n") ] ) ]) ?;
+  with_git_fixture (
+    case . path (), OwnedSkgrepos::Named (&["public", "private"]), &[],
+    |f| {
+      let public : SkgrepoRestriction =
+        SkgrepoRestriction::named (&f . config, "public" . into ()) ?;
+      let opened : String = open_view_of_r (f, Some (&public)) ?;
+      let requested : String = save_under (
+        f, &opened . replacen (
+          "node (gnid r)", "node (gnid r) (viewRequests (folder hidesFromSubs))", 1 ),
+        &public ) ? . saved_view;
+      let hh_lines : Vec<usize> = requested . lines () . enumerate ()
+        . filter ( |(_, line)| line . contains ("restricted (gnid hh)") )
+        . map ( |(index, _)| index )
+        . collect ();
+      assert_eq! ( hh_lines . len (), 2,
+                   "hh stands in both folders:\n{}", requested );
+      assert_eq! ( children_of_the_hidden_outside_folder (&requested),
+                   vec! [ "restricted hh" . to_string () ],
+                   "{}", requested );
+      let edited : String = requested . lines () . enumerate ()
+        . filter ( |(index, _)| *index != hh_lines [1] )
+        . map ( |(_, line)| format! ("{}\n", line) )
+        . collect ();
+      let saved : SaveResponse = save_under (f, &edited, &public) ?;
+      assert_eq! ( members_of ( node_in_graph (f, "r") . hidesFromSubs . or_default () ),
+                   vec! [ ID::from ("s1") ],
+                   "r no longer hides hh" );
+      assert! ( ! saved . saved_view . contains ("(gnid hh)"),
+                "hh's restricted headline goes:\n{}", saved . saved_view );
+      assert! ( saved . buffer_corrections . is_empty (),
+                "the save's own removal is no buffer correction: {:?}",
+                saved . buffer_corrections );
+      Ok (( )) } ) }
+
 /// r, public, records the alias "r public alias" in its public file
 /// and "r secret alias" in its private section. Under "public" the
 /// second, whose record is restricted, is absent, text and count: in a

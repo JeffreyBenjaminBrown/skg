@@ -14,7 +14,8 @@ use crate::git_fixture::{graph_straddle, save_cleanly};
 use crate::pruned_change_view::common::{
   all_changes_view, integrate_unshown_changes, node_lines,
   open_all_changes_buffer, requesting_editable_at, rerendered_view_content,
-  retitle_in_a_content_view, send_stage_and_commit_request, with_fixture};
+  retitle_in_a_content_view, send_integrate_unshown_changes_request,
+  send_stage_and_commit_request, with_fixture};
 
 use skg::graph_straddle::types::GraphStraddle;
 use skg::diff_view::pruned_change_view::ensure_editableOccurrences_exist;
@@ -154,6 +155,41 @@ fn a_change_under_a_new_origin_is_appended_as_a_root_by_the_command (
     assert_eq! ( again . saved_view, shown, "a further save adds nothing" );
     assert_eq! ( integrate_unshown_changes (f) ? . 0, shown,
                  "a further command adds nothing" );
+    Ok (( )) }) }
+
+/// w1a, under the write-protected member w, changes: the command's
+/// first refresh makes w editable and draws its content, which the
+/// user asked for, so its buffer corrections go unread, and it appends
+/// no root. Then s1, under s, an origin the buffer does not show,
+/// changes: the command appends s and refreshes again, reporting by
+/// the request's policy, but for what it draws under s, a first
+/// rendering of s ('rerender_diffView_buffer'). Neither finds anything
+/// the buffer got wrong.
+#[test]
+fn the_command_reports_its_second_refresh_and_not_its_first (
+) -> Result<(), Box<dyn Error>> {
+  with_fixture ("fresh", &["main"], |f| {
+    let buffer : String = open_all_changes_buffer (f) ?;
+    let buffer : String = retitle_in_a_content_view (f, "w1a", "w1a retitled", &buffer) ?;
+    save_cleanly (f, &all_changes_view (), &buffer) ?;
+    let response : String =
+      send_integrate_unshown_changes_request (f, DiffViewBufferKind::AllChanges) ?;
+    let shown : String = rerendered_view_content (&response);
+    assert! ( shown_editable (&shown, "w") && shown_editable (&shown, "w1a"),
+              "the first refresh drew w's content:\n{}", shown );
+    assert_eq! ( root_ids (&shown), vec! [ "q", "r" ], "{}", shown );
+    assert! ( response . contains ("(corrections ())"),
+              "the first refresh reports no buffer correction:\n{}", response );
+    let buffer : String = retitle_in_a_content_view (f, "s1", "s1 retitled", &shown) ?;
+    save_cleanly (f, &all_changes_view (), &buffer) ?;
+    let response : String =
+      send_integrate_unshown_changes_request (f, DiffViewBufferKind::AllChanges) ?;
+    let shown : String = rerendered_view_content (&response);
+    assert_eq! ( root_ids (&shown), vec! [ "q", "r", "s" ],
+                 "the second refresh drew s:\n{}", shown );
+    assert! ( response . contains ("(corrections ())"),
+              "the second refresh reports nothing of s's first rendering:\n{}",
+              response );
     Ok (( )) }) }
 
 /// The new cycle of p and q gains a member: q now contains z, which

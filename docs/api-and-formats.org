@@ -218,7 +218,12 @@ So far there are these endpoints:
        request dropped). What
        the refresh draws as extent is not one: the content of an
        occurrence it extends first, the members of a folder first
-       requested, a fresh view's content. So a reinstatement is
+       requested, a fresh view's content. Nor is what the save itself
+       did: a tombstone where it deleted a node, the viewnode merge
+       and the members drawn that its nodeMerge requests caused, and
+       a headline the refresh took out of a view; nor, at a
+       skgrepo-set switch, what the change of the restriction drew,
+       entombstoned, marked =noClaim= or re-kinded. So a reinstatement is
        reported only where a list already drawn lacked a member, and a
        plain save reports nothing. The list is present and empty if
        none; a failed save's response has no =corrections=. A buffer
@@ -573,7 +578,9 @@ since the command searches the current buffer.
     in ID order, and the buffer refreshed again; R is deduplicated with
     the buffer's roots pinned, so that a changed cycle that already has
     a root gains no second one. What the request draws is what the user
-    asked for, so it reports no buffer correction.
+    asked for: the first refresh reports no buffer correction, and the
+    second reports what the buffer got wrong, but for what it draws
+    under the appended roots.
     =server/serve/handlers/integrate_unshown_changes.rs=, =server/diff_view/pruned_change_view.rs=
     ('ensure_editableOccurrences_exist',
     'contentOrigins_missing_from_buffer'), and 'rerender_view' in

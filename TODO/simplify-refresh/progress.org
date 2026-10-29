@@ -3829,3 +3829,173 @@ a refused save is an Err of 'BufferValidationErrors', not a
 response; an orphan under a write-protected occurrence is
 drawn with '(view noWarrant)' and one under a tombstone is
 not, existing behavior that no buffer correction reports.
+
+** Slice 3
+*** The commits
+**** b7df8b39
+The restriction's two questions: 'record_is_visible' and
+'node_is_restricted' of 'SkgrepoRestriction'; the eight names
+go, and the five inline spellings of slice 1 and the others
+the sweep found call the two.
+**** The last commit
+The buffer correction policy as an enum ('ReportAll',
+'AfterSave', 'AfterRestrictionChange', 'Unread'), its callers,
+the tests, the docs, the problems entry, this record and the
+plan's keyword.
+*** The suites
+**** cargo check --all-targets
+Clean, no warning, at each commit (the first checked alone in a
+temporary worktree).
+**** bash/nextest.sh
+1013 run, 1013 passed (1007 before the slice; seven tests
+added and one removed: the weave's unit test of the record
+question, which became a test of the method in
+'tests/dbs/in_rust_graph/relation_accessors.rs').
+**** bash/integration-tests.sh
+34 of 35 passed. The failure is 'import-md-and-org', which is
+pre-existing and not this plan's.
+**** bash/emacs-tests.sh and bash/nvim-tests.sh
+Not run: the slice touches no client and no message a client
+test asserts.
+**** Failures met during the slice
+The fixpoint sweeps ran first after each change to the policy
+and the tail, and stayed green.
+***** six refresh tests, after the first version of the tail
+Classified as a contradiction in the plan, not a fixture
+adaptation: with the tail dropping every buffer correction of a
+headline it pruned, six existing tests failed, each asserting
+such a buffer correction under the policy that reports
+everything: 'an_unsayable_property_member_is_entombstoned',
+'an_emptied_folder_is_not_reported', 'a_change_viewnode_in_a_
+content_view_is_entombstoned', 'an_occurrence_no_node_answers_
+to_and_no_list_names_becomes_a_tombstone', 'an_edit_request_on_
+what_becomes_a_tombstone_is_dropped_and_reported' and 'a_root_
+whose_node_vanished_is_pruned_and_the_buffer_may_end_empty'.
+The plan also says that everything the existing tests assert
+still holds; the deviation below resolves it, and the six pass
+unchanged.
+***** the integrate request's new test, at first
+New, and fixed: the second refresh, run under 'ReportAll' as the
+plan says, reported "Drew what the graph says belongs here" for
+the content of the root it had just appended. See the
+deviation below.
+**** Checks by mutation
+Each new test fails when its fix is undone: the nodeMerge test
+with the merged gnids ignored (it then gets three "Drew" and one
+"Merged duplicate viewnode siblings", the review's four); the
+narrowing test with 'noClaim' marking reported after a switch;
+the restricted-headline test with the tail's drop off; the
+integrate test with its first refresh under 'ReportAll', and
+again with the appended roots' filter off.
+**** The TCP surface
+Probe (i), the nodeMerge, ran on a scratch server ('verify'
+skill; copy and output in 'tests/results/08/slice3/probes/'):
+the merge's save reports no buffer correction (it reported
+four); the saves back after the merge and after each switch are
+byte-identical and report none, as before.
+*** Deviations from the plan's "how"
+**** the tail drops what it pruned only after a save or a switch
+The plan says the tail drops any buffer correction whose
+headline it pruned, and that the existing tests still hold; six
+of them assert such buffer corrections under 'ReportAll' (above),
+among them a dropped edit request and a root whose node
+vanished, which the user would otherwise never learn of. The
+predicate 'reports_what_the_tail_pruned' answers no under
+'AfterSave', 'AfterRestrictionChange' and 'Unread', and yes
+under 'ReportAll', where such a buffer correction keeps the vnid
+the headline held. The case of the problems entry (a restricted
+headline a save's removal of its record entombstones and the
+tail prunes) is a save's rerender, so it reports nothing.
+**** the integrate request's appended roots are a first rendering
+The second refresh reports under the request's policy, but the
+buffer corrections of headlines under the roots it appended are
+dropped ('outside_the_appended_roots' in 'server/diff_view/
+refresh.rs'): the stub roots are drawn as a first rendering
+draws them, which reports their content as reinstated, and that
+is what the user asked for. The first refresh's are visible
+only when no root is appended; when one is, the first's are
+discarded as before. No server-drawn buffer was found whose
+second refresh reports anything, so the test asserts that
+neither refresh reports the request's own drawing.
+**** a narrowing silences every marking of 'noClaim'
+'AfterRestrictionChange' silences the marking of 'noClaim'
+whatever the reason, not only for a member whose record alone
+is restricted: every open view is up to date before a switch,
+so any marking is the narrowing's doing, as the policy already
+says of reinstatements and entombstonings.
+**** what the merged gnids silence
+'reports_reinstatement' takes the gnid of the node whose list
+the parent shows (an occurrence's own, or that of the node a
+folder describes), and 'reports_viewnode_merge' the gnid of the
+merged siblings; both are quiet when it is an acquirer or an
+acquiree of the save's nodeMerge requests. The save reads them
+from 'SavePlan::nodeMerge_instructions'; 'update_views_after_
+save' takes the policy instead of the deleted gnids.
+**** 'Unread' is read at the end
+Every predicate answers no under 'Unread', and the refresh
+returns no buffer correction under it ('is_read'). The chain
+builder's own walk ('attach_containerward_chains_under_members')
+uses it too, its buffer corrections going nowhere.
+**** where the two methods live and what they take
+'SkgrepoRestriction' is defined in 'server/skgrepo_sets.rs', not
+'server/types/misc.rs', so the methods are there. Each takes
+'impl Into<Option<&SkgrepoRestriction>>', so that a caller
+holding the restriction bare or as an Option passes it as it
+is; no restriction and 'all' answer visible and unrestricted.
+**** what stays beside the two
+'gnid_presence_gated' and 'GnidPresence' stay as the graph's
+lookup of a gnid, asking 'node_is_restricted' of its home. The
+stats' 'pid_skgrepo_is_unrestricted' became 'node_is_shown', a
+call of that lookup. 'relation_membership_is_visible' went:
+'relation_membership_is_real' asks the full composition, and
+the viewnode stats ask 'relationship_is_visible', which adds the
+record question through 'RelRepoLookup'. The opening of a
+single-root view still refuses, under a restriction other than
+'all', a gnid the graph has no node for, as
+'restriction_keeps_out' did.
+**** the sweep reached past the plan's list
+Besides the eight names and the five spellings of slice 1, the
+gated accessors' filters, the ancestor flags of the viewnode
+stats, the override resolution, the link statuses, the titles
+by gnids and the save's suppression of writes to restricted
+nodes ('validate.rs') call the two. Left as they are, since they
+ask neither question: the search's filters by a document's
+skgrepo (a home, or an alias's relRepo), the file-path request's
+skgrepo, the fork's clone skgrepo, the save's choice of an owned
+skgrepo, its refusal to delete a node with restricted sections,
+and the tests of 'is_all' that ask whether there is any
+restriction at all (the search challenge, the overPrivateText
+release, the save's normalization of 'all' to none, the titles'
+shortcut).
+**** tests beside their neighbours
+The narrowing test and the restricted headline's test are in
+'tests/hidden_nodes.rs', and the integrate test in
+'tests/pruned_change_view/recomputed_sets.rs', where the
+restriction's and the diff view's harnesses live; the nodeMerge
+test is in 'tests/corrections_channel.rs' and the 'Unread' test
+in 'tests/refresh/buffer_corrections.rs'.
+**** docs now, not in slice 9
+The glossary's "record" entry defines a restricted node and
+cites the two methods; its "buffer corrections" entry states the
+four cases and marks "Unread" as this plan's coinage;
+'docs/data-model_technical.org', 'docs/api-and-formats.org',
+'docs/diff-view.org' and both COMMANDS files say what is no
+buffer correction now.
+*** Fixtures changed
+No fixture data changed. Tests that passed the default policy
+name 'ReportAll'; the deletion test builds 'after_a_save' with
+no merged gnids; 'tests/leak_battery.rs' asserts the lowered
+relationship through the gated accessor;
+'tests/unit/export_org.rs' imports 'RelPartner' itself. New:
+'a_saves_own_nodeMerge_is_no_buffer_correction',
+'a_narrowing_marks_noClaim_quietly_a_member_whose_record_alone_
+is_restricted', 'a_restricted_headline_whose_record_a_save_
+removed_goes_quietly', 'an_unread_refresh_corrects_as_always_
+and_reports_nothing', 'the_command_reports_its_second_refresh_
+and_not_its_first', and two of the methods
+('a_record_is_visible_when_the_restriction_holds_its_relRepo',
+'an_unnamed_relRepo_under_all_answers_alike_on_both_sides').
+*** Left unfinished
+Nothing of slice 3.
+*** Headline
+DONE.

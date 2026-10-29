@@ -9,7 +9,8 @@
 //   with the view of 'five'; the saved view reports nothing.
 //
 // - a save that deletes a node reports no buffer correction for it,
-//   in any view.
+//   in any view;
+// - a save's nodeMerge reports no buffer correction, in any view.
 //
 // Fixture: one contains two and three; two contains four; five
 // contains two.
@@ -113,6 +114,48 @@ fn a_saves_own_deletion_is_no_buffer_correction
         . collect ();
       assert! ( entombstoned . is_empty (),
                 "the save's own deletion is no buffer correction: {:?}",
+                response . buffer_corrections );
+      Ok (( )) } )) }
+
+/// A save's nodeMerge reports nothing: in the view of one, three
+/// acquires two. There two's occurrence becomes three's and merges with
+/// it, and what three gained is drawn under it; in the view of five,
+/// whose two is now three, and in the view of two, whose root is now
+/// three, what three gained is drawn too. All of it is the user's own
+/// request ('BufferCorrectionPolicy::AfterSave').
+#[test]
+fn a_saves_own_nodeMerge_is_no_buffer_correction
+  () -> Result<(), Box<dyn Error>> {
+  run_with_test_stores (
+    "skg-test-corrections-channel-nodeMerge",
+    "tests/corrections_channel/fixtures",
+    "/tmp/tantivy-test-corrections-channel-nodeMerge",
+    |config, tantivy| Box::pin ( async move {
+      let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
+      let mut views_state : ViewsState = ViewsState {
+        open_views     : OpenViews::new (),
+        graph_straddle : None, };
+      let view_of_one : ViewforestId = ViewforestId::ContentView ("view of one" . into ());
+      let one : String = open_view (
+        "one", &view_of_one, config, tantivy, &graph, &mut views_state ) ?;
+      open_view ( "five", &ViewforestId::ContentView ("view of five" . into ()),
+                  config, tantivy, &graph, &mut views_state ) ?;
+      open_view ( "two", &ViewforestId::ContentView ("view of two" . into ()),
+                  config, tantivy, &graph, &mut views_state ) ?;
+      let merging : String =
+        one . replacen ( "(gnid three)", "(gnid three) (editRequest (merge two))", 1 );
+      assert_ne! ( merging, one );
+      let response : SaveResponse = save (
+        &merging, &view_of_one, config, tantivy, &graph,
+        &mut views_state ) . await ?;
+      assert! ( response . errors . is_empty (), "{:?}", response . errors );
+      assert_eq! ( graph . load_full () . pid_of (&ID::from ("two")),
+                   Some ( ID::from ("three") ),
+                   "three acquired two" );
+      assert! ( response . saved_view . contains ("MERGED: two"),
+                "what three gained is drawn:\n{}", response . saved_view );
+      assert! ( response . buffer_corrections . is_empty (),
+                "the save's own nodeMerge is no buffer correction: {:?}",
                 response . buffer_corrections );
       Ok (( )) } )) }
 

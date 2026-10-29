@@ -207,8 +207,8 @@ pub struct RenderedDiffViewBuffer {
 /// The buffer of kind 'diffView_buffer_kind' over 'straddle', with
 /// roots 'roots' (for a pruned change view, its D in order), and
 /// readiness from 'store': the refresh of a stub of its roots
-/// ('stub_viewforest_of_roots'). A first rendering reports no
-/// buffer correction.
+/// ('stub_viewforest_of_roots'). A first rendering's buffer
+/// corrections go unread ('BufferCorrectionPolicy::Unread').
 pub fn diffView_buffer_viewforest (
   runtime              : &RuntimeGeneration,
   straddle             : &GraphStraddle,
@@ -220,7 +220,7 @@ pub fn diffView_buffer_viewforest (
     stub_viewforest_of_roots (runtime, straddle, diffView_buffer_kind, roots) ?;
   let refreshed : Refreshed = refresh_diffView_viewforest (
     runtime, straddle, diffView_buffer_kind, store, None,
-    &BufferCorrectionPolicy::default (), &mut viewforest,
+    &BufferCorrectionPolicy::Unread, &mut viewforest,
     // A new buffer's first viewnode IDs; 'register_view' reads the record
     // back from the forest.
     &mut ViewnodeIdRecord::default () ) ?;

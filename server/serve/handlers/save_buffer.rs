@@ -10,7 +10,7 @@ use crate::from_text::strandeds::{
   raised_relationship_warning, reset_to_default_relationships,
   stranded_relationships};
 use crate::git_ops::diff::compute_diff_for_skgrepo;
-use crate::refresh::buffer_corrections::{ViewBufferCorrections, corrections_entry_sexp};
+use crate::refresh::buffer_corrections::{BufferCorrectionPolicy, ViewBufferCorrections, corrections_entry_sexp};
 use crate::save::{
   apply_delete_propagation_cleanup,
   PreparedSave, prepare_save_under_mutation_gate,
@@ -979,7 +979,12 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
         skgrepo_restriction,
         text_approved_pids,
         &fork_specs,
-        affected_gnids . deleted . clone () ) ?;
+        BufferCorrectionPolicy::after_a_save (
+          affected_gnids . deleted . clone (),
+          nodeMerges . iter ()
+          . flat_map ( |nodeMerge| [ nodeMerge . acquirer_gnid () . clone (),
+                                     nodeMerge . acquiree_gnid () . clone () ] )
+          . collect () )) ?;
     { // Nonfatal parse warnings (e.g. discarded folder headline text)
       // precede the rerender's warnings.
       let mut warnings : Vec<String> = parse_warnings;

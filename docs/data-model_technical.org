@@ -415,12 +415,20 @@ by viewnode ID and title. What the refresh draws as extent is no buffer correcti
 of an occurrence it extends first, the members of a folder it added,
 a fresh view's content; nor, in the diff view, a change viewnode
 drawn or gone, since those describe the straddle. Nor is a change
-the buffer was not wrong about, which the caller names
-(=BufferCorrectionPolicy=): a tombstone left where the saving user's
-own save deleted the node, and, after a change of the skgrepo
-restriction, a member drawn, a headline entombstoned, or a headline
-re-kinded to a Restricted vognode or back. So a fresh
-view and a plain save report nothing. The callers tag each view's buffer corrections
+the buffer was not wrong about, which the caller names by the
+situation it calls the refresh in (=BufferCorrectionPolicy=): after a
+save (=AfterSave=), a tombstone left where the save deleted the node,
+the viewnode merge of the occurrences of the nodes its nodeMerge
+requests touched and the members drawn under them, and whatever the
+tail pruned; after a change of the skgrepo restriction
+(=AfterRestrictionChange=), a member drawn, a headline entombstoned
+or marked =noClaim=, or a headline re-kinded to a Restricted vognode
+or back. A first drawing (=Unread=: a fresh content view, a buffer
+of the diff view, the search buffer, the first refresh of the
+"integrate unshown changes" request) is corrected as always and
+reports nothing; every other refresh (=ReportAll=) reports every
+buffer correction. So a fresh view and a plain save report
+nothing. The callers tag each view's buffer corrections
 with its view ID (=ViewBufferCorrections=), the =save-result= and
 =rerender-done= responses carry them, and both clients append them to
 their warnings buffer, under one headline per view

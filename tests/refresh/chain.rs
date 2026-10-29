@@ -51,7 +51,7 @@ node m
   let config : SkgConfig = config ();
   let truth : Truth = Truth { graph : &graph, config : &config,
                               restriction : Some (&restriction) };
-  let policy : BufferCorrectionPolicy = BufferCorrectionPolicy::default ();
+  let policy : BufferCorrectionPolicy = BufferCorrectionPolicy::ReportAll;
   let walk : Walk = Walk::new (&truth, RefreshMode::ContentView, 0, &policy);
   let mut chain_nodes : usize = 0;
   for node in run . forest . nodes () . filter ( |node| stands_in_containerward_chain (*node) ) {
@@ -85,7 +85,7 @@ fn a_chain_under_an_editable_occurrence_claims_nothing () {
   let config : SkgConfig = config ();
   let truth : Truth = Truth { graph : &graph, config : &config,
                               restriction : Some (&restriction) };
-  let policy : BufferCorrectionPolicy = BufferCorrectionPolicy::default ();
+  let policy : BufferCorrectionPolicy = BufferCorrectionPolicy::ReportAll;
   let walk : Walk = Walk::new (&truth, RefreshMode::ContentView, 0, &policy);
   let m : NodeId = forest . roots () . next () . unwrap () . id ();
   attach_containerward_chain ( forest . as_internal_tree_mut (), m, &walk ) . unwrap ();
