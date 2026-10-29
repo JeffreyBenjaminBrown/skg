@@ -117,8 +117,8 @@ fn collect_instructions(
 /// PURPOSE:
 /// Find the change leaves that two headlines of a buffer the user
 /// asked to save name with contradictory readiness requests, one
-/// '(ready ...)' and one '(unready ...)'. Each is returned described
-/// ('NamedLeafSet::describe'), with the headlines that name it, in
+/// '(ready ...)' and one '(unready ...)'. Each is returned as the set
+/// both name ('NamedLeafSet'), with the headlines that name it, in
 /// buffer order. Requests that agree contradict nothing.
 /// .
 /// STRATEGY:
@@ -131,16 +131,16 @@ fn collect_instructions(
 pub fn find_contradictory_readiness_requests (
   viewforest : &ViewForest,
   graph      : &InRustGraph,
-) -> Vec<(String, Vec<HeadlineName>)> {
+) -> Vec<(NamedLeafSet, Vec<HeadlineName>)> {
   let requests : Vec<RequestedReadiness> =
     readiness_requests_in_viewforest (viewforest, graph);
   let mut contradictions : Vec<(NamedLeafSet, Vec<HeadlineName>)> = Vec::new ();
   for (position, ready) in requests . iter () . enumerate () {
     for unready in &requests [position + 1 ..] {
       if ready . ready == unready . ready { continue; }
-      for ready_set in ready . named . leaf_sets () {
-        for unready_set in unready . named . leaf_sets () {
-          let Some (shared) = ready_set . overlap (&unready_set)
+      for ready_set in &ready . named {
+        for unready_set in &unready . named {
+          let Some (shared) = ready_set . overlap (unready_set)
             else { continue; };
           let headlines : &mut Vec<HeadlineName> =
             match contradictions . iter () . position ( |(set, _)| *set == shared ) {
@@ -154,5 +154,5 @@ pub fn find_contradictory_readiness_requests (
     . map ( |(set, mut headlines)| {
       headlines . sort_by_key ( |headline| requests . iter ()
         . position ( |request| request . headline == *headline ) );
-      ( set . describe (), headlines ) } )
+      ( set, headlines ) } )
     . collect () }

@@ -14,6 +14,8 @@ use skg::dbs::in_rust_graph::InRustGraph;
 use skg::types::errors::HeadlineName;
 use skg::types::misc::{SkgConfig, Skgrepo, SkgrepoName};
 use skg::types::viewnode::ViewnodeId;
+use skg::diff_view::change_leaves::{LeafKey, NodeAspect};
+use skg::diff_view::readiness_requests::NamedLeafSet;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use skg::test_utils::run_with_test_stores;
@@ -127,7 +129,7 @@ fn readiness_contradictions_in (
     &viewforest, &InRustGraph::from_graphnodes (&[]) )
     . into_iter ()
     . map ( |(leaf, headlines)| (
-      leaf,
+      leaf . describe (),
       headlines . iter ()
         . map ( |headline : &HeadlineName|
                 headline . viewnode_id . as_ref () . unwrap () . 0 . clone () )
@@ -187,6 +189,12 @@ fn validation_refuses_contradictory_readiness_requests () -> Result<(), Box<dyn 
     . filter ( |e| matches! ( e, BufferValidationError::ContradictoryReadinessRequests (..) ))
     . collect ();
   assert_eq! ( refusals . len (), 1, "errors: {:?}", errors );
+  assert! ( matches! (
+              refusals [0],
+              BufferValidationError::ContradictoryReadinessRequests (
+                NamedLeafSet::Leaf ( LeafKey::Node { pid, aspect : NodeAspect::Existence } ), _ )
+              if *pid == ID::from ("x") ),
+            "the refusal keeps the set it found contradictory: {:?}", refusals [0] );
   assert_eq! ( refusals [0] . named_headlines () . iter ()
                . map ( |headline| headline . viewnode_id . clone () )
                . collect::<Vec<Option<ViewnodeId>>> (),
