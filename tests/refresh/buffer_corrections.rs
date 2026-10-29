@@ -130,6 +130,10 @@ node p
   containerFolder
     node q wp noClaim
   node b
+    subscribeeFolder
+      node a wp
+        node p wp noClaim
+          node q wp noClaim
     node s" );
   let reinstated : Vec<&str> =
     run . buffer_corrections . iter ()
@@ -138,8 +142,8 @@ node p
     . collect ();
   assert_eq! ( reinstated, vec! [ "b", "q" ],
                "b was missing from p's content, q from its containers \
-                folder; b's own content is drawn as b is first \
-                extended" ); }
+                folder; b's own content, and its default subscribee \
+                folder, are drawn as b is first extended" ); }
 
 /// Under a policy naming x as deleted by the save, x's tombstone is no
 /// buffer correction, nor is its folder, which the tombstone makes

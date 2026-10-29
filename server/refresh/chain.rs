@@ -22,6 +22,7 @@ use crate::dbs::in_rust_graph::containerward_role_tree::{
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::refresh::{Truth, Walk};
 use crate::refresh::buffer_corrections::BufferCorrectionPolicy;
+use crate::refresh::extent::DrawnEditability;
 use crate::refresh::goal::{Goal, GoalItem, GoalMember, chain_goal};
 use crate::refresh::id_rule::{
   EditabilityAndClaim, IdRuleAnswer, ghost_from_head, id_rule, occurrence_from_truth};
@@ -138,7 +139,8 @@ fn prepend_containerward_chain_node (
     match id_rule (container, Some (goal), false, walk) {
       IdRuleAnswer::Occurrence (pid) => {
         let occurrence : Occurrence = occurrence_from_truth (
-          &pid, EditabilityAndClaim { editable : false, claims : false }, walk ) ?;
+          &pid, EditabilityAndClaim {
+            editability : DrawnEditability::WriteProtected, claims : false }, walk ) ?;
         ( Vognode::Occurrence ( Occurrence {
             viewStats : ViewnodeStats { warrant : item . warrant,
                                         .. ViewnodeStats::default () },

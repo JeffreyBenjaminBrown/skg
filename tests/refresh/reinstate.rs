@@ -53,8 +53,8 @@ node p
   node a
     node a1 wp
   node b wp",
-    "p and a spend the budget; b, drawn editable while it lasted, is \
-     write-protected at its visit and draws nothing" ); }
+    "p and a spend the budget; b, drawn carrying an editable-view \
+     request, stays write-protected at its visit and draws nothing" ); }
 
 #[test]
 fn a_repeat_is_write_protected () {

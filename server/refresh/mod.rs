@@ -48,7 +48,7 @@ use crate::refresh::ancestry::described_node;
 use buffer_corrections::{BufferCorrectionPolicy, BufferCorrection, BufferCorrectionKind, BufferCorrectionLog};
 
 use ego_tree::{NodeId, NodeRef, Tree};
-use std::collections::{HashSet, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::error::Error;
 
 /// The truth: the gated in-Rust graph, the worktree's graph as the
@@ -103,7 +103,7 @@ pub fn refresh_viewforest (
                     "the input holds two editable occurrences of one gnid" );
     fulfill_editableView_requests (tree, &mut walk);
     keep_the_first_editable_occurrence_of_each_node (tree, &mut walk);
-    walk . editable_gnids = editable_gnids_in (tree);
+    walk . editable_occurrence_of = editable_occurrences_in (tree);
     walk_in_level_order (tree, &mut walk) ?; }
   tail::finish (viewforest, viewnode_id_record, walk) }
 
@@ -111,17 +111,14 @@ pub fn refresh_viewforest (
 pub(crate) struct Walk<'a> {
   pub truth          : &'a Truth<'a>,
   pub mode           : RefreshMode<'a>,
-  /// How many more editable occurrences may have their content drawn.
+  /// How many more editable occurrences may have their content drawn
+  /// ('extent.rs').
   pub node_budget    : usize,
-  /// The gnids that have an editable occurrence: at most one each.
-  pub editable_gnids : HashSet<ID>,
-  /// The occurrences this refresh drew editable. At its visit, one
-  /// that the spent budget allows no content becomes write-protected.
-  pub drawn_editable : HashSet<NodeId>,
-  /// The occurrences that carried an editable-view request, or to
-  /// which one passed ('extend_requested_content'): in the diff view
-  /// only their extension may be charged to the budget.
-  pub had_editableView_request : HashSet<NodeId>,
+  /// Where each gnid's one editable occurrence stands. Which
+  /// occurrences this refresh extends first the tree itself says: each
+  /// carries an editable-view request through its own visit
+  /// ('consume_editableView_request').
+  pub editable_occurrence_of : HashMap<ID, NodeId>,
   /// The compound folders this refresh added. Their members are drawn
   /// folded: in the clients' encoding a folder's collapse lives on its
   /// members, since 'folded' on a headline hides it in its parent.
@@ -146,9 +143,7 @@ impl<'a> Walk<'a> {
     buffer_correction_policy : &'a BufferCorrectionPolicy,
   ) -> Walk<'a> {
     Walk { truth, mode, node_budget, buffer_correction_policy,
-           editable_gnids           : HashSet::new (),
-           drawn_editable           : HashSet::new (),
-           had_editableView_request : HashSet::new (),
+           editable_occurrence_of   : HashMap::new (),
            added_compound_folders   : HashSet::new (),
            added_folders            : HashSet::new (),
            buffer_corrections       : BufferCorrectionLog::default (),
@@ -159,32 +154,46 @@ impl<'a> Walk<'a> {
   ) -> bool {
     matches! ( self . mode, RefreshMode::DiffView { .. } ) }
 
-  /// Let an occurrence of 'gnid' hold the gnid's one editability,
-  /// unless another already does ('editable_gnids'). Whether it may.
+  /// Let the occurrence of 'gnid' at 'treeid' hold the gnid's one
+  /// editability, unless another occurrence already does. Whether it
+  /// may.
   pub fn hold_editability (
     &mut self,
-    gnid : &ID,
+    gnid   : &ID,
+    treeid : NodeId,
   ) -> bool {
-    self . editable_gnids . insert ( gnid . clone () ) }
+    *self . editable_occurrence_of . entry ( gnid . clone () )
+      . or_insert (treeid) == treeid }
 
-  /// No occurrence of 'gnid' holds its editability now.
+  /// The occurrence of 'gnid' at 'treeid' holds the gnid's
+  /// editability no more, if it held it.
   pub fn release_editability (
     &mut self,
-    gnid : &ID,
+    gnid   : &ID,
+    treeid : NodeId,
   ) {
-    self . editable_gnids . remove (gnid); }
+    if self . editable_occurrence_of . get (gnid) == Some (&treeid) {
+      self . editable_occurrence_of . remove (gnid); }}
+
+  /// Whether some occurrence of 'gnid' holds its editability.
+  pub fn editability_is_held (
+    &self,
+    gnid : &ID,
+  ) -> bool {
+    self . editable_occurrence_of . contains_key (gnid) }
 
   /// Whether this refresh draws what stands under 'parent' for the
   /// first time: the content of an occurrence it extends first (one
-  /// it drew editable, or one an editable-view request extends, the
-  /// roots of a fresh view's stub among them) and the members of a
-  /// folder it added. Drawing those is extent, not buffer correction.
+  /// carrying an editable-view request through its visit: one it drew,
+  /// one to which a request passed, the roots of a fresh view's stub
+  /// among them) and the members of a folder it added. Drawing those
+  /// is extent, not buffer correction.
   pub fn draws_first_under (
     &self,
+    tree   : &Tree<Viewnode>,
     parent : NodeId,
   ) -> bool {
-    self . drawn_editable . contains (&parent)
-    || self . had_editableView_request . contains (&parent)
+    carries_editableView_request (tree, parent)
     || self . added_folders . contains (&parent) }
 
   /// Report the headline drawn at 'drawn', under 'parent', as
@@ -200,7 +209,7 @@ impl<'a> Walk<'a> {
     parent : NodeId,
     drawn  : NodeId,
   ) {
-    if ! self . draws_first_under (parent)
+    if ! self . draws_first_under (tree, parent)
        && self . buffer_correction_policy . reports_reinstatement (
             gnid_whose_list_is_drawn_under (tree, parent) ) {
       self . buffer_corrections . record (tree, drawn, BufferCorrectionKind::Reinstated); }}
@@ -246,12 +255,38 @@ fn at_most_one_editable_occurrence_per_gnid (
     . filter_map ( |node| node . value () . editable_gnid () )
     . all ( |gnid| seen . insert (gnid) ) }
 
-fn editable_gnids_in (
+/// Where each gnid's editable occurrence stands in 'tree'.
+fn editable_occurrences_in (
   tree : &Tree<Viewnode>,
-) -> HashSet<ID> {
+) -> HashMap<ID, NodeId> {
   tree . root () . descendants ()
-    . filter_map ( |node| node . value () . editable_gnid () . cloned () )
+    . filter_map ( |node| node . value () . editable_gnid ()
+                   . map ( |gnid| ( gnid . clone (), node . id () )) )
     . collect () }
+
+/// Whether the occurrence at 'treeid' carries an editable-view
+/// request. During the walk the request stands for this refresh's
+/// first extension of the occurrence, whoever asked for it: the user,
+/// a request passing on to what it extends, or the drawing of an
+/// occurrence that may be editable. It is consumed at the
+/// occurrence's own visit ('consume_editableView_request') and
+/// dropped when that visit ends.
+pub(crate) fn carries_editableView_request (
+  tree   : &Tree<Viewnode>,
+  treeid : NodeId,
+) -> bool {
+  matches! ( &tree . get (treeid) . unwrap () . value () . kind,
+             ViewnodeKind::Vognode (Vognode::Occurrence (occurrence))
+               if occurrence . view_requests . contains (&ViewRequest::Editable) ) }
+
+/// Give the occurrence at 'treeid' an editable-view request.
+pub(crate) fn add_editableView_request (
+  tree   : &mut Tree<Viewnode>,
+  treeid : NodeId,
+) {
+  if let ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =
+    &mut tree . get_mut (treeid) . unwrap () . value () . kind
+  { occurrence . view_requests . insert (ViewRequest::Editable); }}
 
 /// Two editable occurrences in the input may stand for one node when
 /// a save made one's gnid an extra ID of the other's node (a
@@ -279,12 +314,14 @@ fn keep_the_first_editable_occurrence_of_each_node (
   for repeat in repeats {
     write_protect_occurrence (tree, repeat, walk); }}
 
-/// An editable-view request makes its occurrence the node's editable
-/// one, and any other editable occurrence of the node
+/// An editable-view request in the text makes its occurrence the
+/// node's editable one, and any other editable occurrence of the node
 /// write-protected. Done before the walk, so that an occurrence
-/// write-protected here never draws content first. (The input holds
-/// at most one such request per gnid.) Its content is drawn at its
-/// own visit, as any editable occurrence's is.
+/// write-protected here never draws content first, though it stand
+/// above the requester. (The input holds at most one such request per
+/// gnid.) The request stays on the occurrence, for its own visit to
+/// consume as any other ('consume_editableView_request'): its content
+/// is drawn then, and the request passes on to what it extends.
 fn fulfill_editableView_requests (
   tree : &mut Tree<Viewnode>,
   walk : &mut Walk,
@@ -308,15 +345,14 @@ fn fulfill_editableView_requests (
       write_protect_occurrence (tree, other, walk); }
     if let ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =
       &mut tree . get_mut (treeid) . unwrap () . value () . kind
-    { occurrence . view_requests . remove (&ViewRequest::Editable);
-      if occurrence . is_writeProtected () {
-        occurrence . editability = Editability::Editable {
-          body : None, edit_request : None }; }}
-    walk . had_editableView_request . insert (treeid); }}
+    { if occurrence . is_writeProtected () {
+        occurrence . editability = Editability::Editable { // the re-kind gives it its body
+          body : None, edit_request : None }; }}}}
 
 /// Make the occurrence at 'treeid' write-protected, dropping (and
 /// reporting) the node edit request its new state has no slot for,
-/// and forgetting its gnid's editable occurrence.
+/// and its editable-view request, and forgetting its gnid's editable
+/// occurrence.
 pub(crate) fn write_protect_occurrence (
   tree   : &mut Tree<Viewnode>,
   treeid : NodeId,
@@ -329,13 +365,15 @@ pub(crate) fn write_protect_occurrence (
         let dropped : bool = occurrence . edit_request () . is_some ();
         occurrence . write_protect ();
         ( Some ( occurrence . gnid . clone () ), dropped ) },
+      ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) => {
+        occurrence . write_protect (); // drops a request that would make it editable
+        (None, false) },
       _ => (None, false), };
   if dropped {
     walk . buffer_corrections . record (
       tree, treeid, BufferCorrectionKind::EditRequestDropped ); }
   if let Some (gnid) = gnid {
-    walk . release_editability (&gnid);
-    walk . drawn_editable . remove (&treeid); }}
+    walk . release_editability (&gnid, treeid); }}
 
 #[cfg(test)]
 #[allow(non_snake_case)]

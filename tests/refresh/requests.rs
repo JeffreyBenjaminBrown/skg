@@ -88,6 +88,80 @@ node p
     node c1 wp
   node d wp" ); }
 
+/// Two siblings stand for c, the second asking to be c's editable
+/// occurrence. The viewnode merge keeps the first, which takes the
+/// second's editability and its request: c's content is drawn as c is
+/// first extended, not reported as reinstated.
+#[test]
+fn editableView_on_a_merged_sibling_passes_to_the_result () {
+  let input : String = formatdoc! ("
+    * {} p
+    ** {} c
+    ** {} c
+    ** {} d
+    ", occurrence_metadata ("p", ""),
+       occurrence_metadata ("c", "writeProtected"),
+       occurrence_metadata ("c", "writeProtected (viewRequests editableView)"),
+       occurrence_metadata ("d", "") );
+  let run : Run = run_asserting_fixpoint (&input, &family ());
+  assert_eq! ( run . outline (), "\
+node p
+  node c
+    node c1
+  node d" );
+  assert_eq! ( run . buffer_correction_kinds (),
+               vec! [ BufferCorrectionKind::SiblingsMerged ] ); }
+
+/// An occurrence the buffer already shows editable charges the budget
+/// when its content is drawn, though the budget never write-protects
+/// it: here p and c spend it, so d, drawn at p's visit, stays
+/// write-protected at its own.
+#[test]
+fn an_occurrence_shown_editable_charges_the_budget () {
+  let input : String = formatdoc! ("
+    * {} p
+    ** {} c
+    *** {} c1
+    ", occurrence_metadata ("p", ""), occurrence_metadata ("c", ""),
+       occurrence_metadata ("c1", "") );
+  assert_eq! ( run_asserting_fixpoint_in ( &input, &family (), None, RefreshMode::ContentView, 2 )
+               . outline (), "\
+node p
+  node c
+    node c1
+  node d wp" ); }
+
+/// In the diff view every extension charges the budget, a node of U's
+/// too, though the budget never refuses a node of U. p, whose body
+/// changed, is U; a request on it passes to a and b, outside U. With
+/// a budget of 2, p's extension leaves one for a; with 1, none.
+#[test]
+fn in_the_diff_view_a_node_of_u_charges_the_budget () {
+  let straddle : GraphStraddle = straddle (
+    &[ Graphnode { contains : ids (&["a", "b"]), body : Some ("old" . to_string ()),
+                   .. node ("p") },
+       node ("a"), node ("b") ],
+    &[ Graphnode { contains : ids (&["a", "b"]), body : Some ("new" . to_string ()),
+                   .. node ("p") },
+       node ("a"), node ("b") ] );
+  let input : String = format! (
+    "* {} p\n", occurrence_metadata ("p", "(viewRequests editableView)") );
+  let readiness_store : ReadinessStore = ReadinessStore::default ();
+  let mode : RefreshMode = RefreshMode::DiffView {
+    straddle : &straddle, buffer_kind : DiffViewBufferKind::AllChanges,
+    readiness_store : &readiness_store };
+  let editable_members = |budget : usize| -> Vec<bool> {
+    let run : Run = run_asserting_fixpoint_in (
+      &input, &straddle . after, None, mode, budget );
+    run . forest . roots () . next () . unwrap () . children ()
+      . filter_map ( |child| match &child . value () . kind {
+        ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =>
+          Some ( ! occurrence . is_writeProtected () ),
+        _ => None, } )
+      . collect () };
+  assert_eq! ( editable_members (2), vec! [ true, false ] );
+  assert_eq! ( editable_members (1), vec! [ false, false ] ); }
+
 #[test]
 fn writeProtectedView_write_protects_the_occurrence_alone () {
   let input : String = formatdoc! ("

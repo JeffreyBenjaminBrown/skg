@@ -21,10 +21,13 @@
 //!  7. substitution: in a content view an overridden node is shown as
 //!     its overrider;
 //!  8. requests: each child's view requests are fulfilled and dropped.
-//! Before them, the budget is settled for P ('extent.rs'), an
-//! editable-view request on P extends the content P already shows
-//! ('extend_requested_content'), and P's default folders are added
-//! ('add_default_folders'); then P's goal is computed. Between 5
+//! Before them, an editable-view request on P is consumed, making P
+//! editable if the budget allows, and P charges the budget
+//! ('consume_editableView_request' in 'extent.rs'); the request
+//! passes on to the content P already shows
+//! ('extend_requested_content'); and P's default folders are added
+//! ('add_default_folders'); then P's goal is computed. The request
+//! goes when the visit ends. Between 5
 //! and 6 the diff view draws its change viewnodes and tags the
 //! children with their changes ('diff_view.rs'); after 6, in a
 //! subscribee folder, the folder of what the subscriber hides outside
@@ -36,7 +39,8 @@ use crate::dbs::in_rust_graph::override_resolution::{
   carrier_on_owned_chain, resolve_override};
 use crate::refresh::buffer_corrections::BufferCorrectionKind;
 use crate::refresh::extent::{
-  Extent, drawn_occurrence_is_editable, extent_of_parent, settle_budget_at_visit};
+  DrawnEditability, Extent, consume_editableView_request, drawn_occurrence_editability,
+  drop_editableView_request, extent_of_parent};
 use crate::refresh::goal::{
   Goal, GoalItem, GoalMember, goal_of_parent, hidden_in_subscribee,
   hidden_outside_of_subscribees, member_of_child,
@@ -46,7 +50,8 @@ use crate::refresh::id_rule::{
   EditabilityAndClaim, IdRuleAnswer, entombstone, entombstone_gone_change,
   ghost_from_head, id_rule, occurrence_from_truth, point_occurrence_at,
   rekind_vognode};
-use crate::refresh::{Walk, write_protect_occurrence};
+use crate::refresh::{
+  Walk, add_editableView_request, carries_editableView_request, write_protect_occurrence};
 use crate::refresh::ancestry::{described_node, is_unsayable, parent_reads_claims};
 use crate::refresh::mode::RefreshMode;
 use crate::types::nodes::rust::GraphnodeInRust;
@@ -55,7 +60,7 @@ use crate::refresh::chain::attach_containerward_chain;
 use crate::types::misc::ID;
 use crate::types::tree::moves::{move_after, move_to_first_child, move_to_last_child};
 use crate::types::viewnode::{
-  Editability, FoldAndFocus, Folder, FolderRelation, Ghost, GnidOnlyVognode, PropertyMember,
+  FoldAndFocus, Folder, FolderRelation, Ghost, GnidOnlyVognode, PropertyMember,
   Occurrence,
   ViewRequest, Viewnode, ViewnodeKind, ViewnodeStats, Vognode, Warrant, viewnode_of};
 
@@ -70,7 +75,7 @@ pub(crate) fn visit_parent (
   parent : NodeId,
   walk   : &mut Walk,
 ) -> Result<(), Box<dyn Error>> {
-  settle_budget_at_visit (tree, parent, walk);
+  consume_editableView_request (tree, parent, walk);
   extend_requested_content (tree, parent, walk);
   add_default_folders (tree, parent, walk);
   let goal : Option<Goal> = goal_of_parent (tree, parent, walk);
@@ -90,19 +95,21 @@ pub(crate) fn visit_parent (
   substitute_overriders (tree, parent, goal . as_ref (), walk) ?;
   fulfill_view_requests (tree, parent, walk) ?;
   entombstone_if_an_empty_folder (tree, parent);
+  drop_editableView_request (tree, parent);
   Ok (( )) }
 
 /// An editable-view request extends its occurrence's content, the
 /// content it shows included: each write-protected child that claims
-/// membership becomes editable as a drawn occurrence would (its node
-/// has no editable occurrence, and the budget allows), and extends its
-/// own content in turn, as if it carried the request.
+/// membership, and that a drawn occurrence's rule would let be
+/// editable ('drawn_occurrence_editability'), gets the request too,
+/// which its own visit consumes, and which extends its content in
+/// turn.
 fn extend_requested_content (
   tree   : &mut Tree<Viewnode>,
   parent : NodeId,
   walk   : &mut Walk,
 ) {
-  if ! walk . had_editableView_request . contains (&parent)
+  if ! carries_editableView_request (tree, parent)
      || tree . get (parent) . unwrap () . value () . editable_gnid () . is_none ()
   { return; }
   for child in children_of (tree, parent) {
@@ -111,18 +118,14 @@ fn extend_requested_content (
         if occurrence . is_writeProtected () && occurrence . claimsMembership =>
         occurrence . gnid . clone (),
       _ => continue, };
-    if ! drawn_occurrence_is_editable (tree, parent, &gnid, walk) { continue; }
-    if let ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =
-      &mut tree . get_mut (child) . unwrap () . value () . kind
-    { occurrence . editability = Editability::Editable { // the re-kind gives it its body
-        body : None, edit_request : None }; }
-    walk . hold_editability (&gnid);
-    walk . drawn_editable . insert (child);
-    walk . had_editableView_request . insert (child); }}
+    if drawn_occurrence_editability (tree, parent, &gnid, walk)
+       != DrawnEditability::WriteProtected {
+      add_editableView_request (tree, child); }}}
 
 /// The folders a content view shows without being asked, as it
 /// always has: an occurrence that an editable-view request extends
-/// (a fresh view's roots among them) shows its subscribee folder when
+/// (a fresh view's roots, and every occurrence the refresh draws
+/// editable, among them) shows its subscribee folder when
 /// it subscribes to something the restriction shows (with the folder
 /// of what it hides outside its subscribees, when that holds
 /// anything); and an editable subscribee as such shows the folder of
@@ -137,7 +140,7 @@ fn add_default_folders (
   let Some (pid) : Option<ID> =
     tree . get (parent) . unwrap () . value () . editable_gnid () . cloned ()
     else { return; };
-  if walk . had_editableView_request . contains (&parent)
+  if carries_editableView_request (tree, parent)
      && partnerFolder_members_in_graph (
           walk . truth . graph, &pid, &Folder::Subscribee,
           walk . truth . restriction )
@@ -364,21 +367,16 @@ fn merge_editability (
   let ViewnodeKind::Vognode (Vognode::Occurrence (merged)) : &ViewnodeKind =
     &sibling_viewnode . kind else { return; };
   if merged . is_writeProtected () { return; }
+  walk . release_editability (&merged . gnid, merged_sibling);
   let mut result_mut : NodeMut<Viewnode> = tree . get_mut (result) . unwrap ();
   let ViewnodeKind::Vognode (Vognode::Occurrence (result_occurrence)) : &mut ViewnodeKind =
     &mut result_mut . value () . kind
     else { return; };
-  walk . release_editability (&merged . gnid);
-  let takes_it : bool = result_occurrence . is_writeProtected ()
-    && ! walk . editable_gnids . contains (&result_occurrence . gnid);
-  if takes_it {
+  if result_occurrence . is_writeProtected ()
+     && ! walk . editability_is_held (&result_occurrence . gnid) {
     result_occurrence . editability = merged . editability . clone (); }
   if ! result_occurrence . is_writeProtected () {
-    walk . hold_editability (&result_occurrence . gnid); }
-  if walk . drawn_editable . remove (&merged_sibling) && takes_it {
-    walk . drawn_editable . insert (result); }
-  if walk . had_editableView_request . remove (&merged_sibling) && takes_it {
-    walk . had_editableView_request . insert (result); }}
+    walk . hold_editability (&result_occurrence . gnid, result); }}
 
 //
 // 3. the goal and the warrant
@@ -471,8 +469,8 @@ fn mark_noClaim_unless_warranted (
 /// an order it is appended, and the reorder places it; where it has
 /// none, it follows the last child the goal names (or, when none does,
 /// leads), so that what the user placed after the members stays after
-/// them. A drawn occurrence is editable as
-/// 'drawn_occurrence_is_editable' says; a member of a folder whose
+/// them. A drawn occurrence stands as
+/// 'drawn_occurrence_editability' says; a member of a folder whose
 /// members carry the containerward chain gets its chain.
 fn reinstate (
   tree   : &mut Tree<Viewnode>,
@@ -511,8 +509,8 @@ fn reinstate (
 
 /// Book what a drawn child is: an editable occurrence holds its
 /// node's editability ('Walk::hold_editability'); a folder member
-/// carries its chain. Then
-/// report it, unless drawing it is extent ('Walk::record_drawn').
+/// carries its chain. Then report it, unless drawing it is extent
+/// ('Walk::record_drawn').
 fn after_drawing (
   tree   : &mut Tree<Viewnode>,
   parent : NodeId,
@@ -520,12 +518,7 @@ fn after_drawing (
   walk   : &mut Walk,
 ) -> Result<(), Box<dyn Error>> {
   if let Some (gnid) = tree . get (treeid) . unwrap () . value () . editable_gnid () . cloned () {
-    walk . hold_editability (&gnid);
-    walk . drawn_editable . insert (treeid);
-    if walk . had_editableView_request . contains (&parent) {
-      // The request extends the content it draws, as it extends the
-      // content it shows ('extend_requested_content').
-      walk . had_editableView_request . insert (treeid); }}
+    walk . hold_editability (&gnid, treeid); }
   let carries_chain : bool =
     matches! ( &tree . get (parent) . unwrap () . value () . kind,
                ViewnodeKind::Folder (folder)
@@ -556,17 +549,17 @@ fn draw_item (
   Ok ( match &item . member {
     GoalMember::Gnid (gnid) => match id_rule (gnid, Some (goal), false, walk) {
       IdRuleAnswer::Occurrence (pid) => {
-        let editable : bool =
-          drawn_occurrence_is_editable (tree, parent, &pid, walk);
+        let editability : DrawnEditability =
+          drawn_occurrence_editability (tree, parent, &pid, walk);
         let occurrence : Occurrence =
           occurrence_from_truth (
-            &pid, EditabilityAndClaim { editable, claims }, walk) ?;
+            &pid, EditabilityAndClaim { editability, claims }, walk) ?;
         let mut viewnode : Viewnode = viewnode_of ( ViewnodeKind::Vognode (
           Vognode::Occurrence ( Occurrence {
             viewStats : ViewnodeStats { warrant : item . warrant,
                                         .. ViewnodeStats::default () },
             .. occurrence } )));
-        if editable {
+        if editability != DrawnEditability::WriteProtected {
           diff_view::fold_body_of_drawn_occurrence (&mut viewnode, &pid, walk); }
         Some (viewnode) },
       IdRuleAnswer::Ghost (pid) =>
@@ -776,9 +769,9 @@ fn is_overridden_and_shown_raw (
 /// request write-protects the occurrence (and, for the subtree form,
 /// its content subtree); a folder or flags request adds the folders,
 /// which their own visits fill from their goals. An editable-view
-/// request was fulfilled before the walk
-/// ('fulfill_editableView_requests'), and a fork request is the save's:
-/// it stays.
+/// request stays for the child's own visit to consume
+/// ('consume_editableView_request'), and a fork request is the save's:
+/// it stays too.
 fn fulfill_view_requests (
   tree   : &mut Tree<Viewnode>,
   parent : NodeId,
@@ -789,7 +782,7 @@ fn fulfill_view_requests (
       match &tree . get (child) . unwrap () . value () . kind {
         ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =>
           occurrence . view_requests . iter () . copied ()
-          . filter ( |request| *request != ViewRequest::Fork )
+          . filter ( |request| ! request_stays (request) )
           . collect (),
         _ => continue, };
     if requests . is_empty () { continue; }
@@ -809,8 +802,14 @@ fn fulfill_view_requests (
     add_folders (tree, child, &folders, walk);
     if let ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =
       &mut tree . get_mut (child) . unwrap () . value () . kind
-    { occurrence . view_requests . retain ( |request| *request == ViewRequest::Fork ); }}
+    { occurrence . view_requests . retain (request_stays); }}
   Ok (( )) }
+
+/// Whether 'fulfill_view_requests' leaves the request where it is.
+fn request_stays (
+  request : &ViewRequest,
+) -> bool {
+  matches! ( request, ViewRequest::Editable | ViewRequest::Fork ) }
 
 /// Where the folders a request adds stand among those added at one
 /// visit, first first: the containers folder, the mentioners, the

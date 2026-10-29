@@ -268,14 +268,15 @@ fn the_command_on_a_buffer_with_every_change_editable_changes_nothing (
 
 /// An editable-view request on w, a write-protected member outside
 /// U, cascades through its content as in an ordinary view, until the
-/// node budget (2 here) is spent: w and w1 extend; w2 and w1a stay
+/// node budget (6 here) is spent: the four nodes of U (a, p, q and r)
+/// charge it too, then w and w1 extend; w2 and w1a stay
 /// write-protected. No default folder is added (w1 subscribes to w2),
 /// and the nodes made editable stay so after the next save.
 #[test]
 fn an_editable_view_request_cascades_within_the_node_budget (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("fresh", &["main"], |f| {
-    f . config . initial_node_limit = 2;
+    f . config . initial_node_limit = 6;
     let buffer : String = open_all_changes_buffer (f) ?;
     let requested : String = buffer . replacen (
       "node (gnid w) (skgRepos (nodeRepo main)) writeProtected",
@@ -397,15 +398,15 @@ fn an_editable_view_request_moves_editability_back (
 
 /// An editable-view request on r, an editable node of U, cascades
 /// through its content as in an ordinary view: its members outside U
-/// extend until the node budget (2 here) is spent, so w and w1 become
-/// editable while w2 and w1a stay write-protected. r and a, in U,
-/// are not charged; were either charged, w1 would stay
-/// write-protected. A further save changes nothing.
+/// extend until the node budget (6 here) is spent, so w and w1 become
+/// editable while w2 and w1a stay write-protected. The four nodes of
+/// U (a, p, q and r) charge the budget too: with a budget of 5, w1
+/// would stay write-protected. A further save changes nothing.
 #[test]
 fn an_editable_view_request_on_a_node_of_u_extends_its_members (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("fresh", &["main"], |f| {
-    f . config . initial_node_limit = 2;
+    f . config . initial_node_limit = 6;
     let buffer : String = open_all_changes_buffer (f) ?;
     let requested : String = buffer . replacen (
       "bodyFolded node (gnid r) (skgRepos (nodeRepo main)) ",

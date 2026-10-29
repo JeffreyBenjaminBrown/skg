@@ -34,8 +34,7 @@ use std::sync::{Arc, MutexGuard};
 /// the diff view, over 'straddle', with the '(ready ...)' change facts from
 /// 'store'. The goal holds what HEAD alone warrants, the change
 /// viewnodes are recomputed in place, and the buffer's sets choose
-/// what is editable and what an extension charges to the node budget
-/// ('RefreshMode::charges_node_budget'). The diff view opens only
+/// what may be editable ('drawn_occurrence_editability'). The diff view opens only
 /// under the skgrepo set 'all', but a switch rerenders its open
 /// buffers under 'restriction', which the goal and the ID rule ask as
 /// in a content view: a restricted node is never a ghost.
@@ -112,7 +111,10 @@ pub fn rerender_diffView_buffer (
   Ok ( outside_the_appended_roots (buffer_corrections_again, viewforest, &appended_roots) ) }
 
 /// 'buffer_corrections' without those of headlines in the subtrees of
-/// 'appended_roots'.
+/// 'appended_roots'. The refresh cannot tell that it draws their
+/// content first ('Walk::draws_first_under'): a stub root carries no
+/// editable-view request, which in the diff view would extend its
+/// content beyond U.
 fn outside_the_appended_roots (
   buffer_corrections : Vec<BufferCorrection>,
   viewforest         : &ViewForest,

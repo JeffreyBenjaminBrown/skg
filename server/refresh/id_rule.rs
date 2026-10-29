@@ -22,15 +22,15 @@ use crate::diff_view::change_viewnodes::mk_historical_viewnode;
 use crate::graph_straddle::types::GraphStraddle;
 use crate::refresh::{Walk, write_protect_occurrence};
 use crate::refresh::buffer_corrections::BufferCorrectionKind;
-use crate::refresh::extent::drawn_occurrence_is_editable;
+use crate::refresh::extent::{DrawnEditability, drawn_occurrence_editability};
 use crate::refresh::visit::children_of;
 use crate::refresh::goal::{Goal, GoalMember};
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::nodes::rust::GraphnodeInRust;
 use crate::types::viewnode::{
   ChangeFacts, Editability, Ghost, GnidOnlyKind, GnidOnlyVognode, NodeEditRequest,
-  PropertyMember, RelationshipEditRequest, Occurrence, Viewnode, ViewnodeKind, Vognode,
-  VognodeKind, Warrant, default_occurrence};
+  PropertyMember, RelationshipEditRequest, Occurrence, ViewRequest, Viewnode, ViewnodeKind,
+  Vognode, VognodeKind, Warrant, default_occurrence};
 use crate::refresh::mode::RefreshMode;
 use crate::skgrepo_sets::SkgrepoRestriction;
 
@@ -199,8 +199,8 @@ pub(crate) fn rekind_vognode (
 
 /// Make the ghost or gnid-only vognode 'other' at 'child' (a child of
 /// 'parent') an occurrence of 'pid', where it stands: its node is
-/// back, or the restriction widened to show it. It is editable as an
-/// occurrence drawn there would be. It keeps its claim (a ghost's
+/// back, or the restriction widened to show it. It stands as an
+/// occurrence drawn there would ('drawn_occurrence_editability'). It keeps its claim (a ghost's
 /// becomes a claim) and its relationship request; a restoreNode
 /// request it drops, and reports. Under what was a gnid-only vognode,
 /// every child claims again ('reset_the_claims_of_children'). Its
@@ -223,20 +223,19 @@ fn rekind_to_occurrence (
         gnid_only . kind == GnidOnlyKind::Restricted
         && ! walk . buffer_correction_policy . reports_rekind_across_the_restriction () ),
     _ => (true, false, false), };
-  let editable : bool =
-    drawn_occurrence_is_editable (tree, parent, pid, walk);
+  let editability : DrawnEditability =
+    drawn_occurrence_editability (tree, parent, pid, walk);
   let occurrence : Occurrence =
     occurrence_from_truth (
-      pid, EditabilityAndClaim { editable, claims }, walk) ?;
+      pid, EditabilityAndClaim { editability, claims }, walk) ?;
   let occurrence : Occurrence = Occurrence {
     relationshipEditRequest : requests . relationship_edit_request . clone (),
     .. occurrence };
   set_vognode_keeping_readiness (tree, child, Vognode::Occurrence (occurrence));
   if was_gnid_only {
     reset_the_claims_of_children (tree, child); }
-  if editable {
-    walk . hold_editability (pid);
-    walk . drawn_editable . insert (child); }
+  if editability == DrawnEditability::Editable {
+    walk . hold_editability (pid, child); }
   if requests . restore_node {
     walk . buffer_corrections . record (tree, child, BufferCorrectionKind::EditRequestDropped); }
   if ! quiet {
@@ -404,8 +403,8 @@ pub(crate) fn point_occurrence_at (
   if let Some (was) = was_editable_as . filter ( |was| was != pid ) {
     // Write-protecting releases the gnid it holds, so it goes before
     // the gnid becomes 'pid', which the other occurrence keeps.
-    walk . release_editability (&was);
-    if ! walk . hold_editability (pid) {
+    walk . release_editability (&was, child);
+    if ! walk . hold_editability (pid, child) {
       write_protect_occurrence (tree, child, walk); }}
   if let ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =
     &mut tree . get_mut (child) . unwrap () . value () . kind
@@ -432,16 +431,16 @@ fn refresh_ghost_in_place (
                            warrant         : ghost . warrant,
                            .. fresh }; }}}
 
-/// How an occurrence the refresh draws stands: whether it is
-/// editable, and whether it claims membership of its viewparent's
-/// list.
+/// How an occurrence the refresh draws stands: its editability, and
+/// whether it claims membership of its viewparent's list.
 pub(crate) struct EditabilityAndClaim {
-  pub editable : bool,
-  pub claims   : bool,
+  pub editability : DrawnEditability,
+  pub claims      : bool,
 }
 
-/// An occurrence of 'pid' as the truth has it, editable (with its
-/// body) or write-protected.
+/// An occurrence of 'pid' as the truth has it: editable (with its
+/// body), write-protected, or write-protected carrying an
+/// editable-view request, which its visit consumes.
 pub(crate) fn occurrence_from_truth (
   pid                   : &ID,
   editability_and_claim : EditabilityAndClaim,
@@ -449,13 +448,18 @@ pub(crate) fn occurrence_from_truth (
 ) -> Result<Occurrence, Box<dyn Error>> {
   let node : &GraphnodeInRust = walk . truth . graph . get (pid)
     . ok_or ("occurrence_from_truth: the truth lacks the node") ?;
-  Ok ( Occurrence {
+  let mut occurrence : Occurrence = Occurrence {
     claimsMembership : editability_and_claim . claims,
-    editability      : if editability_and_claim . editable {
-      Editability::Editable { body : node . body . clone (), edit_request : None }
-    } else { Editability::WriteProtected },
+    editability      : match editability_and_claim . editability {
+      DrawnEditability::Editable =>
+        Editability::Editable { body : node . body . clone (), edit_request : None },
+      DrawnEditability::WriteProtected | DrawnEditability::Requested =>
+        Editability::WriteProtected, },
     .. default_occurrence (
-      pid . clone (), node . home_skgrepo . clone (), node . title . clone () ) } ) }
+      pid . clone (), node . home_skgrepo . clone (), node . title . clone () ) };
+  if editability_and_claim . editability == DrawnEditability::Requested {
+    occurrence . view_requests . insert (ViewRequest::Editable); }
+  Ok (occurrence) }
 
 /// The ghost of 'pid', from HEAD. None outside the diff view, or if
 /// HEAD lacks the node.
@@ -486,8 +490,7 @@ fn forget_editable_occurrence (
 ) {
   if let Vognode::Occurrence (occurrence) = vognode {
     if ! occurrence . is_writeProtected () {
-      walk . release_editability (&occurrence . gnid);
-      walk . drawn_editable . remove (&treeid); }}}
+      walk . release_editability (&occurrence . gnid, treeid); }}}
 
 /// Set the vognode at 'treeid' to 'vognode', keeping its fold state,
 /// vnid and readiness request (an edit request every vognode has a

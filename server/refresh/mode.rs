@@ -4,10 +4,8 @@
 //! refresh's diff-view mode ('server/refresh/diff_view.rs') says what
 //! it changes.
 
-use crate::diff_view::pruned_change_view::prunedChangeView_sets_of_buffer;
 use crate::diff_view::readiness_store::ReadinessStore;
 use crate::graph_straddle::types::GraphStraddle;
-use crate::types::misc::ID;
 use crate::types::views_state::DiffViewBufferKind;
 
 #[derive(Clone, Copy)]
@@ -22,25 +20,4 @@ pub enum RefreshMode<'a> {
   DiffView { straddle        : &'a GraphStraddle,
              buffer_kind     : DiffViewBufferKind,
              readiness_store : &'a ReadinessStore },
-}
-
-impl<'a> RefreshMode<'a> {
-  /// Whether this extension of 'pid' is charged to the node budget
-  /// ('server/refresh/extent.rs'). In a content view, every extension
-  /// is. The diff view deviates ('docs/diff-view.org', "Editability in
-  /// the diff view"): a node of U is never charged, whether the pruned
-  /// change view's rule or a request made it editable, so the budget
-  /// bounds only the extensions that an editable-view request makes
-  /// outside U.
-  pub fn charges_node_budget (
-    &self,
-    pid                      : &ID,
-    had_editableViewRequest  : bool,
-  ) -> bool {
-    match self {
-      RefreshMode::ContentView => true,
-      RefreshMode::DiffView { straddle, buffer_kind, .. } =>
-        had_editableViewRequest
-        && ! prunedChangeView_sets_of_buffer (straddle, *buffer_kind)
-             . u . contains (pid), } }
 }
