@@ -7,7 +7,8 @@
 
 use super::*;
 use crate::refresh::ancestry::{
-  ExpectedAncestor, described_node, is_unsayable, required_ancestor_of, required_ancestry};
+  CompoundFolderParties, ExpectedAncestor, compound_folder_parties, described_node,
+  is_unsayable, required_ancestors, required_ancestry};
 use crate::types::viewnode::{ChangesetMarkerKind, Folder};
 use indoc::formatdoc;
 
@@ -105,13 +106,18 @@ fn the_deep_rows_of_the_hidden_folders_reach_the_subscriber () {
     assert! ( ! is_unsayable (&forest, hidden_outside) );
     let title_at = |treeid : Option<NodeId>| -> Option<String> {
       treeid . map ( |treeid| outline_line (&forest, treeid) ) };
-    assert_eq! ( title_at ( required_ancestor_of (&forest, hidden_in, 0) ),
-                 Some ("node e wp" . to_string ()) );
-    assert_eq! ( title_at ( required_ancestor_of (&forest, hidden_in, 1) ),
-                 Some ("subscribeeFolder" . to_string ()) );
-    assert_eq! ( title_at ( required_ancestor_of (&forest, hidden_in, 2) ),
-                 Some ("node s" . to_string ()) );
-    assert_eq! ( required_ancestor_of (&forest, hidden_in, 3), None );
+    assert_eq! ( required_ancestors (&forest, hidden_in) . into_iter ()
+                 . map ( |treeid| outline_line (&forest, treeid) )
+                 . collect::<Vec<String>> (),
+                 vec! [ "node e wp", "subscribeeFolder", "node s" ] );
+    let parties : CompoundFolderParties =
+      compound_folder_parties (&forest, hidden_in) . unwrap ();
+    assert_eq! ( title_at ( Some (parties . subscriber) ), Some ("node s" . to_string ()) );
+    assert_eq! ( title_at ( parties . subscribee ), Some ("node e wp" . to_string ()) );
+    let parties : CompoundFolderParties =
+      compound_folder_parties (&forest, hidden_outside) . unwrap ();
+    assert_eq! ( title_at ( Some (parties . subscriber) ), Some ("node s" . to_string ()) );
+    assert_eq! ( parties . subscribee, None );
     assert_eq! ( title_at ( described_node (&forest, hidden_in) ),
                  Some ("node e wp" . to_string ()) );
     assert_eq! ( title_at ( described_node (&forest, hidden_outside) ),

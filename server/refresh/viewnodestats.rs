@@ -10,7 +10,7 @@ use crate::types::misc::{ID, SkgConfig, SkgrepoName};
 use crate::types::viewnode::{
   GraphnodeStats, Folder, Viewnode, ViewnodeKind, Vognode, Warrant };
 use crate::refresh::ancestry::{
-  CompoundFolderParties, compound_folder_parties, required_ancestor_of};
+  CompoundFolderParties, compound_folder_parties, required_ancestors};
 use crate::refresh::goal::{content_goal_gnids, subscriber_of_subscribee_as_such};
 use ego_tree::{Tree, NodeId, NodeRef};
 use std::collections::{HashMap, HashSet};
@@ -228,7 +228,7 @@ fn set_herald_strings_in_viewnode (
         members . len () })
     } else { None };
   let birth_facts : Vec<BirthFact> =
-    birth_facts (&parent_kind, stands_as_member_here, &flags, overridesHere);
+    birth_facts (tree, &parent_kind, stands_as_member_here, &flags, overridesHere);
   let rel_heralds : RelationshipHeralds = relationship_heralds_sexp (
     &counts, gstats . aliases, gstats . extra_ids, gstats . flags,
     &flags, &birth_facts, unintegrated );
@@ -250,29 +250,34 @@ fn parent_kind_of (
     _ => ParentKind::Other, } }
 
 /// The (pid, generation) of each tracked ancestor: the viewparent
-/// vognode (gen 1), or -- for a folder member -- the folder's required-ancestry
-/// vognodes (gen i+2 for the i-th required ancestor, since the folder itself
-/// is gen 1). Non-vognode ancestors in the chain carry no flag and are
-/// skipped.
+/// vognode (gen 1), or -- for a folder member -- the occurrences of the
+/// folder's required ancestry ('generation_above_a_member').
+/// Non-vognode ancestors in the chain carry no flag and are skipped.
 fn tracked_ancestors (
   tree        : &Tree<Viewnode>,
   parent_kind : &ParentKind,
 ) -> Vec<(ID, usize)> {
   match parent_kind {
     ParentKind::Vognode (pid) => vec![ (pid . clone (), 1) ],
-    ParentKind::Folder (_folder, folder_treeid) => {
-      let mut out : Vec<(ID, usize)> = Vec::new ();
-      let mut i : usize = 0;
-      loop {
-        match required_ancestor_of (tree, *folder_treeid, i) {
-          Some (anc_gnid) => {
-            if let Some (pid) = tree . get (anc_gnid) . and_then (
-                                  |anc| anc . value () . occurrence_gnid () ) {
-              out . push ( (pid . clone (), i + 2) ); }
-            i += 1; }
-          _ => break, } }
-      out }
+    ParentKind::Folder (_folder, folder_treeid) =>
+      required_ancestors (tree, *folder_treeid) . into_iter ()
+      . filter_map ( |ancestor| {
+        let pid : &ID = tree . get (ancestor) ? . value () . occurrence_gnid () ?;
+        Some (( pid . clone (),
+                generation_above_a_member (tree, *folder_treeid, ancestor) ? )) } )
+      . collect (),
     ParentKind::Other => Vec::new (), } }
+
+/// How many generations above a member of the folder at 'folder' its
+/// ancestor 'ancestor' stands: the folder is 1, its viewparent 2.
+fn generation_above_a_member (
+  tree     : &Tree<Viewnode>,
+  folder   : NodeId,
+  ancestor : NodeId,
+) -> Option<usize> {
+  tree . get (folder) ? . ancestors ()
+    . position ( |above| above . id () == ancestor )
+    . map ( |steps_above_the_folder| steps_above_the_folder + 2 ) }
 
 /// Record, for the tracked ancestor 'anc_pid' at 'generation', every
 /// relation it is a member of on each side relative to 'node_pid'.
@@ -351,6 +356,7 @@ fn relationship_is_visible (
 /// ('stands_as_member'), none. Usually a singleton; a
 /// HiddenInSubscribee member has two.
 fn birth_facts (
+  tree                  : &Tree<Viewnode>,
   parent_kind           : &ParentKind,
   stands_as_member_here : bool,
   flags                 : &AncestorFlags,
@@ -365,7 +371,8 @@ fn birth_facts (
           if flags . contains_in . contains (&1) {
             vec![ BirthFact::new ( NodeRelation::Contains, Side::In, Some (1) ) ]
           } else { Vec::new () },
-        ParentKind::Folder (folder, _) => birth_facts_for_folder (folder),
+        ParentKind::Folder (folder, folder_treeid) =>
+          birth_facts_for_folder (tree, folder, *folder_treeid),
         ParentKind::Other => Vec::new (), }}};
   if overridesHere
     && ! facts . iter () . any ( |fact|
@@ -389,7 +396,9 @@ fn side_of_role (
 /// levels deeper under the subscriber. (The table of birth facts is in
 /// docs/api-and-formats.org.)
 fn birth_facts_for_folder (
-  folder : &Folder,
+  tree          : &Tree<Viewnode>,
+  folder        : &Folder,
+  folder_treeid : NodeId,
 ) -> Vec<BirthFact> {
   match folder {
     Folder::Subscribee | Folder::Subscriber
@@ -410,17 +419,15 @@ fn birth_facts_for_folder (
     //     > hiddenOutsideOfSubscribeeFolder > member
     // the subscriber (generation 3) hides it.
     Folder::HiddenInSubscribee | Folder::HiddenOutsideOfSubscribee => {
-      let parties : CompoundFolderParties = compound_folder_parties (folder)
-        . expect ("a compound folder has parties");
-      let generation_above_a_member = |required_ancestor : usize| -> Option<usize> {
-        // The folder is generation 1; its viewparent, required ancestor 0, is 2.
-        Some (required_ancestor + 2) };
+      let Some (parties) : Option<CompoundFolderParties> =
+        compound_folder_parties (tree, folder_treeid)
+        else { return Vec::new (); }; // unsayable, so entombstoned
       once ( BirthFact::new (
           NodeRelation::HidesFromSubs, Side::In,
-          generation_above_a_member (parties . subscriber) ))
+          generation_above_a_member (tree, folder_treeid, parties . subscriber) ))
         . chain ( parties . subscribee . map ( |subscribee| BirthFact::new (
             NodeRelation::Contains, Side::In,
-            generation_above_a_member (subscribee) )) )
+            generation_above_a_member (tree, folder_treeid, subscribee) )) )
         . collect () },
     // 'ParentKind::Folder' holds partner folders only.
     Folder::Alias | Folder::ID | Folder::Flags { .. } => Vec::new (), } }

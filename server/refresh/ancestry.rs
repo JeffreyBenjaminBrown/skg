@@ -8,7 +8,9 @@
 //! unsayable.
 //!
 //! The stats pass reads a folder's ancestors through the table too
-//! ('required_ancestor_of').
+//! ('required_ancestors'). What the table's rows say stays in this
+//! module: its callers get positions in the tree, never a place in a
+//! row.
 
 use crate::types::viewnode::{
   ChangeViewnode, Folder, PropertyMember, Viewnode, ViewnodeKind, Vognode};
@@ -73,58 +75,70 @@ pub fn is_unsayable (
       Some (ancestor) => ! matches_expected (&ancestor . value () . kind, expected),
       None => true, } ) }
 
-/// The 'i'-th required ancestor of the descriptor at 'treeid' (0 =
-/// its viewparent), if its row lists that many.
-pub fn required_ancestor_of (
+/// The ancestors the row of the descriptor at 'treeid' requires, as
+/// they stand, nearest first: as many as the row lists, or fewer
+/// where the tree has fewer.
+pub fn required_ancestors (
   tree   : &Tree<Viewnode>,
   treeid : NodeId,
-  i      : usize,
-) -> Option<NodeId> {
-  let node : NodeRef<Viewnode> = tree . get (treeid) ?;
-  if i >= required_ancestry (&node . value () . kind) . len () {
-    return None; }
-  node . ancestors () . nth (i) . map ( |ancestor| ancestor . id () ) }
+) -> Vec<NodeId> {
+  let Some (node) : Option<NodeRef<Viewnode>> = tree . get (treeid)
+    else { return Vec::new (); };
+  node . ancestors ()
+    . take ( required_ancestry (&node . value () . kind) . len () )
+    . map ( |ancestor| ancestor . id () )
+    . collect () }
 
 /// The node the folder at 'folder' describes, whose relationships,
-/// properties or hides it shows: for the folder of what a subscriber
-/// hides in a subscribee, that subscribee; for the folder of what it
-/// hides outside its subscribees, the subscriber; for any other
-/// folder, its viewparent. None if 'folder' is no folder, or stands
-/// where its ancestry is missing.
+/// properties or hides it shows: for a compound folder, the
+/// subscribee as such of the folder of what a subscriber hides in it,
+/// or the subscriber whose hides outside its subscribees the other
+/// shows ('compound_folder_parties'); for any other folder, its
+/// viewparent. None if 'folder' is no folder, or stands where its
+/// ancestry is missing.
 pub fn described_node (
   tree   : &Tree<Viewnode>,
   folder : NodeId,
 ) -> Option<NodeId> {
   let ViewnodeKind::Folder (kind) : &ViewnodeKind =
     &tree . get (folder) ? . value () . kind else { return None; };
-  let index : usize = match compound_folder_parties (kind) {
-    Some (parties) => parties . subscribee . unwrap_or (parties . subscriber),
-    None => 0, };
-  required_ancestor_of (tree, folder, index) }
+  match kind {
+    Folder::HiddenInSubscribee | Folder::HiddenOutsideOfSubscribee => {
+      let parties : CompoundFolderParties = compound_folder_parties (tree, folder) ?;
+      Some ( parties . subscribee . unwrap_or (parties . subscriber) ) },
+    _ => required_ancestors (tree, folder) . first () . copied (), } }
 
-/// A compound folder's two parties, as indices into its required
-/// ancestry (0 = its viewparent; 'required_ancestor_of'): the
-/// subscriber whose hides it shows, and, for the folder of what the
-/// subscriber hides in one subscribee, that subscribee as such. In
+/// A compound folder's two parties, where they stand: the subscriber
+/// whose hides it shows, and, for the folder of what the subscriber
+/// hides in one subscribee, that subscribee as such. In
 ///   subscriber > subscribeeFolder > subscribee > hiddenInSubscribeeFolder
-/// the subscribee is at 0 and the subscriber at 2; in
+/// the subscribee is the folder's viewparent and the subscriber three
+/// generations up; in
 ///   subscriber > subscribeeFolder > hiddenOutsideOfSubscribeeFolder
-/// the subscriber is at 1.
+/// the subscriber is two up.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CompoundFolderParties {
-  pub subscriber : usize,
-  pub subscribee : Option<usize>,
+  pub subscriber : NodeId,
+  pub subscribee : Option<NodeId>,
 }
 
-/// The parties of a compound folder; None for any other folder.
+/// The parties of the compound folder at 'folder', as
+/// 'described_node' gives the node a folder describes. None for any
+/// other headline, or where the folder's ancestry is missing.
 pub fn compound_folder_parties (
-  folder : &Folder,
+  tree   : &Tree<Viewnode>,
+  folder : NodeId,
 ) -> Option<CompoundFolderParties> {
-  match folder {
-    Folder::HiddenInSubscribee =>
-      Some ( CompoundFolderParties { subscriber : 2, subscribee : Some (0) } ),
-    Folder::HiddenOutsideOfSubscribee =>
-      Some ( CompoundFolderParties { subscriber : 1, subscribee : None } ),
+  let ViewnodeKind::Folder (kind) : &ViewnodeKind =
+    &tree . get (folder) ? . value () . kind else { return None; };
+  let required : Vec<NodeId> = required_ancestors (tree, folder);
+  match kind { // the places are those of the rows ANC_HIDDEN_IN and ANC_HIDDEN_OUTSIDE
+    Folder::HiddenInSubscribee => Some ( CompoundFolderParties {
+      subscriber : *required . get (2) ?,
+      subscribee : Some ( *required . first () ? ) } ),
+    Folder::HiddenOutsideOfSubscribee => Some ( CompoundFolderParties {
+      subscriber : *required . get (1) ?,
+      subscribee : None } ),
     _ => None, } }
 
 /// Whether the save reads the claims of the children of 'parent': an

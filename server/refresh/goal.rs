@@ -27,7 +27,7 @@ use crate::dbs::in_rust_graph::relation_accessors::{GnidPresence, NodeRelation, 
 use crate::graph_straddle::types::Partner;
 use crate::refresh::Walk;
 use crate::refresh::ancestry::{
-  CompoundFolderParties, compound_folder_parties, described_node, required_ancestor_of};
+  CompoundFolderParties, compound_folder_parties, described_node};
 use crate::refresh::diff_view;
 use crate::refresh::extent::is_chain_parent;
 use crate::skgrepo_sets::SkgrepoRestriction;
@@ -302,9 +302,6 @@ fn folder_goal (
   let occurrence_pid_of : &dyn Fn (NodeId) -> Option<ID> =
     &|treeid : NodeId| -> Option<ID> {
       tree . get (treeid) ? . value () . occurrence_gnid () . cloned () };
-  let party_pid : &dyn Fn (usize) -> Option<ID> =
-    &|index : usize| -> Option<ID> {
-      occurrence_pid_of ( required_ancestor_of (tree, folder, index) ? ) };
   let described_pid : &dyn Fn () -> Option<ID> =
     &|| -> Option<ID> {
       occurrence_pid_of ( described_node (tree, folder) ? ) };
@@ -315,17 +312,17 @@ fn folder_goal (
       Some ( diff_view::acquisition_goal (tree, folder, kind, walk)
              . unwrap_or_else ( || Goal::unordered (Vec::new ()) )),
     Folder::HiddenInSubscribee => {
-      let parties : CompoundFolderParties = compound_folder_parties (kind) ?;
+      let parties : CompoundFolderParties = compound_folder_parties (tree, folder) ?;
       Some ( Goal::unordered ( gnid_items (
         hidden_in_subscribee (
-          &party_pid (parties . subscribee ?) ?,
-          &party_pid (parties . subscriber) ?, walk ),
+          &occurrence_pid_of (parties . subscribee ?) ?,
+          &occurrence_pid_of (parties . subscriber) ?, walk ),
         &HashMap::new ()))) },
     Folder::HiddenOutsideOfSubscribee => {
-      let parties : CompoundFolderParties = compound_folder_parties (kind) ?;
+      let parties : CompoundFolderParties = compound_folder_parties (tree, folder) ?;
       Some ( Goal::ordered ( gnid_items (
         hidden_outside_of_subscribees (
-          &party_pid (parties . subscriber) ?, walk ),
+          &occurrence_pid_of (parties . subscriber) ?, walk ),
         &HashMap::new ()))) },
     Folder::Subscribee | Folder::Subscriber
       | Folder::Overridden | Folder::Overrider
