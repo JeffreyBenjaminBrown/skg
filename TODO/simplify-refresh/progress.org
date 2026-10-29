@@ -4283,3 +4283,25 @@ and "Point sits between IDs", Neovim's default prompts); they
 were not added.
 *** Headline
 DONE.
+
+** Orchestrator's notes after slice 5 (2026-10-29)
+Launched 18:32 UTC, reported 18:52 UTC: twenty minutes; 379k
+agent tokens over 176 tool uses. The deviations are sound:
+Emacs's editor name won ('sexpr_edit.lua', its cycling in
+'sexpr_edit/sexpr_cycling.lua'); eight Neovim request modules
+and their functions took the Emacs names, the Ex commands
+unchanged; the modules Neovim keeps apart or together are
+listed in the deviations doc; both clients' generic edits now
+place an added part by its rank, which moved the 'folded' atom
+before the kind atom in the two round-trip tests; the herald
+hints came to Neovim with two tests, and stay in Emacs. Left
+for Jeff, not this plan's: the deviations doc still lists
+three commands Neovim lacks but could have (the open
+'TODO/problems.org' entry "The Neovim client lacks three Emacs
+commands"), so it does not yet list only what Neovim cannot
+do. Corrections carried to slice 7: four Neovim spec files
+named for the old modules take the new names, and the
+integration tests run with Neovim after any rename. Suites:
+nextest 1013 unchanged, Emacs 411 (three new), Neovim 406
+(four new), integration 34 of 35 with either client, the
+pre-existing failure.

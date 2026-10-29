@@ -959,6 +959,14 @@ every script; these greps empty:
 ** TODO Slice 7: the tests and the harness
 Read "The tests the run left untested" in the agreed behavior
 and the tests report first.
+*** Corrections carried from slice 5
+Slice 5 renamed Neovim's modules to the Emacs names but not
+the four spec files named for the old modules ('search_spec',
+'content_view_spec', 'delete_absent_references_spec',
+'flag_spec'): they take their modules' names. The integration
+tests ('tests/integration/*/test-nvim.lua') call Neovim's
+functions directly, so after any rename of this slice they are
+run with Neovim as well as with Emacs.
 *** the tests
 One test per behavior the agreed behavior lists, each named
 for the behavior it asserts, in the file where its neighbors
