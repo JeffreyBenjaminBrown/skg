@@ -44,7 +44,7 @@ pub enum BufferCorrectionKind {
   MarkedNoClaim,
   /// Duplicate viewnode siblings were merged into this one, the
   /// viewnode merge's result, which has a fresh vnid.
-  SiblingsMerged,
+  ViewnodeMerged,
   /// By the ID rule the headline became this kind of vognode, where
   /// it stands.
   Rekinded (VognodeKind),
@@ -78,7 +78,7 @@ impl BufferCorrection {
         "Entombstoned a headline that can stand here for nothing." . to_string (),
       BufferCorrectionKind::MarkedNoClaim =>
         "Marked noClaim a child the graph does not relate to its parent." . to_string (),
-      BufferCorrectionKind::SiblingsMerged =>
+      BufferCorrectionKind::ViewnodeMerged =>
         "Merged duplicate viewnode siblings into this one." . to_string (),
       BufferCorrectionKind::Rekinded (kind) =>
         format! ("Made a headline {}, as the graph has it.", kind . with_article ()),

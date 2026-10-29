@@ -110,7 +110,7 @@ node p
     node c1
   node d" );
   assert_eq! ( run . buffer_correction_kinds (),
-               vec! [ BufferCorrectionKind::SiblingsMerged ] ); }
+               vec! [ BufferCorrectionKind::ViewnodeMerged ] ); }
 
 /// An occurrence the buffer already shows editable charges the budget
 /// when its content is drawn, though the budget never write-protects

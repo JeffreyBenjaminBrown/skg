@@ -33,7 +33,7 @@ mod buffer_corrections;
 mod chain;
 mod claims;
 mod diff_view;
-mod merge_of_siblings;
+mod viewnode_merge;
 mod re_kind;
 mod reinstate;
 mod reorder;

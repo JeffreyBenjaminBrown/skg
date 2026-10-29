@@ -80,7 +80,7 @@ pub(crate) fn visit_parent (
   add_default_folders (tree, parent, walk);
   let goal : Option<Goal> = goal_of_parent (tree, parent, walk);
   rekind_children (tree, parent, goal . as_ref (), walk) ?;
-  merge_siblings (tree, parent, walk) ?;
+  viewnode_merge (tree, parent, walk) ?;
   set_warrants (tree, parent, goal . as_ref ());
   mark_claims (tree, parent, goal . as_ref (), walk);
   if let Some (goal) = &goal {
@@ -236,8 +236,10 @@ fn alias_whose_record_is_restricted (
 /// fresh one, and the "merged" buffer correction names it, unless the
 /// policy says the merge is no buffer correction
 /// ('BufferCorrectionPolicy'): after a save's nodeMerge, the
-/// acquirer's occurrences merge by the user's own request.
-fn merge_siblings (
+/// acquirer's occurrences merge by the user's own request. Only
+/// siblings, standing for one gnid under one parent, are ever merged:
+/// two occurrences of a node elsewhere in the buffer stay apart.
+fn viewnode_merge (
   tree   : &mut Tree<Viewnode>,
   parent : NodeId,
   walk   : &mut Walk,
@@ -248,7 +250,7 @@ fn merge_siblings (
       merge_into (tree, result, *merged_sibling, walk) ?; }
     tree . get_mut (result) . unwrap () . value () . viewnode_id = None;
     if walk . buffer_correction_policy . reports_viewnode_merge (&gnid) {
-      walk . buffer_corrections . record (tree, result, BufferCorrectionKind::SiblingsMerged); }}
+      walk . buffer_corrections . record (tree, result, BufferCorrectionKind::ViewnodeMerged); }}
   Ok (( )) }
 
 /// The children of 'parent' grouped by the gnid they stand for, each
