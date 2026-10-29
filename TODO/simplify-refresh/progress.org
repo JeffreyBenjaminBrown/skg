@@ -4518,3 +4518,36 @@ caller. 'change_fact_atoms' in 'heralds.rs' keeps an import
 inside the function, which the report did not list.
 *** Headline
 DONE.
+
+** Orchestrator's notes after slice 6 (2026-10-29)
+Launched 18:53 UTC, reported 23:40 UTC: four hours and
+forty-seven minutes, of which three hours and sixteen minutes
+passed between the commits of 20:16 and 23:32 with the
+"enrichment" rename and the search tests' move in progress;
+599k agent tokens over 256 tool uses. Sixteen commits, one per
+item as the slice asked. Two behavior changes, accepted; Jeff
+may reverse either: a member the refresh draws where it may be
+editable now carries the editable-view request, so a member
+drawn after a save shows its default subscribee folder as a
+fresh view's members do, and a restricted headline that a
+skgrepo widening turns back into an occurrence passes the
+request to its claiming write-protected children; and the diff
+view's budget counts every node of U drawn editable but never
+refuses one, since only a request's extension outside U can be
+refused, so the review's "later U nodes become write-protected"
+does not happen, which the plan's text never required. The
+other deviations are sound: 'charges_node_budget' went whole,
+since without its parameter it answered yes in both modes;
+'EditabilityAndClaim' pairs a 'DrawnEditability' enum with the
+claim; 'Refreshed' went, the refresh returning its buffer
+corrections alone; the integrate request travels in the
+rerender selector; 'EnrichmentProvenance' is
+'ParseProvenance'. The correction carried from slice 3 was
+checked: 'outside_the_appended_roots' is still needed, since an
+appended stub root carries no request, and its doc says why.
+Corrections carried: to slice 7, the inline "pid, else the raw
+ID" outside the goal and the hides, and an import inside
+'change_fact_atoms'; to slice 10, three facts the docs lack.
+Suites: nextest 1016 of 1016 (three new), Emacs 411, Neovim
+406, integration 34 of 35 with either client, the pre-existing
+failure; the three greps empty.

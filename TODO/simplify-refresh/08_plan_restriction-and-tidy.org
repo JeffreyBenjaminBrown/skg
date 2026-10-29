@@ -995,6 +995,13 @@ the fixture folders have it; the 98 call sites need no change
 if the helper adds the suffix. Run 'bash/nextest.sh' three
 times in a row with two of them overlapping by a few seconds,
 and record that no folder is shared.
+*** Corrections carried from slice 6
+"The pid, else the raw ID" is 'pid_else_raw_id' in the goal and
+the save's hides since slice 6, and still spelled inline in
+'strandeds.rs', 'restore_requests.rs', 'query.rs' and wherever
+else a grep for the pattern finds it: every spelling calls the
+one function. 'change_fact_atoms' ('server/heralds.rs') has an
+import inside the function; it moves to the top of the file.
 *** copies and names
 The 37-line helper trio and 'mk_pair' to 'tests/shared/';
 'tests/search_in_one_message.rs' (renamed in slice 6) uses the
@@ -1101,6 +1108,16 @@ skgrepo set) and "skgrepo widening" (the reverse), and every
 doc, module header, comment and user message says the three
 with the modifier. Identifiers keep their names. The check
 below greps the docs for the bare words.
+*** Corrections carried from slice 6
+Three things slice 6 changed and the docs say nowhere yet: a
+member the refresh draws where it may be editable, after a
+save as in a fresh view, carries the editable-view request and
+so shows its default subscribee folder; the diff view's budget
+counts every node of U it draws editable but never refuses one,
+since only a request's extension outside U can be refused; and
+'AfterRestrictionChange' silences what the tail pruned, as the
+module header and the glossary say since slice 6, which the
+user docs' description of the switch repeats in a sentence.
 *** the docs
 Each item of the agreed behavior's section, in the docs it
 names; the coinages of this plan ('GnidOnlyVognode', 'Unread',
