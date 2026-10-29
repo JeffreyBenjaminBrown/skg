@@ -8,8 +8,7 @@
 use skg::dbs::in_rust_graph::InRustGraph;
 use skg::dbs::init::create_empty_tantivy_index;
 use skg::graph_straddle::types::GraphStraddle;
-use skg::refresh::chain::{
-  ContainerwardChainPartners, attach_containerward_chains_under_members};
+use skg::refresh::chain::attach_containerward_chains_under_members;
 use skg::types::env::{RuntimeGeneration, SkgEnv};
 use skg::types::misc::{ID, RelPartner, SkgConfig, Skgrepo, SkgrepoName};
 use skg::types::nodes::complete::{Graphnode, empty_graphnode};
@@ -126,6 +125,9 @@ fn a_container_folder_from_a_graph_straddle_holds_both_graphs_containers (
 fn the_containerward_chain_walks_a_graph_straddles_union (
 ) -> Result<(), Box<dyn Error>> {
   let f : Fixture = fixture () ?;
+  let truth : Truth = Truth { graph       : &f . runtime . graph,
+                              config      : &f . runtime . config,
+                              restriction : None };
   let child_ids = |tree : &Tree<Viewnode>, node : NodeId| -> Vec<String> {
     let mut ids : Vec<String> =
       children_with_change (tree . get (node) . unwrap ()) . into_iter ()
@@ -135,13 +137,20 @@ fn the_containerward_chain_walks_a_graph_straddles_union (
   { // Over the live graph: the containers now.
     let (mut tree, r) : (Tree<Viewnode>, NodeId) = tree_with_r ();
     attach_containerward_chains_under_members (
-      &mut tree, &[r], &f . runtime . graph,
-      &f . runtime . config, None, ContainerwardChainPartners::LiveGraph ) ?;
+      &mut tree, &[r], &truth, RefreshMode::ContentView ) ?;
     assert_eq! ( child_ids (&tree, r), vec! [ "c1", "c3" ] ); }
-  { // Over the straddle: the containers in either graph.
+  { // Over the straddle: the containers in either graph, c2, which
+    // the worktree lacks, as its ghost, as the ID rule answers.
     let (mut tree, r) : (Tree<Viewnode>, NodeId) = tree_with_r ();
     attach_containerward_chains_under_members (
-      &mut tree, &[r], &f . runtime . graph,
-      &f . runtime . config, None, ContainerwardChainPartners::GraphStraddle (&f . straddle) ) ?;
-    assert_eq! ( child_ids (&tree, r), vec! [ "c1", "c2", "c3" ] ); }
+      &mut tree, &[r], &truth,
+      RefreshMode::DiffView { straddle        : &f . straddle,
+                              buffer_kind     : DiffViewBufferKind::AllChanges,
+                              readiness_store : &ReadinessStore::default () } ) ?;
+    assert_eq! ( child_ids (&tree, r), vec! [ "c1", "c2", "c3" ] );
+    assert! ( tree . get (r) . unwrap () . children () . any ( |child| matches! (
+                &child . value () . kind,
+                ViewnodeKind::Vognode (Vognode::Ghost (ghost))
+                  if ghost . gnid == ID::from ("c2") && ! ghost . claimsMembership )),
+              "c2 stands as its ghost, claiming nothing" ); }
   Ok (( )) }

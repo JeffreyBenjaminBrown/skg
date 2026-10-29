@@ -155,19 +155,3 @@ pub fn full_containerward_role_tree (
   assemble (
     origin_key, & id_of, & children_of,
     & depth_truncated_keys ) }
-
-/// Compute full containerward role tree for each ID, walking the
-/// containers that 'partners_of' gives.
-pub fn containerward_role_trees_by_gnid_from_gnids (
-  partners_of : PartnersOf,
-  gnids      : &[ID],
-  max_depth   : usize,
-) -> HashMap<ID, ContainerwardRoleTree> {
-  let mut map : HashMap<ID, ContainerwardRoleTree> =
-    HashMap::new ();
-  for gnid in gnids {
-    map . insert (
-      gnid . clone (),
-      full_containerward_role_tree (
-        partners_of, gnid, max_depth ) ); }
-  map }

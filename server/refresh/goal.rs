@@ -185,7 +185,7 @@ pub(crate) fn goal_of_parent (
 
 /// Under a node of the containerward chain: its containers, in no
 /// order of the graph's.
-fn chain_goal (
+pub(crate) fn chain_goal (
   pid  : &ID,
   walk : &Walk,
 ) -> Goal {

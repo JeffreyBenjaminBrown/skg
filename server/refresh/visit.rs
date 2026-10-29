@@ -48,15 +48,13 @@ use crate::refresh::id_rule::{
 use crate::refresh::{Walk, write_protect_occurrence};
 use crate::refresh::ancestry::{is_unsayable, parent_reads_claims};
 use crate::refresh::diff_view;
-use crate::refresh::chain::{
-  ContainerwardChainPartners, attach_containerward_chains_under_members};
+use crate::refresh::chain::attach_containerward_chain;
 use crate::types::misc::ID;
 use crate::types::tree::moves::{move_after, move_to_first_child, move_to_last_child};
 use crate::types::viewnode::{
   Editability, FoldAndFocus, Folder, FolderRelation, Ghost, GnidOnlyVognode, PropertyMember,
   Occurrence,
   ViewRequest, Viewnode, ViewnodeKind, ViewnodeStats, Vognode, Warrant, viewnode_of};
-use crate::refresh::mode::RefreshMode;
 
 use ego_tree::{NodeId, NodeMut, NodeRef, Tree};
 use std::collections::{HashMap, HashSet};
@@ -493,13 +491,7 @@ fn after_drawing (
                  if folder . members_carry_containerward_chain () )
     && tree . get (treeid) . unwrap () . value () . is_occurrence ();
   if carries_chain {
-    let partners : ContainerwardChainPartners = match walk . mode {
-      RefreshMode::ContentView => ContainerwardChainPartners::LiveGraph,
-      RefreshMode::DiffView { straddle, .. } =>
-        ContainerwardChainPartners::GraphStraddle (straddle), };
-    attach_containerward_chains_under_members (
-      tree, &[treeid], walk . truth . graph, walk . truth . config,
-      walk . truth . restriction, partners ) ?; }
+    attach_containerward_chain (tree, treeid, walk) ?; }
   if walk . added_compound_folders . contains (&parent) {
     // A folder's collapse lives on its members.
     tree . get_mut (treeid) . unwrap () . value () . foldAndFocus . folded = true; }

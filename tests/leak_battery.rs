@@ -28,8 +28,9 @@ use skg::dbs::in_rust_graph::{InRustGraph};
 use skg::org_to_text::viewforest_to_string;
 use skg::skgrepo_sets::{SkgrepoRestriction, SkgrepoSetName, run_with_skgrepo_set_test_db};
 use skg::test_utils::graph_handle_from_config;
-use skg::refresh::chain::{
-  ContainerwardChainPartners, attach_containerward_chains_under_members};
+use skg::refresh::Truth;
+use skg::refresh::chain::attach_containerward_chains_under_members;
+use skg::refresh::mode::RefreshMode;
 use skg::test_utils::multi_root_view_with_skgrepo_set;
 use skg::types::misc::ID;
 use skg::types::nodes::complete::Graphnode;
@@ -123,8 +124,9 @@ fn inbound_containerward_data_hides_N_at_public (
             "* (skg node (gnid C) (skgRepos (nodeRepo public))) leak-battery-C\n" );
         let c_gnid : NodeId = first_root (&viewforest);
         attach_containerward_chains_under_members (
-          &mut viewforest, &[c_gnid], &graph, config, Some (&public),
-          ContainerwardChainPartners::LiveGraph ) ?;
+          &mut viewforest, &[c_gnid],
+          &Truth { graph : &graph, config, restriction : Some (&public) },
+          RefreshMode::ContentView ) ?;
         let ancestors : BTreeSet<ID> = occurrence_children_gnids (&viewforest, c_gnid);
         assert! (
           ! ancestors . contains (&ID::from ("N")),
@@ -142,8 +144,9 @@ fn inbound_containerward_data_hides_N_at_public (
             "* (skg node (gnid C) (skgRepos (nodeRepo public))) leak-battery-C\n" );
         let c_gnid : NodeId = first_root (&viewforest);
         attach_containerward_chains_under_members (
-          &mut viewforest, &[c_gnid], &graph, config, Some (&all),
-          ContainerwardChainPartners::LiveGraph ) ?;
+          &mut viewforest, &[c_gnid],
+          &Truth { graph : &graph, config, restriction : Some (&all) },
+          RefreshMode::ContentView ) ?;
         let ancestors : BTreeSet<ID> = occurrence_children_gnids (&viewforest, c_gnid);
         assert! (
           ancestors . contains (&ID::from ("N")),

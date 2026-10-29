@@ -20,8 +20,9 @@ use skg::test_utils::{set_skgrepo_retagging_relRepos, graph_handle_from_config};
 use skg::test_utils::run_with_shared_test_stores;
 use skg::from_text::buffer_to_validated_saveplan;
 use skg::org_to_text::viewforest_to_string;
-use skg::refresh::chain::{
-  ContainerwardChainPartners, attach_containerward_chains_under_members};
+use skg::refresh::Truth;
+use skg::refresh::chain::attach_containerward_chains_under_members;
+use skg::refresh::mode::RefreshMode;
 use skg::test_utils::multi_root_view_with_skgrepo_set;
 use skg::types::misc::{ID, MSV, SkgConfig, SkgrepoName, TantivyIndex, members_of, rel_partners_at_relRepo, rel_partners_at_relRepo_msv};
 use skg::types::nodes::complete::Graphnode;
@@ -484,10 +485,8 @@ async fn the_containerward_chain_stops_before_a_restricted_container (
       attach_containerward_chains_under_members (
         &mut viewforest,
         &[child_gnid],
-        &graph,
-        config,
-        Some (&restriction),
-        ContainerwardChainPartners::LiveGraph ) ?;
+        &Truth { graph : &graph, config, restriction : Some (&restriction) },
+        RefreshMode::ContentView ) ?;
       let child_children : BTreeSet<ID> =
         occurrence_children_gnids (&viewforest, child_gnid);
       assert_eq! (

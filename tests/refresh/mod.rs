@@ -29,6 +29,7 @@ use std::sync::Arc;
 
 mod ancestry;
 mod buffer_corrections;
+mod chain;
 mod claims;
 mod diff_view;
 mod merge_of_siblings;

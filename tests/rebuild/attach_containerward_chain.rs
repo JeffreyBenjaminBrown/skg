@@ -1,8 +1,9 @@
 // cargo nextest run --test grouped_saves -E 'test(attach_containerward_chain::)'
 
 use indoc::indoc;
-use skg::refresh::chain::{
-  ContainerwardChainPartners, attach_containerward_chains_under_members};
+use skg::refresh::Truth;
+use skg::refresh::chain::attach_containerward_chains_under_members;
+use skg::refresh::mode::RefreshMode;
 use skg::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewnode_tree;
 use skg::test_utils::{graph_handle_from_config, run_with_shared_test_stores};
@@ -42,8 +43,10 @@ fn a_chain_branches_and_shows_a_repeat_as_a_leaf (
     viewforest . root () . first_child () . unwrap () . id ();
   attach_containerward_chains_under_members (
     &mut viewforest, &[a11],
-    &graph_handle_from_config (config) ? . load_full (), config, None,
-    ContainerwardChainPartners::LiveGraph ) ?;
+    &Truth { graph       : &graph_handle_from_config (config) ? . load_full (),
+             config,
+             restriction : None },
+    RefreshMode::ContentView ) ?;
   let expected : &str = indoc! {"
     * (skg node (gnid a11) (skgRepos (nodeRepo main))) a11
     ** (skg node (gnid a1) (skgRepos (nodeRepo main)) noClaim writeProtected) a1
