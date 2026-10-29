@@ -79,7 +79,7 @@ pub(crate) fn content_goal (
     . filter ( |partner| match partner . existence {
       Some (Existence::Removed) => straddle . node_in_either_graph (&partner . id),
       _ => kept . contains (&partner . id), } ),
-    straddle, walk ))) }
+    walk ))) }
 
 /// The containers of a node of the containerward chain, over the
 /// straddle.
@@ -92,7 +92,7 @@ pub(crate) fn chain_goal (
     straddle . partners (pid, RelationRole::CONTAINER) . iter ()
     . filter ( |partner| partner . existence != Some (Existence::Removed)
                          || straddle . node_in_either_graph (&partner . id) ),
-    straddle, walk ))) }
+    walk ))) }
 
 /// A ghost's old content, where content stands: its content at HEAD.
 pub(crate) fn ghost_content_goal (
@@ -102,7 +102,7 @@ pub(crate) fn ghost_content_goal (
   let (straddle, _) : (&GraphStraddle, DiffViewBufferKind) = diff_view_of (walk) ?;
   Some ( Goal::ordered ( partner_items (
     straddle . partners (pid, RelationRole::CONTENT) . iter (),
-    straddle, walk ))) }
+    walk ))) }
 
 /// A partner folder's members over the straddle. In a folder whose
 /// membership the save reads, a removed member that neither graph has
@@ -120,7 +120,7 @@ pub(crate) fn folder_goal (
       . filter ( |partner| partner . existence != Some (Existence::Removed)
                            || ! kind . is_editable ()
                            || straddle . node_in_either_graph (&partner . id) ),
-      straddle, walk ),
+      walk ),
     kind . goal_is_ordered () )) }
 
 /// A property folder's members over the straddle: the union of the
@@ -219,11 +219,11 @@ pub(crate) fn acquisition_goal (
 /// the restriction as a content view's does ('gnid_items' in
 /// 'goal.rs'): a partner whose record the restriction keeps out (the
 /// worktree's record, or HEAD's when the worktree has none) is left
-/// out, and one whose node it keeps out (the worktree's node, or
-/// HEAD's when the worktree has none) is marked restricted.
+/// out; one whose node it keeps out (the worktree's node, or HEAD's
+/// when the worktree has none) stays, and the ID rule makes it a
+/// Restricted vognode.
 fn partner_items<'a> (
   partners : impl Iterator<Item = &'a Partner>,
-  straddle : &GraphStraddle,
   walk     : &Walk,
 ) -> Vec<GoalItem> {
   let restriction : Option<&SkgrepoRestriction> = walk . truth . restriction;
@@ -232,15 +232,9 @@ fn partner_items<'a> (
       . or ( partner . relRepo_before . as_ref () )
       . is_none_or ( |relRepo| SkgrepoRestriction::record_is_visible (
         restriction, relRepo )) };
-  let node_is_restricted = |gnid : &ID| -> bool {
-    straddle . home_in_worktree_or_head (gnid)
-      . is_some_and ( |home| SkgrepoRestriction::node_is_restricted (
-        restriction, &home )) };
   partners
     . filter ( |partner| record_is_visible (partner) )
-    . map ( |partner| GoalItem {
-      restricted : node_is_restricted (&partner . id),
-      .. partner_item (partner) } )
+    . map (partner_item)
     . collect () }
 
 /// The goal item of a partner over the straddle: warranted by the
@@ -253,7 +247,6 @@ fn partner_item (
     warrant : if partner . existence == Some (Existence::Removed) {
                 Warrant::ByHead } else { Warrant::ByGraph },
     relRepo : None,
-    restricted : false,
     rel     : partner . existence,
     partner : Some ( partner . clone () ), } }
 

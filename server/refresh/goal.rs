@@ -14,8 +14,8 @@
 //! nodes") a goal omits each member whose record the restriction
 //! keeps out: the gated accessors leave it out of every list read
 //! here. It keeps each member whose record is visible: a node the
-//! restriction keeps out, marked restricted ('GoalItem::restricted'),
-//! and a gnid nothing answers to, an unknown, as under no
+//! restriction keeps out, which the ID rule makes a Restricted
+//! vognode, and a gnid nothing answers to, an unknown, as under no
 //! restriction.
 //!
 //! 'partnerFolder_members_in_graph' serves the search's enrichment
@@ -25,7 +25,7 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::node_lookup::graphnode_from_graph;
 use crate::dbs::in_rust_graph::relation_accessors::{GnidPresence, NodeRelation, RelationRole};
 use crate::graph_straddle::types::Partner;
-use crate::refresh::{Truth, Walk};
+use crate::refresh::Walk;
 use crate::refresh::ancestry::{
   CompoundFolderParties, compound_folder_parties, described_node, required_ancestor_of};
 use crate::refresh::diff_view;
@@ -64,10 +64,6 @@ pub(crate) struct GoalItem {
   /// relationship's relRepo, when that differs from the recorder's
   /// home (the unknown's herald, the Restricted vognode's).
   pub relRepo : Option<SkgrepoName>,
-  /// Whether the node it names is restricted: its record is visible
-  /// and the skgrepo restriction keeps out the node's home. The ID
-  /// rule answers it with a Restricted vognode.
-  pub restricted : bool,
   /// In the diff view, the item's existence change in its list.
   pub rel     : Option<Existence>,
   /// In the diff view, the partner the item is, over the straddle.
@@ -87,8 +83,7 @@ impl GoalItem {
     member : GoalMember,
   ) -> GoalItem {
     GoalItem { member, warrant : Warrant::ByGraph,
-               relRepo : None, restricted : false,
-               rel : None, partner : None } }
+               relRepo : None, rel : None, partner : None } }
 }
 
 impl Goal {
@@ -194,7 +189,7 @@ pub(crate) fn chain_goal (
   let containers : Vec<ID> =
     walk . truth . graph . inbound_pids_for_relation_gated (
       pid, NodeRelation::Contains, walk . truth . restriction );
-  Goal::unordered ( gnid_items (containers, &HashMap::new (), walk . truth )) }
+  Goal::unordered ( gnid_items (containers, &HashMap::new ())) }
 
 /// An occurrence's content ('content_goal_gnids'), with the relRepo
 /// of each unknown or restricted member.
@@ -221,7 +216,7 @@ fn content_goal (
     unknown_or_restricted_members_relRepos (graph, restriction, pid, &members);
   Goal::ordered ( gnid_items (
     content_goal_gnids ( graph, restriction, &members, subscriber . as_ref () ),
-    &relRepos, walk . truth )) }
+    &relRepos )) }
 
 /// The content an occurrence shows outside the diff view: the members
 /// of its 'contains' list whose records the restriction shows
@@ -325,13 +320,13 @@ fn folder_goal (
         hidden_in_subscribee (
           &party_pid (parties . subscribee ?) ?,
           &party_pid (parties . subscriber) ?, walk ),
-        &HashMap::new (), walk . truth ))) },
+        &HashMap::new ()))) },
     Folder::HiddenOutsideOfSubscribee => {
       let parties : CompoundFolderParties = compound_folder_parties (kind) ?;
       Some ( Goal::ordered ( gnid_items (
         hidden_outside_of_subscribees (
           &party_pid (parties . subscriber) ?, walk ),
-        &HashMap::new (), walk . truth ))) },
+        &HashMap::new ()))) },
     Folder::Subscribee | Folder::Subscriber
       | Folder::Overridden | Folder::Overrider
       | Folder::Hider | Folder::Hidden
@@ -351,7 +346,7 @@ fn folder_goal (
             &graph . outbound_member_keys_for_relation_gated (
               &described, member_role . relation, walk . truth . restriction ))
         } else { HashMap::new () };
-      Some ( Goal::with_order ( gnid_items (members, &relRepos, walk . truth ),
+      Some ( Goal::with_order ( gnid_items (members, &relRepos ),
                                 kind . goal_is_ordered () )) }, } }
 
 /// The members a folder of this kind under the viewparent should hold,
@@ -501,18 +496,15 @@ fn property_goal (
         . map ( |flag| GoalItem::by_graph (GoalMember::Flag (flag)) )
         . collect () ), } ) }
 
-/// Goal items of gnids, each warranted by the truth, and marked
-/// restricted where the truth says its node is.
+/// Goal items of gnids, each warranted by the truth, with its relRepo
+/// from 'relRepos' where that holds one.
 fn gnid_items (
   gnids    : Vec<ID>,
   relRepos : &HashMap<ID, SkgrepoName>,
-  truth    : &Truth,
 ) -> Vec<GoalItem> {
   gnids . into_iter ()
     . map ( |gnid| GoalItem {
-      relRepo    : relRepos . get (&gnid) . cloned (),
-      restricted : truth . graph . gnid_presence_gated (&gnid, truth . restriction)
-                   == GnidPresence::Restricted,
+      relRepo : relRepos . get (&gnid) . cloned (),
       .. GoalItem::by_graph ( GoalMember::Gnid (gnid) ) } )
     . collect () }
 

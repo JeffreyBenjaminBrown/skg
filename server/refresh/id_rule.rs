@@ -78,10 +78,8 @@ pub(crate) fn id_rule (
     if ! acquired_since_head {
       return IdRuleAnswer::Occurrence (pid); }}
   let restricted_answer = || -> IdRuleAnswer {
-    let named_restricted : bool = parent_goal
-      . and_then ( |goal| goal . item_for ( &GoalMember::Gnid ( gnid . clone () )))
-      . is_some_and ( |item| item . restricted );
-    if named_restricted || is_view_root {
+    let named : bool = parent_goal . is_some_and ( |goal| goal . names_gnid (gnid) );
+    if named || is_view_root {
       IdRuleAnswer::GnidOnly (GnidOnlyKind::Restricted) }
     else { IdRuleAnswer::Tombstone } };
   if presence == GnidPresence::Restricted {
