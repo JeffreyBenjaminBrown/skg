@@ -15,6 +15,16 @@ agreed design. Explain the concrete consequences and recommend an option.
 ** A stumper mystery
 This means at least one goal from the plan that you don't see how to
 achieve, or cannot achieve without doing something ugly.
+** When orchestrating a plan
+The same two reasons stop a run that an orchestrator drives slice
+by slice ('orchestration.org'). A slice that ends without DONE for
+one of them stops the run; so does a slice whose suites are red at
+its end and whose failures the orchestrator cannot classify as
+expected, pre-existing or flaky; so does a slice that changed a
+behavior the plan's "What stays" names. A correction that needs no
+decision of Jeff's is not a stop: it becomes a stage in the plan
+before the next launch.
+
 * Resolve ordinary implementation choices yourself
 Deviations from the plan on *how* to achieve its goals are not reasons to
 stop. Record meaningful deviations in progress.org, leaving the original
@@ -41,3 +51,6 @@ already authorizes that concise report; do not ask permission to write it.
 Ordinary execution does not require a chronological ledger, dashboard, or
 ongoing bookkeeping at every step. Those are optional workflows described
 in [[file:optional-workflows.org]], and require the agreement specified there.
+A plan that asks for a record per slice in progress.org ('plans.org',
+'orchestration.org') is that agreement; the record has the report shape
+'orchestration.org' gives, and no more.

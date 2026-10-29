@@ -12,7 +12,7 @@
   '07_1_review-reports/probe-scripts/'. "Run" means driven end
   to end on an isolated server; "base" means the same at d4252cc4,
   before the plan.
-** A narrowing then a widening loses the views whose roots it kept out
+** FIX PLANNED: A narrowing then a widening loses the views whose roots it kept out
   Run, and the same at the base. A view whose root the narrower
   set keeps out becomes a tombstone root (childless ones pruned,
   the view emptied); widening the set again leaves the root a
@@ -23,7 +23,7 @@
   becomes a Restricted vognode (the view is the user's own
   request), an occurrence again on widening; or the switch
   remembers the roots. Review item 1.
-** The diff view under a restriction leaks and omits
+** FIX PLANNED: The diff view under a restriction leaks and omits
   Run by the tests reviewer through 'refresh_viewforest'. A
   skgrepo-set switch rerenders open diff-view buffers, though the
   diff view opens only under 'all'. Under 'pub' the diff view
@@ -34,14 +34,14 @@
   The leak is likely older than the plan. Fix: gate the ghost
   question and the diff view's goal by the restriction, or close
   or empty diff-view buffers on a narrowing. Review item 1.
-** An alias recorded in a restricted section is shown under the restriction
+** FIX PLANNED: An alias recorded in a restricted section is shown under the restriction
   Run, and the same at the base. 'r' records an alias in its
   private section; under 'pub' the alias shows, text and all, in
   a fresh view and after a switch, and the props count includes
   it. The property goal gates aliases by nothing. Fix: omit an
   alias whose record is restricted, as a relationship's. Review
   item 1.
-** Neovim's buffer writers misplace requests and append a delete
+** FIX PLANNED: Neovim's buffer writers misplace requests and append a delete
   Run (a throwaway plenary spec, '07_1_review-reports/
   nvim-writer-check/'). 'metadata.delete', 'delete_recursive',
   'set_merge_request' and 'detach' write the new form or the
@@ -52,13 +52,13 @@
   the request. Fix: write the whole metadata 'with_edit_request'
   returns, and insert parts at their 'parts' rank; a buffer-level
   test. Review item 2.
-** A readiness request blocks the flag request in both clients
+** FIX PLANNED: A readiness request blocks the flag request in both clients
   Run in Emacs, traced in Neovim. 'skg-request-flag-state.el'
   and Neovim's 'flag.lua' refuse a headline carrying
   '(editRequest (ready ...))' as if it held an edit request: the
   bug slice 4 fixed for 'skg-set-relRepo', in a second place.
   Fix: one predicate per client that skips readiness parts.
-** A bare headline under a tombstone is refused, not saved
+** FIX PLANNED: A bare headline under a tombstone is refused, not saved
   Run, and the same at the base. The plan said a headline typed
   under a tombstone is saved as an orphan; it is refused with
   "Occurrence must have a repo that exists in the config", since
@@ -67,7 +67,7 @@
   tombstone from the nearest occurrence above, or keep the
   refusal and say what to do. The orphan warning also says "not
   yet saved" of a node the same save created.
-** Corrections a user's own gesture causes
+** FIX PLANNED: Corrections a user's own gesture causes
   Run. A nodeMerge reports four buffer corrections (the viewnode
   merge of the acquirer's two occurrences, and three "Drew what
   the graph says belongs here"), all caused by the user's own
@@ -78,7 +78,7 @@
   buffer. After a switch a member whose record alone is
   restricted stays drawn and is reported "Marked noClaim".
 * Problems noticed while executing plan 06, slice 9 (2026-10-27)
-** A requested hidden folder showing a dangling hide may be refused at save
+** FIX PLANNED: A requested hidden folder showing a dangling hide may be refused at save
   Noticed by reading, not run, while slice 9 of
   'TODO/simplify-refresh/06_plan_tidy-refresh.org' gave the goal
   computers the rule that a member whose record is visible and
@@ -96,7 +96,7 @@
   with slice 9, with a spurious clause about 'noClaim' in the
   message.
 * Problems noticed while executing plan 06, slice 1 (2026-10-26)
-** Under a restriction, the graphnode stats are quadratic in a list's length
+** FIX PLANNED: Under a restriction, the graphnode stats are quadratic in a list's length
   Slice 1 of 'TODO/simplify-refresh/06_plan_tidy-refresh.org' made
   the viewnode stats pass linear ('RelRepoLookup' in
   'server/update_buffer/viewnodestats.rs'): a fresh view of a root

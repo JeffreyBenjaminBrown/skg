@@ -15,7 +15,15 @@ plan and should not need to. The brief holds:
 - a "context carried forward" paragraph the orchestrator writes:
   what earlier slices built that this one relies on, names that
   changed since the plan was written, pitfalls found since;
-- the suites to run, each named with its command.
+- the suites to run, each named with its command, with the
+  instruction to serialize full runs (two at once collide on
+  fixed temp paths and the Tantivy writer);
+- the tracked files that are dirty before the launch and whose
+  they are, so that the agent neither commits Jeff's edits nor
+  takes them for a stopped slice's leftovers;
+- where the record goes: the progress file's top-level headline
+  for this plan, one subheadline per slice.
+Note the launch time before launching, for the cost record.
 
 * The report shape
 The agent ends with a report of fixed shape, and the same shape
@@ -30,7 +38,8 @@ goes into 'progress.org' under a headline per slice:
 - whether the slice's headline is DONE.
 
 * Triage before each launch
-Read the report and the diff before launching the next agent.
+Read the report and the diff before launching the next agent,
+and do not run the suites yourself while an agent runs them.
 A small correction that needs no decision of Jeff's becomes a
 stage inserted into the plan under the next slice, headed
 "Corrections carried from slice N", and committed before the

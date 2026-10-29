@@ -1,0 +1,165 @@
+#+title: Benchmark: text search and its enrichment, old vs new
+* Summary
+In both builds the server asks for the snapshot about 100 ms
+after it sends the results. That wait is the idle poll in the
+connection loop: 'read_line' times out after 100 ms, and only
+then does the loop look in the enrichment slot. So the wait
+does not depend on the enrichment thread in either build.
+** Old build: the thread's work was hidden
+The old thread needed 24 ms (286 hits) or 52 ms (724 hits).
+That fit inside the 100 ms wait, so the client never saw it.
+** New build: the enrichment itself is slower
+The thread does nothing, but the stub refresh that replaced
+'render_enriched_search_buffer.rs' takes longer than the old
+hand drawing: 86 vs 79 ms for title-only, and 209 vs 177 ms
+for title+body.
+** Phase 1 is a little slower in the new build
+31 vs 27 ms title-only, 61 vs 56 ms title+body. The spread
+between runs is about as large as that difference.
+** Most of the time to an enriched buffer is the poll
+From request to enriched buffer took about 222 ms (new) and
+208 ms (old) title-only, and 374 vs 337 ms title+body.
+About 100 ms of each is the poll wait.
+* Setup
+** Commits
+- NEW: HEAD 743a2d33 on branch total-diff-view. The working
+  tree had uncommitted changes, but none under 'server/'.
+- OLD: 3a4dc42f, which is 96f0ff20^. Built in a temporary
+  git worktree with its own target directory.
+- Both are debug builds ('cargo build --bin skg',
+  unoptimized). Release builds would be faster in absolute
+  terms. I did not measure them.
+** The phase 2 exchange is the same in both builds
+I checked both copies of docs/api-and-formats.org and both
+copies of server/serve.rs:
+- the same three messages
+- the same "snapshot response" request
+- the same 100 ms idle poll before request-snapshot
+In both builds the thread is spawned after phase 1 is sent.
+** Data
+- A copy of data/, without .index.tantivy and logs: 286 MB,
+  of which 285 MB is under owned/.
+- 61608 .skg files in the copy. 55246 of them are in the 7
+  configured repos. The other 6362 are in a folder that no
+  repo lists.
+- Both servers reported 55198 nodes, 51097 relationships
+  and 56279 indexed documents.
+- Each build got its own copy. Each copy's skgconfig.toml was
+  changed to port 1750 (new) or 1751 (old) and
+  timing_log = false. It kept tantivy_folder =
+  ".index.tantivy", which resolves inside the copy.
+- 'skg check-config' of each build accepted its config
+  unchanged. The old build needed no changes to the config.
+- After the runs, 'diff -rq' found both copies' owned/ trees
+  identical to the original.
+** What "something" matched
+- Title-only (the default): 286 hits. Phase 1 content was
+  287 lines.
+- With (body . "true"): 724 hits. Phase 1 content was 725
+  lines.
+- The two builds returned the same hit counts and the same
+  enriched line counts.
+- No overPrivateText-telescope-confirmation arrived, so no
+  retry was needed. The config restricts no repos.
+* NEW build (HEAD 743a2d33)
+** Server startup: 8.35 s from launch to "Server ready."
+** Title-only, 5 runs
+*** t1, request to search-results
+median 31.0 ms (min 26.6, max 35.7)
+*** t2a, search-results to request-snapshot
+median 104.8 ms (min 101.5, max 108.5)
+*** t2b, snapshot sent to search-enrichment
+median 86.0 ms (min 84.9, max 88.3)
+*** hits and sizes
+286 hits. Enriched content: 1090 lines, 210291 bytes.
+** Title+body, 5 runs
+*** t1, request to search-results
+median 61.1 ms (min 54.6, max 74.4)
+*** t2a, search-results to request-snapshot
+median 104.1 ms (min 100.7, max 108.5)
+*** t2b, snapshot sent to search-enrichment
+median 208.8 ms (min 207.1, max 209.7)
+*** hits and sizes
+724 hits. Enriched content: 2794 lines, 523065 bytes.
+* OLD build (3a4dc42f = 96f0ff20^)
+** Server startup: 7.18 s from launch to "Server ready."
+** Title-only, 5 runs
+*** t1, request to search-results
+median 27.0 ms (min 24.5, max 34.3)
+*** t2a, search-results to request-snapshot
+median 102.4 ms (min 100.8, max 105.0)
+*** t2b, snapshot sent to search-enrichment
+median 78.5 ms (min 76.7, max 80.7)
+*** hits and sizes
+286 hits. Enriched content: 1090 lines, 200583 bytes.
+** Title+body, 5 runs
+*** t1, request to search-results
+median 56.1 ms (min 49.6, max 61.5)
+*** t2a, search-results to request-snapshot
+median 103.5 ms (min 100.9, max 105.5)
+*** t2b, snapshot sent to search-enrichment
+median 177.3 ms (min 175.4, max 186.5)
+*** hits and sizes
+724 hits. Enriched content: 2794 lines, 498126 bytes.
+** The background thread's own time, from the server log
+The old build logs INFO lines when the thread starts, when
+the role trees are done, and when it writes to the slot.
+Six searches of each kind were logged: the warm-up and the
+five measured runs.
+*** 286 hits: 23.5 to 25.2 ms in total
+Role trees took 3 to 5 ms of that. Graph stats for 715 IDs
+took the rest.
+*** 724 hits: 50.9 to 53.0 ms in total
+Role trees took about 7.5 ms of that. Graph stats for 1733
+IDs took the rest.
+* How the numbers were taken
+** Driver script
+'bash/bench-search-enrichment.py', copied from the session's
+scratchpad so that the benchmark can be rerun.
+** One connection per search
+Run with 'python3 -I bench_search.py PORT RUNS'. Each search
+opens its own TCP connection and sends the request line. It
+reads LP messages and stamps each one with a time once its
+last byte has arrived. It answers request-snapshot with the
+phase 1 content, unchanged, and stops at search-enrichment.
+It tells message types apart by searching the sexp text.
+** Timer boundaries
+- t1 starts just before the request is sent.
+- t2b starts just before the snapshot response (line and
+  body) is sent. So it includes sending 56 to 120 KB over
+  loopback.
+** Warm-up
+Each server first got one warm-up pass (1 run of each kind),
+then the 5 measured runs, all in one process. Warm-up times
+were close to the measured ones. The first title-only phase 1
+on a fresh server was slower: about 57 ms new, 34 ms old.
+** Startup time
+Wall time from starting the binary to "Server ready." first
+appearing in its log, polled every 50 ms. Each build was
+measured once, on a fresh copy with no index. A single sample
+does not show which build starts faster.
+** Order
+Run one after the other, never at the same time: NEW first,
+then OLD. Each server was killed by its recorded PID, and its
+port was confirmed free afterwards.
+* What went wrong, and what I did not measure
+** Nothing failed
+- Every search produced exactly three messages, in order:
+  search-results, request-snapshot, search-enrichment.
+- Every enrichment carried content.
+- Every request-snapshot named the terms that were sent.
+- Neither server log contained an error or a panic.
+** Not measured
+- Emacs-side rendering and parsing.
+- Release builds.
+- Repeated startups.
+- The overPrivateText path, because it never came up.
+- Searches other than "something".
+** Enriched content differs slightly between builds
+The new build's enriched content is about 5 percent larger
+in bytes, with the same number of lines. I did not compare
+the two contents, to avoid printing private data.
+** Cleanup
+The worktree, the old target directory and both data copies
+were deleted. Only the driver, the launcher, the server logs
+and the output files remain in the scratchpad bench folder.

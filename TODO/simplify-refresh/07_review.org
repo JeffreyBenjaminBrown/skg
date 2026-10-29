@@ -1,0 +1,1611 @@
+#+title: Review of plan 06: tidy the refresh, run 2026-10-26
+
+* Verdict
+The plan did what it set out to do. Eleven slices in four and a
+half hours, every suite green at every slice's end but the one
+failure older than the plan, eight entries of the problems file
+closed, the refresh's parts in one place under 'server/refresh/',
+both clients aligned around a shared table and two shared case
+files, the search answering in one message, the Restricted
+vognode and the detach and attach commands in, and the test
+flake found at its cause and gone. The probes passed seven of
+ten behaviors end to end, and the fixpoint held after every
+gesture, the nodeMerge and the switch included. Four of the
+agents found and fixed a bug of their own or of the code before
+committing (the 'show_overrider' order, the restore tests'
+denominator, the Restricted children's claims, the flake's real
+cause), which the plan's instruction to confirm traced claims
+by tests earned.
+What needs work is the restriction, which the probes drove
+harder than anything before: a narrowing then a widening loses
+the views whose roots it kept out, the diff view under a
+narrower set shows a deleted private node's title and omits
+Restricted members, and an alias recorded in a restricted
+section shows regardless. Two of the three predate the plan.
+Beside them: Neovim's buffer writers misplace requests and
+append a delete the server refuses (confirmed by a spec), a
+requested hidden folder holding a dangling hide refuses the
+save, and a headline under a tombstone is refused where the
+plan said it was saved. The structural debt the plan left is
+the Restricted vognode as a twin of the unknown, which two
+reports rank first. Decide items 1 to 4 are the corrective
+slice; 5 to 14 are the next tidy.
+
+* What I checked myself
+** The launches and the record
+I launched each of the eleven slices myself as one Opus agent
+at high effort, with the runner's prompt, a paragraph of
+context carried forward and the suites to run, as
+'coding-advice/orchestration.org' says, and read each report
+and diff before the next launch. Four slices got a
+"Corrections carried from slice N" stage from the findings of
+the slice before (slices 2, 3, 4 and 7, and slices 8, 9 and 10
+one each from slices 3, 1 and 5); one of them carried a
+decision Jeff made after the plan was committed. Every
+orchestrator's note in 'progress.org' gives the launch and
+report times. No slice stopped, and no condition of
+'when-to-stop.org' arose.
+** The central code
+I read in full, at acf65e4e: 'server/refresh/id_rule.rs' (the
+five-question rule with the Restricted answer, the re-kinds,
+the quiet entombstoning and the policy's two silences), the
+viewnode merge in 'server/refresh/visit.rs' ('merge_siblings',
+'merge_into', the three merge helpers), the correction policy
+in 'server/refresh/buffer_corrections.rs', the goal's marking
+of restricted members in 'server/refresh/goal.rs' ('gnid_items',
+'unknown_or_restricted_members_relRepos'), 'server/refresh/
+tail.rs', and 'draw_search_buffer' in 'server/serve/handlers/
+text_search.rs'. Each does what the plan's agreed behavior
+says; where an agent deviated, the deviation is the better
+reading of the plan, and the record says why.
+** The docs' statement of the model
+'docs/data-model_technical.org' states the kinds with the
+Restricted vognode, the ID rule in its five questions, the
+nested tombstones as by design, the viewnode merge as step 2
+of the rungs, and the buffer corrections with their two
+silences; the glossary defines every word of the plan's "Words
+this plan uses" and says which are coinages.
+** The suites, by the record
+Every slice's record names the suites it ran and classifies
+every failure met; eleven of eleven ran the Rust suite green,
+and the client and integration suites where the plan asked,
+with the one pre-existing failure ('import-md-and-org', both
+clients) reported and never investigated. Slice 10 ran
+'bash/all-tests.sh' once, green but that failure, after the
+scripts were taught to keep 'tests/results/06/'.
+
+* Results
+** The run
+Eleven slices, 102 commits from d4252cc4 (the plan committed)
+to acf65e4e (slice 10's last), 320 files, about 12,500 lines
+added and 9,300 removed; plus ten commits of mine for the
+plan's corrections and the orchestrator's notes. Started
+21:33 UTC on 2026-10-26, finished 01:57 UTC on the 27th:
+4 hours 24 minutes of wall time, of which 262 minutes were
+agents working.
+** Durations, launched to report, in minutes
+Slice 0, 12; slice 1, 32; slice 2, 28; slice 3, 28; slice 4,
+23; slice 5, 32 (ten runs of the Rust suite included); slice
+6, 23; slice 7, 20; slice 8, 11; slice 9, 35; slice 10, 18.
+The longest were the ones that changed behavior across the
+server and both clients (1, 9) and the ones that ran the most
+suites (5).
+** Counts
+Rust tests: 956 before the plan, 991 after (the readiness
+check, the viewnode merge, the orphan warning, the Restricted
+vognode, the harness, the untested behaviors of the tests
+report). Emacs: 410 before, 406 after (the ghost-tombstone
+commands' tests went, the alist parser's and the "(default)"
+handling's, and new tests came for the detach and attach
+commands, the editor cases and the orphan warning). Neovim:
+400 before, 399 after. Integration: 34 of 35 throughout.
+** The commit rule
+Every slice's last code-modifying commit carried the change of
+its headline to DONE and its record; none stood as a commit
+of its own. Four slices' last commits do not say DONE in their
+subject (0, 1, 3, 4) but carry it; seven do. Agents committed
+per item or per part, 3 to 15 commits per slice, each naming
+the slice and the plan. No agent committed Jeff's four
+modified files, which stayed dirty through the run.
+** The problems file
+Moved to 'TODO/DONE/problems.org' by the run, eight entries:
+the merge's dropped claim; the readiness request blocking
+'skg-set-relRepo'; the two flake entries; the relRepo
+request's herald; the dismissed ghost; the save unhiding a
+restricted member; the vanishing unknown. Opened by the run,
+two: the gated graphnode stats are quadratic in a list's
+length under a restriction (slice 1, outside the plan's two
+functions); a requested hidden folder holding a dangling hide
+may be refused at save (slice 9, read not run).
+** What the record lost
+Nothing. Slice 5 taught 'bash/all-tests.sh' to keep the
+plan-numbered directories of 'tests/results/', and slice 10's
+full run kept the 120 files under 'tests/results/06/'. The
+reviewers' reports are copied beside this review as before.
+
+* Know: what the run did beyond the plan's words
+What each slice did that the plan did not spell out, from the
+records and the diffs; each is sound unless marked.
+** DONE ? Slice 0: the viewnode merge
+*** one "merged" buffer correction per result
+Not one per pairwise merge of the duplicates.
+*** buffer corrections name the vnid held after the tail
+The merge clears the result's vnid, so a name taken earlier
+would be stale.
+*** more requests ride with the merge
+The readiness request, a ghost's requests and an unknown's
+relationship request, as "the union of their requests" means.
+*** the readiness check compares leaf sets without the forest
+'NamedLeafSet'. In one edge case it refuses a save the forest
+would have dropped with a warning: stricter, and harmless.
+*** the refusal is its own error variant
+** DONE ? Slice 1: the refresh's rules
+*** a switch's tombstones are silent too
+The plan named only the widening's reinstatements; the deleted
+phase had entombstoned silently.
+*** what a quiet tombstone makes unsayable is quiet
+*** the policy is a parameter of the refresh
+It took the deleted hook's place in the rerender pipeline.
+*** the orphan check sits beside 'traverse.rs'
+The traversal cannot look upward. A root typed at top level is
+not warned of.
+*** the hide fix asks one question at both of the plan's lines
+*** the emptied-folder rule was built here and withdrawn
+Jeff withdrew it after the plan was committed; slice 2 removed
+it (the churn ledger).
+*** the stats pass went from 3.1 s to 0.14 s for 4,000 children
+Under a restriction 2.6 s remain in the gated graphnode stats,
+outside the plan's two functions, filed.
+** DONE ? Slice 2: the server's words
+*** the unknown keeps a warrant the printer does not write
+The docs give every child one.
+*** 'CompoundFolderParties' holds ancestry indices
+The stats pass derives its generations from it.
+*** "buffer corrections" reached every server name but two
+The two named for the wire field keep it.
+*** "headline with change facts" reached both clients
+In docstrings and keymap descriptions.
+*** two stale test headers rewritten
+** DONE ? Slice 3: the server's copies and shapes
+*** the content-view helper takes a 'Truth', not the runtime
+The search has no runtime generation.
+*** a latent bug in 'show_overrider' found and fixed
+Editability was released in the wrong order, so a buffer could
+hold two editable occurrences of one node; a test written
+first confirmed it, and stays as the regression test.
+*** a new failure caused and fixed within the slice
+Two restore tests: the goal's list counted dangling IDs against
+a denominator of nodes.
+*** the render side asks the graph alone
+Whether the restriction keeps a gnid out
+('restriction_keeps_out').
+*** the client suites ran though not asked
+Both lens engines changed for the WHEN grammar.
+** Slice 4: the clients
+*** Neovim had the same relRepo-herald bug
+Fixed in both, with one rendering case.
+*** the startup-warnings handler no longer calls the replacer
+Rather than changing it, since three other buffers rely on
+replacement.
+*** the kind reader defaults to the occurrence's kind
+In both clients, for metadata naming no kind; this changed
+Neovim's skgrepo inheritance walk to match Emacs.
+*** the 'graphStats' special cases were dead
+A batch-Emacs check over the 90 metadata forms the server
+writes showed it; the pitfall was rewritten for typed metadata
+only.
+*** the Neovim commands are ':SkgDetach' and ':SkgAttach'
+By that client's convention.
+** Slice 5: the tests and the harness
+*** the flake's cause was not the plan's guess
+Tantivy's file-watcher thread outlives a dropped index by one
+poll and can create a lock file while the folder is removed;
+a probe of 16,000 removals measured it.
+*** the fix
+Drop the index first, keep the placeholder index in memory,
+retry once, give the folders the process ID; ten runs passed,
+980 of 980 each.
+*** the fixpoint helper lives in 'server/test_utils.rs'
+The refresh's unit tests are in the library.
+*** the plan-number rule also keeps '04_1'
+*** a sentence went into 'coding-advice/common-gotchas.md'
+** Slice 6: the search in one phase
+*** the 'overPrivateText' exclusion stays after the refresh
+Excluding before it would release the text of folder members
+the refresh draws; so the handler renders a second time after
+the refresh's own render.
+*** the alias folder stays open; the other folders' members fold
+*** the index's 'is_title' field tells title from alias matches
+'TitleOrAlias'.
+*** the override folder's own goal draws an unknown
+For an override target on disk but not in the graph.
+*** a search during a save is no longer refused
+The guard that refused it served the two phases.
+*** the benchmark driver was committed
+** Slice 7: align the editors
+*** both editors order a headline's parts by a 'parts' list
+Added to 'shared/metadata-fields.json' and checked against the
+printer by a new conformance test; an editor opened and closed
+without a change sends back exactly what the server wrote.
+*** the editors' org conversion accepts a list holding one atom
+So a headline carrying '(ready)' can be opened, which neither
+client could do before.
+** Slice 8: the move
+*** 'update_buffer.rs' keeps its name
+For the rerender passes.
+*** 'multi_root_view_via_env' went to the test utilities
+It had no production caller.
+*** 'complete_viewforest_with_graph_straddle' renamed
+To 'refresh_diffView_viewforest'.
+*** functions moved next to their only caller lost 'pub'
+*** three tests renamed for what they test
+** Slice 9: the Restricted vognode
+*** a data-loss bug of the slice's own, caught before any commit
+A Restricted vognode's children came back 'noClaim' when the
+restriction widened, so the next save would have dropped them
+('reset_the_claims_of_children').
+*** re-kinds across a restriction change are silent
+As slice 1 decided for tombstones.
+*** a re-kind to Restricted keeps the occurrence's claim
+*** the chain builder draws a Restricted vognode
+For a restricted container with a visible record.
+*** two fixtures record their omitted members in private sections
+So that the tests go on testing omission.
+*** 'docs/override.org' and 'architecture.md' updated
+They were stale.
+** Slice 10: the user docs and the glossary
+*** "claimant" and "herald label" renamed, not defined
+To "claiming child" and "skgrepo label", rather than defined as
+synonyms.
+*** an integration test's README and comments rewritten
+'save_collateral_delete_then_edit_under_it' described retired
+code; the agent noticed the test never edits under a tombstone,
+only beside one.
+*** small text fixes
+A doubled "buffer buffer correction" and three "a editable"
+messages.
+*** the glossary's lost "owned" pair restored by a guess
+"owned rather than editable".
+*** the API doc cites an untracked file
+'bench-search-enrichment.org' under 'TODO/'.
+* The churn ledger
+What this plan built and then removed within itself.
+** The emptied-folder pruning rule, 231 lines built, 192 removed
+Built in slice 1 (f653ce81: 'RestrictedGoalList', a report
+of omissions from the goal computers, 'Walk::emptied_folders',
+one tail condition, three tests), removed in slice 2
+(25cbae67), 28 minutes apart. The reason, quoted from Jeff in
+'06_2_new-issues.org': "That rule 'if narrowing emptied it,
+delete it' feels rather ad-hoc and seems to be making the code
+unnatural. Right? Unless I'm wrong, let's discard it." Cause
+class: a requirement the human changed with new information,
+the information being the save fix of the same slice, which
+made an empty folder harmless. The plan had stated the rule
+in its agreed behavior; the note arrived after the plan was
+committed and before slice 1 reached it, and I read it only at
+slice 1's report.
+** The ghost-tombstone request's ride through the merge
+Slice 0 carried a ghost's tombstone request through the
+viewnode merge, as "the union of their requests" says; slice 1
+removed the request altogether, as the plan ordered. A few
+lines, zero cost: housekeeping the plan's order implied.
+** Totals
+Two items, one of them real: about 230 lines built and
+removed over half an hour, the one requirement Jeff changed.
+Nothing the agents chose was rejected by the review, and no
+mechanism rested on a false belief about the existing code;
+the two guesses the plan made about causes (the flake's, the
+prepass's difference) were both corrected by the agents from
+measurement, which is what the plan asked them to do.
+
+* Cost
+** Your time
+The review of plan 04.1 was discussed through the sidechannel
+from about 12:00 to 21:30 UTC on 2026-10-26, with the plan
+written, discussed and amended in the same span, by the saves
+of 'temp-for-claude-to-edit.org' (last at 19:43 UTC),
+'05_review.org' (20:10) and '06_2_new-issues.org' (22:19), and
+the commits 743a2d33 (18:09 UTC) and d4252cc4 (20:13 UTC).
+About eight hours, in rounds of ten to thirty minutes, most of
+it on the review's threads and the plan's questions; the run
+itself asked nothing of you.
+** The machine's time
+262 minutes of agent time over 4 hours 24 minutes of wall
+time; about 4.2 million tokens across the eleven slice agents
+(the smallest 207 thousand for slice 8, the largest 562
+thousand for slice 9), plus my own reading and notes between
+slices, plus the seven reviewers below.
+
+* What the user sees differently
+** By decision
+Duplicate viewnode siblings merge into one headline that keeps
+the claim, unfolds if any was unfolded, and gets a fresh vnid.
+A save with contradictory readiness requests on one change leaf
+is refused, naming both headlines. Your own deletions and a
+skgrepo-set switch no longer fill the warnings buffer with
+buffer corrections. A headline typed under a parent that reads
+no claims is saved as before and the save says so: "created an
+orphan". The ghost-tombstone commands (C-c r t, C-c r T and
+the Neovim twins) are gone; a ghost stays until restored or
+committed. A skgrepo-set switch leaves an emptied editable
+folder in place, empty, and it fills again when the set
+widens; where a visible record names a restricted node, a
+Restricted vognode stands, showing "restricted" and the gnid,
+and the save keeps every hide it could not show. Detach
+(C-c s t) and attach (C-c s a) exist. A text search answers
+with one message holding the enriched buffer: no early list of
+hits, no read-only period, no second repaint; a hit found by an
+alias shows the node's title with its alias folder open. The
+metadata editor shows readiness requests and orders a
+headline's parts as the server does. The per-view headline in
+the warnings buffer says "Buffer corrections", and startup
+warnings go under their own headline rather than erasing it.
+The relRepo request's herald reads "request:~NAME" in both
+clients. A rerender of a view with thousands of children is
+twenty times faster. Hand-edited metadata that breaks the
+grammar is refused with the part named, which the docs now
+say.
+** By accident, or unforeseen
+A search during a save is no longer refused (slice 6): it
+behaves as a content-view request does. Neovim's skgrepo
+inheritance walk treats metadata naming no kind as a node, as
+Emacs did (slice 4). The editor can open a headline carrying
+'(ready)' (slice 7). The search's overridden folder shows an
+unknown for an override target on disk but not in the graph
+(slice 6). A requested hidden folder holding a dangling hide
+may be refused at save (slice 9, filed, unconfirmed).
+
+* The reviewers' reports
+Seven Opus agents read the range, each with one question of
+'code-reviews.org', the new "Awkwardness" among them, and
+wrote a report of about 200 lines to 'tests/results/06/review/',
+copied beside this review as '07_1_review-reports/'. Each was
+told the previous review's findings on its question, so each
+says what was fixed, half fixed or still there. Four claims
+were run, not traced: the Neovim writers (a throwaway spec,
+below), the duplication report's client claims, the tests
+report's probes of the refresh, and the probes report.
+** DONE Duplication ('duplication.org', 11 findings)
+Of the previous sixteen: nine fixed, six half fixed, one still
+there (the chain's old builder, which the plan left and slice 9
+extended with a Restricted arm).
+*** DONE AGREED : Neovim's delete and flag skip the one request writer
+**** problem
+Run. Slice 4 routed Emacs's delete, delete-recursive and flag
+through 'skg--write-edit-request'; the Neovim twins still merge
+by hand, so deleting a node that holds a relRepo or merge
+request writes '(editRequest (relRepo pub) delete)', which the
+server refuses; and Neovim's 'write_edit_request' places the
+form by 'parts' and then drops the placement and appends, so a
+new request, and the new detach's 'noClaim', land after the
+diff facts. A throwaway spec confirms all of it
+('07_1_review-reports/nvim-writer-check/'): delete, merge and
+detach misplace; delete appends beside a merge; the flag
+command cannot reach the append case, since it refuses a
+headline that already has a request.
+**** proposal
+The four Neovim callers write the whole metadata that
+'with_edit_request' returns, which already places the form at
+its 'parts' rank, and the detach writer inserts 'noClaim' at
+its rank; a buffer-level Neovim test like Emacs's. Decide 2.
+*** DONE AGREED : The restriction rules are spelled about seven times
+**** problem
+The record rule ('relationship_member_is_visible' omits the
+'is_all' test the gated accessors include; the two differ only
+on a relRepo the config does not name), the home rule (the
+render side asks 'restriction_keeps_out'; the save's
+'member_is_visible' still falls back to the disk;
+'titles_by_gnids' asks the graph, then Tantivy, then the
+disk), and the hidden-outside folder's inside computed by the
+goal and by the save.
+**** proposal
+Two methods on 'SkgrepoRestriction', 'record_is_visible
+(relRepo)' and 'node_is_restricted (home)', used by the save
+and the refresh alike, the disk fallback kept only where a
+caller shows it needs one. Decide 7.
+*** DONE AGREED : The rerender paths share the view, not the pass
+**** problem
+The loop, the apply-and-send block and the candidate collector
+are each written twice, and the text-release decision is made
+at five sites, each building its own response.
+**** proposal
+The save's collateral views go through the same pass as the
+stream's; one function collects the candidates; one helper
+decides the text release and builds the answer, called from
+the five sites.
+*** DONE AGREED : 'goal.rs' gathered the goal computers without merging them
+**** problem
+"The pid, else the raw ID" three ways in the file and a fourth
+in the save; the subscriber subtraction twice; the recorder's
+list read twice, with a dead branch.
+**** proposal
+One function for "the pid, else the raw ID", called by all
+four; one subtraction; the dead branch gone.
+*** DONE Smaller
+**** DONE AGREED : A readiness request still blocks the flag request
+***** problem
+Run in Emacs. The bug slice 4 fixed for relRepo, in a second
+place, in both clients.
+***** proposal
+One predicate per client that skips readiness parts, used by
+every command that asks "does this headline hold an edit
+request". Decide 4.
+**** DONE AGREED : Claims read and set by hand
+***** problem
+Beside 'claims_membership' and 'set_claim', two sites read
+the claim inline and one sets it by hand.
+***** proposal
+'claims' and 'set_claim' as methods of the viewnode, with the
+unification of the two gnid-only kinds, which absorbs the
+paired arms. Decide 5.
+**** DONE AGREED : Tests: copies the run added
+***** problem
+One switch behavior asserted five times; the new search test
+copies two shared helpers; 'switch' and 'open_view_of_r' still
+copied; the editor case file covers fifteen older hand tests.
+***** proposal
+Fold the five into the pinned-buffer test; use the shared
+helpers; delete the fifteen pairwise. Decide 10.
+**** DONE AGREED : The search builds its stub twice over
+***** problem
+'build_search_viewforest' and 'stub_root_of_hit' build roots
+that ask for their containers folder, as the fresh content
+view's stub does.
+***** proposal
+One stub helper for a root asking for its containers folder,
+shared by the search and the fresh content view. Decide 10.
+** DONE Vocabulary and reification ('vocabulary.org', 14 findings)
+Of the previous nineteen: thirteen fixed, five half fixed, one
+still there (extent, extension, extend, which the plan never
+took).
+*** DONE AGREED : "Record" and "restricted node": named, unsaid in code
+**** problem
+The glossary defines both; the code asks the two questions
+under eight names, one of which ('member_is_visible') now
+contradicts the glossary's "visible member", and another
+('restriction_keeps_out') also says yes for an absent gnid.
+**** proposal
+The two methods of Decide 7, named for the glossary's words:
+'record_is_visible' and 'node_is_restricted'.
+*** DONE AGREED : "Reads claims" is said four ways
+**** problem
+The orphan message says "takes no members", COMMANDS its own
+phrase, the clients keep 'editable-parent-p' and
+'node-member-p', and 'skip_non_claimants' brought "claimant",
+which slice 10 declined and which 'multiple_nodes.rs' uses
+for an ID conflict.
+**** proposal
+'reads-claims-p' and 'claims-membership-p' in both clients,
+'only_claiming_children' for the helpers' flag, and every
+message says "reads no claims". Decide 10.
+*** DONE AGREED : 'RerenderOptions' is a second 'RefreshMode'; two mirror paths
+**** problem
+The enum repeats the mode's two variants under "options", and
+slice 8's 'diff_view/refresh.rs' mirrors the older
+'refresh/diff_view.rs'; the two import each other through
+'update_buffer.rs'.
+**** proposal
+'RerenderMode', built from the view and not from an 'Option';
+'diff_view/refresh.rs' becomes 'diff_view/buffer_rerender.rs',
+and the pass context moves where both can import it. Decide
+10.
+*** DONE AGREED : "Restricted vognode": a capital does the work
+**** problem
+Its siblings are single nouns; this one is two words of the
+implementation that users meet in a buffer correction and in
+COMMANDS, parted from "restricted occurrence" and "restricted
+node" by a capital.
+**** proposal
+With the unification the type is 'GnidOnlyVognode' and the kind
+atom stays 'restricted'; user text says "a restricted headline"
+(the correction message, COMMANDS), and the glossary marks the
+coinage. Decide 12, settled so unless you prefer another word.
+*** DONE Smaller
+**** DONE AGREED : 'CompoundFolderParties' is the magic indices under names
+***** problem
+It counts 0 where the glossary's ancestor generation counts 1.
+***** proposal
+Return the two 'NodeId's, as agreed under Awkwardness.
+**** DONE AGREED : The viewnode merge has four spellings
+***** DONE problem
+'merge_siblings', 'SiblingsMerged', 'merge_of_siblings.rs' and
+the glossary's title.
+***** DONE proposal
+'viewnode_merge', 'ViewnodeMerged', 'viewnode_merge.rs'.
+Decide 10.
+***** DONE jeff : clarify in a comment by the type
+that viewnodes are only ever merged when they were siblings.
+****** DONE Claude says: noted
+The doc of 'viewnode_merge' and the comment on 'ViewnodeMerged'
+will say that only siblings standing for one gnid under one
+parent are ever merged, and that nothing else in the refresh
+merges viewnodes. Into the plan with Decide 10.
+**** DONE AGREED : The policy's exceptions outgrew its definition
+***** problem
+Two docs name two silences; the policy has four.
+***** proposal
+One sentence in the module header and one in the glossary
+naming all four; with Decide 6, the enum names them.
+**** DONE "Orphan" had three older senses in the code
+***** DONE problem
+The parser's "orphaned headlines", the weave's "orphaned run",
+the database's "orphaned records".
+***** DONE jeff : just include the noun
+Don't say 'orphan' if it's not clear what kind;
+instead, say 'orphan viewnode', 'orphan gnode', etc.
+****** DONE Claude says: agreed; the proposal
+Every "orphan" takes its noun where the kind is not plain: the
+parser's "orphan headline" (a headline deeper than its parent
+allows), the weave's "orphan run", the database's "orphan
+record", and the new sense "orphan node" in the save's warning
+and the docs. The glossary entry says the noun is required.
+Into the plan with Decide 11.
+******* DONE jeff : never "node"
+Rather, "graphnode" or "viewnode" (or,
+but this might never be user-facing, "treenode").
+******** DONE Claude says: agreed
+"Orphan graphnode" in the save's warning, the docs and the
+glossary; "orphan viewnode" where a viewnode is meant. Into
+the plan with Decide 11.
+**** DONE AGREED : "Enrichment": the product in one doc, the act in another
+***** problem
+And "enriched" and "in one message" survive after the second
+phase went.
+***** proposal
+Keep the product sense only; drop "enriched"; rename the two
+test files for the search buffer rather than the protocol it
+replaced ('search_buffer.rs', 'search-buffer/').
+**** DONE 'EditabilityAndClaim' restates two fields
+***** DONE problem
+'editable : bool' restates 'Editability' and 'claims' the
+field 'claimsMembership'.
+***** DONE proposal
+None strictly simpler: it replaced two positional bools, which
+was the point; leave it until the 'ChildFlags' of the old
+report is built, if ever.
+***** DONE jeff : and insert a TODO comment
+by the type's definition, explaining that intention
+****** DONE Claude says: noted
+The comment will say that the pair stands in for the
+'ChildFlags' of the two flags every child has, proposed by the
+review of plan 04.1 and not built, and that it goes when that
+is. Into the plan with Decide 10.
+**** DONE The plan's own words
+***** problem
+The plan listed "the walk" among words that go, wrongly; and
+my global replace mangled its vocabulary paragraph.
+***** proposal
+The second is fixed (fe332811); the first needs nothing, the
+docs are right.
+** DONE Readability and arrangement ('readability.org', 12 findings)
+Of the previous fourteen: seven fixed and one mostly, four half
+fixed, one left by the plan ('ViewnodeMetadata'); all 24 old
+stale comments resolved, one rewritten wrong again.
+*** DONE The clients are aligned in the table, not around it
+**** DONE problem
+Today the two clients share one fill-in algorithm, the same
+field names, the placement of a headline's parts from the
+shared 'parts' list in their pure functions, and two display
+functions each. They still differ in where their helpers live
+and what they are called, in the headline reader (three
+functions in Emacs, two in Neovim), in the names of the
+readiness gestures, in the name of the editor's entry point,
+and in Neovim's buffer writers, which ignore the parts order.
+**** DONE proposal
+The writers will be fixed (Decide 2), and Neovim's helpers
+will move beside their Emacs twins under the names the case
+file uses, which is cheap. The full alignment of names and
+files would not be simpler than the drift it removes, so the
+rest will stay as it is and 'nvim-client-deviations.org' will
+record it.
+**** DONE jeff : no, let's fully align them
+***** DONE Claude says: noted; what full alignment is
+The two clients will have the same modules under the same
+names, the same functions under the same names (one headline
+reader each, the readiness gestures, the editor's entry, the
+startup-warnings handler), the same homes for the helpers,
+and the shared case file as the oracle for the editor; the
+herald hints Emacs alone shows in the editor will either come
+to Neovim or go from Emacs, your call when the slice meets it.
+'nvim-client-deviations.org' will then list only what Neovim
+cannot do. Moderate to costly, a slice of its own in the
+plan; Decide 10 records it.
+*** DONE DONE-CLAUDE The policy is described too narrowly
+**** WHY-CLAUDE
+Settled under Awkwardness, "Two ways to silence a buffer
+correction" (the enum names every silence), and under
+Vocabulary's "The policy's exceptions outgrew its definition"
+(one sentence in each doc).
+**** problem
+The module header and the glossary name two silences; the
+policy has four; and 'skgrepo_sets.rs''s comment is wrong
+again since slice 9.
+**** proposal
+One sentence in each, and the comment corrected; with Decide
+6 the enum's cases are the list.
+*** DONE DONE-CLAUDE Always-Some Options, threaded parameters
+**** WHY-CLAUDE
+Settled under Awkwardness, "three pass-through layers of
+rerender preparation" (one request struct and one function)
+and "the stats pass threads ten parameters through recursion"
+(a pass struct).
+**** problem
+Three layers of rerender preparation each pass the restriction,
+the policy and an options function; every production caller
+wraps the restriction in 'Some'; the diff-view refresh takes a
+restriction its doc says cannot matter; the stats recursion
+passes ten parameters.
+**** proposal
+The one request struct and function agreed under Awkwardness;
+'&SkgrepoRestriction' taken whole; the stats pass struct.
+Decide 10.
+*** DONE Smaller
+**** DONE AGREED : The re-kinds are told unevenly
+***** problem
+Today the way back from Restricted to an occurrence is a
+27-line inline arm with a one-line comment, 'claim_of' repeats
+'claims_membership', and the Unknown and Restricted arms copy
+each other.
+***** proposal
+The way back will be 'rekind_to_occurrence' with a doc, and the
+unification will remove the paired arms and the second claim
+reader. Decide 5.
+**** DONE AGREED : The readiness-conflict loop names its sides wrongly
+***** problem
+Today the loop calls the earlier request 'ready' and the later
+'unready', whichever each is, and nests six deep.
+***** proposal
+The sides will be 'earlier' and 'later', or a helper will take
+each pair. Decide 10.
+**** DONE AGREED : 'chain.rs''s module doc is attached to a 'use'
+***** problem
+The file opens with '///', which documents the first 'use'.
+***** proposal
+It will open with '//!'. Decide 10.
+**** DONE AGREED : Leftovers in 'goal.rs'
+***** problem
+Today 'raw_outbound_members' retests what its caller tested,
+so its else branch is dead; one wrapper wraps one call; the
+hidden-outside goal keeps 'wt_' prefixes from when it had a
+HEAD side; a closure repeats a match.
+***** proposal
+Each will go with the merge of the goal computers above.
+Decide 10.
+**** DONE AGREED : DONE-CLAUDE The magic depths, half fixed
+***** WHY-CLAUDE
+Settled under Vocabulary's "'CompoundFolderParties' is the
+magic indices under names" and under Awkwardness: the parties
+are returned as tree handles.
+***** proposal
+The 'NodeId's of the parties; one named function for the step
+from an ancestor to a generation, if any caller still needs it.
+**** DONE AGREED : DONE-CLAUDE The search's second render; unread 'config'
+***** WHY-CLAUDE
+Settled under Awkwardness, "The refresh renders; the search
+renders again": the caller renders.
+***** proposal
+The caller will render, and the unread parameter will go.
+Decide 10.
+**** DONE AGREED : Untyped lets, ragged columns, fourteen stale doc comments
+***** problem
+The readability report lists a dozen untyped lets, columns the
+renames left ragged, and fourteen stale doc comments of 46
+sampled.
+***** proposal
+Each will be fixed as the report lists it. Decide 10.
+** DONE User documentation ('user-docs.org', 14 findings)
+Of the previous fifteen: eleven fixed, four half fixed. Counts:
+89 Emacs commands with 127 bindings, 85 Neovim commands with
+115 keys, 26 requests, every one documented under its binding.
+*** DONE AGREED : The parents that read no claims are listed three ways
+**** problem
+The code has one rule, 'parent_reads_claims'; the docs list the
+parents three ways, and one of the lists says a new root gets
+an orphan warning, which it does not.
+**** proposal
+The glossary will state the list once, both COMMANDS docs will
+cite it, and the root sentence will be corrected. Decide 11.
+*** DONE AGREED : The glossary's gaps and contradictions
+**** problem
+Today the glossary has no entry for "herald"; "detach" is "no
+request" in the glossary and a request in the heralds doc; the
+buffer-corrections entry sits in the section users are told
+to skip; "hide" and "orphaned" are used against the glossary's
+own reservations; and COMMANDS says bare "merge" and "ladder".
+**** proposal
+The glossary will gain an entry for "herald"; the heralds doc
+will say that the "detach" herald is styled as a request and
+is none; the buffer-corrections entry will move to the user
+section; the reserved words will be replaced. Decide 11.
+*** DONE AGREED : The Neovim deviations note on the fork confirmation is wrong
+**** problem
+The server's notification names no key and says "save again",
+which Neovim's ':w' refuses there; the fork buffer's header
+shows Emacs keys untranslated; and two Neovim messages name
+Emacs commands.
+**** proposal
+The note will be rewritten, and the header's keys and the two
+messages will join Neovim's translation table. Decide 11.
+*** DONE AGREED : The switch erases unsaved edits; only the doc says so
+**** problem
+The switch's prompt does not say that unsaved edits are lost,
+where two other commands refuse while any view is dirty.
+**** proposal
+The switch would refuse likewise, with the same message.
+Decide 8; your call.
+*** DONE Smaller
+**** DONE AGREED : The API doc cites the untracked benchmark report
+***** problem
+'api-and-formats.org' cites 'bench-search-enrichment.org'
+under 'TODO/', which git does not track.
+***** proposal
+You would commit it, or the numbers would be inlined.
+**** DONE AGREED : Detach and attach's refusal by kind undocumented
+***** problem
+Both commands refuse a headline whose kind carries no claim,
+which the docs omit, and "keeps its ⊥" is wrong for a pending
+detachment.
+***** proposal
+One sentence each, and the ⊥ sentence corrected. Decide 11.
+**** DONE AGREED : 'C-c s r' omits the Restricted vognode
+***** problem
+The command accepts one; its entry names content children,
+partner-folder members, aliases and unknowns only.
+***** proposal
+The entry will name it. Decide 11.
+**** DONE AGREED : The rerender's own messages buffer is documented nowhere
+***** problem
+A rerender's errors and warnings go to a buffer of their own
+in each client, which no doc names.
+***** proposal
+One sentence under "where a save's warnings go" will name it.
+Decide 11.
+**** DONE AGREED : 'RefreshMode''s parts miscounted; a dozen undefined terms
+***** problem
+The glossary gives the diff-view mode two parts where the code
+has three, and about a dozen terms of art the docs use are
+undefined.
+***** proposal
+The count will be corrected and the terms defined as the
+report lists them. Decide 11.
+** DONE AGREED TO ALL : Tests ('tests.org')
+Counts at acf65e4e: nextest 991 of 991, Emacs 406 of 406,
+Neovim 399. Of the previous report's untested behaviors, all
+five ranked ones and most of the sixth are fixed, the
+'debug_assert' and the sweep over search and edited buffers
+remain; one of its claims (the ghost's body untested) was
+wrong. Of the plan's agreed behaviors: the readiness refusal,
+the two silences, the detach and attach commands, the
+one-message search and the save's hide rule are ASSERTED; the
+viewnode merge, the orphan warning, the Restricted vognode and
+the alias-found hit PARTLY; the emptied folder, the linear
+stats pass, the logs rule and the harness NONE.
+*** The diff view under a restriction: untested, and wrong
+**** problem
+A throwaway probe of the refresh showed it. A switch rerenders
+open diff-view buffers, though the diff view opens only under
+"all". Under "public" the diff view leaves out a restricted
+member whose record is visible, so no Restricted vognode with
+change facts appears, and it shows a deleted private node's
+ghost with HEAD's title. The second is a leak of restricted
+text, probably older than this plan, since the deleted phase
+never touched ghosts.
+**** proposal
+The diff view would be gated as the content view is: the ghost
+question would ask the restriction about HEAD's node's home,
+so that a restricted node is never a ghost anywhere, and the
+diff view's goal would keep a restricted member with a visible
+record as a gnid-only vognode with its change facts. Two tests
+would drive a switch over an open diff-view buffer, one with a
+deleted private node and one with a private member under a
+visible record. Decide 1; your second open question.
+*** The viewnode merge is PARTLY tested
+**** problem
+The overrider exception and the carried node edit and
+relationship requests have no test, in the code where the last
+review found its one defect.
+**** proposal
+Two unit tests will go into 'viewnode_merge.rs'. Decide 9.
+*** Gaps the run left
+**** problem
+The emptied-folder rule lost its test when slice 9 filled
+those folders, though the probe shows the behavior holds.
+Nothing tests text refused on a Restricted line, its parsed
+options, a relRepo or readiness request applied to one by the
+save, or its change facts in the diff view; the orphan
+warning's other parents and Neovim's display; the
+ghost-tombstone atom's refusal; or the stats pass. And
+'run_with_test_stores' still uses 92 fixed '/tmp/tantivy-'
+paths without the process ID.
+**** proposal
+Each will get one test as the report names it, the stats pass
+by a count of lookups rather than time, and the index paths
+will take the process ID in 'run_with_test_stores' as the
+fixture paths do. Decide 9.
+*** Copies and names
+**** problem
+Today a 37-line helper trio exists in two collateral test
+files, 'mk_pair' four times beside the shared helper, the new
+search test copies two shared helpers, and seven Lua specs
+each write a 'buffer_with'; 'merge_of_siblings.rs' is named
+for the retitled entry, two comments say "survives",
+'after_a_switch (true)' is a positional boolean, and whole
+switched buffers are pinned with their stats.
+**** proposal
+The trio and 'mk_pair' will move to 'tests/shared/', the
+search test will use the shared pair and reader, 'buffer_with'
+will move to 'tests/nvim/helpers.lua', the file and the
+comments will be renamed, and 'after_a_switch' will take a
+named value. The pinned buffers are a judgment: an outline of
+kind, gnid and vnid would say more and break less, but the raw
+text is the clients' contract, so they will stay. Decide 10.
+** DONE Probes and performance ('probes.org')
+Against an isolated debug server on scratch data, each
+behavior of the plan driven end to end over one persistent
+connection, with the exchanges kept beside the report; where
+a result looked old, rerun against a build of d4252cc4.
+*** Seven of ten passed as agreed
+The viewnode merge (one result, a fresh vnid, unfolded,
+claiming, one "merged" correction, and the fixpoint on the
+save back); the contradictory readiness refusal naming the
+leaf and both vnids, and agreeing requests accepted; no
+buffer correction for the saver's own delete, a narrowing or
+a widening; under a restriction the emptied folder stays, the
+Restricted vognodes carry a gnid and no title, a save
+unchanged leaves both files byte-identical, deleting a
+Restricted hide's line removes that hide alone, and widening
+restores the occurrences with their children claiming; the
+search answers one message with the alias hit's title and its
+alias folder open; detach and attach as the save sees them; a
+nodeMerge and a switch each followed by a byte-identical save
+with no correction.
+*** DONE AGREED : The dangling hide (j)
+**** problem
+A requested hidden folder holding an unknown makes the save
+refuse the buffer, under 'all' as at the base and under 'pub'
+since slice 9, with a spurious 'noClaim' clause in the
+message; the user cannot save until deleting the folder.
+**** proposal
+The hidden folder will accept an unknown as the overridden
+folder does, and the refusal will lose its spurious clause.
+Decide 3.
+*** DONE AGREED : The orphan under a tombstone (d)
+**** problem
+A bare headline typed under a tombstone is refused for want of
+a skgrepo, as at the base, so the plan's "saved as today" was
+wrong for a tombstone. With its skgrepo written it is saved
+and warned of, and the warning says "not yet saved" of a node
+the same save created.
+**** proposal
+The skgrepo inheritance would pass through a tombstone to the
+nearest occurrence above, so that the headline is saved and
+warned of, and the warning's wording would be fixed. Decide 3;
+your third open question.
+*** DONE AGREED : A view whose root the restriction keeps out is lost
+**** problem
+A view whose root the narrower set keeps out becomes a
+tombstone root and never comes back when the set widens, since
+a root has no parent goal to name it. On the copy of your data
+the narrowest set emptied all twenty large views and the switch
+back to 'all' restored none, as at the base.
+**** proposal
+A restricted root would become a gnid-only vognode, since the
+view is the user's own request and its gnid reveals nothing
+they did not ask for, and an occurrence again on widening.
+Decide 1; your first open question.
+*** DONE AGREED : An alias recorded in a restricted section shows
+**** problem
+Such an alias shows, text and all, under the restriction, in
+a fresh view and after a switch, as at the base.
+**** proposal
+The property goal would omit an alias whose record is
+restricted, as it omits a relationship's. Decide 1.
+*** DONE AGREED : Corrections a gesture of your own causes
+**** DONE problem
+Today a Restricted vognode that loses its hide is reported
+"Entombstoned" by a vnid the same refresh prunes; a nodeMerge
+reports four corrections its own request caused; and after a
+switch a member whose record alone is restricted is reported
+"Marked noClaim".
+***** DONE jeff : what do you mean "loses its hide"?
+****** DONE Claude says: the hide it stood for was deleted
+In probe (e) the subscriber r had asked for its hidden folder
+too, so the private node HH, which r hides, stood twice:
+as a Restricted vognode in the write-protected hidden folder,
+and as one in the hidden-outside folder, where the hide can
+be edited. I deleted the line in the hidden-outside folder
+and saved, which unhid HH, so r's file no longer records the
+hide. At the rerender the vognode in the hidden folder stood
+for a relationship that no longer exists; the refresh
+entombstoned it, reported "Entombstoned a headline that can
+stand here for nothing" naming its vnid, and then pruned the
+childless tombstone, so the correction named a headline no
+longer in the buffer. Under 'all', the same gesture on a
+public node leaves the occurrence in the hidden folder, marked
+'noWarrant', and reports nothing; the two cases should agree.
+**** DONE proposal
+The policy would exempt what a save's own requests cause, and
+no correction would name a headline the same refresh prunes.
+Decide 6; your fourth open question.
+*** DONE AGREED : Timing
+**** problem
+The restricted stats pass is still quadratic in a list's
+length: 0.8 s at 2,000 siblings and 3.1 s at 4,000, where the
+unrestricted case takes 99 ms and 177 ms. On the copy of your
+data the server is ready in 7.2 s; a search for "something"
+takes 124 ms title-only and 268 ms with bodies, one message
+each, against 222 and 374 ms under the two phases; a rerender
+of the twenty largest views takes 0.35 to 0.38 s; and a
+switch takes 0.24 to 0.40 s while views remain.
+**** proposal
+The gated graphnode stats would take the same per-recorder
+map, when convenient; nothing else in the refresh needs
+optimizing now. Decide 13.
+** DONE Awkwardness ('awkwardness.org', 12 findings)
+*** DONE The Restricted vognode is a twin of the unknown
+Same five fields; about 37 sites handle the pair in paired
+match arms, the vognode is built in four places, and the
+printer already invented 'GnidOnlyVognode' to treat them as
+one. The duplication report found the twins drifting: the
+distinctness checks count a 'noClaim' unknown but not a
+'noClaim' Restricted vognode, and the relation-folder check
+admits a Restricted vognode in every folder but an unknown in
+one. One struct with a field naming why: moderate, and best
+done before more rules learn the pair. Decide.
+**** DONE jeff : agreed, unify
+***** DONE Claude says: noted; the shape
+One struct for a vognode that stands for a gnid and shows
+nothing of a node, with the fields the two share and one
+field naming why it shows nothing: the gnid resolves to no
+node, or the node is restricted. The printer already has the
+name 'GnidOnlyVognode' for its borrowed view of the pair; the
+struct can take it, and the why field 'GnidOnlyKind { Unknown,
+Restricted }'. The wire atoms, 'unknown' and 'restricted', the
+heralds and the parser's refusals stay as they are, keyed on
+the field. Decide 5 of the review is settled so.
+****** DONE jeff : let's instead call it UnshowableVognode
+and explain in the comment (and glossary, if it's user-facing,
+or the technical part of the glossary if not) that the only
+ways currently known for a graphnode to be unshowable
+are those two.
+******* DONE Claude says: one collision to weigh, then as you say
+"Unshowable" sits beside "unsayable", which the glossary and
+the refresh already use for a descriptor that stands where its
+kind may not ('is_unsayable' in 'ancestry.rs'): two ordinary
+near-synonyms with two technical meanings, the pair
+'names.org' asks us not to make. If that does not trouble you,
+'UnshowableVognode' it is, with the why field
+'UnshowableBecause { NoSuchNode, Restricted }', and the comment
+and the glossary's technical section saying that the only two
+ways known for a gnid's node to be unshowable are that no node
+answers to the gnid and that the restriction keeps the node
+out (for an unknown there is no graphnode, so the sentence
+says "a gnid's node"). If it does trouble you, the printer's
+'GnidOnlyVognode' says what it holds without a second
+"un-" word. The wire atoms, heralds and messages stay as they
+are either way; the user never meets the type's name.
+******** DONE oh sure, never mind
+Just put a comment by the definition of GnidOnlyVognode
+explaining why not to do the rename.
+********* DONE Claude says: noted
+The comment on the struct will say that the kind is not named
+"unshowable" because "unsayable" already names a descriptor
+out of place, and that the two reasons a gnid's node cannot
+be shown are that no node answers to the gnid and that the
+restriction keeps the node out. Into the plan with Decide 5.
+*** DONE Two ways to silence a buffer correction
+The policy silences at recording, as the plan asked; four
+older callers pass the default and throw the corrections
+away. An enum with a 'ReportNone' case, passed by those four,
+would leave one mechanism; the set-plus-bool struct would
+become an enum naming its states. Cheap.
+**** DONE jeff : seems efficient. Would it be elegant?
+***** DONE AGREED : Claude says: yes, on one condition
+The caller's situation is one word: 'ReportAll', 'AfterSave'
+with the deleted gnids, 'AfterRestrictionChange', or the case
+for the four callers that draw a buffer nobody reads the
+corrections of (a fresh view, a search, the diff view's first
+draw, the integrate request). Each predicate of the policy
+becomes one match, and a caller that today drops the value
+says instead why there is nothing to report. The condition:
+the fourth case must be named for the reader, not for the
+change; 'Unread' or 'NobodyListens' says that the refresh
+corrects as always and no one is told, where 'ReportNone'
+could be read as "do not correct". With that name it is the
+elegant form, since the policy then states every situation
+the refresh can be called in and nothing else.
+*** DONE The refresh renders; the search renders again
+'tail::finish' fuses the derived facts, the prune, the vnids
+and the render, so the search reruns the prune and renders
+after folding and excluding, and the integrate path drops a
+render too. Letting the caller render is cheap; the agent of
+slice 6 saw it and left it, as the plan did not ask.
+**** DONE jeff : seems efficient. Would it be elegant?
+***** DONE Claude says: yes; it is the natural division
+The refresh's work ends with a corrected forest and its
+buffer corrections; rendering is a reading of the forest, and
+only the caller knows whether it will fold, exclude or append
+before anyone reads it. So 'finish' would do the derived
+facts, the prune and the vnids, and return the forest, and
+every caller would call 'viewforest_to_string' itself, once,
+when it is done. The search then prunes a second time after
+its exclusion, by the same function it calls today, which is
+the one honest cost: a prune is a step a caller may need twice.
+The alternative, a flag on the refresh saying "do not render",
+is the inelegant one, a parameter about the caller's plans.
+****** DONE jeff : is this an O(N) problem?
+******* DONE Claude says: no; linear work done twice
+A render walks the forest once and prints each headline, so
+it is linear in the buffer's size, as the prune is; the search
+does both a second time, so the cost is twice a linear step,
+not a change of order. In the benchmark on your data a search
+of 724 hits took 268 ms in all, the renders a small part of
+it. The finding is about shape, that the tail fuses four
+steps so a caller that needs to edit the forest after the
+refresh must redo two of them, not about time.
+******** DONE jeff : let's do it
+********* DONE Claude says: noted
+The caller renders; the tail stops at the vnids. Into the plan
+with Decide 10.
+*** DONE The walk's editability is three structures kept in step
+'editable_gnids', 'drawn_editable' and
+'had_editableView_request' mirror the tree's own editability
+and are updated by hand at eight sites; the new
+'hold_editability' and 'release_editability' cover one set. A
+site that forgets one leaves the budget or the extent wrong
+silently. Two methods doing every set: cheap.
+**** DONE jeff : seems efficient. Would it be elegant?
+***** DONE Claude says: two methods suffice; one map is elegant
+The three sets hold two facts. 'editable_gnids' and
+'drawn_editable' are one fact seen twice: which occurrence
+holds a gnid's editability, and whether this refresh drew it
+(the budget charges only those). One map from gnid to the
+tree-id of its editable occurrence, each entry marked drawn
+or not, replaces both, and the two questions ("is this gnid
+held?", "did we draw this one?") become lookups in it; nothing
+can then disagree. 'had_editableView_request' is a different
+fact, which occurrences carried the request, and stays a set.
+The two methods the report proposes are the cheap fix and keep
+the three sets; the map is the elegant one and costs little
+more, since the eight sites become reads and writes of one
+thing. I would do the map.
+****** DONE jeff : where "position" means vnid?
+******* DONE Claude says: no, the tree handle, not the vnid
+Position means the 'NodeId' of 'ego_tree', the handle to a
+viewnode's place in the forest during one refresh, which the
+walk's sets hold today ('drawn_editable : HashSet<NodeId>').
+It lasts for the refresh only; the vnid is minted at the tail
+for viewnodes lacking one and lives in the buffer's text
+between refreshes. The walk never keys on vnids, since the
+headlines it draws have none yet.
+****** DONE jeff : why do we need to remember which ones had_editableView_request?
+******* DONE Claude says: because the fact leaves the tree
+The set records "this occurrence is editable because the user
+asked for it in this refresh", a fact the tree stops holding
+in two ways. The request atom is consumed when the request is
+fulfilled, so an occurrence made editable by a request looks
+afterwards like one that was editable all along; and the
+request cascades ('extend_requested_content'): a
+write-protected child that claims membership becomes editable
+as if it had carried the request, though it never did.
+
+Two later rules read the fact. In the diff view the extent rule
+draws content, and charges the node budget, only for
+occurrences the user asked to make editable this refresh
+('extent.rs', 'charges_node_budget'); the rest of the diff
+view shows the content the buffer already had. And the
+cascade itself recurses on it. So it is a second fact beside
+"which occurrence holds a gnid's editability", and the map I
+proposed replaces only the first two sets, not this one. A
+cleaner home for it would be a transient mark on the
+occurrence's 'Editability' that the printer never writes,
+instead of a set keyed by handle; same information, kept where
+the occurrence is.
+******** DONE jeff : transient in the sense that it never reaches the buffer?
+********* DONE Claude says: yes
+Set during a refresh, read during it, and never written by the
+printer, so no headline in the buffer carries it and the parser
+never meets it; it exists only between the request's
+fulfillment and the tail.
+****** DONE jeff : the natural shape
+I think, would be to simply draw each child with the same
+edit request, and charge the budget immediately when
+an edit request is consumed.
+Would this be a major rewrite?
+Is there some logical problem with it?
+******* DONE Claude says: not major, no problem, one refinement
+Your shape works, with the request atom itself as the carrier:
+the cascade and the drawing of members copy
+'ViewRequest::Editable' onto each child instead of marking a
+set, and an occurrence's request is fulfilled at its own visit,
+where it is made editable and the budget is charged, or, with
+no budget left, it stays write-protected, as today's rule at
+the visit does. The charge moves from "content drawn" to
+"request consumed", which changes nothing observable, since
+every occurrence made editable by request has its content drawn
+at that same visit. The merge already unions view requests, so
+it needs no change. It is not major: the set's eight sites
+become the copy in two places and the fulfillment in one.
+
+The refinement: the extent rule in the diff view must still
+tell an occurrence editable by this refresh's request from one
+editable because the straddle's 'u' set holds it, since only
+the first is charged and extended. If the atom is consumed at
+fulfillment, that fact is gone again, and you are back to a
+set or a mark. So let the atom stay on the occurrence through
+the walk, fulfilled but not yet stripped, and have the tail
+strip every fulfilled view request before printing, as it
+already strips nothing and could. Then "carries the request"
+is the one question, asked where the occurrence is, and no
+set and no transient field exist. One caveat to keep: the
+pass before the walk that fulfills the requests written in the
+text stays, because it write-protects the other occurrences of
+the requested gnid, which may stand above the requester and
+would otherwise have been visited already.
+******** DONE jeff : no, simpler yet, just overcharge
+That budget doesn't have to be precise;
+it's just to avoid explosions.
+********* DONE Claude says: agreed; then nothing is remembered
+With the overcharge the diff view charges every editable
+occurrence whose content it draws, the straddle's own members
+included, and the one question that kept a mark alive goes.
+Your shape then needs no set, no transient field and no
+stripping at the tail: the request atom is copied to the
+cascaded children and the drawn members, consumed at each
+occurrence's own visit, where the occurrence is made editable
+and charged, or stays write-protected when the budget is
+spent, and 'charges_node_budget' loses its second parameter.
+The one consequence to know: a buffer of the diff view whose
+changed nodes outnumber the budget would see the later ones
+write-protected, which today cannot happen; the default
+'initial_node_limit' makes that a diff of thousands of
+changed nodes, which is the explosion the budget exists to
+stop. The pass before the walk stays for the requests written
+in the text, for the reason above. Into the plan with Decide
+10.
+*** DONE 'GoalItem::restricted' re-asks the ID rule's question
+The presence the goal computer stores is the one the ID rule
+has just asked; drop the field. Cheap.
+**** DONE yes please
+***** DONE Claude says: noted
+Into the plan with Decide 10.
+*** DONE the stats pass threads ten parameters through recursion
+A pass struct holding the truth, the two maps and the lookup.
+Cheap to moderate.
+**** DONE jeff : yes please
+***** DONE Claude says: noted
+A pass struct holding the truth, the two containment maps and
+the relRepo lookup, the recursion its methods. Into the plan
+with Decide 10.
+*** DONE 'NamedLeaves' and 'NamedLeafSet' encode one set twice
+Three parallel vectors beside an enum of the same three cases.
+**** DONE jeff : yes please, unify somehow
+***** DONE Claude says: the enum wins
+'NamedLeaves' becomes a list of 'NamedLeafSet' (a node's
+aspect, a relationship's aspect, or a changeset marker's whole
+set), built by 'leaves_named_at'; 'keys_in_forest' maps each
+set to its keys, and the rule saying which leaves a marker's
+set holds lives in one method of the enum, where the
+contradiction check and the forest expansion both read it.
+The refusal keeps the set it found contradictory instead of a
+description string. Into the plan with Decide 10.
+*** DONE 'CompoundFolderParties' holds indices
+They must match the ancestry rows by hand.
+**** DONE jeff : what do you propose?
+***** DONE Claude says: return the parties as tree handles
+'compound_folder_parties (tree, folder)' walks the folder's
+required ancestry and returns the subscriber's and the
+subscribee's positions ('NodeId'), as 'described_node' already
+returns the described node's; no index leaves 'ancestry.rs',
+and the stats pass asks the parties for their pids instead of
+counting generations. Into the plan with Decide 10.
+*** DONE the parser lowers its kind into four flags and rebuilds it
+The plan left that shape.
+**** DONE jeff : what do you propose?
+***** DONE Claude says: keep the kind the parse already has
+'ViewnodeMetadata' keeps 'kind : MetadataKind', the enum the
+parse builds and then lowers into four flags, with each kind's
+own parts beside it (the gnid for a gnid-only vognode, the
+folder for a folder, the property for a member), and
+'viewnode_from_metadata' becomes one match on it instead of a
+180-line chain over the flags; 'names_an_occurrence' is a
+match arm. Moderate, and best done together with the
+unification of the two gnid-only kinds, since both rewrite
+the same arms. Into the plan with Decide 5.
+*** DONE the chain runs its own ID rule
+And now makes a Restricted vognode itself: three builders.
+**** DONE jeff : what do you propose?
+***** DONE Claude says: build chain nodes by the ID rule
+The chain builder decides occurrence, unknown or gnid-only
+vognode for each container with gates of its own and a disk
+read, then the ID rule re-decides it at the member's visit.
+Let the builder draw each chain node by the ID rule and the
+refresh's constructors ('occurrence_from_truth' and the
+gnid-only one), write-protected, with no disk read, so that
+there is one decider and one builder of each kind;
+'graphnode_and_viewnode_from_gnid' then loses its last
+caller. The old report called this costly; with the
+constructors now in place it is moderate, and it belongs with
+the unification, which otherwise gains a fourth builder of
+the gnid-only kind. Into the plan with Decide 5.
+*** DONE three pass-through layers of rerender preparation
+**** DONE jeff : what do you propose?
+***** DONE Claude says: one request struct, one function
+Each handler builds a 'RerenderRequest' (the restriction, the
+buffer correction policy and the selector that says which
+views to rerender and how) and passes it once to the one
+'prepare_rerender_views'; the plain wrapper and the
+'_with_runtime' layer go. The restriction is taken whole, not
+as an 'Option' every caller wraps in 'Some'. Into the plan
+with Decide 10.
+*** DONE two visibility predicates with confusible names
+'member_is_visible' and 'relationship_member_is_visible', side
+by side in 'weave.rs'.
+**** DONE jeff : so, better names? or unify?
+***** DONE Claude says: unify, into the glossary's two questions
+Two methods on 'SkgrepoRestriction', 'record_is_visible
+(relRepo)' and 'node_is_restricted (home)', each taking the
+restriction as it is ('all' answering at once) so that no
+caller wraps an 'Option'; the save's 'member_is_visible' and
+'relationship_member_is_visible', the export's two, the
+accessors' and the stats pass's inline tests all become calls
+of the two, and the disk fallback of 'member_is_visible' moves
+to the one caller that needs it, if any does. That is Decide
+7, settled so.
+*** DONE natural shapes it found
+**** DONE jeff : agreed to all
+***** DONE Claude says: noted
+**** DONE 'EditabilityAndClaim'
+Two positional bools became one named pair.
+**** DONE 'TitleOrAlias'
+A bare string became a sum of its two cases.
+**** DONE 'RefreshMode' carrying the readiness store
+The store rides in the diff-view case, so a content view
+cannot be given one and a diff view cannot lack one.
+**** DONE the 'RerenderOptions' enum
+In place of an 'Option' plus a bool meaningful only when Some.
+**** DONE the rungs' order enforced by 'visit_parent'
+One function calls the eight rungs in order; no caller can
+reorder them.
+**** DONE the clients' placement from the table
+Both editors place a headline's parts by the shared 'parts'
+list, checked against the printer.
+* Open questions for you
+Each stands on its own; the Decide list below cites them.
+** DONE-CLAUDE A view whose root the restriction keeps out
+*** WHY-CLAUDE
+Settled under Probes, "A view whose root the restriction keeps
+out is lost": a restricted root becomes a gnid-only vognode,
+an occurrence again on widening.
+When a skgrepo-set switch keeps out the node a view is rooted
+at, the root becomes a tombstone, its childless subtree is
+pruned, and the view is empty; widening the set again brings
+nothing back, because the ID rule's Restricted answer needs a
+parent's goal to name the gnid and a root has no parent. This
+predates the plan, and on your data the narrowest set empties
+every large view for good. Should a restricted root become a
+Restricted vognode (the view is your own request, so showing
+its gnid reveals nothing you did not ask for), an occurrence
+again on widening? The alternative is for the switch to
+remember the roots it emptied, which is state the model
+forbids, or to close such views.
+** DONE-CLAUDE The diff view under a restriction
+*** WHY-CLAUDE
+Settled under Tests, agreed to all: the ghost question asks
+the restriction about HEAD's node's home, and the diff view's
+goal keeps a restricted member with a visible record as a
+gnid-only vognode with its change facts.
+The diff view opens only under 'all', but a switch rerenders
+its open buffers, and under a narrower set the straddle is not
+gated: a deleted private node's ghost shows HEAD's title, and a
+restricted member with a visible record is omitted rather than
+shown as a Restricted vognode with its change facts. Should the
+ghost question and the diff view's goal be gated by the
+restriction (a restricted node is never a ghost, as the content
+view already holds), or should a narrowing close or empty the
+diff-view buffers?
+** DONE-CLAUDE A headline typed under a tombstone
+*** WHY-CLAUDE
+Settled under Probes, "The orphan under a tombstone": the
+skgrepo inheritance passes through a tombstone to the nearest
+occurrence above, so the headline is saved and warned of.
+Today it is refused for want of a skgrepo, since the inheritance
+stops at a tombstone; the plan believed it was saved. Should it
+inherit the skgrepo through the tombstone from the nearest
+occurrence above and be saved as an orphan with the warning, or
+stay refused with a message that says what to do?
+** Corrections a gesture of your own causes
+A nodeMerge reports four buffer corrections that follow from
+the request; the policy exempts a deletion and a restriction
+change only. Should the policy exempt every change a save's own
+requests cause (the merge of the acquirer's occurrences, the
+members drawn after an acquisition), keeping the reports for
+what the buffer got wrong?
+
+* Claude says: Decide
+Each item opens with its state and gives my recommendation.
+Items 1 and 2 are defects; I would run them, with 3 and 4, as
+one corrective slice before anything else is built on this.
+** DONE-CLAUDE Claude says: 1. the restriction's leaks and losses
+Open; your three open questions above. A narrowing then a
+widening loses the views whose roots it kept out; the diff
+view under a restriction shows a deleted private node's HEAD
+title and omits Restricted members; an alias recorded in a
+restricted section shows under the restriction. Two predate
+the plan, found now because the plan's probes drove the
+restriction harder than anything before. I would make a
+restricted root a Restricted vognode, gate the diff view's
+straddle by the restriction so that a restricted node is never
+a ghost there either, and omit an alias whose record is
+restricted as a relationship's is. Moderate, mostly in
+'id_rule.rs', 'refresh/diff_view.rs' and the property goal,
+with a probe of each as its test.
+*** WHY-CLAUDE
+Settled under Probes ("A view whose root the restriction keeps
+out is lost", "An alias recorded in a restricted section
+shows") and under Tests, agreed to all (the diff view gated):
+all three as the item recommends.
+** DONE-CLAUDE Claude says: 2. the Neovim writers
+Open; confirmed by a throwaway spec. Neovim's delete,
+delete-recursive, merge and detach write their form after the
+diff facts instead of at its 'parts' rank, and delete appends
+beside an existing merge request, which the server refuses.
+Route the four through the one writer and write the whole
+metadata it returns, with a buffer-level test like Emacs's.
+Cheap.
+*** WHY-CLAUDE
+Settled under Duplication, "Neovim's delete and flag skip the
+one request writer".
+** DONE-CLAUDE Claude says: 3. the dangling hide; the orphan
+Open; probes (j) and (d). The hidden folder would accept an
+unknown as the overridden folder does, and the refusal would
+lose its spurious clause. For the tombstone, I would inherit
+the skgrepo through it, so that the plan's sentence becomes
+true and the warning covers the case; your third question.
+Both cheap.
+*** WHY-CLAUDE
+Settled under Probes, "The dangling hide (j)" and "The orphan
+under a tombstone (d)".
+** DONE-CLAUDE Claude says: 4. the flag and the readiness block
+Open. A readiness request still blocks the flag request in both
+clients, the bug slice 4 fixed in one place; one predicate per
+client. Cheap.
+*** WHY-CLAUDE
+Settled under Duplication, "A readiness request still blocks
+the flag request".
+** DONE-CLAUDE Claude says: 5. one gnid-only vognode
+Open; the first finding of two reports. The Restricted vognode
+and the unknown have the same five fields, about 37 sites match
+them in pairs, the vognode is built in four places, and the
+twins have already drifted in validation. One struct with a
+field naming why, and 'claims' and 'set_claim' as methods of
+the viewnode, would absorb most of the arms. Moderate and
+mechanical; I would do it before more rules learn the pair,
+in the same slice as item 1, whose code it touches.
+*** WHY-CLAUDE
+Settled under Awkwardness, "The Restricted vognode is a twin of
+the unknown": one struct, 'GnidOnlyVognode', with a comment on
+why it is not called "unshowable"; the parser keeps its kind
+('the parser lowers its kind into four flags'); the chain is
+built by the ID rule ('the chain runs its own ID rule').
+** DONE AGREED : Claude says: 6. not a buffer correction, round two
+Open; your fourth question. The policy would also exempt what a
+save's own requests cause, and a correction would never name a
+headline the same refresh prunes. With it, the two mechanisms
+of silence would become one: an enum with a 'ReportNone' case
+for the four callers that discard, in place of the set-plus-
+bool struct. Cheap.
+*** DONE Claude says: half settled
+The enum with one silence case for the callers nobody reads
+is settled under Awkwardness, "Two ways to silence a buffer
+correction". What stays open is whether the policy exempts
+what a save's own requests cause (a nodeMerge's four
+corrections) and never names a pruned headline; your question
+under Probes, "Corrections a gesture of your own causes", is
+answered there.
+*** DONE jeff : please restate the problem and proposal
+without referring to any other parts of this document.
+For instance, when you say "the policy would also" above,
+or "the two mechanisms of silence",
+I don't know what policy you mean.
+**** DONE Claude says: restated
+***** DONE problem
+A buffer correction is a message the refresh reports when it
+changed what a buffer said because the buffer disagreed with
+the graph: a member drawn that no headline stood for, a
+headline entombstoned, a child marked 'noClaim', duplicate
+siblings merged, a headline re-kinded, an edit request
+dropped. The save and rerender responses carry them, and the
+clients show them in the warnings buffer.
+
+Not every change the
+refresh makes is the buffer's fault, so the refresh is told
+what to keep quiet about. Today it is told two ways.
+- The first
+  is a value the caller passes into the refresh, a struct named
+  'BufferCorrectionPolicy', holding the set of gnids the save
+  being rerendered deleted (so that their tombstones in the
+  saver's other views are not reported) and a flag saying the
+  rerender follows a skgrepo-set switch (so that what the switch
+  draws, entombstones or re-kinds is not reported); the refresh
+  consults it as it records each correction.
+- The second way is
+  no value at all: four callers that draw a buffer nobody will
+  read corrections of (a fresh content view, a search buffer,
+  the diff view's first draw, the integrate request) pass the
+  struct that reports everything and then throw the corrections
+  away.
+
+A reader who asks "is this change reported?" must know
+both. Three changes that are the user's own doing are reported
+today: a nodeMerge reports four corrections that follow from
+the request (the merge of the acquirer's two occurrences, and
+the members drawn after an acquisition); when a save removes a
+relationship a gnid-only vognode stood for, the refresh
+entombstones that vognode, reports it by its vnid, and then
+prunes the childless tombstone, so the message names a
+headline no longer in the buffer; and after a narrowing, a
+member whose record alone the restriction keeps out stays
+drawn and is reported "Marked noClaim".
+***** DONE proposal
+'BufferCorrectionPolicy' would become an enum of the situations
+a refresh can be called in: 'ReportAll'; 'AfterSave', carrying
+the gnids the save deleted and the gnids its nodeMerge requests
+touched, so that the consequences of both are quiet;
+'AfterRestrictionChange', under which a narrowing's "Marked
+noClaim" is quiet too; and 'Unread', passed by the four
+callers that discard, which says that the refresh corrects as
+always and nobody is told. Each question the refresh asks of
+the policy would be one match over that enum. And the tail,
+which prunes childless tombstones after the walk, would drop
+any correction whose headline it pruned. Cheap.
+** DONE-CLAUDE Claude says: 7. the restriction's two questions
+Open. The code asks "is this record visible" and "is this node
+restricted" under eight names across the save and the refresh,
+one contradicting the glossary ('member_is_visible'), one
+wider than its name ('restriction_keeps_out'); the save's
+spellings still fall back to the disk where the render side
+asks the graph alone. 'record_is_visible' and
+'node_is_restricted' on 'SkgrepoRestriction', used by both
+sides. Cheap.
+*** WHY-CLAUDE
+Settled under Vocabulary, "'Record' and 'restricted node':
+named, unsaid in code", and under Awkwardness, "two visibility
+predicates with confusible names".
+** DONE-CLAUDE Claude says: 8. the switch and unsaved edits
+Open; a design call. The switch still wipes unsaved edits after
+a prompt that does not say so, where two other commands refuse
+while any view is dirty. I would refuse likewise. Cheap.
+*** WHY-CLAUDE
+Settled under User documentation, "The switch erases unsaved
+edits; only the doc says so": the switch refuses while any
+view is dirty.
+** DONE-CLAUDE Claude says: 9. the tests the run left untested
+Open. The viewnode merge's overrider exception and carried
+requests; the emptied editable folder; a Restricted vognode's
+requests on the server and its change facts in the diff view;
+the orphan warning's other parents and Neovim's display; the
+retired atom's refusal; a guard on the stats pass that counts
+lookups; and 'run_with_test_stores''s 92 fixed Tantivy paths,
+which two processes running one test share. All cheap; the
+diff-view ones belong with item 1.
+*** WHY-CLAUDE
+Settled under Tests, agreed to all.
+** DONE-CLAUDE Claude says: 10. names and shapes, cheap
+Open. 'RerenderOptions' as a mode, the mirror-named
+'diff_view/refresh.rs' and 'refresh/diff_view.rs', the three
+rerender layers, the walk's three editability sets behind two
+methods, 'GoalItem::restricted' dropped, 'CompoundFolderParties'
+returning positions, 'NamedLeaves' as a list of sets, the
+viewnode merge's four spellings, the search's second render
+(a refresh option to skip rendering), the readiness-conflict
+loop's names, 'chain.rs''s module doc, 'goal.rs''s leftovers,
+the fourteen stale doc comments and the formatting breaches
+the readability report lists, and the test copies the tests
+and duplication reports list. One housekeeping slice.
+*** WHY-CLAUDE
+Settled item by item under Awkwardness, Vocabulary and
+Readability, every one closed, with these additions from the
+threads: the caller renders and the tail stops at the vnids;
+the walk keeps no editability set, the request atom is copied
+to cascaded children and drawn members and consumed at each
+visit, and the diff view overcharges; the clients are fully
+aligned ("no, let's fully align them" under Readability),
+which is a slice of its own; 'GoalItem::restricted' goes;
+'NamedLeaves' becomes a list of 'NamedLeafSet'; the parties
+are returned as tree handles; one rerender request struct and
+function; 'EditabilityAndClaim' keeps a TODO comment; the
+viewnode merge's comment says siblings only.
+** DONE-CLAUDE Claude says: 11. the docs' residue
+Open. The parents that read no claims stated once and cited
+twice; an entry for "herald"; "detach" is no request in the
+heralds doc too; the buffer-corrections entry moved to the user
+section; the Neovim fork-confirmation note and the untranslated
+keys; 'C-c s r' and the Restricted vognode; the rerender's
+messages buffer; 'RefreshMode''s parts; the policy's four
+silences stated in both docs; the reserved words used otherwise;
+the untracked benchmark report the API doc cites, which you
+could commit. Cheap, with item 10.
+*** WHY-CLAUDE
+Settled under User documentation, every finding agreed, with
+"orphan graphnode" and "orphan viewnode" for the noun.
+** DONE-CLAUDE Claude says: 12. "Restricted vognode" for users
+Open; a design call. Two words of the implementation, parted
+from "restricted occurrence" by a capital, met by users in a
+correction and in COMMANDS. Renaming is costly; I would mark
+the coinage in the glossary and say "a restricted headline" in
+user text, which item 11 can do.
+*** WHY-CLAUDE
+Settled under Vocabulary, "'Restricted vognode': a capital does
+the work": user text says "a restricted headline", the glossary
+marks the coinage, the type is 'GnidOnlyVognode'.
+** DONE-CLAUDE Claude says: 13. the restricted stats pass
+Open. Still quadratic in a list's length under a restriction,
+in the gated graphnode stats outside the plan's two functions:
+0.8 s at 2,000 siblings, 3 s at 4,000, where your largest view
+has about 2,300 lines in all. The same per-recorder map would
+fix it; cheap, and not urgent.
+*** WHY-CLAUDE
+Settled under Probes, "Timing": the same per-recorder map,
+when convenient.
+** DONE-CLAUDE Claude says: 14. the chain's old builder
+Open, unchanged from the last review: it runs its own ID rule
+and now makes a Restricted vognode itself. Costly; a plan of
+its own, or never.
+*** WHY-CLAUDE
+Settled under Awkwardness, "the chain runs its own ID rule":
+the chain builder draws each chain node by the ID rule and the
+refresh's constructors, which supersedes this item's "a plan
+of its own, or never".
+** DONE Claude says: 15. the corrective plan
+Open, and the one decision left here. With every item above
+settled, I would write one plan, '08_plan_restriction-and-tidy
+.org', in the order the fixes need: the restriction's leaks and
+losses with their tests (items 1, 9's diff-view part), the
+gnid-only vognode with the parser's kind and the chain built by
+the ID rule (items 5, 14), the Neovim writers and the flag
+predicate (2, 4), the dangling hide and the tombstone orphan
+(3), the buffer-correction enum and its new exemptions (6), the
+restriction's two questions (7), the switch's refusal (8), then
+the names and shapes (10) with the full client alignment as its
+own slice, the tests (9), the docs (11, 12) and the stats map
+(13). About the size of plan 06. Say go, or say how you want
+it split.
+*** DONE jeff : However you like.
+I am agnostic about the order in which to do those things.
+**** DONE Claude says: noted; writing it
+One plan, '08_plan_restriction-and-tidy.org', beside this
+review, in the order above, with the restriction's fixes
+first since they lose and leak data.
+* Suggestions for coding-advice/
+** DONE AGREED : code-reviews.org: give each reviewer the previous report
+Each reviewer was told the previous review's findings on its
+question and asked what was fixed, half fixed or still there;
+every report answered, and the answers are the plan's
+scorecard. Worth a sentence.
+** DONE AGREED : code-reviews.org: the probes to drive every time
+The three defects that predate the plan were found by driving
+the restriction harder: a narrowing and a widening over real
+views, the diff view under a narrower set, an alias recorded in
+a restricted section. The probes list should name the
+restriction's cases, and a run against a copy of the real data
+for the switch and the search.
+** DONE AGREED : code-reviews.org: a traced client claim gets a headless spec
+The readability report traced the Neovim writers' defect and
+said so; a sixth, small agent ran it headless in a minute. The
+incantation that works is 'PlenaryBustedDirectory' with
+'tests/nvim/minimal_init.lua'; the per-file form does not load
+the init. Worth a line in 'tests/USAGE.md' too.
+** DONE AGREED : plans.org: probe "What stays as it is" before writing it
+The plan said a headline under a tombstone is saved "as today";
+today refused it. A "what stays" sentence about behavior is a
+claim about existing code and deserves the same probe a pitfall
+does.
+** DONE AGREED : orchestration.org: take the report time from the notice
+I estimated three report times and corrected them afterwards;
+the notification's time is the record. Note it before writing
+the orchestrator's notes.
+** DONE AGREED : names.org: the plan's own vocabulary is code
+A global replace over the plan mangled its own definition
+("never bare 'buffer corrections'"); a plan's vocabulary
+section should be checked by the same grep the slices run.

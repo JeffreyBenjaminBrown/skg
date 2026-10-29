@@ -64,7 +64,10 @@ which Jeff copies the threads; Claude then edits only the
 sidechannel, even to apply a change Jeff approved there, and a
 change to the main document waits until Jeff says it is free.
 Jeff sometimes closes a heading by prefixing 'DONE AGREED : ';
-it closes like DONE.
+it closes like DONE. When Claude finds that a heading of its own
+restates something a discussion elsewhere has settled, it marks
+the heading 'DONE-CLAUDE' and gives it a child 'WHY-CLAUDE' that
+says where it was settled, so Jeff is not asked twice.
 ** Clarity
 Every sentence should have a subject and a verb.
 Every new term should be introduced/defined before it is used.

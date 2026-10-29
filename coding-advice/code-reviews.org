@@ -20,6 +20,8 @@ ranked findings first, each finding with file:line, the two or more
 places involved, which is older, what differs, and whether a fix is
 cheap, costly or unwise. The synthesis is written by the planner from
 the reports; the human reads the synthesis, not the reports.
+** Awkwardness
+Does the data flow or the type hierarchy feel unnatural?
 ** Duplication
 Does the work implement the same thing in more than one way, within
 itself? Does it implement anything that already existed, so that two
