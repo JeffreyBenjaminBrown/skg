@@ -135,24 +135,34 @@ pub fn find_contradictory_readiness_requests (
   let requests : Vec<RequestedReadiness> =
     readiness_requests_in_viewforest (viewforest, graph);
   let mut contradictions : Vec<(NamedLeafSet, Vec<HeadlineName>)> = Vec::new ();
-  for (position, ready) in requests . iter () . enumerate () {
-    for unready in &requests [position + 1 ..] {
-      if ready . ready == unready . ready { continue; }
-      for ready_set in &ready . named {
-        for unready_set in &unready . named {
-          let Some (shared) = ready_set . overlap (unready_set)
-            else { continue; };
-          let headlines : &mut Vec<HeadlineName> =
-            match contradictions . iter () . position ( |(set, _)| *set == shared ) {
-              Some (index) => &mut contradictions [index] . 1,
-              None => { contradictions . push (( shared, Vec::new () ));
-                        &mut contradictions . last_mut () . unwrap () . 1 }, };
-          for headline in [ &ready . headline, &unready . headline ] {
-            if ! headlines . contains (headline) {
-              headlines . push ( headline . clone () ); }} }} }}
+  for (position, earlier) in requests . iter () . enumerate () {
+    for later in &requests [position + 1 ..] {
+      if earlier . ready != later . ready {
+        record_contradictions_between (earlier, later, &mut contradictions); }}}
   contradictions . into_iter ()
     . map ( |(set, mut headlines)| {
       headlines . sort_by_key ( |headline| requests . iter ()
         . position ( |request| request . headline == *headline ) );
       ( set, headlines ) } )
     . collect () }
+
+/// Record in 'contradictions' each set of leaves that 'earlier' and
+/// 'later', two requests of opposite readiness, both name, with the
+/// headlines of both: a set already recorded gains them, once each.
+fn record_contradictions_between (
+  earlier        : &RequestedReadiness,
+  later          : &RequestedReadiness,
+  contradictions : &mut Vec<(NamedLeafSet, Vec<HeadlineName>)>,
+) {
+  for earlier_set in &earlier . named {
+    for later_set in &later . named {
+      let Some (shared) : Option<NamedLeafSet> = earlier_set . overlap (later_set)
+        else { continue; };
+      let headlines : &mut Vec<HeadlineName> =
+        match contradictions . iter () . position ( |(set, _)| *set == shared ) {
+          Some (index) => &mut contradictions [index] . 1,
+          None => { contradictions . push (( shared, Vec::new () ));
+                    &mut contradictions . last_mut () . unwrap () . 1 }, };
+      for headline in [ &earlier . headline, &later . headline ] {
+        if ! headlines . contains (headline) {
+          headlines . push ( headline . clone () ); }} }} }
