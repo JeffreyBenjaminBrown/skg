@@ -1,21 +1,21 @@
-/// PURPOSE: Draw the containerward chain under the members of a
-/// partner folder ('Folder::members_carry_containerward_chain'):
-/// under each member, its containers, write-protected and claiming nothing;
-/// under each of those, its containers; and so on breadth-first to
-/// 'max_roleTree_depth', up to the roots.
-/// A node the walk met before (a cycle or a diamond) is shown once
-/// more, as a leaf ('ContainerwardRoleTree::Repeated'). Each chain
-/// node is what the ID rule makes of its gnid under its parent's chain
-/// goal ('chain_goal'), built as the refresh builds that kind, from the
-/// truth and with no disk read; the chain goes on only under an
-/// occurrence.
-/// The refresh draws the chain under a member it draws into such a
-/// folder ('after_drawing' in 'server/refresh/visit.rs'), and never
-/// reinstates a chain node once drawn; no request extends a chain,
-/// and a request on a chain node for its containers draws a
-/// containers folder under it like any other. A chain node carries no
-/// change facts and takes no commit-readiness marker
-/// ('stands_in_containerward_chain').
+//! PURPOSE: Draw the containerward chain under the members of a
+//! partner folder ('Folder::members_carry_containerward_chain'):
+//! under each member, its containers, write-protected and claiming nothing;
+//! under each of those, its containers; and so on breadth-first to
+//! 'max_roleTree_depth', up to the roots.
+//! A node the walk met before (a cycle or a diamond) is shown once
+//! more, as a leaf ('ContainerwardRoleTree::Repeated'). Each chain
+//! node is what the ID rule makes of its gnid under its parent's chain
+//! goal ('chain_goal'), built as the refresh builds that kind, from the
+//! truth and with no disk read; the chain goes on only under an
+//! occurrence.
+//! The refresh draws the chain under a member it draws into such a
+//! folder ('after_drawing' in 'server/refresh/visit.rs'), and never
+//! reinstates a chain node once drawn; no request extends a chain,
+//! and a request on a chain node for its containers draws a
+//! containers folder under it like any other. A chain node carries no
+//! change facts and takes no commit-readiness marker
+//! ('stands_in_containerward_chain').
 
 use crate::dbs::in_rust_graph::containerward_role_tree::{
   ContainerwardRoleTree, containers_in_inRustGraph, full_containerward_role_tree};
