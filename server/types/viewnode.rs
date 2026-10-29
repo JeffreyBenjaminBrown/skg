@@ -167,11 +167,12 @@ impl ViewnodeKind {
 /// has and the worktree lacks; a gnid-only vognode, which shows
 /// nothing of a node: an unknown, for a gnid its parent's list names
 /// and no node answers to, or a Restricted vognode, for a node the
-/// skgrepo restriction keeps out that a visible record names. Where
-/// no record the restriction shows names a restricted node, it has no
-/// vognode: the refresh entombstones its occurrence (the ID rule,
+/// skgrepo restriction keeps out that a visible record names, or that
+/// a view is rooted at. Where no record the restriction shows names a
+/// restricted node, below a view's roots, it has no vognode, not even
+/// a ghost: the refresh entombstones its occurrence (the ID rule,
 /// 'server/refresh/id_rule.rs'), as it does the occurrence of a node
-/// that vanished, unless the diff view can show it as a ghost.
+/// that vanished, unless the diff view can show that one as a ghost.
 #[derive( Debug, Clone, PartialEq )]
 pub enum Vognode {
   Occurrence   (Occurrence),
@@ -220,7 +221,9 @@ pub enum GnidOnlyKind {
   /// keeps out, and a record the restriction shows names it
   /// ('docs/glossary.org', "Restricted vognode"). It shows nothing of
   /// the node, neither its title, its body, its home skgrepo nor its
-  /// stats. Never in the diff view, which runs under no restriction.
+  /// stats. A view whose root the restriction keeps out shows its root
+  /// so too. The diff view, which opens under no restriction, draws it
+  /// after a switch for a restricted member with a visible record.
   Restricted,
 }
 

@@ -5,11 +5,12 @@
 //! the goal of the headline's parent names the gnid (its record is
 //! visible) or the headline is a root of the view (the view is the
 //! user's own request, so its gnid reveals nothing they did not ask
-//! for), and otherwise a tombstone: a restricted node is never a
-//! ghost. Otherwise, is the mode the diff view, and does HEAD have the
-//! node? Then a ghost. Otherwise, does the list of the headline's
-//! parent name this gnid? Then a gnid-only vognode of kind Unknown.
-//! Otherwise a tombstone.
+//! for), and otherwise a tombstone. Otherwise, is the mode the diff
+//! view, and does HEAD have the node? Then a ghost, unless the
+//! restriction keeps out HEAD's node's home, which is answered as a
+//! restricted node is: a restricted node is never a ghost. Otherwise,
+//! does the list of the headline's parent name this gnid? Then a
+//! gnid-only vognode of kind Unknown. Otherwise a tombstone.
 //!
 //! The headline is re-kinded where it stands, keeping its vnid, its
 //! fold state, its children and, for an occurrence, its editability.
@@ -87,7 +88,11 @@ pub(crate) fn id_rule (
   if let Some (straddle) = head {
     if let Some (pid) = straddle . before . pid_of (gnid) {
       if ! straddle . after . nodes . contains_key (&pid) {
-        return IdRuleAnswer::Ghost (pid); }}}
+        let restricted_at_head : bool =
+          straddle . before . gnid_presence_gated (gnid, walk . truth . restriction )
+          == GnidPresence::Restricted;
+        return if restricted_at_head { restricted_answer () }
+               else { IdRuleAnswer::Ghost (pid) }; }}}
   if parent_goal . is_some_and ( |goal| goal . names_gnid (gnid) ) {
     return IdRuleAnswer::GnidOnly (GnidOnlyKind::Unknown); }
   IdRuleAnswer::Tombstone }
@@ -239,7 +244,9 @@ fn rekind_to_occurrence (
 /// Make the occurrence or gnid-only vognode 'other' at 'child' the
 /// ghost of 'pid', where it stands. It keeps the claim it carried,
 /// where the list still names it; every edit request it carried it
-/// drops, and reports.
+/// drops, and reports. Its re-kind from a Restricted vognode is no
+/// buffer correction after a change of the restriction, which widened
+/// ('BufferCorrectionPolicy').
 fn rekind_to_ghost (
   tree        : &mut Tree<Viewnode>,
   child       : NodeId,
@@ -249,6 +256,10 @@ fn rekind_to_ghost (
   walk        : &mut Walk,
 ) -> Result<(), Box<dyn Error>> {
   let requests : EditRequests = EditRequests::of (&other);
+  let quiet : bool = // the restriction widened
+    matches! ( &other, Vognode::GnidOnly (gnid_only)
+                       if gnid_only . kind == GnidOnlyKind::Restricted )
+    && ! walk . buffer_correction_policy . reports_rekind_across_the_restriction ();
   forget_editable_occurrence (&other, child, walk);
   let named_by_the_list : bool =
     parent_goal . and_then ( |goal| goal . item_for ( &GoalMember::Gnid ( pid . clone () )))
@@ -262,7 +273,8 @@ fn rekind_to_ghost (
   set_vognode_keeping_readiness (tree, child, Vognode::Ghost (ghost));
   if requests . any () {
     walk . buffer_corrections . record (tree, child, BufferCorrectionKind::EditRequestDropped); }
-  walk . buffer_corrections . record (tree, child, BufferCorrectionKind::Rekinded (VognodeKind::Ghost));
+  if ! quiet {
+    walk . buffer_corrections . record (tree, child, BufferCorrectionKind::Rekinded (VognodeKind::Ghost)); }
   Ok (( )) }
 
 /// Make the vognode 'other' at 'child' a gnid-only vognode of 'kind'

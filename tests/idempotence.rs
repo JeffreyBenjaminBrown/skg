@@ -43,7 +43,10 @@ use skg::diff_view::readiness_store::ReadinessStore;
 use skg::graph_straddle::types::GraphStraddle;
 use skg::serve::handlers::diff_view::diffView_buffer;
 use skg::test_utils::cleanup_test_tantivy;
-use skg::types::views_state::DiffViewBufferKind;
+use skg::types::views_state::{DiffViewBufferKind, ViewnodeIdRecord};
+use skg::dbs::in_rust_graph::InRustGraph;
+use skg::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
+use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewforest;
 
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
@@ -200,9 +203,13 @@ fn fixture_config (
 // and a 'worktree'), each buffer of the diff view that is not empty,
 // as first rendered, parsed and refreshed again over the same graph
 // straddle and readiness store, comes back as it was, and the second
-// refresh corrects nothing. A case whose straddle cannot be built (one
-// made to be refused) is passed over. A skgrepo folder named
-// 'foreign' is foreign; the others are owned, 'public' first and
+// refresh corrects nothing. Where the case has several owned
+// skgrepos, that holds under each restriction too: the diff view
+// opens only under 'all', but a switch rerenders it, so the buffer as
+// first rendered is refreshed under the restriction, as the switch
+// does, and that is the buffer checked. A case whose straddle cannot
+// be built (one made to be refused) is passed over. A skgrepo folder
+// named 'foreign' is foreign; the others are owned, 'public' first and
 // 'private' last.
 
 const GIT_FIXTURE_CASES : [&str; 4] = [
@@ -217,6 +224,7 @@ fn every_diff_view_fixture_is_a_fixpoint_of_the_refresh (
   let mut failures : Vec<String> = Vec::new ();
   let mut buffers : usize = 0;
   let mut cases : usize = 0;
+  let mut restricted_buffers : usize = 0;
   for case in git_fixture_cases () {
     let (owned, foreign) : (Vec<String>, Vec<String>) = skgrepos_of_case (&case);
     let owned_names : Vec<&str> = owned . iter () . map ( |name| name . as_str () ) . collect ();
@@ -244,35 +252,71 @@ fn every_diff_view_fixture_is_a_fixpoint_of_the_refresh (
                                           case . display (), buffer_kind, e ));
               continue; }, };
         let Some (rendered) = rendered else { continue; };
-        buffers += 1;
-        if let Err (failure) = diff_view_buffer_refreshes_unchanged (
-             &runtime, &straddle, &store, buffer_kind, &rendered . text ) {
-          failures . push ( format! ( "{} {:?}: {}", case . display (), buffer_kind, failure )); }}
+        for restriction in restrictions_of (&runtime . config) {
+          buffers += 1;
+          if restriction . is_some () { restricted_buffers += 1; }
+          if let Err (failure) = diff_view_buffer_refreshes_unchanged (
+               &runtime, &straddle, &store, buffer_kind,
+               &rendered . text, restriction . as_ref () ) {
+            failures . push ( format! (
+              "{} {:?} under {}: {}", case . display (), buffer_kind,
+              restriction . as_ref () . map_or ("no restriction" . to_string (),
+                                                |r| format! ("'{}'", r . name . 0) ),
+              failure )); }}}
       Ok (( )) }) ();
     cleanup_test_tantivy ( Some (&fixture . config . tantivy_folder) ) ?;
     result ?; }
-  println! ("{} buffers over {} cases", buffers, cases);
+  println! ("{} buffers over {} cases, {} of them restricted",
+            buffers, cases, restricted_buffers);
   assert! ( cases > 20, "too few git fixture cases were read: {}", cases );
+  assert! ( restricted_buffers > 5,
+            "too few diff-view buffers were refreshed under a restriction: {}",
+            restricted_buffers );
   assert! ( failures . is_empty (),
             "{} of {} diff-view buffers over {} cases are not fixpoints:\n\n{}",
             failures . len (), buffers, cases, failures . join ("\n\n") );
   Ok (( )) }
 
 /// Whether the buffer 'text' of kind 'buffer_kind', parsed and
-/// refreshed over 'straddle', comes back as it was, correcting
-/// nothing: Err says how not.
+/// refreshed over 'straddle' under 'restriction', comes back as it
+/// was, correcting nothing: Err says how not. Under a restriction,
+/// 'text' is first refreshed as a switch to it does, and its output is
+/// the buffer checked.
 fn diff_view_buffer_refreshes_unchanged (
   runtime     : &RuntimeGeneration,
   straddle    : &GraphStraddle,
   store       : &ReadinessStore,
   buffer_kind : DiffViewBufferKind,
   text        : &str,
+  restriction : Option<&SkgrepoRestriction>,
 ) -> Result<(), String> {
+  let switched : String = match restriction {
+    None => text . to_string (),
+    Some (_) => {
+      let mut forest : ViewForest = parse_for_the_sweep (text, &runtime . graph) ?;
+      let mut record : ViewnodeIdRecord = ViewnodeIdRecord::of_viewforest (&forest);
+      refresh_diffView_viewforest (
+        runtime, straddle, buffer_kind, store, restriction,
+        &BufferCorrectionPolicy::after_a_switch (true), &mut forest, &mut record )
+        . map_err ( |e| format! ("the switch's refresh failed: {}", e) ) ?
+        . text }, };
   refresh_reaches_fixpoint (
-    text, &runtime . graph,
+    &switched, &runtime . graph,
     |forest, record| refresh_diffView_viewforest (
-      runtime, straddle, buffer_kind, store, None,
+      runtime, straddle, buffer_kind, store, restriction,
       &BufferCorrectionPolicy::default (), forest, record )) }
+
+/// 'text' parsed over 'graph', as a buffer the sweep refreshes.
+fn parse_for_the_sweep (
+  text  : &str,
+  graph : &InRustGraph,
+) -> Result<ViewForest, String> {
+  let (forest, errors, _warnings, _provenance) =
+    org_to_viewforest (text, IdResolution::ThroughGraph (graph))
+    . map_err ( |e| format! ("the parse failed: {}", e) ) ?;
+  if ! errors . is_empty () {
+    return Err ( format! ( "the parse refused it: {:?}\n{}", errors, text )); }
+  Ok (forest) }
 
 /// The git fixture cases under 'GIT_FIXTURE_CASES': each folder there
 /// that holds a 'head' folder, or whose subfolders do.

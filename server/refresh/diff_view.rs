@@ -29,13 +29,14 @@ use crate::diff_view::changes::{
 use crate::diff_view::pruned_change_view::{
   PrunedChangeViewSets, prunedChangeView_sets_of_buffer};
 use crate::graph_straddle::types::{GraphStraddle, Partner};
-use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
+use crate::dbs::in_rust_graph::relation_accessors::{GnidPresence, RelationRole};
 use crate::refresh::Walk;
 use crate::refresh::ancestry::described_node;
 use crate::refresh::extent::is_chain_parent;
 use crate::refresh::goal::{
   Goal, GoalItem, GoalMember, member_of_child};
 use crate::refresh::id_rule::entombstone_gone_change;
+use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::refresh::visit::children_of;
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::nodes::complete::Flag;
@@ -73,13 +74,12 @@ pub(crate) fn content_goal (
     . filter ( |partner| partner . existence != Some (Existence::Removed) )
     . map ( |partner| partner . id . clone () )
     . collect () ) . into_iter () . collect ();
-  Some ( Goal::ordered (
+  Some ( Goal::ordered ( partner_items (
     partners . iter ()
     . filter ( |partner| match partner . existence {
       Some (Existence::Removed) => straddle . node_in_either_graph (&partner . id),
-      _ => kept . contains (&partner . id), } )
-    . map (partner_item)
-    . collect () )) }
+      _ => kept . contains (&partner . id), } ),
+    straddle, walk ))) }
 
 /// The containers of a node of the containerward chain, over the
 /// straddle.
@@ -88,12 +88,11 @@ pub(crate) fn chain_goal (
   walk : &Walk,
 ) -> Option<Goal> {
   let (straddle, _) : (&GraphStraddle, DiffViewBufferKind) = diff_view_of (walk) ?;
-  Some ( Goal::unordered (
+  Some ( Goal::unordered ( partner_items (
     straddle . partners (pid, RelationRole::CONTAINER) . iter ()
     . filter ( |partner| partner . existence != Some (Existence::Removed)
-                         || straddle . node_in_either_graph (&partner . id) )
-    . map (partner_item)
-    . collect () )) }
+                         || straddle . node_in_either_graph (&partner . id) ),
+    straddle, walk ))) }
 
 /// A ghost's old content, where content stands: its content at HEAD.
 pub(crate) fn ghost_content_goal (
@@ -101,9 +100,9 @@ pub(crate) fn ghost_content_goal (
   walk : &Walk,
 ) -> Option<Goal> {
   let (straddle, _) : (&GraphStraddle, DiffViewBufferKind) = diff_view_of (walk) ?;
-  Some ( Goal::ordered (
-    straddle . partners (pid, RelationRole::CONTENT) . iter ()
-    . map (partner_item) . collect () )) }
+  Some ( Goal::ordered ( partner_items (
+    straddle . partners (pid, RelationRole::CONTENT) . iter (),
+    straddle, walk ))) }
 
 /// A partner folder's members over the straddle. In a folder whose
 /// membership the save reads, a removed member that neither graph has
@@ -116,12 +115,12 @@ pub(crate) fn folder_goal (
 ) -> Option<Goal> {
   let (straddle, _) : (&GraphStraddle, DiffViewBufferKind) = diff_view_of (walk) ?;
   Some ( Goal::with_order (
-    straddle . partners (described, member_role) . iter ()
-    . filter ( |partner| partner . existence != Some (Existence::Removed)
-                         || ! kind . is_editable ()
-                         || straddle . node_in_either_graph (&partner . id) )
-    . map (partner_item)
-    . collect (),
+    partner_items (
+      straddle . partners (described, member_role) . iter ()
+      . filter ( |partner| partner . existence != Some (Existence::Removed)
+                           || ! kind . is_editable ()
+                           || straddle . node_in_either_graph (&partner . id) ),
+      straddle, walk ),
     kind . goal_is_ordered () )) }
 
 /// A property folder's members over the straddle: the union of the
@@ -210,6 +209,41 @@ pub(crate) fn acquisition_goal (
       . map ( |acquirer| GoalItem::by_graph ( GoalMember::Gnid (acquirer) ))
       . collect () ), } ) }
 
+/// The goal items of 'partners' over the straddle, as the skgrepo
+/// restriction lets them be seen. The diff view opens only under
+/// 'all', but a switch rerenders its open buffers, so its goal asks
+/// the restriction as a content view's does ('gnid_items' in
+/// 'goal.rs'): a partner whose record the restriction keeps out (the
+/// worktree's record, or HEAD's when the worktree has none) is left
+/// out, and one whose node it keeps out (the worktree's node, or
+/// HEAD's when the worktree has none) is marked restricted.
+fn partner_items<'a> (
+  partners : impl Iterator<Item = &'a Partner>,
+  straddle : &GraphStraddle,
+  walk     : &Walk,
+) -> Vec<GoalItem> {
+  let restriction : Option<&SkgrepoRestriction> = walk . truth . restriction;
+  let record_is_visible = |partner : &Partner| -> bool {
+    match ( restriction,
+            partner . relRepo_after . as_ref ()
+            . or ( partner . relRepo_before . as_ref () )) {
+      ( Some (set), Some (relRepo) ) =>
+        set . is_all () || set . contains_skgrepo (relRepo),
+      _ => true, } };
+  let node_is_restricted = |gnid : &ID| -> bool {
+    match walk . truth . graph . gnid_presence_gated (gnid, restriction) {
+      GnidPresence::Restricted => true,
+      GnidPresence::Present    => false,
+      GnidPresence::Absent     =>
+        straddle . before . gnid_presence_gated (gnid, restriction)
+        == GnidPresence::Restricted, } };
+  partners
+    . filter ( |partner| record_is_visible (partner) )
+    . map ( |partner| GoalItem {
+      restricted : node_is_restricted (&partner . id),
+      .. partner_item (partner) } )
+    . collect () }
+
 /// The goal item of a partner over the straddle: warranted by the
 /// truth when the worktree's list holds it, else by HEAD.
 fn partner_item (
@@ -220,7 +254,7 @@ fn partner_item (
     warrant : if partner . existence == Some (Existence::Removed) {
                 Warrant::ByHead } else { Warrant::ByGraph },
     relRepo : None,
-    restricted : false, // the diff view runs under no restriction
+    restricted : false,
     rel     : partner . existence,
     partner : Some ( partner . clone () ), } }
 

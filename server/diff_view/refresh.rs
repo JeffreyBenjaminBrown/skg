@@ -33,8 +33,10 @@ use std::sync::{Arc, MutexGuard};
 /// 'store'. The goal holds what HEAD alone warrants, the change
 /// viewnodes are recomputed in place, and the buffer's sets choose
 /// what is editable and what an extension charges to the node budget
-/// ('RefreshMode::charges_node_budget'). The diff view requires the
-/// skgrepo set 'all', so nothing is restricted there.
+/// ('RefreshMode::charges_node_budget'). The diff view opens only
+/// under the skgrepo set 'all', but a switch rerenders its open
+/// buffers under 'restriction', which the goal and the ID rule ask as
+/// in a content view: a restricted node is never a ghost.
 /// 'buffer_correction_policy' says which changes are no buffer corrections.
 pub fn refresh_diffView_viewforest (
   runtime              : &RuntimeGeneration,

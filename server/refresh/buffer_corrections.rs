@@ -119,7 +119,7 @@ impl BufferCorrectionPolicy {
     ! self . follows_a_restriction_change }
 
   /// Whether re-kinding a headline to a Restricted vognode, or from
-  /// one to an occurrence, is a buffer correction.
+  /// one to an occurrence or a ghost, is a buffer correction.
   pub(crate) fn reports_rekind_across_the_restriction (
     &self,
   ) -> bool {
