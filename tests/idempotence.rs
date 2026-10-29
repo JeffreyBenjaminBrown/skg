@@ -14,7 +14,7 @@
 // c), an AliasFolder + Alias (b has alias "bee"), the IDFolders, a SubscribeeFolder +
 // subscribee-as-such (c subscribes to d), the HiddenOutsideOfSubscribeeFolder, and
 // a partner folder -- e subscribes to b, so b shows a SubscriberFolder listing e.
-// (The death-cleanup / generalized-orphan path -- a folder whose owning node was
+// (The death-cleanup path for an orphan folder -- a folder whose owning node was
 // deleted -- is covered separately by the save_collateral_delete_then_edit_under_it
 // integration test, which only a delete can trigger, not an unchanged-graph rerender.)
 

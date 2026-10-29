@@ -489,7 +489,7 @@ its herald, as they were: the save recomputes them."
          "** (skg node (gnid s) (skgRepos (nodeRepo public))) sibling\n"))))))
 
 (ert-deftest test-skg-replace-link-with-content-warns-for-existing-node ()
-  "Test replacing an existing node warns because it might orphan it."
+  "Test replacing an existing node warns because it might leave an orphan graphnode."
   (with-temp-buffer
     (org-mode)
     (insert
@@ -511,7 +511,7 @@ its herald, as they were: the save recomputes them."
       (should (= save-count 1))
       (should
        (member
-        "Warning: replacing existing node old may have created an orphan"
+        "Warning: replacing existing node old may have created an orphan graphnode"
         messages)))))
 
 (ert-deftest test-skg-replace-link-with-content-rejects-multiple-links ()

@@ -195,7 +195,7 @@ end
 ---save. The leaf must have exactly one org bracket link in its title
 ---plus body, no viewdescendants, and an editable, owned occurrence
 ---viewparent; the link must be an id link. Warns when the leaf
----already had an ID (the old node may become an orphan).
+---already had an ID (the old node may become an orphan graphnode).
 function M.replace_link_with_content ()
   local line = focus.owning_headline_line()
   if not line then error('Not on a headline') end
@@ -206,7 +206,7 @@ function M.replace_link_with_content ()
   local link = M.single_link_in_leaf(line)
   if node_gnid then
     vim.notify(string.format(
-      'Warning: replacing existing node %s may have created an orphan',
+      'Warning: replacing existing node %s may have created an orphan graphnode',
       node_gnid))
   end
   local split = metadata.split_as_stars_metadata_title(

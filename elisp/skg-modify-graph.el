@@ -142,7 +142,7 @@ target, then the buffer is saved."
          (link (skg--single-link-in-current-leaf)))
     (skg--check-content-link-replacement-container parent)
     (when node-gnid
-      (message "Warning: replacing existing node %s may have created an orphan"
+      (message "Warning: replacing existing node %s may have created an orphan graphnode"
                node-gnid))
     (skg--replace-current-leaf-with-linked-content link)
     (skg-request-save-buffer)))

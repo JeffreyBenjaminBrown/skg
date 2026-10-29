@@ -116,7 +116,8 @@ pub fn org_to_viewforest (
     // (the internal forest root is level 0; view roots are level 1).
     while treeid_stack . len() > level {
       treeid_stack . pop(); }
-    // Check for orphaned headlines (e.g., ** without preceding *)
+    // Check for an orphan viewnode, a headline deeper than its parent
+    // allows (e.g., ** without preceding *)
     // treeid_stack.len() should equal level
     // because the internal forest root is at level 0.
     if treeid_stack . len() < level {

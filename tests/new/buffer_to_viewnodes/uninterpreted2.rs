@@ -315,27 +315,28 @@ fn test_org_to_uninterpreted_nodes_rejects_forest_root() {
 }
 
 #[test]
-fn test_org_to_uninterpreted_nodes2_orphaned_nodes() {
-  // Test that nested nodes without a level 1 parent cause an error
-  let input_orphaned: &str =
+fn test_org_to_uninterpreted_nodes2_orphan_viewnodes() {
+  // Test that an orphan viewnode, a headline with no parent at the
+  // level above, causes an error
+  let input_orphan_viewnode: &str =
     indoc! {"
-            ** orphaned level 2 node
+            ** orphan viewnode at level 2
             This should cause an error
         "};
 
-  let result = org_to_viewnode_tree (input_orphaned, IdResolution::AsWritten);
+  let result = org_to_viewnode_tree (input_orphan_viewnode, IdResolution::AsWritten);
   assert!(result . is_err());
   let error_msg = result . unwrap_err();
   assert!(error_msg . contains ("jumps too far between levels"));
   assert!(error_msg . contains ("level 2"));
 
   // Test that level 3 without proper parents also causes an error
-  let input_level3_orphaned: &str =
+  let input_level3_orphan_viewnode: &str =
     indoc! {"
-            *** deeply orphaned level 3 node
+            *** orphan viewnode at level 3
         "};
 
-  let result = org_to_viewnode_tree (input_level3_orphaned, IdResolution::AsWritten);
+  let result = org_to_viewnode_tree (input_level3_orphan_viewnode, IdResolution::AsWritten);
   assert!(result . is_err());
   let error_msg = result . unwrap_err();
   assert!(error_msg . contains ("jumps too far between levels"));
