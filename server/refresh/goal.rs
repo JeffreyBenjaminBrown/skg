@@ -203,10 +203,8 @@ fn content_goal (
   let restriction : Option<&SkgrepoRestriction> = walk . truth . restriction;
   let subscriber : Option<ID> = subscriber_of_subscribee_as_such (tree, parent);
   let unintegrated : &dyn Fn (Vec<ID>) -> Vec<ID> = &|contents : Vec<ID>| -> Vec<ID> {
-    match &subscriber {
-      None => contents,
-      Some (subscriber) => less_what_the_subscriber_integrates (
-        graph, restriction, subscriber, &contents ), } };
+    less_what_the_subscriber_integrates (
+      graph, restriction, subscriber . as_ref (), &contents ) };
   if let Some (goal) = diff_view::content_goal (pid, unintegrated, walk) {
     return goal; }
   let members : Vec<RelPartner<RelationshipMemberKey>> =
@@ -234,20 +232,20 @@ pub(crate) fn content_goal_gnids (
   let contents : Vec<ID> = members . iter ()
     . map ( |member| member . member . id () . clone () )
     . collect ();
-  match subscriber {
-    None => contents,
-    Some (subscriber) => less_what_the_subscriber_integrates (
-      graph, restriction, subscriber, &contents ), } }
+  less_what_the_subscriber_integrates (graph, restriction, subscriber, &contents) }
 
 /// 'contents' less what 'subscriber' hides or contains, as the truth
 /// has it ('unintegrated_content_gnids'): what a subscribee as such
-/// shows of its content.
-pub(crate) fn less_what_the_subscriber_integrates (
+/// shows of its content. All of 'contents' when there is no
+/// subscriber.
+fn less_what_the_subscriber_integrates (
   graph       : &InRustGraph,
   restriction : Option<&SkgrepoRestriction>,
-  subscriber  : &ID,
+  subscriber  : Option<&ID>,
   contents    : &[ID],
 ) -> Vec<ID> {
+  let Some (subscriber) : Option<&ID> = subscriber
+    else { return contents . to_vec (); };
   unintegrated_content_gnids (
     graph, contents,
     &graph . outbound_gnids_for_relation_gated (
@@ -265,9 +263,7 @@ fn unintegrated_content_gnids (
   subscriber_contains : &[ID],
 ) -> Vec<ID> {
   let resolve_pids = |gnids : &[ID]| -> Vec<ID> {
-    gnids . iter ()
-      . map (|gnid| graph . pid_of (gnid) . unwrap_or_else (|| gnid . clone ()))
-      . collect () };
+    gnids . iter () . map ( |gnid| pid_else_raw_id (graph, gnid) ) . collect () };
   let contents : Vec<ID> = resolve_pids (content_gnids);
   let hidden : Vec<ID> = resolve_pids (subscriber_hidden);
   let contained : Vec<ID> = resolve_pids (subscriber_contains);
@@ -363,31 +359,17 @@ pub(crate) fn partnerFolder_members_in_graph (
     member_role . opposite_role ();
   let members : Vec<ID> =
     if recorder_role . is_first_role () { // the folder shows a list in the recorder's file
-      raw_outbound_members (graph, viewparent_pid, member_role, skgrepo_restriction)
+      // Preserve an unresolved ID through this outbound surface. The
+      // canonical-pid accessor below is right for the inverse folders,
+      // but would erase an unknown from the writable overriddenFolder.
+      graph . outbound_member_keys_for_relation_gated (
+        viewparent_pid, member_role . relation, skgrepo_restriction )
         . into_iter ()
         . map ( |member| member . member . into_id () )
         . collect ()
     } else { graph . other_member_pids_gated (
       viewparent_pid, recorder_role, skgrepo_restriction ) };
   Some (members) }
-
-/// The viewparent's partners in the member role's relation, as its file
-/// lists them, each tagged by whether the graph resolves it, if the
-/// folder shows a list in the viewparent's file (the viewparent is the
-/// recorder); else none.
-fn raw_outbound_members (
-  graph               : &InRustGraph,
-  viewparent_pid      : &ID,
-  member_role         : RelationRole,
-  skgrepo_restriction : Option<&SkgrepoRestriction>,
-) -> Vec<RelPartner<RelationshipMemberKey>> {
-  if member_role . opposite_role () . is_first_role () {
-    // Preserve an unresolved ID through this outbound surface.  The old
-    // canonical-PID accessor is still right for inverse/write-protected folders, but
-    // would erase an Unknown from the writable overriddenFolder.
-    graph . outbound_member_keys_for_relation_gated (
-      viewparent_pid, member_role . relation, skgrepo_restriction )
-  } else { Vec::new () }}
 
 /// What 'subscriber' hides in the content of 'subscribee', by the
 /// records the skgrepo restriction shows: the goal of the compound
@@ -416,9 +398,9 @@ fn goal_list_for_hiddenInSubscribee_folder (
 ) -> Vec<ID> {
   let contains_set : HashSet<RelationshipMemberKey> =
     subscribee_contains . iter ()
-    . map (|gnid| relationship_member_key (graph, gnid)) . collect ();
+    . map ( |gnid| graph . relationship_member_key (gnid) ) . collect ();
   subscriber_hides . iter ()
-    . filter ( |gnid| contains_set . contains (&relationship_member_key (graph, gnid)) )
+    . filter ( |gnid| contains_set . contains (&graph . relationship_member_key (gnid)) )
     . cloned () . collect () }
 
 /// What 'subscriber' hides outside the content of its subscribees, by
@@ -440,30 +422,23 @@ pub(crate) fn hidden_outside_of_subscribees (
 /// Goal list for a hiddenOutsideOfSubscribeeFolder: the subscriber's
 /// hides-list minus everything contained by any subscribee.
 fn goal_list_for_hiddenOutsideOfSubscribee_folder (
-  graph                : &InRustGraph,
-  wt_subscriber_hides  : &[ID],
-  wt_subscribees       : &[ID],
+  graph             : &InRustGraph,
+  subscriber_hides  : &[ID],
+  subscribees       : &[ID],
 ) -> Vec<ID> {
-  let wt_subscribee_content_of = | pid : &ID | -> Vec<ID> {
+  let subscribee_content_of = | pid : &ID | -> Vec<ID> {
     graphnode_from_graph (graph, pid)
       . map ( |skg| members_of (& skg . contains) )
       . unwrap_or_default () };
-  let wt_all_subscribee_content : HashSet<RelationshipMemberKey> =
-    wt_subscribees . iter ()
-      . flat_map ( |pid| wt_subscribee_content_of (pid) )
-      . map (|gnid| relationship_member_key (graph, &gnid))
+  let all_subscribee_content : HashSet<RelationshipMemberKey> =
+    subscribees . iter ()
+      . flat_map ( |pid| subscribee_content_of (pid) )
+      . map ( |gnid| graph . relationship_member_key (&gnid) )
       . collect ();
-  wt_subscriber_hides . iter ()
-    . filter ( |gnid| ! wt_all_subscribee_content
-              . contains (&relationship_member_key (graph, gnid)) )
+  subscriber_hides . iter ()
+    . filter ( |gnid| ! all_subscribee_content
+              . contains (&graph . relationship_member_key (gnid)) )
     . cloned () . collect () }
-
-fn relationship_member_key (
-  graph : &InRustGraph,
-  gnid    : &ID,
-) -> RelationshipMemberKey {
-  graph . relationship_member_key (gnid)
-}
 
 /// A property folder's goal: the node's aliases whose records the
 /// skgrepo restriction shows (in order, each with its relRepo when
@@ -529,12 +504,18 @@ fn unknown_or_restricted_members_relRepos (
                        member . relRepo . clone () ))
     . collect () }
 
-/// Each ID as the graph resolves it: its pid, or itself when nothing
-/// answers to it.
+/// Each ID as the graph resolves it ('pid_else_raw_id').
 fn resolve_all (
   gnids : Vec<ID>,
   graph : &InRustGraph,
 ) -> Vec<ID> {
-  gnids . into_iter ()
-    . map ( |gnid| graph . relationship_member_key (&gnid) . into_id () )
-    . collect () }
+  gnids . iter () . map ( |gnid| pid_else_raw_id (graph, gnid) ) . collect () }
+
+/// The pid of the node 'gnid' names, else 'gnid' itself, the raw ID,
+/// when nothing answers to it: how the goal's lists, and the save's
+/// hides ('resolve_visibility.rs'), compare their members.
+pub(crate) fn pid_else_raw_id (
+  graph : &InRustGraph,
+  gnid  : &ID,
+) -> ID {
+  graph . pid_of (gnid) . unwrap_or_else ( || gnid . clone () ) }
