@@ -139,6 +139,45 @@ the approved PIDs."
                        '("p1" "p2"))))
       (should (assq 'skgrepo-restriction skg-response-handler-map)))))
 
+(ert-deftest test-skg-restrict-repo-set-refuses-while-a-view-is-unsaved ()
+  "The repo-set switch refuses while any view has unsaved edits, before
+it prompts for a name, with the message of stage-and-commit; with every
+view clean it asks its question and sends the request."
+  (let ((skg-response-handler-map nil)
+        (skg-lp--pending-count 0)
+        (skg--stream-in-progress nil)
+        (sent nil)
+        (questions nil)
+        (name-prompted nil))
+    (cl-letf (((symbol-function 'skg-tcp-connect-to-rust) (lambda () 'fake-proc))
+              ((symbol-function 'skg--lock-all-skg-buffers) #'ignore)
+              ((symbol-function 'skg--prompt-for-repo-set)
+               (lambda () (setq name-prompted t) "rs"))
+              ((symbol-function 'yes-or-no-p)
+               (lambda (question) (push question questions) t))
+              ((symbol-function 'process-send-string)
+               (lambda (_proc text) (push text sent))))
+      (with-temp-buffer
+        (setq-local skg-view-id "dirty-view")
+        (insert "* (skg node (gnid a)) a\n")
+        (set-buffer-modified-p t)
+        (dolist (switch (list (lambda () (skg-restrict-repo-set "rs"))
+                              (lambda () (call-interactively
+                                          #'skg-restrict-repo-set))))
+          (let ((err (should-error (funcall switch) :type 'user-error)))
+            (should (equal (cadr err)
+                           "Save or revert every skg view before switching the skgrepo-set"))))
+        (should-not name-prompted)
+        (should (null questions))
+        (should (null sent))
+        (set-buffer-modified-p nil)
+        (call-interactively #'skg-restrict-repo-set)
+        (should name-prompted)
+        (should (equal questions
+                       '("Switch repo-set and re-render all SKG buffers? ")))
+        (should (= 1 (length sent)))
+        (should (string-match-p "set skgrepo restriction" (car sent)))))))
+
 (ert-deftest test-skg-response-errors-line-joins-the-errors ()
   (should (equal (skg--response-errors-line
                   (read "((errors (\"first\" \"second\")) (warnings (\"w\")))"))

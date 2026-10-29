@@ -13,6 +13,7 @@ local client = require('skg.client')
 local investigate_unknown_node = require('skg.investigate_unknown_node')
 local length_prefix = require('skg.length_prefix')
 local lock = require('skg.lock')
+local picker = require('skg.picker')
 local rerender = require('skg.rerender')
 local repo_sets = require('skg.repo_sets')
 local sexpr = require('skg.sexpr.parse')
@@ -163,6 +164,49 @@ describe('skg stream consumers', function ()
       assert.is_truthy(state.response_handler_map['skgrepo-restriction'])
     end)
     client.send_string, vim.fn.confirm = original_send, original_confirm
+    assert(ok, err)
+  end)
+
+  it('refuses the repo-set switch while a view is unsaved, before it'
+     .. ' prompts for a name', function ()
+    -- Mirrors test-skg-restrict-repo-set-refuses-while-a-view-is-unsaved.
+    local sent, questions, name_prompted = {}, {}, false
+    local original_send, original_confirm, original_prompt, original_uis =
+      client.send_string, vim.fn.confirm, picker.prompt_for_repo_set,
+      vim.api.nvim_list_uis
+    client.send_string = function (text) table.insert(sent, text) end
+    vim.fn.confirm = function (question)
+      table.insert(questions, question) return 1 end
+    picker.prompt_for_repo_set = function ()
+      name_prompted = true return 'public' end
+    vim.api.nvim_list_uis = function () return { {} } end
+    local ok, err = pcall(function ()
+      local view = buffer.open_org_buffer_from_text(
+        '* (skg node (gnid a)) a', 'skg://a', 'a-view_id')
+      vim.bo[view].modified = true
+      for _, switch in ipairs({
+          function () repo_sets.restrict_repo_set('public') end,
+          function () repo_sets.restrict_repo_set() end }) do
+        local refused, refusal = pcall(switch)
+        assert.is_false(refused)
+        assert.is_truthy(tostring(refusal):find(
+          'skg: save or revert every view before switching the'
+          .. ' skgrepo-set', 1, true))
+      end
+      assert.is_false(name_prompted)
+      assert.are.same({}, questions)
+      assert.are.same({}, sent)
+      vim.bo[view].modified = false
+      repo_sets.restrict_repo_set()
+      assert.is_true(name_prompted)
+      assert.are.same(
+        { 'Switch repo-set and re-render all SKG buffers?' }, questions)
+      assert.are.equal(1, #sent)
+      assert.is_truthy(sent[1]:find('set skgrepo restriction', 1, true))
+    end)
+    client.send_string, vim.fn.confirm, picker.prompt_for_repo_set,
+      vim.api.nvim_list_uis =
+      original_send, original_confirm, original_prompt, original_uis
     assert(ok, err)
   end)
 

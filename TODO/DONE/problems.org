@@ -129,6 +129,38 @@ I'd rather have simpler code.
   and drops the buffer corrections of headlines the tail pruned;
   after a switch ('AfterRestrictionChange') the marking of
   'noClaim' is quiet. A first drawing ('Unread') reports nothing.
+** Neovim's buffer writers misplace requests and append a delete
+  Run (a throwaway plenary spec, '07_1_review-reports/
+  nvim-writer-check/'). 'metadata.delete', 'delete_recursive',
+  'set_merge_request' and 'detach' write the new form or the
+  'noClaim' atom after '(viewRequests ...)', '(view ...)' and
+  '(diff ...)', not at its 'parts' rank, and delete on a headline
+  holding '(editRequest (merge y))' gives '(editRequest (merge
+  y) delete)', which the server refuses at save; Emacs replaces
+  the request. Fix: write the whole metadata 'with_edit_request'
+  returns, and insert parts at their 'parts' rank; a buffer-level
+  test. Review item 2.
+  Fixed by slice 4 of
+  'TODO/simplify-refresh/08_plan_restriction-and-tidy.org': the
+  four commands and the flag stamp write the whole metadata that
+  'with_edit_request' returns ('write_edit_request_at_line' in
+  'nvim/lua/skg/metadata.lua'), which places a new form by
+  'parts' and replaces any request held; detach places 'noClaim'
+  by 'parts' ('with_part_at_its_rank'). The buffer-level test is
+  "the writers place what they write as the server prints it" in
+  'tests/nvim/metadata_spec.lua'.
+** A readiness request blocks the flag request in both clients
+  Run in Emacs, traced in Neovim. 'skg-request-flag-state.el'
+  and Neovim's 'flag.lua' refuse a headline carrying
+  '(editRequest (ready ...))' as if it held an edit request: the
+  bug slice 4 fixed for 'skg-set-relRepo', in a second place.
+  Fix: one predicate per client that skips readiness parts.
+  Fixed by slice 4 of
+  'TODO/simplify-refresh/08_plan_restriction-and-tidy.org': the
+  flag command asks 'skg--node-edit-request-p' in Emacs (the
+  predicate 'skg--node-edit-request-at-point-p' now wraps) and
+  'node_edit_request_p' in Neovim, which skip readiness and
+  relRepo parts.
 * Problems found while planning plan 06 (2026-10-26; fixed 2026-10-27)
 ** An unknown recorded in a visible skgrepo vanishes under a restriction
   Seen by the same experiment, with and without the phase: the

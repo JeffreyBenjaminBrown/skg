@@ -548,8 +548,10 @@ described under <localleader>ss apply here too, across the whole
 subtree.
 *** <localleader>sx : :SkgSetFlagSearchMatching
 Prompts between =search matching= and =no search matching= and stages the
-desired state without saving. Foreign/write-protected/unsaved roots and an
-existing =editRequest= are refused.
+desired state without saving. Foreign/write-protected/unsaved roots and a
+node that already holds an edit request (delete, merge or a flag) are
+refused. A readiness request stays beside it, and a relRepo request gives
+way to it, as to delete and merge.
 *** <localleader>sX : :SkgSetFlagSearchMatchingRecursive
 Applies one selected state uniformly through the true-content subtree,
 deduplicating PIDs and reporting ineligible descendants. It prunes non-vognodes,
@@ -844,8 +846,10 @@ it, holding what stood under the old headline, until nothing is left
 under it. None of this is reported as a buffer correction.
 
 The rerender redraws each open buffer from the view the server last
-saved or rendered for it, so an unsaved edit in an open buffer is
-lost: save every view, or revert it, before switching.
+saved or rendered for it, which would lose an unsaved edit; so while
+any view has unsaved edits the command refuses ("skg: save or revert
+every view before switching the skgrepo-set"), as stage-and-commit
+does, and asks nothing.
 
 If the proposed set would rerender overPrivateText telescope text, Skg asks before
 changing the skgrepo restriction or any view. Declining leaves both unchanged and

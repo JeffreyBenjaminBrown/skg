@@ -561,8 +561,10 @@ described under =C-c s s= apply here too, across the whole subtree.
 *** C-c s x : skg-set-flag-search-matching
 Prompts between =search matching= and =no search matching=, with shift-arrow
 cycling, and stages an idempotent request on the saved occurrence at point.
-It refuses foreign and write-protected nodes and conflicts with another
-=editRequest=. It does not save; save the view to apply it.
+It refuses foreign and write-protected nodes and a node that already
+holds an edit request (delete, merge or a flag). A readiness request
+stays beside it, and a relRepo request gives way to it, as to delete
+and merge. It does not save; save the view to apply it.
 
 With =C-u=, the selected value is applied uniformly to the true-content
 subtree only. Non-vognodes, children carrying =noClaim=, ghosts and
@@ -995,8 +997,10 @@ beside it, holding what stood under the old headline, until nothing
 is left under it. None of this is reported as a buffer correction.
 
 The re-render redraws each open buffer from the view the server last
-saved or rendered for it, so an unsaved edit in an open buffer is
-lost: save every view, or revert it, before switching.
+saved or rendered for it, which would lose an unsaved edit; so while
+any view has unsaved edits the command refuses ("Save or revert every
+skg view before switching the skgrepo-set"), as stage-and-commit
+does, and asks nothing.
 
 If the proposed set would rerender overPrivateText telescope text, Skg asks before
 changing the skgrepo restriction or any view. Declining leaves both unchanged and

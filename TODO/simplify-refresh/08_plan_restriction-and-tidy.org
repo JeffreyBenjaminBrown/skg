@@ -821,7 +821,7 @@ does not name under 'all' answers the same on both sides.
 The suites, with 'bash/integration-tests.sh', and the fixpoint
 sweeps.
 
-** TODO Slice 4: the clients' bugs and the switch's refusal
+** DONE Slice 4: the clients' bugs and the switch's refusal
 Read the three sections of the agreed behavior, the pitfalls on
 Neovim's edit DSL and the switch's clients, and
 '07_1_review-reports/nvim-writer-check/' first.

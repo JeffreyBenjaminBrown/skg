@@ -4025,3 +4025,91 @@ slice 9, the skgrepo modifier, Jeff's rule of today. Suites:
 nextest 1013 of 1013 (seven new, one removed), integration 34
 of 35 with the pre-existing failure; the client suites were
 not run, as no client was touched.
+
+** Slice 4
+*** The commits
+**** 5bf1de4e
+The Neovim writers and the flag predicate: delete,
+delete_recursive, set_merge_request and the flag stamp write
+the whole metadata 'with_edit_request' returns, placed by
+'parts'; detach places 'noClaim' by 'parts'; the flag command
+in both clients asks the predicate 'skg-set-relRepo' uses.
+**** The last commit
+The skgrepo-set switch refuses while a view has unsaved edits,
+in both clients; the docs, the two problems entries, this
+record and the plan's keyword.
+*** The suites
+Run once, serialized, on the finished tree (the first commit
+alone touches no Rust and none of the switch's code; its tests
+pass without the second).
+**** cargo check --all-targets
+Clean, no warning; the slice touches no Rust.
+**** bash/nextest.sh
+1013 run, 1013 passed: unchanged, as the plan says.
+**** bash/emacs-tests.sh
+408 of 408 passed (406 before the slice, two tests added).
+**** bash/nvim-tests.sh
+402 passed, none failed (399 before the slice, three added).
+**** bash/integration-tests.sh
+34 of 35 passed. The failure is 'import-md-and-org', which is
+pre-existing and not this plan's.
+**** Failures met during the slice
+***** 'restore_deleted_node marks a ghost' (Neovim)
+An expected fixture adaptation: the test pinned the appended
+order the defect wrote, '(diff ...)' before '(editRequest
+restoreNode)'. It now pins the printer's order, the request
+before the derived facts.
+**** Checks by mutation
+The new buffer-level Neovim test, run against the writers of
+before the slice ('metadata.lua', 'readiness.lua' and
+'flag.lua' at HEAD), fails at its first case, delete, with the
+request appended after '(diff ...)'. The two new flag tests,
+run against the flag code of before the slice in each client,
+fail with "This node already has an editRequest". The switch's
+tests were not run against the old code.
+**** The TCP surface
+On a scratch server ('verify' skill; script and outputs in
+'tests/results/08/slice4/probe/'), the Neovim writers, run
+headless on a view the server rendered, wrote a delete over a
+merge request, a detach and a merge request; the server saved
+the result with no error, no warning and no buffer correction:
+it deleted the first, detached the second and merged the third.
+*** Deviations from the plan's "how"
+**** Emacs's predicate takes the sexp, its at-point form wraps
+'skg--flag-eligible-root-id' takes a metadata sexp, and its
+test passes one with no buffer, so the flag command needs the
+predicate on a sexp. The logic moved into
+'skg--node-edit-request-p'; 'skg--node-edit-request-at-point-p'
+calls it, and 'skg-set-relRepo' is unchanged. Neovim has no
+set-relRepo, so its twin is new: 'node_edit_request_p' in
+'metadata.lua', on a sexp, like Neovim's other predicates.
+**** a pending relRepo request gives way to the flag request
+The predicate skips relRepo parts, as the plan names it. The
+server takes one edit request beside a readiness request, and
+'with_edit_request' replaces every part but the readiness
+request, so the flag stamp now replaces a pending relRepo
+request, as delete and merge already did in both clients;
+before, the flag command refused it. 'docs/COMMANDS.org' and
+'COMMANDS-nvim.org' say so under the flag command.
+**** one rank helper in Neovim
+'with_part_at_its_rank' ('metadata.lua') places a part by the
+'parts' list; 'readiness.lua''s own table of the forms after
+'(editRequest ...)' went, and its placement calls the helper.
+'readiness_request_p' is exported for the predicate.
+**** the switch checks before it prompts for a name
+Both clients refuse before asking which skgrepo-set, so a
+refused switch asks nothing; Emacs checks in its interactive
+form and again in the body, for a call from code or the retry
+after an over-private-text challenge. The message keeps the
+pattern of the other two commands with its own last words:
+"Save or revert every skg view before switching the
+skgrepo-set" in Emacs, "skg: save or revert every view before
+switching the skgrepo-set" in Neovim, each in its client's
+style.
+*** Fixtures changed
+One: the Neovim test of 'restore_deleted_node', above, which
+pinned the defect's order.
+*** Left unfinished
+Nothing of slice 4.
+*** Headline
+DONE.

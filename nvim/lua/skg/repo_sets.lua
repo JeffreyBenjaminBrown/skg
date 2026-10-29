@@ -2,6 +2,7 @@
 -- restriction; switching re-renders every open view in place. The Lua
 -- port of elisp/skg-request-repo-sets.el.
 
+local buffer = require('skg.buffer')
 local client = require('skg.client')
 local payload = require('skg.payload')
 local picker = require('skg.picker')
@@ -38,9 +39,13 @@ end
 
 ---Set the skgrepo restriction for this connection to NAME (prompted
 ---when absent), after confirmation; the server replies with the
----confirmation followed by the rerender stream.
+---confirmation followed by the rerender stream. Refuses while any view
+---has unsaved edits, which the rerender would replace.
 ---@param name string|nil
 function M.restrict_repo_set (name, approved_pids)
+  if #buffer.other_unsaved_skg_buffers(nil) > 0 then
+    error('skg: save or revert every view before switching the skgrepo-set')
+  end
   name = name or picker.prompt_for_repo_set()
   if not name then return end
   if not approved_pids and #vim.api.nvim_list_uis() > 0

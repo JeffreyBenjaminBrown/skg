@@ -56,8 +56,12 @@
   "Set the skgrepo restriction for this TCP connection to NAME.
 Open SKG buffers are kept and re-rendered in place: the server
 replies with the skgrepo-restriction confirmation followed by the
-rerender stream (rerender-lock, rerender-view*, rerender-done)."
-  (interactive (list (skg--prompt-for-repo-set)))
+rerender stream (rerender-lock, rerender-view*, rerender-done).
+Refuses while any view has unsaved edits, which the rerender would
+replace."
+  (interactive (progn (skg--refuse-repo-set-switch-while-views-unsaved)
+                      (list (skg--prompt-for-repo-set))))
+  (skg--refuse-repo-set-switch-while-views-unsaved)
   (when (or approved-pids
             (yes-or-no-p "Switch repo-set and re-render all SKG buffers? "))
     (skg--send-streaming-request
@@ -75,5 +79,10 @@ rerender stream (rerender-lock, rerender-view*, rerender-done)."
           (message "skg-restrict-repo-set: %S" err))))
      nil nil
      (lambda (pids) (skg-restrict-repo-set name pids)))))
+
+(defun skg--refuse-repo-set-switch-while-views-unsaved ()
+  "Signal `user-error' while any view has unsaved edits."
+  (when (skg--unsaved-view-buffers)
+    (user-error "Save or revert every skg view before switching the skgrepo-set")))
 
 (provide 'skg-request-repo-sets)
