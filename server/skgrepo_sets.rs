@@ -4,7 +4,8 @@ use crate::dbs::init::create_empty_tantivy_index;
 use crate::types::misc::{ID, SkgConfig, SkgrepoName, TantivyIndex};
 pub use crate::types::misc::SkgrepoSetName;
 use crate::types::nodes::complete::Graphnode;
-use crate::test_utils::cleanup_test_tantivy;
+use crate::test_utils::{
+  cleanup_test_tantivy, index_folder_for_this_process, remove_test_dir};
 
 use futures::executor::block_on;
 use std::collections::{BTreeSet, HashMap};
@@ -146,13 +147,18 @@ where
         . ok_or ("fixture config path is not UTF-8")?,
         Some (test_name),
         &[])?;
-    config . tantivy_folder = PathBuf::from (tantivy_folder);
+    config . tantivy_folder =
+      index_folder_for_this_process (tantivy_folder);
     let mut tantivy : TantivyIndex =
       create_empty_tantivy_index (&config . tantivy_folder)?;
     let result : Result<(), Box<dyn Error>> =
       test_fn (&config, &mut tantivy) . await;
+    drop (tantivy); // before its folder goes
     cleanup_test_tantivy (
       Some (config . tantivy_folder . as_path ())) ?;
+    remove_test_dir (
+      fixture_config_path . parent ()
+      . ok_or ("repo set fixture config has no parent")?) ?;
     result }) }
 
 fn prepare_skgrepo_set_fixture_copy (
@@ -164,9 +170,10 @@ fn prepare_skgrepo_set_fixture_copy (
   let skgrepo_root : &Path =
     skgrepo_config_path . parent ()
     . ok_or ("repo set fixture config has no parent")?;
-  let target_root : PathBuf =
+  let target_root : PathBuf = // the process ID, as the index folder has it
     PathBuf::from (format! (
-      "/tmp/skg-repo-set-fixtures-{}", test_name));
+      "/tmp/skg-repo-set-fixtures-{}-{}",
+      test_name, std::process::id () ));
   if target_root . exists () {
     fs::remove_dir_all (&target_root)?; }
   copy_dir_recursively (skgrepo_root, &target_root)?;

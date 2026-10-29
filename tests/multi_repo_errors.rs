@@ -2,7 +2,8 @@
 
 use indoc::indoc;
 use regex::Regex;
-use skg::test_utils::{strip_org_comments, cleanup_test_tantivy, graph_from_config};
+use skg::test_utils::{strip_org_comments, cleanup_test_tantivy, graph_from_config,
+                      index_folder_for_this_process};
 use skg::from_text::buffer_to_validated_saveplan;
 use skg::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewforest;
@@ -13,7 +14,6 @@ use skg::types::misc::SkgConfig;
 
 use skg::dbs::filesystem::not_nodes::load_config;
 use std::error::Error;
-use std::path::PathBuf;
 use futures::executor::block_on;
 
 #[test]
@@ -23,7 +23,7 @@ fn test_multi_skgrepo_errors() -> Result<(), Box<dyn Error>> {
     let mut config: SkgConfig =
       load_config(
         "tests/multi_repo_errors/fixtures/skgconfig.toml")? . 0;
-    config . tantivy_folder = PathBuf::from ("/tmp/tantivy-test-multi-repo-errors-1");
+    config . tantivy_folder = index_folder_for_this_process ("/tmp/tantivy-test-multi-repo-errors-1");
 
 
     // Test buffer with multiple error conditions
@@ -88,7 +88,7 @@ fn test_foreign_node_modification_errors(
     let mut config: SkgConfig =
       load_config(
         "tests/multi_repo_errors/fixtures/skgconfig.toml")? . 0;
-    config . tantivy_folder = PathBuf::from ("/tmp/tantivy-test-multi-repo-errors-2");
+    config . tantivy_folder = index_folder_for_this_process ("/tmp/tantivy-test-multi-repo-errors-2");
 
     // Test 1: Foreign node modifications
     // (all other errors removed so initial validation passes)
@@ -240,7 +240,7 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
     // Load the multi-repo fixture config.
     let mut config: SkgConfig = load_config(
       "tests/multi_repo_errors/fixtures/skgconfig.toml")? . 0;
-    config . tantivy_folder = PathBuf::from ("/tmp/tantivy-test-multi-repo-errors-3");
+    config . tantivy_folder = index_folder_for_this_process ("/tmp/tantivy-test-multi-repo-errors-3");
 
 
     // Test 1: Repo move between owned skgrepos is now allowed

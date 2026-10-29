@@ -6,7 +6,7 @@ use skg::serve::handlers::titles_by_gnids::{
   handle_titles_by_gnids_request_with_skgrepo_set};
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::dbs::in_rust_graph::InRustGraph;
-use skg::test_utils::read_lp_message;
+use skg::test_utils::{IndexFolderForThisProcess, read_lp_message};
 use skg::types::git::SkgrepoDiff;
 use skg::types::misc::{ID, MSV, SkgConfig, Skgrepo, SkgrepoName, SkgrepoSetName, TantivyIndex, rel_partners_at_relRepo_msv};
 use skg::types::nodes::complete::{empty_graphnode, Graphnode};
@@ -39,10 +39,12 @@ fn titles_by_gnids_handler_sends_parseable_titles (
     "The Real Title, with spaces" . to_string ();
   spaced_title_node . home_skgrepo =
     SkgrepoName::from ("main");
+  let index_folder : IndexFolderForThisProcess =
+    IndexFolderForThisProcess::new ("/tmp/tantivy-test-titles-by-ids-handler");
   let (tantivy_index, _indexed_count) : (TantivyIndex, usize) =
     wipe_then_init_tantivy_db (
       &vec![node, spaced_title_node],
-      Path::new ("/tmp/tantivy-test-titles-by-ids-handler"))?;
+      &index_folder . path)?;
   let listener : TcpListener =
     TcpListener::bind ("127.0.0.1:0")?;
   let addr =
@@ -99,8 +101,10 @@ fn restricted_title_lookup_challenges_without_releasing_text (
   node . overPrivateText_telescope = true;
   let graph : InRustGraph =
     InRustGraph::from_graphnodes (&[node . clone ()]);
+  let index_folder : IndexFolderForThisProcess =
+    IndexFolderForThisProcess::new ("/tmp/tantivy-test-title-release");
   let (index, _) = wipe_then_init_tantivy_db (
-    &[node], Path::new ("/tmp/tantivy-test-title-release") ) ?;
+    &[node], &index_folder . path ) ?;
   let config : SkgConfig = SkgConfig::dummyFromSkgrepos (HashMap::from ([
     (skgrepo . clone (), Skgrepo {
       name         : skgrepo . clone (),

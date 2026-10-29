@@ -58,7 +58,9 @@ use tantivy::schema::document::Value;
 /// 4. Cleaning up the database, search index, and temp fixtures
 ///
 /// The test_fn closure receives references to SkgConfig and TantivyIndex
-/// and can run multiple test functions sequentially.
+/// and can run multiple test functions sequentially. The index lives in
+/// 'tantivy_folder' with the process ID appended
+/// ('index_folder_for_this_process').
 ///
 /// Example:
 /// ```
@@ -101,12 +103,14 @@ where
   copy_dir_all(
     &PathBuf::from (fixtures_folder),
     &temp_fixtures)?;
+  let index_folder : PathBuf =
+    index_folder_for_this_process (tantivy_folder);
   let result : Result<(), Box<dyn Error>> = block_on(async {
     let (config, mut tantivy) : (SkgConfig, TantivyIndex)
       = setup_test_tantivy(
           test_name,
           temp_fixtures . to_str() . unwrap(),
-          tantivy_folder )?;
+          index_folder . to_str () . unwrap () )?;
     let mut guard : TestStoreGuard = TestStoreGuard::new (
       test_name, Some ( config . tantivy_folder . clone () ));
     let test_result : Result<Result<(), Box<dyn Error>>,
@@ -131,6 +135,38 @@ fn temp_fixtures_folder (
 ) -> PathBuf {
   PathBuf::from ( format! ( "/tmp/{}-fixtures-{}",
                             test_name, std::process::id () )) }
+
+/// Where a test keeps its search index: the folder it names, with the
+/// process ID appended, as 'temp_fixtures_folder' does, so that two
+/// processes running one test never share an index.
+pub fn index_folder_for_this_process (
+  tantivy_folder : &str,
+) -> PathBuf {
+  PathBuf::from ( format! ( "{}-{}",
+                            tantivy_folder, std::process::id () )) }
+
+/// A test's own search-index folder, at
+/// 'index_folder_for_this_process', removed when the value drops. A
+/// test declares it before the index, so that the index drops first.
+pub struct IndexFolderForThisProcess {
+  pub path : PathBuf,
+}
+
+impl IndexFolderForThisProcess {
+  pub fn new (
+    tantivy_folder : &str,
+  ) -> IndexFolderForThisProcess {
+    IndexFolderForThisProcess {
+      path : index_folder_for_this_process (tantivy_folder) }}
+}
+
+impl Drop for IndexFolderForThisProcess {
+  fn drop (&mut self) {
+    if let Err (e) = cleanup_test_tantivy ( Some (&self . path) ) {
+      tracing::error! (
+        "IndexFolderForThisProcess: removing {} failed: {}",
+        self . path . display (), e); }}
+}
 
 /// Remove a test's temporary directory, if it exists.
 /// PITFALL: Tantivy's meta-file watcher thread outlives the index
@@ -295,8 +331,8 @@ where
   let temp_fixtures : PathBuf =
     temp_fixtures_folder (test_name);
   let tantivy_folder : PathBuf =
-    PathBuf::from ( format! ( "/tmp/tantivy-test-{}-{}",
-                              test_name, std::process::id () ));
+    index_folder_for_this_process (
+      &format! ( "/tmp/tantivy-test-{}", test_name ));
   let result : Result<(), Box<dyn Error>> = block_on ( async {
     let mut session : SharedStoreSession = SharedStoreSession {
       test_name        : test_name . to_string (),

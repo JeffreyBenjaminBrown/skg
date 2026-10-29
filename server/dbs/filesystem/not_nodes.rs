@@ -1,3 +1,4 @@
+use crate::test_utils::index_folder_for_this_process;
 use crate::types::misc::{SkgConfig, Skgrepo, SkgrepoName};
 
 use serde::Deserialize;
@@ -231,6 +232,7 @@ pub fn load_config (
 /// Load config from TOML file with optional overrides for testing.
 ///
 /// - If `test_name` is Some, sets tantivy_folder to /tmp/tantivy-{test_name}
+///   with the process ID appended ('index_folder_for_this_process')
 /// - `repo_overrides` replaces paths for the specified skgrepo names
 ///
 /// # Examples
@@ -286,8 +288,8 @@ pub fn load_config_with_overrides (
   derive_ownership_and_labels (&mut config, &raw_paths);
   validate_skgrepo_sets (&config)?;
   if let Some (name) = test_name {
-    config . tantivy_folder =
-      std::path::PathBuf::from(format!("/tmp/tantivy-{}", name)); }
+    config . tantivy_folder = index_folder_for_this_process (
+      &format! ("/tmp/tantivy-{}", name)); }
   for (skgrepo_name, new_path) in skgrepo_overrides {
     let key : SkgrepoName = SkgrepoName::from (*skgrepo_name);
     if let Some (skgrepo) = config . skgrepos . get_mut (&key) {

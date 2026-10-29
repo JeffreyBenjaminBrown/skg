@@ -8,6 +8,7 @@ use tantivy::schema::document::Value;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use skg::dbs::filesystem::not_nodes::load_config;
 use skg::dbs::init::wipe_then_init_tantivy_db;
+use skg::test_utils::IndexFolderForThisProcess;
 use skg::dbs::tantivy::title_and_skgrepo_by_gnid;
 use skg::dbs::tantivy::escape::{escape_tantivy_intra_word, escape_tantivy_literal};
 use skg::dbs::tantivy::search::{
@@ -20,10 +21,9 @@ use skg::types::nodes::complete::{Flag, Graphnode, empty_graphnode};
 #[test]
 fn test_many_tantivy_things (
 ) -> Result<(), Box<dyn std::error::Error>> {
-  let index_dir : &str =
-    "/tmp/tantivy-test-many-things";
-  let index_path: &Path =
-    Path::new (index_dir);
+  let index_folder : IndexFolderForThisProcess =
+    IndexFolderForThisProcess::new ("/tmp/tantivy-test-many-things");
+  let index_path : &Path = &index_folder . path;
 
   let config = load_config ("tests/tantivy/fixtures/skgconfig.toml")? . 0;
   let nodes: Vec<Graphnode> =
@@ -197,13 +197,14 @@ fn test_aliases() -> Result<(), Box<dyn std::error::Error>> {
   let nodes = vec![apple, banana, kiwi];
 
   // Create Tantivy index - use a separate directory to avoid conflicts with test_many_tantivy_things
-  let index_dir : &str =
-    "/tmp/tantivy-test-aliases";
+  let index_folder : IndexFolderForThisProcess =
+    IndexFolderForThisProcess::new ("/tmp/tantivy-test-aliases");
+  let index_dir : &Path = &index_folder . path;
 
   let (tantivy_index, _indexed_count): (TantivyIndex, usize) =
     wipe_then_init_tantivy_db(
       &nodes,
-      Path::new (index_dir) )?;
+      index_dir )?;
 
   println!("Indexed {} documents", _indexed_count);
 
@@ -354,11 +355,12 @@ fn test_search_finds_titles_with_special_chars (
     colons . title = "cat:dog" . to_string (); }
   let nodes : Vec<Graphnode> =
     vec![c_plus, brackets, colons];
-  let index_dir : &str =
-    "/tmp/tantivy-test-special-chars";
+  let index_folder : IndexFolderForThisProcess =
+    IndexFolderForThisProcess::new ("/tmp/tantivy-test-special-chars");
+  let index_dir : &Path = &index_folder . path;
   let (tantivy_index, _indexed_count) : (TantivyIndex, usize) =
     wipe_then_init_tantivy_db (
-      &nodes, Path::new (index_dir) ) ?;
+      &nodes, index_dir ) ?;
   for (query, expected_id) in &[
     ("C++ tips",     "c_plus"),
     ("[draft] plan", "brackets"),
@@ -392,9 +394,11 @@ fn test_search_body_axis (
   { decoy . pid   = ID::new ("decoy");
     decoy . title = "shopping list" . to_string (); }
   let nodes : Vec<Graphnode> = vec! [recipe, decoy];
+  let index_folder : IndexFolderForThisProcess =
+    IndexFolderForThisProcess::new ("/tmp/tantivy-test-body-axis");
   let (ti, _) : (TantivyIndex, usize) =
     wipe_then_init_tantivy_db (
-      &nodes, Path::new ("/tmp/tantivy-test-body-axis") ) ?;
+      &nodes, &index_folder . path ) ?;
   { // body=false: body content is not findable
     let (matches, _searcher) =
       search_index (&ti, "paprika", &SearchOptions::default ()) ?;
@@ -431,9 +435,11 @@ fn no_search_matching_excludes_title_alias_and_body_in_every_query_mode (
   ordinary . pid = ID::new ("ordinary");
   ordinary . title = "shaver ordinarytoken" . to_string ();
 
+  let index_folder : IndexFolderForThisProcess =
+    IndexFolderForThisProcess::new ("/tmp/tantivy-test-no-search-matching");
   let (index, _) = wipe_then_init_tantivy_db (
     &[excluded . clone (), ordinary],
-    Path::new ("/tmp/tantivy-test-no-search-matching") ) ?;
+    &index_folder . path ) ?;
 
   let cases : [(&str, SearchOptions); 6] = [
     ("titletoken", SearchOptions::default ()),
@@ -489,9 +495,11 @@ fn no_search_matching_overPrivateText_does_not_trigger_search_preflight (
   node . title = "private excluded" . to_string ();
   node . overPrivateText_telescope = true;
   node . flags = vec![Flag::NoSearchMatching];
+  let index_folder : IndexFolderForThisProcess =
+    IndexFolderForThisProcess::new ("/tmp/tantivy-test-no-search-private");
   let (index, _) = wipe_then_init_tantivy_db (
     &[node . clone ()],
-    Path::new ("/tmp/tantivy-test-no-search-private") ) ?;
+    &index_folder . path ) ?;
   assert! (! has_overPrivateText_telescope (&index) ?);
 
   node . flags . clear ();
@@ -514,8 +522,10 @@ fn overPrivateText_telescope_filter_runs_inside_the_search_query (
   overPrivateText . aliases = rel_partners_at_relRepo_msv (
     &SkgrepoName::from ("main"),
     MSV::Specified (vec! ["dirty alias secret" . to_string ()]) );
+  let index_folder : IndexFolderForThisProcess =
+    IndexFolderForThisProcess::new ("/tmp/tantivy-test-overPrivateText-filter");
   let (index, _) = wipe_then_init_tantivy_db (
-    &[clean, overPrivateText], Path::new ("/tmp/tantivy-test-overPrivateText-filter") ) ?;
+    &[clean, overPrivateText], &index_folder . path ) ?;
   assert! ( has_overPrivateText_telescope (&index) ? );
   let opts : SearchOptions = SearchOptions {
     exclude_overPrivateText_telescope : true,
@@ -549,9 +559,11 @@ fn test_search_regex_axis (
   { hello      . pid   = ID::new ("hello");
     hello      . title = "hello" . to_string (); }
   let nodes : Vec<Graphnode> = vec! [history, historical, hello];
+  let index_folder : IndexFolderForThisProcess =
+    IndexFolderForThisProcess::new ("/tmp/tantivy-test-regex-axis");
   let (ti, _) : (TantivyIndex, usize) =
     wipe_then_init_tantivy_db (
-      &nodes, Path::new ("/tmp/tantivy-test-regex-axis") ) ?;
+      &nodes, &index_folder . path ) ?;
   { // Prefix via regex: 'histor.*' matches history, historical.
     let opts = SearchOptions { regex: true, ..SearchOptions::default () };
     let (matches, searcher) =
@@ -588,10 +600,12 @@ fn test_search_regex_multiword (
     mk ("polit",    "political"),
     mk ("sci",      "science"),
     mk ("bio",      "biology") ];
+  let index_folder : IndexFolderForThisProcess =
+    IndexFolderForThisProcess::new ("/tmp/tantivy-test-regex-multiword");
   let (ti, _) : (TantivyIndex, usize) =
     wipe_then_init_tantivy_db (
       &nodes,
-      Path::new ("/tmp/tantivy-test-regex-multiword") ) ?;
+      &index_folder . path ) ?;
   let gather = | pattern : &str | -> Result<Vec<String>, Box<dyn std::error::Error>> {
     let opts : SearchOptions =
       SearchOptions { regex: true, ..SearchOptions::default () };
@@ -641,10 +655,12 @@ fn test_search_regex_with_operators (
     mk ("polbio",   "political biology"),
     mk ("scibio",   "science biology"),
     mk ("bio",      "biology") ];
+  let index_folder : IndexFolderForThisProcess =
+    IndexFolderForThisProcess::new ("/tmp/tantivy-test-regex-operators");
   let (ti, _) : (TantivyIndex, usize) =
     wipe_then_init_tantivy_db (
       &nodes,
-      Path::new ("/tmp/tantivy-test-regex-operators") ) ?;
+      &index_folder . path ) ?;
   let gather = | pattern : &str | -> Result<Vec<String>, Box<dyn std::error::Error>> {
     let opts : SearchOptions =
       SearchOptions { regex: true, operators: true,
@@ -712,10 +728,12 @@ fn test_search_regex_operator_grouping (
     mk ("bio",     "biology"),
     mk ("fish",    "fishing"),
     mk ("polfish", "political fishing") ];
+  let index_folder : IndexFolderForThisProcess =
+    IndexFolderForThisProcess::new ("/tmp/tantivy-test-regex-grouping");
   let (ti, _) : (TantivyIndex, usize) =
     wipe_then_init_tantivy_db (
       &nodes,
-      Path::new ("/tmp/tantivy-test-regex-grouping") ) ?;
+      &index_folder . path ) ?;
   let gather = | pattern : &str | -> Result<Vec<String>, Box<dyn std::error::Error>> {
     let opts : SearchOptions =
       SearchOptions { regex: true, operators: true,
@@ -788,12 +806,13 @@ fn test_title_by_gnid_returns_title_not_alias (
     node . aliases = rel_partners_at_relRepo_msv ( & node . home_skgrepo, MSV::Specified (vec![   "Alias One" . to_string (),
                                    "Alias Two" . to_string () ])); }
   let nodes : Vec<Graphnode> = vec![node];
-  let index_dir : &str =
-    "/tmp/tantivy-test-title-by-id";
+  let index_folder : IndexFolderForThisProcess =
+    IndexFolderForThisProcess::new ("/tmp/tantivy-test-title-by-id");
+  let index_dir : &Path = &index_folder . path;
   let (tantivy_index, indexed_count) : (TantivyIndex, usize) =
     wipe_then_init_tantivy_db (
       &nodes,
-      Path::new (index_dir) )?;
+      index_dir )?;
   assert_eq! (indexed_count, 3,
     "Expected 3 documents (1 title + 2 aliases)");
   let result : Option<(String, SkgrepoName)> =
@@ -819,8 +838,10 @@ fn overPrivateText_telescope_flag_survives_index_build_and_update (
   node . pid = ID::new ("overPrivateText-indexed");
   node . title = "uniquely overPrivateText indexed title" . to_string ();
   node . overPrivateText_telescope = true;
+  let index_folder : IndexFolderForThisProcess =
+    IndexFolderForThisProcess::new ("/tmp/tantivy-test-overPrivateText-flag");
   let (tantivy_index, _) = wipe_then_init_tantivy_db (
-    &[node . clone ()], Path::new ("/tmp/tantivy-test-overPrivateText-flag") )?;
+    &[node . clone ()], &index_folder . path )?;
   let stored_flag = |index : &TantivyIndex| -> Result<String, Box<dyn std::error::Error>> {
     let (matches, searcher) = search_index (
       index, "uniquely overPrivateText indexed title", &SearchOptions::default ())?;
