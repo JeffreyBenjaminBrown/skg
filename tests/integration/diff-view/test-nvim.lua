@@ -154,7 +154,7 @@ T.write_file(data_dir .. 'owned/alpha/r.skg',
 require('skg.misc_requests').rebuild_session_lifetime_stores()
 T.check(T.wait_for(function () return newest_notification('views are now invalid') end, 30),
         'the server reread the files')
-require('skg.content_view').request_single_root_content_view_from_id('r')
+require('skg.single_root_content_view').request_single_root_content_view_from_id('r')
 local view = T.wait_for(function ()
   for _, buf in ipairs(vim.api.nvim_list_bufs()) do
     if vim.api.nvim_buf_is_valid(buf) and vim.b[buf].skg_content_view

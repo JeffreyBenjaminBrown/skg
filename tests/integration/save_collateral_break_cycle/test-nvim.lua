@@ -169,7 +169,7 @@ end
 print('=== SKG Save Collateral Buffers Integration Test ===')
 
 print('=== PHASE 1: Open buffer A ===')
-require('skg.content_view').request_single_root_content_view_from_id('a')
+require('skg.single_root_content_view').request_single_root_content_view_from_id('a')
 local buf_a = T.wait_for_buffer('skg://a')
 T.check(buf_a, 'Buffer skg://a was created')
 assert_headline_structure(buf_a,
@@ -182,7 +182,7 @@ assert_headline_structure(buf_a,
   'phase 1: buffer A initial')
 
 print('=== PHASE 2: Open buffer B ===')
-require('skg.content_view').request_single_root_content_view_from_id('b')
+require('skg.single_root_content_view').request_single_root_content_view_from_id('b')
 local buf_b = T.wait_for_buffer('skg://b')
 T.check(buf_b, 'Buffer skg://b was created')
 assert_headline_structure(buf_b,

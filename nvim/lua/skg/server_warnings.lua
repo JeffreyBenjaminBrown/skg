@@ -6,8 +6,9 @@
 -- appended to M.buffer_name under a headline 'Startup warnings', erasing
 -- nothing (the buffer corrections gathered before a reconnect stay); an
 -- empty one opens nothing. The buffer corrections arrive on a save's
--- save-result and on a rerender stream's rerender-done; show_corrections
--- appends them to the buffer, erasing nothing. The Lua port of
+-- save-result and on a rerender stream's rerender-done;
+-- show_corrections_in_server_warnings appends them to the buffer,
+-- erasing nothing. The Lua port of
 -- elisp/skg-request-server-warnings.el.
 --
 -- DATA USED/ASSUMED: See docs/api-and-formats.org, "Server warnings".
@@ -34,7 +35,7 @@ M.buffer_name = 'skg://messages/server-warnings'
 ---@param tcp any the just-connected tcp handle
 function M.request_server_warnings (tcp)
   state.register_response_handler('server-warnings',
-    function (_payload, response) M.show_server_warnings(response) end,
+    function (_payload, response) M.server_warnings_handler(response) end,
     true)
   tcp:write('((request . "server warnings"))\n')
 end
@@ -43,7 +44,7 @@ end
 ---to M.buffer_name: a level-1 headline 'Startup warnings', each
 ---warning a level-2 headline under it.
 ---@param response any
-function M.show_server_warnings (response)
+function M.server_warnings_handler (response)
   local warnings =
     payload.string_list(payload.field(response, 'warnings'))
   if #warnings == 0 then return end
@@ -63,7 +64,7 @@ end
 ---(see M.corrections_to_org_string), and each of its messages a
 ---level-2 headline. Nil or an empty list does nothing.
 ---@param corrections any
-function M.show_corrections (corrections)
+function M.show_corrections_in_server_warnings (corrections)
   if corrections == nil or not sexpr.is_list(corrections)
      or #corrections == 0 then
     return end

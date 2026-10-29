@@ -1,7 +1,7 @@
 -- Integration test for the motivating override-chain case, nvim
 -- client. The Lua mirror of test-emacs.el in this directory: fork a
 -- foreign N into a public clone C (implicit fork), then run
--- skg.view_requests.fork_node on the shown substitute C and rotate
+-- skg.views.fork_node on the shown substitute C and rotate
 -- its clone to a private skgrepo, forming the chain D overrides C
 -- overrides N. Viewing N's container then shows the chain end D,
 -- marked (overridesHere N), and the save accepts that chain-end
@@ -10,10 +10,10 @@
 local T = dofile('../test-nvim-lib.lua')
 T.arm_timeout(90)
 
-local content_view = require('skg.content_view')
+local content_view = require('skg.single_root_content_view')
 local metadata = require('skg.metadata')
 local save = require('skg.save')
-local view_requests = require('skg.view_requests')
+local view_requests = require('skg.views')
 
 ---Return a live skg view buffer whose text mentions (gnid ID).
 local function buffer_showing (gnid)

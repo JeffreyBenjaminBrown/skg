@@ -19,7 +19,7 @@ local BUFFER_NAME = 'skg://unknown-node'
 ---the ID.
 ---@param gnid string|nil for tests; taken from point or prompted when nil
 function M.investigate_unknown_node (gnid)
-  gnid = gnid or metadata.unknown_id_at_point()
+  gnid = gnid or metadata.unknown_node_id_at_point()
           or vim.fn.input('Investigate ID: ')
   if gnid == '' then
     vim.notify('No ID to investigate', vim.log.levels.WARN)

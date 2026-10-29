@@ -116,7 +116,7 @@ end
 function M.prompt_for_repo_set ()
   local repo_sets = config.repo_set_names()
   if not repo_sets then
-    vim.notify('No skg repo-sets found')
+    vim.notify('No skg repos found')
     return nil end
   return M.completing_read_with_cycle(
     'Most private repo to make available (S-left/right cycle): ', repo_sets, {

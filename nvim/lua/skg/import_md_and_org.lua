@@ -3,7 +3,7 @@ local client = require('skg.client')
 local messages = require('skg.messages')
 local payload = require('skg.payload')
 local picker = require('skg.picker')
-local rerender = require('skg.rerender')
+local rerender = require('skg.rerender_all_views')
 local sexpr = require('skg.sexpr.parse')
 local state = require('skg.state')
 

@@ -24,7 +24,7 @@ end
 
 describe('skg.save request strings', function ()
   it('carries the view_id and the three point fields', function ()
-    local line = save.save_request_string('view_id-1', {
+    local line = save.save_request_sexp('view_id-1', {
       lines_below_focused_headline = 2,
       column = 5,
       screen_lines_below_window_start = 3 }, nil, nil)
@@ -38,7 +38,7 @@ describe('skg.save request strings', function ()
 
   it('adds approved-forks and fork-repos when given', function ()
     -- Mirrors test-skg-fork-confirmation's request-field cases.
-    local line = save.save_request_string('view_id-1', {
+    local line = save.save_request_sexp('view_id-1', {
       lines_below_focused_headline = 0,
       column = 0,
       screen_lines_below_window_start = 0 },
@@ -50,7 +50,7 @@ describe('skg.save request strings', function ()
   end)
 
   it('adds exact approved-hoist pids when given', function ()
-    local line = save.save_request_string('view_id-1', {
+    local line = save.save_request_sexp('view_id-1', {
       lines_below_focused_headline = 0,
       column = 0,
       screen_lines_below_window_start = 0 },
@@ -61,7 +61,7 @@ describe('skg.save request strings', function ()
   end)
 
   it('adds exact text-release pids when given', function ()
-    local line = save.save_request_string('view_id-1', {
+    local line = save.save_request_sexp('view_id-1', {
       lines_below_focused_headline = 0,
       column = 0,
       screen_lines_below_window_start = 0 },
@@ -77,7 +77,7 @@ describe('skg.save strandeds review requests', function ()
 
   it('carries a strandeds review and the relationships it resets to default',
      function ()
-    local line = save.save_request_string('view_id-1', position,
+    local line = save.save_request_sexp('view_id-1', position,
       nil, nil, nil, nil, { { 'contains', 'q', 'n' } })
     assert.is_truthy(line:find('(strandeds-reviewed . "true")', 1, true))
     assert.is_truthy(line:find(
@@ -86,11 +86,11 @@ describe('skg.save strandeds review requests', function ()
 
   it('a review that resets nothing still says it was reviewed',
      function ()
-    local line = save.save_request_string('view_id-1', position,
+    local line = save.save_request_sexp('view_id-1', position,
       nil, nil, nil, nil, {})
     assert.is_truthy(line:find('(strandeds-reviewed . "true")', 1, true))
     assert.is_falsy(line:find('reset-strandeds', 1, true))
-    assert.is_falsy(save.save_request_string('view_id-1', position)
+    assert.is_falsy(save.save_request_sexp('view_id-1', position)
                       :find('strandeds-reviewed', 1, true))
   end)
 

@@ -15,7 +15,7 @@ T.arm_timeout(30) -- the elisp test's run-at-time timeout was 30s
 
 local buffer = require('skg.buffer')
 local save = require('skg.save')
-local view_requests = require('skg.view_requests')
+local view_requests = require('skg.views')
 
 ---ORG_TEXT with each headline reduced to 'STARS TITLE' (TITLE is the
 ---line's final whitespace-delimited token, all skg metadata dropped).

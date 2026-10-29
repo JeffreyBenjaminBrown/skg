@@ -22,7 +22,7 @@ T.check(vim.fn.filereadable(repo_dir .. '/import-root.skg') == 1,
 vim.wait(100, function () return false end, 100)
 T.check(T.wait_for_response(15), 'import refresh settled')
 
-require('skg.content_view')
+require('skg.single_root_content_view')
   .request_single_root_content_view_from_id('import-root')
 local view = T.wait_for_buffer('skg://Sample', 15)
 T.check(view, 'imported root view opened')

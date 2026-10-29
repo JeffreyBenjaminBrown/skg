@@ -4,7 +4,7 @@ local helpers = dofile(
   debug.getinfo(1, 'S').source:sub(2):match('^(.*)/') .. '/helpers.lua')
 
 local buffer = require('skg.buffer')
-local cleanup = require('skg.delete_absent_references')
+local cleanup = require('skg.delete_references_to_absent_node')
 local lock = require('skg.lock')
 
 describe('skg absent-reference cleanup', function ()
@@ -54,7 +54,7 @@ describe('skg absent-reference cleanup', function ()
       '* (skg node (gnid recorder)) recorder\n** (skg unknown (gnid gone))',
       'skg://recorder', 'cleanup-view_id')
     vim.api.nvim_win_set_cursor(0, { 2, 0 })
-    cleanup.request()
+    cleanup.delete_references_to_absent_node()
     vim.wait(3000, function ()
       return #requests == 2 and #notices > 0 and lock.stream_in_progress == nil
     end, 10)
@@ -71,13 +71,13 @@ describe('skg absent-reference cleanup', function ()
   it('refuses a non-Unknown point and every dirty view', function ()
     local normal = buffer.open_org_buffer_from_text(
       '* (skg node (gnid recorder)) recorder', 'skg://recorder', 'normal-view_id')
-    local ok, err = pcall(cleanup.request)
+    local ok, err = pcall(cleanup.delete_references_to_absent_node)
     assert.is_false(ok)
     assert.is_truthy(tostring(err):find('Unknown headline', 1, true))
     vim.api.nvim_buf_set_lines(normal, 0, -1, false, {
       '* (skg unknown (gnid gone))' })
     vim.bo[normal].modified = true
-    ok, err = pcall(cleanup.request)
+    ok, err = pcall(cleanup.delete_references_to_absent_node)
     assert.is_false(ok)
     assert.is_truthy(tostring(err):find('save or revert', 1, true))
   end)

@@ -289,7 +289,7 @@ function M.view_linkstack ()
   end
   vim.api.nvim_set_current_buf(buf)
   vim.api.nvim_win_set_cursor(0, { 1, 0 })
-  vim.notify('Edit linkstack. :w to save changes.')
+  vim.notify('Edit the linkstack. :w to save changes.')
 end
 
 return M

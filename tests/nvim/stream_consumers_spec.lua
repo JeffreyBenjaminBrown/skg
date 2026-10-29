@@ -14,7 +14,7 @@ local investigate_unknown_node = require('skg.investigate_unknown_node')
 local length_prefix = require('skg.length_prefix')
 local lock = require('skg.lock')
 local picker = require('skg.picker')
-local rerender = require('skg.rerender')
+local rerender = require('skg.rerender_all_views')
 local repo_sets = require('skg.repo_sets')
 local sexpr = require('skg.sexpr.parse')
 local state = require('skg.state')
@@ -95,7 +95,7 @@ describe('skg stream consumers', function ()
       { state, 'register_response_handler',
         function (response_type) table.insert(calls,
                                               'handler ' .. response_type) end },
-      { rerender, 'register_overPrivateText_confirmation',
+      { rerender, 'register_rerender_overPrivateText_confirmation',
         function (_retry, unfired_response_type)
           table.insert(calls, 'confirmation ' .. unfired_response_type) end },
       { state, 'lp_reset', function () table.insert(calls, 'reset') end },
@@ -190,7 +190,7 @@ describe('skg stream consumers', function ()
         local refused, refusal = pcall(switch)
         assert.is_false(refused)
         assert.is_truthy(tostring(refusal):find(
-          'skg: save or revert every view before switching the'
+          'skg: save or revert every skg view before switching the'
           .. ' skgrepo-set', 1, true))
       end
       assert.is_false(name_prompted)

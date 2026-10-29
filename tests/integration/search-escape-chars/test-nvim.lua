@@ -5,7 +5,7 @@
 local T = dofile('../test-nvim-lib.lua')
 T.arm_timeout(20)
 
-local search = require('skg.search')
+local search = require('skg.text_search')
 local buffer = require('skg.buffer')
 
 ---Run QUERY and verify the search buffer contains (gnid EXPECTED_ID).

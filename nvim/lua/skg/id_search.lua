@@ -5,7 +5,7 @@
 -- Positions are (1-based line, 0-based byte column) cursor pairs;
 -- matches are byte ranges from Lua patterns.
 
-local content_view = require('skg.content_view')
+local content_view = require('skg.single_root_content_view')
 local metadata = require('skg.metadata')
 local sexpr = require('skg.sexpr.parse')
 

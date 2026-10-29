@@ -5,9 +5,9 @@
 #   Emacs:  elisp/skg-sexpr-edit.el, elisp/skg-sexpr/skg-metadata-fields.el,
 #           elisp/skg-metadata.el, elisp/skg-request-server-warnings.el
 #           (tests/elisp/test-skg-metadata-editor-cases.el)
-#   Neovim: nvim/lua/skg/metadata_edit.lua,
+#   Neovim: nvim/lua/skg/sexpr_edit.lua,
 #           nvim/lua/skg/sexpr/metadata_fields.lua,
-#           nvim/lua/skg/readiness.lua, nvim/lua/skg/server_warnings.lua
+#           nvim/lua/skg/metadata.lua, nvim/lua/skg/server_warnings.lua
 #           (tests/nvim/metadata_editor_cases_spec.lua)
 # Both read the fields and the order of the parts from
 # shared/metadata-fields.json.

@@ -7,6 +7,7 @@ local compare = require('skg.sexpr.compare')
 local metadata = require('skg.metadata')
 local picker = require('skg.picker')
 local sexpr = require('skg.sexpr.parse')
+local sexpr_cycling = require('skg.sexpr_edit.sexpr_cycling')
 
 local function buffer_with (text)
   local buf = vim.api.nvim_create_buf(true, false)
@@ -264,7 +265,7 @@ describe('skg.metadata commands', function ()
     -- derived facts, writes its edit request or 'noClaim' at its rank
     -- in the 'parts' list of 'shared/metadata-fields.json', replacing
     -- any edit request held and keeping a readiness request.
-    local flag = require('skg.flag')
+    local flag = require('skg.flag_state')
     local parent = '* (skg node (gnid p) (skgRepos (nodeRepo r))) p'
     local head = '** (skg (vnid 0a) node (gnid X) (skgRepos (nodeRepo r))'
     local tail = ' (viewRequests editableView) (view noWarrant)'
@@ -309,6 +310,29 @@ describe('skg.metadata commands', function ()
     end)
     vim.notify = real_notify
     assert(ok, err)
+  end)
+
+  it('the generic edit places the parts it adds by rank', function ()
+    -- Mirrors test-skg-edit-metadata-at-point-places-new-parts-by-rank:
+    -- a part the edit adds lands where the server writes it
+    -- (metadata_with_part_at_its_rank), as focus.lua, folds.lua and
+    -- views.lua write them; a part the headline had keeps its
+    -- place.
+    local function edit (line, edits)
+      buffer_with(line)
+      metadata.edit_metadata_at_point(sexpr.read(edits))
+      return metadata.line_text(1)
+    end
+    assert.are.same(
+      { '* (skg (vnid 1) focused node (gnid k) (viewRequests editableView) (view cycle) (diff (node added))) k',
+        '* (skg node (gnid k) (viewRequests editableView definitiveView) (view cycle)) k',
+        '* (skg node (gnid k) noClaim (editRequest delete) (diff (node added))) k' },
+      { edit('* (skg (vnid 1) node (gnid k) (view cycle) (diff (node added))) k',
+             '(skg focused (viewRequests editableView))'),
+        edit('* (skg node (gnid k) (viewRequests editableView) (view cycle)) k',
+             '(skg (viewRequests definitiveView))'),
+        edit('* (skg node (gnid k) (editRequest delete) (diff (node added))) k',
+             '(skg noClaim)') })
   end)
 
   -- The diff view's restore requests; mirrors the restore tests of
@@ -451,9 +475,9 @@ describe('skg.metadata commands', function ()
   ---Open the metadata editor on HEADLINE, the only line of a buffer,
   ---and call BODY(source_buf) in the edit buffer; delete both after.
   local function with_metadata_editor_on (headline, body)
-    local metadata_edit = require('skg.metadata_edit')
+    local sexpr_edit = require('skg.sexpr_edit')
     local source = buffer_with(headline)
-    metadata_edit.edit_metadata()
+    sexpr_edit.view_metadata()
     local ok, err = pcall(body, source)
     if vim.api.nvim_get_current_buf() ~= source then
       vim.api.nvim_buf_delete(0, { force = true }) end
@@ -473,7 +497,7 @@ describe('skg.metadata commands', function ()
 
   it('the metadata editor offers each kind its fields', function ()
     -- Mirrors test-skg-metadata-editor-offers-each-kind-its-fields.
-    local metadata_edit = require('skg.metadata_edit')
+    local sexpr_edit = require('skg.sexpr_edit')
     local view_requests = { 'none (default)', 'editableView',
                             'writeProtectedView', 'writeProtectedSubtreeView',
                             'fork', 'flags', 'folder' }
@@ -503,7 +527,7 @@ describe('skg.metadata commands', function ()
         for field, values in pairs(case[2]) do
           assert.is_true(goto_value_of(field), case[1] .. ' ' .. field)
           assert.are.same(values,
-            metadata_edit.cycle_values_for_field(field),
+            sexpr_cycling.cycle_values_for_field(field),
             case[1] .. ' ' .. field)
         end
         if next(case[2]) == nil then
@@ -512,7 +536,7 @@ describe('skg.metadata commands', function ()
             assert.is_false(goto_value_of(field), case[1] .. ' ' .. field)
           end
         end
-        metadata_edit.apply(vim.api.nvim_get_current_buf())
+        sexpr_edit.apply(vim.api.nvim_get_current_buf())
         assert.are.equal(case[1], vim.api.nvim_buf_get_lines(
           source, 0, 1, false)[1])
       end)
@@ -522,7 +546,7 @@ describe('skg.metadata commands', function ()
   it('the metadata editor cycles to and saves values with arguments',
      function ()
     -- Mirrors test-skg-metadata-editor-cycles-and-saves-values-with-arguments.
-    local metadata_edit = require('skg.metadata_edit')
+    local sexpr_edit = require('skg.sexpr_edit')
     local config = require('skg.config')
     local real_picker = picker.completing_read_with_cycle
     local real_repo_names = config.repo_names
@@ -553,8 +577,8 @@ describe('skg.metadata commands', function ()
         end
         with_metadata_editor_on(case[1], function (source)
           assert.is_true(goto_value_of(case[2]))
-          for _ = 1, case[3] do metadata_edit.cycle(1) end
-          metadata_edit.apply(vim.api.nvim_get_current_buf())
+          for _ = 1, case[3] do sexpr_cycling.cycle(1) end
+          sexpr_edit.apply(vim.api.nvim_get_current_buf())
           assert.are.equal(case[4], vim.api.nvim_buf_get_lines(
             source, 0, 1, false)[1])
         end)

@@ -8,7 +8,7 @@
 -- elisp/skg-request-integrate-unshown-changes.el.
 
 local readiness = require('skg.readiness')
-local rerender = require('skg.rerender')
+local rerender = require('skg.rerender_all_views')
 local sexpr = require('skg.sexpr.parse')
 
 local M = {}

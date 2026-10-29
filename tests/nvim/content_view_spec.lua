@@ -1,4 +1,4 @@
--- Coverage for skg.content_view against the loopback fake server:
+-- Coverage for skg.single_root_content_view against the loopback fake server:
 -- the normal open, the switch-to-view redirect, and the error/warning
 -- display. Mirrors the response-handling halves of the Emacs request tests
 -- and test-skg-warning-channel.el (the content-view channel).
@@ -8,14 +8,14 @@ local helpers = dofile(
   debug.getinfo(1, 'S').source:sub(2):match('^(.*)/') .. '/helpers.lua')
 
 local buffer = require('skg.buffer')
-local content_view = require('skg.content_view')
+local content_view = require('skg.single_root_content_view')
 
-describe('skg.content_view request strings', function ()
+describe('skg.single_root_content_view request strings', function ()
   it('carries id and view-id', function ()
     assert.are.equal(
       '((request . "single root content view") (id . "abc")'
       .. ' (view-id . "view_id-1"))\n',
-      content_view.request_string('abc', 'view_id-1'))
+      content_view.single_root_view_request_string('abc', 'view_id-1'))
   end)
 
   it('carries only the overPrivateText telescope pids approved on retry', function ()
@@ -23,12 +23,12 @@ describe('skg.content_view request strings', function ()
       '((request . "single root content view") (id . "abc")'
       .. ' (view-id . "view_id-1")'
       .. ' (approved-overPrivateText-pids "pid-a" "pid-b"))\n',
-      content_view.request_string(
+      content_view.single_root_view_request_string(
         'abc', 'view_id-1', { 'pid-a', 'pid-b' }))
   end)
 end)
 
-describe('skg.content_view responses', function ()
+describe('skg.single_root_content_view responses', function ()
   local server
 
   before_each(function ()

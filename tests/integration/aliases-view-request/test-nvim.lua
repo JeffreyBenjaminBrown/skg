@@ -56,7 +56,7 @@ end
 ---@return string
 local function request_on_line (line_number)
   print('Loading node from server...')
-  require('skg.content_view')
+  require('skg.single_root_content_view')
     .request_single_root_content_view_from_id('test-node')
   local buf = T.wait_for_buffer('skg://Test Node')
   if not buf then T.fail('Content buffer not created') end
@@ -65,7 +65,7 @@ local function request_on_line (line_number)
   vim.api.nvim_win_set_cursor(0, { line_number + 1, 0 })
   print(string.format(
     'requesting-aliases-view-line-%d', line_number))
-  require('skg.view_requests').show_folderOf_aliases() -- auto-saves
+  require('skg.views').show_folderOf_aliases() -- auto-saves
   T.check(T.wait_for_response(),
           string.format('aliases view response arrived for line %d',
                         line_number))

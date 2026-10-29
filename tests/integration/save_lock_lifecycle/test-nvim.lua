@@ -22,7 +22,7 @@
 local T = dofile('../test-nvim-lib.lua')
 T.arm_timeout(30)
 
-local content_view = require('skg.content_view')
+local content_view = require('skg.single_root_content_view')
 local save = require('skg.save')
 local lock = require('skg.lock')
 

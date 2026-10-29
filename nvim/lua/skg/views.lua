@@ -44,7 +44,7 @@ end
 ---shows. On an editable headline, the save extends its content
 ---editable, up to the server's initial_node_limit extensions. A buffer
 ---may carry one such request per node. Does not auto-save.
-function M.set_editable ()
+function M.request_editable_view ()
   local line = focus.owning_headline_line()
   if not line then error('Not on a headline') end
   metadata.edit_metadata_at_line(line,
@@ -56,7 +56,7 @@ end
 ---makes it write-protected, resyncing its title from the graph, and
 ---makes each of its direct children not affect it, keeping their own
 ---editability and subtrees. A no-op on a write-protected headline.
----Requesting an editable view (set_editable) of another occurrence of
+---Requesting an editable view (request_editable_view) of another occurrence of
 ---the node in the same save moves editability there. Does not
 ---auto-save.
 function M.request_write_protected ()

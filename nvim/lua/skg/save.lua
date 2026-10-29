@@ -22,7 +22,7 @@ local M = {}
 
 ---Sentinel skgrepo the server pre-fills for a clone-to-be whose skgrepo
 ---the user has not specified (in the saved metadata or a prior
----round). 'choose_placeholder_repos' prompts for a replacement per
+---round). 'fork_choose_placeholder_repos' prompts for a replacement per
 ---carrying clone (<localleader>ss on the headline works too);
 ---'approve_fork' refuses while any remains. Must match
 ---FORK_REPO_PLACEHOLDER in server/from_text/fork.rs.
@@ -80,7 +80,7 @@ function M.send_save_buffer (save_buf, saved_view_id, approved_forks, fork_skgre
       M.other_view_buffer_snapshots(save_buf) },
   })
   local request_line =
-    M.save_request_string(saved_view_id, save_point_position,
+    M.save_request_sexp(saved_view_id, save_point_position,
                           approved_forks, fork_skgrepos,
                           approved_hoist_pids,
                           text_approved_pids,
@@ -162,7 +162,8 @@ function M.buffer_snapshot_with_save_metadata (save_buf, focused_had_metadata)
   pcall(focus.remove_focused_metadata)
   pcall(folds.remove_folded_metadata)
   if not focused_had_metadata then
-    pcall(M.strip_bare_skg_at_headline, focus.owning_headline_line()) end
+    pcall(M.strip_bare_skg_at_focused_headline,
+          focus.owning_headline_line()) end
   if was_save_locked then vim.bo[save_buf].modifiable = false end
   if not was_modified then vim.bo[save_buf].modified = false end
   if not ok then error(result) end
@@ -225,7 +226,7 @@ end
 ---@param text_approved_pids string[]|nil
 ---@param strandeds_review table|nil
 ---@return string
-function M.save_request_string (view_id, position, approved_forks,
+function M.save_request_sexp (view_id, position, approved_forks,
                                 fork_skgrepos, approved_hoist_pids,
                                 text_approved_pids, strandeds_review)
   local request = {
@@ -285,7 +286,7 @@ end
 ---Remove a bare '(skg)' left on LINE_NUMBER by the atom add/remove
 ---cycle, when the headline had no metadata to begin with.
 ---@param line_number integer|nil
-function M.strip_bare_skg_at_headline (line_number)
+function M.strip_bare_skg_at_focused_headline (line_number)
   if not line_number then return end
   local line = metadata.line_text(line_number)
   local stars, rest = line:match('^(%*+ )%(skg%) (.*)$')
@@ -369,7 +370,7 @@ function M.save_result_handler (save_buf, response)
   state.response_handler_map['overPrivateText-telescope-confirmation'] = nil
   lock.end_stream()
   lock.unlock_all_save_locked()
-  local ok, err = pcall(M.handle_save_response, save_buf, response)
+  local ok, err = pcall(M.handle_save_sexp, save_buf, response)
   lock.unlock_all_save_locked()
   if not ok then
     log.log('error', 'save', 'parsing save response: %s',
@@ -379,7 +380,7 @@ end
 
 ---@param save_buf integer
 ---@param response any
-function M.handle_save_response (save_buf, response)
+function M.handle_save_sexp (save_buf, response)
   local content = payload.field(response, 'content')
   local content_text =
     (content ~= nil and not sexpr.is_list(content))
@@ -396,7 +397,8 @@ function M.handle_save_response (save_buf, response)
     M.show_save_errors_and_warnings(errors, warnings,
                                     content_text ~= nil)
   end
-  server_warnings.show_corrections(payload.field(response, 'corrections'))
+  server_warnings.show_corrections_in_server_warnings(
+    payload.field(response, 'corrections'))
   local summary = readiness.readiness_summary_from_response(response)
   if summary then -- the saved buffer is one of the diff view's
     vim.notify(readiness.readiness_summary_message(summary)) end
@@ -579,7 +581,7 @@ function M.fork_confirmation_handler (save_buf, response, strandeds_review)
     -- decline_fork directly; interactively, prompt for any clone
     -- skgrepo not yet specified, then ask.
     vim.api.nvim_buf_call(confirm_buf, function ()
-      M.choose_placeholder_repos(confirm_buf)
+      M.fork_choose_placeholder_repos(confirm_buf)
       if vim.fn.confirm('Fork the listed node(s)?',
                         '&Yes\n&No', 2) == 1 then
         M.approve_fork()
@@ -802,7 +804,7 @@ end
 ---itself specified it (the server then omits the placeholder): no
 ---redundant ask.
 ---@param buf integer
-function M.choose_placeholder_repos (buf)
+function M.fork_choose_placeholder_repos (buf)
   local picker = require('skg.picker')
   local owned = require('skg.config').owned_repos() or {}
   vim.api.nvim_buf_call(buf, function ()

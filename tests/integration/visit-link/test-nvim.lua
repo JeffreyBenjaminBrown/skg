@@ -5,7 +5,7 @@
 local T = dofile('../test-nvim-lib.lua')
 T.arm_timeout(15)
 
-local search = require('skg.search')
+local search = require('skg.text_search')
 local buffer = require('skg.buffer')
 local id_search = require('skg.id_search')
 

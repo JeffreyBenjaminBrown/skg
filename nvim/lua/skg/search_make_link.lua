@@ -11,7 +11,7 @@
 -- headline, so the inserted link glues itself to the wrong spot.
 
 local id_search = require('skg.id_search')
-local search = require('skg.search')
+local search = require('skg.text_search')
 
 local M = {}
 

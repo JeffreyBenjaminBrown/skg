@@ -6,7 +6,7 @@ local buffer = require('skg.buffer')
 local client = require('skg.client')
 local payload = require('skg.payload')
 local picker = require('skg.picker')
-local rerender = require('skg.rerender')
+local rerender = require('skg.rerender_all_views')
 local sexpr = require('skg.sexpr.parse')
 local state = require('skg.state')
 
@@ -43,8 +43,8 @@ end
 ---has unsaved edits, which the rerender would replace.
 ---@param name string|nil
 function M.restrict_repo_set (name, approved_pids)
-  if #buffer.other_unsaved_skg_buffers(nil) > 0 then
-    error('skg: save or revert every view before switching the skgrepo-set')
+  if #buffer.unsaved_view_buffers(nil) > 0 then
+    error('skg: save or revert every skg view before switching the skgrepo-set')
   end
   name = name or picker.prompt_for_repo_set()
   if not name then return end

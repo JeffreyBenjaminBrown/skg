@@ -12,7 +12,7 @@ print('=== SKG Content View and Save Integration Test ===')
 
 -- PHASE 1: the content view.
 print("=== PHASE 1: Requesting content view for node '1' ===")
-require('skg.content_view')
+require('skg.single_root_content_view')
   .request_single_root_content_view_from_id('1')
 local view = T.wait_for_buffer('skg://1')
 T.check(view, "a view buffer named after node 1's title opened")

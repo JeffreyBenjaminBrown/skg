@@ -2,6 +2,7 @@
 -- readiness summary a save of a diff-view buffer shows.
 -- Mirrors tests/elisp/test-skg-readiness.el.
 
+local metadata = require('skg.metadata')
 local picker = require('skg.picker')
 local readiness = require('skg.readiness')
 local save = require('skg.save')
@@ -72,7 +73,7 @@ describe('skg.readiness', function ()
       local buf = vim.api.nvim_create_buf(true, false)
       vim.api.nvim_buf_set_lines(buf, 0, -1, false, { line })
       vim.api.nvim_set_current_buf(buf)
-      readiness.write_request(1, ready, objects)
+      readiness.write_readiness_request(1, ready, objects)
       local result = vim.api.nvim_buf_get_lines(buf, 0, 1, false)[1]
       vim.api.nvim_buf_delete(buf, { force = true })
       return result
@@ -298,7 +299,7 @@ describe('skg.readiness', function ()
       local lines = { '* (skg containerFolder) its containers' }
       for _, member in ipairs(members) do table.insert(lines, member) end
       table.insert(lines, '* (skg node (gnid after) (diff (rel added))) after')
-      local change = readiness.folder_change_in_lines(lines, 1)
+      local change = metadata.folder_change_readiness_in_lines(lines, 1)
       return change and { ready = change.ready } or nil
     end
     assert.are.same({ ready = true }, folder_change({ ready_member }))
@@ -323,7 +324,7 @@ describe('skg.readiness', function ()
     -- Only a folder's members count, and only for a folder.
     assert.is_nil(folder_change({ '** (skg node (gnid m)) m',
                                   '*** ' .. unready_alias:sub(4) }))
-    assert.is_nil(readiness.folder_change_in_lines(
+    assert.is_nil(metadata.folder_change_readiness_in_lines(
       { '* (skg node (gnid p)) p', unready_member }, 1))
   end)
 
@@ -363,13 +364,14 @@ describe('skg.readiness', function ()
 
   it('replaces the edit request and keeps the readiness request',
      function ()
-    -- with_edit_request, the counterpart of with_readiness_request,
+    -- metadata_with_edit_request, the counterpart of
+    -- metadata_with_readiness_request,
     -- which the merge and restore commands write with. A nil request
     -- removes the edit request (the relRepo removal of
     -- test-apply-relRepo-keeps-the-readiness-request), and the form
     -- with it when nothing is left.
     local function with_edit_request (metadata_text, request_text)
-      return sexpr.to_string(readiness.with_edit_request(
+      return sexpr.to_string(metadata.metadata_with_edit_request(
         sexpr.read(metadata_text),
         request_text and sexpr.read(request_text)))
     end
@@ -416,15 +418,15 @@ describe('skg.save readiness summary', function ()
     vim.notify = function (message) table.insert(shown, message) end
     local buf = vim.api.nvim_create_buf(true, false)
     local ok, err = pcall(function ()
-      save.handle_save_response(buf, sexpr.read(
+      save.handle_save_sexp(buf, sexpr.read(
         '((content "* (skg node (gnid a)) a\n") (errors ()) (warnings ())'
         .. ' (readiness-summary (ready 12) (changed 14) (foreign 2)'
         .. ' (order-only 1) (notEditable 3)))'))
-      save.handle_save_response(buf, sexpr.read(
+      save.handle_save_sexp(buf, sexpr.read(
         '((content "* (skg node (gnid a)) a\n") (errors ()) (warnings ())'
         .. ' (readiness-summary (ready 14) (changed 14) (foreign 0)'
         .. ' (order-only 0) (notEditable 0)))'))
-      save.handle_save_response(buf, sexpr.read(
+      save.handle_save_sexp(buf, sexpr.read(
         '((content "* (skg node (gnid a)) a\n") (errors ()) (warnings ()))'))
     end)
     vim.notify = original_notify

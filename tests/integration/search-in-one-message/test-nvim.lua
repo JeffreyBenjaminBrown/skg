@@ -8,7 +8,7 @@
 local T = dofile('../test-nvim-lib.lua')
 T.arm_timeout(45)
 
-local search = require('skg.search')
+local search = require('skg.text_search')
 local buffer = require('skg.buffer')
 
 ---The full text of BUF's line beginning "* (skg node (gnid leaf-b)"

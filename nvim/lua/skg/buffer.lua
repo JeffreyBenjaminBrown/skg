@@ -120,7 +120,7 @@ end
 ---A view is a buffer with a view ID: a content view or search
 ---results, but not the fork-confirmation buffer.
 ---@return integer[] views other than BUF with unsaved edits
-function M.other_unsaved_skg_buffers (buf)
+function M.unsaved_view_buffers (buf)
   local result = {}
   for _, other in ipairs(vim.api.nvim_list_bufs()) do
     if other ~= buf and vim.api.nvim_buf_is_valid(other)
@@ -195,7 +195,7 @@ function M.configure_view_buffer (buf, view_id)
   vim.bo[buf].autoindent = false
   heralds.enable(buf)
   -- Ask for a skgrepo after org's insert-heading actions.
-  require('skg.metadata_edit').wrap_org_insert_heading_actions()
+  require('skg.sexpr_edit').wrap_org_insert_heading_actions()
   require('skg.link_annotations').enable(buf)
   require('skg.keymaps').attach_content_view(buf)
   do -- The skg fold model, on every window that shows this buffer.
@@ -255,7 +255,7 @@ function M.confirm_before_dirtying_another_view (buf)
      or vim.b[buf].skg_view_id == nil then
     return end
   vim.b[buf].skg_dirtiness_vetted = true -- ask at most once per dirty spell
-  if #M.other_unsaved_skg_buffers(buf) == 0 then return end
+  if #M.unsaved_view_buffers(buf) == 0 then return end
   local keep = vim.fn.confirm(
     'WARNING: Another buffer has unsaved edits. If you edit this one'
     .. ' as well, your edits could clobber each other.',

@@ -1,4 +1,4 @@
-local flag = require('skg.flag')
+local flag = require('skg.flag_state')
 local compare = require('skg.sexpr.compare')
 local config = require('skg.config')
 local metadata = require('skg.metadata')
@@ -21,7 +21,7 @@ local function has_request (line, value)
     '(skg node (editRequest (flag noSearchMatching %s)))', value)))
 end
 
-describe('skg.flag staging', function ()
+describe('skg.flag_state staging', function ()
   local real_owned_skgrepos = config.owned_repos
   local real_notify = vim.notify
   local real_send_string = client.send_string
@@ -89,7 +89,7 @@ describe('skg.flag staging', function ()
     buffer_with({
       '* (skg node (gnid root) (skgRepos (nodeRepo main)) (editRequest (ready node))) root',
       '** (skg node (gnid child) (skgRepos (nodeRepo main)) (editRequest (unready rel)) (diff (rel added))) child' })
-    flag.set_search_matching()
+    flag.set_flag_search_matching()
     assert.is_truthy(sent:find('(request . "flag state")', 1, true))
     flag._apply(1, true, true)
     assert.are.same({

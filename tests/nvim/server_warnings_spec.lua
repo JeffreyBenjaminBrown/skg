@@ -50,7 +50,7 @@ describe('skg.server_warnings buffer corrections', function ()
       '* (skg node (gnid a)) a', 'skg://shown-view', 'content-view:5')
     messages.scratch_org_buffer(server_warnings.buffer_name,
                                 '* an earlier startup warning')
-    server_warnings.show_corrections(sexpr.read(
+    server_warnings.show_corrections_in_server_warnings(sexpr.read(
       '((content-view:5'
       .. ' "Drew what the graph says belongs here.\\n*** new child'
       .. '\\n- viewnode ID: 0d. To find it: C-c g v 0d\\n"'
@@ -78,9 +78,9 @@ describe('skg.server_warnings buffer corrections', function ()
   end)
 
   it('a second batch goes after the first', function ()
-    server_warnings.show_corrections(sexpr.read(
+    server_warnings.show_corrections_in_server_warnings(sexpr.read(
       '((content-view:1 "First.\\n*** one\\n"))'))
-    server_warnings.show_corrections(sexpr.read(
+    server_warnings.show_corrections_in_server_warnings(sexpr.read(
       '((content-view:2 "Second.\\n*** two\\n"))'))
     assert.are.same({
       '* Buffer corrections in content-view:1', '** First.', '*** one',
@@ -93,9 +93,9 @@ describe('skg.server_warnings buffer corrections', function ()
 
   it('startup warnings go after the buffer corrections, under their'
      .. ' own headline', function ()
-    server_warnings.show_corrections(sexpr.read(
+    server_warnings.show_corrections_in_server_warnings(sexpr.read(
       '((content-view:1 "First.\\n*** one\\n"))'))
-    server_warnings.show_server_warnings(sexpr.read(
+    server_warnings.server_warnings_handler(sexpr.read(
       '((response-type server-warnings)'
       .. ' (warnings ("first warning" "second warning")))'))
     assert.are.same({
@@ -108,9 +108,9 @@ describe('skg.server_warnings buffer corrections', function ()
   end)
 
   it('an absent or empty (corrections ...) list does nothing', function ()
-    server_warnings.show_corrections(nil)
-    server_warnings.show_corrections(sexpr.read('()'))
-    server_warnings.show_corrections(sexpr.read('nil'))
+    server_warnings.show_corrections_in_server_warnings(nil)
+    server_warnings.show_corrections_in_server_warnings(sexpr.read('()'))
+    server_warnings.show_corrections_in_server_warnings(sexpr.read('nil'))
     assert.is_nil(warnings_buffer())
     assert.are.same({}, notified)
   end)

@@ -35,14 +35,8 @@ local shared = require('skg.shared')
 
 local M = {}
 
----skg.readiness, required late: it requires modules that require this
+---skg.metadata, required late: it requires modules that require this
 ---one.
----@return table
-local function readiness ()
-  return require('skg.readiness')
-end
-
----skg.metadata, required late for the same reason.
 ---@return table
 local function metadata ()
   return require('skg.metadata')
@@ -327,7 +321,9 @@ end
 ---at SIDE_TIER). The slash shows SIDE_TIER.
 local function fraction_chunks (total, total_gens, numerator,
                                 numerator_gens, side_tier, subset_tier)
-  assert(numerator <= total, 'herald subset exceeds total')
+  if numerator > total then
+    error(string.format('herald subset %s exceeds total %s',
+                        numerator, total)) end
   if total == 0 then return {} end
   if numerator == 0 then
     return side_chunks(total, total_gens, side_tier) end
@@ -521,7 +517,7 @@ end
 ---SEXP, a headline's metadata, as the lens reads it: its
 ---'repoBoundary' labeled (M.with_repoBoundary_label), and, when
 ---PENDING_DETACHMENT says it is a pending detachment
----(skg.readiness.pending_detachment_p), the atom 'pendingDetachment'
+---(skg.metadata.pending_detachment_p), the atom 'pendingDetachment'
 ---appended, which the rule table renders as a request.
 ---@param sexp any
 ---@param pending_detachment boolean|nil
@@ -583,7 +579,7 @@ end
 ---The herald chunks of FOLDER, a folder's atom, shown because a
 ---member's relationship changed: its ☮ when it is write-protected, its
 ---changed label styled as its ordinary one, then ✓ when FOLDER_CHANGE
----(as skg.readiness.folder_change_in_lines gives it) says it is ready.
+---(as skg.metadata.folder_change_readiness_in_lines gives it) says it is ready.
 ---@param folder string
 ---@param folder_change table
 ---@return table[]
@@ -687,9 +683,10 @@ end
 
 ---Lens the first (skg ...) occurrence on 0-based line ROW of BUF into
 ---one conceal+virtual-text extmark (at most). A folder's herald
----depends on its members' metadata (skg.readiness.folder_change_in_lines),
+---depends on its members' metadata
+---(skg.metadata.folder_change_readiness_in_lines),
 ---and a 'noClaim' headline's on its parents'
----(skg.readiness.pending_detachment_in_lines), read from LINES, BUF's
+---(skg.metadata.pending_detachment_in_lines), read from LINES, BUF's
 ---lines, when given.
 ---@param buf integer
 ---@param row integer
@@ -707,11 +704,11 @@ function M.apply_to_line (buf, row, lines)
   end
   local folder_change = nil
   if line:find('Folder', 1, true) then
-    folder_change = readiness().folder_change_in_lines(
+    folder_change = metadata().folder_change_readiness_in_lines(
       buffer_lines(), row + 1) end
   local pending_detachment = false
   if line:find('noClaim', 1, true) then
-    pending_detachment = readiness().pending_detachment_in_lines(
+    pending_detachment = metadata().pending_detachment_in_lines(
       buffer_lines(), row + 1) end
   local chunks = M.chunks_from_metadata(
     line:sub(start_index, end_index), folder_change, pending_detachment)
@@ -737,7 +734,7 @@ function M.reapply_to_folder_ancestors (buf, row, lines)
         and not lines[headline_index]:match('^%*+%s') do
     headline_index = headline_index - 1 end
   if headline_index < 1 then return end -- also when ROW < 0
-  local indices = readiness().ancestor_indices_in_lines(
+  local indices = metadata().ancestor_headline_indices_in_lines(
     lines, headline_index, math.huge)
   table.insert(indices, 1, headline_index)
   for _, index in ipairs(indices) do

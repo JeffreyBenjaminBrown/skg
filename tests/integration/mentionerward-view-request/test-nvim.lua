@@ -4,7 +4,7 @@
 -- Unlike most view tests, the base buffer here is authored locally
 -- (not fetched from the server) -- the elisp test does the same,
 -- building a scratch org buffer by hand before calling the view
--- request. That exercises skg.view_requests / save purely, against a
+-- request. That exercises skg.views / save purely, against a
 -- buffer whose skg_view_id the test itself assigns.
 
 local T = dofile('../test-nvim-lib.lua')
@@ -12,7 +12,7 @@ T.arm_timeout(30)
 
 local buffer = require('skg.buffer')
 local metadata = require('skg.metadata')
-local view_requests = require('skg.view_requests')
+local view_requests = require('skg.views')
 
 local base_buffer_text =
   '* (skg node (gnid 1) (skgRepos (nodeRepo main))) 1\n'

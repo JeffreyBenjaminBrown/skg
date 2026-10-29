@@ -12,7 +12,7 @@ T.arm_timeout(30)
 print('=== SKG content-view-from-non-root Integration Test ===')
 
 print('=== PHASE 1: Requesting content view of `child` ===')
-require('skg.content_view')
+require('skg.single_root_content_view')
   .request_single_root_content_view_from_id('child')
 local view = T.wait_for_buffer('skg://the child', 15)
 if not view then

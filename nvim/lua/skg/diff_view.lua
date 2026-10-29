@@ -34,7 +34,7 @@ end
 ---since their last commits, in up to four buffers. Buffers that
 ---would be empty are not opened.
 function M.diffView_open ()
-  M.request_buffers(1, 0)
+  M.request_diffView_buffers(1, 0)
 end
 
 ---Request buffer number INDEX of M.buffers; its answer opens it,
@@ -42,7 +42,7 @@ end
 ---buffers opened so far.
 ---@param index integer
 ---@param opened integer
-function M.request_buffers (index, opened)
+function M.request_diffView_buffers (index, opened)
   local buffer_name = M.buffers[index]
   if not buffer_name then
     if opened == 0 then
@@ -52,13 +52,13 @@ function M.request_buffers (index, opened)
   local view_id = buffer.generate_uuid()
   state.register_response_handler('diff-view',
     function (_payload_text, response)
-      local outcome = M.handle_response(response, buffer_name, view_id)
+      local outcome = M.handle_diffView_response(response, buffer_name, view_id)
       -- A refusal applies to every buffer, so it ends the sequence.
       -- The dispatcher drops this one-shot handler after it returns,
       -- so the next request is sent afterward.
       if outcome ~= 'failed' then
         vim.schedule(function ()
-          M.request_buffers(index + 1,
+          M.request_diffView_buffers(index + 1,
                             outcome == 'opened' and opened + 1 or opened)
         end) end
     end, true)
@@ -70,7 +70,7 @@ end
 ---VIEW_ID, unless the server answered '(empty . t)'. Shows any
 ---errors and warnings.
 ---@return string 'opened', 'empty' or 'failed' (no buffer, and errors)
-function M.handle_response (response, buffer_name, view_id)
+function M.handle_diffView_response (response, buffer_name, view_id)
   local ok, outcome = pcall(function ()
     local empty = payload.field_text(response, 'empty') == 't'
     local content = payload.field_text(response, 'content')

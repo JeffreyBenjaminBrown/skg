@@ -1,4 +1,4 @@
--- Coverage for skg.search's one message (search-results, carrying
+-- Coverage for skg.text_search's one message (search-results, carrying
 -- the search buffer) against the loopback fake server, plus skg.search_make_link's finish paths, mirroring
 -- tests/elisp/test-skg-search-make-link.el (the finish-at-link,
 -- finish-at-headline and no-target cases; the label-reduction cases
@@ -10,11 +10,11 @@ local helpers = dofile(
 local buffer = require('skg.buffer')
 local client = require('skg.client')
 local lock = require('skg.lock')
-local search = require('skg.search')
+local search = require('skg.text_search')
 local search_make_link = require('skg.search_make_link')
 local state = require('skg.state')
 
-describe('skg.search', function ()
+describe('skg.text_search', function ()
   local server
 
   before_each(function ()

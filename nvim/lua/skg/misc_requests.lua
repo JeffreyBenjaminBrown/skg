@@ -46,7 +46,7 @@ end
 ---repo the user owns (foreign skgrepos are never written, so they are left
 ---untouched). Rewrites exactly the .skg files whose bodies change;
 ---derived caches are refreshed.
-function M.strip_body_whitespace ()
+function M.strip_trailing_whitespace_from_bodies ()
   vim.notify('Stripping trailing whitespace from bodies ...')
   state.register_response_handler('strip-body-whitespace',
     function (_payload, response)

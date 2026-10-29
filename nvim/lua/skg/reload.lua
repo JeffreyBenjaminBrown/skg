@@ -18,12 +18,10 @@
 -- other module cannot lose them for the rest of the session. The
 -- reload error itself still propagates.
 --
--- One deliberate deviation from elisp: the open TCP connection is
--- closed before the module holding it is discarded. (Emacs keeps the
--- process object alive in its global process list even after the
--- variable naming it is unbound; a dropped Lua uv handle would instead
--- linger open until garbage collection, invisibly.) The client
--- reconnects on the next request, exactly as post-reload Emacs does.
+-- The open TCP connection is closed before the module holding it is
+-- discarded, as Emacs's skg-reload closes it (skg-connection-end); a
+-- dropped Lua uv handle would otherwise linger open until garbage
+-- collection, invisibly. The client reconnects on the next request.
 
 local M = {}
 

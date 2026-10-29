@@ -2,8 +2,8 @@
 -- both read are in tests/shared/metadata-editor-cases.txt.
 
 local fields = require('skg.sexpr.metadata_fields')
-local metadata_edit = require('skg.metadata_edit')
-local readiness = require('skg.readiness')
+local sexpr_edit = require('skg.sexpr_edit')
+local metadata = require('skg.metadata')
 local server_warnings = require('skg.server_warnings')
 local sexpr = require('skg.sexpr.parse')
 
@@ -43,18 +43,18 @@ describe('the metadata editor', function ()
     for _, case in ipairs(cases) do
       if case.metadata then
         local sexp = sexpr.read(case.metadata)
-        local shown = metadata_edit.org_text_to_show(sexp, case.title)
+        local shown = sexpr_edit.org_text_to_show(sexp, case.title)
         assert.are.same({ case.name, case['fill-in'] },
                         { case.name, shown })
         assert.are.same(
           { case.name, case.strip },
-          { case.name, metadata_edit.metadata_text_to_save(
+          { case.name, sexpr_edit.metadata_text_to_save(
               shown, fields.kind_of_sexp(sexp)) })
         for _, writer in ipairs({
             { 'edit request', 'with the edit request',
-              readiness.with_edit_request },
+              metadata.metadata_with_edit_request },
             { 'readiness request', 'with the readiness request',
-              readiness.with_readiness_request } }) do
+              metadata.metadata_with_readiness_request } }) do
           local request = case[writer[1]]
           if request then
             assert.are.same(

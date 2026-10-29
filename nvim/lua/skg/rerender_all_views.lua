@@ -92,7 +92,7 @@ function M.send_streaming_request (label, response_type, request,
     for other_type, other_handler in pairs(other_handlers or {}) do
       state.register_response_handler(other_type, other_handler, true) end
     if overPrivateText_retry then
-      M.register_overPrivateText_confirmation(overPrivateText_retry,
+      M.register_rerender_overPrivateText_confirmation(overPrivateText_retry,
                                               response_type) end
     state.lp_reset()
     client.send_string(sexpr.to_string(request) .. '\n')
@@ -137,7 +137,8 @@ end
 
 ---Register the alternative privacy challenge for a rerendering request.
 ---The retry waits for the server's balanced empty unwind to finish.
-function M.register_overPrivateText_confirmation (retry, unfired_response_type)
+function M.register_rerender_overPrivateText_confirmation (
+    retry, unfired_response_type)
   M.overPrivateText_retry = nil
   M.overPrivateText_challenged = false
   state.register_response_handler('overPrivateText-telescope-confirmation',
@@ -206,7 +207,7 @@ function M.register_rerender_stream_handlers ()
             messages.errors_and_warnings_to_org_string(
               errors, warnings))
         end
-        server_warnings.show_corrections(
+        server_warnings.show_corrections_in_server_warnings(
           payload.field(response, 'corrections'))
       end)
       if not ok then

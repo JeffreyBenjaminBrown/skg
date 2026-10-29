@@ -1,4 +1,5 @@
--- Read and stage the user-mutable noSearchMatching flag.
+-- Read and stage the user-mutable noSearchMatching flag. The Lua port
+-- of elisp/skg-request-flag-state.el.
 
 local client = require('skg.client')
 local config = require('skg.config')
@@ -13,25 +14,26 @@ local M = {}
 local choices = { 'search matching', 'no search matching' }
 local request_namespace = vim.api.nvim_create_namespace('skg-flag-request')
 
-local function eligible_root (line)
+local function flag_eligible_root_id (line)
   local meta = metadata.metadata_sexp_at_line_or_nil(line)
   if not metadata.occurrence_sexp_p(meta) then
-    error('Search matching can be set only on an occurrence') end
+    error('Search matching can be set only on an occurrence', 0) end
   if metadata.node_write_protected_p(meta) then
-    error('Cannot set search matching on a write-protected node') end
-  if metadata.node_edit_request_p(meta) then error('This node already has an editRequest') end
+    error('Cannot set search matching on a write-protected node', 0) end
+  if metadata.node_edit_request_p(meta) then
+    error('This node already has an editRequest', 0) end
   local gnid = metadata.node_id(meta)
-  if not gnid then error('Save the node first; it has no graph ID') end
+  if not gnid then error('Save the node first; it has no graph ID', 0) end
   return gnid
 end
 
-local function stamp (line, desired)
+local function stamp_search_matching_request (line, desired)
   metadata.write_edit_request_at_line(line, {
     sexpr.symbol('flag'), sexpr.symbol('noSearchMatching'),
     sexpr.symbol(desired and 'true' or 'false') }, 'node')
 end
 
-local function recursive_targets (root_line)
+local function flag_recursive_targets (root_line)
   local result = { root_line }
   local root_level = metadata.outline_level(root_line)
   local line = metadata.next_headline_line(root_line)
@@ -50,14 +52,14 @@ end
 
 local function apply (root_line, desired, recursive)
   if not recursive then
-    stamp(root_line, desired)
+    stamp_search_matching_request(root_line, desired)
     vim.notify('Search matching staged for 1 node. Save to apply.')
     return
   end
   local owned = {}
   for _, name in ipairs(config.owned_repos() or {}) do owned[name] = true end
   local seen, skipped, changed = {}, {}, 0
-  for _, line in ipairs(recursive_targets(root_line)) do
+  for _, line in ipairs(flag_recursive_targets(root_line)) do
     local meta = metadata.metadata_sexp_at_line_or_nil(line)
     local gnid = metadata.node_id(meta)
     local reason
@@ -72,7 +74,7 @@ local function apply (root_line, desired, recursive)
       table.insert(skipped, string.format('%s (%s)', gnid or 'no-id', reason))
     else
       seen[gnid] = true
-      stamp(line, desired)
+      stamp_search_matching_request(line, desired)
       changed = changed + 1
     end
   end
@@ -86,7 +88,7 @@ local function request (recursive)
   local buf = vim.api.nvim_get_current_buf()
   local line = focus.owning_headline_line()
   if not line then error('Not on a headline') end
-  local expected_gnid = eligible_root(line)
+  local expected_gnid = flag_eligible_root_id(line)
   local mark = vim.api.nvim_buf_set_extmark(
     buf, request_namespace, line - 1, 0, { right_gravity = true })
   state.register_response_handler('flag-state',
@@ -115,9 +117,9 @@ local function request (recursive)
         local current_gnid = current_meta and metadata.node_id(current_meta)
         if current_gnid ~= expected_gnid and current_gnid ~= canonical_gnid then
           vim.notify('The headline changed while flag state was loading') return end
-        local ok = pcall(eligible_root, current_line)
-        if not ok then
-          vim.notify('The headline is no longer eligible for a flag edit') return end
+        -- Re-run the local refusal after the network round trip.
+        local ok, refusal = pcall(flag_eligible_root_id, current_line)
+        if not ok then vim.notify(tostring(refusal)) return end
         local initial = value == 'true'
           and 'no search matching' or 'search matching'
         local choice = picker.completing_read_with_cycle(
@@ -134,8 +136,8 @@ local function request (recursive)
     expected_gnid))
 end
 
-function M.set_search_matching () request(false) end
-function M.set_search_matching_recursive () request(true) end
+function M.set_flag_search_matching () request(false) end
+function M.set_flag_search_matching_recursive () request(true) end
 
 M._apply = apply
 M._request = request

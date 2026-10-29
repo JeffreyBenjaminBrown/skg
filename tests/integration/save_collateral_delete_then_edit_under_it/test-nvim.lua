@@ -149,7 +149,7 @@ end
 print('=== SKG Collateral Delete Then Edit Under It Integration Test ===')
 
 print('=== PHASE 1: Open buffer 1 (content view of node 1) ===')
-require('skg.content_view').request_single_root_content_view_from_id('1')
+require('skg.single_root_content_view').request_single_root_content_view_from_id('1')
 local buf1 = T.wait_for_buffer('skg://1')
 T.check(buf1, 'Buffer skg://1 was created')
 print('Buffer 1 initial content:\n' .. T.buffer_text(buf1))

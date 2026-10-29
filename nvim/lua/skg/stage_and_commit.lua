@@ -11,14 +11,14 @@
 local buffer = require('skg.buffer')
 local payload = require('skg.payload')
 local readiness = require('skg.readiness')
-local rerender = require('skg.rerender')
+local rerender = require('skg.rerender_all_views')
 local sexpr = require('skg.sexpr.parse')
 
 local M = {}
 
 function M.stage_and_commit ()
-  if #buffer.other_unsaved_skg_buffers(nil) > 0 then
-    error('skg: save or revert every view before staging and committing') end
+  if #buffer.unsaved_view_buffers(nil) > 0 then
+    error('skg: save or revert every skg view before staging and committing') end
   local message = vim.fn.input('Commit message: ')
   if vim.trim(message) == '' then
     error('skg: a commit message is required') end

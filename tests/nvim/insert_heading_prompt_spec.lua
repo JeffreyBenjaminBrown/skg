@@ -5,7 +5,7 @@
 -- prompted for unless only one is owned, and no edit buffer opens.
 
 local config = require('skg.config')
-local metadata_edit = require('skg.metadata_edit')
+local sexpr_edit = require('skg.sexpr_edit')
 local picker = require('skg.picker')
 
 local actions = { 'org_mappings.insert_heading_respect_content',
@@ -58,7 +58,7 @@ local function run_action (action, owned)
     return 'private'
   end
   local ok, err = pcall(function ()
-    metadata_edit.wrap_org_insert_heading_actions()
+    sexpr_edit.wrap_org_insert_heading_actions()
     require('orgmode').action(action)
     vim.cmd('stopinsert')
   end)

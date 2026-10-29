@@ -1,5 +1,5 @@
 -- Integration test for the explicit fork gesture
--- (skg.view_requests.fork_node), nvim client. The Lua mirror of
+-- (skg.views.fork_node), nvim client. The Lua mirror of
 -- test-emacs.el in this directory: open owned container Q (whose
 -- content is the owned M):
 --  - forking a dirty buffer is refused (no confirmation appears);
@@ -11,10 +11,10 @@
 local T = dofile('../test-nvim-lib.lua')
 T.arm_timeout(60)
 
-local content_view = require('skg.content_view')
+local content_view = require('skg.single_root_content_view')
 local metadata = require('skg.metadata')
 local save = require('skg.save')
-local view_requests = require('skg.view_requests')
+local view_requests = require('skg.views')
 
 ---Return a live skg view buffer whose text mentions (gnid ID).
 local function buffer_showing (gnid)

@@ -4,12 +4,12 @@
 --
 -- This tests both:
 --   skg.id_search.goto_id_near_point (elisp skg-goto)
---   skg.search.request_text_search   (elisp skg-request-title-matches)
+--   skg.text_search.request_text_search   (elisp skg-request-title-matches)
 
 local T = dofile('../test-nvim-lib.lua')
 T.arm_timeout(15)
 
-local search = require('skg.search')
+local search = require('skg.text_search')
 local buffer = require('skg.buffer')
 local id_search = require('skg.id_search')
 

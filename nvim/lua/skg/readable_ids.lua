@@ -129,7 +129,7 @@ function M.request_titles (gnids, generation, buf, approved_pids)
     client.send_string(request)
   end)
   if not ok then
-    vim.notify('skg readable ids: server not connected: '
+    vim.notify('skg-readable-ids: server not connected: '
                .. tostring(err))
   end
 end
@@ -141,7 +141,7 @@ function M.ensure_title_response_handler ()
     function (_payload_text, response)
       local entry = table.remove(M.pending_title_requests, 1)
       if not entry then
-        vim.notify('skg readable ids: titles-by-ids response without'
+        vim.notify('skg-readable-ids: titles-by-ids response without'
                    .. ' pending request')
         return end
       state.lp_pending_count = math.max(0, state.lp_pending_count - 1)
@@ -151,7 +151,7 @@ function M.ensure_title_response_handler ()
     function (_payload_text, response)
       local entry = table.remove(M.pending_title_requests, 1)
       if not entry then
-        vim.notify('skg readable ids: privacy challenge without pending request')
+        vim.notify('skg-readable-ids: privacy challenge without pending request')
         return end
       state.lp_pending_count = math.max(0, state.lp_pending_count - 1)
       local prompt = payload.field_text(response, 'prompt') or

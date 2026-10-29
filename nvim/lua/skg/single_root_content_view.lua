@@ -18,7 +18,7 @@ local M = {}
 ---@param view_id string
 ---@param approved_pids string[]|nil
 ---@return string
-function M.request_string (node_gnid, view_id, approved_pids)
+function M.single_root_view_request_string (node_gnid, view_id, approved_pids)
   local request = {
     sexpr.pair(sexpr.symbol('request'), 'single root content view'),
     sexpr.pair(sexpr.symbol('id'), node_gnid),
@@ -41,7 +41,7 @@ function M.request_single_root_content_view_from_id (node_gnid,
   state.register_response_handler('content-view',
     function (payload_text, response)
       state.response_handler_map['overPrivateText-telescope-confirmation'] = nil
-      M.handle_content_view(payload_text, response, view_id)
+      M.handle_content_view_sexp(payload_text, response, view_id)
     end, true)
   -- Alternative to content-view. It is non-one-shot so the pending
   -- response count represents only the one terminal reply.
@@ -62,7 +62,7 @@ function M.request_single_root_content_view_from_id (node_gnid,
     end, false)
   state.lp_reset()
   client.send_string(
-    M.request_string(
+    M.single_root_view_request_string(
       node_gnid, view_id, approved_pids))
 end
 
@@ -72,7 +72,7 @@ end
 ---@param payload_text string
 ---@param response any
 ---@param view_id string
-function M.handle_content_view (payload_text, response, view_id)
+function M.handle_content_view_sexp (payload_text, response, view_id)
   local ok, err = pcall(function ()
     local switch_view_id = payload.field_text(response, 'switch-to-view')
     if switch_view_id then

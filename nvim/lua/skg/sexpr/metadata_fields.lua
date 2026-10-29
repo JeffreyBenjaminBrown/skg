@@ -1,5 +1,5 @@
 -- PURPOSE: Fill in and strip the fields a user may set on a headline,
--- for the metadata editor (skg.metadata_edit), and say what each
+-- for the metadata editor (skg.sexpr_edit), and say what each
 -- field's cycle runs through. The fields of each kind of headline,
 -- their defaults and their values come from
 -- 'shared/metadata-fields.json', whose comments describe them. After

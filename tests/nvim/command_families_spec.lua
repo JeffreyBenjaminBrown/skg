@@ -6,9 +6,10 @@
 
 local fields = require('skg.sexpr.metadata_fields')
 local metadata = require('skg.metadata')
-local metadata_edit = require('skg.metadata_edit')
+local sexpr_edit = require('skg.sexpr_edit')
+local sexpr_cycling = require('skg.sexpr_edit.sexpr_cycling')
 local modify_graph = require('skg.modify_graph')
-local view_requests = require('skg.view_requests')
+local view_requests = require('skg.views')
 
 local function buffer_with (text)
   local buf = vim.api.nvim_create_buf(true, false)
@@ -186,7 +187,7 @@ describe('skg.modify_graph replacements', function ()
   end)
 end)
 
-describe('skg.view_requests', function ()
+describe('skg.views', function ()
   before_each(stub_save)
   after_each(function ()
     unstub_save()
@@ -202,9 +203,9 @@ describe('skg.view_requests', function ()
     assert.are.equal(1, saved_count)
   end)
 
-  it('set_editable stamps without saving', function ()
+  it('request_editable_view stamps without saving', function ()
     buffer_with('* (skg node (gnid n3) writeProtected) title')
-    view_requests.set_editable()
+    view_requests.request_editable_view()
     assert.is_truthy(buffer_text():find(
       '(viewRequests editableView)', 1, true))
     assert.are.equal(0, saved_count)
@@ -237,7 +238,7 @@ describe('skg.view_requests', function ()
   end)
 end)
 
-describe('skg.metadata_edit', function ()
+describe('skg.sexpr_edit', function ()
   before_each(function () stub_owned_repos({ 'public' }) end)
   after_each(function ()
     config.owned_repos = real_owned_skgrepos
@@ -254,7 +255,7 @@ describe('skg.metadata_edit', function ()
   it('opens the filled-in view and applies an edit back', function ()
     local source_buf = buffer_with(
       '* (skg node (gnid abc) (skgRepos (nodeRepo public))) my title')
-    metadata_edit.edit_metadata()
+    sexpr_edit.view_metadata()
     local edit_buf = vim.api.nvim_get_current_buf()
     assert.is_truthy(vim.api.nvim_buf_get_name(edit_buf)
                      :find('metadata%-edit'))
@@ -266,7 +267,7 @@ describe('skg.metadata_edit', function ()
         break
       end
     end
-    metadata_edit.apply(edit_buf)
+    sexpr_edit.apply(edit_buf)
     assert.are.equal(source_buf, vim.api.nvim_get_current_buf())
     assert.are.equal(
       '* (skg node (gnid abc) (skgRepos (nodeRepo public)) writeProtected) my title',
@@ -278,14 +279,14 @@ describe('skg.metadata_edit', function ()
     -- Mirrors the empty-node skeleton cases of
     -- test-skg-insert-heading-repo-prompt.el.
     local source_buf = buffer_with('* just a plain headline')
-    metadata_edit.edit_metadata()
+    sexpr_edit.view_metadata()
     local edit_buf = vim.api.nvim_get_current_buf()
     local text = table.concat(
       vim.api.nvim_buf_get_lines(edit_buf, 0, -1, false), '\n')
     assert.is_truthy(text:find('%* title'))
     assert.is_truthy(text:find('just a plain headline', 1, true))
     assert.is_truthy(text:find('%*%*%*%* public'))
-    metadata_edit.apply(edit_buf)
+    sexpr_edit.apply(edit_buf)
     assert.are.equal(source_buf, vim.api.nvim_get_current_buf())
     assert.are.equal(
       '* (skg node (skgRepos (nodeRepo public))) just a plain headline',
@@ -294,19 +295,19 @@ describe('skg.metadata_edit', function ()
 
   it('cycles field values by their parent field', function ()
     buffer_with(table.concat({
-      metadata_edit.help_text, '',
+      sexpr_edit.help_text, '',
       '* skg', '** node', '*** noClaim',
       '**** false (default)' }, '\n'))
     vim.b.skg_edit_kind_atom = 'node' -- as the editor sets it
     vim.api.nvim_win_set_cursor(0, { 6, 0 })
-    metadata_edit.cycle(1)
+    sexpr_cycling.cycle(1)
     assert.are.equal('**** true', metadata.line_text(6))
-    metadata_edit.cycle(-1)
+    sexpr_cycling.cycle(-1)
     assert.are.equal('**** false (default)', metadata.line_text(6))
   end)
 end)
 
-describe('skg.ancestry and view_new_empty', function ()
+describe('skg.view_ancestry and view_new_empty', function ()
   after_each(function ()
     pcall(vim.api.nvim_buf_delete,
           vim.api.nvim_get_current_buf(), { force = true })
@@ -318,7 +319,7 @@ describe('skg.ancestry and view_new_empty', function ()
       '* a', '** b', '** c', '*** d', '*** e', '*** f' }, '\n'))
     vim.bo[buf].filetype = 'org'
     vim.api.nvim_win_set_cursor(0, { 5, 0 }) -- on 'e'
-    require('skg.ancestry').view_ancestry()
+    require('skg.view_ancestry').view_ancestry()
     assert.are.equal('* a\n** c\n*** e', buffer_text())
   end)
 
