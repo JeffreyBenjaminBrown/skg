@@ -860,6 +860,24 @@ readability report's item 1 and the plan 06 slice 7 record in
 'progress.org' first. Emacs is the reference where the two
 differ and neither is wrong; where Neovim is better, Emacs
 follows.
+*** Corrections carried from slice 4
+Emacs's detach puts 'noClaim' just before '(view ...)' and
+'(diff ...)' rather than at its rank, so it lands after
+'(editRequest ...)' and '(viewRequests ...)'; Neovim's
+'with_part_at_its_rank' places by 'parts'. Each client has one
+rank helper, used by every writer; Emacs follows Neovim here,
+and 'skg--part-written-after-editRequest-p' goes. Neovim's
+generic metadata edit ('edit_metadata_at_line') has nothing
+like Emacs's 'skg--derived-facts-last', so the absent parts
+that 'focus.lua', 'folds.lua' and 'view_requests.lua' write
+land after '(view ...)' and '(diff ...)'; it places by the
+same helper, with a test. Neovim's 'delete_absent_references
+.lua' keeps its own 'any_dirty_view', which does what
+'buffer.other_unsaved_skg_buffers' does: one helper. Where the
+two clients' messages differ only by Neovim's 'skg: ' prefix
+and its lowercase, that is Neovim's convention and stays;
+where the words differ ("before global cleanup" against
+"before global reference cleanup"), Emacs's words win.
 *** modules and names
 One module per concern in each client, under the same name
 (metadata, metadata fields, the editor, readiness, the

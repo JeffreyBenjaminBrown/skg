@@ -4113,3 +4113,26 @@ pinned the defect's order.
 Nothing of slice 4.
 *** Headline
 DONE.
+
+** Orchestrator's notes after slice 4 (2026-10-29)
+Launched 18:19 UTC, reported 18:31 UTC: twelve minutes; 232k
+agent tokens over 119 tool uses. One behavior change, accepted:
+the flag request now replaces a pending relRepo request, as
+delete and merge already did, since the predicate skips relRepo
+parts and the server allows one edit request beside a
+readiness request; before, the flag command refused. Both
+COMMANDS docs say so; Jeff may reverse it. The other deviations
+are sound: Emacs's predicate works on a sexp; Neovim's
+readiness module uses the one rank helper; the switch refuses
+before it asks for a set, in the interactive form and in the
+body. Corrections carried to slice 5: Emacs's detach is behind
+Neovim's on the rank of 'noClaim'; Neovim's generic metadata
+edit appends absent parts; Neovim's delete-references command
+duplicates a dirty-view helper and differs in a message; the
+message-style rule (Neovim's prefix and case stay, Emacs's
+words win). Suites: nextest 1013 unchanged, Emacs 408 (two
+new), Neovim 402 (three new), integration 34 of 35 with the
+pre-existing failure. Two pitfalls for the next brief: one
+Neovim spec runs through 'tests/results/08/slice4/run-spec.sh'
+under a timeout, since a headless Lua error waits for input;
+Lua's 'ipairs' stops at the first nil of a case table.
