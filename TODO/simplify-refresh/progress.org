@@ -3686,3 +3686,28 @@ the tombstones' place) is a design question, filed in
 vognode's folders as tombstones".
 *** Headline
 DONE.
+
+** Orchestrator's notes after slice 1 (2026-10-29)
+Launched 17:17 UTC, reported 17:41 UTC: twenty-four minutes;
+355k agent tokens over 138 tool uses. The deviations are sound
+and two go beyond the plan for good reason: the save under a
+restriction weaves a restricted alias back from disk and the
+write-protected alias check takes the restriction, without
+which the alias fix lost the alias or refused the save; the
+diff view's goal omits restricted records as the content
+view's does; a ghost re-kinded from a Restricted vognode is
+quiet after a switch; an alias a narrowing hides leaves a view
+by the re-kind rung. One design question is filed in
+'TODO/problems.org' ("A narrowing leaves a re-kinded vognode's
+folders as tombstones"): a widened root comes back with its
+content but its folders stay tombstones, which is plan 06's
+behavior for any re-kinded occurrence, not new. Slices 2 and
+3 do not depend on the answer, so the run goes on and the
+question goes to Jeff. Corrections carried: to slice 2, a
+test saving a restricted root and the headline typed under a
+tombstone with no occurrence above; to slice 3, five more
+inline spellings of the record question, the diff view's home
+through the straddle, and two policy sites. Suites: nextest
+1003 of 1003 (eight new), integration 34 of 35 with the
+pre-existing failure; the client suites were not run, as the
+slice touched no client.

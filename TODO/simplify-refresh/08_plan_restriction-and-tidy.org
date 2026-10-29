@@ -728,6 +728,15 @@ hidden-outside folders ('server/from_text/buffer_to_viewnodes/
 local.rs') still say "unknowns or Restricted vognodes". They
 say "references to unknown nodes or restricted headlines", as
 the relation folders' message does since slice 0.
+*** Corrections carried from slice 1
+A test saves a buffer whose root is a restricted headline (a
+view rooted at a private node, narrowed): the save is accepted
+and nothing on disk changes. A folder under a vognode the
+narrowing re-kinded is a tombstone keeping its members; a
+headline typed under one has no occurrence above it, so the
+record says what the save does with it (a refusal for want of
+a skgrepo, or a save), with a test; no new behavior is designed
+for it.
 *** the dangling hide
 With slice 0's rule in place, confirm that a requested hidden
 folder holding a gnid-only vognode of kind Unknown saves under
@@ -757,6 +766,19 @@ and 'bash/integration-tests.sh'.
 Read the two sections of the agreed behavior, the pitfalls on
 the four callers and the save's knowledge, and the awkwardness
 report's items 2 and 12 first.
+*** Corrections carried from slice 1
+Slice 1 spelled the record question inline five times more:
+'aliases_with_relRepo_unless_home', 'graphnodestats_for_pid',
+the write-protected alias check ('write_protected_edits.rs'),
+'preserve_invisible_members' and 'partner_items'; the sweep
+takes them with the eight. In the diff view "the node is
+restricted" asks the worktree's home, or HEAD's when the
+worktree lacks the node: the caller finds the home through the
+straddle and asks the one method, so that no second spelling
+is born. The policy enum covers the two sites slice 1 added:
+'rekind_to_ghost', which asks
+'reports_rekind_across_the_restriction', and the entombstoned
+alias, which asks 'reports_entombstoning (None)'.
 *** the enum
 'BufferCorrectionPolicy' becomes the enum of "Words this plan
 uses"; each predicate of the policy is one match; the save's
