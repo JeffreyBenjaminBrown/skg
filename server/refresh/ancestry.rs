@@ -75,19 +75,23 @@ pub fn is_unsayable (
       Some (ancestor) => ! matches_expected (&ancestor . value () . kind, expected),
       None => true, } ) }
 
-/// The ancestors the row of the descriptor at 'treeid' requires, as
-/// they stand, nearest first: as many as the row lists, or fewer
-/// where the tree has fewer.
-pub fn required_ancestors (
+/// Whether the save reads the claims of the children of 'parent': an
+/// editable occurrence, or an editable folder whose node is an
+/// editable occurrence. Under any other parent no child claims
+/// membership, whatever it carries, and the printer writes no
+/// 'noClaim' there.
+pub fn parent_reads_claims (
   tree   : &Tree<Viewnode>,
-  treeid : NodeId,
-) -> Vec<NodeId> {
-  let Some (node) : Option<NodeRef<Viewnode>> = tree . get (treeid)
-    else { return Vec::new (); };
-  node . ancestors ()
-    . take ( required_ancestry (&node . value () . kind) . len () )
-    . map ( |ancestor| ancestor . id () )
-    . collect () }
+  parent : NodeId,
+) -> bool {
+  match &tree . get (parent) . unwrap () . value () . kind {
+    ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =>
+      ! occurrence . is_writeProtected (),
+    ViewnodeKind::Folder (folder) if folder . is_editable () =>
+      described_node (tree, parent)
+        . and_then ( |described| tree . get (described) )
+        . is_some_and ( |described| described . value () . editable_gnid () . is_some () ),
+    _ => false, } }
 
 /// The node the folder at 'folder' describes, whose relationships,
 /// properties or hides it shows: for a compound folder, the
@@ -141,23 +145,19 @@ pub fn compound_folder_parties (
       subscribee : None } ),
     _ => None, } }
 
-/// Whether the save reads the claims of the children of 'parent': an
-/// editable occurrence, or an editable folder whose node is an
-/// editable occurrence. Under any other parent no child claims
-/// membership, whatever it carries, and the printer writes no
-/// 'noClaim' there.
-pub fn parent_reads_claims (
+/// The ancestors the row of the descriptor at 'treeid' requires, as
+/// they stand, nearest first: as many as the row lists, or fewer
+/// where the tree has fewer.
+pub fn required_ancestors (
   tree   : &Tree<Viewnode>,
-  parent : NodeId,
-) -> bool {
-  match &tree . get (parent) . unwrap () . value () . kind {
-    ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =>
-      ! occurrence . is_writeProtected (),
-    ViewnodeKind::Folder (folder) if folder . is_editable () =>
-      described_node (tree, parent)
-        . and_then ( |described| tree . get (described) )
-        . is_some_and ( |described| described . value () . editable_gnid () . is_some () ),
-    _ => false, } }
+  treeid : NodeId,
+) -> Vec<NodeId> {
+  let Some (node) : Option<NodeRef<Viewnode>> = tree . get (treeid)
+    else { return Vec::new (); };
+  node . ancestors ()
+    . take ( required_ancestry (&node . value () . kind) . len () )
+    . map ( |ancestor| ancestor . id () )
+    . collect () }
 
 /// The required ancestry of a kind, nearest first. A vognode, a
 /// tombstone and the buffer root require none.

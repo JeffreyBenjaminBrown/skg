@@ -262,7 +262,7 @@ fn unintegrated_content_gnids (
   subscriber_hidden   : &[ID],
   subscriber_contains : &[ID],
 ) -> Vec<ID> {
-  let resolve_pids = |gnids : &[ID]| -> Vec<ID> {
+  let resolve_pids : &dyn Fn (&[ID]) -> Vec<ID> = &|gnids : &[ID]| -> Vec<ID> {
     gnids . iter () . map ( |gnid| pid_else_raw_id (graph, gnid) ) . collect () };
   let contents : Vec<ID> = resolve_pids (content_gnids);
   let hidden : Vec<ID> = resolve_pids (subscriber_hidden);
@@ -426,7 +426,7 @@ fn goal_list_for_hiddenOutsideOfSubscribee_folder (
   subscriber_hides  : &[ID],
   subscribees       : &[ID],
 ) -> Vec<ID> {
-  let subscribee_content_of = | pid : &ID | -> Vec<ID> {
+  let subscribee_content_of : &dyn Fn (&ID) -> Vec<ID> = &|pid : &ID| -> Vec<ID> {
     graphnode_from_graph (graph, pid)
       . map ( |skg| members_of (& skg . contains) )
       . unwrap_or_default () };

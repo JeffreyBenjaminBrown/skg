@@ -866,11 +866,13 @@ pub fn emittable_metadata_atoms () -> std::collections::HashSet<&'static str> {
 /// Atoms no wire carries, which the clients write into a headline's
 /// metadata before they hand it to the lens: 'pendingDetachment'
 /// ('pending_detachment_rule').
-fn client_computed_atoms () -> Vec<&'static str> {
+fn client_computed_atoms (
+) -> Vec<&'static str> {
   vec! [ "pendingDetachment" ] }
 
 /// Every kind atom the server writes: the kinds a WHEN may name.
-pub fn emittable_kind_atoms () -> HashSet<&'static str> {
+pub fn emittable_kind_atoms (
+) -> HashSet<&'static str> {
   [ "node", "ghost", "unknown", "restricted", "tombstone" ] . into_iter ()
     . chain ( property_and_change_kind_atoms () )
     . chain ( Folder::all () . iter () . map ( |folder| folder . repr_in_client () ))
@@ -878,21 +880,27 @@ pub fn emittable_kind_atoms () -> HashSet<&'static str> {
 
 /// The kind atoms of the property members and the change viewnodes,
 /// as their 'repr_in_client' writes them, from one value of each kind.
-fn property_and_change_kind_atoms () -> Vec<&'static str> {
-  fn propertyMember_guard ( q : &PropertyMember ) { // compile error here = update the values below
+fn property_and_change_kind_atoms (
+) -> Vec<&'static str> {
+  fn propertyMember_guard ( // a compile error here: update the values below
+    q : &PropertyMember,
+  ) {
     match q {
       PropertyMember::Alias { .. } | PropertyMember::ID { .. }
         | PropertyMember::Flag { .. } => () }}
   let _ = propertyMember_guard;
-  fn changeViewnode_guard ( q : &ChangeViewnode ) { // ditto
+  fn changeViewnode_guard ( // ditto
+    q : &ChangeViewnode,
+  ) {
     match q {
       ChangeViewnode::OldText { .. }
         | ChangeViewnode::BodyDiff { .. } | ChangeViewnode::HomeSkgrepoMove { .. }
         | ChangeViewnode::RelRepoMove { .. } | ChangeViewnode::ChangesetMarker { .. }
         => () }}
   let _ = changeViewnode_guard;
-  let no_change : &dyn Fn () -> SkgrepoChange = &|| -> SkgrepoChange { SkgrepoChange { old : SkgrepoName::from (""),
-                                     new : SkgrepoName::from ("") } };
+  let no_change : &dyn Fn () -> SkgrepoChange = &|| -> SkgrepoChange {
+    SkgrepoChange { old : SkgrepoName::from (""),
+                    new : SkgrepoName::from ("") } };
   [ PropertyMember::Alias { text : String::new (), relRepo : None,
                             relationshipEditRequest : None,
                             claimsMembership : true, warrant : Warrant::ByGraph },
@@ -910,7 +918,8 @@ fn property_and_change_kind_atoms () -> Vec<&'static str> {
     . collect () }
 
 /// The kinds every WHEN rule in the table names.
-pub fn when_kinds_in_rule_table () -> HashSet<&'static str> {
+pub fn when_kinds_in_rule_table (
+) -> HashSet<&'static str> {
   rules_in_rule_table () . into_iter ()
     . flat_map ( |rule| rule . when )
     . collect () }

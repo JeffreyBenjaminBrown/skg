@@ -225,19 +225,19 @@ impl BufferCorrectionPolicy {
 /// The buffer corrections of one refreshed view, tagged with the view.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ViewBufferCorrections {
-  pub viewforest_id : ViewforestId,
-  pub buffer_corrections   : Vec<BufferCorrection>,
+  pub viewforest_id      : ViewforestId,
+  pub buffer_corrections : Vec<BufferCorrection>,
 }
 
 impl ViewBufferCorrections {
   /// The view's buffer corrections, if it has any.
   pub fn of (
-    viewforest_id : &ViewforestId,
-    buffer_corrections   : Vec<BufferCorrection>,
+    viewforest_id      : &ViewforestId,
+    buffer_corrections : Vec<BufferCorrection>,
   ) -> Option<ViewBufferCorrections> {
     if buffer_corrections . is_empty () { return None; }
     Some ( ViewBufferCorrections { viewforest_id : viewforest_id . clone (),
-                             buffer_corrections } ) }
+                                   buffer_corrections } ) }
 }
 
 /// The 'corrections' entry of a save or rerender-done response:
@@ -278,8 +278,8 @@ impl BufferCorrectionLog {
     let viewnode : &Viewnode = tree . get (treeid) . unwrap () . value ();
     self . entries . push ((
       BufferCorrection { kind,
-                   vnid  : viewnode . viewnode_id . clone (),
-                   title : viewnode . title () . to_string () },
+                         vnid  : viewnode . viewnode_id . clone (),
+                         title : viewnode . title () . to_string () },
       treeid )); }
 
   /// The buffer corrections, each headline named by the vnid it holds

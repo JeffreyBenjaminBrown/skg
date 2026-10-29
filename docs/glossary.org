@@ -189,7 +189,7 @@ skgrepo, aliases (one lacked, reordered, or with a relRepo request) or
 flags. No child of a write-protected occurrence claims membership,
 whatever it carries: a child the user typed under it, which stays
 unwarranted, since no save reads claims there, is saved as an orphan
-(see "claims membership"). A buffer may hold at most one editable occurrence of a node,
+graphnode (see "claims membership"). A buffer may hold at most one editable occurrence of a node,
 so that two occurrences cannot contradict each other. Make one
 editable with =skg-set-editable= (=C-c s d=), which writes a
 =editableView= view request; make one write-protected with
@@ -239,8 +239,8 @@ carries, and the server writes no =noClaim= there. A child that
 claims nothing is in no list: the save neither adds nor removes a
 relationship for it, and what it shows of its own node is saved or
 not by its editability, as at any occurrence. So a headline typed
-under a viewparent that reads no claims is saved as an *orphan*, a
-node that no list contains (a term this glossary takes from
+under a viewparent that reads no claims is saved as an *orphan
+graphnode*, a node that no list contains (a term this glossary takes from
 'docs/COMMANDS.org'), and the save warns of each one, naming its
 headline ('orphan_warnings' in
 'server/from_text/local_fieldintent_collection/mod.rs'). Under a
@@ -545,7 +545,7 @@ rendered, a root included, so a user sees one only where it
 holds something. The save discards anything typed on its line, and no
 child of a tombstone claims membership (a headline typed under one,
 taking the skgrepo of the nearest occurrence above, is saved as an
-orphan; see "claims membership"); every folder accepts one
+orphan graphnode; see "claims membership"); every folder accepts one
 among its children. In code the kind is 'ViewnodeKind::Tombstone',
 and on the wire the atom =tombstone=.
 
@@ -689,7 +689,7 @@ are shown raw, and so, one level down, are the children of most
 overridden nodes shown raw ('docs/api-and-formats.org', "Override
 substitution and the overridesHere part").
 An ordinary single-root visit always opens the requested node itself,
-shown raw. In enriched search results, each result shows its override
+shown raw. In the search buffer, each hit shows its override
 folders, holding its visible direct override relatives in both
 directions. Override facts also appear in explicitly requested override
 folders.
@@ -1382,7 +1382,7 @@ Which kind of view a refresh refreshes ('RefreshMode' in
 'DiffView', which carries the graph straddle and the buffer kind. It
 decides whether a parent's goal includes what HEAD alone warrants,
 whether ghosts and change viewnodes are drawn, and what the node
-budget charges.
+budget may refuse.
 
 *** gnid, pid, extra ID
 
@@ -1440,7 +1440,7 @@ ladder, the skgrepos in privacy order.)
 *** viewnode merge, duplicate viewnode siblings
 
 *Duplicate viewnode siblings* are siblings standing for one gnid
-under one parent. The refresh's second rung ('merge_siblings') makes
+under one parent. The refresh's second rung ('viewnode_merge') makes
 each set of them one viewnode, by a *viewnode merge*. The result
 stands where the first of them stood and has a fresh viewnode ID.
 It is folded only if every sibling was, and its body is folded only
@@ -1468,9 +1468,10 @@ old content where content stands); none of it, beyond what the buffer
 already shows, for a write-protected occurrence's content and for the
 containerward chain. An *extension* is one editable occurrence's
 content drawn whole; the *node budget* ('initial_node_limit') counts
-them, each charging it once ('RefreshMode::charges_node_budget'),
-and once it is spent the occurrences the refresh draws are
-write-protected. A folder fills its members without spending any. The
+them, each charging it once at its visit, and once it is spent the
+occurrences the refresh draws are write-protected (they carry an
+editable-view request their visit consumes,
+'consume_editableView_request'). A folder fills its members without spending any. The
 module comment of 'server/refresh/extent.rs' states the rule. The
 server *renders* a viewforest when it produces its org text
 ('server/org_to_text.rs').
@@ -1482,8 +1483,9 @@ buffer. One the buffer holds keeps its editability; an editable-view
 request moves it, write-protecting the node's other occurrence; among
 the occurrences the refresh draws, the first of a node is editable
 when its parent's children are editable content, no other occurrence
-of the node is, and the budget allows
-('drawn_occurrence_is_editable'), and a repeat is write-protected.
+of the node is, and the budget allows at its visit
+('drawn_occurrence_editability', 'consume_editableView_request'), and
+a repeat is write-protected.
 The diff view's deviations are in 'docs/diff-view.org', "Editability
 in the diff view".
 
@@ -1505,7 +1507,8 @@ the nodes its nodeMerge requests touched and the members drawn under
 them, and what the tail pruned, are the user's own doing;
 'AfterRestrictionChange', a skgrepo-set switch's rerender, after
 which what the refresh draws, entombstones, marks =noClaim= or
-re-kinds across the restriction is the restriction's doing; and
+re-kinds across the restriction, and what the tail pruned, is the
+restriction's doing; and
 'Unread' (a coinage of plan 08), a first drawing, whose buffer
 corrections nobody reads: the refresh corrects as always, and nobody
 is told. The refresh reports

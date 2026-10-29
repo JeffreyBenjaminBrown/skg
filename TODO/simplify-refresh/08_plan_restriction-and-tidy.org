@@ -914,7 +914,7 @@ Both client suites green; a test in each that the editor
 opened and closed sends back what the server wrote; the shared
 case files unchanged. 'bash/integration-tests.sh' green.
 
-** TODO Slice 6: names and shapes
+** DONE Slice 6: names and shapes
 Read "The refresh renders nothing", "Editability during the
 walk" and "Names and shapes" in the agreed behavior, and the
 awkwardness report, first. Commit per item.

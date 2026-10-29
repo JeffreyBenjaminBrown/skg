@@ -4305,3 +4305,216 @@ integration tests run with Neovim after any rename. Suites:
 nextest 1013 unchanged, Emacs 411 (three new), Neovim 406
 (four new), integration 34 of 35 with either client, the
 pre-existing failure.
+
+** Slice 6
+*** The commits
+**** 7cb1c912
+The refresh renders nothing: the tail stops at the vnids and the
+buffer corrections, each caller renders once, and the render's
+unread 'config' parameter goes.
+**** ceb55e79
+Editability during the walk: the editable-view request is the
+carrier, consumed at each occurrence's visit; the walk keeps one
+map from gnid to its editable occurrence.
+**** c93b9217
+'GoalItem::restricted' goes; the ID rule asks whether the goal
+names the gnid.
+**** efea49c1
+'NamedLeaves' is a list of 'NamedLeafSet'; the changeset
+marker's rule is 'NamedLeafSet::holds'; the readiness refusal
+keeps the set.
+**** 0ef2c8b5
+'compound_folder_parties (tree, folder)' returns positions;
+'required_ancestors' replaces the indexed 'required_ancestor_of'.
+**** b8e5a3f5
+One 'RerenderRequest' and one 'prepare_rerender_views';
+'RerenderMode'; 'server/diff_view/buffer_rerender.rs'; the pass
+context in 'server/rerender_pass.rs'.
+**** 6074eb8c
+The TODO comment on 'EditabilityAndClaim'.
+**** a2f38fb3
+'viewnode_merge', 'ViewnodeMerged',
+'tests/refresh/viewnode_merge.rs', the siblings-only comment.
+**** 2d174fc2
+'goal.rs': 'pid_else_raw_id', used by the save's hides too; one
+subscriber subtraction; no dead branch.
+**** 3a9703c9
+The readiness-conflict loop's 'earlier' and 'later', the pair's
+comparison a function of its own.
+**** 652f8d9c
+'chain.rs' opens with '//!'.
+**** 093f4e74
+The clients' 'reads-claims-p' and 'claims-membership-p', the
+flag 'only_claiming_children', "reads no claims" everywhere.
+**** 7df2f8f7
+"Orphan" takes its noun: orphan viewnodes in the parser, an
+orphan graphnode in the link-replacement warning.
+**** ff1145a8
+"Enrichment" names the search's product only; the search's tests
+are named for the search buffer; 'ParseProvenance'.
+**** 49fbe4a3
+The policy's silences stated whole in the module header; the
+switch handler's stale doc.
+**** The last commit
+The readability report's stale comments, untyped lets, ragged
+columns and one-line signatures; the docs; this record and the
+plan's keyword.
+*** The suites
+Run serialized on the finished tree.
+**** cargo check --all-targets
+Clean, no warning.
+**** bash/nextest.sh
+1016 run, 1016 passed (1013 before; three added:
+'editableView_on_a_merged_sibling_passes_to_the_result',
+'an_occurrence_shown_editable_charges_the_budget',
+'in_the_diff_view_a_node_of_u_charges_the_budget').
+**** bash/emacs-tests.sh
+411 of 411 passed.
+**** bash/nvim-tests.sh
+406 passed, none failed.
+**** bash/integration-tests.sh
+Emacs: 34 of 35. Neovim ('SKG_TEST_CLIENT=nvim'): 34 of 35. The
+failure each time is 'import-md-and-org', pre-existing and not
+this plan's.
+**** The three greps
+All three empty.
+**** Failures met during the slice
+The fixpoint sweeps and the refresh's unit tests ran first after
+each change to the tail and the walk, and stayed green.
+***** three, after the first version of the editability rework
+Classified as expected fixture adaptations. Two diff-view tests
+('an_editable_view_request_cascades_within_the_node_budget',
+'an_editable_view_request_on_a_node_of_u_extends_its_members')
+set the budget to 2 and assumed that the four nodes of U charge
+nothing; the plan's overcharge makes them charge, so the budget
+is 6 there, and the comments say why. The third,
+'a_member_missing_from_a_list_already_drawn_is_reported', drew
+a member that now shows its default subscribee folder: see the
+deviation "a drawn occurrence carries the request".
+**** Checks by mutation
+The merged-sibling test fails when 'merge_requests' drops the
+union of view requests. The integrate request's test fails when
+'outside_the_appended_roots' is bypassed (see "Corrections
+carried from slice 3" below). The diff-view budget test was not
+mutated; by the code, the former rule gives it '[true, false]'
+at a budget of 1.
+**** The TCP surface
+On a scratch server ('verify' skill; script and output in
+'tests/results/08/slice6/probe/'), after the editability commit
+and again at the end: a fresh view, its save back, a body edit,
+the all-changes buffer of the diff view and its save back, a
+search, and a switch to 'pub' and back to 'all' with a save back
+after each. Every save was byte-identical, with no error, no
+warning and no buffer correction; the two runs gave the same
+text.
+*** Deviations from the plan's "how"
+**** 'charges_node_budget' goes, not only its second parameter
+Without the parameter it answered yes in both modes: every
+editable occurrence whose content is drawn charges the budget, at
+its visit ('consume_editableView_request' in 'extent.rs').
+**** a drawn occurrence carries the request
+With 'drawn_editable' gone, the request is also what makes an
+occurrence the refresh draws editable at its visit when the
+budget allows, whether or not a request extends its parent: in a
+content view every occurrence drawn where it may be editable is
+drawn write-protected carrying 'ViewRequest::Editable', and so is
+one 'rekind_to_occurrence' makes. So the tree alone says which
+occurrences this refresh extends first ('draws_first_under').
+Two consequences, both accepted: a member the refresh draws
+after a save shows its default subscribee folder, as a fresh
+view's members do (one test's outline adapted); and a restricted
+headline that a widening makes an occurrence again extends its
+claiming write-protected children as a request would.
+**** a node of U is never refused by the budget
+In the diff view a node of U drawn where no request extends is
+drawn editable at once, holding its node's editability, and the
+budget never refuses a node of U, though each one charges it. A
+request's extension outside U is what the budget refuses. The
+review's discussion expected later nodes of U to be
+write-protected once the budget is spent; the plan's text does
+not say so, and 'a_buffer_whose_u_exceeds_the_node_budget_is_
+rendered_in_full' still holds. Giving a node of U the request
+instead would have extended its content beyond U.
+**** the request lives through its occurrence's visit
+The pass before the walk makes a requested occurrence editable
+and leaves the request on it; 'fulfill_view_requests' keeps it on
+a child; the occurrence's own visit consumes it and it goes when
+the visit ends ('drop_editableView_request'), since the cascade,
+the default folders and the draws of that visit ask for it.
+'write_protect_occurrence' drops it from any occurrence, so a
+'writeProtectedView' request beats a request the cascade passed.
+**** 'EditabilityAndClaim' pairs an enum and the claim
+Its 'editable' became 'editability : DrawnEditability'
+('WriteProtected', 'Requested', 'Editable'), since a drawn
+occurrence is now write-protected with or without the request,
+or editable at once. The TODO comment says what the pair stands
+in for, as the plan asks.
+**** the refresh returns its buffer corrections alone
+'Refreshed' went: 'refresh_viewforest' returns the buffer
+corrections, and 'finish' takes the walk and names them after the
+prune and the vnids. The refresh's unit tests keep a local
+'Refreshed' with the rendered text ('refresh_and_render' in
+'tests/refresh/mod.rs'); 'refresh_reaches_fixpoint' renders the
+forest itself.
+**** the rerender request's selector says the integrate request
+'RerenderSelector' is 'All', 'Where (predicate)' or
+'IntegratingUnshownChanges (view)'; the last sets
+'RerenderPassContext::integrates_unshown_changes', which
+'rerender_diffView_buffer' reads, since 'RerenderMode' is built
+from the view alone ('ContentView' or 'DiffView (buffer kind)').
+'prepare_rerender_views' takes the runtime from every caller, and
+'authorize_prepared_rerenders' the restriction bare, its dead
+'None' branch gone. The pass context's home is
+'server/rerender_pass.rs'.
+**** the ancestry's indices
+'required_ancestor_of (tree, treeid, i)' became
+'required_ancestors (tree, treeid)', positions nearest first; the
+stats pass's generation is 'generation_above_a_member', one
+function, and 'birth_facts' takes the tree.
+**** the parse's "enrichment"
+The parse's record of what it invented was
+'EnrichmentProvenance'; it is 'ParseProvenance', and the comments
+that called the parse "enrichment" say "the parse".
+**** what else the word sweeps reached
+"Claimant" left the refresh's comments and a test name
+('under_an_editable_occurrence_an_unwarranted_claiming_child_is_
+marked_noClaim'); the conflicting node of an ID conflict keeps it
+('multiple_nodes.rs', 'tests/unit/prepared_graph_update.rs'). The
+COMMANDS docs, the glossary's three "saved as an orphan" and the
+API doc's "not orphaned" say their nouns.
+**** docs now, not in slice 10
+'docs/data-model_technical.org' (the tail, the walk, the extent
+and the budget, the default folders, the goal's restricted
+members), 'docs/diff-view.org' and 'docs/api-and-formats.org'
+(the diff view's budget, the search's enrichment), the glossary
+(the budget, the editability rule, the viewnode merge's function,
+the policy's silences, "orphan graphnode", "mode") and both
+COMMANDS docs.
+*** Fixtures changed
+No fixture data changed. The two diff-view budget tests' budget
+(2 to 6) and comments; one outline in
+'tests/refresh/buffer_corrections.rs' and two assertion messages;
+every call of the render without its 'config'; the tests that
+read 'Refreshed . text'; the renamed tests and files
+('tests/refresh/viewnode_merge.rs', 'tests/search_buffer.rs' and
+its fixtures, 'tests/integration/search-buffer/'); the clients'
+detach messages in their two tests; the link-replacement warning
+in 'test-skg-metadata.el'.
+*** Corrections carried from slice 3
+'outside_the_appended_roots' is still needed: a stub root the
+integrate request appends carries no request (one would extend
+its content beyond U, as above), so the second refresh cannot
+tell that it draws that content first. Bypassing it fails
+'the_command_reports_its_second_refresh_and_not_its_first'. Its
+doc says why. The tail's end stays after the prune and the vnids.
+*** Left unfinished
+Of the readability report's fourteen stale comments, six were
+already right (slices 0 to 5); the rest are fixed. "The pid, else
+the raw ID" is still spelled inline outside the goal and the
+save's hides ('strandeds.rs', 'restore_requests.rs',
+'readiness_requests.rs', 'query.rs' and others), which the plan
+did not name. 'viewforest_tree_to_string' keeps its one test
+caller. 'change_fact_atoms' in 'heralds.rs' keeps an import
+inside the function, which the report did not list.
+*** Headline
+DONE.

@@ -406,7 +406,7 @@ pub(crate) fn point_occurrence_at (
       write_protect_occurrence (tree, child, walk); }}
   if let ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =
     &mut tree . get_mut (child) . unwrap () . value () . kind
-  { occurrence . gnid        = pid . clone ();
+  { occurrence . gnid         = pid . clone ();
     occurrence . title        = node . title . clone ();
     occurrence . home_skgrepo = node . home_skgrepo . clone ();
     if let Editability::Editable { body, .. } = &mut occurrence . editability
@@ -426,7 +426,7 @@ fn refresh_ghost_in_place (
       &mut tree . get_mut (child) . unwrap () . value () . kind
     { *ghost_mut = Ghost { restoreNode_request : ghost . restoreNode_request,
                            claimsMembership    : ghost . claimsMembership,
-                           warrant         : ghost . warrant,
+                           warrant             : ghost . warrant,
                            .. fresh }; }}}
 
 /// How an occurrence the refresh draws stands: its editability, and

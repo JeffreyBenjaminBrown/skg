@@ -148,8 +148,8 @@ impl NamedLeafSet {
     &self,
     other : &NamedLeafSet,
   ) -> Option<NamedLeafSet> {
-    let narrower_within = |narrower : &NamedLeafSet,
-                           wider    : &NamedLeafSet| -> bool {
+    let narrower_within : &dyn Fn (&NamedLeafSet, &NamedLeafSet) -> bool =
+      &|narrower : &NamedLeafSet, wider : &NamedLeafSet| -> bool {
       match (narrower, wider) {
         (NamedLeafSet::Leaf (leaf), _) => wider . holds (leaf),
         (NamedLeafSet::ContentRelationshipsOf (pid, _),
@@ -306,7 +306,8 @@ fn keys_in_forest (
 /// Set the '(ready ...)' and '(leaves ...)' change facts of every
 /// viewnode that carries them. An object is ready when it names some
 /// leaf of 'forest' and every leaf it names is marked at its current
-/// fingerprint ('store'); the order-only marker is always ready. The
+/// fingerprint ('store'); the order-only changeset marker is always
+/// ready. The
 /// '(leaves ...)' fact is 'leaves_fact_at'. On an occurrence
 /// whose leaves fact lists 'all', '(ready ...)' names 'all' when every
 /// leaf its node records is marked. A ready changeset marker's '(ready

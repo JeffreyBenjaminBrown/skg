@@ -286,8 +286,9 @@ fn vognode_member (
 /// its siblings, and remove it. The result is folded only if both
 /// were, and so is its body; it is focused if either was, claims
 /// membership if either did, carries the requests of both
-/// ('merge_requests'), and is editable if either was
-/// ('merge_editability'). It takes the merged
+/// ('merge_requests') and its own readiness request, else the merged
+/// sibling's, and is editable if either was ('merge_editability'). It
+/// takes the merged
 /// sibling's children after its own, each marked 'noClaim' unless
 /// the truth warrants it under the result.
 fn merge_into (
@@ -568,7 +569,7 @@ fn draw_item (
         ghost_from_head (&pid, walk) . map ( |ghost|
           viewnode_of ( ViewnodeKind::Vognode (Vognode::Ghost ( Ghost {
             claimsMembership : claims,
-            warrant      : item . warrant,
+            warrant          : item . warrant,
             .. ghost } )))),
       IdRuleAnswer::GnidOnly (kind) =>
         Some ( viewnode_of ( ViewnodeKind::Vognode ( Vognode::GnidOnly (
@@ -581,17 +582,17 @@ fn draw_item (
         relRepo                 : item . relRepo . clone (),
         relationshipEditRequest : None,
         claimsMembership        : claims,
-        warrant             : item . warrant, } ))),
+        warrant                 : item . warrant, } ))),
     GoalMember::Id (id) =>
       Some ( viewnode_of ( ViewnodeKind::PropertyMember ( PropertyMember::ID {
-        gnid            : id . clone (),
+        gnid             : id . clone (),
         claimsMembership : claims,
-        warrant      : item . warrant, } ))),
+        warrant          : item . warrant, } ))),
     GoalMember::Flag (flag) =>
       Some ( viewnode_of ( ViewnodeKind::PropertyMember ( PropertyMember::Flag {
-        flag        : *flag,
-        title       : String::new (),
-        body        : None,
+        flag    : *flag,
+        title   : String::new (),
+        body    : None,
         warrant : item . warrant, } ))), } ) }
 
 //

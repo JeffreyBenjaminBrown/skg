@@ -149,7 +149,7 @@ mode is 'RefreshMode::DiffView', which carries the straddle, the
 buffer kind and the readiness store, from which the refresh reads
 the marks ('server/refresh/mode.rs')
 ('refresh_diffView_viewforest' and
-'rerender_diffView_buffer' in 'server/diff_view/refresh.rs').
+'rerender_diffView_buffer' in 'server/diff_view/buffer_rerender.rs').
 The diff-view mode ('server/refresh/diff_view.rs') changes the
 refresh so:
 - a parent's goal is the union of its lists in the two graphs
@@ -168,8 +168,8 @@ refresh so:
   raw graph facts;
 - no default folder is drawn; a folder appears where something
   changed, or where the buffer holds one;
-- what is editable, and what an extension charges to the node
-  budget, the buffer's sets decide ("Editability in the diff view");
+- what may be editable, and what the node budget may refuse, the
+  buffer's sets decide ("Editability in the diff view");
 - in the tail, the '(ready ...)' change facts are set from the
   store, and in the skgrepo-changes buffer the home skgrepo moves.
 The diff view opens only under the skgrepo restriction 'all', but a
@@ -367,8 +367,9 @@ comment of 'server/refresh/extent.rs' -- with these deviations.
 An occurrence the refresh draws in editable content is editable when
 its node is in U and has no editable occurrence yet, and its whole
 content list is drawn; a member outside U is a write-protected member
-shown without its content. No size cap applies: the node budget is
-not charged for any of this. A removed member in content position is
+shown without its content. No size cap applies: the node budget never
+refuses a node of U, though each one's extension charges it, as every
+extension does. A removed member in content position is
 an occurrence like any other here: a node whose first drawn
 occurrence is a removed member (one its only container dropped, say,
 or one first reached through a container that dropped it) is
@@ -379,12 +380,13 @@ An editable-view request (C-c s d) behaves as in any view: it makes
 its occurrence the editable one, write-protecting the other (whose
 content keeps its own editability), and passes on to its content:
 each member it shows or draws whose node has no editable occurrence
-is editable while the budget allows, and passes it on in turn. Only
-the extension of a node outside U that a request reached is charged
-to 'initial_node_limit' ('RefreshMode::charges_node_budget'); a
-node of U is never charged, whether the rule above or a request made
-it editable. A request adds no default folders, since the diff view
-draws none.
+is editable while the budget allows, and passes it on in turn. Every
+extension charges 'initial_node_limit', the nodes of U included, but
+the budget refuses only a node outside U that a request reached: a
+node of U is editable whether the rule above or a request reached
+it. Charging U overcounts, which the budget can afford: it exists to
+stop an explosion, not to count. A request adds no default folders,
+since the diff view draws none.
 ** A save makes nothing editable and appends no root
 After a save, a buffer's sets are recomputed, and the refresh extends
 by the recomputed U wherever it draws something new. Nothing the buffer

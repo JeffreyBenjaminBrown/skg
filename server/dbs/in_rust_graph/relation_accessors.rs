@@ -257,7 +257,7 @@ impl InRustGraph {
     relation : NodeRelation,
     restriction : Option<&SkgrepoRestriction>,
   ) -> Vec<RelPartner<ID>> {
-    let Some (node) = self . nodes . get (pid) else {
+    let Some (node) : Option<&GraphnodeInRust> = self . nodes . get (pid) else {
       return Vec::new (); };
     let members : Vec<RelPartner<ID>> = match relation {
       NodeRelation::Contains =>

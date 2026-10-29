@@ -53,7 +53,7 @@ Kill the buffer to cancel without saving."
 ;;
 
 (defun skg-sexp-edit--apply ()
-  "Save changes from sexp-edit buffer back to the repo sexp."
+  "Save changes from the sexp-edit buffer back to the headline's metadata."
   (interactive)
   (let* ((new-text (skg-sexp-edit--metadata-text-to-save
                     (buffer-substring-no-properties (point-min) (point-max))
@@ -237,7 +237,7 @@ field childless, so an untouched save yields just
 
 (defun skg-view-metadata--empty-node-org-text (skgrepo title)
   "Build org text for the empty-node metadata view.
-REPO is pre-filled under the `nodeRepo' of `skgRepos'.  TITLE, if non-blank,
+SKGREPO is pre-filled under the `nodeRepo' of `skgRepos'.  TITLE, if non-blank,
 appears under a display-only `title' group; otherwise `title' is shown
 childless.  Every editable field other than repo appears childless,
 so the strip step (`skg-metadata-fields-strip-defaults-from-org') drops the

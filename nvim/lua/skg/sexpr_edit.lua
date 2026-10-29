@@ -88,7 +88,7 @@ function M.open_empty_node_view (source_buf, line_number, split)
   M.goto_field_value('nodeRepo')
 end
 
----Org text for the empty-node metadata view: REPO pre-filled;
+---Org text for the empty-node metadata view: SKGREPO pre-filled;
 ---TITLE, if non-blank, under a display-only title group; every other
 ---editable field childless, so the strip step drops the ones the user
 ---never populates.

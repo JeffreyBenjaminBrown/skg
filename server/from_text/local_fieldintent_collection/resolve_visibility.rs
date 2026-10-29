@@ -128,8 +128,10 @@ fn apply_hiddenoutside_edits (
     if ! config . skgrepo_is_owned (&subscriber_from_disk . home_skgrepo) {
       continue; }
 
-    let key = |gnid : &ID| -> ID { pid_else_raw_id (graph, gnid) };
-    let is_visible = |member : &RelPartner<ID>| -> bool {
+    let key : &dyn Fn (&ID) -> ID =
+      &|gnid : &ID| -> ID { pid_else_raw_id (graph, gnid) };
+    let is_visible : &dyn Fn (&RelPartner<ID>) -> bool =
+      &|member : &RelPartner<ID>| -> bool {
       SkgrepoRestriction::record_is_visible (
         skgrepo_restriction, &member . relRepo ) };
     let subscribee_gnids : Vec<ID> =

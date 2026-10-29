@@ -271,7 +271,7 @@ pub(crate) fn multi_root_view_via_runtime (
   let (viewforest, buffer_content) : (ViewForest, String) =
     render_initial_view ( runtime, root_gnids, skgrepo_restriction ) ?;
   // The pids the caller registers for this view -- its occurrences,
-  // via the one shared skgrepo of which-kinds-count
+  // via the one shared source of which kinds count
   // (views_state::pids_from_viewforest), the same helper update_view uses post-save.
   let pids : Vec<ID> =
     pids_from_viewforest (&viewforest)

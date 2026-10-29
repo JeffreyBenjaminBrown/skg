@@ -298,7 +298,8 @@ fn flag_ancestor_relations (
   anc_pid               : &ID,
   generation            : usize,
 ) {
-  let mut contains_rel_is_visible = |recorder : &ID, target : &ID| -> bool {
+  let contains_rel_is_visible : &mut dyn FnMut (&ID, &ID) -> bool =
+    &mut |recorder : &ID, target : &ID| -> bool {
     restriction . is_none ()
     || relRepos . relRepo (graph, recorder, NodeRelation::Contains, target)
        . is_some_and ( |relRepo| SkgrepoRestriction::record_is_visible (
@@ -492,9 +493,9 @@ fn set_relRepo (
         ParentKind::Vognode (parent_pid) =>
           (parent_pid, NodeRelation::Contains, node_pid),
         ParentKind::Folder (folder, folder_treeid) => {
-          let Some (role) = folder . relation_member_role ()
+          let Some (role) : Option<RelationRole> = folder . relation_member_role ()
           else { break 'compute None; }; // compound partner folders
-          let Some (described_pid) =
+          let Some (described_pid) : Option<ID> =
             tree . get (folder_treeid) . unwrap () . parent ()
             . and_then ( |p| p . value () . occurrence_gnid () . cloned () )
           else { break 'compute None; };

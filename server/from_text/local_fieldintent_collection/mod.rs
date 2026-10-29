@@ -162,7 +162,7 @@ fn is_created_as_an_orphan (
 ) -> bool {
   let ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) = &node . value () . kind
     else { return false; };
-  let Some (parent) = node . parent () else { return false; };
+  let Some (parent) : Option<NodeRef<Viewnode>> = node . parent () else { return false; };
   let created : bool =
     ! occurrence . is_writeProtected ()
     && ! matches! ( occurrence . edit_request (), Some (NodeEditRequest::Delete) )

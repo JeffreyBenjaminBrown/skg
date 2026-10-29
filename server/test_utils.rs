@@ -36,12 +36,15 @@ use std::any::Any;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fs;
+use std::io::ErrorKind;
 use std::net::{TcpListener, TcpStream};
 use std::future::Future;
-use std::panic::AssertUnwindSafe;
+use std::panic::{AssertUnwindSafe, resume_unwind};
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::sync::Arc;
+use std::thread::sleep;
+use std::time::Duration;
 use tantivy::{DocAddress, Searcher, TantivyDocument};
 use tantivy::schema::document::Value;
 
@@ -141,8 +144,8 @@ pub fn remove_test_dir (
   if ! dir . exists () { return Ok (( )); }
   match fs::remove_dir_all (dir) {
     Ok (()) => Ok (( )),
-    Err (e) if e . kind () == std::io::ErrorKind::DirectoryNotEmpty => {
-      std::thread::sleep ( std::time::Duration::from_millis (50) );
+    Err (e) if e . kind () == ErrorKind::DirectoryNotEmpty => {
+      sleep ( Duration::from_millis (50) );
       fs::remove_dir_all (dir) ?;
       Ok (( )) },
     Err (e) => Err ( Box::new (e) ), }}
@@ -159,7 +162,7 @@ fn test_result_after_cleanup (
     Err (panic_payload) => {
       if let Err (e) = cleanup_result {
         tracing::error! ("Cleanup error after test panic: {}", e); }
-      std::panic::resume_unwind (panic_payload) }, }}
+      resume_unwind (panic_payload) }, }}
 
 /// Serializes store-using tests (shared groups and the per-test
 /// run_with_test_stores family) within one process. Under nextest every

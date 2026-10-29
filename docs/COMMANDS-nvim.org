@@ -96,9 +96,8 @@ replaced at each save that has any: =skg://messages/save-warnings=,
 =skg://messages/save-errors= when the save was refused, or
 =skg://messages/save-errors-and-warnings= when it has both. One such
 warning names each orphan graphnode the save created: a node that no
-list contains, made from a headline typed under a parent whose
-claims the save does not read (see "first some vocab" under
-<localleader>s).
+list contains, made from a headline typed under a parent that reads
+no claims (see "first some vocab" under <localleader>s).
 ** :SkgShowUnsavedChanges : archive edits for manual recovery
 Prompts for a local Org file, writes a detached recovery document, opens
 it, and reports its actual path. The document contains context, lossless
@@ -299,7 +298,7 @@ or go to the view of it that was already open if that exists.
 
 The requested node itself is always the raw root. Recursive content
 below it can still use override substitution. Override facts remain
-visible in enriched search results and through the override
+visible in the search buffer and through the override
 folders.
 
 If you're not sure whether the cursor is on something visitable
@@ -692,7 +691,7 @@ node it links to, then save the buffer.
 
 Point can be on the headline or in the node body. The node at
 point can be new or already in the graph. If it already has an
-ID, the command warns that the old node might become an orphan.
+ID, the command warns that the old node might become an orphan graphnode.
 
 The headline title plus body must contain exactly one org bracket
 link, and that link must be an =id:= link. The node must have no
@@ -769,11 +768,11 @@ buffer opened that it holds nowhere editable as not editable in this
 view. <localleader>ru integrates such changes.
 Nothing the buffer holds editable is write-protected again by the
 server. An editable-view
-request (<localleader>sd) works as in any view, except that only the
-extension of a node outside U (the nodes the buffer extends anyway:
-those that changed and those leading to them) is charged to
-'initial_node_limit'; nothing else in the buffer is bounded by that
-limit.
+request (<localleader>sd) works as in any view, except that
+'initial_node_limit' refuses only the extension of a node outside U
+(the nodes the buffer extends anyway: those that changed and those
+leading to them). Every extension in the buffer counts toward it,
+but nothing else in the buffer is bounded by that limit.
 Why the diff view commits whole skgrepos, and offers nothing
 smaller: in skg a partial commit is dangerous. The graph is one
 structure spread over many files, so committing some changed files

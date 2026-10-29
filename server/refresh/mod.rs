@@ -86,9 +86,11 @@ pub fn refresh_content_viewforest (
 /// 'node_budget' extensions of new editable content
 /// ('extent.rs'). 'viewnode_id_record' assigns the vnids of the
 /// viewnodes the refresh draws. 'buffer_correction_policy' says which
-/// changes are no buffer corrections. Edit requests pass through
-/// untouched; view requests are fulfilled and dropped. Returns what the
-/// refresh changed, in walk order.
+/// changes are no buffer corrections. Edit requests pass through,
+/// but for one a headline's new kind or new write-protection has no
+/// slot for, which is dropped and reported; view requests are
+/// fulfilled and dropped. Returns what the refresh changed, in walk
+/// order.
 pub fn refresh_viewforest (
   viewforest               : &mut ViewForest,
   viewnode_id_record       : &mut ViewnodeIdRecord,
@@ -109,37 +111,37 @@ pub fn refresh_viewforest (
 
 /// What the walk carries from one parent to the next.
 pub(crate) struct Walk<'a> {
-  pub truth          : &'a Truth<'a>,
-  pub mode           : RefreshMode<'a>,
+  pub truth                    : &'a Truth<'a>,
+  pub mode                     : RefreshMode<'a>,
   /// How many more editable occurrences may have their content drawn
   /// ('extent.rs').
-  pub node_budget    : usize,
+  pub node_budget              : usize,
   /// Where each gnid's one editable occurrence stands. Which
   /// occurrences this refresh extends first the tree itself says: each
   /// carries an editable-view request through its own visit
   /// ('consume_editableView_request').
-  pub editable_occurrence_of : HashMap<ID, NodeId>,
+  pub editable_occurrence_of   : HashMap<ID, NodeId>,
   /// The compound folders this refresh added. Their members are drawn
   /// folded: in the clients' encoding a folder's collapse lives on its
   /// members, since 'folded' on a headline hides it in its parent.
-  pub added_compound_folders : HashSet<NodeId>,
+  pub added_compound_folders   : HashSet<NodeId>,
   /// The folders this refresh added, on request or by default, or
   /// drew as change viewnodes. Their members are extent
   /// ('Walk::record_drawn').
-  pub added_folders  : HashSet<NodeId>,
-  pub buffer_corrections : BufferCorrectionLog,
+  pub added_folders            : HashSet<NodeId>,
+  pub buffer_corrections       : BufferCorrectionLog,
   pub buffer_correction_policy : &'a BufferCorrectionPolicy,
   /// The headlines entombstoned without a buffer correction
   /// ('BufferCorrectionPolicy'). What their entombstoning makes
   /// unsayable beneath them goes unreported too.
-  pub quiet_tombstones : HashSet<NodeId>,
+  pub quiet_tombstones         : HashSet<NodeId>,
 }
 
 impl<'a> Walk<'a> {
   fn new (
-    truth             : &'a Truth<'a>,
-    mode              : RefreshMode<'a>,
-    node_budget       : usize,
+    truth                    : &'a Truth<'a>,
+    mode                     : RefreshMode<'a>,
+    node_budget              : usize,
     buffer_correction_policy : &'a BufferCorrectionPolicy,
   ) -> Walk<'a> {
     Walk { truth, mode, node_budget, buffer_correction_policy,

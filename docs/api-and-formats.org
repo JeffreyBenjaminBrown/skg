@@ -63,8 +63,7 @@ So far there are these endpoints:
 
   - Response: one LP =((response-type search-results) (content
     "ORG") (warnings ("..." ...)))=, whose content is the search
-    buffer, enriched: each hit, and what the enrichment draws under
-    it. A no-match or error response has the same response type and
+    buffer: each hit, and what the enrichment draws under it. A no-match or error response has the same response type and
     a single =content= field, a message to the user. (The
     overPrivateText challenge above is sent instead of it.) No other
     message follows; the search buffer is an ordinary view from
@@ -73,8 +72,9 @@ So far there are these endpoints:
     - The hits are the roots of the search buffer, ordinary
       write-protected occurrences (not special non-vognode kinds),
       best first. Each shows its node's title.
-    - The enrichment is a refresh of a stub built from the hits
-      ('draw_search_buffer'), the same code every view is drawn
+    - The search draws the enrichment by a refresh of a stub built
+      from the hits ('build_search_viewforest', then
+      'draw_search_buffer'), the same code every view is drawn
       with: each hit asks for its containers folder ('(folder
       containers)'), and holds an empty overrider and overridden
       folder when that folder's goal has members, and an empty
@@ -92,15 +92,15 @@ So far there are these endpoints:
       among them. A matching node recursively overridden by an owned result
       is suppressed at the top level; if the owned result overrides
       it directly, it reappears in that result's overridden folder.
-    - The enrichment uses the same skgrepo restriction as the
-      search. The containerward chain stops before restricted
+    - The search draws the enrichment under the same skgrepo
+      restriction as it searches under. The containerward chain stops before restricted
       containers.
     - The search takes no hit cap and no node budget. The refresh's
       node budget exists, and the stub could be given one; that is
       left unmade.
     - Note: the search once answered in two phases: the hits at once,
       then, after the server asked for a snapshot of the search
-      buffer, the enriched buffer. That protocol showed the hits a
+      buffer, the enrichment under them. That protocol showed the hits a
       tenth to a quarter of a second earlier for a search of hundreds
       of hits, and was removed for its complexity
       ('TODO/simplify-refresh/bench-search-enrichment.org' holds the
@@ -256,9 +256,10 @@ So far there are these endpoints:
        write-protected member shown without its content. It
        makes no occurrence editable and appends no root; the "integrate
        unshown changes" request below does. An editable-view request
-       cascades as in any view, and only the extension of a node
-       outside U spends =initial_node_limit=; nothing else in the
-       buffer spends that budget.
+       cascades as in any view. Every extension spends
+       =initial_node_limit=, but the budget refuses only the extension
+       of a node outside U; nothing else in the buffer is bounded by
+       it.
   - Readiness requests (=(ready OBJECTS)= and =(unready OBJECTS)=
     inside a headline's =(editRequest ...)=; see "Metadata of the
     diff view") are
@@ -1858,8 +1859,8 @@ When a skgrepo-set switch is applied to an open view (an
 already-rendered buffer), every occurrence of a now-restricted node
 becomes, in place, a Restricted vognode where its record is visible,
 and otherwise a tombstone; either keeps the occurrence's viewnode ID,
-fold state and viewchildren, so its visible descendants are not
-orphaned:
+fold state and viewchildren, so its visible descendants keep their
+place:
 
 #+begin_example
 (skg tombstone)

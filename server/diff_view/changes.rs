@@ -100,9 +100,9 @@ pub(crate) struct FrontChangeViewnodeConditions {
 /// What an editable node holds ahead of its content, in order,
 /// partner folders aside: for a node in C, its old text, its home
 /// skgrepo move, its "it acquired" folder, its alias, ID and flags
-/// folders that changed, and its content and relRepo markers, each
-/// as 'aspects' says; then, in the order-only buffer, its order-only
-/// marker. Each is one viewnode; the refresh draws what lies under
+/// folders that changed, and its content and relRepo changeset
+/// markers, each as 'aspects' says; then, in the order-only buffer,
+/// its order-only changeset marker. Each is one viewnode; the refresh draws what lies under
 /// it at its own visit.
 pub(crate) fn model_of_front_change_viewnodes (
   straddle   : &GraphStraddle,

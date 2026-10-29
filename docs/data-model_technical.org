@@ -280,8 +280,9 @@ the stats count it nowhere. The diff view's goal asks the
 restriction too, though the diff view opens only under 'all': a
 switch rerenders its open buffers.
 It keeps each member whose record is visible: a node the restriction
-keeps out, marked restricted (=GoalItem::restricted=), which the ID
-rule answers with a Restricted vognode; and a gnid nothing answers
+keeps out, which the ID rule, finding the node restricted and the
+gnid named by the goal, answers with a Restricted vognode; and a gnid
+nothing answers
 to, an unknown, as under no restriction. The save is its mirror: it
 restores to a list only the members whose records are restricted,
 and to a node's aliases only those whose records are restricted,
@@ -290,10 +291,11 @@ which the buffer could not show (=preserve_invisible_members= and
 while it claims, and deleting its line removes the record.
 
 *** The walk and the refresh's rungs
-Before the walk, every editable-view request is fulfilled: its
-occurrence becomes the node's editable one and any other editable
-occurrence of the node is write-protected
-(=fulfill_editableView_requests=); and where a nodeMerge made two
+Before the walk, every editable-view request in the text is
+fulfilled: its occurrence becomes the node's editable one and any
+other editable occurrence of the node is write-protected
+(=fulfill_editableView_requests=), the request staying on it for its
+visit to consume; and where a nodeMerge made two
 editable occurrences stand for one node, the first in level order
 stays editable (=keep_the_first_editable_occurrence_of_each_node=).
 The input holds at most one editable occurrence per gnid, which
@@ -304,8 +306,9 @@ re-check.
 The walk then visits every parent in level order from the buffer
 root, a parent's own kind settled before its children are visited.
 At each parent P (=visit_parent= in =server/refresh/visit.rs=) it
-settles the node budget (below), lets an editable-view request extend
-the content P already shows, adds P's default folders, computes P's
+consumes P's editable-view request and charges the node budget
+(below), lets the request extend the content P already shows, adds
+P's default folders, computes P's
 goal, and runs the *refresh's rungs* in order, weakest first (older
 text calls them the ladder):
 1. re-kind: each vognode child becomes what the ID rule says; each
@@ -355,7 +358,8 @@ membership or it is the flags folder, which stays visible when empty
 
 A content view draws some folders unasked, as it always has
 (=add_default_folders=): an occurrence that an editable-view request
-extends, a fresh view's roots among them, shows its subscribee folder
+extends, a fresh view's roots and every occurrence the refresh draws
+editable among them, shows its subscribee folder
 when it subscribes to something the restriction shows, and the
 folder of what it hides outside its subscribees inside that, when it
 hides something there; an editable subscribee shown as such shows the
@@ -378,16 +382,20 @@ The *extent* is how much of P's goal the refresh draws
 editable occurrence's content, and in the diff view for a ghost's old
 content where content stands; none of it, beyond what the buffer
 already shows, for a write-protected occurrence's content and for the
-containerward chain. An occurrence the refresh draws is editable when
-its parent's children are editable content, no other occurrence of
-its node is editable, and the budget allows; otherwise
-write-protected. Each editable occurrence whose content is drawn
-charges the budget once (=RefreshMode::charges_node_budget=); one
-the refresh drew editable whose content the spent budget no longer
-allows is write-protected at its own visit. An editable-view request
-passes on to the content it extends, showing or drawing. The diff
-view's deviations are in =docs/diff-view.org=, "Editability in the
-diff view".
+containerward chain. An occurrence the refresh draws where its
+parent's children are editable content is drawn write-protected,
+carrying an editable-view request; so is a write-protected child that
+claims membership under an occurrence carrying one: the request
+passes on to the content it extends, showing or drawing. At the
+occurrence's own visit the request is consumed: the occurrence
+becomes editable when no other occurrence of its node is and the
+budget allows, and stays write-protected otherwise; the request goes
+when the visit ends. Each editable occurrence whose content is drawn
+charges the budget once, at its visit, whatever made it editable: the
+budget need not count exactly, only stop an explosion. The walk keeps
+no other record of editability than where each node's one editable
+occurrence stands. The diff view's deviations are in
+=docs/diff-view.org=, "Editability in the diff view".
 
 *** The tail
 After the walk, once (=server/refresh/tail.rs=): the derived facts are
@@ -402,8 +410,10 @@ empty that goes when empty; an editable folder stays even when
 empty, since the user can add to it, so one whose every member's
 record the skgrepo restriction keeps out stays, empty, and fills again
 when the restriction widens; every
-viewnode that lacks a viewnode ID gets one; and the viewforest is
-rendered.
+viewnode that lacks a viewnode ID gets one. The refresh renders
+nothing: each caller renders the viewforest once, when it is done
+with it (=viewforest_to_string=), the search after it has folded
+what it drew and excluded the overPrivateText nodes.
 
 *** Buffer corrections
 The refresh reports what it changed because the buffer contradicted
