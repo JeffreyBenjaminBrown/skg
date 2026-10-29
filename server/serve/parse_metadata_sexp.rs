@@ -626,7 +626,7 @@ fn read_metadata_part (
     _ => &[], };
   match name {
     "noClaim" =>
-      // the occurrence claims no membership; a claimant carries nothing
+      // the occurrence claims no membership; a claiming one carries nothing
       metadata . claimsMembership = false,
     "writeProtected" =>
       metadata . writeProtected = true,

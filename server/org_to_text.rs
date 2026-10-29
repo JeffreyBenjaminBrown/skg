@@ -316,8 +316,8 @@ pub(crate) fn skgRepos_form (
   else { Some ( format! ( "(skgRepos {})", repos . join (" ") )) } }
 
 /// 'noClaim' for a child that claims no membership where its claim is
-/// read; a claimant, and any child where no claim is read, carries
-/// nothing.
+/// read; a claiming child, and any child where no claim is read,
+/// carries nothing.
 fn noClaim_atom (
   claimsMembership : bool,
   claims_are_read  : bool,

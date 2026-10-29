@@ -283,7 +283,7 @@ fn a_writeProtect_request_and_an_editable_request_move_editability_and_back (
 /// In the 'kinds' fixture the worktree removed sub's subscription to
 /// s1, so the buffer shows s1's subscriber folder holding sub as a
 /// removed member marked '(diff (rel removed))', with no claim atom,
-/// since the folder does not read claims. Write-protected, s1 saves
+/// since the folder reads no claims. Write-protected, s1 saves
 /// unchanged: the save does not check a write-protected occurrence's
 /// partner folders.
 #[test]

@@ -1,7 +1,7 @@
 -- Mirrors tests/elisp/test-skg-detach-attach.el: under a parent that
 -- reads claims, skg.metadata.detach (<localleader>st) writes 'noClaim'
 -- on the headline at point and skg.metadata.attach (<localleader>sa)
--- removes it. Both refuse under a parent that does not read claims,
+-- removes it. Both refuse under a parent that reads no claims,
 -- say so when there is nothing to do, and never save.
 
 local keymaps = require('skg.keymaps')
@@ -83,7 +83,7 @@ describe('skg.metadata detach and attach', function ()
         buffer_with(case[1], case[2])
         local ok, err = pcall(command)
         assert.is_false(ok)
-        assert.is_truthy(tostring(err):match('does not read claims'))
+        assert.is_truthy(tostring(err):match('reads no claims'))
         assert.are.equal(case[1], buffer_text())
         vim.api.nvim_buf_delete(0, { force = true })
       end

@@ -129,7 +129,7 @@ pub fn extract_nonmergeSavePlan_locally_in_graph (
         nodeMerge_acquisitions )) }
 
 /// One warning per orphan graphnode the save creates: a node from a
-/// headline typed under a parent whose claims the save does not read
+/// headline typed under a parent that reads no claims
 /// ('parent_reads_claims': a write-protected occurrence, a ghost, a
 /// gnid-only vognode, a tombstone, a write-protected folder). The node
 /// is saved, and no list contains it. Under a tombstone, the headline

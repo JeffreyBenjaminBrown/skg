@@ -55,7 +55,7 @@ call `skg-request-save-buffer' afterward."
 (defun skg-detach ()
   "Write 'noClaim' on the headline at point, so that the next save
 takes it out of its parent's list. Refuses a headline whose parent
-does not read claims (`skg--editable-parent-p'), and one that claims
+reads no claims (`skg--reads-claims-p'), and one that claims
 nothing already. Does not save; call `skg-request-save-buffer'
 afterward."
   (interactive)
@@ -63,8 +63,8 @@ afterward."
 
 (defun skg-attach ()
   "Remove 'noClaim' from the headline at point, so that the next save
-puts it in its parent's list. Refuses a headline whose parent does
-not read claims (`skg--editable-parent-p'), and one that claims
+puts it in its parent's list. Refuses a headline whose parent reads
+no claims (`skg--reads-claims-p'), and one that claims
 membership already. Does not save; call `skg-request-save-buffer'
 afterward."
   (interactive)
@@ -76,7 +76,7 @@ when CLAIMS is non-nil, else claim nothing, by removing or writing
 'noClaim'. Returns the message saying what the next save will do, or
 that nothing changed. Signals `user-error' off a headline, on a
 headline whose kind cannot carry 'noClaim', and under a parent that
-does not read claims."
+reads no claims."
   (unless (org-at-heading-p)
     (user-error "Not on a headline"))
   (let* ((verb (if claims "attach" "detach"))
@@ -86,10 +86,10 @@ does not read claims."
     (unless (member "noClaim" (skg-metadata-fields-field-names kind))
       (user-error "Cannot %s: a headline of kind %s claims no membership"
                   verb (alist-get 'kind kind)))
-    (unless (skg--editable-parent-p (nth 0 ancestors) (nth 1 ancestors))
-      (user-error "Cannot %s: the parent does not read claims (it is write-protected, or no editable node), so no child claims membership of it"
+    (unless (skg--reads-claims-p (nth 0 ancestors) (nth 1 ancestors))
+      (user-error "Cannot %s: the parent reads no claims (it is write-protected, or no editable node), so no child claims membership of it"
                   verb))
-    (cond ((eq claims (skg--node-member-p metadata-sexp))
+    (cond ((eq claims (skg--claims-membership-p metadata-sexp))
            (if claims
                "This headline claims membership already; nothing to attach."
              "This headline claims nothing already; nothing to detach."))
@@ -628,7 +628,7 @@ command, but does not edit anything."
           (let ((meta (skg--metadata-sexp-at-point-or-nil)))
             (cond
              ((skg--occurrence-sexp-p meta)
-              (if (not (skg--node-member-p meta))
+              (if (not (skg--claims-membership-p meta))
                   (skg--goto-next-headline-after-subtree)
                 (when (skg--relationship-kind-matches-p kind)
                   (push (copy-marker (line-beginning-position)) targets))
@@ -657,7 +657,7 @@ inert); for `subscribee' and `overridden', the viewparent must be
 the matching writable folder with a editable anchor."
   (let ((meta (skg--metadata-sexp-at-point-or-nil)))
     (and (or (and (skg--occurrence-sexp-p meta)
-                  (skg--node-member-p meta))
+                  (skg--claims-membership-p meta))
              (skg--gnid-only-vognode-sexp-p meta))
          (save-excursion
            (and (org-up-heading-safe)
@@ -691,7 +691,7 @@ not writable relationships."
 position: an true occurrence member of a subscribeeFolder."
   (let ((meta (skg--metadata-sexp-at-point-or-nil)))
     (and (skg--occurrence-sexp-p meta)
-         (skg--node-member-p meta)
+         (skg--claims-membership-p meta)
          (save-excursion
            (and (org-up-heading-safe)
                 (skg--non-vognode-atom-present-p
@@ -811,7 +811,7 @@ buffer_to_viewnodes/local.rs)."
                             (skg--metadata-sexp-at-point-or-nil)))))
     (cond ((skg--partner-folder-atom parent-sexp) t)
           ((skg--vognode-sexp-p parent-sexp)
-           (and (not (skg--node-member-p metadata))
+           (and (not (skg--claims-membership-p metadata))
                 (not (skg--containerward-chain-node-at-point-p))))
           (t nil))))
 
@@ -827,7 +827,7 @@ server/refresh/chain.rs)."
         (let ((metadata (skg--metadata-sexp-at-point-or-nil)))
           (unless (and (skg--vognode-sexp-p metadata)
                        (or (not (skg--occurrence-sexp-p metadata))
-                           (not (skg--node-member-p metadata))))
+                           (not (skg--claims-membership-p metadata))))
             (throw 'answer nil))
           (unless (and (org-up-heading-safe)
                        (skg--vognode-sexp-p
@@ -986,7 +986,7 @@ parent has GRANDPARENT-SEXP, is a pending detachment: it carries
   (and (consp metadata-sexp)
        (memq 'noClaim (cdr metadata-sexp))
        (skg--warranted-by-the-graph-p metadata-sexp)
-       (skg--editable-parent-p parent-sexp grandparent-sexp)))
+       (skg--reads-claims-p parent-sexp grandparent-sexp)))
 
 (defun skg--warranted-by-the-graph-p (metadata-sexp)
   "Non-nil unless METADATA-SEXP's '(view ...)' carries 'noWarrant' or
@@ -997,11 +997,11 @@ warrants is no detachment."
              (memq 'ghostWarrant view)
              (skg--relationship-removed-p metadata-sexp)))))
 
-(defun skg--editable-parent-p (parent-sexp grandparent-sexp)
-  "Non-nil when a headline under a parent with PARENT-SEXP, whose own
-parent has GRANDPARENT-SEXP, stands under an editable parent: a node
-that is not write-protected, or a folder 'shared/herald-styles.json'
-does not list as write-protected whose anchor is such a node."
+(defun skg--reads-claims-p (parent-sexp grandparent-sexp)
+  "Non-nil when a parent with PARENT-SEXP, whose own parent has
+GRANDPARENT-SEXP, reads its children's claims: a node that is not
+write-protected, or a folder 'shared/herald-styles.json' does not list
+as write-protected whose anchor is such a node."
   (let ((editable-node-p
          (lambda (sexp)
            (and (skg--occurrence-sexp-p sexp)
@@ -1170,7 +1170,7 @@ OLD-REPO. Restores point afterward."
                   (> (org-outline-level) start-level))
         (let ((metadata-sexp (skg--metadata-sexp-at-point-or-nil)))
           (if (not (and (skg--occurrence-sexp-p metadata-sexp)
-                        (skg--node-member-p metadata-sexp)))
+                        (skg--claims-membership-p metadata-sexp)))
               (skg--goto-next-headline-after-subtree)
             (when (equal (skg--node-repo metadata-sexp) old-skgrepo)
               (save-excursion (funcall fn)))
@@ -1195,9 +1195,10 @@ does not read (`skg--metadata-on-line')."
   (and metadata-sexp
        (skg-sexp-subtree-p metadata-sexp '(skg node))))
 
-(defun skg--node-member-p (metadata-sexp)
-  "Return non-nil unless METADATA-SEXP carries the bare noClaim atom.
-A member carries nothing."
+(defun skg--claims-membership-p (metadata-sexp)
+  "Return non-nil unless METADATA-SEXP carries the bare noClaim atom:
+whether the headline claims membership of its parent's list, where
+its parent reads claims (`skg--reads-claims-p')."
   (not (skg-sexp-subtree-p metadata-sexp '(skg noClaim))))
 
 (defun skg--node-repo (metadata-sexp)

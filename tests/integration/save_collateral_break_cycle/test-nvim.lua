@@ -60,7 +60,7 @@ end
 ---@return string
 local function relation_from_sexp (sexp, claims_nothing, chain_node)
   local non_member = claims_nothing
-    or (sexp ~= nil and not metadata.node_member_p(sexp))
+    or (sexp ~= nil and not metadata.claims_membership_p(sexp))
   local chain_node_role = nil
   if chain_node then
     chain_node_role = role_of_chain_node_from_rels(metadata.sexp_cdr_at_path(

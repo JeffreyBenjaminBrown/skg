@@ -297,8 +297,10 @@ function M.unknown_node_id_at_point ()
 end
 
 ---@param metadata_sexp any
----@return boolean is it a member: does it lack the bare noClaim atom?
-function M.node_member_p (metadata_sexp)
+---@return boolean does it lack the bare noClaim atom: does the headline
+---claim membership of its parent's list, where its parent reads claims
+---(M.reads_claims_p)?
+function M.claims_membership_p (metadata_sexp)
   return not compare.subtree_p(metadata_sexp,
     { SKG, sexpr.symbol('noClaim') })
 end
@@ -581,16 +583,16 @@ end
 
 ---Write 'noClaim' on the headline at point, so that the next save
 ---takes it out of its parent's list. Refuses a headline whose parent
----does not read claims (M.editable_parent_p), and one
+---reads no claims (M.reads_claims_p), and one
 ---that claims nothing already. Does not save. Mirrors skg-detach.
 function M.detach ()
   vim.notify(M.set_claim(false))
 end
 
 ---Remove 'noClaim' from the headline at point, so that the next save
----puts it in its parent's list. Refuses a headline whose parent does
----not read claims, and one that claims membership already. Does not
----save. Mirrors skg-attach.
+---puts it in its parent's list. Refuses a headline whose parent reads
+---no claims, and one that claims membership already. Does not save.
+---Mirrors skg-attach.
 function M.attach ()
   vim.notify(M.set_claim(true))
 end
@@ -598,7 +600,7 @@ end
 ---Make the headline at point claim membership of its parent's list
 ---when CLAIMS, else claim nothing, by removing or writing 'noClaim'.
 ---Errors off a headline, on a headline whose kind cannot carry
----'noClaim', and under a parent that does not read claims.
+---'noClaim', and under a parent that reads no claims.
 ---@param claims boolean
 ---@return string what the next save will do, or that nothing changed
 function M.set_claim (claims)
@@ -614,12 +616,12 @@ function M.set_claim (claims)
   local ancestors = M.ancestor_metadata_sexps_in_lines(
     vim.api.nvim_buf_get_lines(0, 0, -1, false),
     M.current_line_number(), 2)
-  if not M.editable_parent_p(ancestors[1], ancestors[2]) then
+  if not M.reads_claims_p(ancestors[1], ancestors[2]) then
     error(string.format(
-      'Cannot %s: the parent does not read claims (it is write-protected,'
+      'Cannot %s: the parent reads no claims (it is write-protected,'
       .. ' or no editable node), so no child claims membership of it',
       verb), 0) end
-  if claims == M.node_member_p(metadata_sexp) then
+  if claims == M.claims_membership_p(metadata_sexp) then
     if claims then
       return 'This headline claims membership already; nothing to attach.'
     end
@@ -824,7 +826,7 @@ function M.change_repo_recursive (old_skgrepo, new_skgrepo)
   while line and (M.outline_level(line) or 0) > start_level do
     local metadata = M.metadata_sexp_at_line_or_nil(line)
     if not (M.occurrence_sexp_p(metadata)
-            and M.node_member_p(metadata)) then
+            and M.claims_membership_p(metadata)) then
       line = M.next_headline_after_subtree(line)
     else
       if M.node_repo(metadata) == old_skgrepo then
@@ -1097,9 +1099,9 @@ end
 function M.pending_detachment_p (metadata_sexp, parent_sexp,
                                  grandparent_sexp)
   return sexpr.is_list(metadata_sexp)
-         and not M.node_member_p(metadata_sexp)
+         and not M.claims_membership_p(metadata_sexp)
          and M.warranted_by_the_graph_p(metadata_sexp)
-         and M.editable_parent_p(parent_sexp, grandparent_sexp)
+         and M.reads_claims_p(parent_sexp, grandparent_sexp)
 end
 
 ---@param metadata_sexp any
@@ -1122,12 +1124,11 @@ end
 
 ---@param parent_sexp any|nil
 ---@param grandparent_sexp any|nil
----@return boolean does a headline under a parent with PARENT_SEXP,
----whose own parent has GRANDPARENT_SEXP, stand under an editable
----parent: a node that is not write-protected, or a folder
----'shared/herald-styles.json' does not list as write-protected whose
----anchor is such a node?
-function M.editable_parent_p (parent_sexp, grandparent_sexp)
+---@return boolean does a parent with PARENT_SEXP, whose own parent has
+---GRANDPARENT_SEXP, read its children's claims: a node that is not
+---write-protected, or a folder 'shared/herald-styles.json' does not
+---list as write-protected whose anchor is such a node?
+function M.reads_claims_p (parent_sexp, grandparent_sexp)
   local folder = M.folder_atom(parent_sexp)
   if folder then
     return not vim.tbl_contains(
@@ -1144,7 +1145,7 @@ end
 ---@return boolean
 function M.pending_detachment_in_lines (lines, index)
   local metadata_sexp = M.metadata_on_line(lines[index])
-  if not (metadata_sexp and not M.node_member_p(metadata_sexp)) then
+  if not (metadata_sexp and not M.claims_membership_p(metadata_sexp)) then
     return false end
   local ancestors = M.ancestor_metadata_sexps_in_lines(lines, index, 2)
   return M.pending_detachment_p(metadata_sexp, ancestors[1], ancestors[2])
@@ -1235,7 +1236,7 @@ function M.containerward_chain_node_at_line_p (line_number)
     local metadata = M.metadata_sexp_at_line_or_nil(line)
     if not (M.vognode_sexp_p(metadata)
             and (not M.occurrence_sexp_p(metadata)
-                 or not M.node_member_p(metadata))) then
+                 or not M.claims_membership_p(metadata))) then
       return false end
     local parent = parent_line(line)
     if not (parent
@@ -1267,7 +1268,7 @@ function M.restoreRel_position_at_line_p (line_number)
   local parent_sexp = M.metadata_sexp_at_line_or_nil(parent)
   if M.partner_folder_atom(parent_sexp) then return true end
   if M.vognode_sexp_p(parent_sexp) then
-    return not M.node_member_p(M.metadata_sexp_at_line_or_nil(line))
+    return not M.claims_membership_p(M.metadata_sexp_at_line_or_nil(line))
            and not M.containerward_chain_node_at_line_p(line)
   end
   return false

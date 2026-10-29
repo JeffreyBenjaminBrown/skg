@@ -8,7 +8,7 @@ use super::*;
 use indoc::formatdoc;
 
 #[test]
-fn under_an_editable_occurrence_an_unwarranted_claimant_is_marked_noClaim () {
+fn under_an_editable_occurrence_an_unwarranted_claiming_child_is_marked_noClaim () {
   let graph : InRustGraph = graph (&[
     Graphnode { contains : ids (&["c", "d"]), .. node ("p") },
     node ("c"), node ("d"), node ("z"), ]);

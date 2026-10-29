@@ -2,7 +2,7 @@
 ;;;
 ;;; Under a parent that reads claims, skg-detach (C-c s t) writes
 ;;; 'noClaim' on the headline at point and skg-attach (C-c s a)
-;;; removes it. Both refuse under a parent that does not read claims,
+;;; removes it. Both refuse under a parent that reads no claims,
 ;;; say so when there is nothing to do, and never save.
 
 (load-file (expand-file-name "../../elisp/skg-test-utils.el"
@@ -101,7 +101,7 @@ parent at all, both refuse and change nothing."
       (let ((result (test-skg-detach-attach--run
                      (car case) (cdr case) command)))
         (should (eq (car result) 'error))
-        (should (string-match-p "does not read claims" (cdr result)))))))
+        (should (string-match-p "reads no claims" (cdr result)))))))
 
 (ert-deftest test-skg-detach-and-attach-say-so-on-a-no-op ()
   (dolist (case

@@ -40,7 +40,7 @@ local function flag_recursive_targets (root_line)
   while line and (metadata.outline_level(line) or 0) > root_level do
     local meta = metadata.metadata_sexp_at_line_or_nil(line)
     if metadata.occurrence_sexp_p(meta)
-       and metadata.node_member_p(meta) then
+       and metadata.claims_membership_p(meta) then
       table.insert(result, line)
       line = metadata.next_headline_line(line)
     else

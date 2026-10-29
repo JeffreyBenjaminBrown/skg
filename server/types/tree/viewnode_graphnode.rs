@@ -45,33 +45,33 @@ pub fn find_children_by_gnids (
 /// Check if all nodes at the specified generation satisfy the predicate.
 /// Returns true if the generation is empty (vacuously true).
 /// Negative generations = ancestors; positive = descendants.
-/// If skip_non_claimants, excludes Occurrences that claim nothing.
+/// If only_claiming_children, excludes Occurrences that claim nothing.
 pub fn generation_includes_only<F> (
-  tree                : &Tree<Viewnode>,
-  treeid : NodeId,
-  generation          : i32,
-  skip_non_claimants    : bool,
-  predicate           : F,
+  tree                   : &Tree<Viewnode>,
+  treeid                 : NodeId,
+  generation             : i32,
+  only_claiming_children : bool,
+  predicate              : F,
 ) -> bool
 where F: Fn (&Viewnode) -> bool
-{ collect_generation( tree, treeid, generation, skip_non_claimants )
+{ collect_generation( tree, treeid, generation, only_claiming_children )
     . iter()
     . all ( |&gnid| predicate(
       tree . get (gnid) . unwrap() . value() )) }
 
 /// Check if the generation is nonempty and all nodes satisfy the predicate.
 /// Negative generations = ancestors; positive = descendants.
-/// If skip_non_claimants, excludes Occurrences that claim nothing.
+/// If only_claiming_children, excludes Occurrences that claim nothing.
 pub fn generation_exists_and_includes<F> (
-  tree                : &Tree<Viewnode>,
-  treeid : NodeId,
-  generation          : i32,
-  skip_non_claimants    : bool,
-  predicate           : F,
+  tree                   : &Tree<Viewnode>,
+  treeid                 : NodeId,
+  generation             : i32,
+  only_claiming_children : bool,
+  predicate              : F,
 ) -> bool
 where F: Fn (&Viewnode) -> bool
 { let nodes = collect_generation(
-    tree, treeid, generation, skip_non_claimants);
+    tree, treeid, generation, only_claiming_children);
   !nodes . is_empty() &&
     nodes . iter() . all(
       |&gnid| predicate(
@@ -79,27 +79,27 @@ where F: Fn (&Viewnode) -> bool
 
 /// Check if the specified generation is empty.
 /// Negative generations = ancestors; positive = descendants.
-/// If skip_non_claimants, excludes Occurrences that claim nothing.
+/// If only_claiming_children, excludes Occurrences that claim nothing.
 pub fn generation_does_not_exist (
-  tree                : &Tree<Viewnode>,
-  treeid : NodeId,
-  generation          : i32,
-  skip_non_claimants    : bool,
+  tree                   : &Tree<Viewnode>,
+  treeid                 : NodeId,
+  generation             : i32,
+  only_claiming_children : bool,
 ) -> bool {
-  collect_generation( tree, treeid, generation, skip_non_claimants
+  collect_generation( tree, treeid, generation, only_claiming_children
                     ) . is_empty() }
 
 /// Collect NodeIds at a specified generation relative to the given node.
 /// Negative generation = ancestors (-1 = parent, -2 = grandparent, etc.)
 /// Positive generation = descendants (1 = children, 2 = grandchildren, etc.)
 /// Generation 0 returns just the node itself.
-/// If 'skip_non_claimants' is true and generation > 0,
+/// If 'only_claiming_children' is true and generation > 0,
 ///   then we exclude Occurrences that claim nothing.
 fn collect_generation (
-  tree               : &Tree<Viewnode>,
-  treeid : NodeId,
-  generation         : i32,
-  skip_non_claimants   : bool,
+  tree                   : &Tree<Viewnode>,
+  treeid                 : NodeId,
+  generation             : i32,
+  only_claiming_children : bool,
 ) -> Vec<NodeId> {
   if generation == 0 {
     return vec![treeid]; }
@@ -121,13 +121,12 @@ fn collect_generation (
         vec![];
       for gnid in current_gen {
         if let Some (n) = tree . get (gnid) {
-          // Under a parent that does not read its children's claims
-          // ('parent_reads_claims') no occurrence claims, whatever it
-          // carries.
+          // Under a parent that reads no claims ('parent_reads_claims')
+          // no occurrence claims, whatever it carries.
           let claims_are_read : bool = parent_reads_claims (tree, gnid);
           next_gen . extend(
             n . children()
-              . filter(|c| !skip_non_claimants ||
+              . filter(|c| !only_claiming_children ||
                           // Only an occurrence is filtered: a ghost or an
                           // unknown counts here, whatever it claims.
                           !matches!(&c . value() . kind,

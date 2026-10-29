@@ -142,7 +142,7 @@ true-content subtree.  This modifies metadata but does not save."
       (while (and (not (eobp)) (> (org-outline-level) root-level))
         (let ((meta (skg--metadata-sexp-at-point-or-nil)))
           (if (and (skg--occurrence-sexp-p meta)
-                   (skg--node-member-p meta))
+                   (skg--claims-membership-p meta))
               (progn
                 (push (copy-marker (line-beginning-position)) targets)
                 (outline-next-heading))
