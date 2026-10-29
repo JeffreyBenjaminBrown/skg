@@ -257,6 +257,60 @@ describe('skg.metadata commands', function ()
       '(skg node (editRequest delete))'))
   end)
 
+  it('the writers place what they write as the server prints it',
+     function ()
+    -- Mirrors test-skg-write-edit-request-places-it-as-the-server-does:
+    -- each command, run on a headline that carries view requests and
+    -- derived facts, writes its edit request or 'noClaim' at its rank
+    -- in the 'parts' list of 'shared/metadata-fields.json', replacing
+    -- any edit request held and keeping a readiness request.
+    local flag = require('skg.flag')
+    local parent = '* (skg node (gnid p) (skgRepos (nodeRepo r))) p'
+    local head = '** (skg (vnid 0a) node (gnid X) (skgRepos (nodeRepo r))'
+    local tail = ' (viewRequests editableView) (view noWarrant)'
+                 .. ' (diff (rel added))) title'
+    local function line_after (parts, command)
+      buffer_with(parent .. '\n' .. head .. parts .. tail)
+      vim.api.nvim_win_set_cursor(0, { 2, 0 })
+      command()
+      return metadata.line_text(2)
+    end
+    local cases = {
+      { 'delete', '', metadata.delete, ' (editRequest delete)' },
+      { 'delete over a merge', ' (editRequest (merge y))',
+        metadata.delete, ' (editRequest delete)' },
+      { 'delete beside a readiness request', ' (editRequest (merge y) (ready node))',
+        metadata.delete, ' (editRequest delete (ready node))' },
+      { 'delete_recursive over a merge', ' (editRequest (merge y))',
+        metadata.delete_recursive, ' (editRequest delete)' },
+      { 'merge', '', function () metadata.set_merge_request('z') end,
+        ' (editRequest (merge z))' },
+      { 'merge over a delete', ' (editRequest delete)',
+        function () metadata.set_merge_request('z') end,
+        ' (editRequest (merge z))' },
+      { 'merge over a merge', ' (editRequest (merge y))',
+        function () metadata.set_merge_request('z') end,
+        ' (editRequest (merge z))' },
+      { 'the flag stamp', '', function () flag._apply(2, false, false) end,
+        ' (editRequest (flag noSearchMatching false))' },
+      { 'the flag stamp beside a readiness request', ' (editRequest (ready node))',
+        function () flag._apply(2, true, false) end,
+        ' (editRequest (flag noSearchMatching true) (ready node))' },
+      { 'detach', '', metadata.detach, ' noClaim' },
+      { 'detach beside a merge', ' (editRequest (merge y))',
+        metadata.detach, ' noClaim (editRequest (merge y))' } }
+    local real_notify = vim.notify
+    vim.notify = function () end
+    local ok, err = pcall(function ()
+      for _, case in ipairs(cases) do
+        assert.are.equal(head .. case[4] .. tail,
+                         line_after(case[2], case[3]), case[1])
+      end
+    end)
+    vim.notify = real_notify
+    assert(ok, err)
+  end)
+
   -- The diff view's restore requests; mirrors the restore tests of
   -- tests/elisp/test-skg-metadata.el.
 
@@ -288,7 +342,7 @@ describe('skg.metadata commands', function ()
     metadata.restore_deleted_node()
     assert.are.equal(
       '* (skg (vnid 0d) ghost (gnid g) (skgRepos (nodeRepo main))'
-        .. ' (diff (node removed) (rel removed)) (editRequest restoreNode))'
+        .. ' (editRequest restoreNode) (diff (node removed) (rel removed)))'
         .. ' g',
       buffer_text())
   end)

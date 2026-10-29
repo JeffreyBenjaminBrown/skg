@@ -13,28 +13,22 @@ local M = {}
 local choices = { 'search matching', 'no search matching' }
 local request_namespace = vim.api.nvim_create_namespace('skg-flag-request')
 
-local function edit_request_p (meta)
-  local values = metadata.sexp_cdr_at_path(meta,
-    { 'skg', 'editRequest' })
-  return values ~= nil and #values > 0
-end
-
 local function eligible_root (line)
   local meta = metadata.metadata_sexp_at_line_or_nil(line)
   if not metadata.occurrence_sexp_p(meta) then
     error('Search matching can be set only on an occurrence') end
   if metadata.node_write_protected_p(meta) then
     error('Cannot set search matching on a write-protected node') end
-  if edit_request_p(meta) then error('This node already has an editRequest') end
+  if metadata.node_edit_request_p(meta) then error('This node already has an editRequest') end
   local gnid = metadata.node_id(meta)
   if not gnid then error('Save the node first; it has no graph ID') end
   return gnid
 end
 
 local function stamp (line, desired)
-  metadata.edit_metadata_at_line(line, sexpr.read(string.format(
-    '(skg (editRequest (flag noSearchMatching %s)))',
-    desired and 'true' or 'false')))
+  metadata.write_edit_request_at_line(line, {
+    sexpr.symbol('flag'), sexpr.symbol('noSearchMatching'),
+    sexpr.symbol(desired and 'true' or 'false') }, 'node')
 end
 
 local function recursive_targets (root_line)
@@ -70,7 +64,7 @@ local function apply (root_line, desired, recursive)
     if not gnid then reason = 'no saved ID'
     elseif seen[gnid] then reason = 'duplicate occurrence'
     elseif metadata.node_write_protected_p(meta) then reason = 'write-protected'
-    elseif edit_request_p(meta) then reason = 'already has an editRequest'
+    elseif metadata.node_edit_request_p(meta) then reason = 'already has an editRequest'
     elseif not owned[metadata.node_repo(meta)] then reason = 'foreign repo' end
     if reason == 'duplicate occurrence' then
       -- A PID already stamped is intentionally silent.

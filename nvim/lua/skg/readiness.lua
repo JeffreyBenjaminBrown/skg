@@ -470,22 +470,10 @@ end
 
 -- ── the gestures ───────────────────────────────────────────────────
 
----The heads of the top-level forms the server writes after
----'(editRequest ...)' (shared.metadata_parts); a new one is placed
----before the first of them.
-local FORMS_AFTER_EDIT_REQUEST = {}
-do
-  local after = false
-  for _, part in ipairs(shared.metadata_parts) do
-    if after then FORMS_AFTER_EDIT_REQUEST[part] = true end
-    if part == 'editRequest' then after = true end
-  end
-end
-
 ---@param request any a part of an '(editRequest ...)'
 ---@return boolean is it a readiness request, '(ready OBJECT...)' or
 ---'(unready OBJECT...)'?
-local function readiness_request_p (request)
+function M.readiness_request_p (request)
   local head = head_name(request)
   return head == 'ready' or head == 'unready'
 end
@@ -505,19 +493,15 @@ local function with_edit_request_form (metadata_sexp, requests_from)
                              old_form and { unpack(old_form, 2) } or {})) do
     table.insert(new_form, request) end
   if #new_form == 1 then new_form = nil end
-  local unplaced_form = not old_form and new_form or nil
+  if not old_form then
+    return new_form and metadata.with_part_at_its_rank(metadata_sexp, new_form)
+           or metadata_sexp end
   local result = { metadata_sexp[1] }
   for i = 2, #metadata_sexp do
     local element = metadata_sexp[i]
-    if element == old_form then
-      if new_form then table.insert(result, new_form) end
-    else
-      if unplaced_form and FORMS_AFTER_EDIT_REQUEST[head_name(element)] then
-        table.insert(result, unplaced_form)
-        unplaced_form = nil end
-      table.insert(result, element) end
+    if element ~= old_form then table.insert(result, element)
+    elseif new_form then table.insert(result, new_form) end
   end
-  if unplaced_form then table.insert(result, unplaced_form) end
   return result
 end
 
@@ -533,7 +517,7 @@ end
 function M.with_readiness_request (metadata_sexp, readiness_request)
   return with_edit_request_form(metadata_sexp, function (requests)
     local kept = vim.tbl_filter(
-      function (request) return not readiness_request_p(request) end,
+      function (request) return not M.readiness_request_p(request) end,
       requests)
     table.insert(kept, readiness_request)
     return kept end)
@@ -550,7 +534,7 @@ end
 ---@return any
 function M.with_edit_request (metadata_sexp, edit_request)
   return with_edit_request_form(metadata_sexp, function (requests)
-    local kept = vim.tbl_filter(readiness_request_p, requests)
+    local kept = vim.tbl_filter(M.readiness_request_p, requests)
     if edit_request ~= nil then table.insert(kept, 1, edit_request) end
     return kept end)
 end

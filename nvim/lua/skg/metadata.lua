@@ -316,34 +316,111 @@ function M.edit_metadata_at_line (line_number, edits)
   end
 end
 
----Make REQUEST the edit request of the headline at point, keeping the
----readiness request its '(editRequest ...)' holds
----(skg.readiness.with_edit_request). A nil REQUEST removes the edit
----request. KIND, when given, is the kind atom a headline without
----metadata gets.
+---Rewrite the metadata of the headline at LINE_NUMBER as REWRITE, a
+---function of the metadata sexp, gives it. KIND, when given, is the
+---kind atom a headline without metadata gets. Off a headline, does
+---nothing. Mirrors skg--rewrite-metadata-at-point.
+---@param line_number integer
+---@param rewrite fun(metadata_sexp: any): any
+---@param kind string|nil
+function M.rewrite_metadata_at_line (line_number, rewrite, kind)
+  if not M.at_headline_p(line_number) then return end
+  local split = M.split_as_stars_metadata_title(M.line_text(line_number))
+  if not split then return end
+  local metadata_sexp = { SKG }
+  if split.metadata ~= '' then metadata_sexp = sexpr.read(split.metadata)
+  elseif kind then table.insert(metadata_sexp, sexpr.symbol(kind)) end
+  M.replace_line(line_number, M.format_headline(
+    split.stars, sexpr.to_string(rewrite(metadata_sexp)), split.title))
+end
+
+---The name 'shared/metadata-fields.json' gives ELEMENT, a part of
+---'(skg ...)', in its 'parts' list: a list's head, an atom's name, or
+---'KIND' for a kind's atom.
+---@param element any
+---@return string|nil
+local function metadata_part_name (element)
+  if sexpr.is_list(element) then
+    return element[1] ~= nil and not sexpr.is_list(element[1])
+           and sexpr.atom_text(element[1]) or nil end
+  local name = sexpr.atom_text(element)
+  if shared.metadata_kind(name) then return 'KIND' end
+  return name
+end
+
+---Each name of 'shared/metadata-fields.json''s 'parts' list, mapped to
+---its position there.
+local METADATA_PART_RANK = {}
+for rank, name in ipairs(shared.metadata_parts) do
+  METADATA_PART_RANK[name] = rank end
+
+---METADATA_SEXP with PART, a part of '(skg ...)' it lacks, where the
+---server writes it ('parts' in 'shared/metadata-fields.json'): before
+---the first part the server writes after it, else last.
+---@param metadata_sexp any
+---@param part any
+---@return any
+function M.with_part_at_its_rank (metadata_sexp, part)
+  local part_rank = METADATA_PART_RANK[metadata_part_name(part)]
+  local result = { metadata_sexp[1] }
+  for i = 2, #metadata_sexp do
+    local element = metadata_sexp[i]
+    local element_rank = METADATA_PART_RANK[metadata_part_name(element)]
+    if part and part_rank and element_rank and element_rank > part_rank then
+      table.insert(result, part)
+      part = nil end
+    table.insert(result, element)
+  end
+  if part then table.insert(result, part) end
+  return result
+end
+
+---Make REQUEST the edit request of the headline at LINE_NUMBER,
+---replacing any it holds and keeping the readiness request its
+---'(editRequest ...)' holds (skg.readiness.with_edit_request). A nil
+---REQUEST removes the edit request. KIND, when given, is the kind atom
+---a headline without metadata gets. Mirrors skg--write-edit-request.
+---@param line_number integer
+---@param request any|nil
+---@param kind string|nil
+function M.write_edit_request_at_line (line_number, request, kind)
+  M.rewrite_metadata_at_line(line_number, function (metadata_sexp)
+    return require('skg.readiness').with_edit_request(
+      metadata_sexp, request) end,
+    kind)
+end
+
+---M.write_edit_request_at_line at the cursor's headline.
 ---@param request any|nil
 ---@param kind string|nil
 function M.write_edit_request (request, kind)
-  local metadata_sexp = M.metadata_sexp_at_line_or_nil(nil)
-  local edits = { SKG }
-  if kind then table.insert(edits, sexpr.symbol(kind)) end
-  if metadata_sexp then
-    table.insert(edits, (sexpr.read('(DELETE (editRequest))'))) end
-  for _, part in ipairs(require('skg.readiness').with_edit_request(
-                          metadata_sexp or { SKG }, request)) do
-    if sexpr.is_list(part) and part[1] == sexpr.symbol('editRequest') then
-      table.insert(edits, part) end
+  M.write_edit_request_at_line(M.current_line_number(), request, kind)
+end
+
+---Whether METADATA_SEXP is an occurrence's that already holds an edit
+---request: a part of its '(editRequest ...)' that is neither a
+---relRepo request nor a readiness request. Mirrors
+---skg--node-edit-request-p.
+---@param metadata_sexp any|nil
+---@return boolean
+function M.node_edit_request_p (metadata_sexp)
+  if not M.occurrence_sexp_p(metadata_sexp) then return false end
+  for _, part in ipairs(M.sexp_cdr_at_path(
+                          metadata_sexp, { 'skg', 'editRequest' }) or {}) do
+    local head = sexpr.is_list(part) and sexpr.atom_text(part[1]) or nil
+    if not (head == 'relRepo'
+            or require('skg.readiness').readiness_request_p(part)) then
+      return true end
   end
-  M.edit_metadata_at_point(edits)
+  return false
 end
 
 -- ── user commands ──────────────────────────────────────────────────
 
----Mark the headline at point for deletion (metadata gains
----(editRequest delete)). Does not save.
+---Mark the headline at point for deletion: 'delete' becomes its edit
+---request (M.write_edit_request). Does not save.
 function M.delete ()
-  M.edit_metadata_at_point(
-    sexpr.read('(skg node (editRequest delete))'))
+  M.write_edit_request(sexpr.symbol('delete'), 'node')
   vim.notify(
     'This change will only be applied when you save the buffer.')
 end
@@ -405,8 +482,10 @@ function M.set_claim (claims)
     M.edit_metadata_at_point(sexpr.read('(skg (DELETE noClaim))'))
     return "Attached: the next save puts this headline in its parent's list."
   end
-  M.edit_metadata_at_point(sexpr.read(
-    metadata_sexp and '(skg noClaim)' or '(skg node noClaim)'))
+  M.rewrite_metadata_at_line(M.current_line_number(),
+    function (sexp)
+      return M.with_part_at_its_rank(sexp, sexpr.symbol('noClaim')) end,
+    'node')
   return "Detached: the next save takes this headline out of its parent's list."
 end
 
@@ -415,15 +494,14 @@ end
 ---skipped. Does not save.
 function M.delete_recursive ()
   if not M.at_headline_p() then error('Not on a headline') end
-  local edits = sexpr.read('(skg node (editRequest delete))')
   local start_line = M.current_line_number()
   local start_level = M.outline_level(start_line)
-  M.edit_metadata_at_line(start_line, edits)
+  M.write_edit_request_at_line(start_line, sexpr.symbol('delete'), 'node')
   local line = M.next_headline_line(start_line)
   while line and (M.outline_level(line) or 0) > start_level do
     local meta = M.metadata_sexp_at_line_or_nil(line)
     if meta and M.occurrence_sexp_p(meta) then
-      M.edit_metadata_at_line(line, edits) end
+      M.write_edit_request_at_line(line, sexpr.symbol('delete'), 'node') end
     line = M.next_headline_line(line)
   end
   vim.notify(

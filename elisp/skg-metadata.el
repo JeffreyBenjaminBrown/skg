@@ -352,12 +352,18 @@ an ID missing."
       (format "%s" (car values)))))
 
 (defun skg--node-edit-request-at-point-p ()
-  "Whether the occurrence headline at point already requests delete or
-merge: its '(editRequest ...)' holds a part that is neither a relRepo
-request nor a readiness request."
-  (let* ((metadata (or (skg--metadata-sexp-at-point-or-nil) '(skg)))
-         (values (and (skg--occurrence-sexp-p metadata)
-                      (skg-sexp-cdr-at-path metadata '(skg editRequest)))))
+  "Whether the headline at point holds an edit request
+\(`skg--node-edit-request-p')."
+  (skg--node-edit-request-p
+   (or (skg--metadata-sexp-at-point-or-nil) '(skg))))
+
+(defun skg--node-edit-request-p (metadata-sexp)
+  "Whether METADATA-SEXP is an occurrence's that already holds an edit
+request (delete, merge or a flag): its '(editRequest ...)' holds a
+part that is neither a relRepo request nor a readiness request. Every
+command that asks whether a headline holds an edit request asks this."
+  (let ((values (and (skg--occurrence-sexp-p metadata-sexp)
+                     (skg-sexp-cdr-at-path metadata-sexp '(skg editRequest)))))
     (seq-some (lambda (part)
                 (not (or (eq (car-safe part) 'relRepo)
                          (skg--readiness-request-p part))))

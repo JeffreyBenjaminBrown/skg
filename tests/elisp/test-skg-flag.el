@@ -111,4 +111,27 @@
   (should (eq (lookup-key skg-content-view-mode-map (kbd "C-c s x"))
               #'skg-set-flag-search-matching)))
 
+(ert-deftest test-skg-flag-a-readiness-request-takes-the-flag-request ()
+  "A headline whose '(editRequest ...)' holds only a readiness request
+holds no edit request (`skg--node-edit-request-p'): it takes the flag
+request, alone and in a recursive staging, which keeps the readiness
+request after it."
+  (should (equal (skg--flag-eligible-root-id
+                  '(skg node (gnid root) (skgRepos (nodeRepo main))
+                        (editRequest (ready node))))
+                 "root"))
+  (with-temp-buffer
+    (insert
+     "* (skg node (gnid root) (skgRepos (nodeRepo main)) (editRequest (ready node))) root\n"
+     "** (skg node (gnid child) (skgRepos (nodeRepo main)) (editRequest (unready rel)) (diff (rel added))) child")
+    (org-mode)
+    (goto-char (point-min))
+    (cl-letf (((symbol-function 'skg--owned-repos)
+               (lambda () '("main"))))
+      (skg--stage-flag-search-matching-recursive t))
+    (should (equal (buffer-string)
+                   (concat
+                    "* (skg node (gnid root) (skgRepos (nodeRepo main)) (editRequest (flag noSearchMatching true) (ready node))) root\n"
+                    "** (skg node (gnid child) (skgRepos (nodeRepo main)) (editRequest (flag noSearchMatching true) (unready rel)) (diff (rel added))) child")))))
+
 (provide 'test-skg-flag)
