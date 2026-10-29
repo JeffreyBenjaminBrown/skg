@@ -431,6 +431,10 @@ fn refresh_ghost_in_place (
 
 /// How an occurrence the refresh draws stands: its editability, and
 /// whether it claims membership of its viewparent's list.
+// TODO: The pair stands in for the 'ChildFlags' that the review of
+// plan 04.1 proposed, the flags every child has (its claim and its
+// warrant) beside 'FoldAndFocus', and that is not built. When it is,
+// this goes.
 pub(crate) struct EditabilityAndClaim {
   pub editability : DrawnEditability,
   pub claims      : bool,
