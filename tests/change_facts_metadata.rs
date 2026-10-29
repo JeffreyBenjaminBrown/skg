@@ -14,7 +14,7 @@ use skg::serve::parse_metadata_sexp::{
 use skg::types::misc::{ID, SkgConfig, SkgrepoName};
 use skg::types::nodes::complete::Flag;
 use skg::types::viewnode::{
-  ChangeFacts, DiffChange, Existence, Ghost, LeavesFact, Unknown, PropertyMember, DiffObject, ReadinessRequest, Viewnode,
+  ChangeFacts, DiffChange, Existence, Ghost, GnidOnlyKind, GnidOnlyVognode, LeavesFact, PropertyMember, DiffObject, ReadinessRequest, Viewnode,
   ViewnodeKind, Vognode, Warrant, mk_editable_viewnode,
   mk_writeProtected_viewnode, viewnode_of};
 
@@ -106,9 +106,8 @@ fn ghosts_and_unknowns_round_trip_their_readiness_requests () {
     "ghost (gnid d) (skgRepos (nodeRepo main)) (editRequest (unready node)) (diff (node removed) (ready node))" );
   assert_round_trip (
     with_facts (
-      viewnode_of ( ViewnodeKind::Vognode ( Vognode::Unknown ( Unknown {
-          gnid : ID::from ("u"), relRepo : None, relationshipEditRequest : None,
-          claimsMembership : true, warrant : Warrant::ByGraph, } ))),
+      viewnode_of ( ViewnodeKind::Vognode ( Vognode::GnidOnly ( GnidOnlyVognode::new (
+          GnidOnlyKind::Unknown, ID::from ("u"), None, true, Warrant::ByGraph ) ))),
       facts ( None, Some (Existence::Added), None ),
       request (true, &[]) ),
     "unknown (gnid u) (editRequest (ready)) (diff (rel added))" ); }

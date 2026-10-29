@@ -798,7 +798,7 @@ fn unknown_relrepo_fact_and_request_round_trip_separately (
   use crate::types::viewnode::{mk_unknown_viewnode, RelationshipEditRequest, ViewnodeKind, Vognode};
 
   let mut unknown = mk_unknown_viewnode ( ID::new ("absent-raw") );
-  if let ViewnodeKind::Vognode (Vognode::Unknown (u)) = &mut unknown . kind {
+  if let ViewnodeKind::Vognode (Vognode::GnidOnly (u)) = &mut unknown . kind {
     u . relRepo = Some ( SkgrepoName::from ("private") );
     u . relationshipEditRequest = Some ( RelationshipEditRequest::RelRepo ( SkgrepoName::from ("secret") ));
   } else { unreachable! (); }

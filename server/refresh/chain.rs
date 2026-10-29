@@ -22,7 +22,7 @@ use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::{ID, SkgConfig, SkgrepoName};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::viewnode::{
-  Restricted, Viewnode, ViewnodeKind, Vognode, Warrant, mk_editable_viewnode,
+  GnidOnlyKind, GnidOnlyVognode, Viewnode, ViewnodeKind, Vognode, Warrant, mk_editable_viewnode,
   mk_unknown_viewnode, mk_writeProtected_noClaim_from_viewnode, viewnode_of };
 
 use ego_tree::{NodeId, Tree};
@@ -151,12 +151,9 @@ fn prepend_containerward_chain_node (
       tree . get_mut (parent)
         . ok_or ("prepend_containerward_chain_node: parent not found") ?
         . prepend ( viewnode_of ( ViewnodeKind::Vognode (
-          Vognode::Restricted ( Restricted {
-            gnid                    : container . clone (),
-            relRepo                 : None,
-            relationshipEditRequest : None,
-            claimsMembership        : false,
-            warrant                 : Warrant::ByGraph, } ))));
+          Vognode::GnidOnly ( GnidOnlyVognode::new (
+            GnidOnlyKind::Restricted, container . clone (), None, false,
+            Warrant::ByGraph ) ))));
       return Ok (None); }
     if graph . restriction_keeps_out (container, Some (restriction))
     { return Ok (None); }}

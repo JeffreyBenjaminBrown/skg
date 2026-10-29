@@ -109,7 +109,7 @@ node p
   assert_eq! ( h . value () . viewnode_id, Some ( ViewnodeId ("zz" . into ()) ),
                "it keeps its vnid" );
   assert_eq! ( run . buffer_correction_kinds (),
-               vec! [ BufferCorrectionKind::Rekinded (VognodeKind::Restricted) ] );
+               vec! [ BufferCorrectionKind::Rekinded (VognodeKind::GnidOnly (GnidOnlyKind::Restricted)) ] );
   assert! ( ! run . text . contains ("secret title"), "{}", run . text ); }
 
 #[test]

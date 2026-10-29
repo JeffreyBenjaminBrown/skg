@@ -1,11 +1,11 @@
 use crate::refresh::ancestry::parent_reads_claims;
 use crate::serve::util::sexp_to_client_string;
-use crate::types::misc::{ID, SkgConfig, SkgrepoName};
+use crate::types::misc::{SkgConfig, SkgrepoName};
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
   ChangeFacts, FoldAndFocus, ReadinessRequest,
   Viewnode, ViewnodeKind, Vognode, PropertyMember, ChangeViewnode, Occurrence,
-  Ghost, NodeEditRequest,
+  Ghost, GnidOnlyVognode, NodeEditRequest,
   RelationshipEditRequest,
   Warrant,
 };
@@ -209,23 +209,9 @@ fn viewnode_to_string_without_viewnode_id (
     ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =>
       Ok ( occurrence_metadata_to_string (
         viewnode . foldAndFocus, occurrence, claims_are_read, change_facts, request )),
-    ViewnodeKind::Vognode (Vognode::Unknown (unknown_node)) =>
+    ViewnodeKind::Vognode (Vognode::GnidOnly (gnid_only)) =>
       Ok ( gnid_only_vognode_metadata_to_string (
-        viewnode . foldAndFocus,
-        GnidOnlyVognode { kind_atom               : "unknown",
-                          gnid                    : &unknown_node . gnid,
-                          relRepo                 : unknown_node . relRepo . as_ref (),
-                          relationshipEditRequest : unknown_node . relationshipEditRequest . as_ref (),
-                          claimsMembership        : unknown_node . claimsMembership },
-        claims_are_read, change_facts, request )),
-    ViewnodeKind::Vognode (Vognode::Restricted (restricted)) =>
-      Ok ( gnid_only_vognode_metadata_to_string (
-        viewnode . foldAndFocus,
-        GnidOnlyVognode { kind_atom               : "restricted",
-                          gnid                    : &restricted . gnid,
-                          relRepo                 : restricted . relRepo . as_ref (),
-                          relationshipEditRequest : restricted . relationshipEditRequest . as_ref (),
-                          claimsMembership        : restricted . claimsMembership },
+        viewnode . foldAndFocus, gnid_only,
         claims_are_read, change_facts, request )),
     ViewnodeKind::Vognode (Vognode::Ghost (ghost)) =>
       Ok ( ghost_metadata_to_string (
@@ -536,18 +522,8 @@ fn ghost_metadata_to_string (
     . chain ( diff_form (change_facts) ) );
   parts . join (" ") }
 
-/// What the printer writes of a vognode that shows only a gnid: an
-/// unknown, or a Restricted vognode.
-struct GnidOnlyVognode<'a> {
-  kind_atom               : &'static str,
-  gnid                    : &'a ID,
-  relRepo                 : Option<&'a SkgrepoName>,
-  relationshipEditRequest : Option<&'a RelationshipEditRequest>,
-  claimsMembership        : bool,
-}
-
-/// Render metadata for an unknown or a Restricted vognode, KIND being
-/// 'unknown' or 'restricted':
+/// Render metadata for a gnid-only vognode, KIND being 'unknown' or
+/// 'restricted':
 ///   [focused] [folded] [bodyFolded] KIND (gnid X)
 ///   [(skgRepos (relRepo R))] [noClaim]
 ///   [(editRequest [(relRepo R)] [READINESS])] [(diff ...)]
@@ -556,18 +532,18 @@ struct GnidOnlyVognode<'a> {
 /// skgrepo restriction keeps out.
 fn gnid_only_vognode_metadata_to_string (
   foldAndFocus    : FoldAndFocus,
-  vognode         : GnidOnlyVognode,
+  vognode         : &GnidOnlyVognode,
   claims_are_read : bool,
   change_facts    : &ChangeFacts,
   request         : &Option<ReadinessRequest>,
 ) -> String {
   let mut parts : Vec < String > = foldAndFocus_atoms (foldAndFocus);
-  parts . push ( vognode . kind_atom . to_string () );
+  parts . push ( vognode . kind . wire_atom () . to_string () );
   parts . push ( format! ("(gnid {})", vognode . gnid . 0) );
-  parts . extend ( skgRepos_form ( None, vognode . relRepo ));
+  parts . extend ( skgRepos_form ( None, vognode . relRepo . as_ref () ));
   parts . extend ( noClaim_atom (vognode . claimsMembership, claims_are_read) );
   parts . extend ( editRequest_form (
-    vognode . relationshipEditRequest . map (relationshipEditRequest_element),
+    vognode . relationshipEditRequest . as_ref () . map (relationshipEditRequest_element),
     request ));
   parts . extend ( diff_form (change_facts) );
   parts . join (" ") }

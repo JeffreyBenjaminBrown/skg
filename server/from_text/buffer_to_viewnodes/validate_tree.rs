@@ -254,11 +254,11 @@ fn validate_view_roots (
       &root . value () . kind,
         ViewnodeKind::Vognode (Vognode::Occurrence (_))
         | ViewnodeKind::Tombstone // e.g. where a restricted root stood, kept for its children (the API doc's "Restricted-skgrepo nodes")
-        | ViewnodeKind::Vognode (Vognode::Unknown (_))
+        | ViewnodeKind::Vognode (Vognode::GnidOnly (_))
         | ViewnodeKind::Vognode (Vognode::Ghost (_)))
     { errors . push (
         BufferValidationError::Other (
-          "View roots must be Occurrences, tombstones, unknowns or ghosts."
+          "View roots must be Occurrences, tombstones, restricted headlines, references to unknown nodes or ghosts."
           . to_string () )); }}}
 
 /// No two nodes with the same ID may carry editable view requests,

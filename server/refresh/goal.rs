@@ -139,8 +139,8 @@ impl Goal {
 
 /// What a child stands for in its parent's goal, if anything: an
 /// occurrence stands for the gnid its parent's list would hold (the
-/// original of a shown overrider), a ghost, an unknown or a
-/// Restricted vognode for its gnid, a property member for its value.
+/// original of a shown overrider), a ghost or a gnid-only vognode for
+/// its gnid, a property member for its value.
 pub(crate) fn member_of_child (
   viewnode : &Viewnode,
 ) -> Option<GoalMember> {
@@ -149,10 +149,8 @@ pub(crate) fn member_of_child (
       Some ( GoalMember::Gnid ( occurrence . collected_gnid () )),
     ViewnodeKind::Vognode (Vognode::Ghost (ghost)) =>
       Some ( GoalMember::Gnid ( ghost . gnid . clone () )),
-    ViewnodeKind::Vognode (Vognode::Unknown (unknown)) =>
-      Some ( GoalMember::Gnid ( unknown . gnid . clone () )),
-    ViewnodeKind::Vognode (Vognode::Restricted (restricted)) =>
-      Some ( GoalMember::Gnid ( restricted . gnid . clone () )),
+    ViewnodeKind::Vognode (Vognode::GnidOnly (gnid_only)) =>
+      Some ( GoalMember::Gnid ( gnid_only . gnid . clone () )),
     ViewnodeKind::PropertyMember (PropertyMember::Alias { text, .. }) =>
       Some ( GoalMember::Alias ( text . clone () )),
     ViewnodeKind::PropertyMember (PropertyMember::ID { gnid, .. }) =>

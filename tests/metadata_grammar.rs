@@ -11,7 +11,8 @@ use skg::serve::parse_metadata_sexp::{
   METADATA_GRAMMAR, ViewnodeMetadata, parse_metadata_to_viewnodemd};
 use skg::types::misc::{ID, SkgConfig, SkgrepoName};
 use skg::types::viewnode::{
-  Ghost, PropertyMember, Unknown, Viewnode, ViewnodeId, ViewnodeKind, Vognode, Warrant,
+  Ghost, GnidOnlyKind, GnidOnlyVognode, PropertyMember, Viewnode, ViewnodeId, ViewnodeKind,
+  Vognode, Warrant,
   mk_editable_viewnode, mk_writeProtected_viewnode, viewnode_of};
 
 use std::collections::HashMap;
@@ -55,10 +56,9 @@ fn each_kind_prints_its_parts_beside_its_atom (
       claimsMembership : true, warrant : Warrant::ByGraph } )))),
     "ghost (gnid g) (skgRepos (nodeRepo main)) (editRequest restoreNode)" );
   assert_eq! (
-    rendered ( viewnode_of ( ViewnodeKind::Vognode ( Vognode::Unknown ( Unknown {
-      gnid : ID::from ("u"), relRepo : Some ( SkgrepoName::from ("pub") ),
-      relationshipEditRequest : None, claimsMembership : true,
-      warrant : Warrant::ByGraph } )))),
+    rendered ( viewnode_of ( ViewnodeKind::Vognode ( Vognode::GnidOnly ( GnidOnlyVognode::new (
+      GnidOnlyKind::Unknown, ID::from ("u"), Some ( SkgrepoName::from ("pub") ),
+      true, Warrant::ByGraph ) )))),
     "unknown (gnid u) (skgRepos (relRepo pub))" );
   assert_eq! (
     rendered ( viewnode_of ( ViewnodeKind::PropertyMember ( PropertyMember::alias ( "an alias" . into (), Some ( SkgrepoName::from ("pub") ), None ) ))),

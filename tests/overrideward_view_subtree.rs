@@ -23,7 +23,7 @@ use skg::skgrepo_sets::{SkgrepoRestriction, SkgrepoSetName};
 use skg::test_utils::{graph_handle_from_config, run_with_shared_test_stores};
 use skg::types::misc::{ID, SkgConfig, SkgrepoName};
 use skg::types::tree::forest::ViewForest;
-use skg::types::viewnode::{Folder, Viewnode, ViewnodeKind, Vognode};
+use skg::types::viewnode::{Folder, GnidOnlyKind, Viewnode, ViewnodeKind, Vognode};
 use skg::types::views_state::ViewnodeIdRecord;
 
 /// One search hit, as a MatchGroups entry.
@@ -236,8 +236,9 @@ fn a_hit_overriding_an_absent_node_shows_it_in_a_folder (
   let members : Vec<NodeRef<Viewnode>> = folder . children () . collect ();
   assert_eq! ( members . len (), 1, "one member, for \"gone\"" );
   assert! ( matches! ( &members [0] . value () . kind,
-                       ViewnodeKind::Vognode (Vognode::Unknown (unknown))
-                       if unknown . gnid == ID::from ("gone") ),
+                       ViewnodeKind::Vognode (Vognode::GnidOnly (unknown))
+                       if unknown . kind == GnidOnlyKind::Unknown
+                          && unknown . gnid == ID::from ("gone") ),
             "the member is the unknown \"gone\": {:?}",
             members [0] . value () . kind );
   Ok (( )) }

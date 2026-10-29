@@ -2,7 +2,7 @@
 /// Nodes of the graph are represented via the 'Graphnode' type.
 /// Nodes of the tree are represented via the 'Viewnode' type.
 /// Some 'Viewnode's represent graphnodes, which need not exist; these are
-/// 'Vognode's (an occurrence, a ghost or an unknown).
+/// 'Vognode's (an occurrence, a ghost or a gnid-only vognode).
 /// Others encode information about neighboring tree nodes, such as
 /// aliases, IDs, and partner folders.
 
@@ -164,20 +164,19 @@ impl ViewnodeKind {
 
 /// A viewnode that stands for a gnid: an occurrence, for a node the
 /// gated graph has; a ghost, only in the diff view, for a node HEAD
-/// has and the worktree lacks; an unknown, for a gnid its parent's
-/// list names and no node answers to; a Restricted vognode, for a
-/// node the skgrepo restriction keeps out that a visible record
-/// names. Where no record the restriction shows names a restricted
-/// node, it has no vognode: the refresh entombstones its occurrence
-/// (the ID rule, 'server/refresh/id_rule.rs'), as it does the
-/// occurrence of a node that vanished, unless the diff view can show
-/// it as a ghost.
+/// has and the worktree lacks; a gnid-only vognode, which shows
+/// nothing of a node: an unknown, for a gnid its parent's list names
+/// and no node answers to, or a Restricted vognode, for a node the
+/// skgrepo restriction keeps out that a visible record names. Where
+/// no record the restriction shows names a restricted node, it has no
+/// vognode: the refresh entombstones its occurrence (the ID rule,
+/// 'server/refresh/id_rule.rs'), as it does the occurrence of a node
+/// that vanished, unless the diff view can show it as a ghost.
 #[derive( Debug, Clone, PartialEq )]
 pub enum Vognode {
   Occurrence   (Occurrence),
   Ghost        (Ghost),
-  Unknown      (Unknown),
-  Restricted   (Restricted),
+  GnidOnly     (GnidOnlyVognode),
 }
 
 /// The kind of a vognode, without its payload.
@@ -185,8 +184,7 @@ pub enum Vognode {
 pub enum VognodeKind {
   Occurrence,
   Ghost,
-  Unknown,
-  Restricted,
+  GnidOnly (GnidOnlyKind),
 }
 
 impl VognodeKind {
@@ -198,88 +196,101 @@ impl VognodeKind {
     match self {
       VognodeKind::Occurrence => "an occurrence",
       VognodeKind::Ghost      => "a ghost",
-      VognodeKind::Unknown    => "an unknown",
-      VognodeKind::Restricted => "a Restricted vognode", } }
+      VognodeKind::GnidOnly (GnidOnlyKind::Unknown)    => "an unknown",
+      VognodeKind::GnidOnly (GnidOnlyKind::Restricted) => "a Restricted vognode", } }
 }
 
-/// A reference that resolves to nothing: a gnid that its parent's
-/// list names and no node answers to.
-///
-/// ARISES: when some node's `contains` (or similar list) names an ID that has no
-/// record anywhere -- not a primary pid or extra_id in the graph, not on disk,
-/// and not recoverable through any diff procedure. Built by
-/// `mk_unknown_viewnode`, e.g. when `graphnode_and_viewnode_from_id` returns
-/// None. A genuine dangling pointer. Can result from bad data, or from a
-/// reference to another user's node that has since been deleted.
-///
-/// USED: it lets the view degrade gracefully -- carrying the bad reference as
-/// its own kind, rather than erroring, is what keeps a single bad reference deep
-/// in a subtree from killing the whole view at its root. Inert on save (it emits
-/// no fieldIntents, though its descendants still might, so extraction recurses
-/// through it). If it is still a member of its parent's contains it is retained
-/// (a present-but-unresolvable reference); if the list no longer names it,
-/// the refresh entombstones it and the prune removes it.
-///
-/// DISTINCT INFO: it carries only the `id`: no skgrepo (it is the one
-/// vognode for which `pid_and_skgrepo` returns None) and no text.
-/// That emptiness is the information: a reference exists, but we have
-/// no record of its target.
-#[derive( Debug, Clone, PartialEq )]
-pub struct Unknown {
-  pub gnid                 : ID,
-  /// Display-only fact about this unknown's binding relationship.
-  pub relRepo         : Option<SkgrepoName>,
-  /// A pending request about this reference's relationship to its
-  /// viewparent (only a relRepo change: the parser refuses
-  /// restoreRel here), consumed only by save.
-  pub relationshipEditRequest : Option<RelationshipEditRequest>,
-  /// Whether the save reads its raw ID into its viewparent's list.
-  /// The refresh marks it false, written 'noClaim', on one whose
-  /// relationship HEAD alone warrants: a dangling partner the worktree
-  /// lost.
-  pub claimsMembership : bool,
-  /// Whether the truth relates it to its viewparent as its position
-  /// implies ('Warrant'), as the refresh set it. Never 'No': the ID
-  /// rule makes a headline an unknown only where its viewparent's goal
-  /// names the gnid. The printer writes none: the metadata grammar
-  /// gives an unknown no '(view ...)'.
-  pub warrant : Warrant,
+/// Why a gnid-only vognode shows nothing of a node.
+#[derive( Debug, Clone, Copy, PartialEq, Eq )]
+pub enum GnidOnlyKind {
+  /// An unknown: no node answers to the gnid.
+  ///
+  /// ARISES: when some node's `contains` (or similar list) names an
+  /// ID that has no record anywhere -- not a primary pid or extra_id
+  /// in the graph, not on disk, and not recoverable through any diff
+  /// procedure. A genuine dangling pointer. Can result from bad data,
+  /// or from a reference to another user's node that has since been
+  /// deleted. It lets the view degrade gracefully -- carrying the bad
+  /// reference as its own kind, rather than erroring, is what keeps a
+  /// single bad reference deep in a subtree from killing the whole
+  /// view at its root. That emptiness is the information: a
+  /// reference exists, but we have no record of its target.
+  Unknown,
+  /// A Restricted vognode: the node is one the skgrepo restriction
+  /// keeps out, and a record the restriction shows names it
+  /// ('docs/glossary.org', "Restricted vognode"). It shows nothing of
+  /// the node, neither its title, its body, its home skgrepo nor its
+  /// stats. Never in the diff view, which runs under no restriction.
+  Restricted,
 }
 
-/// A Restricted vognode: where a record the skgrepo restriction shows
-/// names a node it keeps out, it stands for that node, by the
-/// record's gnid, and shows nothing of the node ('docs/glossary.org',
-/// "Restricted vognode").
+impl GnidOnlyKind {
+  /// The kind's atom on the wire.
+  pub fn wire_atom (
+    self,
+  ) -> &'static str {
+    match self {
+      GnidOnlyKind::Unknown    => "unknown",
+      GnidOnlyKind::Restricted => "restricted", } }
+}
+
+/// A gnid-only vognode: one that stands for a gnid and shows nothing
+/// of a node, for one of two reasons ('kind'): no node answers to the
+/// gnid (an unknown), or the node is one the skgrepo restriction keeps
+/// out (a Restricted vognode). The kind is not called "unshowable",
+/// since "unsayable" already names a descriptor standing where its
+/// kind may not ('is_unsayable').
 ///
-/// ARISES: from the ID rule ('server/refresh/id_rule.rs'), for a gnid
-/// the truth says is restricted that its parent's goal names: drawn
-/// for a goal item marked restricted, or re-kinded in place from an
-/// occurrence whose node the restriction newly keeps out (and back to
-/// an occurrence when the restriction widens). Never in the diff view,
-/// which runs under no restriction.
+/// ARISES: from the ID rule ('server/refresh/id_rule.rs'), only where
+/// its viewparent's goal names the gnid: drawn for a goal item, or
+/// re-kinded in place from another vognode (and back to an occurrence
+/// when its node is back, or the restriction widens).
 ///
-/// USED: as an unknown is. It claims membership as an unknown does:
-/// when it claims, the save keeps its gnid in its viewparent's list;
-/// deleting its line removes the record. It takes a relRepo request
-/// and a readiness request. Text on its line is refused. It has no
-/// goal, so what stands under it is no member of it.
+/// USED: inert on save: it emits no fieldIntents, though its
+/// descendants still might, so extraction recurses through it. When it
+/// claims membership, the save keeps its gnid in its viewparent's
+/// list; deleting its line removes the record. It takes a relRepo
+/// request and a readiness request. Text on its line is refused. It
+/// has no goal, so what stands under it is no member of it.
 ///
-/// DISTINCT INFO: the record's gnid and relRepo; nothing of the node,
-/// neither its title, its body, its home skgrepo nor its stats.
+/// DISTINCT INFO: the gnid and the record's relRepo, and nothing of a
+/// node: no skgrepo ('pid_and_skgrepo' returns None for it) and no
+/// text.
 #[derive( Debug, Clone, PartialEq )]
-pub struct Restricted {
+pub struct GnidOnlyVognode {
   pub gnid                    : ID,
   /// Display-only: the record's relRepo, where it differs from the
   /// recorder's home.
   pub relRepo                 : Option<SkgrepoName>,
-  /// A pending relRepo change of the record, consumed only by save.
+  /// A pending request about this reference's relationship to its
+  /// viewparent (only a relRepo change: the parser refuses restoreRel
+  /// here), consumed only by save.
   pub relationshipEditRequest : Option<RelationshipEditRequest>,
-  /// Whether the save reads its gnid into its viewparent's list.
+  /// Whether the save reads its gnid into its viewparent's list. The
+  /// refresh marks it false, written 'noClaim', on one whose
+  /// relationship HEAD alone warrants: a dangling partner the
+  /// worktree lost.
   pub claimsMembership        : bool,
   /// Whether the truth relates it to its viewparent as its position
-  /// implies ('Warrant'), as the refresh set it. The printer writes
-  /// none, as for an unknown.
+  /// implies ('Warrant'), as the refresh set it. Never 'No': the ID
+  /// rule makes a headline gnid-only only where its viewparent's goal
+  /// names the gnid. The printer writes none: the metadata grammar
+  /// gives a gnid-only vognode no '(view ...)'.
   pub warrant                 : Warrant,
+  pub kind                    : GnidOnlyKind,
+}
+
+impl GnidOnlyVognode {
+  /// A gnid-only vognode of 'kind' for 'gnid', carrying no request.
+  pub fn new (
+    kind             : GnidOnlyKind,
+    gnid             : ID,
+    relRepo          : Option<SkgrepoName>,
+    claimsMembership : bool,
+    warrant          : Warrant,
+  ) -> GnidOnlyVognode {
+    GnidOnlyVognode { gnid, relRepo, claimsMembership, warrant, kind,
+                      relationshipEditRequest : None, } }
 }
 
 /// A ghost: a node that the before-graph of the diff view's graph
@@ -979,21 +990,32 @@ impl Vognode {
     match self {
       Vognode::Occurrence (t) => &t . gnid,
       Vognode::Ghost        (g) => &g . gnid,
-      Vognode::Unknown      (u) => &u . gnid,
-      Vognode::Restricted   (r) => &r . gnid,
+      Vognode::GnidOnly     (g) => &g . gnid,
     } }
 
-  /// The id and home skgrepo of the node it stands for; None for an
-  /// unknown, which knows no skgrepo, and for a Restricted vognode,
-  /// which shows none.
+  /// Whether the vognode claims membership of its viewparent's list.
+  pub fn claims (&self) -> bool {
+    match self {
+      Vognode::Occurrence (occurrence) => occurrence . claimsMembership,
+      Vognode::Ghost      (ghost)      => ghost . claimsMembership,
+      Vognode::GnidOnly   (gnid_only)  => gnid_only . claimsMembership, } }
+
+  /// The kind of the vognode, without its payload.
+  pub fn kind (&self) -> VognodeKind {
+    match self {
+      Vognode::Occurrence (_)         => VognodeKind::Occurrence,
+      Vognode::Ghost      (_)         => VognodeKind::Ghost,
+      Vognode::GnidOnly   (gnid_only) => VognodeKind::GnidOnly (gnid_only . kind), } }
+
+  /// The id and home skgrepo of the node it stands for; None for a
+  /// gnid-only vognode, which shows none.
   pub fn pid_and_skgrepo (
     &self,
   ) -> Option<(&ID, &SkgrepoName)> {
     match self {
       Vognode::Occurrence (t) => Some ((&t . gnid, &t . home_skgrepo)),
       Vognode::Ghost        (g) => Some ((&g . gnid, &g . home_skgrepo)),
-      Vognode::Unknown      (_) => None,
-      Vognode::Restricted   (_) => None,
+      Vognode::GnidOnly     (_) => None,
     } }
 }
 
@@ -1170,12 +1192,10 @@ impl Viewnode {
         if let Editability::Editable { edit_request, .. } =
           &mut occurrence . editability
         { *edit_request = None; }},
-      ViewnodeKind::Vognode (Vognode::Unknown (unknown)) => {
-        if restored (&unknown . relationshipEditRequest) {
-          unknown . claimsMembership = true; }
-        unknown . relationshipEditRequest = None },
-      ViewnodeKind::Vognode (Vognode::Restricted (restricted)) =>
-        restricted . relationshipEditRequest = None,
+      ViewnodeKind::Vognode (Vognode::GnidOnly (gnid_only)) => {
+        if restored (&gnid_only . relationshipEditRequest) {
+          gnid_only . claimsMembership = true; }
+        gnid_only . relationshipEditRequest = None },
       ViewnodeKind::Vognode (Vognode::Ghost (ghost)) =>
         ghost . restoreNode_request = false,
       ViewnodeKind::PropertyMember (PropertyMember::Alias {
@@ -1183,6 +1203,56 @@ impl Viewnode {
         if restored (relationshipEditRequest) {
           *claimsMembership = true; }
         *relationshipEditRequest = None },
+      _ => {}, }}
+
+  /// Whether the viewnode claims membership of its viewparent's list;
+  /// None for a kind that carries no claim.
+  pub fn claims (&self) -> Option<bool> {
+    match &self . kind {
+      ViewnodeKind::Vognode (vognode) => Some ( vognode . claims () ),
+      ViewnodeKind::PropertyMember (
+        PropertyMember::Alias { claimsMembership, .. }
+        | PropertyMember::ID { claimsMembership, .. } ) =>
+        Some (*claimsMembership),
+      _ => None, } }
+
+  /// Set the claim of a kind that carries one; any other is left as
+  /// it is.
+  pub fn set_claim (
+    &mut self,
+    claims : bool,
+  ) {
+    match &mut self . kind {
+      ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =>
+        occurrence . claimsMembership = claims,
+      ViewnodeKind::Vognode (Vognode::Ghost (ghost)) =>
+        ghost . claimsMembership = claims,
+      ViewnodeKind::Vognode (Vognode::GnidOnly (gnid_only)) =>
+        gnid_only . claimsMembership = claims,
+      ViewnodeKind::PropertyMember (
+        PropertyMember::Alias { claimsMembership, .. }
+        | PropertyMember::ID { claimsMembership, .. } ) =>
+        *claimsMembership = claims,
+      _ => {}, }}
+
+  /// Store 'warrant': every vognode and property member keeps one; a
+  /// folder, a change viewnode and a tombstone keep none.
+  pub fn set_warrant (
+    &mut self,
+    warrant : Warrant,
+  ) {
+    match &mut self . kind {
+      ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =>
+        occurrence . viewStats . warrant = warrant,
+      ViewnodeKind::Vognode (Vognode::Ghost (ghost)) =>
+        ghost . warrant = warrant,
+      ViewnodeKind::Vognode (Vognode::GnidOnly (gnid_only)) =>
+        gnid_only . warrant = warrant,
+      ViewnodeKind::PropertyMember (
+        PropertyMember::Alias { warrant : stored, .. }
+        | PropertyMember::ID { warrant : stored, .. }
+        | PropertyMember::Flag { warrant : stored, .. } ) =>
+        *stored = warrant,
       _ => {}, }}
 
   pub fn title (&self) -> &str {
@@ -1195,8 +1265,7 @@ impl Viewnode {
       ViewnodeKind::Folder (folder) => folder . title (),
       ViewnodeKind::BufferRoot
         | ViewnodeKind::Tombstone
-        | ViewnodeKind::Vognode (Vognode::Unknown (_))
-        | ViewnodeKind::Vognode (Vognode::Restricted (_)) =>
+        | ViewnodeKind::Vognode (Vognode::GnidOnly (_)) =>
         "",
     }}
 
@@ -1231,10 +1300,8 @@ impl Viewnode {
         format!("ghost:{}", h . gnid . 0),
       ViewnodeKind::Tombstone =>
         "tombstone" . to_string (),
-      ViewnodeKind::Vognode (Vognode::Unknown (u)) =>
-        format!("unknown:{}", u . gnid . 0),
-      ViewnodeKind::Vognode (Vognode::Restricted (r)) =>
-        format!("restricted:{}", r . gnid . 0), }}
+      ViewnodeKind::Vognode (Vognode::GnidOnly (g)) =>
+        format!("{}:{}", g . kind . wire_atom (), g . gnid . 0), }}
 
   /// Reasonable for both Occurrences and Non-vognodes.
   pub fn body (&self) -> Option < &String > {
@@ -1244,8 +1311,7 @@ impl Viewnode {
       ViewnodeKind::Folder (folder) => folder . body (),
       ViewnodeKind::PropertyMember (member) => member . body (),
       ViewnodeKind::ChangeViewnode (change) => change . body (),
-      ViewnodeKind::Vognode (Vognode::Unknown (_))
-        | ViewnodeKind::Vognode (Vognode::Restricted (_))
+      ViewnodeKind::Vognode (Vognode::GnidOnly (_))
         | ViewnodeKind::BufferRoot
         | ViewnodeKind::Tombstone => None,
     }}
@@ -1376,12 +1442,9 @@ pub fn mk_editable_viewnode (
 pub fn mk_unknown_viewnode (
   gnid : ID,
 ) -> Viewnode {
-  viewnode_of ( ViewnodeKind::Vognode (Vognode::Unknown ( Unknown {
-      gnid,
-      relRepo         : None,
-      relationshipEditRequest : None,
-      claimsMembership : true,
-      warrant : Warrant::ByGraph, } )) ) }
+  viewnode_of ( ViewnodeKind::Vognode (Vognode::GnidOnly (
+    GnidOnlyVognode::new (
+      GnidOnlyKind::Unknown, gnid, None, true, Warrant::ByGraph )) )) }
 
 /// Create a write-protected Viewnode from disk data.
 /// Body is always None since write-protected nodes don't have editable content.

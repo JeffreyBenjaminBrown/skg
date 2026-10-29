@@ -124,8 +124,9 @@ fn view_can_display_absent_reference_change (
   || viewforest . nodes () . any (|node| matches! (
        &node . value () . kind,
        crate::types::viewnode::ViewnodeKind::Vognode (
-         crate::types::viewnode::Vognode::Unknown (unknown))
-       if unknown . gnid == *raw_gnid ))
+         crate::types::viewnode::Vognode::GnidOnly (unknown))
+       if unknown . kind == crate::types::viewnode::GnidOnlyKind::Unknown
+          && unknown . gnid == *raw_gnid ))
 }
 
 #[cfg(test)]

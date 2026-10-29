@@ -19,7 +19,7 @@ use crate::types::misc::{
   MSV, RelPartner, Skgrepo, SkgrepoName, SkgrepoSetName, rel_partners_at_relRepo};
 use crate::types::nodes::complete::{Graphnode, empty_graphnode};
 use crate::types::viewnode::{
-  ChangeViewnode, PropertyMember, ViewnodeId, VognodeKind, Warrant};
+  ChangeViewnode, GnidOnlyKind, PropertyMember, ViewnodeId, VognodeKind, Warrant};
 use crate::types::views_state::DiffViewBufferKind;
 
 use ego_tree::{NodeId, NodeRef};
@@ -227,13 +227,10 @@ fn describe (
       parts . push ( format! ("ghost {}", ghost . gnid) );
       if ! ghost . claimsMembership { parts . push ("noClaim" . into ()); }
       parts . extend ( warrant_atom (ghost . warrant) ); },
-    ViewnodeKind::Vognode (Vognode::Unknown (unknown)) => {
-      parts . push ( format! ("unknown {}", unknown . gnid) );
-      if ! unknown . claimsMembership { parts . push ("noClaim" . into ()); }},
-    ViewnodeKind::Vognode (Vognode::Restricted (restricted)) => {
-      parts . push ( format! ("restricted {}", restricted . gnid) );
-      if ! restricted . claimsMembership { parts . push ("noClaim" . into ()); }
-      parts . extend ( warrant_atom (restricted . warrant) ); },
+    ViewnodeKind::Vognode (Vognode::GnidOnly (gnid_only)) => {
+      parts . push ( format! ("{} {}", gnid_only . kind . wire_atom (), gnid_only . gnid) );
+      if ! gnid_only . claimsMembership { parts . push ("noClaim" . into ()); }
+      parts . extend ( warrant_atom (gnid_only . warrant) ); },
     ViewnodeKind::Tombstone => parts . push ("tombstone" . into ()),
     ViewnodeKind::BufferRoot => parts . push ("root" . into ()),
     ViewnodeKind::Folder (folder) =>

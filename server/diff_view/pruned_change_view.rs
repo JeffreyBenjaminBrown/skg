@@ -459,16 +459,9 @@ pub fn ensure_editableOccurrences_exist (
     let children : Vec<NodeId> = viewforest . get (treeid) . unwrap () . children ()
       . map ( |child| child . id () ) . collect ();
     for child in children {
-      match &mut viewforest . get_mut (child) . unwrap () . value () . kind {
-        ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =>
-          occurrence . claimsMembership = true,
-        ViewnodeKind::Vognode (Vognode::Unknown (unknown)) =>
-          unknown . claimsMembership = true,
-        ViewnodeKind::Vognode (Vognode::Restricted (restricted)) =>
-          restricted . claimsMembership = true,
-        ViewnodeKind::Vognode (Vognode::Ghost (ghost)) =>
-          ghost . claimsMembership = true,
-        _ => {}, }}}}
+      if matches! ( viewforest . get (child) . unwrap () . value () . kind,
+                    ViewnodeKind::Vognode (_) ) {
+        viewforest . get_mut (child) . unwrap () . value () . set_claim (true); }}}}
 
 /// The viewforest's occurrences in content position
 /// ('in_content_position') that are roots, members or removed members

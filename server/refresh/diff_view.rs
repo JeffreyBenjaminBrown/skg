@@ -413,7 +413,7 @@ pub(crate) fn tag_children (
           Some ( DiffChange { node : Some (Existence::Removed),
                               rel  : if is_root { None } else { rel },
                               properties : false } ),
-        ViewnodeKind::Vognode (Vognode::Unknown (_) | Vognode::Restricted (_))
+        ViewnodeKind::Vognode (Vognode::GnidOnly (_))
           | ViewnodeKind::PropertyMember (_) =>
           Some ( DiffChange { rel, .. DiffChange::default () } ),
         _ => None, };

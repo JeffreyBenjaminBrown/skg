@@ -300,7 +300,7 @@ async fn test_find_buffer_errors_for_saving (
                    if title == "Alias with body problem and orphaned" && kind == "alias")
         }), "Should find Body_of_NonVognode error for alias"); }
 
-      // View roots must be Occurrences, tombstones, unknowns or ghosts.
+      // View roots must be Occurrences, tombstones, gnid-only vognodes or ghosts.
       { let viewroot_re = Regex::new(r"(?i)view roots.*must.*occurrence.*ghost") . unwrap();
         let viewroot_errors: Vec<&BufferValidationError> =
           errors . iter()
@@ -308,7 +308,7 @@ async fn test_find_buffer_errors_for_saving (
                                if viewroot_re . is_match (msg)))
           . collect();
         assert_eq!(viewroot_errors . len(), 1,
-                   "Should find 1 'View roots must be Occurrences, tombstones, unknowns or ghosts' error"); }
+                   "Should find 1 'View roots must be Occurrences, ..., or ghosts' error"); }
 
       // Occurrence child belongs elsewhere (root has Alias children directly, not via AliasFolder)
       { let occurrence_children_re =
@@ -877,6 +877,45 @@ fn duplicate_members_of_write_protected_folders_pass_validation () {
   for folder_gnid in partner_folder_treeids (&viewforest) {
     validate_local_structure (&viewforest, folder_gnid, &config)
       . expect ("duplicate members of a write-protected folder should pass validation"); }}
+
+/// A gnid-only vognode counts in the distinctness checks when it
+/// claims, and only then, whatever its kind: beside a claiming
+/// occurrence of its gnid, one marked 'noClaim' passes and a claiming
+/// one is refused, in a content list and in an editable relation
+/// folder alike.
+#[test]
+fn a_gnid_only_vognode_counts_in_the_distinctness_checks_when_it_claims () {
+  let config : SkgConfig = validation_config ();
+  for kind in ["unknown", "restricted"] {
+    for (claim, passes) in [("noClaim", true), ("", false)] {
+      let content_list : String = format! ( indoc! {"
+        * (skg node (gnid root) (skgRepos (nodeRepo main))) parent
+        ** (skg node (gnid x) (skgRepos (nodeRepo main))) x
+        ** (skg {} (gnid x) {})
+      "}, kind, claim );
+      let folder : String = format! ( indoc! {"
+        * (skg node (gnid r) (skgRepos (nodeRepo main))) r
+        ** (skg subscribeeFolder)
+        *** (skg hiddenOutsideOfSubscribeeFolder)
+        **** (skg node (gnid x) (skgRepos (nodeRepo main)) writeProtected) x
+        **** (skg {} (gnid x) {})
+      "}, kind, claim );
+      for (input, checked) in [ (content_list, "the content list"),
+                                (folder, "the hiddenOutsideOfSubscribeeFolder") ] {
+        let (viewforest, parsing_errors, _warnings, _provenance)
+          : (ViewForest, Vec<BufferValidationError>, Vec<String>, EnrichmentProvenance)
+          = org_to_viewforest (&input, IdResolution::AsWritten) . unwrap ();
+        assert_eq! ( parsing_errors . len (), 0, "{:?}", parsing_errors );
+        let parent : ego_tree::NodeId = viewforest . nodes ()
+          . filter ( |node_ref| node_ref . children () . count () == 2 )
+          . map ( |node_ref| node_ref . id () )
+          . next () . expect ("a parent of two");
+        let result : Result<(), String> =
+          validate_local_structure (&viewforest, parent, &config)
+          . map_err ( |error| error . message );
+        assert_eq! ( result . is_ok (), passes,
+                     "{} beside an occurrence of its gnid in {}, '{}': {:?}",
+                     kind, checked, claim, result ); }}}}
 
 fn partner_folder_treeids (
   viewforest : &ViewForest,

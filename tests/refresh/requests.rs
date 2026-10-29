@@ -218,12 +218,12 @@ node p
   unknown x" );
   let x : NodeRef<Viewnode> =
     run . forest . roots () . next () . unwrap () . first_child () . unwrap ();
-  let ViewnodeKind::Vognode (Vognode::Unknown (unknown)) = &x . value () . kind
+  let ViewnodeKind::Vognode (Vognode::GnidOnly (unknown)) = &x . value () . kind
     else { panic! ("x is no unknown: {:?}", x . value () . kind) };
   assert_eq! ( unknown . relationshipEditRequest, None );
   assert_eq! ( run . buffer_correction_kinds (),
                vec! [ BufferCorrectionKind::EditRequestDropped,
-                      BufferCorrectionKind::Rekinded (VognodeKind::Unknown) ] ); }
+                      BufferCorrectionKind::Rekinded (VognodeKind::GnidOnly (GnidOnlyKind::Unknown)) ] ); }
 
 /// x is in no graph and p's list does not name it, so its occurrence
 /// becomes a tombstone, which has no slot for a request; being

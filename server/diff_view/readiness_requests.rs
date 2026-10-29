@@ -231,16 +231,16 @@ fn leaves_named_at (
       return None,
     ViewnodeKind::Vognode (vognode) => {
       let pid : ID = vognode_leaf_pid (node . value (), pid_of) ?;
-      let is_unknown : bool = // or Restricted: no node it shows, one relationship
-        matches! (vognode, Vognode::Unknown (_) | Vognode::Restricted (_));
+      let is_gnid_only : bool = // no node it shows, one relationship
+        matches! (vognode, Vognode::GnidOnly (_));
       let objects : Vec<DiffObject> =
         if ! objects . is_empty () {
           objects . iter () . copied () . collect ()
-        } else if is_unknown { vec! [ DiffObject::Rel ] }
+        } else if is_gnid_only { vec! [ DiffObject::Rel ] }
         else { vec! [ DiffObject::Node, DiffObject::Rel ] };
       for object in objects {
         match object {
-          DiffObject::Node if ! is_unknown =>
+          DiffObject::Node if ! is_gnid_only =>
             leaves . push ( LeafKey::Node {
               pid : pid . clone (), aspect : NodeAspect::Existence } ),
           DiffObject::Node => {},
@@ -359,8 +359,7 @@ pub fn set_ready_facts_in_viewforest (
                         . then_some (DiffObject::All) )
               . collect ();
             ( ! objects . is_empty () ) . then_some (objects) },
-          ViewnodeKind::Vognode (
-            Vognode::Unknown (_) | Vognode::Restricted (_) ) =>
+          ViewnodeKind::Vognode (Vognode::GnidOnly (_)) =>
             object_is_ready (node, &[]) . then (BTreeSet::new),
           ViewnodeKind::ChangeViewnode ( ChangeViewnode::ChangesetMarker { kind } ) =>
             ( *kind == ChangesetMarkerKind::OrderOnly

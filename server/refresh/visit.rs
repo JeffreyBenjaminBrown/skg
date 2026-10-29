@@ -53,8 +53,8 @@ use crate::refresh::chain::{
 use crate::types::misc::ID;
 use crate::types::tree::moves::{move_after, move_to_first_child, move_to_last_child};
 use crate::types::viewnode::{
-  Editability, FoldAndFocus, Folder, FolderRelation, Ghost, PropertyMember, Restricted,
-  Unknown, Occurrence,
+  Editability, FoldAndFocus, Folder, FolderRelation, Ghost, GnidOnlyVognode, PropertyMember,
+  Occurrence,
   ViewRequest, Viewnode, ViewnodeKind, ViewnodeStats, Vognode, Warrant, viewnode_of};
 use crate::refresh::mode::RefreshMode;
 
@@ -266,20 +266,18 @@ fn merge_into (
         sibling_viewnode . readiness_request . clone (); }
     merge_requests ( &mut result_viewnode . kind,
                      &sibling_viewnode . kind ); }
-  if claims_membership (&sibling_viewnode) == Some (true) {
+  if sibling_viewnode . claims () == Some (true) {
     // Validation lets at most one claiming child of a parent stand
     // for a gnid ('claiming_children_have_distinct_gnids'), so no
     // claim is lost.
-    set_claim (tree, result, true); }
+    tree . get_mut (result) . unwrap () . value () . set_claim (true); }
   merge_editability (tree, result, merged_sibling, &sibling_viewnode, walk);
   let goal : Option<Goal> = goal_of_parent (tree, result, walk);
   for grandchild in children_of (tree, merged_sibling) {
     move_to_last_child (tree, result, grandchild) ?;
-    let viewnode : &Viewnode = tree . get (grandchild) . unwrap () . value ();
-    if claims_membership (viewnode) == Some (true)
-       && warrant_of_child (goal . as_ref (), viewnode) != Some (Warrant::ByGraph) {
-      set_claim (tree, grandchild, false);
-      walk . buffer_corrections . record (tree, grandchild, BufferCorrectionKind::MarkedNoClaim); }}
+    let warrant : Option<Warrant> =
+      warrant_of_child (goal . as_ref (), tree . get (grandchild) . unwrap () . value ());
+    mark_noClaim_unless_warranted (tree, grandchild, warrant, walk); }
   tree . get_mut (merged_sibling) . unwrap () . detach ();
   Ok (( )) }
 
@@ -293,8 +291,8 @@ fn merge_fold_and_focus (
   result . focused    = result . focused    || merged_sibling . focused; }
 
 /// The result carries the union of the view requests, and the
-/// relationship request of whichever carried one (an unknown's or a
-/// Restricted vognode's too); on a ghost, the restoreNode request, if
+/// relationship request of whichever carried one (a gnid-only
+/// vognode's too); on a ghost, the restoreNode request, if
 /// either carried it. The node edit request rides with the
 /// editability ('merge_editability').
 fn merge_requests (
@@ -310,12 +308,8 @@ fn merge_requests (
     ( ViewnodeKind::Vognode (Vognode::Ghost (result)),
       ViewnodeKind::Vognode (Vognode::Ghost (merged)) ) => {
       result . restoreNode_request |= merged . restoreNode_request; },
-    ( ViewnodeKind::Vognode (Vognode::Unknown (result)),
-      ViewnodeKind::Vognode (Vognode::Unknown (merged)) ) => {
-      if result . relationshipEditRequest . is_none () {
-        result . relationshipEditRequest = merged . relationshipEditRequest . clone (); }},
-    ( ViewnodeKind::Vognode (Vognode::Restricted (result)),
-      ViewnodeKind::Vognode (Vognode::Restricted (merged)) ) => {
+    ( ViewnodeKind::Vognode (Vognode::GnidOnly (result)),
+      ViewnodeKind::Vognode (Vognode::GnidOnly (merged)) ) => {
       if result . relationshipEditRequest . is_none () {
         result . relationshipEditRequest = merged . relationshipEditRequest . clone (); }},
     _ => {}, }}
@@ -383,31 +377,7 @@ fn set_warrants (
                goal, tree . get (child) . unwrap () . value () ) {
         Some (warrant) => warrant,
         None => continue, }};
-    set_warrant (tree, child, warrant); }}
-
-/// Store 'warrant' on the child at 'treeid': every vognode and
-/// property member keeps one; a folder, a change viewnode and a
-/// tombstone keep none.
-pub(crate) fn set_warrant (
-  tree    : &mut Tree<Viewnode>,
-  treeid  : NodeId,
-  warrant : Warrant,
-) {
-  match &mut tree . get_mut (treeid) . unwrap () . value () . kind {
-    ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =>
-      occurrence . viewStats . warrant = warrant,
-    ViewnodeKind::Vognode (Vognode::Ghost (ghost)) =>
-      ghost . warrant = warrant,
-    ViewnodeKind::Vognode (Vognode::Unknown (unknown)) =>
-      unknown . warrant = warrant,
-    ViewnodeKind::Vognode (Vognode::Restricted (restricted)) =>
-      restricted . warrant = warrant,
-    ViewnodeKind::PropertyMember (
-      PropertyMember::Alias { warrant : stored, .. }
-      | PropertyMember::ID { warrant : stored, .. }
-      | PropertyMember::Flag { warrant : stored, .. } ) =>
-      *stored = warrant,
-    _ => {}, }}
+    tree . get_mut (child) . unwrap () . value () . set_warrant (warrant); }}
 
 //
 // 4. claims
@@ -430,54 +400,29 @@ fn mark_claims (
   let claims_are_read : bool = parent_reads_claims (tree, parent);
   for child in children_of (tree, parent) {
     let viewnode : &Viewnode = tree . get (child) . unwrap () . value ();
-    let Some (claims) : Option<bool> = claims_membership (viewnode) else { continue; };
+    let Some (claims) : Option<bool> = viewnode . claims () else { continue; };
     if is_root {
-      if viewnode . is_occurrence () { set_claim (tree, child, true); }}
+      if viewnode . is_occurrence () {
+        tree . get_mut (child) . unwrap () . value () . set_claim (true); }}
     else if claims_are_read {
-      if claims && warrant_of_child (goal, viewnode) != Some (Warrant::ByGraph) {
-        set_claim (tree, child, false);
-        walk . buffer_corrections . record (tree, child, BufferCorrectionKind::MarkedNoClaim); }}
-    else if claims { set_claim (tree, child, false); }}}
+      let warrant : Option<Warrant> = warrant_of_child (goal, viewnode);
+      mark_noClaim_unless_warranted (tree, child, warrant, walk); }
+    else if claims {
+      tree . get_mut (child) . unwrap () . value () . set_claim (false); }}}
 
-/// Whether the viewnode claims membership; None for a kind that
-/// carries no claim.
-fn claims_membership (
-  viewnode : &Viewnode,
-) -> Option<bool> {
-  match &viewnode . kind {
-    ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =>
-      Some (occurrence . claimsMembership),
-    ViewnodeKind::Vognode (Vognode::Unknown (unknown)) =>
-      Some (unknown . claimsMembership),
-    ViewnodeKind::Vognode (Vognode::Restricted (restricted)) =>
-      Some (restricted . claimsMembership),
-    ViewnodeKind::Vognode (Vognode::Ghost (ghost)) =>
-      Some (ghost . claimsMembership),
-    ViewnodeKind::PropertyMember (
-      PropertyMember::Alias { claimsMembership, .. }
-      | PropertyMember::ID { claimsMembership, .. } ) =>
-      Some (*claimsMembership),
-    _ => None, } }
-
-pub(crate) fn set_claim (
-  tree   : &mut Tree<Viewnode>,
-  treeid : NodeId,
-  claims : bool,
+/// Where the save reads claims: the child at 'treeid', if it claims
+/// and its warrant is not 'ByGraph', is marked 'noClaim', and that is
+/// reported.
+fn mark_noClaim_unless_warranted (
+  tree    : &mut Tree<Viewnode>,
+  treeid  : NodeId,
+  warrant : Option<Warrant>,
+  walk    : &mut Walk,
 ) {
-  match &mut tree . get_mut (treeid) . unwrap () . value () . kind {
-    ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =>
-      occurrence . claimsMembership = claims,
-    ViewnodeKind::Vognode (Vognode::Unknown (unknown)) =>
-      unknown . claimsMembership = claims,
-    ViewnodeKind::Vognode (Vognode::Restricted (restricted)) =>
-      restricted . claimsMembership = claims,
-    ViewnodeKind::Vognode (Vognode::Ghost (ghost)) =>
-      ghost . claimsMembership = claims,
-    ViewnodeKind::PropertyMember (
-      PropertyMember::Alias { claimsMembership, .. }
-      | PropertyMember::ID { claimsMembership, .. } ) =>
-      *claimsMembership = claims,
-    _ => {}, }}
+  if tree . get (treeid) . unwrap () . value () . claims () == Some (true)
+     && warrant != Some (Warrant::ByGraph) {
+    tree . get_mut (treeid) . unwrap () . value () . set_claim (false);
+    walk . buffer_corrections . record (tree, treeid, BufferCorrectionKind::MarkedNoClaim); }}
 
 //
 // 5. reinstate
@@ -597,20 +542,10 @@ fn draw_item (
             claimsMembership : claims,
             warrant      : item . warrant,
             .. ghost } )))),
-      IdRuleAnswer::Unknown =>
-        Some ( viewnode_of ( ViewnodeKind::Vognode ( Vognode::Unknown ( Unknown {
-          gnid                   : gnid . clone (),
-          relRepo                 : item . relRepo . clone (),
-          relationshipEditRequest : None,
-          claimsMembership        : claims,
-          warrant                 : item . warrant, } )))),
-      IdRuleAnswer::Restricted =>
-        Some ( viewnode_of ( ViewnodeKind::Vognode ( Vognode::Restricted ( Restricted {
-          gnid                    : gnid . clone (),
-          relRepo                 : item . relRepo . clone (),
-          relationshipEditRequest : None,
-          claimsMembership        : claims,
-          warrant                 : item . warrant, } )))),
+      IdRuleAnswer::GnidOnly (kind) =>
+        Some ( viewnode_of ( ViewnodeKind::Vognode ( Vognode::GnidOnly (
+          GnidOnlyVognode::new (
+            kind, gnid . clone (), item . relRepo . clone (), claims, item . warrant ))))),
       IdRuleAnswer::Tombstone => None, },
     GoalMember::Alias (text) =>
       Some ( viewnode_of ( ViewnodeKind::PropertyMember ( PropertyMember::Alias {
@@ -763,11 +698,8 @@ fn stop_substituting (
   let warrant : Warrant = warrant_of_child (
     Some (goal), tree . get (child) . unwrap () . value () )
     . unwrap_or (Warrant::No);
-  set_warrant (tree, child, warrant);
-  if warrant != Warrant::ByGraph
-     && claims_membership (tree . get (child) . unwrap () . value ()) == Some (true) {
-    set_claim (tree, child, false);
-    walk . buffer_corrections . record (tree, child, BufferCorrectionKind::MarkedNoClaim); }
+  tree . get_mut (child) . unwrap () . value () . set_warrant (warrant);
+  mark_noClaim_unless_warranted (tree, child, Some (warrant), walk);
   let member : GoalMember = GoalMember::Gnid ( original . clone () );
   let stands : bool = tree . get (parent) . unwrap () . children ()
     . any ( |sibling| member_of_child (sibling . value ()) . as_ref () == Some (&member) );

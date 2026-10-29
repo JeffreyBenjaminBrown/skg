@@ -67,16 +67,14 @@ fn consuming_edit_requests_covers_every_carrier_but_not_view_requests () {
   let mut unknown : Viewnode = Viewnode {
     readiness_request : Some (ReadinessRequest {
       ready : true, objects : BTreeSet::new () }),
-    .. viewnode_of ( ViewnodeKind::Vognode (Vognode::Unknown (
-      Unknown {
-        gnid : ID::from ("unknown"),
-        relRepo : None,
+    .. viewnode_of ( ViewnodeKind::Vognode (Vognode::GnidOnly (
+      GnidOnlyVognode {
         relationshipEditRequest : Some (RelationshipEditRequest::RelRepo (SkgrepoName::from ("private"))),
-        claimsMembership : true,
-        warrant : Warrant::ByGraph, }))) };
+        .. GnidOnlyVognode::new (
+          GnidOnlyKind::Unknown, ID::from ("unknown"), None, true, Warrant::ByGraph ) }))) };
   unknown . consume_edit_request_after_save ();
   assert_eq! (unknown . readiness_request, None);
-  let ViewnodeKind::Vognode (Vognode::Unknown (unknown)) = &unknown . kind
+  let ViewnodeKind::Vognode (Vognode::GnidOnly (unknown)) = &unknown . kind
   else { panic! ("expected unknown node"); };
   assert_eq! (unknown . relationshipEditRequest, None);
 

@@ -74,13 +74,12 @@ fn visit (
   match &node_ref . value() . kind {
     ViewnodeKind::Vognode (Vognode::Occurrence (t)) =>
       visit_occurrence (node_ref, t, context, collected),
-    ViewnodeKind::Vognode (vognode @ ( Vognode::Ghost (_) | Vognode::Unknown (_)
-                                       | Vognode::Restricted (_) )) =>
+    ViewnodeKind::Vognode (vognode @ ( Vognode::Ghost (_) | Vognode::GnidOnly (_) )) =>
       recurse_under_vognode (
         node_ref,
         Some ( DefiningFolderRecorder {
-          // Carrying the identity of the ghost, unknown or Restricted
-          // vognode (write-protected, not save-eligible) keeps a
+          // Carrying the identity of the ghost or gnid-only vognode
+          // (write-protected, not save-eligible) keeps a
           // subscribeeFolder found under a ghost meaningful: its
           // children stay in subscribee-as-such position, so their
           // title edits bounce via text claims instead of silently
@@ -362,7 +361,7 @@ fn visit_hiddenOutside_folder (
               member_counts_for_partnerFolder (t) . then ( || (
                 t . gnid . clone (),
                 RelationshipEditRequest::relRepo_of (&t . relationshipEditRequest) . cloned () )),
-            _ => claiming_unknown_ghost_or_restricted_member (child . value ()), };
+            _ => claiming_gnid_only_or_ghost_member (child . value ()), };
         if let Some ((gnid, relRepo_request)) = member {
           if relRepo_request . is_some () {
             return Err ("HiddenOutsideOfSubscribee membership is editable, but hide relRepos are derived." . to_string ()); }
@@ -411,8 +410,8 @@ fn dedup_members_by_gnid (
 
 /// This returns the members of an overriddenFolder or a
 /// subscribeeFolder: its occurrence children that pass the partner
-/// folder membership predicate, and its claiming unknowns, ghosts and
-/// Restricted vognodes ('claiming_unknown_ghost_or_restricted_member'),
+/// folder membership predicate, and its claiming gnid-only vognodes
+/// and ghosts ('claiming_gnid_only_or_ghost_member'),
 /// silently deduplicated (by ID; see 'dedup_members_by_gnid'),
 /// preserving first-occurrence
 /// order. Each member is paired with its headline's explicit
@@ -433,31 +432,28 @@ fn partnerFolder_members (
         if member_counts_for_partnerFolder (t) =>
           members . push ((t . gnid . clone(),
                            RelationshipEditRequest::relRepo_of (&t . relationshipEditRequest) . cloned ())),
-      _ => members . extend ( claiming_unknown_ghost_or_restricted_member (child . value ()) ), }}
+      _ => members . extend ( claiming_gnid_only_or_ghost_member (child . value ()) ), }}
   dedup_members_by_gnid (members) }
 
-/// A claiming unknown, ghost or Restricted vognode child, as a member
-/// of the list its position implies: its gnid, with an unknown's or a
-/// Restricted vognode's relRepo request. An unknown is save-inert as
-/// a node, but its raw ID is load-bearing membership data at a
-/// structured relationship position; a Restricted vognode keeps the
-/// gnid of the record it stands for as an unknown does; a ghost the
-/// list still names (a dangling reference to a node HEAD has) keeps
-/// its gnid there as an unknown does, and carries no relRepo request.
+/// A claiming gnid-only vognode or ghost child, as a member of the
+/// list its position implies: its gnid, with a gnid-only vognode's
+/// relRepo request. A gnid-only vognode is save-inert as a node, but
+/// its raw ID is load-bearing membership data at a structured
+/// relationship position: an unknown's, of a reference that resolves
+/// to nothing, and a Restricted vognode's, of the record it stands
+/// for. A ghost the list still names (a dangling reference to a node
+/// HEAD has) keeps its gnid there as a gnid-only vognode does, and
+/// carries no relRepo request.
 /// 'None' as the request asks disk supplementation to keep an
 /// existing destination skgrepo sticky. None for any other child.
-fn claiming_unknown_ghost_or_restricted_member (
+fn claiming_gnid_only_or_ghost_member (
   viewnode : &Viewnode,
 ) -> Option<(ID, Option<SkgrepoName>)> {
   match &viewnode . kind {
-    ViewnodeKind::Vognode (Vognode::Unknown (unknown))
-      if unknown . claimsMembership =>
-      Some (( unknown . gnid . clone (),
-              RelationshipEditRequest::relRepo_of (&unknown . relationshipEditRequest) . cloned () )),
-    ViewnodeKind::Vognode (Vognode::Restricted (restricted))
-      if restricted . claimsMembership =>
-      Some (( restricted . gnid . clone (),
-              RelationshipEditRequest::relRepo_of (&restricted . relationshipEditRequest) . cloned () )),
+    ViewnodeKind::Vognode (Vognode::GnidOnly (gnid_only))
+      if gnid_only . claimsMembership =>
+      Some (( gnid_only . gnid . clone (),
+              RelationshipEditRequest::relRepo_of (&gnid_only . relationshipEditRequest) . cloned () )),
     ViewnodeKind::Vognode (Vognode::Ghost (ghost))
       if ghost . claimsMembership =>
       Some (( ghost . gnid . clone (), None )),
@@ -493,7 +489,7 @@ fn content_members (
             // the original member it is shown in place of.
             t . collected_gnid (),
             RelationshipEditRequest::relRepo_of (&t . relationshipEditRequest) . cloned () )); }},
-      _ => contents . extend ( claiming_unknown_ghost_or_restricted_member (child . value ()) ), }}
+      _ => contents . extend ( claiming_gnid_only_or_ghost_member (child . value ()) ), }}
   contents }
 
 /// This returns the children that the buffer presents as visible
@@ -514,6 +510,6 @@ fn visible_content_members (
           // so hide/unhide inference must speak of the original.
           t . collected_gnid ()); },
       _ => visible . extend (
-        claiming_unknown_ghost_or_restricted_member (child . value ())
+        claiming_gnid_only_or_ghost_member (child . value ())
         . map ( |(gnid, _)| gnid )), }}
   visible }

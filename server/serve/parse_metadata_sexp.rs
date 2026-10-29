@@ -61,7 +61,7 @@ use crate::types::viewnode::{
   ChangeFacts, DiffObject, FoldAndFocus, ReadinessRequest,
   GraphnodeStats, ViewnodeStats, NodeEditRequest, ViewRequest, FolderRelation,
   ChangesetMarkerKind, PropertyMember, ChangeViewnode, Folder,
-  Ghost, Restricted, Unknown,
+  Ghost, GnidOnlyKind, GnidOnlyVognode,
   Editability, RelationshipEditRequest, ViewnodeId, Warrant,
 };
 use crate::types::viewnode::{
@@ -203,23 +203,15 @@ pub fn viewnode_from_metadata (
         let relationshipEditRequest : Option<RelationshipEditRequest> =
           metadata . unknown_relRepo_request . clone ()
           . map (RelationshipEditRequest::RelRepo);
-        ( ViewnodeKind::Vognode (
-            if metadata . is_restricted {
-              Vognode::Restricted ( Restricted {
-                gnid             : uid . clone (),
-                relRepo          : metadata . unknown_relRepo . clone (),
-                relationshipEditRequest,
-                claimsMembership : metadata . claimsMembership,
-                warrant : Warrant::ByGraph, // a derived fact: the refresh sets it
-              } )
-            } else {
-              Vognode::Unknown ( Unknown {
-                gnid             : uid . clone (),
-                relRepo          : metadata . unknown_relRepo . clone (),
-                relationshipEditRequest,
-                claimsMembership : metadata . claimsMembership,
-                warrant : Warrant::ByGraph, // a derived fact: the refresh sets it
-              } ) } ),
+        ( ViewnodeKind::Vognode ( Vognode::GnidOnly ( GnidOnlyVognode {
+            relationshipEditRequest,
+            .. GnidOnlyVognode::new (
+              if metadata . is_restricted { GnidOnlyKind::Restricted }
+              else { GnidOnlyKind::Unknown },
+              uid . clone (),
+              metadata . unknown_relRepo . clone (),
+              metadata . claimsMembership,
+              Warrant::ByGraph ) } )), // a derived fact: the refresh sets it
           if body . is_some () || ! title . is_empty () {
             Some ( BufferValidationError::Other ( with_org_subheadlines (
               if metadata . is_restricted {

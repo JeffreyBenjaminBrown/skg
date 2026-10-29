@@ -198,7 +198,7 @@ fn skgrepo_of_nearest_occurrence_ancestor (
           . unwrap_or_else ( || at . home_skgrepo . clone () )
         } else { at . home_skgrepo . clone () } ),
       ViewnodeKind::Vognode (
-        Vognode::Ghost (_) | Vognode::Unknown (_) | Vognode::Restricted (_))
+        Vognode::Ghost (_) | Vognode::GnidOnly (_))
         | ViewnodeKind::Folder (_) => continue,
       ViewnodeKind::PropertyMember (_)
         | ViewnodeKind::ChangeViewnode (_)

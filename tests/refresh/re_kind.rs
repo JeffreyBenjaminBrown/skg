@@ -32,7 +32,7 @@ node p
   assert_eq! ( x . value () . viewnode_id, Some ( ViewnodeId ("zz" . into ()) ),
                "the unknown keeps the occurrence's vnid" );
   assert_eq! ( run . buffer_correction_kinds (),
-               vec! [ BufferCorrectionKind::Rekinded (VognodeKind::Unknown) ] ); }
+               vec! [ BufferCorrectionKind::Rekinded (VognodeKind::GnidOnly (GnidOnlyKind::Unknown)) ] ); }
 
 #[test]
 fn an_occurrence_no_node_answers_to_and_no_list_names_becomes_a_tombstone () {
