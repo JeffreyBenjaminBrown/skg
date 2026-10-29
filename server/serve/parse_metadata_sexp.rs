@@ -95,13 +95,13 @@ pub enum RestoreRequest {
 pub struct ViewnodeMetadata {
   pub foldAndFocus: FoldAndFocus,
   pub viewnode_id: Option<ViewnodeId>,
-  // None means vognode, Some means non-vognode.
-  pub non_vognode: Option<ViewnodeKind>,
-  // Occurrence fields (ignored if non-vognode is Some)
+  // The kind the headline names, with the parts only that kind takes.
+  pub kind: MetadataKind,
+  // An occurrence's or a ghost's (ignored for any other kind)
   pub gnid: Option<ID>,
   pub home_skgrepo: Option<SkgrepoName>,
-  // False when the headline carries 'noClaim': on a node, an alias,
-  // an id or an unknown.
+  // False when the headline carries 'noClaim': on a node, a ghost, an
+  // alias, an id or a gnid-only vognode.
   pub claimsMembership: bool,
   pub writeProtected: bool,
   pub graphStats: GraphnodeStats,
@@ -116,28 +116,40 @@ pub struct ViewnodeMetadata {
   pub readiness_request: Option<ReadinessRequest>,
   pub property_relRepo : Option<SkgrepoName>,
   pub property_relRepo_request : Option<SkgrepoName>,
-  // When true, this is a ghost (id and skgrepo are used).
-  pub is_ghost: bool,
-  // When true, this is a tombstone.
-  pub is_tombstone: bool,
-  // When Some, this is an unknown (a viewnode for a missing
-  // referent), or, when 'is_restricted', a Restricted vognode.
-  // Carries only the id; no skgrepo/title/body apply. The two
-  // fields after it are either kind's too.
-  pub unknown_node_gnid: Option<ID>,
-  pub unknown_relRepo : Option<SkgrepoName>,
-  pub unknown_relRepo_request : Option<SkgrepoName>,
-  // When true, this is a Restricted vognode.
-  pub is_restricted: bool,
+}
+
+/// The kind a headline's metadata names. A gnid-only vognode's parts
+/// ride with its kind; so do a folder's and a property member's, in
+/// the viewnode kind 'Other' holds.
+#[derive(Debug, Clone, PartialEq)]
+pub enum MetadataKind {
+  Node,
+  Ghost,
+  GnidOnly (GnidOnlyMetadata),
+  Tombstone,
+  Other (ViewnodeKind),
+}
+
+/// What a gnid-only vognode's headline says: its kind, its gnid, the
+/// record's relRepo and a relRepo request. The parse names the kind
+/// before it reads the parts, so until it has read them the gnid is
+/// empty; a headline that writes none is refused.
+#[derive(Debug, Clone, PartialEq)]
+pub struct GnidOnlyMetadata {
+  pub kind            : GnidOnlyKind,
+  pub gnid            : ID,
+  pub relRepo         : Option<SkgrepoName>,
+  pub relRepo_request : Option<SkgrepoName>,
 }
 
 impl ViewnodeMetadata {
   /// Whether the headline is an occurrence: no other kind is named.
   pub fn names_an_occurrence (&self) -> bool {
-    self . non_vognode . is_none ()
-    && ! self . is_ghost
-    && ! self . is_tombstone
-    && self . unknown_node_gnid . is_none () }
+    matches! ( self . kind, MetadataKind::Node ) }
+
+  /// Whether the headline is a ghost.
+  pub fn is_ghost (&self) -> bool {
+    matches! ( self . kind, MetadataKind::Ghost ) }
 
   /// What a message says of the headline that wrote this metadata and
   /// TITLE: the IDs it writes, not any the parse supplies.
@@ -147,15 +159,16 @@ impl ViewnodeMetadata {
   ) -> HeadlineName {
     HeadlineName::of (
       self . viewnode_id . as_ref (),
-      self . gnid . as_ref ()
-        . or ( self . unknown_node_gnid . as_ref () ),
+      match &self . kind {
+        MetadataKind::GnidOnly (gnid_only) => Some (&gnid_only . gnid),
+        _ => self . gnid . as_ref () },
       title ) }}
 
 pub fn default_metadata() -> ViewnodeMetadata {
   ViewnodeMetadata {
     foldAndFocus: FoldAndFocus::default(),
     viewnode_id: None,
-    non_vognode: None,
+    kind: MetadataKind::Node,
     gnid: None,
     home_skgrepo: None,
     claimsMembership: true,
@@ -169,13 +182,7 @@ pub fn default_metadata() -> ViewnodeMetadata {
     view_requests: HashSet::new(),
     readiness_request: None,
     property_relRepo : None,
-    property_relRepo_request : None,
-    is_ghost: false,
-    is_tombstone: false,
-    unknown_node_gnid: None,
-    unknown_relRepo: None,
-    unknown_relRepo_request: None,
-    is_restricted: false, }}
+    property_relRepo_request : None, }}
 
 /// Create a Viewnode from parsed metadata components.
 /// This is the bridge between parsing (ViewnodeMetadata) and runtime (Viewnode).
@@ -199,30 +206,29 @@ pub fn viewnode_from_metadata (
     metadata . headline_name (&title);
   let (kind, error, warning)
     : (ViewnodeKind, Option<BufferValidationError>, Option<String>)
-    = if let Some (ref uid) = metadata . unknown_node_gnid {
+    = match &metadata . kind {
+      MetadataKind::GnidOnly (gnid_only) => {
         let relationshipEditRequest : Option<RelationshipEditRequest> =
-          metadata . unknown_relRepo_request . clone ()
+          gnid_only . relRepo_request . clone ()
           . map (RelationshipEditRequest::RelRepo);
         ( ViewnodeKind::Vognode ( Vognode::GnidOnly ( GnidOnlyVognode {
             relationshipEditRequest,
             .. GnidOnlyVognode::new (
-              if metadata . is_restricted { GnidOnlyKind::Restricted }
-              else { GnidOnlyKind::Unknown },
-              uid . clone (),
-              metadata . unknown_relRepo . clone (),
+              gnid_only . kind,
+              gnid_only . gnid . clone (),
+              gnid_only . relRepo . clone (),
               metadata . claimsMembership,
               Warrant::ByGraph ) } )), // a derived fact: the refresh sets it
           if body . is_some () || ! title . is_empty () {
             Some ( BufferValidationError::Other ( with_org_subheadlines (
-              if metadata . is_restricted {
-                "restricted content cannot be edited." }
-              else { "unknown content cannot be edited." },
+              &format! ( "{} content cannot be edited.",
+                         gnid_only . kind . wire_atom () ),
               &[ headline . clone () ] )))
           } else { None },
-          None )
-      } else if metadata . is_tombstone {
-        ( ViewnodeKind::Tombstone, None, None )
-      } else if metadata . is_ghost {
+          None ) },
+      MetadataKind::Tombstone =>
+        ( ViewnodeKind::Tombstone, None, None ),
+      MetadataKind::Ghost =>
         ( ViewnodeKind::Vognode (Vognode::Ghost ( Ghost {
             gnid : metadata . gnid . clone ()
                     . unwrap_or_else ( || ID::from ("")),
@@ -234,8 +240,8 @@ pub fn viewnode_from_metadata (
               metadata . restore_request == Some (RestoreRequest::RestoreNode),
             claimsMembership : metadata . claimsMembership,
             warrant : Warrant::ByGraph, // a derived fact: the refresh sets it
-          } )), None, None )
-      } else if let Some ( ref non_vognode ) = metadata . non_vognode {
+          } )), None, None ),
+      MetadataKind::Other (non_vognode) => {
         let is_flags_folder = matches! (non_vognode,
           ViewnodeKind::Folder (Folder::Flags { .. }));
         let is_flag = matches! (non_vognode,
@@ -305,10 +311,9 @@ pub fn viewnode_from_metadata (
             ViewnodeKind::ChangeViewnode (ChangeViewnode::ChangesetMarker {
               kind : *kind }),
           other => other . clone () };
-        ( non_vognode_with_title, error, folder_title_warning )
-      } else {
-      // Occurrence
-      { let relationshipEditRequest : Option<RelationshipEditRequest> =
+        ( non_vognode_with_title, error, folder_title_warning ) },
+      MetadataKind::Node => {
+        let relationshipEditRequest : Option<RelationshipEditRequest> =
           // lives outside 'Editability'
           if metadata . restore_request == Some (RestoreRequest::RestoreRel)
           { Some (RelationshipEditRequest::RestoreRel) }
@@ -359,8 +364,7 @@ pub fn viewnode_from_metadata (
         let node_kind : ViewnodeKind =
           ViewnodeKind::Vognode ( Vognode::Occurrence (t) );
         ( node_kind,
-          error, None ) }
-    };
+          error, None ) }, };
   ( Viewnode { foldAndFocus      : metadata . foldAndFocus,
                  kind,
                  // derived facts, which the parser skips
@@ -404,17 +408,6 @@ fn retired_spelling (
   format! ( "'{}' is a retired metadata spelling; the grammar is {}",
             spelling, METADATA_GRAMMAR ) }
 
-/// The kind a headline's metadata names.
-#[derive(Debug, Clone)]
-enum MetadataKind {
-  Node,
-  Ghost,
-  Unknown,
-  Restricted,
-  Tombstone,
-  Other (ViewnodeKind),
-}
-
 /// The parts a kind accepts, beside the position atoms and the
 /// viewnode ID, which every kind accepts.
 fn parts_of_kind (
@@ -427,7 +420,7 @@ fn parts_of_kind (
     MetadataKind::Ghost =>
       &[ "gnid", "skgRepos", "noClaim", "editRequest", "viewRequests",
          "view", "diff" ],
-    MetadataKind::Unknown | MetadataKind::Restricted =>
+    MetadataKind::GnidOnly (_) =>
       &[ "gnid", "skgRepos", "noClaim", "editRequest", "diff" ],
     MetadataKind::Tombstone => &[],
     MetadataKind::Other (ViewnodeKind::PropertyMember (
@@ -455,10 +448,19 @@ fn kind_name (
   match kind {
     MetadataKind::Node      => "node" . to_string (),
     MetadataKind::Ghost     => "ghost" . to_string (),
-    MetadataKind::Unknown   => "unknown" . to_string (),
-    MetadataKind::Restricted => "restricted" . to_string (),
+    MetadataKind::GnidOnly (gnid_only) => gnid_only . kind . wire_atom () . to_string (),
     MetadataKind::Tombstone => "tombstone" . to_string (),
     MetadataKind::Other (kind) => kind_error_label (kind), } }
+
+/// A gnid-only kind as the parse names it, its parts not yet read.
+fn gnid_only_kind_to_read (
+  kind : GnidOnlyKind,
+) -> MetadataKind {
+  MetadataKind::GnidOnly ( GnidOnlyMetadata {
+    kind,
+    gnid            : ID::default (),
+    relRepo         : None,
+    relRepo_request : None, } ) }
 
 /// Parse metadata from org-mode headline into ViewnodeMetadata.
 /// See file header comment for full syntax.
@@ -490,25 +492,20 @@ pub fn parse_metadata_to_viewnodemd (
       if parts . iter () . any ( |(seen, _)| *seen == name ) {
         return Err ( format! ( "{} may appear only once", name )); }
       parts . push ( (name, element) ); }}
-  let kind : MetadataKind = kind . unwrap_or (MetadataKind::Node);
+  let mut kind : MetadataKind = kind . unwrap_or (MetadataKind::Node);
   for (name, _) in &parts {
     if ! parts_of_kind (&kind) . contains ( &name . as_str () ) {
       return Err ( format! ( "A headline of kind {} does not take {}",
                              kind_name (&kind), name )); }}
   for (name, element) in &parts {
-    read_metadata_part (&kind, name, element, &mut result) ?; }
-  match kind {
-    MetadataKind::Node => {},
-    MetadataKind::Ghost => result . is_ghost = true,
-    MetadataKind::Unknown =>
-      if result . unknown_node_gnid . is_none () {
-        return Err ( "An unknown requires its (gnid X)" . to_string () ); },
-    MetadataKind::Restricted => {
-      if result . unknown_node_gnid . is_none () {
-        return Err ( "A Restricted vognode requires its (gnid X)" . to_string () ); }
-      result . is_restricted = true; },
-    MetadataKind::Tombstone => result . is_tombstone = true,
-    MetadataKind::Other (other) => result . non_vognode = Some (other), }
+    read_metadata_part (&mut kind, name, element, &mut result) ?; }
+  if let MetadataKind::GnidOnly (gnid_only) = &kind {
+    if gnid_only . gnid . 0 . is_empty () {
+      return Err ( match gnid_only . kind {
+        GnidOnlyKind::Unknown    => "An unknown requires its (gnid X)",
+        GnidOnlyKind::Restricted => "A Restricted vognode requires its (gnid X)", }
+                   . to_string () ); }}
+  result . kind = kind;
   check_where_the_edit_request_sits (&result) ?;
   Ok (result) }
 
@@ -538,8 +535,8 @@ fn classify_metadata_element (
         "noClaim" | "writeProtected" => part (&atom),
         "node"       => a_kind (MetadataKind::Node),
         "ghost"      => a_kind (MetadataKind::Ghost),
-        "unknown"    => a_kind (MetadataKind::Unknown),
-        "restricted" => a_kind (MetadataKind::Restricted),
+        "unknown"    => a_kind ( gnid_only_kind_to_read (GnidOnlyKind::Unknown) ),
+        "restricted" => a_kind ( gnid_only_kind_to_read (GnidOnlyKind::Restricted) ),
         "tombstone"  => a_kind (MetadataKind::Tombstone),
         "alias"      => a_kind ( MetadataKind::Other (
           ViewnodeKind::PropertyMember (
@@ -619,7 +616,7 @@ fn classify_metadata_element (
 /// 'kind' into 'metadata'. 'parts_of_kind' has already said the kind
 /// takes it.
 fn read_metadata_part (
-  kind     : &MetadataKind,
+  kind     : &mut MetadataKind,
   name     : &str,
   element  : &Sexp,
   metadata : &mut ViewnodeMetadata,
@@ -636,8 +633,8 @@ fn read_metadata_part (
     "view" | "diff" => {}, // derived facts, skipped whole
     "gnid" => {
       let gnid : ID = ID::from ( single_argument (name, args) ? );
-      if matches! (kind, MetadataKind::Unknown | MetadataKind::Restricted) {
-        metadata . unknown_node_gnid = Some (gnid);
+      if let MetadataKind::GnidOnly (gnid_only) = kind {
+        gnid_only . gnid = gnid;
       } else { metadata . gnid = Some (gnid); }},
     "skgRepos" => {
       let (nodeRepo, relRepo) : (Option<SkgrepoName>, Option<SkgrepoName>) =
@@ -656,8 +653,8 @@ fn read_metadata_part (
             return Err ( format! (
               "The skgRepos of a headline of kind {} holds only (relRepo R)",
               kind_name (kind) )); }
-          if matches! (kind, MetadataKind::Unknown | MetadataKind::Restricted) {
-            metadata . unknown_relRepo = relRepo;
+          if let MetadataKind::GnidOnly (gnid_only) = kind {
+            gnid_only . relRepo = relRepo;
           } else { metadata . property_relRepo = relRepo; }}, }},
     "overridesHere" =>
       // Load-bearing: save extraction round-trips the original ID
@@ -681,7 +678,7 @@ fn read_metadata_part (
           return Err (message); }
         let takes_a_relRepo_request : bool =
           matches! ( kind,
-            MetadataKind::Unknown | MetadataKind::Restricted
+            MetadataKind::GnidOnly (_)
             | MetadataKind::Other ( ViewnodeKind::PropertyMember (
                 PropertyMember::Alias { .. } )));
         if request_metadata . edit_request . is_some ()
@@ -693,8 +690,8 @@ fn read_metadata_part (
             if takes_a_relRepo_request { "(relRepo R) and a readiness request" }
             else { "a readiness request" } )); }
         metadata . readiness_request = request_metadata . readiness_request;
-        if matches! (kind, MetadataKind::Unknown | MetadataKind::Restricted) {
-          metadata . unknown_relRepo_request = request_metadata . relRepo_request;
+        if let MetadataKind::GnidOnly (gnid_only) = kind {
+          gnid_only . relRepo_request = request_metadata . relRepo_request;
         } else {
           metadata . property_relRepo_request = request_metadata . relRepo_request; }}, },
     "viewRequests" =>
@@ -738,19 +735,19 @@ fn check_where_the_edit_request_sits (
 ) -> Result<(), String> {
   let is_occurrence : bool =
     metadata . names_an_occurrence ();
-  if metadata . is_ghost && ! metadata . view_requests . is_empty ()
+  if metadata . is_ghost () && ! metadata . view_requests . is_empty ()
   { return Err ( "A ghost accepts no view request" . to_string () ); }
   // 'parse_editrequest_sexp' reads at most one of the two.
   match ( &metadata . restore_request, &metadata . edit_request ) {
-    ( Some (RestoreRequest::RestoreNode), _ ) if metadata . is_ghost =>
+    ( Some (RestoreRequest::RestoreNode), _ ) if metadata . is_ghost () =>
       Ok (( )),
     ( Some (RestoreRequest::RestoreRel), _ ) if is_occurrence =>
       Ok (( )),
     ( request @ Some (_), _ ) =>
       Err ( misplaced_restore_request_message (
-        request, metadata . is_ghost )
+        request, metadata . is_ghost () )
             . expect ("a restore request") ),
-    ( None, Some (_) ) if metadata . is_ghost =>
+    ( None, Some (_) ) if metadata . is_ghost () =>
       Err ( "A ghost accepts no edit request but restoreNode"
             . to_string () ),
     _ => Ok (( )), } }

@@ -4,11 +4,13 @@
 // ('METADATA_GRAMMAR' in server/serve/parse_metadata_sexp.rs): the
 // viewnode ID first, the kind a bare atom, every part beside it at the
 // top level, in any order; the retired spellings refused with a
-// message naming the grammar; and each kind taking only its own parts.
+// message naming the grammar; each kind taking only its own parts; and
+// the parse keeping the kind it read, with that kind's parts.
 
 use skg::org_to_text::viewnode_to_string;
 use skg::serve::parse_metadata_sexp::{
-  METADATA_GRAMMAR, ViewnodeMetadata, parse_metadata_to_viewnodemd};
+  GnidOnlyMetadata, METADATA_GRAMMAR, MetadataKind, ViewnodeMetadata,
+  parse_metadata_to_viewnodemd, viewnode_from_metadata};
 use skg::types::misc::{ID, SkgConfig, SkgrepoName};
 use skg::types::viewnode::{
   Ghost, GnidOnlyKind, GnidOnlyVognode, PropertyMember, Viewnode, ViewnodeId, ViewnodeKind,
@@ -122,6 +124,14 @@ fn each_kind_takes_only_its_own_parts (
       "The skgRepos of a headline of kind unknown holds only (relRepo R)" ),
     ( "(skg unknown (skgRepos (relRepo pub)))",
       "An unknown requires its (gnid X)" ),
+    ( "(skg restricted (gnid r) writeProtected)",
+      "A headline of kind restricted does not take writeProtected" ),
+    ( "(skg restricted (gnid r) (skgRepos (nodeRepo main)))",
+      "The skgRepos of a headline of kind restricted holds only (relRepo R)" ),
+    ( "(skg restricted (skgRepos (relRepo pub)))",
+      "A Restricted vognode requires its (gnid X)" ),
+    ( "(skg restricted (gnid r) (editRequest delete))",
+      "A headline of kind restricted accepts no edit request but (relRepo R) and a readiness request" ),
     ( "(skg alias (gnid a))",
       "A headline of kind alias does not take gnid" ),
     ( "(skg alias (skgRepos (nodeRepo main)))",
@@ -144,7 +154,33 @@ fn a_headline_naming_no_kind_is_a_node (
 ) {
   let metadata : ViewnodeMetadata =
     parse_metadata_to_viewnodemd ("(skg focused)") . unwrap ();
-  assert! ( metadata . non_vognode . is_none () && ! metadata . is_ghost
-            && ! metadata . is_tombstone
-            && metadata . unknown_node_gnid . is_none ()
+  assert! ( metadata . kind == MetadataKind::Node
             && metadata . foldAndFocus . focused ); }
+
+/// The parse keeps a gnid-only vognode's kind with its parts, and
+/// refuses text on its line as it always has, by its kind's atom.
+#[test]
+fn a_gnid_only_vognode_keeps_its_kind_and_its_parts (
+) {
+  for kind in [ GnidOnlyKind::Unknown, GnidOnlyKind::Restricted ] {
+    let metadata : ViewnodeMetadata = parse_metadata_to_viewnodemd ( &format! (
+      "(skg {} (gnid g) (skgRepos (relRepo pub)) noClaim (editRequest (relRepo priv)))",
+      kind . wire_atom () )) . unwrap ();
+    assert_eq! ( metadata . kind, MetadataKind::GnidOnly ( GnidOnlyMetadata {
+      kind,
+      gnid            : ID::from ("g"),
+      relRepo         : Some ( SkgrepoName::from ("pub") ),
+      relRepo_request : Some ( SkgrepoName::from ("priv") ), } ));
+    assert! ( ! metadata . names_an_occurrence () );
+    let (viewnode, error, _warning) =
+      viewnode_from_metadata (&metadata, String::new (), None);
+    assert_eq! ( error, None );
+    let ViewnodeKind::Vognode ( Vognode::GnidOnly (gnid_only) ) = &viewnode . kind
+      else { panic! ("{:?} parsed to {:?}", kind, viewnode . kind) };
+    assert_eq! ( ( gnid_only . kind, gnid_only . claimsMembership ), (kind, false) );
+    let (_viewnode, error, _warning) =
+      viewnode_from_metadata (&metadata, "typed text" . into (), None);
+    let refusal : String = format! ( "{:?}", error . expect ("text is refused") );
+    assert! ( refusal . contains ( &format! (
+                "{} content cannot be edited.", kind . wire_atom () )),
+              "{}", refusal ); }}

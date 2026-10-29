@@ -794,7 +794,7 @@ fn flag_requests_parse_round_trip_and_reject_write_protected_flags (
 fn unknown_relrepo_fact_and_request_round_trip_separately (
 ) {
   use crate::org_to_text::viewnode_to_string;
-  use crate::serve::parse_metadata_sexp::parse_metadata_to_viewnodemd;
+  use crate::serve::parse_metadata_sexp::{MetadataKind, parse_metadata_to_viewnodemd};
   use crate::types::viewnode::{mk_unknown_viewnode, RelationshipEditRequest, ViewnodeKind, Vognode};
 
   let mut unknown = mk_unknown_viewnode ( ID::new ("absent-raw") );
@@ -809,8 +809,10 @@ fn unknown_relrepo_fact_and_request_round_trip_separately (
             "Unknown facts and requests must serialize in stable order: {}", rendered );
   let parsed = parse_metadata_to_viewnodemd (
     &format! ("(skg {})", rendered) ) . unwrap ();
-  assert_eq! ( parsed . unknown_relRepo,
+  let MetadataKind::GnidOnly (gnid_only) = &parsed . kind
+    else { panic! ("parsed as {:?}", parsed . kind) };
+  assert_eq! ( gnid_only . relRepo,
                Some (SkgrepoName::from ("private")) );
-  assert_eq! ( parsed . unknown_relRepo_request,
+  assert_eq! ( gnid_only . relRepo_request,
                Some (SkgrepoName::from ("secret")) );
 }

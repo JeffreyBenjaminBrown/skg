@@ -2,6 +2,7 @@
 
 use skg::dbs::tantivy::search::{SearchOptions, search_index};
 use skg::from_text::buffer_to_viewnodes::uninterpreted::headline_to_triple;
+use skg::serve::parse_metadata_sexp::MetadataKind;
 use skg::org_to_text::viewforest_to_string;
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::types::misc::{ID, MSV, RelPartner, SkgConfig, SkgrepoName, SkgrepoSetName, TantivyIndex, rel_partners_at_relRepo_msv};
@@ -106,8 +107,8 @@ fn test_text_search_org_format (
                     ( gnid . to_string (), title ) ); }} },
             _ => {
               if let Some (md) = metadata {
-                if let Some ( ViewnodeKind::Folder (Folder::Alias) )
-                  = md . non_vognode
+                if let MetadataKind::Other ( ViewnodeKind::Folder (Folder::Alias) )
+                  = md . kind
                   { gnids_with_alias_folder . push (
                       level1_headlines . last () . unwrap () . 0 . clone () ); }} }, }} }
 
