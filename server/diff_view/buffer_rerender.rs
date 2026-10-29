@@ -22,7 +22,7 @@ use crate::types::misc::ID;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::ViewnodeId;
 use crate::types::views_state::{DiffViewBufferKind, ViewnodeIdRecord};
-use crate::update_buffer::{DiffViewRerender, RerenderPassContext};
+use crate::rerender_pass::RerenderPassContext;
 use crate::refresh::mode::RefreshMode;
 
 use ego_tree::NodeId;
@@ -59,7 +59,7 @@ pub fn refresh_diffView_viewforest (
 /// Rerender a buffer of the diff view: bring the straddle in the
 /// context's slot up to date, and refresh the buffer over it.
 /// Only for the "integrate unshown changes" request
-/// ('DiffViewRerender::integrate_unshown_changes') does it make occurrences editable or
+/// ('RerenderPassContext::integrates_unshown_changes') does it make occurrences editable or
 /// append roots: before the refresh each node of the recomputed U
 /// without an editable occurrence becomes editable at its first
 /// content occurrence; after it, the content origins of the recomputed
@@ -74,13 +74,12 @@ pub fn refresh_diffView_viewforest (
 /// rendering of them, and unread as a first rendering is
 /// ('outside_the_appended_roots').
 pub fn rerender_diffView_buffer (
-  context            : &mut RerenderPassContext<'_>,
-  rerender           : DiffViewRerender,
-  viewforest         : &mut ViewForest,
-  viewnode_id_record : &mut ViewnodeIdRecord,
+  context              : &mut RerenderPassContext<'_>,
+  diffView_buffer_kind : DiffViewBufferKind,
+  viewforest           : &mut ViewForest,
+  viewnode_id_record   : &mut ViewnodeIdRecord,
 ) -> Result<Vec<BufferCorrection>, Box<dyn Error>> {
-  let DiffViewRerender { buffer_kind : diffView_buffer_kind,
-                         integrate_unshown_changes } : DiffViewRerender = rerender;
+  let integrate_unshown_changes : bool = context . integrates_unshown_changes;
   let runtime : &RuntimeGeneration = &context . runtime;
   let restriction : Option<&SkgrepoRestriction> = context . skgrepo_restriction;
   let buffer_correction_policy : &BufferCorrectionPolicy =

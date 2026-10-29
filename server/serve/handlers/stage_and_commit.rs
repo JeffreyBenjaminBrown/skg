@@ -24,7 +24,7 @@ use crate::graph_straddle::types::GraphStraddle;
 use crate::diff_view::readiness_store::ReadinessStore;
 use crate::serve::ViewsState;
 use crate::serve::rerender_stream::{
-  PreparedRerenders, prepare_rerender_views_where,
+  PreparedRerenders, RerenderRequest, RerenderSelector, prepare_rerender_views,
   stream_empty_rerender, stream_prepared_rerenders};
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{
@@ -34,7 +34,6 @@ use crate::sexp_string::quote_sexp_string;
 use crate::skgrepo_sets::{SkgrepoRestriction, require_skgrepo_set_all};
 use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::types::misc::SkgrepoName;
-use crate::update_buffer::RerenderOptions;
 
 use sexp::{Atom, Sexp};
 use std::iter::once;
@@ -96,11 +95,13 @@ fn stream_rerender_diffView_views (
   views_state         : &mut ViewsState,
   skgrepo_restriction : &SkgrepoRestriction,
 ) {
-  let prepared : PreparedRerenders = prepare_rerender_views_where (
+  let prepared : PreparedRerenders = prepare_rerender_views (
     env, env . runtime_snapshot (), views_state,
-    Some (skgrepo_restriction), BufferCorrectionPolicy::ReportAll,
-    RerenderOptions::ordinary,
-    |_, state| state . diffView_buffer_kind . is_some () );
+    RerenderRequest {
+      restriction              : skgrepo_restriction,
+      buffer_correction_policy : BufferCorrectionPolicy::ReportAll,
+      selector                 : RerenderSelector::Where ( Box::new (
+        |_, state| state . diffView_buffer_kind . is_some () )), } );
   stream_prepared_rerenders (stream, views_state, prepared);
 }
 

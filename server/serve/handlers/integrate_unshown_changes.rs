@@ -15,7 +15,7 @@ use crate::diff_view::readiness_requests::buffer_readiness_summary_for;
 use crate::graph_straddle::types::GraphStraddle;
 use crate::serve::ViewsState;
 use crate::serve::rerender_stream::{
-  PreparedRerenders, prepare_rerender_views_where,
+  PreparedRerenders, RerenderRequest, RerenderSelector, prepare_rerender_views,
   stream_empty_rerender, stream_prepared_rerenders};
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{
@@ -24,7 +24,7 @@ use crate::serve::util::{
 use crate::skgrepo_sets::{SkgrepoRestriction, require_skgrepo_set_all};
 use crate::types::env::SkgEnv;
 use crate::types::views_state::ViewforestId;
-use crate::update_buffer::{RerenderOptions, RerenderedView};
+use crate::update_buffer::RerenderedView;
 
 use std::net::TcpStream;
 use std::sync::Arc;
@@ -54,9 +54,9 @@ pub fn handle_integrate_unshown_changes_request (
       stream_prepared_rerenders (stream, views_state, prepared); }, }}
 
 /// The named buffer's registered viewforest, rerendered over the
-/// connection's graph straddle, brought up to date, with
-/// 'integrate_unshown_changes' set ('RerenderOptions'), and the readiness
-/// summary of the result. Nothing is registered or sent. Refused
+/// connection's graph straddle, brought up to date, with its unshown
+/// changes integrated ('RerenderSelector::IntegratingUnshownChanges'),
+/// and the readiness summary of the result. Nothing is registered or sent. Refused
 /// unless the skgrepo restriction is 'all', as the diff view
 /// is, and unless the view is a buffer of the diff view.
 fn integrate_unshown_changes (
@@ -72,11 +72,12 @@ fn integrate_unshown_changes (
     return Err ( format! (
       "View {} is not a buffer of the diff view.",
       viewforest_id . repr_in_client () )); }
-  let prepared : PreparedRerenders = prepare_rerender_views_where (
+  let prepared : PreparedRerenders = prepare_rerender_views (
     env, env . runtime_snapshot (), views_state,
-    Some (skgrepo_restriction), BufferCorrectionPolicy::ReportAll,
-    RerenderOptions::for_integrating_unshown_changes,
-    |registered_viewforest_id, _| *registered_viewforest_id == viewforest_id );
+    RerenderRequest {
+      restriction              : skgrepo_restriction,
+      buffer_correction_policy : BufferCorrectionPolicy::ReportAll,
+      selector                 : RerenderSelector::IntegratingUnshownChanges (viewforest_id), } );
   let (Some (view), Some (straddle)) :
     (Option<&RerenderedView>, Option<&Arc<GraphStraddle>>) =
     (prepared . views . first (), prepared . graph_straddle . as_ref ())

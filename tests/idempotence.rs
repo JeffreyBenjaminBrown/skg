@@ -38,7 +38,7 @@ use skg::types::tree::forest::ViewForest;
 use skg::update_buffer::render_initial_view;
 
 use crate::git_fixture::{OwnedSkgrepos, git_fixture, graph_straddle};
-use skg::diff_view::refresh::refresh_diffView_viewforest;
+use skg::diff_view::buffer_rerender::refresh_diffView_viewforest;
 use skg::diff_view::pruned_change_view::RenderedDiffViewBuffer;
 use skg::diff_view::readiness_store::ReadinessStore;
 use skg::graph_straddle::types::GraphStraddle;

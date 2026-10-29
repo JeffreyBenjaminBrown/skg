@@ -3,7 +3,7 @@ use crate::serve::ViewsState;
 use crate::serve::rerender_stream::{
   PreparedRerenders,
   authorize_prepared_rerenders,
-  prepare_rerender_views_with_runtime,
+  RerenderRequest, RerenderSelector, prepare_rerender_views,
   stream_empty_rerender,
   stream_prepared_rerenders};
 use crate::serve::handlers::text_release::approved_pids_from_request;
@@ -17,7 +17,6 @@ use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::types::misc::SkgrepoSetName;
 use crate::types::misc::SkgConfig;
-use crate::update_buffer::RerenderOptions;
 
 use std::net::TcpStream;
 use std::sync::Arc;
@@ -82,13 +81,15 @@ fn set_skgrepo_restriction (
           stream, skgrepo_restriction, &e . to_string ());
         return; }};
   let mut prepared : PreparedRerenders =
-    prepare_rerender_views_with_runtime (
-      env, runtime, views_state, Some (&restriction),
-      BufferCorrectionPolicy::after_a_switch (
-        restriction != *skgrepo_restriction ),
-      RerenderOptions::ordinary );
+    prepare_rerender_views (
+      env, runtime, views_state,
+      RerenderRequest {
+        restriction              : &restriction,
+        buffer_correction_policy : BufferCorrectionPolicy::after_a_switch (
+          restriction != *skgrepo_restriction ),
+        selector                 : RerenderSelector::All, } );
   if ! authorize_prepared_rerenders (
-    stream, &mut prepared, Some (&restriction),
+    stream, &mut prepared, &restriction,
     "repo-set-switch-rerender",
     &approved_pids_from_request (request) ) {
     return; }

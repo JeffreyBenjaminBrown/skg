@@ -34,7 +34,7 @@ use crate::types::viewnode::{
   ChangeFacts, Editability, Existence, FoldAndFocus, Folder, Viewnode, ViewnodeKind,
   Vognode, mk_editable_viewnode, viewnode_of};
 use crate::types::views_state::{DiffViewBufferKind, ViewnodeIdRecord, pids_from_viewforest};
-use crate::diff_view::refresh::refresh_diffView_viewforest;
+use crate::diff_view::buffer_rerender::refresh_diffView_viewforest;
 use crate::refresh::buffer_corrections::BufferCorrectionPolicy;
 
 use ego_tree::{NodeId, NodeRef};

@@ -4,7 +4,7 @@ use crate::delete_references_to_absent_node::{
 use crate::dbs::in_rust_graph::new_handle;
 use crate::save::update_graph_minus_nodeMerges_with_hoist_approval;
 use crate::serve::rerender_stream::{
-  PreparedRerenders, prepare_rerender_views_where,
+  PreparedRerenders, RerenderRequest, RerenderSelector, prepare_rerender_views,
   stream_empty_rerender, stream_prepared_rerenders };
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{
@@ -16,7 +16,6 @@ use crate::types::env::SkgEnv;
 use crate::types::misc::ID;
 use crate::types::tree::forest::ViewForest;
 use crate::types::views_state::pids_from_viewforest;
-use crate::update_buffer::RerenderOptions;
 use crate::serve::ViewsState;
 
 use futures::executor::block_on;
@@ -101,12 +100,14 @@ fn stream_rerender_views_after_absent_reference_cleanup (
   raw_gnid     : &crate::types::misc::ID,
   affected_recorder_pids : &HashSet<crate::types::misc::ID>,
 ) {
-  let prepared : PreparedRerenders = prepare_rerender_views_where (
+  let prepared : PreparedRerenders = prepare_rerender_views (
     env, env . runtime_snapshot (), views_state,
-    Some (skgrepo_restriction), BufferCorrectionPolicy::ReportAll,
-    RerenderOptions::ordinary,
-    |_, state| view_can_display_absent_reference_change (
-      &state . viewforest, raw_gnid, affected_recorder_pids ));
+    RerenderRequest {
+      restriction              : skgrepo_restriction,
+      buffer_correction_policy : BufferCorrectionPolicy::ReportAll,
+      selector                 : RerenderSelector::Where ( Box::new (
+        |_, state| view_can_display_absent_reference_change (
+          &state . viewforest, raw_gnid, affected_recorder_pids ))), } );
   stream_prepared_rerenders (stream, views_state, prepared);
 }
 

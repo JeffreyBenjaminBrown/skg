@@ -8,12 +8,11 @@ use crate::serve::handlers::text_release::approved_pids_from_request;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::rerender_stream::{
   PreparedRerenders, authorize_prepared_rerenders,
-  prepare_rerender_views, stream_prepared_rerenders};
+  RerenderRequest, RerenderSelector, prepare_rerender_views, stream_prepared_rerenders};
 use crate::serve::util::{ format_lock_views_sexp, format_rerender_done_sexp, send_response_with_length_prefix, tag_sexp_response};
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::env::SkgEnv;
 use crate::types::views_state::ViewforestId;
-use crate::update_buffer::RerenderOptions;
 
 use std::net::TcpStream;
 use std::collections::HashSet;
@@ -83,12 +82,15 @@ fn stream_rerender_views_excluding (
   excluded : &HashSet<ViewforestId>,
 ) {
   let mut prepared : PreparedRerenders = prepare_rerender_views (
-    env, views_state, Some (skgrepo_restriction),
-    BufferCorrectionPolicy::ReportAll, RerenderOptions::ordinary );
+    env, env . runtime_snapshot (), views_state,
+    RerenderRequest {
+      restriction              : skgrepo_restriction,
+      buffer_correction_policy : BufferCorrectionPolicy::ReportAll,
+      selector                 : RerenderSelector::All, } );
   prepared . viewforest_ids . retain (|viewforest_id| ! excluded . contains (viewforest_id));
   prepared . views . retain (|view| ! excluded . contains (&view . viewforest_id));
   if ! authorize_prepared_rerenders (
-    stream, &mut prepared, Some (skgrepo_restriction),
+    stream, &mut prepared, skgrepo_restriction,
     "rerender-all-views", approved_pids) {
     return; }
   stream_prepared_rerenders (stream, views_state, prepared);

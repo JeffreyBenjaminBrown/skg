@@ -1,6 +1,8 @@
 //! The rerender pipeline every request that rerenders open views
-//! outside a save shares: prepare, answer, stream. Each rerender is
-//! prepared in memory first ('prepare_rerender_views_where'), so that
+//! outside a save shares: prepare, answer, stream. The request says
+//! under which restriction, with which buffer correction policy and
+//! which views ('RerenderRequest'). Each rerender is prepared in
+//! memory first ('prepare_rerender_views'), so that
 //! a text-release decision ('authorize_prepared_rerenders') can
 //! precede any visible change, and then streamed: "rerender-lock",
 //! one "rerender-view" per view, "rerender-done", which carries the
@@ -20,17 +22,17 @@ use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{ format_lock_views_sexp, format_rerender_done_sexp, format_single_view_sexp, send_response_with_length_prefix, tag_sexp_response};
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
-use crate::types::views_state::{DiffViewBufferKind, ViewforestId, ViewState};
+use crate::types::views_state::{ViewforestId, ViewState};
 use crate::types::views_state::pids_from_viewforest;
-use crate::update_buffer::{
-  RerenderOptions, RerenderPassContext, RerenderedView, rerender_open_view};
+use crate::rerender_pass::RerenderPassContext;
+use crate::update_buffer::{RerenderedView, rerender_open_view};
 
 use std::net::TcpStream;
 use std::collections::HashSet;
 use std::sync::Arc;
 
 pub(crate) struct PreparedRerenders {
-  runtime  : std::sync::Arc<RuntimeGeneration>,
+  runtime  : Arc<RuntimeGeneration>,
   pub(crate) viewforest_ids : Vec<ViewforestId>,
   pub(crate) views    : Vec<RerenderedView>,
   pub(crate) errors   : Vec<String>,
@@ -38,67 +40,69 @@ pub(crate) struct PreparedRerenders {
   pub(crate) graph_straddle : Option<Arc<GraphStraddle>>, // the connection's, as the rerenders brought it up to date
 }
 
-/// Complete every rerender in memory. Nothing is sent and no registered
-/// view is changed, so the text-release decision can precede the lock and
-/// the first externally visible mutation.
+/// What a request that rerenders open views asks of the pass: the
+/// skgrepo restriction to rerender under, which changes are no buffer
+/// corrections, and which views.
+pub(crate) struct RerenderRequest<'a> {
+  pub restriction              : &'a SkgrepoRestriction,
+  pub buffer_correction_policy : BufferCorrectionPolicy,
+  pub selector                 : RerenderSelector<'a>,
+}
+
+/// Which open views a rerender request rerenders, chosen from what
+/// each already holds, before any is cloned or rerendered, so that a
+/// request can leave unrelated clean and dirty buffers untouched.
+pub(crate) enum RerenderSelector<'a> {
+  /// Every open view.
+  All,
+  /// The open views the predicate selects.
+  Where (Box<dyn Fn (&ViewforestId, &ViewState) -> bool + 'a>),
+  /// The one buffer of the diff view an "integrate unshown changes"
+  /// request names, which is rerendered integrating them
+  /// ('RerenderPassContext::integrates_unshown_changes').
+  IntegratingUnshownChanges (ViewforestId),
+}
+
+impl RerenderSelector<'_> {
+  fn selects (
+    &self,
+    viewforest_id : &ViewforestId,
+    state         : &ViewState,
+  ) -> bool {
+    match self {
+      RerenderSelector::All => true,
+      RerenderSelector::Where (include) => include (viewforest_id, state),
+      RerenderSelector::IntegratingUnshownChanges (named) => viewforest_id == named, } }
+}
+
+/// Complete every rerender 'request' asks for in memory, against
+/// 'runtime'. Nothing is sent and no registered view is changed, so
+/// the text-release decision can precede the lock and the first
+/// externally visible mutation. Each view is rerendered in the mode
+/// its own buffer kind gives ('rerender_open_view').
 pub(crate) fn prepare_rerender_views (
-  env                 : &SkgEnv,
-  views_state         : &ViewsState,
-  skgrepo_restriction : Option<&SkgrepoRestriction>,
-  buffer_correction_policy : BufferCorrectionPolicy,
-  rerender_options    : fn (Option<DiffViewBufferKind>) -> RerenderOptions,
-) -> PreparedRerenders {
-  let runtime = env . runtime_snapshot ();
-  prepare_rerender_views_with_runtime (
-    env, runtime, views_state, skgrepo_restriction,
-    buffer_correction_policy, rerender_options)
-}
-
-pub(crate) fn prepare_rerender_views_with_runtime (
-  env                 : &SkgEnv,
-  runtime             : std::sync::Arc<RuntimeGeneration>,
-  views_state         : &ViewsState,
-  skgrepo_restriction : Option<&SkgrepoRestriction>,
-  buffer_correction_policy : BufferCorrectionPolicy,
-  rerender_options    : fn (Option<DiffViewBufferKind>) -> RerenderOptions,
-) -> PreparedRerenders {
-  prepare_rerender_views_where (
-    env, runtime, views_state, skgrepo_restriction,
-    buffer_correction_policy, rerender_options, |_, _| true )
-}
-
-/// Prepare only open views selected from their already-held state.
-/// The selector is deliberately evaluated before cloning or rerendering, so a
-/// command can leave unrelated clean *and dirty* buffers entirely untouched.
-/// 'rerender_options' gives the options of each view's 'rerender_view'
-/// from the view's buffer kind in the diff view, if any.
-/// 'buffer_correction_policy' says which changes the rerenders report
-/// as no buffer corrections.
-pub(crate) fn prepare_rerender_views_where (
-  env                 : &SkgEnv,
-  runtime             : std::sync::Arc<RuntimeGeneration>,
-  views_state         : &ViewsState,
-  skgrepo_restriction : Option<&SkgrepoRestriction>,
-  buffer_correction_policy : BufferCorrectionPolicy,
-  rerender_options    : fn (Option<DiffViewBufferKind>) -> RerenderOptions,
-  include             : impl Fn (&ViewforestId, &ViewState) -> bool,
+  env         : &SkgEnv,
+  runtime     : Arc<RuntimeGeneration>,
+  views_state : &ViewsState,
+  request     : RerenderRequest,
 ) -> PreparedRerenders {
   let viewforest_ids : Vec<ViewforestId> = views_state . open_views . views . iter ()
-    .filter (|(viewforest_id, state)| include (viewforest_id, state))
+    .filter (|(viewforest_id, state)| request . selector . selects (viewforest_id, state))
     .map (|(viewforest_id, _)| viewforest_id . clone ()) . collect ();
+  let integrates_unshown_changes : bool = matches! (
+    request . selector, RerenderSelector::IntegratingUnshownChanges (_) );
   let mut context : RerenderPassContext = RerenderPassContext::new (
-    env, runtime, skgrepo_restriction,
+    env, runtime, Some (request . restriction),
     // A buffer of the diff view is refreshed over a graph straddle
     // brought up to date from the connection's. Streaming the
     // rerenders writes it back, as a save does.
     views_state . graph_straddle . clone (),
-    buffer_correction_policy );
+    request . buffer_correction_policy, integrates_unshown_changes );
   let mut rendered_views : Vec<RerenderedView> = Vec::new ();
   for viewforest_id in &viewforest_ids {
     let _span : tracing::span::EnteredSpan =
       tracing::info_span! ( "rerender_view (rerender-all)" ) . entered ();
-    match rerender_open_view (
-      viewforest_id, views_state, &mut context, rerender_options )
+    match rerender_open_view (viewforest_id, views_state, &mut context)
     { Ok (rendered) => rendered_views . push (rendered),
       Err (e) => context . errors . push (e), }}
   PreparedRerenders {
@@ -111,14 +115,16 @@ pub(crate) fn prepare_rerender_views_where (
   }
 }
 
+/// Whether the prepared rerenders may be streamed under 'restriction'
+/// ('decide_text_release'). If not, the challenge is sent, and an
+/// empty rerender stream after it.
 pub(crate) fn authorize_prepared_rerenders (
-  stream             : &mut TcpStream,
-  prepared           : &mut PreparedRerenders,
-  skgrepo_restriction : Option<&SkgrepoRestriction>,
-  operation          : &str,
-  approved_pids      : &HashSet<crate::types::misc::ID>,
+  stream        : &mut TcpStream,
+  prepared      : &mut PreparedRerenders,
+  restriction   : &SkgrepoRestriction,
+  operation     : &str,
+  approved_pids : &HashSet<crate::types::misc::ID>,
 ) -> bool {
-  let Some (restriction) = skgrepo_restriction else { return true; };
   let candidates : Vec<crate::types::misc::ID> =
     prepared . views . iter ()
     . flat_map ( |view|

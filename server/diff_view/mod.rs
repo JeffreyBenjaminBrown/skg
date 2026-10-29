@@ -3,8 +3,8 @@
 //! describes it; this module implements it:
 //! - 'pruned_change_view.rs': C, R, U and D, each buffer's sets, and
 //!   its stub roots;
-//! - 'refresh.rs': rendering and rerendering a whole buffer, each a
-//!   refresh in diff-view mode ('server/refresh/diff_view.rs');
+//! - 'buffer_rerender.rs': rendering and rerendering a whole buffer,
+//!   each a refresh in diff-view mode ('server/refresh/diff_view.rs');
 //! - 'changes.rs': what changed about a node, and the change viewnodes
 //!   that say it;
 //! - 'change_viewnodes.rs': the diff view's own viewnodes;
@@ -14,11 +14,11 @@
 //! - 'restore_requests.rs': what a save writes for the two restore
 //!   requests.
 
+pub mod buffer_rerender;
 pub mod change_leaves;
 pub mod change_viewnodes;
 pub mod changes;
 pub mod pruned_change_view;
 pub mod readiness_requests;
 pub mod readiness_store;
-pub mod refresh;
 pub mod restore_requests;
