@@ -3,7 +3,9 @@
 //! the node? Then an occurrence. Otherwise, does the truth say the
 //! node is restricted? Then a gnid-only vognode of kind Restricted, if
 //! the goal of the headline's parent names the gnid (its record is
-//! visible), and otherwise a tombstone: a restricted node is never a
+//! visible) or the headline is a root of the view (the view is the
+//! user's own request, so its gnid reveals nothing they did not ask
+//! for), and otherwise a tombstone: a restricted node is never a
 //! ghost. Otherwise, is the mode the diff view, and does HEAD have the
 //! node? Then a ghost. Otherwise, does the list of the headline's
 //! parent name this gnid? Then a gnid-only vognode of kind Unknown.
@@ -40,22 +42,24 @@ pub(crate) enum IdRuleAnswer {
   Occurrence (ID),
   /// The ghost of the node HEAD had under this pid.
   Ghost (ID),
-  /// A gnid-only vognode: of kind Restricted where the truth says the
-  /// node is restricted and the parent's goal names it, marked so; of
-  /// kind Unknown where no node answers to a gnid the parent's goal
-  /// names.
+  /// A gnid-only vognode: of kind Restricted where the node is
+  /// restricted and the parent's goal names it, marked so, or it is a
+  /// root of the view; of kind Unknown where no node answers to a gnid
+  /// the parent's goal names.
   GnidOnly (GnidOnlyKind),
   Tombstone,
 }
 
 /// The ID rule for 'gnid', under a parent whose goal is
-/// 'parent_goal'. In the diff view, a node HEAD had under 'gnid' that
+/// 'parent_goal', or under the buffer root when 'is_view_root' (which
+/// has no goal). In the diff view, a node HEAD had under 'gnid' that
 /// a nodeMerge has since made an extra ID of another node is not back:
 /// 'gnid' is its ghost's, not an occurrence of the acquirer.
 pub(crate) fn id_rule (
-  gnid        : &ID,
-  parent_goal : Option<&Goal>,
-  walk        : &Walk,
+  gnid         : &ID,
+  parent_goal  : Option<&Goal>,
+  is_view_root : bool,
+  walk         : &Walk,
 ) -> IdRuleAnswer {
   let head : Option<&GraphStraddle> = match walk . mode {
     RefreshMode::DiffView { straddle, .. } => Some (straddle),
@@ -71,12 +75,15 @@ pub(crate) fn id_rule (
            straddle . before . nodes . contains_key (gnid) );
     if ! acquired_since_head {
       return IdRuleAnswer::Occurrence (pid); }}
-  if presence == GnidPresence::Restricted {
+  let restricted_answer = || -> IdRuleAnswer {
     let named_restricted : bool = parent_goal
       . and_then ( |goal| goal . item_for ( &GoalMember::Gnid ( gnid . clone () )))
       . is_some_and ( |item| item . restricted );
-    return if named_restricted { IdRuleAnswer::GnidOnly (GnidOnlyKind::Restricted) }
-           else { IdRuleAnswer::Tombstone }; }
+    if named_restricted || is_view_root {
+      IdRuleAnswer::GnidOnly (GnidOnlyKind::Restricted) }
+    else { IdRuleAnswer::Tombstone } };
+  if presence == GnidPresence::Restricted {
+    return restricted_answer (); }
   if let Some (straddle) = head {
     if let Some (pid) = straddle . before . pid_of (gnid) {
       if ! straddle . after . nodes . contains_key (&pid) {
@@ -159,7 +166,9 @@ pub(crate) fn rekind_vognode (
     ViewnodeKind::Vognode (vognode) => vognode . clone (),
     _ => return Ok (( )), };
   let gnid : ID = vognode . gnid () . clone ();
-  match ( id_rule (&gnid, parent_goal, walk), vognode ) {
+  let is_view_root : bool = matches! (
+    tree . get (parent) . unwrap () . value () . kind, ViewnodeKind::BufferRoot );
+  match ( id_rule (&gnid, parent_goal, is_view_root, walk), vognode ) {
     ( IdRuleAnswer::Occurrence (pid), Vognode::Occurrence (_) ) =>
       point_occurrence_at (tree, child, &pid, walk) ?,
     ( IdRuleAnswer::Occurrence (pid), other ) =>

@@ -513,7 +513,7 @@ fn draw_item (
   let claims : bool =
     item . warrant == Warrant::ByGraph && parent_reads_claims (tree, parent);
   Ok ( match &item . member {
-    GoalMember::Gnid (gnid) => match id_rule (gnid, Some (goal), walk) {
+    GoalMember::Gnid (gnid) => match id_rule (gnid, Some (goal), false, walk) {
       IdRuleAnswer::Occurrence (pid) => {
         let editable : bool =
           drawn_occurrence_is_editable (tree, parent, &pid, walk);

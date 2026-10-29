@@ -135,7 +135,7 @@ fn prepend_containerward_chain_node (
     goal . item_for ( &GoalMember::Gnid ( container . clone () ))
     else { return Ok (None); };
   let (vognode, pid) : (Vognode, Option<ID>) =
-    match id_rule (container, Some (goal), walk) {
+    match id_rule (container, Some (goal), false, walk) {
       IdRuleAnswer::Occurrence (pid) => {
         let occurrence : Occurrence = occurrence_from_truth (
           &pid, EditabilityAndClaim { editable : false, claims : false }, walk ) ?;

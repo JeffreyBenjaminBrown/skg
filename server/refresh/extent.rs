@@ -42,17 +42,20 @@ pub(crate) fn is_chain_parent (
   holds_containerward_chain ( tree . get (treeid) . unwrap () ) }
 
 /// Whether an occurrence of 'pid' the refresh draws under 'parent' is
-/// editable: its parent's children are editable content, no other
-/// occurrence of the node is editable, and the budget allows (in the
-/// diff view: the node is in U, or an editable-view request extends
-/// 'parent' and the budget allows).
+/// editable: its parent's children are editable content, or it is a
+/// root of the view (one the ID rule makes an occurrence again), no
+/// other occurrence of the node is editable, and the budget allows (in
+/// the diff view: the node is in U, or an editable-view request
+/// extends 'parent' and the budget allows).
 pub(crate) fn drawn_occurrence_is_editable (
   tree   : &Tree<Viewnode>,
   parent : NodeId,
   pid    : &ID,
   walk   : &Walk,
 ) -> bool {
-  children_are_editable_content (tree, parent, walk)
+  ( children_are_editable_content (tree, parent, walk)
+    || matches! ( tree . get (parent) . unwrap () . value () . kind,
+                  ViewnodeKind::BufferRoot ))
   && ! walk . editable_gnids . contains (pid)
   && match walk . mode {
     RefreshMode::ContentView => walk . node_budget > 0,

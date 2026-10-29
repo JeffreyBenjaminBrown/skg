@@ -241,10 +241,11 @@ impl GnidOnlyKind {
 /// since "unsayable" already names a descriptor standing where its
 /// kind may not ('is_unsayable').
 ///
-/// ARISES: from the ID rule ('server/refresh/id_rule.rs'), only where
-/// its viewparent's goal names the gnid: drawn for a goal item, or
-/// re-kinded in place from another vognode (and back to an occurrence
-/// when its node is back, or the restriction widens).
+/// ARISES: from the ID rule ('server/refresh/id_rule.rs'), where its
+/// viewparent's goal names the gnid, or, for a restricted node, where
+/// it is a root of the view: drawn for a goal item, or re-kinded in
+/// place from another vognode (and back to an occurrence when its node
+/// is back, or the restriction widens).
 ///
 /// USED: inert on save: it emits no fieldIntents, though its
 /// descendants still might, so extraction recurses through it. When it

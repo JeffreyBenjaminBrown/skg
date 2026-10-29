@@ -21,8 +21,8 @@
 // after b and hides hp ("hp secret", private).
 
 use crate::git_fixture::{
-  Fixture, OwnedSkgrepos, open_content_view, switch_skgrepo_set, with_git_fixture,
-  write_unchanged_skgrepos};
+  Fixture, OwnedSkgrepos, open_content_view, switch_skgrepo_set,
+  switch_skgrepo_set_rerendering, with_git_fixture, write_unchanged_skgrepos};
 use crate::git_fixture_helpers::mk_test_tcp_stream_pair;
 
 use skg::from_text::strandeds::StrandedsReview;
@@ -42,6 +42,7 @@ use std::net::TcpStream;
 use std::path::Path;
 
 const VIEW : &str = "view of r";
+const VIEW_OF_H : &str = "view of h";
 
 /// Two saves under the restriction "public", each of which writes r:
 /// one of a view drawn under it, and one of a view drawn under "all"
@@ -247,7 +248,13 @@ fn a_tightened_restriction_re_kinds_an_occurrence_of_a_restricted_node_in_place 
 /// The exact buffers of a view of r switched to "public" and back to
 /// "all": narrowed, hs is a Restricted vognode in the subscribee
 /// folder, and h's occurrence a Restricted vognode holding s1;
-/// widened, each is an occurrence again, where it stood.
+/// widened, each is an occurrence again, where it stood. And of a view
+/// rooted at h, which is private: narrowed, its root is a Restricted
+/// vognode, showing "restricted" and h's gnid and nothing of h;
+/// widened, it is h's editable occurrence again, where it stood, with
+/// s1 claiming under it. Its containers folder, which may stand under
+/// an occurrence alone, became a tombstone at the narrowing, as under
+/// any occurrence re-kinded to a Restricted vognode, and keeps r.
 #[test]
 fn a_switch_and_its_reverse_draw_these_buffers (
 ) -> Result<(), Box<dyn Error>> {
@@ -259,10 +266,16 @@ fn a_switch_and_its_reverse_draw_these_buffers (
       let mut restriction : SkgrepoRestriction =
         SkgrepoRestriction::named (&f . config, "all" . into ()) ?;
       open_view_of_r (f, None) ?;
-      let narrowed : String = switch (f, &mut restriction, "public") ?;
-      let widened : String = switch (f, &mut restriction, "all") ?;
-      assert_eq! ( narrowed, SWITCHED_TO_PUBLIC );
-      assert_eq! ( widened, SWITCHED_BACK_TO_ALL );
+      let view_of_h : String = open_content_view (f, "h", VIEW_OF_H, None) ?;
+      let (narrowed, _) : (Vec<String>, String) = switch_skgrepo_set_rerendering (
+        f, &mut restriction, "public", &[VIEW, VIEW_OF_H] ) ?;
+      let (widened, _) : (Vec<String>, String) = switch_skgrepo_set_rerendering (
+        f, &mut restriction, "all", &[VIEW, VIEW_OF_H] ) ?;
+      assert_eq! ( narrowed [0], SWITCHED_TO_PUBLIC );
+      assert_eq! ( widened [0], SWITCHED_BACK_TO_ALL );
+      assert_eq! ( view_of_h, VIEW_OF_H_UNDER_ALL );
+      assert_eq! ( narrowed [1], VIEW_OF_H_SWITCHED_TO_PUBLIC );
+      assert_eq! ( widened [1], VIEW_OF_H_SWITCHED_BACK_TO_ALL );
       Ok (( )) } ) }
 
 /// As above, where r also hides hh, private, from its subscribers:
@@ -326,6 +339,27 @@ const SWITCHED_BACK_TO_ALL : &str = "\
 ** (skg (vnid 0e) node (gnid h) (skgRepos (nodeRepo private) (relRepo public)) (view (rels (contains (in 1 (ancestors 1)) (out 1))) (props (aliases 1)) (birth (contains in 1)) repoBoundary)) h secret
 *** (skg (vnid 0f) node (gnid s1) (skgRepos (nodeRepo public)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)) repoBoundary)) s1
 ** (skg (vnid 0g) node (gnid b) (skgRepos (nodeRepo public)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) b
+";
+
+const VIEW_OF_H_UNDER_ALL : &str = "\
+* (skg (vnid 0a) node (gnid h) (skgRepos (nodeRepo private)) (view (rels (contains (in 1) (out 1))) (props (aliases 1)) repoBoundary)) h secret
+** (skg (vnid 0b) containerFolder)
+*** (skg (vnid 0c) node (gnid r) (skgRepos (nodeRepo public) (relRepo public)) writeProtected (view (rels (contains (out 3 (ancestors 2))) (subscribesTo (out 1))) (birth (contains out 2)) repoBoundary)) r
+** (skg (vnid 0d) node (gnid s1) (skgRepos (nodeRepo public)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)) repoBoundary)) s1
+";
+
+const VIEW_OF_H_SWITCHED_TO_PUBLIC : &str = "\
+* (skg (vnid 0a) restricted (gnid h))
+** (skg (vnid 0b) tombstone)
+*** (skg (vnid 0c) node (gnid r) (skgRepos (nodeRepo public)) writeProtected (view (rels (contains (out 2))) repoBoundary)) r
+** (skg (vnid 0d) node (gnid s1) (skgRepos (nodeRepo public)) (view repoBoundary)) s1
+";
+
+const VIEW_OF_H_SWITCHED_BACK_TO_ALL : &str = "\
+* (skg (vnid 0a) node (gnid h) (skgRepos (nodeRepo private)) (view (rels (contains (in 1) (out 1))) (props (aliases 1)) repoBoundary)) h secret
+** (skg (vnid 0b) tombstone)
+*** (skg (vnid 0c) node (gnid r) (skgRepos (nodeRepo public)) writeProtected (view (rels (contains (out 3)) (subscribesTo (out 1))) repoBoundary)) r
+** (skg (vnid 0d) node (gnid s1) (skgRepos (nodeRepo public)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)) repoBoundary)) s1
 ";
 
 /// A switch's rerender reports no buffer corrections: narrowed, the

@@ -196,3 +196,87 @@ node p
   node c
   node hh",
     "k claims under h again, so that a save keeps it in h's contents" ); }
+
+/// r, in 'private', contains a and b, both in 'main'.
+fn private_root () -> InRustGraph {
+  graph (&[
+    Graphnode { title        : "r's secret title" . to_string (),
+                home_skgrepo : SkgrepoName::from ("private"),
+                contains     : ids (&["a", "b"]), .. node ("r") },
+    node ("a"), node ("b") ]) }
+
+#[test]
+fn a_root_the_restriction_newly_keeps_out_becomes_restricted_in_place () {
+  let input : String = formatdoc! ("
+    * (skg (vnid rr) folded node (gnid r) (skgRepos (nodeRepo private))) r's secret title
+    ** {} a
+    ** {} b
+    ", occurrence_metadata ("a", ""), occurrence_metadata ("b", "") );
+  let run : Run = refreshed_under_main_only (&input, &private_root ());
+  assert_eq! ( run . outline (), "\
+restricted r folded
+  node a noClaim
+  node b noClaim",
+    "the view is the user's own request, so its root stands as a \
+     Restricted vognode, keeping its fold state and its children, \
+     which claim nothing under it" );
+  let r : NodeRef<Viewnode> = run . forest . roots () . next () . unwrap ();
+  assert_eq! ( r . value () . viewnode_id, Some ( ViewnodeId ("rr" . into ()) ),
+               "it keeps its vnid" );
+  assert_eq! ( run . buffer_correction_kinds (),
+               vec! [ BufferCorrectionKind::Rekinded (VognodeKind::GnidOnly (GnidOnlyKind::Restricted)) ] );
+  assert! ( run . text . contains ("restricted (gnid r)"), "{}", run . text );
+  assert! ( ! run . text . contains ("secret"), "{}", run . text ); }
+
+#[test]
+fn a_restricted_root_becomes_an_occurrence_again_when_the_restriction_widens () {
+  let input : String = formatdoc! ("
+    * (skg (vnid rr) folded restricted (gnid r))
+    ** {} a
+    ** {} b
+    ", occurrence_metadata ("a", ""), occurrence_metadata ("b", "") );
+  let run : Run = run_asserting_fixpoint (&input, &private_root ());
+  assert_eq! ( run . outline (), "\
+node r folded
+  node a
+  node b",
+    "an editable occurrence, as the root was, its children claiming" );
+  let r : NodeRef<Viewnode> = run . forest . roots () . next () . unwrap ();
+  assert_eq! ( r . value () . viewnode_id, Some ( ViewnodeId ("rr" . into ()) ),
+               "it keeps its vnid" );
+  assert_eq! ( run . buffer_correction_kinds (),
+               vec! [ BufferCorrectionKind::Rekinded (VognodeKind::Occurrence) ] );
+  assert! ( run . text . contains ("r's secret title"), "{}", run . text ); }
+
+#[test]
+fn the_children_of_a_restricted_root_claim_again_when_it_becomes_an_occurrence () {
+  // One forest, kept between refreshes as a view is: narrowed, then
+  // widened, never printed and parsed in between.
+  let config : SkgConfig = config ();
+  let graph : InRustGraph = private_root ();
+  let restriction : SkgrepoRestriction = main_only ();
+  let input : String = formatdoc! ("
+    * (skg node (gnid r) (skgRepos (nodeRepo private))) r's secret title
+    ** {} a
+    ** {} b
+    ", occurrence_metadata ("a", ""), occurrence_metadata ("b", "") );
+  let mut forest : ViewForest = parse (&input, IdResolution::ThroughGraph (&graph));
+  let mut record : ViewnodeIdRecord = ViewnodeIdRecord::of_viewforest (&forest);
+  let mut texts : Vec<String> = Vec::new ();
+  for restriction in [ Some (&restriction), None ] {
+    let refreshed : Refreshed = refresh_viewforest (
+      &mut forest, &mut record,
+      &Truth { graph : &graph, config : &config, restriction },
+      RefreshMode::ContentView, 100, &BufferCorrectionPolicy::after_a_switch (true) )
+      . unwrap ();
+    assert_eq! ( refreshed . buffer_corrections, Vec::new (),
+                 "a switch's re-kinds across the restriction are no buffer \
+                  corrections" );
+    texts . push (refreshed . text); }
+  assert! ( texts [0] . contains ("restricted (gnid r)")
+            && ! texts [0] . contains ("secret"), "{}", texts [0] );
+  assert_eq! ( outline (&forest), "\
+node r
+  node a
+  node b",
+    "a and b claim under r again, so that a save keeps them in r's contents" ); }

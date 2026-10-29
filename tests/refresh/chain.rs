@@ -62,7 +62,7 @@ node m
     let ViewnodeKind::Vognode (vognode) = &node . value () . kind
       else { panic! ("a chain node is a vognode") };
     assert! ( ! vognode . claims (), "{:?} claims nothing", vognode );
-    match ( id_rule (vognode . gnid (), Some (&goal), &walk), vognode ) {
+    match ( id_rule (vognode . gnid (), Some (&goal), false, &walk), vognode ) {
       ( IdRuleAnswer::Occurrence (pid), Vognode::Occurrence (occurrence) ) =>
         assert! ( occurrence . gnid == pid && occurrence . is_writeProtected () ),
       ( IdRuleAnswer::GnidOnly (kind), Vognode::GnidOnly (gnid_only) ) =>

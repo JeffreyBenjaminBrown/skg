@@ -241,6 +241,19 @@ pub fn switch_skgrepo_set (
   name        : &str,
   view        : &str,
 ) -> Result<(String, String), Box<dyn Error>> {
+  let (mut rerendered, done) : (Vec<String>, String) =
+    switch_skgrepo_set_rerendering (f, restriction, name, &[view]) ?;
+  Ok (( rerendered . remove (0), done )) }
+
+/// Switch to the skgrepo-set 'name'; return each of 'views' as
+/// rerendered, in order, and the "rerender-done" message, which
+/// carries the buffer corrections.
+pub fn switch_skgrepo_set_rerendering (
+  f           : &mut Fixture,
+  restriction : &mut SkgrepoRestriction,
+  name        : &str,
+  views       : &[&str],
+) -> Result<(Vec<String>, String), Box<dyn Error>> {
   let env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
   let (mut stream, read_end) : (TcpStream, TcpStream) = mk_test_tcp_stream_pair ();
   handle_skgrepo_set_request (
@@ -249,15 +262,17 @@ pub fn switch_skgrepo_set (
     &env, &mut f . views_state, restriction );
   drop (stream);
   let messages : Vec<String> = read_all_lp_messages ( &mut BufReader::new (read_end) );
-  let rerendered : Option<String> = messages . iter ()
+  let rerendered = |view : &str| -> String {
+    messages . iter ()
     . find ( |message| message . contains ("rerender-view")
                        && message . contains (&format! ("(view-id \"{}\")", view)) )
     . and_then ( |message| extract_string_field_from_sexp (
-      &message [ message . find ('(') ? .. ], "content" ));
+      &message [ message . find ('(') ? .. ], "content" ))
+    . unwrap_or_else (
+      || panic! ( "the switch to {} rerenders {}: {:?}", name, view, messages )) };
   let done : String = messages . iter ()
     . find ( |message| message . contains ("rerender-done") )
     . cloned ()
     . unwrap_or_else ( || panic! ( "the switch to {} ends: {:?}", name, messages ));
-  Ok (( rerendered . unwrap_or_else (
-          || panic! ( "the switch to {} rerenders the view: {:?}", name, messages )),
+  Ok (( views . iter () . map ( |view| rerendered (view) ) . collect (),
         done )) }
