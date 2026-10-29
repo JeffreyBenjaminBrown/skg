@@ -848,7 +848,7 @@ under it. None of this is reported as a buffer correction.
 The rerender redraws each open buffer from the view the server last
 saved or rendered for it, which would lose an unsaved edit; so while
 any view has unsaved edits the command refuses ("skg: save or revert
-every view before switching the skgrepo-set"), as stage-and-commit
+every skg view before switching the skgrepo-set"), as stage-and-commit
 does, and asks nothing.
 
 If the proposed set would rerender overPrivateText telescope text, Skg asks before
@@ -877,6 +877,10 @@ A field left at its default is dropped when the edit is applied.
 A readiness request the diff view's gestures wrote
 (see <localleader>r) is shown in the edit request field, beside
 the other request; deleting it there clears it.
+After each headline, in parentheses, is the herald that field or
+value gives a headline in a view, colored as there (once the server
+has sent its herald rules); the hint is not text, and shows what
+the editor opened with, not what cycling a value makes.
 Metadata edited by hand, here or in the view itself, is checked
 against the metadata grammar when you save: a headline whose metadata
 breaks it refuses the save, and the refusal names the part that

@@ -2,6 +2,7 @@
 -- temporary buffer: ':w' (or <localleader>cc) applies the edited tree
 -- back into the source headline; killing the buffer cancels;
 -- S-left/S-right cycle field values (skg.sexpr_edit.sexpr_cycling).
+-- Each headline shows, in parentheses, the herald its path produces.
 -- Also asks for a skgrepo after org's insert-heading actions when the
 -- new headline cannot inherit one. The Lua port of
 -- elisp/skg-sexpr-edit.el.
@@ -13,6 +14,9 @@
 
 local bijection = require('skg.sexpr.org_bijection')
 local fields = require('skg.sexpr.metadata_fields')
+local herald_rules = require('skg.herald_rules')
+local heralds = require('skg.heralds')
+local lens = require('skg.sexpr.lens')
 local metadata = require('skg.metadata')
 local picker = require('skg.picker')
 local sexpr = require('skg.sexpr.parse')
@@ -147,6 +151,107 @@ function M.open_edit_buffer (org_text, source_buf, line_number,
   vim.keymap.set('n', '<S-Right>', sexpr_cycling.cycle_right,
                  { buffer = buf, desc = 'Cycle this value right' })
   vim.api.nvim_set_current_buf(buf)
+  M.decorate_with_heralds(buf)
+end
+
+-- ── herald hints ───────────────────────────────────────────────────
+
+M.herald_hints_namespace =
+  vim.api.nvim_create_namespace('skg-metadata-edit-herald-hints')
+
+---Append, per headline of BUF, the herald its metadata path produces:
+---colored per herald rules, inside (uncolored) parentheses, after the
+---rest of the title. Implemented as virtual text, so the hints never
+---become buffer text -- applying reads titles, and a herald baked into
+---a title would corrupt the sexp. A no-op without a rule table (e.g.
+---no server connection). Hints reflect the values at open time;
+---cycling a value does not refresh them. Mirrors
+---skg-sexp-edit--decorate-with-heralds.
+---@param buf integer
+function M.decorate_with_heralds (buf)
+  if not herald_rules.get_rules() then return end
+  local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+  local kind_atoms = M.kind_atoms_in_lines(lines)
+  local path = {} -- { level, title } entries, outermost first
+  for row, line in ipairs(lines) do
+    local stars, title = line:match('^(%*+) (.*)$')
+    if stars then
+      local level = #stars
+      while #path > 0 and path[#path].level >= level do
+        table.remove(path) end
+      table.insert(path, { level = level, title = vim.trim(title) })
+      local labels = {}
+      for _, entry in ipairs(path) do table.insert(labels, entry.title) end
+      local chunks = M.herald_for_label_path(labels, kind_atoms)
+      if chunks then
+        local virt_text = { { ' (', 'Normal' } }
+        for _, chunk in ipairs(chunks) do table.insert(virt_text, chunk) end
+        table.insert(virt_text, { ')', 'Normal' })
+        vim.api.nvim_buf_set_extmark(buf, M.herald_hints_namespace,
+                                     row - 1, 0,
+                                     { virt_text = virt_text,
+                                       virt_text_pos = 'eol' })
+      end
+    end
+  end
+end
+
+---The kind atoms the metadata view in LINES shows: each level-2
+---headline whose title is an atom of a kind in
+---'shared/metadata-fields.json'. The heralds of a kind's parts fire
+---only beside its atom, so each hint's object carries them. Mirrors
+---skg-sexp-edit--kind-atoms-in-buffer.
+---@param lines string[]
+---@return string[]
+function M.kind_atoms_in_lines (lines)
+  local atoms = {}
+  for _, line in ipairs(lines) do
+    local title = line:match('^%*%* (.*)$')
+    if title and shared.metadata_kind(vim.trim(title)) then
+      table.insert(atoms, vim.trim(title)) end
+  end
+  return atoms
+end
+
+---The herald display chunks for the metadata-view headline whose
+---label path from the buffer's root is LABELS (title strings,
+---outermost first), or nil when that path produces none. Builds a
+---minimal object sexp along the path, with KIND_ATOMS beside it at the
+---top level, and runs the same lens engine the heralds view uses, so
+---the hint matches what the content view would show. Mirrors
+---skg-sexp-edit--herald-for-label-path.
+---@param labels string[]
+---@param kind_atoms string[]|nil
+---@return table[]|nil
+function M.herald_for_label_path (labels, kind_atoms)
+  local rules = herald_rules.get_rules()
+  if not rules or #labels == 0 then return nil end
+  local path_object = M.nest_label_path(labels)
+  local object = { path_object[1] }
+  for _, atom in ipairs(kind_atoms or {}) do
+    local in_path = false
+    for i = 2, #path_object do
+      if path_object[i] == sexpr.symbol(atom) then in_path = true end
+    end
+    if not in_path then table.insert(object, sexpr.symbol(atom)) end
+  end
+  for i = 2, #path_object do table.insert(object, path_object[i]) end
+  local ok, tokens = pcall(lens.transform_sexp_flat, object, rules)
+  if not ok or not tokens then return nil end
+  return heralds.tokens_to_chunks_with_rels(tokens, nil)
+end
+
+---Nest LABELS (title strings, outermost first) into an object sexp:
+---the labels skg, writeProtected, true become (skg (writeProtected
+---true)). Mirrors skg-sexp-edit--nest-label-path.
+---@param labels string[]
+---@return any[]
+function M.nest_label_path (labels)
+  local nested = sexpr.symbol(labels[#labels])
+  for i = #labels - 1, 1, -1 do
+    nested = { sexpr.symbol(labels[i]), nested } end
+  if sexpr.is_list(nested) then return nested end
+  return { nested }
 end
 
 ---Move the cursor to the first child headline under FIELD_NAME.

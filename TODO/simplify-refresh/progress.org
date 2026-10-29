@@ -4136,3 +4136,150 @@ pre-existing failure. Two pitfalls for the next brief: one
 Neovim spec runs through 'tests/results/08/slice4/run-spec.sh'
 under a timeout, since a headless Lua error waits for input;
 Lua's 'ipairs' stops at the first nil of a case table.
+
+** Slice 5
+*** The commits
+**** 0ffb1f2c
+Emacs follows Neovim where Neovim is better: one rank helper,
+'skg--metadata-with-part-at-its-rank', places every part a writer
+adds, the generic edit's included (detach's 'noClaim', the fold
+and focus atoms); 'skg--derived-facts-last' and
+'skg--part-written-after-editRequest-p' went. One headline
+reader, 'skg--metadata-on-line', which took the position
+'skg--metadata-from' took. 'skg--readiness-request-at-point',
+'skg--gnid-only-vognode-sexp-p'; the delete-references command
+asks 'skg--unsaved-view-buffers'; 'skg-reload' closes the
+connection first.
+**** ff07847f
+Neovim's modules and functions take the Emacs names; the
+detachment, folder-change, change-facts and edit-request helpers
+move from 'readiness.lua' to 'metadata.lua'; one headline reader,
+'metadata_on_line'; the generic edit places by
+'metadata_with_part_at_its_rank'; the delete-references command
+asks 'buffer.unsaved_view_buffers'; messages take Emacs's words.
+**** The last commit
+The herald hints in Neovim's metadata editor and their tests; the
+deviations doc, the two COMMANDS docs, a path in
+'TODO/problems.org', this record and the plan's keyword.
+*** The suites
+Run serialized on the finished tree.
+**** cargo check --all-targets
+Clean, no warning; the slice touches no Rust.
+**** bash/nextest.sh
+1013 run, 1013 passed: unchanged, as the plan says.
+**** bash/emacs-tests.sh
+411 of 411 passed (408 before; three added: detach places
+'noClaim' at its rank, the generic edit places what it adds, the
+editor opened and applied untouched sends back what the server
+wrote).
+**** bash/nvim-tests.sh
+406 passed, none failed (402 before; four added: the generic
+edit's placement, the herald hints, no hint without a rule
+table, the editor's untouched round trip). At the second commit
+alone, without the hints, 404 passed.
+**** bash/integration-tests.sh
+Emacs: 34 of 35. Neovim ('SKG_TEST_CLIENT=nvim'): 34 of 35. The
+failure each time is 'import-md-and-org', pre-existing and not
+this plan's.
+**** Failures met during the slice
+***** the fold round trip, in both clients
+'test-skg-fold-round-trip' and 'skg.folds round-trips fold state
+through the atoms': an expected fixture adaptation. Each pinned
+the appended order the generic edit wrote, '(skg node (gnid 1)
+folded)'; the atom now lands where the server writes it, before
+the kind atom, so the round trip gives back exactly what it
+read, '(skg folded node (gnid 1))'.
+**** Checks by mutation
+Neovim's generic edit without the placement fails the new
+placement test and the writers' test (detach now goes through
+the generic edit). The two new Emacs placement tests fail
+against the 'skg-metadata.el' of before the slice.
+**** The TCP surface
+On a scratch server ('verify' skill; script and outputs in
+'tests/results/08/slice5/probe/'), headless Neovim, on a view the
+server rendered, opened the editor on one headline and applied
+it untouched, detached a second, folded a third and gave a
+fourth a view request through the generic edit. The server saved
+it with no error, no warning and no buffer correction: the first
+unchanged, the second out of the list, the third's 'folded' kept
+where the server writes it.
+*** Deviations from the plan's "how"
+**** the editor's module takes the Emacs name
+'metadata_edit.lua' became 'sexpr_edit.lua', and its cycling
+went to 'sexpr_edit/sexpr_cycling.lua', the homes Emacs has
+('skg-sexpr-edit.el', 'skg-sexpr-edit/skg-sexpr-cycling.el'):
+Emacs is the reference where neither name is wrong. The entry is
+'view_metadata', which the Ex command ':SkgViewMetadata' already
+said; 'cycle_left' and 'cycle_right' are named, as in Emacs.
+**** the case file's header comment changed, not its cases
+'tests/shared/metadata-editor-cases.txt' names each client's
+modules in a comment; it now names 'sexpr_edit.lua' and
+'metadata.lua' for Neovim. No case changed.
+**** "the requests" taken as every one-to-one request module
+Renamed besides the editor and the search ('text_search'):
+'flag_state', 'delete_references_to_absent_node', 'export_org',
+'single_root_content_view', 'views', 'rerender_all_views', and
+'view_ancestry'; with their functions' twins
+('set_flag_search_matching', 'request_editable_view',
+'single_root_view_request_string', 'handle_content_view_sexp',
+'request_diffView_buffers', 'handle_diffView_response',
+'register_rerender_overPrivateText_confirmation', and in
+'save.lua' 'save_request_sexp', 'handle_save_sexp',
+'strip_bare_skg_at_focused_headline',
+'fork_choose_placeholder_repos'; 'misc_requests.lua''s
+'strip_trailing_whitespace_from_bodies'). The Ex commands did not
+change. Kept, and named in the deviations doc: modules named for
+an Emacs mechanism ('heralds', 'folds', 'goto_git', 'keymaps',
+'lock'), 'misc_requests' (three one-command Emacs files), and
+three Emacs files Neovim splits in two ('id_search' and
+'linkstack', 'config' and 'picker', 'save' and 'messages').
+**** what reads lines keeps its shape
+Neovim works by line number where Emacs works at point, so a
+twin of '-at-point' says '_at_line'; the functions that read a
+whole buffer's lines at once for the heralds keep '_in_lines'
+('pending_detachment_in_lines',
+'folder_change_readiness_in_lines',
+'ancestor_headline_indices_in_lines'), and the readiness walks
+keep Neovim's line lists ('child_lines', 'subtree_lines') against
+Emacs's callbacks with point on each headline. Neovim's
+'ready_p' leaves a changed folder to 'ready_at_line'.
+'metadata_on_line' reads a line's text and gives the sexp;
+'skg--metadata-on-line' also gives where it stands, which Emacs's
+heralds need.
+**** where Neovim was better
+Emacs took Neovim's rank helper, the '-at-point' name of the
+request helper, the '-sexp-p' of the gnid-only predicate, and
+the reload's closing of the connection, which the deviations doc
+had marked as a deliberate improvement.
+**** the parts a generic edit adds
+Both clients' generic edits now place each part the headline
+lacked by the 'parts' list, so a fold or focus atom lands before
+the kind atom, a view request before the derived facts; a part
+the headline had keeps its place.
+**** the messages
+Emacs's words now: "every skg view" in the three refusals and
+"global reference cleanup"; "No skg repos found"; "Edit the
+linkstack."; the editor's help line ("Press :w ... to save");
+"skg-readable-ids:"; the herald fraction's error names its
+values. Neovim's flag command, after the round trip, reports the
+refusal's own words, as Emacs does, not "no longer eligible";
+its two readiness commands refuse off a headline, as Emacs's do.
+Left as they are, because the gesture differs: the prompts that
+name keys or buttons Neovim has instead of Emacs's, the git
+jumps' messages (neogit), and the save's report buffers.
+*** Fixtures changed
+The two fold round-trip tests, above; the switch's refusal
+message in 'stream_consumers_spec.lua'; the module paths and
+function names the specs and the Neovim integration tests call.
+*** Left unfinished
+'docs/nvim-client-deviations.org' still lists "Commands not
+ported" (the relRepo gesture, the body toggle, the readable-ids
+refresh), the open entry "The Neovim client lacks three Emacs
+commands" in 'TODO/problems.org': Neovim could do them, so the
+list is not only what it cannot do, but porting three commands
+is not an alignment of names and homes. A few messages exist in
+one client only (the survey found Emacs's handler-error echoes
+and "Point sits between IDs", Neovim's default prompts); they
+were not added.
+*** Headline
+DONE.

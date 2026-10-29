@@ -854,7 +854,7 @@ the switch say so.
 'bash/emacs-tests.sh', 'bash/nvim-tests.sh' and
 'bash/integration-tests.sh' green; 'bash/nextest.sh' unchanged.
 
-** TODO Slice 5: the clients fully aligned
+** DONE Slice 5: the clients fully aligned
 Read "The clients fully aligned" in the agreed behavior, the
 readability report's item 1 and the plan 06 slice 7 record in
 'progress.org' first. Emacs is the reference where the two

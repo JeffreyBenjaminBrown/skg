@@ -52,7 +52,7 @@
   '* (skg (node ...)) x' becomes '* * (skg (node ...)) x'.
   'meta_return' finds headlines by treesitter and works. The
   skgrepo prompt that wraps both
-  ('wrap_org_insert_heading_actions', 'nvim/lua/skg/metadata_edit.lua')
+  ('wrap_org_insert_heading_actions', 'nvim/lua/skg/sexpr_edit.lua')
   acts only on a new empty headline, so it leaves such a line alone;
   its test names its buffer like an org file. Found by a probe in
   'tests/results/plan19-slice10/probe_orgmode.lua'.

@@ -1,13 +1,47 @@
 #+TITLE: The Neovim client's deviations from the Emacs client
-# The final report requested with the port: every place the Neovim
-# client intentionally behaves differently from the Emacs client, and
-# why the difference was necessary (or, in two marked cases, an
-# improvement taken deliberately). Anything not listed here is
-# intended to behave identically; if it doesn't, that's a bug worth
-# reporting in ../TODO/problems.org.
+# Every place the Neovim client behaves differently from the Emacs
+# client because Neovim cannot do what Emacs does, and the commands
+# it lacks. Anything not listed here is intended to behave
+# identically; if it doesn't, that's a bug worth reporting in
+# ../TODO/problems.org.
 #
 # Wire compatibility is total: same protocol, same requests, same
 # metadata grammar, zero server changes.
+
+* The two clients' names match
+A Neovim module has its Emacs file's name, without 'skg-' or
+'skg-request-' and with '_' for '-': 'skg-metadata.el' is
+'metadata.lua', 'skg-request-text-search.el' is 'text_search.lua',
+'skg-sexpr-edit.el' and 'skg-sexpr-edit/skg-sexpr-cycling.el' are
+'sexpr_edit.lua' and 'sexpr_edit/sexpr_cycling.lua'. A function has
+its Emacs twin's name, without the 'skg-' or 'skg--' prefix and its
+module's own prefix, in the same module. Where an Emacs function acts
+at point, its twin takes a line number and says '_at_line' for
+'-at-point'; a few that read the whole buffer at once say
+'_in_lines' ('pending_detachment_in_lines'). The shared case files in
+'tests/shared/' are the oracles both clients are tested against.
+
+Some names stay apart because they name an Emacs mechanism Neovim
+does not have: 'heralds-minor-mode.el' is 'heralds.lua' (no minor
+modes), 'skg-org-fold.el' is 'folds.lua', 'skg-request-file-path.el'
+is 'goto_git.lua' (no magit; see "The git jumps"),
+'skg-keymaps-and-aliases.el' is 'keymaps.lua' (no 'M-x' aliases),
+'skg-request-save/skg-lock-buffers.el' is 'lock.lua'. Where Emacs
+splits a concern over several files that each hold one command
+('skg-request-verify-connection.el',
+'skg-request-rebuild-session-lifetime-stores.el',
+'skg-request-strip-body-whitespace.el'), Neovim keeps the commands in
+'misc_requests.lua'. Helpers Emacs gets from its own library
+('read', 'prin1-to-string', reading a field of a response) are
+'sexpr/parse.lua' and 'payload.lua'. Three Emacs files hold two
+concerns each, which Neovim keeps apart: 'skg-id-search.el' is
+'id_search.lua' and 'linkstack.lua', 'skg-config.el' is 'config.lua'
+and 'picker.lua' (the prompts), 'skg-request-save.el' is 'save.lua'
+and 'messages.lua' (the report buffers).
+
+A message has the same words in both clients; Neovim's begins
+'skg: ' and in lowercase where Emacs's begins with a capital, and
+names Neovim's keys where Emacs's names a chord.
 
 * Input model (necessary: vim is modal, and C-c belongs to the terminal)
 - The Emacs 'C-c ...' chords become '<localleader>' plus the same
@@ -123,11 +157,6 @@
 - The Lua sexp printer renders the empty list as '()' where elisp
   prints 'nil'; the server's parser accepts both, and the reader maps
   both to the same value.
-- ':SkgReload' (the dev-convenience module reload) closes the TCP
-  connection before discarding the module holding it, where Emacs
-  left the old process object dangling in its process list. Marked as
-  a deliberate improvement, not a fidelity gap. The client reconnects
-  on the next request either way.
 - 'view-without-metadata' takes the visual selection (or the last
   visual marks); Emacs took the active region.
 - 'search-interactive''s 'h' option opens docs/COMMANDS-nvim.org
