@@ -243,7 +243,9 @@ under a viewparent that reads no claims is saved as an *orphan*, a
 node that no list contains (a term this glossary takes from
 'docs/COMMANDS.org'), and the save warns of each one, naming its
 headline ('orphan_warnings' in
-'server/from_text/local_fieldintent_collection/mod.rs').
+'server/from_text/local_fieldintent_collection/mod.rs'). Under a
+tombstone, as under a ghost or a folder, the headline takes its
+skgrepo from the nearest occurrence above.
 
 Under an editable parent the refresh marks =noClaim= on every child
 it keeps that the graph does not relate to its viewparent (see
@@ -541,7 +543,9 @@ overPrivateText node (see "text search, search view, enrichment").
 The refresh prunes a childless tombstone before the buffer is
 rendered, a root included, so a user sees one only where it
 holds something. The save discards anything typed on its line, and no
-child of a tombstone claims membership; every folder accepts one
+child of a tombstone claims membership (a headline typed under one,
+taking the skgrepo of the nearest occurrence above, is saved as an
+orphan; see "claims membership"); every folder accepts one
 among its children. In code the kind is 'ViewnodeKind::Tombstone',
 and on the wire the atom =tombstone=.
 

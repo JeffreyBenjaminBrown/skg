@@ -32,7 +32,6 @@ use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::save::{
   NodeInstruction, PostSkgsaveCommitNoticeCandidate, SaveNode, SkgrepoMove };
-use crate::types::errors::with_org_subheadlines;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
   Folder, NodeEditRequest, Viewnode, ViewnodeKind, Vognode};
@@ -126,20 +125,27 @@ pub fn extract_nonmergeSavePlan_locally_in_graph (
           post_skgsave_commit_notice_candidates },
         nodeMerge_acquisitions )) }
 
-/// One warning per node the save creates from a headline typed under
-/// a parent whose claims the save does not read ('parent_reads_claims':
-/// a write-protected occurrence, a ghost, an unknown, a tombstone, a
-/// write-protected folder): the node is saved, and nothing contains
-/// it. A root is not one: the user typed it where no list is.
+/// One warning per orphan graphnode the save creates: a node from a
+/// headline typed under a parent whose claims the save does not read
+/// ('parent_reads_claims': a write-protected occurrence, a ghost, a
+/// gnid-only vognode, a tombstone, a write-protected folder). The node
+/// is saved, and no list contains it. Under a tombstone, the headline
+/// takes its skgrepo from the nearest occurrence above
+/// ('complete_occurrence_skgrepo'), as under a ghost. A root is not
+/// one: the user typed it where no list is. The warning names the
+/// headline by its title and new gnid; the headline has no viewnode ID
+/// until the rerender gives it one.
 fn orphan_warnings (
   viewforest : &ViewForest,
   graph      : &InRustGraph,
 ) -> Vec<String> {
   viewforest . nodes ()
     . filter ( |node| is_created_as_an_orphan (viewforest, *node, graph) )
-    . map ( |node| with_org_subheadlines (
-      "Created an orphan, a node that nothing contains, from a headline whose parent takes no members:",
-      &[ node . value () . headline_name () ] ))
+    . map ( |node| format! (
+      "{}\n{}",
+      "Created an orphan graphnode, a node that no list contains, from a headline whose parent reads no claims:",
+      node . value () . headline_name ()
+        . org_subheadline_of_a_node_this_save_created () ))
     . collect () }
 
 /// Whether the save creates a node from 'node', an editable occurrence

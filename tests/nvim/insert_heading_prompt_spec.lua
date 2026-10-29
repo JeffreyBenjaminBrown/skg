@@ -110,7 +110,8 @@ describe('the skgrepo prompt after inserting a headline', function ()
         { '** (skg restricted (gnid h))', false },
         { '** (skg bodyFolded node (gnid m) (skgRepos (nodeRepo public))) m', false },
         { '** (skg (gnid n) (skgRepos (nodeRepo public))) n', false },
-        { '** (skg tombstone)', true } }) do
+        { '** (skg tombstone)', false },
+        { '** (skg alias) an alias', true } }) do
         content_view_with(table.concat({
           '* (skg node (gnid x) (skgRepos (nodeRepo public))) x',
           case[1],

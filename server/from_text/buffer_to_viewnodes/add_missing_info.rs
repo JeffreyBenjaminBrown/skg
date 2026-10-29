@@ -176,13 +176,15 @@ pub fn complete_occurrence_skgrepo (
   did_inherit }
 
 /// The skgrepo of the nearest occurrence at or above 'node'.
-/// The walk rootward passes through ghosts, unknowns, Restricted
-/// vognodes and folders,
+/// The walk rootward passes through ghosts, gnid-only vognodes,
+/// tombstones and folders,
 /// which carry no home skgrepo of their own (and never show the home
-/// herald), so a new headline below a ghost or in a partner folder
-/// inherits from the occurrence above them. Any other kind ends the
-/// walk and supplies none: the buffer root (so a bare headline at top
-/// level is refused at validation), a tombstone, a property.
+/// herald), so a new headline below a ghost, a tombstone or in a
+/// partner folder inherits from the occurrence above them (and, its
+/// parent reading no claims, is saved as an orphan graphnode). Any
+/// other kind ends the walk and supplies none: the buffer root (so a
+/// bare headline at top level, or one with no occurrence above it, is
+/// refused at validation), a property, a change viewnode.
 /// A write-protected occurrence's skgrepo is the one its ID will have
 /// after this save (WRITEPROTECTED_SKGREPOS_AFTER_SAVE), not the one it
 /// shows.
@@ -199,11 +201,11 @@ fn skgrepo_of_nearest_occurrence_ancestor (
         } else { at . home_skgrepo . clone () } ),
       ViewnodeKind::Vognode (
         Vognode::Ghost (_) | Vognode::GnidOnly (_))
+        | ViewnodeKind::Tombstone
         | ViewnodeKind::Folder (_) => continue,
       ViewnodeKind::PropertyMember (_)
         | ViewnodeKind::ChangeViewnode (_)
-        | ViewnodeKind::BufferRoot
-        | ViewnodeKind::Tombstone => return None, }}
+        | ViewnodeKind::BufferRoot => return None, }}
   None }
 
 /// Whether an occurrence headline typed under 'viewparent' is an

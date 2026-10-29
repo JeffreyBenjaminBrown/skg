@@ -118,6 +118,21 @@ impl HeadlineName {
   pub fn org_subheadline (
     &self
   ) -> String {
+    let viewnode_line : String = match &self . viewnode_id {
+      Some (viewnode_id) => format! (
+        "- viewnode ID: {}. To find it: C-c g v {}\n",
+        viewnode_id, viewnode_id ),
+      None => "- not yet saved\n" . to_string (), };
+    format! ( "{}{}", self . org_subheadline_of_a_node_this_save_created (),
+              viewnode_line ) }
+
+  /// The org subheadline naming a headline from which the save that
+  /// sends the message created a node: the title (or '(untitled)')
+  /// and 'graphnode ID: X', with no viewnode line, since the headline
+  /// is saved and its viewnode ID is the rerender's to give.
+  pub fn org_subheadline_of_a_node_this_save_created (
+    &self
+  ) -> String {
     let heading : &str =
       if self . title . is_empty () { "(untitled)" }
       else { &self . title };
@@ -125,12 +140,7 @@ impl HeadlineName {
       self . graphnode_id . as_ref ()
       . map ( |gnid| format! ("- graphnode ID: {}\n", gnid . 0) )
       . unwrap_or_default ();
-    let viewnode_line : String = match &self . viewnode_id {
-      Some (viewnode_id) => format! (
-        "- viewnode ID: {}. To find it: C-c g v {}\n",
-        viewnode_id, viewnode_id ),
-      None => "- not yet saved\n" . to_string (), };
-    format! ( "*** {}\n{}{}", heading, graphnode_line, viewnode_line ) }
+    format! ( "*** {}\n{}", heading, graphnode_line ) }
 }
 
 impl fmt::Display for HeadlineName {

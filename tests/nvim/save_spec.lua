@@ -351,9 +351,9 @@ describe('skg.save pipeline', function ()
 
   it('shows the orphan warning, naming its headline, on save-result',
      function ()
-    local orphan = 'Created an orphan, a node that nothing contains,'
-      .. ' from a headline whose parent takes no members:\n'
-      .. '*** typed under two\n- graphnode ID: n1\n- not yet saved\n'
+    local orphan = 'Created an orphan graphnode, a node that no list'
+      .. ' contains, from a headline whose parent reads no claims:\n'
+      .. '*** typed under two\n- graphnode ID: n1\n'
     server = helpers.connect_to_fake_server(function (line, respond)
       if line:find('save buffer', 1, true) then
         respond(helpers.framed(
@@ -377,8 +377,10 @@ describe('skg.save pipeline', function ()
     local text = table.concat(
       vim.api.nvim_buf_get_lines(found, 0, -1, false), '\n')
     assert.is_truthy(text:find(
-      '** Created an orphan, a node that nothing contains,', 1, true))
-    assert.is_truthy(text:find('\n*** typed under two\n', 1, true))
+      '** Created an orphan graphnode, a node that no list contains,'
+      .. ' from a headline whose parent reads no claims:', 1, true))
+    assert.is_truthy(text:find(
+      '\n*** typed under two\n- graphnode ID: n1', 1, true))
     vim.api.nvim_buf_delete(found, { force = true })
   end)
 

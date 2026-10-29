@@ -719,7 +719,7 @@ restriction leaks and omits" and "An alias recorded in a
 restricted section is shown under the restriction" to
 'TODO/DONE/'.
 
-** TODO Slice 2: the save's two refusals
+** DONE Slice 2: the save's two refusals
 Read the two sections of the agreed behavior and probes (j)
 and (d) first.
 *** Corrections carried from slice 0

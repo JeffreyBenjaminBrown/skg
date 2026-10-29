@@ -49,15 +49,6 @@
   '(editRequest (ready ...))' as if it held an edit request: the
   bug slice 4 fixed for 'skg-set-relRepo', in a second place.
   Fix: one predicate per client that skips readiness parts.
-** FIX PLANNED: A bare headline under a tombstone is refused, not saved
-  Run, and the same at the base. The plan said a headline typed
-  under a tombstone is saved as an orphan; it is refused with
-  "Occurrence must have a repo that exists in the config", since
-  the skgrepo inheritance stops at a tombstone. With its skgrepo
-  written it is saved and warned of. Fix: inherit through a
-  tombstone from the nearest occurrence above, or keep the
-  refusal and say what to do. The orphan warning also says "not
-  yet saved" of a node the same save created.
 ** FIX PLANNED: Corrections a user's own gesture causes
   Run. A nodeMerge reports four buffer corrections (the viewnode
   merge of the acquirer's two occurrences, and three "Drew what
@@ -68,24 +59,6 @@
   it, so the correction names a headline no longer in the
   buffer. After a switch a member whose record alone is
   restricted stays drawn and is reported "Marked noClaim".
-* Problems noticed while executing plan 06, slice 9 (2026-10-27)
-** FIX PLANNED: A requested hidden folder showing a dangling hide may be refused at save
-  Noticed by reading, not run, while slice 9 of
-  'TODO/simplify-refresh/06_plan_tidy-refresh.org' gave the goal
-  computers the rule that a member whose record is visible and
-  that resolves to no node stays in the goal as an unknown: a
-  hidden folder the user requested could then hold an unknown,
-  and validation ('server/from_text/buffer_to_viewnodes/local.rs')
-  accepts an unknown only in the overridden folder, so a save of
-  that buffer might be refused. To check with a test; if so, let
-  the hidden folder accept an unknown as the overridden folder
-  does. The entry "Subscribee-as-such hides may misfire under a
-  restricted skgrepo-set" below now applies only to members whose
-  records are restricted, since slice 9 shows the others as
-  Restricted vognodes. Confirmed by the review's probe (j): the
-  save is refused under 'all' and under 'pub', the latter new
-  with slice 9, with a spurious clause about 'noClaim' in the
-  message.
 * Problems noticed while executing plan 06, slice 1 (2026-10-26)
 ** FIX PLANNED: Under a restriction, the graphnode stats are quadratic in a list's length
   Slice 1 of 'TODO/simplify-refresh/06_plan_tidy-refresh.org' made

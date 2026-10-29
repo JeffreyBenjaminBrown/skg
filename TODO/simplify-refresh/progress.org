@@ -3711,3 +3711,102 @@ through the straddle, and two policy sites. Suites: nextest
 1003 of 1003 (eight new), integration 34 of 35 with the
 pre-existing failure; the client suites were not run, as the
 slice touched no client.
+
+** Slice 2
+*** The commits
+**** 68e3fc4a
+The dangling hide and a restricted root's save: the folders'
+check of 'noClaim' goes, three folder messages say "restricted
+headlines or references to unknown nodes"; tests of probe (j)'s
+shape, of the refusal's clause, and of a restricted root's save.
+**** The last commit
+The headline under a tombstone: the skgrepo inheritance passes
+through a tombstone, the orphan warning's new text without "not
+yet saved", both clients' walk and tests; the docs, the
+problems entries, this record and the plan's keyword.
+*** The suites
+**** cargo check --all-targets
+Clean, no warning.
+**** bash/nextest.sh
+1007 run, 1007 passed (1003 before the slice, four tests added:
+two in 'tests/hidden_nodes.rs', one in 'tests/orphan_warning
+.rs', one in 'tests/new/buffer_to_viewnodes/validate_tree.rs').
+**** bash/emacs-tests.sh
+406 of 406 passed.
+**** bash/nvim-tests.sh
+399 passed, none failed.
+**** bash/integration-tests.sh
+34 of 35 passed. The failure is 'import-md-and-org', which is
+pre-existing and not this plan's.
+**** Failures met during the slice
+None in the suites. Each new test was checked by mutation: the
+tombstone test fails with the walk stopping at a tombstone
+again ("Occurrence must have a repo that exists in the
+config."), the dangling hide's with the gnid-only vognode taken
+out of the relation folders' kinds, and the clause test against
+the code before the slice.
+**** The TCP surface
+Probes (j) and (d) ran on scratch servers ('verify' skill);
+copies, scripts and outputs are in 'tests/results/08/slice2/
+probes/'. Probe (j): under 'all' and under 'pub' the buffer
+with the requested hidden folder saves unchanged, identical,
+and r keeps the hides of s1 and 'nowhere'. Probe (d): the
+headline under the tombstone and the one under write-protected
+A are both saved in 'pub' and warned of by title and gnid, with
+no "not yet saved"; Q's and B's files are unchanged.
+*** Deviations from the plan's "how"
+**** the 'noClaim' check goes, not only its clause
+The four folder validators' second check ("Occurrence children
+must be members (no noClaim)") read a generation that already
+leaves out each occurrence claiming nothing
+('collect_generation' with 'skip_non_claimants'), so it could
+fire only for a child of another kind, beside the first check's
+refusal. It is removed in all four (relation folders,
+subscribee, hidden-in and hidden-outside folders), so a refusal
+of a child's kind names the admitted kinds alone.
+**** the clients' walk follows the server's
+Emacs 'skg--headline-can-inherit-skgrepo-p' and Neovim
+'headline_can_inherit_skgrepo_p' mirror the server's walk, as
+their docs say; both now pass through a tombstone, so typing a
+headline under one no longer prompts for a skgrepo. Their tests
+now expect no prompt under a tombstone and one under an alias.
+'docs/COMMANDS.org' and 'docs/COMMANDS-nvim.org' say so.
+**** the warning names the headline without a viewnode line
+'HeadlineName::org_subheadline_of_a_node_this_save_created'
+('server/types/errors.rs') writes the title and the graphnode
+ID; 'org_subheadline' builds on it. 'docs/api-and-formats.org'
+("How a message names a headline") states the case.
+**** the ghost case in a content view
+The plan's test of a headline under a ghost is in
+'tests/orphan_warning.rs' with a ghost typed into a content
+view; the save accepts it, warns of the orphan graphnode and
+saves it in the skgrepo of the occurrence above. The diff-view
+case stays in 'tests/pruned_change_view/users_notes.rs'.
+**** docs touched now, not in slice 9
+Besides the walk, the two COMMANDS files' sentences on the
+orphan warning say "orphan graphnode" and "no list contains";
+the glossary's "claims membership" and "tombstone" entries say
+that a headline typed under a tombstone takes the skgrepo of the
+nearest occurrence above.
+*** Fixtures changed
+No fixture data changed. 'tests/hidden_nodes.rs' writes a new
+fixture for the dangling hide (probe (j)'s r, c1, s, s1, and a
+private hh) and gains 'save_view_under' and 'skg_files_on_disk';
+'tests/orphan_warning.rs' shares its setup in helpers. The
+clients' orphan-warning tests ('tests/elisp/test-skg-save-
+response-folded-root.el', 'tests/nvim/save_spec.lua') assert
+the new text and the absent viewnode line; the insert-heading
+prompt tests changed as above.
+*** Left unfinished
+**** a headline under a restricted root's tombstone
+As the corrections from slice 1 asked, the record says what the
+save does: a headline typed under the tombstone that a narrowing
+left in place of a restricted root's containers folder has no
+occurrence above it (the walk passes the tombstone and the
+restricted headline and meets the buffer root), so the save
+refuses it with "Occurrence must have a repo that exists in the
+config." and changes nothing; with its skgrepo written, it would
+be saved as an orphan graphnode. No new behavior was designed.
+Tested in 'tests/hidden_nodes.rs'.
+*** Headline
+DONE.

@@ -148,8 +148,8 @@ without prompting."
 
 (ert-deftest test-insert-heading-prompts-only-when-it-cannot-inherit ()
   "C-return prompts for a repo exactly when the new headline cannot
-inherit one: not below a folder, a ghost or a Restricted vognode whose
-viewparent is a node, but below a tombstone."
+inherit one: not below a folder, a ghost, a gnid-only vognode or a
+tombstone whose viewparent is a node, but below an alias."
   (dolist (case '(("* (skg node (gnid x) (skgRepos (nodeRepo public))) x\n** (skg subscribeeFolder)\n*** (skg node (gnid y) (skgRepos (nodeRepo public))) y\n"
                    nil)
                   ("* (skg node (gnid x) (skgRepos (nodeRepo public))) x\n** (skg ghost (gnid d) (skgRepos (nodeRepo public))) d\n*** (skg node (gnid y) (skgRepos (nodeRepo public))) y\n"
@@ -161,6 +161,8 @@ viewparent is a node, but below a tombstone."
                   ("* (skg node (gnid x) (skgRepos (nodeRepo public))) x\n** (skg (gnid n) (skgRepos (nodeRepo public))) n\n*** (skg node (gnid y) (skgRepos (nodeRepo public))) y\n"
                    nil)
                   ("* (skg node (gnid x) (skgRepos (nodeRepo public))) x\n** (skg tombstone)\n*** (skg node (gnid y) (skgRepos (nodeRepo public))) y\n"
+                   nil)
+                  ("* (skg node (gnid x) (skgRepos (nodeRepo public))) x\n** (skg alias) an alias\n*** (skg node (gnid y) (skgRepos (nodeRepo public))) y\n"
                    t)))
     (test--with-skg-content-view
      (car case)

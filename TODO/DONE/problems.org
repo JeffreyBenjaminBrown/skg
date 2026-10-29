@@ -1,3 +1,27 @@
+* Problems noticed while executing plan 06, slice 9 (2026-10-27; fixed 2026-10-29)
+** A requested hidden folder showing a dangling hide may be refused at save
+  Noticed by reading, not run, while slice 9 of
+  'TODO/simplify-refresh/06_plan_tidy-refresh.org' gave the goal
+  computers the rule that a member whose record is visible and
+  that resolves to no node stays in the goal as an unknown: a
+  hidden folder the user requested could then hold an unknown,
+  and validation ('server/from_text/buffer_to_viewnodes/local.rs')
+  accepts an unknown only in the overridden folder, so a save of
+  that buffer might be refused. To check with a test; if so, let
+  the hidden folder accept an unknown as the overridden folder
+  does. The entry "Subscribee-as-such hides may misfire under a
+  restricted skgrepo-set" below now applies only to members whose
+  records are restricted, since slice 9 shows the others as
+  Restricted vognodes. Confirmed by the review's probe (j): the
+  save is refused under 'all' and under 'pub', the latter new
+  with slice 9, with a spurious clause about 'noClaim' in the
+  message.
+  Fixed by slices 0 and 2 of
+  'TODO/simplify-refresh/08_plan_restriction-and-tidy.org': every
+  relation folder admits a gnid-only vognode (slice 0), so the
+  buffer saves under 'all' and under 'pub' and keeps the hide;
+  the folders' check of 'noClaim', which only ever fired beside
+  the refusal of a child's kind, is gone (slice 2).
 * Problems found by the review of plan 06 (2026-10-27; fixed 2026-10-29)
   Found by the probes and the tests reviewer of
   'TODO/simplify-refresh/07_review.org'.
@@ -45,6 +69,23 @@
   property goals and the stats omit it, the re-kind rung takes it
   from a view drawn before a narrowing, and a restricted save
   keeps it.
+** A bare headline under a tombstone is refused, not saved
+  Run, and the same at the base. The plan said a headline typed
+  under a tombstone is saved as an orphan; it is refused with
+  "Occurrence must have a repo that exists in the config", since
+  the skgrepo inheritance stops at a tombstone. With its skgrepo
+  written it is saved and warned of. Fix: inherit through a
+  tombstone from the nearest occurrence above, or keep the
+  refusal and say what to do. The orphan warning also says "not
+  yet saved" of a node the same save created.
+  Fixed by slice 2 of
+  'TODO/simplify-refresh/08_plan_restriction-and-tidy.org': the
+  skgrepo inheritance passes through a tombstone to the nearest
+  occurrence above, so the headline is saved as an orphan
+  graphnode and warned of; the warning names it by its title and
+  gnid, without "not yet saved". A headline with no occurrence
+  above it (under the tombstone of a restricted root's folder) is
+  still refused for want of a skgrepo.
 * Problems found while planning plan 06 (2026-10-26; fixed 2026-10-27)
 ** An unknown recorded in a visible skgrepo vanishes under a restriction
   Seen by the same experiment, with and without the phase: the

@@ -80,9 +80,9 @@ A save's own warnings and errors go to a buffer of their own,
 replaced at each save that has any: =*SKG Save Warnings*=,
 =*SKG Save Errors - Inconsistencies Found*= when the save was
 refused, or =*SKG Save Errors and Warnings*= when it has both. One
-such warning names each orphan the save created: a node that nothing
-contains, made from a headline typed under a parent whose
-membership the save does not read (see "first some vocab" under
+such warning names each orphan graphnode the save created: a node
+that no list contains, made from a headline typed under a parent
+whose claims the save does not read (see "first some vocab" under
 C-c s).
 ** C-a : skg-beginning-of-line
 On a headline, moves point to the start of its title, after the stars
@@ -457,8 +457,8 @@ No child of a write-protected occurrence claims membership,
 whatever it carries, and nothing in one of its folders does.
 A child the user typed under it, which stays unwarranted (⊥),
 since no save reads claims there, is still saved as a node of its
-own: an orphan, a node that nothing contains, of which the save
-warns.
+own: an orphan graphnode, a node that no list contains, of which the
+save warns.
 The way out is to make the edit at the node's editable occurrence
 instead, or to undo it, make this occurrence editable
 (C-c s d on it), save, and edit it then.
@@ -947,10 +947,10 @@ Opens a blank Skg content view in which to create new nodes.
 **** why
 Creating a headline through Skg's commands prompts for any skgrepo it
 cannot inherit: a headline inherits one from the nearest occurrence
-above it, passing through folders, ghosts, unknowns and Restricted
-vognodes, so a root prompts, and so does a headline whose walk up
-meets a tombstone, an alias, an ID, a flag or a change viewnode
-first.  Save
+above it, passing through folders, ghosts, tombstones, unknowns and
+Restricted vognodes, so a root prompts, and so does a headline whose
+walk up meets an alias, an ID, a flag or a change viewnode first, or
+meets no occurrence.  Save
 validation also catches a node whose skgrepo was omitted when the
 headline was entered as plain text.
 *** C-c v h : skg-view-heralds-mode

@@ -412,7 +412,10 @@ headline without one, such as a folder. Under it comes =- graphnode
 ID: X= when the headline carries a graphnode ID, then =- viewnode ID:
 X= (see "The metadata headers") with the command that finds it, or =-
 not yet saved= for a headline without a viewnode ID: one the user
-typed or copied since the last render. No message invents a viewnode
+typed or copied since the last render. A warning of a node the same
+save created from such a headline (an orphan graphnode) ends after
+the graphnode ID, since the headline is saved and has no viewnode ID
+until the rerender gives it one. No message invents a viewnode
 ID. A message about several occurrences of a node names each in
 turn. A failed save's validation errors each follow as a =** Error
 N= headline of the one =NOTHING WAS SAVED= message, so their

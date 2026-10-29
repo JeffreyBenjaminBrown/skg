@@ -94,9 +94,10 @@ A save's own warnings and errors go to a buffer of their own,
 replaced at each save that has any: =skg://messages/save-warnings=,
 =skg://messages/save-errors= when the save was refused, or
 =skg://messages/save-errors-and-warnings= when it has both. One such
-warning names each orphan the save created: a node that nothing
-contains, made from a headline typed under a parent whose membership
-the save does not read (see "first some vocab" under <localleader>s).
+warning names each orphan graphnode the save created: a node that no
+list contains, made from a headline typed under a parent whose
+claims the save does not read (see "first some vocab" under
+<localleader>s).
 ** :SkgShowUnsavedChanges : archive edits for manual recovery
 Prompts for a local Org file, writes a detached recovery document, opens
 it, and reports its actual path. The document contains context, lossless
@@ -440,8 +441,8 @@ No child of a write-protected occurrence claims membership,
 whatever it carries, and nothing in one of its folders does.
 A child the user typed under it, which stays unwarranted (⊥),
 since no save reads claims there, is still saved as a node of its
-own: an orphan, a node that nothing contains, of which the save
-warns.
+own: an orphan graphnode, a node that no list contains, of which the
+save warns.
 The way out is to make the edit at the node's editable occurrence
 instead, or to undo it, make this occurrence editable
 (<localleader>sd on it), save, and edit it then.
@@ -795,9 +796,9 @@ Opens a blank Skg content view in which to create new nodes.
 **** why
 Every node needs a skgrepo.
 A headline inherits one from the nearest occurrence above it,
-passing through folders, ghosts, unknowns and Restricted vognodes;
-a root, or a headline whose walk up meets a tombstone, an alias, an
-ID, a flag or a change viewnode first,
+passing through folders, ghosts, tombstones, unknowns and Restricted
+vognodes; a root, or a headline whose walk up meets an alias, an
+ID, a flag or a change viewnode first, or meets no occurrence,
 needs its skgrepo chosen explicitly.
 nvim-orgmode's insert-heading actions (org_meta_return and
 org_insert_heading_respect_content) prompt for it when the new

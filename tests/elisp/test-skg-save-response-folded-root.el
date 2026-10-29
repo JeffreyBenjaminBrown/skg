@@ -232,8 +232,8 @@ headline and not back on the focused headline."
       (kill-buffer buf))))
 
 (ert-deftest test-save-response-shows-the-orphan-warning-naming-its-headline ()
-  "The warning of a node created as an orphan shows in the save
-warnings, the headline it names a subheadline of it."
+  "The warning of an orphan graphnode the save created shows in the
+save warnings, the headline it names a subheadline of it."
   (let ((buf (generate-new-buffer "*test-save-response-orphan*"))
         (shown nil))
     (unwind-protect
@@ -252,16 +252,17 @@ warnings, the headline it names a subheadline of it."
               `((content "* root\n")
                 (errors ())
                 (warnings (,(concat
-                             "Created an orphan, a node that nothing contains, "
-                             "from a headline whose parent takes no members:\n"
-                             "*** typed under two\n- graphnode ID: n1\n"
-                             "- not yet saved\n"))))))
+                             "Created an orphan graphnode, a node that no list "
+                             "contains, from a headline whose parent reads no "
+                             "claims:\n"
+                             "*** typed under two\n- graphnode ID: n1\n"))))))
             (should (equal (car shown) "*SKG Save Warnings*"))
             (should (string-match-p
-                     (concat "^\\* warnings\n\\*\\* Created an orphan, "
-                             "a node that nothing contains, from a headline "
-                             "whose parent takes no members:\n"
-                             "\\*\\*\\* typed under two$")
+                     (concat "^\\* warnings\n\\*\\* Created an orphan "
+                             "graphnode, a node that no list contains, from a "
+                             "headline whose parent reads no claims:\n"
+                             "\\*\\*\\* typed under two\n"
+                             "- graphnode ID: n1$")
                      (nth 2 shown)))))
       (kill-buffer buf))))
 
