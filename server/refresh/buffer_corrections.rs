@@ -12,7 +12,8 @@
 //!   under them; and whatever left the buffer, pruned by the tail;
 //! - 'AfterRestrictionChange': a skgrepo-set switch's rerender, after
 //!   which what the refresh draws, entombstones, marks 'noClaim' or
-//!   re-kinds across the restriction is the restriction's doing;
+//!   re-kinds across the restriction, and what the tail pruned, is the
+//!   restriction's doing;
 //! - 'Unread': a buffer nobody reads the buffer corrections of (a
 //!   first drawing); it is corrected as always, and nobody is told.
 //! The refresh reports buffer corrections;

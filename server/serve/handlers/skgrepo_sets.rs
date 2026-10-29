@@ -51,11 +51,13 @@ pub fn handle_skgrepo_set_request (
 
 /// Under a skgrepo restriction (the API doc's "Restricted-skgrepo nodes"): a repo-set switch
 /// re-renders open views in place rather than closing them. The
-/// refresh brings each view under the new restriction: it entombstones
-/// the occurrences the restriction keeps out, draws no restricted
-/// member, prunes childless tombstones, and draws what a widening
-/// reveals; a folder the restriction empties stays, empty, as any
-/// empty editable folder does. The rest keeps its
+/// refresh brings each view under the new restriction: an occurrence
+/// of a node the restriction now keeps out becomes a restricted
+/// headline where its record is visible, and a tombstone elsewhere; a
+/// member whose record it keeps out leaves; childless tombstones are
+/// pruned; and what a widening reveals is drawn. A folder the
+/// restriction empties stays, empty, as any empty editable folder
+/// does. The rest keeps its
 /// viewnode IDs. When the restriction changed, none of that is a
 /// buffer correction ('BufferCorrectionPolicy'). Results stream via
 /// the rerender-all message flow (lock, per-view, done).
