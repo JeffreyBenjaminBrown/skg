@@ -7,25 +7,6 @@
   fixed, prefix its headline with 'FIX PLANNED: ' and leave it here
   until the fix lands; then move it as above.
 * Problems noticed while executing plan 08, slice 1 (2026-10-29)
-** A narrowing leaves a re-kinded vognode's folders as tombstones
-  An occurrence the restriction newly keeps out becomes a
-  Restricted vognode in place; its folders, which the ancestry
-  table admits under an occurrence alone, become tombstones that
-  keep their members. Widening makes it an occurrence again, but
-  the tombstones stay (a tombstone stays while it holds
-  anything), and a folder the view had by request is not drawn
-  again. Seen for a root's containers folder
-  ('a_switch_and_its_reverse_draw_these_buffers' in
-  'tests/hidden_nodes.rs', the view of h) and, in the diff view,
-  for a changed partner folder, which the refresh draws again
-  beside the tombstone (probe 'probe_dv.py' in
-  'tests/results/08/slice1/probes/'). Nothing leaks and nothing
-  is lost from the graph; the view is not as it was. A folder
-  whose records live in the partners' files (containers,
-  subscribers, overriders, hiders, mentioners) could stay under a
-  Restricted vognode without leaking, and a re-kind back to an
-  occurrence could take the tombstones' place; either is a design
-  choice for Jeff.
 * Problems found by the review of plan 06 (2026-10-27)
   Found by the probes and the tests reviewer of
   'TODO/simplify-refresh/07_review.org'; the exchanges are in
