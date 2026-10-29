@@ -3531,3 +3531,22 @@ hidden-outside and subscribee folders still say "unknowns or
 Restricted vognodes"; slice 9's user-text pass can take them.
 *** Headline
 DONE.
+
+** Orchestrator's notes after slice 0 (2026-10-29)
+Launched 16:53 UTC, reported 17:16 UTC: twenty-three minutes;
+356k agent tokens over 156 tool uses. Every deviation is sound:
+a re-kind to a gnid-only vognode keeps the claim it carried
+(the claims rung never promotes one); the one admission rule
+reaches the view roots and the acquiredBy folder, which slice
+1's restricted root needs; the parser dropped two flags more;
+the chain keeps the role tree for its shape and the ID rule
+for each node's kind, so a container the worktree lacks is a
+ghost in the diff view now; one helper marks 'noClaim'; the
+glossary entry came early. Two corrections carried: the doc of
+'GnidOnlyKind::Restricted' says it is never in the diff view,
+which slice 1 makes false (carried to slice 1); three folder
+messages still say "unknowns or Restricted vognodes" (carried
+to slice 2, which rewrites the neighbouring refusal). Suites:
+nextest 995 of 995 (four new), Emacs 406, Neovim 399,
+integration 34 of 35 with the pre-existing failure. The
+agent's pitfalls for slices 1 and 2 go into their briefs.

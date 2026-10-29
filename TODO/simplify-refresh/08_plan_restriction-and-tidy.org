@@ -671,6 +671,12 @@ built as the ID rule answers. Then the suites, with
 Read the three sections of the agreed behavior, the pitfalls
 on the straddle and the root, and probes (k) and (e) with the
 tests report's "The diff view under a restriction" first.
+*** Corrections carried from slice 0
+The doc of 'GnidOnlyKind::Restricted' ('server/types/
+viewnode.rs') says the kind is never in the diff view, which
+runs under no restriction. This slice makes that false: the
+sentence says instead that the diff view draws it, after a
+switch, for a restricted member with a visible record.
 *** a restricted root
 In 'id_rule' ('server/refresh/id_rule.rs'), a gnid the truth
 says is restricted, under the buffer root, answers 'GnidOnly
@@ -716,6 +722,12 @@ restricted section is shown under the restriction" to
 ** TODO Slice 2: the save's two refusals
 Read the two sections of the agreed behavior and probes (j)
 and (d) first.
+*** Corrections carried from slice 0
+The messages of the subscribee, hidden-in-subscribee and
+hidden-outside folders ('server/from_text/buffer_to_viewnodes/
+local.rs') still say "unknowns or Restricted vognodes". They
+say "references to unknown nodes or restricted headlines", as
+the relation folders' message does since slice 0.
 *** the dangling hide
 With slice 0's rule in place, confirm that a requested hidden
 folder holding a gnid-only vognode of kind Unknown saves under
