@@ -23,7 +23,6 @@
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::node_lookup::opt_graphnode_by_gnid;
-use crate::refresh::goal::pid_else_raw_id;
 use crate::from_text::local_fieldintent_collection::lower::LoweredNodeIntents;
 use crate::from_text::local_fieldintent_collection::types::{
   HiddenOutsideEdit, SubscribeeVisibility };
@@ -129,7 +128,7 @@ fn apply_hiddenoutside_edits (
       continue; }
 
     let key : &dyn Fn (&ID) -> ID =
-      &|gnid : &ID| -> ID { pid_else_raw_id (graph, gnid) };
+      &|gnid : &ID| -> ID { graph . pid_else_raw_id (gnid) };
     let is_visible : &dyn Fn (&RelPartner<ID>) -> bool =
       &|member : &RelPartner<ID>| -> bool {
       SkgrepoRestriction::record_is_visible (

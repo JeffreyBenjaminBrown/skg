@@ -66,8 +66,7 @@ pub fn resolve_override (
   gnid  : &ID,
 ) -> OverrideResolution {
   let input_pid : ID = // extra-ID safety: resolve before walking
-    graph . pid_of (gnid)
-    . unwrap_or_else ( || gnid . clone () );
+    graph . pid_else_raw_id (gnid);
   let mut seen : HashSet<ID> =
     HashSet::from ( [ input_pid . clone () ] );
   let mut current : ID = input_pid . clone ();

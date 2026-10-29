@@ -46,8 +46,9 @@ use crate::sexp_string::quote_sexp_string;
 use crate::types::misc::{ID, SkgConfig, SkgrepoChange, SkgrepoName};
 use crate::types::nodes::complete::Flag;
 use crate::types::viewnode::{
-  ChangesetMarkerKind, DiffChange, Folder, PropertyMember, ChangeViewnode,
-  DiffObject, ViewRequest, Warrant};
+  ChangeFacts, ChangesetMarkerKind, DiffChange, Folder, GraphnodeStats,
+  PropertyMember, ChangeViewnode, DiffObject, ViewRequest, ViewnodeStats,
+  Warrant};
 
 use serde_json::Value;
 use std::collections::HashSet;
@@ -928,7 +929,6 @@ pub fn when_kinds_in_rule_table (
 /// its head, the heads of its parts and their atoms, and the diff
 /// objects.
 fn change_fact_atoms () -> Vec<&'static str> {
-  use crate::types::viewnode::ChangeFacts;
   fn guard ( facts : ChangeFacts, object : DiffObject ) {
     let ChangeFacts {
       change : _,   // -> node, rel, properties, with DiffChange::EMITTABLE_ATOMS
@@ -951,7 +951,6 @@ fn change_fact_atoms () -> Vec<&'static str> {
 /// destructuring pattern is the exhaustiveness guard -- a new field
 /// fails to compile here until it is accounted for.
 fn graphstats_atoms () -> Vec<&'static str> {
-  use crate::types::viewnode::GraphnodeStats;
   fn guard ( g : GraphnodeStats ) {
     let GraphnodeStats {
       aliases : _,    // -> Ak, inside semantic rels metadata
@@ -969,7 +968,6 @@ fn graphstats_atoms () -> Vec<&'static str> {
 /// atoms. The relationship facts are the forms named in
 /// 'emittable_metadata_atoms'.
 fn viewstats_atoms () -> Vec<&'static str> {
-  use crate::types::viewnode::ViewnodeStats;
   fn guard ( v : ViewnodeStats ) {
     let ViewnodeStats {
       cycle : _,

@@ -357,8 +357,7 @@ fn apply_sticky_relRepos_in_graph_with_prospective_homes (
   let recorder_pid  : ID         = supplemented . pid    . clone ();
   let recorder_home : SkgrepoName = supplemented . home_skgrepo . clone ();
   let resolve = |gnid : &ID| -> ID {
-    graph . pid_of (gnid)
-      . unwrap_or_else ( || gnid . clone () ) };
+    graph . pid_else_raw_id (gnid) };
   let member_key = |gnid : &ID| -> RelationshipMemberKey {
     graph . relationship_member_key (gnid) };
   let home_of = |gnid : &ID| -> Option<SkgrepoName> {

@@ -175,7 +175,7 @@ impl InRustGraph {
     seeds : impl IntoIterator<Item = ID>,
   ) -> HashSet<ID> {
     let seed_gnids : HashSet<ID> = seeds . into_iter ()
-      . map (|gnid| self . pid_of (&gnid) . unwrap_or (gnid))
+      . map (|gnid| self . pid_else_raw_id (&gnid))
       . collect ();
     let mut result : HashSet<ID> = seed_gnids . clone ();
     for seed in &seed_gnids {
@@ -188,7 +188,7 @@ impl InRustGraph {
         result . extend (
           self . outbound_gnids_for_relation (seed, relation)
             . into_iter ()
-            . map (|gnid| self . pid_of (&gnid) . unwrap_or (gnid)));
+            . map (|gnid| self . pid_else_raw_id (&gnid)));
         result . extend (
           self . inbound_pids_for_relation (seed, relation)); }}
     result . extend (self . override_walk_from_seeds (
@@ -214,7 +214,7 @@ impl InRustGraph {
           self . inbound_pids_for_relation (
             &node, NodeRelation::Overrides), };
       for raw_gnid in next {
-        let gnid : ID = self . pid_of (&raw_gnid) . unwrap_or (raw_gnid);
+        let gnid : ID = self . pid_else_raw_id (&raw_gnid);
         if visited . insert (gnid . clone ()) {
           pending . push (gnid); }} }
     visited

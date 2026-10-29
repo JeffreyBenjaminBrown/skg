@@ -201,8 +201,7 @@ fn relationship_at_head (
   let list : &[RelPartner<ID>] = relation_list (&recorder, key . relation) ?;
   let (index, partner) : (usize, &RelPartner<ID>) =
     list . iter () . enumerate () . find ( |(_, partner)|
-      before . pid_of (&partner . member) . as_ref () . unwrap_or (&partner . member)
-      == &key . member ) ?;
+      before . pid_else_raw_id (&partner . member) == key . member ) ?;
   Some ( RestoredRelationship {
     key           : key . clone (),
     stored_member : partner . member . clone (),
@@ -229,7 +228,7 @@ fn restoreRel_requests (
   live       : &InRustGraph,
 ) -> Vec<(Option<RelationshipKey>, HeadlineName)> {
   let pid_of = |gnid : &ID| -> ID {
-    live . pid_of (gnid) . unwrap_or_else ( || gnid . clone () ) };
+    live . pid_else_raw_id (gnid) };
   viewforest . root () . descendants ()
     . filter ( |node| matches! ( &node . value () . kind,
       ViewnodeKind::Vognode (Vognode::Occurrence (t)) if t . relationshipEditRequest == Some (RelationshipEditRequest::RestoreRel) ))
@@ -290,7 +289,7 @@ fn add_relationship (
     NodeRelation::LinksTo       => return Ok (( )), };
   let member_of = |stored : &ID| -> ID {
     if restored_pids . contains (stored) { stored . clone () }
-    else { live . pid_of (stored) . unwrap_or_else ( || stored . clone () ) } };
+    else { live . pid_else_raw_id (stored) } };
   if list . iter () . any ( |partner| member_of (&partner . member) == key . member )
   { return Ok (( )); }
   let at : usize = relationship . index . min ( list . len () );

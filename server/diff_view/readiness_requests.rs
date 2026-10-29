@@ -95,7 +95,7 @@ pub fn readiness_requests_in_viewforest (
   graph      : &InRustGraph,
 ) -> Vec<RequestedReadiness> {
   let pid_of = |gnid : &ID| -> ID {
-    graph . pid_of (gnid) . unwrap_or_else ( || gnid . clone () ) };
+    graph . pid_else_raw_id (gnid) };
   viewforest . root () . descendants ()
     . filter_map ( |node| {
       let request : &ReadinessRequest = node . value () . readiness_request . as_ref () ?;
@@ -320,7 +320,7 @@ pub fn set_ready_facts_in_viewforest (
   graph      : &InRustGraph,
 ) {
   let pid_of = |gnid : &ID| -> ID {
-    graph . pid_of (gnid) . unwrap_or_else ( || gnid . clone () ) };
+    graph . pid_else_raw_id (gnid) };
   let object_is_ready = |node : NodeRef<Viewnode>, objects : &[DiffObject]| -> bool {
     let keys : Vec<LeafKey> = keys_named_at (node, objects, forest, &pid_of);
     ! keys . is_empty () && forest . readiness_of_leaves (store, &keys) };

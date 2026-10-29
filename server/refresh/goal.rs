@@ -263,7 +263,7 @@ fn unintegrated_content_gnids (
   subscriber_contains : &[ID],
 ) -> Vec<ID> {
   let resolve_pids : &dyn Fn (&[ID]) -> Vec<ID> = &|gnids : &[ID]| -> Vec<ID> {
-    gnids . iter () . map ( |gnid| pid_else_raw_id (graph, gnid) ) . collect () };
+    gnids . iter () . map ( |gnid| graph . pid_else_raw_id (gnid) ) . collect () };
   let contents : Vec<ID> = resolve_pids (content_gnids);
   let hidden : Vec<ID> = resolve_pids (subscriber_hidden);
   let contained : Vec<ID> = resolve_pids (subscriber_contains);
@@ -504,18 +504,9 @@ fn unknown_or_restricted_members_relRepos (
                        member . relRepo . clone () ))
     . collect () }
 
-/// Each ID as the graph resolves it ('pid_else_raw_id').
+/// Each ID as the graph resolves it ('InRustGraph::pid_else_raw_id').
 fn resolve_all (
   gnids : Vec<ID>,
   graph : &InRustGraph,
 ) -> Vec<ID> {
-  gnids . iter () . map ( |gnid| pid_else_raw_id (graph, gnid) ) . collect () }
-
-/// The pid of the node 'gnid' names, else 'gnid' itself, the raw ID,
-/// when nothing answers to it: how the goal's lists, and the save's
-/// hides ('resolve_visibility.rs'), compare their members.
-pub(crate) fn pid_else_raw_id (
-  graph : &InRustGraph,
-  gnid  : &ID,
-) -> ID {
-  graph . pid_of (gnid) . unwrap_or_else ( || gnid . clone () ) }
+  gnids . iter () . map ( |gnid| graph . pid_else_raw_id (gnid) ) . collect () }

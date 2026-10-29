@@ -308,8 +308,7 @@ fn keep_the_first_editable_occurrence_of_each_node (
     if let Some (gnid) = node . value () . editable_gnid () {
       let pid : ID = match walk . truth . graph . gnid_presence_gated (
                              gnid, walk . truth . restriction ) {
-        GnidPresence::Present => walk . truth . graph . pid_of (gnid)
-          . unwrap_or_else ( || gnid . clone () ),
+        GnidPresence::Present => walk . truth . graph . pid_else_raw_id (gnid),
         _ => gnid . clone (), };
       if ! seen . insert (pid) { repeats . push (treeid); }}
     queue . extend ( node . children () . map ( |child| child . id () )); }

@@ -447,8 +447,7 @@ fn set_omitted_body (
       & tree . get (treeid) . unwrap () . value () . kind
     else { return; };
     t . is_writeProtected ()
-      && { let pid : ID = graph . pid_of (node_pid)
-             . unwrap_or_else ( || node_pid . clone () );
+      && { let pid : ID = graph . pid_else_raw_id (node_pid);
            graph . nodes . get (&pid)
              . map_or ( false, |n| n . body . is_some () ) } };
   if let ViewnodeKind::Vognode (Vognode::Occurrence (t)) =

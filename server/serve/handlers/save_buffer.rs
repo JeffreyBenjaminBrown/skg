@@ -1007,8 +1007,7 @@ fn post_skgsave_commit_hiddenoutside_warnings (
   candidates : &[PostSkgsaveCommitNoticeCandidate],
 ) -> Vec<String> {
   let key = |gnid : &ID| -> ID {
-    graph . pid_of (gnid)
-      . unwrap_or_else (|| gnid . clone ()) };
+    graph . pid_else_raw_id (gnid) };
   let label = |gnid : &ID| -> String {
     match graphnode_from_graph (graph, gnid) {
       Some (node) => format! ("{} ({})", node . title, node . pid),

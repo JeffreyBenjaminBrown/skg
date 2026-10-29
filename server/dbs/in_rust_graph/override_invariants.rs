@@ -58,8 +58,7 @@ pub fn validate_override_invariants (
       // Override targets can be primary or extra IDs. Validate against the
       // effective primary PID, matching graph relationship resolution.
       let overridden : ID =
-        graph . pid_of (&target)
-        . unwrap_or_else ( || target . clone () );
+        graph . pid_else_raw_id (&target);
       owned_overriders_by_overridden
         . entry (overridden)
         . or_default ()
@@ -127,10 +126,8 @@ pub fn derive_affected_override_scope (
 ) -> OverrideCheckScope {
   let mut skgrepos : HashSet<ID> = touched_pids . clone ();
   for raw in affected_gnids {
-    let old_key : ID = base . pid_of (raw)
-      . unwrap_or_else (|| raw . clone ());
-    let final_key : ID = candidate . pid_of (raw)
-      . unwrap_or_else (|| raw . clone ());
+    let old_key : ID = base . pid_else_raw_id (raw);
+    let final_key : ID = candidate . pid_else_raw_id (raw);
     if old_key == final_key { continue; }
     for (graph, key) in [
       (base, &old_key), (base, &final_key),
@@ -144,11 +141,11 @@ pub fn derive_affected_override_scope (
     if let Some (node) = base . nodes . get (skgrepo) {
       targets . extend (
         members_of (node . overrides . or_default ()) . into_iter ()
-          . map (|raw| base . pid_of (&raw) . unwrap_or (raw))); }
+          . map (|raw| base . pid_else_raw_id (&raw))); }
     if let Some (node) = candidate . nodes . get (skgrepo) {
       targets . extend (
         members_of (node . overrides . or_default ()) . into_iter ()
-          . map (|raw| candidate . pid_of (&raw) . unwrap_or (raw))); }}
+          . map (|raw| candidate . pid_else_raw_id (&raw))); }}
   OverrideCheckScope { skgrepos, targets }
 }
 
@@ -218,7 +215,7 @@ pub fn existing_owned_overrider_of (
   overridden : &ID,
 ) -> Option<ID> {
   let pid : ID =
-    graph . pid_of (overridden) . unwrap_or_else ( || overridden . clone () );
+    graph . pid_else_raw_id (overridden);
   owned_overriders_of (config, graph, &pid) . into_iter () . next () }
 
 /// The owned nodes (by pid) that override 'overridden' (a pid), via

@@ -112,6 +112,15 @@ impl InRustGraph {
     } else {
       self . extra_id_to_pid . get (gnid) . cloned () } }
 
+  /// The pid of the node 'gnid' names, else 'gnid' itself, the raw
+  /// ID, when nothing answers to it: how a list's members compare
+  /// when some of them may name no node.
+  pub fn pid_else_raw_id (
+    &self,
+    gnid : &ID,
+  ) -> ID {
+    self . pid_of (gnid) . unwrap_or_else ( || gnid . clone () ) }
+
   /// Resolve an ID (primary or extra) to its '(pid, repo)'.
   /// Returns None if the ID is unknown.
   pub fn pid_and_skgrepo (&self, gnid: &ID) -> Option<(ID, SkgrepoName)> {
@@ -126,7 +135,7 @@ fn canonical_key (
   identity : &InRustGraph,
   raw      : &ID,
 ) -> ID {
-  identity . pid_of (raw) . unwrap_or_else (|| raw . clone ())
+  identity . pid_else_raw_id (raw)
 }
 
 /// Add one recorder's five relationship contributions. Identity claims are

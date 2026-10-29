@@ -21,7 +21,7 @@ pub fn find_related_nodes (
     // each second member (see docs/data-model_technical.org) to its corresponding PID
     // (which might be itself) before inserting.
     let pid_or_self = |gnid: &ID| -> ID {
-      graph . pid_of (gnid) . unwrap_or_else ( || gnid . clone () ) };
+      graph . pid_else_raw_id (gnid) };
     match (relation, input_role, output_role) {
       // Forward lookups: read the field on the node.
       ("contains",                     "container",   "content")  =>

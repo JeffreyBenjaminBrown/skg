@@ -156,7 +156,7 @@ fn relationship_keys (
   node     : &GraphnodeInRust,
 ) -> BTreeMap<&'static str, BTreeSet<ID>> {
   let canonical = |raw : &ID| -> ID {
-    identity . pid_of (raw) . unwrap_or_else (|| raw . clone ()) };
+    identity . pid_else_raw_id (raw) };
   BTreeMap::from ([
     ("contained_by", members_of (&node . contains) . into_iter ()
       . map (|raw| canonical (&raw)) . collect ()),

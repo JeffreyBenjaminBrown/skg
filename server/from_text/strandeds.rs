@@ -81,7 +81,7 @@ pub fn stranded_relationships (
       NodeInstruction::Save (_) => None, } )
     . collect ();
   let resolve = |gnid : &ID| -> ID {
-    graph . pid_of (gnid) . unwrap_or_else ( || gnid . clone () ) };
+    graph . pid_else_raw_id (gnid) };
   let home_before = |gnid : &ID| -> Option<SkgrepoName> {
     graph . pid_and_skgrepo (gnid) . map ( |(_pid, home)| home )
       . or_else ( || home_from_disk (gnid, config) ) };
@@ -150,7 +150,7 @@ pub fn reset_to_default_relationships (
   graph        : &InRustGraph,
 ) {
   let resolve = |gnid : &ID| -> ID {
-    graph . pid_of (gnid) . unwrap_or_else ( || gnid . clone () ) };
+    graph . pid_else_raw_id (gnid) };
   for stranded in strandeds {
     let recorder_pid : &ID = &stranded . relationship . recorder;
     let position : Option<usize> =
