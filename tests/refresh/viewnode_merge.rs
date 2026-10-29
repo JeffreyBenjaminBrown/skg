@@ -2,12 +2,15 @@
 // standing for one gnid) are merged into one viewnode, the result,
 // which stands where the first stood and has a fresh vnid. It is
 // folded only if every sibling was, and so is its body; it is focused,
-// editable and claiming if any sibling was; it carries the union of
-// their view requests; it holds every sibling's children in sibling
-// order, each marked 'noClaim' unless the truth warrants it under the
-// result.
+// editable and claiming if any sibling was, but not editable when it
+// shows an overrider whose editable occurrence is elsewhere; it carries
+// the union of their view requests, and the edit request and the
+// relationship request of whichever carried one; it holds every
+// sibling's children in sibling order, each marked 'noClaim' unless the
+// truth warrants it under the result.
 
 use super::*;
+use crate::types::viewnode::{NodeEditRequest, RelationshipEditRequest};
 use indoc::formatdoc;
 
 /// p contains c; c contains d; e is a node no list names.
@@ -182,3 +185,78 @@ fn roots_standing_for_one_gnid_are_merged () {
     * {} p
     ", occurrence_metadata ("p", ""), occurrence_metadata ("p", "writeProtected") );
   assert_eq! ( run_asserting_fixpoint (&input, &graph) . outline (), "node p" ); }
+
+#[test]
+fn the_merged_siblings_node_edit_request_rides_with_its_editability () {
+  // The first c is write-protected; the second, editable, carries a
+  // delete request. The result is editable, and so carries the delete.
+  let input : String = formatdoc! ("
+    * {} p
+    ** {} c
+    ** {} c
+    ", occurrence_metadata ("p", ""), occurrence_metadata ("c", "writeProtected"),
+       occurrence_metadata ("c", "noClaim (editRequest delete)") );
+  let run : Run = run_asserting_fixpoint (&input, &family ());
+  let result : NodeRef<Viewnode> = children_of_first_root (&run) [0];
+  let ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) = &result . value () . kind
+    else { panic! ("the result is an occurrence") };
+  assert_eq! ( occurrence . editability,
+               Editability::Editable { body         : None,
+                                       edit_request : Some (NodeEditRequest::Delete) } ); }
+
+#[test]
+fn the_merged_siblings_relationship_request_is_carried () {
+  let input : String = formatdoc! ("
+    * {} p
+    ** {} c
+    ** {} c
+    ", occurrence_metadata ("p", ""), occurrence_metadata ("c", "writeProtected"),
+       occurrence_metadata ("c", "writeProtected noClaim (editRequest (relRepo private))") );
+  let run : Run = run_asserting_fixpoint (&input, &family ());
+  let result : NodeRef<Viewnode> = children_of_first_root (&run) [0];
+  let ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) = &result . value () . kind
+    else { panic! ("the result is an occurrence") };
+  assert_eq! ( occurrence . relationshipEditRequest,
+               Some ( RelationshipEditRequest::RelRepo ( SkgrepoName::from ("private") )) ); }
+
+/// p contains n, which o overrides. Under p, o stands for n
+/// ('overridesHere'), write-protected, and beside it n itself is
+/// editable: the two stand for one gnid, so they merge into o's place.
+fn an_overrider_beside_its_editable_original (
+  first_roots : &str,
+) -> String {
+  formatdoc! ("
+    {}* {} p
+    ** {} o
+    ** {} n
+    ", first_roots, occurrence_metadata ("p", ""),
+       occurrence_metadata ("o", "writeProtected (overridesHere n)"),
+       occurrence_metadata ("n", "noClaim") ) }
+
+fn overridden () -> InRustGraph {
+  graph (&[
+    Graphnode { contains : ids (&["n"]), .. node ("p") },
+    node ("n"),
+    Graphnode { overrides : msv_ids (&["n"]), .. node ("o") }, ]) }
+
+#[test]
+fn the_result_takes_the_merged_siblings_editability () {
+  let run : Run = run_asserting_fixpoint (
+    &an_overrider_beside_its_editable_original (""), &overridden ());
+  assert_eq! ( run . outline (), "\
+node p
+  node o (overridesHere n)" ); }
+
+#[test]
+fn the_result_stays_write_protected_when_its_node_is_editable_elsewhere () {
+  // The overrider exception: the result shows o, and o's editable
+  // occurrence is the first root, so the result does not take n's
+  // editability.
+  let run : Run = run_asserting_fixpoint (
+    &an_overrider_beside_its_editable_original (
+      &format! ("* {} o\n", occurrence_metadata ("o", ""))),
+    &overridden ());
+  assert_eq! ( run . outline (), "\
+node o
+node p
+  node o wp (overridesHere n)" ); }
