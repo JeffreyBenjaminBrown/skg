@@ -7,6 +7,7 @@
 use crate::types::misc::{ID, MSV, RelPartner, SkgrepoName, members_msv};
 use crate::types::nodes::complete::{Flag, Graphnode};
 use crate::types::links::links_from_node;
+use crate::skgrepo_sets::SkgrepoRestriction;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct GraphnodeInRust {
@@ -70,12 +71,16 @@ impl GraphnodeInRust {
       . chain ( self . extra_ids . iter () . cloned () )
       . collect () }
 
-  /// Each alias's text, in order, with its relRepo where that differs
-  /// from the node's home: what an alias headline names.
+  /// Each alias whose record the skgrepo restriction shows (each,
+  /// under none), its text, in order, with its relRepo where that
+  /// differs from the node's home: what an alias headline names.
   pub fn aliases_with_relRepo_unless_home (
     &self,
+    restriction : Option<&SkgrepoRestriction>,
   ) -> Vec<(String, Option<SkgrepoName>)> {
     self . aliases . or_default () . iter ()
+      . filter ( |alias| restriction . is_none_or (
+        |set| set . is_all () || set . contains_skgrepo (&alias . relRepo) ))
       . map ( |alias| ( alias . member . clone (),
                         ( alias . relRepo != self . home_skgrepo )
                           . then ( || alias . relRepo . clone () ) ))

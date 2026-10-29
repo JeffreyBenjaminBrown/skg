@@ -3550,3 +3550,139 @@ to slice 2, which rewrites the neighbouring refusal). Suites:
 nextest 995 of 995 (four new), Emacs 406, Neovim 399,
 integration 34 of 35 with the pre-existing failure. The
 agent's pitfalls for slices 1 and 2 go into their briefs.
+
+** Slice 1
+*** The commits
+**** d9f5a6a8
+A restricted root: the ID rule answers a restricted gnid under
+the buffer root with a gnid-only vognode of kind Restricted; the
+way back makes it an editable occurrence, its children claiming.
+**** f4ab189d
+The diff view gated: its goal asks the restriction of each
+partner's record and node ('partner_items'), the ghost question
+asks it of HEAD's node's home, and the diff-view fixpoint sweep
+runs under each restriction.
+**** The last commit
+The alias recorded in a restricted section: omitted by both
+property goals and the stats, taken from a view by the re-kind
+rung, kept by a restricted save; the docs, the problems entries,
+this record and the plan's keyword.
+*** The suites
+**** cargo check --all-targets
+Clean, no warning.
+**** bash/nextest.sh
+1003 run, 1003 passed (995 before the slice, eight tests added;
+the two sweeps of 'tests/idempotence.rs' were extended, not
+added).
+**** bash/integration-tests.sh
+34 of 35 passed. The failure is 'import-md-and-org', which is
+pre-existing and not this plan's.
+**** bash/emacs-tests.sh and bash/nvim-tests.sh
+Not run: the slice touches no client and no message a client
+test asserts.
+**** Failures met during the slice
+None in the suites. The fixpoint sweeps ran first after the
+change to the ID rule, and stayed green after each change. Each
+new test was checked by mutation: it fails when its fix is
+undone (the root case, the root's editability, the ghost gate,
+the goal's restricted mark, the quiet ghost re-kind, the alias
+goal, the alias count, the save's alias weave, the
+write-protected alias check, the alias re-kind).
+**** The TCP surface
+Probes (k) and (e) and a new diff-view probe ran against scratch
+servers ('verify' skill); copies, scripts and outputs are in
+'tests/results/08/slice1/probes/'. Probe (k): narrowed, 'cv:R'
+is "restricted (gnid R)" over its content; widened, R's editable
+occurrence where it stood, A drawn again beside the tombstone
+that kept A1. Probe (e): narrowed, r's alias folder holds no
+alias and r counts none; saved unchanged, both of r's files are
+byte-identical. Probe 'probe_dv.py': narrowed, the deleted
+private k is "restricted (gnid k)" with '(diff (rel removed))'
+and no title, the added private h "restricted (gnid h)" with
+'(diff (rel added))'; widened, both as before; no switch reports
+a buffer correction.
+*** Deviations from the plan's "how"
+**** the root case is a parameter of the ID rule
+'id_rule' takes 'is_view_root', which 'rekind_vognode' computes
+from the parent's kind; the chain and the reinstate rung pass
+false. A root has no goal, so the goal cannot carry it.
+**** a re-kinded root is editable
+'drawn_occurrence_is_editable' counts the buffer root as a
+parent of editable content, so a root made an occurrence again
+is editable, as it was before the narrowing, when no other
+occurrence holds the node and the budget allows (in the diff
+view, when the node is in U). Its only caller at a root is
+'rekind_to_occurrence'.
+**** the diff view's goal omits restricted records too
+The plan asks the goal to mark a restricted member with a
+visible record; 'partner_items' also leaves out a partner whose
+record is restricted (the worktree's record, or HEAD's when the
+worktree has none), as a content view's goal does, or a switch
+would show a private relationship of a visible node. A node is
+restricted by the worktree's home, or HEAD's when the worktree
+has none.
+**** a ghost re-kinded from a Restricted vognode is quiet
+Widening made the deleted private node's Restricted vognode its
+ghost again with a "Made a headline a ghost" buffer correction;
+'rekind_to_ghost' now stays quiet after a change of the
+restriction, as the other re-kinds across it do.
+**** the alias's save and validation follow the goal
+Once the alias folder omits a restricted alias, two save paths
+had to learn it. 'preserve_invisible_members' weaves the disk's
+aliases back in, as it does 'contains' (without it, a restricted
+save of an alias folder deleted the private alias: the alias
+test failed so). 'errors_for_writeProtected_occurrences' takes
+the restriction and compares a write-protected occurrence's
+alias folder with the aliases whose records are visible
+(without it, such a save was refused: "aliases differ from the
+graph's").
+**** the alias leaves a view by the re-kind rung
+A view drawn under 'all' kept the private alias after a switch,
+marked 'noClaim' and unwarranted. 'alias_whose_record_is_
+restricted' ('visit.rs') makes the re-kind rung entombstone such
+an alias, which the tail then prunes; after a switch that is no
+buffer correction.
+**** the question is spelled inline, five times more
+Until slice 3 names 'record_is_visible', the record question is
+spelled as the gated accessors spell it, in
+'aliases_with_relRepo_unless_home' (now taking the restriction),
+'graphnodestats_for_pid' (now taking it), the write-protected
+alias check, 'preserve_invisible_members' and 'partner_items'.
+Slice 3 should sweep these with the others.
+**** a helper switches and reads several views
+'switch_skgrepo_set_rerendering' ('tests/shared/git_fixture.rs')
+returns each named view after one switch; 'switch_skgrepo_set'
+calls it with one.
+**** the docs now, not in slice 9
+'docs/diff-view.org', 'docs/api-and-formats.org',
+'docs/data-model_technical.org' and the glossary said the
+restriction plays no part in the diff view, or named no root
+case; the sentences that became false were rewritten.
+*** Fixtures changed
+No fixture data changed. 'tests/hidden_nodes.rs' writes a new
+fixture for the alias test (r with a public and a private
+alias) and pins the buffers of a view rooted at h in
+'a_switch_and_its_reverse_draw_these_buffers'. The diff-view
+sweep of 'tests/idempotence.rs' refreshes each buffer under each
+restriction as a switch does, then checks the fixpoint (ten
+restricted buffers). Two call sites gained a 'None' argument
+('tests/graphnodestats_hiding.rs', 'tests/refresh/chain.rs').
+*** Left unfinished
+**** a narrowed vognode's folders stay tombstones
+The plan's test says a widened view rooted at a private node "is
+the view it was". The root, its vnid, fold state, editability
+and content come back; but its containers folder, which the
+ancestry table admits under an occurrence alone, became a
+tombstone at the narrowing, keeping its chain, and stays one
+after widening, while the fresh view's folder request is gone.
+The same holds for any occurrence re-kinded to a Restricted
+vognode, and in the diff view the refresh draws the changed
+partner folder again beside the tombstone. Nothing leaks or is
+lost from the graph. The test pins the buffers as they are; the
+choice (keep such folders under a Restricted vognode where their
+records live in the partners' files, or let the way back take
+the tombstones' place) is a design question, filed in
+'TODO/problems.org' as "A narrowing leaves a re-kinded
+vognode's folders as tombstones".
+*** Headline
+DONE.

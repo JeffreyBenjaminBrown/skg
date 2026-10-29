@@ -38,15 +38,20 @@ impl AllGraphnodeStats {
 
 /// Extract GraphnodeStats for a single PID from AllGraphnodeStats and
 /// an optional disk Graphnode (the skgrepo of the alias / extra-id /
-/// flag counts).
+/// flag counts). The alias count is of the aliases whose records the
+/// skgrepo restriction shows, as the alias folder's goal is.
 pub fn graphnodestats_for_pid (
-  pid          : &ID,
-  stats        : &AllGraphnodeStats,
-  graphnode : Option<&Graphnode>,
+  pid         : &ID,
+  stats       : &AllGraphnodeStats,
+  graphnode   : Option<&Graphnode>,
+  restriction : Option<&SkgrepoRestriction>,
 ) -> GraphnodeStats {
   let aliases : usize =
     graphnode
-    . map ( |n| n . aliases . or_default () . len () )
+    . map ( |n| n . aliases . or_default () . iter ()
+                . filter ( |alias| restriction . is_none_or (
+                  |set| set . is_all () || set . contains_skgrepo (&alias . relRepo) ))
+                . count () )
     . unwrap_or (0);
   let extra_ids : usize =
     graphnode
@@ -309,7 +314,7 @@ mod tests {
         Flag::NoSearchMatching ],
       .. empty_graphnode () };
     let result = graphnodestats_for_pid (
-      &pid, &AllGraphnodeStats::empty (), Some (&node));
+      &pid, &AllGraphnodeStats::empty (), Some (&node), None);
     assert_eq! (result . flags, 2);
   }
 }

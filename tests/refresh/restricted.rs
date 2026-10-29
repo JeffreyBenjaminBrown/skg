@@ -280,3 +280,60 @@ node r
   node a
   node b",
     "a and b claim under r again, so that a save keeps them in r's contents" ); }
+
+/// r, in 'main', records the alias "r public alias" in 'main' and
+/// "r secret alias" in 'private'.
+fn r_with_a_private_alias () -> InRustGraph {
+  graph (&[
+    Graphnode { aliases : MSV::Specified ( vec! [
+                  RelPartner::at_relRepo ( SkgrepoName::from ("main"),
+                                           "r public alias" . to_string () ),
+                  RelPartner::at_relRepo ( SkgrepoName::from ("private"),
+                                           "r secret alias" . to_string () ) ] ),
+                .. node ("r") } ]) }
+
+#[test]
+fn an_alias_whose_record_is_restricted_is_neither_drawn_nor_counted () {
+  let input : String = formatdoc! ("
+    * {} r
+    ", occurrence_metadata ("r", "(viewRequests (folder aliases))") );
+  let narrowed : Run = refreshed_under_main_only (&input, &r_with_a_private_alias ());
+  assert_eq! ( narrowed . outline (), "\
+node r
+  aliasFolder
+    alias r public alias" );
+  assert! ( narrowed . text . contains ("(props (aliases 1))")
+            && ! narrowed . text . contains ("secret"), "{}", narrowed . text );
+  let unrestricted : Run = run_asserting_fixpoint (&input, &r_with_a_private_alias ());
+  assert_eq! ( unrestricted . outline (), "\
+node r
+  aliasFolder
+    alias r public alias
+    alias r secret alias" );
+  assert! ( unrestricted . text . contains ("(props (aliases 2))"), "{}", unrestricted . text ); }
+
+#[test]
+fn a_switch_takes_from_a_view_the_alias_whose_record_it_makes_restricted () {
+  let config : SkgConfig = config ();
+  let graph : InRustGraph = r_with_a_private_alias ();
+  let restriction : SkgrepoRestriction = main_only ();
+  let shown : String = formatdoc! ("
+    * {} r
+    ** (skg aliasFolder)
+    *** (skg alias) r public alias
+    *** (skg alias (skgRepos (relRepo private))) r secret alias
+    ", occurrence_metadata ("r", "") );
+  let mut forest : ViewForest = parse (&shown, IdResolution::ThroughGraph (&graph));
+  let mut record : ViewnodeIdRecord = ViewnodeIdRecord::of_viewforest (&forest);
+  let narrowed : Refreshed = refresh_viewforest (
+    &mut forest, &mut record,
+    &Truth { graph : &graph, config : &config, restriction : Some (&restriction) },
+    RefreshMode::ContentView, 100, &BufferCorrectionPolicy::after_a_switch (true) )
+    . unwrap ();
+  assert_eq! ( outline (&forest), "\
+node r
+  aliasFolder
+    alias r public alias" );
+  assert! ( ! narrowed . text . contains ("secret"), "{}", narrowed . text );
+  assert_eq! ( narrowed . buffer_corrections, Vec::new (),
+               "what the restriction takes is no buffer correction" ); }

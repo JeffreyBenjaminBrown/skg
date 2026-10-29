@@ -4,7 +4,8 @@
 //!  1. re-kind: each child that stands for a gnid becomes what the ID
 //!     rule says, where it stands; each descriptor (folder, property
 //!     member, change viewnode) whose position the ancestry table
-//!     forbids, or whose change is gone, is entombstoned;
+//!     forbids, or whose change is gone, is entombstoned, and so is an
+//!     alias whose record the skgrepo restriction keeps out;
 //!  2. viewnode merge: duplicate viewnode siblings, standing for one
 //!     gnid, are merged into one;
 //!  3. the goal and the warrant: each child's warrant is set from P's
@@ -46,7 +47,9 @@ use crate::refresh::id_rule::{
   ghost_from_head, id_rule, occurrence_from_truth, point_occurrence_at,
   rekind_vognode};
 use crate::refresh::{Walk, write_protect_occurrence};
-use crate::refresh::ancestry::{is_unsayable, parent_reads_claims};
+use crate::refresh::ancestry::{described_node, is_unsayable, parent_reads_claims};
+use crate::refresh::mode::RefreshMode;
+use crate::types::nodes::rust::GraphnodeInRust;
 use crate::refresh::diff_view;
 use crate::refresh::chain::attach_containerward_chain;
 use crate::types::misc::ID;
@@ -181,12 +184,43 @@ fn rekind_children (
       ViewnodeKind::Folder (_)
         | ViewnodeKind::PropertyMember (_)
         | ViewnodeKind::ChangeViewnode (_) =>
-        if is_unsayable (tree, child) {
+        if is_unsayable (tree, child)
+           || alias_whose_record_is_restricted (tree, child, walk) {
           entombstone (tree, child, walk); }
         else if diff_view::change_is_gone (tree, child, walk) {
           entombstone_gone_change (tree, child, walk); },
       ViewnodeKind::Tombstone | ViewnodeKind::BufferRoot => {}, }}
   Ok (( )) }
+
+/// Whether the headline at 'treeid' is an alias whose record the
+/// skgrepo restriction keeps out: the node its folder describes has
+/// the alias (in the diff view, in the worktree or at HEAD) and no
+/// record of it the restriction shows. The property goal omits such an
+/// alias, as a content goal omits a member whose record is restricted;
+/// this takes it from a view drawn before the restriction narrowed.
+fn alias_whose_record_is_restricted (
+  tree   : &Tree<Viewnode>,
+  treeid : NodeId,
+  walk   : &Walk,
+) -> bool {
+  let Some (restriction) = walk . truth . restriction else { return false; };
+  let ViewnodeKind::PropertyMember (PropertyMember::Alias { text, .. }) =
+    &tree . get (treeid) . unwrap () . value () . kind else { return false; };
+  let Some (pid) : Option<ID> =
+    described_node (tree, tree . get (treeid) . unwrap () . parent () . unwrap () . id ())
+    . and_then ( |described| tree . get (described) ? . value () . occurrence_gnid () . cloned () )
+    else { return false; };
+  let head : Option<&GraphnodeInRust> = match walk . mode {
+    RefreshMode::DiffView { straddle, .. } => straddle . before . get (&pid),
+    RefreshMode::ContentView => None, };
+  let nodes : Vec<&GraphnodeInRust> =
+    walk . truth . graph . get (&pid) . into_iter () . chain (head) . collect ();
+  let has_it : bool = nodes . iter () . any (
+    |node| node . alias_texts () . contains (text) );
+  let shows_it : bool = nodes . iter () . any (
+    |node| node . aliases_with_relRepo_unless_home (Some (restriction)) . iter ()
+           . any ( |(visible, _)| visible == text ));
+  has_it && ! shows_it }
 
 //
 // 2. viewnode merge

@@ -172,8 +172,14 @@ refresh so:
   budget, the buffer's sets decide ("Editability in the diff view");
 - in the tail, the '(ready ...)' change facts are set from the
   store, and in the skgrepo-changes buffer the home skgrepo moves.
-The skgrepo restriction plays no part, since the diff view requires
-'all'.
+The diff view opens only under the skgrepo restriction 'all', but a
+skgrepo-set switch rerenders its open buffers under the new
+restriction, which the refresh then asks as in a content view: the
+goal omits a member whose record is restricted and marks one whose
+node is restricted (the worktree's node, or HEAD's when the worktree
+has none), which stands as a Restricted vognode carrying its change
+facts and none of the change viewnodes that would show its text; a
+restricted node is never a ghost.
 ** Change viewnodes and tags
 At each editable occurrence of a node in C, the refresh holds, ahead
 of its content, what 'model_of_front_change_viewnodes'

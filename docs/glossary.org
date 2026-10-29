@@ -619,7 +619,8 @@ node's home are both unrestricted.
 A *Restricted vognode* (a gnid-only vognode of kind
 'GnidOnlyKind::Restricted' in 'server/types/viewnode.rs', on the wire =restricted (gnid ID)
 [(skgRepos (relRepo REPO))] [noClaim] [(editRequest ...)]=) stands
-where a visible record names a restricted node. It carries the
+where a visible record names a restricted node, or where a view is
+rooted at one (the view is the user's own request). It carries the
 record's gnid and relRepo and nothing of the node: no title, no body,
 no home skgrepo, no stats; its herald is "restricted", and text typed
 on its line is refused, as on an unknown's. A goal keeps such a
@@ -627,7 +628,9 @@ member, marked restricted, and omits only members whose records are
 restricted; the ID rule answers it (see "the ID rule"). An occurrence
 of a node the restriction newly keeps out becomes one in place,
 keeping its viewnode ID, fold state and children, and an occurrence
-again when the restriction widens. It claims membership as an
+again when the restriction widens; in the diff view, after a
+switch, a restricted node's ghost becomes one, or a tombstone, by
+the same rule, since a restricted node is never a ghost. It claims membership as an
 unknown does: a save keeps its gnid in the list it claims a place
 in, and deleting its line removes the record; the save restores to a
 list only the members whose records are restricted, which the buffer

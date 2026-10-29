@@ -17,7 +17,7 @@ fn rels_for (
   pid   : &str,
   stats : &AllGraphnodeStats,
 ) -> RelationCounts {
-  graphnodestats_for_pid ( &ID::from (pid), stats, None )
+  graphnodestats_for_pid ( &ID::from (pid), stats, None, None )
     . rels
     . unwrap_or_else ( || panic! ("no rels for {}", pid) ) }
 

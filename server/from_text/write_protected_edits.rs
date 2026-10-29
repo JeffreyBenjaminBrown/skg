@@ -4,19 +4,21 @@
 //! judged by the graph alone: it must say what the graph says.
 
 use crate::types::errors::{BufferValidationError, HeadlineName};
-use crate::types::misc::{ID, SkgrepoName, members_of};
+use crate::types::misc::{ID, SkgrepoName};
 use crate::types::nodes::complete::{Flag, Graphnode};
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{RelationshipEditRequest, Folder, PropertyMember, Occurrence, Viewnode, ViewnodeKind, Vognode};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::node_lookup::graphnode_from_graph;
+use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::nodes::complete::flag_is_true;
 
 use ego_tree::NodeRef;
 
 /// Every write-protected occurrence of the saved view must agree with
 /// the graph: its title and home skgrepo equal the node's, and its
-/// alias folder, when present, shows the node's aliases in order and
+/// alias folder, when present, shows the node's aliases whose records
+/// the skgrepo 'restriction' shows (each, under none) in order and
 /// takes no relRepo request. Under a write-protected parent no child
 /// claims membership, so what else stands there (an alias the node
 /// lacks, a child, a folder's members) is the user's note or the diff
@@ -25,8 +27,9 @@ use ego_tree::NodeRef;
 /// 'find_buffer_errors_for_saving'.) Every present flags folder, under
 /// any recorder, is server-owned and must show the node's flags.
 pub fn errors_for_writeProtected_occurrences (
-  viewforest : &ViewForest,
-  graph      : &InRustGraph,
+  viewforest  : &ViewForest,
+  graph       : &InRustGraph,
+  restriction : Option<&SkgrepoRestriction>,
 ) -> Vec<BufferValidationError> {
   let mut errors : Vec<BufferValidationError> =
     flags_surface_errors_against_graph (viewforest, graph);
@@ -37,7 +40,7 @@ pub fn errors_for_writeProtected_occurrences (
     if let Some (graphnode) = graphnode_from_graph (graph, &occurrence . gnid) {
       let differences : Vec<String> =
         writeProtected_differences_from_graph (
-          node, occurrence, &graphnode );
+          node, occurrence, &graphnode, restriction );
       if ! differences . is_empty () {
         errors . push (BufferValidationError::EditedWriteProtectedOccurrence {
           gnid    : occurrence . gnid . clone (),
@@ -51,6 +54,7 @@ fn writeProtected_differences_from_graph (
   node                : NodeRef<Viewnode>,
   occurrence          : &Occurrence,
   graphnode           : &Graphnode,
+  restriction         : Option<&SkgrepoRestriction>,
 ) -> Vec<String> {
   let mut differences : Vec<String> = Vec::new ();
   if occurrence . title != graphnode . title {
@@ -63,7 +67,11 @@ fn writeProtected_differences_from_graph (
       occurrence . home_skgrepo, graphnode . home_skgrepo )); }
   if let Some (aliases_in_view) = aliases_of_occurrence (node) {
     let aliases_in_graph : Vec<String> =
-      members_of (graphnode . aliases . or_default ());
+      graphnode . aliases . or_default () . iter ()
+      . filter ( |alias| restriction . is_none_or (
+        |set| set . is_all () || set . contains_skgrepo (&alias . relRepo) ))
+      . map ( |alias| alias . member . clone () )
+      . collect ();
     let differs : bool =
       aliases_in_view . iter () . any ( |(_, request)| request . is_some () )
       || aliases_in_view . into_iter ()
@@ -306,7 +314,7 @@ mod tests {
         .. node ("private_sub") } ]) }
 
   fn errors_in (text : &str) -> Vec<BufferValidationError> {
-    errors_for_writeProtected_occurrences ( &forest (text), &graph () ) }
+    errors_for_writeProtected_occurrences ( &forest (text), &graph (), None ) }
 
   #[test]
   fn an_occurrence_that_agrees_with_the_graph_passes () {

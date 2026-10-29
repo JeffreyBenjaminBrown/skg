@@ -204,10 +204,13 @@ questions, the first yes winning (=id_rule= in
 an occurrence of the node's pid. Otherwise, does the truth say the
 node is restricted (=Restricted=, =GnidPresence=: the skgrepo
 restriction keeps out its home)? Then, if its viewparent's goal names
-the gnid, marked restricted (its record is visible), it is a
-Restricted vognode; if not, a tombstone. Either reveals nothing of
-the node, and a restricted node is never a ghost. Otherwise, in the
-diff view, does HEAD have it? Then it is the node's ghost. Otherwise,
+the gnid, marked restricted (its record is visible), or it is a root
+of the view (the view is the user's own request), it is a Restricted
+vognode; if not, a tombstone. Either reveals nothing of the node.
+Otherwise, in the diff view, does HEAD have it? Then it is the node's
+ghost, unless the restriction keeps out HEAD's node's home, when it
+is answered as a restricted node is: a restricted node is never a
+ghost. Otherwise,
 does its viewparent's list name the gnid? Then it is an unknown.
 Otherwise it is a tombstone. So an occurrence of a node the
 restriction newly keeps out becomes a Restricted vognode in place
@@ -271,12 +274,17 @@ implies no relationship (the buffer root, a tombstone, an unknown, a
 Restricted vognode) has no goal.
 
 Under a skgrepo restriction a goal omits each member whose record is
-restricted: the gated accessors of the in-Rust graph leave it out.
+restricted: the gated accessors of the in-Rust graph leave it out;
+an alias folder's goal omits an alias whose record is restricted, and
+the stats count it nowhere. The diff view's goal asks the
+restriction too, though the diff view opens only under 'all': a
+switch rerenders its open buffers.
 It keeps each member whose record is visible: a node the restriction
 keeps out, marked restricted (=GoalItem::restricted=), which the ID
 rule answers with a Restricted vognode; and a gnid nothing answers
 to, an unknown, as under no restriction. The save is its mirror: it
 restores to a list only the members whose records are restricted,
+and to a node's aliases only those whose records are restricted,
 which the buffer could not show (=preserve_invisible_members= and
 =server/from_text/weave.rs=), so a Restricted vognode keeps its member
 while it claims, and deleting its line removes the record.
@@ -303,7 +311,8 @@ text calls them the ladder):
 1. re-kind: each vognode child becomes what the ID rule says; each
    descriptor whose position the ancestry table forbids, or, for a
    change viewnode, whose change is gone, is *unsayable* and becomes a
-   tombstone;
+   tombstone, and so does an alias whose record the restriction keeps
+   out;
 2. viewnode merge: duplicate viewnode siblings, standing for one
    gnid, are merged into one viewnode, which stands where the first
    stood and gets a fresh viewnode ID; it is folded (and body-folded)

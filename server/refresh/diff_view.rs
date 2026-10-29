@@ -124,8 +124,9 @@ pub(crate) fn folder_goal (
     kind . goal_is_ordered () )) }
 
 /// A property folder's members over the straddle: the union of the
-/// node's aliases, IDs or true flags in the two graphs, each lost one
-/// warranted by HEAD.
+/// node's aliases (those whose records the skgrepo restriction shows),
+/// IDs or true flags in the two graphs, each lost one warranted by
+/// HEAD.
 pub(crate) fn property_goal (
   kind : &Folder,
   pid  : &ID,
@@ -143,11 +144,14 @@ pub(crate) fn property_goal (
       .. GoalItem::by_graph (member) } };
   Some ( match kind {
     Folder::Alias => {
+      let restriction : Option<&SkgrepoRestriction> = walk . truth . restriction;
       let texts : &dyn Fn (Option<&GraphnodeInRust>) -> Vec<String> =
         &|node : Option<&GraphnodeInRust>| -> Vec<String> {
-        node . map ( |node| node . alias_texts () ) . unwrap_or_default () };
+        node . map ( |node| node . aliases_with_relRepo_unless_home (restriction)
+                            . into_iter () . map ( |(text, _)| text ) . collect () )
+        . unwrap_or_default () };
       let relRepos_after : HashMap<String, Option<SkgrepoName>> =
-        after . map ( |node| node . aliases_with_relRepo_unless_home ()
+        after . map ( |node| node . aliases_with_relRepo_unless_home (restriction)
                              . into_iter () . collect () )
         . unwrap_or_default ();
       let relRepo_after : &dyn Fn (&String) -> Option<SkgrepoName> =

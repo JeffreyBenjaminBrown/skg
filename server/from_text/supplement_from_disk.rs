@@ -188,8 +188,9 @@ fn supplement_nodeSaveIntent_from_disk (
 /// node's relationship-list members, so its lists describe only the
 /// visible subset.  This merges each list with its disk counterpart
 /// (the API doc's "Restricted-skgrepo nodes"): the anchored
-/// 'weave' for the order-meaningful 'contains' and 'subscribesTo',
-/// the 'set_difference_merge' for the order-meaningless
+/// 'weave' for the order-meaningful 'contains', 'subscribesTo' and
+/// 'aliases' (the alias folder omits an alias whose record is
+/// restricted), the 'set_difference_merge' for the order-meaningless
 /// 'overrides'.  A field is replaced only when the merge
 /// changed it, so an untouched field keeps its MSV shape (and the
 /// noop filter can still recognize an unchanged node).
@@ -262,6 +263,21 @@ fn preserve_invisible_members (
       &buffer_overrides );
     if merged != submitted_overrides {
       supplemented . overrides =
+        MSV::Specified (rel_partners_at_relRepo (&recorder_skgrepo, merged)); }}
+  { // The sticky pass after this gives each alias its relRepo again,
+    // by its text.
+    let alias_visible = |text : &String| -> bool {
+      disk_node . aliases . or_default () . iter ()
+        . find ( |alias| &alias . member == text )
+        . is_some_and ( |alias| restriction . is_all ()
+                                || restriction . contains_skgrepo (&alias . relRepo) ) };
+    let submitted_aliases : Vec<String> =
+      members_of (supplemented . aliases . or_default ());
+    let merged : Vec<String> = weave (
+      &members_of (disk_node . aliases . or_default ()), &alias_visible,
+      &submitted_aliases );
+    if merged != submitted_aliases {
+      supplemented . aliases =
         MSV::Specified (rel_partners_at_relRepo (&recorder_skgrepo, merged)); }}
   supplemented }
 

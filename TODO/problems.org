@@ -6,41 +6,32 @@
   When a plan or a settled discussion decides how an entry will be
   fixed, prefix its headline with 'FIX PLANNED: ' and leave it here
   until the fix lands; then move it as above.
+* Problems noticed while executing plan 08, slice 1 (2026-10-29)
+** A narrowing leaves a re-kinded vognode's folders as tombstones
+  An occurrence the restriction newly keeps out becomes a
+  Restricted vognode in place; its folders, which the ancestry
+  table admits under an occurrence alone, become tombstones that
+  keep their members. Widening makes it an occurrence again, but
+  the tombstones stay (a tombstone stays while it holds
+  anything), and a folder the view had by request is not drawn
+  again. Seen for a root's containers folder
+  ('a_switch_and_its_reverse_draw_these_buffers' in
+  'tests/hidden_nodes.rs', the view of h) and, in the diff view,
+  for a changed partner folder, which the refresh draws again
+  beside the tombstone (probe 'probe_dv.py' in
+  'tests/results/08/slice1/probes/'). Nothing leaks and nothing
+  is lost from the graph; the view is not as it was. A folder
+  whose records live in the partners' files (containers,
+  subscribers, overriders, hiders, mentioners) could stay under a
+  Restricted vognode without leaking, and a re-kind back to an
+  occurrence could take the tombstones' place; either is a design
+  choice for Jeff.
 * Problems found by the review of plan 06 (2026-10-27)
   Found by the probes and the tests reviewer of
   'TODO/simplify-refresh/07_review.org'; the exchanges are in
   '07_1_review-reports/probe-scripts/'. "Run" means driven end
   to end on an isolated server; "base" means the same at d4252cc4,
   before the plan.
-** FIX PLANNED: A narrowing then a widening loses the views whose roots it kept out
-  Run, and the same at the base. A view whose root the narrower
-  set keeps out becomes a tombstone root (childless ones pruned,
-  the view emptied); widening the set again leaves the root a
-  tombstone, since a root has no parent goal to name it, so the
-  view never comes back. On a copy of Jeff's data the narrowest
-  set emptied all twenty large views and the switch back to
-  'all' restored none. Fix: a root the restriction keeps out
-  becomes a Restricted vognode (the view is the user's own
-  request), an occurrence again on widening; or the switch
-  remembers the roots. Review item 1.
-** FIX PLANNED: The diff view under a restriction leaks and omits
-  Run by the tests reviewer through 'refresh_viewforest'. A
-  skgrepo-set switch rerenders open diff-view buffers, though the
-  diff view opens only under 'all'. Under 'pub' the diff view
-  omits a restricted member whose record is visible (no
-  Restricted vognode with its change facts), and a deleted
-  private node's ghost shows HEAD's title: the straddle is not
-  gated, so the ghost question answers for a restricted node.
-  The leak is likely older than the plan. Fix: gate the ghost
-  question and the diff view's goal by the restriction, or close
-  or empty diff-view buffers on a narrowing. Review item 1.
-** FIX PLANNED: An alias recorded in a restricted section is shown under the restriction
-  Run, and the same at the base. 'r' records an alias in its
-  private section; under 'pub' the alias shows, text and all, in
-  a fresh view and after a switch, and the props count includes
-  it. The property goal gates aliases by nothing. Fix: omit an
-  alias whose record is restricted, as a relationship's. Review
-  item 1.
 ** FIX PLANNED: Neovim's buffer writers misplace requests and append a delete
   Run (a throwaway plenary spec, '07_1_review-reports/
   nvim-writer-check/'). 'metadata.delete', 'delete_recursive',

@@ -44,16 +44,18 @@ pub fn set_graphnodestats_in_viewforest (
       root_treeid,
       graph,
       & stats,
-      config ) };
+      config,
+      restriction ) };
   Ok (( stats . container_to_contents,
         stats . content_to_containers )) }
 
 pub fn set_metadata_relationships_in_node_recursive (
-  tree   : &mut Tree<Viewnode>,
-  treeid : NodeId,
-  graph  : &InRustGraph,
-  stats  : &AllGraphnodeStats,
-  config : &SkgConfig,
+  tree        : &mut Tree<Viewnode>,
+  treeid      : NodeId,
+  graph       : &InRustGraph,
+  stats       : &AllGraphnodeStats,
+  config      : &SkgConfig,
+  restriction : Option<&SkgrepoRestriction>,
 ) {
   let new_stats : Option < GraphnodeStats > =
     { match & tree . get (treeid) . unwrap () . value () . kind {
@@ -63,7 +65,7 @@ pub fn set_metadata_relationships_in_node_recursive (
                      graph, config, &t . gnid, &t . home_skgrepo
                    ). ok ();
                Some ( graphnodestats_for_pid (
-                 &t . gnid, stats, graphnode_opt . as_ref () )) },
+                 &t . gnid, stats, graphnode_opt . as_ref (), restriction )) },
         _ => None }};
   match new_stats {
     Some (gs) =>
@@ -80,7 +82,8 @@ pub fn set_metadata_relationships_in_node_recursive (
       child_treeid,
       graph,
       stats,
-      config ); } }
+      config,
+      restriction ); } }
 
 /// The gnids of the occurrences in 'tree', in preorder, each as often
 /// as it occurs: the nodes whose graph stats the stats pass sets.

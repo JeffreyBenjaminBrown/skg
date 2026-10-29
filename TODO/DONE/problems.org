@@ -1,3 +1,50 @@
+* Problems found by the review of plan 06 (2026-10-27; fixed 2026-10-29)
+  Found by the probes and the tests reviewer of
+  'TODO/simplify-refresh/07_review.org'.
+** A narrowing then a widening loses the views whose roots it kept out
+  Run, and the same at the base. A view whose root the narrower
+  set keeps out becomes a tombstone root (childless ones pruned,
+  the view emptied); widening the set again leaves the root a
+  tombstone, since a root has no parent goal to name it, so the
+  view never comes back. On a copy of Jeff's data the narrowest
+  set emptied all twenty large views and the switch back to
+  'all' restored none. Fix: a root the restriction keeps out
+  becomes a Restricted vognode (the view is the user's own
+  request), an occurrence again on widening; or the switch
+  remembers the roots. Review item 1.
+  Fixed by slice 1 of
+  'TODO/simplify-refresh/08_plan_restriction-and-tidy.org': the
+  ID rule answers a restricted root with a Restricted vognode,
+  and an editable occurrence again when the set widens. A folder
+  under the root still becomes a tombstone at the narrowing, as
+  under any occurrence re-kinded to a Restricted vognode.
+** The diff view under a restriction leaks and omits
+  Run by the tests reviewer through 'refresh_viewforest'. A
+  skgrepo-set switch rerenders open diff-view buffers, though the
+  diff view opens only under 'all'. Under 'pub' the diff view
+  omits a restricted member whose record is visible (no
+  Restricted vognode with its change facts), and a deleted
+  private node's ghost shows HEAD's title: the straddle is not
+  gated, so the ghost question answers for a restricted node.
+  The leak is likely older than the plan. Fix: gate the ghost
+  question and the diff view's goal by the restriction, or close
+  or empty diff-view buffers on a narrowing. Review item 1.
+  Fixed by slice 1 of
+  'TODO/simplify-refresh/08_plan_restriction-and-tidy.org': the
+  diff view's goal asks the restriction of each partner's record
+  and node, and the ghost question of HEAD's node's home.
+** An alias recorded in a restricted section is shown under the restriction
+  Run, and the same at the base. 'r' records an alias in its
+  private section; under 'pub' the alias shows, text and all, in
+  a fresh view and after a switch, and the props count includes
+  it. The property goal gates aliases by nothing. Fix: omit an
+  alias whose record is restricted, as a relationship's. Review
+  item 1.
+  Fixed by slice 1 of
+  'TODO/simplify-refresh/08_plan_restriction-and-tidy.org': both
+  property goals and the stats omit it, the re-kind rung takes it
+  from a view drawn before a narrowing, and a restricted save
+  keeps it.
 * Problems found while planning plan 06 (2026-10-26; fixed 2026-10-27)
 ** An unknown recorded in a visible skgrepo vanishes under a restriction
   Seen by the same experiment, with and without the phase: the

@@ -384,6 +384,78 @@ fn a_switch_reports_no_buffer_corrections (
                   name, done, view ); }
       Ok (( )) } ) }
 
+/// r, public, records the alias "r public alias" in its public file
+/// and "r secret alias" in its private section. Under "public" the
+/// second, whose record is restricted, is absent, text and count: in a
+/// fresh view, and in r's alias folder after a switch. A save under
+/// "public" keeps it, even with r's alias folder edited, and with a
+/// write-protected occurrence of r showing its folder too. Under "all"
+/// it is present again.
+#[test]
+fn an_alias_recorded_in_a_restricted_section_is_shown_only_under_all (
+) -> Result<(), Box<dyn Error>> {
+  let case : tempfile::TempDir = tempfile::TempDir::new () ?;
+  write_unchanged_skgrepos ( case . path (), &[
+    ( "public", &[
+      ("r", "pid: r\ntitle: r\naliases:\n- r public alias\ncontains:\n- a\n"),
+      ("a", "pid: a\ntitle: a\n") ] ),
+    ( "private", &[
+      ("r", "pid: r\naliases:\n- r secret alias\n") ] ) ]) ?;
+  with_git_fixture (
+    case . path (), OwnedSkgrepos::Named (&["public", "private"]), &[],
+    |f| {
+      let public : SkgrepoRestriction =
+        SkgrepoRestriction::named (&f . config, "public" . into ()) ?;
+      let mut restriction : SkgrepoRestriction =
+        SkgrepoRestriction::named (&f . config, "all" . into ()) ?;
+      let fresh_under_public : String =
+        open_content_view (f, "r", "fresh view of r", Some (&public)) ?;
+      assert! ( fresh_under_public . contains ("(props (aliases 1))")
+                && ! fresh_under_public . contains ("secret"),
+                "a fresh view under public counts r's public alias alone:\n{}",
+                fresh_under_public );
+      let opened : String = open_view_of_r (f, None) ?;
+      assert! ( opened . contains ("(props (aliases 2))"),
+                "under all r counts both aliases:\n{}", opened );
+      let with_aliases : String = save_under (
+        f, &opened . replacen (
+          ") r\n", " (viewRequests (folder aliases))) r\n", 1 ),
+        &restriction ) ? . saved_view;
+      assert! ( with_aliases . contains ("r secret alias"),
+                "under all r's alias folder shows both:\n{}", with_aliases );
+      let narrowed : String = switch (f, &mut restriction, "public") ?;
+      assert! ( narrowed . contains ("(props (aliases 1))")
+                && narrowed . contains (") r public alias\n")
+                && ! narrowed . contains ("secret"),
+                "narrowed, r shows and counts its public alias alone:\n{}",
+                narrowed );
+      { // saved under "public", r's alias folder edited, and r shown
+        // again write-protected with its folder
+        let edited : String = format! (
+          "{}* (skg node (gnid r) (skgRepos (nodeRepo public)) writeProtected) r\n\
+           ** (skg aliasFolder)\n\
+           *** (skg alias) r public alias\n",
+          narrowed . replacen (
+            ") r public alias\n", ") r public alias\n*** (skg alias) r typed alias\n", 1 ));
+        save_under (f, &edited, &public) ?;
+        let r : GraphnodeInRust = node_in_graph (f, "r");
+        let mut aliases : Vec<String> = members_of ( r . aliases . or_default () );
+        aliases . sort ();
+        assert_eq! ( aliases,
+                     vec! [ "r public alias" . to_string (),
+                            "r secret alias" . to_string (),
+                            "r typed alias" . to_string () ],
+                     "the save keeps the alias whose record is restricted" );
+        assert! ( r . aliases . or_default () . iter () . any (
+                    |alias| alias . member == "r secret alias"
+                            && alias . relRepo . 0 == "private" ),
+                  "in its private section: {:?}", r . aliases ); }
+      let widened : String = switch (f, &mut restriction, "all") ?;
+      assert! ( widened . contains ("(props (aliases 3))")
+                && widened . contains ("r secret alias"),
+                "widened, r shows and counts every alias:\n{}", widened );
+      Ok (( )) } ) }
+
 /// Nothing in 'buffer' shows the text of a private node, and each of
 /// 'gnids' stands only as a Restricted vognode.
 fn assert_restricted_vognodes_alone_stand_for (

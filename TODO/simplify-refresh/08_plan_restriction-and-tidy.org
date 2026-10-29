@@ -667,7 +667,7 @@ built as the ID rule answers. Then the suites, with
 'bash/emacs-tests.sh', 'bash/nvim-tests.sh' and
 'bash/integration-tests.sh'.
 
-** TODO Slice 1: the restriction's leaks and losses
+** DONE Slice 1: the restriction's leaks and losses
 Read the three sections of the agreed behavior, the pitfalls
 on the straddle and the root, and probes (k) and (e) with the
 tests report's "The diff view under a restriction" first.

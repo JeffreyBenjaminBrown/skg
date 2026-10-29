@@ -1819,14 +1819,22 @@ Its herald is "restricted". It has no content of its own drawn: no
 goal, no folders. It claims membership as an unknown does, takes a
 relRepo request and a readiness request, and refuses text typed on
 its line. A member whose record the set shows and that resolves to
-no node at all is an unknown, as under no restriction.
+no node at all is an unknown, as under no restriction. A view rooted
+at a node the set keeps out shows its root as a Restricted vognode
+too, since the view is the user's own request; it is the node's
+occurrence again when the set widens. An alias whose record the set
+keeps out is neither drawn nor counted in =(props (aliases N))=.
+The diff view opens only under 'all', but a switch rerenders its
+buffers under the new set as a content view is rerendered: a
+restricted node is never a ghost there.
 
 Saving preserves what rendering omitted: a member whose record is
 restricted cannot be deleted (or even seen), so the save combines the
 buffer's visible lists with the disk lists -- order-preserving (the
 anchored weave) for =contains= and =subscribesTo=, set-difference
 for =overrides= -- restoring only the members whose records are
-restricted. A Restricted vognode keeps its member in the list while
+restricted, and a node's aliases whose records are restricted. A
+Restricted vognode keeps its member in the list while
 it claims, and deleting its line removes the record, as deleting an
 unknown's does. The folder of what a subscriber hides outside its
 subscribees replaces the hides with a visible record, each of which

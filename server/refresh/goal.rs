@@ -473,9 +473,10 @@ fn relationship_member_key (
   graph . relationship_member_key (gnid)
 }
 
-/// A property folder's goal: the node's aliases (in order, each with
-/// its relRepo when that differs from the node's home), its IDs (pid
-/// first) or its true flags.
+/// A property folder's goal: the node's aliases whose records the
+/// skgrepo restriction shows (in order, each with its relRepo when
+/// that differs from the node's home), its IDs (pid first) or its true
+/// flags.
 fn property_goal (
   kind : &Folder,
   pid  : &ID,
@@ -486,7 +487,7 @@ fn property_goal (
   let node : &GraphnodeInRust = walk . truth . graph . get (pid) ?;
   Some ( match kind {
     Folder::Alias => Goal::ordered (
-      node . aliases_with_relRepo_unless_home () . into_iter ()
+      node . aliases_with_relRepo_unless_home (walk . truth . restriction) . into_iter ()
         . map ( |(text, relRepo)| GoalItem {
           relRepo, .. GoalItem::by_graph ( GoalMember::Alias (text) ) } )
         . collect () ),
