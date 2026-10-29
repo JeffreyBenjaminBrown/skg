@@ -151,7 +151,7 @@ fn after_a_restriction_change_the_re_kinds_across_it_are_no_buffer_corrections (
     let mut record : ViewnodeIdRecord = ViewnodeIdRecord::of_viewforest (&forest);
     refresh_and_render (
       &mut forest, &mut record, truth, RefreshMode::ContentView, 100,
-      &BufferCorrectionPolicy::after_a_switch (true) )
+      &BufferCorrectionPolicy::AfterRestrictionChange )
       . unwrap () };
   let shown : String = formatdoc! ("
     * {} p
@@ -187,7 +187,7 @@ fn the_children_of_a_restricted_vognode_claim_again_when_it_becomes_an_occurrenc
     refresh_viewforest (
       &mut forest, &mut record,
       &Truth { graph : &graph, config : &config, restriction },
-      RefreshMode::ContentView, 100, &BufferCorrectionPolicy::after_a_switch (true) )
+      RefreshMode::ContentView, 100, &BufferCorrectionPolicy::AfterRestrictionChange )
       . unwrap (); }
   assert_eq! ( outline (&forest), "\
 node p
@@ -267,7 +267,7 @@ fn the_children_of_a_restricted_root_claim_again_when_it_becomes_an_occurrence (
     let refreshed : Refreshed = refresh_and_render (
       &mut forest, &mut record,
       &Truth { graph : &graph, config : &config, restriction },
-      RefreshMode::ContentView, 100, &BufferCorrectionPolicy::after_a_switch (true) )
+      RefreshMode::ContentView, 100, &BufferCorrectionPolicy::AfterRestrictionChange )
       . unwrap ();
     assert_eq! ( refreshed . buffer_corrections, Vec::new (),
                  "a switch's re-kinds across the restriction are no buffer \
@@ -328,7 +328,7 @@ fn a_switch_takes_from_a_view_the_alias_whose_record_it_makes_restricted () {
   let narrowed : Refreshed = refresh_and_render (
     &mut forest, &mut record,
     &Truth { graph : &graph, config : &config, restriction : Some (&restriction) },
-    RefreshMode::ContentView, 100, &BufferCorrectionPolicy::after_a_switch (true) )
+    RefreshMode::ContentView, 100, &BufferCorrectionPolicy::AfterRestrictionChange )
     . unwrap ();
   assert_eq! ( outline (&forest), "\
 node r

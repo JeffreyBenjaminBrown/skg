@@ -2,6 +2,8 @@
 -- (the linkstack half is mirrored in linkstack_spec.lua) plus the
 -- label-reduction cases of test-skg-search-make-link.el.
 
+local helpers = dofile(
+  debug.getinfo(1, 'S').source:sub(2):match('^(.*)/') .. '/helpers.lua')
 local id_search = require('skg.id_search')
 
 local navigation_text = table.concat({
@@ -11,13 +13,7 @@ local navigation_text = table.concat({
   '* no id',
   '' }, '\n')
 
-local function buffer_with (text)
-  local buf = vim.api.nvim_create_buf(true, false)
-  vim.api.nvim_buf_set_lines(buf, 0, -1, false, vim.split(text, '\n'))
-  vim.api.nvim_set_current_buf(buf)
-  vim.api.nvim_win_set_cursor(0, { 1, 0 })
-  return buf
-end
+local buffer_with = helpers.buffer_with
 
 local function cursor ()
   return vim.api.nvim_win_get_cursor(0)

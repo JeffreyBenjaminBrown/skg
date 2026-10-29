@@ -4,6 +4,8 @@
 -- apply/cycle round trips (test-skg-insert-heading.el's empty-node
 -- view cases and test-skg-metadata-editing.el's spirit).
 
+local helpers = dofile(
+  debug.getinfo(1, 'S').source:sub(2):match('^(.*)/') .. '/helpers.lua')
 local fields = require('skg.sexpr.metadata_fields')
 local metadata = require('skg.metadata')
 local sexpr_edit = require('skg.sexpr_edit')
@@ -11,18 +13,8 @@ local sexpr_cycling = require('skg.sexpr_edit.sexpr_cycling')
 local modify_graph = require('skg.modify_graph')
 local view_requests = require('skg.views')
 
-local function buffer_with (text)
-  local buf = vim.api.nvim_create_buf(true, false)
-  vim.api.nvim_buf_set_lines(buf, 0, -1, false, vim.split(text, '\n'))
-  vim.api.nvim_set_current_buf(buf)
-  vim.api.nvim_win_set_cursor(0, { 1, 0 })
-  return buf
-end
-
-local function buffer_text ()
-  return table.concat(
-    vim.api.nvim_buf_get_lines(0, 0, -1, false), '\n')
-end
+local buffer_with = helpers.buffer_with
+local buffer_text = helpers.buffer_text
 
 ---Stub the save module so auto-saving commands can run serverless.
 local saved_count

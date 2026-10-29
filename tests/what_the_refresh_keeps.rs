@@ -210,8 +210,8 @@ async fn stale_content_is_kept_unwarranted (
 
 /// In a view of k, a write-protected copy of m holding a note is
 /// pasted, claiming nothing, beside the member m. The two siblings stand
-/// for one node, so the refresh merges them: the first, the member m,
-/// survives, still editable, and the note joins its content. When k
+/// for one node, so the refresh merges them into one viewnode where
+/// the member m stood, editable, and the note joins its content. When k
 /// loses l and m, saved from a second view of k, the first view's
 /// rerender keeps that m, unwarranted, with mc and the note; that
 /// buffer saves.
@@ -365,8 +365,8 @@ async fn a_folder_member_kept_unwarranted_is_warranted_when_its_membership_retur
 
 /// The rerender of a stored view whose d holds two copies of e (a
 /// write-protected one holding ec, then an editable leaf) and two of f
-/// merges each pair: the first e survives, editable since the other
-/// was, holding ec; one f remains. That buffer saves.
+/// merges each pair: one e where the first stood, editable since the
+/// other was, holding ec; one f. That buffer saves.
 async fn duplicate_members_merge (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,

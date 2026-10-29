@@ -3,24 +3,16 @@
 -- skg.modify_graph and the minibuffer linkstack cases with
 -- skg.linkstack).
 
+local helpers = dofile(
+  debug.getinfo(1, 'S').source:sub(2):match('^(.*)/') .. '/helpers.lua')
 local compare = require('skg.sexpr.compare')
 local metadata = require('skg.metadata')
 local picker = require('skg.picker')
 local sexpr = require('skg.sexpr.parse')
 local sexpr_cycling = require('skg.sexpr_edit.sexpr_cycling')
 
-local function buffer_with (text)
-  local buf = vim.api.nvim_create_buf(true, false)
-  vim.api.nvim_buf_set_lines(buf, 0, -1, false, vim.split(text, '\n'))
-  vim.api.nvim_set_current_buf(buf)
-  vim.api.nvim_win_set_cursor(0, { 1, 0 })
-  return buf
-end
-
-local function buffer_text ()
-  return table.concat(
-    vim.api.nvim_buf_get_lines(0, 0, -1, false), '\n')
-end
+local buffer_with = helpers.buffer_with
+local buffer_text = helpers.buffer_text
 
 ---The first line's parsed metadata sexp, mirroring the elisp test
 ---helper test-skg--extract-metadata-sexp.
@@ -630,8 +622,6 @@ describe('skg.metadata keybinding surface', function ()
 
   it("opens the container folder with '<localleader>lc'", function ()
     -- The folder commands sit under 'l', mirroring Emacs's C-c l.
-    local helpers = dofile(
-      debug.getinfo(1, 'S').source:sub(2):match('^(.*)/') .. '/helpers.lua')
     local save = require('skg.save')
     helpers.install_fixture_herald_rules()
     local saves = 0

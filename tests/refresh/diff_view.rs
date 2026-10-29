@@ -411,7 +411,7 @@ fn diff_view_narrowed_by_a_switch (
                                        restriction : Some (&restriction) };
   let narrowed : Refreshed = refresh_and_render (
     &mut forest, &mut record, &narrowed_truth, mode, 100,
-    &BufferCorrectionPolicy::after_a_switch (true) ) . unwrap ();
+    &BufferCorrectionPolicy::AfterRestrictionChange ) . unwrap ();
   if let Err (failure) = refresh_reaches_fixpoint (
     &narrowed . text, graph,
     |again, again_record| refresh_viewforest (
@@ -457,7 +457,7 @@ node p
     RefreshMode::DiffView { straddle : &straddle,
                             buffer_kind : DiffViewBufferKind::AllChanges,
                             readiness_store : &readiness_store },
-    100, &BufferCorrectionPolicy::after_a_switch (true) ) . unwrap ();
+    100, &BufferCorrectionPolicy::AfterRestrictionChange ) . unwrap ();
   assert_eq! ( widened . text, opened );
   assert_eq! ( widened . buffer_corrections, Vec::new () ); }
 

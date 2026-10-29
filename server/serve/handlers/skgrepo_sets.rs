@@ -88,7 +88,7 @@ fn set_skgrepo_restriction (
       RerenderRequest {
         restriction              : &restriction,
         buffer_correction_policy : BufferCorrectionPolicy::after_a_switch (
-          restriction != *skgrepo_restriction ),
+          skgrepo_restriction, &restriction ),
         selector                 : RerenderSelector::All, } );
   if ! authorize_prepared_rerenders (
     stream, &mut prepared, &restriction,

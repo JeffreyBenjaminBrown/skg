@@ -4,20 +4,13 @@
 -- removes it. Both refuse under a parent that reads no claims,
 -- say so when there is nothing to do, and never save.
 
+local helpers = dofile(
+  debug.getinfo(1, 'S').source:sub(2):match('^(.*)/') .. '/helpers.lua')
 local keymaps = require('skg.keymaps')
 local metadata = require('skg.metadata')
 
-local function buffer_with (text, line)
-  local buf = vim.api.nvim_create_buf(true, false)
-  vim.api.nvim_buf_set_lines(buf, 0, -1, false, vim.split(text, '\n'))
-  vim.api.nvim_set_current_buf(buf)
-  vim.api.nvim_win_set_cursor(0, { line, 0 })
-  return buf
-end
-
-local function buffer_text ()
-  return table.concat(vim.api.nvim_buf_get_lines(0, 0, -1, false), '\n')
-end
+local buffer_with = helpers.buffer_with
+local buffer_text = helpers.buffer_text
 
 local editable_parent = '* (skg node (gnid p) (skgRepos (nodeRepo r))) p'
 

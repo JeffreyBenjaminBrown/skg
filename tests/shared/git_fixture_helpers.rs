@@ -1,6 +1,7 @@
 // Git, stream and viewnode helpers for the tests over git fixtures
 // (the graph straddle and the diff view) and for other tests that need
-// a gitrepo, a stream pair or a viewnode carrying change facts.
+// a gitrepo, a stream pair, a save's collateral views or a viewnode
+// carrying change facts.
 // Declared once per test target that uses it, in
 // 'tests/grouped_repos.rs', 'tests/grouped_unit.rs',
 // 'tests/grouped_views.rs', 'tests/grouped_overrides.rs' and
@@ -9,12 +10,19 @@
 use git2::Repository;
 use std::error::Error;
 use std::fs;
+use std::io::BufReader;
 use std::net::TcpStream;
 use std::path::Path;
 
+use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::metadata_canon::without_viewnode_ids;
-use skg::test_utils::copy_dir_all;
-use skg::types::misc::SkgrepoName;
+use skg::serve::ViewsState;
+use skg::serve::handlers::save_buffer::SaveResponse;
+use skg::test_utils::{
+  copy_dir_all, extract_string_field_from_sexp, read_all_lp_messages,
+  update_from_and_rerender_buffer_test};
+use skg::types::misc::{SkgConfig, SkgrepoName, TantivyIndex};
+use skg::types::views_state::ViewforestId;
 use skg::types::nodes::complete::Graphnode;
 use skg::types::nodes::fs::GraphnodeOnDisk;
 use skg::org_to_text::viewnode_to_string;
@@ -92,6 +100,34 @@ pub fn mk_test_tcp_stream_pair ()
   let (read_end, _) =
     listener . accept () . unwrap ();
   (write_end, read_end) }
+
+/// Save the buffer attributed to 'viewforest_id', returning the
+/// SaveResponse and the collateral views' rendered contents.
+pub async fn save_and_read_collateral (
+  buffer        : &str,
+  viewforest_id : &ViewforestId,
+  config        : &SkgConfig,
+  tantivy       : &mut TantivyIndex,
+  graph         : &InRustGraphHandle,
+  views_state   : &mut ViewsState,
+) -> Result<(SaveResponse, Vec<String>), Box<dyn Error>> {
+  let (mut stream, read_end) : (TcpStream, TcpStream) =
+    mk_test_tcp_stream_pair ();
+  let response : SaveResponse =
+    update_from_and_rerender_buffer_test (
+      &mut stream, buffer, config, tantivy, graph,
+      &Ok (viewforest_id . clone ()), views_state ) . await ?;
+  drop (stream);
+  let mut reader : BufReader<TcpStream> = BufReader::new (read_end);
+  let collateral_views : Vec<String> =
+    read_all_lp_messages (&mut reader)
+    . into_iter ()
+    . filter ( |msg| msg . contains ("collateral-view") )
+    . map ( |msg| extract_string_field_from_sexp (&msg, "content")
+            . unwrap_or_else (
+              || panic! ("no content field in collateral-view: {}", msg)) )
+    . collect ();
+  Ok ((response, collateral_views)) }
 
 //
 // Viewnode helpers

@@ -8,8 +8,10 @@
 // delete) on L.
 
 use std::error::Error;
+
+use crate::git_fixture_helpers::mk_test_tcp_stream_pair;
 use std::io::BufReader;
-use std::net::{TcpListener, TcpStream};
+use std::net::TcpStream;
 
 
 use skg::dbs::in_rust_graph::{
@@ -30,14 +32,6 @@ use skg::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewnode_tree;
 use ego_tree::Tree;
 use skg::metadata_canon::without_viewnode_ids;
-
-fn mk_pair () -> (TcpStream, TcpStream) {
-  let listener : TcpListener =
-    TcpListener::bind ("127.0.0.1:0") . unwrap ();
-  let addr : std::net::SocketAddr = listener . local_addr () . unwrap ();
-  let write_end : TcpStream = TcpStream::connect (addr) . unwrap ();
-  let (read_end, _) = listener . accept () . unwrap ();
-  (write_end, read_end) }
 
 #[test]
 fn deleting_a_node_present_in_another_view_reports_no_errors
@@ -108,7 +102,7 @@ fn deleting_a_node_present_in_another_view_reports_no_errors
       let delete_buffer : String =
         "* (skg node (gnid L) (skgRepos (nodeRepo main)) (editRequest delete)) [[id:X][to X]]\n"
         . to_string ();
-      let (mut stream, read_end) : (TcpStream, TcpStream) = mk_pair ();
+      let (mut stream, read_end) : (TcpStream, TcpStream) = mk_test_tcp_stream_pair ();
       let response : SaveResponse =
         update_from_and_rerender_buffer (
           &mut stream, &delete_buffer, config, tantivy, &graph, &Ok (l_viewforest_id . clone ()), &mut views_state ) . await ?;
@@ -174,7 +168,7 @@ fn a_deleted_root_vanishes_and_a_buffer_may_end_with_no_roots
       let delete_buffer : String =
         "* (skg node (gnid L) (skgRepos (nodeRepo main)) (editRequest delete)) [[id:X][to X]]\n"
         . to_string ();
-      let (mut stream, read_end) : (TcpStream, TcpStream) = mk_pair ();
+      let (mut stream, read_end) : (TcpStream, TcpStream) = mk_test_tcp_stream_pair ();
       let response : SaveResponse =
         update_from_and_rerender_buffer (
           &mut stream, &delete_buffer, config, tantivy, &graph,

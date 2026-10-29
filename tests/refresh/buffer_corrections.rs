@@ -194,7 +194,7 @@ fn a_member_drawn_after_a_restriction_change_is_not_reported () {
        occurrence_metadata ("a1", "") );
   let mut forest : ViewForest = parse (&input, IdResolution::ThroughGraph (&graph));
   let refreshed : Refreshed = refresh_once (
-    &mut forest, &graph, &BufferCorrectionPolicy::after_a_switch (true) );
+    &mut forest, &graph, &BufferCorrectionPolicy::AfterRestrictionChange );
   assert! ( refreshed . text . contains ("(gnid b)"), "b is drawn:\n{}", refreshed . text );
   assert! ( refreshed . buffer_corrections . is_empty (), "{:?}", refreshed . buffer_corrections ); }
 

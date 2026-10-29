@@ -300,7 +300,7 @@ fn diff_view_buffer_refreshes_unchanged (
       let mut record : ViewnodeIdRecord = ViewnodeIdRecord::of_viewforest (&forest);
       refresh_diffView_viewforest (
         runtime, straddle, buffer_kind, store, restriction,
-        &BufferCorrectionPolicy::after_a_switch (true), &mut forest, &mut record )
+        &BufferCorrectionPolicy::AfterRestrictionChange, &mut forest, &mut record )
         . map_err ( |e| format! ("the switch's refresh failed: {}", e) ) ?;
       viewforest_to_string (&forest)
         . map_err ( |e| format! ("the switch's render failed: {}", e) ) ? }, };

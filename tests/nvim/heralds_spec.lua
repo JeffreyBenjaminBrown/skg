@@ -16,13 +16,6 @@ local function herald_text (metadata_text)
   return heralds.chunks_text(heralds.chunks_from_metadata(metadata_text))
 end
 
-local function scratch_buffer_with (lines)
-  local buf = vim.api.nvim_create_buf(true, false)
-  vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
-  vim.api.nvim_set_current_buf(buf)
-  return buf
-end
-
 local function herald_extmarks (buf)
   return vim.api.nvim_buf_get_extmarks(
     buf, heralds.namespace, 0, -1, { details = true })
@@ -89,7 +82,7 @@ describe('skg.heralds', function ()
   end)
 
   it('toggling adds and removes extmarks', function ()
-    local buf = scratch_buffer_with({
+    local buf = helpers.buffer_with({
       'Test line with (skg node (gnid 123) (view (rels (contains (out 2)))'
       .. ' cycle)) herald',
       'Another line (skg node (gnid 456) (editRequest delete)'
@@ -112,7 +105,7 @@ describe('skg.heralds', function ()
     -- rels payload (contains (in 2 (ancestors 1))), birth contains
     -- renders as the C token 2aC: the in-side numeral "2" (medium), the
     -- ancestor "a" at its floor (low), and the birth letter "C" (low).
-    local buf = scratch_buffer_with({
+    local buf = helpers.buffer_with({
       'Line with (skg node (gnid 123) noClaim (editRequest delete)'
       .. ' (view (rels (contains (in 2 (ancestors 1))))'
       .. ' (birth (contains in 1)) noWarrant cycle)) text' })
@@ -142,7 +135,7 @@ describe('skg.heralds', function ()
   end)
 
   it('dictates the view faces in a heralded window', function ()
-    local buf = scratch_buffer_with({
+    local buf = helpers.buffer_with({
       '* (skg node (gnid 1) (view (rels (contains (out 2))))) a headline' })
     heralds.enable(buf)
     local winhighlight = vim.wo.winhighlight
@@ -164,7 +157,7 @@ describe('skg.heralds', function ()
     herald_rules.install_rules(nil)
     local original = herald_rules.request_herald_rules
     herald_rules.request_herald_rules = install_fixture_rules
-    local buf = scratch_buffer_with({
+    local buf = helpers.buffer_with({
       '(skg node (gnid 1) (skgRepos (nodeRepo s)) (view (rels (contains (out 2)))))' })
     local enabled = heralds.enable(buf)
     herald_rules.request_herald_rules = original
@@ -182,7 +175,7 @@ describe('skg.heralds', function ()
     local original_timeout = herald_rules.attempt_timeout_ms
     herald_rules.request_herald_rules = function () calls = calls + 1 end
     herald_rules.attempt_timeout_ms = 20
-    local buf = scratch_buffer_with({ '(skg node (gnid 1))' })
+    local buf = helpers.buffer_with({ '(skg node (gnid 1))' })
     local enabled = heralds.enable(buf)
     herald_rules.request_herald_rules = original
     herald_rules.attempt_timeout_ms = original_timeout
@@ -194,7 +187,7 @@ describe('skg.heralds', function ()
   end)
 
   it('refreshes heralds on edited lines', function ()
-    local buf = scratch_buffer_with({ 'plain line', 'another' })
+    local buf = helpers.buffer_with({ 'plain line', 'another' })
     heralds.enable(buf)
     assert.are.equal(0, #herald_extmarks(buf))
     vim.api.nvim_buf_set_lines(buf, 0, 1, false, {
@@ -205,7 +198,7 @@ describe('skg.heralds', function ()
 
   it('renders a folder changed by its members, and keeps it current',
      function ()
-    local buf = scratch_buffer_with({
+    local buf = helpers.buffer_with({
       '* (skg node (gnid p)) p',
       '** (skg containerFolder) its containers',
       '*** (skg node (gnid r) (diff (rel added) (leaves 2 node rel) (ready rel))) r',
@@ -276,7 +269,7 @@ describe('skg.heralds', function ()
   ---The display text of the herald on the last of LINES, with heralds
   ---on, or nil when it has none.
   local function last_line_display (lines)
-    local buf = scratch_buffer_with(lines)
+    local buf = helpers.buffer_with(lines)
     heralds.enable(buf)
     local marks = vim.api.nvim_buf_get_extmarks(
       buf, heralds.namespace, { #lines - 1, 0 }, { #lines - 1, -1 },

@@ -12,8 +12,10 @@
 use indoc::indoc;
 use std::collections::HashSet;
 use std::error::Error;
+
+use crate::git_fixture_helpers::mk_test_tcp_stream_pair;
 use std::io::BufReader;
-use std::net::{TcpListener, TcpStream};
+use std::net::TcpStream;
 
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use skg::dbs::filesystem::not_nodes::load_config;
@@ -26,7 +28,7 @@ use skg::serve::handlers::text_search::{
   handle_text_search_request};
 use skg::skgrepo_sets::{SkgrepoRestriction, SkgrepoSetName};
 use skg::test_utils::{extract_string_field_from_sexp, graph_handle_from_config,
-                      read_lp_message, set_skgrepo_retagging_relRepos,
+                      read_all_lp_messages, set_skgrepo_retagging_relRepos,
                       skg_env_from_parts};
 use skg::test_utils::run_with_shared_test_stores;
 use skg::types::env::SkgEnv;
@@ -51,27 +53,6 @@ fn all_tests
         &s . config, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
 
-fn connected_tcp_stream_pair (
-) -> Result<(TcpStream, TcpStream), Box<dyn Error>> {
-  let listener : TcpListener =
-    TcpListener::bind ("127.0.0.1:0")?;
-  let addr = listener . local_addr ()?;
-  let client : TcpStream =
-    TcpStream::connect (addr)?;
-  let (server, _addr) =
-    listener . accept ()?;
-  Ok ((server, client)) }
-
-fn read_all_lp_messages (
-  client : TcpStream,
-) -> Vec<String> {
-  let mut reader : BufReader<TcpStream> =
-    BufReader::new (client);
-  let mut messages : Vec<String> = Vec::new ();
-  while let Ok (m) = read_lp_message (&mut reader) {
-    messages . push (m); }
-  messages }
-
 /// Search for 'terms' under the restriction "all", and return every
 /// message the server sent, with the views state the search left.
 fn search (
@@ -88,14 +69,16 @@ fn search (
       graph_straddle    : None, };
   let all : SkgrepoRestriction =
     SkgrepoRestriction::named (config, SkgrepoSetName::from ("all"))?;
-  let (mut server, client) = connected_tcp_stream_pair ()?;
+  let (mut server, client) : (TcpStream, TcpStream) =
+    mk_test_tcp_stream_pair ();
   handle_text_search_request (
     &mut server,
     &format! ( "((request . \"text search\") (terms . \"{}\") (regex . \"false\") (body . \"false\") (operators . \"false\"))",
                terms ),
     &env, &mut views_state, &all );
   drop (server);
-  Ok (( read_all_lp_messages (client), views_state )) }
+  Ok (( read_all_lp_messages (&mut BufReader::new (client)),
+       views_state )) }
 
 async fn a_search_without_hits_answers_in_one_message (
   config  : &SkgConfig,

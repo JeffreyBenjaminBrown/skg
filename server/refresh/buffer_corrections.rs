@@ -23,6 +23,7 @@
 //! of its own in its warnings buffer ('docs/api-and-formats.org',
 //! "Save buffer").
 
+use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::errors::{HeadlineName, with_org_subheadlines};
 use crate::types::misc::ID;
 use crate::types::viewnode::{Viewnode, ViewnodeId, VognodeKind};
@@ -130,11 +131,13 @@ impl BufferCorrectionPolicy {
   ) -> BufferCorrectionPolicy {
     BufferCorrectionPolicy::AfterSave { deleted, nodeMerged } }
 
-  /// The policy of a skgrepo-set switch's rerender.
+  /// The policy of the rerender of a skgrepo-set switch from the
+  /// restriction 'before' to the restriction 'after'.
   pub fn after_a_switch (
-    restriction_changed : bool,
+    before : &SkgrepoRestriction,
+    after  : &SkgrepoRestriction,
   ) -> BufferCorrectionPolicy {
-    if restriction_changed { BufferCorrectionPolicy::AfterRestrictionChange }
+    if before != after { BufferCorrectionPolicy::AfterRestrictionChange }
     else { BufferCorrectionPolicy::ReportAll } }
 
   /// Whether anyone reads the refresh's buffer corrections.

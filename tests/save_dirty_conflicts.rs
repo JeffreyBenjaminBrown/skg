@@ -1,7 +1,8 @@
 use std::error::Error;
+
+use crate::git_fixture_helpers::mk_test_tcp_stream_pair;
 use std::fs;
 use std::io::BufReader;
-use std::net::{TcpListener, TcpStream};
 
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::dbs::node_lookup::graphnode_from_graph;
@@ -17,14 +18,6 @@ use skg::types::misc::ID;
 use skg::types::errors::SaveError;
 use skg::types::save::format_save_error_as_org;
 use skg::types::views_state::{OpenViews, ViewforestId};
-
-fn mk_pair () -> (TcpStream, TcpStream) {
-  let listener : TcpListener = TcpListener::bind ("127.0.0.1:0") . unwrap ();
-  let write_end : TcpStream = TcpStream::connect (
-    listener . local_addr () . unwrap ()) . unwrap ();
-  let (read_end, _) = listener . accept () . unwrap ();
-  (write_end, read_end)
-}
 
 fn dirty_buffer_snapshot (
   viewforest_id : &str,
@@ -70,7 +63,7 @@ fn conflicting_dirty_view_refuses_before_mutation_and_disjoint_view_succeeds
         . path . join ("A.skg");
       let a_before : Vec<u8> = fs::read (&a_path) ?;
 
-      let (mut stream, read_end) = mk_pair ();
+      let (mut stream, read_end) = mk_test_tcp_stream_pair ();
       let result = update_from_and_rerender_buffer_with_snapshots_test (
         &mut stream, &edited_a, config, tantivy, &graph,
         &Ok (saved_viewforest_id . clone ()), &mut views_state,
@@ -107,7 +100,7 @@ fn conflicting_dirty_view_refuses_before_mutation_and_disjoint_view_succeeds
         config, Some (tantivy), &ID::from ("X")) ?;
       views_state . open_views . register_view (
         &graph . load_full (), x_viewforest_id, x_forest, &x_pids);
-      let (mut stream, read_end) = mk_pair ();
+      let (mut stream, read_end) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer_with_snapshots_test (
         &mut stream, &edited_a, config, tantivy, &graph,
         &Ok (saved_viewforest_id), &mut views_state,
@@ -156,7 +149,7 @@ fn missing_or_unparseable_dirty_baseline_refuses () -> Result<(), Box<dyn Error>
           open_views        : OpenViews::new (),
           graph_straddle    : None,
         };
-        let (mut stream, _) = mk_pair ();
+        let (mut stream, _) = mk_test_tcp_stream_pair ();
         let result = update_from_and_rerender_buffer_with_snapshots_test (
           &mut stream, &a_view, config, tantivy, &graph,
           &Ok (ViewforestId::ContentView ("saved-a" . into ())),

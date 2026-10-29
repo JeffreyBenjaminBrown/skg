@@ -15,62 +15,18 @@
 //    under the saved one, and never as a warning.
 
 use std::error::Error;
-use std::io::BufReader;
-use std::net::{TcpListener, TcpStream};
+
+use crate::git_fixture_helpers::{
+  save_and_read_collateral, without_lines_containing};
 
 use skg::dbs::in_rust_graph::{
   InRustGraphHandle};
 use skg::test_utils::{
-  run_with_test_stores, graph_handle_from_config,
-  extract_string_field_from_sexp, read_all_lp_messages};
-use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
+  run_with_test_stores, graph_handle_from_config};
 use skg::test_utils::single_root_view;
 use skg::serve::ViewsState;
-use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::types::views_state::{OpenViews, ViewforestId};
-use skg::types::misc::{ID, SkgConfig, TantivyIndex};
-
-fn mk_pair () -> (TcpStream, TcpStream) {
-  let listener : TcpListener =
-    TcpListener::bind ("127.0.0.1:0") . unwrap ();
-  let addr : std::net::SocketAddr = listener . local_addr () . unwrap ();
-  let write_end : TcpStream = TcpStream::connect (addr) . unwrap ();
-  let (read_end, _) = listener . accept () . unwrap ();
-  (write_end, read_end) }
-
-/// Save the buffer attributed to 'viewforest_id', returning the saved view, the
-/// full SaveResponse, and the collateral views' rendered contents.
-async fn save_and_read_collateral (
-  buffer      : &str,
-  viewforest_id : &ViewforestId,
-
-  config      : &SkgConfig,
-  tantivy     : &mut TantivyIndex,
-  graph       : &InRustGraphHandle,
-  views_state : &mut ViewsState,
-) -> Result<(SaveResponse, Vec<String>), Box<dyn Error>> {
-  let (mut stream, read_end) : (TcpStream, TcpStream) = mk_pair ();
-  let response : SaveResponse =
-    update_from_and_rerender_buffer (
-      &mut stream, buffer, config, tantivy, graph,
-      &Ok (viewforest_id . clone ()), views_state ) . await ?;
-  drop (stream);
-  let mut reader : BufReader<TcpStream> = BufReader::new (read_end);
-  let collateral_views : Vec<String> =
-    read_all_lp_messages (&mut reader)
-    . into_iter ()
-    . filter ( |msg| msg . contains ("collateral-view") )
-    . map ( |msg| extract_string_field_from_sexp (&msg, "content")
-            . unwrap_or_else (
-              || panic! ("no content field in collateral-view: {}", msg)) )
-    . collect ();
-  Ok ((response, collateral_views)) }
-
-fn drop_member_line ( buf : &str, fragment : &str ) -> String {
-  buf . lines ()
-    . filter ( |l| ! l . contains (fragment) )
-    . collect::<Vec<_>> ()
-    . join ("\n") + "\n" }
+use skg::types::misc::ID;
 
 #[test]
 fn collateral_partner_folder_update_and_warning_scoping
@@ -124,7 +80,7 @@ fn collateral_partner_folder_update_and_warning_scoping
 
       // Drop N from S's subscribeeFolder (emptying it = explicit empty
       // set) and save S's view.
-      let edited_s : String = drop_member_line (&s_view, "(gnid N)");
+      let edited_s : String = without_lines_containing (&s_view, "(gnid N)");
       let (response, collateral_views) =
         save_and_read_collateral (
           &edited_s, &s_viewforest_id, config, tantivy, &graph,

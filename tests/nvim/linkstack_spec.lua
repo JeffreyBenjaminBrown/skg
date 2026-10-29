@@ -1,20 +1,12 @@
 -- Mirrors the linkstack half of tests/elisp/test-skg-id-search.el.
 
+local helpers = dofile(
+  debug.getinfo(1, 'S').source:sub(2):match('^(.*)/') .. '/helpers.lua')
 local linkstack = require('skg.linkstack')
 local state = require('skg.state')
 
-local function buffer_with (text)
-  local buf = vim.api.nvim_create_buf(true, false)
-  vim.api.nvim_buf_set_lines(buf, 0, -1, false, vim.split(text, '\n'))
-  vim.api.nvim_set_current_buf(buf)
-  vim.api.nvim_win_set_cursor(0, { 1, 0 })
-  return buf
-end
-
-local function buffer_text ()
-  return table.concat(
-    vim.api.nvim_buf_get_lines(0, 0, -1, false), '\n')
-end
+local buffer_with = helpers.buffer_with
+local buffer_text = helpers.buffer_text
 
 ---Place the cursor on the first occurrence of NEEDLE (plus OFFSET).
 local function cursor_on (needle, offset)

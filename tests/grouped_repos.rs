@@ -3,6 +3,7 @@
 // files are grouped into a few [[test]] targets.
 
 #[path = "shared/git_fixture_helpers.rs"]
+#[allow(dead_code)] // This target uses only some of the helpers.
 mod git_fixture_helpers;
 
 #[path = "shared/parse_helpers.rs"]

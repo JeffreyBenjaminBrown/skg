@@ -1,21 +1,19 @@
 -- Mirrors tests/elisp/test-skg-org-fold.el, on vim folds driven by
 -- skg's buffer-local foldexpr instead of org-fold.
 
+local helpers = dofile(
+  debug.getinfo(1, 'S').source:sub(2):match('^(.*)/') .. '/helpers.lua')
+
 local folds = require('skg.folds')
 local metadata = require('skg.metadata')
 
 local function buffer_with (text)
-  local buf = vim.api.nvim_create_buf(true, false)
-  vim.api.nvim_buf_set_lines(buf, 0, -1, false, vim.split(text, '\n'))
-  vim.api.nvim_set_current_buf(buf)
+  local buf = helpers.buffer_with(text)
   folds.set_up_window()
   return buf
 end
 
-local function buffer_text ()
-  return table.concat(
-    vim.api.nvim_buf_get_lines(0, 0, -1, false), '\n')
-end
+local buffer_text = helpers.buffer_text
 
 ---Visible non-empty lines, counting a closed fold's own first line as
 ---visible (org showed the folded headline too).

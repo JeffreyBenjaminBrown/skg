@@ -2,6 +2,7 @@
 //
 // Tests of skgrepo-sets ('docs/api-and-formats.org', "skgrepo-sets").
 
+use crate::git_fixture_helpers::mk_test_tcp_stream_pair;
 use crate::parse_helpers::{first_root, occurrence_children_gnids, viewnode_tree_as_written};
 use indoc::indoc;
 use ego_tree::{NodeId, Tree};
@@ -34,7 +35,7 @@ use skg::types::views_state::{OpenViews, ViewState, ViewforestId, ViewnodeIdReco
 
 use std::collections::{BTreeSet, HashSet};
 use std::error::Error;
-use std::net::{TcpListener, TcpStream};
+use std::net::TcpStream;
 use skg::metadata_canon::without_viewnode_ids;
 
 #[test]
@@ -139,8 +140,8 @@ fn override_substitute_across_skgrepo_switch_anonymizes_and_keeps_original (
                     pids       : HashSet::new (),
                     diffView_buffer_kind : None,
                     viewnode_id_record : ViewnodeIdRecord::default () });
-      let (mut server_stream, _client_stream) =
-        connected_tcp_stream_pair ()?;
+      let (mut server_stream, _client_stream) : (TcpStream, TcpStream) =
+        mk_test_tcp_stream_pair ();
       std::thread::scope ( |scope| {
         scope . spawn ( || {
           handle_skgrepo_set_request (
@@ -222,17 +223,6 @@ fn saved_or_graph_node_by_gnid (
     . unwrap_or_else (|| panic! ("Node not found in plan or graph: {}", gnid))
 }
 
-fn connected_tcp_stream_pair (
-) -> Result<(TcpStream, TcpStream), Box<dyn Error>> {
-  let listener : TcpListener =
-    TcpListener::bind ("127.0.0.1:0")?;
-  let addr = listener . local_addr ()?;
-  let client : TcpStream =
-    TcpStream::connect (addr)?;
-  let (server, _addr) =
-    listener . accept ()?;
-  Ok ((server, client)) }
-
 #[test]
 fn config_loads_default_skgrepo_set_and_prefix_skgrepo_sets (
 ) -> Result<(), Box<dyn Error>> {
@@ -297,8 +287,8 @@ async fn skgrepo_set_switch_rerenders_views (
           pids       : HashSet::from ([ID::from ("active-search-hit")]),
           diffView_buffer_kind : None,
           viewnode_id_record : ViewnodeIdRecord::default (), });
-      let (mut server_stream, _client_stream) =
-        connected_tcp_stream_pair ()?;
+      let (mut server_stream, _client_stream) : (TcpStream, TcpStream) =
+        mk_test_tcp_stream_pair ();
       std::thread::scope ( |scope| {
         // The handler is sync and calls block_on internally (as the
         // real connection thread does); it cannot run inside this

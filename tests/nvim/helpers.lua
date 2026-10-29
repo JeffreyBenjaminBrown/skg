@@ -124,4 +124,24 @@ function M.wipe_skg_buffers ()
   end
 end
 
+---A listed buffer holding TEXT (one string, or a list of lines), made
+---current, with the cursor on LINE (default 1).
+---@param text string|string[]
+---@param line? integer
+---@return integer
+function M.buffer_with (text, line)
+  local lines = type(text) == 'table' and text or vim.split(text, '\n')
+  local buf = vim.api.nvim_create_buf(true, false)
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+  vim.api.nvim_set_current_buf(buf)
+  vim.api.nvim_win_set_cursor(0, { line or 1, 0 })
+  return buf
+end
+
+---The current buffer's text, its lines joined by newlines.
+---@return string
+function M.buffer_text ()
+  return table.concat(vim.api.nvim_buf_get_lines(0, 0, -1, false), '\n')
+end
+
 return M
