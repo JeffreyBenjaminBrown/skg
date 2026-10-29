@@ -4,7 +4,7 @@
 // ones that changed (the new recursion surface) say so in comments.
 
 use crate::parse_helpers::viewnode_tree_as_written;
-use skg::from_text::buffer_to_viewnodes::add_missing_info::EnrichmentProvenance;
+use skg::from_text::buffer_to_viewnodes::add_missing_info::ParseProvenance;
 use indoc::indoc;
 use ego_tree::Tree;
 use skg::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
@@ -127,7 +127,7 @@ async fn nodeInstructions_from_org_with_disk (
 
 ) -> Result<Vec<NodeInstruction>, Box<dyn Error>> {
   let (viewforest, _parsing_errors, _warnings, _provenance)
-    : (ViewForest, Vec<BufferValidationError>, Vec<String>, EnrichmentProvenance) =
+    : (ViewForest, Vec<BufferValidationError>, Vec<String>, ParseProvenance) =
     org_to_viewforest (org_text, IdResolution::ThroughGraph (&graph_from_config (config) ?)) ?;
   let (save_plan, _nodeMerge_acquisitions) =
     extract_nonmergeSavePlan_locally (

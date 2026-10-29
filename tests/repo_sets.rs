@@ -554,7 +554,7 @@ fn search_enrichment_omits_the_restricted_containers (
       vec![ (1.0, TitleOrAlias::Title ("unrestricted search hit" . to_string ())) ] ));
   let rendered : String =
     skg::serve::handlers::text_search
-      ::enriched_search_buffer_for_skgrepo_set_for_test (
+      ::search_buffer_for_skgrepo_set_for_test (
         &graph,
         &config,
         "search term",
@@ -572,7 +572,7 @@ fn search_enrichment_omits_the_restricted_containers (
     rendered );
   assert! (
     rendered . contains ("repoBoundary"),
-    "enriched search results should show the repo herald at the \
+    "the search buffer should show the repo herald at the \
      repo boundary (the restriction-repo root): {}",
     rendered );
   assert! (

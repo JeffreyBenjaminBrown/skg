@@ -23,7 +23,7 @@ use crate::types::tree::forest::ViewForest;
 
 use buffer_to_viewnodes::uninterpreted::org_to_viewforest;
 use buffer_to_viewnodes::add_missing_info::IdResolution;
-use buffer_to_viewnodes::add_missing_info::EnrichmentProvenance;
+use buffer_to_viewnodes::add_missing_info::ParseProvenance;
 use fork::{
   CloneSkgrepoInputs,
   explicit_new_child_skgrepos_for_foreign_vognodes,
@@ -83,9 +83,9 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
     // The set 'all' restricts nothing; downstream stages treat None
     // as "no restriction", so normalize here, once.
     skgrepo_restriction . filter ( |a| ! a . is_all () );
-  let ( viewforest, parsing_errors, parsing_warnings, enrichment )
+  let ( viewforest, parsing_errors, parsing_warnings, provenance )
     : ( ViewForest, Vec<BufferValidationError>, Vec<String>,
-        EnrichmentProvenance )
+        ParseProvenance )
     = { let _span : tracing::span::EnteredSpan = tracing::info_span!(
           "org_to_viewforest" ). entered();
         // Parse the raw buffer, supplying missing gnids and skgrepos,
@@ -154,7 +154,7 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
   let owned_ancestor_skgrepo : HashMap<ID, SkgrepoName> =
     owned_ancestor_skgrepos_for_foreign_vognodes (
       &viewforest,
-      & enrichment . writeProtected_skgrepos_after_save,
+      & provenance . writeProtected_skgrepos_after_save,
       config );
   let adopt_clone_skgrepo : HashMap<ID, ID> = {
     // Bare new headlines under a foreign node are not foreign-creation
@@ -162,8 +162,8 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
     // Ancestry is likewise only visible here, while the viewforest is
     // live; only the parse knew which nodes were new and repoless.
     let new_with_inherited_skgrepo : HashSet<ID> =
-      enrichment . new_nodes
-      . intersection (& enrichment . inherited_skgrepo_nodes)
+      provenance . new_nodes
+      . intersection (& provenance . inherited_skgrepo_nodes)
       . cloned () . collect ();
     new_foreign_nodes_adopting_clone_skgrepos (
       &viewforest, & new_with_inherited_skgrepo, config ) };
@@ -172,8 +172,8 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
     // skgrepos on the forked node's new children:
     // the confirmation flow shows it as settled instead of asking.
     let new_with_explicit_skgrepo : HashSet<ID> =
-      enrichment . new_nodes
-      . difference (& enrichment . inherited_skgrepo_nodes)
+      provenance . new_nodes
+      . difference (& provenance . inherited_skgrepo_nodes)
       . cloned () . collect ();
     explicit_new_child_skgrepos_for_foreign_vognodes (
       &viewforest, & new_with_explicit_skgrepo, config ) };

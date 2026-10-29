@@ -8,7 +8,7 @@ use crate::types::misc::ID;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{Viewnode, ViewnodeId, ViewnodeKind};
 use super::add_missing_info::{
-  EnrichmentProvenance,
+  ParseProvenance,
   IdResolution,
   complete_occurrence_skgrepo,
   make_occurrence_an_alias,
@@ -45,7 +45,7 @@ pub fn org_to_viewnode_tree (
               String > {
   let (viewforest, parsing_errors, _warnings, _provenance)
     : (ViewForest, Vec<BufferValidationError>, Vec<String>,
-       EnrichmentProvenance) =
+       ParseProvenance) =
     org_to_viewforest (input, id_resolution)?;
   Ok ( ( viewforest . into_internal_tree (), parsing_errors ) ) }
 
@@ -76,7 +76,7 @@ pub fn org_to_viewforest (
 ) -> Result < ( ViewForest,
                 Vec<BufferValidationError>,
                 Vec<String>,
-                EnrichmentProvenance ),
+                ParseProvenance ),
               String > {
   let mut viewforest: ViewForest =
     ViewForest::new();
@@ -104,8 +104,8 @@ pub fn org_to_viewforest (
       if ! viewnode_ids_seen . insert (viewnode_id . clone ()) {
         metadata . viewnode_id = None; }}
     replace_gnid_with_pid (metadata, id_resolution); }
-  let mut provenance : EnrichmentProvenance =
-    EnrichmentProvenance::new (
+  let mut provenance : ParseProvenance =
+    ParseProvenance::new (
       skgrepos_after_save_of_writeProtected_occurrences (
         viewnode_line_cols . iter ()
           . filter_map ( |line_col| line_col . headline . 1 . as_ref () ),
@@ -161,7 +161,7 @@ fn complete_linecol_to_viewnode (
   viewnode_line_col : &mut ViewnodeLineCol,
   viewparent        : NodeRef<Viewnode>,
   id_resolution     : IdResolution,
-  provenance        : &mut EnrichmentProvenance,
+  provenance        : &mut ParseProvenance,
 ) -> Result < ( Viewnode,
                 Option<BufferValidationError>,
                 Option<String> ),

@@ -10,7 +10,7 @@ use skg::types::errors::BufferValidationError;
 use skg::test_utils::{run_with_shared_test_stores, compare_viewnode_trees_modulo_gnid, compare_viewnode_trees, graph_from_config};
 use skg::types::viewnode::{
   PropertyMember, Viewnode, ViewnodeKind, Vognode};
-use skg::from_text::buffer_to_viewnodes::add_missing_info::EnrichmentProvenance;
+use skg::from_text::buffer_to_viewnodes::add_missing_info::ParseProvenance;
 use skg::types::misc::{SkgConfig, ID, SkgrepoName, TantivyIndex};
 use skg::types::tree::forest::{
   ViewForest,
@@ -77,7 +77,7 @@ async fn test_provenance_records_what_the_parse_invented (
   "};
   let (viewforest, errors, _warnings, provenance)
     : (ViewForest, Vec<BufferValidationError>, Vec<String>,
-       EnrichmentProvenance)
+       ParseProvenance)
     = org_to_viewforest (input, IdResolution::ThroughGraph (&graph_from_config (config) ?)) ?;
   assert! (errors . is_empty (), "{:?}", errors);
   let gnid_of = |title : &str| -> ID {
@@ -213,7 +213,7 @@ async fn test_child_of_writeProtected_occurrence_inherits_its_gnid_skgrepo (
 /// pasted from the link stack arrives as a bare id under a
 /// 'subscribeeFolder' non-vognode, with no skgrepo.
 /// 'inherit_skgrepo_from_nearest_occurrence_ancestor_if_possible'
-/// would give it the recorder's skgrepo; enrichment must resolve the
+/// would give it the recorder's skgrepo; the parse must resolve the
 /// node's own from the graph by id instead.
 /// Before the fix this node stayed repoless and the save was refused
 /// with "Occurrence must have a repo that exists in the config".

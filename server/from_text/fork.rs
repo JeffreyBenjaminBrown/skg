@@ -180,8 +180,9 @@ pub fn fork_spec_from_buffer_node (
 /// its new explicit-repo immediate occurrence children agree on;
 /// nothing is recorded when they disagree (ambiguous -- the flow then
 /// asks) or when there are none. 'new_nodes_with_explicit_repos' is
-/// enrichment's new-nodes set minus its inherited-repo set: only a
-/// skgrepo the user actually typed counts as a specification.
+/// the parse's new-nodes set minus its inherited-repo set
+/// ('ParseProvenance'): only a skgrepo the user actually typed counts
+/// as a specification.
 pub fn explicit_new_child_skgrepos_for_foreign_vognodes (
   viewforest                       : &ViewForest,
   new_nodes_with_explicit_skgrepos : &HashSet<ID>,

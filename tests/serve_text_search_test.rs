@@ -21,7 +21,7 @@ fn test_text_search_org_format (
   // This test verifies that the stub of the search buffer holds one
   // root per matching ID, titled by its title, and an alias folder
   // under each root that some alias matched. (The refresh fills the
-  // alias folder; 'tests/search_in_one_message.rs' tests that.)
+  // alias folder; 'tests/search_buffer.rs' tests that.)
 
   /* PITFALL: This is easiest to understand by reading just the definitions of the nodes and the assertions. The logic between those two portions, though necessary for *running* the test, is not particularly helpful for understanding the test. */
 

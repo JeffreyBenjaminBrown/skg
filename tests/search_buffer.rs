@@ -1,10 +1,10 @@
-// cargo nextest run --test grouped_repos -E 'test(search_in_one_message::)'
+// cargo nextest run --test grouped_repos -E 'test(search_buffer::)'
 //
 // A text search is answered by one 'search-results' message, whose
 // content is the search buffer: each hit with what the enrichment
 // draws under it ('docs/api-and-formats.org', "Text search").
 //
-// Fixture (tests/search_in_one_message/fixtures, one skgrepo): "nest
+// Fixture (tests/search_buffer/fixtures, one skgrepo): "nest
 // of birds" contains "kestrel feather" and "osprey", whose aliases are
 // "kestrel cousin" and "fish hawk". A search for "kestrel" finds the
 // first by its title and the second through an alias.
@@ -39,15 +39,15 @@ use skg::types::views_state::{OpenViews, ViewforestId, ViewnodeIdRecord};
 #[test]
 fn all_tests
   () -> Result<(), Box<dyn Error>> {
-  let fixtures : &str = "tests/search_in_one_message/fixtures";
+  let fixtures : &str = "tests/search_buffer/fixtures";
   run_with_shared_test_stores (
-    "skg-test-search-in-one-message",
+    "skg-test-search-buffer",
     |s| Box::pin ( async move {
       s . reset ("a_search_without_hits_answers_in_one_message", fixtures) ?;
       a_search_without_hits_answers_in_one_message (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("a_search_answers_with_the_enriched_buffer_in_one_message", fixtures) ?;
-      a_search_answers_with_the_enriched_buffer_in_one_message (
+      s . reset ("a_search_answers_with_the_search_buffer_in_one_message", fixtures) ?;
+      a_search_answers_with_the_search_buffer_in_one_message (
         &s . config, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
 
@@ -111,13 +111,14 @@ async fn a_search_without_hits_answers_in_one_message (
             "no view is registered for a search without hits" );
   Ok (( )) }
 
-/// The one message holds the enriched buffer. The hit found by its
+/// The one message holds the search buffer, with what the enrichment
+/// draws under each hit. The hit found by its
 /// title shows collapsed: its containers folder is folded. The hit
 /// found through an alias shows its node's title, not the alias, and
 /// its folders: the containers folder collapsed (its member folded),
 /// and the alias folder open, holding all of the node's aliases. The
 /// search view is registered with every node the buffer shows.
-async fn a_search_answers_with_the_enriched_buffer_in_one_message (
+async fn a_search_answers_with_the_search_buffer_in_one_message (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -146,7 +147,7 @@ async fn a_search_answers_with_the_enriched_buffer_in_one_message (
       *** (skg alias) kestrel cousin
       *** (skg alias) fish hawk
     "} ),
-    "the hits, enriched, in one message:\n{}", content );
+    "the hits, with what the enrichment draws, in one message:\n{}", content );
   let view_pids : &HashSet<ID> =
     & views_state . open_views . views
       . get (&ViewforestId::SearchView ("kestrel" . to_string ()))

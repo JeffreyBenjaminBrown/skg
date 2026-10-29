@@ -1,6 +1,6 @@
 // cargo test validate_tree
 
-use skg::from_text::buffer_to_viewnodes::add_missing_info::EnrichmentProvenance;
+use skg::from_text::buffer_to_viewnodes::add_missing_info::ParseProvenance;
 use indoc::indoc;
 use regex::Regex;
 use skg::types::errors::BufferValidationError;
@@ -157,7 +157,7 @@ async fn test_writeProtected_relRepo_request_needs_an_editable_recorder (
       *** (skg node (gnid orphaned) (skgRepos (nodeRepo main)) writeProtected (editRequest (relRepo main))) under a write-protected parent
     "};
   let (viewforest, parsing_errors, _warnings, _provenance)
-    : (ViewForest, Vec<BufferValidationError>, Vec<String>, EnrichmentProvenance)
+    : (ViewForest, Vec<BufferValidationError>, Vec<String>, ParseProvenance)
     = org_to_viewforest (input, IdResolution::AsWritten) ?;
   assert! ( parsing_errors . is_empty (),
             "Parsing should accept every relRepo request: {:?}",
@@ -200,7 +200,7 @@ async fn test_find_buffer_errors_for_saving (
             "};
 
       let (viewforest, parsing_errors, _warnings, _provenance)
-        : (ViewForest, Vec<BufferValidationError>, Vec<String>, EnrichmentProvenance)
+        : (ViewForest, Vec<BufferValidationError>, Vec<String>, ParseProvenance)
         = org_to_viewforest (input_with_errors, IdResolution::AsWritten) . unwrap();
       let validation_errors: Vec<BufferValidationError> =
         find_buffer_errors_for_saving(&viewforest, config)?;
@@ -345,7 +345,7 @@ async fn test_find_buffer_errors_for_saving_valid_input (
             "};
 
       let (viewforest, parsing_errors, _warnings, _provenance)
-        : (ViewForest, Vec<BufferValidationError>, Vec<String>, EnrichmentProvenance) =
+        : (ViewForest, Vec<BufferValidationError>, Vec<String>, ParseProvenance) =
         org_to_viewforest (valid_input, IdResolution::AsWritten) . unwrap();
       let errors: Vec<BufferValidationError> = find_buffer_errors_for_saving(&viewforest, config)?;
 
@@ -719,7 +719,7 @@ fn test_edit_request_on_writeProtected_is_rejected_at_parse_time() {
       ** (skg node (gnid protected) (skgRepos (nodeRepo main)) writeProtected (editRequest delete)) protected child
     "};
   let (_viewforest, parsing_errors, _warnings, _provenance)
-    : (ViewForest, Vec<BufferValidationError>, Vec<String>, EnrichmentProvenance)
+    : (ViewForest, Vec<BufferValidationError>, Vec<String>, ParseProvenance)
     = org_to_viewforest (input_delete, IdResolution::AsWritten) . unwrap ();
   let matching : Vec<&BufferValidationError> =
     parsing_errors . iter ()
@@ -738,7 +738,7 @@ fn test_edit_request_on_writeProtected_is_rejected_at_parse_time() {
       ** (skg node (gnid protected) (skgRepos (nodeRepo main)) writeProtected (editRequest (merge other))) protected child
     "};
   let (_viewforest2, parsing_errors2, _warnings__viewforest2, _provenance)
-    : (ViewForest, Vec<BufferValidationError>, Vec<String>, EnrichmentProvenance)
+    : (ViewForest, Vec<BufferValidationError>, Vec<String>, ParseProvenance)
     = org_to_viewforest (input_merge, IdResolution::AsWritten) . unwrap ();
   let matching2 : Vec<&BufferValidationError> =
     parsing_errors2 . iter ()
@@ -757,7 +757,7 @@ fn test_edit_request_on_writeProtected_is_rejected_at_parse_time() {
       ** (skg node (gnid leaf) (skgRepos (nodeRepo main)) (editRequest delete)) leaf
     "};
   let (_viewforest3, parsing_errors3, _warnings__viewforest3, _provenance)
-    : (ViewForest, Vec<BufferValidationError>, Vec<String>, EnrichmentProvenance)
+    : (ViewForest, Vec<BufferValidationError>, Vec<String>, ParseProvenance)
     = org_to_viewforest (input_editable, IdResolution::AsWritten) . unwrap ();
   assert! ( ! parsing_errors3 . iter () . any ( |e|
     matches! (e, BufferValidationError::EditRequestOnWriteProtectedOccurrence (_, _)) ),
@@ -780,7 +780,7 @@ fn a_tombstone_holding_a_visible_child_passes_local_validation () {
       ** (skg node (gnid other) (skgRepos (nodeRepo main))) another visible child
     "};
   let (viewforest, parsing_errors, _warnings_viewforest, _provenance)
-    : (ViewForest, Vec<BufferValidationError>, Vec<String>, EnrichmentProvenance)
+    : (ViewForest, Vec<BufferValidationError>, Vec<String>, ParseProvenance)
     = org_to_viewforest (input, IdResolution::AsWritten) . unwrap ();
   assert_eq! (
     parsing_errors . len(), 0,
@@ -813,7 +813,7 @@ fn a_tombstone_does_not_collide_with_content () {
       ** (skg tombstone)
     "};
   let (viewforest, parsing_errors, _warnings_viewforest, _provenance)
-    : (ViewForest, Vec<BufferValidationError>, Vec<String>, EnrichmentProvenance)
+    : (ViewForest, Vec<BufferValidationError>, Vec<String>, ParseProvenance)
     = org_to_viewforest (input, IdResolution::AsWritten) . unwrap ();
   assert_eq! (
     parsing_errors . len(), 0,
@@ -843,7 +843,7 @@ fn duplicate_members_of_defining_folders_pass_validation () {
       *** (skg node (gnid dup2) (skgRepos (nodeRepo main)) writeProtected) dup2
     "};
   let (viewforest, parsing_errors, _warnings_viewforest, _provenance)
-    : (ViewForest, Vec<BufferValidationError>, Vec<String>, EnrichmentProvenance)
+    : (ViewForest, Vec<BufferValidationError>, Vec<String>, ParseProvenance)
     = org_to_viewforest (input, IdResolution::AsWritten) . unwrap ();
   assert_eq! (
     parsing_errors . len(), 0,
@@ -867,7 +867,7 @@ fn duplicate_members_of_write_protected_folders_pass_validation () {
       *** (skg node (gnid dup) (skgRepos (nodeRepo main)) writeProtected) dup
     "};
   let (viewforest, parsing_errors, _warnings_viewforest, _provenance)
-    : (ViewForest, Vec<BufferValidationError>, Vec<String>, EnrichmentProvenance)
+    : (ViewForest, Vec<BufferValidationError>, Vec<String>, ParseProvenance)
     = org_to_viewforest (input, IdResolution::AsWritten) . unwrap ();
   assert_eq! (
     parsing_errors . len(), 0,
@@ -903,7 +903,7 @@ fn a_gnid_only_vognode_counts_in_the_distinctness_checks_when_it_claims () {
       for (input, checked) in [ (content_list, "the content list"),
                                 (folder, "the hiddenOutsideOfSubscribeeFolder") ] {
         let (viewforest, parsing_errors, _warnings, _provenance)
-          : (ViewForest, Vec<BufferValidationError>, Vec<String>, EnrichmentProvenance)
+          : (ViewForest, Vec<BufferValidationError>, Vec<String>, ParseProvenance)
           = org_to_viewforest (&input, IdResolution::AsWritten) . unwrap ();
         assert_eq! ( parsing_errors . len (), 0, "{:?}", parsing_errors );
         let parent : ego_tree::NodeId = viewforest . nodes ()
@@ -938,7 +938,7 @@ fn a_folder_refusing_a_childs_kind_says_nothing_of_noClaim () {
       **** (skg aliasFolder)
     "};
   let (viewforest, parsing_errors, _warnings, _provenance)
-    : (ViewForest, Vec<BufferValidationError>, Vec<String>, EnrichmentProvenance)
+    : (ViewForest, Vec<BufferValidationError>, Vec<String>, ParseProvenance)
     = org_to_viewforest (input, IdResolution::AsWritten) . unwrap ();
   assert_eq! ( parsing_errors . len (), 0, "{:?}", parsing_errors );
   let folders : Vec<NodeId> = viewforest . nodes ()

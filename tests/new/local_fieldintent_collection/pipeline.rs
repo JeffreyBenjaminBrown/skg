@@ -6,7 +6,7 @@
 /// the old extraction path before its deletion. The cases marked
 /// "new recursion surface" are the deliberate behavior changes.
 
-use skg::from_text::buffer_to_viewnodes::add_missing_info::EnrichmentProvenance;
+use skg::from_text::buffer_to_viewnodes::add_missing_info::ParseProvenance;
 use indoc::indoc;
 use skg::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewforest;
@@ -33,7 +33,7 @@ async fn placed_forest_from_org_with_disk (
   config : &SkgConfig,
 ) -> Result<ViewForest, Box<dyn Error>> {
   let (viewforest, _parsing_errors, _warnings, _provenance)
-    : (ViewForest, Vec<BufferValidationError>, Vec<String>, EnrichmentProvenance) =
+    : (ViewForest, Vec<BufferValidationError>, Vec<String>, ParseProvenance) =
     org_to_viewforest (input, IdResolution::ThroughGraph (&graph_from_config (config) ?)) ?;
   Ok ( viewforest ) }
 

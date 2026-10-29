@@ -5,7 +5,7 @@
 /// - an occurrence typed under an alias folder becomes an alias;
 /// - an occurrence without a skgrepo gets one: the graph's, or that
 ///   of its nearest occurrence ancestor;
-/// and the record of what the parse invented ('EnrichmentProvenance').
+/// and the record of what the parse invented ('ParseProvenance').
 /// An occurrence without a gnid gets a fresh one from
 /// 'viewnode_from_metadata'.
 
@@ -64,18 +64,18 @@ impl IdResolution<'_> {
 /// It also needs a fact the tree does not show:
 /// 'writeProtected_skgrepos_after_save' (see
 /// 'skgrepos_after_save_of_writeProtected_occurrences').
-pub struct EnrichmentProvenance {
+pub struct ParseProvenance {
   pub new_nodes               : HashSet<ID>,
   pub inherited_skgrepo_nodes : HashSet<ID>,
   pub writeProtected_skgrepos_after_save : HashMap<ID, SkgrepoName>,
 }
 
-impl EnrichmentProvenance {
+impl ParseProvenance {
   /// Nothing invented yet.
   pub fn new (
     writeProtected_skgrepos_after_save : HashMap<ID, SkgrepoName>,
-  ) -> EnrichmentProvenance {
-    EnrichmentProvenance {
+  ) -> ParseProvenance {
+    ParseProvenance {
       new_nodes               : HashSet::new (),
       inherited_skgrepo_nodes : HashSet::new (),
       writeProtected_skgrepos_after_save, }}

@@ -90,7 +90,7 @@ pub fn search_gnids_for_skgrepo_set_for_test (
   search_ids_for_skgrepo_set_for_test_impl (
     tantivy_index, config, restriction, terms, limit ) }
 
-pub fn enriched_search_buffer_for_skgrepo_set_for_test (
+pub fn search_buffer_for_skgrepo_set_for_test (
   graph            : &InRustGraph,
   config           : &SkgConfig,
   terms            : &str,
@@ -347,7 +347,7 @@ pub fn draw_search_buffer (
     prune_childless_tombstones (viewforest . as_internal_tree_mut ()) ?; }
   viewforest_to_string (viewforest) }
 
-/// Make the hit at 'hit' a root of the enrichment's stub: a
+/// Make the hit at 'hit' a root of the search's stub: a
 /// write-protected occurrence asking for its containers folder,
 /// holding, after any alias folder it has, a folder of the nodes that
 /// override it and then one of the nodes it overrides, each only when

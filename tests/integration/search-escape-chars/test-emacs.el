@@ -12,7 +12,7 @@
   (setq integration-test-phase (format "searching %s" query))
   (skg--request-text-search query nil nil nil)
   (skg-test-wait-for-buffer (skg-search-buffer-name query))
-  ;; The next query must not replace the snapshot being enriched.
+  ;; The next query must not replace the snapshot being drawn.
   (skg-test-wait-for-response)
   (let ((search-buffer (get-buffer (skg-search-buffer-name query))))
     (if search-buffer

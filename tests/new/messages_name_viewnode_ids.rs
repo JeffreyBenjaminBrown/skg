@@ -8,7 +8,7 @@
 // lines; a parse error and a warning end with theirs
 // ('docs/api-and-formats.org', "How a message names a headline").
 
-use skg::from_text::buffer_to_viewnodes::add_missing_info::EnrichmentProvenance;
+use skg::from_text::buffer_to_viewnodes::add_missing_info::ParseProvenance;
 use indoc::indoc;
 use skg::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::{
@@ -61,7 +61,7 @@ fn parse_errors_and_warnings (
   buffer : &str,
 ) -> (Vec<BufferValidationError>, Vec<String>) {
   let (_viewforest, errors, warnings, _provenance)
-    : (ViewForest, Vec<BufferValidationError>, Vec<String>, EnrichmentProvenance)
+    : (ViewForest, Vec<BufferValidationError>, Vec<String>, ParseProvenance)
     = org_to_viewforest (buffer, IdResolution::AsWritten) . unwrap ();
   (errors, warnings) }
 

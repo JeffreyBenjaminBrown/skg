@@ -58,7 +58,7 @@ const FORK_ROOT_BUFFER : &str = indoc! {"
 
 /// ('docs/forks.org', "Adding new content under a foreign node"): a bare
 /// new headline (no metadata at all) appended under a foreign root.
-/// Enrichment mints it an id and inherits the foreign skgrepo; that must
+/// The parse mints it an id and inherits the foreign skgrepo; that must
 /// not be a foreign-creation error -- appending it edits N's contains,
 /// which forks N, and the new node rides that fork, adopting the clone's
 /// skgrepo.
@@ -98,7 +98,7 @@ const EXPLICIT_FORK_BUFFER : &str = indoc! {"
   ** (skg node (gnid N) (skgRepos (nodeRepo foreign)) writeProtected) N-original
   "};
 
-/// An explicit fork request on a brand-new (id-less) headline: enrichment
+/// An explicit fork request on a brand-new (id-less) headline: the parse
 /// mints a fresh pid that is not in the graph, so the fork is rejected.
 const EXPLICIT_FORK_UNKNOWN_BUFFER : &str = indoc! {"
   * (skg node (skgRepos (nodeRepo owned)) (viewRequests fork)) Brand New

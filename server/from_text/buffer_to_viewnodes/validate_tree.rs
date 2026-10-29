@@ -214,7 +214,7 @@ fn overridesHere_part_errors (
 /// - at most one fork request per id ('ForkRequestMultiple');
 /// - the id must exist in the graph -- you cannot fork an unsaved
 ///   headline ('ForkRequestOnUnknownNode'); a new headline got a fresh
-///   pid from enrichment, which is not in the graph;
+///   pid from the parse, which is not in the graph;
 /// - if the node already has an owned overrider, fail early with
 ///   'ForkAlreadyExists' (the helpful message) rather than a later
 ///   monogamy abort at skgsave-commit.

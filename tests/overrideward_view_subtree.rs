@@ -58,8 +58,8 @@ fn all_tests () -> Result<(), Box<dyn Error>> {
       Ok (( )) } )) }
 
 /// End-to-end: replay production's search (suppression, the hits as a
-/// stub, then the enrichment, a refresh of the stub) and check the
-/// rendered buffer. The suppressed F is
+/// stub, then the refresh of the stub, which draws the enrichment) and
+/// check the rendered buffer. The suppressed F is
 /// absent from the top level and reappears in U's overridden folder,
 /// carrying its override heralds -- U, two levels up, overrides it.
 /// G, which F overrides, is not shown: the search buffer's override
@@ -84,7 +84,7 @@ fn end_to_end_render_shows_a_suppressed_node_in_a_folder_with_heralds (
   assert_eq! (
     search_results, vec![ ID::from ("U") ],
     "F and G are suppressed, so only U is a top-level result" );
-  // The enrichment.
+  // The refresh, which draws the enrichment.
   let buffer : String = draw_search_buffer (
     &mut viewforest, &mut ViewnodeIdRecord::default (), graph, config,
     &search_results, restriction, false ) ?;

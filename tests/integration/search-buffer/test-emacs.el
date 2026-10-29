@@ -30,7 +30,7 @@
       (message "✗ FAIL: leaf-b search root is linksToParent: %S" line)
       (kill-emacs 1))))
 
-(defun integration-test-search-in-one-message ()
+(defun integration-test-search-buffer ()
   (message "=== SKG Search In One Message Integration Test ===")
 
   (let ((test-port (getenv "SKG_TEST_PORT")))
@@ -65,7 +65,7 @@
       ;; (rels (contains (in 1))).
       (if (string-match-p "(rels (contains (in 1)))" content)
           (progn
-            (message "✓ PASS: the first search buffer is enriched, with node relationship stats")
+            (message "✓ PASS: the first search buffer holds what the enrichment draws, with node relationship stats")
             (message "Buffer content:\n%s" content)
             (kill-emacs 0))
         (progn
@@ -80,4 +80,4 @@
      (message "TIMEOUT: test timed out at phase: %s"
               integration-test-phase)
      (kill-emacs 1)))
-  (integration-test-search-in-one-message))
+  (integration-test-search-buffer))

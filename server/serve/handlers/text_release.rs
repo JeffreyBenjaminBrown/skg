@@ -150,8 +150,9 @@ pub fn challenge_response (
 }
 
 /// Entombstone the occurrences of overPrivateText nodes. Search
-/// exclusion uses this after enrichment so the partner folders it draws
-/// cannot broaden the choice made before the Tantivy query.
+/// exclusion uses this after the refresh draws the enrichment, so the
+/// partner folders it draws cannot broaden the choice made before the
+/// Tantivy query.
 pub fn exclude_overPrivateText_nodes_from_viewforest (
   viewforest : &mut Tree<Viewnode>,
   graph      : &InRustGraph,
