@@ -53,7 +53,7 @@ investigate it.
 A note for whoever launches the run, not for the agent.
 'bash/run-plan-slices.sh' hard-codes a plan, its progress
 headline and its last slice (lines 31, 32 and 38). They point
-at this file, "Restriction and tidy" and 9 since 2026-10-29;
+at this file, "Restriction and tidy" and 10 since 2026-10-29;
 keep that edit out of the slices' commits. Commit the plan and
 any edits under 'TODO/' first. The orchestrator's habits are in
 'coding-advice/orchestration.org'.
@@ -72,7 +72,7 @@ in a slice's commit. When a slice fixes an entry of
 'TODO/DONE/problems.org' as that file's header says.
 
 ** Scope
-Ten slices, 0 to 9, in the order they must land. The fixes
+Eleven slices, 0 to 10, in the order they must land. The fixes
 come first, since they lose and leak data. Slice 0 makes the
 unknown and the Restricted vognode one kind, keeps the parse's
 kind as a kind, and builds the containerward chain by the ID
@@ -89,10 +89,11 @@ Slice 5 aligns the two clients in full. Slice 6 puts the
 server's names and shapes right, the refresh's rendering and
 editability among them. Slice 7 completes the tests and fixes
 the harness's index paths. Slice 8 makes the restricted stats
-pass linear. Slice 9 brings the user documentation and the
+pass linear. Slice 9 ports the three Emacs commands Neovim
+lacks. Slice 10 brings the user documentation and the
 glossary up to date. The plan may be run as one run or as
 several ('bash/run-plan-slices.sh 0 3', then '4 6', then
-'7 9').
+'7 10').
 
 * Words this plan uses
 The glossary defines the refresh and its vocabulary. The words
@@ -384,8 +385,24 @@ length under a restriction (0.8 s at 2,000 siblings, 3.1 s at
 4,000). After slice 8 they will use the same per-recorder
 relRepo map the stats pass uses, and the 4,000-sibling case
 under a restriction will take well under a second, measured.
-** The docs and the glossary (slice 9)
-After slice 9 the glossary states once which parents read no
+** The three commands Neovim lacks (slice 9)
+Today Neovim has no counterpart of 'C-c s r' and 'C-c s R'
+(the relRepo gesture, 'skg-set-relRepo' and
+'skg-set-relRepo-recursive'), 'C-c v b' (the body toggle,
+'skg-org-body-toggle') and 'C-c v R' (the readable-ids
+refresh, 'skg-readable-ids-refresh'), and
+'docs/nvim-client-deviations.org' lists them under "Commands
+not ported". After slice 9 Neovim will have the three under
+its key scheme ('<localleader>sr', '<localleader>sR',
+'<localleader>vb', '<localleader>vR') and as Ex commands,
+under the Emacs names translated as slice 5 translates them,
+each with a test; the deviations doc will list only what
+Neovim cannot do; and the relRepo gesture will send the
+recorder with its info request in both clients, where Emacs's
+sends none today (the 'TODO/problems.org' entry "Emacs's
+relRepo info request always sends a nil recorder").
+** The docs and the glossary (slice 10)
+After slice 10 the glossary states once which parents read no
 claims and both COMMANDS docs cite it; it has an entry for
 "herald"; it says "orphan graphnode" with the noun rule; the
 heralds doc says the "detach" herald is styled as a request
@@ -1008,7 +1025,70 @@ a test that counts lookups, beside slice 7's; the suites. Move
 the entry "Under a restriction, the graphnode stats are
 quadratic in a list's length" to 'TODO/DONE/'.
 
-** TODO Slice 9: the docs and the glossary
+** TODO Slice 9: the three commands Neovim lacks
+Read "The three commands Neovim lacks" in the agreed behavior,
+'docs/nvim-client-deviations.org' ("Input model" and "Commands
+not ported") and the slice 5 record in 'progress.org' first.
+Emacs is the reference; Neovim's key scheme and its 'skg: '
+message prefix are Neovim's own.
+*** the readable-ids refresh
+'readable_ids.lua' gains 'refresh' (empty the title cache and
+annotate the buffer again), bound as '<localleader>vR' and
+':SkgReadableIdsRefresh', as 'skg-readable-ids-refresh'
+('elisp/skg-readable-ids.el') does; a test beside the toggle's.
+*** the body toggle
+'folds.lua' gains the body toggle of 'skg-org-body-toggle'
+('elisp/skg-org-fold.el'): from a folded subtree, show the body
+and the immediate children without opening them; otherwise
+hide or show the body alone; from inside a body, go to its
+headline first; a bodyless headline is left alone, with a
+message, unless its children need revealing. Bound as
+'<localleader>vb' and an Ex command. Tests on the cases of
+'tests/elisp/test-skg-org-fold.el' that Neovim's fold model
+can express; the record says which it cannot, and the
+deviations doc lists those.
+*** the relRepo gesture
+'metadata.lua' gains 'set_relRepo' and 'set_relRepo_recursive'
+with their helpers: the port of 'skg-set-relRepo'
+('elisp/skg-request-relRepo-info.el': the request for the
+relationship's default and current relRepo; the choice among
+the repos at least as private as the default plus the
+no-override choice, pre-filled with a pending request, else
+the current value or the default; the write of '(editRequest
+(relRepo REPO))' through the one writer at its rank) and of
+'skg-set-relRepo-recursive' and its helpers
+('elisp/skg-metadata.el', from 'skg--rel-at-point' to
+'skg--relRepo-prune-below-p': the relationship-kind menu, the
+walk of the subtree, its targets, the refusals on
+write-protected folder members and on roots). The choice
+dialog uses 'picker.lua' ('completing_read_with_cycle'); the
+kind menu uses 'vim.ui.select'. Bound as '<localleader>sr' and
+'<localleader>sR' and Ex commands. Both clients send the
+recorder with the info request: today 'skg--rel-at-point'
+returns ':recorder' and Emacs sends '(owner . ,(plist-get
+relationship :owner))', so the request names none and the
+command offers every skgrepo; Emacs sends the recorder, Neovim
+does from the start, and the entry "Emacs's relRepo info
+request always sends a nil recorder" moves to 'TODO/DONE/'.
+The wire key 'owner' stays unless renaming it in the server
+and both clients is cheap. Tests: the cases of
+'tests/elisp/test-skg-set-relRepo.el' in a Neovim spec, and
+one integration test under 'tests/integration/' that sets a
+relRepo from each client and saves, if the harness makes it
+cheap, else the record says why not.
+*** the docs
+'docs/COMMANDS-nvim.org' gains the three commands;
+'docs/nvim-client-deviations.org' loses "Commands not ported"
+and lists only what Neovim cannot do; 'docs/COMMANDS.org'
+notes the recorder fix where it describes 'C-c s r'. The entry
+"The Neovim client lacks three Emacs commands" moves to
+'TODO/DONE/'.
+*** tests
+'bash/emacs-tests.sh', 'bash/nvim-tests.sh' and
+'bash/integration-tests.sh' with both clients green;
+'bash/nextest.sh' unchanged unless the wire key was renamed.
+
+** TODO Slice 10: the docs and the glossary
 Read "The docs and the glossary" in the agreed behavior and the
 user-docs report first. Every earlier slice brought the docs of
 what it changed; this slice does the rest and the glossary.
@@ -1044,7 +1124,7 @@ and the two-question check of 'coding-advice/plans.org'
 * Verification and completion
 At the end of every slice: 'cargo check --all-targets' with no
 warning; 'bash/nextest.sh' green; the client and integration
-scripts as each slice says. At the end of slice 9:
+scripts as each slice says. At the end of slice 10:
 'bash/all-tests.sh' green but the pre-existing failure. The
 plan is complete when every slice headline reads DONE,
 'progress.org' holds the classification of every failure met,
@@ -1060,5 +1140,7 @@ readiness request blocks the flag request in both clients",
 "Corrections a user's own gesture causes", "A requested hidden
 folder showing a dangling hide may be refused at save", and
 "Under a restriction, the graphnode stats are quadratic in a
-list's length".
+list's length", "The Neovim client lacks three Emacs
+commands" and "Emacs's relRepo info request always sends a
+nil recorder".
 
