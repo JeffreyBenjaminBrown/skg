@@ -3424,3 +3424,110 @@ Suites: 'bash/all-tests.sh' green but the pre-existing
 'import-md-and-org' failure, both clients: Emacs 406, Neovim
 399, nextest 991, doctests, integration 34 of 35.
 
+* Restriction and tidy
+** Slice 0
+*** The commits
+**** 7a7d0215
+One gnid-only kind: 'Vognode::GnidOnly (GnidOnlyVognode)' with
+'kind : GnidOnlyKind', the ID rule's 'GnidOnly (kind)' answer
+and its three re-kinds, the methods 'claims', 'set_claim' and
+'set_warrant' of 'Viewnode', and validation's one rule.
+**** 0341ea23
+The parser keeps its kind: 'ViewnodeMetadata' carries 'kind :
+MetadataKind', a gnid-only vognode's parts in
+'GnidOnlyMetadata'; 'viewnode_from_metadata' is one match.
+**** e4d28790
+The chain by the ID rule: each chain node is what 'id_rule'
+answers under its parent's 'chain_goal', built from the truth,
+with no disk read and no gate of its own.
+**** The last commit
+The clients' one predicate each, the glossary, this record and
+the plan's keyword.
+*** The suites
+**** cargo check --all-targets
+Clean, no warning.
+**** bash/nextest.sh
+995 run, 995 passed (991 before the slice, four tests added).
+**** bash/emacs-tests.sh
+406 of 406 passed.
+**** bash/nvim-tests.sh
+399 passed, none failed.
+**** bash/integration-tests.sh
+34 of 35 passed. The failure is 'import-md-and-org', which is
+pre-existing and not this plan's.
+**** Failures met during the slice
+None. The suites were green after each of the three code
+commits; no fixture needed adapting for behavior, only for the
+types' names.
+**** The TCP surface
+The review's probes (e), (j) and (k) and a probe of the chain
+ran against a scratch server ('verify' skill) after each code
+commit; copies and outputs are in 'tests/results/08/slice0/
+probes/'. Probes (e) and (k) give the review's exchanges again,
+but for the order in which rerendered views stream. Probe (j),
+the dangling hide, now saves under 'all' and under 'pub', its
+hide of 'nowhere' kept: slice 2 has only its test and the
+message's clause left.
+*** Deviations from the plan's "how"
+**** a re-kind keeps the claim it carried, for either kind
+A vognode re-kinded to an unknown used to claim membership
+whatever it carried; one re-kinded to a Restricted vognode kept
+its claim. Both now keep it ('rekind_to_gnid_only'): the claims
+rung never promotes a claim, so keeping it is what parsed text
+would give, and no test depended on the difference.
+**** the one rule reaches past the relation folders
+The view roots ('validate_view_roots') and the acquiredBy
+folder admitted an unknown and not a Restricted vognode; they
+now admit a gnid-only vognode of either kind. A restricted
+root, which slice 1 draws, therefore passes validation. The
+relation folders' message and the view roots' message say
+"restricted headlines" and "references to unknown nodes".
+**** 'VognodeKind' carries the gnid-only kind
+'VognodeKind' is 'Occurrence', 'Ghost' or 'GnidOnly
+(GnidOnlyKind)', so 'Rekinded' names a gnid-only vognode's
+kind; the buffer correction's text is unchanged.
+**** the parser drops two more flags
+Besides the four the plan names, 'non_vognode' (now 'Other' of
+the kind) and the unknown's two relRepo fields (now in
+'GnidOnlyMetadata') go. A gnid-only kind is named before its
+parts are read, so its gnid is empty until then, as the id
+property's is; a headline that writes none is refused with the
+same texts as before.
+**** the chain keeps the role tree for its shape
+The role tree still gives the order, the depth and a node met
+before as a leaf; the chain goal says which containers stand
+and the ID rule what each is. The chain goes on only under an
+occurrence, which is what 'holds_containerward_chain' already
+said: in the diff view the old builder drew containers under
+an unknown. A container the worktree lacks is now its ghost in
+the diff view, as the ID rule answers, where it was an
+unknown. 'attach_containerward_chains_under_members' stays
+public for the tests, taking a 'Truth' and a 'RefreshMode' and
+drawing as a refresh with no budget would.
+**** one helper for marking 'noClaim'
+'mark_noClaim_unless_warranted' ('visit.rs') replaces the
+three copies of the claims rung's test the duplication report
+listed (item 6), with the hand-set claims of
+'pruned_change_view.rs' now 'set_claim'.
+**** the glossary now, not in slice 9
+The glossary cited 'Vognode::Unknown' and
+'Vognode::Restricted'; it now cites the new type and has an
+entry "gnid-only vognode", marked as plan 08's term.
+*** Fixtures changed
+No fixture data changed. The tests that named the two variants
+name the one ('tests/refresh/', 'tests/unit/',
+'tests/metadata_grammar.rs' and others); the refresh tests'
+outline prints a warrant for an unknown as for a Restricted
+vognode; the four tests that drew a chain directly pass a
+truth and a mode; 'tests/graph_straddle_engines.rs' asserts the
+ghost in the straddle's chain. New: the distinctness test in
+'tests/new/buffer_to_viewnodes/validate_tree.rs' (checked by
+mutation: it fails when a 'noClaim' gnid-only vognode counts),
+the kept-kind test in 'tests/metadata_grammar.rs', and two
+chain tests in 'tests/refresh/chain.rs'.
+*** Left unfinished
+Nothing of slice 0. The messages of the hidden-in-subscribee,
+hidden-outside and subscribee folders still say "unknowns or
+Restricted vognodes"; slice 9's user-text pass can take them.
+*** Headline
+DONE.

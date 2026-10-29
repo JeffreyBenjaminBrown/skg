@@ -608,7 +608,7 @@ Each slice ends with the tests it names; "the suites" means
 and 'bash/integration-tests.sh' green (but the pre-existing
 failure) where the slice says so. Serialize full runs.
 
-** TODO Slice 0: one gnid-only kind
+** DONE Slice 0: one gnid-only kind
 Read "One gnid-only kind" in the agreed behavior, the
 awkwardness report's item 1 and the duplication report's item
 2 first.

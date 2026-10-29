@@ -563,7 +563,8 @@ and re-warranted where it stands.
 *** ghost, unknown
 
 The two vognodes that stand for no node of the graph
-('Vognode::Ghost', 'Vognode::Unknown' in 'server/types/viewnode.rs').
+('Vognode::Ghost', and 'Vognode::GnidOnly' of kind
+'GnidOnlyKind::Unknown', in 'server/types/viewnode.rs').
 A *ghost*, drawn only in the diff view, stands for a node HEAD has
 and the worktree lacks, write-protected, with HEAD's title and body
 (=ghost (gnid ID) (skgRepos (nodeRepo REPO))=); it accepts
@@ -593,6 +594,19 @@ The "investigate unknown node" request says what git history knows of
 it, and the delete-references-to-absent-node command removes the
 references.
 
+*** gnid-only vognode
+
+A *gnid-only vognode* (a term of plan 08; 'GnidOnlyVognode' in
+'server/types/viewnode.rs') stands for a gnid and shows nothing of a
+node, for one of two reasons, its kind ('GnidOnlyKind'): an unknown
+(no node answers to the gnid) or a Restricted vognode (the
+restriction keeps the node out). The two take the same parts on the
+wire under their own atoms, =unknown= and =restricted=; validation
+and the save treat them alike, and the ID rule, the heralds, the
+parser's refusal of text and the buffer corrections tell them apart.
+User text says "a reference to an unknown
+node" or "a restricted headline", never the type.
+
 *** record, Restricted vognode
 
 A *record* is a relationship as one node's file states it, in one
@@ -602,8 +616,8 @@ the skgrepo restriction keeps its relRepo out, and *visible*
 otherwise. A member of a goal is visible when its record and its
 node's home are both unrestricted.
 
-A *Restricted vognode* ('Vognode::Restricted' in
-'server/types/viewnode.rs', on the wire =restricted (gnid ID)
+A *Restricted vognode* (a gnid-only vognode of kind
+'GnidOnlyKind::Restricted' in 'server/types/viewnode.rs', on the wire =restricted (gnid ID)
 [(skgRepos (relRepo REPO))] [noClaim] [(editRequest ...)]=) stands
 where a visible record names a restricted node. It carries the
 record's gnid and relRepo and nothing of the node: no title, no body,

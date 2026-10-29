@@ -716,17 +716,28 @@ function M.partner_folder_atom (metadata_sexp)
 end
 
 ---@param metadata_sexp any
----@return boolean is it a vognode's: an occurrence, an unknown,
----a Restricted vognode or a ghost?
-function M.vognode_sexp_p (metadata_sexp)
+---@return boolean is it a gnid-only vognode's, one that shows only
+---its gnid: an unknown's or a Restricted vognode's? Either takes a
+---relRepo request, as a relationship member. Mirrors
+---skg--gnid-only-vognode-p.
+function M.gnid_only_vognode_sexp_p (metadata_sexp)
   if not sexpr.is_list(metadata_sexp) then return false end
-  if M.occurrence_sexp_p(metadata_sexp) then return true end
-  for _, head in ipairs({ 'unknown', 'restricted', 'ghost' }) do
+  for _, head in ipairs({ 'unknown', 'restricted' }) do
     if compare.subtree_p(metadata_sexp,
                          { SKG, sexpr.symbol(head) }) then
       return true end
   end
   return false
+end
+
+---@param metadata_sexp any
+---@return boolean is it a vognode's: an occurrence, a gnid-only
+---vognode or a ghost?
+function M.vognode_sexp_p (metadata_sexp)
+  if not sexpr.is_list(metadata_sexp) then return false end
+  return M.occurrence_sexp_p(metadata_sexp)
+    or M.gnid_only_vognode_sexp_p(metadata_sexp)
+    or compare.subtree_p(metadata_sexp, { SKG, sexpr.symbol('ghost') })
 end
 
 ---@param line_number integer

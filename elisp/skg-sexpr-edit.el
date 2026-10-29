@@ -282,7 +282,7 @@ buffer.  (The full metadata view is reserved for an explicit
   "Whether the save can give the headline at point a skgrepo by
 inheritance, as the server's walk rootward decides
 ('skgrepo_of_nearest_occurrence_ancestor'): it passes through
-ghosts, unknowns, Restricted vognodes and folders, and through
+ghosts, gnid-only vognodes and folders, and through
 headlines without
 metadata, which inherit the same way; the first other ancestor must
 be an occurrence.  A root cannot inherit, nor can a headline whose
@@ -291,10 +291,12 @@ viewnode."
   (save-excursion
     (catch 'answer
       (while (org-up-heading-safe)
-        (let (( kind (alist-get 'kind (skg-metadata-fields-kind-of-sexp
-                                      (skg--metadata-sexp-at-point-or-nil))) ))
+        (let* (( metadata (skg--metadata-sexp-at-point-or-nil) )
+               ( kind (alist-get 'kind (skg-metadata-fields-kind-of-sexp
+                                        metadata)) ))
           (cond ((equal kind "occurrence") (throw 'answer t))
-                ((member kind '(nil "ghost" "unknown" "restricted" "folder")))
+                ((or (member kind '(nil "ghost" "folder"))
+                     (skg--gnid-only-vognode-p metadata)))
                 (t (throw 'answer nil)))))
       nil)))
 
