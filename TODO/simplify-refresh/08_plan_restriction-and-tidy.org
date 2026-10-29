@@ -883,6 +883,20 @@ case files unchanged. 'bash/integration-tests.sh' green.
 Read "The refresh renders nothing", "Editability during the
 walk" and "Names and shapes" in the agreed behavior, and the
 awkwardness report, first. Commit per item.
+*** Corrections carried from slice 3
+The integrate request passes 'Unread' to its first refresh and
+'ReportAll' to its second, and the second drops the corrections
+under the roots it appended ('outside_the_appended_roots'),
+because content drawn under an occurrence that
+'ensure_editableOccurrences_exist' or a diff-view stub made
+editable is not in the walk's editability sets and so counts
+as a reinstatement. After the rework below, in which the
+request atom is the carrier, check whether that handling is
+still needed and drop it if not, with its test adjusted.
+'into_buffer_corrections' decides "pruned" by whether a
+headline still reaches the tree root, and
+'outside_the_appended_roots' filters by vnid: both run after
+the prune and the vnids, so the tail's end stays after them.
 *** the refresh renders nothing
 'finish' ('server/refresh/tail.rs') ends at the vnids and
 returns the forest and its corrections; every caller renders
@@ -950,6 +964,12 @@ The suites with every script.
 ** TODO Slice 8: the restricted stats pass
 Read "The restricted stats pass" in the agreed behavior and
 the plan 06 slice 1 record in 'progress.org' first.
+*** Corrections carried from slice 3
+Under 'all' the viewnode stats now build the 'RelRepoLookup'
+maps that they skipped before slice 3. Measure the pass at
+4,000 siblings under 'all' with and without the map, record
+both numbers, and keep a skip under no skgrepo restriction
+only if the difference matters.
 *** the map
 'fetch_all_graphnodestats_with_skgrepo_set'
 ('server/dbs/in_rust_graph/stats.rs') builds a per-recorder
@@ -966,6 +986,15 @@ quadratic in a list's length" to 'TODO/DONE/'.
 Read "The docs and the glossary" in the agreed behavior and the
 user-docs report first. Every earlier slice brought the docs of
 what it changed; this slice does the rest and the glossary.
+*** Corrections carried from slices 1 to 3
+Jeff's rule of 2026-10-29: the words "restriction", "narrowing"
+and "widening" always take the modifier "skgrepo" ("the skgrepo
+restriction", "a skgrepo narrowing", "a skgrepo widening"). The
+glossary defines "skgrepo narrowing" (a switch to a smaller
+skgrepo set) and "skgrepo widening" (the reverse), and every
+doc, module header, comment and user message says the three
+with the modifier. Identifiers keep their names. The check
+below greps the docs for the bare words.
 *** the docs
 Each item of the agreed behavior's section, in the docs it
 names; the coinages of this plan ('GnidOnlyVognode', 'Unread',
@@ -976,6 +1005,8 @@ These greps empty:
 #+begin_example
   rg -n -i 'unshowable|Restricted vognode' docs/COMMANDS.org \
     docs/COMMANDS-nvim.org
+  rg -n -i '(^|[^o] )(restriction|narrowing|widening)\b' docs | \
+    rg -v 'skgrepo (restriction|narrowing|widening)'
   rg -n '\borphan\b[^ ]' docs server elisp nvim | \
     rg -v 'orphan (graphnode|viewnode|run|record)'
 #+end_example

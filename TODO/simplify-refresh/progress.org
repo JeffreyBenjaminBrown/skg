@@ -3999,3 +3999,29 @@ and_not_its_first', and two of the methods
 Nothing of slice 3.
 *** Headline
 DONE.
+
+** Orchestrator's notes after slice 3 (2026-10-29)
+Launched 17:54 UTC, reported 18:17 UTC: twenty-three minutes;
+366k agent tokens over 150 tool uses. Jeff's commit d17c4807
+landed under the slice's commits without harm. One judgment
+call, accepted: the plan said the tail drops any buffer
+correction of a headline it pruned, and also that every
+existing test still holds; six tests assert such corrections
+under 'ReportAll' (a dropped edit request, a view root whose
+node vanished), which the user should learn of, so the agent
+drops them after a save, after a skgrepo restriction change
+and under 'Unread' only, which covers the review's case, a
+save's rerender. Jeff may reverse it. The other deviations
+are sound: the integrate request's second refresh drops the
+corrections under the roots it appended; a skgrepo narrowing
+silences every 'noClaim' marking, since every open view is
+current before a switch; the two methods live beside
+'SkgrepoRestriction' in 'server/skgrepo_sets.rs'; the sweep
+reached every site that asks either question. Corrections
+carried: to slice 6, the integrate request's special handling
+to be revisited after the editability rework, and the tail's
+order; to slice 8, the viewnode stats' maps under 'all'; to
+slice 9, the skgrepo modifier, Jeff's rule of today. Suites:
+nextest 1013 of 1013 (seven new, one removed), integration 34
+of 35 with the pre-existing failure; the client suites were
+not run, as no client was touched.
