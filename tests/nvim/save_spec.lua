@@ -517,11 +517,30 @@ describe('skg.save pipeline', function ()
     local messages = require('skg.messages')
     assert.are.equal(
       'set the clone\'s repo (<localleader>ss); visit an editable view'
-      .. ' (<localleader>gg); move it with skg-set-relRepo'
+      .. ' (<localleader>gg); move it with :SkgSetRelRepo'
       .. ' (<localleader>sr)',
       messages.with_neovim_bindings(
         'set the clone\'s repo (C-c s s); visit an editable view'
         .. ' (C-c g RET); move it with skg-set-relRepo (C-c s r)'))
+  end)
+
+  it('names the fork buffer\'s keys and the Neovim twins of the Emacs'
+     .. ' commands server messages name', function ()
+    local messages = require('skg.messages')
+    assert.are.equal(
+      'APPROVE with <localleader>cc ... DECLINE with <localleader>ck',
+      messages.with_neovim_bindings(
+        'APPROVE with C-c C-c ... DECLINE with C-c C-k'))
+    assert.are.equal(
+      'restore it first (:SkgRestoreDeletedNode); a removed member'
+      .. ' (:SkgRestoreRemovedMembership); run'
+      .. ' :SkgInvestigateUnknownNode on it; use'
+      .. ' :SkgSetFlagSearchMatching',
+      messages.with_neovim_bindings(
+        'restore it first (skg-restore-deleted-node); a removed member'
+        .. ' (skg-restore-removed-membership); run'
+        .. ' skg-investigate-unknown-node on it; use'
+        .. ' skg-set-flag-search-matching'))
   end)
 
   it('refuses a second save while one streams', function ()

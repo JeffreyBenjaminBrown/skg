@@ -2,6 +2,7 @@
 -- The Lua port of elisp/skg-request-delete-references-to-absent-node.el.
 
 local buffer = require('skg.buffer')
+local messages = require('skg.messages')
 local metadata = require('skg.metadata')
 local payload = require('skg.payload')
 local rerender = require('skg.rerender_all_views')
@@ -28,7 +29,8 @@ local function send (gnid, approved_preview)
     'delete-references-confirmation', request,
     function (_text, response)
       remove_unfired_handlers({ 'delete-references-result', 'error' })
-      local content = payload.field_text(response, 'content') or ''
+      local content = messages.with_neovim_bindings(
+        payload.field_text(response, 'content') or '')
       local approval = payload.field_text(response, 'approved-preview') or ''
       local buf = vim.api.nvim_create_buf(false, true)
       vim.api.nvim_buf_set_name(buf, 'skg://absent-reference-warning')

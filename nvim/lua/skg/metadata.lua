@@ -18,6 +18,7 @@ local edit_dsl = require('skg.sexpr.edit_dsl')
 local picker = require('skg.picker')
 local sexpr = require('skg.sexpr.parse')
 local shared = require('skg.shared')
+local messages = require('skg.messages')
 
 local M = {}
 
@@ -870,13 +871,14 @@ end
 
 -- The diff view's restore requests ('docs/diff-view.org', "Restoring
 -- what a change removed"). The server refuses them on the wrong kind of
--- headline with the same texts. Mirrors elisp/skg-metadata.el.
+-- headline with the same texts, which Neovim shows naming its own
+-- commands (messages.with_neovim_bindings). Mirrors elisp/skg-metadata.el.
 
-M.restore_rel_on_a_deleted_node =
-  'This node is deleted; restore it first (skg-restore-deleted-node)'
-M.restore_node_on_a_node_not_deleted =
+M.restore_rel_on_a_deleted_node = messages.with_neovim_bindings(
+  'This node is deleted; restore it first (skg-restore-deleted-node)')
+M.restore_node_on_a_node_not_deleted = messages.with_neovim_bindings(
   'Only a node deleted since HEAD can be restored;'
-  .. ' restoreNode belongs on a ghost (skg-restore-deleted-node)'
+  .. ' restoreNode belongs on a ghost (skg-restore-deleted-node)')
 M.restore_rel_without_a_removed_membership =
   'Only a removed membership can be restored'
 

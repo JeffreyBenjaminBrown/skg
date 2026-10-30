@@ -567,9 +567,11 @@ function M.fork_confirmation_handler (save_buf, response, strandeds_review)
     -- placeholder skgrepo silently did nothing.
     local content = payload.field_text(response, 'content')
     local to_minibuffer = payload.field_text(response, 'to-minibuffer')
-    confirm_buf = M.show_fork_confirmation(content or '', save_buf)
+    confirm_buf = M.show_fork_confirmation(
+      messages.with_neovim_bindings(content or ''), save_buf)
     vim.b[confirm_buf].skg_fork_strandeds_review = strandeds_review
-    if to_minibuffer then vim.notify(to_minibuffer) end
+    if to_minibuffer then
+      vim.notify(messages.with_neovim_bindings(to_minibuffer)) end
   end)
   if not ok then
     log.log('error', 'save', 'fork-confirmation handler error: %s',

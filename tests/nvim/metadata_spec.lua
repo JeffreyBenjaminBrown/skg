@@ -423,7 +423,7 @@ describe('skg.metadata commands', function ()
 
   it('the restore commands refuse the wrong kind of headline', function ()
     assert.are.equal(
-      'This node is deleted; restore it first (skg-restore-deleted-node)',
+      'This node is deleted; restore it first (:SkgRestoreDeletedNode)',
       refusal_of('* (skg ghost (gnid g) (skgRepos (nodeRepo main))'
                  .. ' (diff (node removed) (rel removed))) g',
                  metadata.restore_removed_membership))
@@ -459,7 +459,7 @@ describe('skg.metadata commands', function ()
       '* (skg tombstone) x' }) do
       assert.are.equal('Only a node deleted since HEAD can be restored;'
                        .. ' restoreNode belongs on a ghost'
-                       .. ' (skg-restore-deleted-node)',
+                       .. ' (:SkgRestoreDeletedNode)',
         refusal_of(headline, metadata.restore_deleted_node))
     end
   end)

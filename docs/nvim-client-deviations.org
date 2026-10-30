@@ -143,13 +143,23 @@ names Neovim's keys where Emacs's names a chord.
   'skg://messages/server-warnings', shown in a split, with the cursor
   left where it was; Emacs moves point in '*SKG Server Warnings*' to
   what it appended.
-- Server messages name Emacs chords. The client rewrites those it
-  has a binding for ('neovim_bindings_of_emacs_chords' in
-  nvim/lua/skg/messages.lua: C-c s d, C-c s w, C-c s s, C-c s r,
-  C-c g RET, C-c g v). It leaves the others as they are: the
-  fork-confirmation buffer's 'C-c C-c' and 'C-c C-k' are
-  '<localleader>cc' and '<localleader>ck' here, as the notification
-  that opens it says.
+- Server messages name Emacs chords and Emacs commands. The client
+  rewrites those it has a twin for, in the messages it shows and in
+  the fork-confirmation buffer and the absent-reference warning
+  ('with_neovim_bindings' in nvim/lua/skg/messages.lua): the chords
+  C-c s d, C-c s w, C-c s s, C-c s r, C-c g RET, C-c g v, and the
+  fork-confirmation buffer's C-c C-c and C-c C-k, which are
+  '<localleader>cc' and '<localleader>ck' there; and the commands
+  skg-restore-deleted-node, skg-restore-removed-membership,
+  skg-investigate-unknown-node, skg-set-relRepo and
+  skg-set-flag-search-matching, which become their ':Skg*' twins.
+  Any other Emacs name a message carries stays as it is.
+- The fork confirmation: the server's notification ("N node(s) will
+  be forked. Save again to approve, or kill this buffer to
+  decline.") names no key. In Neovim the client asks at once
+  ("Fork the listed node(s)?"); later, '<localleader>cc' in the
+  confirmation buffer approves and '<localleader>ck' declines, while
+  ':w' there refuses and names those two keys.
 - View buffers are named 'skg://TITLE' (search: 'skg://?TERMS');
   Emacs used '*TITLE*'. Message/report buffers live under
   'skg://messages/...', 'skg://unknown-node', 'skg://diff-view: ...',

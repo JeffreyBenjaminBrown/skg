@@ -20,16 +20,32 @@ M.neovim_bindings_of_emacs_chords = {
   ['C-c s r'] = '<localleader>sr',
   ['C-c g RET'] = '<localleader>gg',
   ['C-c g v'] = '<localleader>gv',
+  -- the fork-confirmation buffer's own keys (save.show_fork_confirmation)
+  ['C-c C-c'] = '<localleader>cc',
+  ['C-c C-k'] = '<localleader>ck',
+}
+
+---The Emacs commands that server messages name, each with the Ex
+---command that is its Neovim twin.
+M.neovim_commands_of_emacs_commands = {
+  ['skg-restore-deleted-node'] = ':SkgRestoreDeletedNode',
+  ['skg-restore-removed-membership'] = ':SkgRestoreRemovedMembership',
+  ['skg-investigate-unknown-node'] = ':SkgInvestigateUnknownNode',
+  ['skg-set-relRepo'] = ':SkgSetRelRepo',
+  ['skg-set-flag-search-matching'] = ':SkgSetFlagSearchMatching',
 }
 
 ---MESSAGE with each Emacs chord it names replaced by its Neovim
----binding.
+---binding, and each Emacs command by its Neovim twin.
 ---@param message string
 ---@return string
 function M.with_neovim_bindings (message)
-  for chord, binding in pairs(M.neovim_bindings_of_emacs_chords) do
-    message = message:gsub(vim.pesc(chord),
-                           function () return binding end)
+  for _, table_of_twins in ipairs({ M.neovim_bindings_of_emacs_chords,
+                                    M.neovim_commands_of_emacs_commands }) do
+    for emacs_name, neovim_name in pairs(table_of_twins) do
+      message = message:gsub(vim.pesc(emacs_name),
+                             function () return neovim_name end)
+    end
   end
   return message
 end
