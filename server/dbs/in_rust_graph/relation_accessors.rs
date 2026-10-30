@@ -1,9 +1,21 @@
 use std::collections::{HashMap, HashSet};
+#[cfg(test)]
+use std::cell::Cell;
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::{ID, RelPartner, RelationshipMemberKey, SkgrepoName, members_of};
 use crate::types::nodes::rust::GraphnodeInRust;
+
+#[cfg(test)]
+thread_local! {
+  /// How many times this thread has read a recorder's stored list
+  /// ('stored_rel_partners'). The unit tests count the reads to see
+  /// that a pass over the members of one list reads it a bounded
+  /// number of times, not once per member, which would make the pass
+  /// quadratic in the list's length.
+  pub(crate) static STORED_LIST_READS : Cell<usize> = const { Cell::new (0) };
+}
 
 /// The five stored outbound relationship types and their endpoint roles.
 /// This is domain vocabulary; storage adapters consume it rather than own it.
@@ -376,6 +388,8 @@ impl InRustGraph {
     recorder : &ID,
     relation : NodeRelation,
   ) -> Option<StoredRelPartners<'_>> {
+    #[cfg(test)]
+    STORED_LIST_READS . with ( |reads| reads . set ( reads . get () + 1 ));
     let node : &GraphnodeInRust = self . nodes . get (recorder) ? ;
     Some ( match relation {
       NodeRelation::Contains =>

@@ -4551,3 +4551,201 @@ ID" outside the goal and the hides, and an import inside
 Suites: nextest 1016 of 1016 (three new), Emacs 411, Neovim
 406, integration 34 of 35 with either client, the pre-existing
 failure; the three greps empty.
+
+** Slice 7
+*** The commits
+**** d1ae3307
+The four Neovim specs named for the old modules take their
+modules' names: 'text_search_spec', 'single_root_content_view
+_spec', 'delete_references_to_absent_node_spec' and
+'flag_state_spec'.
+**** 6217f9d7
+"The pid, else the raw ID" is one method,
+'InRustGraph::pid_else_raw_id', which every spelling calls; the
+three atom tables of 'heralds.rs' import at the top of the file.
+**** e68f52bd
+Every test's search index carries the process ID
+('index_folder_for_this_process', 'IndexFolderForThisProcess').
+**** acc4c038
+The tests' copies shared ('save_and_read_collateral',
+'mk_test_tcp_stream_pair', 'read_all_lp_messages', Neovim's
+'buffer_with' and 'buffer_text'); 'after_a_switch' takes the
+two skgrepo restrictions; the two "survives" comments reworded.
+**** 5a2a1488
+The viewnode merge's overrider exception and its carried node
+edit and relationship requests.
+**** 5b965f40
+The emptied editable folder, the relRepo and readiness requests
+on a gnid-only vognode, the retired atom, the title hit with
+aliases.
+**** The last commit
+The viewnode stats pass by a count of list reads; the two
+problems entries; this record and the plan's keyword.
+*** The tests the run left untested
+Each behavior of "The tests the run left untested", checked
+against the tests that exist first.
+**** written by this slice
+***** the viewnode merge's overrider exception
+'the_result_stays_write_protected_when_its_node_is_editable
+_elsewhere', with its control 'the_result_takes_the_merged
+_siblings_editability' ('tests/refresh/viewnode_merge.rs').
+***** the viewnode merge's carried requests
+'the_merged_siblings_node_edit_request_rides_with_its
+_editability' and 'the_merged_siblings_relationship_request_is
+_carried', in the same file.
+***** the emptied editable folder
+'an_editable_folder_a_narrowing_empties_stays_and_fills_again
+_on_widening' ('tests/refresh/restricted.rs').
+***** a relRepo request applied by the save
+'a_relRepo_request_on_a_restricted_headline_moves_its_record'
+('tests/hidden_nodes.rs').
+***** a readiness request applied by the save
+'a_readiness_request_on_an_unknown_marks_its_leaf'
+('tests/pruned_change_view/readiness.rs').
+***** the retired atom
+'the_retired_tombstone_view_request_is_refused'
+('tests/metadata_grammar.rs').
+***** the stats pass by a count of lookups
+'the_viewnode_stats_pass_reads_a_list_a_bounded_number_of_times'
+('tests/refresh/tail.rs').
+***** a title hit with aliases
+The sub-test 'a_title_hit_with_aliases_draws_no_alias_folder' of
+'tests/search_buffer.rs'.
+***** checked by mutation
+Each fails with its behavior undone: the overrider exception's
+held-elsewhere check dropped; the merged relationship request
+dropped; a gnid-only vognode's relRepo request, and its
+readiness request, dropped by the parser; 'RelRepoLookup'
+bypassed (20 list reads at 10 members, 400 at 200); the osprey
+title hit given an alias folder. Not mutated: the node edit
+request rides with the editability, so that test fails whenever
+the result is not editable; the folder test asserts its outlines
+directly.
+**** already covered, and by which slice
+***** text refused on the line, and its options parsed
+Slice 0 (0341ea23): 'a_gnid_only_vognode_keeps_its_kind_and_its
+_parts' ('tests/metadata_grammar.rs'), for both kinds.
+***** change facts, and the diff view under a skgrepo restriction
+Slice 1 (f4ab189d), its two cases: 'a_switch_makes_the_ghost_of
+_a_deleted_private_node_a_restricted_vognode' and 'a_switch
+_makes_a_private_member_with_a_visible_record_a_restricted
+_vognode_with_its_change' ('tests/refresh/diff_view.rs').
+***** the orphan warning under three more parents
+Slice 2 (1cc61d74): 'headlines_under_a_tombstone_a_ghost_and_a
+_write_protected_folder_are_orphans' ('tests/orphan_warning.rs').
+***** Neovim's display of the orphan warning
+Plan 06's slice 1 (81fbc464): 'shows the orphan warning, naming
+its headline, on save-result' ('tests/nvim/save_spec.lua'), its
+text adapted by slice 2 of this plan. The tests report, which
+said none, missed it.
+*** The suites
+Run serialized on the finished tree, but for the harness check.
+**** cargo check --all-targets
+Clean, no warning.
+**** bash/nextest.sh
+1025 run, 1025 passed (1016 before; nine tests added: four in
+'tests/refresh/viewnode_merge.rs' and one each in
+'tests/refresh/restricted.rs', 'tests/refresh/tail.rs',
+'tests/hidden_nodes.rs', 'tests/pruned_change_view/readiness
+.rs' and 'tests/metadata_grammar.rs'; the search's is a sub-test
+of 'search_buffer::all_tests').
+**** bash/emacs-tests.sh
+411 of 411 passed.
+**** bash/nvim-tests.sh
+406 passed, none failed, in 36 spec files.
+**** bash/integration-tests.sh
+Emacs: 34 of 35. Neovim ('SKG_TEST_CLIENT=nvim'): 34 of 35. The
+failure each time is 'import-md-and-org', pre-existing and not
+this plan's.
+**** Failures met during the slice
+None in the suites. One new test failed at first, as written: the
+emptied-folder test, whose member was public with its record in
+the private section. That member is not omitted under the skgrepo
+narrowing but stays, marked 'noClaim', and stays so after the
+skgrepo widening. Classified as new behavior found, not this
+slice's doing (plan 06's claims rung): the test took probe A's
+shape, a private member whose record is private, which the agreed
+behavior names, and the finding went to 'TODO/problems.org' (see
+"Left unfinished"). The refilled member is drawn write-protected,
+as any member a refresh draws.
+*** The harness check
+After the commit giving the index folders the process ID, three
+runs of 'bash/nextest.sh --no-fail-fast': the first alone, the
+second and third overlapping, the third started four seconds
+after the second, each taking about eight seconds. All three ran
+1025 tests and passed 1025. During the overlap a listing of
+'/tmp' every second showed each test's fixture and index folders
+twice, one per process ID, and no folder without the ID was
+created or touched by the runs. Before this slice an overlap
+shared 97 fixed '/tmp/tantivy-' paths (the plan counted 98).
+*** Deviations from the plan's "how"
+**** the process ID reaches past 'run_with_test_stores'
+Of the 97 fixed index paths, 19 never went through
+'run_with_test_stores': 'run_with_skgrepo_set_test_db'
+('server/skgrepo_sets.rs', whose fixture copy had no ID either,
+and was never removed), the test name of
+'load_config_with_overrides', and the tests that name their own
+index ('tantivy.rs', 'titles_by_ids.rs', 'multi_repo_errors.rs').
+One helper, 'index_folder_for_this_process', serves all of them
+and the shared sessions; a test that names its own folder holds
+an 'IndexFolderForThisProcess', which removes it on drop, since
+a folder with the ID would otherwise accumulate. The repo-set
+helper now removes its fixture copy. The one path left,
+'/tmp/tantivy-test-fixpoint-unused' ('tests/idempotence.rs'),
+names a folder nothing creates.
+**** 'pid_else_raw_id' is a method of the in-Rust graph
+It moved from 'goal.rs' to 'InRustGraph', beside 'pid_of', so
+that the graph's own code (the queries, the override checks,
+the index) calls it without importing the refresh. Two closures
+named 'resolve' ('multiple_nodes.rs', 'git_snapshot.rs') read a
+map of extra IDs, not the graph, and stay.
+**** all three atom tables' imports
+'graphstats_atoms' and 'viewstats_atoms' had the same import
+inside the function as 'change_fact_atoms'; all three moved.
+**** 'after_a_switch' takes the two skgrepo restrictions
+"A named value": it takes the skgrepo restrictions before and
+after the switch and compares them itself; a test that means a
+changed skgrepo restriction names 'AfterRestrictionChange'.
+**** the copies, and their neighbors
+'drop_member_line' became the shared 'without_lines_containing';
+'save_and_read_collateral' sits with the stream pair in
+'tests/shared/git_fixture_helpers.rs', so 'tests/grouped_repos
+.rs' allows its dead code as the other targets do; the copy of
+the pair in 'tests/repo_sets.rs' went too. Neovim's
+'buffer_text' moved with 'buffer_with', and 'heralds_spec.lua''s
+'scratch_buffer_with' is the eighth copy; 'folds_spec.lua'
+keeps a wrapper that sets up the fold window.
+**** a count of lookups needs a counter
+'STORED_LIST_READS', a thread-local under 'cfg(test)' in
+'relation_accessors.rs', counts the reads of a recorder's stored
+list; the test compares a list of 10 members with one of 200.
+Slice 8's test of the graphnode stats can read the same
+counter: the gated inbound counts read the list through
+'relRepo'.
+**** one test per gnid-only kind
+The relRepo request is tested on a restricted headline and the
+readiness request on an unknown in the diff view, which opens
+only under 'all'.
+*** Fixtures changed
+No fixture data changed. Two new tests write their own fixture:
+the readiness test a case whose worktree adds an ID that names
+nothing, the relRepo test the 'hidden_nodes' fixture. The renamed
+Neovim specs, and the eight that load 'helpers.lua' for
+'buffer_with'.
+*** Left unfinished
+**** a skgrepo widening keeps a skgrepo narrowing's 'noClaim'
+Found by the emptied-folder test's first version and confirmed by
+a throwaway save: a member whose record alone a skgrepo narrowing
+makes restricted is marked 'noClaim'; the skgrepo widening leaves
+the mark, and a save under 'all' then deletes the private record.
+Not this plan's change and not tested by it; a design question,
+filed in 'TODO/problems.org' ("A skgrepo widening keeps a skgrepo
+narrowing's noClaim").
+**** a panicking store test leaves its fixture copy
+Filed in 'TODO/problems.org'; harmless to the results.
+**** copies the plan did not name
+'warnings_buffer' in three Neovim specs and the older Rust
+copies the tests report lists ('save_view', 'line_containing'
+and others) stay.
+*** Headline
+DONE.

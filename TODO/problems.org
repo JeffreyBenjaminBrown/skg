@@ -6,6 +6,40 @@
   When a plan or a settled discussion decides how an entry will be
   fixed, prefix its headline with 'FIX PLANNED: ' and leave it here
   until the fix lands; then move it as above.
+* Problems noticed while executing plan 08, slice 7 (2026-10-30)
+** A skgrepo widening keeps a skgrepo narrowing's noClaim
+  Run, not traced, by a throwaway test in
+  'tests/hidden_nodes.rs', deleted after the run. r, public,
+  contains a, and records in its private section that it contains
+  pc, public. A view of r drawn under 'all' and switched to
+  'public' (a skgrepo narrowing) marks pc 'noClaim', quietly, as
+  slice 3 of plan 08 made it. Switched back to 'all' (a skgrepo
+  widening), pc stays 'noClaim', warranted, and no buffer
+  correction says so. Saved unchanged under 'all', the save reads
+  the 'noClaim' as a detachment: r's private file is deleted, and
+  with it the record that r contains pc, which nothing the user
+  typed asked for.
+  The claims rung never promotes a claim
+  ('mark_noClaim_unless_warranted', 'server/refresh/visit.rs'),
+  since a 'noClaim' may be the user's pending detachment, so the
+  refresh cannot tell the skgrepo narrowing's marking from the
+  user's. A fix needs a design: the skgrepo narrowing could
+  leave the claim (a save under a skgrepo restriction already
+  keeps the records it cannot show,
+  'preserve_invisible_members'), or the skgrepo widening could
+  restore the claim of a member whose record it shows again, or
+  the skgrepo narrowing could mark such a member in a way the
+  skgrepo widening can undo.
+** A store test that panics leaves its fixture copy in /tmp
+  'run_with_test_stores' and 'run_with_shared_test_stores'
+  ('server/test_utils.rs') resume a test's panic inside
+  'block_on', after the index's cleanup, so the
+  'remove_test_dir' of the fixture copy that follows is never
+  reached: each failing run leaves
+  '/tmp/<test>-fixtures-<process ID>' behind, as the failing
+  mutation runs of plan 08's slice 7 left two. Harmless to the
+  results, since the folder carries the process ID; it only
+  accumulates.
 * Problems noticed while executing plan 08, slice 1 (2026-10-29)
 * Problems noticed while executing plan 06, slice 1 (2026-10-26)
 ** FIX PLANNED: Under a restriction, the graphnode stats are quadratic in a list's length

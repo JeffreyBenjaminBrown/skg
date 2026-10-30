@@ -973,7 +973,7 @@ every script; these greps empty:
   rg -n -i 'enriched' server tests docs elisp nvim
 #+end_example
 
-** TODO Slice 7: the tests and the harness
+** DONE Slice 7: the tests and the harness
 Read "The tests the run left untested" in the agreed behavior
 and the tests report first.
 *** Corrections carried from slice 5
