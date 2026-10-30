@@ -386,6 +386,34 @@ unknown does."
        (should (string-match-p "(relRepo trusted)"
                                (test--buffer-line 3)))))))
 
+;; --- The info request ---
+
+(ert-deftest test-relRepo-info-request-names-the-recorder ()
+  "The info request names the relationship's recorder, its member and
+its relation, so the server can answer with the relationship's default."
+  (test--with-skg-content-view
+   (concat
+    "* (skg node (gnid recorder) (skgRepos (nodeRepo public))) recorder\n"
+    "** (skg node (gnid kid) (skgRepos (nodeRepo public))) kid\n")
+   test--config-public-private-trusted
+   (lambda ()
+     (goto-char (point-min))
+     (search-forward "(gnid kid)" nil t)
+     (beginning-of-line)
+     (let ((skg-response-handler-map nil)
+           (skg-lp--pending-count 0)
+           sent)
+       (cl-letf (((symbol-function 'skg-tcp-connect-to-rust)
+                  (lambda () 'fake-proc))
+                 ((symbol-function 'process-send-string)
+                  (lambda (_proc string) (push string sent))))
+         (skg--set-relRepo-at-point))
+       (should (= 1 (length sent)))
+       (let ((request (read (car sent))))
+         (should (equal (cdr (assq 'recorder request)) "recorder"))
+         (should (equal (cdr (assq 'member request)) "kid"))
+         (should (equal (cdr (assq 'relation request)) "contains")))))))
+
 ;; --- The response handler, network and minibuffer stubbed ---
 
 (defun test--run-info-handler (payload choice-fn)

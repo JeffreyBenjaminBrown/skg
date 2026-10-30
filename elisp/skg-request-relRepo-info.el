@@ -81,7 +81,7 @@ and prompt from the reply."
          (concat
           (prin1-to-string
            `((request . "relRepo info")
-             (owner . ,(plist-get relationship :owner))
+             (recorder . ,(plist-get relationship :recorder))
              (member . ,(plist-get relationship :member))
              (relation . ,(plist-get relationship :relation))))
           "\n"))))))

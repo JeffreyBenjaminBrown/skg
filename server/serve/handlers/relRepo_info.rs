@@ -44,7 +44,7 @@ fn relRepo_info_response_body (
 ) -> Result<String, String> {
   let runtime = env . runtime_snapshot ();
   let recorder : ID = ID (
-    value_from_request_sexp ("owner", request) ? );
+    value_from_request_sexp ("recorder", request) ? );
   let member : ID = ID (
     value_from_request_sexp ("member", request) ? );
   let relation : NodeRelation = relation_from_client_string (
