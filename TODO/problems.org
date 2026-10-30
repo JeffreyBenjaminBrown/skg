@@ -41,20 +41,6 @@
   results, since the folder carries the process ID; it only
   accumulates.
 * Problems noticed while executing plan 08, slice 1 (2026-10-29)
-* Problems noticed while executing plan 06, slice 1 (2026-10-26)
-** FIX PLANNED: Under a restriction, the graphnode stats are quadratic in a list's length
-  Slice 1 of 'TODO/simplify-refresh/06_plan_tidy-refresh.org' made
-  the viewnode stats pass linear ('RelRepoLookup' in
-  'server/update_buffer/viewnodestats.rs'): a fresh view of a root
-  with 4,000 contained children, debug build, went from 3.1 s to
-  0.14 s. Restricted to one skgrepo, the same view went from 11.3 s
-  to 2.7 s, and nearly all of the 2.7 s (2.6 s, timed by a
-  throwaway test) is 'set_graphnodestats_in_viewforest_with_skgrepo_set'
-  ('fetch_all_graphnodestats_with_skgrepo_set',
-  'server/dbs/in_rust_graph/stats.rs'), whose gated inbound counts
-  presumably ask the relRepo of each child's relationship by a scan
-  of the parent's list, as the stats pass did. Read, not traced; the
-  same per-recorder map would likely fix it.
 * Problems noticed while executing plan 19, slice 12 (2026-10-24)
 ** Emacs's relRepo info request always sends a nil recorder
   'skg-set-relRepo' asks the server which skgrepos a relationship may

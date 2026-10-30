@@ -487,7 +487,7 @@ impl InRustGraph {
   /// The inbound partners of 'pid' under 'relation' whose records the
   /// skgrepo restriction shows, 'relRepo_of' giving the relRepo of a
   /// partner's record (see 'relRepo'). Asks nothing of a partner when
-  /// there is no restriction.
+  /// there is no skgrepo restriction.
   fn inbound_pids_gated_by (
     &self,
     pid         : &ID,

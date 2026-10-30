@@ -1,3 +1,27 @@
+* Problems noticed while executing plan 06, slice 1 (2026-10-26; fixed 2026-10-30)
+** Under a restriction, the graphnode stats are quadratic in a list's length
+  Slice 1 of 'TODO/simplify-refresh/06_plan_tidy-refresh.org' made
+  the viewnode stats pass linear ('RelRepoLookup' in
+  'server/update_buffer/viewnodestats.rs'): a fresh view of a root
+  with 4,000 contained children, debug build, went from 3.1 s to
+  0.14 s. Restricted to one skgrepo, the same view went from 11.3 s
+  to 2.7 s, and nearly all of the 2.7 s (2.6 s, timed by a
+  throwaway test) is 'set_graphnodestats_in_viewforest_with_skgrepo_set'
+  ('fetch_all_graphnodestats_with_skgrepo_set',
+  'server/dbs/in_rust_graph/stats.rs'), whose gated inbound counts
+  presumably ask the relRepo of each child's relationship by a scan
+  of the parent's list, as the stats pass did. Read, not traced; the
+  same per-recorder map would likely fix it.
+  Fixed by slice 8 of
+  'TODO/simplify-refresh/08_plan_restriction-and-tidy.org': the
+  graphnode stats read each recorder's relRepos once
+  ('RelRepoLookup', now in
+  'server/dbs/in_rust_graph/relation_accessors.rs'). The same view,
+  debug build, restricted to one skgrepo: 2.85 s before, 0.14 s
+  after. Under 'all' it was as slow (2.84 s), since slice 3 of that
+  plan had dropped the gated accessors' early answer for 'all'; it
+  is 0.14 s too. 'the_graphnode_stats_pass_reads_a_list_a_bounded
+  _number_of_times' ('tests/refresh/tail.rs') counts the list reads.
 * Problems noticed while executing plan 08, slice 1 (2026-10-29)
 ** DONE ignoring : A skgrepo narrowing leaves a re-kinded vognode's folders as tombstones
   An occurrence the skgrepo restriction newly keeps out becomes a

@@ -4776,3 +4776,100 @@ to 10 do not depend on the answer, so the run goes on. Suites:
 nextest 1025 of 1025 (nine new), Emacs 411, Neovim 406,
 integration 34 of 35 with either client, the pre-existing
 failure.
+
+** Slice 8
+*** The commits
+**** 7075baee
+'RelRepoLookup' moves from the viewnode stats to
+'server/dbs/in_rust_graph/relation_accessors.rs' and answers the
+gated inbound partners; it and the graph's own
+'inbound_pids_for_relation_gated' share one filter
+('inbound_pids_gated_by').
+**** The last commit
+The graphnode stats keep a 'RelRepoLookup' for their pass and
+read each partner set once; the test that counts their list
+reads; the problems entry moved; this record and the plan's
+keyword.
+*** The suites
+Run serialized on the finished tree.
+**** cargo check --all-targets
+Clean, no warning.
+**** bash/nextest.sh
+1026 run, 1026 passed (1025 before; one test added,
+'the_graphnode_stats_pass_reads_a_list_a_bounded_number_of
+_times' in 'tests/refresh/tail.rs').
+**** bash/integration-tests.sh
+Emacs: 34 of 35. The failure is 'import-md-and-org',
+pre-existing and not this plan's.
+**** the client suites
+Not run: no client and no message a client test asserts was
+touched.
+**** Failures met during the slice
+None.
+*** The timings
+A throwaway test, kept as text in
+'tests/results/08/slice8/throwaway_slice8_timing.rs.txt', with
+its logs beside it: a fresh view of a root with 4,000 contained
+children, budget 100,000, through 'refresh_viewforest', debug
+build ('cargo test --lib'), three runs each; then each stats
+pass alone over that drawn view. "main" is the skgrepo
+restriction to one skgrepo, "all" the set 'all', "none" no
+skgrepo restriction ('None').
+**** before
+The whole refresh: none 0.14 s; main 2.84 to 2.87 s; all 2.84
+to 2.87 s. The graphnode stats alone: none 0.055 s; main 2.75
+to 2.77 s; all 2.76 to 2.77 s. The viewnode stats alone: none
+0.041 s; main 0.043 to 0.044 s; all 0.043 to 0.044 s.
+**** after
+The whole refresh: none 0.13 s; main 0.14 s; all 0.135 s. The
+graphnode stats alone: none 0.045 s; main 0.050 to 0.052 s; all
+0.050 s. The viewnode stats alone: unchanged.
+**** the viewnode stats under 'all', with and without the map
+With the map, as the code is: 0.042 to 0.043 s. Without it (a
+temporary skip of the lookups when the set is 'all', reverted):
+0.040 s. Two or three milliseconds of a 135 ms refresh, so no
+skip is kept.
+**** the graphnode stats under 'all', with and without the map
+The same temporary skip in the gated inbound partners: 0.050 s
+with the map, 0.045 s without; five milliseconds, so no skip is
+kept there either.
+*** Deviations from the plan's "how"
+**** the map's home
+'RelRepoLookup' moved to the graph's relation accessors, beside
+'relRepos_by_target_pid', since the graphnode stats live in
+'server/dbs/' and must not import the refresh. Its new method,
+'inbound_pids_for_relation_gated', is the graph's method of that
+name reading the map; both pass their relRepo source to one
+filter rather than repeat it.
+**** each partner set read once
+The old loop asked the gated contents and containers twice, once
+for the count and once for the containment maps. The loop now
+collects each relation's shown partners once and takes the
+count and the intersection with the view's gnids from that set.
+**** 'all' was quadratic too
+Slice 3 replaced the gated accessors' early answer for 'all'
+with 'record_is_visible', so under 'all', which production
+passes as a skgrepo restriction and not as 'None', the gated
+inbound partners scanned the recorder's list per partner: the
+2.84 s under 'all' above. The map fixes both cases; the plan
+named only the skgrepo restriction to fewer skgrepos.
+**** the test counts list reads
+As slice 7's does, by 'STORED_LIST_READS': a list of 200
+members is read as often as one of 10. With the fix undone
+the counts were 10 and 200. The two tests share the view
+they draw ('a_view_of_a_list_under_a_skgrepo_restriction').
+*** Fixtures changed
+None.
+*** Left unfinished
+**** other callers of the graph's gated inbound partners
+'InRustGraph::inbound_pids_for_relation_gated' still scans a
+partner's list per call. Its other callers (the goal's inbound
+partner folders, 'other_member_pids_gated') ask of one
+graphnode's partners, each a different recorder, so no list is
+scanned once per member of it; not measured.
+**** a duplicate gnid's stats
+'gnids_that_can_have_graphnodestats' lists a gnid once per
+occurrence, and the graphnode stats compute each occurrence's
+anew. Harmless and not quadratic; noted only.
+*** Headline
+DONE.

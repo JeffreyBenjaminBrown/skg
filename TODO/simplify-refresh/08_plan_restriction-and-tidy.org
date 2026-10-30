@@ -1011,7 +1011,7 @@ shared pair and reader; 'buffer_with' to
 *** tests
 The suites with every script.
 
-** TODO Slice 8: the restricted stats pass
+** DONE Slice 8: the restricted stats pass
 Read "The restricted stats pass" in the agreed behavior and
 the plan 06 slice 1 record in 'progress.org' first.
 *** Corrections carried from slice 3

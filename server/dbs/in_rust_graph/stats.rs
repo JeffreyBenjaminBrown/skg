@@ -12,7 +12,8 @@
 /// operations used by the uniform-herald grammar.
 
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::dbs::in_rust_graph::relation_accessors::{GnidPresence, NodeRelation};
+use crate::dbs::in_rust_graph::relation_accessors::{
+  GnidPresence, NodeRelation, RelRepoLookup };
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::ID;
 use crate::types::nodes::complete::Graphnode;
@@ -98,8 +99,10 @@ pub fn fetch_all_graphnodestats_with_skgrepo_set (
 /// recorded at a skgrepo outside 'unrestricted' must not inflate a count or
 /// appear in these maps, in either direction, even when the member
 /// node itself is unrestricted (still checked separately via
-/// 'pid_repo_is_unrestricted', matching every other render surface's
-/// two-part gate).
+/// 'node_is_shown', matching every other render surface's
+/// two-part gate). The inbound side reads each recorder's relRepos
+/// once ('RelRepoLookup'), so that the members of one long list do
+/// not each scan it.
 fn fetch_all_graphnodestats_in_rust (
   graph   : &InRustGraph,
   pids    : &[ID],
@@ -112,36 +115,36 @@ fn fetch_all_graphnodestats_in_rust (
     : HashMap<ID, HashSet<ID>> = HashMap::new ();
   let mut content_to_containers
     : HashMap<ID, HashSet<ID>> = HashMap::new ();
+  let mut relRepos : RelRepoLookup = RelRepoLookup::default ();
   for pid in pids {
-    // Inbound counts: gated partners, further repo-filtered.
-    let inbound_count = | relation : NodeRelation | -> usize {
-      graph . inbound_pids_for_relation_gated (pid, relation, restriction)
-      . iter ()
-      . filter ( |p| node_is_shown (graph, restriction, p) )
-      . collect::<HashSet<_>> () . len () };
-    // Outbound counts: gated partners, further repo-filtered.
-    let outbound_count = | relation : NodeRelation | -> usize {
-      graph . outbound_pids_for_relation_gated (pid, relation, restriction)
-      . iter ()
-      . filter ( |p| node_is_shown (graph, restriction, p) )
-      . collect::<HashSet<_>> () . len () };
-    let containers : usize = inbound_count (NodeRelation::Contains);
-    let contents : usize = outbound_count (NodeRelation::Contains);
-    let hiders : usize =
-      inbound_count (NodeRelation::HidesFromSubs);
-    let hides : usize =
-      outbound_count (NodeRelation::HidesFromSubs);
-    let subscribers : usize = inbound_count (NodeRelation::SubscribesTo);
-    let subscribees : usize = outbound_count (NodeRelation::SubscribesTo);
-    let overriders : usize = inbound_count (NodeRelation::Overrides);
-    let overrides_out : usize =
-      outbound_count (NodeRelation::Overrides);
-    let mentioners : HashSet<ID> =
-      graph . inbound_pids_for_relation_gated (
-        pid, NodeRelation::LinksTo, restriction )
+    // Inbound partners: gated, further repo-filtered.
+    let mut inbound_shown = | relation : NodeRelation | -> HashSet<ID> {
+      relRepos . inbound_pids_for_relation_gated (
+        graph, pid, relation, restriction )
       . into_iter ()
-      . filter (|mentioner| node_is_shown (graph, restriction, mentioner))
-      . collect ();
+      . filter ( |p| node_is_shown (graph, restriction, p) )
+      . collect () };
+    // Outbound partners: gated, further repo-filtered.
+    let outbound_shown = | relation : NodeRelation | -> HashSet<ID> {
+      graph . outbound_pids_for_relation_gated (pid, relation, restriction)
+      . into_iter ()
+      . filter ( |p| node_is_shown (graph, restriction, p) )
+      . collect () };
+    let shown_containers : HashSet<ID> = inbound_shown (NodeRelation::Contains);
+    let shown_contents : HashSet<ID> = outbound_shown (NodeRelation::Contains);
+    let hiders : usize =
+      inbound_shown (NodeRelation::HidesFromSubs) . len ();
+    let hides : usize =
+      outbound_shown (NodeRelation::HidesFromSubs) . len ();
+    let subscribers : usize =
+      inbound_shown (NodeRelation::SubscribesTo) . len ();
+    let subscribees : usize =
+      outbound_shown (NodeRelation::SubscribesTo) . len ();
+    let overriders : usize =
+      inbound_shown (NodeRelation::Overrides) . len ();
+    let overrides_out : usize =
+      outbound_shown (NodeRelation::Overrides) . len ();
+    let mentioners : HashSet<ID> = inbound_shown (NodeRelation::LinksTo);
     let link_total : usize = mentioners . len ();
     let link_substantive : usize = mentioners . iter ()
       . filter (|mentioner| {
@@ -155,27 +158,23 @@ fn fetch_all_graphnodestats_in_rust (
       . or_insert_with (|| link_facts_for_mentioner (graph, restriction, pid))
       . 0 . len ();
     counts . insert ( pid . clone (), RelationCounts {
-      containers, contents, hiders, hides,
+      containers : shown_containers . len (),
+      contents   : shown_contents . len (),
+      hiders, hides,
       subscribers, subscribees, overriders, overrides_out,
       link_total, link_substantive, link_targets } );
-    // container_to_contents[pid] = (pid's gated contents) ∩ pid_set.
+    // container_to_contents[pid] = (pid's shown contents) ∩ pid_set.
     { let intersected : HashSet<ID> =
-        graph . outbound_pids_for_relation_gated (
-          pid, NodeRelation::Contains, restriction )
-        . into_iter ()
+        shown_contents . into_iter ()
         . filter ( |p| pid_set . contains (p) )
-        . filter ( |p| node_is_shown (graph, restriction, p) )
         . collect ();
       if ! intersected . is_empty () {
         container_to_contents . insert ( pid . clone (),
                                          intersected ); }}
-    // content_to_containers[pid] = (pid's gated containers) ∩ pid_set.
+    // content_to_containers[pid] = (pid's shown containers) ∩ pid_set.
     { let intersected : HashSet<ID> =
-        graph . inbound_pids_for_relation_gated (
-          pid, NodeRelation::Contains, restriction )
-        . into_iter ()
+        shown_containers . into_iter ()
         . filter ( |p| pid_set . contains (p) )
-        . filter ( |p| node_is_shown (graph, restriction, p) )
         . collect ();
       if ! intersected . is_empty () {
         content_to_containers . insert ( pid . clone (),
