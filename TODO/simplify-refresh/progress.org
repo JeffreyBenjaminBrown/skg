@@ -4873,3 +4873,23 @@ occurrence, and the graphnode stats compute each occurrence's
 anew. Harmless and not quadratic; noted only.
 *** Headline
 DONE.
+
+** Orchestrator's notes after slice 8 (2026-10-30)
+Launched 00:06 UTC, reported 00:15 UTC: nine minutes; 160k
+agent tokens over 55 tool uses. Two commits. The deviations
+are sound, and one is a finding: slice 3's sweep took the
+gated accessors' early answer for 'all' away, and production
+passes 'all' as a skgrepo restriction rather than as none, so
+the graphnode stats had become quadratic under 'all' as well
+(2.85 s at 4,000 children, where 'None' took 0.14 s); the one
+map fixes both, 0.14 s under either. The slice 3 correction
+was measured: the viewnode stats' map costs 2 to 3 ms of a
+135 ms refresh under 'all', so no skip is kept. 'RelRepoLookup'
+lives beside the graph's relation accessors now, since the
+stats in 'server/dbs/' must not import the refresh. One
+correction carried to slice 10: no doc may say 'all' skips the
+relRepo lookups. Every 'FIX PLANNED' entry of
+'TODO/problems.org' has moved to 'TODO/DONE/'. Suites: nextest
+1026 of 1026 (one new), integration 34 of 35 with the
+pre-existing failure; the client suites were not run, as no
+client was touched.

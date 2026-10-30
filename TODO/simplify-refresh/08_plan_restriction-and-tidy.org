@@ -1118,6 +1118,13 @@ since only a request's extension outside U can be refused; and
 'AfterRestrictionChange' silences what the tail pruned, as the
 module header and the glossary say since slice 6, which the
 user docs' description of the switch repeats in a sentence.
+*** Corrections carried from slice 8
+Since slice 3 the gated accessors ask 'record_is_visible' under
+'all' too, with no early answer, and since slice 8 the
+graphnode stats keep one 'RelRepoLookup' for the whole pass:
+a doc that says 'all' skips the relRepo lookups, or that the
+stats under a skgrepo restriction cost more than under 'all',
+is wrong and is corrected.
 *** the docs
 Each item of the agreed behavior's section, in the docs it
 names; the coinages of this plan ('GnidOnlyVognode', 'Unread',
