@@ -10,13 +10,14 @@ use crate::types::views_state::DiffViewBufferKind;
 
 #[derive(Clone, Copy)]
 pub enum RefreshMode<'a> {
-  /// The refresh of a content view, from the live graph.
+  /// The refresh of a content view, from the live graph
+  /// ('docs/glossary.org', "the truth").
   ContentView,
   /// The refresh of the buffer of kind 'buffer_kind' of the diff view,
   /// over 'straddle'. Its goals are the union of the straddle: the
   /// members of either graph, each tagged with the change of its node
-  /// and of its relationship. 'readiness_store' gives the readiness
-  /// facts.
+  /// and of its relationship. 'readiness_store' gives the '(ready ...)'
+  /// change facts.
   DiffView { straddle        : &'a GraphStraddle,
              buffer_kind     : DiffViewBufferKind,
              readiness_store : &'a ReadinessStore },

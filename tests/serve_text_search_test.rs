@@ -361,7 +361,7 @@ fn private_alias_documents_are_filtered_before_grouping (
         assert! ( ! matches_by_gnid . contains_key (
                     &ID::new ("id_leveled")),
                   "private alias doc leaked into a main-only search" ); }
-      { // No restriction (None): the alias matches.
+      { // No skgrepo restriction (None): the alias matches.
         let ( best_matches, searcher ) =
           search_index ( &tantivy_index, "zanzibar",
                          &SearchOptions::default () ) ?;

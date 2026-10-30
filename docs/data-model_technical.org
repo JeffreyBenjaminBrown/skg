@@ -186,7 +186,7 @@ of a gnid its viewparent's list names and no node answers to; a
 *Restricted vognode*, of a node the skgrepo restriction keeps out
 that a visible record names (a record is a relationship as one
 node's file states it, in one skgrepo's section, visible when the
-restriction holds that skgrepo), showing nothing of the node but the
+skgrepo restriction holds that skgrepo), showing nothing of the node but the
 record's gnid and relRepo. A
 *descriptor* describes its viewparent: a folder, a property member
 (an alias, an ID or a flag in its property folder) or a change
@@ -202,21 +202,20 @@ What a headline standing for a gnid becomes is decided by five
 questions, the first yes winning (=id_rule= in
 =server/refresh/id_rule.rs=). Does the truth have the node? Then it is
 an occurrence of the node's pid. Otherwise, does the truth say the
-node is restricted (=Restricted=, =GnidPresence=: the skgrepo
-restriction keeps out its home)? Then, if its viewparent's goal names
-the gnid, marked restricted (its record is visible), or it is a root
+node is restricted (=Restricted=, =GnidPresence=: the
+skgrepo restriction keeps out its home)? Then, if its viewparent's
+goal names the gnid (its record is visible), or it is a root
 of the view (the view is the user's own request), it is a Restricted
 vognode; if not, a tombstone. Either reveals nothing of the node.
 Otherwise, in the diff view, does HEAD have it? Then it is the node's
-ghost, unless the restriction keeps out HEAD's node's home, when it
+ghost, unless the skgrepo restriction keeps out HEAD's node's home, when it
 is answered as a restricted node is: a restricted node is never a
 ghost. Otherwise,
 does its viewparent's list name the gnid? Then it is an unknown.
-Otherwise it is a tombstone. So an occurrence of a node the
-restriction newly keeps out becomes a Restricted vognode in place
-where its record is visible, and an occurrence again when the
-restriction widens; after a change of the restriction neither re-kind
-is a buffer correction. When an unknown or a Restricted vognode
+Otherwise it is a tombstone. So an occurrence of a node a
+skgrepo narrowing keeps out becomes a Restricted vognode in place where its
+record is visible, and an occurrence again after a skgrepo widening;
+after either, neither re-kind is a buffer correction. When an unknown or a Restricted vognode
 becomes an occurrence, each of its children claims again, as the
 text of its view, which writes no =noClaim= under it, would say, and
 the claims rung marks those the truth does not warrant there. In the diff view, a gnid that HEAD had
@@ -277,13 +276,13 @@ Under a skgrepo restriction a goal omits each member whose record is
 restricted: the gated accessors of the in-Rust graph leave it out;
 an alias folder's goal omits an alias whose record is restricted, and
 the stats count it nowhere. The diff view's goal asks the
-restriction too, though the diff view opens only under 'all': a
-switch rerenders its open buffers.
-It keeps each member whose record is visible: a node the restriction
-keeps out, which the ID rule, finding the node restricted and the
+skgrepo restriction too, though the diff view opens only under
+'all': a switch rerenders its open buffers.
+It keeps each member whose record is visible: a node the
+skgrepo restriction keeps out, which the ID rule, finding the node restricted and the
 gnid named by the goal, answers with a Restricted vognode; and a gnid
 nothing answers
-to, an unknown, as under no restriction. The save is its mirror: it
+to, an unknown, as under no skgrepo restriction. The save is its mirror: it
 restores to a list only the members whose records are restricted,
 and to a node's aliases only those whose records are restricted,
 which the buffer could not show (=preserve_invisible_members= and
@@ -312,15 +311,16 @@ P's default folders, computes P's
 goal, and runs the *refresh's rungs* in order, weakest first (older
 text calls them the ladder):
 1. re-kind: each vognode child becomes what the ID rule says; each
-   descriptor whose position the ancestry table forbids, or, for a
-   change viewnode, whose change is gone, is *unsayable* and becomes a
-   tombstone, and so does an alias whose record the restriction keeps
-   out;
+   descriptor whose position the ancestry table forbids is
+   *unsayable* and becomes a tombstone, and so does a change viewnode
+   whose change is gone, and an alias whose record the
+   skgrepo restriction keeps out;
 2. viewnode merge: duplicate viewnode siblings, standing for one
    gnid, are merged into one viewnode, which stands where the first
    stood and gets a fresh viewnode ID; it is folded (and body-folded)
    only if every sibling was, and focused, editable and claiming if
-   any was; it carries the siblings' requests; every sibling's
+   any was (but not editable where it stands for another node whose
+   editable occurrence is elsewhere in the buffer); it carries the siblings' requests; every sibling's
    children are appended to it in sibling order, each marked
    =noClaim= unless the truth warrants it there (the glossary's
    "viewnode merge");
@@ -360,7 +360,7 @@ A content view draws some folders unasked, as it always has
 (=add_default_folders=): an occurrence that an editable-view request
 extends, a fresh view's roots and every occurrence the refresh draws
 editable among them, shows its subscribee folder
-when it subscribes to something the restriction shows, and the
+when it subscribes to something the skgrepo restriction shows, and the
 folder of what it hides outside its subscribees inside that, when it
 hides something there; an editable subscribee shown as such shows the
 folder of what its subscriber hides in it, when that holds anything.
@@ -409,7 +409,7 @@ buffer may end with no roots, and so is a folder the pruning leaves
 empty that goes when empty; an editable folder stays even when
 empty, since the user can add to it, so one whose every member's
 record the skgrepo restriction keeps out stays, empty, and fills again
-when the restriction widens; every
+after a skgrepo widening; every
 viewnode that lacks a viewnode ID gets one. The refresh renders
 nothing: each caller renders the viewforest once, when it is done
 with it (=viewforest_to_string=), the search after it has folded

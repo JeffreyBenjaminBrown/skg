@@ -36,9 +36,13 @@ parent's content stays where it stands in another view, marked
 does not put it back; delete it there, or attach it (C-c s a) to put
 the relationship back at that view's next save. A member that one
 view's save added is drawn into every other view that shows its
-list. A headline standing for a node the save deleted becomes a
-tombstone ("something stood here") in every view, holding whatever
-stood under it; a tombstone that holds nothing goes.
+list, as a fresh view draws its members: editable where no other
+occurrence of its node is and the node budget allows, and then
+with its subscribee folder when it subscribes to something the
+skgrepo restriction shows. A headline standing for a node the save
+deleted becomes a tombstone ("something stood here") in every view,
+holding whatever stood under it; a tombstone that holds nothing
+goes.
 *** buffer corrections
 A save or a rerender that finds a buffer saying something the graph
 contradicts corrects the buffer, and says so: each such change is a
@@ -65,18 +69,19 @@ correction says one of these six things:
 - "Merged duplicate viewnode siblings into this one." Two or more
   siblings stood for one node under one parent (a pasted copy, say);
   they became one headline, holding all their children.
-- "Made a headline an unknown, as the graph has it." (or an
-  occurrence, a ghost, a Restricted vognode). The headline is now
-  the kind of headline the graph says it is: an unknown where no node
-  answers to its ID, say.
+- "Made a headline a reference to an unknown node, as the graph has
+  it." (or an occurrence, a ghost, or restricted). The headline is
+  now the kind of headline the graph says it is: a reference to an
+  unknown node where no node answers to its ID, say.
 - "Dropped an edit request its headline has no slot for." After such
   a change of kind, a request the new kind cannot carry was dropped.
 What the server draws because you asked for it (the content of a
 node you made editable, a folder you requested, a new view) is no
 buffer correction, nor is what your own save did: a tombstone where
-it deleted a node, what a merge it asked for joined or drew, a
+it deleted a node, what a nodeMerge it asked for joined or drew, a
 headline it took out of the view; nor what a change of the
-skgrepo-set (C-c v l) draws, hides or marks noClaim.
+skgrepo-set (C-c v l) draws, entombstones, re-kinds, marks noClaim
+or prunes.
 *** where a save's warnings go
 A save's own warnings and errors go to a buffer of their own,
 replaced at each save that has any: =*SKG Save Warnings*=,
@@ -84,7 +89,15 @@ replaced at each save that has any: =*SKG Save Warnings*=,
 refused, or =*SKG Save Errors and Warnings*= when it has both. One
 such warning names each orphan graphnode the save created: a node
 that no list contains, made from a headline typed under a parent
-that reads no claims (see "first some vocab" under C-c s).
+that reads no claims ('docs/glossary.org', "claims membership",
+lists those parents). A new view root is in no list either, but is
+not warned of.
+
+A rerender that follows a command (C-c v l, a commit, an import, the
+cleanup of references to an absent node, the integration of unshown
+changes, or M-x skg-request-rerender-all-views) has errors and
+warnings of its own, which go to =*skg rerender messages*=; its
+buffer corrections go to =*SKG Server Warnings*= as a save's do.
 ** C-a : skg-beginning-of-line
 On a headline, moves point to the start of its title, after the stars
 and the metadata; pressed again, to the true start of the line. On
@@ -459,7 +472,9 @@ whatever it carries, and nothing in one of its folders does.
 A child the user typed under it, which stays unwarranted (⊥),
 since no save reads claims there, is still saved as a node of its
 own: an orphan graphnode, a node that no list contains, of which the
-save warns.
+save warns. A write-protected occurrence is one of the parents that
+read no claims, which 'docs/glossary.org' lists under "claims
+membership".
 The way out is to make the edit at the node's editable occurrence
 instead, or to undo it, make this occurrence editable
 (C-c s d on it), save, and edit it then.
@@ -514,9 +529,11 @@ folder under one that is not write-protected -- writes 'noClaim' on
 the headline at point, so that the next save takes it out of the
 parent's list. The headline stays in the buffer: a child the graph
 put there shows =detach= until the save, and =⊥= after it.
-Under a parent that reads no claims (a write-protected occurrence, a
-write-protected folder, or none at all) it refuses, since no child
-claims membership there. On a headline that claims nothing already,
+Under a parent that reads no claims (a write-protected occurrence
+or folder, a ghost, a reference to an unknown node, a restricted
+headline, a tombstone, or none at all; 'docs/glossary.org', "claims
+membership", is the list) it refuses, since no child claims
+membership there. On a headline that claims nothing already,
 it says so and changes nothing. It does not save.
 *** C-c s a : skg-attach
 The reverse of C-c s t: removes 'noClaim' from the headline at point,
@@ -561,9 +578,9 @@ described under =C-c s s= apply here too, across the whole subtree.
 Prompts between =search matching= and =no search matching=, with shift-arrow
 cycling, and stages an idempotent request on the saved occurrence at point.
 It refuses foreign and write-protected nodes and a node that already
-holds an edit request (delete, merge or a flag). A readiness request
-stays beside it, and a relRepo request gives way to it, as to delete
-and merge. It does not save; save the view to apply it.
+holds an edit request (delete, a nodeMerge or a flag). A readiness
+request stays beside it, and a relRepo request gives way to it, as to
+delete and a nodeMerge request. It does not save; save the view to apply it.
 
 With =C-u=, the selected value is applied uniformly to the true-content
 subtree only. Non-vognodes, children carrying =noClaim=, ghosts and
@@ -607,9 +624,10 @@ is not restored; the save says so.
 Sets the relRepo of the relationship instance the headline at
 point represents -- =contains= for a content child, the folder's
 relation for a member of an editable partner folder, or the alias membership
-for an alias headline. An unknown in one of those writable
-positions is supported too: it carries only its raw relationship member ID,
-never a node edit. (Formerly
+for an alias headline. A reference to an unknown node or a
+restricted headline in one of those writable positions is supported
+too: it carries only its raw relationship member ID, never a node
+edit. (Formerly
 =skg-privatize-relationship=; renamed because the gesture now moves
 privacy in both directions.)
 
@@ -638,7 +656,7 @@ Choosing a skgrepo writes an =(editRequest (relRepo REPO))= metadata
 request. This
 both raises privacy above the default and lowers it back down to
 (never below) the default -- the way to publicize a relationship stuck at
-an old, more private skgrepo after its endpoint's home moved. A relationship
+an old, more private skgrepo after its endpoint's home skgrepo moved. A relationship
 sitting more private than its default is marked with a red =~NAME= herald
 immediately before the ⌂ skgrepo herald; once saved at its default,
 request and display herald disappear.
@@ -684,7 +702,7 @@ there (write-protected folders belong to the other end; links carry no
 independent skgrepo; hide skgrepos are derived at save). RET picks a
 role; q aborts.
 
-It then prompts for a skgrepo over the whole ladder, plus the
+It then prompts for a skgrepo over every skgrepo, plus the
 no-override choice, which instead removes existing skgrepo requests
 throughout the subtree. Unlike the single-relationship command, no
 per-relationship default is fetched -- the subtree's relationships have different
@@ -754,7 +772,7 @@ Works on write-protected headlines too.
 Toggles the commit-readiness of the home-skgrepo move of the node at
 point (or of the move at point), then saves: it unmarks the move if
 it is ready, else marks it. With a prefix argument (C-u C-c r h), it
-does the same to every descendant whose home moved between the same
+does the same to every descendant whose home skgrepo moved between the same
 two skgrepos. Works on write-protected headlines too.
 *** C-c r u : skg-diffView-integrate-unshown-changes
 Integrates every change not editable in the buffer of the diff view.
@@ -876,10 +894,10 @@ Each field a user may set on the headline's kind is shown,
 at its default when it is absent, and S-left / S-right cycle
 it through the values that kind takes,
 as 'shared/metadata-fields.json' lists them:
-a write-protected node is offered no delete, merge or flag request,
+a write-protected node is offered no delete, nodeMerge or flag request,
 a removed member is also offered restoreRel,
 a ghost restoreNode.
-A value that needs more (merge's target, relRepo's skgrepo,
+A value that needs more (a nodeMerge's target, relRepo's skgrepo,
 a flag and its value, a folder's relation) prompts for it.
 A field left at its default is dropped when the edit is applied
 (C-c C-c).
@@ -930,8 +948,10 @@ buffer holds editable is write-protected again by the server. An
 editable-view request (C-c s d) works as in any view, except that
 'initial_node_limit' refuses only the extension of a node outside U
 (the nodes the buffer extends anyway: those that changed and those
-leading to them). Every extension in the buffer counts toward it,
-but nothing else in the buffer is bounded by that limit.
+leading to them). Every node of U drawn editable counts toward it,
+as does every other extension in the buffer, but no node of U is
+ever refused, and nothing else in the buffer is bounded by that
+limit.
 Why the diff view commits whole skgrepos, and offers nothing
 smaller: in skg a partial commit is dangerous. The graph is one
 structure spread over many files, so committing some changed files
@@ -956,8 +976,8 @@ Opens a blank Skg content view in which to create new nodes.
 **** why
 Creating a headline through Skg's commands prompts for any skgrepo it
 cannot inherit: a headline inherits one from the nearest occurrence
-above it, passing through folders, ghosts, tombstones, unknowns and
-Restricted vognodes, so a root prompts, and so does a headline whose
+above it, passing through folders, ghosts, tombstones, references to
+unknown nodes and restricted headlines, so a root prompts, and so does a headline whose
 walk up meets an alias, an ID, a flag or a change viewnode first, or
 meets no occurrence.  Save
 validation also catches a node whose skgrepo was omitted when the
@@ -979,27 +999,30 @@ connection. Skgrepo-sets are the prefixes of the config's privacy
 order, so the question the command asks is really "what is the most
 private skgrepo to make available?" -- choosing a skgrepo activates it
 and everything more public. Tab completion and shift-left /
-shift-right cycling walk the ladder in privacy order. The command
+shift-right cycling walk the skgrepos in privacy order. The command
 then re-renders open Skg buffers after confirmation, and tells the
 server to use that skgrepo-set for subsequent requests. Choose =all=
-(the whole ladder) to remove the restriction.
+(every skgrepo) to remove the skgrepo restriction.
 
-Under a restriction, a node in a skgrepo outside the set shows
-nothing of itself. Where a relationship recorded in a skgrepo the set
-holds names such a node (say a public node contains a private one),
-the view shows a headline with no title, heralded =restricted=,
-standing for it: a Restricted vognode. It keeps the relationship as
-it was when you save, and deleting its line removes the relationship,
-as deleting an unknown's does; =C-c s r= sets its relRepo. A
-relationship recorded in a skgrepo outside the set shows nothing at
-all, and a save keeps it. Narrowing the set turns an open view's
-headline of such a node into a Restricted vognode (or, where nothing
-the set shows names it, a tombstone, "something stood here") in
-place, its children kept, and widening it turns the Restricted
-vognode back. Where a tombstone took the node's place, widening
-draws the node anew where the graph puts it, and the tombstone stays
-beside it, holding what stood under the old headline, until nothing
-is left under it. None of this is reported as a buffer correction.
+Under a skgrepo restriction, a node in a skgrepo outside the set
+shows nothing of itself. Where a relationship recorded in a skgrepo
+the set holds names such a node (say a public node contains a
+private one), the view shows a headline with no title, heralded
+=restricted=, standing for it: a restricted headline. It keeps the
+relationship as it was when you save, and deleting its line removes
+the relationship, as deleting a reference to an unknown node does;
+=C-c s r= sets its relRepo. A relationship recorded in a skgrepo
+outside the set shows nothing at all, and a save keeps it. A
+skgrepo narrowing (a switch to a smaller set) turns an open view's headline
+of such a node into a restricted headline (or, where nothing the set
+shows names it, a tombstone, "something stood here") in place, its
+children kept, and a skgrepo widening (a switch to a larger set)
+turns the restricted headline back. Where a tombstone took the
+node's place, a skgrepo widening draws the node anew where the graph
+puts it, and the tombstone stays beside it, holding what stood under
+the old headline, until nothing is left under it. None of this is
+reported as a buffer correction, nor is a tombstone the switch
+leaves holding nothing, which goes.
 
 The re-render redraws each open buffer from the view the server last
 saved or rendered for it, which would lose an unsaved edit; so while
@@ -1011,9 +1034,9 @@ If the proposed set would rerender overPrivateText telescope text, Skg asks befo
 changing the skgrepo restriction or any view. Declining leaves both unchanged and
 an empty rerender stream releases the client's preemptive locks.
 
-=M-x skg-list-repo-sets= shows the current restriction and the
-skgrepo-sets available, and =M-x skg-show-skgrepo-restriction= shows
-the restriction alone.
+=M-x skg-list-repo-sets= shows the current skgrepo restriction and
+the skgrepo-sets available, and =M-x skg-show-skgrepo-restriction=
+shows the skgrepo restriction alone.
 *** C-c v r : skg-readable-ids-mode
 This changes how node IDs are displayed.
 The ID itself is a kind of special random gibberish called UUID v4.
@@ -1031,9 +1054,9 @@ server round-trip at all. See =C-c v R= for when it goes stale.
 *** C-c v R : skg-readable-ids-refresh
 Empties the session's ID-to-title cache (see =C-c v r=) and
 re-annotates the current buffer. Use it after anything that changes
-what titles the server would answer with: a node retitled, or the
-skgrepo restriction widened (IDs restricted under the old set were
-cached as unresolvable). Both keys are bound in content views only;
+what titles the server would answer with: a node retitled, or a
+skgrepo widening (IDs restricted under the old skgrepo restriction
+were cached as unresolvable). Both keys are bound in content views only;
 in a magit or raw .skg buffer, use M-x.
 *** C-c v s : skg-view-linkstack
 View and maybe edit the set of links you've stored.
@@ -1163,7 +1186,7 @@ It also creates two kinds of nodes that do not so correspond:
   so you can export back to the same path if you want.
   But this is dangerous -- see "Re-export is dangerous" below.
 
-The importer does not merge into existing nodes,
+The importer does not combine its nodes with existing ones,
 copy attachments, synchronize later edits, or automatically export.
 
 Only document structure, selected metadata, links, and named Markdown
@@ -1260,7 +1283,7 @@ nothing is deleted or written; see
 [[*An Org headline inside a block or fence stops the import.][the same check in the interactive importer]].
 Otherwise the importer creates 'OUTPUT_DIR' if necessary, then deletes every
 immediate '.skg' file already in it, before importing the input. There is no confirmation,
-dry run, merge-with-destination mode, or automatic backup. Other files and
+dry run, mode that combines with the destination, or automatic backup. Other files and
 nested directories are left alone. Use a fresh staging directory and inspect
 the result before replacing existing data.
 
@@ -1284,9 +1307,9 @@ headline levels introduce grouping nodes titled 'These are special!' and
 
 'ROAM_ALIASES' becomes Skg aliases. Nodes with an original ID receive the
 'Had ID before import' flag. Duplicate IDs within the input
-are merged: children and aliases are combined, and additional titles and
+are combined into one node: children and aliases are combined, and additional titles and
 bodies are appended with a separator. Such nodes receive 'Was overloaded
-during org-roam import'. This does not compare or merge with existing
+during org-roam import'. This does not compare or combine with existing
 nodes in your configured Skg skgrepos.
 ***** Text and links
 Bodies are copied with whitespace normalization. Parsed property drawers

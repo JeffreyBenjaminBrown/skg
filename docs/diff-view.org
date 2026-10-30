@@ -59,8 +59,8 @@ Each is shown with its content in the new order, as write-protected
 members shown without their content, and with an order-only changeset
 marker, which is always ready. Its sets are empty: it renders no pruned change view.
 ** Refusals
-Every buffer is refused, and the client stops, unless the skgrepo
-restriction is 'all', and when the graph straddle cannot be built: an
+Every buffer is refused, and the client stops, unless the
+skgrepo restriction is 'all', and when the graph straddle cannot be built: an
 owned skgrepo that is not in a gitrepo or has no HEAD commit, or a
 HEAD that fails the whole-graph validation. A merge commit at HEAD is
 no reason to refuse.
@@ -174,10 +174,10 @@ refresh so:
   store, and in the skgrepo-changes buffer the home skgrepo moves.
 The diff view opens only under the skgrepo restriction 'all', but a
 skgrepo-set switch rerenders its open buffers under the new
-restriction, which the refresh then asks as in a content view: the
-goal omits a member whose record is restricted and marks one whose
-node is restricted (the worktree's node, or HEAD's when the worktree
-has none), which stands as a Restricted vognode carrying its change
+skgrepo restriction, which the refresh then asks as in a content
+view: the goal omits a member whose record is restricted and keeps
+one whose node is restricted (the worktree's node, or HEAD's when
+the worktree has none), which stands as a Restricted vognode carrying its change
 facts and none of the change viewnodes that would show its text; a
 restricted node is never a ghost.
 ** Change viewnodes and tags

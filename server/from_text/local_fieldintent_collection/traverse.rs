@@ -416,8 +416,8 @@ fn dedup_members_by_gnid (
 /// preserving first-occurrence
 /// order. Each member is paired with its headline's explicit
 /// '(editRequest (relRepo NAME))' request, if any (see 'FieldIntent').
-/// Tombstones contribute nothing. A member whose record the skgrepo
-/// restriction keeps out has no headline: the folder omits it from
+/// Tombstones contribute nothing. A member whose record the
+/// skgrepo restriction keeps out has no headline: the folder omits it from
 /// display, and the save preserves it (the set-difference merge for
 /// overrides; for 'subscribesTo', which is order-meaningful, disk
 /// supplementation's weave restores it at its disk position; see the

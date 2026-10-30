@@ -57,12 +57,12 @@ repo_sets.restrict_repo_set('all')
 T.check(T.wait_for(function ()
   return status('private-node', 'resolved')
          and state.lp_pending_count == 0 end, 10),
-  'widening the repo-set refreshes a link target without a headline')
+  'a skgrepo widening refreshes a link target without a headline')
 repo_sets.restrict_repo_set('public')
 T.check(T.wait_for(function ()
   return status('private-node', 'restricted')
          and state.lp_pending_count == 0 end, 10),
-  'narrowing the repo-set hides its repo again')
+  'a skgrepo narrowing hides its repo again')
 annotations.toggle_repo_overlay(buf)
 T.check(suffix('⌂:PUB') and suffix('⌂:restricted') and not suffix('PRIV')
         and not suffix('missing') and broken_count() > 0,

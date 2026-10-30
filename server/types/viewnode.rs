@@ -168,7 +168,7 @@ impl ViewnodeKind {
 /// nothing of a node: an unknown, for a gnid its parent's list names
 /// and no node answers to, or a Restricted vognode, for a node the
 /// skgrepo restriction keeps out that a visible record names, or that
-/// a view is rooted at. Where no record the restriction shows names a
+/// a view is rooted at. Where no record the skgrepo restriction shows names a
 /// restricted node, below a view's roots, it has no vognode, not even
 /// a ghost: the refresh entombstones its occurrence (the ID rule,
 /// 'server/refresh/id_rule.rs'), as it does the occurrence of a node
@@ -189,16 +189,18 @@ pub enum VognodeKind {
 }
 
 impl VognodeKind {
-  /// The kind as a message names it, with its article: "an
-  /// occurrence", "a ghost", "an unknown", "a Restricted vognode".
-  pub fn with_article (
+  /// What a message says a headline became: "an occurrence", "a
+  /// ghost", "a reference to an unknown node", "restricted". A message
+  /// to the user never names the type.
+  pub fn what_a_headline_becomes (
     &self,
   ) -> &'static str {
     match self {
       VognodeKind::Occurrence => "an occurrence",
       VognodeKind::Ghost      => "a ghost",
-      VognodeKind::GnidOnly (GnidOnlyKind::Unknown)    => "an unknown",
-      VognodeKind::GnidOnly (GnidOnlyKind::Restricted) => "a Restricted vognode", } }
+      VognodeKind::GnidOnly (GnidOnlyKind::Unknown)    =>
+        "a reference to an unknown node",
+      VognodeKind::GnidOnly (GnidOnlyKind::Restricted) => "restricted", } }
 }
 
 /// Why a gnid-only vognode shows nothing of a node.
@@ -218,12 +220,13 @@ pub enum GnidOnlyKind {
   /// reference exists, but we have no record of its target.
   Unknown,
   /// A Restricted vognode: the node is one the skgrepo restriction
-  /// keeps out, and a record the restriction shows names it
+  /// keeps out, and a record the skgrepo restriction shows names it
   /// ('docs/glossary.org', "Restricted vognode"). It shows nothing of
   /// the node, neither its title, its body, its home skgrepo nor its
-  /// stats. A view whose root the restriction keeps out shows its root
-  /// so too. The diff view, which opens under no restriction, draws it
-  /// after a switch for a restricted member with a visible record.
+  /// stats. A view whose root the skgrepo restriction keeps out shows
+  /// its root so too. The diff view, which opens under no
+  /// skgrepo restriction, draws it after a switch for a restricted
+  /// member with a visible record.
   Restricted,
 }
 
@@ -248,7 +251,7 @@ impl GnidOnlyKind {
 /// viewparent's goal names the gnid, or, for a restricted node, where
 /// it is a root of the view: drawn for a goal item, or re-kinded in
 /// place from another vognode (and back to an occurrence when its node
-/// is back, or the restriction widens).
+/// is back, or the skgrepo restriction widens).
 ///
 /// USED: inert on save: it emits no fieldIntents, though its
 /// descendants still might, so extraction recurses through it. When it

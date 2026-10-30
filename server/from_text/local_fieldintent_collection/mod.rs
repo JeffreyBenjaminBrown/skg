@@ -60,7 +60,7 @@ pub fn extract_nonmergeSavePlan_locally_in_graph (
   viewforest             : &ViewForest,
   graph                  : &InRustGraph,
   config                 : &SkgConfig,
-  skgrepo_restriction    : Option<&SkgrepoRestriction>, // None means no restriction; callers normalize 'all' to None.
+  skgrepo_restriction    : Option<&SkgrepoRestriction>, // None means no skgrepo restriction; callers normalize 'all' to None.
 ) -> Result<(NonmergeSavePlan, Vec<(ID, ID)>), Box<dyn Error>> {
   let _span : tracing::span::EnteredSpan = tracing::info_span!(
     "extract_nonmergeSavePlan_locally" ). entered();

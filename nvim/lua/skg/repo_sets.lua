@@ -1,6 +1,6 @@
--- PURPOSE: List, query, and switch the per-connection skgrepo
--- restriction; switching re-renders every open view in place. The Lua
--- port of elisp/skg-request-repo-sets.el.
+-- PURPOSE: List, query, and switch the per-connection
+-- skgrepo restriction; switching re-renders every open view in
+-- place. The Lua port of elisp/skg-request-repo-sets.el.
 
 local buffer = require('skg.buffer')
 local client = require('skg.client')

@@ -3,12 +3,12 @@
 /// see (the API doc's "Restricted-skgrepo nodes").
 ///
 /// VOCABULARY (shared by both functions):
-/// - A disk member is visible iff its record is: the restriction
+/// - A disk member is visible iff its record is: the skgrepo restriction
 ///   holds its relRepo ('SkgrepoRestriction::record_is_visible'). A
 ///   visible member has a headline the user could delete: an
 ///   occurrence, or a gnid-only vognode (a reference to an unknown
 ///   node, or a restricted headline: a member whose node the
-///   restriction keeps out).
+///   skgrepo restriction keeps out).
 /// - A disk member is positioned iff it appears in the buffer list.
 ///   Only visible members ever do: save extraction never puts a
 ///   member whose record is restricted (an invisible one) into a

@@ -11,12 +11,12 @@
 //! a Restricted vognode) has no goal.
 //!
 //! Under a skgrepo restriction (the API doc's "Restricted-skgrepo
-//! nodes") a goal omits each member whose record the restriction
+//! nodes") a goal omits each member whose record the skgrepo restriction
 //! keeps out: the gated accessors leave it out of every list read
 //! here. It keeps each member whose record is visible: a node the
-//! restriction keeps out, which the ID rule makes a Restricted
+//! skgrepo restriction keeps out, which the ID rule makes a Restricted
 //! vognode, and a gnid nothing answers to, an unknown, as under no
-//! restriction.
+//! skgrepo restriction.
 //!
 //! 'partnerFolder_members_in_graph' serves the search's enrichment
 //! too.
@@ -217,7 +217,7 @@ fn content_goal (
     &relRepos )) }
 
 /// The content an occurrence shows outside the diff view: the members
-/// of its 'contains' list whose records the restriction shows
+/// of its 'contains' list whose records the skgrepo restriction shows
 /// ('members', gated, a raw ID where nothing answers), less what
 /// 'subscriber' hides or contains when the occurrence is a subscribee
 /// as such. The restricted members among them are drawn as Restricted

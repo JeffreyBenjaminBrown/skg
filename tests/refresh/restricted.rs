@@ -1,8 +1,9 @@
 // The skgrepo restriction ('docs/data-model_technical.org', "Under a
 // skgrepo restriction"). A record is a relationship as one node's file
 // states it, in one skgrepo's section. A goal omits a member whose
-// record the restriction keeps out, and keeps one whose record is
-// visible: an unresolved ID as an unknown, as under no restriction.
+// record the skgrepo restriction keeps out, and keeps one whose
+// record is visible: an unresolved ID as an unknown, as under no
+// skgrepo restriction.
 
 use super::*;
 use indoc::formatdoc;
@@ -42,7 +43,7 @@ fn an_unknown_whose_record_is_visible_is_drawn_under_a_restriction () {
 node p
   node c
   unknown missing",
-    "the unknown stays, as under no restriction; the one recorded in \
+    "the unknown stays, as under no skgrepo restriction; the one recorded in \
      'private' is not drawn" );
   assert! ( ! run . text . contains ("hidden-missing"), "{}", run . text ); }
 
@@ -270,7 +271,7 @@ fn the_children_of_a_restricted_root_claim_again_when_it_becomes_an_occurrence (
       RefreshMode::ContentView, 100, &BufferCorrectionPolicy::AfterRestrictionChange )
       . unwrap ();
     assert_eq! ( refreshed . buffer_corrections, Vec::new (),
-                 "a switch's re-kinds across the restriction are no buffer \
+                 "a switch's re-kinds across the skgrepo restriction are no buffer \
                   corrections" );
     texts . push (refreshed . text); }
   assert! ( texts [0] . contains ("restricted (gnid r)")
@@ -336,7 +337,7 @@ node r
     alias r public alias" );
   assert! ( ! narrowed . text . contains ("secret"), "{}", narrowed . text );
   assert_eq! ( narrowed . buffer_corrections, Vec::new (),
-               "what the restriction takes is no buffer correction" ); }
+               "what the skgrepo restriction takes is no buffer correction" ); }
 
 #[test]
 fn an_editable_folder_a_narrowing_empties_stays_and_fills_again_on_widening () {
@@ -367,7 +368,7 @@ fn an_editable_folder_a_narrowing_empties_stays_and_fills_again_on_widening () {
       RefreshMode::ContentView, 100, &BufferCorrectionPolicy::AfterRestrictionChange )
       . unwrap ();
     assert_eq! ( refreshed . buffer_corrections, Vec::new (),
-                 "what the restriction empties or fills is no buffer correction" );
+                 "what the skgrepo restriction empties or fills is no buffer correction" );
     outlines . push ( outline (&forest) ); }
   assert_eq! ( outlines, vec! [ "\
 node s
@@ -376,4 +377,4 @@ node s
   subscribeeFolder
     node e wp" . to_string () ],
     "the editable folder stays, empty, where a save would read it, and \
-     the widening fills it again, claiming" ); }
+     the skgrepo widening fills it again, claiming" ); }

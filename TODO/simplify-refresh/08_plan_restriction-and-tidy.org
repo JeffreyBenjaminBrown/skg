@@ -1095,7 +1095,7 @@ notes the recorder fix where it describes 'C-c s r'. The entry
 'bash/integration-tests.sh' with both clients green;
 'bash/nextest.sh' unchanged unless the wire key was renamed.
 
-** TODO Slice 10: the docs and the glossary
+** DONE Slice 10: the docs and the glossary
 Read "The docs and the glossary" in the agreed behavior and the
 user-docs report first. Every earlier slice brought the docs of
 what it changed; this slice does the rest and the glossary.

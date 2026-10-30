@@ -34,7 +34,7 @@ M.pending_title_requests = {}
 ---skgrepo restriction). Kept across neogit refreshes, so that a
 ---re-annotation asks for nothing it has seen; one whose IDs are all
 ---cached sends no request at all. It goes stale when a node is
----retitled or the skgrepo restriction is widened; M.refresh empties it.
+---retitled, and after a skgrepo widening; M.refresh empties it.
 ---@type table<string, string|false>
 M.title_cache = {}
 
@@ -52,8 +52,8 @@ end
 
 ---Empty the ID-to-title cache and annotate BUF again. For after
 ---anything that changes what titles the server would answer with: a
----node retitled, or the skgrepo restriction widened (IDs restricted
----under the old one were cached as missing).
+---node retitled, or a skgrepo widening (IDs restricted under the old
+---skgrepo restriction were cached as missing).
 ---@param buf integer
 function M.refresh (buf)
   buf = buf ~= 0 and buf or vim.api.nvim_get_current_buf()

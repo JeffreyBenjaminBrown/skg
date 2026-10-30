@@ -50,7 +50,7 @@ pub fn import_org_roam_directory (
   let org_files : Vec<PathBuf> = org_files_in (org_dir);
   refuse_headlines_inside_blocks (&org_files)?; // before wiping anything
   fs::create_dir_all (output_dir)?;
-  for entry in fs::read_dir (output_dir)? { // Wipe existing .skg files to avoid orphans from previous runs.
+  for entry in fs::read_dir (output_dir)? { // Wipe existing .skg files, so that none from a previous run stays.
     let entry : fs::DirEntry = entry?;
     let path : PathBuf = entry . path();
     if path . extension() . map_or (false, |e| e == "skg") {

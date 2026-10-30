@@ -385,11 +385,12 @@ node p
   node q
     relRepoMove" ); }
 
-/// Refresh 'text' over 'straddle' under no restriction, as the diff
-/// view opens, then refresh the same forest under the restriction to
-/// 'main' alone, as a switch's rerender does, and assert that its
-/// output is a fixpoint under that restriction. Returns the two runs'
-/// texts and the forest as narrowed.
+/// Refresh 'text' over 'straddle' under no skgrepo restriction, as
+/// the diff view opens, then refresh the same forest under the
+/// skgrepo restriction to 'main' alone, as a switch's rerender does,
+/// and assert that its output is a fixpoint under that
+/// skgrepo restriction. Returns the two runs' texts and the forest as
+/// narrowed.
 fn diff_view_narrowed_by_a_switch (
   text     : &str,
   straddle : &GraphStraddle,

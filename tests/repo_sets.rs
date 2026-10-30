@@ -497,10 +497,10 @@ async fn the_containerward_chain_stops_before_a_restricted_container (
         rendered );
       Ok (( )) }
 
-/// The enrichment under the restriction "public": the hit's containers
-/// folder holds its public container, whose chain stops before the
-/// private container above it, and nothing of the private container
-/// that contains the hit directly.
+/// The enrichment under the skgrepo restriction "public": the hit's
+/// containers folder holds its public container, whose chain stops
+/// before the private container above it, and nothing of the private
+/// container that contains the hit directly.
 #[test]
 fn search_enrichment_omits_the_restricted_containers (
 ) -> Result<(), Box<dyn Error>> {
@@ -609,7 +609,7 @@ async fn tombstones_under_folders_save_without_error (
 ) -> Result<(), Box<dyn Error>> {
   // ('docs/api-and-formats.org', "Restricted-skgrepo nodes: omission,
   // retention, and save preservation"): a buffer switched to a
-  // restriction can hold tombstones under folders, where hidden
+  // skgrepo restriction can hold tombstones under folders, where hidden
   // members stood; saving it must not error.
       let buffer = indoc! {"
         * (skg node (gnid root) (skgRepos (nodeRepo public))) root

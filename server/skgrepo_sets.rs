@@ -51,10 +51,10 @@ impl SkgrepoRestriction {
 
   /// Whether a record (a relationship as one node's file states it,
   /// in the section of the skgrepo 'relRepo') is visible: the
-  /// restriction holds its skgrepo. No restriction, and the set
-  /// 'all', hold every skgrepo, even one the config does not name.
-  /// The restriction is taken as the caller holds it, bare or as an
-  /// 'Option' (None for no restriction).
+  /// skgrepo restriction holds its skgrepo. No skgrepo restriction,
+  /// and the set 'all', hold every skgrepo, even one the config does
+  /// not name. The skgrepo restriction is taken as the caller holds
+  /// it, bare or as an 'Option' (None for no skgrepo restriction).
   pub fn record_is_visible<'a> (
     restriction : impl Into<Option<&'a SkgrepoRestriction>>,
     relRepo     : &SkgrepoName,
@@ -65,9 +65,10 @@ impl SkgrepoRestriction {
                             || restriction . contains_skgrepo (relRepo), } }
 
   /// Whether a node whose home skgrepo is 'home' is restricted: the
-  /// restriction keeps its home out. No restriction, and the set
-  /// 'all', restrict no node. The restriction is taken as the caller
-  /// holds it, bare or as an 'Option' (None for no restriction).
+  /// skgrepo restriction keeps its home out. No skgrepo restriction,
+  /// and the set 'all', restrict no node. The skgrepo restriction is
+  /// taken as the caller holds it, bare or as an 'Option' (None for
+  /// no skgrepo restriction).
   pub fn node_is_restricted<'a> (
     restriction : impl Into<Option<&'a SkgrepoRestriction>>,
     home        : &SkgrepoName,
@@ -78,7 +79,7 @@ impl SkgrepoRestriction {
                             && ! restriction . contains_skgrepo (home), } }
 }
 
-/// Refuses unless the restriction is 'all'. 'what' is the refused
+/// Refuses unless the skgrepo restriction is 'all'. 'what' is the refused
 /// command, as the subject of the refusal ("The diff view").
 pub fn require_skgrepo_set_all (
   what        : &str,

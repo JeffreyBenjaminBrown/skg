@@ -37,7 +37,10 @@ So far there are these endpoints:
     (regex . "BOOL") (body . "BOOL") (operators . "BOOL"))=, plus
     optional =(overPrivateText-telescopes . "include")= or
     =(overPrivateText-telescopes . "exclude")=.
-    - Search always returns every match. Prominent nodes (literal roots, cycle-roots, mentioned nodes, and things that had an ID when imported) are ranked higher, via their prominence multiplier.
+    - Search always returns every match. Prominent nodes (a root, a member of a
+      cycle, a node linked to, a node that had an ID before import, or a
+      multiply contained node; 'docs/glossary.org', "prominent") are ranked
+      higher, via their prominence multiplier.
     - =regex=, =body=, =operators= are optional; each defaults to "false".
       - "regex=true": interpret the query as a per-token regex; a RegexQuery is built directly and the QueryParser is bypassed.
       - "body=true": also search node bodies (titles are always searched).
@@ -92,9 +95,9 @@ So far there are these endpoints:
       among them. A matching node recursively overridden by an owned result
       is suppressed at the top level; if the owned result overrides
       it directly, it reappears in that result's overridden folder.
-    - The search draws the enrichment under the same skgrepo
-      restriction as it searches under. The containerward chain stops before restricted
-      containers.
+    - The search draws the enrichment under the same
+      skgrepo restriction as it searches under. The containerward
+      chain stops before restricted containers.
     - The search takes no hit cap and no node budget. The refresh's
       node budget exists, and the stub could be given one; that is
       left unmade.
@@ -198,7 +201,7 @@ So far there are these endpoints:
        The keep-set contains selected collateral targets and every dirty view
        whose baseline/current buffer snapshots were checked, including unregistered
        views. The saved view is retained implicitly. Only unrelated clean
-       views may unlock at this point. A malformed narrowing message leaves
+       views may unlock at this point. A malformed save-relax-lock message leaves
        all locks held until terminal cleanup.
     3. Zero or more collateral-view messages (one per collateral view, streamed as each finishes):
        =Content-Length: N\r\n\r\n((response-type collateral-view) (view-id "VIEW_ID") (content "..."))=
@@ -222,7 +225,7 @@ So far there are these endpoints:
        did: a tombstone where it deleted a node, the viewnode merge
        and the members drawn that its nodeMerge requests caused, and
        a headline the refresh took out of a view; nor, at a
-       skgrepo-set switch, what the change of the restriction drew,
+       skgrepo-set switch, what the change of the skgrepo restriction drew,
        entombstoned, marked =noClaim= or re-kinded. So a reinstatement is
        reported only where a list already drawn lacked a member, and a
        plain save reports nothing. The list is present and empty if
@@ -547,8 +550,8 @@ since the command searches the current buffer.
       rerender does: its roots and what it holds editable stay, and what
       was committed loses its change facts. The marks of the changes committed are dropped
       from the readiness store.
-    - =((errors ("REFUSAL")) (warnings ()))= when the skgrepo
-      restriction is not =all=, the message is blank, or the graph
+    - =((errors ("REFUSAL")) (warnings ()))= when the
+      skgrepo restriction is not =all=, the message is blank, or the graph
       straddle cannot be built. The rerender stream is empty.
   - Logic: =server/serve/handlers/stage_and_commit.rs=,
     =server/git_ops/stage_and_commit.rs=.
@@ -564,8 +567,8 @@ since the command searches the current buffer.
     - =((readiness-summary ...) (errors ()) (warnings ()))=, the save
       response's form, for the buffer as rerendered; the rerender
       stream carries that buffer.
-    - =((errors ("REFUSAL")) (warnings ()))= when the skgrepo
-      restriction is not =all=, VIEW_ID is not a buffer of the
+    - =((errors ("REFUSAL")) (warnings ()))= when the
+      skgrepo restriction is not =all=, VIEW_ID is not a buffer of the
       diff view, or the rerender fails. The rerender stream is empty.
   - Logic: the graph straddle is brought up to date, and the buffer's
     pruned change view sets recomputed. Each node of U without an editable
@@ -599,8 +602,8 @@ since the command searches the current buffer.
       at, its title then, its own relation lists then, and every node of
       that tree that referred to it (links included); or
       =** never present in the git history of any skgrepo=.
-  - Refused, with the reason as an error, unless the skgrepo
-    restriction is =all=: history can hold the text of any skgrepo.
+  - Refused, with the reason as an error, unless the
+    skgrepo restriction is =all=: history can hold the text of any skgrepo.
   - Logic: =server/serve/handlers/investigate_unknown_node.rs=,
     =server/git_ops/vanished.rs=.
 
@@ -845,7 +848,7 @@ one automatically.
        a tombstone is pruned unless it holds something; an editable
        folder whose every member's record the new set keeps out stays,
        empty, as any empty editable folder does; and the refresh fills
-       every folder per the new set, so widening the set makes each
+       every folder per the new set, so a skgrepo widening makes each
        Restricted vognode an occurrence again and reveals members and
        folders. When the set changed, none of this is reported as a
        buffer correction (see "Restricted-skgrepo nodes" below).
@@ -960,8 +963,9 @@ save. A member carries nothing, and so does a view root. The atom is
 meaningful only where the save reads the claims of the viewparent's
 children: under an editable occurrence, and under an editable folder
 (subscribee, overridden, hidden-outside, alias) of one. Under any
-other viewparent no child claims, whatever it carries, and the server
-writes no =noClaim= there.
+other viewparent ('docs/glossary.org', "claims membership", lists
+them) no child claims, whatever it carries, and the server writes no
+=noClaim= there.
 
 The atom =omittedBody= in =(view ...)= accompanies =writeProtected= on a
 write-protected node whose graphnode has a body — one the rendering
@@ -1294,7 +1298,7 @@ A buffer whose part the server would not have rendered (the carrier
 is not on N's owned override chain -- the ownership-gated,
 visibility-ungated walk out of N) aborts the save with an
 explanation. With chains the honest carrier may be a middle link
-(shown when a later link's mentioner is hidden), so the check accepts
+(shown when a later link's mentioner is restricted), so the check accepts
 any node on the chain and rejects only off-chain facts. A
 skgrepo-set switch that makes a
 shown substitute's skgrepo restricted turns it into a tombstone (the
@@ -1582,7 +1586,7 @@ base 36 (two characters at least, skipping any spelled like a number,
 such as =05= or =1e5=), to every viewnode that lacks one at the end of a
 refresh, and never reassigns or reuses one: a headline keeps the
 viewnode ID it carried through a save and a rerender, through a cut
-and paste, and through a skgrepo-set switch that does not hide it. A
+and paste, and through a skgrepo-set switch that leaves it standing. A
 headline typed without one gets one; of two headlines carrying one
 viewnode ID, the first in buffer order keeps it and the second (a copy)
 gets a fresh one; a headline carrying one the view does not know
@@ -1599,8 +1603,8 @@ spellings: =(node ...)=, =(ghost ...)= and =(unknown ...)= as forms,
 top-level =(relRepo REPO)=, =(FOLDER changed)=, =(rels ...)=,
 =(viewStats ...)=, =omittedBody= or the old home skgrepo herald
 outside =(view ...)=, =(readyRequest ...)=, =(unreadyRequest ...)=,
-and the old atoms of a child claiming nothing and of a hidden node's
-placeholder ('parse_metadata_sexp.rs' names each).
+and the old atoms of a child claiming nothing and of a restricted
+node's retired placeholder ('parse_metadata_sexp.rs' names each).
 
 Metadata is not WYSIWYG; its appearance in the client
 is determined by =elisp/heralds-minor-mode.el=, whose rule table is
@@ -1620,7 +1624,8 @@ no ID, no change facts and no title (the parser discards text typed on
 its line), and holds only what stands below it. The refresh makes one
 of a headline that can stand where it is for nothing: an occurrence
 whose node a save deleted (in the diff view, its ghost instead, when
-HEAD has the node) or the skgrepo restriction hides, a descriptor
+HEAD has the node) or the skgrepo restriction keeps out where no
+visible record names it, a descriptor
 whose position its kind forbids, a change viewnode whose change is
 gone, an empty folder nothing can be added to, a ghost on request.
 The refresh prunes it once it is childless, a view root included, so a
@@ -1830,7 +1835,7 @@ Its herald is "restricted". It has no content of its own drawn: no
 goal, no folders. It claims membership as an unknown does, takes a
 relRepo request and a readiness request, and refuses text typed on
 its line. A member whose record the set shows and that resolves to
-no node at all is an unknown, as under no restriction. A view rooted
+no node at all is an unknown, as under no skgrepo restriction. A view rooted
 at a node the set keeps out shows its root as a Restricted vognode
 too, since the view is the user's own request; it is the node's
 occurrence again when the set widens. An alias whose record the set

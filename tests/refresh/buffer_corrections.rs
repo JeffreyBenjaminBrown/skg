@@ -181,8 +181,8 @@ node p
   assert_eq! ( reported, vec! [ ( BufferCorrectionKind::Entombstoned, "y" ) ] ); }
 
 /// After a change of the skgrepo restriction, what a list already
-/// drawn lacked and the refresh draws is the restriction's doing, not
-/// a buffer correction.
+/// drawn lacked and the refresh draws is the skgrepo restriction's
+/// doing, not a buffer correction.
 #[test]
 fn a_member_drawn_after_a_restriction_change_is_not_reported () {
   let graph : InRustGraph = family ();

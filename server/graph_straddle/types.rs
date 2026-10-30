@@ -106,7 +106,7 @@ impl GraphStraddle {
 
   /// The home skgrepo of the node 'gnid' names: the worktree's, or
   /// HEAD's when the worktree lacks the node. What the diff view asks
-  /// of the restriction about a node ('node_is_restricted').
+  /// of the skgrepo restriction about a node ('node_is_restricted').
   pub fn home_in_worktree_or_head (
     &self,
     gnid : &ID,

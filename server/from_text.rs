@@ -81,7 +81,7 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
 ) -> Result<(ViewForest, SavePlan, Vec<String>), SaveError> {
   let skgrepo_restriction : Option<&SkgrepoRestriction> =
     // The set 'all' restricts nothing; downstream stages treat None
-    // as "no restriction", so normalize here, once.
+    // as "no skgrepo restriction", so normalize here, once.
     skgrepo_restriction . filter ( |a| ! a . is_all () );
   let ( viewforest, parsing_errors, parsing_warnings, provenance )
     : ( ViewForest, Vec<BufferValidationError>, Vec<String>,

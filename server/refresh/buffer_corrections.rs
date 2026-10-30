@@ -12,8 +12,8 @@
 //!   under them; and whatever left the buffer, pruned by the tail;
 //! - 'AfterRestrictionChange': a skgrepo-set switch's rerender, after
 //!   which what the refresh draws, entombstones, marks 'noClaim' or
-//!   re-kinds across the restriction, and what the tail pruned, is the
-//!   restriction's doing;
+//!   re-kinds across the skgrepo restriction, and what the tail pruned,
+//!   is the skgrepo restriction's doing;
 //! - 'Unread': a buffer nobody reads the buffer corrections of (a
 //!   first drawing); it is corrected as always, and nobody is told.
 //! The refresh reports buffer corrections;
@@ -83,7 +83,8 @@ impl BufferCorrection {
       BufferCorrectionKind::ViewnodeMerged =>
         "Merged duplicate viewnode siblings into this one." . to_string (),
       BufferCorrectionKind::Rekinded (kind) =>
-        format! ("Made a headline {}, as the graph has it.", kind . with_article ()),
+        format! ("Made a headline {}, as the graph has it.",
+                 kind . what_a_headline_becomes ()),
       BufferCorrectionKind::EditRequestDropped =>
         "Dropped an edit request its headline has no slot for." . to_string (), };
     with_org_subheadlines (
@@ -109,11 +110,11 @@ pub enum BufferCorrectionPolicy {
     /// The acquirer and the acquiree of each nodeMerge request.
     nodeMerged : HashSet<ID>, },
   /// The rerender of a skgrepo-set switch that changed the
-  /// restriction. Every open view was up to date before the switch,
-  /// so what its rerender draws (a widening), entombstones or marks
-  /// 'noClaim' (a narrowing), and what it makes a restricted headline
-  /// or an occurrence or a ghost again, is the restriction's doing,
-  /// not the buffer's.
+  /// skgrepo restriction. Every open view was up to date before the
+  /// switch, so what its rerender draws (a skgrepo widening),
+  /// entombstones or marks 'noClaim' (a skgrepo narrowing), and what
+  /// it makes a restricted headline or an occurrence or a ghost
+  /// again, is the skgrepo restriction's doing, not the buffer's.
   AfterRestrictionChange,
   /// The refresh of a buffer whose buffer corrections nobody reads:
   /// a first drawing (a fresh content view, a buffer of the diff
@@ -132,7 +133,7 @@ impl BufferCorrectionPolicy {
     BufferCorrectionPolicy::AfterSave { deleted, nodeMerged } }
 
   /// The policy of the rerender of a skgrepo-set switch from the
-  /// restriction 'before' to the restriction 'after'.
+  /// skgrepo restriction 'before' to the skgrepo restriction 'after'.
   pub fn after_a_switch (
     before : &SkgrepoRestriction,
     after  : &SkgrepoRestriction,
@@ -199,7 +200,7 @@ impl BufferCorrectionPolicy {
 
   /// Whether a buffer correction of a headline the tail then pruned
   /// is reported, named by the vnid it held. After a save, or a change
-  /// of the restriction, what left the buffer went by the user's own
+  /// of the skgrepo restriction, what left the buffer went by the user's own
   /// doing, and its buffer correction would name a headline the buffer
   /// no longer holds.
   pub(crate) fn reports_what_the_tail_pruned (

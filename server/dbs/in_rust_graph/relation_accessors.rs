@@ -284,10 +284,10 @@ impl InRustGraph {
       None => RelationshipMemberKey::UnresolvedRawId (raw_member . clone ()), } }
 
   /// Whether the gated graph has the node 'gnid' names (a pid or an
-  /// extra ID): 'Present' when its home skgrepo is in the skgrepo
-  /// restriction, or there is none ('restriction' None or 'all');
-  /// 'Restricted' when the graph has it and the restriction excludes its
-  /// home; 'Absent' when the graph has no such node.
+  /// extra ID): 'Present' when its home skgrepo is in the
+  /// skgrepo restriction, or there is none ('restriction' None or 'all');
+  /// 'Restricted' when the graph has it and the skgrepo restriction
+  /// excludes its home; 'Absent' when the graph has no such node.
   pub fn gnid_presence_gated (
     &self,
     gnid        : &ID,

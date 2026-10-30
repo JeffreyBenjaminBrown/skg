@@ -57,7 +57,7 @@ fn all_tests
         &s . config, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
 
-/// Search for 'terms' under the restriction "all", and return every
+/// Search for 'terms' under the skgrepo restriction "all", and return every
 /// message the server sent, with the views state the search left.
 fn search (
   config  : &SkgConfig,

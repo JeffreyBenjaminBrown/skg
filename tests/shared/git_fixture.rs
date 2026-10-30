@@ -196,7 +196,7 @@ pub fn skg_files (
   Ok (files) }
 
 //
-// Fixtures of two skgrepos, and a content view under a restriction
+// Fixtures of two skgrepos, and a content view under a skgrepo restriction
 //
 
 /// Write each skgrepo's files, by name without '.skg', to both its

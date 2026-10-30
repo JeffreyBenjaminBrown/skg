@@ -202,9 +202,9 @@ impl<'a> Walk<'a> {
   /// reinstated, unless drawing it is extent ('draws_first_under'):
   /// a reinstatement is a buffer correction only where a list already drawn
   /// was missing a member, and only when the policy says so of the
-  /// node whose list it is ('BufferCorrectionPolicy'): the restriction
-  /// did not just widen, nor a nodeMerge the save requested give that
-  /// node the member.
+  /// node whose list it is ('BufferCorrectionPolicy'):
+  /// the skgrepo restriction did not just widen, nor a nodeMerge the
+  /// save requested give that node the member.
   pub(crate) fn record_drawn (
     &mut self,
     tree   : &Tree<Viewnode>,

@@ -10,9 +10,10 @@
 //             x contains r; s1.
 //   private : s ("s secret") contains s1.
 // The view of r shows x in a containers folder once it is requested,
-// and d in c's subscribee folder. Under the restriction "public", s,
-// which r records in its public file, is a Restricted vognode holding
-// s1, and an occurrence again, with its viewnode ID, back under "all".
+// and d in c's subscribee folder. Under the skgrepo restriction
+// "public", s, which r records in its public file, is a Restricted
+// vognode holding s1, and an occurrence again, with its viewnode ID,
+// back under "all".
 
 use crate::git_fixture::{
   Fixture, OwnedSkgrepos, open_content_view, save_cleanly, switch_skgrepo_set,

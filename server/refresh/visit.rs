@@ -126,7 +126,7 @@ fn extend_requested_content (
 /// always has: an occurrence that an editable-view request extends
 /// (a fresh view's roots, and every occurrence the refresh draws
 /// editable, among them) shows its subscribee folder when
-/// it subscribes to something the restriction shows (with the folder
+/// it subscribes to something the skgrepo restriction shows (with the folder
 /// of what it hides outside its subscribees, when that holds
 /// anything); and an editable subscribee as such shows the folder of
 /// what its subscriber hides in it, when that holds anything. Not in
@@ -198,9 +198,10 @@ fn rekind_children (
 /// Whether the headline at 'treeid' is an alias whose record the
 /// skgrepo restriction keeps out: the node its folder describes has
 /// the alias (in the diff view, in the worktree or at HEAD) and no
-/// record of it the restriction shows. The property goal omits such an
-/// alias, as a content goal omits a member whose record is restricted;
-/// this takes it from a view drawn before the restriction narrowed.
+/// record of it the skgrepo restriction shows. The property goal
+/// omits such an alias, as a content goal omits a member whose record
+/// is restricted; this takes it from a view drawn before the
+/// skgrepo restriction narrowed.
 fn alias_whose_record_is_restricted (
   tree   : &Tree<Viewnode>,
   treeid : NodeId,
@@ -450,8 +451,9 @@ fn mark_claims (
 /// Where the save reads claims: the child at 'treeid', if it claims
 /// and its warrant is not 'ByGraph', is marked 'noClaim', and that is
 /// reported, unless the policy says the marking is no buffer
-/// correction ('BufferCorrectionPolicy'): after a narrowing, a member
-/// whose record alone the restriction now keeps out loses its claim.
+/// correction ('BufferCorrectionPolicy'): after a skgrepo narrowing,
+/// a member whose record alone the skgrepo restriction now keeps out
+/// loses its claim.
 fn mark_noClaim_unless_warranted (
   tree    : &mut Tree<Viewnode>,
   treeid  : NodeId,

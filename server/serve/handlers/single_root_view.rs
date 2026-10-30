@@ -46,7 +46,7 @@ pub fn handle_single_root_view_request (
         match runtime . graph . pid_and_skgrepo (&gnid) {
           Some ((_pid, home)) =>
             SkgrepoRestriction::node_is_restricted (skgrepo_restriction, &home),
-          None => // the graph has no such node: refused under any restriction
+          None => // the graph has no such node: refused under any skgrepo restriction
             ! skgrepo_restriction . is_all (), };
       if kept_out {
         let response_sexp : String =

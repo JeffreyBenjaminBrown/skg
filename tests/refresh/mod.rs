@@ -75,7 +75,7 @@ pub(super) fn config () -> SkgConfig {
       Skgrepo { name : SkgrepoName::from ("private"), abbreviation : None,
                 path : PathBuf::from ("private"), owned : true } ) ])) }
 
-/// The restriction to 'main' alone.
+/// The skgrepo restriction to 'main' alone.
 pub(super) fn main_only () -> SkgrepoRestriction {
   SkgrepoRestriction {
     name     : SkgrepoSetName ( "public" . to_string () ),
@@ -143,7 +143,7 @@ impl Run {
 }
 
 /// Refresh 'text' as a content view over 'graph', with no
-/// restriction and a large budget, asserting the fixpoint.
+/// skgrepo restriction and a large budget, asserting the fixpoint.
 pub(super) fn run_asserting_fixpoint (
   text  : &str,
   graph : &InRustGraph,
@@ -178,9 +178,9 @@ pub(super) fn run_asserting_fixpoint_in (
   Run { forest, text : first . text, buffer_corrections : first . buffer_corrections } }
 
 /// Refresh 'forest' once, as a content view over 'graph' with no
-/// restriction, a large budget and 'policy', asserting no fixpoint:
-/// for a forest parsed as written, a stub, or a policy that a second
-/// refresh would not share.
+/// skgrepo restriction, a large budget and 'policy', asserting no
+/// fixpoint: for a forest parsed as written, a stub, or a policy that
+/// a second refresh would not share.
 pub(super) fn refresh_once (
   forest : &mut ViewForest,
   graph  : &InRustGraph,

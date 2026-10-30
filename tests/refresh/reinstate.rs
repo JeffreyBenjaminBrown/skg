@@ -135,7 +135,7 @@ node s
 #[test]
 fn a_folder_omits_the_members_whose_records_are_restricted () {
   // 'secret' and 'hush' are private. secret records its containment
-  // of p in 'main', which the restriction shows, so it stands as a
+  // of p in 'main', which the skgrepo restriction shows, so it stands as a
   // Restricted vognode; hush records it in 'private', so nothing
   // stands for it.
   let graph : InRustGraph = graph (&[

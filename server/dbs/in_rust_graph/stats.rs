@@ -218,8 +218,8 @@ pub(crate) fn mentioner_is_substantive (
 ) -> bool {
   link_facts_for_mentioner (graph, restriction, pid) . 1 }
 
-/// Whether the graph has the node 'pid' names and the skgrepo
-/// restriction shows it.
+/// Whether the graph has the node 'pid' names and the
+/// skgrepo restriction shows it.
 fn node_is_shown (
   graph       : &InRustGraph,
   restriction : Option<&SkgrepoRestriction>,

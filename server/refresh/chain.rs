@@ -120,11 +120,12 @@ fn insert_containers (
 /// the chain goal of 'parent', names it, as the ID rule answers it and
 /// as the refresh builds each kind: an occurrence write-protected, a
 /// ghost or a gnid-only vognode, each claiming nothing; for a
-/// tombstone, nothing. A container whose record the restriction keeps
-/// out the goal does not name ('docs/telescopes.org', "What lives
-/// where"); one whose record is visible and whose node is restricted
-/// is a gnid-only vognode. Returns the chain node and, for an
-/// occurrence, its pid: the chain goes on only under an occurrence.
+/// tombstone, nothing. A container whose record the
+/// skgrepo restriction keeps out the goal does not name
+/// ('docs/telescopes.org', "What lives where"); one whose record is
+/// visible and whose node is restricted is a gnid-only vognode.
+/// Returns the chain node and, for an occurrence, its pid: the chain
+/// goes on only under an occurrence.
 fn prepend_containerward_chain_node (
   tree      : &mut Tree<Viewnode>,
   parent    : NodeId,

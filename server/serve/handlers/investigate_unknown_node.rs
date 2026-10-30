@@ -22,9 +22,8 @@ use std::net::TcpStream;
 /// Handle "investigate unknown node": say what the requested ID is.
 /// If it resolves to a node of the live graph, the answer names that
 /// node; otherwise it is what git history says the ID used to be
-/// ('server/git_ops/vanished.rs'). Refused under a skgrepo
-/// restriction other than 'all', since history can hold the text of
-/// any skgrepo.
+/// ('server/git_ops/vanished.rs'). Refused under a skgrepo restriction
+/// other than 'all', since history can hold the text of any skgrepo.
 pub fn handle_investigate_unknown_node_request (
   stream      : &mut TcpStream,
   request     : &str,

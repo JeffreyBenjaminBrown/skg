@@ -182,9 +182,12 @@ omitted from the buffer. =⟳= marks a cycle.
 The bare atom =noClaim= (a child that does not affect its parent's
 membership on save) has no glyph of its own. Under an editable parent
 a child the graph warrants and that claims nothing is one the user
-marked =noClaim= to detach it: it shows the request =detach= until the
-next save takes it out of its parent's list. The client sees that
-from the parent, since the child's own metadata cannot say it.
+marked =noClaim= to detach it: it shows =detach= until the next save
+takes it out of its parent's list. The client sees that from the
+parent, since the child's own metadata cannot say it. =detach= is
+styled as a request, and listed with them above, but it is none:
+detaching writes only the =noClaim= atom, and the save reads that as
+it reads any claim.
 
 =⌂:LABEL= marks a node's home skgrepo boundary (the atom
 =repoBoundary= in =(view ...)=). LABEL is the skgrepo's skgrepo label,
@@ -205,8 +208,8 @@ or =request:search matching=, and in the diff view =restore membership=
 and =restore node=, are save requests.
 
 An unknown node is labeled =Reference to unknown node.=. A
-Restricted vognode, standing where a record the skgrepo restriction
-shows names a node the restriction keeps out, is labeled
+restricted headline, standing where a record the skgrepo restriction
+shows names a node the skgrepo restriction keeps out, is labeled
 =restricted=, with its record's relRepo (=~NAME=) where that differs
 from the default, and reveals no node title or home skgrepo.
 =something stood here= marks a tombstone: a headline with no title,
@@ -215,7 +218,7 @@ holding that headline's children. The refresh leaves one where a
 node stood that the graph lacks and its viewparent's list does not
 name, such as one a save deleted (in the diff view, its ghost stands
 there instead); where a node the skgrepo restriction now keeps out
-stood and no record the restriction shows names it; where a folder,
+stood and no record the skgrepo restriction shows names it; where a folder,
 a property member or a change viewnode stood in a place its kind
 cannot stand; where a change viewnode stood whose change is gone;
 and where a folder stood that was left holding nothing, unless the
@@ -238,7 +241,7 @@ those. A folder member shows them as a content member does, so a
 modified write-protected member reads =☮ M=; its =~+= or =~-= is its
 relationship, of the folder's kind, to the folder's viewparent. On an alias, ID or
 flag member, which has one diff object, the same change facts read =+= and
-=-=, and the one object of an unknown or a Restricted vognode reads =~+= or =~-=. A =✓= after a diff object's change facts says its
+=-=, and the one object of an unknown or a restricted headline reads =~+= or =~-=. A =✓= after a diff object's change facts says its
 changes are marked commit-ready, so =∃+✓ ~+= is a new node, approved,
 in a new relationship that is not; =M✓= is a modified node every
 change of whose file is marked. A commit readiness aggregate (a
@@ -284,7 +287,7 @@ differently by kind sits under a WHEN directive,
 =(WHEN KIND... RULE...)=, whose rules apply to a headline only when
 one of its elements is one of the KINDs. A =(diff ...)= needs it: on
 a node or a ghost it has two diff objects (=∃+=, =~+=), on an unknown
-or a Restricted vognode one relationship (=~+=), and on a property or
+or a restricted headline one relationship (=~+=), and on a property or
 a change viewnode one
 object (=+=). The lens engines ('elisp/skg-sexpr/skg-lens.el',
 'nvim/lua/skg/sexpr/lens.lua') document the directive, and the Rust

@@ -182,7 +182,7 @@ fn set_herald_strings_in_viewnode (
       { flags . record (NodeRelation::HidesFromSubs, true, 3); }}}
   let unintegrated : Option<usize> =
     // A subscribee as such counts the nodes its content goal draws as
-    // occurrences: nodes the restriction shows, as the count of its
+    // occurrences: nodes the skgrepo restriction shows, as the count of its
     // contents is ('RelationCounts').
     if stands_as_member_here {
       subscriber_of_subscribee_as_such (tree, treeid) . map ( |subscriber| {

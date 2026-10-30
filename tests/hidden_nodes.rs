@@ -2,14 +2,14 @@
 //
 // A node is restricted when the skgrepo restriction excludes its home
 // skgrepo ('docs/api-and-formats.org', "Restricted-skgrepo nodes").
-// Where a record the restriction shows names a restricted node, the
-// view shows a Restricted vognode, which says nothing of the node; a
-// member whose record is restricted has no headline. A save under a
-// restriction keeps what a Restricted vognode stands for while it
-// claims, and the members the buffer could not show, which disk
-// supplementation owns; a tightened restriction re-kinds an open
-// view's occurrence of a restricted node to a Restricted vognode in
-// place, over its children.
+// Where a record the skgrepo restriction shows names a restricted
+// node, the view shows a Restricted vognode, which says nothing of
+// the node; a member whose record is restricted has no headline. A
+// save under a skgrepo restriction keeps what a Restricted vognode
+// stands for while it claims, and the members the buffer could not
+// show, which disk supplementation owns; a tightened skgrepo restriction
+// re-kinds an open view's occurrence of a restricted node to a
+// Restricted vognode in place, over its children.
 //
 // The fixture, written by the test:
 //   public  : r contains a, h, b and subscribes to hs; a; b; s1; hv.
@@ -44,7 +44,7 @@ use std::path::{Path, PathBuf};
 const VIEW : &str = "view of r";
 const VIEW_OF_H : &str = "view of h";
 
-/// Two saves under the restriction "public", each of which writes r:
+/// Two saves under the skgrepo restriction "public", each of which writes r:
 /// one of a view drawn under it, and one of a view drawn under "all"
 /// and then switched to "public". In both, h and hs are Restricted
 /// vognodes, which keep r's members h and hs, in place.
@@ -142,8 +142,8 @@ fn a_save_under_a_restriction_keeps_every_hide_and_member (
 
 /// As above, but the line of the Restricted vognode hh is deleted
 /// before the save: that one hide goes, and the records the
-/// restriction keeps out (r's hide of hp, its containment of hc) stay
-/// as they were.
+/// skgrepo restriction keeps out (r's hide of hp, its containment of
+/// hc) stay as they were.
 #[test]
 fn deleting_a_restricted_vognodes_line_removes_its_record_alone (
 ) -> Result<(), Box<dyn Error>> {
@@ -226,7 +226,7 @@ fn a_relRepo_request_on_a_restricted_headline_moves_its_record (
       assert_ne! ( requested, opened, "h stands in r's content:\n{}", opened );
       let saved : SaveResponse = save_under (f, &requested, &public) ?;
       assert! ( ! saved . saved_view . contains ("(gnid h)"),
-                "the record went where the restriction hides it:\n{}",
+                "the record went where the skgrepo restriction keeps it out:\n{}",
                 saved . saved_view );
       let r : GraphnodeInRust = node_in_graph (f, "r");
       let h : &RelPartner<ID> = r . contains . iter ()
@@ -291,8 +291,9 @@ fn a_tightened_restriction_re_kinds_an_occurrence_of_a_restricted_node_in_place 
 /// vognode, showing "restricted" and h's gnid and nothing of h;
 /// widened, it is h's editable occurrence again, where it stood, with
 /// s1 claiming under it. Its containers folder, which may stand under
-/// an occurrence alone, became a tombstone at the narrowing, as under
-/// any occurrence re-kinded to a Restricted vognode, and keeps r.
+/// an occurrence alone, became a tombstone at the skgrepo narrowing,
+/// as under any occurrence re-kinded to a Restricted vognode, and
+/// keeps r.
 #[test]
 fn a_switch_and_its_reverse_draw_these_buffers (
 ) -> Result<(), Box<dyn Error>> {
@@ -401,7 +402,7 @@ const VIEW_OF_H_SWITCHED_BACK_TO_ALL : &str = "\
 ";
 
 /// A switch's rerender reports no buffer corrections: narrowed, the
-/// Restricted vognodes are the restriction's doing, and widened, the
+/// Restricted vognodes are the skgrepo restriction's doing, and widened, the
 /// occurrences drawn again are too ('BufferCorrectionPolicy').
 #[test]
 fn a_switch_reports_no_buffer_corrections (
@@ -425,7 +426,7 @@ fn a_switch_reports_no_buffer_corrections (
 /// r, public, contains a in its public file and pc, public, in its
 /// private section. Narrowed to "public", pc's record is restricted
 /// while pc is not: pc stays drawn, marked 'noClaim', and the switch
-/// reports no buffer correction, for the narrowing did it
+/// reports no buffer correction, for the skgrepo narrowing did it
 /// ('BufferCorrectionPolicy::AfterRestrictionChange').
 #[test]
 fn a_narrowing_marks_noClaim_quietly_a_member_whose_record_alone_is_restricted (
@@ -452,7 +453,7 @@ fn a_narrowing_marks_noClaim_quietly_a_member_whose_record_alone_is_restricted (
                                                && line . contains (" noClaim ") ),
                 "narrowed, pc stays, marked noClaim:\n{}", view );
       assert! ( done . contains ("(corrections ())"),
-                "the narrowing reports no buffer correction: {}\n\nview:\n{}",
+                "the skgrepo narrowing reports no buffer correction: {}\n\nview:\n{}",
                 done, view );
       Ok (( )) } ) }
 
@@ -585,7 +586,7 @@ fn an_alias_recorded_in_a_restricted_section_is_shown_only_under_all (
 /// A view rooted at h, which is private, drawn under "all" and
 /// switched to "public": its root is a restricted headline. Saved as
 /// it is, under "public", it saves, and nothing on disk changes. A
-/// headline typed under the tombstone the narrowing left in place of
+/// headline typed under the tombstone the skgrepo narrowing left in place of
 /// h's containers folder has no occurrence above it to take a skgrepo
 /// from, so the save refuses it for want of one, and nothing on disk
 /// changes either.

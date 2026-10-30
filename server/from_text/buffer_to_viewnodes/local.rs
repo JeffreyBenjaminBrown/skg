@@ -312,7 +312,7 @@ fn validate_relation_folder (
                        // a former member, in the diff view; save-inert
                        ViewnodeKind::Vognode (Vognode::Ghost (_))
                        // a member whose node no graph has, or the
-                       // restriction keeps out
+                       // skgrepo restriction keeps out
                        | ViewnodeKind::Vognode (Vognode::GnidOnly (_)))))
     { errors . push(format!("{}'s children must include only Occurrences, tombstones, ghosts, restricted headlines or references to unknown nodes.", label)); }
   if !siblings_cannot_include(

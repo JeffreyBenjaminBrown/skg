@@ -56,7 +56,7 @@ pub fn build_diskSupplemented_nodeInstructions (
   intents                : Vec<NodeIntent>,
   graph                  : &InRustGraph,
   config                 : &SkgConfig,
-  skgrepo_restriction    : Option<&SkgrepoRestriction>, // None means no restriction; callers normalize 'all' to None.
+  skgrepo_restriction    : Option<&SkgrepoRestriction>, // None means no skgrepo restriction; callers normalize 'all' to None.
 ) -> Result<NodeInstructions_with_Repomoves, Box<dyn Error>> {
   let mut result : NodeInstructions_with_Repomoves =
     NodeInstructions_with_Repomoves::with_capacity (intents . len());

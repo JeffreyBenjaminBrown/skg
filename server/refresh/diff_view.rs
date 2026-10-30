@@ -213,15 +213,15 @@ pub(crate) fn acquisition_goal (
       . map ( |acquirer| GoalItem::by_graph ( GoalMember::Gnid (acquirer) ))
       . collect () ), } ) }
 
-/// The goal items of 'partners' over the straddle, as the skgrepo
-/// restriction lets them be seen. The diff view opens only under
-/// 'all', but a switch rerenders its open buffers, so its goal asks
-/// the restriction as a content view's does ('gnid_items' in
-/// 'goal.rs'): a partner whose record the restriction keeps out (the
-/// worktree's record, or HEAD's when the worktree has none) is left
-/// out; one whose node it keeps out (the worktree's node, or HEAD's
-/// when the worktree has none) stays, and the ID rule makes it a
-/// Restricted vognode.
+/// The goal items of 'partners' over the straddle, as the
+/// skgrepo restriction lets them be seen. The diff view opens only
+/// under 'all', but a switch rerenders its open buffers, so its goal
+/// asks the skgrepo restriction as a content view's does
+/// ('gnid_items' in 'goal.rs'): a partner whose record the
+/// skgrepo restriction keeps out (the worktree's record, or HEAD's
+/// when the worktree has none) is left out; one whose node it keeps
+/// out (the worktree's node, or HEAD's when the worktree has none)
+/// stays, and the ID rule makes it a Restricted vognode.
 fn partner_items<'a> (
   partners : impl Iterator<Item = &'a Partner>,
   walk     : &Walk,

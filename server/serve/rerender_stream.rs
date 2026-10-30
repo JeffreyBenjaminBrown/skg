@@ -1,8 +1,8 @@
 //! The rerender pipeline every request that rerenders open views
 //! outside a save shares: prepare, answer, stream. The request says
-//! under which restriction, with which buffer correction policy and
-//! which views ('RerenderRequest'). Each rerender is prepared in
-//! memory first ('prepare_rerender_views'), so that
+//! under which skgrepo restriction, with which buffer correction
+//! policy and which views ('RerenderRequest'). Each rerender is
+//! prepared in memory first ('prepare_rerender_views'), so that
 //! a text-release decision ('authorize_prepared_rerenders') can
 //! precede any visible change, and then streamed: "rerender-lock",
 //! one "rerender-view" per view, "rerender-done", which carries the

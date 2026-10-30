@@ -165,7 +165,7 @@ fn a_resolvable_id_reports_its_node (
   Ok (( )) }
 
 /// History can hold the text of any skgrepo, so the request is
-/// refused under a restriction.
+/// refused under a skgrepo restriction.
 #[test]
 fn the_request_is_refused_under_a_skgrepo_restriction (
 ) -> Result<(), Box<dyn Error>> {

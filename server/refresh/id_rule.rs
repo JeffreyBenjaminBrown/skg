@@ -7,7 +7,7 @@
 //! user's own request, so its gnid reveals nothing they did not ask
 //! for), and otherwise a tombstone. Otherwise, is the mode the diff
 //! view, and does HEAD have the node? Then a ghost, unless the
-//! restriction keeps out HEAD's node's home, which is answered as a
+//! skgrepo restriction keeps out HEAD's node's home, which is answered as a
 //! restricted node is: a restricted node is never a ghost. Otherwise,
 //! does the list of the headline's parent name this gnid? Then a
 //! gnid-only vognode of kind Unknown. Otherwise a tombstone.
@@ -149,7 +149,7 @@ impl EditRequests {
 /// - an occurrence, from an occurrence: pointed at the pid as the
 ///   truth has it ('point_occurrence_at');
 /// - an occurrence, from a ghost or a gnid-only vognode: its node is
-///   back, or the restriction widened ('rekind_to_occurrence'), two
+///   back, or the skgrepo restriction widened ('rekind_to_occurrence'), two
 ///   cases;
 /// - a ghost, from a ghost: refreshed from HEAD, keeping its requests
 ///   and its claim ('refresh_ghost_in_place');
@@ -197,13 +197,14 @@ pub(crate) fn rekind_vognode (
 
 /// Make the ghost or gnid-only vognode 'other' at 'child' (a child of
 /// 'parent') an occurrence of 'pid', where it stands: its node is
-/// back, or the restriction widened to show it. It stands as an
+/// back, or the skgrepo restriction widened to show it. It stands as an
 /// occurrence drawn there would ('drawn_occurrence_editability'). It keeps its claim (a ghost's
 /// becomes a claim) and its relationship request; a restoreNode
 /// request it drops, and reports. Under what was a gnid-only vognode,
 /// every child claims again ('reset_the_claims_of_children'). Its
 /// re-kind from a Restricted vognode is no buffer correction after a
-/// change of the restriction, which widened ('BufferCorrectionPolicy').
+/// change of the skgrepo restriction, which widened
+/// ('BufferCorrectionPolicy').
 fn rekind_to_occurrence (
   tree   : &mut Tree<Viewnode>,
   parent : NodeId,
@@ -217,7 +218,7 @@ fn rekind_to_occurrence (
     Vognode::GnidOnly (gnid_only) =>
       ( gnid_only . claimsMembership,
         true,
-        // the restriction widened
+        // the skgrepo restriction widened
         gnid_only . kind == GnidOnlyKind::Restricted
         && ! walk . buffer_correction_policy . reports_rekind_across_the_restriction () ),
     _ => (true, false, false), };
@@ -244,8 +245,8 @@ fn rekind_to_occurrence (
 /// ghost of 'pid', where it stands. It keeps the claim it carried,
 /// where the list still names it; every edit request it carried it
 /// drops, and reports. Its re-kind from a Restricted vognode is no
-/// buffer correction after a change of the restriction, which widened
-/// ('BufferCorrectionPolicy').
+/// buffer correction after a change of the skgrepo restriction, which
+/// widened ('BufferCorrectionPolicy').
 fn rekind_to_ghost (
   tree        : &mut Tree<Viewnode>,
   child       : NodeId,
@@ -255,7 +256,7 @@ fn rekind_to_ghost (
   walk        : &mut Walk,
 ) -> Result<(), Box<dyn Error>> {
   let requests : EditRequests = EditRequests::of (&other);
-  let quiet : bool = // the restriction widened
+  let quiet : bool = // the skgrepo restriction widened
     matches! ( &other, Vognode::GnidOnly (gnid_only)
                        if gnid_only . kind == GnidOnlyKind::Restricted )
     && ! walk . buffer_correction_policy . reports_rekind_across_the_restriction ();
@@ -280,8 +281,8 @@ fn rekind_to_ghost (
 /// for 'gnid', where it stands, keeping its claim, its relRepo request
 /// (an edit request of another kind it drops, and reports) and its
 /// readiness request. Its re-kind to kind Restricted is no buffer
-/// correction after a change of the restriction, which made its node
-/// restricted ('BufferCorrectionPolicy').
+/// correction after a change of the skgrepo restriction, which made
+/// its node restricted ('BufferCorrectionPolicy').
 fn rekind_to_gnid_only (
   tree        : &mut Tree<Viewnode>,
   child       : NodeId,
@@ -303,7 +304,7 @@ fn rekind_to_gnid_only (
         Warrant::ByGraph ) } )); // the warrant rung sets it
   if dropped {
     walk . buffer_corrections . record (tree, child, BufferCorrectionKind::EditRequestDropped); }
-  let quiet : bool = // the restriction narrowed
+  let quiet : bool = // the skgrepo restriction narrowed
     kind == GnidOnlyKind::Restricted
     && ! walk . buffer_correction_policy . reports_rekind_across_the_restriction ();
   if ! quiet {

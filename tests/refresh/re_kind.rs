@@ -57,9 +57,9 @@ node p
 
 #[test]
 fn a_restricted_node_its_parent_lists_in_a_restricted_record_becomes_a_tombstone () {
-  // p lists h in its 'private' section, which the restriction keeps
-  // out: no record the restriction shows names h. (Where one does, h
-  // becomes a Restricted vognode: 'restricted.rs'.)
+  // p lists h in its 'private' section, which the skgrepo restriction
+  // keeps out: no record the skgrepo restriction shows names h. (Where
+  // one does, h becomes a Restricted vognode: 'restricted.rs'.)
   let graph : InRustGraph = graph (&[
     Graphnode { contains : [ rel_partners_at_relRepo (
                                &SkgrepoName::from ("private"), vec! [ ID::from ("h") ] ),

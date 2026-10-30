@@ -243,9 +243,10 @@ fn update_relevant_neighborhood_canonicalizes_aliases_and_retains_unknowns () {
     gnid_set (&["known", "unknown", "points-at-unknown"]));
 }
 
-// A node the restriction excludes is restricted, by its pid or an extra
-// ID; without a restriction, or under 'all', it is present; a gnid
-// no node answers to is absent, whatever the restriction.
+// A node the skgrepo restriction excludes is restricted, by its pid or
+// an extra ID; without a skgrepo restriction, or under 'all', it is
+// present; a gnid no node answers to is absent, whatever the
+// skgrepo restriction.
 #[test]
 fn gnid_presence_gated_tells_hidden_from_absent () {
   let mut private : Graphnode = node ("private", &["private-extra"], &[], &[], &[]);
@@ -268,10 +269,10 @@ fn gnid_presence_gated_tells_hidden_from_absent () {
   assert_eq! ( presence ("nowhere", Some (&only_main)), GnidPresence::Absent );
   assert_eq! ( presence ("nowhere", None), GnidPresence::Absent ); }
 
-// A record is visible when the restriction holds its relRepo, whatever
-// its member: the buffer shows an unresolvable member as a reference
-// to an unknown node, and a member whose home is restricted as a
-// restricted headline.
+// A record is visible when the skgrepo restriction holds its relRepo,
+// whatever its member: the buffer shows an unresolvable member as a
+// reference to an unknown node, and a member whose home is restricted
+// as a restricted headline.
 #[test]
 fn a_record_is_visible_when_the_restriction_holds_its_relRepo () {
   let only_main : SkgrepoRestriction = SkgrepoRestriction {

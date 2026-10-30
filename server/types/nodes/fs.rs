@@ -20,8 +20,8 @@
 //!   section as a whole node. Used only where a single file is the
 //!   honest unit: historical blobs (the vanished-node search) and
 //!   the git fallback of "titles by ids" ('server/git_ops/diff.rs'),
-//!   which reads only titles and filters them by the skgrepo
-//!   restriction.
+//!   which reads only titles and filters them by the
+//!   skgrepo restriction.
 
 use serde::{Serialize, Deserialize};
 

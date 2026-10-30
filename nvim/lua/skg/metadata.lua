@@ -1194,8 +1194,8 @@ end
 
 ---@param metadata_sexp any
 ---@return boolean is it a gnid-only vognode's, one that shows only
----its gnid: an unknown's or a Restricted vognode's? Either takes a
----relRepo request, as a relationship member. Mirrors
+---its gnid: a reference to an unknown node or a restricted headline?
+---Either takes a relRepo request, as a relationship member. Mirrors
 ---skg--gnid-only-vognode-sexp-p.
 function M.gnid_only_vognode_sexp_p (metadata_sexp)
   if not sexpr.is_list(metadata_sexp) then return false end
@@ -1478,8 +1478,9 @@ function M.writable_folder_sexp_p (metadata_sexp)
 end
 
 ---@param metadata_sexp any|nil
----@return string|nil the raw member ID of an occurrence, an unknown or
----a Restricted vognode. Mirrors skg--relationship-member-id.
+---@return string|nil the raw member ID of an occurrence, a reference
+---to an unknown node or a restricted headline. Mirrors
+---skg--relationship-member-id.
 function M.relationship_member_id (metadata_sexp)
   if not (M.occurrence_sexp_p(metadata_sexp)
           or M.gnid_only_vognode_sexp_p(metadata_sexp)) then
@@ -1495,9 +1496,9 @@ end
 ---contains the headline's node; for a writable folder's member, the
 ---folder's anchor (its viewparent) records the folder's relation toward
 ---it. Errors where the headline represents no writable relationship:
----off an occurrence, an unknown or a Restricted vognode, on a root
----headline, under a write-protected folder, parent or anchor, or with
----an ID missing. Mirrors skg--rel-at-point.
+---off an occurrence, a reference to an unknown node or a restricted
+---headline, on a root headline, under a write-protected folder,
+---parent or anchor, or with an ID missing. Mirrors skg--rel-at-point.
 ---@param line_number integer
 ---@return table
 function M.rel_at_line (line_number)
@@ -1611,7 +1612,7 @@ end
 
 ---Apply CHOICE, a repo name or M.relRepo_no_override, to the headline
 ---at LINE_NUMBER. Edits only the buffer. Errors where a delete or a
----merge is pending. Mirrors skg--apply-relRepo-choice.
+---nodeMerge request is pending. Mirrors skg--apply-relRepo-choice.
 ---@param line_number integer
 ---@param choice string
 ---@return string what the next save will do with the relationship
@@ -1783,7 +1784,7 @@ end
 ---relationship to its view-parent is of KIND
 ---(M.relationship_kind_matches_p), as M.relRepo_recursive_targets finds
 ---them. Errors before any write when a target holds a delete or a
----merge. Mirrors skg--set-relRepo-recursive-walk.
+---nodeMerge request. Mirrors skg--set-relRepo-recursive-walk.
 ---@param line_number integer
 ---@param kind string
 ---@param choice string
@@ -1847,9 +1848,9 @@ function M.relRepo_recursive_targets (line_number, kind)
   return targets
 end
 
----Is the headline at LINE_NUMBER an occurrence claiming membership, an
----unknown or a Restricted vognode, whose relationship to its
----view-parent is of KIND and is collected at save from this position?
+---Is the headline at LINE_NUMBER an occurrence claiming membership, a
+---reference to an unknown node or a restricted headline, whose
+---relationship to its view-parent is of KIND and is collected at save from this position?
 ---For 'content', the view-parent is an editable occurrence not in
 ---subscribee-as-such position; for 'subscribee' and 'overridden', it is
 ---the matching writable folder with an editable anchor. Mirrors

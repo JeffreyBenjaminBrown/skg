@@ -95,7 +95,7 @@ async fn rerender_is_a_fixpoint_impl (
 // it, the fresh content view of the node, parsed and refreshed again
 // over the same graph, comes back as it was, and the second refresh
 // corrects nothing. Where the fixture has several skgrepos, that
-// holds under each restriction too, for each node it shows. A fixture
+// holds under each skgrepo restriction too, for each node it shows. A fixture
 // folder whose graph does not load (one built to be refused, or
 // holding no '.skg' files) is passed over.
 
@@ -128,14 +128,14 @@ fn every_content_view_fixture_is_a_fixpoint_of_the_refresh (
         if let Err (failure) = refreshes_unchanged (&runtime, pid, restriction . as_ref ()) {
           failures . push ( format! (
             "{} {} under {}: {}", folder . display (), pid . 0,
-            restriction . as_ref () . map_or ("no restriction" . to_string (),
+            restriction . as_ref () . map_or ("no skgrepo restriction" . to_string (),
                                               |r| format! ("'{}'", r . name . 0) ),
             failure )); }}}}
   println! ( "{} views over {} fixture folders, {} of them restricted",
              views, folders, restricted_folders . len () );
   assert! ( folders > 40, "too few fixture folders were read: {}", folders );
   assert! ( restricted_folders . len () > 5,
-            "too few fixture folders were read under a restriction: {}",
+            "too few fixture folders were read under a skgrepo restriction: {}",
             restricted_folders . len () );
   assert! ( failures . is_empty (),
             "{} of {} views over {} fixture folders are not fixpoints:\n\n{}",
@@ -158,8 +158,9 @@ fn refreshes_unchanged (
       forest, record, &Truth::of_runtime (runtime, restriction),
       &BufferCorrectionPolicy::ReportAll )) }
 
-/// No restriction, then the restriction through each skgrepo but the
-/// most private (through which it would be no restriction).
+/// No skgrepo restriction, then the skgrepo restriction through
+/// each skgrepo but the most private (through which it would be no
+/// skgrepo restriction).
 fn restrictions_of (
   config : &SkgConfig,
 ) -> Vec<Option<SkgrepoRestriction>> {
@@ -207,9 +208,9 @@ fn fixture_config (
 // as first rendered, parsed and refreshed again over the same graph
 // straddle and readiness store, comes back as it was, and the second
 // refresh corrects nothing. Where the case has several owned
-// skgrepos, that holds under each restriction too: the diff view
+// skgrepos, that holds under each skgrepo restriction too: the diff view
 // opens only under 'all', but a switch rerenders it, so the buffer as
-// first rendered is refreshed under the restriction, as the switch
+// first rendered is refreshed under the skgrepo restriction, as the switch
 // does, and that is the buffer checked. A case whose straddle cannot
 // be built (one made to be refused) is passed over. A skgrepo folder
 // named 'foreign' is foreign; the others are owned, 'public' first and
@@ -263,7 +264,7 @@ fn every_diff_view_fixture_is_a_fixpoint_of_the_refresh (
                &rendered . text, restriction . as_ref () ) {
             failures . push ( format! (
               "{} {:?} under {}: {}", case . display (), buffer_kind,
-              restriction . as_ref () . map_or ("no restriction" . to_string (),
+              restriction . as_ref () . map_or ("no skgrepo restriction" . to_string (),
                                                 |r| format! ("'{}'", r . name . 0) ),
               failure )); }}}
       Ok (( )) }) ();
@@ -273,7 +274,7 @@ fn every_diff_view_fixture_is_a_fixpoint_of_the_refresh (
             buffers, cases, restricted_buffers);
   assert! ( cases > 20, "too few git fixture cases were read: {}", cases );
   assert! ( restricted_buffers > 5,
-            "too few diff-view buffers were refreshed under a restriction: {}",
+            "too few diff-view buffers were refreshed under a skgrepo restriction: {}",
             restricted_buffers );
   assert! ( failures . is_empty (),
             "{} of {} diff-view buffers over {} cases are not fixpoints:\n\n{}",
@@ -282,7 +283,7 @@ fn every_diff_view_fixture_is_a_fixpoint_of_the_refresh (
 
 /// Whether the buffer 'text' of kind 'buffer_kind', parsed and
 /// refreshed over 'straddle' under 'restriction', comes back as it
-/// was, correcting nothing: Err says how not. Under a restriction,
+/// was, correcting nothing: Err says how not. Under a skgrepo restriction,
 /// 'text' is first refreshed as a switch to it does, and its output is
 /// the buffer checked.
 fn diff_view_buffer_refreshes_unchanged (

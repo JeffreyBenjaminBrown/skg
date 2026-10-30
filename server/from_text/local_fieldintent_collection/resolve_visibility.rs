@@ -43,7 +43,7 @@ pub fn resolve_visibility (
   hidden_outside : &[(ID, HiddenOutsideEdit)],
   graph       : &InRustGraph,
   config      : &SkgConfig,
-  skgrepo_restriction : Option<&SkgrepoRestriction>, // None means no restriction; callers normalize 'all' to None.
+  skgrepo_restriction : Option<&SkgrepoRestriction>, // None means no skgrepo restriction; callers normalize 'all' to None.
 ) -> Result<(LoweredNodeIntents, Vec<PostSkgsaveCommitNoticeCandidate>), Box<dyn Error>> {
   validate_no_overlapping_subscribee_hiderel_conflicts (
     visibility, graph, config ) ?;
@@ -100,11 +100,11 @@ pub fn resolve_visibility (
 /// inference.  Only the old *visible outside* hides are replaceable: hides
 /// whose records are restricted, and members inside a subscribee, remain owned
 /// by the graph and survive an edit of this compound partner folder. A hide is
-/// visible, and so replaceable, when the restriction holds its relRepo
+/// visible, and so replaceable, when the skgrepo restriction holds its relRepo
 /// ('SkgrepoRestriction::record_is_visible'): the folder as drawn showed its
 /// member, as an occurrence or a gnid-only vognode, so the submitted
 /// folder is the whole set of hides with a visible record outside the
-/// subscribees, and a folder saved under a restriction never unhides a
+/// subscribees, and a folder saved under a skgrepo restriction never unhides a
 /// member it could not show. What counts as inside is what the folder's goal
 /// subtracts ('goal_list_for_hiddenOutsideOfSubscribee_folder'): the whole
 /// content of each subscribee, whatever records it.
@@ -192,8 +192,8 @@ fn apply_hiddenoutside_edits (
 ///   omitted from the buffer, not removed, so they never count as
 ///   removals ('SkgrepoRestriction::record_is_visible'). A member
 ///   with a visible record had a headline (a restricted headline,
-///   where the restriction keeps out its node), so its absence is a
-///   removal.
+///   where the skgrepo restriction keeps out its node), so its absence
+///   is a removal.
 /// - A child the same save explicitly shows through one of F's
 ///   subscriptions (a subscribee-as-such signal) is not hidden here:
 ///   the explicit subscription-view gesture wins. This runs before

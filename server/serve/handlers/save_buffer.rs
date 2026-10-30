@@ -167,7 +167,7 @@ impl SaveResponse {
                    fork_confirmation : Some (prompt),
                    .. SaveResponse::empty () } }
 
-  /// A save whose rerender holds text the restriction may not
+  /// A save whose rerender holds text the skgrepo restriction may not
   /// release without approval: the challenge, and no text.
   pub fn text_release_challenge (
     decision : &TextReleaseDecision,

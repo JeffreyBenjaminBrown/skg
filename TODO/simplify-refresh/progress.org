@@ -5038,3 +5038,183 @@ both COMMANDS docs, the noun "skgrepo widening" for slice 9's
 new prose, and the integration count 35 of 36. Suites: nextest
 1026 unchanged, Emacs 412 (one new), Neovim green, integration
 35 of 36 with either client, the pre-existing failure.
+
+** Slice 10
+*** The commits
+**** 644c1422
+Neovim names its own keys and commands in server messages: the
+translation table in 'nvim/lua/skg/messages.lua' rewrites the
+fork-confirmation buffer's C-c C-c and C-c C-k and five Emacs
+command names; the client applies it to the fork-confirmation
+buffer and its notification, the absent-reference warning and its
+own copies of the restore refusals; a test of each; the
+deviations doc.
+**** The last commit
+The skgrepo modifier in comments and test messages across
+'server/', 'tests/' and both clients; the re-kind buffer
+correction's words ('what_a_headline_becomes'); the clients'
+docstrings say "a restricted headline" and "a reference to an
+unknown node"; the docs and the glossary; this record and the
+plan's keyword.
+*** The suites
+**** cargo check --all-targets
+Clean, no warning.
+**** bash/all-tests.sh
+Build, Emacs 412 of 412, Neovim 452 passes with no failure and no
+error, nextest 1026 of 1026, doctests pass, integration 35 of 36
+with each client. The one failure each time, retried once and
+failing again, is 'import-md-and-org': pre-existing, not
+investigated. No other failure at any point. Log:
+'tests/results/08/slice10/all-tests.log' and 'ALL.org' beside it.
+**** Neovim's count
+Slice 9 recorded 441 passes; this run has 452 distinct passing
+tests, and the per-file totals also sum to 452. This slice adds
+one; the other ten were in the suite before it, so slice 9's
+count, made from interleaved output, was low.
+**** after the suite
+Three comments and one test's assertion message changed after
+the run ('rerender_pass.rs', 'metadata.lua',
+'tests/hidden_nodes.rs');
+'cargo check' stayed clean and the tests that name a record pass.
+**** The TCP surface
+On a scratch server ('verify' skill; script and output in
+'tests/results/08/slice10/probe/'), a ghost typed under a node
+whose list names a gnid nothing answers to is answered "Made a
+headline a reference to an unknown node, as the graph has it."
+*** The three greps
+All three empty. The second one is line-based, so a "skgrepo" at
+a line's end before "restriction" on the next would be flagged;
+every such break was rejoined. A script that reads across line
+breaks ('tests/results/08/slice10/bare_words.py') finds the three
+words without "skgrepo" only as wire atoms, quoted words, a
+command name and "restrictions on order".
+*** The two-question check
+**** does its code cite anything under TODO/
+No. 'rg "TODO/"' over 'server', 'elisp', 'nvim', 'shared' and
+'tests' (but 'tests/results') finds nothing. Of the docs, the
+README and the deviations doc cite tracked files, and
+'api-and-formats.org' cites 'bench-search-enrichment.org', which
+is tracked now.
+**** what terms did this plan's code coin or reuse
+A survey of the plan's diff (acf65e4e to this commit) found 227
+new names, most of them Neovim twins of Emacs names. The words
+the plan coined are in the glossary and marked: gnid-only vognode
+('GnidOnlyVognode', 'GnidOnlyKind'), 'Unread', orphan graphnode,
+orphan viewnode, 'RerenderMode', skgrepo narrowing and skgrepo
+widening. The other names reuse glossary words in their glossary
+sense (record, visible, restricted, viewnode merge, claims
+membership, reads claims, re-kind).
+***** words the glossary does not define
+'DrawnEditability' and its 'Requested', 'RerenderRequest',
+'RerenderSelector', 'ParseProvenance', 'node_is_shown',
+'editability_is_held'. Each is an implementation name its doc
+comment defines.
+***** a second meaning
+"provenance" meant import provenance (the flags) before
+'ParseProvenance'; "selector" meant the clients' circular
+selector before 'RerenderSelector'; "shown" in 'node_is_shown'
+is a third word for what the skgrepo restriction lets be seen,
+beside "visible" and "unrestricted". "Unread" sits near the diff
+view's "unready". The code spells "rekind" ('rekind_to_*') where
+the glossary and the older 'Rekinded' say "re-kind".
+***** "search buffer"
+Slice 6 named the search's tests for the "search buffer"; the
+glossary's term is "search view". A synonym the glossary does not
+define.
+***** reserved words in the plan's added lines
+Fixed here: bare "merge" for a nodeMerge request (two Lua
+docstrings, 'rerender_pass.rs') and the skgrepo restriction that
+"hides" (an assertion message). Left: bare "merge" for the
+viewnode merge inside its own function and tests ('visit.rs',
+'tests/refresh/viewnode_merge.rs', 'tests/what_the_refresh_keeps
+.rs'), "merge" for a title cache ('readable_ids.lua'); bare
+"index" in 'server/test_utils.rs' and 'skgrepo_sets.rs' for the
+search index's folder; bare "generation" for ancestor generations
+('ancestry.rs', 'viewnodestats.rs') and for a cache counter
+('readable_ids.lua'); "hide" for vim folds in 'folds.lua'; bare
+"snapshot" in an integration test's comment.
+*** Deviations from the plan's "how"
+**** the sweep reached comments and test messages
+The plan's rule says every doc, module header, comment and user
+message takes "skgrepo"; about 80 comments and 15 test messages
+in 'server/', 'tests/' and the clients did. Other senses stay:
+the
+save lock's "narrowing" and a "restriction-repo root".
+**** the re-kind buffer correction's words
+User text says "a reference to an unknown node" and "a restricted
+headline", so 'VognodeKind::with_article' became
+'what_a_headline_becomes', and the message reads "Made a headline
+a reference to an unknown node, as the graph has it." or "Made a
+headline restricted, as the graph has it."; the parser's refusals
+keep their words, as the plan says.
+**** the translation table holds commands too
+'neovim_commands_of_emacs_commands' beside the chords' table:
+the two messages the report named (the restore refusal's
+'skg-restore-deleted-node' and the absent-reference warning's
+'skg-investigate-unknown-node') and three more server messages
+name (skg-restore-removed-membership, skg-set-relRepo,
+skg-set-flag-search-matching).
+**** "restricted headline" in the glossary
+The record entry is now "record, restricted headline, Restricted
+vognode": the user's word and the implementation's, the type
+named once. The technical docs keep "Restricted vognode".
+**** the dozen undefined terms
+Defined in the glossary: herald, kind atom, view facts, data
+root, export root, link status and link annotation, in-folder and
+out-folder, live graph, gated graph. "Literal root" and
+"cycle-root" were the API doc's private list of prominence
+sources; it now gives the glossary's list and cites it.
+**** small fixes beside the list
+From the reports' smaller findings: "change facts" listed the
+'(ready ...)' readiness and the commit-readiness marker as two
+parts; "branch" became "viewbranch" and a cross-reference said
+"below" for an entry above; the technical model's "unsayable"
+was wider than the code's (a gone change is entombstoned, not
+unsayable) and its viewnode merge lacked the editability
+exception; "forest", "single-root visit" and "home moved" took
+their full words. Stale since slice 6: the glossary and two docs
+said the goal marks a restricted member, which it no longer
+does.
+**** slice 6's three facts
+A member a save drew into another view is drawn as a fresh
+view's members are (both COMMANDS docs, "what a save does to
+other views"); every node of U drawn editable counts toward the
+budget and none is refused (both, under the diff view); a switch
+prunes a tombstone left holding nothing, which is no buffer
+correction (both, under the switch and "buffer corrections").
+**** slice 8's correction
+No doc said that 'all' skips the relRepo lookups or that the
+stats cost more under a skgrepo restriction; nothing to correct.
+*** Findings already done
+**** of the user-docs report
+Finding 11 (the switch erases unsaved edits) was done by slice 4,
+which made the switch refuse. Finding 4's "orphaned" in the API
+doc, and the COMMANDS docs' "orphan" without its noun, by slice
+6. Finding 1's orphan warning words ("orphan graphnode", no "not
+yet saved") by slice 2, the list of parents here. Finding 9's
+refusal message by slice 9, the doc here. Finding 5's citation:
+'bench-search-enrichment.org' is tracked now, by Jeff's commit.
+Findings 2, 3, 6, 7, 10, 12 and 14 were open and are done here;
+the three folder messages of finding 13 lost "Restricted
+vognode" in slices 0 and 2 but still name Rust types.
+**** of the vocabulary report
+Items 1 (the two questions) and 11 (the policy) by slice 3; 2
+(the clients' predicates), 3 ('RerenderMode'), 4 (the path), 6,
+7, 9, 10, 12 (orphan in the parser) and 13 by slice 6; 8 (the
+coinage, and "a restricted headline" in user text) here. Item 5
+is open: the tail's prune still calls
+'detach_viewnode_transferring_focus', which the glossary's rule
+on "detach" rules out; so is item 14's 'herald_label'.
+*** Left unfinished
+**** user-docs findings outside the plan's list
+8 (detach and attach on a headline that claims nothing; attach on
+a pending detachment drops 'detach' at once) and 13's smaller
+gaps (the M-x name of C-c m f, the contradictory readiness
+refusal, refusals no entry mentions, the four folder messages
+that name Rust types such as 'HiddenInSubscribeeFolder').
+**** unknown in user text
+The COMMANDS docs still say "an unknown" where the glossary
+defines the word in its user section; only the passages this
+slice rewrote say "a reference to an unknown node".
+*** Headline
+DONE.

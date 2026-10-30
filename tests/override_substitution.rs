@@ -316,7 +316,7 @@ async fn ownership_and_visibility_gate_substitution (
         let marked : Vec<&str> = marked_lines (&view, "N2");
         assert_eq! ( marked . len (), 1, "{}", view );
         assert! ( marked [0] . contains ("(gnid R2)"), "{}", view ); }
-      { // The restriction beats substitution: restricted original,
+      { // The skgrepo restriction beats substitution: restricted original,
         // recorded in an unrestricted section, unrestricted overrider
         // -> the original stands as a Restricted vognode, and the
         // overrider is not shown in its place.

@@ -27,8 +27,9 @@ pub struct RerenderPassContext<'a> {
   /// connection's, and keeps what it becomes.
   pub graph_straddle            : Option<Arc<GraphStraddle>>,
   /// Which changes the rerenders report as no buffer corrections: a
-  /// save's rerender says what the save deleted and merged, a
-  /// skgrepo-set switch whether the restriction changed; every other
+  /// save's rerender says what the save deleted and what its
+  /// nodeMerge requests touched, a
+  /// skgrepo-set switch whether the skgrepo restriction changed; every other
   /// rerender reports every change.
   pub buffer_correction_policy  : BufferCorrectionPolicy,
   /// True only for the "integrate unshown changes" request, which

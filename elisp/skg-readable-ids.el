@@ -40,8 +40,8 @@ stale -- a node retitled, the repo-set widened -- in which case
 (defun skg-readable-ids-refresh ()
   "Empty the ID-to-title cache and re-annotate the current buffer.
 Use this after anything that changes what titles the server would
-answer with: a node retitled, or the skgrepo restriction widened
-(IDs restricted under the old set were cached as missing)."
+answer with: a node retitled, or a skgrepo widening (IDs restricted
+under the old skgrepo restriction were cached as missing)."
   (interactive)
   (clrhash skg-readable-ids--title-cache)
   (skg-readable-ids--annotate-buffer))

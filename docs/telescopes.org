@@ -6,7 +6,7 @@ your skgrepos, each file one *telescope section* holding the slice
 of the node recorded at that skgrepo's privacy level. There is no linking
 relationship between the sections — sharing an ID /is/ being the
 same node. (Why "telescope"? Because it extends one section at a
-time: widening your skgrepo-set to the next privacy level pulls out
+time: a skgrepo widening to the next privacy level pulls out
 exactly one more section per node, whereas an accordion — the
 term's rejected predecessor — expands uniformly.)
 

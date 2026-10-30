@@ -49,9 +49,13 @@ parent's content stays where it stands in another view, marked
 does not put it back; delete it there, or attach it (<localleader>sa)
 to put the relationship back at that view's next save. A member that
 one view's save added is drawn into every other view that shows its
-list. A headline standing for a node the save deleted becomes a
-tombstone ("something stood here") in every view, holding whatever
-stood under it; a tombstone that holds nothing goes.
+list, as a fresh view draws its members: editable where no other
+occurrence of its node is and the node budget allows, and then
+with its subscribee folder when it subscribes to something the
+skgrepo restriction shows. A headline standing for a node the save
+deleted becomes a tombstone ("something stood here") in every view,
+holding whatever stood under it; a tombstone that holds nothing
+goes.
 *** buffer corrections
 A save or a rerender that finds a buffer saying something the graph
 contradicts corrects the buffer, and says so: each such change is a
@@ -78,18 +82,19 @@ rerenders. A buffer correction says one of these six things:
 - "Merged duplicate viewnode siblings into this one." Two or more
   siblings stood for one node under one parent (a pasted copy, say);
   they became one headline, holding all their children.
-- "Made a headline an unknown, as the graph has it." (or an
-  occurrence, a ghost, a Restricted vognode). The headline is now
-  the kind of headline the graph says it is: an unknown where no node
-  answers to its ID, say.
+- "Made a headline a reference to an unknown node, as the graph has
+  it." (or an occurrence, a ghost, or restricted). The headline is
+  now the kind of headline the graph says it is: a reference to an
+  unknown node where no node answers to its ID, say.
 - "Dropped an edit request its headline has no slot for." After such
   a change of kind, a request the new kind cannot carry was dropped.
 What the server draws because you asked for it (the content of a
 node you made editable, a folder you requested, a new view) is no
 buffer correction, nor is what your own save did: a tombstone where
-it deleted a node, what a merge it asked for joined or drew, a
+it deleted a node, what a nodeMerge it asked for joined or drew, a
 headline it took out of the view; nor what a change of the
-skgrepo-set (<localleader>vl) draws, hides or marks noClaim.
+skgrepo-set (<localleader>vl) draws, entombstones, re-kinds, marks
+noClaim or prunes.
 *** where a save's warnings go
 A save's own warnings and errors go to a buffer of their own,
 replaced at each save that has any: =skg://messages/save-warnings=,
@@ -97,7 +102,15 @@ replaced at each save that has any: =skg://messages/save-warnings=,
 =skg://messages/save-errors-and-warnings= when it has both. One such
 warning names each orphan graphnode the save created: a node that no
 list contains, made from a headline typed under a parent that reads
-no claims (see "first some vocab" under <localleader>s).
+no claims ('docs/glossary.org', "claims membership", lists those
+parents). A new view root is in no list either, but is not warned
+of.
+
+A rerender that follows a command (<localleader>vl, a commit, an
+import, the cleanup of references to an absent node, or the
+integration of unshown changes) has errors and warnings of its own,
+which go to =skg://messages/rerender=; its buffer corrections go to
+=skg://messages/server-warnings= as a save's do.
 ** :SkgShowUnsavedChanges : archive edits for manual recovery
 Prompts for a local Org file, writes a detached recovery document, opens
 it, and reports its actual path. The document contains context, lossless
@@ -442,7 +455,9 @@ whatever it carries, and nothing in one of its folders does.
 A child the user typed under it, which stays unwarranted (⊥),
 since no save reads claims there, is still saved as a node of its
 own: an orphan graphnode, a node that no list contains, of which the
-save warns.
+save warns. A write-protected occurrence is one of the parents that
+read no claims, which 'docs/glossary.org' lists under "claims
+membership".
 The way out is to make the edit at the node's editable occurrence
 instead, or to undo it, make this occurrence editable
 (<localleader>sd on it), save, and edit it then.
@@ -497,9 +512,11 @@ folder under one that is not write-protected -- writes 'noClaim' on
 the headline at point, so that the next save takes it out of the
 parent's list. The headline stays in the buffer: a child the graph
 put there shows =detach= until the save, and =⊥= after it.
-Under a parent that reads no claims (a write-protected occurrence, a
-write-protected folder, or none at all) it refuses, since no child
-claims membership there. On a headline that claims nothing already,
+Under a parent that reads no claims (a write-protected occurrence
+or folder, a ghost, a reference to an unknown node, a restricted
+headline, a tombstone, or none at all; 'docs/glossary.org', "claims
+membership", is the list) it refuses, since no child claims
+membership there. On a headline that claims nothing already,
 it says so and changes nothing. It does not save.
 *** <localleader>sa : :SkgAttach
 The reverse of <localleader>st: removes 'noClaim' from the headline at point,
@@ -590,7 +607,7 @@ settable from the child's position -- =content= (ordinary content),
 overriddenFolder member); choosing any other role says why its
 relationship cannot be set from there.
 
-It then prompts for a skgrepo over the whole ladder, plus the
+It then prompts for a skgrepo over every skgrepo, plus the
 no-override choice, which instead removes the pending requests
 throughout the subtree. No per-relationship default is fetched, so
 the save's floor check validates each relationship.
@@ -599,14 +616,14 @@ The walk recurses only on viewchildren that are members: member
 occurrences, and the two editable folders. It prunes below
 write-protected nodes and subscribee-as-such members, and prunes
 write-protected folders and other non-vognodes entirely. A pending
-delete or merge anywhere in the walk refuses the whole gesture before
-any edit. Save the view afterward to apply the changes.
+delete or nodeMerge request anywhere in the walk refuses the whole
+gesture before any edit. Save the view afterward to apply the changes.
 *** <localleader>sx : :SkgSetFlagSearchMatching
 Prompts between =search matching= and =no search matching= and stages the
 desired state without saving. Foreign/write-protected/unsaved roots and a
-node that already holds an edit request (delete, merge or a flag) are
-refused. A readiness request stays beside it, and a relRepo request gives
-way to it, as to delete and merge.
+node that already holds an edit request (delete, a nodeMerge or a
+flag) are refused. A readiness request stays beside it, and a relRepo
+request gives way to it, as to delete and a nodeMerge request.
 *** <localleader>sX : :SkgSetFlagSearchMatchingRecursive
 Applies one selected state uniformly through the true-content subtree,
 deduplicating PIDs and reporting ineligible descendants. It prunes non-vognodes,
@@ -836,8 +853,10 @@ server. An editable-view
 request (<localleader>sd) works as in any view, except that
 'initial_node_limit' refuses only the extension of a node outside U
 (the nodes the buffer extends anyway: those that changed and those
-leading to them). Every extension in the buffer counts toward it,
-but nothing else in the buffer is bounded by that limit.
+leading to them). Every node of U drawn editable counts toward it,
+as does every other extension in the buffer, but no node of U is
+ever refused, and nothing else in the buffer is bounded by that
+limit.
 Why the diff view commits whole skgrepos, and offers nothing
 smaller: in skg a partial commit is dangerous. The graph is one
 structure spread over many files, so committing some changed files
@@ -863,8 +882,8 @@ Opens a blank Skg content view in which to create new nodes.
 **** why
 Every node needs a skgrepo.
 A headline inherits one from the nearest occurrence above it,
-passing through folders, ghosts, tombstones, unknowns and Restricted
-vognodes; a root, or a headline whose walk up meets an alias, an
+passing through folders, ghosts, tombstones, references to unknown
+nodes and restricted headlines; a root, or a headline whose walk up meets an alias, an
 ID, a flag or a change viewnode first, or meets no occurrence,
 needs its skgrepo chosen explicitly.
 nvim-orgmode's insert-heading actions (org_meta_return and
@@ -890,23 +909,27 @@ Neovim connection.
 The command asks which skgrepo-set to activate, with TAB completion
 and S-Left / S-Right cycling. After confirmation it tells the server
 to use that skgrepo-set and rerenders open Skg buffers in place. Choose
-=all= to remove the restriction.
+=all= to remove the skgrepo restriction.
 
-Under a restriction, a node in a skgrepo outside the set shows
-nothing of itself. Where a relationship recorded in a skgrepo the set
-holds names such a node (say a public node contains a private one),
-the view shows a headline with no title, heralded =restricted=,
-standing for it: a Restricted vognode. It keeps the relationship as
-it was when you save, and deleting its line removes the relationship,
-as deleting an unknown's does; '<localleader>sr' sets its relRepo. A relationship recorded in a skgrepo outside the set shows
-nothing at all, and a save keeps it. Narrowing the set turns an open
-view's headline of such a node into a Restricted vognode (or, where
+Under a skgrepo restriction, a node in a skgrepo outside the set
+shows nothing of itself. Where a relationship recorded in a skgrepo
+the set holds names such a node (say a public node contains a
+private one), the view shows a headline with no title, heralded
+=restricted=, standing for it: a restricted headline. It keeps the
+relationship as it was when you save, and deleting its line removes
+the relationship, as deleting a reference to an unknown node does;
+'<localleader>sr' sets its relRepo. A relationship recorded in a
+skgrepo outside the set shows nothing at all, and a save keeps it. A
+skgrepo narrowing (a switch to a smaller set) turns an open view's
+headline of such a node into a restricted headline (or, where
 nothing the set shows names it, a tombstone, "something stood here")
-in place, its children kept, and widening it turns the Restricted
-vognode back. Where a tombstone took the node's place, widening draws
-the node anew where the graph puts it, and the tombstone stays beside
-it, holding what stood under the old headline, until nothing is left
-under it. None of this is reported as a buffer correction.
+in place, its children kept, and a skgrepo widening (a switch to a
+larger set) turns the restricted headline back. Where a tombstone
+took the node's place, a skgrepo widening draws the node anew where
+the graph puts it, and the tombstone stays beside it, holding what
+stood under the old headline, until nothing is left under it. None
+of this is reported as a buffer correction, nor is a tombstone the
+switch leaves holding nothing, which goes.
 
 The rerender redraws each open buffer from the view the server last
 saved or rendered for it, which would lose an unsaved edit; so while
@@ -918,9 +941,9 @@ If the proposed set would rerender overPrivateText telescope text, Skg asks befo
 changing the skgrepo restriction or any view. Declining leaves both unchanged and
 an empty rerender stream releases the client's preemptive locks.
 
-':SkgListRepoSets' shows the current restriction and the skgrepo-sets
-available, and ':SkgShowSkgrepoRestriction' shows the restriction
-alone.
+':SkgListRepoSets' shows the current skgrepo restriction and the
+skgrepo-sets available, and ':SkgShowSkgrepoRestriction' shows the
+skgrepo restriction alone.
 *** <localleader>vm : :SkgViewMetadata
 When called from a node in a view of the graph,
 this switches to a view of the metadata of that node,
@@ -931,10 +954,10 @@ editRequest, viewRequests, nodeRepo, ...).
 Each field a user may set on the headline's kind is shown,
 at its default when it is absent, and cycles through the values
 that kind takes, as 'shared/metadata-fields.json' lists them:
-a write-protected node is offered no delete, merge or flag request,
+a write-protected node is offered no delete, nodeMerge or flag request,
 a removed member is also offered restoreRel,
 a ghost restoreNode.
-A value that needs more (merge's target, relRepo's skgrepo,
+A value that needs more (a nodeMerge's target, relRepo's skgrepo,
 a flag and its value, a folder's relation) prompts for it.
 A field left at its default is dropped when the edit is applied.
 A readiness request the diff view's gestures wrote
@@ -978,8 +1001,8 @@ The ID-to-title map is cached for the whole Neovim session, so a
 neogit refresh re-requests nothing it has already seen. This empties
 the cache and annotates the current buffer again. Use it after
 anything that changes what titles the server would answer with: a
-node retitled, or the skgrepo restriction widened (IDs restricted
-under the old one were cached as unresolvable). The key is bound in
+node retitled, or a skgrepo widening (IDs restricted under the old
+skgrepo restriction were cached as unresolvable). The key is bound in
 content views only; elsewhere, run ':SkgReadableIdsRefresh'.
 *** <localleader>vs : :SkgViewLinkstack
 View and maybe edit the set of links you've stored.
