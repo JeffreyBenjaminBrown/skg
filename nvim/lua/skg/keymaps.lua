@@ -123,6 +123,8 @@ M.commands = {
                    desc = 'Show only the outline ancestry of point' },
   ReadableIdsToggle = { module = 'skg.readable_ids', fn = 'toggle',
                         desc = 'Toggle shortened, title-annotated UUIDs' },
+  ReadableIdsRefresh = { module = 'skg.readable_ids', fn = 'refresh',
+                         desc = 'Forget the cached titles and annotate the IDs again' },
   ViewLinkstack = { module = 'skg.linkstack', fn = 'view_linkstack',
                   desc = 'View and edit the linkstack' },
   ViewWithoutMetadata = { module = 'skg.metadata', fn = 'view_without_metadata',
@@ -297,6 +299,7 @@ M.content_view_bindings = {
   { 'vm', 'ViewMetadata' },              -- C-c v m
   { 'vo', 'ViewAncestry' },           -- C-c v o
   { 'vr', 'ReadableIdsToggle' },         -- C-c v r
+  { 'vR', 'ReadableIdsRefresh' },        -- C-c v R
   { 'vs', 'ViewLinkstack' },               -- C-c v s
   { 'vw', 'ViewWithoutMetadata' },       -- C-c v w
   { 'in', 'IdNext' },                    -- C-c i n
