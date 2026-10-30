@@ -177,6 +177,47 @@ impl RelationRole {
                    position : BinaryRolePosition::Second };
 }
 
+/// The relRepos a pass over many members reads, one map per recorder
+/// and relation, built the first time the pass asks of that recorder
+/// ('InRustGraph::relRepos_by_target_pid'): a pass over the N members
+/// of one list costs O(N), not a scan of the list per member. The
+/// graphnode stats ('server/dbs/in_rust_graph/stats.rs') and the
+/// viewnode stats ('server/refresh/viewnodestats.rs') each keep one
+/// for their pass.
+#[derive(Default)]
+pub struct RelRepoLookup {
+  maps : HashMap<(ID, NodeRelation), Option<HashMap<ID, SkgrepoName>>>,
+}
+
+impl RelRepoLookup {
+  /// What 'InRustGraph::inbound_pids_for_relation_gated' answers.
+  pub fn inbound_pids_for_relation_gated (
+    &mut self,
+    graph       : &InRustGraph,
+    pid         : &ID,
+    relation    : NodeRelation,
+    restriction : Option<&SkgrepoRestriction>,
+  ) -> Vec<ID> {
+    graph . inbound_pids_gated_by (
+      pid, relation, restriction,
+      |partner| self . relRepo (graph, partner, relation, pid) ) }
+
+  /// What 'InRustGraph::relRepo' answers.
+  pub fn relRepo (
+    &mut self,
+    graph    : &InRustGraph,
+    recorder : &ID,
+    relation : NodeRelation,
+    target   : &ID,
+  ) -> Option<SkgrepoName> {
+    let target_pid : ID = graph . pid_of (target) ?;
+    match self . maps . entry (( recorder . clone (), relation ))
+      . or_insert_with ( || graph . relRepos_by_target_pid (recorder, relation) )
+    { Some (relRepos) => relRepos . get (&target_pid) . cloned (),
+      None => // links, or a recorder the graph lacks
+        graph . relRepo (recorder, relation, target), } }
+}
+
 impl InRustGraph {
   /// IDs whose rendered relationship context can change when any seed changes.
   /// Ordinary relations contribute one hop in either direction. Override
@@ -439,10 +480,25 @@ impl InRustGraph {
     relation : NodeRelation,
     restriction : Option<&SkgrepoRestriction>,
   ) -> Vec<ID> {
+    self . inbound_pids_gated_by (
+      pid, relation, restriction,
+      |partner| self . relRepo (partner, relation, pid) ) }
+
+  /// The inbound partners of 'pid' under 'relation' whose records the
+  /// skgrepo restriction shows, 'relRepo_of' giving the relRepo of a
+  /// partner's record (see 'relRepo'). Asks nothing of a partner when
+  /// there is no restriction.
+  fn inbound_pids_gated_by (
+    &self,
+    pid         : &ID,
+    relation    : NodeRelation,
+    restriction : Option<&SkgrepoRestriction>,
+    mut relRepo_of : impl FnMut (&ID) -> Option<SkgrepoName>,
+  ) -> Vec<ID> {
     self . inbound_pids_for_relation (pid, relation)
       . into_iter ()
       . filter ( |partner| restriction . is_none ()
-        || self . relRepo (partner, relation, pid)
+        || relRepo_of (partner)
            . is_some_and ( |relRepo| SkgrepoRestriction::record_is_visible (
              restriction, &relRepo )) )
       . collect () }

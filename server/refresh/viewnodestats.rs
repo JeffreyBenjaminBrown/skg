@@ -1,7 +1,7 @@
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::stats::mentioner_is_substantive;
 use crate::dbs::in_rust_graph::relation_accessors::{
-  BinaryRolePosition, GnidPresence, NodeRelation, RelationRole };
+  BinaryRolePosition, GnidPresence, NodeRelation, RelRepoLookup, RelationRole };
 use crate::herald_tokens::{
   AncestorFlags, BirthFact, RelationshipHeralds, Side, relationship_heralds_sexp };
 use crate::skgrepo_sets::SkgrepoRestriction;
@@ -24,32 +24,6 @@ const GRAPH_RELATIONS : [NodeRelation; 4] = [
   NodeRelation::HidesFromSubs,
   NodeRelation::SubscribesTo,
   NodeRelation::Overrides, ];
-
-/// The relRepos the stats pass reads, one map per recorder and
-/// relation, built the first time the pass asks of that recorder
-/// ('InRustGraph::relRepos_by_target_pid'): a view of N members of one
-/// list costs O(N), not a scan of the list per member.
-#[derive(Default)]
-struct RelRepoLookup {
-  maps : HashMap<(ID, NodeRelation), Option<HashMap<ID, SkgrepoName>>>,
-}
-
-impl RelRepoLookup {
-  /// What 'InRustGraph::relRepo' answers.
-  fn relRepo (
-    &mut self,
-    graph    : &InRustGraph,
-    recorder : &ID,
-    relation : NodeRelation,
-    target   : &ID,
-  ) -> Option<SkgrepoName> {
-    let target_pid : ID = graph . pid_of (target) ?;
-    match self . maps . entry (( recorder . clone (), relation ))
-      . or_insert_with ( || graph . relRepos_by_target_pid (recorder, relation) )
-    { Some (relRepos) => relRepos . get (&target_pid) . cloned (),
-      None => // links, or a recorder the graph lacks
-        graph . relRepo (recorder, relation, target), } }
-}
 
 /// The stats of each occurrence (its rels, props, birth, 'cycle',
 /// 'repoBoundary', 'omittedBody', relRepo). The warrants and the
