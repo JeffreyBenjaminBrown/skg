@@ -28,14 +28,14 @@
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
-PLAN=TODO/simplify-refresh/08_plan_restriction-and-tidy.org
-PROGRESS_HEADLINE='Restriction and tidy'
+PLAN=TODO/simplify-refresh/10_plan.org
+PROGRESS_HEADLINE='Plan 10'
 PLAN_DIR=$(dirname "$PLAN")
 LOG_DIR=$PLAN_DIR/run-logs
 MODEL="${SKG_PLAN_MODEL:-claude-opus-5-5}"
 EFFORT="${SKG_PLAN_EFFORT:-high}"
 FIRST="${1:-0}"
-LAST="${2:-10}"
+LAST="${2:-6}"
 mkdir -p "$LOG_DIR"
 
 # Modified tracked files, space-separated; empty on a clean tree. (awk, not

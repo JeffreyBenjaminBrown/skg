@@ -6,8 +6,133 @@
   When a plan or a settled discussion decides how an entry will be
   fixed, prefix its headline with 'FIX PLANNED: ' and leave it here
   until the fix lands; then move it as above.
+* Problems found by the review of plan 08 (2026-10-30)
+  Found by the throwaway tests of 'TODO/simplify-refresh/
+  09_review.org' (Open questions 1 and 2); the tests are in
+  'tests/results/08/review/throwaway-tests/', each with its log
+  and the line to add to run it. Both run; neither loses data.
+** FIX PLANNED: An editable occurrence under an extra ID can lose its editability
+  'editable_occurrences_in' ('server/refresh/mod.rs') keys the
+  walk's map of editable occurrences by the gnid as written in
+  the buffer, where 'keep_the_first_editable_occurrence_of_each
+  _node' keys by 'pid_else_raw_id'. After a nodeMerge made b an
+  extra ID of a, a buffer holding an editable occurrence written
+  under b answers 'editability_is_held (a)' with no until that
+  occurrence's parent is visited. When a container that lists a
+  without showing its content is visited first, the occurrence
+  reinstated under it takes a's editability, and the user's
+  occurrence, written under b, is write-protected with only
+  "Reinstated" reported; written under a it keeps its
+  editability. Never two editable occurrences, always a
+  fixpoint. In the diff view a related loss: HEAD holding a and
+  b apart and the worktree holding the nodeMerge, two editable
+  roots written under b and a end as the ghost of b and a
+  write-protected occurrence of a, so the changed node has no
+  editable occurrence, with only the re-kind reported. Fix: key
+  the map by the pid; decide the diff-view case.
+** FIX PLANNED: A save under a skgrepo narrowing deletes a restricted hide
+  Run ('09_1_review-reports/throwaway-tests/
+  lead4_restricted_hide_of_subscribee_content.rs'). R, home
+  'public', subscribes to E (record in R's public section) and
+  hides H (record in R's private section); E, public, contains
+  H and C in its public section. Under the skgrepo restriction
+  to 'public' the hide is invisible, so H is drawn as ordinary
+  claiming content of E under R's subscription, and R's line
+  counts no hide, which is right. Saving that view unchanged
+  deletes 'private/r.skg', and the hide with it, with no warning
+  and no buffer correction: the subscribee-visibility loop of
+  'server/from_text/local_fieldintent_collection/
+  resolve_visibility.rs' works out what to unhide from all of
+  R's hides on disk, never asking whether a hide's record is
+  visible, and reads H's presence as claiming content of the
+  editable E as an unhide. Deleting H's line instead, with no
+  save before it, changes no file and the next drawing puts H
+  back; after an unchanged save the same deletion records a new
+  hide of H in R's public section, moving the hide from
+  'private' to 'public'. 'apply_hiddenoutside_edits' in the same
+  file asks the record's visibility and keeps a restricted hide
+  (lead3); the loop should ask the same. With E containing H by
+  a restricted record too, every save leaves the files as they
+  were.
+** Writes that touch what the skgrepo restriction hides (eleven)
+  Found by the review's search against Jeff's principle of
+  2026-10-30 (the skgrepo restriction limits what can be edited
+  as well as what can be seen); the report is
+  '09_1_review-reports/restriction-edits.org', the tests
+  'lead5_*' beside it, each case through the real save path on
+  disk fixtures under 'public' and 'private'. Run unless marked
+  read. Each is one problem; the report has file:line and the
+  fix for each.
+*** FIX PLANNED: The subscribee loop writes a public hide of a private member
+  Run. 'resolve_visibility.rs' 55-95 reads the subscribee's
+  contents and the subscriber's hides ungated; under 'public' an
+  unchanged save of an editable subscribee records a hide of each
+  privately contained member in the subscriber's public file.
+  Leaks and loses. The unhide half is the entry above.
+*** FIX PLANNED: A fork copies restricted records into the clone's home
+  Run. 'build_fork_clone' ('fork.rs':390) copies every record of
+  the template, read whole, at the clone's skgrepo with no floor;
+  under 'public' and under 'all' a private record becomes public.
+*** FIX PLANNED: A restricted graphnode with a visible nodeRepo is moved
+  Run. 'suppress_writes_to_restricted_nodes' ('validate.rs':353)
+  keys on the buffer's home, not the graph's: a root for a
+  private graphnode pasted with a public nodeRepo moves its home
+  to public, loses its private title, and warns "remain unchanged
+  in graph".
+*** FIX PLANNED: A new hide's floor ignores the record that explains it
+  Run. 'hide_skgrepo' ('supplement_from_disk.rs':536) floors a
+  new hide at the most public subscription whose subscribee
+  contains the member by any record, and the inference from
+  removals ('resolve_visibility.rs':203) reads contents ungated:
+  a public hide of a privately contained member (under 'all'
+  too); a hide written into a restricted section silently.
+*** FIX PLANNED: A delete strips restricted records naming the graphnode
+  Run. 'apply_delete_propagation_cleanup' ('save.rs':406)
+  rewrites every owned referencer, restricted sections included;
+  the refusal guards only the deleted graphnode's own sections.
+*** FIX PLANNED: A nodeMerge under a restriction moves restricted records
+  Run. Admitted when both homes are visible
+  ('local_fieldintent_collection/mod.rs':101); the acquiree's
+  private file is deleted and its records move into the
+  acquirer's private section, a restricted hide dropped.
+*** FIX PLANNED: A visible gesture creates a restricted record silently
+  Run. A restricted graphnode pasted under a visible editable
+  parent records the membership in a restricted section (the
+  default floor, 'types/misc.rs':614), and the line vanishes from
+  the view with no warning; read: a hide typed into the
+  hidden-outside folder with a restricted explaining
+  subscription, and an explicit relRepo request to a restricted
+  skgrepo, do the same.
+*** FIX PLANNED: The delete-references cleanup rewrites hidden recorders
+  Read. 'delete_references_to_absent_node.rs':124-185 scans and
+  rewrites every owned graphnode, and its confirmation names the
+  restricted recorders.
+*** FIX PLANNED: Restore and readiness requests ride a save under any restriction
+  Read. 'save_buffer.rs':790-805 applies restore instructions
+  after the suppression; restoreNode writes HEAD's telescope and
+  in-links, restricted recorders included; an "all of" readiness
+  request marks leaves in restricted sections.
+*** FIX PLANNED: The md/org import ignores the skgrepo restriction
+  Read. Dispatched without the skgrepo restriction ('serve.rs'
+  120-230); 'import_md_and_org/batch.rs':70 writes into any owned
+  destination, restricted or not. The strip of body whitespace
+  shares the dispatch and stays as it is by Jeff's choice
+  (2026-10-31), its docs saying so.
+** FIX PLANNED: The hidden-outside folder's goal reads restricted records
+  'goal.rs' (around line 406) says the folder of what a
+  subscriber hides outside its subscribees is computed by the
+  records the skgrepo restriction shows, but the subscribees'
+  content is read ungated (around 429-432), where the hidden-in
+  goal is gated. Under a skgrepo narrowing, s subscribing to e
+  and hiding h, with e containing h by a restricted record, h
+  shows in neither folder though h and the hide are visible
+  records; with e itself restricted, h's presence in the folder
+  depends on e's private content, which a reader can infer. The
+  hides count above the folder says two where the folder holds
+  one. A save under the narrowing keeps both hides. Fix: gate the
+  subscribee's content as 'hidden_in_subscribee' does.
 * Problems noticed while executing plan 08, slice 7 (2026-10-30)
-** A skgrepo widening keeps a skgrepo narrowing's noClaim
+** FIX PLANNED: A skgrepo widening keeps a skgrepo narrowing's noClaim
   Run, not traced, by a throwaway test in
   'tests/hidden_nodes.rs', deleted after the run. r, public,
   contains a, and records in its private section that it contains
@@ -30,7 +155,7 @@
   restore the claim of a member whose record it shows again, or
   the skgrepo narrowing could mark such a member in a way the
   skgrepo widening can undo.
-** A store test that panics leaves its fixture copy in /tmp
+** FIX PLANNED: A store test that panics leaves its fixture copy in /tmp
   'run_with_test_stores' and 'run_with_shared_test_stores'
   ('server/test_utils.rs') resume a test's panic inside
   'block_on', after the index's cleanup, so the

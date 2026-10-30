@@ -289,6 +289,17 @@ which the buffer could not show (=preserve_invisible_members= and
 =server/from_text/weave.rs=), so a Restricted vognode keeps its member
 while it claims, and deleting its line removes the record.
 
+The rule behind the mirror: the skgrepo restriction limits what the
+save may write as it limits what the refresh may show. Every decision
+of the save that a record's absence from the buffer drives (a member
+gone from a list, a hide, an alias, an extra ID, a subscription or an
+override gone, a relRepo or a home that differs) asks the record's
+visibility first, and a record the skgrepo restriction keeps out is
+neither removed, moved nor rewritten, whatever the buffer shows in its
+place. A write that acts on the restriction's silence is a defect
+('TODO/problems.org', "A save under a skgrepo narrowing deletes a
+restricted hide", for one).
+
 *** The walk and the refresh's rungs
 Before the walk, every editable-view request in the text is
 fulfilled: its occurrence becomes the node's editable one and any

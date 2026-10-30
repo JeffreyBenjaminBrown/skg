@@ -1012,7 +1012,10 @@ private one), the view shows a headline with no title, heralded
 relationship as it was when you save, and deleting its line removes
 the relationship, as deleting a reference to an unknown node does;
 =C-c s r= sets its relRepo. A relationship recorded in a skgrepo
-outside the set shows nothing at all, and a save keeps it. A
+outside the set shows nothing at all, and a save keeps it. The skgrepo
+restriction limits what you can edit as it limits what you can see:
+a save never removes, moves or rewrites a relationship the set keeps
+out, however the buffer looks. A
 skgrepo narrowing (a switch to a smaller set) turns an open view's headline
 of such a node into a restricted headline (or, where nothing the set
 shows names it, a tombstone, "something stood here") in place, its

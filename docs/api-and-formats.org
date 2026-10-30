@@ -1811,6 +1811,12 @@ A readiness gesture on such a folder acts on each changed membership.
 #+end_example
 
 ** Restricted-skgrepo nodes: omission, retention, and save preservation
+  - The principle: the skgrepo restriction limits writes as it limits
+    views. Under a skgrepo-set narrower than =all=, no save or other
+    write removes, moves, rewrites or creates a record, a section or
+    a node file the set keeps out, and none reads the buffer's silence
+    about such a record as an edit: what the user could not see, the
+    user did not edit. The rules below are its cases.
 
 Under a restricted skgrepo-set, a node whose home skgrepo the set
 keeps out is /restricted/, and the view shows nothing of it: no

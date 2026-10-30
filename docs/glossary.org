@@ -603,35 +603,111 @@ and re-warranted where it stands.
 
 *** buffer corrections
 
-A *buffer correction* (a term of plan 06, never a bare "correction")
-is a change the refresh made to what a buffer
-said because the buffer was wrong about the graph ('BufferCorrection',
-'BufferCorrectionKind' in 'server/refresh/buffer_corrections.rs'): a
-headline reinstated, entombstoned, marked =noClaim=, the result of a
-viewnode merge, re-kinded, or stripped of an edit request its new
-kind has no slot for. What it draws as extent is no buffer
-correction. Nor are the changes the buffer was not wrong about,
-which the refresh learns of from its caller, who names the situation
-it is called in, the *buffer correction policy*
-('BufferCorrectionPolicy'): 'ReportAll', which exempts nothing;
-'AfterSave', a save's rerender, after which a tombstone left where
-the save deleted the node, the viewnode merge of the occurrences of
-the nodes its nodeMerge requests touched and the members drawn under
-them, and what the tail pruned, are the user's own doing;
-'AfterRestrictionChange', a skgrepo-set switch's rerender, after
-which what the refresh draws, entombstones, marks =noClaim= or
-re-kinds across the skgrepo restriction, and what the tail pruned,
-is the doing of the skgrepo narrowing or skgrepo widening; and
-'Unread' (a term of plan 08), a first drawing, whose buffer
-corrections nobody reads: the refresh corrects as always, and nobody
-is told. The refresh reports
-buffer corrections; it does not warn. The save and rerender
-responses carry each view's buffer corrections, tagged with its view
-ID ('ViewBufferCorrections'), in their field =(corrections ...)=, and
-the clients show them in their warnings buffer, under a headline
-"Buffer corrections in" the view's buffer name (see "startup warnings
-channel" among the terms of the implementation). 'docs/COMMANDS.org',
-"buffer corrections", lists the six messages.
+**** What a buffer correction is
+A *buffer correction* is one change the refresh made to a view
+because the view said something the graph contradicts. It is not an
+error and writes nothing to disk; it tells you that a headline
+of a view changed, which may be a view you are not looking at.
+Code: 'BufferCorrection' and 'BufferCorrectionKind' in
+'server/refresh/buffer_corrections.rs'.
+
+**** What is never a buffer correction
+What the refresh draws because you asked for it: the content of
+a headline you made editable, a folder you requested, a fresh
+view. That is extent (see "extent, extension, node budget"),
+not a correction of anything you said.
+
+**** The six kinds
+Each kind has one message; the message names the headline it
+concerns, by its title and its viewnode ID ('C-c g v' finds
+it).
+
+***** reinstated
+"Drew what the graph says belongs here." A list the view already
+showed lacks a member the graph has, and the refresh draws it:
+one another view's save added, say, or one you deleted from a
+write-protected folder.
+
+***** entombstoned
+"Entombstoned a headline that can stand here for nothing." The
+headline became a tombstone, keeping its children: its node is
+gone, or it stood in a place where its kind cannot stand.
+
+***** marked noClaim
+"Marked noClaim a child the graph does not relate to its
+parent." A child of an editable parent claimed membership, and
+the graph does not put it there (another view's save removed
+it, say): it stays, shown ⊥, and the next save leaves it out of
+the parent's list.
+
+***** merged
+"Merged duplicate viewnode siblings into this one." Two or more
+siblings stood for one node under one parent (a pasted copy,
+say); they became one headline, holding all their children.
+
+***** re-kinded
+"Made a headline an occurrence, as the graph has it." (or "a
+ghost", "a reference to an unknown node", "restricted"). The
+headline became the kind of headline the graph says it is:
+restricted where the skgrepo restriction now keeps its node
+out, an occurrence again where the node is back or shown
+again, and so on (see "the ID rule").
+
+***** an edit request dropped
+"Dropped an edit request its headline has no slot for." After a
+change of kind, a request the new kind cannot carry was
+dropped: a delete request on a headline that became a ghost,
+say.
+
+**** The buffer correction policy
+The refresh does not know why it was called; its caller tells
+it, by naming the situation, the *buffer correction policy*
+('BufferCorrectionPolicy'). Under each policy some changes are
+not reported, because the view was not wrong about them: they
+follow from what the user just did. The four policies, each
+with what it does not report; everything else is reported.
+
+***** report everything ('ReportAll')
+Nothing is left out. A rerender that no save and no switch
+caused, such as the rerender-all-views command.
+
+***** after a save ('AfterSave')
+The save's own consequences are not reported: a headline
+entombstoned because it stood for a node the save deleted; for
+the nodes a nodeMerge the save requested touched (the acquirer
+and the acquiree), the merge of their occurrences and the
+members drawn under them; and any correction of a headline the
+refresh then pruned from the view. Reported: markings of
+noClaim, re-kinds, dropped edit requests, and every other
+reinstatement, entombstoning and merge.
+
+***** after a skgrepo-set switch ('AfterRestrictionChange')
+Every open view was up to date before the switch, so what the
+switch changes is the skgrepo restriction's doing and is not
+reported: every reinstatement (a skgrepo widening shows members
+again), every entombstoning and every marking of noClaim (a
+skgrepo narrowing hides members), every re-kind across the
+skgrepo restriction (a headline made restricted, or made an
+occurrence or a ghost again), and any correction of a headline
+the refresh then pruned. Reported: merges, re-kinds for another
+reason, and dropped edit requests.
+
+***** a first drawing ('Unread', a term of plan 08)
+A buffer nobody wrote and nobody reads corrections of: a fresh
+content view, a buffer of the diff view when first drawn, the
+search view, the first refresh of the integrate request. The
+refresh corrects as always, and nothing is reported.
+
+**** Where they appear
+The refresh reports buffer corrections; it does not warn. The
+save and rerender responses carry each view's buffer
+corrections, tagged with its view ID ('ViewBufferCorrections'),
+in their field =(corrections ...)=. The clients show them in
+their warnings buffer, under a headline "Buffer corrections in"
+followed by the view's buffer name, one headline per correction
+(see "startup warnings channel" among the terms of the
+implementation). 'docs/COMMANDS.org', "buffer corrections",
+has the user's account.
 
 *** ghost, unknown
 
@@ -801,6 +877,17 @@ as distinct from 'present' and 'absent' ('GnidPresence'), and the
 view shows nothing of it but, where a visible record names it, a
 restricted headline (see "record, restricted headline, Restricted
 vognode"). "Hidden" is reserved for hides-from-subscriptions.
+
+The skgrepo restriction limits what can be edited as well as what can
+be seen: no save, nodeMerge,
+fork, deletion, commit or other write may remove, move, rewrite or
+create a record, a section or a node file the skgrepo restriction
+keeps out, nor act on the buffer's silence about such a record, since
+what the user could not see the user did not edit. A save under a
+skgrepo restriction therefore keeps every restricted record as it was
+('preserve_invisible_members' in 'server/from_text/weave.rs') and asks
+a record's visibility ('record_is_visible') before any decision that a
+record's absence from the buffer would drive.
 
 A *skgrepo narrowing* is a skgrepo-set switch to a smaller
 skgrepo-set, and a *skgrepo widening* a switch to a larger one (both
