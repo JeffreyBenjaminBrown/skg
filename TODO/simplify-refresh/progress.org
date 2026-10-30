@@ -5218,3 +5218,35 @@ defines the word in its user section; only the passages this
 slice rewrote say "a reference to an unknown node".
 *** Headline
 DONE.
+
+** Orchestrator's notes after slice 10 (2026-10-30)
+Launched 00:41 UTC, reported 01:05 UTC: twenty-four minutes;
+377k agent tokens over 212 tool uses. Two commits. The plan is
+complete: every slice headline reads DONE, the three greps are
+empty, 'bash/all-tests.sh' is green but the pre-existing
+failure, the two-question check is answered in the record, and
+every entry the plan marked in 'TODO/problems.org' has moved.
+The deviations are sound: the comment sweep for "skgrepo"
+reached about eighty comments and left the save lock's own
+"narrowing" alone; the re-kind buffer correction now says "a
+reference to an unknown node"; a second translation table
+gives Neovim its own command names in server messages; the
+glossary's entry is "record, restricted headline, Restricted
+vognode" and ten undefined terms are defined. Left for the
+review: the two-question check names six new names the
+glossary lacks ('DrawnEditability', 'RerenderRequest',
+'RerenderSelector', 'ParseProvenance', 'node_is_shown',
+'editability_is_held'), second meanings ("provenance",
+"selector", "shown", "Unread" beside "unready", "rekind"
+against "re-kind", "search buffer" against "search view"), and
+bare reserved words in the plan's added lines; user-docs
+findings 8 and 13 and vocabulary items 5 and 14 stay open, not
+in the plan's list. Neovim's count is 452 by both methods;
+slice 9's 441 was read from interleaved output. Suites by
+'bash/all-tests.sh': Emacs 412, Neovim 452, nextest 1026,
+doctests green, integration 35 of 36 with either client. The
+run: eleven slices, 59 commits from b8f714ce to a97b32f2, 274
+files, 14,104 lines added and 4,591 removed since acf65e4e,
+from 16:53 UTC on 2026-10-29 to 01:05 UTC on 2026-10-30 with
+one session break. Next: the review, as 'code-reviews.org'
+says, as '09_review.org' beside this file.
