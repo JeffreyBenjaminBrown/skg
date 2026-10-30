@@ -25,10 +25,110 @@
 -- buffer the user edits.
 
 local compare = require('skg.sexpr.compare')
+local focus = require('skg.focus')
 local metadata = require('skg.metadata')
 local sexpr = require('skg.sexpr.parse')
 
 local M = {}
+
+-- ── the body toggle ────────────────────────────────────────────────
+
+---Toggle the visibility of the body of the headline at point. If the
+---headline's subtree is folded, show its body and immediate children
+---without opening the children's entries. Otherwise, hide or show the
+---body without changing the children's visibility. Works from the
+---headline or from inside its body; from the body, the cursor moves to
+---the start of the headline. A bodyless headline is left alone, with a
+---message, unless its children need to be revealed. A one-line body
+---cannot be hidden (vim cannot close a one-line fold), so it is left
+---alone too, with a message. Mirrors skg-org-body-toggle.
+function M.org_body_toggle ()
+  local headline = focus.owning_headline_line()
+  if not headline then error('Before the first headline', 0) end
+  if headline ~= metadata.current_line_number() then
+    vim.api.nvim_win_set_cursor(0, { headline, 0 }) end
+  local body_state = M.body_state_at_line(headline)
+  local first_child = M.first_child_line(headline)
+  if first_child and M.line_invisible_p(first_child) then
+    M.show_entry(headline)
+    M.show_children(headline)
+  elseif body_state == 'absent' then
+    vim.notify('This headline has no body.')
+  elseif body_state == 'hidden' then
+    M.show_entry(headline)
+  elseif M.body_line_count(headline) == 1 then
+    vim.notify('A one-line body cannot be hidden: vim cannot close a'
+               .. ' one-line fold.')
+  else
+    M.hide_entry(headline)
+  end
+end
+
+---'absent' when the headline at LNUM has no body, 'hidden' when its
+---first body line is inside a closed fold, else 'visible'.
+---@param lnum integer
+---@return string
+function M.body_state_at_line (lnum)
+  local body_line = lnum + 1
+  if body_line > vim.api.nvim_buf_line_count(0)
+     or metadata.at_headline_p(body_line) then
+    return 'absent' end
+  if vim.fn.foldclosed(body_line) ~= -1 then return 'hidden' end
+  return 'visible'
+end
+
+---The number of body lines of the headline at LNUM.
+---@param lnum integer
+---@return integer
+function M.body_line_count (lnum)
+  local next_headline = metadata.next_headline_line(lnum)
+                        or vim.api.nvim_buf_line_count(0) + 1
+  return next_headline - lnum - 1
+end
+
+---The line of the first child of the headline at LNUM, or nil. The
+---stand-in for org-goto-first-child.
+---@param lnum integer
+---@return integer|nil
+function M.first_child_line (lnum)
+  local next_headline = metadata.next_headline_line(lnum)
+  if next_headline
+     and metadata.outline_level(next_headline) > metadata.outline_level(lnum)
+  then return next_headline end
+  return nil
+end
+
+---Show the headline at LNUM and its body: open every closed fold that
+---holds its first body line, the headline's own subtree fold among
+---them. (Opening the subtree fold leaves the body's fold as it was.)
+---The stand-in for org-fold-show-entry.
+---@param lnum integer
+function M.show_entry (lnum)
+  local last = vim.api.nvim_buf_line_count(0)
+  local line = lnum + 1 <= last and not metadata.at_headline_p(lnum + 1)
+               and lnum + 1 or lnum
+  for _ = 1, metadata.outline_level(lnum) + 1 do
+    if vim.fn.foldclosed(line) == -1 then return end
+    pcall(vim.cmd, string.format('%dfoldopen', line))
+  end
+end
+
+---Show each immediate child headline of the headline at LNUM, with its
+---own subtree folded. A child of one line is left open, since closing
+---a one-line fold hides nothing and makes the next close close its
+---parent. The stand-in for org-fold-show-children.
+---@param lnum integer
+function M.show_children (lnum)
+  local level = metadata.outline_level(lnum)
+  local child = M.first_child_line(lnum)
+  while child and metadata.outline_level(child) > level do
+    local after = metadata.next_headline_after_subtree(child)
+    local subtree_end = (after or vim.api.nvim_buf_line_count(0) + 1) - 1
+    if vim.fn.foldclosed(child) == -1 and subtree_end > child then
+      M.close_fold_at(child) end
+    child = after
+  end
+end
 
 -- ── the fold expression ────────────────────────────────────────────
 

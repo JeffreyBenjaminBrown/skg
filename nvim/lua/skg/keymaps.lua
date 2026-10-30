@@ -121,6 +121,8 @@ M.commands = {
                    desc = "Edit the node's metadata as an org tree" },
   ViewAncestry = { module = 'skg.view_ancestry', fn = 'view_ancestry',
                    desc = 'Show only the outline ancestry of point' },
+  OrgBodyToggle = { module = 'skg.folds', fn = 'org_body_toggle',
+                    desc = "Hide or show the body of the headline at point" },
   ReadableIdsToggle = { module = 'skg.readable_ids', fn = 'toggle',
                         desc = 'Toggle shortened, title-annotated UUIDs' },
   ReadableIdsRefresh = { module = 'skg.readable_ids', fn = 'refresh',
@@ -291,6 +293,7 @@ M.content_view_bindings = {
   { 'mc', 'ReplaceLinkWithContent' },    -- C-c m c
   { 'mf', 'Fork' },                      -- C-c m f
   { 'ml', 'ReplaceContentWithLink' },    -- C-c m l
+  { 'vb', 'OrgBodyToggle' },             -- C-c v b
   { 'vd', 'DiffViewOpen' },              -- C-c v d
   { 've', 'ViewNewEmpty' },              -- C-c v e
   { 'vh', 'HeraldsToggle' },             -- C-c v h
