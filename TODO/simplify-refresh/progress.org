@@ -4893,3 +4893,128 @@ relRepo lookups. Every 'FIX PLANNED' entry of
 1026 of 1026 (one new), integration 34 of 35 with the
 pre-existing failure; the client suites were not run, as no
 client was touched.
+
+** Slice 9
+*** The commits
+**** 7599dbd5
+Neovim's readable-ids refresh: 'readable_ids.lua' gains the
+session title cache Emacs keeps, and 'refresh' empties it and
+annotates again ('<localleader>vR', ':SkgReadableIdsRefresh').
+**** 1777f861
+Neovim's body toggle, 'folds.org_body_toggle'
+('<localleader>vb', ':SkgOrgBodyToggle').
+**** c9933b42
+Emacs's relRepo info request sends the recorder, and the wire
+key the server reads is 'recorder'; a test of the request.
+**** The last commit
+Neovim's relRepo gesture: 'relRepo_info.lua' ('set_relRepo',
+'set_relRepo_at_line', 'set_relRepo_from_info') and its helpers
+in 'metadata.lua' ('rel_at_line' to 'folder_anchor_editable_p',
+'set_relRepo_recursive'), '<localleader>sr' and
+'<localleader>sR', ':SkgSetRelRepo' and
+':SkgSetRelRepoRecursive'; 'C-c s r' in server messages
+rewritten for Neovim; the integration test
+'tests/integration/set-relRepo'; the docs; the two problems
+entries moved; this record and the plan's keyword.
+*** The suites
+Run serialized on the finished tree.
+**** cargo check --all-targets
+Clean, no warning.
+**** bash/nextest.sh
+1026 run, 1026 passed. The wire key's rename touched one line of
+the handler; no Rust test sends the request, so none changed.
+**** bash/emacs-tests.sh
+412 of 412 passed (411 before; one added, the request names the
+recorder, which fails against the code before the slice).
+**** bash/nvim-tests.sh
+No failure and no error. 441 tests report success, counted as
+the lines plenary prints per test; 45 of them are new (six in
+'readable_ids_spec.lua', four in 'folds_spec.lua', 29 in
+'metadata_spec.lua', six in 'relRepo_info_spec.lua'). The
+per-file summaries plenary prints sum to fewer, since the
+parallel runs interleave their output, so this count and the
+406 of slice 8's record were not made the same way.
+**** bash/integration-tests.sh
+Emacs: 35 of 36. Neovim ('SKG_TEST_CLIENT=nvim'): 35 of 36. The
+new 'set-relRepo' passes with each; the failure each time is
+'import-md-and-org', pre-existing and not this plan's.
+**** Failures met during the slice
+***** the binding of 'C-c s r' in a server message
+'save_spec.lua' pinned that Neovim leaves 'C-c s r' in a server
+message as it is, since Neovim had no binding: an expected
+fixture adaptation. It now names '<localleader>sr'.
+***** the integration test against a stale binary
+The first run of 'set-relRepo' offered every skgrepo: the
+integration harness runs 'target/debug/skg' as built, and it was
+built before the wire key's rename. Not a defect; 'cargo build'
+fixed it.
+*** The TCP surface
+A scratch server ('verify' skill, port 1750; script and output in
+'tests/results/08/slice9/probe/'), driven by headless Neovim: the
+body toggle on a body the server rendered hid it and showed it
+again; the readable-ids refresh emptied a cache holding a stale
+title and asked again, caching an unknown UUID as missing; the
+relRepo gesture on a content child got the default 'private' and
+the current 'public' from the server, offered 'private', 'secret'
+and the no-override choice, prefilled 'private' and wrote
+'secret'; the recursive gesture offered the whole ladder and set
+one 'content' relationship; the save recorded '(relRepo secret)'
+with no warning. The Emacs gesture was driven by the integration
+test.
+*** Deviations from the plan's "how"
+**** the single-relationship command lives in 'relRepo_info.lua'
+The plan put 'set_relRepo' in 'metadata.lua'. Slice 5's naming
+rule keeps a function in its Emacs file's twin, and
+'skg-set-relRepo' lives in 'skg-request-relRepo-info.el', so its
+twin, with the request and its handler, is
+'nvim/lua/skg/relRepo_info.lua'; the recursive command and every
+helper are in 'metadata.lua', as in Emacs. Functions acting at
+point take a line ('rel_at_line', 'relRepo_requested_value
+(line)'); the names are Emacs's otherwise.
+**** the wire key renamed
+Renaming 'owner' to 'recorder' cost one line in the server, one
+in Emacs and one in 'docs/api-and-formats.org', so it is
+renamed, and Neovim sends 'recorder' from the start.
+**** Neovim had no title cache
+The plan's refresh empties "the title cache"; Neovim's
+'readable_ids.lua' had none and asked for every title at each
+annotation. It now keeps Emacs's cache (an unresolved ID cached
+as missing, only uncached IDs requested, titles placed from the
+cache in a namespace of their own), without which the refresh
+would do what an annotation does.
+**** the kind menu is a selection list
+'vim.ui.select' lists one entry per relation role, "contains:
+content", with "(not settable here)" on the seven others;
+choosing one of those says why, as RET on it does in Emacs's org
+menu. The deviations doc says so.
+**** a refusal's words
+'skg--rel-at-point' said "Not on an occurrence, an unknown or a
+Restricted vognode"; both clients now say "Not on an occurrence,
+a reference to an unknown node or a restricted headline", as the
+plan's rule for user text asks.
+**** a one-line body
+Vim cannot close a one-line fold, and closing one marks it
+closed, so that the next close closes the headline's subtree
+(tried in 'tests/results/08/slice9/probe_fold.lua'). The toggle
+leaves a one-line body shown with a message rather than close it,
+and it closes a child's subtree only when the subtree has more
+than one line.
+**** 'C-c s r' in server messages
+'messages.neovim_bindings_of_emacs_chords' now rewrites 'C-c s r'
+as '<localleader>sr', since Neovim has the binding.
+*** Fixtures changed
+The 'save_spec.lua' case above. The test of Emacs's body toggle
+that opens a folded headline has a one-line body; Neovim's twin
+gives it two lines, since the one-line case is the one vim cannot
+express, tested on its own.
+*** Left unfinished
+**** the body-toggle case vim cannot express
+Hiding a one-line body. The deviations doc lists it under
+"Folding".
+**** prose untouched
+'docs/COMMANDS.org' and 'docs/COMMANDS-nvim.org' still call the
+gnid-only vognode "a Restricted vognode" in their skgrepo-set
+section, and docstrings in 'elisp/skg-metadata.el' and their Lua
+twins name it so; slice 10's docs pass owns the user text.
+*** Headline
+DONE.

@@ -1,3 +1,30 @@
+* Problems noticed while executing plan 19, slice 12 (2026-10-24; fixed 2026-10-30)
+** Emacs's relRepo info request always sends a nil recorder
+  'skg-set-relRepo' asks the server which skgrepos a relationship may
+  take ('elisp/skg-request-relRepo-info.el'), sending '(owner .
+  ,(plist-get relationship :owner))'; but 'skg--rel-at-point'
+  ('elisp/skg-metadata.el') returns ':recorder', not ':owner', so the
+  request names no recorder, and the command falls back to offering
+  every skgrepo ('docs/COMMANDS.org', "C-c s r"). Read, not run. The
+  wire key 'owner' ('server/serve/handlers/relRepo_info.rs') also
+  means the recorder; renaming it would match the prose.
+  Fixed by slice 9 of
+  'TODO/simplify-refresh/08_plan_restriction-and-tidy.org': Emacs
+  sends the recorder, and the wire key is 'recorder' in the server and
+  both clients. 'test-relRepo-info-request-names-the-recorder' and the
+  integration test 'tests/integration/set-relRepo' check it.
+** The Neovim client lacks three Emacs commands
+  'C-c s r' and 'C-c s R' (the relRepo gesture), 'C-c v b' (the body
+  toggle) and 'C-c v R' (the readable-ids refresh) have no Neovim
+  counterpart. 'docs/nvim-client-deviations.org' now lists them under
+  "Commands not ported".
+  Fixed by slice 9 of
+  'TODO/simplify-refresh/08_plan_restriction-and-tidy.org': Neovim has
+  the three as '<localleader>sr' and '<localleader>sR'
+  ('relRepo_info.set_relRepo', 'metadata.set_relRepo_recursive'),
+  '<localleader>vb' ('folds.org_body_toggle') and '<localleader>vR'
+  ('readable_ids.refresh'); the deviations doc lists only what Neovim
+  cannot do.
 * Problems noticed while executing plan 06, slice 1 (2026-10-26; fixed 2026-10-30)
 ** Under a restriction, the graphnode stats are quadratic in a list's length
   Slice 1 of 'TODO/simplify-refresh/06_plan_tidy-refresh.org' made

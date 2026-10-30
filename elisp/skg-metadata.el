@@ -285,7 +285,7 @@ an ID missing."
   (let ((member-sexp (skg--metadata-sexp-at-point-or-nil)))
     (unless (or (skg--occurrence-sexp-p member-sexp)
                 (skg--gnid-only-vognode-sexp-p member-sexp))
-      (user-error "Not on an occurrence, an unknown or a Restricted vognode"))
+      (user-error "Not on an occurrence, a reference to an unknown node or a restricted headline"))
     (let ((member-gnid (skg--relationship-member-id member-sexp))
           (parent-sexp (save-excursion
                          (and (org-up-heading-safe)

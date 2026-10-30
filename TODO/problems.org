@@ -42,15 +42,6 @@
   accumulates.
 * Problems noticed while executing plan 08, slice 1 (2026-10-29)
 * Problems noticed while executing plan 19, slice 12 (2026-10-24)
-** Emacs's relRepo info request always sends a nil recorder
-  'skg-set-relRepo' asks the server which skgrepos a relationship may
-  take ('elisp/skg-request-relRepo-info.el'), sending '(owner .
-  ,(plist-get relationship :owner))'; but 'skg--rel-at-point'
-  ('elisp/skg-metadata.el') returns ':recorder', not ':owner', so the
-  request names no recorder, and the command falls back to offering
-  every skgrepo ('docs/COMMANDS.org', "C-c s r"). Read, not run. The
-  wire key 'owner' ('server/serve/handlers/relRepo_info.rs') also
-  means the recorder; renaming it would match the prose.
 ** Two texts with a bare "repo"
   The overPrivateText release warning says "selected below its node's
   home repo" ('server/serve/handlers/text_release.rs', two messages),
@@ -58,11 +49,6 @@
   now quotes the code. A comment in 'nvim/lua/skg/keymaps.lua' calls
   the module "the single skgrepo of truth", an over-eager rename of
   "source of truth" ('docs/COMMANDS-nvim.org' had it too; fixed there).
-** The Neovim client lacks three Emacs commands
-  'C-c s r' and 'C-c s R' (the relRepo gesture), 'C-c v b' (the body
-  toggle) and 'C-c v R' (the readable-ids refresh) have no Neovim
-  counterpart. 'docs/nvim-client-deviations.org' now lists them under
-  "Commands not ported".
 * Problems noticed while executing plan 19, slice 10 (2026-10-24)
 ** nvim-orgmode's insert-heading-respect-content breaks in a view
   nvim-orgmode's 'insert_heading_respect_content' (default

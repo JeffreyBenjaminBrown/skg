@@ -545,6 +545,62 @@ Only member descendents (those without the 'noClaim' atom) are traversed.
 The write-protected warning and the save's handling of relationships
 described under <localleader>ss apply here too, across the whole
 subtree.
+*** <localleader>sr : :SkgSetRelRepo
+Sets the relRepo of the relationship the headline at point represents
+-- =contains= for a content child, the folder's relation for a member
+of an editable partner folder, or the alias membership for an alias
+headline. A reference to an unknown node, or a restricted headline,
+in one of those writable positions is supported too: it carries only
+its raw member ID, never a node edit.
+
+For a node-to-node relationship, the command asks the server for its
+default relRepo and current relRepo (the "relRepo info" endpoint; the
+request names the relationship's recorder -- the viewparent, or the
+folder's anchor -- its member and its relation), then prompts
+-- with TAB completion and S-Left/S-Right cycling, like the other
+skgrepo prompts -- over the skgrepos at least as private as the
+default (more public ones could leak an endpoint's ID and would be
+refused at save), plus a no-override choice. The prompt starts with a
+pending request when it is offered, else the current relRepo or the
+default, so Enter keeps the most specific choice. If the server
+cannot resolve the relationship (e.g. a node not yet saved), every
+skgrepo is offered and the save's floor check backstops. For an
+alias, the default is its owning node's home, read from the buffer
+with no request.
+
+Choosing a skgrepo writes an =(editRequest (relRepo REPO))= request,
+which both raises privacy above the default and lowers it back down
+to (never below) the default. The no-override choice removes the
+request: a saved relationship keeps its saved skgrepo (sticky); to
+reach the default, choose it.
+
+Refuses on a member of a write-protected folder (the relationship
+belongs to the other end there), under a write-protected parent or
+anchor, and on a root headline, which represents no relationship.
+The command only edits the buffer; save the view to apply it.
+*** <localleader>sR : :SkgSetRelRepoRecursive
+Like 'SetRelRepo', but applied throughout the subtree at point (the
+node at point's own relationship to its viewparent included).
+
+It first asks, with Neovim's selection menu, which role the
+view-children should play toward their viewparents: one entry per
+role of the schema's five node-node relations. Only three roles are
+settable from the child's position -- =content= (ordinary content),
+=subscribee= (a subscribeeFolder member) and =overridden= (an
+overriddenFolder member); choosing any other role says why its
+relationship cannot be set from there.
+
+It then prompts for a skgrepo over the whole ladder, plus the
+no-override choice, which instead removes the pending requests
+throughout the subtree. No per-relationship default is fetched, so
+the save's floor check validates each relationship.
+
+The walk recurses only on viewchildren that are members: member
+occurrences, and the two editable folders. It prunes below
+write-protected nodes and subscribee-as-such members, and prunes
+write-protected folders and other non-vognodes entirely. A pending
+delete or merge anywhere in the walk refuses the whole gesture before
+any edit. Save the view afterward to apply the changes.
 *** <localleader>sx : :SkgSetFlagSearchMatching
 Prompts between =search matching= and =no search matching= and stages the
 desired state without saving. Foreign/write-protected/unsaved roots and a
@@ -745,6 +801,15 @@ whose title is an =[[id:...][...]]= link to the original node.
 If the original headline title already contains a link, the
 command asks "Are you sure?" before proceeding.
 ** <localleader>v : view-level commands
+*** <localleader>vb : :SkgOrgBodyToggle
+Toggles the visibility of the body of the headline at point without
+hiding its children. If the whole headline is folded, the command
+shows its body and immediate children, but leaves each child's
+subtree folded. Works from the headline or from inside its body;
+called from the body, the cursor moves to the start of the headline.
+A bodyless headline is left alone unless its children need to be
+revealed. A one-line body cannot be hidden, since vim cannot close a
+one-line fold; the command says so and leaves it shown.
 *** <localleader>vd : :SkgDiffViewOpen
 If you use git to manage your data,
 this opens the diff view: every change in the owned skgrepos
@@ -833,8 +898,7 @@ holds names such a node (say a public node contains a private one),
 the view shows a headline with no title, heralded =restricted=,
 standing for it: a Restricted vognode. It keeps the relationship as
 it was when you save, and deleting its line removes the relationship,
-as deleting an unknown's does; its metadata view offers its relRepo
-request. A relationship recorded in a skgrepo outside the set shows
+as deleting an unknown's does; '<localleader>sr' sets its relRepo. A relationship recorded in a skgrepo outside the set shows
 nothing at all, and a save keeps it. Narrowing the set turns an open
 view's headline of such a node into a Restricted vognode (or, where
 nothing the set shows names it, a tombstone, "something stood here")
@@ -909,6 +973,14 @@ content views: elsewhere, run ':SkgReadableIdsToggle'. A .skg file
 buffer starts with it on.
 (It doesn't yet know how to read the git history
 to find titles for deleted files.)
+*** <localleader>vR : :SkgReadableIdsRefresh
+The ID-to-title map is cached for the whole Neovim session, so a
+neogit refresh re-requests nothing it has already seen. This empties
+the cache and annotates the current buffer again. Use it after
+anything that changes what titles the server would answer with: a
+node retitled, or the skgrepo restriction widened (IDs restricted
+under the old one were cached as unresolvable). The key is bound in
+content views only; elsewhere, run ':SkgReadableIdsRefresh'.
 *** <localleader>vs : :SkgViewLinkstack
 View and maybe edit the set of links you've stored.
 (See "the linkstack" below.)

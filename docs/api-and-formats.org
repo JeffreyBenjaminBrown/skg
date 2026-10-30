@@ -617,7 +617,7 @@ since the command searches the current buffer.
     view, and recomputes context rankings for search.
 
 ** relRepo info
-  - Request: ((request . "relRepo info") (owner . "ID")
+  - Request: ((request . "relRepo info") (recorder . "ID")
     (member . "ID") (relation . "contains")) — relation is one of
     =contains=, =subscribesTo=, =overrides=: the three
     relations an explicit =(editRequest (relRepo ...))= request can name.

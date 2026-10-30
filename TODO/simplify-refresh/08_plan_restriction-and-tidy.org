@@ -1032,7 +1032,7 @@ a test that counts lookups, beside slice 7's; the suites. Move
 the entry "Under a restriction, the graphnode stats are
 quadratic in a list's length" to 'TODO/DONE/'.
 
-** TODO Slice 9: the three commands Neovim lacks
+** DONE Slice 9: the three commands Neovim lacks
 Read "The three commands Neovim lacks" in the agreed behavior,
 'docs/nvim-client-deviations.org' ("Input model" and "Commands
 not ported") and the slice 5 record in 'progress.org' first.

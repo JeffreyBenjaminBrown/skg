@@ -615,7 +615,9 @@ privacy in both directions.)
 
 For a node-to-node relationship, the command asks the server for its default
 relRepo and current relRepo (the
-"relRepo info" endpoint), then prompts -- with both
+"relRepo info" endpoint; the request names the relationship's
+recorder -- the viewparent, or the folder's anchor -- its member and
+its relation), then prompts -- with both
 tab-completion and S-left/S-right cycling, like the other skgrepo
 dialogs -- over the skgrepos at least as private as the default (more
 public ones could leak an endpoint's ID and would be rejected at

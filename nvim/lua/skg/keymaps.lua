@@ -91,6 +91,10 @@ M.commands = {
                 desc = "Change the node's repo (in-buffer; save applies)" },
   SetRepoRecursive = { module = 'skg.metadata', fn = 'set_repo_recursive',
                          desc = 'Change repo here and in matching descendants' },
+  SetRelRepo = { module = 'skg.relRepo_info', fn = 'set_relRepo',
+                 desc = 'Request the relRepo of the relationship at point' },
+  SetRelRepoRecursive = { module = 'skg.metadata', fn = 'set_relRepo_recursive',
+                          desc = 'Request a relRepo for each relationship of a kind in the subtree' },
   Detach = { module = 'skg.metadata', fn = 'detach',
              desc = "Write noClaim: the save takes it out of its parent's list" },
   Attach = { module = 'skg.metadata', fn = 'attach',
@@ -274,6 +278,8 @@ M.content_view_bindings = {
   { 'sl', 'RestoreRemovedMembership' },  -- C-c s l
   { 'ss', 'SetRepo' },                 -- C-c s s
   { 'sS', 'SetRepoRecursive' },        -- C-c s S
+  { 'sr', 'SetRelRepo' },                -- C-c s r
+  { 'sR', 'SetRelRepoRecursive' },       -- C-c s R
   { 'st', 'Detach' },                    -- C-c s t
   { 'sa', 'Attach' },                    -- C-c s a
   { 'rr', 'CycleCommitReady' },          -- C-c r r

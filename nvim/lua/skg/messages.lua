@@ -17,6 +17,7 @@ M.neovim_bindings_of_emacs_chords = {
   ['C-c s d'] = '<localleader>sd',
   ['C-c s w'] = '<localleader>sw',
   ['C-c s s'] = '<localleader>ss',
+  ['C-c s r'] = '<localleader>sr',
   ['C-c g RET'] = '<localleader>gg',
   ['C-c g v'] = '<localleader>gv',
 }

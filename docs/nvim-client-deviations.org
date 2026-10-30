@@ -1,7 +1,7 @@
 #+TITLE: The Neovim client's deviations from the Emacs client
 # Every place the Neovim client behaves differently from the Emacs
-# client because Neovim cannot do what Emacs does, and the commands
-# it lacks. Anything not listed here is intended to behave
+# client because Neovim cannot do what Emacs does. Anything not
+# listed here is intended to behave
 # identically; if it doesn't, that's a bug worth reporting in
 # ../TODO/problems.org.
 #
@@ -70,6 +70,11 @@ names Neovim's keys where Emacs's names a chord.
   gives them (docs/COMMANDS-nvim.org, "keys outside content views").
 - Emacs also binds 'C-c C-o' to skg-goto, in place of org's
   open-at-point; Neovim has only '<localleader>gg'.
+- The relationship-kind menu of the recursive relRepo gesture
+  ('<localleader>sR') is Neovim's selection menu ('vim.ui.select'),
+  one entry per relation role, where Emacs pops up an org buffer of
+  the relations and their roles; choosing a role that cannot be set
+  says why, as RET on it does in Emacs.
 - The skgrepo prompts cycle with S-Left/S-Right and complete with TAB,
   as in Emacs; the 'C-?' show-all-skgrepos helper key inside the prompt
   is dropped (terminals rarely deliver C-?); ':SkgViewRepoList'
@@ -105,6 +110,10 @@ names Neovim's keys where Emacs's names a chord.
   updated while not displayed anywhere gets its fold atoms stripped but
   has no fold state to restore into, and appears fully open when next
   displayed. (Emacs restored folds even in undisplayed buffers.)
+- For the same reason the body toggle ('<localleader>vb', Emacs's
+  'C-c v b') leaves a one-line body shown, and says so; org hid it.
+  (Closing a one-line fold would also mark it closed, so that the
+  next close would close the headline's whole subtree.)
 - skg view buffers use skg's own foldexpr (a body gets its own fold
   one level below its headline, which is what makes 'bodyFolded'
   representable) rather than nvim-orgmode's folding; the org plugin
@@ -136,12 +145,11 @@ names Neovim's keys where Emacs's names a chord.
   what it appended.
 - Server messages name Emacs chords. The client rewrites those it
   has a binding for ('neovim_bindings_of_emacs_chords' in
-  nvim/lua/skg/messages.lua: C-c s d, C-c s w, C-c s s, C-c g RET,
-  C-c g v). It leaves the others as they are: 'C-c s r', in the
-  leak-shaped membership warnings, names a command Neovim lacks (see
-  "Commands not ported"), and the fork-confirmation buffer's 'C-c C-c'
-  and 'C-c C-k' are '<localleader>cc' and '<localleader>ck' here, as
-  the notification that opens it says.
+  nvim/lua/skg/messages.lua: C-c s d, C-c s w, C-c s s, C-c s r,
+  C-c g RET, C-c g v). It leaves the others as they are: the
+  fork-confirmation buffer's 'C-c C-c' and 'C-c C-k' are
+  '<localleader>cc' and '<localleader>ck' here, as the notification
+  that opens it says.
 - View buffers are named 'skg://TITLE' (search: 'skg://?TERMS');
   Emacs used '*TITLE*'. Message/report buffers live under
   'skg://messages/...', 'skg://unknown-node', 'skg://diff-view: ...',
@@ -164,14 +172,3 @@ names Neovim's keys where Emacs's names a chord.
 - The 'M-x' cosmetic machinery (alias names, completion-predicate
   hiding of internal names) has no analog; the ':Skg*' commands are
   the public names.
-
-* Commands not ported
-These Emacs commands have no Neovim counterpart yet; nothing in
-nvim/lua/skg/keymaps.lua binds or defines them.
-- 'C-c s r' and 'C-c s R' ('skg-set-relRepo' and
-  'skg-set-relRepo-recursive'), which write a '(relRepo NAME)' edit
-  request. A '(relRepo NAME)' typed into the metadata by hand, or
-  set in the metadata editor, still works.
-- 'C-c v b' ('skg-org-body-toggle').
-- 'C-c v R' ('skg-readable-ids-refresh'); '<localleader>vr' toggles
-  readable-ids, as 'C-c v r' does.

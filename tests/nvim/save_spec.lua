@@ -512,12 +512,13 @@ describe('skg.save pipeline', function ()
     vim.api.nvim_buf_delete(found, { force = true })
   end)
 
-  it('names the Neovim bindings of C-c s s and C-c g RET, and leaves'
-     .. ' C-c s r, which has none', function ()
+  it('names the Neovim bindings of C-c s s, C-c g RET and C-c s r',
+     function ()
     local messages = require('skg.messages')
     assert.are.equal(
       'set the clone\'s repo (<localleader>ss); visit an editable view'
-      .. ' (<localleader>gg); move it with skg-set-relRepo (C-c s r)',
+      .. ' (<localleader>gg); move it with skg-set-relRepo'
+      .. ' (<localleader>sr)',
       messages.with_neovim_bindings(
         'set the clone\'s repo (C-c s s); visit an editable view'
         .. ' (C-c g RET); move it with skg-set-relRepo (C-c s r)'))
