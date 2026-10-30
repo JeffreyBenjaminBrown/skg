@@ -5018,3 +5018,23 @@ section, and docstrings in 'elisp/skg-metadata.el' and their Lua
 twins name it so; slice 10's docs pass owns the user text.
 *** Headline
 DONE.
+
+** Orchestrator's notes after slice 9 (2026-10-30)
+Launched 00:16 UTC; the session ended at about 00:24 UTC with
+Jeff's reboot, after three commits; the same agent was resumed
+at 00:33 UTC with its context and reported at 00:40 UTC: about
+eighteen minutes of agent time; 320k agent tokens over 110
+tool uses. Four commits. The deviations are sound: the
+gesture's entry lives in 'relRepo_info.lua' beside its Emacs
+twin, as slice 5's rule says; the wire key is 'recorder', one
+line in each of the server, Emacs and the API doc; Neovim got
+the title cache the refresh empties, which it lacked; the kind
+menu is 'vim.ui.select'; a one-line body cannot be hidden by
+vim's folds, which the deviations doc lists. Neovim's suite is
+counted by its per-test lines now (441, 45 new), since
+plenary's parallel output interleaves the per-file totals.
+Corrections carried to slice 10: "Restricted vognode" still in
+both COMMANDS docs, the noun "skgrepo widening" for slice 9's
+new prose, and the integration count 35 of 36. Suites: nextest
+1026 unchanged, Emacs 412 (one new), Neovim green, integration
+35 of 36 with either client, the pre-existing failure.

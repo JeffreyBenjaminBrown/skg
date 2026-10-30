@@ -1125,6 +1125,16 @@ graphnode stats keep one 'RelRepoLookup' for the whole pass:
 a doc that says 'all' skips the relRepo lookups, or that the
 stats under a skgrepo restriction cost more than under 'all',
 is wrong and is corrected.
+*** Corrections carried from slice 9
+Both COMMANDS docs still say "Restricted vognode" in the
+paragraph of 'C-c v l' and '<localleader>vl', and the
+skgrepo-set sections of both say it too; user text says "a
+restricted headline". Slice 9's new prose in
+'docs/COMMANDS-nvim.org' and 'nvim/lua/skg/readable_ids.lua'
+says "the skgrepo restriction widened" where the glossary's
+noun is "a skgrepo widening"; it takes the noun. The
+integration suite has 36 tests since slice 9, so its expected
+result is 35 of 36, the pre-existing failure the one.
 *** the docs
 Each item of the agreed behavior's section, in the docs it
 names; the coinages of this plan ('GnidOnlyVognode', 'Unread',
