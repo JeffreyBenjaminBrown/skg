@@ -4749,3 +4749,30 @@ copies the tests report lists ('save_view', 'line_containing'
 and others) stay.
 *** Headline
 DONE.
+
+** Orchestrator's notes after slice 7 (2026-10-30)
+Launched 23:41 UTC, reported 00:04 UTC: twenty-three minutes;
+397k agent tokens over 204 tool uses. Seven commits. No
+correction carried. The deviations are sound: the process ID
+reaches the nineteen index paths that never went through
+'run_with_test_stores'; 'pid_else_raw_id' is a method of the
+graph; 'after_a_switch' compares the two skgrepo restrictions
+itself; the stats test counts list reads through a
+'cfg (test)' thread-local. Four of the agreed behavior's gaps
+were already covered by slices 0, 1 and 2 and by plan 06's
+slice 1, recorded as such. The harness check passed: three
+runs, two overlapping, no folder without the process ID. One
+defect found, filed in 'TODO/problems.org' ("A skgrepo widening
+keeps a skgrepo narrowing's noClaim") and older than this plan:
+a view narrowed and widened again keeps the 'noClaim' the
+skgrepo narrowing marked on a member whose record alone was
+restricted, and a save under 'all' then reads it as a
+detachment and deletes the record. It needs a design choice,
+so it goes to Jeff with the orchestrator's recommendation (the
+skgrepo widening restores the claim: since slice 4 a switch
+happens only while every view is saved, so no 'noClaim' under a
+parent that reads claims is the user's at a switch). Slices 8
+to 10 do not depend on the answer, so the run goes on. Suites:
+nextest 1025 of 1025 (nine new), Emacs 411, Neovim 406,
+integration 34 of 35 with either client, the pre-existing
+failure.
