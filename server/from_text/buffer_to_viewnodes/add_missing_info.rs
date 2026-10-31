@@ -10,7 +10,7 @@
 /// 'viewnode_from_metadata'.
 
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::serve::parse_metadata_sexp::ViewnodeMetadata;
+use crate::serve::parse_metadata_sexp::{MetadataKind, OccurrenceMetadata, ViewnodeMetadata};
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::viewnode::{RelationshipEditRequest, Folder, PropertyMember, Viewnode, ViewnodeKind, Vognode};
 use ego_tree::NodeRef;
@@ -103,12 +103,13 @@ pub fn replace_gnid_with_pid (
   metadata      : &mut ViewnodeMetadata,
   id_resolution : IdResolution,
 ) {
-  if ! metadata . names_an_occurrence () { return; }
+  let MetadataKind::Occurrence (occurrence) = &mut metadata . kind
+    else { return; };
   let pid : Option<ID> =
-    metadata . gnid . as_ref ()
+    occurrence . gnid . as_ref ()
     . and_then ( |gnid| id_resolution . pid_of (gnid) );
   if let Some (pid) = pid {
-    metadata . gnid = Some (pid); }}
+    occurrence . gnid = Some (pid); }}
 
 /// The skgrepo each ID with a write-protected occurrence will have once
 /// this save lands: that of its editable occurrence in this buffer, if
@@ -126,11 +127,12 @@ pub fn skgrepos_after_save_of_writeProtected_occurrences<'a> (
   let mut editable_skgrepos : HashMap<ID, SkgrepoName> = HashMap::new ();
   let mut writeProtected_gnids : HashSet<ID> = HashSet::new ();
   for metadata in headlines {
-    if ! metadata . names_an_occurrence () { continue; }
-    let Some (gnid) = &metadata . gnid else { continue; };
-    if metadata . writeProtected {
+    let MetadataKind::Occurrence (occurrence) = &metadata . kind
+      else { continue; };
+    let Some (gnid) = &occurrence . gnid else { continue; };
+    if occurrence . writeProtected {
       writeProtected_gnids . insert (gnid . clone ());
-    } else if let Some (skgrepo) = &metadata . home_skgrepo {
+    } else if let Some (skgrepo) = &occurrence . home_skgrepo {
       editable_skgrepos . insert (gnid . clone (), skgrepo . clone ()); }}
   writeProtected_gnids . into_iter ()
     . filter_map ( |gnid| {
@@ -153,26 +155,25 @@ pub fn skgrepos_after_save_of_writeProtected_occurrences<'a> (
 /// What finds none leaves the headline without one, for validation to
 /// refuse. Returns whether it inherited one.
 pub fn complete_occurrence_skgrepo (
-  metadata                           : &mut ViewnodeMetadata,
+  occurrence                         : &mut OccurrenceMetadata,
   viewparent                         : NodeRef<Viewnode>,
   id_resolution                      : IdResolution,
   writeProtected_skgrepos_after_save : &HashMap<ID, SkgrepoName>,
 ) -> bool {
-  if ! metadata . names_an_occurrence ()
-     || metadata . home_skgrepo . is_some () { return false; }
+  if occurrence . home_skgrepo . is_some () { return false; }
   let from_graph : Option<SkgrepoName> =
-    if metadata . writeProtected {
-      metadata . gnid . as_ref ()
+    if occurrence . writeProtected {
+      occurrence . gnid . as_ref ()
       . and_then ( |gnid| id_resolution . home_skgrepo_of (gnid) )
     } else { None };
   if from_graph . is_some () {
-    metadata . home_skgrepo = from_graph;
+    occurrence . home_skgrepo = from_graph;
     return false; }
   let inherited : Option<SkgrepoName> =
     skgrepo_of_nearest_occurrence_ancestor (
       viewparent, writeProtected_skgrepos_after_save );
   let did_inherit : bool = inherited . is_some ();
-  metadata . home_skgrepo = inherited;
+  occurrence . home_skgrepo = inherited;
   did_inherit }
 
 /// The skgrepo of the nearest occurrence at or above 'node'.

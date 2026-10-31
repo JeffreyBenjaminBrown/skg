@@ -10,7 +10,7 @@
 use crate::git_fixture_helpers::{assert_round_trip, with_facts};
 use skg::org_to_text::viewnode_to_string;
 use skg::serve::parse_metadata_sexp::{
-  ViewnodeMetadata, parse_metadata_to_viewnodemd};
+  MetadataKind, OccurrenceMetadata, ViewnodeMetadata, parse_metadata_to_viewnodemd};
 use skg::types::misc::{ID, SkgrepoName};
 use skg::types::nodes::complete::Flag;
 use skg::types::viewnode::{
@@ -90,7 +90,9 @@ fn an_edit_request_and_a_readiness_request_share_one_form () {
   let metadata : ViewnodeMetadata = parse_metadata_to_viewnodemd (
     "(skg node (gnid a) (editRequest delete (ready node)))" ) . unwrap ();
   assert_eq! ( metadata . readiness_request, request (true, &[DiffObject::Node]) );
-  assert! ( metadata . edit_request . is_some () ); }
+  assert! ( matches! ( metadata . kind,
+                       MetadataKind::Occurrence ( OccurrenceMetadata {
+                         edit_request : Some (_), .. } ))); }
 
 #[test]
 fn ghosts_and_unknowns_round_trip_their_readiness_requests () {

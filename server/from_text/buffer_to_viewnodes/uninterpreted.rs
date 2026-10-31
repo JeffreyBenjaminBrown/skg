@@ -3,7 +3,7 @@
 
 use crate::types::sexp::find_sexp_end;
 use crate::types::errors::{BufferValidationError, HeadlineName, with_org_subheadlines};
-use crate::serve::parse_metadata_sexp::{ parse_metadata_to_viewnodemd, default_metadata, viewnode_from_metadata, ViewnodeMetadata };
+use crate::serve::parse_metadata_sexp::{ parse_metadata_to_viewnodemd, default_metadata, viewnode_from_metadata, MetadataKind, ViewnodeMetadata };
 use crate::types::misc::ID;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{Viewnode, ViewnodeId, ViewnodeKind};
@@ -168,16 +168,17 @@ fn complete_linecol_to_viewnode (
               String > {
   let metadata : &mut ViewnodeMetadata =
     viewnode_line_col . headline . 1 . get_or_insert_with (default_metadata);
-  let is_alias : bool =
-    metadata . names_an_occurrence ()
-    && viewparent_makes_aliases (viewparent);
-  let skgrepo_inherited : bool =
-    ! is_alias
-    && complete_occurrence_skgrepo (
-         metadata, viewparent, id_resolution,
-         & provenance . writeProtected_skgrepos_after_save );
-  let gnid_minted : bool =
-    metadata . names_an_occurrence () && metadata . gnid . is_none ();
+  let (is_alias, skgrepo_inherited, gnid_minted) : (bool, bool, bool) =
+    match &mut metadata . kind {
+      MetadataKind::Occurrence (occurrence) => {
+        let is_alias : bool = viewparent_makes_aliases (viewparent);
+        let skgrepo_inherited : bool =
+          ! is_alias
+          && complete_occurrence_skgrepo (
+               occurrence, viewparent, id_resolution,
+               & provenance . writeProtected_skgrepos_after_save );
+        ( is_alias, skgrepo_inherited, occurrence . gnid . is_none () ) },
+      _ => (false, false, false), };
   let (_level, mut viewnode, error_opt, warning_opt)
     : (usize, Viewnode, Option<BufferValidationError>, Option<String>)
     = linecol_to_viewnode (viewnode_line_col)?;
@@ -264,8 +265,13 @@ fn linecol_to_viewnode(
       parsed_metadata
     } else { // No metadata, so use defaults.
       default_metadata () };
+  let (writeProtected, gnid) : (bool, Option<ID>) = // an occurrence's
+    match &metadata . kind {
+      MetadataKind::Occurrence (occurrence) =>
+        ( occurrence . writeProtected, occurrence . gnid . clone () ),
+      _ => (false, None), };
   let body_on_writeProtected : bool =
-    metadata . writeProtected
+    writeProtected
     && body_text . as_ref () . is_some_and (
       |body| ! body . trim () . is_empty () );
   let ( viewnode, error_opt, warning_opt )
@@ -279,7 +285,7 @@ fn linecol_to_viewnode(
       . to_string () ); }
   let error_opt : Option<BufferValidationError> =
     error_opt . or_else ( || if body_on_writeProtected {
-      Some (match metadata . gnid . clone () {
+      Some (match gnid . clone () {
         Some (gnid) => BufferValidationError::EditedWriteProtectedOccurrence {
           gnid    : gnid,
           title    : title . clone (),

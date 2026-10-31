@@ -19,7 +19,7 @@ use std::path::Path;
 fn unrestricted () -> SkgrepoRestriction {
   SkgrepoRestriction::unrestricted (
     &SkgConfig::dummyFromSkgrepos (HashMap::new ())) }
-use skg::types::viewnode::{Folder, ViewnodeKind};
+use skg::types::viewnode::Folder;
 
 #[test]
 fn test_text_search_org_format (
@@ -105,12 +105,12 @@ fn test_text_search_org_format (
         { match level {
             1 => {
               if let Some (md) = metadata {
-                if let Some (gnid) = md . gnid {
+                if let Some (gnid) = md . kind . gnid () {
                   level1_headlines . push (
                     ( gnid . to_string (), title ) ); }} },
             _ => {
               if let Some (md) = metadata {
-                if let MetadataKind::Other ( ViewnodeKind::Folder (Folder::Alias) )
+                if let MetadataKind::Folder (Folder::Alias)
                   = md . kind
                   { gnids_with_alias_folder . push (
                       level1_headlines . last () . unwrap () . 0 . clone () ); }} }, }} }
@@ -200,7 +200,7 @@ fn test_search_results_preserve_links_in_title (
       let mut found_link_node_title : Option<String> = None;
       for line in result . lines () {
         if let Ok (( 1, Some (md), title )) = headline_to_triple (line) {
-          if md . gnid . as_ref () . map ( |i| i . as_str () )
+          if md . kind . gnid () . map ( |i| i . as_str () )
                                   == Some ("link_node") {
             found_link_node_title = Some (title); }} }
       let title : String = found_link_node_title

@@ -3,7 +3,7 @@
 use skg::assert_metadata_eq;
 use skg::org_to_text::viewnode_to_text;
 use skg::herald_tokens::RelationshipHeralds;
-use skg::serve::parse_metadata_sexp::{ViewnodeMetadata, parse_metadata_to_viewnodemd};
+use skg::serve::parse_metadata_sexp::{MetadataKind, ViewnodeMetadata, parse_metadata_to_viewnodemd};
 use skg::types::misc::{ID, SkgrepoName};
 use skg::types::viewnode::{ Viewnode, ViewnodeKind, Vognode, Occurrence, Editability, ViewnodeStats, default_occurrence };
 use skg::types::viewnode::{Folder, Warrant, viewnode_of};
@@ -81,8 +81,10 @@ fn skgrepo_name_with_whitespace_is_one_round_trippable_atom () {
       . strip_prefix ("* ")
       . expect ("rendered headline has bullet") )
     . expect ("quoted repo should parse");
+  let MetadataKind::Occurrence (occurrence) = &metadata . kind
+    else { panic! ("parsed as {:?}", metadata . kind) };
   assert_eq! (
-    metadata . home_skgrepo, Some (SkgrepoName::from ("Mr Cheese")) );
+    occurrence . home_skgrepo, Some (SkgrepoName::from ("Mr Cheese")) );
 }
 
 #[test]

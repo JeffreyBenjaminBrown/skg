@@ -9,8 +9,8 @@
 
 use skg::org_to_text::viewnode_to_string;
 use skg::serve::parse_metadata_sexp::{
-  GnidOnlyMetadata, METADATA_GRAMMAR, MetadataKind, ViewnodeMetadata,
-  parse_metadata_to_viewnodemd, viewnode_from_metadata};
+  GnidOnlyMetadata, METADATA_GRAMMAR, MetadataKind, OccurrenceMetadata,
+  ViewnodeMetadata, parse_metadata_to_viewnodemd, viewnode_from_metadata};
 use skg::types::misc::{ID, SkgrepoName};
 use skg::types::viewnode::{
   Ghost, GnidOnlyKind, GnidOnlyVognode, PropertyMember, Viewnode, ViewnodeId, ViewnodeKind,
@@ -72,12 +72,14 @@ fn the_declared_parts_parse_back_in_any_order (
      (skgRepos (relRepo pub) (nodeRepo main)) noClaim (gnid n) node folded (vnid 1a))" )
     . unwrap ();
   assert_eq! ( in_print_order, shuffled );
-  assert_eq! ( in_print_order . gnid, Some ( ID::from ("n") ));
-  assert_eq! ( in_print_order . home_skgrepo, Some ( SkgrepoName::from ("main") ));
+  let MetadataKind::Occurrence (occurrence) = &in_print_order . kind
+    else { panic! ("parsed as {:?}", in_print_order . kind) };
+  assert_eq! ( occurrence . gnid, Some ( ID::from ("n") ));
+  assert_eq! ( occurrence . home_skgrepo, Some ( SkgrepoName::from ("main") ));
   assert_eq! ( in_print_order . viewStats . relRepo, Some ( SkgrepoName::from ("pub") ));
-  assert_eq! ( in_print_order . overridesHere, Some ( ID::from ("o") ));
-  assert! ( in_print_order . writeProtected
-            && ! in_print_order . claimsMembership
+  assert_eq! ( occurrence . overridesHere, Some ( ID::from ("o") ));
+  assert! ( occurrence . writeProtected
+            && ! occurrence . claimsMembership
             && in_print_order . foldAndFocus . folded ); }
 
 #[test]
@@ -126,6 +128,12 @@ fn each_kind_takes_only_its_own_parts (
       "A headline of kind ghost does not take writeProtected" ),
     ( "(skg ghost (gnid g) (skgRepos (nodeRepo main) (relRepo pub)))",
       "A ghost's skgRepos holds only (nodeRepo R)" ),
+    ( "(skg ghost (skgRepos (nodeRepo main)))",
+      "A ghost requires its (gnid X)" ),
+    ( "(skg ghost (gnid g) (viewRequests editableView))",
+      "A headline of kind ghost does not take viewRequests" ),
+    ( "(skg ghost (gnid g) (editRequest delete))",
+      "A headline of kind ghost accepts no edit request but restoreNode and a readiness request" ),
     ( "(skg unknown (gnid u) writeProtected)",
       "A headline of kind unknown does not take writeProtected" ),
     ( "(skg unknown (gnid u) (skgRepos (nodeRepo main)))",
@@ -162,7 +170,8 @@ fn a_headline_naming_no_kind_is_a_node (
 ) {
   let metadata : ViewnodeMetadata =
     parse_metadata_to_viewnodemd ("(skg focused)") . unwrap ();
-  assert! ( metadata . kind == MetadataKind::Node
+  assert! ( metadata . kind == MetadataKind::Occurrence (
+              OccurrenceMetadata::default () )
             && metadata . foldAndFocus . focused ); }
 
 /// The parse keeps a gnid-only vognode's kind with its parts, and
@@ -176,10 +185,10 @@ fn a_gnid_only_vognode_keeps_its_kind_and_its_parts (
       kind . wire_atom () )) . unwrap ();
     assert_eq! ( metadata . kind, MetadataKind::GnidOnly ( GnidOnlyMetadata {
       kind,
-      gnid            : ID::from ("g"),
-      relRepo         : Some ( SkgrepoName::from ("pub") ),
-      relRepo_request : Some ( SkgrepoName::from ("priv") ), } ));
-    assert! ( ! metadata . names_an_occurrence () );
+      gnid             : ID::from ("g"),
+      relRepo          : Some ( SkgrepoName::from ("pub") ),
+      relRepo_request  : Some ( SkgrepoName::from ("priv") ),
+      claimsMembership : false, } ));
     let (viewnode, error, _warning) =
       viewnode_from_metadata (&metadata, String::new (), None);
     assert_eq! ( error, None );

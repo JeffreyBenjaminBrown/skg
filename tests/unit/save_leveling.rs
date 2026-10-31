@@ -682,7 +682,8 @@ fn relrepo_fact_and_request_round_trip_separately (
   // The rendered fact and a requested skgrepo are distinct: the fact
   // remains under viewStats, while only editRequest carries write intent.
   use crate::org_to_text::viewnode_to_string;
-  use crate::serve::parse_metadata_sexp::parse_metadata_to_viewnodemd;
+  use crate::serve::parse_metadata_sexp::{
+    MetadataKind, OccurrenceEditRequest, parse_metadata_to_viewnodemd};
   use crate::types::viewnode::{
     default_occurrence, RelationshipEditRequest, Occurrence, Viewnode, ViewnodeKind, Vognode,
     viewnode_of };
@@ -706,8 +707,11 @@ fn relrepo_fact_and_request_round_trip_separately (
   assert_eq! ( parsed . viewStats . relRepo,
                Some ( SkgrepoName::from ("private") ),
                "relRepo did not round-trip through render+parse" );
-  assert_eq! ( parsed . relRepo_request,
-               Some ( SkgrepoName::from ("secret") ),
+  let MetadataKind::Occurrence (occurrence) = &parsed . kind
+    else { panic! ("parsed as {:?}", parsed . kind) };
+  assert_eq! ( occurrence . edit_request,
+               Some ( OccurrenceEditRequest::OfTheRelationship (
+                 RelationshipEditRequest::RelRepo ( SkgrepoName::from ("secret") ))),
                "relRepo request did not round-trip" );
 }
 
@@ -742,7 +746,8 @@ fn relrepo_requests_are_contextual_and_singular (
 fn flag_requests_parse_round_trip_and_reject_write_protected_flags (
 ) {
   use crate::org_to_text::viewnode_to_string;
-  use crate::serve::parse_metadata_sexp::parse_metadata_to_viewnodemd;
+  use crate::serve::parse_metadata_sexp::{
+    MetadataKind, OccurrenceEditRequest, parse_metadata_to_viewnodemd};
   use crate::types::nodes::complete::Flag;
   use crate::types::viewnode::{
     default_occurrence, Occurrence, NodeEditRequest, Viewnode,
@@ -765,9 +770,11 @@ fn flag_requests_parse_round_trip_and_reject_write_protected_flags (
       "(editRequest (flag noSearchMatching {}))", value)) );
     let parsed = parse_metadata_to_viewnodemd (
       &format! ("(skg {})", rendered)) . unwrap ();
-    assert_eq! ( parsed . edit_request,
-      Some (NodeEditRequest::SetFlag {
-        flag : Flag::NoSearchMatching, value }) );
+    let MetadataKind::Occurrence (parsed_occurrence) = &parsed . kind
+      else { panic! ("parsed as {:?}", parsed . kind) };
+    assert_eq! ( parsed_occurrence . edit_request,
+      Some ( OccurrenceEditRequest::OfTheNode ( NodeEditRequest::SetFlag {
+        flag : Flag::NoSearchMatching, value } )) );
     node . consume_edit_request_after_save ();
     let ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) = &node . kind
       else { unreachable! (); };

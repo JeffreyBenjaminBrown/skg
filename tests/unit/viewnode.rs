@@ -3,7 +3,7 @@ use super::*;
 use crate::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewforest;
 use crate::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
 use crate::org_to_text::viewnode_to_string;
-use crate::serve::parse_metadata_sexp::{ViewnodeMetadata, parse_metadata_to_viewnodemd, viewnode_from_metadata};
+use crate::serve::parse_metadata_sexp::{MetadataKind, ViewnodeMetadata, parse_metadata_to_viewnodemd, viewnode_from_metadata};
 use crate::types::errors::BufferValidationError;
 use crate::types::viewnode::Viewnode;
 use crate::types::tree::forest::{ViewForest, editable_occurrences};
@@ -99,7 +99,9 @@ fn writeProtect_requests_round_trip () {
       parse_metadata_to_viewnodemd (
         &format! ( "(skg node (gnid x) (viewRequests {}))", atom ) )
       . unwrap ();
-    assert_eq! ( metadata . view_requests,
+    let MetadataKind::Occurrence (occurrence) = &metadata . kind
+      else { panic! ("parsed as {:?}", metadata . kind) };
+    assert_eq! ( occurrence . view_requests,
                  [request] . into_iter () . collect () ); }}
 
 // 'write_protect' discards the body and edit request and drops the

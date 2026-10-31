@@ -20,7 +20,7 @@ use crate::serve::handlers::save_buffer::{
   update_from_and_rerender_buffer,
   update_from_and_rerender_buffer_with_approvals,
 };
-use crate::serve::parse_metadata_sexp::ViewnodeMetadata;
+use crate::serve::parse_metadata_sexp::{MetadataKind, ViewnodeMetadata};
 use crate::types::tree::forest::ViewForest;
 use crate::types::views_state::{OpenViews, ViewforestId, ViewnodeIdRecord};
 use crate::types::misc::{MSV, SkgConfig, Skgrepo, ID, TantivyIndex, SkgrepoName, rel_partners_at_relRepo, rel_partners_at_relRepo_msv, RelPartner};
@@ -651,9 +651,9 @@ pub fn compare_headlines_modulo_gnid(
     (Ok((level1, metadata1, title1)),
      Ok((level2, metadata2, title2))) => {
       let has_id1: bool =
-        metadata1 . as_ref() . map_or(false, |m| m . gnid . is_some());
+        metadata1 . as_ref() . map_or(false, |m| m . kind . gnid () . is_some());
       let has_id2: bool =
-        metadata2 . as_ref() . map_or(false, |m| m . gnid . is_some());
+        metadata2 . as_ref() . map_or(false, |m| m . kind . gnid () . is_some());
       if has_id1 != has_id2 {
         // One has an ID and the other doesn't, so they are unequal.
         return false; }
@@ -752,12 +752,13 @@ fn compare_two_viewnode_branches_recursively_modulo_gnid (
              compare_two_viewnode_branches_recursively_modulo_gnid(
                *c1, *c2)) ) }}
 
-/// Remove ID from metadata struct while preserving other metadata
+/// Remove an occurrence's ID from metadata struct while preserving other metadata
 fn strip_id_from_metadata_struct(
   metadata: Option<ViewnodeMetadata>
 ) -> Option<ViewnodeMetadata> {
   metadata . map(|mut meta| {
-    meta . gnid = None;
+    if let MetadataKind::Occurrence (occurrence) = &mut meta . kind {
+      occurrence . gnid = None; }
     meta
   } ) }
 

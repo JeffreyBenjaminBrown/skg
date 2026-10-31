@@ -6015,3 +6015,142 @@ that still say "repo-set" or "skgrepo-set" for the skgrepo
 restriction, in both clients and the server. Suites: nextest
 1061 of 1061, Emacs 414 of 414, Neovim 453 passes, integration
 35 of 36 with either client, the pre-existing failure.
+** Slice 4
+*** The commits
+**** The last commit
+The whole slice, as one commit: the type change breaks every
+reader of the parse at once. 'ViewnodeMetadata' keeps the
+viewnode ID, the fold and focus state, the readiness request
+and the derived facts; 'MetadataKind' has one variant per kind
+the table lists, each carrying its parts; the parse reads
+'shared/metadata-fields.json' ('server/serve/
+metadata_fields.rs') and refuses by one rule a part the kind
+does not take; 'viewnode_from_metadata' is one match. With the
+callers, the adapted tests, a test that each variant takes its
+table's parts and no other, the API doc, this record and the
+plan's keyword.
+*** The suites
+**** cargo check --all-targets
+Clean, no warning.
+**** bash/nextest.sh
+1061 of 1061: the count of slice 3. One test replaced by its
+generalization ('each_node_value_parses_to_what_it_names'
+became 'each_variant_takes_its_tables_parts_and_no_other',
+which covers every kind); three rows added to
+'each_kind_takes_only_its_own_parts'.
+**** bash/emacs-tests.sh
+414 of 414.
+**** bash/nvim-tests.sh
+453 per-test passes, none failed.
+**** bash/integration-tests.sh
+35 of 36 with Emacs and 35 of 36 with Neovim
+('SKG_TEST_CLIENT=nvim'); the failure is 'import-md-and-org'
+both times, pre-existing and not this plan's.
+**** Failures met during the slice
+None but the pre-existing one. The compiler found every reader
+of the old fields; each suite passed on its first full run.
+**** The TCP surface
+'tests/results/10/slice4/probe/run-probe.sh' starts an isolated
+server (port 1800; scratch data under the probe folder, removed
+after; stopped by its recorded PID) over a skgrepo "main" where
+r contains a, b and c, and c has the alias "see", and runs
+'probe-emacs.el', Emacs headless. It viewed r, wrote
+'(editRequest delete)' before 'node' on a and
+'(viewRequests (folder aliases))' before 'node' on c, retitled
+b, and saved: the rerendered view lacked a, showed "b new" and
+an aliasFolder holding "see" under c; 'a.skg' was gone and
+'b.skg' retitled. It then wrote '(editRequest delete)' on the
+alias and saved: nothing was saved, and the errors buffer said
+"A headline of kind alias accepts no edit request but (relRepo
+R) and a readiness request". (An earlier run's regexp hit the
+aliasFolder's line instead; that save was refused with "A
+headline of kind aliasFolder does not take editRequest".)
+Output: 'probe-emacs.out'.
+*** Deviations from the plan's "how"
+**** an occurrence's one edit request holds a relRepo too
+The plan lists "the one edit request" and "the relRepo
+request" apart. The table has one field, 'editRequest', and
+the grammar admits one request in it, so 'OccurrenceMetadata'
+has one, 'OccurrenceEditRequest': 'OfTheNode' (delete, merge,
+flag) or 'OfTheRelationship' (relRepo, restoreRel). The arm of
+'viewnode_from_metadata' splits it into the editability's
+request and the occurrence's relationship edit request. Two
+fields would admit a state the grammar does not.
+**** a ghost keeps its home skgrepo
+The plan's list for a ghost omits it; the parser reads a
+ghost's '(skgRepos (nodeRepo R))' and the ghost viewnode
+carries one. 'GhostMetadata' holds it as an 'Option'; a ghost
+that writes none gets the empty name, as before, and the
+refresh gives it HEAD's.
+**** a ghost requires its gnid
+A ghost that wrote no gnid parsed to the empty gnid, which a
+claiming ghost would have saved into its viewparent's list.
+'GhostMetadata' holds an 'ID', and the parse refuses one
+without: "A ghost requires its (gnid X)", as it refuses an
+unknown viewnode without one. A new refusal; every ghost the
+printer writes has its gnid.
+**** the table holds only the user's fields
+The table lists what a user sets (noClaim, writeProtected, the
+values of editRequest and viewRequests) and does not change.
+The other parts (the gnid, the skgrepos, 'overridesHere', the
+derived facts, and '(editRequest ...)' holding only a readiness
+request) each kind takes by a list in the parser,
+'NamedKind::parts_the_table_leaves_out'. The one rule,
+'NamedKind::takes_part', asks the table or that list; a request
+in '(editRequest ...)' the table does not list for the kind is
+refused by 'check_the_kind_takes_the_edit_request'.
+**** two refusal texts changed, neither pinned
+A ghost's view request: "A headline of kind ghost does not take
+viewRequests" (was "A ghost accepts no view request"). A ghost's
+edit request but restoreNode: "A headline of kind ghost accepts
+no edit request but restoreNode and a readiness request" (was
+"A ghost accepts no edit request but restoreNode"); the "but"
+list is read from the table for every kind. The texts
+'tests/metadata_grammar.rs' pinned are unchanged; the restore
+refusals keep their constants; the new texts are pinned there
+now.
+**** two parse-internal types, coined
+'NamedKind' is the kind an atom names before the parse reads
+the parts beside it; 'WrittenParts' holds the parts as written
+until the kind's variant takes them in 'kind_with_its_parts',
+one match. Coined here; neither leaves the parser.
+**** the variants' names
+'MetadataKind::Node' is 'Occurrence', the table's name for the
+kind; 'Other (ViewnodeKind)' became 'Alias', 'ID', 'Flag',
+'ChangeViewnode', 'Folder', 'Tombstone' and 'BufferRoot'.
+'MetadataKind::atom' names a kind in a message, and
+'MetadataKind::gnid' answers 'headline_name'.
+**** what went
+'RestoreRequest', 'parts_of_kind', 'kind_name',
+'kind_error_label', 'gnid_only_kind_to_read',
+'check_where_the_edit_request_sits', 'folder_kind_of_atom',
+'names_an_occurrence' and 'is_ghost': the callers match on the
+variant ('add_missing_info.rs', 'uninterpreted.rs',
+'test_utils.rs'). 'complete_occurrence_skgrepo' takes the
+occurrence's metadata.
+**** the derived facts stay on 'ViewnodeMetadata'
+As the plan says, 'graphStats' and 'viewStats' stay there. The
+parser reads into them only an occurrence's relRepo, into
+'viewStats'.
+**** how the server reads the table
+Embedded at compile time ('include_str!'), as
+'server/heralds.rs' embeds 'shared/herald-styles.json'. The
+plan says the parser reads the table "as the printer and the
+editors do"; the printer does not read it: the conformance
+test checks the printer's order against it.
+*** Fixtures changed
+None of data. The tests that read the old flat fields read the
+variant's: 'tests/metadata_grammar.rs',
+'tests/metadata_fields_table.rs', 'tests/change_facts_
+metadata.rs', 'tests/render_util.rs', 'tests/serve_text_
+search_test.rs', 'tests/unit/save_leveling.rs' and
+'tests/unit/viewnode.rs'.
+*** Left unfinished
+Nothing of the slice. For Jeff: the table's own "comment"
+('shared/metadata-fields.json', line 2) says the server's
+parser is checked against it by a conformance test; the parser
+now also reads it. The plan says the table does not change, so
+the comment stays. The API doc says the new rule
+('docs/api-and-formats.org', "Content view", line 952).
+*** Headline
+DONE.

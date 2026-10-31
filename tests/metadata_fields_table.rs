@@ -13,12 +13,14 @@
 
 use skg::org_to_text::viewnode_to_string;
 use skg::serve::parse_metadata_sexp::{
-  RestoreRequest, ViewnodeMetadata, parse_metadata_to_viewnodemd, viewnode_from_metadata};
+  MetadataKind, OccurrenceEditRequest, ViewnodeMetadata,
+  parse_metadata_to_viewnodemd, viewnode_from_metadata};
 use skg::types::misc::{ID, SkgrepoChange, SkgrepoName};
 use skg::types::nodes::complete::Flag;
 use skg::types::viewnode::{
   ChangesetMarkerKind, DiffChange, Existence, FolderRelation, NodeEditRequest,
-  Folder, PropertyMember, ChangeViewnode, ViewRequest, Viewnode, ViewnodeKind, Vognode};
+  Folder, PropertyMember, ChangeViewnode, RelationshipEditRequest, ViewRequest,
+  Viewnode, ViewnodeKind, Vognode};
 
 use serde_json::Value;
 use sexp::Sexp;
@@ -112,14 +114,24 @@ fn edit_request_wire_name (
     NodeEditRequest::Delete          => "delete",
     NodeEditRequest::SetFlag { .. }  => "flag", } }
 
-/// The wire name of each restore request. The match makes a new
-/// variant a compile error here until it is named.
-fn restore_request_wire_name (
-  request : &RestoreRequest,
+/// The wire name of each request about a relationship. The match
+/// makes a new variant a compile error here until it is named.
+fn relationship_edit_request_wire_name (
+  request : &RelationshipEditRequest,
 ) -> &'static str {
   match request {
-    RestoreRequest::RestoreNode => "restoreNode",
-    RestoreRequest::RestoreRel  => "restoreRel", } }
+    RelationshipEditRequest::RelRepo (_) => "relRepo",
+    RelationshipEditRequest::RestoreRel  => "restoreRel", } }
+
+/// The wire name of an occurrence's edit request.
+fn occurrence_edit_request_wire_name (
+  request : &OccurrenceEditRequest,
+) -> &'static str {
+  match request {
+    OccurrenceEditRequest::OfTheNode (request) =>
+      edit_request_wire_name (request),
+    OccurrenceEditRequest::OfTheRelationship (request) =>
+      relationship_edit_request_wire_name (request), } }
 
 fn every_edit_request (
 ) -> Vec<NodeEditRequest> {
@@ -128,9 +140,10 @@ fn every_edit_request (
          NodeEditRequest::SetFlag { flag : Flag::NoSearchMatching,
                                     value : true } ] }
 
-fn every_restore_request (
-) -> Vec<RestoreRequest> {
-  vec! [ RestoreRequest::RestoreNode, RestoreRequest::RestoreRel ] }
+fn every_relationship_edit_request (
+) -> Vec<RelationshipEditRequest> {
+  vec! [ RelationshipEditRequest::RelRepo ( SkgrepoName::from ("r") ),
+         RelationshipEditRequest::RestoreRel ] }
 
 /// The wire name of each view request, as the parser reads it. The
 /// match makes a new variant a compile error here until it is named.
@@ -345,10 +358,11 @@ fn the_values_name_every_request_the_parser_knows () {
   let mut expected_edit_request_values : BTreeSet<String> =
     every_edit_request () . iter ()
     . map ( |request| edit_request_wire_name (request) . to_string () )
-    . chain ( every_restore_request () . iter ()
-              . map ( |request| restore_request_wire_name (request) . to_string () ))
+    . chain ( every_relationship_edit_request () . iter ()
+              . map ( |request| relationship_edit_request_wire_name (request)
+                                . to_string () ))
     . collect ();
-  expected_edit_request_values . insert ( "relRepo" . to_string () );
+  expected_edit_request_values . insert ( "restoreNode" . to_string () ); // a ghost's
   assert_eq! ( edit_request_values, expected_edit_request_values );
   assert_eq! ( view_request_values,
                every_view_request () . iter ()
@@ -372,39 +386,86 @@ fn the_values_name_every_request_the_parser_knows () {
             . collect::<Vec<String>> () ] ),
         _ => assert! ( one_ofs . is_empty () ), } } } }
 
+/// The value of the field 'field_name' that the parsed kind 'kind'
+/// holds, by its name in the table; None where it holds none.
+fn value_held (
+  kind       : &MetadataKind,
+  field_name : &str,
+) -> Option<String> {
+  let unclaimed = |claimsMembership : bool| -> Option<String> {
+    ( ! claimsMembership ) . then ( || "true" . to_string () ) };
+  let relRepo_request = |request : &Option<SkgrepoName>| -> Option<String> {
+    request . as_ref () . map ( |_| "relRepo" . to_string () ) };
+  match (kind, field_name) {
+    ( MetadataKind::Occurrence (occurrence), "noClaim" ) =>
+      unclaimed (occurrence . claimsMembership),
+    ( MetadataKind::Occurrence (occurrence), "writeProtected" ) =>
+      occurrence . writeProtected . then ( || "true" . to_string () ),
+    ( MetadataKind::Occurrence (occurrence), "editRequest" ) =>
+      occurrence . edit_request . as_ref ()
+      . map ( |request| occurrence_edit_request_wire_name (request) . to_string () ),
+    ( MetadataKind::Occurrence (occurrence), "viewRequests" ) =>
+      occurrence . view_requests . iter () . next ()
+      . map ( |request| view_request_wire_name (request) . to_string () ),
+    ( MetadataKind::Ghost (ghost), "noClaim" ) =>
+      unclaimed (ghost . claimsMembership),
+    ( MetadataKind::Ghost (ghost), "editRequest" ) =>
+      ghost . restoreNode_request . then ( || "restoreNode" . to_string () ),
+    ( MetadataKind::GnidOnly (gnid_only), "noClaim" ) =>
+      unclaimed (gnid_only . claimsMembership),
+    ( MetadataKind::GnidOnly (gnid_only), "editRequest" ) =>
+      relRepo_request (&gnid_only . relRepo_request),
+    ( MetadataKind::Alias (alias), "noClaim" ) =>
+      unclaimed (alias . claimsMembership),
+    ( MetadataKind::Alias (alias), "editRequest" ) =>
+      relRepo_request (&alias . relRepo_request),
+    ( MetadataKind::ID { claimsMembership }, "noClaim" ) =>
+      unclaimed (*claimsMembership),
+    _ => None, } }
+
+/// Each kind's variant takes the fields the table lists for it: a
+/// headline that writes none holds none, and one that writes a value
+/// the table offers holds that value. A field the table does not list
+/// for a kind is refused by the one rule, naming the kind and the
+/// field. ('nothing_the_table_does_not_offer_parses' refuses the
+/// values the table does not offer, among them every edit request on
+/// a kind whose '(editRequest ...)' holds only a readiness request.)
 #[test]
-fn each_node_value_parses_to_what_it_names () {
+fn each_variant_takes_its_tables_parts_and_no_other () {
   let table : Value = metadata_fields_table ();
-  let node : &Value = kinds (&table) . iter ()
-    . find ( |kind| strings_of (&kind ["atoms"]) == vec! [ "node" ] )
-    . unwrap ();
-  let example : String = example_of_kind ("node");
-  let absent : ViewnodeMetadata = parse_cleanly (&example) . unwrap ();
-  assert! ( ! absent . writeProtected );
-  assert_eq! ( absent . claimsMembership, true );
-  assert! ( absent . edit_request . is_none ()
-            && absent . relRepo_request . is_none () );
-  assert! ( absent . view_requests . is_empty () );
-  for field in fields_of (node) {
-    for written in written_values (field) {
-      let base : String = with_field (&example, "(diff (rel removed))");
-      let parsed : ViewnodeMetadata =
-        parse_cleanly ( &with_field (&base, &written . text) )
-        . unwrap ();
-      match written . field_name . as_str () {
-        "writeProtected" => assert! ( parsed . writeProtected ),
-        "noClaim" => assert_eq! ( parsed . claimsMembership, false ),
-        "editRequest" if written . value == "relRepo" =>
-          assert! ( parsed . relRepo_request . is_some () ),
-        "editRequest" => assert_eq! (
-          parsed . edit_request . as_ref () . map (edit_request_wire_name)
-            . or ( parsed . restore_request . as_ref () . map (restore_request_wire_name) ),
-          Some ( written . value . as_str () )),
-        "viewRequests" => assert_eq! (
-          parsed . view_requests . iter () . map (view_request_wire_name)
-            . collect::<Vec<&str>> (),
-          vec! [ written . value . as_str () ] ),
-        other => panic! ( "unknown field {}", other ), } } } }
+  let mut a_field_written : Vec<WrittenValue> = Vec::new ();
+  for written in kinds (&table) . iter ()
+    . flat_map ( |kind| fields_of (kind) . iter () . flat_map (written_values) ) {
+    if ! a_field_written . iter ()
+         . any ( |seen| seen . field_name == written . field_name ) {
+      a_field_written . push (written); }}
+  for kind in kinds (&table) {
+    let listed : BTreeSet<String> = fields_of (kind) . iter ()
+      . map ( |field| field ["name"] . as_str () . unwrap () . to_string () )
+      . collect ();
+    for atom in strings_of (&kind ["atoms"]) {
+      let example : String = example_of_kind (&atom);
+      let absent : ViewnodeMetadata = parse_cleanly (&example) . unwrap ();
+      for written in &a_field_written {
+        assert_eq! ( value_held (&absent . kind, &written . field_name), None,
+                     "{} holds {}", example, written . field_name ); }
+      for field in fields_of (kind) {
+        for written in written_values (field) {
+          let sexp : String = with_field (
+            &with_field (&example, "(diff (rel removed))"),
+            &written . text );
+          let parsed : ViewnodeMetadata = parse_cleanly (&sexp) . unwrap ();
+          assert_eq! ( value_held (&parsed . kind, &written . field_name),
+                       Some ( written . value . clone () ),
+                       "{} parsed to {:?}", sexp, parsed . kind ); } }
+      for written in &a_field_written {
+        if listed . contains (&written . field_name)
+           || written . field_name == "editRequest" { continue; }
+        let sexp : String = with_field (&example, &written . text);
+        assert_eq! ( parse_metadata_to_viewnodemd (&sexp),
+                     Err ( format! ( "A headline of kind {} does not take {}",
+                                     atom, written . field_name )),
+                     "{}", sexp ); } } } }
 
 /// The table's 'parts' are the parts of '(skg ...)' in the order the
 /// printer writes them: an occurrence carrying every part prints each

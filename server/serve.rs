@@ -1,4 +1,5 @@
 pub mod handlers;
+pub mod metadata_fields;
 pub mod parse_metadata_sexp;
 pub mod protocol;
 pub mod rerender_stream;

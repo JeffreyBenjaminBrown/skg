@@ -949,8 +949,15 @@ ghost or an unknown stands for, and =(skgRepos (nodeRepo REPO)
 [(relRepo REPO)])= its home skgrepo and the skgrepo recording its
 relationship to its viewparent, the relRepo written only when it
 differs from the default (a ghost has no relRepo; an unknown and an
-alias have only one). The parser refuses the retired spellings
-listed in "The metadata headers" with a message naming the grammar.
+alias have only one). A ghost, an unknown viewnode and a restricted
+viewnode require their =(gnid ID)=. The fields a user sets
+(=noClaim=, =writeProtected=, the requests of =(editRequest ...)=
+and =(viewRequests ...)=) a kind takes as
+=shared/metadata-fields.json= lists them for it: the parser reads
+that table, as both clients' metadata editors do, and refuses a
+field or a request the table does not list for the kind. The parser
+refuses the retired spellings listed in "The metadata headers" with
+a message naming the grammar.
 
 Any such string is valid metadata
 (although much of it might be ignored by Emacs),

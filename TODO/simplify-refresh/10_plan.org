@@ -771,7 +771,7 @@ Every fixture that names "all" names a skgrepo; the suites with
 every script. The user docs' passages on the switch and the API
 doc's "skgrepo-sets" section say the new words.
 
-** TODO Slice 4: the parser's natural shape
+** DONE Slice 4: the parser's natural shape
 Read "The parser's natural shape" in the agreed behavior,
 Decide 9 of the review, and the pitfalls on the refusal texts
 and the table first.
