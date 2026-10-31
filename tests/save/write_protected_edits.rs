@@ -17,6 +17,7 @@ use skg::types::nodes::complete::{
 use skg::types::views_state::{OpenViews, ViewforestId};
 
 use std::error::Error;
+use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use std::net::TcpStream;
 
 #[test]
@@ -31,10 +32,8 @@ fn deleting_the_flags_folder_is_accepted_and_inert (
       let mut views_state : ViewsState = ViewsState {
         open_views        : OpenViews::new (),
         graph_straddle    : None, };
-      let listener : std::net::TcpListener =
-        std::net::TcpListener::bind ("127.0.0.1:0")?;
-      let mut stream : TcpStream =
-        TcpStream::connect (listener . local_addr ()?)?;
+      let (mut stream, _read_end) : (TcpStream, TcpStream) =
+        mk_test_tcp_stream_pair ();
       let viewforest_id : Result<ViewforestId, String> = Ok (
         ViewforestId::ContentView ("flags-folder-deletion-test" . to_string ()));
       let with_flags = indoc! {"
@@ -94,10 +93,8 @@ async fn saving_an_edited_writeProtected_occurrence_impl (
   let mut views_state : ViewsState = ViewsState {
     open_views        : OpenViews::new (),
     graph_straddle    : None, };
-  let listener : std::net::TcpListener =
-    std::net::TcpListener::bind ("127.0.0.1:0")?;
-  let mut stream : TcpStream =
-    TcpStream::connect (listener . local_addr ()?)?;
+  let (mut stream, _read_end) : (TcpStream, TcpStream) =
+    mk_test_tcp_stream_pair ();
   let viewforest_id : Result<ViewforestId, String> = Ok (
     ViewforestId::ContentView ("write-protected-edits-test" . to_string ()));
   let rendered = indoc! {"

@@ -544,7 +544,7 @@ its raw member ID, never a node edit.
 For a node-to-node relationship, the command asks the server for its
 default relRepo and current relRepo (the "relRepo info" endpoint; the
 request names the relationship's recorder -- the viewparent, or the
-folder's anchor -- its member and its relation), then prompts
+folder's viewparent -- its member and its relation), then prompts
 -- with TAB completion and S-Left/S-Right cycling, like the other
 skgrepo prompts -- over the skgrepos at least as private as the
 default (more public ones could leak an endpoint's ID and would be
@@ -564,7 +564,8 @@ reach the default, choose it.
 
 Refuses on a member of a write-protected folder (the relationship
 belongs to the other end there), under a write-protected parent or
-anchor, and on a root headline, which represents no relationship.
+folder's viewparent, and on a root headline, which represents no
+relationship.
 The command only edits the buffer; save the view to apply it.
 *** <localleader>sR : :SkgSetRelRepoRecursive
 Like 'SetRelRepo', but applied throughout the subtree at point (the
@@ -593,11 +594,15 @@ gesture before any edit. Save the view afterward to apply the changes.
 Prompts between =search matching= and =no search matching= and stages the
 desired state without saving. Foreign/write-protected/unsaved roots and a
 node that already holds an edit request (delete, a nodeMerge or a
-flag) are refused. A readiness request stays beside it, and a relRepo
-request gives way to it, as to delete and a nodeMerge request.
+flag) are refused. A readiness request stays beside it. A pending
+relRepo request gives way to it, and the message says so: "replaced a
+pending relRepo request". ':SkgDelete' (<localleader>dd) and
+':SkgSetMergeRequest' (<localleader>sm) replace a pending relRepo
+request too, and a flag request, without saying so.
 *** <localleader>sX : :SkgSetFlagSearchMatchingRecursive
 Applies one selected state uniformly through the true-content subtree,
-deduplicating PIDs and reporting ineligible descendants. It prunes non-vognodes,
+deduplicating PIDs and reporting ineligible descendants; the message
+counts the pending relRepo requests it replaced. It prunes non-vognodes,
 branches carrying =noClaim=, ghosts and unknowns. Save with
 =:w= afterward.
 *** <localleader>sm : :SkgSetMergeRequest

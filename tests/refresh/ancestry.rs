@@ -158,9 +158,9 @@ fn an_occurrence_is_never_unsayable () {
   assert_eq! ( run . outline (), "\
 node p
   tombstone
-    node c wp noClaim
+    node c wp noClaim ⊥
   tombstone
-    node c wp noClaim" ); }
+    node c wp noClaim ⊥" ); }
 
 trait KindName { fn kind_name (&self) -> &'static str; }
 impl KindName for Viewnode {

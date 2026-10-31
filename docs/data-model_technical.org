@@ -167,7 +167,7 @@ returns the buffer's text and the list of what it corrected
 editable occurrence per requested node, asking for its containers
 folder and to be the node's editable occurrence); a rerender, the
 saved view and every collateral view are refreshes of what the
-buffer holds (=rerender_view=); the search buffer is the refresh of
+buffer holds (=refresh_view= in =server/rerender_pass.rs=); the search buffer is the refresh of
 a stub built from the hits (=draw_search_buffer=); the diff
 view's buffers are refreshes in diff-view mode (=docs/diff-view.org=,
 "Rendering a buffer").
@@ -248,7 +248,9 @@ property of the node in a property folder. In the diff view HEAD
 alone may warrant it, a *ghost warrant*. The warrant is derived
 (=Warrant { ByGraph, ByHead, No }=), recomputed at every refresh and
 written in =(view ...)= as =noWarrant= or =ghostWarrant=, nothing
-meaning warranted by the truth; a root carries none.
+meaning warranted by the truth; a root carries none, nor does a
+tombstone's child, but for an orphan graphnode, which is
+unwarranted.
 
 Under an editable parent at rest the two agree: every child that
 claims and that the truth does not warrant vanishes at the refresh,
@@ -443,7 +445,7 @@ budget allows, and stays write-protected otherwise; the request goes
 when the visit ends. Each editable occurrence whose content is drawn
 charges the budget once, at its visit, whatever made it editable: the
 budget need not count exactly, only stop an explosion. The walk keeps
-no other record of editability than where each node's one editable
+nothing else of editability than where each node's one editable
 occurrence stands. The diff view's deviations are in
 =docs/diff-view.org=, "Editability in the diff view".
 

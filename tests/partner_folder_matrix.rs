@@ -23,6 +23,7 @@
 
 use skg::metadata_canon::without_viewnode_ids;
 use std::error::Error;
+use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use std::net::TcpStream;
 
 use skg::skgrepo_sets::SkgrepoRestriction;
@@ -119,10 +120,8 @@ async fn save (
   let mut views_state : ViewsState = ViewsState {
     open_views        : OpenViews::new (),
     graph_straddle    : None, };
-  let listener : std::net::TcpListener =
-    std::net::TcpListener::bind ("127.0.0.1:0") . unwrap ();
-  let mut stream : TcpStream =
-    TcpStream::connect (listener . local_addr () . unwrap ()) . unwrap ();
+  let (mut stream, _read_end) : (TcpStream, TcpStream) =
+    mk_test_tcp_stream_pair ();
   update_from_and_rerender_buffer (
     &mut stream, buf, config, tantivy, graph,
     // The saved view's ID.
@@ -278,7 +277,16 @@ async fn write_protected_insert (
       "save reported errors: {:?}", resp . errors)); return Ok (( )); }
   // The intruder stays in the rerendered view, unwarranted. Under a
   // write-protected folder no child claims, so it carries no claim
-  // atom, and there is no claim to correct.
+  // atom, and there is no claim to correct. The hides folder is the
+  // exception: a graphnode its viewparent hides by no record vanishes
+  // from it ('unhidden_in_the_hides_folder' in
+  // 'server/refresh/visit.rs').
+  if spec . atom == "hiddenFolder" {
+    if resp . saved_view . contains (&format! ("(gnid {})", spec . intruder)) {
+      fails . record (&scenario, format! (
+        "the intruder must vanish from the hides folder: {}",
+        resp . saved_view )); }
+    return Ok (( )); }
   { let intruder_after : &str = line_containing (
       &resp . saved_view, &format! ("(gnid {})", spec . intruder) );
     if ! intruder_after . contains ("noWarrant")

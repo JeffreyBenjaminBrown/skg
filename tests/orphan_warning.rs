@@ -12,7 +12,9 @@
 // holds two, write-protected.
 
 use std::error::Error;
-use std::net::{TcpListener, TcpStream};
+use crate::parse_helpers::{occurrences_titled, viewnode_tree_as_written};
+use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
+use std::net::TcpStream;
 
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::serve::ViewsState;
@@ -20,8 +22,11 @@ use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::test_utils::{run_with_test_stores, graph_handle_from_config};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::test_utils::single_root_view;
-use skg::types::misc::{ID, SkgConfig, TantivyIndex};
+use skg::types::misc::{ID, SkgConfig, SkgrepoName, TantivyIndex};
+use skg::types::viewnode::{Viewnode, ViewnodeKind, Vognode};
 use skg::types::views_state::{OpenViews, ViewforestId};
+
+use ego_tree::Tree;
 
 const ORPHAN_WARNING : &str =
   "Created an orphan graphnode, a node that no list contains, from a headline whose parent reads no claims:\n";
@@ -56,9 +61,15 @@ fn a_headline_typed_where_no_list_is_read_is_warned_of_as_an_orphan
                 orphans [0] );
       assert! ( ! orphans [0] . contains ("not yet saved"),
                 "the headline is saved: {}", orphans [0] );
-      assert! ( response . saved_view . contains (") typed under two\n"),
-                "the orphan is saved, and drawn where it was typed:\n{}",
-                response . saved_view );
+      let saved : Tree<Viewnode> = viewnode_tree_as_written (&response . saved_view);
+      let viewparents_of_the_orphan : Vec<Option<ID>> =
+        occurrences_titled (&saved, "typed under two") . iter ()
+        . map ( |orphan| orphan . parent () . and_then (
+          |viewparent| viewparent . value () . occurrence_gnid () . cloned () ))
+        . collect ();
+      assert_eq! ( viewparents_of_the_orphan, vec! [ Some (ID::from ("two")) ],
+                   "the orphan is saved, and drawn where it was typed:\n{}",
+                   response . saved_view );
       Ok (( )) } )) }
 
 /// A headline typed under a tombstone takes its skgrepo from the
@@ -111,12 +122,23 @@ fn headlines_under_a_tombstone_a_ghost_and_a_write_protected_folder_are_orphans
       assert! ( ! response . saved_view . contains ("typed under a ghost"),
                 "the headline typed under the ghost vanishes:\n{}",
                 response . saved_view );
+      let saved : Tree<Viewnode> = viewnode_tree_as_written (&response . saved_view);
       for title in [ "typed in the containers folder",
                      "typed under a tombstone", "a typed root" ] {
+        assert! ( occurrences_titled (&saved, title) . iter () . any ( |node_ref|
+                    matches! ( &node_ref . value () . kind,
+                               ViewnodeKind::Vognode (Vognode::Occurrence (occurrence))
+                                 if occurrence . home_skgrepo == SkgrepoName::from ("main") )),
+                  "{} is saved in main:\n{}", title, response . saved_view ); }
+      // The parser skips the derived facts of '(view ...)', so the
+      // warrant is read from the text.
+      for title in [ "typed in the containers folder", "typed under a tombstone" ] {
         assert! ( response . saved_view . lines () . any ( |line|
                     line . ends_with (&format! (") {}", title))
-                    && line . contains ("(nodeRepo main)") ),
-                  "{} is saved in main:\n{}", title, response . saved_view ); }
+                    && line . contains ("(view noWarrant)") ),
+                  "{}, which no list contains, is marked unwarranted, as one \
+                   typed under a write-protected occurrence is:\n{}",
+                  title, response . saved_view ); }
       Ok (( )) } )) }
 
 //
@@ -161,9 +183,8 @@ async fn save_view_of_four (
   assert_eq! ( rendered, four );
   views_state . open_views . register_view (
     &graph . load_full (), view_of_four . clone (), viewforest, &pids );
-  let listener : TcpListener = TcpListener::bind ("127.0.0.1:0") . unwrap ();
-  let mut stream : TcpStream =
-    TcpStream::connect (listener . local_addr () . unwrap ()) . unwrap ();
+  let (mut stream, _read_end) : (TcpStream, TcpStream) =
+    mk_test_tcp_stream_pair ();
   update_from_and_rerender_buffer (
     &mut stream, typed, config, tantivy, &graph,
     &Ok (view_of_four), &mut views_state ) . await }

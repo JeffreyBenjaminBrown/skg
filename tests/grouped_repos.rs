@@ -45,6 +45,9 @@ mod diff_view;
 #[path = "viewnode_id_stability.rs"]
 mod viewnode_id_stability;
 
+#[path = "editability_carrier.rs"]
+mod editability_carrier;
+
 #[path = "hidden_nodes.rs"]
 mod hidden_nodes;
 

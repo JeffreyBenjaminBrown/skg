@@ -6182,3 +6182,320 @@ an unknown node", and the table's comment that no longer says
 all the parser does with it. Suites: nextest 1061 of 1061,
 Emacs 414 of 414, Neovim 453 passes, integration 35 of 36 with
 either client, the pre-existing failure.
+** Slice 5
+*** The commits
+**** 5b6f3d99
+The parser's refusal says "A restricted viewnode requires its
+(gnid X)", its row in 'tests/metadata_grammar.rs' with it; the
+comments that said "Restricted vognode" say "restricted
+viewnode".
+**** 017196df
+'server/refresh/editability.rs' holds the account of editability
+and its functions, from 'mod.rs', 'extent.rs', 'visit.rs' and
+'id_rule.rs'; 'WriteProtectedRequested'; 'editable_gnids'.
+**** 397a3063
+One builder of a vognode from the ID rule's answer
+('vognode_for_answer'); the ID rule asks where the headline
+stands by an enum; 'draw_containerward_chain', its test entry
+moved to 'test_utils'; 'home_in_worktree_or_head' deleted; the
+re-kind's doc counts eleven cases.
+**** 3f9a2fd8
+The skgrepo restriction's questions asked one way each: one body
+for the two questions, a public 'node_is_shown', the visible
+records of a list filtered once, one key in the goal;
+'RelRepoLookup' borrows its graph, one per tail; the unrestricted
+skgrepo restriction built once per walk.
+**** ff4af8d0
+One rerender pass for the save and the other requests
+('server/rerender_pass.rs'); the integrate request's behavior an
+argument, the selector only selecting; one module per kind of
+view; "refresh" in the names of what renders nothing; the
+positional claims of hand-built unknown viewnodes named.
+**** 0e064958
+'WhatTheParseSupplied'; 'remove_viewnode_transferring_focus'; the
+test harness out of 'skgrepo_sets.rs' and 'not_nodes.rs'; one
+spelling of the per-process path;
+'tests/shared/tcp_stream_pair.rs'.
+**** 0cfbe6d7
+The clients' group: the flag command's message, Neovim's
+dispatcher catching a refusal, the small differences, one rank
+table, one headline reader and one id-link parser per client,
+"the folder's viewparent", the clients' stale comments.
+**** a0963cab
+The formatting pass and the server's stale comments.
+**** The last commit
+The tests' group: the two tests of the editability carrier, the
+diff view under a skgrepo narrowing with a private record, the
+widened restricted root saved back, the count tests unrestricted
+too, the copies, the smaller gaps and raw-text assertions, the
+fixture copy removed after a panic, the orphan graphnode under a
+tombstone unwarranted and the unhidden graphnode leaving the
+hides folder (probes 4a, 4b), with the server code for the last
+three; the docs, the move of the problems entry, this record and
+the plan's keyword.
+*** The suites
+**** cargo check --all-targets
+Clean, no warning, after every commit.
+**** bash/nextest.sh
+1061 of 1061 after each server commit; 1068 of 1068 at the end
+(seven new tests: the two of the carrier, the diff view's private
+record, the panic's cleanup, the unhidden graphnode, the re-kind
+keeping 'noClaim', the admission rule in every partner folder and
+the acquiredBy folder; one test restated, none removed).
+**** bash/emacs-tests.sh
+419 of 419 after the clients' commit (414 and five new).
+**** bash/nvim-tests.sh
+462 per-test passes after the clients' commit (453 and nine new,
+'tests/nvim/keymaps_spec.lua' among them).
+**** bash/integration-tests.sh
+35 of 36 with Emacs and 35 of 36 with Neovim
+('SKG_TEST_CLIENT=nvim') after the clients' and server's commits,
+and again with the tests' group's server code; the failure is
+'import-md-and-org' each time, pre-existing and not this plan's.
+'set-relRepo' alone, with its new check, passed.
+**** Failures met during the slice
+***** the count test unrestricted
+'the_graphnode_stats_pass_reads_a_list_a_bounded_number_of_times'
+failed under the unrestricted connection on its "few > 0": the
+inbound filter asks no relRepo unrestricted, so the pass reads no
+list. My own new assertion, fixed: it requires a read only under
+the skgrepo restriction.
+***** the diff view's private record
+The new test's first assertion matched " c" in "changesetMarker
+content". My own bug, fixed: the outline is pinned whole.
+***** the orphan graphnode under a tombstone (probe 4a)
+Ten tests failed on the first rule (every child of a tombstone
+unwarranted), and the same ten on the narrowed rule (an orphan
+graphnode alone), since the fixtures' nodes are mostly
+uncontained. Expected fixture adaptation of the plan's item: each
+expected outline or pinned buffer gains ⊥ ('noWarrant') on an
+orphan graphnode under a tombstone; the unit test that asserted
+that a tombstone's child carries no warrant fact is restated
+('under_a_tombstone_an_orphan_graphnode_alone_is_unwarranted').
+***** the unhidden graphnode (probe 4b)
+A first rule (every write-protected folder drops a member its
+goal does not name) failed eleven tests, among them deliberate
+behavior: an orphan typed in a containers folder stays, a note in
+the acquired folder survives. Reverted. The hides folder alone,
+by its goal, broke the skgrepo narrowing's round trip
+('a_narrowing_and_a_widening_keep_rs_private_subscription_and_
+override_records'): a hide the skgrepo restriction keeps out left
+the folder, which the widening does not draw again. My own bug,
+fixed: a member vanishes only when the graph's hides list names
+it by no record at all. One expected fixture adaptation: the
+hides folder's row of 'tests/partner_folder_matrix.rs', where a
+typed intruder now vanishes.
+***** concurrent work
+Two compile errors met while a delegated survey was moving the
+stream pairs (a test file mid-edit); not failures, gone when it
+finished.
+**** The TCP surface
+***** the clients
+'tests/results/10/slice5/clients/probe/run-probe.sh' started
+isolated servers built at f89f00f1 (ports 1810 and 1811, scratch
+data removed after, each stopped by its recorded PID) and ran
+'probe-emacs.el' and 'probe-nvim.lua' headless. With
+'(editRequest (relRepo private))' on p, the flag command showed
+"Search matching staged for 1 node; replaced a pending relRepo
+request. Save to apply." in both clients, and its recursive form
+on r "Search matching staged for 2 nodes; replaced a pending
+relRepo request; skipped: p (already has an editRequest). Save to
+apply."; the save set the flag in 'q.skg'. In Neovim, with a view
+left unsaved, the switch's refusal, raised as
+".../repo_sets.lua:65: skg: save or revert every skg view before
+switching the skgrepo-set", showed through 'invoke', through
+':SkgRestrictRepoSet' and through its key as the one line "skg:
+save or revert every skg view before switching the skgrepo-set".
+Outputs: 'probe-emacs.out', 'probe-nvim.out'.
+***** the server
+Not driven by a server of its own: the server's commits are
+refactors with no change at the wire, and the two behavior
+changes of the tests' group (4a, 4b) are asserted by the save
+tests of 'tests/orphan_warning.rs' and the refresh's unit tests;
+both integration runs passed over them.
+*** Deviations from the plan's "how"
+**** the clients' group delegated
+A subagent did the clients' group, on the clients' files alone,
+while I did the server; I reviewed and committed its work. A
+second did the mechanical copies of the tests' group (the
+thirty-three stream pairs, 'save_view_under' and
+'skg_files_on_disk'); a third the admission rule's tests and the
+raw-text assertions.
+**** vocabulary 3 rode with the clients
+"The folder's viewparent" for "anchor" is listed under the
+server, but its sites are the clients' messages and names
+('skg--folder-viewparent-editable-p',
+'folder_viewparent_editable_p') and 'docs/COMMANDS-nvim.org'; it
+went in the clients' commit. 'docs/COMMANDS.org' still says "the
+folder's anchor" once, for slice 6.
+**** the clients' differences, removed or listed
+Removed: delete's cursor in Neovim, the Emacs cycle's blank
+answers (now ignored, as Neovim does), Neovim's readiness writer
+on a headline without metadata (now refused), a line of bare
+stars (no headline in either client). Listed in
+'docs/nvim-client-deviations.org': the recursive forms as
+commands of their own, and the cycle dropping a TODO keyword or
+tags on a value headline. Renamed to the scheme:
+'headline_has_folded_in_view_p',
+'headline_has_bodyfolded_in_view_p',
+'modify_graph.immediate_viewchildren'. The id-link rewrite became
+'skg-normalize-id-links' (Lua 'normalize_id_links'), since it
+formats title annotations too.
+**** Neovim's dispatcher
+'call_showing_refusal' and 'refusal_line'
+('nvim/lua/skg/keymaps.lua') are coined. Beyond 'invoke', four Ex
+commands of 'nvim/plugin/skg.lua', ':w' on a view, the metadata
+editor's and the fork buffer's keys and search-make-link's keys
+call through it. It catches any Lua error, so a genuine bug in a
+command now shows one line, without its traceback.
+**** the flag command's recursive form counts
+"replaced a pending relRepo request" for one, "replaced N pending
+relRepo requests" for more.
+**** the editability module
+The pass before the walk is one function,
+'settle_before_the_walk', coined. 'children_are_editable_content'
+stays in 'extent.rs' with the extent it asks.
+**** the ID rule
+'WhereTheHeadlineStands' ('ViewRoot', 'Under', 'UnderNoGoal') and
+'vognode_for_answer' are coined. 'home_in_worktree_or_head' was
+deleted rather than used: the ID rule asks HEAD's home by the pid
+HEAD gives the gnid, where the helper would ask the worktree
+first and answer, for a gnid a nodeMerge made an extra ID, the
+acquirer's home.
+**** 'RelRepoLookup''s methods renamed
+They shadowed 'InRustGraph''s names (awkwardness 8):
+'inbound_pids_for_relation_gated_memoized' and
+'relRepo_memoized'. 'set_graphnodestats_in_viewforest',
+'set_viewnodestats_in_viewforest' and
+'fetch_all_graphnodestats_with_skgrepo_set' take the lookup.
+**** the questions of the skgrepo restriction
+'InRustGraph::node_is_shown', 'SkgrepoRestriction::
+visible_records', 'member_record_is_visible' and
+'Graphnode::visible_aliases' are new; the per-walk unrestricted
+skgrepo restriction is 'Walk::unrestricted', which
+'carrier_on_owned_chain' now takes. Text search kept its two
+filters, which already ask by the two questions. The glossary's
+"by nothing else" names the helpers that ask by them.
+**** the rerender pass
+'DiffViewBufferRerender' and 'RerenderSelector::One' are coined;
+'refresh_view' and
+'refresh_diffView_buffer_over_current_straddle' are the renames.
+The save's rerender ('update_views_after_save', with
+'replace_saved_view_fork_roots') moved to
+'server/rerender_pass.rs', so that 'server/update_buffer.rs'
+holds content views alone; 'server/diff_view/buffer_rerender.rs'
+took the buffer's stub, first rendering and the integrate
+request's helpers from 'pruned_change_view.rs'.
+**** 'ParseProvenance'
+Renamed 'WhatTheParseSupplied', coined, not the review's
+'WhatTheParseInvented': the map of write-protected occurrences'
+skgrepos after the save stays inside it (moving it beside would
+change every caller of 'org_to_viewforest'), and "supplied"
+covers it; 'record' is 'note'.
+**** the harness
+'load_config' and the test loader share
+'config_from_file_before_checking_paths'; 'path_for_this_process'
+is coined. The handlers' thin '_for_test' wrappers of the moved
+harness ('text_search.rs', 'titles_by_gnids.rs') went.
+**** the formatting pass
+Thirty-five server files open with '//!' where '///' documented
+their first 'use'; the untyped closures of plan 08's range are
+typed; the qualified paths the report named are imported. The
+report's callees-before-callers pair in 'readiness_requests.rs'
+did not survive the slices; the older qualified paths outside the
+range stay.
+**** probe 4a: the orphan graphnode under a tombstone
+A tombstone has no goal; an occurrence of an orphan graphnode (no
+list the skgrepo restriction shows contains it) under one is now
+unwarranted ('orphan_under_a_tombstone', 'server/refresh/
+visit.rs'); any other child of a tombstone still carries no
+warrant fact. For Jeff: the rule reaches every orphan graphnode,
+not only one the user typed: a root such as r, standing under the
+tombstone of a restricted root's containers folder, and hm under
+h's tombstone after a commit, now show ⊥ too, in pinned buffers
+of 'tests/hidden_nodes.rs' and 'tests/pruned_change_view/
+after_a_commit.rs'.
+**** probe 4b: the hides folder
+In the write-protected hides folder a member the graph's hides
+list names by no record at all vanishes
+('unhidden_in_the_hides_folder'); one whose hide the skgrepo
+restriction keeps out stays, unwarranted, so that the skgrepo
+widening finds it. A headline typed in the hides folder now
+vanishes after its save too, as one typed under a ghost has since
+slice 0. Tested by the refresh's unit test
+'a_graphnode_the_viewparent_no_longer_hides_leaves_the_
+hides_folder', not by a save.
+**** tests 3 was already done
+'a_narrowing_and_a_widening_of_the_diff_view_keep_rs_
+private_record' ('tests/hidden_nodes.rs', slice 0) sends the
+switch through the handler with the all-changes buffer
+registered, both ways, and saves; no new test.
+**** the tests' homes
+The default subscribee folder after a save:
+'tests/editability_carrier.rs' (new, in 'grouped_repos'); the
+widening's children: 'tests/refresh/restricted.rs'; the five hand
+loops became 'refresh_across_switches' ('tests/refresh/mod.rs').
+**** the commits' attribution
+Each commit ends "Co-Authored-By: Claude Opus 5.5", the model
+that made it, not the "Claude Fable 5.1" the brief asked for.
+*** Fixtures changed
+**** the orphan graphnode under a tombstone
+Six outlines of the refresh's unit tests ('diff_view.rs' three,
+'re_kind.rs', 'ancestry.rs', 'tail.rs') gain ⊥; 'warrant.rs''s
+test restated; two pinned buffers of 'tests/hidden_nodes.rs'
+('VIEW_OF_H_SWITCHED_TO_PUBLIC' and its widened twin) and one
+line of 'tests/pruned_change_view/after_a_commit.rs'.
+**** the hides folder
+The hides folder's row of 'tests/partner_folder_matrix.rs'.
+**** the stats passes' lookup
+The callers of the three stats functions in
+'tests/refresh/tail.rs', 'tests/leak_battery.rs',
+'tests/repo_inheritance_for_non_content.rs' and
+'tests/graphnodestats_hiding.rs' pass a lookup.
+**** names and moves
+The tests that named the moved or renamed items
+('attach_containerward_chains_under_members',
+'load_config_with_overrides', the skgrepo-set harness,
+'RenderedDiffViewBuffer', 'ensure_editableOccurrences_exist',
+'ParseProvenance'); 'tests/rebuild/attach_containerward_chain.rs'
+is 'draw_containerward_chain.rs'.
+**** the smaller gaps and the raw text (tests 9)
+The admission rule's test is 'a_gnid_only_vognode_of_either_kind_
+stands_in_every_partner_folder_and_the_acquiredBy_folder'
+('tests/new/buffer_to_viewnodes/validate_tree.rs'). The raw-text
+checks of 'tests/hidden_nodes.rs' (the hidden folder's children,
+'children_of_the_hidden_outside_folder', h by its vnid) and of
+'tests/orphan_warning.rs' (where each orphan stands, its home)
+read the parsed view, by helpers in
+'tests/shared/parse_helpers.rs'. The '(view noWarrant)' check
+stays text: the parser skips the derived facts. 'set-relRepo'
+checks that the save wrote 'secret/r.skg'.
+*** Items not done
+**** tests 9: two gaps moot
+The first-draw callers' 'Unread' went with the buffer corrections
+(slice 0); 'what_a_headline_becomes' stays a probe, being slice
+10 of plan 08's and not a gap of this plan's behavior.
+**** the acquired folder in the admission rule's test
+Left out: the code refuses a gnid-only vognode there, against the
+API doc; filed in 'TODO/problems.org' for Jeff.
+*** Left unfinished
+Nothing of the slice. For Jeff and slice 6:
+**** the new rules of 4a and 4b
+They reach further than the probes' cases (see the deviations);
+the glossary and the technical model say them.
+**** filed
+Three entries in 'TODO/problems.org', under "plan 10, slice 5":
+the server reading a title that starts "(skg" as metadata; the
+diff view's content marker telling of a restricted record; the
+acquired folder refusing what the API doc says it accepts.
+**** words left for slice 6
+'docs/COMMANDS.org' says "the folder's anchor" once (around line
+612); the folders' refusals in 'server/from_text/buffer_to_
+viewnodes/local.rs' say "restricted headlines" and "references to
+unknown nodes", pinned by 'a_folder_refusing_a_childs_kind_says_
+nothing_of_noClaim'; the docs say "Restricted vognode" 29 times;
+Neovim's switch refusal says "skgrepo-set". A comment of
+'server/types/viewnode.rs' cites the glossary's entry as
+"restricted viewnode", the name slice 6 gives it.
+*** Headline
+DONE.

@@ -18,7 +18,8 @@
 use skg::test_utils::save_and_rerender;
 use std::error::Error;
 use std::io::BufReader;
-use std::net::{TcpListener, TcpStream};
+use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
+use std::net::TcpStream;
 
 use skg::test_utils::{
   extract_string_field_from_sexp, graph_handle_from_config,
@@ -125,10 +126,8 @@ async fn save_view_and_read_collateral (
   graph       : &InRustGraphHandle,
   views_state : &mut ViewsState,
 ) -> Result<(String, Vec<String>), Box<dyn Error>> {
-  let listener : TcpListener = TcpListener::bind ("127.0.0.1:0") . unwrap ();
-  let mut stream : TcpStream =
-    TcpStream::connect (listener . local_addr () . unwrap ()) . unwrap ();
-  let (read_end, _) = listener . accept () . unwrap ();
+  let (mut stream, read_end) : (TcpStream, TcpStream) =
+    mk_test_tcp_stream_pair ();
   let response : SaveResponse = update_from_and_rerender_buffer (
     &mut stream, buffer, config, tantivy, graph,
     &Ok (viewforest_id . clone ()), views_state ) . await ?;

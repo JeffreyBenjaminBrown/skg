@@ -13,12 +13,18 @@ A Neovim module has its Emacs file's name, without 'skg-' or
 'skg-request-' and with '_' for '-': 'skg-metadata.el' is
 'metadata.lua', 'skg-request-text-search.el' is 'text_search.lua',
 'skg-sexpr-edit.el' and 'skg-sexpr-edit/skg-sexpr-cycling.el' are
-'sexpr_edit.lua' and 'sexpr_edit/sexpr_cycling.lua'. A function has
+sexpr_edit.lua' and 'sexpr_edit/sexpr_cycling.lua'. A function has
 its Emacs twin's name, without the 'skg-' or 'skg--' prefix and its
 module's own prefix, in the same module. Where an Emacs function acts
 at point, its twin takes a line number and says '_at_line' for
 '-at-point'; a few that read the whole buffer at once say
-'_in_lines' ('pending_detachment_in_lines'). The shared case files in
+'_in_lines' ('pending_detachment_in_lines'), and a few that act at
+the cursor, as Emacs's act at point, keep '_at_point'
+('edit_metadata_at_point', 'unknown_node_id_at_point'). Where Emacs
+uses org's outline functions, Neovim has line functions of its own in
+'metadata.lua', which have no Emacs twin: 'parent_line',
+'next_headline_line' and their kin play 'org-up-heading-safe',
+'outline-next-heading' and theirs. The shared case files in
 'tests/shared/' are the oracles both clients are tested against.
 
 Some names stay apart because they name an Emacs mechanism Neovim
@@ -43,6 +49,13 @@ A message has the same words in both clients; Neovim's begins
 'skg: ' and in lowercase where Emacs's begins with a capital, and
 names Neovim's keys where Emacs's names a chord.
 
+A refusal shows as one line in both clients. Emacs signals it as a
+'user-error'; Neovim raises it as a Lua 'error ()', and every key and
+':Skg*' command calls its function through one dispatcher
+('call_showing_refusal' in nvim/lua/skg/keymaps.lua), which shows the
+refusal at error level without the Lua traceback and without the
+"FILE:LINE: " prefix that 'error ()' adds.
+
 * Input model (necessary: vim is modal, and C-c belongs to the terminal)
 - The Emacs 'C-c ...' chords become '<localleader>' plus the same
   mnemonic letters ('C-c s d' -> '<localleader>sd'); where Emacs ended
@@ -51,6 +64,12 @@ names Neovim's keys where Emacs's names a chord.
   (skg buffers are 'acwrite'; ':w' runs the save pipeline). Every
   command is also an ':Skg*' Ex command. The full table lives in
   nvim/lua/skg/keymaps.lua and docs/COMMANDS-nvim.org.
+- Neovim has no prefix argument, so each recursive form that Emacs
+  runs with 'C-u' is a command of its own, with its own key: delete's
+  is ':SkgDeleteRecursive' on '<localleader>dR', the flag command's
+  ':SkgSetFlagSearchMatchingRecursive' on '<localleader>sX', and the
+  commit-readiness gestures' are on '<localleader>rR' and
+  '<localleader>rH'.
 - Extra vim-idiomatic surfaces beyond the Emacs set: ']i' / '[i' as
   id-next/prev motions; '^' plays the C-a title toggle; '<Tab>'
   toggles the fold at point and '<S-Tab>' global visibility.
@@ -142,7 +161,8 @@ names Neovim's keys where Emacs's names a chord.
 - Server messages name Emacs chords and Emacs commands. The client
   rewrites those it has a twin for, in the messages it shows and in
   the fork-confirmation buffer and the absent-reference warning
-  ('with_neovim_bindings' in nvim/lua/skg/messages.lua): the chords
+  ('with_neovim_bindings' in nvim/lua/skg/messages.lua, which reads
+  the Neovim keys and Ex names from nvim/lua/skg/keymaps.lua): the chords
   C-c s d, C-c s w, C-c s s, C-c s r, C-c g RET, C-c g v, and the
   fork-confirmation buffer's C-c C-c and C-c C-k, which are
   '<localleader>cc' and '<localleader>ck' there; and the commands
@@ -173,6 +193,11 @@ names Neovim's keys where Emacs's names a chord.
   both to the same value.
 - 'view-without-metadata' takes the visual selection (or the last
   visual marks); Emacs took the active region.
+- In the metadata editor, S-Left/S-Right read and rewrite a value
+  headline's whole title, so a TODO keyword or tags typed on one are
+  read as part of the value and dropped by the cycle; Emacs's
+  'org-edit-headline' keeps them. Skg writes neither on a value
+  headline, and keeping them would need org's keyword set in Neovim.
 - 'search-interactive''s 'h' option opens docs/COMMANDS-nvim.org
   (falling back to COMMANDS.org).
 - The 'M-x' cosmetic machinery (alias names, completion-predicate

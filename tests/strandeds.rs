@@ -33,7 +33,8 @@ use futures::executor::block_on;
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::io::BufReader;
-use std::net::{TcpListener, TcpStream};
+use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
+use std::net::TcpStream;
 use std::path::Path;
 use tempfile::TempDir;
 
@@ -92,9 +93,8 @@ fn save (
   viewforest_id : &ViewforestId,
   review  : &StrandedsReview,
 ) -> Result<(SaveResponse, HashMap<String, String>), Box<dyn Error>> {
-  let listener : TcpListener = TcpListener::bind ("127.0.0.1:0") ?;
-  let mut stream : TcpStream = TcpStream::connect (listener . local_addr () ?) ?;
-  let (read_end, _) = listener . accept () ?;
+  let (mut stream, read_end) : (TcpStream, TcpStream) =
+    mk_test_tcp_stream_pair ();
   let mut env : SkgEnv =
     skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
   let response : SaveResponse = block_on (

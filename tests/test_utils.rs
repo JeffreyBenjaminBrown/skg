@@ -1,4 +1,10 @@
-use skg::test_utils::compare_headlines_modulo_gnid;
+use skg::test_utils::{
+  compare_headlines_modulo_gnid, path_for_this_process, run_with_test_stores};
+
+use std::any::Any;
+use std::error::Error;
+use std::panic::catch_unwind;
+use std::path::PathBuf;
 
 #[test]
 fn test_compare_headlines_modulo_gnid() {
@@ -98,3 +104,21 @@ fn test_strip_org_comments() {
   let input_whitespace: &str = "   # just a comment";
   assert_eq!(strip_org_comments (input_whitespace), "");
 }
+
+/// A store test that panics leaves no fixture copy behind:
+/// 'run_with_test_stores' removes it before the panic resumes.
+#[test]
+fn a_store_test_that_panics_leaves_no_fixture_copy () {
+  let test_name : &str = "skg-test-a-store-test-that-panics";
+  let fixture_copy : PathBuf =
+    path_for_this_process ( &format! ("/tmp/{}-fixtures", test_name) );
+  let outcome : Result<Result<(), Box<dyn Error>>, Box<dyn Any + Send>> =
+    catch_unwind ( || run_with_test_stores (
+      test_name,
+      "tests/save_dirty_conflicts/fixtures",
+      "/tmp/tantivy-test-a-store-test-that-panics",
+      |_config, _tantivy| Box::pin (async move {
+        panic! ("the test fails") } ) ));
+  assert! ( outcome . is_err (), "the panic resumes" );
+  assert! ( ! fixture_copy . exists (),
+            "{} was left behind", fixture_copy . display () ); }

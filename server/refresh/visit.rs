@@ -38,6 +38,8 @@
 //! children and nothing the user could add there is entombstoned, so
 //! that the tail prunes it.
 
+use crate::dbs::in_rust_graph::InRustGraph;
+use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::dbs::in_rust_graph::override_resolution::{
   carrier_on_owned_chain, resolve_override};
 use crate::refresh::editability::{
@@ -85,7 +87,7 @@ pub(crate) fn visit_parent (
   let goal : Option<Goal> = goal_of_parent (tree, parent, walk);
   rekind_children (tree, parent, goal . as_ref (), walk) ?;
   viewnode_merge (tree, parent, walk) ?;
-  set_warrants (tree, parent, goal . as_ref ());
+  set_warrants (tree, parent, goal . as_ref (), walk);
   mark_claims (tree, parent, goal . as_ref (), walk) ?;
   if let Some (goal) = &goal {
     if extent_of_parent (tree, parent, walk) == Extent::All {
@@ -344,21 +346,43 @@ pub(crate) fn warrant_of_child (
       . map ( |item| item . warrant )
       . unwrap_or (Warrant::No), } ) }
 
+/// Set each child's warrant ('warrant_of_child'); a root's is
+/// 'ByGraph', carrying no warrant fact. Under a tombstone, which has
+/// no goal, an occurrence of an orphan graphnode (one no list the
+/// skgrepo restriction shows contains) is unwarranted, as it is under
+/// a write-protected occurrence ('orphan_under_a_tombstone').
 fn set_warrants (
   tree   : &mut Tree<Viewnode>,
   parent : NodeId,
   goal   : Option<&Goal>,
+  walk   : &Walk,
 ) {
   let is_root : bool = matches! ( tree . get (parent) . unwrap () . value () . kind,
                                   ViewnodeKind::BufferRoot );
   for child in children_of (tree, parent) {
     let warrant : Warrant =
       if is_root { Warrant::ByGraph } // a root carries no warrant fact
+      else if orphan_under_a_tombstone (tree, parent, child, walk) { Warrant::No }
       else { match warrant_of_child (
                goal, tree . get (child) . unwrap () . value () ) {
         Some (warrant) => warrant,
         None => continue, }};
     tree . get_mut (child) . unwrap () . value () . set_warrant (warrant); }}
+
+/// Whether 'child', under 'parent', is an occurrence of an orphan
+/// graphnode under a tombstone: a node that no list the skgrepo
+/// restriction shows contains, as a headline the user typed there
+/// and saved is.
+fn orphan_under_a_tombstone (
+  tree   : &Tree<Viewnode>,
+  parent : NodeId,
+  child  : NodeId,
+  walk   : &Walk,
+) -> bool {
+  matches! ( tree . get (parent) . unwrap () . value () . kind, ViewnodeKind::Tombstone )
+  && tree . get (child) . unwrap () . value () . occurrence_gnid ()
+     . is_some_and ( |pid| walk . truth . graph . inbound_pids_for_relation_gated (
+       pid, NodeRelation::Contains, walk . truth . restriction ) . is_empty () ) }
 
 //
 // 4. claims
@@ -370,7 +394,12 @@ fn set_warrants (
 /// (a ghost warrant included: the worktree lacks that relationship)
 /// vanishes ('vanish_if_unwarranted'); a child that claims nothing (a
 /// pending detachment the user wrote) stays. Under any other parent
-/// no child claims.
+/// no child claims; but under the hides folder ('Folder::Hidden',
+/// write-protected: what its viewparent hides), a child the graph's
+/// hides list does not name at all vanishes, so that a graphnode a
+/// save unhid leaves it ('unhidden_in_the_hides_folder'). A hide the
+/// skgrepo restriction keeps out stays, unwarranted, for a skgrepo
+/// widening to show again.
 fn mark_claims (
   tree   : &mut Tree<Viewnode>,
   parent : NodeId,
@@ -389,9 +418,34 @@ fn mark_claims (
     else if claims_are_read {
       let warrant : Option<Warrant> = warrant_of_child (goal, viewnode);
       vanish_if_unwarranted (tree, child, warrant, walk) ?; }
+    else if warrant_of_child (goal, viewnode) == Some (Warrant::No)
+            && unhidden_in_the_hides_folder (tree, parent, child, walk) {
+      vanish (tree, child, walk) ?; }
     else if claims {
       tree . get_mut (child) . unwrap () . value () . set_claim (false); }}
   Ok (( )) }
+
+/// Whether 'child' stands in the hides folder at 'parent' for a
+/// graphnode its described node hides by no record at all, visible or
+/// not: a hide a save removed.
+fn unhidden_in_the_hides_folder (
+  tree   : &Tree<Viewnode>,
+  parent : NodeId,
+  child  : NodeId,
+  walk   : &Walk,
+) -> bool {
+  if ! matches! ( tree . get (parent) . unwrap () . value () . kind,
+                  ViewnodeKind::Folder (Folder::Hidden) ) { return false; }
+  let Some (hider) : Option<ID> = described_node (tree, parent)
+    . and_then ( |described| tree . get (described) . unwrap () . value ()
+                 . occurrence_gnid () . cloned () )
+    else { return false; };
+  let Some (hidden) : Option<ID> =
+    tree . get (child) . unwrap () . value () . occurrence_gnid () . cloned ()
+    else { return false; };
+  let graph : &InRustGraph = walk . truth . graph;
+  ! graph . outbound_gnids_for_relation (&hider, NodeRelation::HidesFromSubs)
+    . iter () . any ( |gnid| graph . pid_else_raw_id (gnid) == hidden ) }
 
 /// Where the save reads claims: the child at 'treeid', if it claims
 /// and its warrant is not 'ByGraph', vanishes with its subtree.

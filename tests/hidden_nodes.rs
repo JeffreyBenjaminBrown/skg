@@ -21,12 +21,12 @@
 // after b and hides hp ("hp secret", private).
 
 use crate::git_fixture::{
-  Fixture, OwnedSkgrepos, edit_line, open_content_view, switch_skgrepo_set,
-  switch_skgrepo_set_rerendering, with_git_fixture, write_unchanged_skgrepos};
-use crate::git_fixture::save_under as save_under_restriction;
+  Fixture, OwnedSkgrepos, edit_line, open_content_view, save_view_under, skg_files,
+  switch_skgrepo_set, switch_skgrepo_set_rerendering, with_git_fixture,
+  write_unchanged_skgrepos};
+use crate::parse_helpers::{first_folder, kind_and_gnid_of_each_child, viewnode_tree_as_written};
 use crate::pruned_change_view::common::open_all_changes_buffer;
 
-use skg::save::DeleteFrom;
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::types::misc::{ID, RelPartner, SkgrepoName, members_of};
@@ -35,7 +35,10 @@ use skg::metadata_canon::without_viewnode_ids;
 use skg::org_to_text::viewforest_to_string;
 use skg::types::errors::SaveError;
 use skg::types::save::format_save_error_as_org;
+use skg::types::viewnode::{Folder, Viewnode, ViewnodeId, ViewnodeKind, Vognode};
 use skg::types::views_state::{DiffViewBufferKind, ViewforestId};
+
+use ego_tree::{NodeId, Tree};
 
 use std::collections::BTreeMap;
 use std::error::Error;
@@ -199,12 +202,12 @@ fn deleting_a_restricted_vognode_whose_hide_would_land_restricted_is_refused (
                         && line . contains ("restricted (gnid x)") )
         . unwrap_or_else ( || panic! ( "x stands in r's content:\n{}", opened ))
         . to_string ();
-      let files_before : BTreeMap<PathBuf, String> = skg_files_on_disk (f) ?;
+      let files_before : BTreeMap<String, String> = skg_files (f) ?;
       assert_refused_for_a_restricted_record (
         save_view_under (f, VIEW, &opened . replacen ( &format! ("{}\n", x_line), "", 1 ),
                          &public),
         "- Relation: hidesFromSubs\n- Member: x\n- The record's repo: private" );
-      assert_eq! ( skg_files_on_disk (f) ?, files_before, "no file changed" );
+      assert_eq! ( skg_files (f) ?, files_before, "no file changed" );
       Ok (( )) } ) }
 
 /// Under "public", h stands in r's content as a restricted headline,
@@ -226,11 +229,11 @@ fn a_relRepo_request_on_a_restricted_headline_into_a_restricted_skgrepo_is_refus
       let requested : String = opened . replacen (
         "restricted (gnid h)", "restricted (gnid h) (editRequest (relRepo private))", 1 );
       assert_ne! ( requested, opened, "h stands in r's content:\n{}", opened );
-      let files_before : BTreeMap<PathBuf, String> = skg_files_on_disk (f) ?;
+      let files_before : BTreeMap<String, String> = skg_files (f) ?;
       assert_refused_for_a_restricted_record (
         save_view_under (f, VIEW, &requested, &public),
         "- Relation: contains\n- Member: h\n- The record's repo: private" );
-      assert_eq! ( skg_files_on_disk (f) ?, files_before, "no file changed" );
+      assert_eq! ( skg_files (f) ?, files_before, "no file changed" );
       let r : GraphnodeInRust = node_in_graph (f, "r");
       let h : &RelPartner<ID> = r . contains . iter ()
         . find ( |partner| partner . member == ID::from ("h") )
@@ -289,8 +292,15 @@ fn a_tightened_restriction_re_kinds_an_occurrence_of_a_restricted_node_in_place 
                          && line . contains ("(gnid s1)") ),
                 "it holds s1:\n{}", switched );
       let back : String = switch (f, &mut restriction, "private") ?;
-      assert! ( back . contains ("(vnid 0e) node (gnid h) ")
-                && back . contains (") h secret\n"),
+      let back_tree : Tree<Viewnode> = viewnode_tree_as_written (&back);
+      assert! ( back_tree . values ()
+                . find ( |viewnode| viewnode . viewnode_id
+                                    == Some ( ViewnodeId ("0e" . to_string ()) ))
+                . is_some_and ( |viewnode| matches! (
+                  &viewnode . kind,
+                  ViewnodeKind::Vognode (Vognode::Occurrence (occurrence))
+                    if occurrence . gnid == ID::from ("h")
+                       && occurrence . title == "h secret" )),
                 "the switch back draws h where it stood:\n{}", back );
       Ok (( )) } ) }
 
@@ -304,7 +314,8 @@ fn a_tightened_restriction_re_kinds_an_occurrence_of_a_restricted_node_in_place 
 /// s1 claiming under it. Its containers folder, which may stand under
 /// an occurrence alone, became a tombstone at the skgrepo narrowing,
 /// as under any occurrence re-kinded to a Restricted vognode, and
-/// keeps r.
+/// keeps r. The widened view of h, tombstone and all, saved back
+/// unrestricted, changes no file.
 #[test]
 fn a_switch_and_its_reverse_draw_these_buffers (
 ) -> Result<(), Box<dyn Error>> {
@@ -326,6 +337,12 @@ fn a_switch_and_its_reverse_draw_these_buffers (
       assert_eq! ( view_of_h, VIEW_OF_H_UNDER_ALL );
       assert_eq! ( narrowed [1], VIEW_OF_H_SWITCHED_TO_PUBLIC );
       assert_eq! ( widened [1], VIEW_OF_H_SWITCHED_BACK_TO_ALL );
+      let files_before : BTreeMap<String, String> = skg_files (f) ?;
+      let saved : SaveResponse =
+        save_view_under (f, VIEW_OF_H, &widened [1], &restriction) ?;
+      assert! ( saved . errors . is_empty (), "{:?}", saved . errors );
+      assert_eq! ( skg_files (f) ?, files_before,
+                   "the widened view of h, saved back, changes no file" );
       Ok (( )) } ) }
 
 /// As above, where r also hides hh, private, from its subscribers:
@@ -401,14 +418,14 @@ const VIEW_OF_H_UNDER_ALL : &str = "\
 const VIEW_OF_H_SWITCHED_TO_PUBLIC : &str = "\
 * (skg (vnid 0a) restricted (gnid h))
 ** (skg (vnid 0b) tombstone)
-*** (skg (vnid 0c) node (gnid r) (skgRepos (nodeRepo public)) writeProtected (view (rels (contains (out 2))) repoBoundary)) r
+*** (skg (vnid 0c) node (gnid r) (skgRepos (nodeRepo public)) writeProtected (view (rels (contains (out 2))) noWarrant repoBoundary)) r
 ** (skg (vnid 0d) node (gnid s1) (skgRepos (nodeRepo public)) (view repoBoundary)) s1
 ";
 
 const VIEW_OF_H_SWITCHED_BACK_TO_ALL : &str = "\
 * (skg (vnid 0a) node (gnid h) (skgRepos (nodeRepo private)) (view (rels (contains (in 1) (out 1))) (props (aliases 1)) repoBoundary)) h secret
 ** (skg (vnid 0b) tombstone)
-*** (skg (vnid 0c) node (gnid r) (skgRepos (nodeRepo public)) writeProtected (view (rels (contains (out 3)) (subscribesTo (out 1))) repoBoundary)) r
+*** (skg (vnid 0c) node (gnid r) (skgRepos (nodeRepo public)) writeProtected (view (rels (contains (out 3)) (subscribesTo (out 1))) noWarrant repoBoundary)) r
 ** (skg (vnid 0d) node (gnid s1) (skgRepos (nodeRepo public)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)) repoBoundary)) s1
 ";
 
@@ -635,7 +652,7 @@ fn round_trip_keeps_the_private_record (
         SkgrepoRestriction::unrestricted (&f . config);
       let mut restriction : SkgrepoRestriction = all . clone ();
       let opened : String = open (f) ?;
-      let files_before : BTreeMap<PathBuf, String> = skg_files_on_disk (f) ?;
+      let files_before : BTreeMap<String, String> = skg_files (f) ?;
       let narrowed : String = switch_skgrepo_set (f, &mut restriction, "public", view) ? . 0;
       // pc, a member of r; s, of its subscribee folder; o, of its
       // overridden folder. (The hidden folder, write-protected, reads
@@ -651,10 +668,10 @@ fn round_trip_keeps_the_private_record (
                    "widened, the view is as it was opened" );
       let saved : SaveResponse = save_view_cleanly_under (f, view, &widened, &all) ?;
       assert_eq! ( saved . saved_view, widened, "saved unchanged, it comes back as it went" );
-      let files_after : BTreeMap<PathBuf, String> = skg_files_on_disk (f) ?;
-      let but_o = |files : &BTreeMap<PathBuf, String>| -> BTreeMap<PathBuf, String> {
+      let files_after : BTreeMap<String, String> = skg_files (f) ?;
+      let but_o = |files : &BTreeMap<String, String>| -> BTreeMap<String, String> {
         files . iter ()
-        . filter ( |(path, _)| ! path . ends_with ("o.skg") )
+        . filter ( |(path, _)| ! path . ends_with ("/o.skg") )
         . map ( |(path, text)| ( path . clone (), text . clone () ))
         . collect () };
       assert_eq! ( but_o (&files_after), but_o (&files_before),
@@ -829,13 +846,13 @@ fn a_save_of_a_view_whose_root_is_a_restricted_headline_changes_nothing (
       let narrowed : String =
         switch_skgrepo_set (f, &mut restriction, "public", VIEW_OF_H) ? . 0;
       assert_eq! ( narrowed, VIEW_OF_H_SWITCHED_TO_PUBLIC );
-      let before : BTreeMap<PathBuf, String> = skg_files_on_disk (f) ?;
+      let before : BTreeMap<String, String> = skg_files (f) ?;
       let saved : SaveResponse =
         save_view_under (f, VIEW_OF_H, &narrowed, &restriction) ?;
       assert! ( saved . errors . is_empty (), "{:?}", saved . errors );
       assert_eq! ( saved . saved_view, narrowed,
                    "the saved view is the view as it was" );
-      assert_eq! ( skg_files_on_disk (f) ?, before,
+      assert_eq! ( skg_files (f) ?, before,
                    "the save of the restricted root changes nothing on disk" );
       let typed : String = narrowed . replacen (
         ") r\n", ") r\n*** typed under the tombstone\n", 1 );
@@ -848,7 +865,7 @@ fn a_save_of_a_view_whose_root_is_a_restricted_headline_changes_nothing (
                 && refusal . contains ("typed under the tombstone"),
                 "a headline with no occurrence above it is refused for want of a skgrepo: {}",
                 refusal );
-      assert_eq! ( skg_files_on_disk (f) ?, before,
+      assert_eq! ( skg_files (f) ?, before,
                    "the refused save changes nothing on disk" );
       Ok (( )) } ) }
 
@@ -881,17 +898,15 @@ fn a_requested_hidden_folder_holding_a_dangling_hide_saves (
           f, &opened . replacen (
             "node (gnid r)", "node (gnid r) (viewRequests (folder hidesFromSubs))", 1 ),
           &restriction ) ? . saved_view;
-        let hidden_folder_children : Vec<&str> = requested . lines ()
-          . skip_while ( |line| ! line . contains ("hiddenFolder") )
-          . skip (1)
-          . take_while ( |line| line . starts_with ("***") )
-          . filter ( |line| line . starts_with ("*** ") )
-          . collect ();
-        assert! ( hidden_folder_children . len () == 2
-                  && hidden_folder_children [0] . contains ("node (gnid s1)")
-                  && hidden_folder_children [1] . contains (" unknown (gnid nowhere))"),
-                  "under {} the hidden folder holds s1 and the unknown 'nowhere':\n{}",
-                  name, requested );
+        let requested_tree : Tree<Viewnode> = viewnode_tree_as_written (&requested);
+        let hidden_folder_children : Vec<String> =
+          first_folder (&requested_tree, &Folder::Hidden)
+          . map ( |folder| kind_and_gnid_of_each_child (&requested_tree, folder) )
+          . unwrap_or_default ();
+        assert_eq! ( hidden_folder_children,
+                     vec! [ "node s1" . to_string (), "unknown nowhere" . to_string () ],
+                     "under {} the hidden folder holds s1 and the unknown 'nowhere':\n{}",
+                     name, requested );
         let saved : SaveResponse = save_under (f, &requested, &restriction) ?;
         assert_eq! ( saved . saved_view, requested,
                      "under {} the buffer saves as it was", name );
@@ -923,22 +938,11 @@ fn assert_restricted_vognodes_alone_stand_for (
 fn children_of_the_hidden_outside_folder (
   buffer : &str,
 ) -> Vec<String> {
-  let lines : Vec<&str> = buffer . lines () . collect ();
-  let folder : usize = lines . iter ()
-    . position ( |line| line . contains ("hiddenOutsideOfSubscribeeFolder") )
+  let tree : Tree<Viewnode> = viewnode_tree_as_written (buffer);
+  let folder : NodeId =
+    first_folder (&tree, &Folder::HiddenOutsideOfSubscribee)
     . unwrap_or_else ( || panic! ( "no hidden-outside folder:\n{}", buffer ));
-  let depth = |line : &str| -> usize { line . chars () . take_while ( |c| *c == '*' ) . count () };
-  let folder_depth : usize = depth (lines [folder]);
-  lines [folder + 1 ..] . iter ()
-    . take_while ( |line| depth (line) > folder_depth )
-    . filter ( |line| depth (line) == folder_depth + 1 )
-    . map ( |line| {
-      let gnid : &str = line . split ("(gnid ") . nth (1) . and_then (
-        |rest| rest . split (')') . next () ) . unwrap_or ("?");
-      let kind : &str = if line . contains (" restricted (gnid ") { "restricted" }
-                        else { "node" };
-      format! ("{} {}", kind, gnid) } )
-    . collect () }
+  kind_and_gnid_of_each_child (&tree, folder) }
 
 /// r keeps its members: it contains a, h, b and hc, hc after b as its
 /// private section places it, and subscribes to hs.
@@ -1036,28 +1040,6 @@ fn save_under (
             "the buffer must save without errors, got {:?}\n\nbuffer:\n{}",
             response . errors, text );
   Ok (response) }
-
-/// Save 'text' as 'view' under 'restriction', whatever the response.
-fn save_view_under (
-  f           : &mut Fixture,
-  view        : &str,
-  text        : &str,
-  restriction : &SkgrepoRestriction,
-) -> Result<SaveResponse, Box<dyn Error>> {
-  save_under_restriction (
-    f, view, text, restriction, true, DeleteFrom::NotChosen ) }
-
-/// Every '.skg' file of every skgrepo, by path, with its text.
-fn skg_files_on_disk (
-  f : &Fixture,
-) -> Result<BTreeMap<PathBuf, String>, Box<dyn Error>> {
-  let mut files : BTreeMap<PathBuf, String> = BTreeMap::new ();
-  for skgrepo in f . config . skgrepos . values () {
-    for entry in std::fs::read_dir (&skgrepo . path) ? {
-      let path : PathBuf = entry ? . path ();
-      if path . extension () . is_some_and ( |extension| extension == "skg" ) {
-        files . insert ( path . clone (), std::fs::read_to_string (&path) ? ); }}}
-  Ok (files) }
 
 fn node_in_graph (
   f   : &Fixture,

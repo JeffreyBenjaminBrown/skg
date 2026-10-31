@@ -163,7 +163,6 @@ fn a_narrowing_and_a_widening_re_kind_across_the_restriction_and_back () {
 fn the_children_of_a_restricted_vognode_claim_again_when_it_becomes_an_occurrence () {
   // One forest, kept between refreshes as a view is: narrowed, then
   // widened, never printed and parsed in between.
-  let config : SkgConfig = config ();
   let graph : InRustGraph = p_h_c ();
   let restriction : SkgrepoRestriction = main_only ();
   let input : String = formatdoc! ("
@@ -174,13 +173,8 @@ fn the_children_of_a_restricted_vognode_claim_again_when_it_becomes_an_occurrenc
     ", occurrence_metadata ("p", ""), occurrence_metadata ("k", ""),
        occurrence_metadata ("c", "") );
   let mut forest : ViewForest = parse (&input, IdResolution::ThroughGraph (&graph));
-  let mut record : ViewnodeIdRecord = ViewnodeIdRecord::of_viewforest (&forest);
-  for restriction in [ &restriction, &unrestricted () ] {
-    refresh_viewforest (
-      &mut forest, &mut record,
-      &Truth { graph : &graph, config : &config, restriction },
-      RefreshMode::ContentView, 100 )
-      . unwrap (); }
+  refresh_across_switches (
+    &mut forest, &graph, &[ &restriction, &unrestricted () ], RefreshMode::ContentView );
   assert_eq! ( outline (&forest), "\
 node p
   node h
@@ -188,6 +182,40 @@ node p
   node c
   node hh",
     "k claims under h again, so that a save keeps it in h's contents" ); }
+
+/// The editable-view request as the carrier of editability: an
+/// occurrence a skgrepo widening makes of a restricted viewnode is
+/// drawn as any occurrence the refresh draws, carrying the request,
+/// which passes on to each child that claims membership and was
+/// write-protected: k, write-protected under h before the skgrepo
+/// narrowing, is editable after the skgrepo widening.
+#[test]
+fn a_widening_makes_the_write_protected_children_of_a_restricted_vognode_editable () {
+  let graph : InRustGraph = p_h_c ();
+  let restriction : SkgrepoRestriction = main_only ();
+  let input : String = formatdoc! ("
+    * {} p
+    ** (skg node (gnid h) (skgRepos (nodeRepo private)) writeProtected) h's secret title
+    *** {} k
+    ** {} c
+    ", occurrence_metadata ("p", ""), occurrence_metadata ("k", "writeProtected"),
+       occurrence_metadata ("c", "") );
+  let mut forest : ViewForest = parse (&input, IdResolution::ThroughGraph (&graph));
+  let outlines : Vec<String> = refresh_across_switches (
+    &mut forest, &graph, &[ &restriction, &unrestricted () ], RefreshMode::ContentView )
+    . into_iter () . map ( |(_text, outline)| outline ) . collect ();
+  assert_eq! ( outlines [0], "\
+node p
+  restricted h
+    node k wp noClaim
+  node c" );
+  assert_eq! ( outlines [1], "\
+node p
+  node h
+    node k
+  node c
+  node hh",
+    "h is an occurrence again, drawn editable, and k under it editable" ); }
 
 /// r, in 'private', contains a and b, both in 'main'.
 fn private_root () -> InRustGraph {
@@ -240,7 +268,6 @@ node r folded
 fn the_children_of_a_restricted_root_claim_again_when_it_becomes_an_occurrence () {
   // One forest, kept between refreshes as a view is: narrowed, then
   // widened, never printed and parsed in between.
-  let config : SkgConfig = config ();
   let graph : InRustGraph = private_root ();
   let restriction : SkgrepoRestriction = main_only ();
   let input : String = formatdoc! ("
@@ -249,17 +276,11 @@ fn the_children_of_a_restricted_root_claim_again_when_it_becomes_an_occurrence (
     ** {} b
     ", occurrence_metadata ("a", ""), occurrence_metadata ("b", "") );
   let mut forest : ViewForest = parse (&input, IdResolution::ThroughGraph (&graph));
-  let mut record : ViewnodeIdRecord = ViewnodeIdRecord::of_viewforest (&forest);
-  let mut texts : Vec<String> = Vec::new ();
-  for restriction in [ &restriction, &unrestricted () ] {
-    let refreshed : String = refresh_and_render (
-      &mut forest, &mut record,
-      &Truth { graph : &graph, config : &config, restriction },
-      RefreshMode::ContentView, 100 )
-      . unwrap ();
-    texts . push (refreshed); }
-  assert! ( texts [0] . contains ("restricted (gnid r)")
-            && ! texts [0] . contains ("secret"), "{}", texts [0] );
+  let steps : Vec<(String, String)> = refresh_across_switches (
+    &mut forest, &graph, &[ &restriction, &unrestricted () ], RefreshMode::ContentView );
+  let narrowed : &str = &steps [0] . 0;
+  assert! ( narrowed . contains ("restricted (gnid r)")
+            && ! narrowed . contains ("secret"), "{}", narrowed );
   assert_eq! ( outline (&forest), "\
 node r
   node a
@@ -299,7 +320,6 @@ node r
 
 #[test]
 fn a_switch_takes_from_a_view_the_alias_whose_record_it_makes_restricted () {
-  let config : SkgConfig = config ();
   let graph : InRustGraph = r_with_a_private_alias ();
   let restriction : SkgrepoRestriction = main_only ();
   let shown : String = formatdoc! ("
@@ -309,13 +329,10 @@ fn a_switch_takes_from_a_view_the_alias_whose_record_it_makes_restricted () {
     *** (skg alias (skgRepos (relRepo private))) r secret alias
     ", occurrence_metadata ("r", "") );
   let mut forest : ViewForest = parse (&shown, IdResolution::ThroughGraph (&graph));
-  let mut record : ViewnodeIdRecord = ViewnodeIdRecord::of_viewforest (&forest);
-  let narrowed : String = refresh_and_render (
-    &mut forest, &mut record,
-    &Truth { graph : &graph, config : &config, restriction : &restriction },
-    RefreshMode::ContentView, 100 )
-    . unwrap ();
-  assert_eq! ( outline (&forest), "\
+  let (narrowed, narrowed_outline) : (String, String) = refresh_across_switches (
+    &mut forest, &graph, &[ &restriction ], RefreshMode::ContentView )
+    . remove (0);
+  assert_eq! ( narrowed_outline, "\
 node r
   aliasFolder
     alias r public alias" );
@@ -327,7 +344,6 @@ fn an_editable_folder_a_narrowing_empties_stays_and_fills_again_on_widening () {
   // 'private' section, so that under 'main' alone nothing stands for
   // e. One forest, kept between refreshes as a view is: narrowed, then
   // widened.
-  let config : SkgConfig = config ();
   let graph : InRustGraph = graph (&[
     Graphnode { subscribesTo : MSV::Specified ( rel_partners_at_relRepo (
                   &SkgrepoName::from ("private"), vec! [ ID::from ("e") ] )),
@@ -341,15 +357,9 @@ fn an_editable_folder_a_narrowing_empties_stays_and_fills_again_on_widening () {
     ", occurrence_metadata ("s", ""),
        "(skg node (gnid e) (skgRepos (nodeRepo private)))" );
   let mut forest : ViewForest = parse (&input, IdResolution::ThroughGraph (&graph));
-  let mut record : ViewnodeIdRecord = ViewnodeIdRecord::of_viewforest (&forest);
-  let mut outlines : Vec<String> = Vec::new ();
-  for restriction in [ &restriction, &unrestricted () ] {
-    refresh_viewforest (
-      &mut forest, &mut record,
-      &Truth { graph : &graph, config : &config, restriction },
-      RefreshMode::ContentView, 100 )
-      . unwrap ();
-    outlines . push ( outline (&forest) ); }
+  let outlines : Vec<String> = refresh_across_switches (
+    &mut forest, &graph, &[ &restriction, &unrestricted () ], RefreshMode::ContentView )
+    . into_iter () . map ( |(_text, outline)| outline ) . collect ();
   assert_eq! ( outlines, vec! [ "\
 node s
   subscribeeFolder" . to_string (), "\

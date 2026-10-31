@@ -251,6 +251,16 @@ pub fn under_public (
         SkgrepoRestriction::named (&f . config, "public" . into ()) ?;
       body (f, &restriction) } ) }
 
+/// Save 'text' as the content view 'view' under 'restriction', its
+/// forks approved, whatever the response.
+pub fn save_view_under (
+  f           : &mut Fixture,
+  view        : &str,
+  text        : &str,
+  restriction : &SkgrepoRestriction,
+) -> Result<SaveResponse, Box<dyn Error>> {
+  save_under (f, view, text, restriction, true, DeleteFrom::NotChosen) }
+
 /// Save 'text' as the content view 'view' through the save handler's
 /// own pipeline, under 'restriction', its forks approved when 'approved_forks', with the
 /// delete-from choice 'delete_from'.

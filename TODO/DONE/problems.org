@@ -200,6 +200,22 @@
   Test beside the handler. The strip of body whitespace stays in
   'TODO/problems.org'.
 * Problems noticed while executing plan 08, slice 7 (2026-10-30; fixed 2026-10-31)
+** A store test that panics leaves its fixture copy in /tmp
+  'run_with_test_stores' and 'run_with_shared_test_stores'
+  ('server/test_utils.rs') resume a test's panic inside
+  'block_on', after the index's cleanup, so the
+  'remove_test_dir' of the fixture copy that follows is never
+  reached: each failing run leaves
+  '/tmp/<test>-fixtures-<process ID>' behind, as the failing
+  mutation runs of plan 08's slice 7 left two. Harmless to the
+  results, since the folder carries the process ID; it only
+  accumulates.
+  Fixed by slice 5 of 'TODO/simplify-refresh/10_plan.org':
+  'test_result_after_cleanup' ('server/test_utils.rs') removes the
+  fixture copy before a panic resumes, for 'run_with_test_stores'
+  and 'run_with_shared_test_stores' alike. The test is
+  'a_store_test_that_panics_leaves_no_fixture_copy'
+  ('tests/test_utils.rs'), which fails without the fix.
 ** A skgrepo widening keeps a skgrepo narrowing's noClaim
   Run, not traced, by a throwaway test in
   'tests/hidden_nodes.rs', deleted after the run. r, public,

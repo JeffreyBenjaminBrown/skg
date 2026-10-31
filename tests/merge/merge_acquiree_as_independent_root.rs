@@ -22,6 +22,7 @@
 
 use indoc::indoc;
 use std::error::Error;
+use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use std::net::TcpStream;
 
 use skg::test_utils::{run_with_test_stores, graph_handle_from_config, audit_inrustgraph_or_panic};
@@ -60,10 +61,8 @@ async fn merge_acquiree_as_independent_root_impl (
         open_views            : OpenViews::new (),
         graph_straddle        : None,
         };
-  let listener : std::net::TcpListener =
-    std::net::TcpListener::bind ("127.0.0.1:0") . unwrap ();
-  let mut stream : TcpStream =
-    TcpStream::connect (listener . local_addr () . unwrap ()) . unwrap ();
+  let (mut stream, _read_end) : (TcpStream, TcpStream) =
+    mk_test_tcp_stream_pair ();
   let response = update_from_and_rerender_buffer (
     &mut stream,
     input_org_text, config, tantivy, &graph,

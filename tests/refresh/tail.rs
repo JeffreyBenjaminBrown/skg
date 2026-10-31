@@ -28,7 +28,7 @@ fn a_tombstone_root_that_holds_something_stays () {
     ", occurrence_metadata ("k", "") );
   assert_eq! ( run_asserting_fixpoint (&input, &graph) . outline (), "\
 tombstone
-  node k noClaim" ); }
+  node k noClaim ⊥" ); }
 
 #[test]
 fn every_viewnode_gets_a_vnid () {
@@ -54,11 +54,12 @@ fn a_folder_the_prune_leaves_childless_goes_too () {
        occurrence_metadata ("gone", "writeProtected") );
   assert_eq! ( run_asserting_fixpoint (&input, &graph) . outline (), "node p" ); }
 
-/// A view of p, which contains 'members' nodes, drawn under the
-/// skgrepo restriction to 'main', with its graph: the stats of p's
-/// members ask the relRepo of each one's relationship to p.
-fn a_view_of_a_list_under_a_skgrepo_restriction (
-  members : usize,
+/// A view of p, which contains 'members' nodes, drawn under
+/// 'restriction', with its graph: the stats of p's members ask the
+/// relRepo of each one's relationship to p.
+fn a_view_of_a_list_under (
+  members     : usize,
+  restriction : &SkgrepoRestriction,
 ) -> (InRustGraph, ViewForest) {
   let member_pids : Vec<String> =
     ( 0 .. members ) . map ( |i| format! ("c{}", i) ) . collect ();
@@ -71,61 +72,69 @@ fn a_view_of_a_list_under_a_skgrepo_restriction (
   let graph : InRustGraph = graph (&nodes);
   let forest : ViewForest = run_asserting_fixpoint_in (
     &format! ("* {} p\n", occurrence_metadata ("p", "")),
-    &graph, &main_only (), RefreshMode::ContentView, 1000 ) . forest;
+    &graph, restriction, RefreshMode::ContentView, 1000 ) . forest;
   assert_eq! ( forest . roots () . next () . unwrap () . children () . count (), members );
   (graph, forest) }
 
 /// How many times the graphnode stats pass reads a recorder's stored
-/// list over 'a_view_of_a_list_under_a_skgrepo_restriction'.
+/// list over 'a_view_of_a_list_under' 'restriction'.
 fn stored_list_reads_of_the_graphnode_stats_pass (
-  members : usize,
+  members     : usize,
+  restriction : &SkgrepoRestriction,
 ) -> usize {
   let (graph, mut forest) : (InRustGraph, ViewForest) =
-    a_view_of_a_list_under_a_skgrepo_restriction (members);
+    a_view_of_a_list_under (members, restriction);
   STORED_LIST_READS . with ( |reads| reads . set (0) );
   set_graphnodestats_in_viewforest (
-    forest . as_internal_tree_mut (), &graph, &config (), &main_only (),
+    forest . as_internal_tree_mut (), &graph, &config (), restriction,
     &mut RelRepoLookup::over (&graph) )
     . unwrap ();
   STORED_LIST_READS . with ( |reads| reads . get () ) }
 
 /// How many times the viewnode stats pass reads a recorder's stored
-/// list over 'a_view_of_a_list_under_a_skgrepo_restriction'.
+/// list over 'a_view_of_a_list_under' 'restriction'.
 fn stored_list_reads_of_the_viewnode_stats_pass (
-  members : usize,
+  members     : usize,
+  restriction : &SkgrepoRestriction,
 ) -> usize {
   let config : SkgConfig = config ();
-  let restriction : SkgrepoRestriction = main_only ();
   let (graph, mut forest) : (InRustGraph, ViewForest) =
-    a_view_of_a_list_under_a_skgrepo_restriction (members);
+    a_view_of_a_list_under (members, restriction);
   let tree : &mut Tree<Viewnode> = forest . as_internal_tree_mut ();
   let (container_to_contents, content_to_containers)
     : (HashMap<ID, HashSet<ID>>, HashMap<ID, HashSet<ID>>) =
     set_graphnodestats_in_viewforest (
-      tree, &graph, &config, &restriction, &mut RelRepoLookup::over (&graph) )
+      tree, &graph, &config, restriction, &mut RelRepoLookup::over (&graph) )
     . unwrap ();
   STORED_LIST_READS . with ( |reads| reads . set (0) );
   set_viewnodestats_in_viewforest ( // a lookup of its own, so that it reads the list itself
     tree, &graph, &container_to_contents, &content_to_containers,
-    &config, &restriction, &mut RelRepoLookup::over (&graph) );
+    &config, restriction, &mut RelRepoLookup::over (&graph) );
   STORED_LIST_READS . with ( |reads| reads . get () ) }
 
+/// Under a skgrepo restriction and unrestricted alike. Unrestricted,
+/// the inbound filter asks no relRepo ('inbound_pids_gated_by'), so
+/// the pass reads no list at all.
 #[test]
 fn the_graphnode_stats_pass_reads_a_list_a_bounded_number_of_times () {
-  let (few, many) : (usize, usize) =
-    ( stored_list_reads_of_the_graphnode_stats_pass (10),
-      stored_list_reads_of_the_graphnode_stats_pass (200) );
-  assert! ( few > 0, "the pass asks of the relationships" );
-  assert_eq! ( few, many,
-               "a list of 200 members is read as often as one of 10, not \
-                once per member ('RelRepoLookup')" ); }
+  for restriction in [ main_only (), unrestricted () ] {
+    let (few, many) : (usize, usize) =
+      ( stored_list_reads_of_the_graphnode_stats_pass (10, &restriction),
+        stored_list_reads_of_the_graphnode_stats_pass (200, &restriction) );
+    assert! ( few > 0 || restriction . is_unrestricted (),
+              "the pass asks of the relationships ({:?})", restriction );
+    assert_eq! ( few, many,
+                 "under {:?}, a list of 200 members is read as often as one of \
+                  10, not once per member ('RelRepoLookup')", restriction ); }}
 
+/// Under a skgrepo restriction and unrestricted alike.
 #[test]
 fn the_viewnode_stats_pass_reads_a_list_a_bounded_number_of_times () {
-  let (few, many) : (usize, usize) =
-    ( stored_list_reads_of_the_viewnode_stats_pass (10),
-      stored_list_reads_of_the_viewnode_stats_pass (200) );
-  assert! ( few > 0, "the pass asks of the relationships" );
-  assert_eq! ( few, many,
-               "a list of 200 members is read as often as one of 10, not \
-                once per member ('RelRepoLookup')" ); }
+  for restriction in [ main_only (), unrestricted () ] {
+    let (few, many) : (usize, usize) =
+      ( stored_list_reads_of_the_viewnode_stats_pass (10, &restriction),
+        stored_list_reads_of_the_viewnode_stats_pass (200, &restriction) );
+    assert! ( few > 0, "the pass asks of the relationships ({:?})", restriction );
+    assert_eq! ( few, many,
+                 "under {:?}, a list of 200 members is read as often as one of \
+                  10, not once per member ('RelRepoLookup')", restriction ); }}

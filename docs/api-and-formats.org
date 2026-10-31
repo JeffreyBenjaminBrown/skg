@@ -579,10 +579,10 @@ since the command searches the current buffer.
     second one. Last, the buffer is refreshed once, as after a save,
     which gives each node made editable its body and draws its content
     list and the content of each appended root.
-    =server/serve/handlers/integrate_unshown_changes.rs=, =server/diff_view/pruned_change_view.rs=
+    =server/serve/handlers/integrate_unshown_changes.rs=, =server/diff_view/buffer_rerender.rs=
     ('ensure_editableOccurrences_exist',
-    'contentOrigins_missing_from_buffer'), and 'rerender_view' in
-    =server/update_buffer.rs=.
+    'contentOrigins_missing_from_buffer'), and 'refresh_view' in
+    =server/rerender_pass.rs=.
 
 ** Investigate unknown node
   - Request: =((request . "investigate unknown node") (id . "ID"))=.

@@ -141,3 +141,25 @@ fn a_visible_hide_of_what_a_restricted_subscribee_contains_stands_outside_under_
     node ("c"), node ("h") ]);
   assert_eq! ( where_h_stands (&graph),
                ( vec! [INSIDE . to_string ()], vec! [OUTSIDE . to_string ()] )); }
+
+/// The hides folder ('hiddenFolder', write-protected) shows what its
+/// viewparent hides. A graphnode r hides by no record any more, u, as
+/// after a save that unhid it, vanishes from it; q, which r still
+/// hides, stays.
+#[test]
+fn a_graphnode_the_viewparent_no_longer_hides_leaves_the_hides_folder () {
+  let graph : InRustGraph = graph (&[
+    Graphnode { hidesFromSubs : MSV::Specified ( ids (&["q"]) ), .. node ("r") },
+    node ("q"), node ("u") ]);
+  let input : String = formatdoc! ("
+    * {} r
+    ** (skg hiddenFolder)
+    *** {} q
+    *** {} u
+    ", occurrence_metadata ("r", ""), occurrence_metadata ("q", "writeProtected"),
+       occurrence_metadata ("u", "writeProtected") );
+  assert_eq! ( run_asserting_fixpoint (&input, &graph) . outline (), "\
+node r
+  hiddenFolder
+    node q wp noClaim",
+    "u, which r no longer hides, leaves the hides folder" ); }

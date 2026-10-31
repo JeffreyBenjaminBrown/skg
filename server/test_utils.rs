@@ -127,8 +127,7 @@ where
     let cleanup_result : Result<(), Box<dyn Error>> =
       cleanup_test_tantivy ( Some (&config . tantivy_folder) );
     guard . disarm ();
-    test_result_after_cleanup (test_result, cleanup_result) } );
-  remove_test_dir (&temp_fixtures) ?;
+    test_result_after_cleanup (test_result, cleanup_result, &temp_fixtures) } );
   result
 }
 
@@ -197,17 +196,23 @@ pub fn remove_test_dir (
       Ok (( )) },
     Err (e) => Err ( Box::new (e) ), }}
 
-/// A test's result once its stores are cleaned up: a cleanup error
-/// fails a test that passed, and a panic resumes after cleanup.
+/// A test's result once its stores are cleaned up and its fixture
+/// copy 'temp_fixtures' removed: a cleanup error fails a test that
+/// passed, and a panic resumes after both, so that a failing test
+/// leaves no fixture copy behind.
 fn test_result_after_cleanup (
   test_result    : Result<Result<(), Box<dyn Error>>,
                           Box<dyn Any + Send>>,
   cleanup_result : Result<(), Box<dyn Error>>,
+  temp_fixtures  : &Path,
 ) -> Result<(), Box<dyn Error>> {
+  let removal_result : Result<(), Box<dyn Error>> =
+    remove_test_dir (temp_fixtures);
   match test_result {
-    Ok (inner) => { cleanup_result ?; inner },
+    Ok (inner) => { cleanup_result ?; removal_result ?; inner },
     Err (panic_payload) => {
-      if let Err (e) = cleanup_result {
+      for e in [cleanup_result . err (), removal_result . err ()]
+        . into_iter () . flatten () {
         tracing::error! ("Cleanup error after test panic: {}", e); }
       resume_unwind (panic_payload) }, }}
 
@@ -365,8 +370,7 @@ where
     let cleanup_result : Result<(), Box<dyn Error>> =
       cleanup_test_tantivy (Some (&tantivy_folder)) ;
     guard . disarm ();
-    test_result_after_cleanup (test_result, cleanup_result) } );
-  remove_test_dir (&temp_fixtures) ?;
+    test_result_after_cleanup (test_result, cleanup_result, &temp_fixtures) } );
   result }
 
 /// Whether 'text', parsed over 'graph' and refreshed again by

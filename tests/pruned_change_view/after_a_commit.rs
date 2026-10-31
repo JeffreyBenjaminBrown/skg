@@ -90,7 +90,7 @@ fn a_commit_converts_what_the_diff_view_showed (
       "*** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim writeProtected (view (rels (contains (in 2) (out 1))) noWarrant)) x\n* (skg node (gnid s)" ]);
     assert! ( ! committed . contains ("(gnid h)"), "h's ghost is gone:\n{}", committed );
     assert! ( without_viewnode_ids (&committed) . contains (
-                "* (skg tombstone)\n** (skg node (gnid hm) (skgRepos (nodeRepo main))) hm\n" ),
+                "* (skg tombstone)\n** (skg node (gnid hm) (skgRepos (nodeRepo main)) (view noWarrant)) hm\n" ),
               "h's tombstone keeps hm:\n{}", committed );
     for fact in [ "(diff ", "changed)", "changesetMarker", "oldText",
                   " ghost (gnid ", "homeSkgrepoMove", "(ready" ] {

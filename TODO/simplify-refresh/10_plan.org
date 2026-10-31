@@ -814,7 +814,7 @@ and the refresh tests adapt to the type; a test that each
 variant takes its table's parts and no other; the suites with
 every script.
 
-** TODO Slice 5: the tidy
+** DONE Slice 5: the tidy
 Read "The tidy" in the agreed behavior and Decide 15 of the
 review ("The cheap tidy, item by item") first. Commit per
 group.

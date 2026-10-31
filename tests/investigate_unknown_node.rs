@@ -15,7 +15,8 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::fs;
 use std::io::BufReader;
-use std::net::{TcpListener, TcpStream};
+use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
+use std::net::TcpStream;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tempfile::TempDir;
@@ -99,9 +100,8 @@ fn investigate (
   let runtime : Arc<RuntimeGeneration> = env . runtime_snapshot ();
   let restriction : SkgrepoRestriction =
     SkgrepoRestriction::of_privacy_order_for_test (&["main", "other"], restriction);
-  let listener : TcpListener = TcpListener::bind ("127.0.0.1:0") ?;
-  let client : TcpStream = TcpStream::connect ( listener . local_addr () ? ) ?;
-  let (mut server, _peer) = listener . accept () ?;
+  let (mut server, client) : (TcpStream, TcpStream) =
+    mk_test_tcp_stream_pair ();
   handle_investigate_unknown_node_request (
     &mut server,
     &format! ( "((request . \"investigate unknown node\") (id . \"{}\"))", id ),

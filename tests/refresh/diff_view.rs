@@ -104,7 +104,7 @@ fn in_the_diff_view_an_occurrence_no_node_answers_to_stays_a_tombstone () {
 node p
   node c wp
   tombstone
-    node k wp noClaim" ); }
+    node k wp noClaim ⊥" ); }
 
 #[test]
 fn a_ghost_whose_node_is_back_becomes_an_occurrence_in_place () {
@@ -217,7 +217,7 @@ fn a_gone_change_viewnodes_tombstone_keeps_what_the_user_wrote_under_it () {
   assert_eq! ( run . outline (), "\
 node p
   tombstone
-    node n noClaim" ); }
+    node n noClaim ⊥" ); }
 
 #[test]
 fn a_missing_change_viewnode_is_drawn () {
@@ -462,15 +462,12 @@ fn diff_view_narrowed_by_a_switch (
     readiness_store : &readiness_store };
   let graph : &InRustGraph = &straddle . after;
   let mut forest : ViewForest = parse (text, IdResolution::ThroughGraph (graph));
-  let mut record : ViewnodeIdRecord = ViewnodeIdRecord::of_viewforest (&forest);
-  let opened : String = refresh_and_render (
-    &mut forest, &mut record,
-    &Truth { graph, config : &config, restriction : &SkgrepoRestriction::unrestricted (&config) },
-    mode, 100 ) . unwrap ();
+  let mut steps : Vec<(String, String)> = refresh_across_switches (
+    &mut forest, graph, &[ &unrestricted (), &restriction ], mode );
+  let (narrowed, _) : (String, String) = steps . pop () . unwrap ();
+  let (opened, _) : (String, String) = steps . pop () . unwrap ();
   let narrowed_truth : Truth = Truth { graph, config : &config,
                                        restriction : &restriction };
-  let narrowed : String = refresh_and_render (
-    &mut forest, &mut record, &narrowed_truth, mode, 100 ) . unwrap ();
   if let Err (failure) = refresh_reaches_fixpoint (
     &narrowed, graph,
     |again, again_record| refresh_viewforest (
@@ -505,15 +502,13 @@ node p
   assert! ( ! narrowed . contains ("ghost")
             && ! narrowed . contains ("secret"), "{}", narrowed );
   let mut forest : ViewForest = forest;
-  let config : SkgConfig = config ();
   let readiness_store : ReadinessStore = ReadinessStore::default ();
-  let widened : String = refresh_and_render (
-    &mut forest, &mut ViewnodeIdRecord::default (),
-    &Truth { graph : &straddle . after, config : &config, restriction : &SkgrepoRestriction::unrestricted (&config) },
+  let (widened, _) : (String, String) = refresh_across_switches (
+    &mut forest, &straddle . after, &[ &unrestricted () ],
     RefreshMode::DiffView { straddle : &straddle,
                             buffer_kind : DiffViewBufferKind::AllChanges,
-                            readiness_store : &readiness_store },
-    100 ) . unwrap ();
+                            readiness_store : &readiness_store } )
+    . remove (0);
   assert_eq! ( widened, opened ); }
 
 /// The worktree added h, private, to p's content, recording it in
@@ -544,7 +539,7 @@ node p
   changesetMarker content
   restricted h
     tombstone
-      node p wp noClaim" );
+      node p wp noClaim ⊥" );
   let h : NodeRef<Viewnode> = forest . roots () . next () . unwrap ()
     . children () . nth (1) . unwrap ();
   assert_eq! ( h . value () . change_facts . change . rel, Some (Existence::Added) );
@@ -552,3 +547,28 @@ node p
             && narrowed . contains ("restricted (gnid h) (diff (rel added)")
             && ! narrowed . contains ("oldText")
             && ! narrowed . contains ("secret"), "{}", narrowed ); }
+
+/// The worktree added c, public, to p's content, recording it in p's
+/// private section. Under no skgrepo restriction the diff view shows
+/// c with its change; narrowed, the record is restricted, so the goal
+/// leaves c out ('partner_items'): nothing of the private
+/// relationship shows, though c itself is public.
+#[test]
+fn a_switch_leaves_out_a_member_whose_record_is_private () {
+  let straddle : GraphStraddle = straddle (
+    &[ node ("p"), node ("c") ],
+    &[ Graphnode { contains : rel_partners_at_relRepo (
+                     &SkgrepoName::from ("private"), vec! [ ID::from ("c") ] ),
+                   .. node ("p") },
+       node ("c") ] );
+  let (opened, narrowed, forest) : (String, String, ViewForest) =
+    diff_view_narrowed_by_a_switch (
+      &format! ("* {} p\n", occurrence_metadata ("p", "")), &straddle );
+  assert! ( opened . contains ("(gnid c)"), "unrestricted, c shows: {}", opened );
+  assert! ( ! narrowed . contains ("(gnid c)"), "{}", narrowed );
+  assert_eq! ( outline (&forest), "\
+node p
+  changesetMarker content",
+    "c is left out; the changeset marker of p's content stays (filed in \
+     'TODO/problems.org': it says that p's content changed by a \
+     restricted record)" ); }

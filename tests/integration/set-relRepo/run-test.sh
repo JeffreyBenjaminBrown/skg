@@ -74,6 +74,12 @@ start_skg_server
 
 SKG_CONFIG_FILE="$TEMP_CONFIG" run_client_test
 
+# The save recorded r's relationship to k in r's secret section.
+if [ "$TEST_RESULT" -eq 0 ] && [ ! -f "$TEST_DIR/data/owned/secret/r.skg" ]; then
+  echo "FAIL: the save wrote no secret/r.skg"
+  TEST_RESULT=1
+fi
+
 echo ""
 echo "=== Test Complete ==="
 exit $TEST_RESULT

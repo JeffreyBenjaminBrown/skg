@@ -14,6 +14,7 @@
 // that folder.
 
 use std::error::Error;
+use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use std::net::TcpStream;
 
 use skg::test_utils::{run_with_shared_test_stores, graph_handle_from_config};
@@ -52,10 +53,8 @@ async fn save_buffer (
   graph       : &InRustGraphHandle, // must be the explicit handle, or the save's coherence debug-assert reads a stale graph
   views_state : &mut ViewsState,
 ) -> Result<SaveResponse, Box<dyn Error>> {
-  let listener : std::net::TcpListener =
-    std::net::TcpListener::bind ("127.0.0.1:0") . unwrap ();
-  let mut stream : TcpStream =
-    TcpStream::connect (listener . local_addr () . unwrap ()) . unwrap ();
+  let (mut stream, _read_end) : (TcpStream, TcpStream) =
+    mk_test_tcp_stream_pair ();
   update_from_and_rerender_buffer (
     &mut stream,
     buf, config, tantivy, graph,

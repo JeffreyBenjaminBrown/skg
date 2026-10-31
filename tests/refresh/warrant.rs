@@ -84,17 +84,26 @@ node p
     alias a
     alias b noClaim ⊥" ); }
 
+/// A tombstone has no goal, so a child under it carries no warrant
+/// fact, but for an orphan graphnode, which no list contains: it is
+/// unwarranted, as under a write-protected occurrence. c is an orphan;
+/// d is contained by e. A root carries no warrant fact.
 #[test]
-fn a_child_of_a_tombstone_and_a_root_carry_no_warrant_fact () {
-  let graph : InRustGraph = graph (&[ node ("p"), node ("c") ]);
+fn under_a_tombstone_an_orphan_graphnode_alone_is_unwarranted () {
+  let graph : InRustGraph = graph (&[
+    node ("p"), node ("c"), node ("d"),
+    Graphnode { contains : ids (&["d"]), .. node ("e") } ]);
   let input : String = formatdoc! ("
     * {} p
     ** (skg tombstone)
     *** {} c
-    ", occurrence_metadata ("p", ""), occurrence_metadata ("c", "writeProtected") );
+    *** {} d
+    ", occurrence_metadata ("p", ""), occurrence_metadata ("c", "writeProtected"),
+       occurrence_metadata ("d", "writeProtected") );
   let run : Run = run_asserting_fixpoint (&input, &graph);
   assert_eq! ( run . outline (), "\
 node p
   tombstone
-    node c wp noClaim" );
-  assert! ( ! run . text . contains ("noWarrant"), "{}", run . text ); }
+    node c wp noClaim ⊥
+    node d wp noClaim" );
+  assert_eq! ( run . text . matches ("noWarrant") . count (), 1, "{}", run . text ); }

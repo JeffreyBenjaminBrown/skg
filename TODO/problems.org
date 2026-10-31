@@ -6,6 +6,30 @@
   When a plan or a settled discussion decides how an entry will be
   fixed, prefix its headline with 'FIX PLANNED: ' and leave it here
   until the fix lands; then move it as above.
+* Problems noticed while executing plan 10, slice 5 (2026-10-31)
+** The server reads a title that starts "(skg" as metadata
+  'headline_to_triple' ('server/from_text/buffer_to_viewnodes/
+  uninterpreted.rs') takes a headline whose text after the stars
+  starts with "(skg" for metadata, so '* (skgrepos are cool) title'
+  is parsed as metadata and refused. Slice 5 made both clients read
+  metadata only where "(skg" is followed by a space or ")"
+  ('skg--metadata-opening-regexp', 'metadata_opening_pattern'); the
+  server's parser was not in the slice's list. Traced, not run.
+** The diff view's content marker tells of a restricted record
+  Run by 'a_switch_leaves_out_a_member_whose_record_is_private'
+  ('tests/refresh/diff_view.rs'). p's file adds c to p's content in
+  p's private section since HEAD. Under the skgrepo restriction
+  "main" the all-changes buffer leaves c out, as it should, but
+  keeps p's '(skg changesetMarker content)', which says that p's
+  content changed: a change the skgrepo restriction keeps out.
+** The acquired folder refuses what the API doc says it accepts
+  'validate_acquired_folder' ('server/from_text/buffer_to_viewnodes/
+  local.rs') admits only ghosts and occurrences, while
+  'docs/api-and-formats.org' says "An acquiredFolder also accepts a
+  child the user puts there, which claims nothing", so an unknown or
+  restricted viewnode put there is refused. Found while writing
+  slice 5's test of the admission rule, which leaves the acquired
+  folder out. Traced, not run.
 * Problems noticed while executing plan 10, slice 2 (2026-10-31)
   Found by repeating the search of
   'TODO/simplify-refresh/09_1_review-reports/restriction-edits.org'
@@ -64,17 +88,6 @@
   its skgrepo-set from the request, a read leak. Both stay as they
   are by Jeff's choice (2026-10-31); slice 6 of
   'TODO/simplify-refresh/10_plan.org' documents them so.
-* Problems noticed while executing plan 08, slice 7 (2026-10-30)
-** FIX PLANNED: A store test that panics leaves its fixture copy in /tmp
-  'run_with_test_stores' and 'run_with_shared_test_stores'
-  ('server/test_utils.rs') resume a test's panic inside
-  'block_on', after the index's cleanup, so the
-  'remove_test_dir' of the fixture copy that follows is never
-  reached: each failing run leaves
-  '/tmp/<test>-fixtures-<process ID>' behind, as the failing
-  mutation runs of plan 08's slice 7 left two. Harmless to the
-  results, since the folder carries the process ID; it only
-  accumulates.
 * Problems noticed while executing plan 08, slice 1 (2026-10-29)
 * Problems noticed while executing plan 19, slice 12 (2026-10-24)
 ** Two texts with a bare "repo"

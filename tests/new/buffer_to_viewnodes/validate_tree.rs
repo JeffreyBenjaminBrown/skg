@@ -4,7 +4,7 @@ use skg::from_text::buffer_to_viewnodes::add_missing_info::WhatTheParseSupplied;
 use indoc::indoc;
 use regex::Regex;
 use skg::types::errors::BufferValidationError;
-use skg::types::misc::{SkgConfig, Skgrepo, SkgrepoName, TantivyIndex};
+use skg::types::misc::{ID, SkgConfig, Skgrepo, SkgrepoName, TantivyIndex};
 use skg::types::tree::forest::ViewForest;
 use skg::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewforest;
@@ -14,7 +14,7 @@ use skg::test_utils::run_with_test_stores;
 use std::error::Error;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use skg::types::viewnode::ViewnodeKind;
+use skg::types::viewnode::{ViewnodeKind, Vognode};
 use ego_tree::NodeId;
 
 const FIXTURES : &str =
@@ -916,6 +916,70 @@ fn a_gnid_only_vognode_counts_in_the_distinctness_checks_when_it_claims () {
         assert_eq! ( result . is_ok (), passes,
                      "{} beside an occurrence of its gnid in {}, '{}': {:?}",
                      kind, checked, claim, result ); }}}}
+
+/// A gnid-only vognode of either kind, an unknown viewnode or a
+/// restricted viewnode, stands as a member of every partner folder
+/// and of the acquiredBy folder, as it does in a content list and the
+/// hidden-outside folder (above): where a record names a node no graph
+/// has, or one the skgrepo restriction keeps out ('docs/api-and-formats.org',
+/// "Restricted-skgrepo nodes": "content, subscribees, and every partner
+/// folder's members alike"). Every viewnode of the buffer passes local
+/// validation.
+#[test]
+fn a_gnid_only_vognode_of_either_kind_stands_in_every_partner_folder_and_the_acquiredBy_folder () {
+  let config : SkgConfig = validation_config ();
+  for kind in ["unknown", "restricted"] {
+    let mut inputs : Vec<(String, String)> =
+      [ "subscribeeFolder", "subscriberFolder", "overriddenFolder",
+        "overriderFolder", "hiderFolder", "hiddenFolder",
+        "containerFolder", "mentionerFolder" ]
+      . iter ()
+      . map ( |folder| (
+        format! ( indoc! {"
+          * (skg node (gnid r) (skgRepos (nodeRepo main))) r
+          ** (skg {})
+          *** (skg {} (gnid x))
+        "}, folder, kind ),
+        folder . to_string () ))
+      . collect ();
+    inputs . push ((
+      format! ( indoc! {"
+        * (skg node (gnid r) (skgRepos (nodeRepo main))) r
+        ** (skg subscribeeFolder)
+        *** (skg node (gnid s) (skgRepos (nodeRepo main)) writeProtected) s
+        **** (skg hiddenInSubscribeeFolder)
+        ***** (skg {} (gnid x))
+      "}, kind ),
+      "hiddenInSubscribeeFolder" . to_string () ));
+    inputs . push ((
+      format! ( indoc! {"
+        * (skg node (gnid r) (skgRepos (nodeRepo main))) r
+        ** (skg ghost (gnid g) (skgRepos (nodeRepo main))) g
+        *** (skg acquiredByFolder)
+        **** (skg {} (gnid x))
+      "}, kind ),
+      "acquiredByFolder" . to_string () ));
+    for (input, folder) in inputs {
+      let (viewforest, parsing_errors, _warnings, _supplied)
+        : (ViewForest, Vec<BufferValidationError>, Vec<String>, WhatTheParseSupplied)
+        = org_to_viewforest (&input, IdResolution::AsWritten) . unwrap ();
+      assert_eq! ( parsing_errors . len (), 0,
+                   "{} in a {}: {:?}", kind, folder, parsing_errors );
+      let gnid_only_kinds : Vec<&str> = viewforest . nodes ()
+        . filter_map ( |node_ref| match &node_ref . value () . kind {
+          ViewnodeKind::Vognode (Vognode::GnidOnly (gnid_only))
+            if gnid_only . gnid == ID::from ("x")
+            => Some (gnid_only . kind . wire_atom ()),
+          _ => None, })
+        . collect ();
+      assert_eq! ( gnid_only_kinds, vec! [kind],
+                   "the {} parses as such in a {}", kind, folder );
+      for node_ref in viewforest . nodes () {
+        let result : Result<(), String> =
+          validate_local_structure (&viewforest, node_ref . id (), &config)
+          . map_err ( |error| error . message );
+        assert! ( result . is_ok (),
+                  "{} in a {}: {:?}", kind, folder, result ); }}}}
 
 /// A relation folder, the subscribee folder and the two compound
 /// hidden folders refuse a child of a kind they do not admit (here an

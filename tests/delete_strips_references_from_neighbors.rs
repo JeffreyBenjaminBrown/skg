@@ -24,6 +24,7 @@ use indoc::indoc;
 use std::error::Error;
 use std::fs;
 use std::io::BufReader;
+use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use std::net::TcpStream;
 use std::path::Path;
 
@@ -125,10 +126,8 @@ async fn absent_reference_cleanup_handler_confirms_then_rewrites (
                 env : &mut SkgEnv,
                 views_state : &mut ViewsState|
    -> Result<Vec<String>, Box<dyn Error>> {
-    let listener : std::net::TcpListener =
-      std::net::TcpListener::bind ("127.0.0.1:0") ?;
-    let client : TcpStream = TcpStream::connect (listener . local_addr () ?) ?;
-    let (mut server, _) = listener . accept () ?;
+    let (mut server, client) : (TcpStream, TcpStream) =
+      mk_test_tcp_stream_pair ();
     // The handler synchronously rerenders via `block_on`; run it outside this
     // async test's executor, as production does on its connection thread.
     std::thread::scope (|scope| {
@@ -226,10 +225,8 @@ async fn delete_preserves_foreign_referencer (
     open_views        : OpenViews::new (),
     graph_straddle    : None,
   };
-  let listener : std::net::TcpListener =
-    std::net::TcpListener::bind ("127.0.0.1:0") ?;
-  let mut stream : TcpStream = TcpStream::connect (
-    listener . local_addr () ? ) ?;
+  let (mut stream, _read_end) : (TcpStream, TcpStream) =
+    mk_test_tcp_stream_pair ();
   let input_org_text : &str = indoc! {"
     * (skg node (gnid cheese) (skgRepos (nodeRepo foreign))) cheese
     ** (skg node (gnid victim) (skgRepos (nodeRepo owned)) (editRequest delete)) victim
@@ -270,8 +267,8 @@ async fn delete_in_foreign_subscribee_rerenders_as_unknown (
   let mut views_state : ViewsState = ViewsState {
     open_views     : OpenViews::new (),
     graph_straddle : None };
-  let listener = std::net::TcpListener::bind ("127.0.0.1:0") ?;
-  let mut stream = TcpStream::connect (listener . local_addr () ?) ?;
+  let (mut stream, _read_end) : (TcpStream, TcpStream) =
+    mk_test_tcp_stream_pair ();
   let response = update_from_and_rerender_buffer (
     &mut stream, indoc! {"
       * (skg node (gnid subscriber) (skgRepos (nodeRepo foreign))) foreign subscriber
@@ -299,8 +296,8 @@ async fn delete_in_foreign_overridden_rerenders_as_unknown (
   let mut views_state : ViewsState = ViewsState {
     open_views     : OpenViews::new (),
     graph_straddle : None };
-  let listener = std::net::TcpListener::bind ("127.0.0.1:0") ?;
-  let mut stream = TcpStream::connect (listener . local_addr () ?) ?;
+  let (mut stream, _read_end) : (TcpStream, TcpStream) =
+    mk_test_tcp_stream_pair ();
   let response = update_from_and_rerender_buffer (
     &mut stream, indoc! {"
       * (skg node (gnid overrider) (skgRepos (nodeRepo foreign))) foreign overrider
@@ -329,8 +326,8 @@ async fn delete_in_foreign_hiddenoutside_rerenders_as_unknown (
   let mut views_state : ViewsState = ViewsState {
     open_views     : OpenViews::new (),
     graph_straddle : None };
-  let listener = std::net::TcpListener::bind ("127.0.0.1:0") ?;
-  let mut stream = TcpStream::connect (listener . local_addr () ?) ?;
+  let (mut stream, _read_end) : (TcpStream, TcpStream) =
+    mk_test_tcp_stream_pair ();
   let response = update_from_and_rerender_buffer (
     &mut stream, indoc! {"
       * (skg node (gnid hide-subscriber) (skgRepos (nodeRepo foreign))) foreign hide subscriber
@@ -373,10 +370,8 @@ async fn delete_strips_references_impl (
         open_views            : OpenViews::new (),
         graph_straddle        : None,
         };
-  let listener : std::net::TcpListener =
-    std::net::TcpListener::bind ("127.0.0.1:0") . unwrap ();
-  let mut stream : TcpStream =
-    TcpStream::connect (listener . local_addr () . unwrap ()) . unwrap ();
+  let (mut stream, _read_end) : (TcpStream, TcpStream) =
+    mk_test_tcp_stream_pair ();
   let _response = update_from_and_rerender_buffer (
     &mut stream,
     input_org_text, config, tantivy, &graph,
@@ -525,10 +520,8 @@ async fn strip_pass_handles_extra_ids_impl (
         open_views            : OpenViews::new (),
         graph_straddle        : None,
         };
-  let listener : std::net::TcpListener =
-    std::net::TcpListener::bind ("127.0.0.1:0") . unwrap ();
-  let mut stream : TcpStream =
-    TcpStream::connect (listener . local_addr () . unwrap ()) . unwrap ();
+  let (mut stream, _read_end) : (TcpStream, TcpStream) =
+    mk_test_tcp_stream_pair ();
   let _response = update_from_and_rerender_buffer (
     &mut stream,
     input_org_text, config, tantivy, &graph,

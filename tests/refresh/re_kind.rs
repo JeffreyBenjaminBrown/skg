@@ -257,7 +257,7 @@ fn a_folder_its_position_forbids_is_entombstoned_keeping_its_children () {
 node p
   tombstone
     tombstone
-      node k wp noClaim
+      node k wp noClaim ⊥
   node c" ); }
 
 #[test]
@@ -269,3 +269,20 @@ fn a_change_viewnode_in_a_content_view_is_entombstoned () {
     ", occurrence_metadata ("p", "") );
   let run : Run = run_asserting_fixpoint (&input, &graph);
   assert_eq! ( run . outline (), "node p" ); }
+
+/// A re-kind keeps the claim the headline carried: x, written
+/// 'noClaim' (a pending detachment), becomes an unknown that claims
+/// nothing, so that the save still reads the detachment.
+#[test]
+fn a_re_kind_keeps_a_noClaim_the_headline_carried () {
+  let graph : InRustGraph = graph (&[ p_lists (&["c", "x"]), node ("c") ]);
+  let input : String = formatdoc! ("
+    * {} p
+    ** {} c
+    ** {} x
+    ", occurrence_metadata ("p", ""), occurrence_metadata ("c", ""),
+       occurrence_metadata ("x", "noClaim") );
+  assert_eq! ( run_asserting_fixpoint (&input, &graph) . outline (), "\
+node p
+  node c
+  unknown x noClaim" ); }

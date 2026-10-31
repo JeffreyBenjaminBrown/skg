@@ -328,6 +328,13 @@ position implies no relationship, carries it too, and the wire
 writes nothing for it. Claim and warrant are independent: a child
 the user typed under a write-protected parent, which stays
 unwarranted, since no save reads claims there, carries no =noClaim=.
+A tombstone has no goal, so its children carry no warrant fact, but
+for an orphan graphnode, which no list contains: it is unwarranted
+there too. In the write-protected hides folder (=hiddenFolder=) a
+graphnode its viewparent hides by no record vanishes, so that a
+graphnode a save unhid leaves it; a hide the skgrepo restriction
+keeps out stays, unwarranted ('mark_claims' in
+'server/refresh/visit.rs').
 The refresh keeps an unwarranted child where it stands; it never
 removes a child.
 
@@ -729,7 +736,12 @@ visible when its record and its node's home are both unrestricted.
 The code asks the two questions by
 'SkgrepoRestriction::record_is_visible' and
 'SkgrepoRestriction::node_is_restricted' ('server/skgrepo_sets.rs'),
-and by nothing else. With no skgrepo restriction every skgrepo is
+which share one body, and by nothing else: the records of a list it
+shows are 'SkgrepoRestriction::visible_records'; whether the graph
+shows the node a gnid names, 'InRustGraph::gnid_presence_gated' and
+'InRustGraph::node_is_shown' answer by the second question; and
+whether a connection is unrestricted,
+'SkgrepoRestriction::is_unrestricted'. With no skgrepo restriction every skgrepo is
 shown; under any skgrepo restriction a record whose relRepo the
 config does not name is visible, and a node whose home skgrepo the
 config does not name is unrestricted.
@@ -1484,7 +1496,7 @@ the flags folder, which stays to show that the node has no true flag
 
 When the refresh draws a member of a folder whose members carry the
 chain, it hangs the member's chain under it
-('attach_containerward_chains_under_members' in
+('draw_containerward_chain' in
 'server/refresh/chain.rs'), walking the member's
 containers breadth-first over the live graph or, in the diff view,
 over the union of the straddle. The extent of a chain is none, so a
@@ -1553,7 +1565,7 @@ whether ghosts and change viewnodes are drawn, and what the node
 budget may refuse.
 
 A rerender pass is told less: 'RerenderMode' (a term of plan 08, in
-'server/update_buffer.rs') is 'ContentView' or 'DiffView' with the
+'server/rerender_pass.rs') is 'ContentView' or 'DiffView' with the
 buffer kind, built from the view being rerendered; the rerender of a
 buffer of the diff view adds the graph straddle the pass shares
 across the views it rerenders ('RerenderPassContext' in
@@ -1648,7 +1660,8 @@ them, each charging it once at its visit, and once it is spent the
 occurrences the refresh draws are write-protected (they carry an
 editable-view request their visit consumes,
 'consume_editableView_request'). A folder fills its members without spending any. The
-module comment of 'server/refresh/extent.rs' states the rule. The
+module comment of 'server/refresh/extent.rs' states the extent, and
+that of 'server/refresh/editability.rs' the node budget. The
 server *renders* a viewforest when it produces its org text
 ('server/org_to_text.rs').
 
@@ -1661,7 +1674,10 @@ the occurrences the refresh draws, the first of a node is editable
 when its parent's children are editable content, no other occurrence
 of the node is, and the budget allows at its visit
 ('drawn_occurrence_editability', 'consume_editableView_request'), and
-a repeat is write-protected.
+a repeat is write-protected. The editable occurrence *holds* its
+node's editability: the walk keeps where it stands, and an occurrence
+write-protected, re-kinded or merged away releases it
+('Walk::hold_editability', 'server/refresh/editability.rs').
 The diff view's deviations are in 'docs/diff-view.org', "Editability
 in the diff view".
 

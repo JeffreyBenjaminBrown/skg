@@ -1,4 +1,5 @@
 use crate::git_fixture_helpers::{commit_all, configure_git_user};
+use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use skg::dbs::init::wipe_then_init_tantivy_db;
 use skg::serve::handlers::titles_by_gnids::{
   add_deleted_node_titles_by_gnids,
@@ -14,7 +15,7 @@ use skg::types::nodes::complete::{empty_graphnode, Graphnode};
 use std::collections::HashMap;
 use std::error::Error;
 use std::fs;
-use std::net::{TcpListener, TcpStream};
+use std::net::TcpStream;
 use std::path::Path;
 use tempfile::TempDir;
 
@@ -45,14 +46,8 @@ fn titles_by_gnids_handler_sends_parseable_titles (
     wipe_then_init_tantivy_db (
       &vec![node, spaced_title_node],
       &index_folder . path)?;
-  let listener : TcpListener =
-    TcpListener::bind ("127.0.0.1:0")?;
-  let addr =
-    listener . local_addr ()?;
-  let client : TcpStream =
-    TcpStream::connect (addr)?;
-  let (mut server, _peer) =
-    listener . accept ()?;
+  let (mut server, client) : (TcpStream, TcpStream) =
+    mk_test_tcp_stream_pair ();
   let request : &str =
     "((request . \"titles by ids\") \
       (ids \"11111111-1111-4111-8111-111111111111\" \
@@ -117,9 +112,8 @@ fn restricted_title_lookup_challenges_without_releasing_text (
     SkgrepoRestriction::of_privacy_order_for_test (
       &[skgrepo . 0 . as_str (), "private"], skgrepo . 0 . as_str ());
   let respond = |request : &str| -> Result<String, Box<dyn Error>> {
-    let listener : TcpListener = TcpListener::bind ("127.0.0.1:0")?;
-    let client : TcpStream = TcpStream::connect (listener . local_addr ()?)?;
-    let (mut server, _) = listener . accept ()?;
+    let (mut server, client) : (TcpStream, TcpStream) =
+      mk_test_tcp_stream_pair ();
     handle_titles_by_gnids_request_with_skgrepo_set (
       &mut server, request, &index, &config, &restriction, &graph );
     drop (server);
@@ -205,14 +199,8 @@ fn titles_by_gnids_finds_deleted_git_file_title_without_diff_mode (
          abbreviation  : None,
          path          : skgrepo_dir . to_path_buf (),
          owned         : true }) ]));
-  let listener : TcpListener =
-    TcpListener::bind ("127.0.0.1:0")?;
-  let addr =
-    listener . local_addr ()?;
-  let client : TcpStream =
-    TcpStream::connect (addr)?;
-  let (mut server, _peer) =
-    listener . accept ()?;
+  let (mut server, client) : (TcpStream, TcpStream) =
+    mk_test_tcp_stream_pair ();
   let request : String =
     format! (
       "((request . \"titles by ids\") (ids \"{}\"))",
@@ -265,14 +253,8 @@ fn titles_by_gnids_finds_untracked_git_file_title_without_diff_mode (
          abbreviation  : None,
          path          : skgrepo_dir . to_path_buf (),
          owned         : true }) ]));
-  let listener : TcpListener =
-    TcpListener::bind ("127.0.0.1:0")?;
-  let addr =
-    listener . local_addr ()?;
-  let client : TcpStream =
-    TcpStream::connect (addr)?;
-  let (mut server, _peer) =
-    listener . accept ()?;
+  let (mut server, client) : (TcpStream, TcpStream) =
+    mk_test_tcp_stream_pair ();
   let request : String =
     format! (
       "((request . \"titles by ids\") (ids \"{}\"))",

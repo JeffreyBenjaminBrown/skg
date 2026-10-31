@@ -109,6 +109,25 @@ pub(super) fn refresh_and_render (
   refresh_viewforest (forest, record, truth, mode, budget) ?;
   viewforest_to_string (forest) }
 
+/// Refresh 'forest' under each of 'restrictions' in turn, as a view
+/// is refreshed at each switch of the skgrepo restriction: one forest
+/// and one vnid record, never printed and parsed in between. The text
+/// and the outline ('outline') after each refresh.
+pub(super) fn refresh_across_switches (
+  forest       : &mut ViewForest,
+  graph        : &InRustGraph,
+  restrictions : &[&SkgrepoRestriction],
+  mode         : RefreshMode,
+) -> Vec<(String, String)> {
+  let config : SkgConfig = config ();
+  let mut record : ViewnodeIdRecord = ViewnodeIdRecord::of_viewforest (forest);
+  restrictions . iter () . map ( |restriction| {
+    let text : String = refresh_and_render (
+      forest, &mut record, &Truth { graph, config : &config, restriction },
+      mode, 100 ) . unwrap ();
+    ( text, outline (forest) ) } )
+    . collect () }
+
 /// What one refresh made.
 pub(super) struct Run {
   pub forest : ViewForest,

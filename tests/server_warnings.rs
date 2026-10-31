@@ -13,7 +13,8 @@ use skg::test_utils::read_lp_message;
 use skg::types::misc::SkgConfig;
 
 use std::io::BufReader;
-use std::net::{TcpListener, TcpStream};
+use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
+use std::net::TcpStream;
 
 #[test]
 fn an_old_key_spelling_is_warned_about_by_its_new_spelling_and_the_config_still_loads (
@@ -93,11 +94,8 @@ fn a_foreign_manifest_the_config_contradicts_is_served_as_a_warning (
 fn served_warnings_response (
   warnings : &[String],
 ) -> Result<String, Box<dyn std::error::Error>> {
-  let listener : TcpListener = TcpListener::bind ("127.0.0.1:0") ?;
-  let mut write_end : TcpStream =
-    TcpStream::connect (listener . local_addr () ?) ?;
-  let (read_end, _) : (TcpStream, std::net::SocketAddr) =
-    listener . accept () ?;
+  let (mut write_end, read_end) : (TcpStream, TcpStream) =
+    mk_test_tcp_stream_pair ();
   handle_server_warnings_request (&mut write_end, warnings);
   drop (write_end);
   let mut reader : BufReader<TcpStream> = BufReader::new (read_end);

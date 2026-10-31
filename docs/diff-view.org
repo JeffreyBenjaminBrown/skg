@@ -140,7 +140,7 @@ context), or, when the after-graph lacks the node, its ghost. In a
 pruned change view, a root with several containers gets a folded
 container folder, which the refresh fills with its containers in
 either graph and their containerward chains
-('stub_viewforest_of_roots' in 'server/diff_view/pruned_change_view.rs').
+('stub_viewforest_of_roots' in 'server/diff_view/buffer_rerender.rs').
 ** The refresh over the straddle
 A buffer of the diff view is drawn, and redrawn after every save,
 rerender and commit, by the one refresh every view uses
@@ -149,7 +149,8 @@ mode is 'RefreshMode::DiffView', which carries the straddle, the
 buffer kind and the readiness store, from which the refresh reads
 the marks ('server/refresh/mode.rs')
 ('refresh_diffView_viewforest' and
-'rerender_diffView_buffer' in 'server/diff_view/buffer_rerender.rs').
+'refresh_diffView_buffer_over_current_straddle' in
+'server/diff_view/buffer_rerender.rs').
 The diff-view mode ('server/refresh/diff_view.rs') changes the
 refresh so:
 - a parent's goal is the union of its lists in the two graphs
@@ -362,7 +363,7 @@ The diff view follows the rule that decides which occurrence is
 editable in any view -- one editable occurrence per node, the first
 the refresh draws where its parent is editable content, the
 editable-view request and the node budget, described in the module
-comment of 'server/refresh/extent.rs' -- with these deviations.
+comment of 'server/refresh/editability.rs' -- with these deviations.
 ** A node of U is editable, with its whole content list
 An occurrence the refresh draws in editable content is editable when
 its node is in U and has no editable occurrence yet, and its whole
@@ -411,7 +412,8 @@ Each content origin of D that the buffer makes editable nowhere is
 then appended as a stub root, in ID order, with the standing roots
 pinned, and the buffer is refreshed once, as after a save, which
 gives each node made editable its body and draws its content list
-and the content of each appended root ('rerender_diffView_buffer').
+and the content of each appended root
+('refresh_diffView_buffer_over_current_straddle').
 The answer
 is the readiness summary, and the rerender stream carries the buffer.
 It does not matter who write-protected an occurrence: the user asked

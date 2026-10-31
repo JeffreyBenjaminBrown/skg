@@ -158,7 +158,7 @@ the edit must not continue to show editable =F=: editing it again would request
 another fork.  The post-save update therefore makes one saved-view-only
 exception to the rule that roots are shown raw: a level-one =F= named by
 one of this save's exact =ForkSpec=s is rewritten to =K=
-('replace_saved_view_fork_roots' in =server/update_buffer.rs=).  A
+('replace_saved_view_fork_roots' in =server/rerender_pass.rs=).  A
 recursive-content occurrence of =F= is replaced by its newly visible
 substitute =K= at any refresh, as substitution always does.
 
@@ -301,7 +301,7 @@ not perform interactive override substitution.
 - [[file:../server/dbs/in_rust_graph/override_resolution.rs][owned override substitution]]
 - [[file:../server/dbs/in_rust_graph/override_invariants.rs][owned monogamy and cycle invariants]]
 - [[file:../server/refresh/visit.rs][substitution and raw positions ('substitute_overriders')]]
-- [[file:../server/update_buffer.rs][saved-view fork replacement and collateral rerendering]]
+- [[file:../server/rerender_pass.rs][saved-view fork replacement and collateral rerendering]]
 - [[file:../server/types/views_state.rs][open-view root registration]]
 - [[file:../server/types/viewnode.rs][folder rules and =overridesHere= collection]]
 - [[file:../server/refresh/visit.rs][on-demand folder construction ('fulfill_view_requests')]]
