@@ -5983,3 +5983,35 @@ the second and the last commit, not before the first, a
 refactor with no change at the wire.
 *** Headline
 DONE.
+** Orchestrator's notes after slice 3 (2026-10-31)
+Launched 05:58 UTC, reported 06:23 UTC: twenty-five minutes;
+425k agent tokens over 232 tool uses. Three commits: the
+'Option' gone (a pure refactor, the suite green on it), the one
+encoding with the wire, the config and the server's tests, then
+the clients and the docs. No failure met but the pre-existing
+one; the fixtures were changed ahead of the runs, as the
+compiler and the grep found them. The deviations are sound: the
+third field, the skgrepos kept out, makes the rule for a
+skgrepo the config does not name one question and
+'is_unrestricted' "keeps none out"; the display answers the
+name alone and each client builds its label from the config it
+already reads for the prompt; 'SkgrepoSetName' went with the
+reserved name, so a skgrepo may be named "all"; a config that
+names no skgrepo gets an unrestricted restriction showing the
+empty name, a corner the agent coined and only one fixture
+reaches. For Jeff: 'data/skgconfig.toml' has no
+'default_repo_set' line, so his server starts unrestricted as
+before; the wire's display and switch answers carry no
+'content' now; the integrate request's "all" and the wire's
+'(delete-from . "all")' stay, being no set's name. Corrections
+carried: to slice 4, the dummy config under 'main_only' and
+'unrestricted' in 'tests/refresh/mod.rs'; to slice 5, the
+'unrestricted' helper for the count tests, the per-occurrence
+construction of the unrestricted skgrepo restriction in the
+walk, the borrow of the test helpers, and the check's grep for
+"all", which must spare the wire's field and the diff object;
+to slice 6, the messages, key descriptions and the CLI usage
+that still say "repo-set" or "skgrepo-set" for the skgrepo
+restriction, in both clients and the server. Suites: nextest
+1061 of 1061, Emacs 414 of 414, Neovim 453 passes, integration
+35 of 36 with either client, the pre-existing failure.

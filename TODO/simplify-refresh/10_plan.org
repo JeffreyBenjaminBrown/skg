@@ -783,6 +783,15 @@ The new tests write headlines with the edit request before
 removed)))' ('tests/restricted_graphnode_in_the_buffer.rs',
 'tests/fork_merge_delete_under_a_narrowing.rs'); the
 table-driven parse accepts the fields in any order, as today.
+*** Corrections carried from slice 3
+The refresh tests' skgrepo restrictions 'main_only' and
+'unrestricted' ('tests/refresh/mod.rs', around line 80) are
+built by 'SkgrepoRestriction::named' over a dummy config whose
+privacy order is alphabetical, so "main" is more public than
+"private" there; a parser test that builds a skgrepo
+restriction of its own goes through 'named' or
+'of_privacy_order_for_test', never a struct literal (the
+fields are private).
 *** the shape
 'ViewnodeMetadata' keeps the viewnode ID, the fold and focus
 state, the readiness request and the derived facts;
@@ -809,6 +818,26 @@ every script.
 Read "The tidy" in the agreed behavior and Decide 15 of the
 review ("The cheap tidy, item by item") first. Commit per
 group.
+*** Corrections carried from slice 3
+The count tests (tests 8) run unrestricted by 'unrestricted'
+of 'tests/refresh/mod.rs', beside 'main_only'; they are in
+'tests/refresh/tail.rs' (around lines 74, 87 and 97).
+'SkgrepoRestriction::unrestricted (config)' allocates its sets
+on every call and is called per occurrence in
+'server/refresh/visit.rs' ('is_overridden_and_shown_raw',
+around line 791) and per call of 'carrier_on_owned_chain';
+build it once per walk, as 'RelRepoLookup' is built once per
+tail (awkwardness 8). The helpers of
+'tests/shared/git_fixture.rs' take '&SkgrepoRestriction'
+beside '&mut Fixture': bind the restriction with a 'let' first,
+since building it from the fixture's config in the same call
+does not borrow-check. The check's grep for "all" below must
+spare, beside 'heralds', the wire's '(delete-from . "all")'
+('save.rs', 'serve/handlers/save_buffer.rs',
+'serve/protocol.rs') and the diff object of
+'types/viewnode.rs'; 'is_unrestricted' is the one "is this
+skgrepo unrestricted" (duplication 1), so that item is
+half done.
 *** the clients
 The flag command's message after replacing a pending relRepo
 request says so, with a test in each client; the docs say the
@@ -882,6 +911,21 @@ Read "The docs and the glossary" in the agreed behavior, the
 user-docs report and the vocabulary report first. Every earlier
 slice brought the docs of what it changed; this slice does the
 rest.
+*** Corrections carried from slice 3
+Messages, key descriptions and the CLI usage still say
+"repo-set" or "skgrepo-set" where the skgrepo restriction is
+meant: the save's refusals in 'server/types/errors.rs' (around
+261 to 265, "restricted under the current repo-set"), the
+export's usage in 'server/main.rs' (around 340), the switch's
+prompts and refusals in 'elisp/skg-request-repo-sets.el'
+(around 68 and 95), 'nvim/lua/skg/buffer.lua' (around 146) and
+the key descriptions of 'nvim/lua/skg/keymaps.lua' (around 123
+and 196) and 'elisp/skg-keymaps-and-aliases.el'; they say
+"skgrepo restriction". The wire's field names ('repo-set',
+'repo-sets', 'default_repo_set') and the glossary's
+"skgrepo-set" for the set a skgrepo restriction denotes stay.
+A grep for 'repo-set' over 'server elisp nvim' outside the
+wire's names joins the check.
 *** the words
 "An unknown viewnode" and "a restricted viewnode" in user text,
 docs and messages, in place of "an unknown", "a reference to an
