@@ -80,11 +80,11 @@ fn reject_retired_config_keys (
       "This config defines [[repo_sets]], a retired mechanism. ",
       "Repo-sets are now the prefixes of the [[repos]] order: ",
       "list your repos most-public-first, and select a set by ",
-      "naming the most private repo to make available (or 'all'). ",
+      "naming the most private repo to show. ",
       "See docs/telescopes.org, \"The privacy order\". ",
       "Delete the [[repo_sets]] entries and, if a ",
       "deleted set was your default_repo_set, replace that with a ",
-      "repo name or 'all'." ) . into () ); }
+      "repo name, or leave it out for no restriction." ) . into () ); }
   let has_user_owns_it : bool =
     parsed . as_ref ()
     . and_then ( |v| v . get ("repos") )
@@ -304,15 +304,11 @@ pub fn load_config_with_overrides (
 fn validate_skgrepo_sets (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn std::error::Error>> {
-  if config . skgrepos . contains_key (&SkgrepoName::from ("all")) {
-    return Err ("Configured repo may not be named 'all'" . into ()); }
-  if config . default_skgrepo_set . 0 != "all"
-  && ! config . skgrepos . contains_key (
-       &SkgrepoName::from ( config . default_skgrepo_set . 0 . as_str () )) {
-    return Err (format! (
-      "default_repo_set '{}' names no configured repo. It must be 'all' or the name of the most private repo to make available.",
-      config . default_skgrepo_set
-    ) . into ()); }
+  if let Some (default) = &config . default_skgrepo_set {
+    if ! config . skgrepos . contains_key (default) {
+      return Err (format! (
+        "default_repo_set '{}' names no configured repo. It must name the most private repo to show; left out, it is the config's most private repo.",
+        default ) . into ()); }}
   Ok (()) }
 
 /// Resolve relative paths in the config against data_root.

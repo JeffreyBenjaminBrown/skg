@@ -179,15 +179,15 @@ pub fn ids (
 ) -> BTreeSet<ID> {
   list . iter () . map ( |s| ID::from (*s) ) . collect () }
 
-/// Send 'request' to the "stage and commit" handler, under the
-/// skgrepo set 'all'; return everything it wrote.
+/// Send 'request' to the "stage and commit" handler, with
+/// no skgrepo restriction; return everything it wrote.
 pub fn send_stage_and_commit_request (
   f       : &mut Fixture,
   env     : &SkgEnv,
   request : &str,
 ) -> Result<String, Box<dyn Error>> {
   let all_skgrepos : SkgrepoRestriction =
-    SkgrepoRestriction::named (&f . config, "all" . into ()) ?;
+    SkgrepoRestriction::unrestricted (&f . config);
   let (mut stream, mut read_end) : (TcpStream, TcpStream) =
     mk_test_tcp_stream_pair ();
   handle_stage_and_commit_request (
@@ -198,7 +198,7 @@ pub fn send_stage_and_commit_request (
   Ok (response) }
 
 /// Send a "integrate unshown changes" request for the buffer 'diffView_buffer_kind'
-/// to its handler, under the skgrepo set 'all'; return everything it
+/// to its handler, with no skgrepo restriction; return everything it
 /// wrote.
 pub fn send_integrate_unshown_changes_request (
   f                    : &mut Fixture,
@@ -206,7 +206,7 @@ pub fn send_integrate_unshown_changes_request (
 ) -> Result<String, Box<dyn Error>> {
   let env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
   let all_skgrepos : SkgrepoRestriction =
-    SkgrepoRestriction::named (&f . config, "all" . into ()) ?;
+    SkgrepoRestriction::unrestricted (&f . config);
   let (mut stream, mut read_end) : (TcpStream, TcpStream) =
     mk_test_tcp_stream_pair ();
   handle_integrate_unshown_changes_request (

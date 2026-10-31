@@ -15,7 +15,7 @@ use std::net::TcpStream;
 
 use indoc::indoc;
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::HashMap;
 
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use skg::dbs::in_rust_graph::{
@@ -24,7 +24,7 @@ use skg::from_text::buffer_to_validated_saveplan;
 use skg::from_text::buffer_to_validated_saveplan_with_fork_skgrepos;
 use skg::org_to_text::viewforest_to_string;
 use skg::serve::ViewsState;
-use skg::skgrepo_sets::{SkgrepoRestriction, SkgrepoSetName};
+use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::test_utils::{graph_handle_from_config, run_with_shared_test_stores};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::test_utils::update_from_and_rerender_buffer_with_fork_approval_test;
@@ -318,10 +318,9 @@ async fn explicit_fork_round_trip_and_monogamy (
 async fn fork_default_prefers_unrestricted_owned_skgrepo (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
-  let restriction : SkgrepoRestriction = SkgrepoRestriction {
-    name    : SkgrepoSetName ("only-owned2" . to_string ()),
-    skgrepos : BTreeSet::from ([ SkgrepoName::from ("owned2"),
-                               SkgrepoName::from ("foreign") ]), };
+  let restriction : SkgrepoRestriction = // shows owned2 and foreign
+    SkgrepoRestriction::of_privacy_order_for_test (
+      &["owned2", "foreign", "owned"], "foreign");
   let ( _vf, save_plan, _w ) = buffer_to_validated_saveplan (
     FORK_ROOT_BUFFER, config, &restriction )  ?;
   assert_eq! ( save_plan . fork_specs . len (), 1,
@@ -692,9 +691,9 @@ async fn fork_skgrepo_restricted (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
   // Save planning reloads the freshly reset fixture graph.
-  let restriction : SkgrepoRestriction = SkgrepoRestriction {
-    name    : SkgrepoSetName ("only-foreign" . to_string ()),
-    skgrepos : BTreeSet::from ([ SkgrepoName::from ("foreign") ]), };
+  let restriction : SkgrepoRestriction = // shows foreign alone
+    SkgrepoRestriction::of_privacy_order_for_test (
+      &["foreign", "owned", "owned2"], "foreign");
   let result = buffer_to_validated_saveplan (
     FORK_BUFFER, config, &restriction ) ;
   match result {

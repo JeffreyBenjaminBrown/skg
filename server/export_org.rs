@@ -13,7 +13,7 @@
 //! unit-testable. The server handler and the `export-org`
 //! subcommand both call it.
 
-use crate::skgrepo_sets::{SkgrepoRestriction, SkgrepoSetName};
+use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::SkgConfig;
 use crate::types::misc::ID;
 use crate::types::nodes::complete::Graphnode;
@@ -271,9 +271,8 @@ pub(crate) fn claimed_export_targets (
   nodes : &[Graphnode],
   config : &SkgConfig,
 ) -> Result<Vec<(ID, String)>, String> {
-  let restriction : SkgrepoRestriction = SkgrepoRestriction::named (
-    config, SkgrepoSetName::from ("all"))
-    .map_err (|error| error . to_string ())?;
+  let restriction : SkgrepoRestriction =
+    SkgrepoRestriction::unrestricted (config);
   let aliases : HashMap<ID, ID> = nodes . iter ()
     .flat_map (|node| node . extra_ids . iter ()
       .map (|extra| (extra . clone (), node . pid . clone ())))
@@ -362,7 +361,7 @@ fn discover_roots (
       warnings . push ( format! (
         "export root {} is in repo {} which is restricted under \
          repo-set {}; skipping",
-        parent . pid, parent . home_skgrepo, restriction . name ) );
+        parent . pid, parent . home_skgrepo, restriction . most_private_shown ) );
       continue; }
     if let Some (owner) = target_owner . get (&target) {
       warnings . push ( format! (

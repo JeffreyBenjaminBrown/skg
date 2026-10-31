@@ -26,13 +26,13 @@ use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use skg::dbs::in_rust_graph::relation_accessors::{NodeRelation, RelationRole};
 use skg::dbs::in_rust_graph::{InRustGraph};
 use skg::org_to_text::viewforest_to_string;
-use skg::skgrepo_sets::{SkgrepoRestriction, SkgrepoSetName, run_with_skgrepo_set_test_db};
+use skg::skgrepo_sets::{SkgrepoRestriction, run_with_skgrepo_set_test_db};
 use skg::test_utils::graph_handle_from_config;
 use skg::refresh::Truth;
 use skg::refresh::chain::attach_containerward_chains_under_members;
 use skg::refresh::mode::RefreshMode;
 use skg::test_utils::multi_root_view_with_skgrepo_set;
-use skg::types::misc::{ID, SkgConfig};
+use skg::types::misc::{ID, SkgConfig, SkgrepoName};
 use skg::types::nodes::complete::Graphnode;
 use skg::types::viewnode::{RelationCounts, Viewnode, ViewnodeKind, Vognode};
 use skg::refresh::viewnodestats::set_viewnodestats_in_viewforest;
@@ -48,9 +48,9 @@ fn content_view_of_N_gates_privately_contained_C (
     "/tmp/tantivy-test-leak-battery-content",
     |config, tantivy| Box::pin ( async move {
       let public : SkgrepoRestriction =
-        SkgrepoRestriction::named (config, SkgrepoSetName::from ("public"))?;
+        SkgrepoRestriction::named (config, SkgrepoName::from ("public"))?;
       let all : SkgrepoRestriction =
-        SkgrepoRestriction::named (config, SkgrepoSetName::from ("all"))?;
+        SkgrepoRestriction::unrestricted (config);
 
       // At "public": N's private membership of C must not render --
       // neither C's id nor its title -- even though C itself is a
@@ -67,14 +67,14 @@ fn content_view_of_N_gates_privately_contained_C (
         at_public . contains ("leak-battery-N"),
         "N itself is public and must render: {}", at_public );
 
-      // At "all": the private membership is visible.
+      // At "private" (no restriction): the private membership is visible.
       let (at_all, _pids, _tree) : (String, Vec<ID>, Tree<Viewnode>) =
         multi_root_view_with_skgrepo_set (
           config, Some (tantivy),
           &[ ID::from ("N") ], &all ) ?;
       assert! (
         at_all . contains ("leak-battery-C"),
-        "under 'all' the private containment is visible: {}", at_all );
+        "unrestricted the private containment is visible: {}", at_all );
       Ok (( )) } )) }
 
 #[test]
@@ -86,9 +86,9 @@ fn inbound_containerward_data_hides_N_at_public (
     "/tmp/tantivy-test-leak-battery-inbound",
     |config, _tantivy| Box::pin ( async move {
       let public : SkgrepoRestriction =
-        SkgrepoRestriction::named (config, SkgrepoSetName::from ("public"))?;
+        SkgrepoRestriction::named (config, SkgrepoName::from ("public"))?;
       let all : SkgrepoRestriction =
-        SkgrepoRestriction::named (config, SkgrepoSetName::from ("all"))?;
+        SkgrepoRestriction::unrestricted (config);
 
       // Unit-style pin: the gated in-Rust-graph accessor directly.
       // C's containerward data (who contains C) must not name N at
@@ -110,11 +110,11 @@ fn inbound_containerward_data_hides_N_at_public (
           &ID::from ("C"), NodeRelation::Contains, &all );
       assert! (
         inbound_all . contains (&ID::from ("N")),
-        "under 'all' N's containment of C is visible inbound: {:?}",
+        "unrestricted N's containment of C is visible inbound: {:?}",
         inbound_all );
 
       // Rendered chain: C's containerward chain must stop before N
-      // at "public" (N is shown at "all").
+      // at "public" (N is shown at "private" (no restriction)).
       let graph_handle = (
         graph_handle_from_config (config)? );
       let graph = graph_handle . load_full ();
@@ -150,7 +150,7 @@ fn inbound_containerward_data_hides_N_at_public (
         let ancestors : BTreeSet<ID> = occurrence_children_gnids (&viewforest, c_gnid);
         assert! (
           ancestors . contains (&ID::from ("N")),
-          "under 'all' the rendered containerward chain shows \
+          "unrestricted the rendered containerward chain shows \
            N: {:?}", ancestors );
       }
       Ok (( )) } )) }
@@ -164,9 +164,9 @@ fn subscriberFolder_style_inbound_gates_privately_recorded_subscription (
     "/tmp/tantivy-test-leak-battery-subscriber",
     |config, _tantivy| Box::pin ( async move {
       let public : SkgrepoRestriction =
-        SkgrepoRestriction::named (config, SkgrepoSetName::from ("public"))?;
+        SkgrepoRestriction::named (config, SkgrepoName::from ("public"))?;
       let all : SkgrepoRestriction =
-        SkgrepoRestriction::named (config, SkgrepoSetName::from ("all"))?;
+        SkgrepoRestriction::unrestricted (config);
       let nodes : Vec<Graphnode> =
         read_all_skg_files_from_skgrepos (config)?;
       let graph : InRustGraph =
@@ -190,7 +190,7 @@ fn subscriberFolder_style_inbound_gates_privately_recorded_subscription (
           &ID::from ("C"), RelationRole::SUBSCRIBEE, &all );
       assert! (
         subscribers_all . contains (&ID::from ("S")),
-        "under 'all' S's subscription to C is visible: {:?}",
+        "unrestricted S's subscription to C is visible: {:?}",
         subscribers_all );
       Ok (( )) } )) }
 
@@ -203,9 +203,9 @@ fn default_subscribeeFolder_requires_an_unrestricted_subscription_relationship (
     "/tmp/tantivy-test-leak-battery-default-subscribee-folder",
     |config, tantivy| Box::pin ( async move {
       let public : SkgrepoRestriction =
-        SkgrepoRestriction::named (config, SkgrepoSetName::from ("public"))?;
+        SkgrepoRestriction::named (config, SkgrepoName::from ("public"))?;
       let all : SkgrepoRestriction =
-        SkgrepoRestriction::named (config, SkgrepoSetName::from ("all"))?;
+        SkgrepoRestriction::unrestricted (config);
 
       // S and C are both public, but S's subscription to C is recorded
       // only in private.  The default folder's existence must follow the
@@ -225,11 +225,11 @@ fn default_subscribeeFolder_requires_an_unrestricted_subscription_relationship (
           &[ ID::from ("S") ], &all ) ?;
       assert! (
         at_all . contains ("subscribeeFolder"),
-        "the unrestricted subscription must create the default folder under all:\n{}",
+        "the unrestricted subscription must create the default folder unrestricted:\n{}",
         at_all );
       assert! (
         at_all . contains ("leak-battery-C"),
-        "the unrestricted subscription's member must render under all:\n{}",
+        "the unrestricted subscription's member must render unrestricted:\n{}",
         at_all );
       Ok (( )) } )) }
 
@@ -242,9 +242,9 @@ fn ancestor_heralds_gate_privately_recorded_relations (
     "/tmp/tantivy-test-leak-battery-heralds",
     |config, _tantivy| Box::pin ( async move {
       let public : SkgrepoRestriction =
-        SkgrepoRestriction::named (config, SkgrepoSetName::from ("public"))?;
+        SkgrepoRestriction::named (config, SkgrepoName::from ("public"))?;
       let all : SkgrepoRestriction =
-        SkgrepoRestriction::named (config, SkgrepoSetName::from ("all"))?;
+        SkgrepoRestriction::unrestricted (config);
       let graph_handle = (
         graph_handle_from_config (config)? );
       let graph = graph_handle . load_full ();
@@ -293,7 +293,7 @@ fn ancestor_heralds_gate_privately_recorded_relations (
       let at_all : Option<String> = herald_of_S (&all) ?;
       assert! (
         at_all . as_deref () . unwrap_or ("") . contains ("subscribesTo"),
-        "under 'all' the subscription flags S's herald: {:?}", at_all );
+        "unrestricted the subscription flags S's herald: {:?}", at_all );
       Ok (( )) } )) }
 
 #[test]
@@ -323,10 +323,8 @@ fn a_lowered_relationship_is_governed_by_its_new_level (
     recorder,
     node_at ("lowered", "public"),
     node_at ("kept",    "public") ] );
-  let public : SkgrepoRestriction = SkgrepoRestriction {
-    name    : SkgrepoSetName::from ("public"),
-    skgrepos : [ SkgrepoName::from ("public") ]
-      . into_iter () . collect () };
+  let public : SkgrepoRestriction =
+    SkgrepoRestriction::of_privacy_order_for_test (&["public", "private"], "public");
   let contents_under = |restriction : &SkgrepoRestriction| -> Vec<ID> {
     graph . outbound_pids_for_relation_gated (
       & ID::from ("recorder"), NodeRelation::Contains, restriction ) };

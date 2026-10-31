@@ -5,7 +5,7 @@
 
 use skg::dbs::init::empty_in_ram_tantivy_index;
 use skg::serve::handlers::investigate_unknown_node::handle_investigate_unknown_node_request;
-use skg::skgrepo_sets::{SkgrepoRestriction, SkgrepoSetName};
+use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::test_utils::{graph_handle_from_config, read_lp_message, skg_env_from_parts};
 use skg::types::env::{RuntimeGeneration, SkgEnv};
 use skg::types::misc::{SkgConfig, Skgrepo, SkgrepoName, TantivyIndex};
@@ -84,9 +84,10 @@ fn fixture (
       Skgrepo { name, abbreviation : None, path : skgrepo, owned : true } ) ]));
   Ok ( Fixture { _root : root, config } ) }
 
-/// The investigation of 'id' under the skgrepo restriction named
-/// 'restriction': the response's content, and whether it reported
-/// errors.
+/// The investigation of 'id' under the skgrepo restriction
+/// 'restriction', over the privacy order "main", "other" (the second
+/// no skgrepo restriction): the response's content, and whether it
+/// reported errors.
 fn investigate (
   f           : &Fixture,
   id          : &str,
@@ -96,11 +97,8 @@ fn investigate (
   let env : SkgEnv = skg_env_from_parts (
     &f . config, &tantivy, &graph_handle_from_config (&f . config) ? );
   let runtime : Arc<RuntimeGeneration> = env . runtime_snapshot ();
-  let restriction : SkgrepoRestriction = {
-    let mut all : SkgrepoRestriction =
-      SkgrepoRestriction::named ( &f . config, SkgrepoSetName::from ("all") ) ?;
-    all . name = SkgrepoSetName::from (restriction);
-    all };
+  let restriction : SkgrepoRestriction =
+    SkgrepoRestriction::of_privacy_order_for_test (&["main", "other"], restriction);
   let listener : TcpListener = TcpListener::bind ("127.0.0.1:0") ?;
   let client : TcpStream = TcpStream::connect ( listener . local_addr () ? ) ?;
   let (mut server, _peer) = listener . accept () ?;
@@ -131,7 +129,7 @@ fn investigate (
 fn a_deleted_node_is_reported_from_history (
 ) -> Result<(), Box<dyn Error>> {
   let f : Fixture = fixture () ?;
-  let (content, errors) : (String, bool) = investigate (&f, "v", "all") ?;
+  let (content, errors) : (String, bool) = investigate (&f, "v", "other") ?;
   assert! ( ! errors, "no error expected:\n{}", content );
   assert! ( content . starts_with ("* v\n"), "the ID heads the answer:\n{}", content );
   assert! ( content . contains ("*** title when last present: Vanishing"),
@@ -149,7 +147,7 @@ fn a_deleted_node_is_reported_from_history (
 fn a_never_committed_id_has_no_sightings (
 ) -> Result<(), Box<dyn Error>> {
   let f : Fixture = fixture () ?;
-  let (content, errors) : (String, bool) = investigate (&f, "ghost", "all") ?;
+  let (content, errors) : (String, bool) = investigate (&f, "ghost", "other") ?;
   assert! ( ! errors, "no error expected:\n{}", content );
   assert_eq! ( content,
                "* ghost\n** never present in the git history of any skgrepo\n" );
@@ -159,7 +157,7 @@ fn a_never_committed_id_has_no_sightings (
 fn a_resolvable_id_reports_its_node (
 ) -> Result<(), Box<dyn Error>> {
   let f : Fixture = fixture () ?;
-  let (content, errors) : (String, bool) = investigate (&f, "w", "all") ?;
+  let (content, errors) : (String, bool) = investigate (&f, "w", "other") ?;
   assert! ( ! errors, "no error expected:\n{}", content );
   assert_eq! ( content, "w resolves to node Kept (w) in main\n" );
   Ok (( )) }
@@ -170,7 +168,7 @@ fn a_resolvable_id_reports_its_node (
 fn the_request_is_refused_under_a_skgrepo_restriction (
 ) -> Result<(), Box<dyn Error>> {
   let f : Fixture = fixture () ?;
-  let (content, errors) : (String, bool) = investigate (&f, "v", "some") ?;
+  let (content, errors) : (String, bool) = investigate (&f, "v", "main") ?;
   assert! ( errors, "the refusal must be an error:\n{}", content );
   assert! ( ! content . contains ("Vanishing"),
             "a refusal must reveal nothing:\n{}", content );

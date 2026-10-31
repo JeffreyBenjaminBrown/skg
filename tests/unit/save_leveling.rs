@@ -10,8 +10,7 @@ use crate::from_text::local_fieldintent_collection::lower::{
   NodeIntent, RequestedRelRepos};
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::{
-  ID, MSV, RelPartner, SkgConfig, Skgrepo, SkgrepoName,
-  SkgrepoSetName};
+  ID, MSV, RelPartner, SkgConfig, Skgrepo, SkgrepoName};
 use crate::types::nodes::complete::{
   Flag, Graphnode, empty_graphnode};
 use crate::types::save::{NodeInstruction, SaveNode};
@@ -664,10 +663,8 @@ fn restricted_delete_refusal_sees_restricted_sections (
   std::fs::write (
     tmp . path () . join ("private/n.skg"),
     "pid: n\n" ) . unwrap ();
-  let restriction : SkgrepoRestriction = SkgrepoRestriction {
-    name    : SkgrepoSetName::from ("public"),
-    skgrepos : [ SkgrepoName::from ("public") ]
-      . into_iter () . collect (), };
+  let restriction : SkgrepoRestriction =
+    SkgrepoRestriction::named (&config, SkgrepoName::from ("public")) . unwrap ();
   let refusal : Result<(), String> =
     refuse_delete_with_restricted_sections (
       &config, &restriction, &ID::new ("n") );

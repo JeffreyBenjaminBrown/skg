@@ -83,9 +83,8 @@ fn link_statuses_response (
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::dbs::filesystem::not_nodes::load_config;
-  use crate::skgrepo_sets::SkgrepoSetName;
   use crate::types::misc::SkgrepoName;
+  use crate::dbs::filesystem::not_nodes::load_config;
   use crate::types::nodes::complete::{Graphnode, empty_graphnode};
   use crate::dbs::in_rust_graph::InRustGraphHandle;
   use arc_swap::ArcSwap;
@@ -98,7 +97,7 @@ mod tests {
     config . skgrepos . get_mut (&SkgrepoName::from ("public"))
       .unwrap () . abbreviation = Some ("pub" . to_string ());
     let restriction : SkgrepoRestriction = SkgrepoRestriction::named (
-      &config, SkgrepoSetName::from ("public")) . unwrap ();
+      &config, SkgrepoName::from ("public")) . unwrap ();
     let visible : Graphnode = Graphnode {
       pid : ID::from ("visible"),
       extra_ids : vec![ID::from ("old-visible")],
@@ -134,7 +133,7 @@ mod tests {
     let config : SkgConfig = load_config (
       "tests/repo_sets/fixtures/skgconfig.toml") . unwrap () . 0;
     let restriction : SkgrepoRestriction = SkgrepoRestriction::named (
-      &config, SkgrepoSetName::from ("public")) . unwrap ();
+      &config, SkgrepoName::from ("public")) . unwrap ();
     let handle : InRustGraphHandle = Arc::new (ArcSwap::from_pointee (
       InRustGraph::new ()));
     let requested : Vec<ID> = vec![ID::from ("old-new")];

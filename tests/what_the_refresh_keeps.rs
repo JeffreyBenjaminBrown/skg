@@ -26,7 +26,7 @@ use skg::metadata_canon::without_viewnode_ids;
 use skg::serve::ViewsState;
 use skg::serve::handlers::rerender_all_views::handle_rerender_all_views_request;
 use skg::serve::handlers::save_buffer::SaveResponse;
-use skg::skgrepo_sets::{SkgrepoRestriction, SkgrepoSetName};
+use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::test_utils::{
   extract_string_field_from_sexp, graph_handle_from_config,
   read_all_lp_messages, run_with_shared_test_stores, skg_env_from_parts};
@@ -421,7 +421,7 @@ fn rerendered_stored_view (
     &graph . load_full (), viewforest_id . clone (), stored_tree, &[ID::from ("d")] );
   let env : SkgEnv = skg_env_from_parts (config, tantivy, graph);
   let all : SkgrepoRestriction =
-    SkgrepoRestriction::named (config, SkgrepoSetName::from ("all")) ?;
+    SkgrepoRestriction::unrestricted (config);
   let (mut stream, read_end) : (TcpStream, TcpStream) = mk_test_tcp_stream_pair ();
   std::thread::scope ( |scope| {
     // The handler blocks on futures itself, so it cannot run inside

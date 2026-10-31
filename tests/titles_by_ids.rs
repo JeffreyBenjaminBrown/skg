@@ -8,10 +8,10 @@ use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::dbs::in_rust_graph::InRustGraph;
 use skg::test_utils::{IndexFolderForThisProcess, read_lp_message};
 use skg::types::git::SkgrepoDiff;
-use skg::types::misc::{ID, MSV, SkgConfig, Skgrepo, SkgrepoName, SkgrepoSetName, TantivyIndex, rel_partners_at_relRepo_msv};
+use skg::types::misc::{ID, MSV, SkgConfig, Skgrepo, SkgrepoName, TantivyIndex, rel_partners_at_relRepo_msv};
 use skg::types::nodes::complete::{empty_graphnode, Graphnode};
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::HashMap;
 use std::error::Error;
 use std::fs;
 use std::net::{TcpListener, TcpStream};
@@ -113,10 +113,9 @@ fn restricted_title_lookup_challenges_without_releasing_text (
       owned        : true,
     })
   ]));
-  let restriction = SkgrepoRestriction {
-    name    : SkgrepoSetName::from ("public"),
-    skgrepos : BTreeSet::from ([skgrepo]),
-  };
+  let restriction : SkgrepoRestriction =
+    SkgrepoRestriction::of_privacy_order_for_test (
+      &[skgrepo . 0 . as_str (), "private"], skgrepo . 0 . as_str ());
   let respond = |request : &str| -> Result<String, Box<dyn Error>> {
     let listener : TcpListener = TcpListener::bind ("127.0.0.1:0")?;
     let client : TcpStream = TcpStream::connect (listener . local_addr ()?)?;

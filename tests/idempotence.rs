@@ -32,7 +32,7 @@ use skg::refresh::{Truth, refresh_content_viewforest};
 use skg::test_utils::{graph_from_config, main_skgrepo_config, refresh_reaches_fixpoint};
 use skg::types::env::RuntimeGeneration;
 use skg::skgrepo_sets::SkgrepoRestriction;
-use skg::types::misc::{SkgrepoName, SkgrepoSetName};
+use skg::types::misc::{SkgrepoName};
 use skg::types::tree::forest::ViewForest;
 use skg::update_buffer::render_initial_view;
 
@@ -166,7 +166,7 @@ fn restrictions_of (
   std::iter::once (SkgrepoRestriction::unrestricted (config))
     . chain ( ordered . into_iter () . take (narrower)
               . filter_map ( |skgrepo| SkgrepoRestriction::named (
-                  config, SkgrepoSetName ( skgrepo . 0 . clone () ))
+                  config, SkgrepoName ( skgrepo . 0 . clone () ))
                 . ok () ))
     . collect () }
 
@@ -175,7 +175,7 @@ fn in_the_report (
   restriction : &SkgrepoRestriction,
 ) -> String {
   if restriction . is_unrestricted () { "no skgrepo restriction" . to_string () }
-  else { format! ("'{}'", restriction . name . 0) } }
+  else { format! ("'{}'", restriction . most_private_shown . 0) } }
 
 /// Every folder named 'fixtures' under 'root', but the test results.
 fn fixture_folders (
@@ -213,7 +213,7 @@ fn fixture_config (
 // straddle and readiness store, comes back as it was, and the second
 // refresh corrects nothing. Where the case has several owned
 // skgrepos, that holds under each skgrepo restriction too: the diff view
-// opens only under 'all', but a switch rerenders it, so the buffer as
+// opens only unrestricted, but a switch rerenders it, so the buffer as
 // first rendered is refreshed under the skgrepo restriction, as the switch
 // does, and that is the buffer checked. A case whose straddle cannot
 // be built (one made to be refused) is passed over. A skgrepo folder

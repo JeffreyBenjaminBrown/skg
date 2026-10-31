@@ -13,7 +13,7 @@
 // and d in c's subscribee folder. Under the skgrepo restriction
 // "public", s, which r records in its public file, is a Restricted
 // vognode holding s1, and an occurrence again, with its viewnode ID,
-// back under "all".
+// back under "private" (no restriction).
 
 use crate::git_fixture::{
   Fixture, OwnedSkgrepos, open_content_view, save_cleanly, switch_skgrepo_set,
@@ -38,7 +38,7 @@ fn viewnode_ids_survive_a_save_a_request_and_a_switch (
     case . path (), OwnedSkgrepos::Named (&["public", "private"]), &[],
     |f| {
       let mut restriction : SkgrepoRestriction =
-        SkgrepoRestriction::named (&f . config, "all" . into ()) ?;
+        SkgrepoRestriction::unrestricted (&f . config);
       let opened : String = open_view_of_r (f) ?;
       let typed : String = { // a typed child, saved
         let saved : String = save (f, &opened . replacen (
@@ -67,7 +67,7 @@ fn viewnode_ids_survive_a_save_a_request_and_a_switch (
                      Some ("** (gnid s)"),
                      "s's Restricted vognode keeps its viewnode ID:\n{}", switched );
         switched };
-      let all : String = switch (f, &mut restriction, "all") ?;
+      let all : String = switch (f, &mut restriction, "private") ?;
       assert_every_viewnode_id_kept (
         "a switch back to all", &public, &all, &["(gnid s)"] );
       assert_every_viewnode_id_kept (

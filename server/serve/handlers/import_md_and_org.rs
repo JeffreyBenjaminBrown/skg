@@ -168,7 +168,7 @@ mod tests {
   use crate::dbs::init::empty_in_ram_tantivy_index;
   use crate::dbs::in_rust_graph::InRustGraph;
   use crate::dbs::tantivy::background_writer::wait_for_tantivy_writes_idle;
-  use crate::types::misc::{SkgConfig, Skgrepo, SkgrepoSetName};
+  use crate::types::misc::{SkgConfig, Skgrepo, SkgrepoName};
   use std::collections::HashMap;
   use std::fs;
   use std::io::{BufRead, BufReader, Read};
@@ -212,8 +212,8 @@ mod tests {
         name : skgrepo_name . clone (), abbreviation : None,
         path : skgrepo . clone (), owned : true, }),
     ]));
-    let unrestricted : SkgrepoRestriction = SkgrepoRestriction::named (
-      &config, SkgrepoSetName::from ("all")) . unwrap ();
+    let unrestricted : SkgrepoRestriction =
+      SkgrepoRestriction::unrestricted (&config);
     let env : SkgEnv = SkgEnv::new (config, Arc::new (InRustGraph::new ()),
       empty_in_ram_tantivy_index () . unwrap ());
     let listener : TcpListener = TcpListener::bind ("127.0.0.1:0") . unwrap ();
@@ -274,7 +274,7 @@ mod tests {
     let mut config : SkgConfig = SkgConfig::dummyFromSkgrepos (skgrepos);
     config . skgrepo_order = vec! [ SkgrepoName::from ("public"), SkgrepoName::from ("private") ];
     let public : SkgrepoRestriction = SkgrepoRestriction::named (
-      &config, SkgrepoSetName::from ("public")) . unwrap ();
+      &config, SkgrepoName::from ("public")) . unwrap ();
     let env : SkgEnv = SkgEnv::new (config, Arc::new (InRustGraph::new ()),
       empty_in_ram_tantivy_index () . unwrap ());
     let listener : TcpListener = TcpListener::bind ("127.0.0.1:0") . unwrap ();

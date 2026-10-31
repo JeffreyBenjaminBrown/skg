@@ -227,7 +227,6 @@ mod tests {
   use crate::types::misc::{RelPartner, SkgConfig, SkgrepoName};
   use crate::dbs::filesystem::not_nodes::load_config;
   use std::collections::HashMap;
-  use crate::skgrepo_sets::SkgrepoSetName;
 
   fn node (
     gnid : &str,
@@ -277,7 +276,7 @@ mod tests {
     let config = load_config (
       "tests/repo_sets/fixtures/skgconfig.toml") . unwrap () . 0;
     let restriction : SkgrepoRestriction = SkgrepoRestriction::named (
-      &config, SkgrepoSetName::from ("public")) . unwrap ();
+      &config, SkgrepoName::from ("public")) . unwrap ();
     let mut mentioner : Graphnode = node (
       "mentioner", "[[id:target][d]] [[id:private-target][p]]", None);
     mentioner . home_skgrepo = SkgrepoName::from ("public");

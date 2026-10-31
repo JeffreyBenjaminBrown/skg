@@ -20,7 +20,7 @@ use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{
   send_response_with_length_prefix, sexp_to_client_string,
   tag_sexp_response, viewforest_id_from_request};
-use crate::skgrepo_sets::{SkgrepoRestriction, require_skgrepo_set_all};
+use crate::skgrepo_sets::{SkgrepoRestriction, require_unrestricted};
 use crate::types::env::SkgEnv;
 use crate::types::views_state::ViewforestId;
 use crate::update_buffer::RerenderedView;
@@ -56,7 +56,7 @@ pub fn handle_integrate_unshown_changes_request (
 /// connection's graph straddle, brought up to date, with its unshown
 /// changes integrated ('RerenderSelector::IntegratingUnshownChanges'),
 /// and the readiness summary of the result. Nothing is registered or sent. Refused
-/// unless the skgrepo restriction is 'all', as the diff view
+/// unless the connection is unrestricted, as the diff view
 /// is, and unless the view is a buffer of the diff view.
 fn integrate_unshown_changes (
   env                 : &SkgEnv,
@@ -64,7 +64,7 @@ fn integrate_unshown_changes (
   skgrepo_restriction : &SkgrepoRestriction,
   request             : &str,
 ) -> Result<(PreparedRerenders, BufferReadinessSummary), String> {
-  require_skgrepo_set_all (
+  require_unrestricted (
     "Integrating unshown changes", skgrepo_restriction ) ?;
   let viewforest_id : ViewforestId = viewforest_id_from_request (request) ?;
   if views_state . open_views . diffView_buffer_kind_of_view (&viewforest_id) . is_none () {

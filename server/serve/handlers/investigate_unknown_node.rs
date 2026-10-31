@@ -11,7 +11,7 @@ use crate::serve::util::{
   send_response_with_length_prefix,
   tag_sexp_response,
   value_from_request_sexp};
-use crate::skgrepo_sets::{SkgrepoRestriction, require_skgrepo_set_all};
+use crate::skgrepo_sets::{SkgrepoRestriction, require_unrestricted};
 use crate::types::env::RuntimeGeneration;
 use crate::types::misc::ID;
 use crate::types::nodes::rust::GraphnodeInRust;
@@ -22,8 +22,8 @@ use std::net::TcpStream;
 /// Handle "investigate unknown node": say what the requested ID is.
 /// If it resolves to a node of the live graph, the answer names that
 /// node; otherwise it is what git history says the ID used to be
-/// ('server/git_ops/vanished.rs'). Refused under a skgrepo restriction
-/// other than 'all', since history can hold the text of any skgrepo.
+/// ('server/git_ops/vanished.rs'). Refused unless the connection is
+/// unrestricted, since history can hold the text of any skgrepo.
 pub fn handle_investigate_unknown_node_request (
   stream      : &mut TcpStream,
   request     : &str,
@@ -47,7 +47,7 @@ fn investigation_as_org (
   runtime     : &RuntimeGeneration,
   restriction : &SkgrepoRestriction,
 ) -> Result<String, String> {
-  require_skgrepo_set_all ("Investigating an unknown node", restriction) ?;
+  require_unrestricted ("Investigating an unknown node", restriction) ?;
   let gnid : ID = ID::from ( value_from_request_sexp ("id", request) ? );
   if let Some (pid) = runtime . graph . pid_of (&gnid) {
     let node : &GraphnodeInRust = runtime . graph . get (&pid)

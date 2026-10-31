@@ -14,7 +14,7 @@ use crate::serve::util::{
 use crate::sexp_string::quote_sexp_string;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
-use crate::types::misc::SkgrepoSetName;
+use crate::types::misc::SkgrepoName;
 use crate::types::misc::SkgConfig;
 
 use std::net::TcpStream;
@@ -67,9 +67,9 @@ fn set_skgrepo_restriction (
   views_state      : &mut ViewsState,
   skgrepo_restriction : &mut SkgrepoRestriction,
 ) {
-  let name : SkgrepoSetName =
+  let name : SkgrepoName = // the most private skgrepo to show
     match value_from_request_sexp ("name", request) {
-      Ok (name) => SkgrepoSetName::from (name),
+      Ok (name) => SkgrepoName::from (name),
       Err (e) => {
         refuse_unwinding (stream, skgrepo_restriction, &e);
         return; }};
@@ -100,15 +100,15 @@ fn send_skgrepo_sets_response (
   config      : &SkgConfig,
   restriction : &SkgrepoRestriction,
 ) {
-  // Repo-sets are the prefixes of the privacy order, so the
-  // choices are the skgrepos themselves, in that order (each meaning
-  // "this repo and everything more public"), plus "all" last (the
-  // longest prefix). Order is meaningful; do not sort.
-  let mut names : Vec<String> =
+  // The skgrepo restriction is one skgrepo, the most private one
+  // shown, so the choices are the skgrepos themselves, in privacy
+  // order (each meaning "this skgrepo and everything more public"),
+  // the last of them no skgrepo restriction. Order is meaningful; do
+  // not sort.
+  let names : Vec<String> =
     config . ordered_skgrepos () . iter ()
     . map ( |name| name . 0 . clone () )
     . collect ();
-  names . push ("all" . to_string ());
   let names_sexp : String =
     names . iter ()
     . map ( |name| quote_sexp_string (name) )
@@ -118,27 +118,28 @@ fn send_skgrepo_sets_response (
     format! (
       "((response-type {}) (restriction {}) (sets ({})))",
       TcpToClient::SkgrepoSets . repr_in_client (),
-      quote_sexp_string (&restriction . name . 0),
+      quote_sexp_string (&restriction . most_private_shown . 0),
       names_sexp );
   send_response_with_length_prefix (stream, &response); }
 
+/// The skgrepo restriction, as the most private skgrepo it shows. The
+/// clients say whether that is no skgrepo restriction (" (no
+/// restriction)" appended to the config's most private skgrepo); the
+/// response carries no words for them to show.
 fn send_skgrepo_restriction_response (
   stream : &mut TcpStream,
   restriction : &SkgrepoRestriction,
 ) {
-  let name : &str =
-    &restriction . name . 0;
   let response : String =
     format! (
-      "((response-type {}) (restriction {}) (content {}))",
+      "((response-type {}) (restriction {}))",
       TcpToClient::SkgrepoRestriction . repr_in_client (),
-      quote_sexp_string (name),
-      quote_sexp_string (&format! ("Skgrepo restriction: {}", name)) );
+      quote_sexp_string (&restriction . most_private_shown . 0) );
   send_response_with_length_prefix (stream, &response); }
 
 /// The unwinding refusal shape (the quiet shape): the endpoint's
 /// normal skgrepo-restriction response-type carrying explanatory text
-/// and the unchanged skgrepo restriction, followed by an empty rerender
+/// in 'content' and the unchanged skgrepo restriction, followed by an empty rerender
 /// stream.  Emacs locks all Skg buffers and sets its
 /// stream-in-progress guard before sending a switch request; a
 /// response-type it has no handler for would leave it wedged, so
@@ -152,7 +153,7 @@ fn refuse_unwinding (
     format! (
       "((response-type {}) (restriction {}) (content {}))",
       TcpToClient::SkgrepoRestriction . repr_in_client (),
-      quote_sexp_string (&restriction . name . 0),
+      quote_sexp_string (&restriction . most_private_shown . 0),
       quote_sexp_string (msg));
   send_response_with_length_prefix (stream, &response);
   stream_empty_rerender (stream); }

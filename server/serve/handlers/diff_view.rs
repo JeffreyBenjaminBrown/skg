@@ -16,7 +16,7 @@ use crate::serve::util::{
   format_buffer_response_sexp, send_response_with_length_prefix,
   sexp_to_client_string, tag_sexp_response, true_entry_sexp,
   value_from_request_sexp, viewforest_id_from_request};
-use crate::skgrepo_sets::{SkgrepoRestriction, require_skgrepo_set_all};
+use crate::skgrepo_sets::{SkgrepoRestriction, require_unrestricted};
 use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::types::misc::ID;
 use crate::types::views_state::{DiffViewBufferKind, ViewforestId};
@@ -26,7 +26,7 @@ use std::sync::{Arc, MutexGuard};
 
 /// Answer a "diff view" request with the named buffer, register
 /// it under the request's view-id, or answer '(empty . t)'. Refused
-/// unless the skgrepo restriction is 'all', and when the graph straddle
+/// unless the connection is unrestricted, and when the graph straddle
 /// cannot be built (an owned skgrepo outside git, or without a HEAD
 /// commit).
 pub fn handle_diffView_request (
@@ -39,7 +39,7 @@ pub fn handle_diffView_request (
   let runtime : Arc<RuntimeGeneration> = env . runtime_snapshot ();
   let response : Result<(Option<RenderedDiffViewBuffer>, DiffViewBufferKind, ViewforestId), String> =
     ( || {
-      require_skgrepo_set_all ("The diff view", skgrepo_restriction) ?;
+      require_unrestricted ("The diff view", skgrepo_restriction) ?;
       let viewforest_id : ViewforestId = viewforest_id_from_request (request) ?;
       let buffer_name : String = value_from_request_sexp ("buffer", request) ?;
       let diffView_buffer_kind : DiffViewBufferKind = DiffViewBufferKind::from_wire_name (&buffer_name)

@@ -45,7 +45,7 @@ pub fn handle_get_file_path_request_with_skgrepo_set (
         TcpToClient::GetFilePath,
         &format! (
           "Error: repo {} is not in skgrepo restriction {}",
-          skgrepo, restriction . name ) ));
+          skgrepo, restriction . most_private_shown ) ));
     return; }
   let raw_path : String = match path_from_pid_and_skgrepo (
     config,

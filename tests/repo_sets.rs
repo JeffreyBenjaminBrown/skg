@@ -11,10 +11,7 @@ use skg::dbs::filesystem::not_nodes::load_config;
 use skg::serve::ViewsState;
 use skg::serve::handlers::skgrepo_sets::handle_skgrepo_set_request;
 use skg::serve::handlers::text_search::TitleOrAlias;
-use skg::skgrepo_sets::{
-  SkgrepoRestriction,
-  SkgrepoSetName,
-  run_with_skgrepo_set_test_db};
+use skg::skgrepo_sets::{SkgrepoRestriction, run_with_skgrepo_set_test_db};
 use skg::dbs::node_lookup::graphnode_from_graph;
 use skg::test_utils::multi_root_view;
 use skg::test_utils::{set_skgrepo_retagging_relRepos, graph_handle_from_config};
@@ -88,7 +85,7 @@ fn all_tests
 ///
 /// Fixtures: public 'ovr-sub-container' -> 'ovr-sub-original' (N);
 /// private 'ovr-sub-overrider' (R) overrides ovr-sub-original and
-/// contains the public 'ovr-sub-child' (D). Under "all" R substitutes
+/// contains the public 'ovr-sub-child' (D). Under "private" (no restriction) R substitutes
 /// for N; switching to "public" makes R restricted.
 ///
 /// Installs the explicit graph handle (override resolution reads
@@ -105,7 +102,7 @@ fn override_substitute_across_skgrepo_switch_anonymizes_and_keeps_original (
       (
         skg::test_utils::graph_handle_from_config (config) ? );
 
-      // 1. Under "all", R is shown in place of N (substitution).
+      // 1. Under "private" (no restriction), R is shown in place of N (substitution).
       let (view_all, _pids, tree_all)
         : (String, Vec<ID>, Tree<Viewnode>) =
         multi_root_view (
@@ -113,11 +110,11 @@ fn override_substitute_across_skgrepo_switch_anonymizes_and_keeps_original (
           &[ ID::from ("ovr-sub-container") ] ) ?;
       assert! (
         view_all . contains ("(overridesHere ovr-sub-original)"),
-        "under 'all' the overrider should substitute for N:\n{}",
+        "unrestricted the overrider should substitute for N:\n{}",
         view_all );
       assert! (
         view_all . contains ("private overrider title must not leak"),
-        "under 'all' the unrestricted overrider is shown:\n{}", view_all );
+        "unrestricted the unrestricted overrider is shown:\n{}", view_all );
 
       // 2. Switch to "public": R goes restricted; the view re-renders.
       let graph : skg::dbs::in_rust_graph::InRustGraphHandle =
@@ -126,7 +123,7 @@ fn override_substitute_across_skgrepo_switch_anonymizes_and_keeps_original (
         skg::test_utils::skg_env_from_parts (
           config, tantivy, &graph );
       let mut restriction : SkgrepoRestriction =
-        SkgrepoRestriction::named (config, SkgrepoSetName::from ("all")) ?;
+        SkgrepoRestriction::unrestricted (config);
       let mut views_state : ViewsState =
         ViewsState { 
                      open_views        : OpenViews::new (),
@@ -174,7 +171,7 @@ fn override_substitute_across_skgrepo_switch_anonymizes_and_keeps_original (
       // 4. Saving the switched view keeps N in the container's
       //    contains, and the restricted overrider writes nothing.
       let public : SkgrepoRestriction =
-        SkgrepoRestriction::named (config, SkgrepoSetName::from ("public")) ?;
+        SkgrepoRestriction::named (config, SkgrepoName::from ("public")) ?;
       let plan = buffer_to_validated_saveplan (
         &view_public, config, &public )  ? . 1;
       if let Some (c) = plan . node_instructions . iter () . find_map (
@@ -225,32 +222,55 @@ fn saved_or_graph_node_by_gnid (
 #[test]
 fn config_loads_default_skgrepo_set_and_prefix_skgrepo_sets (
 ) -> Result<(), Box<dyn Error>> {
-  // Skgrepo-sets are the prefixes of the privacy order: naming a
-  // skgrepo selects it and everything more public. The fixture lists
-  // public before private, so "public" selects only itself.
+  // The skgrepo restriction is one skgrepo, the most private shown,
+  // and denotes the prefix of the privacy order through it. The
+  // fixture lists public before private, so "public" shows only
+  // itself, and "private" is no skgrepo restriction.
   let config =
     load_config ("tests/repo_sets/fixtures/skgconfig.toml")? . 0;
   assert_eq! (
-    config . default_skgrepo_set_name (),
-    &SkgrepoSetName::from ("public"));
-  assert_eq! (
-    config . skgrepo_set_skgrepos (&SkgrepoSetName::from ("public"))?,
-    BTreeSet::from ([SkgrepoName::from ("public")]));
-  assert_eq! (
-    config . skgrepo_set_skgrepos (&SkgrepoSetName::from ("all"))?,
-    BTreeSet::from ([
-      SkgrepoName::from ("private"),
-      SkgrepoName::from ("public")]));
+    config . default_skgrepo_set,
+    Some (SkgrepoName::from ("public")) );
+  let public : SkgrepoRestriction =
+    SkgrepoRestriction::named (&config, SkgrepoName::from ("public")) ?;
+  assert_eq! ( public . skgrepos,
+               BTreeSet::from ([SkgrepoName::from ("public")]) );
+  assert! ( ! public . is_unrestricted () );
+  let private : SkgrepoRestriction =
+    SkgrepoRestriction::named (&config, SkgrepoName::from ("private")) ?;
+  assert_eq! ( private . skgrepos,
+               BTreeSet::from ([ SkgrepoName::from ("private"),
+                                 SkgrepoName::from ("public")]) );
+  assert! ( private . is_unrestricted () );
+  assert_eq! ( private, SkgrepoRestriction::unrestricted (&config) );
+  assert! ( SkgrepoRestriction::named (&config, SkgrepoName::from ("all")) . is_err (),
+            "'all' names no skgrepo of this config" );
   Ok (( )) }
 
 #[test]
-fn config_rejects_reserved_all_skgrepo_and_skgrepo_set_names (
+fn a_config_without_a_default_starts_unrestricted (
+) -> Result<(), Box<dyn Error>> {
+  let config =
+    load_config ("tests/partner_folder_matrix/fixtures/skgconfig.toml")? . 0;
+  assert_eq! ( config . default_skgrepo_set, None );
+  assert! ( SkgrepoRestriction::default_from_config (&config) ? . is_unrestricted () );
+  Ok (( )) }
+
+#[test]
+fn a_skgrepo_may_be_named_all (
+) -> Result<(), Box<dyn Error>> {
+  // "all" is no reserved name: it is a skgrepo like any other.
+  let config =
+    load_config ("tests/repo_sets/fixtures-a-skgrepo-named-all/skgconfig.toml")? . 0;
+  let restriction : SkgrepoRestriction =
+    SkgrepoRestriction::default_from_config (&config) ?;
+  assert_eq! ( restriction . most_private_shown, SkgrepoName::from ("all") );
+  assert! ( restriction . is_unrestricted () );
+  Ok (( )) }
+
+#[test]
+fn config_rejects_retired_skgrepo_sets (
 ) {
-  let skgrepo_all =
-    load_config ("tests/repo_sets/fixtures-invalid/repo-all/skgconfig.toml");
-  assert! (
-    skgrepo_all . is_err (),
-    "configured repo named all must be rejected" );
   let skgrepo_set_all =
     load_config ("tests/repo_sets/fixtures-invalid/repo-set-all/skgconfig.toml");
   assert! (
@@ -272,7 +292,7 @@ async fn skgrepo_set_switch_rerenders_views (
       let mut restriction : SkgrepoRestriction =
         SkgrepoRestriction::named (
           config,
-          SkgrepoSetName::from ("public"))?;
+          SkgrepoName::from ("public"))?;
       let mut views_state : ViewsState =
         ViewsState {
           open_views        : OpenViews::new (),
@@ -295,13 +315,13 @@ async fn skgrepo_set_switch_rerenders_views (
         scope . spawn ( || {
           handle_skgrepo_set_request (
             &mut server_stream,
-            "((request . \"set skgrepo restriction\") (name . \"all\"))",
+            "((request . \"set skgrepo restriction\") (name . \"private\"))",
             &env,
             &mut views_state,
             &mut restriction); } ); } );
       assert_eq! (
-        restriction . name,
-        SkgrepoSetName::from ("all"),
+        restriction . most_private_shown,
+        SkgrepoName::from ("private"),
         "repo-set switch should update the skgrepo restriction" );
       assert! (
         views_state . open_views . views . contains_key (&viewforest_id),
@@ -319,7 +339,7 @@ async fn content_view_omits_restricted_contained_nodes (
       let restriction : SkgrepoRestriction =
         SkgrepoRestriction::named (
           &config,
-          SkgrepoSetName::from ("public"))?;
+          SkgrepoName::from ("public"))?;
       let (actual, pids, _viewforest) : (String, Vec<ID>, Tree<Viewnode>) =
         multi_root_view_with_skgrepo_set (
           config, None,
@@ -349,7 +369,7 @@ async fn search_filters_restricted_skgrepos_before_ranking_and_truncation (
       let restriction : SkgrepoRestriction =
         SkgrepoRestriction::named (
           &config,
-          SkgrepoSetName::from ("public"))?;
+          SkgrepoName::from ("public"))?;
       let gnids : Vec<ID> =
         skg::serve::handlers::text_search::search_gnids_for_skgrepo_set_for_test (
           &tantivy,
@@ -377,7 +397,7 @@ async fn tombstone_in_buffer_does_not_drive_contains (
   // under the "public" set.)
       let restriction : SkgrepoRestriction =
         SkgrepoRestriction::named (
-          config, SkgrepoSetName ("public" . to_string ())) ?;
+          config, SkgrepoName ("public" . to_string ())) ?;
       { // The user drags the tombstone to the end. The save keeps
         // private-a at its disk position (after active-a), not the
         // buffer position, and writes no SaveNode for it.
@@ -410,7 +430,7 @@ async fn restricted_skgrepo_search_and_save_work_together_end_to_end (
       let restriction : SkgrepoRestriction =
         SkgrepoRestriction::named (
           &config,
-          SkgrepoSetName::from ("public"))?;
+          SkgrepoName::from ("public"))?;
       let gnids : Vec<ID> =
         skg::serve::handlers::text_search::search_gnids_for_skgrepo_set_for_test (
           tantivy,
@@ -465,7 +485,7 @@ async fn the_containerward_chain_stops_before_a_restricted_container (
       let restriction : SkgrepoRestriction =
         SkgrepoRestriction::named (
           &config,
-          SkgrepoSetName::from ("public"))?;
+          SkgrepoName::from ("public"))?;
       let mut viewforest : Tree<Viewnode> =
         viewnode_tree_as_written (indoc! {"
           * (skg node (gnid child-for-backpath) (skgRepos (nodeRepo public))) child-for-backpath
@@ -508,7 +528,7 @@ fn search_enrichment_omits_the_restricted_containers (
   let restriction : SkgrepoRestriction =
     SkgrepoRestriction::named (
       &config,
-      SkgrepoSetName::from ("public"))?;
+      SkgrepoName::from ("public"))?;
   let mut result_node : Graphnode =
     skg::types::nodes::complete::empty_graphnode ();
   result_node . pid = ID::from ("active-search-hit");
@@ -587,7 +607,7 @@ fn titles_by_gnids_omits_restricted_skgrepo_titles (
   let restriction : SkgrepoRestriction =
     SkgrepoRestriction::named (
       &config,
-      SkgrepoSetName::from ("public"))?;
+      SkgrepoName::from ("public"))?;
   let titles =
     skg::serve::handlers::titles_by_gnids::titles_by_gnids_for_skgrepo_set_for_test (
       &config,
@@ -618,7 +638,7 @@ async fn tombstones_under_folders_save_without_error (
       "};
       let restriction : SkgrepoRestriction =
         SkgrepoRestriction::named (
-          config, SkgrepoSetName ("public" . to_string ())) ?;
+          config, SkgrepoName ("public" . to_string ())) ?;
       let result =
         buffer_to_validated_saveplan (
           buffer, config, &restriction ) ;
@@ -645,7 +665,7 @@ async fn tombstone_in_subscribee_folder_does_not_contribute_to_subscribesTo (
       "};
       let restriction : SkgrepoRestriction =
         SkgrepoRestriction::named (
-          config, SkgrepoSetName ("public" . to_string ())) ?;
+          config, SkgrepoName ("public" . to_string ())) ?;
       let instructions : Vec<NodeInstruction> =
         buffer_to_validated_saveplan (
           buffer, config, &restriction )  ?
@@ -668,7 +688,7 @@ async fn weave_preserves_omitted_restricted_content_members (
   // (reorder, delete) still land.
       let restriction : SkgrepoRestriction =
         SkgrepoRestriction::named (
-          config, SkgrepoSetName ("public" . to_string ())) ?;
+          config, SkgrepoName ("public" . to_string ())) ?;
       let graph = graph_handle_from_config (config)? . load_full ();
       { // Disk: root contains [active-a, private-a, active-b].
         // The restricted buffer omits private-a; saving must keep it,
@@ -737,7 +757,7 @@ async fn restricted_save_preserves_invisible_override_targets (
   // deleted.
       let restriction : SkgrepoRestriction =
         SkgrepoRestriction::named (
-          &config, SkgrepoSetName::from ("public") )?;
+          &config, SkgrepoName::from ("public") )?;
       let override_set = |node : &Graphnode| -> Vec<ID> {
         match &node . overrides {
           MSV::Specified (gnids) => {

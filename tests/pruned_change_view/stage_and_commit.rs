@@ -30,7 +30,7 @@ const SKGREPOS : [&str; 2] = [ "public", "private" ];
 fn all (
   f : &Fixture,
 ) -> Result<SkgrepoRestriction, Box<dyn Error>> {
-  Ok ( SkgrepoRestriction::named (&f . config, "all" . into ()) ? ) }
+  Ok ( SkgrepoRestriction::unrestricted (&f . config) ) }
 
 fn gitrepo (
   f       : &Fixture,
@@ -279,8 +279,8 @@ fn a_request_is_refused_under_a_skgrepo_restriction (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("buffers", &SKGREPOS, |f| {
     let env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
-    let mut restriction : SkgrepoRestriction = all (f) ?;
-    restriction . name = "some" . into ();
+    let restriction : SkgrepoRestriction =
+      SkgrepoRestriction::named (&f . config, "public" . into ()) ?;
     let head : Oid = head_id (f, "public") ?;
     let answer : StageAndCommitAnswer = stage_and_commit (
       &env, &mut f . views_state, &restriction, "message", true );

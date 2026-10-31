@@ -215,7 +215,7 @@ pub(crate) fn acquisition_goal (
 
 /// The goal items of 'partners' over the straddle, as the
 /// skgrepo restriction lets them be seen. The diff view opens only
-/// under 'all', but a switch rerenders its open buffers, so its goal
+/// to an unrestricted connection, but a switch rerenders its open buffers, so its goal
 /// asks the skgrepo restriction as a content view's does
 /// ('gnid_items' in 'goal.rs'): a partner whose record the
 /// skgrepo restriction keeps out (the worktree's record, or HEAD's

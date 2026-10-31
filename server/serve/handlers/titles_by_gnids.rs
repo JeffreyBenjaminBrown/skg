@@ -11,7 +11,6 @@ use crate::serve::util::{send_response_with_length_prefix, sexp_to_client_string
 use crate::sexp_string::quote_sexp_string;
 use crate::skgrepo_sets::{
   SkgrepoRestriction,
-  SkgrepoSetName,
   titles_for_skgrepo_set_for_test,
 };
 use crate::types::disk_home::home_from_disk;
@@ -42,10 +41,7 @@ pub fn handle_titles_by_gnids_request (
   config            : &SkgConfig,
 ) {
   let restriction : SkgrepoRestriction =
-    SkgrepoRestriction::named (
-      config,
-      SkgrepoSetName::from ("all"))
-    . expect ("reserved repo-set all should always resolve");
+    SkgrepoRestriction::unrestricted (config);
   handle_titles_by_gnids_request_with_skgrepo_set (
     stream, request, tantivy_index, config,
     &restriction, graph ) }

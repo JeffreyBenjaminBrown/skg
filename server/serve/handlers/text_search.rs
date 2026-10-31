@@ -292,11 +292,9 @@ fn filter_match_groups_to_unrestricted_skgrepos (
   matches_by_gnid : MatchGroups,
   restriction   : &SkgrepoRestriction,
 ) -> MatchGroups {
-  if restriction . is_unrestricted () {
-    return matches_by_gnid; }
   matches_by_gnid . into_iter ()
     . filter ( |(_, (skgrepo, _))|
-      restriction . contains_skgrepo (skgrepo) )
+      ! SkgrepoRestriction::node_is_restricted (restriction, skgrepo) )
     . collect () }
 
 /// Draw the search buffer ('docs/api-and-formats.org', "Text search"):
@@ -506,8 +504,7 @@ pub fn group_matches_by_gnid (
           // -- a private alias of a public node must neither match
           // nor shift ranking ('docs/api-and-formats.org', "Text search"). The
           // group-level filter below survives as a backstop.
-          if ! restriction . is_unrestricted ()
-          && ! restriction . contains_skgrepo (&skgrepo) {
+          if ! SkgrepoRestriction::record_is_visible (restriction, &skgrepo) {
             continue; }}
         let origin_type : Option < ProminenceSource > =
           retrieved_doc

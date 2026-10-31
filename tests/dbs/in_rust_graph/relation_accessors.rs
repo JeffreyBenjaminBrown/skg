@@ -7,9 +7,18 @@ use skg::dbs::in_rust_graph::relation_accessors::{
 };
 use skg::types::misc::{ID, MSV, RelPartner, RelationshipMemberKey, SkgConfig, SkgrepoName, rel_partners_at_relRepo};
 use skg::types::nodes::complete::{Graphnode, empty_graphnode};
-use skg::skgrepo_sets::{SkgrepoRestriction, SkgrepoSetName};
+use skg::skgrepo_sets::SkgrepoRestriction;
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::HashMap;
+
+/// The skgrepo restriction to 'main', over the privacy order 'main',
+/// 'private'.
+fn only_main () -> SkgrepoRestriction {
+  SkgrepoRestriction::of_privacy_order_for_test (&["main", "private"], "main") }
+
+/// No skgrepo restriction over the privacy order 'main', 'private'.
+fn unrestricted_over_main_and_private () -> SkgrepoRestriction {
+  SkgrepoRestriction::of_privacy_order_for_test (&["main", "private"], "private") }
 
 /// No skgrepo restriction, for a graph built without a config.
 fn unrestricted () -> SkgrepoRestriction {
@@ -258,12 +267,8 @@ fn gnid_presence_gated_tells_hidden_from_absent () {
   private . home_skgrepo = SkgrepoName::from ("private");
   let graph : InRustGraph = InRustGraph::from_graphnodes (&[
     node ("public", &[], &[], &[], &[]), private ]);
-  let only_main : SkgrepoRestriction = SkgrepoRestriction {
-    name     : SkgrepoSetName ("main" . to_string ()),
-    skgrepos : BTreeSet::from ([ SkgrepoName::from ("main") ]) };
-  let all : SkgrepoRestriction = SkgrepoRestriction {
-    name     : SkgrepoSetName ("all" . to_string ()),
-    skgrepos : BTreeSet::new () };
+  let only_main : SkgrepoRestriction = only_main ();
+  let all : SkgrepoRestriction = unrestricted_over_main_and_private ();
   let presence = |gnid : &str, restriction : &SkgrepoRestriction|
     graph . gnid_presence_gated (&ID::from (gnid), restriction);
   assert_eq! ( presence ("public", &only_main), GnidPresence::Present );
@@ -279,9 +284,7 @@ fn gnid_presence_gated_tells_hidden_from_absent () {
 // as a restricted headline.
 #[test]
 fn a_record_is_visible_when_the_restriction_holds_its_relRepo () {
-  let only_main : SkgrepoRestriction = SkgrepoRestriction {
-    name     : SkgrepoSetName ("main" . to_string ()),
-    skgrepos : BTreeSet::from ([ SkgrepoName::from ("main") ]) };
+  let only_main : SkgrepoRestriction = only_main ();
   assert! ( SkgrepoRestriction::record_is_visible (
     &only_main, &SkgrepoName::from ("main") ));
   assert! ( ! SkgrepoRestriction::record_is_visible (
@@ -295,31 +298,39 @@ fn a_record_is_visible_when_the_restriction_holds_its_relRepo () {
   assert! ( ! SkgrepoRestriction::node_is_restricted (
     &unrestricted (), &SkgrepoName::from ("private") )); }
 
-// Under 'all', a record in a skgrepo the config does not name is
-// visible, and a node homed there is not restricted, on both sides:
-// the render side's gated lists ('outbound_rel_partners_for_relation_gated')
-// and the save's weave ('SkgrepoRestriction::record_is_visible') answer
-// alike. The set 'all' here names no skgrepo at all.
+// A record in a skgrepo the config does not name is visible under
+// every skgrepo restriction, on both sides: the render side's gated
+// lists ('outbound_rel_partners_for_relation_gated') and the save's
+// weave ('SkgrepoRestriction::record_is_visible') answer alike.
 #[test]
-fn an_unnamed_relRepo_under_all_answers_alike_on_both_sides () {
+fn a_record_in_a_skgrepo_the_config_does_not_name_is_visible_under_every_restriction () {
   let mut recorder : Graphnode = node ("recorder", &[], &[], &[], &[]);
   recorder . contains = vec! [ RelPartner::at_relRepo (
     SkgrepoName::from ("unnamed"), ID::from ("member") ) ];
+  let graph : InRustGraph = InRustGraph::from_graphnodes (&[
+    recorder, node ("member", &[], &[], &[], &[]) ]);
+  for restriction in [ only_main (), unrestricted_over_main_and_private () ] {
+    let shown_by_the_render : bool =
+      graph . outbound_rel_partners_for_relation_gated (
+        &ID::from ("recorder"), NodeRelation::Contains, &restriction )
+      . iter () . any ( |partner| partner . member == ID::from ("member") );
+    assert! ( shown_by_the_render,
+              "under {}", restriction . most_private_shown );
+    assert! ( SkgrepoRestriction::record_is_visible (
+                &restriction, &SkgrepoName::from ("unnamed") ),
+              "under {}", restriction . most_private_shown ); }}
+
+// A graphnode homed in a skgrepo the config does not name is
+// restricted under no skgrepo restriction: the gated graph shows it.
+#[test]
+fn a_graphnode_homed_in_a_skgrepo_the_config_does_not_name_is_never_restricted () {
   let mut member : Graphnode = node ("member", &[], &[], &[], &[]);
   member . home_skgrepo = SkgrepoName::from ("unnamed");
-  let graph : InRustGraph = InRustGraph::from_graphnodes (&[ recorder, member ]);
-  let all : SkgrepoRestriction = SkgrepoRestriction {
-    name     : SkgrepoSetName ("all" . to_string ()),
-    skgrepos : BTreeSet::new () };
-  let shown_by_the_render : bool =
-    graph . outbound_rel_partners_for_relation_gated (
-      &ID::from ("recorder"), NodeRelation::Contains, &all )
-    . iter () . any ( |partner| partner . member == ID::from ("member") );
-  let visible_to_the_save : bool =
-    SkgrepoRestriction::record_is_visible (&all, &SkgrepoName::from ("unnamed"));
-  assert! (shown_by_the_render);
-  assert_eq! (shown_by_the_render, visible_to_the_save);
-  assert_eq! ( graph . gnid_presence_gated (&ID::from ("member"), &all),
-               GnidPresence::Present );
-  assert! ( ! SkgrepoRestriction::node_is_restricted (
-    &all, &SkgrepoName::from ("unnamed") )); }
+  let graph : InRustGraph = InRustGraph::from_graphnodes (&[ member ]);
+  for restriction in [ only_main (), unrestricted_over_main_and_private () ] {
+    assert! ( ! SkgrepoRestriction::node_is_restricted (
+                &restriction, &SkgrepoName::from ("unnamed") ),
+              "under {}", restriction . most_private_shown );
+    assert_eq! ( graph . gnid_presence_gated (&ID::from ("member"), &restriction),
+                 GnidPresence::Present,
+                 "under {}", restriction . most_private_shown ); }}

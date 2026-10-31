@@ -30,7 +30,7 @@ use crate::serve::util::{
   send_response_with_length_prefix, sexp_to_client_string,
   tag_sexp_response, true_entry_sexp, value_from_request_sexp};
 use crate::sexp_string::quote_sexp_string;
-use crate::skgrepo_sets::{SkgrepoRestriction, require_skgrepo_set_all};
+use crate::skgrepo_sets::{SkgrepoRestriction, require_unrestricted};
 use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::types::misc::SkgrepoName;
 
@@ -86,7 +86,7 @@ pub fn handle_stage_and_commit_request (
 /// After a git-commit: rerender each open buffer of the diff view as
 /// any rerender does, over the graph straddle the commit rebuilt. Its
 /// roots stay ('docs/diff-view.org', "What the refresh keeps"), and
-/// what the commit made unchanged loses its decorations. The commit requires the skgrepo-set all, so no text is
+/// what the commit made unchanged loses its decorations. The commit requires an unrestricted connection, so no text is
 /// withheld and no release is asked for.
 fn stream_rerender_diffView_views (
   stream              : &mut TcpStream,
@@ -103,8 +103,8 @@ fn stream_rerender_diffView_views (
   stream_prepared_rerenders (stream, views_state, prepared);
 }
 
-/// See the module comment. Refused unless the skgrepo restriction is
-/// 'all', as the diff view is. A confirmed request skips both checks.
+/// See the module comment. Refused unless the connection is
+/// unrestricted, as the diff view is. A confirmed request skips both checks.
 /// After the git-commits, the
 /// connection's graph straddle is rebuilt (each committed HEAD moved), and
 /// the store keeps exactly the marks whose change-forest leaves still
@@ -117,7 +117,7 @@ pub fn stage_and_commit (
   confirmed           : bool,
 ) -> StageAndCommitAnswer {
   if let Err (refusal) =
-    require_skgrepo_set_all ("Stage and commit", skgrepo_restriction) {
+    require_unrestricted ("Stage and commit", skgrepo_restriction) {
     return StageAndCommitAnswer::Refused (refusal); }
   if message . trim () . is_empty () {
     return StageAndCommitAnswer::Refused (

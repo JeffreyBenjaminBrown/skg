@@ -1,5 +1,5 @@
 use serde::{Serialize, Deserialize, Serializer, Deserializer};
-use std::collections::{BTreeSet, HashMap};
+use std::collections::HashMap;
 use std::fmt;
 use std::ops::Deref;
 use std::path::PathBuf;
@@ -190,14 +190,6 @@ pub fn members_msv<T : Clone> (
     MSV::Specified (v)   =>
       MSV::Specified ( members_of (v) ), }}
 
-/// Identifies a skgrepo-set choice. Skgrepo-sets are no longer defined
-/// by hand: they are the prefixes of the config's skgrepo order (most
-/// public first), so a choice is either "all" (every skgrepo) or the
-/// name of a configured skgrepo -- meaning "that skgrepo and everything
-/// more public", i.e. the most private skgrepo to make available.
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct SkgrepoSetName ( pub String );
-
 impl Skgrepo {
   pub fn herald_label (&self) -> &str {
     self . abbreviation . as_deref ()
@@ -222,12 +214,16 @@ pub struct SkgConfig {
   // validators, and prefix skgrepo-sets all read it, through the
   // comparison chokepoint methods below ('ordered_skgrepos',
   // 'repo_position', 'is_strictly_more_public', 'more_private_of',
-  // 'prefix_through'). No other code may compare skgrepo positions.
+  // 'privacy_order_split_after'). No other code may compare skgrepo
+  // positions.
   #[serde (skip)]
   pub skgrepo_order   : Vec<SkgrepoName>,
 
-  #[serde(rename = "default_repo_set", default = "default_skgrepo_set_name")]
-  pub default_skgrepo_set : SkgrepoSetName,
+  // The skgrepo restriction a connection starts with: the most
+  // private skgrepo it shows ('SkgrepoRestriction'). Absent, the most
+  // private skgrepo of the config: no skgrepo restriction.
+  #[serde(rename = "default_repo_set", default)]
+  pub default_skgrepo_set : Option<SkgrepoName>,
 
   // The directory (as a first path component under the data root)
   // whose skgrepos the user owns; every other skgrepo is foreign
@@ -331,9 +327,6 @@ where
   Ok (map)
 }
 
-fn default_skgrepo_set_name () -> SkgrepoSetName {
-  SkgrepoSetName::from ("all") }
-
 fn default_owned_folder () -> String {
   "owned" . to_string () }
 
@@ -435,12 +428,6 @@ impl fmt::Display for SkgrepoName {
          -> fmt::Result {
     write! ( f, "{}", self . 0 ) }}
 
-impl fmt::Display for SkgrepoSetName {
-  fn fmt ( &self,
-            f: &mut fmt::Formatter<'_> )
-         -> fmt::Result {
-    write! ( f, "{}", self . 0 ) }}
-
 impl From<String> for ID {
   fn from ( s : String ) -> Self {
     ID (s) }}
@@ -453,17 +440,9 @@ impl From<String> for SkgrepoName {
   fn from ( s : String ) -> Self {
     SkgrepoName (s) }}
 
-impl From<String> for SkgrepoSetName {
-  fn from ( s : String ) -> Self {
-    SkgrepoSetName (s) }}
-
 impl From<&String> for SkgrepoName {
   fn from ( s : &String ) -> Self {
     SkgrepoName ( s . clone () ) }}
-
-impl From<&String> for SkgrepoSetName {
-  fn from ( s : &String ) -> Self {
-    SkgrepoSetName ( s . clone () ) }}
 
 impl From <&str> for ID {
   fn from(s: &str) -> Self {
@@ -472,10 +451,6 @@ impl From <&str> for ID {
 impl From <&str> for SkgrepoName {
   fn from(s: &str) -> Self {
     SkgrepoName ( s . to_string () ) }}
-
-impl From <&str> for SkgrepoSetName {
-  fn from(s: &str) -> Self {
-    SkgrepoSetName ( s . to_string () ) }}
 
 impl SkgConfig {
   /// Creates a SkgConfig with dummy values for everything except skgrepos.
@@ -488,7 +463,7 @@ impl SkgConfig {
       data_root          : PathBuf::from ("."),
       skgrepos,
       skgrepo_order       : Vec::new (),
-      default_skgrepo_set : SkgrepoSetName::from ("all"),
+      default_skgrepo_set : None,
       owned_folder       : "owned" . to_string (),
       tantivy_folder     : PathBuf::from ("/tmp/unused"),
       port               : 0,
@@ -507,7 +482,7 @@ impl SkgConfig {
       data_root          : PathBuf::from ("."),
       skgrepos,
       skgrepo_order       : Vec::new (),
-      default_skgrepo_set : SkgrepoSetName::from ("all"),
+      default_skgrepo_set : None,
       owned_folder       : "owned" . to_string (),
       tantivy_folder     : PathBuf::from (tantivy_folder),
       port               : DEFAULT_PORT,
@@ -549,11 +524,6 @@ impl SkgConfig {
     &self,
   ) -> Option<SkgrepoName> {
     self . first_owned_skgrepo_in_config_order () }
-
-  pub fn default_skgrepo_set_name (
-    &self,
-  ) -> &SkgrepoSetName {
-    &self . default_skgrepo_set }
 
   /// The comparison chokepoint, with the methods below it. Every
   /// skgrepo name, in privacy order: most public first, most private
@@ -623,34 +593,21 @@ impl SkgConfig {
       self . more_private_of (
         recorder_home . clone (), member_home . clone () ) }}
 
-  /// The prefix of the privacy order through 'repo', inclusive:
-  /// that skgrepo and everything more public. Errors if the skgrepo is
-  /// not configured.
-  pub fn prefix_through (
+  /// The privacy order split after 'skgrepo': the prefix through it,
+  /// inclusive (that skgrepo and everything more public), and the
+  /// rest (everything more private). Errors if the skgrepo is not
+  /// configured.
+  pub fn privacy_order_split_after (
     &self,
     skgrepo : &SkgrepoName,
-  ) -> Result<Vec<SkgrepoName>, String> {
-    let ordered : Vec<SkgrepoName> =
+  ) -> Result<(Vec<SkgrepoName>, Vec<SkgrepoName>), String> {
+    let mut ordered : Vec<SkgrepoName> =
       self . ordered_skgrepos ();
     let position : usize =
       ordered . iter () . position ( |s| s == skgrepo )
       . ok_or_else ( || format! (
         "Repo '{}' not found in config", skgrepo )) ?;
-    Ok ( ordered [..= position] . to_vec () ) }
-
-  /// The skgrepos a skgrepo-set choice makes available: everything for
-  /// "all"; for a skgrepo name, the prefix of the privacy order
-  /// through it (that skgrepo and everything more public).
-  pub fn skgrepo_set_skgrepos (
-    &self,
-    name : &SkgrepoSetName,
-  ) -> Result<BTreeSet<SkgrepoName>, String> {
-    if name . 0 == "all" {
-      return Ok ( self . skgrepos . keys () . cloned () . collect () ); }
-    Ok ( self
-         . prefix_through ( &SkgrepoName::from ( name . 0 . as_str () ))
-         . map_err ( |_| format! (
-           "Repo-set '{}' names no configured repo. A repo-set is 'all' or the name of the most private repo to make available.",
-           name )) ?
-         . into_iter () . collect () ) }
+    let more_private : Vec<SkgrepoName> =
+      ordered . split_off (position + 1);
+    Ok (( ordered, more_private )) }
 }

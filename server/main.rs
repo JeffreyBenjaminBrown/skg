@@ -13,7 +13,7 @@ use skg::dbs::filesystem::not_nodes::load_config;
 use skg::heralds::herald_styles_inconsistencies;
 use skg::export_org::{
   export_candidate_pids, export_to_org, ExportReport};
-use skg::skgrepo_sets::{SkgrepoRestriction, SkgrepoSetName};
+use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::telescope::dependencies_manifest::foreign_manifest_order_warnings;
 use skg::dbs::init::{InitContextHandoff, initialize_dbs};
 use skg::types::env::SkgEnv;
@@ -338,7 +338,8 @@ fn run_import (
 /// subcommand runs the same core for scripting and testing.
 ///
 /// USAGE: cargo run --bin skg -- export-org [config-path] [skgrepo-set] [output-dir] [--include-overPrivateText-telescopes]
-/// (skgrepo-set defaults to "all", output-dir to "org-exports").
+/// (skgrepo-set, the most private skgrepo to export, defaults to the
+/// config's most private skgrepo, output-dir to "org-exports").
 /// output-dir is resolved against the current working directory; an
 /// absolute path is used as-is.
 fn run_export_org (
@@ -354,15 +355,14 @@ fn run_export_org (
     else { "data/skgconfig.toml" . to_string() };
   let config : SkgConfig =
     load_config (&config_path) ? . 0;
-  let set_name : SkgrepoSetName =
+  let restriction : SkgrepoRestriction =
     if positional . len () > 1 {
-      SkgrepoSetName::from (positional[1] . as_str()) }
-    else { SkgrepoSetName::from ("all") };
+      SkgrepoRestriction::named (
+        &config, SkgrepoName::from (positional[1] . as_str()) ) ? }
+    else { SkgrepoRestriction::unrestricted (&config) };
   let output_dir : String =
     if positional . len () > 2 { positional[2] . clone () }
     else { "org-exports" . to_string() };
-  let restriction : SkgrepoRestriction =
-    SkgrepoRestriction::named (&config, set_name) ?;
   let nodes : Vec<Graphnode> =
     read_all_skg_files_from_skgrepos (&config) ?;
   let candidates : HashSet<ID> =
@@ -379,8 +379,8 @@ fn run_export_org (
       . collect::<Vec<&str>> () . join (", ");
     if ! restriction . is_unrestricted () && ! include_overPrivateText_telescopes {
       return Err (format! (
-        "export-org would release title or body selected below home for PIDs {} under repo-set {}; rerun with --include-overPrivateText-telescopes to approve",
-        pids, restriction . name ) . into ()); }
+        "export-org would release title or body selected below home for PIDs {} under the skgrepo restriction {}; rerun with --include-overPrivateText-telescopes to approve",
+        pids, restriction . most_private_shown ) . into ()); }
     eprintln! (
       "Warning: export-org includes title or body selected below home for PIDs {}.",
       pids ); }

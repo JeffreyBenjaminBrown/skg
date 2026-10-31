@@ -1,5 +1,4 @@
 tantivy_folder = "/tmp/placeholder"
-default_repo_set = "all"
 
 [[repos]]
 name = "public"

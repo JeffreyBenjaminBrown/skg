@@ -37,7 +37,7 @@ fn a_request_registers_its_buffer_and_the_last_close_drops_the_straddle (
   with_fixture ("sets", &["main"], |f| {
     let env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
     let all : SkgrepoRestriction =
-      SkgrepoRestriction::named (&f . config, "all" . into ()) ?;
+      SkgrepoRestriction::unrestricted (&f . config);
     { let (mut stream, read_end) : (TcpStream, TcpStream) =
         mk_test_tcp_stream_pair ();
       handle_diffView_request (
@@ -74,9 +74,8 @@ fn a_request_is_refused_under_a_skgrepo_restriction (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("sets", &["main"], |f| {
     let env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
-    let mut restriction : SkgrepoRestriction =
-      SkgrepoRestriction::named (&f . config, "all" . into ()) ?;
-    restriction . name = "some" . into ();
+    let restriction : SkgrepoRestriction = // 'main' shown, 'other' kept out
+      SkgrepoRestriction::of_privacy_order_for_test (&["main", "other"], "main");
     let (mut stream, read_end) : (TcpStream, TcpStream) =
       mk_test_tcp_stream_pair ();
     handle_diffView_request (
@@ -99,7 +98,7 @@ fn a_rerender_all_writes_its_refreshed_straddle_back (
     f . graph . store ( graph_handle_from_config (&f . config) ? . load_full () );
     let env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
     let all : SkgrepoRestriction =
-      SkgrepoRestriction::named (&f . config, "all" . into ()) ?;
+      SkgrepoRestriction::unrestricted (&f . config);
     let (mut stream, read_end) : (TcpStream, TcpStream) =
       mk_test_tcp_stream_pair ();
     handle_rerender_all_views_request (
@@ -126,7 +125,7 @@ fn request_the_four_buffers (
   with_fixture (case, skgrepos, |f| {
     let env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
     let all : SkgrepoRestriction =
-      SkgrepoRestriction::named (&f . config, "all" . into ()) ?;
+      SkgrepoRestriction::unrestricted (&f . config);
     for diffView_buffer_kind in DiffViewBufferKind::ALL {
       let viewforest_id : String = format! ( "diff-view: {}", diffView_buffer_kind . wire_name () );
       let (mut stream, read_end) : (TcpStream, TcpStream) =
@@ -157,14 +156,14 @@ fn the_four_requests_skip_the_empty_buffers (
 ) -> Result<(), Box<dyn Error>> {
   request_the_four_buffers ( "sets", &["main"], &[ DiffViewBufferKind::AllChanges ] ) }
 
-/// Send the "all changes" request under the skgrepo set 'all'; return
+/// Send the "all changes" request with no skgrepo restriction; return
 /// the response, and whether the buffer was registered.
 fn request_all_changes (
   f : &mut Fixture,
 ) -> Result<(String, bool), Box<dyn Error>> {
   let env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
   let all : SkgrepoRestriction =
-    SkgrepoRestriction::named (&f . config, "all" . into ()) ?;
+    SkgrepoRestriction::unrestricted (&f . config);
   let (mut stream, read_end) : (TcpStream, TcpStream) =
     mk_test_tcp_stream_pair ();
   handle_diffView_request (

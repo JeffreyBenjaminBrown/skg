@@ -55,7 +55,7 @@ pub fn handle_single_root_view_request (
             &vec! [format! (
               "Node {} is not in skgrepo restriction {}",
               gnid,
-              skgrepo_restriction . name )],
+              skgrepo_restriction . most_private_shown )],
             &[] );
         send_response_with_length_prefix (
           stream,

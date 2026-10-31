@@ -17,7 +17,8 @@
 use indoc::indoc;
 
 use skg::from_text::buffer_to_validated_saveplan;
-use skg::skgrepo_sets::{SkgrepoRestriction, SkgrepoSetName, run_with_skgrepo_set_test_db};
+use skg::skgrepo_sets::{SkgrepoRestriction, run_with_skgrepo_set_test_db};
+use skg::types::misc::SkgrepoName;
 use skg::types::misc::{ID, members_of};
 use skg::types::nodes::complete::Graphnode;
 use skg::types::save::{NodeInstruction, SaveNode};
@@ -54,7 +55,7 @@ fn writes_to_restricted_nodes_are_suppressed_with_warning (
         skg::test_utils::graph_handle_from_config (config) ? );
       let restriction : SkgrepoRestriction =
         SkgrepoRestriction::named (
-          config, SkgrepoSetName ("public" . to_string ())) ?;
+          config, SkgrepoName ("public" . to_string ())) ?;
       { // An edited now-restricted editable node: write suppressed,
         // warning attached, containment preserved.
         let buffer = indoc! {"

@@ -1,9 +1,9 @@
 //! The single release policy for textual data from overPrivateText telescopes.
 //!
 //! Folding may select a title or body below the node's home skgrepo. That is
-//! safe to hold internally, but a restricted skgrepo-set must not release it
-//! without an explicit approval for the affected PID. The reserved 'all'
-//! skgrepo-set may release it, with a warning.
+//! safe to hold internally, but a skgrepo restriction must not release it
+//! without an explicit approval for the affected PID. An unrestricted
+//! connection may release it, with a warning.
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::serve::protocol::TcpToClient;
@@ -240,7 +240,6 @@ fn pair (
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::skgrepo_sets::SkgrepoSetName;
   use crate::types::misc::SkgrepoName;
   use crate::types::nodes::complete::{
     Graphnode, empty_graphnode};
@@ -256,11 +255,8 @@ mod tests {
   }
 
   fn restricted () -> SkgrepoRestriction {
-    SkgrepoRestriction {
-      name    : SkgrepoSetName::from ("public"),
-      skgrepos : [SkgrepoName::from ("home")]
-                . into_iter () . collect (),
-    }
+    SkgrepoRestriction::of_privacy_order_for_test (
+      &["public", "home", "private"], "home")
   }
 
   #[test]

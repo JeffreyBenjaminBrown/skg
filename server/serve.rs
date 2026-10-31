@@ -32,7 +32,6 @@ use crate::serve::protocol::{RequestType, TcpToClient};
 use crate::serve::util::{ request_type_from_request, send_response_with_length_prefix, tag_text_response};
 use crate::types::env::SkgEnv;
 use crate::skgrepo_sets::SkgrepoRestriction;
-use crate::types::misc::SkgrepoSetName;
 use crate::types::views_state::OpenViews;
 
 use std::io::{BufRead, BufReader};
@@ -90,11 +89,8 @@ fn handle_emacs (
       . unwrap_or_else ( |e| {
         tracing::error! (
           error = %e,
-          "failed to initialize skgrepo restriction; falling back to all");
-        SkgrepoRestriction::named (
-          &runtime . config,
-          SkgrepoSetName::from ("all"))
-        . expect ("reserved repo-set all should always resolve") });
+          "failed to initialize skgrepo restriction; falling back to no skgrepo restriction");
+        SkgrepoRestriction::unrestricted (&runtime . config) });
 
   let mut pending_import : Option<PendingImport> = None;
 

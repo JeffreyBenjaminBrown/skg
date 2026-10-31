@@ -10,7 +10,7 @@ use crate::serve::util::{
   send_response_with_length_prefix, tag_sexp_response, tag_text_response,
   value_from_request_sexp };
 use crate::sexp_string::quote_sexp_string;
-use crate::skgrepo_sets::{SkgrepoRestriction, require_skgrepo_set_all};
+use crate::skgrepo_sets::{SkgrepoRestriction, require_unrestricted};
 use crate::types::env::SkgEnv;
 use crate::types::misc::ID;
 use crate::types::tree::forest::ViewForest;
@@ -31,7 +31,7 @@ pub fn handle_delete_references_to_absent_node_request (
   let raw_gnid = match value_from_request_sexp ("id", request) {
     Ok (gnid) => ID::from (gnid),
     Err (e) => return refuse (stream, &e), };
-  if let Err (e) = require_skgrepo_set_all ( // it scans and rewrites every owned recorder
+  if let Err (e) = require_unrestricted ( // it scans and rewrites every owned recorder
     "Deleting the references to an absent ID", skgrepo_restriction )
   { return refuse (stream, &e); }
   // Preview validation and the resulting rewrite are one mutation.  Taking

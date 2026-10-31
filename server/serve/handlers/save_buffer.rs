@@ -17,7 +17,7 @@ use crate::save::{
   restricted_records_naming_deleted_graphnodes,
 };
 use crate::serve::ViewsState;
-use crate::skgrepo_sets::{SkgrepoRestriction, require_skgrepo_set_all};
+use crate::skgrepo_sets::{SkgrepoRestriction, require_unrestricted};
 use crate::serve::protocol::TcpToClient;
 use crate::serve::handlers::telescope_hoist::{
   HoistCandidate,
@@ -845,7 +845,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
     // restriction may hide: refused unless the connection is
     // unrestricted.
     let unrestricted = |what : &str| -> Result<(), Box<dyn Error>> {
-      require_skgrepo_set_all (what, skgrepo_restriction)
+      require_unrestricted (what, skgrepo_restriction)
         . map_err ( |e| Box::new ( SaveError::BufferValidationErrors {
             errors : vec! [ crate::types::errors::BufferValidationError::Other (e) ],
             warnings : parse_warnings . clone (), } ) as Box<dyn Error> ) };

@@ -4,11 +4,10 @@
 
 use super::*;
 use crate::types::misc::RelPartner;
-use crate::skgrepo_sets::{SkgrepoRestriction, SkgrepoSetName};
+use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::{ID, SkgrepoName, rel_partners_at_relRepo};
 use crate::types::nodes::complete::empty_graphnode;
 
-use std::collections::BTreeSet;
 use std::fs;
 
 const MAGIC : &str = "3d9aa9be-d95a-48bc-b362-33f9e7ebdf6f";
@@ -30,8 +29,7 @@ fn node (
   n }
 
 fn restriction_all () -> SkgrepoRestriction {
-  SkgrepoRestriction { name  : SkgrepoSetName::from ("all"),
-                    skgrepos : BTreeSet::new () } }
+  SkgrepoRestriction::of_privacy_order_for_test (&["main"], "main") }
 
 //
 // relpath
@@ -331,10 +329,8 @@ fn private_skgrepo_relationship_is_omitted_from_restricted_export () {
     node ("pub",  "Public child",  None, &[]),
     node ("priv", "Private child", None, &[]),
   ];
-  let main_only : SkgrepoRestriction = SkgrepoRestriction {
-    name    : SkgrepoSetName::from ("main"),
-    skgrepos : [ SkgrepoName::from ("main") ]
-      . into_iter () . collect () };
+  let main_only : SkgrepoRestriction =
+    SkgrepoRestriction::of_privacy_order_for_test (&["main", "private"], "main");
   let dir : tempfile::TempDir = tempfile::tempdir () . unwrap ();
   export_to_org (&main_only, &nodes, dir . path ()) . unwrap ();
   let content : String =
@@ -343,7 +339,7 @@ fn private_skgrepo_relationship_is_omitted_from_restricted_export () {
   assert! ( ! content . contains ("Private child"),
             "an relationship from a private repo leaked into a main-only export:\n{}",
             content );
-  { // Under "all", both children render.
+  { // Under "main", both children render.
     let dir : tempfile::TempDir = tempfile::tempdir () . unwrap ();
     export_to_org (&restriction_all (), &nodes, dir . path ()) . unwrap ();
     let content : String =

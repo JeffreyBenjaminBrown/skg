@@ -27,7 +27,7 @@ use skg::serve::ViewsState;
 use skg::serve::handlers::text_search::{
   MatchGroups, TitleOrAlias, build_search_viewforest, draw_search_buffer,
   handle_text_search_request};
-use skg::skgrepo_sets::{SkgrepoRestriction, SkgrepoSetName};
+use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::test_utils::{extract_string_field_from_sexp, graph_handle_from_config,
                       read_all_lp_messages, set_skgrepo_retagging_relRepos,
                       skg_env_from_parts};
@@ -57,7 +57,7 @@ fn all_tests
         &s . config, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
 
-/// Search for 'terms' under the skgrepo restriction "all", and return every
+/// Search for 'terms' under the skgrepo restriction its most private skgrepo (no restriction), and return every
 /// message the server sent, with the views state the search left.
 fn search (
   config  : &SkgConfig,
@@ -72,7 +72,7 @@ fn search (
       open_views        : OpenViews::new (),
       graph_straddle    : None, };
   let all : SkgrepoRestriction =
-    SkgrepoRestriction::named (config, SkgrepoSetName::from ("all"))?;
+    SkgrepoRestriction::unrestricted (config);
   let (mut server, client) : (TcpStream, TcpStream) =
     mk_test_tcp_stream_pair ();
   handle_text_search_request (
@@ -198,7 +198,7 @@ fn an_excluded_overPrivateText_container_leaves_no_trace (
   let config : SkgConfig =
     load_config ("tests/repo_sets/fixtures/skgconfig.toml") ? . 0;
   let restriction : SkgrepoRestriction =
-    SkgrepoRestriction::named (&config, SkgrepoSetName::from ("public")) ?;
+    SkgrepoRestriction::named (&config, SkgrepoName::from ("public")) ?;
   let mut hit : Graphnode = empty_graphnode ();
   hit . pid = ID::from ("hit");
   hit . title = "the hit" . to_string ();

@@ -16,14 +16,14 @@ use crate::graph_straddle::types::GraphStraddle;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::test_utils::refresh_reaches_fixpoint;
 use crate::types::misc::{
-  MSV, RelPartner, Skgrepo, SkgrepoName, SkgrepoSetName, rel_partners_at_relRepo};
+  MSV, RelPartner, Skgrepo, SkgrepoName, rel_partners_at_relRepo};
 use crate::types::nodes::complete::{Graphnode, empty_graphnode};
 use crate::types::viewnode::{
   ChangeViewnode, PropertyMember, ViewnodeId, Warrant};
 use crate::types::views_state::DiffViewBufferKind;
 
 use ego_tree::{NodeId, NodeRef};
-use std::collections::{BTreeSet, HashMap};
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -80,9 +80,8 @@ pub(super) fn unrestricted () -> SkgrepoRestriction {
 
 /// The skgrepo restriction to 'main' alone.
 pub(super) fn main_only () -> SkgrepoRestriction {
-  SkgrepoRestriction {
-    name     : SkgrepoSetName ( "public" . to_string () ),
-    skgrepos : BTreeSet::from ([ SkgrepoName::from ("main") ]) } }
+  SkgrepoRestriction::named (&config (), SkgrepoName::from ("main"))
+    . unwrap () }
 
 pub(super) fn graph (
   nodes : &[Graphnode],

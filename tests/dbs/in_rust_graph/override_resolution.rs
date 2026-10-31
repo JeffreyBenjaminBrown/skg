@@ -3,7 +3,7 @@ use skg::dbs::in_rust_graph::override_resolution::{
   OverrideResolution,
   resolve_override,
 };
-use skg::skgrepo_sets::{SkgrepoRestriction, SkgrepoSetName};
+use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::types::misc::{
   ID, MSV, RelPartner, SkgConfig, Skgrepo, SkgrepoName,
   rel_partners_at_relRepo};
@@ -60,15 +60,20 @@ fn node (
     };
   node }
 
+/// The skgrepo restriction that shows 'skgrepos' and keeps out every
+/// other skgrepo of 'config', as if 'skgrepos' were the most public.
 fn restricted_to (
   skgrepos : &[&str],
 ) -> SkgrepoRestriction {
-  SkgrepoRestriction {
-    name    : SkgrepoSetName ( "restricted" . to_string () ),
-    skgrepos : skgrepos . iter ()
-      . map ( |s| SkgrepoName::from (*s) )
-      . collect (),
-  }}
+  let config : SkgConfig = config ();
+  let kept_out : Vec<SkgrepoName> = config . ordered_skgrepos () . into_iter ()
+    . filter ( |s| ! skgrepos . contains (&s . 0 . as_str ()) )
+    . collect ();
+  let order : Vec<&str> = skgrepos . iter () . copied ()
+    . chain ( kept_out . iter () . map ( |s| s . 0 . as_str () ) )
+    . collect ();
+  SkgrepoRestriction::of_privacy_order_for_test (
+    &order, skgrepos [skgrepos . len () - 1] ) }
 
 fn resolve (
   nodes  : Vec<Graphnode>,

@@ -5,7 +5,7 @@ use skg::from_text::buffer_to_viewnodes::uninterpreted::headline_to_triple;
 use skg::serve::parse_metadata_sexp::MetadataKind;
 use skg::org_to_text::viewforest_to_string;
 use skg::skgrepo_sets::SkgrepoRestriction;
-use skg::types::misc::{ID, MSV, RelPartner, SkgConfig, SkgrepoName, SkgrepoSetName, TantivyIndex, rel_partners_at_relRepo_msv};
+use skg::types::misc::{ID, MSV, RelPartner, SkgConfig, SkgrepoName, TantivyIndex, rel_partners_at_relRepo_msv};
 use skg::types::nodes::complete::{Graphnode, empty_graphnode};
 use skg::dbs::init::wipe_then_init_tantivy_db;
 use skg::test_utils::remove_test_dir;
@@ -352,10 +352,8 @@ fn private_alias_documents_are_filtered_before_grouping (
       let ( tantivy_index, _ ) : ( TantivyIndex, usize ) =
         wipe_then_init_tantivy_db (
           &nodes, Path::new (index_dir) ) ?;
-      let public_only : SkgrepoRestriction = SkgrepoRestriction {
-        name    : SkgrepoSetName::from ("main"),
-        skgrepos : [ SkgrepoName::from ("main") ]
-          . into_iter () . collect (), };
+      let public_only : SkgrepoRestriction =
+        SkgrepoRestriction::of_privacy_order_for_test (&["main", "private"], "main");
       { // Restricted search: the private alias doc must not match.
         let ( best_matches, searcher ) =
           search_index ( &tantivy_index, "zanzibar",

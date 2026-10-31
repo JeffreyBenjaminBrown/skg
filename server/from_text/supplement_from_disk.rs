@@ -290,7 +290,7 @@ pub fn refuse_delete_with_restricted_sections (
 ) -> Result<(), String> {
   if has_restricted_sections (config, restriction, pid) {
     return Err ( format! (
-      "Cannot delete '{}': it has telescope sections in restricted repos. Widen the repo-set (e.g. to 'all') and retry.",
+      "Cannot delete '{}': it has telescope sections in restricted repos. Widen the skgrepo restriction to show them and retry.",
       pid )); }
   Ok (( )) }
 
@@ -307,7 +307,7 @@ pub fn refuse_nodeMerge_with_restricted_sections (
   for pid in [acquirer, acquiree] {
     if has_restricted_sections (config, restriction, pid) {
       return Err ( format! (
-        "Cannot merge '{}' into '{}': '{}' has telescope sections in restricted repos. Widen the repo-set (e.g. to 'all') and retry.",
+        "Cannot merge '{}' into '{}': '{}' has telescope sections in restricted repos. Widen the skgrepo restriction to show them and retry.",
         acquiree, acquirer, pid )); }}
   Ok (( )) }
 

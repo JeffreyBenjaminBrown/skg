@@ -25,7 +25,7 @@ use std::net::TcpStream;
 use skg::from_text::buffer_to_validated_saveplan;
 use skg::assert_metadata_eq;
 use skg::serve::ViewsState;
-use skg::skgrepo_sets::{SkgrepoRestriction, SkgrepoSetName};
+use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::test_utils::{
   run_with_shared_test_stores,
   graph_handle_from_config};
@@ -299,7 +299,7 @@ async fn ownership_and_visibility_gate_substitution (
         assert! ( view . contains ("(gnid N1)"), "{}", view ); }
       let restriction : SkgrepoRestriction =
         SkgrepoRestriction::named (
-          config, SkgrepoSetName ("main" . to_string ())) ?;
+          config, SkgrepoName ("main" . to_string ())) ?;
       { // A restricted owned overrider does not substitute.
         let (view, _pids, _tree) =
           multi_root_view_with_skgrepo_set (
@@ -332,7 +332,7 @@ async fn ownership_and_visibility_gate_substitution (
       Ok (( )) }
 
 /// Save 'buf' under a specific skgrepo restriction (the test shims save
-/// under 'all'). Asserts no save errors and returns the rerendered
+/// unrestricted). Asserts no save errors and returns the rerendered
 /// view.
 async fn save_under_set (
   buf     : &str,
@@ -363,7 +363,7 @@ async fn save_under_set (
   Ok ( response . saved_view ) }
 
 /// A half-visible owned chain: D overrides C overrides N, with the
-/// end D in skgrepo 'other'. Under 'all' the END D substitutes for N;
+/// end D in skgrepo 'other'. Unrestricted the END D substitutes for N;
 /// under 'main' (hiding 'other') the middle C substitutes. Saving the
 /// half-visible view accepts the middle carrier (it is on N's chain)
 /// and keeps N in P's contains; an off-chain fact is rejected.
@@ -373,19 +373,19 @@ async fn chain_half_visible_keeps_the_original (
 ) -> Result<(), Box<dyn Error>> {
       (
         graph_handle_from_config (config) ? );
-      { // Under 'all', the chain end D is shown in N's place.
+      { // Unrestricted, the chain end D is shown in N's place.
         let (view, _p, _t) =
           multi_root_view (
             config, Some (tantivy),
             &[ ID::from ("P") ] ) ?;
         let marked : Vec<&str> = marked_lines (&view, "N");
         assert_eq! ( marked . len (), 1,
-          "one substitute for N under all:\n{}", view );
+          "one substitute for N unrestricted:\n{}", view );
         assert! ( marked [0] . contains ("(gnid D)"),
-          "the chain end D is shown under all:\n{}", view ); }
+          "the chain end D is shown unrestricted:\n{}", view ); }
       let main_set : SkgrepoRestriction =
         SkgrepoRestriction::named (
-          config, SkgrepoSetName ("main" . to_string ())) ?;
+          config, SkgrepoName ("main" . to_string ())) ?;
       let view_main : String = {
         // Under 'main', D's skgrepo 'other' is restricted, so the middle
         // C is shown instead.
