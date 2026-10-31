@@ -5576,3 +5576,26 @@ user sees as E's content stays content for the narrowing's
 duration", but the user's deletion has no visible effect.
 *** Headline
 DONE.
+
+** Orchestrator's notes after slice 1 (2026-10-31)
+Launched 04:50 UTC, reported 05:09 UTC: nineteen minutes; 319k
+agent tokens over 116 tool uses. Three commits, one per defect,
+sixteen new tests, none changed. The deviations are sound: one
+key ('Walk::editability_key') answers what an ID names for the
+pass before the walk, the map and the visits alike, with the
+diff view's ghost case inside it; the hidden-outside folder's
+save follows its goal, so a hide of what a subscribee contains
+only by a restricted record can be removed from the folder; the
+save tests live in a module of 'grouped_repos' rather than in
+'tests/hidden_nodes.rs'. One consequence for Jeff, not a stop:
+under a skgrepo narrowing, where the subscriber's hide of a
+graphnode is restricted and the subscribee contains it by a
+visible record, deleting that graphnode's line under the
+subscribee writes nothing and the refresh draws it again, as
+the agreed behavior implies but the user may not expect.
+Corrections carried: to slice 2, the two ungated reads left in
+'resolve_visibility.rs' and the moved line numbers; to slice
+3, two 'Option' parameters more. Suites: nextest 1038 of 1038,
+integration 35 of 36 with either client, the pre-existing
+failure; the client suites were not run, as no client was
+touched.

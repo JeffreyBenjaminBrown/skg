@@ -621,6 +621,17 @@ Read "Every write obeys the skgrepo restriction" in the agreed
 behavior, Decide 14 of the review, the report
 'restriction-edits.org' in full, and the three 'lead5_' tests
 with their logs first.
+*** Corrections carried from slice 1
+Slice 1 gated the subscribee-visibility step and the
+hidden-outside goal and left 'infer_hides_from_contains_
+removals' and 'validate_no_overlapping_subscribee_hiderel_
+conflicts' ('resolve_visibility.rs') reading subscribee content
+ungated; finding 3 below takes the first, and the second reads
+through the gate too, harmless today or not. The helper
+'members_with_visible_records' in the same file is the gated
+read to reuse. The line numbers 'restriction-edits.org' gives
+for 'resolve_visibility.rs' are about twenty to thirty lines
+later now; search by name.
 *** the fork (finding 2)
 'build_fork_clone' ('server/from_text/fork.rs:390') copies
 into the clone only the records the skgrepo restriction shows,
@@ -691,6 +702,13 @@ and the export.
 Read "One encoding of the skgrepo restriction" in the agreed
 behavior, Decide 7 of the review, and the pitfalls on the
 'all' literals and the save's normalization first.
+*** Corrections carried from slice 1
+Two 'Option<&SkgrepoRestriction>' parameters more than the
+sixty-one the plan counted: in
+'goal_list_for_hiddenOutsideOfSubscribee_folder' ('goal.rs')
+and in 'members_with_visible_records'
+('resolve_visibility.rs'); they become bare references with
+the rest.
 *** the type
 'SkgrepoRestriction' ('server/skgrepo_sets.rs') holds the most
 private skgrepo shown and the set it denotes; 'named' takes a
