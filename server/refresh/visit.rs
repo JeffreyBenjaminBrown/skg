@@ -22,10 +22,11 @@
 //!     followed;
 //!  7. substitution: in a content view an overridden node is shown as
 //!     its overrider;
-//!  8. requests: each child's view requests are fulfilled and dropped.
+//!  8. requests: each child's view requests are fulfilled and dropped,
+//!     but for a fork request, which stays for the save.
 //! Before them, an editable-view request on P is consumed, making P
 //! editable if the budget allows, and P charges the budget
-//! ('consume_editableView_request' in 'extent.rs'); the request
+//! ('consume_editableView_request' in 'editability.rs'); the request
 //! passes on to the content P already shows
 //! ('extend_requested_content'); and P's default folders are added
 //! ('add_default_folders'); then P's goal is computed. The request
@@ -39,20 +40,21 @@
 
 use crate::dbs::in_rust_graph::override_resolution::{
   carrier_on_owned_chain, resolve_override};
-use crate::refresh::extent::{
-  DrawnEditability, Extent, consume_editableView_request, drawn_occurrence_editability,
-  drop_editableView_request, extent_of_parent};
+use crate::refresh::editability::{
+  DrawnEditability, EditabilityAndClaim, carries_editableView_request,
+  consume_editableView_request,
+  drawn_occurrence_editability, drop_editableView_request, extend_requested_content,
+  merge_editability, occurrence_from_truth, write_protect_occurrence};
+use crate::refresh::extent::{Extent, extent_of_parent};
 use crate::refresh::goal::{
   Goal, GoalItem, GoalMember, goal_of_parent, hidden_in_subscribee,
   hidden_outside_of_subscribees, member_of_child,
   subscriber_of_subscribee_as_such};
 use crate::refresh::goal::partnerFolder_members_in_graph;
 use crate::refresh::id_rule::{
-  EditabilityAndClaim, IdRuleAnswer, entombstone,
-  ghost_from_head, id_rule, occurrence_from_truth, point_occurrence_at,
+  IdRuleAnswer, entombstone, ghost_from_head, id_rule, point_occurrence_at,
   rekind_vognode};
-use crate::refresh::{
-  Walk, add_editableView_request, carries_editableView_request, write_protect_occurrence};
+use crate::refresh::Walk;
 use crate::refresh::ancestry::{described_node, is_unsayable, parent_reads_claims};
 use crate::refresh::mode::RefreshMode;
 use crate::refresh::tail::detach_viewnode_transferring_focus;
@@ -100,30 +102,6 @@ pub(crate) fn visit_parent (
   entombstone_if_an_empty_folder (tree, parent);
   drop_editableView_request (tree, parent);
   Ok (( )) }
-
-/// An editable-view request extends its occurrence's content, the
-/// content it shows included: each write-protected child that claims
-/// membership, and that a drawn occurrence's rule would let be
-/// editable ('drawn_occurrence_editability'), gets the request too,
-/// which its own visit consumes, and which extends its content in
-/// turn.
-fn extend_requested_content (
-  tree   : &mut Tree<Viewnode>,
-  parent : NodeId,
-  walk   : &mut Walk,
-) {
-  if ! carries_editableView_request (tree, parent)
-     || tree . get (parent) . unwrap () . value () . editable_gnid () . is_none ()
-  { return; }
-  for child in children_of (tree, parent) {
-    let gnid : ID = match &tree . get (child) . unwrap () . value () . kind {
-      ViewnodeKind::Vognode (Vognode::Occurrence (occurrence))
-        if occurrence . is_writeProtected () && occurrence . claimsMembership =>
-        occurrence . gnid . clone (),
-      _ => continue, };
-    if drawn_occurrence_editability (tree, parent, &gnid, walk)
-       != DrawnEditability::WriteProtected {
-      add_editableView_request (tree, child); }}}
 
 /// The folders a content view shows without being asked, as it
 /// always has: an occurrence that an editable-view request extends
@@ -347,31 +325,6 @@ fn merge_requests (
       if result . relationshipEditRequest . is_none () {
         result . relationshipEditRequest = merged . relationshipEditRequest . clone (); }},
     _ => {}, }}
-
-/// The merged sibling's editability, and its edit request with it,
-/// passes to the result, unless the result stands for another node (a
-/// node and its shown overrider stand for one gnid) whose editable
-/// occurrence is elsewhere in the buffer.
-fn merge_editability (
-  tree             : &mut Tree<Viewnode>,
-  result           : NodeId,
-  merged_sibling   : NodeId,
-  sibling_viewnode : &Viewnode,
-  walk             : &mut Walk,
-) {
-  let ViewnodeKind::Vognode (Vognode::Occurrence (merged)) : &ViewnodeKind =
-    &sibling_viewnode . kind else { return; };
-  if merged . is_writeProtected () { return; }
-  walk . release_editability (&merged . gnid, merged_sibling);
-  let mut result_mut : NodeMut<Viewnode> = tree . get_mut (result) . unwrap ();
-  let ViewnodeKind::Vognode (Vognode::Occurrence (result_occurrence)) : &mut ViewnodeKind =
-    &mut result_mut . value () . kind
-    else { return; };
-  if result_occurrence . is_writeProtected ()
-     && ! walk . editability_is_held (&result_occurrence . gnid) {
-    result_occurrence . editability = merged . editability . clone (); }
-  if ! result_occurrence . is_writeProtected () {
-    walk . hold_editability (&result_occurrence . gnid, result); }}
 
 //
 // 3. the goal and the warrant

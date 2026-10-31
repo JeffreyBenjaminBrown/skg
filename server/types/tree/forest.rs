@@ -33,7 +33,7 @@ impl Forest<Viewnode> {
 
 /// The IDs of the nodes that have an editable occurrence in the
 /// viewforest ('Viewnode::editable_gnid').
-pub fn editable_occurrences (
+pub fn editable_gnids (
   viewforest : &ViewForest,
 ) -> HashSet<ID> {
   viewforest . nodes ()

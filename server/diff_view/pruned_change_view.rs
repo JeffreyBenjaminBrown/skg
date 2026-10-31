@@ -30,7 +30,7 @@ use crate::types::env::RuntimeGeneration;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::misc::{ID, SkgrepoChange};
-use crate::types::tree::forest::{ViewForest, editable_occurrences, in_content_position};
+use crate::types::tree::forest::{ViewForest, editable_gnids, in_content_position};
 use crate::types::viewnode::{
   ChangeFacts, Editability, Existence, FoldAndFocus, Folder, Viewnode, ViewnodeKind,
   Vognode, mk_editable_viewnode, viewnode_of};
@@ -315,7 +315,7 @@ pub fn nodes_editable_in_diffView (
         Some ( h . gnid . clone () ),
       _ => None, } )
     . collect ();
-  editable_occurrences (viewforest) . into_iter ()
+  editable_gnids (viewforest) . into_iter ()
     . chain (historical_in_content_position)
     . collect () }
 
@@ -445,7 +445,7 @@ pub fn ensure_editableOccurrences_exist (
 ) {
   let u : &BTreeSet<ID> =
     & prunedChangeView_sets_of_buffer (straddle, diffView_buffer_kind) . u;
-  let mut editable : HashSet<ID> = editable_occurrences (viewforest);
+  let mut editable : HashSet<ID> = editable_gnids (viewforest);
   let occurrences : Vec<NodeId> =
     content_occurrences_in_level_order (viewforest);
   for treeid in occurrences {

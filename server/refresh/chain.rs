@@ -21,10 +21,10 @@ use crate::dbs::in_rust_graph::containerward_role_tree::{
   ContainerwardRoleTree, containers_in_inRustGraph, full_containerward_role_tree};
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::refresh::{Truth, Walk};
-use crate::refresh::extent::DrawnEditability;
+use crate::refresh::editability::{
+  DrawnEditability, EditabilityAndClaim, occurrence_from_truth};
 use crate::refresh::goal::{Goal, GoalItem, GoalMember, chain_goal};
-use crate::refresh::id_rule::{
-  EditabilityAndClaim, IdRuleAnswer, ghost_from_head, id_rule, occurrence_from_truth};
+use crate::refresh::id_rule::{IdRuleAnswer, ghost_from_head, id_rule};
 use crate::refresh::mode::RefreshMode;
 use crate::types::misc::ID;
 use crate::types::viewnode::{

@@ -23,16 +23,17 @@
 use crate::dbs::in_rust_graph::relation_accessors::GnidPresence;
 use crate::diff_view::change_viewnodes::mk_historical_viewnode;
 use crate::graph_straddle::types::GraphStraddle;
-use crate::refresh::{Walk, write_protect_occurrence};
-use crate::refresh::extent::{DrawnEditability, drawn_occurrence_editability};
+use crate::refresh::Walk;
+use crate::refresh::editability::{
+  DrawnEditability, EditabilityAndClaim, drawn_occurrence_editability,
+  forget_editable_occurrence, occurrence_from_truth, write_protect_occurrence};
 use crate::refresh::visit::{children_of, vanish};
 use crate::refresh::goal::{Goal, GoalMember};
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::nodes::rust::GraphnodeInRust;
 use crate::types::viewnode::{
   ChangeFacts, Editability, Ghost, GnidOnlyKind, GnidOnlyVognode,
-  RelationshipEditRequest, Occurrence, ViewRequest, Viewnode, ViewnodeKind,
-  Vognode, Warrant, default_occurrence};
+  RelationshipEditRequest, Occurrence, Viewnode, ViewnodeKind, Vognode, Warrant};
 use crate::refresh::mode::RefreshMode;
 use crate::skgrepo_sets::SkgrepoRestriction;
 
@@ -331,40 +332,6 @@ fn refresh_ghost_in_place (
                            warrant             : ghost . warrant,
                            .. fresh }; }}}
 
-/// How an occurrence the refresh draws stands: its editability, and
-/// whether it claims membership of its viewparent's list.
-// TODO: The pair stands in for the 'ChildFlags' that the review of
-// plan 04.1 proposed, the flags every child has (its claim and its
-// warrant) beside 'FoldAndFocus', and that is not built. When it is,
-// this goes.
-pub(crate) struct EditabilityAndClaim {
-  pub editability : DrawnEditability,
-  pub claims      : bool,
-}
-
-/// An occurrence of 'pid' as the truth has it: editable (with its
-/// body), write-protected, or write-protected carrying an
-/// editable-view request, which its visit consumes.
-pub(crate) fn occurrence_from_truth (
-  pid                   : &ID,
-  editability_and_claim : EditabilityAndClaim,
-  walk                  : &Walk,
-) -> Result<Occurrence, Box<dyn Error>> {
-  let node : &GraphnodeInRust = walk . truth . graph . get (pid)
-    . ok_or ("occurrence_from_truth: the truth lacks the node") ?;
-  let mut occurrence : Occurrence = Occurrence {
-    claimsMembership : editability_and_claim . claims,
-    editability      : match editability_and_claim . editability {
-      DrawnEditability::Editable =>
-        Editability::Editable { body : node . body . clone (), edit_request : None },
-      DrawnEditability::WriteProtected | DrawnEditability::Requested =>
-        Editability::WriteProtected, },
-    .. default_occurrence (
-      pid . clone (), node . home_skgrepo . clone (), node . title . clone () ) };
-  if editability_and_claim . editability == DrawnEditability::Requested {
-    occurrence . view_requests . insert (ViewRequest::Editable); }
-  Ok (occurrence) }
-
 /// The ghost of 'pid', from HEAD. None outside the diff view, or if
 /// HEAD lacks the node.
 pub(crate) fn ghost_from_head (
@@ -384,17 +351,6 @@ fn goal_relRepo (
 ) -> Option<SkgrepoName> {
   goal . and_then ( |goal| goal . item_for ( &GoalMember::Gnid ( gnid . clone () )) )
     . and_then ( |item| item . relRepo . clone () ) }
-
-/// When the vognode at 'treeid' was an editable occurrence, its node
-/// has no editable occurrence now.
-fn forget_editable_occurrence (
-  vognode : &Vognode,
-  treeid  : NodeId,
-  walk    : &mut Walk,
-) {
-  if let Vognode::Occurrence (occurrence) = vognode {
-    if ! occurrence . is_writeProtected () {
-      walk . release_editability (&occurrence . gnid, treeid); }}}
 
 /// Set the vognode at 'treeid' to 'vognode', keeping its fold state,
 /// vnid and readiness request (an edit request every vognode has a

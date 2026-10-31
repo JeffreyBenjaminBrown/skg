@@ -6,7 +6,7 @@ use crate::org_to_text::viewnode_to_string;
 use crate::serve::parse_metadata_sexp::{MetadataKind, ViewnodeMetadata, parse_metadata_to_viewnodemd, viewnode_from_metadata};
 use crate::types::errors::BufferValidationError;
 use crate::types::viewnode::Viewnode;
-use crate::types::tree::forest::{ViewForest, editable_occurrences};
+use crate::types::tree::forest::{ViewForest, editable_gnids};
 
 // 'Folder::goal_is_ordered', 'Folder::is_editable' and
 // 'Folder::members_are_properties' are the per-kind rules that the
@@ -124,7 +124,7 @@ fn write_protect_drops_the_editable_request_and_keeps_membership () {
                [ ViewRequest::Flags ] . into_iter () . collect () );
   assert_eq! (t . claimsMembership, false); }
 
-// 'editable_occurrences' collects the IDs of the editable
+// 'editable_gnids' collects the IDs of the editable
 // occurrences at any depth, and no write-protected one, ghost or
 // folder.
 #[test]
@@ -146,7 +146,7 @@ fn editable_occurrences_are_those_not_write_protected () {
     ID::from ("protected"), SkgrepoName::from ("public"), "protected" . into (),
     true ));
   tree . get_mut (root) . unwrap () . append ( mk_unknown_viewnode (ID::from ("unknown")) );
-  assert_eq! ( editable_occurrences (&viewforest),
+  assert_eq! ( editable_gnids (&viewforest),
                [ "root", "in-folder", "member" ] . into_iter ()
                . map (ID::from) . collect::<HashSet<ID>> () ); }
 
