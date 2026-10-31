@@ -8,7 +8,7 @@
 //! goal also holds what HEAD alone warrants ('diff_view.rs'). Each
 //! item names a gnid or a property value. A parent whose position
 //! implies no relationship (the buffer root, a tombstone, an unknown,
-//! a Restricted vognode) has no goal.
+//! a restricted viewnode) has no goal.
 //!
 //! Under a skgrepo restriction (the API doc's "Restricted-skgrepo
 //! nodes") a goal omits each member whose record the skgrepo restriction
@@ -61,7 +61,7 @@ pub(crate) struct GoalItem {
   pub warrant : Warrant,
   /// For a gnid nothing answers to, or a restricted one: its
   /// relationship's relRepo, when that differs from the recorder's
-  /// home (the unknown's herald, the Restricted vognode's).
+  /// home (the unknown's herald, the restricted viewnode's).
   pub relRepo : Option<SkgrepoName>,
   /// In the diff view, the item's existence change in its list.
   pub rel     : Option<Existence>,

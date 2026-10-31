@@ -521,7 +521,7 @@ fn ghost_metadata_to_string (
 ///   [(skgRepos (relRepo R))] [noClaim]
 ///   [(editRequest [(relRepo R)] [READINESS])] [(diff ...)]
 /// An unknown stands where a referenced ID resolved to nothing in any
-/// db; a Restricted vognode, where a visible record names a node the
+/// db; a restricted viewnode, where a visible record names a node the
 /// skgrepo restriction keeps out.
 fn gnid_only_vognode_metadata_to_string (
   foldAndFocus    : FoldAndFocus,

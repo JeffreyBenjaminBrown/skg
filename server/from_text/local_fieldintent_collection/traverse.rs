@@ -440,7 +440,7 @@ fn partnerFolder_members (
 /// relRepo request. A gnid-only vognode is save-inert as a node, but
 /// its raw ID is load-bearing membership data at a structured
 /// relationship position: an unknown's, of a reference that resolves
-/// to nothing, and a Restricted vognode's, of the record it stands
+/// to nothing, and a restricted viewnode's, of the record it stands
 /// for. A ghost the list still names (a dangling reference to a node
 /// HEAD has) keeps its gnid there as a gnid-only vognode does, and
 /// carries no relRepo request.

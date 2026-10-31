@@ -145,7 +145,7 @@ fn each_kind_takes_only_its_own_parts (
     ( "(skg restricted (gnid r) (skgRepos (nodeRepo main)))",
       "The skgRepos of a headline of kind restricted holds only (relRepo R)" ),
     ( "(skg restricted (skgRepos (relRepo pub)))",
-      "A Restricted vognode requires its (gnid X)" ),
+      "A restricted viewnode requires its (gnid X)" ),
     ( "(skg restricted (gnid r) (editRequest delete))",
       "A headline of kind restricted accepts no edit request but (relRepo R) and a readiness request" ),
     ( "(skg alias (gnid a))",

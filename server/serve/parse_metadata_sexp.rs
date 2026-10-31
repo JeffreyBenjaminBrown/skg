@@ -26,8 +26,8 @@
 ///         [(editRequest [restoreNode] [READINESS])]
 ///   unknown (gnid ID) [(skgRepos (relRepo REPO))] [noClaim]
 ///           [(editRequest [(relRepo REPO)] [READINESS])]
-///   restricted, the Restricted vognode, with the parts an unknown
-///     takes
+///   restricted, the restricted viewnode, with the parts an
+///     unknown viewnode takes
 ///   alias [(skgRepos (relRepo REPO))] [noClaim]
 ///         [(editRequest [(relRepo REPO)] [READINESS])]
 ///   id [noClaim] [(editRequest READINESS)],
@@ -109,7 +109,8 @@ pub struct ViewnodeMetadata {
 pub enum MetadataKind {
   Occurrence     (OccurrenceMetadata),
   Ghost          (GhostMetadata),
-  GnidOnly       (GnidOnlyMetadata), // an unknown or a Restricted vognode
+  GnidOnly       (GnidOnlyMetadata), // an unknown viewnode or
+                                     // a restricted viewnode
   Alias          (AliasMetadata),
   ID             { claimsMembership : bool },
   Flag           (Flag),
@@ -818,7 +819,7 @@ fn kind_with_its_parts (
         relRepo_request_alone (atom, written . edit_request) ?;
       let gnid : ID = written . gnid . ok_or_else ( || match kind {
         GnidOnlyKind::Unknown    => "An unknown requires its (gnid X)",
-        GnidOnlyKind::Restricted => "A Restricted vognode requires its (gnid X)", }
+        GnidOnlyKind::Restricted => "A restricted viewnode requires its (gnid X)", }
         . to_string () ) ?;
       Ok ( MetadataKind::GnidOnly ( GnidOnlyMetadata {
         kind, gnid, relRepo, relRepo_request, claimsMembership } )) },

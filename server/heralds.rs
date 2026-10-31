@@ -28,7 +28,7 @@
 /// directive stays because '(view ...)' and '(diff ...)' are the only
 /// nested forms and a '(diff ...)' reads differently by kind: a node's
 /// and a ghost's has two diff objects (∃+, ~+), an unknown's and a
-/// Restricted vognode's one relationship (~+), a property's or a
+/// restricted viewnode's one relationship (~+), a property's or a
 /// change viewnode's one object
 /// (+). A WHEN emits nothing of its own, so it takes no style. The
 /// conformance tests check that a WHEN names only kind atoms and
@@ -300,7 +300,7 @@ fn readiness_request_rules (
       readiness_request_rule ("unreadyRequest", "unready", "request:unready") ]) ] }
 
 /// The same for a leaf with a single diff object (a property member, an
-/// unknown, a Restricted vognode), whose '(ready)' names no object, or
+/// unknown viewnode, a restricted viewnode), whose '(ready)' names no object, or
 /// 'all' on a changeset marker. 'added' and 'removed' render its
 /// existence, whichever object it names.
 fn change_fact_rules_for_one_object (
@@ -595,7 +595,7 @@ pub fn herald_rule_table () -> HeraldRule {
   }}
 
 /// The rules of a vognode that shows only a gnid, an unknown or a
-/// Restricted vognode, whose kind atom is KIND: HERALD for the kind,
+/// restricted viewnode, whose kind atom is KIND: HERALD for the kind,
 /// the relRepo of its record, a pending detachment, a relRepo
 /// request, and, in the diff view, the change facts of its one
 /// object, its relationship to its viewparent.
@@ -620,7 +620,7 @@ fn gnid_only_vognode_rule (
 /// The kinds whose '(diff ...)' renders a single diff object: the
 /// property members and the diff view's change viewnodes but the body
 /// diff, which carries none. A node's, a ghost's, an unknown's and a
-/// Restricted vognode's have rules of their own; a folder carries
+/// restricted viewnode's have rules of their own; a folder carries
 /// none.
 fn kinds_whose_diff_has_one_object (
 ) -> Vec<&'static str> {
@@ -984,8 +984,8 @@ fn viewstats_atoms () -> Vec<&'static str> {
          "ghostWarrant" ] }
 
 /// The claim atom the serializer can emit: 'noClaim' on an occurrence,
-/// an alias, an id, an unknown or a Restricted vognode that does not
-/// claim membership (one that claims carries nothing).
+/// an alias, an id, an unknown viewnode or a restricted viewnode that
+/// does not claim membership (one that claims carries nothing).
 fn claim_emitted_atoms () -> Vec<&'static str> {
   vec! [ "noClaim" ] }
 

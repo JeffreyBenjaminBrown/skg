@@ -226,8 +226,8 @@ fn relationship_aspect_name (
 
 /// The leaves that a request naming the diff objects 'objects' at
 /// 'node' names. No objects on a vognode means both of its objects
-/// (only 'rel' on an unknown or a Restricted vognode); a property
-/// member has one object.
+/// (only 'rel' on an unknown viewnode or a restricted viewnode); a
+/// property member has one object.
 /// None for a viewnode that names no leaf, among them a node of the
 /// containerward chain, which shows no change.
 fn leaves_named_at (

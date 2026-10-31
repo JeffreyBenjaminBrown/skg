@@ -221,7 +221,7 @@ pub(crate) fn acquisition_goal (
 /// skgrepo restriction keeps out (the worktree's record, or HEAD's
 /// when the worktree has none) is left out; one whose node it keeps
 /// out (the worktree's node, or HEAD's when the worktree has none)
-/// stays, and the ID rule makes it a Restricted vognode.
+/// stays, and the ID rule makes it a restricted viewnode.
 fn partner_items<'a> (
   partners : impl Iterator<Item = &'a Partner>,
   walk     : &Walk,

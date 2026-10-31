@@ -166,7 +166,7 @@ impl ViewnodeKind {
 /// gated graph has; a ghost, only in the diff view, for a node HEAD
 /// has and the worktree lacks; a gnid-only vognode, which shows
 /// nothing of a node: an unknown, for a gnid its parent's list names
-/// and no node answers to, or a Restricted vognode, for a node the
+/// and no node answers to, or a restricted viewnode, for a node the
 /// skgrepo restriction keeps out that a visible record names, or that
 /// a view is rooted at. Where no record the skgrepo restriction shows names a
 /// restricted node, below a view's roots, it has no vognode, not even
@@ -219,9 +219,9 @@ pub enum GnidOnlyKind {
   /// view at its root. That emptiness is the information: a
   /// reference exists, but we have no record of its target.
   Unknown,
-  /// A Restricted vognode: the node is one the skgrepo restriction
+  /// A restricted viewnode: the node is one the skgrepo restriction
   /// keeps out, and a record the skgrepo restriction shows names it
-  /// ('docs/glossary.org', "Restricted vognode"). It shows nothing of
+  /// ('docs/glossary.org', "restricted viewnode"). It shows nothing of
   /// the node, neither its title, its body, its home skgrepo nor its
   /// stats. A view whose root the skgrepo restriction keeps out shows
   /// its root so too. The diff view, which opens under no
@@ -243,7 +243,7 @@ impl GnidOnlyKind {
 /// A gnid-only vognode: one that stands for a gnid and shows nothing
 /// of a node, for one of two reasons ('kind'): no node answers to the
 /// gnid (an unknown), or the node is one the skgrepo restriction keeps
-/// out (a Restricted vognode). The kind is not called "unshowable",
+/// out (a restricted viewnode). The kind is not called "unshowable",
 /// since "unsayable" already names a descriptor standing where its
 /// kind may not ('is_unsayable').
 ///
