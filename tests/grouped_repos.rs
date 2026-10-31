@@ -57,3 +57,6 @@ mod fork_merge_delete_under_a_narrowing;
 
 #[path = "restricted_graphnode_in_the_buffer.rs"]
 mod restricted_graphnode_in_the_buffer;
+
+#[path = "requests_refused_under_a_narrowing.rs"]
+mod requests_refused_under_a_narrowing;

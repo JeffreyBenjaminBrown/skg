@@ -76,7 +76,11 @@ you own. =C=:
 
 - copies =N='s title, body, and *child list* — the child IDs only, a
   /shallow/ copy, not =N='s whole subtree (this is what makes forking
-  cheap);
+  cheap). Each child keeps its privacy: one =N= records in a more
+  private skgrepo than =C='s is recorded in =C='s section of that
+  skgrepo. Under a skgrepo restriction =C= copies only the children
+  you can see; the rest stay =N='s, and surface under =C= as
+  unintegrated content after a skgrepo widening;
 - *subscribes to* =N=, so =N='s later additions surface to you as
   unintegrated content (below);
 - *overrides* =N=, so /override substitution/ shows =C= wherever =N=

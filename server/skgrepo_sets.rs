@@ -16,6 +16,15 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::pin::Pin;
 
+/// The skgrepo restriction: the skgrepos a connection currently shows
+/// ('docs/glossary.org', "skgrepo, home skgrepo, skgrepo-set,
+/// gitrepo"). It limits what can be edited as well as what can be
+/// seen: no save, nodeMerge, fork, deletion, commit or other write may
+/// remove, move, rewrite or create a record, a section or a node file
+/// it keeps out, nor act on the buffer's silence about such a record.
+/// Every write asks 'record_is_visible' or 'node_is_restricted' first,
+/// refuses what would land out of sight, or refuses unless the
+/// connection is unrestricted ('require_skgrepo_set_all').
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SkgrepoRestriction {
   pub name    : SkgrepoSetName,

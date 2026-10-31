@@ -17,7 +17,7 @@ use crate::save::{
   restricted_records_naming_deleted_graphnodes,
 };
 use crate::serve::ViewsState;
-use crate::skgrepo_sets::SkgrepoRestriction;
+use crate::skgrepo_sets::{SkgrepoRestriction, require_skgrepo_set_all};
 use crate::serve::protocol::TcpToClient;
 use crate::serve::handlers::telescope_hoist::{
   HoistCandidate,
@@ -27,7 +27,8 @@ use crate::serve::handlers::telescope_hoist::{
   needs_confirmation as hoist_needs_confirmation,
   repair_saves_for_unwritten_candidates,
 };
-use crate::diff_view::readiness_requests::consume_readiness_requests;
+use crate::diff_view::readiness_requests::{
+  consume_readiness_requests, viewforest_has_readiness_requests};
 use crate::diff_view::restore_requests::{
   add_restore_instructions, viewforest_has_restore_requests};
 use crate::graph_straddle::build::current_graph_straddle_in_slot;
@@ -840,6 +841,20 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
     fork_specs,
     post_skgsave_commit_notice_candidates }
     = save_plan;
+  { // Restore and readiness requests write or approve what a skgrepo
+    // restriction may hide: refused unless the connection is
+    // unrestricted.
+    let unrestricted = |what : &str| -> Result<(), Box<dyn Error>> {
+      match skgrepo_restriction {
+        None => Ok (( )),
+        Some (restriction) => require_skgrepo_set_all (what, restriction)
+          . map_err ( |e| Box::new ( SaveError::BufferValidationErrors {
+              errors : vec! [ crate::types::errors::BufferValidationError::Other (e) ],
+              warnings : parse_warnings . clone (), } ) as Box<dyn Error> ), } };
+    if viewforest_has_restore_requests (&viewforest) {
+      unrestricted ("A restore request") ?; }
+    if viewforest_has_readiness_requests (&viewforest) {
+      unrestricted ("A readiness request") ?; }}
   let restore_warnings : Vec<String> =
     // The restore requests become more graph edits, written from the
     // before-graph of the graph straddle; built only when needed.

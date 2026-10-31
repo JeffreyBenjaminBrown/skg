@@ -1,6 +1,7 @@
 use crate::import_md_and_org::batch::{
   ImportPreparation, PreparedImportBatch, prepare_import_batch};
 use crate::serve::protocol::TcpToClient;
+use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::serve::util::{
   send_response_with_length_prefix, sexp_to_client_string,
   tag_sexp_response, value_from_request_sexp};
@@ -23,6 +24,7 @@ pub fn handle_import_md_and_org_request (
   request : &str,
   env : &SkgEnv,
   pending : &mut Option<PendingImport>,
+  skgrepo_restriction : &SkgrepoRestriction, // the import refuses a destination it keeps out
 ) {
   let action : String = value_from_request_sexp ("action", request)
     .unwrap_or_else (|_| "preview" . to_string ());
@@ -39,6 +41,9 @@ pub fn handle_import_md_and_org_request (
         != Some (token . as_str ()) {
         return refuse (stream, "Unknown or stale import approval; preview again."); }
       let approval : PendingImport = pending . take () . unwrap ();
+      if let Err (error) = refuse_a_restricted_destination (
+        &approval . batch . destination_skgrepo, skgrepo_restriction )
+      { return refuse (stream, &error); }
       let warnings : Vec<String> = diagnostic_warnings (&approval . batch);
       let gate = env . mutation_gate ();
       let _guard = block_on (gate . lock ());
@@ -59,6 +64,9 @@ pub fn handle_import_md_and_org_request (
       let skgrepo : String = match value_from_request_sexp ("destination-repo", request) {
         Ok (skgrepo) => skgrepo,
         Err (error) => return refuse (stream, &error), };
+      if let Err (error) = refuse_a_restricted_destination (
+        &SkgrepoName::from (skgrepo . as_str ()), skgrepo_restriction )
+      { return refuse (stream, &error); }
       let host_answer : Option<String> =
         value_from_request_sexp ("host-root", request) . ok ();
       let host_root : Option<PathBuf> = host_answer . as_deref ()
@@ -87,6 +95,19 @@ pub fn handle_import_md_and_org_request (
     _ => refuse (stream, "Unknown import action"),
   }
 }
+
+/// The import writes its nodes into its destination skgrepo: refused
+/// when the skgrepo restriction keeps that skgrepo out, since what the
+/// user cannot see the user does not write.
+fn refuse_a_restricted_destination (
+  destination         : &SkgrepoName,
+  skgrepo_restriction : &SkgrepoRestriction,
+) -> Result<(), String> {
+  if SkgrepoRestriction::node_is_restricted (skgrepo_restriction, destination) {
+    return Err ( format! (
+      "Cannot import into the repo '{}': it is restricted under the current repo-set. Activate it first; nothing invisible is written silently.",
+      destination )); }
+  Ok (( )) }
 
 fn diagnostic_warnings (
   batch : &PreparedImportBatch,
@@ -147,7 +168,7 @@ mod tests {
   use crate::dbs::init::empty_in_ram_tantivy_index;
   use crate::dbs::in_rust_graph::InRustGraph;
   use crate::dbs::tantivy::background_writer::wait_for_tantivy_writes_idle;
-  use crate::types::misc::{SkgConfig, Skgrepo};
+  use crate::types::misc::{SkgConfig, Skgrepo, SkgrepoSetName};
   use std::collections::HashMap;
   use std::fs;
   use std::io::{BufRead, BufReader, Read};
@@ -191,6 +212,8 @@ mod tests {
         name : skgrepo_name . clone (), abbreviation : None,
         path : skgrepo . clone (), owned : true, }),
     ]));
+    let unrestricted : SkgrepoRestriction = SkgrepoRestriction::named (
+      &config, SkgrepoSetName::from ("all")) . unwrap ();
     let env : SkgEnv = SkgEnv::new (config, Arc::new (InRustGraph::new ()),
       empty_in_ram_tantivy_index () . unwrap ());
     let listener : TcpListener = TcpListener::bind ("127.0.0.1:0") . unwrap ();
@@ -203,11 +226,11 @@ mod tests {
       input . display ());
     let mut pending : Option<PendingImport> = None;
     handle_import_md_and_org_request (
-      &mut server_stream, &preview_request, &env, &mut pending);
+      &mut server_stream, &preview_request, &env, &mut pending, &unrestricted);
     let first : String = response (&mut client);
     let first_token : String = field (&first, "approval-token");
     handle_import_md_and_org_request (
-      &mut server_stream, &preview_request, &env, &mut pending);
+      &mut server_stream, &preview_request, &env, &mut pending, &unrestricted);
     let second : String = response (&mut client);
     let second_token : String = field (&second, "approval-token");
     assert_ne! (first_token, second_token);
@@ -215,24 +238,61 @@ mod tests {
       "((request . \"import md and org\") (action . \"apply\") (approval-token . \"{}\"))",
       first_token);
     handle_import_md_and_org_request (
-      &mut server_stream, &stale, &env, &mut pending);
+      &mut server_stream, &stale, &env, &mut pending, &unrestricted);
     assert! (response (&mut client) . contains ("stale"));
     let valid : String = format! (
       "((request . \"import md and org\") (action . \"apply\") (approval-token . \"{}\"))",
       second_token);
     let mut other_session : Option<PendingImport> = None;
     handle_import_md_and_org_request (
-      &mut server_stream, &valid, &env, &mut other_session);
+      &mut server_stream, &valid, &env, &mut other_session, &unrestricted);
     assert! (response (&mut client) . contains ("stale"));
     assert! (pending . is_some ());
     handle_import_md_and_org_request (
-      &mut server_stream, &valid, &env, &mut pending);
+      &mut server_stream, &valid, &env, &mut pending, &unrestricted);
     let success : String = response (&mut client);
     assert! (success . contains ("record-id"));
     assert! (pending . is_none ());
     handle_import_md_and_org_request (
-      &mut server_stream, &valid, &env, &mut pending);
+      &mut server_stream, &valid, &env, &mut pending, &unrestricted);
     assert! (response (&mut client) . contains ("stale"));
     wait_for_tantivy_writes_idle ();
+  }
+
+  #[test]
+  fn a_destination_the_skgrepo_restriction_keeps_out_is_refused () {
+    let temp : tempfile::TempDir = tempfile::tempdir () . unwrap ();
+    let input : PathBuf = temp . path () . join ("input");
+    fs::create_dir (&input) . unwrap ();
+    fs::write (input . join ("note.md"), "# Note\nBody\n") . unwrap ();
+    let mut skgrepos : HashMap<SkgrepoName, Skgrepo> = HashMap::new ();
+    for name in ["public", "private"] {
+      let path : PathBuf = temp . path () . join (name);
+      fs::create_dir (&path) . unwrap ();
+      skgrepos . insert (SkgrepoName::from (name), Skgrepo {
+        name : SkgrepoName::from (name), abbreviation : None, path, owned : true, }); }
+    let mut config : SkgConfig = SkgConfig::dummyFromSkgrepos (skgrepos);
+    config . skgrepo_order = vec! [ SkgrepoName::from ("public"), SkgrepoName::from ("private") ];
+    let public : SkgrepoRestriction = SkgrepoRestriction::named (
+      &config, SkgrepoSetName::from ("public")) . unwrap ();
+    let env : SkgEnv = SkgEnv::new (config, Arc::new (InRustGraph::new ()),
+      empty_in_ram_tantivy_index () . unwrap ());
+    let listener : TcpListener = TcpListener::bind ("127.0.0.1:0") . unwrap ();
+    let client_stream : TcpStream =
+      TcpStream::connect (listener . local_addr () . unwrap ()) . unwrap ();
+    let (mut server_stream, _) = listener . accept () . unwrap ();
+    let mut client : BufReader<TcpStream> = BufReader::new (client_stream);
+    let mut pending : Option<PendingImport> = None;
+    handle_import_md_and_org_request (
+      &mut server_stream,
+      &format! (
+        "((request . \"import md and org\") (action . \"preview\") (input-directory . \"{}\") (destination-repo . \"private\"))",
+        input . display ()),
+      &env, &mut pending, &public);
+    let refusal : String = response (&mut client);
+    assert! ( refusal . contains ("Cannot import into the repo 'private'"), "{}", refusal );
+    assert! ( pending . is_none (), "nothing was prepared" );
+    assert! ( fs::read_dir (temp . path () . join ("private")) . unwrap () . next () . is_none (),
+              "nothing was written" );
   }
 }

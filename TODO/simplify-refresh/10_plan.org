@@ -616,7 +616,7 @@ restricted records", "A save under a skgrepo narrowing deletes
 a restricted hide" and "The subscribee loop writes a public
 hide of a private member" to 'TODO/DONE/'.
 
-** TODO Slice 2: every write obeys the skgrepo restriction
+** DONE Slice 2: every write obeys the skgrepo restriction
 Read "Every write obeys the skgrepo restriction" in the agreed
 behavior, Decide 14 of the review, the report
 'restriction-edits.org' in full, and the three 'lead5_' tests

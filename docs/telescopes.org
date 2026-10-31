@@ -86,8 +86,11 @@ as that recorder home. Every relRepo is clamped to be no more
 public than the recorder's home (a section more public than the home
 would imply a title-less public face). Hides floor higher:
 a hide reveals that you hide something, so it must be at least as
-private as both endpoints and the most public subscription that
-explains it.
+private as both endpoints and the most public explanation of it. An
+explanation is a subscription whose subscribee contains the hidden
+node, and stands at the more private of the subscription's relRepo
+and the relRepo of that contains relationship, so a public hide never
+names a private membership.
 
 ** Setting a relationship's skgrepo
 

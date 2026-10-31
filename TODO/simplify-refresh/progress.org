@@ -5599,3 +5599,159 @@ Corrections carried: to slice 2, the two ungated reads left in
 integration 35 of 36 with either client, the pre-existing
 failure; the client suites were not run, as no client was
 touched.
+
+** Slice 2
+*** The commits
+**** 753f7c58
+A delete's propagation stops for the delete-from confirmation
+where restricted records name a deleted graphnode; both clients
+ask and re-issue the save; the shared test helpers move to
+'tests/shared/git_fixture.rs'.
+**** 386bbcd0
+The save reads, floors and refuses by the skgrepo restriction:
+findings 2, 3, 4, 6 and 7, and the stage carried from slice 1.
+**** The last commit
+The refusals of the delete-references cleanup, of a save's
+restore and readiness requests, and of an import into a
+restricted destination (findings 8 to 10); the docs; the
+principle on 'SkgrepoRestriction'; the moves of the problems
+entries; this record and the plan's keyword.
+*** The suites
+**** cargo check --all-targets
+Clean, no warning.
+**** bash/nextest.sh
+1058 of 1058: slice 1's 1038 and twenty new tests (four in
+'tests/hide_inference_under_a_narrowing.rs', seven in
+'tests/fork_merge_delete_under_a_narrowing.rs', five in
+'tests/restricted_graphnode_in_the_buffer.rs', three in
+'tests/requests_refused_under_a_narrowing.rs', one beside the
+import's handler). Run again after the session break, on the
+same tree.
+**** bash/emacs-tests.sh
+413 of 413: 407 and six new, in
+'tests/elisp/test-skg-delete-from-confirmation.el'.
+**** bash/nvim-tests.sh
+451 per-test passes, none failed: 446 and five new in
+'tests/nvim/save_spec.lua'.
+**** bash/integration-tests.sh
+35 of 36 with Emacs and 35 of 36 with Neovim
+('SKG_TEST_CLIENT=nvim'); the failure is 'import-md-and-org'
+both times, pre-existing and not this plan's (its preview
+refuses a heading inside a block, as before).
+**** Failures met during the slice
+***** two tests of 'tests/hidden_nodes.rs'
+Expected fixture adaptation. Each saved a record into a
+restricted section: a relRepo request on a restricted viewnode
+to "private", and the deletion of a restricted viewnode from a
+subscriber's content, whose inferred hide floors at "private",
+the more private of the two homes. Both now assert the refusal
+and that no file changed.
+***** four Emacs tests of the confirmations
+Expected fixture adaptation: they compare the exact arguments of
+the re-issued save, which gained a trailing delete-from.
+***** one new Neovim test
+Mine: it looked for "delete-from" in a request whose view ID
+contains the words. It looks for the field now.
+***** the build cache after the session break
+'cargo check' replayed warnings of corrupted incremental
+artifacts; 'cargo clean -p skg' cleared them. Environment, not
+code.
+**** The TCP surface
+The verify skill's isolated servers (ports 1791 and 1792, scratch
+data under 'tests/results/10/slice2/probe/', each stopped by its
+recorded PID) ran under the skgrepo restriction "public": x and y
+public, v containing both publicly, w (public) containing both by
+private records, w2 (home private) containing both. From each
+client, headless ('probe-emacs.el', 'probe-nvim.lua'): deleting
+x and answering c wrote nothing; deleting x and answering v
+removed x and v's record of it and left both private files as
+they were; deleting y and answering a removed every record of y.
+The prompt each time named two records.
+*** The search repeated
+**** the three tests
+Rerun as suite tests: every case leaves the files as they were,
+or refuses, or (with no skgrepo restriction, or on the user's
+choice of all owned records) writes as agreed.
+**** steps 1, 3 and 4
+Redone by a reading subagent over the save pipeline, the writes
+after the save plan, and every relRepo decision.
+***** cleared
+The hide inference and the subscribee steps, the disk
+supplementation, the suppression, the fork, the nodeMerge, the
+delete propagation (its count covers the user's own saves), the
+Hoist repairs (they serve only nodeMerge acquirees), and the
+refused requests.
+***** found and fixed in the slice
+A headline pasted for a member whose record is restricted, with
+an explicit relRepo request for a visible skgrepo, moved the
+record out of the restricted section. Confirmed by a test, then
+refused ('RecordMovedOutOfRestrictedSkgrepo'), and documented.
+***** found and filed in 'TODO/problems.org'
+Under "Problems noticed while executing plan 10, slice 2": a
+strandeds reset computes a hide's new default with restricted
+subscriptions, after the landing check, so it can raise a hide
+into a restricted section or list and move a restricted one
+(three owned skgrepos needed; traced, not run); a pasted headline
+for a member with a restricted record, without a relRepo request,
+may reorder the restricted section; an explicit fork of a private
+node records the clone's subscription and override of it, and
+copies its title and body, at the clone's home (any
+skgrepo-set; perhaps intended). None is among the plan's
+findings.
+***** read leak, not a write
+The warning of a hide that moved into a subscribee's folder
+names the subscribees, restricted ones included.
+*** Deviations from the plan's "how"
+**** the confirmation's wire
+The response type is 'delete-from-confirmation', with
+'(count N)' and a prompt that says how many records and that
+nothing was saved; the clients append "Delete from: (c)ancel,
+(v)isible records only, (a)ll owned records" (Emacs by
+'read-char-choice', Neovim by 'confirm' buttons). It precedes
+every other confirmation, since the propagation is derived before
+the strandeds. The choice rides the retries of the other
+confirmations and the approving fork re-save, never a later save.
+**** the fork floors only by owned relRepos
+A record in a foreign section says nothing of an owned
+section's privacy, so it lands at the clone's home. The clone's
+hides are floored as its contents are.
+**** a record moved out of a restricted section
+Refused too, beyond the plan's list; found by the search.
+**** the refusals' forms
+Finding 7's refusal is a validation error of its own
+('RecordSkgrepoRestricted'), naming recorder, relation, member
+and skgrepo, closing with the fork's "Activate it first". The
+nodeMerge's refusal takes the delete's path and words ("Cannot
+merge 'B' into 'A': 'X' has telescope sections in restricted
+repos. ..."), so the client shows it, as the delete's, under
+"Database error found". The restore and readiness refusals refuse
+the whole save before anything is written, in
+'require_skgrepo_set_all''s words ("A readiness request requires
+no skgrepo restriction ..."); the delete-references one says
+"Deleting the references to an absent ID requires ...".
+**** finding 4's warning
+The existing warning is true now and stays as it was.
+**** where the tests went
+Four new modules of the 'grouped_repos' binary, one per group,
+rather than 'tests/grouped_repos.rs' or 'tests/hidden_nodes.rs';
+the import's refusal is tested beside its handler. The helpers
+'under_public', 'save_under' and 'list_in' moved to
+'tests/shared/git_fixture.rs', and slice 1's module uses them.
+**** docs beyond the plan's list
+'docs/forks.org' (the clone copies only visible children, at
+their privacy) and 'docs/telescopes.org' (the hide floor). The
+old doc of 'hide_skgrepo' promised a fallback to the most private
+subscription that the code never had; it says what the code does.
+*** Fixtures changed
+The two tests of 'tests/hidden_nodes.rs' above, renamed for what
+they assert; and the expected argument lists of four Emacs tests.
+*** Left unfinished
+Nothing of the slice. One consequence for Jeff: under a skgrepo
+narrowing, deleting a restricted viewnode from a subscriber's
+content is refused when a subscribee contains it, since the hide
+it infers would land in the restricted home's skgrepo. The entry
+"Subscribee-as-such hides may misfire under a restricted
+skgrepo-set" (plan 08, slice 7) still stands in
+'TODO/problems.org', though slice 1 fixed it.
+*** Headline
+DONE.

@@ -176,6 +176,11 @@ So far there are these endpoints:
       =strandeds-confirmation=: the first says the user reviewed the
       stranded relationships, the second names those to reset to default
       (possibly none).
+    - =(delete-from . "visible")= or =(delete-from . "all")= is
+      present only on a retry after =delete-from-confirmation=: the
+      user chose to strip the deleted IDs from the visible records
+      only, or from every owned record. It rides that save and its
+      retries, and is never cached.
     - =(approved-hoist-pids "PID" ...)= is present only on a retry
       after =telescope-hoist-confirmation=. It is the exact list the
       user approved for text publication; it is not a boolean and
@@ -245,9 +250,12 @@ So far there are these endpoints:
     consumed by a save of any buffer, not only one of the diff view's,
     after its graph edits succeed: each sets or clears the marks of the
     change-forest leaves its headline names, at their current
-    fingerprints. A save that stops for a confirmation (strandeds,
-    Hoist, forks) or fails consumes none, and leaves them in the
-    buffer. A request that names no current change is dropped, with
+    fingerprints. A save that stops for a confirmation (delete-from,
+    strandeds, Hoist, forks) or fails consumes none, and leaves them in
+    the buffer. Under a skgrepo restriction a save carrying a readiness
+    request, or a restore request, is refused before anything is
+    written: =A readiness request requires no skgrepo restriction= (or
+    =A restore request ...=), in the words of the diff view's refusal. A request that names no current change is dropped, with
     the warning =A readiness request names no current change; it was
     dropped.=, which names its headline as a subheadline.
   - A write-protected occurrence saves nothing of its own, so a save is
@@ -273,6 +281,21 @@ So far there are these endpoints:
     =save-result= with nil content and actionable errors naming view IDs and
     IDs, and performs no filesystem, graph, search index, registry, or collateral
     update. There is no save-anyway path.
+  - Deleting under a skgrepo restriction: a delete's propagation strips
+    the deleted IDs from every owned recorder ('apply_delete_propagation
+    _cleanup' in 'server/save.rs'). When records in sections the skgrepo
+    restriction keeps out name a deleted graphnode and the request
+    lacks =(delete-from ...)=, nothing is skgsave-committed and the
+    server replies, before any other decision and in place of
+    save-result, =((response-type delete-from-confirmation) (count N)
+    (prompt "..."))=, N the number of such records, with no IDs. The
+    clients ask "Delete from: (c)ancel, (v)isible records only, (a)ll
+    owned records" and re-issue the same save with
+    =(delete-from . "visible")= or =(delete-from . "all")=; cancel
+    saves nothing. Under "visible" the restricted records stay as they
+    are, and the dangling ID shows as an unknown viewnode where its
+    recorder is shown; under "all" every owned record of the deleted
+    IDs goes, as with no skgrepo restriction.
   - Moving a node between skgrepos: for each home skgrepo move the server
     finds every relationship touching the moved node, in either
     direction and whether or not a view shows it, that sat at its
@@ -282,8 +305,8 @@ So far there are these endpoints:
     privatizing move) is raised to the new default, and the save's
     warnings say so. If any other remains and the request lacks
     =(strandeds-reviewed . "true")=, nothing is skgsave-committed and the
-    server replies, before any other decision and in place of
-    save-result,
+    server replies, before any other decision but the delete-from
+    confirmation and in place of save-result,
     =((response-type strandeds-confirmation) (strandeds (((relation
     "contains") (recorder "R") (member "M") (relRepo "REPO") (default
     "REPO")) ...)) (prompt "..."))=, with IDs but no titles. The
@@ -335,7 +358,8 @@ So far there are these endpoints:
     approved retry, the ordinary save-result carries the shared overPrivateText-
     telescope warning. Declining leaves current client buffers and the
     server's open-view registry unchanged.
-  - Exactly one of =save-result=, =strandeds-confirmation=,
+  - Exactly one of =save-result=, =delete-from-confirmation=,
+    =strandeds-confirmation=,
     =telescope-hoist-confirmation=, =fork-confirmation=, and the save-rerender
     =overPrivateText-telescope-confirmation= is sent as the terminal response to
     one save attempt.
@@ -646,6 +670,11 @@ TCP connection:
 - Initial preview request: =((request . "import md and org")
   (action . "preview") (input-directory . "/absolute/server/path")
   (destination-repo . "OWNED-REPO"))=.
+- A destination the connection's skgrepo restriction keeps out is
+  refused, at the preview and again at the apply, with
+  =response-type= =import-md-and-org-result= and the error "Cannot
+  import into the repo 'REPO': it is restricted under the current
+  repo-set. ...". Nothing is written.
 - If absolute filesystem links to =.md= or =.org= files are found, the
   server responds with
   =response-type= =import-md-and-org-host-mapping-needed= and a =content=
@@ -740,6 +769,10 @@ one automatically.
 
   - Initial request: =((request . "delete references to absent node")
     (id . "RAW-ID"))=. =RAW-ID= must still be absent.
+  - Refused unless the connection is unrestricted, since the cleanup
+    scans and rewrites every owned recorder: the error response
+    "Deleting the references to an absent ID requires no skgrepo
+    restriction ...", followed by an empty rerender stream.
   - If owned title/body links point at the ID, response type
     =delete-references-confirmation= carries =(id ...)=, an opaque
     =(approved-preview ...)=, =(content "ORG WARNING")=, and a prompt,
@@ -1866,6 +1899,50 @@ content is never extended.
 Edits to restricted nodes themselves are /suppressed/ at save, not
 fatal: any nodeInstruction that would write a restricted skgrepo is
 dropped and the save succeeds with the warning "Restricted nodes
-present in saved buffer remain unchanged in graph." An untouched
-stale node saves silently (its identical-to-disk nodeInstruction is
-discarded as a no-op first).
+present in saved buffer remain unchanged in graph." A node is
+restricted by its home as the graph has it, as well as by the home
+the buffer gives it: a headline for a restricted graphnode, pasted
+with a visible nodeRepo, leaves the graphnode where it is, its title
+and body as they were. An untouched stale node saves silently (its
+identical-to-disk nodeInstruction is discarded as a no-op first). A
+nodeMerge of a restricted node is suppressed the same way.
+
+The writes that are not edits of a restricted node obey the
+principle as follows.
+  - A record that would land in a restricted section is refused, with
+    nothing written, naming the recorder, the relation, the member and
+    the skgrepo ("Cannot save a record into a restricted repo ...
+    Activate it first; an invisible record is never created
+    silently."): a member typed or pasted whose default floor, the
+    more private of the two homes, is restricted; a hide inferred from
+    a removal, or typed into the folder of what a subscriber hides
+    outside its subscribees, that its explanation floors in a
+    restricted section; an explicit relRepo request to a restricted
+    skgrepo. A record the graph already holds there is not refused.
+    Nor may a record leave such a section: a headline pasted for a
+    member whose record is restricted, carrying an explicit relRepo
+    request, is refused ("Cannot move a record out of a restricted
+    repo ...").
+  - A new hide's relRepo is at least as private as each record that
+    explains it: the hider's subscription and the subscribee's
+    contains record, the more private of the two, the most public such
+    explanation winning; and at least the more private of the two
+    homes. Removals infer hides only from what the set shows: the
+    subscriber's visible subscriptions, their contents by visible
+    records, and its visible hides, so that re-adding a member drops
+    no restricted hide of it.
+  - A fork copies into its clone only the records the set shows, each
+    at the more private of its relRepo, when owned, and the clone's
+    home. The rest stays the original's; the clone subscribes to it,
+    so after a skgrepo widening the rest shows under the clone as
+    unintegrated content.
+  - Deleting a node whose telescope has a restricted section is
+    refused ("Cannot delete 'ID': it has telescope sections in
+    restricted repos. ..."), and so is a nodeMerge either of whose
+    nodes has one ("Cannot merge 'B' into 'A': ..."). A delete whose
+    propagation reaches restricted records of other nodes stops for
+    the delete-from confirmation ("Save buffer").
+  - The cleanup of the references to an absent ID, and a save's
+    restore and readiness requests, are refused unless the connection
+    is unrestricted. The import of md and org files is refused when
+    its destination skgrepo is restricted.

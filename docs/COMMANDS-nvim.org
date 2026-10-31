@@ -85,6 +85,15 @@ newer graph.
 Marks the node at point for deletion from the graph.
 Upon saving the view, it will vanish not just from this view,
 but from the graph itself.
+Under a skgrepo restriction, when relationships recorded in skgrepos
+the restriction keeps out name the deleted node (another node's
+private section contains it, say), the save writes nothing and asks
+"Delete from: (c)ancel, (v)isible records only, (a)ll owned records",
+saying how many such relationships there are. Visible records only
+deletes the node and the relationships you can see, and leaves the
+others as they are, so the node's ID dangles there; all owned records
+removes them too, as a save with no skgrepo restriction does. Cancel
+saves nothing. The choice applies to that save alone.
 *** <localleader>dR : :SkgDeleteRecursive
 Same as Delete, but also marks every occurrence viewdescendant
 of the node at point. Descendent headlines that are not occurrences
@@ -102,6 +111,10 @@ unchanged, and require confirmation before the structural cleanup.  If the
 scan changes before confirmation, the command refuses the stale approval;
 run it again to rescan.  The warning ends by naming the Emacs command
 skg-investigate-unknown-node, whose twin here is <localleader>tr.
+Under a skgrepo restriction it refuses ("Deleting the references to an
+absent ID requires no skgrepo restriction"), since it rewrites every
+owned recorder, those the restriction keeps out included.
+
 ** <localleader>f : text search
 The 'f' is for 'find'.
 *** <localleader>ff : :SkgSearch
@@ -880,7 +893,17 @@ the relationship, as deleting a reference to an unknown node does;
 skgrepo outside the set shows nothing at all, and a save keeps it. The skgrepo
 restriction limits what you can edit as it limits what you can see:
 a save never removes, moves or rewrites a relationship the set keeps
-out, however the buffer looks. A
+out, however the buffer looks, and never creates one silently. A save
+that would record a relationship in a skgrepo the set keeps out (a
+restricted viewnode pasted as content, a hide only a relationship
+outside the set explains, '<localleader>sr' toward such a skgrepo) is refused, naming the
+skgrepo. A fork copies into its clone only the relationships the set
+shows; a node merge, like a delete, is refused when either node has a
+section outside the set; a delete whose cleanup would strip
+relationships outside the set asks first (see the delete). Restoring
+from HEAD, readiness requests and the cleanup of an absent ID's
+references are refused unless the set is =all=, and an import into a
+skgrepo outside the set is refused. A
 skgrepo narrowing (a switch to a smaller set) turns an open view's
 headline of such a node into a restricted headline in place, its
 children kept, and a skgrepo widening (a switch to a larger set)
@@ -1091,7 +1114,8 @@ after the stars and before the (possibly new) keyword.
 *** :SkgImportMdAndOrg
 With the server running, choose an absolute input directory in the
 server/container filesystem and an existing owned destination skgrepo. The
-skgrepo determines the privacy of all new nodes. Skg scans exact =.md= and
+skgrepo determines the privacy of all new nodes; one the skgrepo
+restriction keeps out is refused. Skg scans exact =.md= and
 =.org= files recursively, leaves the originals untouched, and asks for a
 host-root mapping only when absolute links to =.md= or =.org= files occur.
 Blank mapping leaves unresolved links with warnings. Links to other kinds of

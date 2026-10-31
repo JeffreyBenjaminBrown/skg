@@ -6,12 +6,43 @@
   When a plan or a settled discussion decides how an entry will be
   fixed, prefix its headline with 'FIX PLANNED: ' and leave it here
   until the fix lands; then move it as above.
+* Problems noticed while executing plan 10, slice 2 (2026-10-31)
+  Found by repeating the search of
+  'TODO/simplify-refresh/09_1_review-reports/restriction-edits.org'
+  after the slice's fixes (read, not run, unless said).
+** A strandeds reset can move a hide across the skgrepo restriction
+  'stranded_relationships' ('server/from_text/strandeds.rs') runs
+  after the save's check of records landing restricted, takes no
+  skgrepo restriction, and computes a hide's new default with
+  'hide_skgrepo', which counts restricted subscriptions. With three
+  owned skgrepos and the restriction {public, semi}: r subscribes to
+  e1 (public) and e2 (private), both containing y, and hides y at
+  public; one save drops the subscription to e1 and moves y to semi.
+  The hide is raised automatically to private, and the warning names
+  'private'. Conversely a restricted hide whose new default is
+  visible is listed in the strandeds confirmation (a leak), and
+  resetting it moves the record into view. Traced, not run.
+** A pasted headline for a member with a restricted record reorders it
+  Without a relRepo request, a headline pasted under r for m, which
+  r contains by a restricted record, is woven as already placed: the
+  record stays in its restricted section, but the weave may reorder
+  that section, and the pasted line vanishes from the view with no
+  warning. With an explicit relRepo request the save is now refused
+  ('RecordMovedOutOfRestrictedSkgrepo'). Read, not run.
+** An explicit fork of a private node names it in the clone's home
+  'build_fork_clone' records the clone's 'subscribesTo' and
+  'overrides' of N at the clone's home with no floor, and copies N's
+  title and body there: forking a private owned N into a public
+  clone publishes N's ID, title and body. The user chooses the
+  clone's skgrepo in the confirmation buffer, so this may be
+  intended; it breaks the default floor rule for those two records.
+  Under any skgrepo-set. Read, not run.
 * Problems found by the review of plan 08 (2026-10-30)
   Found by the throwaway tests of 'TODO/simplify-refresh/
   09_review.org' (Open questions 1 and 2); the tests are in
   'tests/results/08/review/throwaway-tests/', each with its log
   and the line to add to run it. Both run; neither loses data.
-** Writes that touch what the skgrepo restriction hides (eleven)
+** Writes that touch what the skgrepo restriction hides (one of eleven left)
   Found by the review's search against Jeff's principle of
   2026-10-30 (the skgrepo restriction limits what can be edited
   as well as what can be seen); the report is
@@ -20,55 +51,13 @@
   disk fixtures under 'public' and 'private'. Run unless marked
   read. Each is one problem; the report has file:line and the
   fix for each.
-*** FIX PLANNED: A fork copies restricted records into the clone's home
-  Run. 'build_fork_clone' ('fork.rs':390) copies every record of
-  the template, read whole, at the clone's skgrepo with no floor;
-  under 'public' and under 'all' a private record becomes public.
-*** FIX PLANNED: A restricted graphnode with a visible nodeRepo is moved
-  Run. 'suppress_writes_to_restricted_nodes' ('validate.rs':353)
-  keys on the buffer's home, not the graph's: a root for a
-  private graphnode pasted with a public nodeRepo moves its home
-  to public, loses its private title, and warns "remain unchanged
-  in graph".
-*** FIX PLANNED: A new hide's floor ignores the record that explains it
-  Run. 'hide_skgrepo' ('supplement_from_disk.rs':536) floors a
-  new hide at the most public subscription whose subscribee
-  contains the member by any record, and the inference from
-  removals ('resolve_visibility.rs':203) reads contents ungated:
-  a public hide of a privately contained member (under 'all'
-  too); a hide written into a restricted section silently.
-*** FIX PLANNED: A delete strips restricted records naming the graphnode
-  Run. 'apply_delete_propagation_cleanup' ('save.rs':406)
-  rewrites every owned referencer, restricted sections included;
-  the refusal guards only the deleted graphnode's own sections.
-*** FIX PLANNED: A nodeMerge under a restriction moves restricted records
-  Run. Admitted when both homes are visible
-  ('local_fieldintent_collection/mod.rs':101); the acquiree's
-  private file is deleted and its records move into the
-  acquirer's private section, a restricted hide dropped.
-*** FIX PLANNED: A visible gesture creates a restricted record silently
-  Run. A restricted graphnode pasted under a visible editable
-  parent records the membership in a restricted section (the
-  default floor, 'types/misc.rs':614), and the line vanishes from
-  the view with no warning; read: a hide typed into the
-  hidden-outside folder with a restricted explaining
-  subscription, and an explicit relRepo request to a restricted
-  skgrepo, do the same.
-*** FIX PLANNED: The delete-references cleanup rewrites hidden recorders
-  Read. 'delete_references_to_absent_node.rs':124-185 scans and
-  rewrites every owned graphnode, and its confirmation names the
-  restricted recorders.
-*** FIX PLANNED: Restore and readiness requests ride a save under any restriction
-  Read. 'save_buffer.rs':790-805 applies restore instructions
-  after the suppression; restoreNode writes HEAD's telescope and
-  in-links, restricted recorders included; an "all of" readiness
-  request marks leaves in restricted sections.
-*** FIX PLANNED: The md/org import ignores the skgrepo restriction
-  Read. Dispatched without the skgrepo restriction ('serve.rs'
-  120-230); 'import_md_and_org/batch.rs':70 writes into any owned
-  destination, restricted or not. The strip of body whitespace
-  shares the dispatch and stays as it is by Jeff's choice
-  (2026-10-31), its docs saying so.
+*** FIX PLANNED: Strip body whitespace and the export ignore the skgrepo restriction
+  Read. Strip body whitespace is dispatched without the skgrepo
+  restriction ('serve.rs') and rewrites every owned graphnode whose
+  body changes, restricted ones included; the export to org takes
+  its skgrepo-set from the request, a read leak. Both stay as they
+  are by Jeff's choice (2026-10-31); slice 6 of
+  'TODO/simplify-refresh/10_plan.org' documents them so.
 * Problems noticed while executing plan 08, slice 7 (2026-10-30)
 ** FIX PLANNED: A store test that panics leaves its fixture copy in /tmp
   'run_with_test_stores' and 'run_with_shared_test_stores'

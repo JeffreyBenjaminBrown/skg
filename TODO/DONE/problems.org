@@ -77,8 +77,9 @@
   goal does. Tests in 'tests/refresh/hide_folders.rs' (Jeff's
   table of six cases, and the restricted subscribee) and
   'tests/subscriber_hides_under_a_narrowing.rs'.
-** Writes that touch what the skgrepo restriction hides (one of eleven)
-  The rest stay in 'TODO/problems.org'.
+** Writes that touch what the skgrepo restriction hides (ten of eleven)
+  The strip of body whitespace, with the export, stays in
+  'TODO/problems.org'.
 *** The subscribee loop writes a public hide of a private member
   Run. 'resolve_visibility.rs' 55-95 reads the subscribee's
   contents and the subscriber's hides ungated; under 'public' an
@@ -90,6 +91,90 @@
   a restricted hide" above. Test:
   'an_unchanged_save_hides_nothing_that_only_a_restricted_record_explains'
   in 'tests/subscriber_hides_under_a_narrowing.rs'.
+*** A fork copies restricted records into the clone's home
+  Run. 'build_fork_clone' ('fork.rs':390) copies every record of
+  the template, read whole, at the clone's skgrepo with no floor;
+  under 'public' and under 'all' a private record becomes public.
+  Fixed by slice 2 of 'TODO/simplify-refresh/10_plan.org':
+  'build_fork_clone' copies only the visible records, each at the
+  more private of its owned relRepo and the clone's home. Tests in
+  'tests/fork_merge_delete_under_a_narrowing.rs'.
+*** A restricted graphnode with a visible nodeRepo is moved
+  Run. 'suppress_writes_to_restricted_nodes' ('validate.rs':353)
+  keys on the buffer's home, not the graph's: a root for a
+  private graphnode pasted with a public nodeRepo moves its home
+  to public, loses its private title, and warns "remain unchanged
+  in graph".
+  Fixed by slice 2 of 'TODO/simplify-refresh/10_plan.org': the
+  suppression keys on the graph's home as well as the buffer's, so
+  the warning is true. Test in
+  'tests/restricted_graphnode_in_the_buffer.rs'.
+*** A new hide's floor ignores the record that explains it
+  Run. 'hide_skgrepo' ('supplement_from_disk.rs':536) floors a
+  new hide at the most public subscription whose subscribee
+  contains the member by any record, and the inference from
+  removals ('resolve_visibility.rs':203) reads contents ungated:
+  a public hide of a privately contained member (under 'all'
+  too); a hide written into a restricted section silently.
+  Fixed by slice 2 of 'TODO/simplify-refresh/10_plan.org': each
+  explanation stands at the more private of its subscription's and
+  its contains record's relRepos, and the inference reads only
+  visible subscriptions, contents and hides. Tests in
+  'tests/hide_inference_under_a_narrowing.rs'.
+*** A delete strips restricted records naming the graphnode
+  Run. 'apply_delete_propagation_cleanup' ('save.rs':406)
+  rewrites every owned referencer, restricted sections included;
+  the refusal guards only the deleted graphnode's own sections.
+  Fixed by slice 2 of 'TODO/simplify-refresh/10_plan.org': the
+  save stops for the delete-from confirmation ((c)ancel, (v)isible
+  records only, (a)ll owned records), in both clients. Tests in
+  'tests/fork_merge_delete_under_a_narrowing.rs' and both clients'.
+*** A nodeMerge under a restriction moves restricted records
+  Run. Admitted when both homes are visible
+  ('local_fieldintent_collection/mod.rs':101); the acquiree's
+  private file is deleted and its records move into the
+  acquirer's private section, a restricted hide dropped.
+  Fixed by slice 2 of 'TODO/simplify-refresh/10_plan.org': refused
+  when either graphnode has a restricted section, in the delete's
+  words. Test in 'tests/fork_merge_delete_under_a_narrowing.rs'.
+*** A visible gesture creates a restricted record silently
+  Run. A restricted graphnode pasted under a visible editable
+  parent records the membership in a restricted section (the
+  default floor, 'types/misc.rs':614), and the line vanishes from
+  the view with no warning; read: a hide typed into the
+  hidden-outside folder with a restricted explaining
+  subscription, and an explicit relRepo request to a restricted
+  skgrepo, do the same.
+  Fixed by slice 2 of 'TODO/simplify-refresh/10_plan.org':
+  'refuse_records_landing_restricted' refuses a new or moved record
+  in a restricted section, naming the skgrepo, and one moved out of
+  such a section. Tests in
+  'tests/restricted_graphnode_in_the_buffer.rs'.
+*** The delete-references cleanup rewrites hidden recorders
+  Read. 'delete_references_to_absent_node.rs':124-185 scans and
+  rewrites every owned graphnode, and its confirmation names the
+  restricted recorders.
+  Fixed by slice 2 of 'TODO/simplify-refresh/10_plan.org': refused
+  unless the connection is unrestricted. Test in
+  'tests/requests_refused_under_a_narrowing.rs'.
+*** Restore and readiness requests ride a save under any restriction
+  Read. 'save_buffer.rs':790-805 applies restore instructions
+  after the suppression; restoreNode writes HEAD's telescope and
+  in-links, restricted recorders included; an "all of" readiness
+  request marks leaves in restricted sections.
+  Fixed by slice 2 of 'TODO/simplify-refresh/10_plan.org': a save
+  carrying either is refused unless the connection is unrestricted.
+  Tests in 'tests/requests_refused_under_a_narrowing.rs'.
+*** The md/org import ignores the skgrepo restriction
+  Read. Dispatched without the skgrepo restriction ('serve.rs'
+  120-230); 'import_md_and_org/batch.rs':70 writes into any owned
+  destination, restricted or not. The strip of body whitespace
+  shares the dispatch and stays as it is by Jeff's choice
+  (2026-10-31), its docs saying so.
+  Fixed by slice 2 of 'TODO/simplify-refresh/10_plan.org': a
+  restricted destination is refused, at the preview and the apply.
+  Test beside the handler. The strip of body whitespace stays in
+  'TODO/problems.org'.
 * Problems noticed while executing plan 08, slice 7 (2026-10-30; fixed 2026-10-31)
 ** A skgrepo widening keeps a skgrepo narrowing's noClaim
   Run, not traced, by a throwaway test in

@@ -846,7 +846,13 @@ what the user could not see the user did not edit. A save under a
 skgrepo restriction therefore keeps every restricted record as it was
 ('preserve_invisible_members' in 'server/from_text/weave.rs') and asks
 a record's visibility ('record_is_visible') before any decision that a
-record's absence from the buffer would drive.
+record's absence from the buffer would drive. It refuses a save that
+would create or move a record into a restricted section, naming the
+skgrepo, and a delete whose propagation would strip restricted records
+of other graphnodes stops for the *delete-from confirmation* (a term
+of plan 10): the user cancels, deletes from the visible records only,
+or deletes from all owned records ('docs/api-and-formats.org', "Save
+buffer").
 
 A *skgrepo narrowing* is a skgrepo-set switch to a smaller
 skgrepo-set, and a *skgrepo widening* a switch to a larger one (both
@@ -1814,7 +1820,8 @@ someday let the second member record one; 'RecorderwardRelmap' in
 
 A /git-commit/ is git's. A /skgsave-commit/ is the step of a save that
 writes the .skg files and swaps in the new graph; a save that stops to
-ask for confirmation (forks, Hoist) skgsave-commits nothing. A
+ask for confirmation (forks, Hoist, strandeds, delete-from)
+skgsave-commits nothing. A
 /tantivy-commit/ makes search-index writes visible; a save's happens
 later, on a background worker. Where context leaves no doubt (HEAD, a
 merge commit, a 'git2' call) bare "commit" means a git-commit.

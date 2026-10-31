@@ -77,6 +77,13 @@ pub fn consume_readiness_requests (
       "The readiness marks were applied but not written to disk: {}", e )); }
   warnings }
 
+/// Whether some headline of 'viewforest' carries a readiness request.
+pub fn viewforest_has_readiness_requests (
+  viewforest : &ViewForest,
+) -> bool {
+  viewforest . root () . descendants ()
+    . any ( |node| node . value () . readiness_request . is_some () ) }
+
 /// One readiness request, read from the saved buffer.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RequestedReadiness {

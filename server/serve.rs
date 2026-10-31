@@ -213,7 +213,8 @@ fn handle_emacs (
                                            &request_header ),
           Ok (RequestType::ImportMdAndOrg) =>
             handle_import_md_and_org_request (
-              &mut stream, &request_header, &env, &mut pending_import ),
+              &mut stream, &request_header, &env, &mut pending_import,
+              &skgrepo_restriction ),
           Ok (RequestType::RebuildSessionLifetimeStores) =>
             handle_rebuild_session_lifetime_stores_request ( &mut stream,
                                          &mut env,
