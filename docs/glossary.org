@@ -2,9 +2,11 @@
 The words Skg uses, in two parts: the terms a user meets, and the
 terms of the implementation. Links inside it name headlines.
 
-A term marked "a term of plan 06" or "of plan 08" was coined by that
-plan of the refresh's rewrite (October 2026; plan 06 tidied the
-refresh, plan 08 fixed the skgrepo restriction and tidied again).
+A term marked "a term of plan 06", "of plan 08" or "of plan 10" was
+coined by that plan of the refresh's rewrite (October 2026; plan 06
+tidied the refresh, plan 08 fixed the skgrepo restriction and tidied
+again, plan 10 ended the buffer corrections and made every write obey
+the skgrepo restriction).
 The other terms are older, or ordinary words.
 
 ** Terms a user meets
@@ -84,7 +86,7 @@ the end of a refresh and never reuses one, so a viewnode ID that
 reappears after a cut and paste names the same viewnode moved. A
 parsed headline carrying a viewnode ID the view does not know (typed
 by hand, or brought back by an old copy of the buffer's text) loses
-it and gets a fresh one. A skgrepo-set switch keeps the viewnode ID
+it and gets a fresh one. A switch of the skgrepo restriction keeps the viewnode ID
 of everything the new skgrepo restriction still shows. The view's
 'ViewnodeIdRecord' ('server/types/views_state.rs') holds the counter
 and the viewnode IDs of the viewforest as last rendered.
@@ -112,7 +114,7 @@ that viewnode ID and opens the folds around it. In code it is
 A *herald* is a short styled token a client shows at the start of a
 headline in place of a part of its metadata, when heralds are on
 (=C-c v h=; =<localleader>vh= in Neovim): =☮= for write-protected,
-=⊥= for unwarranted, =restricted= for a restricted headline, and so
+=⊥= for unwarranted, =restricted= for a restricted viewnode, and so
 on. The server serves the rule table that maps metadata to heralds,
 and both clients draw by it. 'docs/heralds.org' is the legend of
 every herald and its style. Decorations on text that is not metadata
@@ -173,7 +175,8 @@ changes commit-ready, and it changes neither the view nor the graph.
 In code a node's own edit request is a 'NodeEditRequest', kept in
 'Editability::Editable'; a request about a headline's relationship to
 its viewparent (=relRepo=, =restoreRel=), which an occurrence, an
-unknown or an alias may carry, is a 'RelationshipEditRequest'; a
+unknown viewnode, a restricted viewnode or an alias may carry, is a
+'RelationshipEditRequest'; a
 readiness request is the viewnode's 'ReadinessRequest'.
 
 *** gesture
@@ -246,8 +249,8 @@ A child *claims membership* when the save will read it as a member
 of its viewparent's list; it is then a *claiming child* (a term of
 plan 06). That is a
 declared part: the bare atom =noClaim= says no, its absence yes
-('claimsMembership' in code, on an occurrence, a ghost, an unknown, a
-restricted headline, an alias or an ID;
+('claimsMembership' in code, on an occurrence, a ghost, an unknown
+viewnode, a restricted viewnode, an alias or an ID;
 'docs/api-and-formats.org', "Content view"). It means something
 only where the save reads the claims of its viewparent's children:
 under an editable occurrence, and under an editable folder
@@ -257,8 +260,8 @@ under an editable occurrence, and under an editable folder
 Every other viewparent *reads no claims*. This is the one list of
 them, which the user docs cite: a write-protected occurrence; a
 write-protected folder (a containers or mentioners folder, say), and
-any folder of a write-protected occurrence; a ghost, an unknown and
-a restricted headline; a tombstone; and the buffer root, whose
+any folder of a write-protected occurrence; a ghost, an unknown
+viewnode and a restricted viewnode; a tombstone; and the buffer root, whose
 children are the view's roots. Under any of them no child claims,
 whatever it carries, the server writes no =noClaim=, and detach and
 attach refuse. A child that
@@ -278,15 +281,16 @@ skgrepo from the nearest occurrence above.
 (a term of plan 08; plan 06, which took the word from
 'docs/COMMANDS.org', used it without its noun); an *orphan viewnode*
 (a term of plan 08) is a headline the parser cannot place under a
-parent, being deeper than its parent allows. The weave's "orphan
-run" and the database's
-"orphan record" keep their nouns too.
+parent, being deeper than its parent allows. The weave's "orphaned
+run" ('weave_orphaned_run_reattaches_leftward' in
+'tests/unit/weave.rs') and the database's "orphaned records"
+('server/dbs/init.rs') keep their nouns too.
 
 Under an editable parent a child that claims and that the graph
 does not relate to its viewparent (see "warranted, 'noWarrant',
 'ghostWarrant'") vanishes (see "vanish"): one whose relationship a
-save in another view removed, one whose record alone a skgrepo
-narrowing keeps out, a child a viewnode merge moved there. A child
+save in another view removed, one whose record alone a
+skgrepo narrowing keeps out, a child a viewnode merge moved there. A child
 there that claims nothing is one the user marked =noClaim= to
 detach it: a *pending detachment*, herald "detach", which the next
 save takes out of the list. No wire says it; each client sees it and
@@ -354,6 +358,19 @@ neither: a warranted member of a write-protected folder claims
 nothing but stands as a member, and a warranted child of an editable
 occurrence that the user marked =noClaim= stands as none. It is not
 written; the stats pass computes it where it computes those facts.
+
+*** true-content subtree
+
+The *true-content subtree* of a headline is the headline and every
+occurrence below it reached through occurrences that claim
+membership: its content, its content's content, and so on. A
+folder, a property member, a ghost, an unknown viewnode, a
+restricted viewnode, a tombstone and a child carrying =noClaim= end
+it, with everything under them. The recursive gestures walk it: the
+recursive flag gesture ('skg-set-flag-search-matching' with =C-u=,
+=C-u C-c s x=; =<localleader>sX= in Neovim) and the recursive
+skgrepo gesture ('skg-set-repo' with =C-u=, =C-u C-c s s=;
+=<localleader>sS=).
 
 *** partner folder
 
@@ -453,6 +470,17 @@ restriction shows: under a skgrepo narrowing, a hide of H that S
 contains only by a restricted record stands in the hidden-outside
 folder, and a hide recorded in a restricted section stands in
 neither.
+
+*** the folder's viewparent
+
+A folder's *viewparent* is the headline the folder stands under: the
+node whose relationships the folder lists. A gesture on a member of
+the folder that edits the member's relationship (the relRepo
+gesture, 'skg-set-relRepo', =C-c s r=; =<localleader>sr= in Neovim)
+edits the relationship between the member and the folder's
+viewparent, and refuses where the folder's viewparent is
+write-protected. Say "the folder's viewparent", never "the folder's
+anchor" ("anchor" is reserved; see "placement, more public anchor").
 
 *** write-protected set
 
@@ -578,7 +606,8 @@ is not called unfolding.
 A *text search* (=C-c f=) answers with one message, which opens a
 *search view*: an ordinary view, named by its query (=search:TERMS=),
 whose roots are the hits, best first, each a write-protected
-occurrence of its node. The *enrichment* (the search enrichment) is
+occurrence of its node. Its buffer is the *search buffer*, a synonym
+the docs and the code use for the search view. The *enrichment* (the search enrichment) is
 what the search draws under each hit, with the refresh every view is
 drawn with: its containers folder, whose members carry the
 containerward chain; its overrider and overridden folders, when it
@@ -675,11 +704,10 @@ chain node, and, in the diff view, a ghost and a tombstone. The word
 is unrelated to 'server/git_ops/vanished.rs', which asks at what
 commit a node's file left the git history.
 
-*** ghost, unknown
+*** ghost, unknown viewnode
 
-The two vognodes that stand for no node of the graph
-('Vognode::Ghost', and 'Vognode::GnidOnly' of kind
-'GnidOnlyKind::Unknown', in 'server/types/viewnode.rs').
+The two headlines that stand for a gnid the graph has no graphnode
+for (in the implementation, two vognodes: see "gnid-only vognode").
 A *ghost*, drawn only in the diff view, stands for a node HEAD has
 and the worktree lacks, write-protected, with HEAD's title and body
 (=ghost (gnid ID) (skgRepos (nodeRepo REPO))=); it accepts
@@ -688,41 +716,35 @@ restored or its deletion is committed ('docs/diff-view.org', "deleted
 and new nodes"). A ghost claims
 membership only where its viewparent's list in the worktree still
 names its gnid, a dangling reference to a node HEAD has, and the save
-then keeps that gnid in the list, as it keeps an unknown's; anywhere
-else it claims nothing. An *unknown* stands for a gnid its
-viewparent's list names and no node answers to (see "unknown node,
-dangling ID"). An occurrence whose node a save deleted becomes a
-tombstone, or, in the diff view, its ghost. In a content view a ghost
-is re-kinded by the ID rule: an unknown where the list names it, else
-a tombstone.
+then keeps that gnid in the list, as it keeps an unknown viewnode's;
+anywhere else it claims nothing. An *unknown viewnode* (a term of
+plan 10; the wire's atom =unknown=, herald "Reference to unknown
+node.") is the headline standing for an unknown graphnode, a gnid its
+viewparent's list names and no graphnode answers to (see "unknown
+graphnode, dangling ID"). In a content view an occurrence whose
+graphnode a save deleted becomes an unknown viewnode where its
+viewparent's list still names the gnid, and otherwise vanishes (see
+"vanish"); in the diff view it becomes its ghost. In a content view
+a ghost is re-kinded by the ID rule: an unknown viewnode where the
+list names it, else a tombstone.
 
-*** unknown node, dangling ID
+*** unknown graphnode, dangling ID
 
-An *unknown node* is an ID that some node's contains, subscribesTo,
-hidesFromSubs or overrides list names but that no node of the graph
-answers to, as primary or extra ID; such an ID is *dangling*. A view
-shows it as an unknown ("Reference to unknown node."), which claims
-membership, since removing it would edit the list. A *dangling
-partner* is a member of a list whose ID is dangling; in the diff
-view, one the worktree lost is an unknown carrying '(rel removed)'.
-The "investigate unknown node" request says what git history knows of
-it, and the delete-references-to-absent-node command removes the
-references.
+An *unknown graphnode* (a term of plan 10) is the graphnode an ID
+names that the graph does not have: the ID is one that some node's
+contains, subscribesTo, hidesFromSubs or overrides list names but
+that no graphnode answers to, as primary or extra ID; such an ID is
+*dangling*. A view shows it as an unknown viewnode (see "ghost,
+unknown viewnode"), which claims membership, since removing it would
+edit the list. A *dangling partner* is a member of a list whose ID is
+dangling; in the diff view, one the worktree lost is an unknown
+viewnode carrying '(rel removed)'. The command
+'skg-investigate-unknown-node' (=C-c t r=; =<localleader>tr= in
+Neovim) says what git history knows of an unknown graphnode, and
+'skg-delete-references-to-absent-node' (=C-c d a=; =<localleader>da=)
+removes the references to it.
 
-*** gnid-only vognode
-
-A *gnid-only vognode* (a term of plan 08; 'GnidOnlyVognode' in
-'server/types/viewnode.rs') stands for a gnid and shows nothing of a
-node, for one of two reasons, its kind ('GnidOnlyKind'): an unknown
-(no node answers to the gnid) or a Restricted vognode (the
-skgrepo restriction keeps the node out). The two take the same parts on the
-wire under their own atoms, =unknown= and =restricted=; validation
-and the save treat them alike, and the ID rule, the heralds and the
-parser's refusal of text tell them apart.
-User text says "a reference to an unknown
-node" or "a restricted headline", never the type.
-
-*** record, restricted headline, Restricted vognode
+*** record, restricted, visible
 
 A *record* (a term of plan 06, as are *restricted* and *visible*
 here) is a relationship as one node's file states it, in one
@@ -746,29 +768,39 @@ shown; under any skgrepo restriction a record whose relRepo the
 config does not name is visible, and a node whose home skgrepo the
 config does not name is unrestricted.
 
-A *restricted headline*, in the implementation's word a *Restricted
-vognode* (a term of plan 06; a gnid-only vognode of kind
-'GnidOnlyKind::Restricted' in 'server/types/viewnode.rs', on the wire =restricted (gnid ID)
-[(skgRepos (relRepo REPO))] [noClaim] [(editRequest ...)]=): user
-text says "a restricted headline", never the type's name. It stands
-where a visible record names a restricted node, or where a view is
-rooted at one (the view is the user's own request). It carries the
-record's gnid and relRepo and nothing of the node: no title, no body,
-no home skgrepo, no stats; its herald is "restricted", and text typed
-on its line is refused, as on an unknown's. A goal keeps such a
-member, and omits only members whose records are restricted; the ID
-rule answers it where the goal names its gnid (see "the ID rule").
-An occurrence of a node that a skgrepo narrowing keeps out becomes
-one in place, keeping its viewnode ID, fold state and children, and
-an occurrence again after a skgrepo widening; in the diff view,
-after a switch, a restricted node's ghost becomes one, or a tombstone, by
-the same rule, since a restricted node is never a ghost. It claims membership as an
-unknown does: a save keeps its gnid in the list it claims a place
-in, and deleting its line removes the record; the save restores to a
-list only the members whose records are restricted, which the buffer
-could not show. It takes a relRepo request and a readiness request.
-The retired placeholder 'restrictedNode', which stood for nothing,
-is a different thing, and the parser refuses its spelling.
+*** restricted viewnode
+
+A *restricted viewnode* (a term of plan 10; on the wire =restricted
+(gnid ID) [(skgRepos (relRepo REPO))] [noClaim] [(editRequest
+...)]=) is the headline standing for a graphnode the
+skgrepo restriction keeps out (a restricted graphnode; see "record,
+restricted, visible"). It stands where a visible record names a
+restricted graphnode, or where a view opened before a
+skgrepo narrowing is rooted at one (the view is the user's own
+request; opening a view of a restricted graphnode is refused). It carries the record's gnid and relRepo
+and nothing of the graphnode: no title, no body, no home skgrepo, no
+stats; its herald is "restricted", and text typed on its line is
+refused, as on an unknown viewnode's. A goal keeps such a member,
+and omits only members whose records are restricted; the ID rule
+answers it where the goal names its gnid (see "the ID rule").
+
+An occurrence of a graphnode that a skgrepo narrowing keeps out
+becomes a restricted viewnode in place, keeping its viewnode ID,
+fold state and children, and an occurrence again after a
+skgrepo widening. A view root of such a graphnode becomes a
+restricted viewnode whether or not a record names it. The
+folders under such an occurrence describe a graphnode the restricted
+viewnode shows nothing of, so they become tombstones, holding their
+members, and stay tombstones after the skgrepo widening. In the diff
+view, after a switch, a restricted graphnode's ghost becomes a
+restricted viewnode, or a tombstone, by the same rule, since a
+restricted graphnode is never a ghost. A restricted viewnode claims
+membership as an unknown viewnode does: a save keeps its gnid in the
+list it claims a place in, and deleting its line removes the record;
+the save restores to a list only the members whose records are
+restricted, which the buffer could not show. It takes a relRepo
+request and a readiness request. In the implementation it is a
+gnid-only vognode (see "gnid-only vognode").
 
 *** ancestor generation
 
@@ -810,7 +842,8 @@ are shown raw, and so, one level down, are the children of most
 overridden nodes shown raw ('docs/api-and-formats.org', "Override
 substitution and the overridesHere part").
 A view opened on one node always shows the requested node itself,
-shown raw. In the search buffer, each hit shows its override
+shown raw: it is the view's *raw root*, so that its immediate
+children are shown raw too. In the search buffer, each hit shows its override
 folders, holding its visible direct override relatives in both
 directions. Override facts also appear in explicitly requested override
 folders.
@@ -842,16 +875,24 @@ show: its =abbreviation= in the config, or else its name
 
 The *skgrepo restriction* ('SkgrepoRestriction') is the skgrepo-set a
 connection currently shows, named by the most private skgrepo it
-shows; when that is the config's most private skgrepo it holds every
-skgrepo, restricts nothing, and the connection is unrestricted
-(has no skgrepo restriction). A skgrepo inside it is
+shows. When that is the config's most private skgrepo it holds every
+skgrepo and restricts nothing: the connection is *unrestricted* (a
+term of plan 10), and has no skgrepo restriction. The clients show
+it so by appending *" (no restriction)"* (a term of plan 10) to that
+skgrepo's name where they show the skgrepo restriction, words that
+never travel on the wire or sit in the config. To *switch* the skgrepo restriction is to choose
+another with 'skg-restrict-repo-set' (=C-c v l=; =<localleader>vl=
+in Neovim): the clients refuse while a view has unsaved edits, and
+the server rerenders every open view under the new one, saying
+nothing of what the rerender changed. A skgrepo inside the
+skgrepo-set the skgrepo restriction shows is
 *unrestricted*, one outside it *restricted*, and so are their nodes
 and occurrences: the *gated graph*, the in-Rust graph as the
 skgrepo restriction lets it be seen, answers 'restricted' for such a node,
 as distinct from 'present' and 'absent' ('GnidPresence'), and the
 view shows nothing of it but, where a visible record names it, a
-restricted headline (see "record, restricted headline, Restricted
-vognode"). "Hidden" is reserved for hides-from-subscriptions.
+restricted viewnode (see "restricted viewnode"). "Hidden" is reserved
+for hides-from-subscriptions.
 
 The skgrepo restriction limits what can be edited as well as what can
 be seen: no save, nodeMerge,
@@ -870,16 +911,18 @@ of plan 10): the user cancels, deletes from the visible records only,
 or deletes from all owned records ('docs/api-and-formats.org', "Save
 buffer").
 
-A *skgrepo narrowing* is a skgrepo-set switch to a smaller
+A *skgrepo narrowing* is a switch to a smaller
 skgrepo-set, and a *skgrepo widening* a switch to a larger one (both
 terms of plan 08). The words "restriction", "narrowing" and
 "widening" always take the modifier "skgrepo". Where an occurrence of
 a node stood when a skgrepo narrowing kept it out, a restricted
-headline stands in its place where its record is visible, holding
+viewnode stands in its place where its record is visible, holding
 the occurrence's children; where it is not, the occurrence vanishes
 with them (see "vanish"), as does a member whose record alone the
 skgrepo narrowing keeps out, and the skgrepo widening draws each
-again where the graph puts it.
+again where the graph puts it. A view root is the exception: it
+stays, as a restricted viewnode, whether or not its record is
+visible (see "restricted viewnode").
 
 *** owned, foreign
 
@@ -956,7 +999,7 @@ skgrepo moved and the recorders of the relationships whose relRepo
 moved, each with all of its changes. Say "home skgrepo move", not
 "home move".
 
-*** sticky rule (sticky-else-default)
+*** sticky rule (sticky-else-default), floor check
 
 Where a relationship's relRepo comes from at save time:
 a relationship already on disk keeps its relRepo (*sticky*); a new relationship
@@ -964,8 +1007,9 @@ between owned nodes defaults to the more-private endpoint home. A new
 relationship from an owned recorder to a foreign member defaults to the recorder's
 home, deliberately making the foreign ID and relationship visible at
 that owned skgrepo without proposing a foreign write. Every relRepo is
-clamped to be no more public than the recorder's home. Hides
-floor higher (at least the most public subscription explaining them). A
+clamped to be no more public than the recorder's home. Hides have
+a higher floor (at least the most public subscription explaining
+them; see "floor" below). A
 =(relRepo NAME)= atom (the =skg-set-relRepo= gesture)
 overrides sticky with any skgrepo at least as private as the relationship's
 default — raising privacy, or moving a stuck skgrepo back to the
@@ -973,6 +1017,17 @@ default; a more-public choice is a save error. A legacy or
 hand-authored relationship whose disk relRepo already sits more public than
 its default may be held or made more private, never made still more
 public. See =server/from_text/supplement_from_disk.rs=.
+
+A relationship's default relRepo is its *floor*: the most public
+skgrepo it may be recorded in. The save's *floor check*
+('apply_sticky_relRepos_in_graph') refuses a relRepo request more
+public than the floor, naming the relationship. The relRepo gesture
+('skg-set-relRepo', =C-c s r=) offers only the skgrepos at least as
+private as the floor when the server can say what the floor is; where it
+cannot (a node not yet saved, or the recursive gesture,
+'skg-set-relRepo-recursive', =C-c s R=; =<localleader>sR= in Neovim,
+whose relationships have different floors), it offers every
+skgrepo, and the floor check is what refuses a choice too public.
 
 **** stranded relationship, strandeds
 
@@ -1065,12 +1120,54 @@ The directory that holds 'skgconfig.toml'. Every relative path in
 the config resolves against it ('docs/api-and-formats.org',
 "skgconfig.toml").
 
-*** export root
+*** export root, export marker
 
-A node that the export to org writes to a file of its own: one of its
-=contains= children has a title linking to the export instruction
-node and a body naming the =target_filepath=
-('docs/api-and-formats.org', "Export to org").
+An *export root* is a node that the export to org
+('skg-export-some-to-org', no key; =:SkgExportToOrg= in Neovim)
+writes to a file of its own. It is marked by an *export marker*: one
+of its =contains= children whose title links to the fixed ID
+=3d9aa9be-d95a-48bc-b362-33f9e7ebdf6f= and whose body names the
+=target_filepath=. The node that ID names only documents the
+feature; the docs also call it the export instruction node. See
+'docs/COMMANDS.org', "choosing what to export: export markers", and
+'docs/api-and-formats.org', "Export to org".
+
+*** linkstack
+
+The *linkstack* is a stack of links the user has stored, to insert
+later: 'skg-id-push' (=C-c u=) pushes a link to the node at point;
+'skg-paste-id' (=C-c o i=), 'skg-paste-link' (=C-c o l=) and
+'skg-paste-node' (=C-c o n=) paste the top one, as an ID, a link or
+a write-protected occurrence of its node; and 'skg-pop-id' (=C-c O
+i=) and 'skg-pop-link' (=C-c O l=) pop it. 'skg-view-linkstack' (=C-c v s=) shows the whole stack for
+editing. Neovim's keys are in 'docs/COMMANDS-nvim.org', "the
+linkstack".
+
+*** metadata editor
+
+The *metadata editor* is the buffer that 'skg-view-metadata'
+(=C-c v m=; =<localleader>vm= in Neovim) opens on the metadata of the
+headline at point, one part per line. It shows each field the
+headline's kind takes, as 'shared/metadata-fields.json' lists them,
+and S-left and S-right cycle a field through its values. =C-c C-c=
+applies the edit to the headline.
+
+*** node budget
+
+How many editable occurrences' content a view draws at once
+('initial_node_limit' in the config, 1000 by default). Once it is
+spent, the occurrences a view draws are write-protected, and
+'skg-set-editable' (=C-c s d=) makes one editable. See "extent,
+extension, node budget" among the terms of the implementation.
+
+*** non-vognode
+
+A headline that stands for no graphnode: a folder, a property member
+(an alias, an ID, a flag), a change viewnode of the diff view, and a
+tombstone. The headlines that do stand for one (an occurrence, a
+ghost, an unknown viewnode, a restricted viewnode) are the
+*vognodes*. See "vognode, non-vognode" among the terms of the
+implementation.
 
 *** link status, link annotation
 
@@ -1093,6 +1190,18 @@ last commits, with the context needed to understand them: "all
 changes", "merges", "skgrepo changes" and "order-only changes". Each is
 an ordinary editable view. Foreign skgrepos are excluded; the
 readiness summary only counts their changed files.
+
+**** change viewnode
+
+A headline the diff view adds to describe a change
+('ChangeViewnode'): a node's old text, with its body diff; its home
+skgrepo move; its changeset markers; and, under a member, the relRepo
+move of the member's relationship. At each refresh an occurrence's
+change viewnodes are recomputed in place from the straddle: kept
+while the change exists, drawn when missing, entombstoned when the
+change is gone, the tombstone keeping what the user drew under it
+('server/refresh/diff_view.rs'). The acquisition folders and the
+changed folders are drawn the same way.
 
 **** pruned change view
 
@@ -1406,22 +1515,35 @@ neighborhood independently in the before and after graph snapshots.
 *** vognode, non-vognode
 
 A *vognode* is a viewnode standing for a gnid ('Vognode' in
-'server/types/viewnode.rs'), of one of four kinds: an *occurrence*,
-of a node the truth has; a *ghost*, in the diff view only, of a node
-HEAD has and the worktree lacks; an *unknown*, of a gnid its
-viewparent's list names and no node answers to; a *Restricted
-vognode*, of a node the skgrepo restriction keeps out (a restricted
-node) that a visible record names (see "record, restricted
-headline, Restricted vognode"). An occurrence of a restricted node
-becomes a Restricted
-vognode where its record is visible; where it is not, in a content
-view, it vanishes (see "vanish"), and in the diff view it becomes a
+'server/types/viewnode.rs'), one of three structs: an *occurrence*
+('Occurrence'), of a graphnode the truth has; a *ghost* ('Ghost'),
+in the diff view only, of a graphnode HEAD has and the worktree
+lacks; and a gnid-only vognode ('GnidOnlyVognode', see "gnid-only
+vognode"), an unknown viewnode or a restricted viewnode. An
+occurrence of a restricted graphnode becomes a restricted viewnode
+where its record is visible; where it is not, in a content view, it
+vanishes (see "vanish"), and in the diff view it becomes a
 tombstone.
 
 The other viewnodes are *non-vognodes*: the *descriptors* -- folders,
 property members and change viewnodes, which describe their
 viewparent or its relationships rather than standing for a graphnode
 -- the buffer root and tombstones.
+
+*** gnid-only vognode
+
+A *gnid-only vognode* (a term of plan 08; 'GnidOnlyVognode' in
+'server/types/viewnode.rs') stands for a gnid and shows nothing of a
+graphnode, for one of two reasons, its kind ('GnidOnlyKind'):
+'Unknown', an unknown viewnode (no graphnode answers to the gnid), or
+'Restricted', a restricted viewnode (the skgrepo restriction keeps
+the graphnode out). The two take the same parts on the wire under
+their own atoms, =unknown= and =restricted=; validation and the save
+treat them alike, and the ID rule, the heralds and the parser's
+refusal of text tell them apart. User text says "an unknown viewnode"
+or "a restricted viewnode", never the type. The retired placeholder
+'restrictedNode', which stood for nothing, is a different thing, and
+the parser refuses its spelling.
 
 *** open views, single-root
 
@@ -1440,7 +1562,7 @@ A relationship is recorded in the .skg file of one of its two nodes, its
 the mentioner, the subscriber, the hider, the overrider). The other node
 is a member of the recorder's list. The relationship as the
 recorder's file states it, in one of its sections, is a *record* (see
-"record, restricted headline, Restricted vognode").
+"record, restricted, visible").
 
 The node that has an ID, as its PID or as an extra ID, is that ID's
 *carrier*. (Not "owner": the user *owns* skgrepos.)
@@ -1513,14 +1635,14 @@ above it is unwarranted (⊥).
 *** the refresh
 
 The one operation that takes a buffer, parsed and validated, and the
-truth, and returns the corrected buffer and what it corrected
+truth, and brings the buffer up to date with the truth, in place
 ('refresh_viewforest' in 'server/refresh/mod.rs'). Every view is drawn
 by it: a fresh content view (the refresh of a stub), every rerender
 (the saved view, the collateral views, "rerender all views", a
-skgrepo-set switch), the search enrichment and the diff view's
+switch of the skgrepo restriction), the search enrichment and the diff view's
 buffers. It decides everything from the buffer and the truth as they
-are now, and is a *fixpoint*: refreshing its own output changes and
-corrects nothing, up to the viewnode IDs it assigns
+are now, and is a *fixpoint*: refreshing its own output changes
+nothing, up to the viewnode IDs it assigns
 ('tests/idempotence.rs'). 'docs/data-model_technical.org', "The
 refresh: how a view follows the graph", states the whole model.
 
@@ -1529,7 +1651,9 @@ of little more than its roots, which the refresh fills: for a fresh
 content view, one editable occurrence per requested node, asking for
 its containers folder and its extension ('stub_of_fresh_content_view'
 in 'server/update_buffer.rs'); for a search, the hits
-('draw_search_buffer'); for a buffer of the diff view, one *stub
+('build_search_viewforest', which 'draw_search_buffer' refreshes, in
+'server/serve/handlers/text_search.rs'); for a buffer of the diff
+view, one *stub
 root* per member of D ('docs/diff-view.org', "Stub roots").
 
 The refresh walks the viewforest, visiting each parent once and
@@ -1539,7 +1663,9 @@ the *stats pass*, which computes every occurrence's derived facts
 ('viewnodestats.rs', 'graphnodestats.rs' beside it); in the diff
 view, the '(ready ...)' change facts and the home skgrepo moves; the
 pruning of childless tombstones, and of folders the pruning empties;
-a viewnode ID for each viewnode lacking one; and the rendering.
+and a viewnode ID for each viewnode lacking one. The tail renders
+nothing: each caller renders the viewforest once, when it is done
+with it.
 
 *** the truth
 
@@ -1584,10 +1710,11 @@ ID ("vnid") names a viewnode, not a node.
 What a headline standing for a gnid becomes, by five questions in
 order, the first yes winning ('id_rule' in 'server/refresh/id_rule.rs'):
 does the truth have the node (an occurrence); does the truth say the
-node is restricted (a Restricted vognode where its viewparent's goal
-names it, and otherwise a tombstone, never a ghost); in the diff
+node is restricted (a restricted viewnode where its viewparent's goal
+names it or the headline is a view root, and otherwise a tombstone,
+never a ghost); in the diff
 view, does HEAD (a ghost); does its viewparent's list name the gnid
-(an unknown); else a tombstone. The
+(an unknown viewnode); else a tombstone. The
 refresh *re-kinds* a headline by it where it stands, keeping its
 viewnode ID, fold state, children and, for an occurrence, its
 editability; but an occurrence the rule makes a tombstone in a
@@ -1604,10 +1731,10 @@ two graphs of the straddle. Each *goal item* names a gnid or a
 property value ('GoalItem', 'GoalMember'). The goal decides each
 child's warrant, what is reinstated and, where it is ordered, the
 children's order. A parent whose position implies no relationship
-(the buffer root, a tombstone, an unknown, a Restricted vognode) has
-none. Under a skgrepo restriction a goal omits the members whose
+(the buffer root, a tombstone, an unknown viewnode, a restricted
+viewnode) has none. Under a skgrepo restriction a goal omits the members whose
 records are restricted and keeps the others, a restricted node's
-too, which the ID rule makes a Restricted vognode.
+too, which the ID rule makes a restricted viewnode.
 
 *** the refresh's rungs, unsayable
 
@@ -1919,18 +2046,6 @@ A viewnode is in *content position* when its viewparent is the buffer
 root, an occurrence, or a ghost that is itself in content position
 ('in_content_position'). A ghost in
 content position holds its old content under it.
-
-**** change viewnode
-
-A headline the diff view adds to describe a change
-('ChangeViewnode'): a node's old text, with its body diff; its home
-skgrepo move; its changeset markers; and, under a member, the relRepo
-move of the member's relationship. At each refresh an occurrence's
-change viewnodes are recomputed in place from the straddle: kept
-while the change exists, drawn when missing, entombstoned when the
-change is gone, the tombstone keeping what the user drew under it
-('server/refresh/diff_view.rs'). The acquisition folders and the
-changed folders are drawn the same way.
 
 *** Terms of Tantivy, the search index
 
