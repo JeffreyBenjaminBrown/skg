@@ -31,6 +31,7 @@ mod ancestry;
 mod chain;
 mod claims;
 mod diff_view;
+mod hide_folders;
 mod viewnode_merge;
 mod re_kind;
 mod reinstate;

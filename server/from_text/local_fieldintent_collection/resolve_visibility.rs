@@ -106,8 +106,8 @@ pub fn resolve_visibility (
 /// folder is the whole set of hides with a visible record outside the
 /// subscribees, and a folder saved under a skgrepo restriction never unhides a
 /// member it could not show. What counts as inside is what the folder's goal
-/// subtracts ('goal_list_for_hiddenOutsideOfSubscribee_folder'): the whole
-/// content of each subscribee, whatever records it.
+/// subtracts ('goal_list_for_hiddenOutsideOfSubscribee_folder'): the content
+/// of each subscribee by the records the skgrepo restriction shows.
 fn apply_hiddenoutside_edits (
   lowered                : &mut LoweredNodeIntents,
   edits                  : &[(ID, HiddenOutsideEdit)],
@@ -140,7 +140,8 @@ fn apply_hiddenoutside_edits (
       let Some (subscribee) =
         opt_graphnode_by_gnid (graph, config, &subscribee_gnid) ?
       else { continue; };
-      for member in &subscribee . contains {
+      for member in subscribee . contains . iter ()
+        . filter (|member| is_visible (member)) {
         inside . insert (key (&member . member)); }}
 
     // The replacement domain is intentionally built from disk, rather than

@@ -22,7 +22,6 @@
 //! too.
 
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::dbs::node_lookup::graphnode_from_graph;
 use crate::dbs::in_rust_graph::relation_accessors::{GnidPresence, NodeRelation, RelationRole};
 use crate::graph_straddle::types::Partner;
 use crate::refresh::Walk;
@@ -31,7 +30,7 @@ use crate::refresh::ancestry::{
 use crate::refresh::diff_view;
 use crate::refresh::extent::is_chain_parent;
 use crate::skgrepo_sets::SkgrepoRestriction;
-use crate::types::misc::{ID, RelPartner, RelationshipMemberKey, SkgrepoName, members_of};
+use crate::types::misc::{ID, RelPartner, RelationshipMemberKey, SkgrepoName};
 use crate::types::nodes::complete::Flag;
 use crate::types::nodes::rust::GraphnodeInRust;
 use crate::types::tree::forest::in_content_position;
@@ -406,6 +405,9 @@ fn goal_list_for_hiddenInSubscribee_folder (
 /// What 'subscriber' hides outside the content of its subscribees, by
 /// the records the skgrepo restriction shows: the goal of its compound
 /// folder 'HiddenOutsideOfSubscribee', in the order of its hides list.
+/// A subscribee's content is read by the same records, so a hide of
+/// something a subscribee contains only by a restricted record stands
+/// here, outside, as it does in the view.
 pub(crate) fn hidden_outside_of_subscribees (
   subscriber : &ID,
   walk       : &Walk,
@@ -416,20 +418,22 @@ pub(crate) fn hidden_outside_of_subscribees (
     &graph . outbound_gnids_for_relation_gated (
       subscriber, NodeRelation::HidesFromSubs, walk . truth . restriction ),
     &graph . outbound_gnids_for_relation_gated (
-      subscriber, NodeRelation::SubscribesTo, walk . truth . restriction ));
+      subscriber, NodeRelation::SubscribesTo, walk . truth . restriction ),
+    walk . truth . restriction );
   resolve_all (goal, graph) }
 
 /// Goal list for a hiddenOutsideOfSubscribeeFolder: the subscriber's
-/// hides-list minus everything contained by any subscribee.
+/// hides-list minus everything any subscribee contains by a record
+/// the skgrepo restriction shows.
 fn goal_list_for_hiddenOutsideOfSubscribee_folder (
   graph             : &InRustGraph,
   subscriber_hides  : &[ID],
   subscribees       : &[ID],
+  restriction       : Option<&SkgrepoRestriction>,
 ) -> Vec<ID> {
-  let subscribee_content_of : &dyn Fn (&ID) -> Vec<ID> = &|pid : &ID| -> Vec<ID> {
-    graphnode_from_graph (graph, pid)
-      . map ( |skg| members_of (& skg . contains) )
-      . unwrap_or_default () };
+  let subscribee_content_of : &dyn Fn (&ID) -> Vec<ID> = &|subscribee : &ID| -> Vec<ID> {
+    graph . outbound_gnids_for_relation_gated (
+      &graph . pid_else_raw_id (subscribee), NodeRelation::Contains, restriction ) };
   let all_subscribee_content : HashSet<RelationshipMemberKey> =
     subscribees . iter ()
       . flat_map ( |pid| subscribee_content_of (pid) )
