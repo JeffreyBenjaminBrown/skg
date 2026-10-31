@@ -5791,3 +5791,195 @@ to slice 4, the headlines the new tests write with the edit
 request before 'node'. Suites: nextest 1058 of 1058, Emacs 413
 of 413, Neovim 451 passes, integration 35 of 36 with either
 client, the pre-existing failure.
+** Slice 3
+*** The commits
+**** aa2e00f7
+No function takes an 'Option' of the skgrepo restriction: every
+'Option<&SkgrepoRestriction>' is a bare reference, a caller that
+passed None passes 'SkgrepoRestriction::unrestricted', the save's
+normalization of 'all' goes, and 'is_all' is 'is_unrestricted'.
+The ungated accessors read the graph directly. Still the set
+'all' underneath; nextest 1058 of 1058 on it.
+**** 85520981
+The skgrepo restriction is one skgrepo, the most private shown:
+the type, the config's default, the wire, 'require_unrestricted',
+the 'all' literals, the refusal texts, a skgrepo the config does
+not name, and the server's tests and fixtures.
+**** The last commit
+Both clients' prompts and displays, their tests, the integration
+test that switched to "all", the docs, this record and the plan's
+keyword.
+*** The suites
+**** cargo check --all-targets
+Clean, no warning.
+**** bash/nextest.sh
+1061 of 1061: slice 2's 1058, less the test of the reserved
+names, plus four of the config and the skgrepo named "all"
+('tests/repo_sets.rs') and two of the skgrepos the config does
+not name, which replace one ('tests/dbs/in_rust_graph/
+relation_accessors.rs').
+**** bash/emacs-tests.sh
+414 of 414: 413 and one new, the label and the message of the
+skgrepo restriction.
+**** bash/nvim-tests.sh
+453 per-test passes, none failed: 451 and two new, the label
+with the message, and the prompt.
+**** bash/integration-tests.sh
+35 of 36 with Emacs and 35 of 36 with Neovim
+('SKG_TEST_CLIENT=nvim'); the failure is 'import-md-and-org'
+both times, pre-existing and not this plan's.
+**** Failures met during the slice
+None but the pre-existing one. Every suite passed on its first
+run after each commit's code; the fixture changes below were
+made before the runs, as the compiler and the grep for "all"
+found them.
+**** The TCP surface
+***** the server, raw
+An isolated server (port 1793, scratch data under
+'tests/results/10/slice3/scratch/', removed after, stopped by
+its recorded PID) with the skgrepos "public" and "private": the
+list answered '(sets ("public" "private"))', the display
+'(restriction "private")' with no content; on one connection a
+switch to "public" rerendered the open view without s, the
+display said "public", a switch to "all" was refused in the
+unwinding shape ("'all' names no skgrepo of the config. ..."),
+the diff view was refused ("The diff view requires no skgrepo
+restriction; the skgrepo restriction is public. Switch it to
+private, the most private skgrepo, first."), and a switch to
+"private" drew s again. The probe is
+'tests/results/10/slice3/probe_switch.py'; its exchange,
+'tcp-server-2.txt'.
+***** each client, headless
+'tests/results/10/slice3/probe/run-probe.sh' starts a server
+(ports 1794 and 1795) under "public" and runs
+'probe-emacs.el' or 'probe-nvim.lua'; each server was stopped by
+its recorded PID. Both clients showed "Skgrepo restriction:
+public" and "available: public, private (no restriction)"; the
+prompt offered "public" and "private (no restriction)", the
+latter the default, and choosing it sent "private", showed
+"Skgrepo restriction: private (no restriction)" and drew s in
+the view; a switch to "all" showed the server's refusal; a
+switch to "public" made s vanish. Outputs: 'probe-emacs.out',
+'probe-nvim.out'.
+*** Deviations from the plan's "how"
+**** a third field, the skgrepos kept out
+'SkgrepoRestriction' holds the most private skgrepo shown
+('most_private_shown'), the set it denotes ('skgrepos') and,
+beyond the plan's two, the config's skgrepos more private than
+it ('kept_out', in privacy order). A skgrepo the config does not
+name is in neither set, so 'record_is_visible' and
+'node_is_restricted' each ask one question of 'kept_out', and
+'is_unrestricted' is "keeps none out". The field is private;
+tests build a skgrepo restriction without a config by
+'of_privacy_order_for_test'.
+**** a config that names no skgrepo
+'SkgrepoRestriction::unrestricted' of such a config (the fixture
+of 'tests/server_warnings.rs' is one) shows the empty name and
+keeps nothing out. Coined here; no other code reaches it.
+**** where None skipped a step, the step asks 'is_unrestricted'
+The nodeMerge filter, 'preserve_invisible_members', the
+suppression of writes to restricted nodes, the refusal of
+records landing restricted, the count of restricted records a
+delete names and the alias check of the claims rung skipped
+their work under None and ran it under 'all'; each now asks
+'is_unrestricted' first, so an unrestricted save does what a
+save under None did. The gated accessors keep one path: the
+inbound filter's early exit is 'is_unrestricted', which answers
+as the per-record question would.
+**** the ungated accessors
+'other_member_pids', 'relRepo_for_stored_member' and
+'relation_membership_is_real' called their gated twins with
+None; they read the graph directly, through the new
+'outbound_rel_partners_for_relation' and
+'outbound_member_keys_for_relation' (the graph straddle's union
+walk uses the latter). 'fetch_all_graphnodestats', used only by
+tests, went; they call the gated one unrestricted.
+**** the display carries no words
+The display and a successful switch answer
+'(restriction "NAME")' alone; a refusal still carries
+'(content ...)'. Each client shows the content when there is
+one, else "Skgrepo restriction: " and the label. The clients
+learn which skgrepo is the most private from the config file
+they already read for the prompt.
+**** 'SkgrepoSetName' went
+A skgrepo restriction's name is a 'SkgrepoName'. The config's
+'privacy_order_split_after' replaces 'prefix_through' as the
+chokepoint 'named' reads; 'skgrepo_set_skgrepos' and
+'default_skgrepo_set_name' went.
+**** a skgrepo may be named "all"
+The config's refusal of it went with the reserved name, as the
+plan's 'all' literals say; its fixture moved from
+'tests/repo_sets/fixtures-invalid/repo-all/' to
+'tests/repo_sets/fixtures-a-skgrepo-named-all/', where a test
+loads it.
+**** text search
+The per-document filter asks 'record_is_visible' of an alias
+document's skgrepo and the group filter 'node_is_restricted' of
+the node's home, so a skgrepo the config does not name is shown
+there as elsewhere.
+**** the export's prompt
+The export shares the switch's prompt, so it shows the same
+labels; its warning fires for the most private skgrepo.
+**** docs beyond the switch and the API doc's section
+Every passage that named the set 'all' was false after the
+slice, so the docs say the new words wherever they spoke of it:
+'docs/api-and-formats.org' (the refusals, the text release, the
+export and its CLI, the config table and its privacy order, the
+wire's shapes; the export field is '(repo-set . "NAME")', as the
+server reads it, where the doc said 'skgrepo-set'), three
+sentences of the glossary ("by nothing else", the skgrepo
+restriction, the text release), 'docs/COMMANDS.org' and
+'docs/COMMANDS-nvim.org' (the switch's prompt, the list, the
+refusals, the export), 'docs/diff-view.org',
+'docs/data-model_technical.org' and 'docs/telescopes.org' (the
+comment of 'example-data/skgconfig.toml' went with 85520981). The
+readiness
+object 'all' and the wire's '(delete-from . "all")' stay.
+*** Fixtures changed
+**** the tests that named "all"
+Every 'SkgrepoRestriction::named (..., "all")' is
+'SkgrepoRestriction::unrestricted', and every switch to "all"
+over the wire is a switch to the fixture's most private skgrepo,
+"private" ('tests/hidden_nodes.rs', 'viewnode_id_stability.rs',
+'repo_sets.rs', the link-annotations integration test of both
+clients); comments that said "under all" say "unrestricted".
+**** the tests that faked a restriction
+Three tests renamed the set 'all' to fake a skgrepo restriction
+that showed everything; two of 'tests/fork.rs' and the helper of
+another file built sets that are no prefix of their order.
+They build theirs with 'of_privacy_order_for_test' over an
+order that keeps their point:
+'tests/pruned_change_view/request.rs' and
+'investigate_unknown_node.rs' add a second, more private skgrepo
+"other"; 'tests/fork.rs' and the 'restricted_to' of
+'tests/dbs/in_rust_graph/override_resolution.rs' put the
+skgrepos shown first; 'stage_and_commit.rs' names "public".
+**** the struct literals
+'main_only' ('tests/refresh/mod.rs') and the restrictions of
+'tests/unit/', 'leak_battery.rs', 'serve_text_search_test.rs',
+'titles_by_ids.rs', 'relation_accessors.rs' and
+'text_release.rs' are built by 'named' or
+'of_privacy_order_for_test'; 'tests/refresh/mod.rs' gains
+'unrestricted'.
+**** the configs
+'default_repo_set = "all"' left the two configs of
+'tests/partner_folder_matrix/'; the config with a skgrepo named
+"all" moved (above). The test of the reserved names became three:
+the default and the prefixes, a config without a default, a
+skgrepo named "all"; the refusal of the retired '[[repo_sets]]'
+stays.
+**** the clients
+The prompt's test and the config readers' test in both clients
+expect the names without "all" and the label on the most
+private; the Neovim stream test's switch answer has no content.
+*** Left unfinished
+Nothing of the slice. For Jeff and slice 6: the save's refusals
+in 'server/types/errors.rs' and the import's still say
+"restricted under the current repo-set", and the clients'
+refusal of a switch with unsaved views says "skgrepo-set"; the
+glossary keeps "skgrepo-set" for the set a skgrepo restriction
+denotes. The verify skill's isolated server was driven before
+the second and the last commit, not before the first, a
+refactor with no change at the wire.
+*** Headline
+DONE.

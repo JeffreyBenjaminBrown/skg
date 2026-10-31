@@ -283,8 +283,8 @@ Under a skgrepo restriction a goal omits each member whose record is
 restricted: the gated accessors of the in-Rust graph leave it out;
 an alias folder's goal omits an alias whose record is restricted, and
 the stats count it nowhere. The diff view's goal asks the
-skgrepo restriction too, though the diff view opens only under
-'all': a switch rerenders its open buffers.
+skgrepo restriction too, though the diff view opens only on an
+unrestricted connection: a switch rerenders its open buffers.
 It keeps each member whose record is visible: a node the
 skgrepo restriction keeps out, which the ID rule, finding the node restricted and the
 gnid named by the goal, answers with a Restricted vognode; and a gnid

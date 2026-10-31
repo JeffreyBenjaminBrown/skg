@@ -14,9 +14,10 @@
 
 (defun skg-export-some-to-org (repo-set output-dir &optional approved-pids)
   "Export Skg data to .org files under OUTPUT-DIR.
-Prompts for a REPO-SET (S-left/S-right cycle, tab completion);
-only nodes from that set are included, so choose a public-facing
-subset to avoid exporting private notes.  Then prompts for
+Prompts for a REPO-SET, the most private repo to export
+(S-left/S-right cycle, tab completion); only nodes from it and the
+more public repos are included, so choose a public-facing repo to
+avoid exporting private notes.  Then prompts for
 OUTPUT-DIR.
 
 OUTPUT-DIR is interpreted *by the server*, relative to the project
@@ -38,9 +39,9 @@ untouched."
          (read-string
           "Export to dir (relative to the server's project root) [org-exports]: "
           nil nil "org-exports")))
-  (when (string= repo-set "all")
+  (when (equal repo-set (car (last (skg--repo-names))))
     (message
-     "Exporting repo-set `all'; consider a public-facing repo-set so private notes are not exported."))
+     "Exporting with no skgrepo restriction; consider a more public repo so private notes are not exported."))
   (let ((tcp-proc (skg-tcp-connect-to-rust)))
     (skg-register-response-handler
      'export-to-org

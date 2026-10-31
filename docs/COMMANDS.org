@@ -130,8 +130,8 @@ telescope (one whose selected title or body lies below home), Skg asks
 whether to include or exclude overPrivateText telescopes before running the query.
 Exclude filters them in Tantivy before matching, and from what is drawn
 under each hit; Include is permission
-for this search only. Under skgrepo-set =all= they are included without a
-prompt and the result carries a warning.
+for this search only. With no skgrepo restriction they are included
+without a prompt and the result carries a warning.
 *** C-c f RET : skg-search
 Text search across titles and aliases, returning every
 matching node.
@@ -366,7 +366,7 @@ vanished at, its title then, its own relation lists then, and every
 node that referred to it then, links included; or that the ID was
 never in any skgrepo's history. If HEAD still holds the ID's file,
 it says so: "still present at HEAD (only the worktree lacks it)". It
-refuses unless the skgrepo restriction is 'all'; a refusal opens the
+refuses unless the connection is unrestricted; a refusal opens the
 same buffer, as "* investigation failed" with the reason under it.
 ** C-c l : show a folder (both folders of a relation)
 These commands don't edit the graph. Each inserts a request into the
@@ -901,7 +901,7 @@ since their last commits (how each worktree differs from HEAD), with
 the context needed to understand it. It opens up to four buffers,
 "diff-view: all changes", "diff-view: merges", "diff-view: skgrepo
 changes" and "diff-view: order-only changes", skipping any that would
-be empty. It refuses unless the skgrepo restriction is 'all', and
+be empty. It refuses unless the connection is unrestricted, and
 when an owned skgrepo is not in a git repository or has no HEAD
 commit (the refusal names the skgrepo). A
 buffer keeps its roots until you close it, but for a ghost root
@@ -969,11 +969,13 @@ Restricts display and search to one skgrepo-set for this Emacs
 connection. Skgrepo-sets are the prefixes of the config's privacy
 order, so the question the command asks is really "what is the most
 private skgrepo to make available?" -- choosing a skgrepo activates it
-and everything more public. Tab completion and shift-left /
-shift-right cycling walk the skgrepos in privacy order. The command
-then re-renders open Skg buffers after confirmation, and tells the
-server to use that skgrepo-set for subsequent requests. Choose =all=
-(every skgrepo) to remove the skgrepo restriction.
+and everything more public. The prompt, "Most private repo to show
+(S-left/right cycle): ", lists the skgrepos by name in privacy order,
+the most private as "NAME (no restriction)", which is the default;
+tab completion and shift-left / shift-right cycling walk them. The
+command then re-renders open Skg buffers after confirmation, and tells
+the server to use that skgrepo-set for subsequent requests. Choose the
+most private skgrepo to remove the skgrepo restriction.
 
 Under a skgrepo restriction, a node in a skgrepo outside the set
 shows nothing of itself. Where a relationship recorded in a skgrepo
@@ -995,8 +997,8 @@ shows; a node merge, like a delete, is refused when either node has a
 section outside the set; a delete whose cleanup would strip
 relationships outside the set asks first (see the delete). Restoring
 from HEAD, readiness requests and the cleanup of an absent ID's
-references are refused unless the set is =all=, and an import into a
-skgrepo outside the set is refused. A
+references are refused unless the connection is unrestricted, and an
+import into a skgrepo outside the set is refused. A
 skgrepo narrowing (a switch to a smaller set) turns an open view's headline
 of such a node into a restricted headline in place, its children
 kept, and a skgrepo widening (a switch to a larger set) turns the
@@ -1019,7 +1021,9 @@ an empty rerender stream releases the client's preemptive locks.
 
 =M-x skg-list-repo-sets= shows the current skgrepo restriction and
 the skgrepo-sets available, and =M-x skg-show-skgrepo-restriction=
-shows the skgrepo restriction alone.
+shows the skgrepo restriction alone, each marking the most private
+skgrepo " (no restriction)": "Skgrepo restriction: public; available:
+public, private (no restriction)".
 *** C-c v r : skg-readable-ids-mode
 This changes how node IDs are displayed.
 The ID itself is a kind of special random gibberish called UUID v4.
@@ -1353,7 +1357,9 @@ Exports Skg data to plain =.org= files, so the data can be read
 It asks two things:
 - the most private skgrepo to include. The export includes
   that skgrepo and every skgrepo more public than it.
-  Choose all to include every skgrepo.
+  The default, the most private skgrepo (shown with
+  " (no restriction)"), includes every skgrepo, with a warning
+  that private notes will be exported.
 - which directory to write to (default =org-exports=). This path
   is interpreted *by the server*, relative to the project root the
   server runs from. Because the server may run inside a Docker
@@ -1432,8 +1438,8 @@ node "Some links might be broken.", or, when that node is not
 exported either, becomes its plain label.
 **** privacy
 If a restricted export would include overPrivateText telescope text, Skg asks for
-approval for each such ID before writing any file. Skgrepo-set =all= exports
-it with a warning. The noninteractive form "fails closed" (fails before writing any files) unless passed
+approval for each such ID before writing any file. An export of the
+most private skgrepo (no skgrepo restriction) includes it with a warning. The noninteractive form "fails closed" (fails before writing any files) unless passed
 =--include-overPrivateText-telescopes=:
 
 : cargo run --bin skg -- export-org [config-path] [skgrepo-set] [output-dir] [--include-overPrivateText-telescopes]

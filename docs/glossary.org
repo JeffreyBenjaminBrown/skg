@@ -729,8 +729,10 @@ visible when its record and its node's home are both unrestricted.
 The code asks the two questions by
 'SkgrepoRestriction::record_is_visible' and
 'SkgrepoRestriction::node_is_restricted' ('server/skgrepo_sets.rs'),
-and by nothing else: no skgrepo restriction, and the set 'all', hold every
-skgrepo, even one the config does not name.
+and by nothing else. With no skgrepo restriction every skgrepo is
+shown; under any skgrepo restriction a record whose relRepo the
+config does not name is visible, and a node whose home skgrepo the
+config does not name is unrestricted.
 
 A *restricted headline*, in the implementation's word a *Restricted
 vognode* (a term of plan 06; a gnid-only vognode of kind
@@ -827,8 +829,10 @@ show: its =abbreviation= in the config, or else its name
 ('herald_label' in code).
 
 The *skgrepo restriction* ('SkgrepoRestriction') is the skgrepo-set a
-connection currently shows; the skgrepo-set =all= holds every
-skgrepo, and so restricts nothing. A skgrepo inside it is
+connection currently shows, named by the most private skgrepo it
+shows; when that is the config's most private skgrepo it holds every
+skgrepo, restricts nothing, and the connection is unrestricted
+(has no skgrepo restriction). A skgrepo inside it is
 *unrestricted*, one outside it *restricted*, and so are their nodes
 and occurrences: the *gated graph*, the in-Rust graph as the
 skgrepo restriction lets it be seen, answers 'restricted' for such a node,
@@ -909,7 +913,7 @@ section. The flag applies to the whole telescope, even if only one text
 field is below home. This violates the rule that the node's text lives at
 home; see [[file:./telescopes.org][privacy telescopes]].
 
-Skgrepo-set =all= can show that text with a warning. A restricted request
+An unrestricted connection can show that text with a warning. A restricted request
 asks for approval scoped to the affected node IDs and that request before
 releasing it; search asks whether to include or exclude such telescopes.
 Approval to display the text does not authorize *Hoist*, the separate

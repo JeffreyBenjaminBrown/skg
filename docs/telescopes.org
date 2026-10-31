@@ -16,9 +16,10 @@ Your =skgconfig.toml= lists skgrepos in privacy order, most public
 first (see =api-and-formats.org=). That order is the ladder of
 *privacy levels*. A *skgrepo-set* is a prefix of the ladder —
 choosing one is answering "what is the most private skgrepo I want
-visible right now?" — and the reserved set =all= is the whole
-ladder. Screen-sharing with a colleague, you might switch to the
-=public= prefix; alone, back to =all=.
+visible right now?" — and the most private skgrepo's set is the
+whole ladder, no skgrepo restriction. Screen-sharing with a
+colleague, you might switch to the =public= prefix; alone, back to
+the most private skgrepo.
 
 ** What lives where
 
@@ -42,8 +43,8 @@ relRepo: the skgrepo of the section that records it.
 
 Reading the node *composes* the sections, most public first, into one
 effective node. Under a restricted skgrepo-set you see the *visible
-composition* — only the unrestricted sections' contributions — while =all= shows
-the *full composition*. A more private section can both /add/ members and
+composition* — only the unrestricted sections' contributions — while with no
+skgrepo restriction you see the *full composition*. A more private section can both /add/ members and
 /place/ them: its members interleave into the more public list via
 placement anchors, so your private ordering of a public list
 survives without the public file recording anything. Saving decomposes
@@ -60,8 +61,8 @@ edits those files; their contents are visible only by inspecting the raw
 foreign repository. A wholly foreign telescope is retained normally.
 
 If composing has to select a title or body below home, Skg marks the
-whole telescope *overPrivateText*. Skgrepo-set =all= displays that text with a
-warning. A restricted skgrepo-set asks before releasing it, using an
+whole telescope *overPrivateText*. An unrestricted connection displays that
+text with a warning. A restricted skgrepo-set asks before releasing it, using an
 approval scoped to the exact PIDs and the single request; search asks
 whether to include or exclude overPrivateText telescopes before it matches. This
 release approval does not authorize Hoist. Conversely, approving

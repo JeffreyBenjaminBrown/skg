@@ -111,17 +111,24 @@ function M.prompt_for_repo_change (current_skgrepo)
       initial_input = current_skgrepo, cycle_values = owned })
 end
 
----Choose a skgrepo-set name, with completion and cycling.
----@return string|nil
+---Choose the skgrepo restriction, the most private repo to show,
+---with completion and cycling. Each choice is shown by its name, the
+---most private one with ' (no restriction)' appended, the default.
+---@return string|nil the chosen repo's name
 function M.prompt_for_repo_set ()
-  local repo_sets = config.repo_set_names()
-  if not repo_sets then
+  local names = config.repo_set_names()
+  if not names or #names == 0 then
     vim.notify('No skg repos found')
     return nil end
-  return M.completing_read_with_cycle(
-    'Most private repo to make available (S-left/right cycle): ', repo_sets, {
-      require_match = true, cycle_values = repo_sets,
-      initial_input = 'all' })
+  local labels = vim.tbl_map(config.skgrepo_restriction_label, names)
+  local label = M.completing_read_with_cycle(
+    'Most private repo to show (S-left/right cycle): ', labels, {
+      require_match = true, cycle_values = labels,
+      initial_input = labels[#labels] })
+  if not label then return nil end
+  for i, candidate in ipairs(labels) do
+    if candidate == label then return names[i] end
+  end
 end
 
 ---Display an org buffer listing configured skgrepos and their paths.

@@ -268,8 +268,7 @@ describe('skg stream consumers', function ()
       if line:find('set skgrepo restriction', 1, true) then
         seen = line
         respond(helpers.framed(
-          '((response-type skgrepo-restriction) (restriction "public")'
-          .. ' (content "Skgrepo restriction: public"))'))
+          '((response-type skgrepo-restriction) (restriction "public"))'))
         respond(helpers.framed(
           '((response-type rerender-lock) (lock-views ()))'))
         respond(helpers.framed(

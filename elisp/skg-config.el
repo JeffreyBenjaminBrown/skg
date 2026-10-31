@@ -81,16 +81,19 @@ name directly."
        (local-set-key (kbd "C-?") #'skg-view-repo-list)))))
 
 (defun skg--prompt-for-repo-set ()
-  "Prompt for a repo-set choice, with completion and S-left/S-right cycling.
-A repo-set is a prefix of the config's privacy order: choosing a
-repo makes it and everything more public available; \"all\" makes
-everything available."
-  (let ((repo-sets (skg--repo-set-names)))
-    (unless repo-sets
+  "Prompt for the skgrepo restriction, with completion and S-left/S-right cycling.
+The skgrepo restriction is the most private skgrepo to show: choosing
+a repo shows it and everything more public.  Each choice is shown by
+its name, the most private one with \" (no restriction)\" appended,
+the default.  Returns the chosen repo's name."
+  (let* ((names (skg--repo-set-names))
+         (labels (mapcar #'skg--skgrepo-restriction-label names)))
+    (unless names
       (user-error "No skg repos found"))
-    (skg--completing-read-with-cycle
-     "Most private repo to make available (S-left/right cycle): "
-     repo-sets nil t nil nil "all" nil repo-sets)))
+    (let ((label (skg--completing-read-with-cycle
+                  "Most private repo to show (S-left/right cycle): "
+                  labels nil t nil nil (car (last labels)) nil labels)))
+      (nth (cl-position label labels :test #'string=) names))))
 
 (defun skg--repo-paths ()
   "Return an alist of (repo-name . absolute-path) from skgconfig.toml."
@@ -105,14 +108,19 @@ everything available."
       (skg-repo-names-from-toml config-file))))
 
 (defun skg--repo-set-names ()
-  "Return the repo-set choices, in privacy order, ending with \"all\".
-The choices are the configured repo names (each meaning that
-repo and everything more public -- a prefix of the config's
-privacy order) plus the reserved \"all\"."
-  (let ((config-file (skg-config-file)))
-    (when config-file
-      (append (skg-repo-names-from-toml config-file)
-              (list "all")))))
+  "Return the skgrepo restriction's choices: the repo names, in privacy order.
+Each names the most private repo to show, that repo and everything
+more public (a prefix of the config's privacy order); the last
+shows every repo, no skgrepo restriction."
+  (skg--repo-names))
+
+(defun skg--skgrepo-restriction-label (name)
+  "How the clients show the skgrepo restriction NAME, a repo name.
+The config's most private repo, which shows every repo, gets
+\" (no restriction)\" appended; the words never reach the server."
+  (if (equal name (car (last (skg--repo-names))))
+      (concat name " (no restriction)")
+    name))
 
 (defun skg-view-repo-list ()
   "Display an org buffer listing configured repos and their paths."

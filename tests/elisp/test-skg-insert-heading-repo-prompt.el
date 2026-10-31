@@ -14,6 +14,7 @@
 (require 'skg-buffer)
 (require 'skg-sexpr-edit)
 (require 'skg-config)
+(require 'skg-request-repo-sets)
 
 (defvar test--config-public-and-private
   (concat "[[repos]]\n"
@@ -353,28 +354,56 @@ or alone; deleting it there clears it."
                       "private"))))))
 
 (ert-deftest test-repo-set-prompt-completes-configured-repo-sets ()
-  "skg--prompt-for-repo-set completes the prefix repo-set choices:
-the repos in privacy order, then \"all\"."
+  "skg--prompt-for-repo-set completes the repos in privacy order, the
+most private one shown with \" (no restriction)\" and the default,
+and returns the chosen repo's name."
   (test--with-skg-content-view
    "* (skg node (gnid x) (skgRepos (nodeRepo public))) x\n"
    test--config-with-interleaved-repo-sets
    (lambda ()
-     (cl-letf (((symbol-function 'completing-read)
-                (lambda (prompt collection predicate require-match
-                         initial-input &optional hist def
-                         inherit-input-method)
-                  (should (string-match-p "Most private repo" prompt))
-                  (should (equal collection
-                                 '("public" "private" "all")))
-                  (should (null predicate))
-                  (should require-match)
-                  (should (null initial-input))
-                  (should (null hist))
-                  (should (equal def "all"))
-                  (should (null inherit-input-method))
-                  "private")))
-       (should (equal (skg--prompt-for-repo-set)
-                      "private"))))))
+     (dolist (case '(("public" . "public")
+                     ("private (no restriction)" . "private")))
+       (cl-letf (((symbol-function 'completing-read)
+                  (lambda (prompt collection predicate require-match
+                           initial-input &optional hist def
+                           inherit-input-method)
+                    (should (string-match-p "Most private repo" prompt))
+                    (should (equal collection
+                                   '("public" "private (no restriction)")))
+                    (should (null predicate))
+                    (should require-match)
+                    (should (null initial-input))
+                    (should (null hist))
+                    (should (equal def "private (no restriction)"))
+                    (should (null inherit-input-method))
+                    (car case))))
+         (should (equal (skg--prompt-for-repo-set)
+                        (cdr case))))))))
+
+(ert-deftest test-skgrepo-restriction-label-marks-the-most-private-repo ()
+  "The most private repo is shown with \" (no restriction)\"; the
+others, and a name the config lacks, by their names."
+  (test--with-skg-content-view
+   "* (skg node (gnid x) (skgRepos (nodeRepo public))) x\n"
+   test--config-with-interleaved-repo-sets
+   (lambda ()
+     (should (equal (skg--skgrepo-restriction-label "public") "public"))
+     (should (equal (skg--skgrepo-restriction-label "private")
+                    "private (no restriction)"))
+     (should (equal (skg--skgrepo-restriction-label "elsewhere") "elsewhere"))
+     (should (equal (skg--skgrepo-restriction-message
+                     '((response-type skgrepo-restriction)
+                       (restriction "private")))
+                    "Skgrepo restriction: private (no restriction)"))
+     (should (equal (skg--skgrepo-restriction-message
+                     '((response-type skgrepo-restriction)
+                       (restriction "public")))
+                    "Skgrepo restriction: public"))
+     (should (equal (skg--skgrepo-restriction-message
+                     '((response-type skgrepo-restriction)
+                       (restriction "public")
+                       (content "refused")))
+                    "refused")))))
 
 (ert-deftest test-config-readers-handle-interleaved-repo-tables ()
   "Elisp config readers should not confuse [[repos]] and [[repo_sets]]."
@@ -384,7 +413,7 @@ the repos in privacy order, then \"all\"."
    (lambda ()
      (should (equal (skg--repo-names) '("public" "private")))
      (should (equal (skg--repo-set-names)
-                    '("public" "private" "all")))
+                    '("public" "private")))
      (should (equal (mapcar #'car (skg--repo-paths))
                     '("public" "private"))))))
 

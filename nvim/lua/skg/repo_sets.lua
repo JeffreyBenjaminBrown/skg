@@ -4,6 +4,7 @@
 
 local buffer = require('skg.buffer')
 local client = require('skg.client')
+local config = require('skg.config')
 local payload = require('skg.payload')
 local picker = require('skg.picker')
 local rerender = require('skg.rerender_all_views')
@@ -12,7 +13,9 @@ local state = require('skg.state')
 
 local M = {}
 
----Ask the server for the configured skgrepo-sets.
+---Ask the server for the skgrepo restriction and its choices; shows
+---each repo by its name, the most private one with ' (no
+---restriction)' appended.
 function M.list_repo_sets ()
   state.register_response_handler('repo-sets',
     function (_payload_text, response)
@@ -21,7 +24,9 @@ function M.list_repo_sets ()
         payload.string_list(payload.field(response, 'sets'))
       vim.notify(string.format(
         'Skgrepo restriction: %s; available: %s',
-        restriction or '?', table.concat(sets, ', ')))
+        restriction and config.skgrepo_restriction_label(restriction) or '?',
+        table.concat(vim.tbl_map(config.skgrepo_restriction_label, sets),
+                     ', ')))
     end, true)
   state.lp_reset()
   client.send_string('((request . "list repo sets"))\n')
@@ -31,15 +36,28 @@ end
 function M.show_skgrepo_restriction ()
   state.register_response_handler('skgrepo-restriction',
     function (_payload_text, response)
-      vim.notify(payload.field_text(response, 'content') or '?')
+      vim.notify(M.skgrepo_restriction_message(response))
     end, true)
   state.lp_reset()
   client.send_string('((request . "skgrepo restriction"))\n')
 end
 
----Set the skgrepo restriction for this connection to NAME (prompted
----when absent), after confirmation; the server replies with the
----confirmation followed by the rerender stream. Refuses while any view
+---What to show for a skgrepo-restriction RESPONSE: a refusal carries
+---its words in 'content'; otherwise the response names the skgrepo
+---restriction, shown by its label.
+---@return string
+function M.skgrepo_restriction_message (response)
+  local content = payload.field_text(response, 'content')
+  if content then return content end
+  local restriction = payload.field_text(response, 'restriction')
+  return 'Skgrepo restriction: '
+    .. (restriction and config.skgrepo_restriction_label(restriction) or '?')
+end
+
+---Set the skgrepo restriction for this connection to NAME, the most
+---private repo to show (prompted when absent), after confirmation;
+---the server replies with the confirmation followed by the rerender
+---stream. Refuses while any view
 ---has unsaved edits, which the rerender would replace.
 ---@param name string|nil
 function M.restrict_repo_set (name, approved_pids)
@@ -63,7 +81,7 @@ function M.restrict_repo_set (name, approved_pids)
   rerender.send_streaming_request('rerender', 'skgrepo-restriction',
     request,
     function (_payload_text, response)
-      vim.notify(payload.field_text(response, 'content') or '?')
+      vim.notify(M.skgrepo_restriction_message(response))
     end, nil,
     function (pids) M.restrict_repo_set(name, pids) end)
 end

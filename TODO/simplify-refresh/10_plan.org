@@ -698,7 +698,7 @@ cleanup, the restore and readiness requests, and the import's
 half of the global commands) to 'TODO/DONE/', leaving the strip
 and the export.
 
-** TODO Slice 3: one encoding of the skgrepo restriction
+** DONE Slice 3: one encoding of the skgrepo restriction
 Read "One encoding of the skgrepo restriction" in the agreed
 behavior, Decide 7 of the review, and the pitfalls on the
 'all' literals and the save's normalization first.

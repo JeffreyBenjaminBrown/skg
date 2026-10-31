@@ -60,7 +60,7 @@ members shown without their content, and with an order-only changeset
 marker, which is always ready. Its sets are empty: it renders no pruned change view.
 ** Refusals
 Every buffer is refused, and the client stops, unless the
-skgrepo restriction is 'all', and when the graph straddle cannot be built: an
+connection is unrestricted, and when the graph straddle cannot be built: an
 owned skgrepo that is not in a gitrepo or has no HEAD commit, or a
 HEAD that fails the whole-graph validation. A merge commit at HEAD is
 no reason to refuse.
@@ -172,7 +172,7 @@ refresh so:
   buffer's sets decide ("Editability in the diff view");
 - in the tail, the '(ready ...)' change facts are set from the
   store, and in the skgrepo-changes buffer the home skgrepo moves.
-The diff view opens only under the skgrepo restriction 'all', but a
+The diff view opens only on an unrestricted connection, but a
 skgrepo-set switch rerenders its open buffers under the new
 skgrepo restriction, which the refresh then asks as in a content
 view: the goal omits a member whose record is restricted and keeps
@@ -617,7 +617,7 @@ C-c r c ('skg-stage-and-commit') prompts once for a message and sends
 "stage and commit". The server stages the changed '.skg' files of
 every owned skgrepo, deletions included, and git-commits each gitrepo
 that has changes with that message, by the gitrepo's configured user.
-It refuses unless the skgrepo restriction is 'all', for a blank
+It refuses unless the connection is unrestricted, for a blank
 message, and when the straddle cannot be built. It commits whole
 skgrepos, never less: a partial commit can leave HEAD inconsistent
 (referencing nodes it lacks, recording a relationship from one end

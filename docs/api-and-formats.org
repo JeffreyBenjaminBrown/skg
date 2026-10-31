@@ -61,8 +61,9 @@ So far there are these endpoints:
       and to what the enrichment draws, after it: the occurrences of
       overPrivateText nodes there become tombstones, and childless
       tombstones are pruned. The choice
-      is request-scoped. Skgrepo-set =all= needs no choice and returns a
-      warning if the results include overPrivateText telescopes.
+      is request-scoped. An unrestricted connection needs no choice
+      and returns a warning if the results include overPrivateText
+      telescopes.
 
   - Response: one LP =((response-type search-results) (content
     "ORG") (warnings ("..." ...)))=, whose content is the search
@@ -121,7 +122,8 @@ So far there are these endpoints:
     =(operation single-root-view)=, the exact PIDs, and a text-free
     prompt. An approved retry carries those
     exact PIDs in =approved-overPrivateText-pids=; approval is not cached.
-    Skgrepo-set =all= returns the ordinary response with a warning.
+    An unrestricted connection receives the ordinary response with a
+    warning.
   - If =NODE_ID= resolves to a restricted skgrepo, the server refuses the
     request with a human-readable message and does not open a buffer.
     Following a link to a restricted-skgrepo node behaves the same way.
@@ -354,8 +356,8 @@ So far there are these endpoints:
     (operation save-rerender) (pids ("P" ...)) (prompt "..."))=.
     The save itself has succeeded; only its updated text is withheld.
     The client may retry the same save with
-    =(approved-overPrivateText-pids "P" ...)=. Under skgrepo-set =all=, or on an
-    approved retry, the ordinary save-result carries the shared overPrivateText-
+    =(approved-overPrivateText-pids "P" ...)=. On an unrestricted connection,
+    or on an approved retry, the ordinary save-result carries the shared overPrivateText-
     telescope warning. Declining leaves current client buffers and the
     server's open-view registry unchanged.
   - Exactly one of =save-result=, =delete-from-confirmation=,
@@ -482,7 +484,7 @@ since the command searches the current buffer.
     - =((empty . t) (errors ()) (warnings ()))=: the buffer would show
       nothing, so the client does not open it.
     - =((content "") (errors ("REFUSAL")) (warnings ()))=: refused, when
-      the skgrepo restriction is not =all=, when an owned skgrepo is
+      the connection has a skgrepo restriction, when an owned skgrepo is
       not a gitrepo or has no HEAD commit, or for an unknown BUFFER. A
       refusal applies to every buffer, so the client stops.
   - What each buffer shows: the "all changes" buffer is the pruned change view over
@@ -546,7 +548,7 @@ since the command searches the current buffer.
       was committed loses its change facts. The marks of the changes committed are dropped
       from the readiness store.
     - =((errors ("REFUSAL")) (warnings ()))= when the
-      skgrepo restriction is not =all=, the message is blank, or the graph
+      connection has a skgrepo restriction, the message is blank, or the graph
       straddle cannot be built. The rerender stream is empty.
   - Logic: =server/serve/handlers/stage_and_commit.rs=,
     =server/git_ops/stage_and_commit.rs=.
@@ -563,7 +565,7 @@ since the command searches the current buffer.
       response's form, for the buffer as rerendered; the rerender
       stream carries that buffer.
     - =((errors ("REFUSAL")) (warnings ()))= when the
-      skgrepo restriction is not =all=, VIEW_ID is not a buffer of the
+      connection has a skgrepo restriction, VIEW_ID is not a buffer of the
       diff view, or the rerender fails. The rerender stream is empty.
   - Logic: the graph straddle is brought up to date, and the buffer's
     pruned change view sets recomputed. Each node of U without an editable
@@ -594,8 +596,8 @@ since the command searches the current buffer.
       at, its title then, its own relation lists then, and every node of
       that tree that referred to it (links included); or
       =** never present in the git history of any skgrepo=.
-  - Refused, with the reason as an error, unless the
-    skgrepo restriction is =all=: history can hold the text of any skgrepo.
+  - Refused, with the reason as an error, unless the connection is
+    unrestricted: history can hold the text of any skgrepo.
   - Logic: =server/serve/handlers/investigate_unknown_node.rs=,
     =server/git_ops/vanished.rs=.
 
@@ -712,8 +714,9 @@ under each imported file root prepares a later Org export, but does not run
 one automatically.
 
 ** Export to org
-  - Request: =((request . "export to org") (skgrepo-set . "NAME")
+  - Request: =((request . "export to org") (repo-set . "NAME")
     (output-dir . "PATH") (approved-overPrivateText-pids "PID" ...))=.
+    - NAME is a skgrepo name, the most private skgrepo to export.
     - Both fields are required; a missing or blank =output-dir= is an
       error (the server applies no default -- the client supplies the
       user a default but always sends a value). =output-dir= is
@@ -726,7 +729,7 @@ one automatically.
     =((content "REPORT") (errors ("..." ...)) (warnings ("..." ...)))=.
     =content= is a human-readable report (files written, broken-link
     count, warning count). =errors= is non-empty only on failure
-    (bad/unknown skgrepo-set name, unreadable =.skg= files, filesystem
+    (bad/unknown skgrepo name, unreadable =.skg= files, filesystem
     error). =warnings= are non-fatal (skipped roots,
     broken links).
   - Behavior: Reads all =.skg= files fresh from disk, finds every
@@ -742,8 +745,9 @@ one automatically.
     Before writing anything, a restricted export involving overPrivateText
     telescopes returns LP =overPrivateText-telescope-confirmation= with
     =(operation export-to-org)= and the exact PIDs. An approved retry
-    carries those PIDs in =approved-overPrivateText-pids=. An =all= export, or
-    an approved restricted export, returns the ordinary export response
+    carries those PIDs in =approved-overPrivateText-pids=. An export of
+    the config's most private skgrepo (no skgrepo restriction), or an
+    approved restricted export, returns the ordinary export response
     with the shared warning.
   - An *export root* is a node one of whose =contains= children has
     a title linking to the instruction node
@@ -761,8 +765,10 @@ one automatically.
     =#PID= get a =:CUSTOM_ID: PID= drawer.
   - The same export is available as a CLI subcommand (no running server):
     =cargo run --bin skg -- export-org [config-path] [skgrepo-set]
-    [output-dir] [--include-overPrivateText-telescopes]=. Under a restricted set it
-    fails closed before writing unless the flag is present; under =all=
+    [output-dir] [--include-overPrivateText-telescopes]=; =skgrepo-set=,
+    the most private skgrepo to export, defaults to the config's most
+    private skgrepo. Under a restricted set it fails closed before
+    writing unless the flag is present; with no skgrepo restriction
     (and on an approved restricted run) it prints the warning.
 
 ** Delete references to an absent node
@@ -813,8 +819,8 @@ one automatically.
     the exact PIDs, followed by an empty rerender stream
     (=rerender-lock= with no view IDs, then clean =rerender-done=). No view
     text is sent and no open-view registry entry changes. A retry adds
-    =approved-overPrivateText-pids=; =all= instead adds the shared warning to
-    =rerender-done=.
+    =approved-overPrivateText-pids=; an unrestricted connection instead
+    adds the shared warning to =rerender-done=.
   - =server/serve/rerender_stream.rs= prepares, authorizes and streams
     the rerenders; every request answered by a rerender stream shares
     it.
@@ -822,21 +828,24 @@ one automatically.
 ** skgrepo-sets
   - Skgrepo-sets are the prefixes of the config's privacy order (see
     "skgconfig.toml > skgrepo-sets" below): each skgrepo name denotes
-    itself plus everything more public, and =all= means every skgrepo.
+    itself plus everything more public. The skgrepo restriction is one
+    skgrepo, the most private one shown; a connection that shows the
+    config's most private skgrepo is unrestricted.
   - Request: ((request . "list repo sets"))
   - Response: LP response-type "repo-sets" with
     =((restriction "NAME") (sets ("NAME1" "NAME2" ...)))=. The sets are
-    the skgrepo names in privacy order (most public first) followed
-    by =all=; order is meaningful (it is the privacy ladder), so
-    clients should preserve it.
+    the skgrepo names in privacy order (most public first), the last
+    of them no skgrepo restriction; order is meaningful (it is the
+    privacy ladder), so clients should preserve it.
   - Request: ((request . "skgrepo restriction"))
   - Response: LP response-type "skgrepo-restriction" with
     =((restriction "NAME"))=.
   - Request: =((request . "set skgrepo restriction") (name . "NAME")
-    (approved-overPrivateText-pids "PID" ...))=.
+    (approved-overPrivateText-pids "PID" ...))=, NAME the most private
+    skgrepo to show.
   - Response: Multiple length-prefixed messages, sent sequentially:
     1. Skgrepo-set response:
-       =Content-Length: N\r\n\r\n(("response-type" "skgrepo-restriction") ("restriction" "NAME") ("content" "Skgrepo restriction: NAME"))=
+       =Content-Length: N\r\n\r\n((response-type skgrepo-restriction) (restriction "NAME"))=
     2. The rerender stream, as in "rerender all views":
        rerender-lock → rerender-view* → rerender-done. Each open view
        is re-rendered in place under the new set by the refresh alone:
@@ -858,8 +867,10 @@ one automatically.
     connection. The rerender starts from each view as the server last
     stored it, and the clients replace each buffer's text with the
     result, so an unsaved edit in an open buffer is lost.
-  - Refusal: the endpoint's error paths (missing or unknown set
-    name) answer in the normal skgrepo-restriction response-type,
+  - Refusal: the endpoint's error paths (a missing name, or one that
+    names no skgrepo of the config: "'NAME' names no skgrepo of the
+    config. The skgrepo restriction is the most private skgrepo to
+    show.") answer in the normal skgrepo-restriction response-type,
     carrying the explanatory text as =content= and the unchanged set
     as =restriction=, followed by an empty rerender stream (a
     rerender-lock naming no views, then rerender-done), so the
@@ -889,8 +900,8 @@ one automatically.
   - Under a restricted skgrepo-set, requested titles involving overPrivateText
     telescopes instead return LP =overPrivateText-telescope-confirmation= with
     =(operation titles-by-ids)= and the exact PIDs. An approved retry
-    carries those PIDs in =approved-overPrivateText-pids=; =all= returns the
-    ordinary map with the shared warning.
+    carries those PIDs in =approved-overPrivateText-pids=; an unrestricted
+    connection receives the ordinary map with the shared warning.
 
 ** Shutdown server
   - Request: ((request . "shutdown"))
@@ -1324,7 +1335,7 @@ Pass its path as a command-line argument (default: =data/skgconfig.toml=) when s
 | =initial_node_limit= | no       | 1000    | Max nodes to render in initial content views.                    |
 | =timing_log=         | no       | false   | When true, writes a JSON log to =<data_root>/logs/server.jsonl=. |
 | =beep_when_server_becomes_available= | no | true | When true, plays a local sound after server initialization finishes. |
-| =default_repo_set= | no | =all= | The skgrepo restriction when a client connects. Runtime changes are per connection and are not written back. |
+| =default_repo_set= | no | the most private skgrepo | The skgrepo restriction when a client connects: the most private skgrepo to show. The default is no skgrepo restriction. Runtime changes are per connection and are not written back. |
 | =owned_folder= | no | =owned= | The top-level folder under the data root whose skgrepos the user owns (see Skgrepos, below). |
 | =max_roleTree_depth= | no | 20 | Max breadth-first depth of a containerward chain. |
 
@@ -1352,7 +1363,7 @@ available skgrepo-sets (below).
 | =name=         | no       | Unique name for this skgrepo (used in metadata, provenance). Defaults to =path=. |
 | =abbreviation= | no       | Short label for heralds. Owned skgrepos with defaulted names abbreviate to the path minus the owned folder. |
 
-The skgrepo name =all= is reserved and rejected.
+Two skgrepos of one name are rejected.
 
 *Ownership is by location, not declaration*: a skgrepo is owned
 (writable) iff its path lies under =<data_root>/<owned_folder>=,
@@ -1366,10 +1377,12 @@ the migration script (=bash/migrate-to-author-folders.sh=).
 Skgrepo-sets are no longer declared; the retired =[[repo_sets]]=
 table is rejected with an error. The sets are exactly the
 *prefixes of the privacy order*: each skgrepo's name denotes the
-set consisting of itself and every more-public skgrepo, and the
-reserved name =all= means every skgrepo. Choosing a set is choosing
+set consisting of itself and every more-public skgrepo; the most
+private skgrepo's set holds every skgrepo, and so is no skgrepo
+restriction. Choosing a set is choosing
 "the most private skgrepo to make available." =default_repo_set=
-(top-level field) names the skgrepo restriction when a client connects.
+(top-level field) names the skgrepo restriction when a client
+connects; left out, it is the most private skgrepo.
 
 Example:
 
@@ -1391,8 +1404,8 @@ path = "Fred"           # foreign => write-protected
 #+end_src
 
 Here the available skgrepo-sets are =public= = {public},
-=private= = {public, private}, =Fred= = =all= = {public, private,
-Fred}.
+=private= = {public, private}, =Fred= = {public, private, Fred};
+=Fred=, the most private, is no skgrepo restriction.
 
 ** OTHER_SKGREPO_DEPENDENCIES.toml
 
@@ -1811,7 +1824,7 @@ A readiness gesture on such a folder acts on each changed membership.
 
 ** Restricted-skgrepo nodes: omission, retention, and save preservation
   - The principle: the skgrepo restriction limits writes as it limits
-    views. Under a skgrepo-set narrower than =all=, no save or other
+    views. Under a skgrepo restriction, no save or other
     write removes, moves, rewrites or creates a record, a section or
     a node file the set keeps out, and none reads the buffer's silence
     about such a record as an edit: what the user could not see, the
@@ -1845,9 +1858,9 @@ at a node the set keeps out shows its root as a Restricted vognode
 too, since the view is the user's own request; it is the node's
 occurrence again when the set widens. An alias whose record the set
 keeps out is neither drawn nor counted in =(props (aliases N))=.
-The diff view opens only under 'all', but a switch rerenders its
-buffers under the new set as a content view is rerendered: a
-restricted node is never a ghost there.
+The diff view opens only on an unrestricted connection, but a
+switch rerenders its buffers under the new set as a content view
+is rerendered: a restricted node is never a ghost there.
 
 Saving preserves what rendering omitted: a member whose record is
 restricted cannot be deleted (or even seen), so the save combines the

@@ -186,17 +186,25 @@ function M.repo_names ()
   return file and M.repo_names_from_toml(file) or nil
 end
 
----The skgrepo-set choices, in privacy order, ending with 'all'.
----A skgrepo-set is a prefix of the config's privacy order: each
----repo names the set of itself and everything more public;
----'all' means every skgrepo.
----@return string[]|nil skgrepo-set choices, 'all' last, or nil
+---The skgrepo restriction's choices: the repo names, in privacy
+---order. Each names the most private repo to show, that repo and
+---everything more public (a prefix of the config's privacy order);
+---the last shows every repo, no skgrepo restriction.
+---@return string[]|nil the choices, or nil without config
 function M.repo_set_names ()
-  local file = M.config_file()
-  if not file then return nil end
-  local names = M.repo_names_from_toml(file)
-  table.insert(names, 'all')
-  return names
+  return M.repo_names()
+end
+
+---How the clients show the skgrepo restriction NAME, a repo name:
+---the config's most private repo, which shows every repo, gets
+---' (no restriction)' appended; the words never reach the server.
+---@param name string
+---@return string
+function M.skgrepo_restriction_label (name)
+  local names = M.repo_names()
+  if names and #names > 0 and names[#names] == name then
+    return name .. ' (no restriction)' end
+  return name
 end
 
 ---@return string[]|nil owned skgrepo names, or nil without config

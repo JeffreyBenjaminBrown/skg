@@ -53,7 +53,7 @@ T.check(vim.b[buf].skg_link_repo_suffix ~= true,
         'repo suffix starts off')
 local repo_sets = require('skg.repo_sets')
 local state = require('skg.state')
-repo_sets.restrict_repo_set('all')
+repo_sets.restrict_repo_set('private')
 T.check(T.wait_for(function ()
   return status('private-node', 'resolved')
          and state.lp_pending_count == 0 end, 10),

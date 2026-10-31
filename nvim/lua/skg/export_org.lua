@@ -4,6 +4,7 @@
 -- the server's report. The Lua port of elisp/skg-request-export-org.el.
 
 local client = require('skg.client')
+local config = require('skg.config')
 local messages = require('skg.messages')
 local payload = require('skg.payload')
 local picker = require('skg.picker')
@@ -12,8 +13,9 @@ local state = require('skg.state')
 
 local M = {}
 
----Export REPO_SET (prompted when absent; choose a public-facing set
----so private notes stay private) to OUTPUT_DIR, which the server
+---Export REPO_SET, the most private repo to export, and every more
+---public repo (prompted when absent; choose a public-facing repo so
+---private notes stay private) to OUTPUT_DIR, which the server
 ---resolves against its own project root -- possibly inside a
 ---container whose filesystem differs from this editor's, hence no
 ---path completion on the prompt. Defaults to 'org-exports'.
@@ -28,9 +30,10 @@ function M.export_some_to_org (repo_set, output_dir, approved_pids)
       .. ' [org-exports]: ')
     if output_dir == '' then output_dir = 'org-exports' end
   end
-  if repo_set == 'all' then
-    vim.notify("Exporting repo-set 'all'; consider a public-facing"
-               .. ' repo-set so private notes are not exported.')
+  local names = config.repo_names()
+  if names and names[#names] == repo_set then
+    vim.notify('Exporting with no skgrepo restriction; consider a more'
+               .. ' public repo so private notes are not exported.')
   end
   state.register_response_handler('export-to-org',
     function (_payload_text, response)
