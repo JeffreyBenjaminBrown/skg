@@ -2,7 +2,8 @@
 /// 'SubscribeeVisibility' signals that collection put in the map.
 /// It is async because it consults disk.
 /// .
-/// The policy, for subscriber R viewing subscribee E, is:
+/// The policy of the subscribee-visibility step, for subscriber R
+/// viewing subscribee E, is:
 /// .
 /// - If N is graph-content of subscribee E,
 ///   and E has a viewchild with ID N and claimsMembership,
@@ -14,7 +15,13 @@
 /// - If N is a claimsMembership viewchild of E but is not
 ///   graph-content of E, then it is not a hiderel edit.
 ///   This does not touch it. The refresh of the save's rerender
-///   will mark it noClaim.
+///   makes it vanish.
+/// .
+/// Both E's content and R's hides are read by the records the
+/// skgrepo restriction shows, as the view drew them: a hide whose
+/// record is restricted is neither removed nor moved, and no hide is
+/// inferred of a member that only a restricted record of E's
+/// explains.
 /// .
 /// Resolution cannot run during collection, even in principle: it
 /// needs disk (the subscribee's contains, the subscriber's hides)
@@ -68,12 +75,13 @@ pub fn resolve_visibility (
         &subscriber_from_disk );
     let visible_content : HashSet<ID> =
       signal . visible . iter() . cloned() . collect();
-    let subscribee_contains : Vec<ID> =
-      members_of (&subscribee_from_disk . contains);
-    let subscriber_hides : Vec<ID> =
-      members_of (
-        subscriber_from_disk . hidesFromSubs
-        . or_default() );
+    let subscribee_contains : Vec<ID> = // what the buffer could show of the subscribee's content
+      members_with_visible_records (
+        &subscribee_from_disk . contains, skgrepo_restriction );
+    let subscriber_hides : Vec<ID> = // a restricted hide the buffer could not show, so no save removes it
+      members_with_visible_records (
+        subscriber_from_disk . hidesFromSubs . or_default (),
+        skgrepo_restriction );
     let inferred_hides : Vec<ID> =
       subscribee_contains . iter()
       . filter ( |gnid| ! visible_content . contains (*gnid) )
@@ -95,6 +103,18 @@ pub fn resolve_visibility (
     &mut lowered, hidden_outside, graph, config,
     skgrepo_restriction ) ?;
   Ok ((lowered, post_skgsave_commit_notice_candidates)) }
+
+/// The members of 'list' whose records the skgrepo restriction shows
+/// ('SkgrepoRestriction::record_is_visible'), as written.
+fn members_with_visible_records (
+  list                : &[RelPartner<ID>],
+  skgrepo_restriction : Option<&SkgrepoRestriction>,
+) -> Vec<ID> {
+  list . iter ()
+    . filter ( |member| SkgrepoRestriction::record_is_visible (
+      skgrepo_restriction, &member . relRepo ))
+    . map ( |member| member . member . clone () )
+    . collect () }
 
 /// Applies the submitted visible-outside subset after all ordinary hide
 /// inference.  Only the old *visible outside* hides are replaceable: hides

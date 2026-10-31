@@ -441,7 +441,11 @@ inside N's subscribee folder and holds N's hides that S contains, in
 the order of N's hides list. The *hidden-outside compound partner
 folder* (=hiddenOutsideOfSubscribeeFolder=) stands in N's subscribee
 folder beside the subscribees and holds N's hides that no subscribee
-contains.
+contains. Both read each relationship by the records the skgrepo
+restriction shows: under a skgrepo narrowing, a hide of H that S
+contains only by a restricted record stands in the hidden-outside
+folder, and a hide recorded in a restricted section stands in
+neither.
 
 *** write-protected set
 
@@ -494,6 +498,21 @@ They are not just subscribees, but they are being shown /as/ subscribees.
 This changes the way edits are interpreted:
 Edits to a "subscribee as such" can only affect
 what the relevant subscriber hides, nothing else.
+
+*** the subscribee-visibility step
+
+The *subscribee-visibility step* (a term of plan 10) is the step of
+the save that, for a subscribee as such shown editable under its
+subscriber, reads what the buffer shows of the subscribee's content
+and rewrites the subscriber's hides to match: content shown there,
+claiming, is unhidden, and content not shown, which the subscriber
+does not contain, is hidden ('resolve_visibility' in
+'server/from_text/local_fieldintent_collection/resolve_visibility.rs').
+It reads the subscribee's content and the subscriber's hides by the
+records the skgrepo restriction shows, as the view drew them, so a
+hide recorded in a restricted section is neither removed nor moved,
+and no hide is written of a member that only a restricted record
+explains.
 
 *** role tree, and the -ward adjectives
 

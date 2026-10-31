@@ -5463,3 +5463,116 @@ Suites: nextest 1022 of 1022 (twelve tests gone, eight new),
 Emacs 407, Neovim 446, integration 35 of 36 with either client,
 the pre-existing failure. The two greps of slice 5 and 6 on the
 corrections are already empty.
+
+** Slice 1
+*** The commits
+**** 10348582
+The walk keys a node's editability by its pid
+('Walk::editability_key'), but for an ID in the diff view that
+HEAD had as a node of its own, which keys only itself; three
+tests in 'tests/refresh/re_kind.rs' and 'diff_view.rs'.
+**** 330ac856
+The hidden-outside goal reads each subscribee's content through
+the gate, and the save of that folder counts as inside what the
+goal does; seven tests in 'tests/refresh/hide_folders.rs'.
+**** The last commit
+The subscribee-visibility step reads both its lists through the
+gate; five save tests in
+'tests/subscriber_hides_under_a_narrowing.rs'; the docs, the
+move of the four problems entries, this record and the plan's
+keyword.
+*** The suites
+**** cargo check --all-targets
+Clean, no warning.
+**** bash/nextest.sh
+1038 of 1038: slice 0's 1022 and sixteen new tests (four of the
+editability map, seven of the hide folders, five saves).
+**** bash/integration-tests.sh
+35 of 36 with Emacs and 35 of 36 with Neovim
+('SKG_TEST_CLIENT=nvim'); the failure is 'import-md-and-org'
+both times, pre-existing and not this plan's. Run before the
+last two edits, a rewrapped doc comment in
+'server/refresh/mod.rs' and one refresh unit test; the code was
+otherwise as committed.
+**** bash/emacs-tests.sh, bash/nvim-tests.sh
+Not run: the slice touches no client and no message a client
+test asserts.
+**** Failures met during the slice
+None but the pre-existing one. The fixpoint sweeps
+('tests/idempotence.rs' and the refresh unit tests) ran first
+after the change to the refresh and again at the end; both
+passed. Each new test that asserts a fix was run against the
+old code too, and failed there: the window case and the diff
+view's acquirer, the visible hide of restricted content, the
+keyed editable-view request, and three of the five saves (the
+other two pass on both, as the review found).
+**** The TCP surface
+The verify skill's isolated server (port 1781, scratch data
+under 'tests/results/10/slice1/scratch/', removed after) ran
+lead4's base case: narrowed to 'pub', the subscribee folder
+requested, e made editable and the view saved unchanged; the
+private file of r kept its hide of h, and the public file named
+no hide of e's private member x. The server was stopped by its
+recorded PID. The probe and its output are in
+'tests/results/10/slice1/probes/'.
+*** Deviations from the plan's "how"
+**** the key, not the pass, asks the ghost question
+The plan has the pass before the walk ask the ghost question.
+Every hold, release and question of the map goes through one
+key ('Walk::editability_key'), which asks it, so that the pass,
+the map's builder and the visits cannot disagree on what an ID
+names. 'acquired_since_head' is the ID rule's own test, moved
+into a function both use.
+**** the editable-view request pass keys too
+'fulfill_editableView_requests' compared raw gnids, so a
+request on an occurrence written under the pid left an editable
+occurrence under an extra ID editable, and the pass after it
+then kept that one, being first in level order, and dropped the
+request's effect. It compares by the key now; a test in
+'re_kind.rs' fails on the old code.
+**** a restricted gnid keys by its pid
+'keep_the_first_editable_occurrence_of_each_node' keyed a gnid
+the restriction keeps out by the ID as written. The key is
+ungated: the ID rule makes every such occurrence a gnid-only
+vognode, which releases the editability either way, and the
+key reveals nothing.
+**** the hidden-outside folder's save follows its goal
+'apply_hiddenoutside_edits' counted as inside the whole content
+of each subscribee, as its doc said the goal did. With the goal
+gated, a hide of something a subscribee contains only by a
+restricted record stands in the folder under the narrowing;
+counted as inside, its line could not be edited, and deleting
+it changed nothing. The save now counts only the visible
+records, as the goal does; the last save test asserts that the
+line's deletion removes the visible hide and leaves the
+subscribee's private record.
+**** where the save tests went
+A new module of the 'grouped_repos' binary,
+'tests/subscriber_hides_under_a_narrowing.rs', rather than
+'tests/hidden_nodes.rs', which has a fixture of its own and is
+over a thousand lines; it holds lead3, lead4's two cells, lead5's
+case 1 and lead2's save. lead2's case B (a restricted subscribee)
+became a seventh refresh test. Not made tests: lead3's case C
+(a restricted root, which 'hidden_nodes.rs' already covers) and
+lead4's deletions of h under e.
+**** docs beyond the module docs
+The glossary takes "the subscribee-visibility step" now, marked
+as a term of plan 10, and its entry "compound partner folder"
+says both folders read by the visible records; the API doc's
+"Restricted-skgrepo nodes" and the technical model say the
+same, the technical model in place of its citation of the
+problems entry this slice closes, and the walk's key. The module
+doc of 'resolve_visibility.rs' names the step and the gate, and
+loses its stale "will mark it noClaim".
+*** Fixtures changed
+None. No existing test changed.
+*** Left unfinished
+Nothing of the slice. One behavior seen and not pinned: under
+the narrowing, with r's hide of h restricted and e containing h
+by a visible record, deleting h's line from under e writes
+nothing (h is already hidden, by the restricted record) and the
+rerender draws h again under e. That is the agreed "what the
+user sees as E's content stays content for the narrowing's
+duration", but the user's deletion has no visible effect.
+*** Headline
+DONE.

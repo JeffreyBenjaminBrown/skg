@@ -570,7 +570,7 @@ responses. 'docs/diff-view.org' and 'data-model_technical.org':
 the mentions of buffer corrections and of the integrate
 request's two passes.
 
-** TODO Slice 1: the three defects of the review's tests
+** DONE Slice 1: the three defects of the review's tests
 Read "Three defects of the review's tests" in the agreed
 behavior, Decide 13 of the review, and the throwaway tests
 'lead1_editable_occurrence_under_an_extra_id.rs',

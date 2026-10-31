@@ -1827,7 +1827,16 @@ it claims, and deleting its line removes the record, as deleting an
 unknown's does. The folder of what a subscriber hides outside its
 subscribees replaces the hides with a visible record, each of which
 it showed, as an occurrence, an unknown or a Restricted vognode; a
-hide recorded in a restricted section is never replaced. Edits to
+hide recorded in a restricted section is never replaced. Which hides
+stand outside the subscribees is what the visible records say: a
+hide of a node a subscribee contains only by a restricted record
+stands in that folder, and its line edits the hide. A subscribee
+shown editable under its subscriber shows its content by its
+visible records, less the hides with a visible record; the save
+writes the subscriber's hides from what it shows, by the same
+records, so that a hide recorded in a restricted section survives
+even where the subscribee's content shows the hidden node, and no
+hide is written of a member only a restricted record explains. Edits to
 visible members, including deletions, are honored. A member whose
 record is restricted needs no headline for this: the disk supplies
 it.

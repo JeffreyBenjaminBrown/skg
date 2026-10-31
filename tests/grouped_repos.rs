@@ -45,3 +45,6 @@ mod viewnode_id_stability;
 
 #[path = "hidden_nodes.rs"]
 mod hidden_nodes;
+
+#[path = "subscriber_hides_under_a_narrowing.rs"]
+mod subscriber_hides_under_a_narrowing;

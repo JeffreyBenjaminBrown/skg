@@ -1,3 +1,95 @@
+* Problems found by the review of plan 08 (2026-10-30; fixed 2026-10-31)
+  Found by the throwaway tests of 'TODO/simplify-refresh/
+  09_review.org' (Open questions 1 and 2); the tests are in
+  'tests/results/08/review/throwaway-tests/', each with its log
+  and the line to add to run it.
+** An editable occurrence under an extra ID can lose its editability
+  'editable_occurrences_in' ('server/refresh/mod.rs') keys the
+  walk's map of editable occurrences by the gnid as written in
+  the buffer, where 'keep_the_first_editable_occurrence_of_each
+  _node' keys by 'pid_else_raw_id'. After a nodeMerge made b an
+  extra ID of a, a buffer holding an editable occurrence written
+  under b answers 'editability_is_held (a)' with no until that
+  occurrence's parent is visited. When a container that lists a
+  without showing its content is visited first, the occurrence
+  reinstated under it takes a's editability, and the user's
+  occurrence, written under b, is write-protected with only
+  "Reinstated" reported; written under a it keeps its
+  editability. Never two editable occurrences, always a
+  fixpoint. In the diff view a related loss: HEAD holding a and
+  b apart and the worktree holding the nodeMerge, two editable
+  roots written under b and a end as the ghost of b and a
+  write-protected occurrence of a, so the changed node has no
+  editable occurrence, with only the re-kind reported. Fix: key
+  the map by the pid; decide the diff-view case.
+  Fixed by slice 1 of 'TODO/simplify-refresh/10_plan.org': the
+  walk keys its map by the pid ('Walk::editability_key',
+  'server/refresh/mod.rs'), and in the diff view an ID that HEAD
+  had as a node of its own keys only itself, since the ID rule
+  makes its occurrence that node's ghost, so the acquirer keeps
+  its editable occurrence. Tests in 'tests/refresh/re_kind.rs'
+  and 'tests/refresh/diff_view.rs'.
+** A save under a skgrepo narrowing deletes a restricted hide
+  Run ('09_1_review-reports/throwaway-tests/
+  lead4_restricted_hide_of_subscribee_content.rs'). R, home
+  'public', subscribes to E (record in R's public section) and
+  hides H (record in R's private section); E, public, contains
+  H and C in its public section. Under the skgrepo restriction
+  to 'public' the hide is invisible, so H is drawn as ordinary
+  claiming content of E under R's subscription, and R's line
+  counts no hide, which is right. Saving that view unchanged
+  deletes 'private/r.skg', and the hide with it, with no warning
+  and no buffer correction: the subscribee-visibility loop of
+  'server/from_text/local_fieldintent_collection/
+  resolve_visibility.rs' works out what to unhide from all of
+  R's hides on disk, never asking whether a hide's record is
+  visible, and reads H's presence as claiming content of the
+  editable E as an unhide. Deleting H's line instead, with no
+  save before it, changes no file and the next drawing puts H
+  back; after an unchanged save the same deletion records a new
+  hide of H in R's public section, moving the hide from
+  'private' to 'public'. 'apply_hiddenoutside_edits' in the same
+  file asks the record's visibility and keeps a restricted hide
+  (lead3); the loop should ask the same. With E containing H by
+  a restricted record too, every save leaves the files as they
+  were.
+  Fixed by slice 1 of 'TODO/simplify-refresh/10_plan.org': the
+  subscribee-visibility step reads the subscribee's content and
+  the subscriber's hides by their visible records, so it neither
+  removes nor moves a restricted hide. Tests in
+  'tests/subscriber_hides_under_a_narrowing.rs'.
+** The hidden-outside folder's goal reads restricted records
+  'goal.rs' (around line 406) says the folder of what a
+  subscriber hides outside its subscribees is computed by the
+  records the skgrepo restriction shows, but the subscribees'
+  content is read ungated (around 429-432), where the hidden-in
+  goal is gated. Under a skgrepo narrowing, s subscribing to e
+  and hiding h, with e containing h by a restricted record, h
+  shows in neither folder though h and the hide are visible
+  records; with e itself restricted, h's presence in the folder
+  depends on e's private content, which a reader can infer. The
+  hides count above the folder says two where the folder holds
+  one. A save under the narrowing keeps both hides. Fix: gate the
+  subscribee's content as 'hidden_in_subscribee' does.
+  Fixed by slice 1 of 'TODO/simplify-refresh/10_plan.org': the
+  goal reads each subscribee's content through the gated
+  accessor, and the save of the folder counts as inside what the
+  goal does. Tests in 'tests/refresh/hide_folders.rs' (Jeff's
+  table of six cases, and the restricted subscribee) and
+  'tests/subscriber_hides_under_a_narrowing.rs'.
+** Writes that touch what the skgrepo restriction hides (one of eleven)
+  The rest stay in 'TODO/problems.org'.
+*** The subscribee loop writes a public hide of a private member
+  Run. 'resolve_visibility.rs' 55-95 reads the subscribee's
+  contents and the subscriber's hides ungated; under 'public' an
+  unchanged save of an editable subscribee records a hide of each
+  privately contained member in the subscriber's public file.
+  Leaks and loses. The unhide half is the entry above.
+  Fixed by slice 1 of 'TODO/simplify-refresh/10_plan.org', by
+  the change that fixed "A save under a skgrepo narrowing deletes
+  a restricted hide" above. Test:
+  'an_unchanged_save_hides_nothing_that_only_a_restricted_record_explains'
+  in 'tests/subscriber_hides_under_a_narrowing.rs'.
 * Problems noticed while executing plan 08, slice 7 (2026-10-30; fixed 2026-10-31)
 ** A skgrepo widening keeps a skgrepo narrowing's noClaim
   Run, not traced, by a throwaway test in
