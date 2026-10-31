@@ -113,17 +113,19 @@ pub fn resolve_override (
 /// node can be any link of the chain (a middle carrier, when a later
 /// link's skgrepo is hidden), not only the end, so it must accept any
 /// honest carrier and reject only an off-chain (faked/stale) fact.
-/// Visibility-ungated (the unrestricted skgrepo restriction) so a fact that was honest
-/// when rendered does not start failing after a skgrepo-set switch;
-/// 'path' is the full owned chain (ownership still gates).
+/// Visibility-ungated ('unrestricted', the config's unrestricted
+/// skgrepo restriction, which the caller builds once) so a fact that
+/// was honest when rendered does not start failing after a switch of
+/// the skgrepo restriction; 'path' is the full owned chain (ownership
+/// still gates).
 pub fn carrier_on_owned_chain (
-  config   : &SkgConfig,
-  graph    : &InRustGraph,
-  original : &ID,   // the fact's N
-  carrier  : &ID,   // the shown node's own id
+  config       : &SkgConfig,
+  graph        : &InRustGraph,
+  unrestricted : &SkgrepoRestriction,
+  original     : &ID,   // the fact's N
+  carrier      : &ID,   // the shown node's own id
 ) -> bool {
-  resolve_override (
-    config, graph, &SkgrepoRestriction::unrestricted (config), original)
+  resolve_override (config, graph, unrestricted, original)
     . path . contains (carrier) }
 
 /// The overriders of 'pid' that substitution may follow: the relationship's

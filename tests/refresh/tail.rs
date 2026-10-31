@@ -5,7 +5,7 @@
 // number of times, however long.
 
 use super::*;
-use crate::dbs::in_rust_graph::relation_accessors::STORED_LIST_READS;
+use crate::dbs::in_rust_graph::relation_accessors::{RelRepoLookup, STORED_LIST_READS};
 use crate::refresh::graphnodestats::set_graphnodestats_in_viewforest;
 use crate::refresh::viewnodestats::set_viewnodestats_in_viewforest;
 use indoc::formatdoc;
@@ -84,7 +84,8 @@ fn stored_list_reads_of_the_graphnode_stats_pass (
     a_view_of_a_list_under_a_skgrepo_restriction (members);
   STORED_LIST_READS . with ( |reads| reads . set (0) );
   set_graphnodestats_in_viewforest (
-    forest . as_internal_tree_mut (), &graph, &config (), &main_only () )
+    forest . as_internal_tree_mut (), &graph, &config (), &main_only (),
+    &mut RelRepoLookup::over (&graph) )
     . unwrap ();
   STORED_LIST_READS . with ( |reads| reads . get () ) }
 
@@ -100,12 +101,13 @@ fn stored_list_reads_of_the_viewnode_stats_pass (
   let tree : &mut Tree<Viewnode> = forest . as_internal_tree_mut ();
   let (container_to_contents, content_to_containers)
     : (HashMap<ID, HashSet<ID>>, HashMap<ID, HashSet<ID>>) =
-    set_graphnodestats_in_viewforest (tree, &graph, &config, &restriction)
+    set_graphnodestats_in_viewforest (
+      tree, &graph, &config, &restriction, &mut RelRepoLookup::over (&graph) )
     . unwrap ();
   STORED_LIST_READS . with ( |reads| reads . set (0) );
-  set_viewnodestats_in_viewforest (
+  set_viewnodestats_in_viewforest ( // a lookup of its own, so that it reads the list itself
     tree, &graph, &container_to_contents, &content_to_containers,
-    &config, &restriction );
+    &config, &restriction, &mut RelRepoLookup::over (&graph) );
   STORED_LIST_READS . with ( |reads| reads . get () ) }
 
 #[test]

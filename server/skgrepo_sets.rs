@@ -1,7 +1,7 @@
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use crate::dbs::filesystem::not_nodes::load_config_with_overrides;
 use crate::dbs::init::create_empty_tantivy_index;
-use crate::types::misc::{ID, SkgConfig, SkgrepoName, TantivyIndex};
+use crate::types::misc::{ID, RelPartner, SkgConfig, SkgrepoName, TantivyIndex};
 use crate::types::nodes::complete::Graphnode;
 use crate::test_utils::{
   cleanup_test_tantivy, index_folder_for_this_process, remove_test_dir};
@@ -136,7 +136,7 @@ impl SkgrepoRestriction {
     restriction : &SkgrepoRestriction,
     relRepo     : &SkgrepoName,
   ) -> bool {
-    ! restriction . kept_out . contains (relRepo) }
+    ! restriction . keeps_out (relRepo) }
 
   /// Whether a node whose home skgrepo is 'home' is restricted: the
   /// skgrepo restriction keeps its home out. A node homed in a skgrepo
@@ -146,7 +146,37 @@ impl SkgrepoRestriction {
     restriction : &SkgrepoRestriction,
     home        : &SkgrepoName,
   ) -> bool {
-    restriction . kept_out . contains (home) }
+    restriction . keeps_out (home) }
+
+  /// The records among 'partners' the skgrepo restriction shows
+  /// ('record_is_visible'), in order.
+  pub fn visible_records<'a, T> (
+    restriction : &'a SkgrepoRestriction,
+    partners    : &'a [RelPartner<T>],
+  ) -> impl Iterator<Item = &'a RelPartner<T>> + 'a {
+    partners . iter ()
+      . filter ( |partner| SkgrepoRestriction::record_is_visible (
+        restriction, &partner . relRepo )) }
+
+  /// Whether 'partners' records 'member' and the skgrepo restriction
+  /// shows that record.
+  pub fn member_record_is_visible<T : PartialEq> (
+    restriction : &SkgrepoRestriction,
+    partners    : &[RelPartner<T>],
+    member      : &T,
+  ) -> bool {
+    partners . iter ()
+      . find ( |partner| &partner . member == member )
+      . is_some_and ( |partner| SkgrepoRestriction::record_is_visible (
+        restriction, &partner . relRepo )) }
+
+  /// The body of both questions: whether 'skgrepo' is among the
+  /// config's skgrepos the skgrepo restriction keeps out.
+  fn keeps_out (
+    &self,
+    skgrepo : &SkgrepoName,
+  ) -> bool {
+    self . kept_out . contains (skgrepo) }
 }
 
 /// Refuses unless the connection is unrestricted. 'what' is the

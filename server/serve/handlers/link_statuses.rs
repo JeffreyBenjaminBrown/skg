@@ -5,8 +5,9 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{send_response_with_length_prefix, value_from_request_sexp};
 use crate::sexp_string::quote_sexp_string;
+use crate::dbs::in_rust_graph::relation_accessors::GnidPresence;
 use crate::skgrepo_sets::SkgrepoRestriction;
-use crate::types::misc::{ID, SkgConfig};
+use crate::types::misc::{ID, SkgConfig, SkgrepoName};
 use crate::types::sexp::extract_string_list_from_sexp;
 use sexp::Sexp;
 use std::net::TcpStream;
@@ -25,12 +26,12 @@ pub fn classify_link_gnids (
   gnids : &[ID],
 ) -> Vec<(ID, LinkStatus)> {
   gnids . iter () . map (|gnid| {
-    let status : LinkStatus = match graph . pid_and_skgrepo (gnid) {
-      None => LinkStatus::Missing,
-      Some ((_pid, skgrepo))
-        if SkgrepoRestriction::node_is_restricted (restriction, &skgrepo) =>
-        LinkStatus::Restricted,
-      Some ((pid, skgrepo)) => {
+    let status : LinkStatus = match graph . gnid_presence_gated (gnid, restriction) {
+      GnidPresence::Absent     => LinkStatus::Missing,
+      GnidPresence::Restricted => LinkStatus::Restricted,
+      GnidPresence::Present    => {
+        let (pid, skgrepo) : (ID, SkgrepoName) = graph . pid_and_skgrepo (gnid)
+          . expect ("a present gnid resolves");
         let skgrepo_label : String = config . skgrepos . get (&skgrepo)
           .map (|s| s . herald_label () . to_string ())
           .unwrap_or_else (|| skgrepo . 0 . clone ());

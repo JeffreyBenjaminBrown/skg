@@ -3,6 +3,7 @@ use crate::dbs::in_rust_graph::stats::{
   graphnodestats_for_pid,
   AllGraphnodeStats};
 use crate::skgrepo_sets::SkgrepoRestriction;
+use crate::dbs::in_rust_graph::relation_accessors::RelRepoLookup;
 use crate::types::misc::{ID, SkgConfig};
 use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
 use crate::dbs::in_rust_graph::InRustGraph;
@@ -24,6 +25,7 @@ pub fn set_graphnodestats_in_viewforest (
   graph       : &InRustGraph,
   config      : &SkgConfig,
   restriction : &SkgrepoRestriction,
+  relRepos    : &mut RelRepoLookup,
 ) -> Result < ( HashMap < ID, HashSet < ID > >,
                HashMap < ID, HashSet < ID > > ),
              Box<dyn Error> > {
@@ -35,7 +37,7 @@ pub fn set_graphnodestats_in_viewforest (
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "fetch_all_graphnodestats" ). entered();
       fetch_all_graphnodestats_with_skgrepo_set (
-        graph, & pids, restriction ) } ?;
+        graph, relRepos, & pids, restriction ) } ?;
   let root_treeid : NodeId = viewforest . root () . id ();
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "set_graphnodestats_recursive" ). entered();

@@ -190,6 +190,7 @@ fn overridesHere_part_errors (
   config     : &SkgConfig,
   errors     : &mut Vec<BufferValidationError>,
 ) {
+  let unrestricted : SkgrepoRestriction = SkgrepoRestriction::unrestricted (config);
   for edge in viewforest . root () . traverse () {
     let Edge::Open (node_ref) = edge else { continue; };
     let (carrier, original) : (ID, ID) =
@@ -201,11 +202,11 @@ fn overridesHere_part_errors (
             None => continue },
         _ => continue };
     let chain_ok : bool =
-      carrier_on_owned_chain (config, graph, &original, &carrier);
+      carrier_on_owned_chain (config, graph, &unrestricted, &original, &carrier);
     if ! chain_ok {
       let effective : Option<ID> = // the chain end, for the message
         Some (resolve_override (
-          config, graph, &SkgrepoRestriction::unrestricted (config), &original)
+          config, graph, &unrestricted, &original)
           . effective);
       errors . push (
         BufferValidationError::OverridesHere_Mismatch (

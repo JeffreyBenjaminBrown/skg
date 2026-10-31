@@ -8,6 +8,7 @@
 //! it ('viewforest_to_string'). The warrants the refresh's rungs set
 //! are kept: the stats pass does not recompute them.
 
+use crate::dbs::in_rust_graph::relation_accessors::RelRepoLookup;
 use crate::diff_view::pruned_change_view::set_diffView_facts_in_viewforest;
 use crate::refresh::{Truth, Walk};
 use crate::refresh::visit::folder_goes_when_empty;
@@ -41,15 +42,17 @@ fn set_derived_facts (
   walk       : &Walk,
 ) -> Result<(), Box<dyn Error>> {
   let truth : &Truth = walk . truth;
+  let mut relRepos : RelRepoLookup = // read by both stats passes
+    RelRepoLookup::over (truth . graph);
   let (container_to_contents, content_to_containers)
     : (HashMap<ID, HashSet<ID>>, HashMap<ID, HashSet<ID>>) =
     set_graphnodestats_in_viewforest (
       viewforest . as_internal_tree_mut (), truth . graph, truth . config,
-      truth . restriction ) ?;
+      truth . restriction, &mut relRepos ) ?;
   set_viewnodestats_in_viewforest (
     viewforest . as_internal_tree_mut (), truth . graph,
     &container_to_contents, &content_to_containers,
-    truth . config, truth . restriction );
+    truth . config, truth . restriction, &mut relRepos );
   if let RefreshMode::DiffView { straddle, buffer_kind, readiness_store } = walk . mode {
     set_diffView_facts_in_viewforest (
       viewforest, straddle, buffer_kind, readiness_store, truth . graph ); }

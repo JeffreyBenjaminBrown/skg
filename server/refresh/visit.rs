@@ -640,7 +640,8 @@ fn substitute_overriders (
         if effective == original {
           stop_substituting (tree, parent, child, &original, goal, walk) ?;
         } else if ! carrier_on_owned_chain (
-                      walk . truth . config, walk . truth . graph, &original, &gnid ) {
+                      walk . truth . config, walk . truth . graph, &walk . unrestricted,
+                      &original, &gnid ) {
           show_overrider (tree, child, &effective, Some (original), walk) ?; }}, }}
   Ok (( )) }
 
@@ -724,7 +725,7 @@ fn is_overridden_and_shown_raw (
   raw_position
   && occurrence . overridesHere . is_none ()
   && resolve_override ( walk . truth . config, walk . truth . graph,
-                        &SkgrepoRestriction::unrestricted (walk . truth . config),
+                        &walk . unrestricted,
                         &occurrence . gnid ) . effective != occurrence . gnid }
 
 //

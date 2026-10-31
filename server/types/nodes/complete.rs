@@ -14,6 +14,7 @@
 //! system enforces that 'home_repo' never appears in YAML.
 
 use crate::types::misc::{ID, MSV, RelPartner, SkgrepoName};
+use crate::skgrepo_sets::SkgrepoRestriction;
 
 use std::collections::HashSet;
 
@@ -108,6 +109,13 @@ pub struct Graphnode {
 }
 
 impl Graphnode {
+  /// Each alias whose record the skgrepo restriction shows, in order.
+  pub fn visible_aliases<'a> (
+    &'a self,
+    restriction : &'a SkgrepoRestriction,
+  ) -> impl Iterator<Item = &'a RelPartner<String>> + 'a {
+    SkgrepoRestriction::visible_records (restriction, self . aliases . or_default ()) }
+
   pub fn all_gnids (&self) -> impl Iterator<Item = &ID> {
     std::iter::once (&self . pid)
       . chain (self . extra_ids . iter()) }

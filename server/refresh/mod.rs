@@ -116,6 +116,11 @@ pub(crate) struct Walk<'a> {
   /// folded: in the clients' encoding a folder's collapse lives on its
   /// members, since 'folded' on a headline hides it in its parent.
   pub added_compound_folders   : HashSet<NodeId>,
+  /// The skgrepo restriction that keeps nothing out, of the truth's
+  /// config: what override resolution asks under when it must not
+  /// depend on the connection's ('carrier_on_owned_chain'). Built
+  /// once per walk.
+  pub unrestricted             : SkgrepoRestriction,
 }
 
 impl<'a> Walk<'a> {
@@ -126,7 +131,8 @@ impl<'a> Walk<'a> {
   ) -> Walk<'a> {
     Walk { truth, mode, node_budget,
            editable_occurrence_of : HashMap::new (),
-           added_compound_folders : HashSet::new (), } }
+           added_compound_folders : HashSet::new (),
+           unrestricted : SkgrepoRestriction::unrestricted (truth . config), } }
 
   pub fn is_diff_view (
     &self,

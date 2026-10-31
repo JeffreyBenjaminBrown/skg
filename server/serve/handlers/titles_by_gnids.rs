@@ -1,4 +1,5 @@
-use crate::dbs::tantivy::titles_by_gnids;
+use crate::dbs::in_rust_graph::relation_accessors::GnidPresence;
+use crate::dbs::tantivy::{title_and_skgrepo_by_gnid, titles_by_gnids};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::serve::handlers::text_release::{
   TextReleaseDecision,
@@ -89,12 +90,15 @@ pub fn handle_titles_by_gnids_request_with_skgrepo_set (
       &mut title_map, &gnids, skgrepo_diffs ); }
   title_map . retain ( |gnid, _| {
     restriction . is_unrestricted () // a gnid no store resolves (a deleted node's) keeps its title
-    || graph . pid_and_skgrepo (gnid) . map (|(_, skgrepo)| skgrepo)
-       . or_else (|| crate::dbs::tantivy::title_and_skgrepo_by_gnid (
-         tantivy_index, gnid ) . map (|(_, skgrepo)| skgrepo))
-       . or_else (|| home_from_disk (gnid, config))
-       . is_some_and ( |home| ! SkgrepoRestriction::node_is_restricted (
-         restriction, &home )) } );
+    || match graph . gnid_presence_gated (gnid, restriction) {
+         GnidPresence::Present    => true,
+         GnidPresence::Restricted => false,
+         GnidPresence::Absent     => // the graph lacks it: the other stores' home
+           title_and_skgrepo_by_gnid (tantivy_index, gnid)
+           . map (|(_, skgrepo)| skgrepo)
+           . or_else (|| home_from_disk (gnid, config))
+           . is_some_and ( |home| ! SkgrepoRestriction::node_is_restricted (
+             restriction, &home )), }} );
   let requested : HashSet<ID> = gnids . iter () . cloned () . collect ();
   let mut overPrivateText_pids : Vec<ID> = gnids . iter ()
     . filter_map ( |gnid| graph . pid_of (gnid) )

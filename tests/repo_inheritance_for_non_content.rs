@@ -10,6 +10,7 @@ use skg::types::viewnode::{ Viewnode, ViewnodeKind, viewforest_root_viewnode, mk
 use skg::types::viewnode::Vognode;
 use skg::refresh::viewnodestats::set_viewnodestats_in_viewforest;
 use skg::dbs::in_rust_graph::InRustGraph;
+use skg::dbs::in_rust_graph::relation_accessors::RelRepoLookup;
 
 use ego_tree::Tree;
 use std::collections::HashMap;
@@ -57,13 +58,15 @@ fn skgrepo_inheritance_across_non_content_same_skgrepo () {
       "node B" . to_string (),
       false );
     viewforest . get_mut (a_gnid) . unwrap () . append (vn); }
+  let graph : InRustGraph = InRustGraph::new ();
   set_viewnodestats_in_viewforest (
     &mut viewforest,
-    &InRustGraph::new (),
+    &graph,
     &container_to_contents,
     &content_to_containers,
     &config,
-    &SkgrepoRestriction::unrestricted (&config) );
+    &SkgrepoRestriction::unrestricted (&config),
+    &mut RelRepoLookup::over (&graph) );
   // B has same skgrepo as A, so homeRepoAtBoundary should be false,
   // even though B claims nothing.
   let b_ref =
@@ -99,13 +102,15 @@ fn skgrepo_inheritance_across_non_content_different_skgrepo () {
       "node B" . to_string (),
       false );
     viewforest . get_mut (a_gnid) . unwrap () . append (vn); }
+  let graph : InRustGraph = InRustGraph::new ();
   set_viewnodestats_in_viewforest (
     &mut viewforest,
-    &InRustGraph::new (),
+    &graph,
     &container_to_contents,
     &content_to_containers,
     &config,
-    &SkgrepoRestriction::unrestricted (&config) );
+    &SkgrepoRestriction::unrestricted (&config),
+    &mut RelRepoLookup::over (&graph) );
   let b_ref =
     viewforest . get (a_gnid) . unwrap ()
     . first_child () . unwrap ();

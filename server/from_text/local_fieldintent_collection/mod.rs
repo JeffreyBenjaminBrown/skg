@@ -106,9 +106,7 @@ pub fn extract_nonmergeSavePlan_locally_in_graph (
           // restricted section (the API doc's "Restricted-skgrepo
           // nodes").
           let shown = |gnid : &ID| -> bool {
-            graph . pid_and_skgrepo (gnid) . is_some_and (
-              |(_pid, home)| ! SkgrepoRestriction::node_is_restricted (
-                restriction, &home )) };
+            graph . node_is_shown (gnid, restriction) };
           let before : usize = nodeMerge_acquisitions . len ();
           let kept : Vec<(ID, ID)> =
             nodeMerge_acquisitions . into_iter ()

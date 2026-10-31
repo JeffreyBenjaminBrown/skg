@@ -177,39 +177,47 @@ impl RelationRole {
                    position : BinaryRolePosition::Second };
 }
 
-/// The relRepos a pass over many members reads, one map per recorder
-/// and relation, built the first time the pass asks of that recorder
-/// ('InRustGraph::relRepos_by_target_pid'): a pass over the N members
-/// of one list costs O(N), not a scan of the list per member. The
-/// graphnode stats ('server/dbs/in_rust_graph/stats.rs') and the
-/// viewnode stats ('server/refresh/viewnodestats.rs') each keep one
-/// for their pass.
-#[derive(Default)]
-pub struct RelRepoLookup {
-  maps : HashMap<(ID, NodeRelation), Option<HashMap<ID, SkgrepoName>>>,
+/// The relRepos of the graph 'graph' that a pass over many members
+/// reads, one map per recorder and relation, built the first time the
+/// pass asks of that recorder ('InRustGraph::relRepos_by_target_pid'):
+/// a pass over the N members of one list costs O(N), not a scan of
+/// the list per member. The tail of a refresh builds one for both of
+/// its stats passes, the graphnode stats
+/// ('server/dbs/in_rust_graph/stats.rs') and the viewnode stats
+/// ('server/refresh/viewnodestats.rs').
+pub struct RelRepoLookup<'g> {
+  graph : &'g InRustGraph,
+  maps  : HashMap<(ID, NodeRelation), Option<HashMap<ID, SkgrepoName>>>,
 }
 
-impl RelRepoLookup {
-  /// What 'InRustGraph::inbound_pids_for_relation_gated' answers.
-  pub fn inbound_pids_for_relation_gated (
+impl<'g> RelRepoLookup<'g> {
+  /// An empty lookup of the relRepos of 'graph'.
+  pub fn over (
+    graph : &'g InRustGraph,
+  ) -> RelRepoLookup<'g> {
+    RelRepoLookup { graph, maps : HashMap::new () } }
+
+  /// What 'InRustGraph::inbound_pids_for_relation_gated' answers of
+  /// the lookup's graph.
+  pub fn inbound_pids_for_relation_gated_memoized (
     &mut self,
-    graph       : &InRustGraph,
     pid         : &ID,
     relation    : NodeRelation,
     restriction : &SkgrepoRestriction,
   ) -> Vec<ID> {
+    let graph : &'g InRustGraph = self . graph;
     graph . inbound_pids_gated_by (
       pid, relation, restriction,
-      |partner| self . relRepo (graph, partner, relation, pid) ) }
+      |partner| self . relRepo_memoized (partner, relation, pid) ) }
 
-  /// What 'InRustGraph::relRepo' answers.
-  pub fn relRepo (
+  /// What 'InRustGraph::relRepo' answers of the lookup's graph.
+  pub fn relRepo_memoized (
     &mut self,
-    graph    : &InRustGraph,
     recorder : &ID,
     relation : NodeRelation,
     target   : &ID,
   ) -> Option<SkgrepoName> {
+    let graph : &'g InRustGraph = self . graph;
     let target_pid : ID = graph . pid_of (target) ?;
     match self . maps . entry (( recorder . clone (), relation ))
       . or_insert_with ( || graph . relRepos_by_target_pid (recorder, relation) )
@@ -299,6 +307,16 @@ impl InRustGraph {
         if SkgrepoRestriction::node_is_restricted (restriction, &home) {
           GnidPresence::Restricted }
         else { GnidPresence::Present }, }}
+
+  /// Whether the graph has the node 'gnid' names and the
+  /// skgrepo restriction shows it ('gnid_presence_gated' answers
+  /// 'Present').
+  pub fn node_is_shown (
+    &self,
+    gnid        : &ID,
+    restriction : &SkgrepoRestriction,
+  ) -> bool {
+    self . gnid_presence_gated (gnid, restriction) == GnidPresence::Present }
 
   /// Stored outbound members for one relationship whose relRepo the
   /// skgrepo restriction shows ('outbound_rel_partners_for_relation').

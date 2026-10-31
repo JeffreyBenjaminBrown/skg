@@ -1,4 +1,5 @@
 use crate::from_text::fork::{CloneSkgrepoInputs, fork_spec_from_buffer_node};
+use crate::dbs::in_rust_graph::relation_accessors::GnidPresence;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::dbs::node_lookup::{graphnode_from_graph, opt_graphnode_by_gnid};
 use crate::dbs::in_rust_graph::InRustGraph;
@@ -365,9 +366,7 @@ pub fn suppress_writes_to_restricted_nodes (
   let restriction : &SkgrepoRestriction = skgrepo_restriction;
   let restricted = |gnid : &ID, buffer_home : &SkgrepoName| -> bool {
     SkgrepoRestriction::node_is_restricted (restriction, buffer_home)
-    || graph . pid_and_skgrepo (gnid) . is_some_and (
-      |(_pid, graph_home)| SkgrepoRestriction::node_is_restricted (
-        restriction, &graph_home )) };
+    || graph . gnid_presence_gated (gnid, restriction) == GnidPresence::Restricted };
   let mut suppressed : bool = false;
   let node_instructions : Vec<NodeInstruction> =
     node_instructions . into_iter ()

@@ -23,7 +23,7 @@ use std::collections::BTreeSet;
 use std::error::Error;
 
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
-use skg::dbs::in_rust_graph::relation_accessors::{NodeRelation, RelationRole};
+use skg::dbs::in_rust_graph::relation_accessors::{NodeRelation, RelRepoLookup, RelationRole};
 use skg::dbs::in_rust_graph::{InRustGraph};
 use skg::org_to_text::viewforest_to_string;
 use skg::skgrepo_sets::{SkgrepoRestriction, run_with_skgrepo_set_test_db};
@@ -273,7 +273,8 @@ fn ancestor_heralds_gate_privately_recorded_relations (
           & HashMap::new (),
           & HashMap::new (),
           config,
-          restriction );
+          restriction,
+          &mut RelRepoLookup::over (&graph) );
         let c_treeid : NodeId = first_root (&viewforest);
         let s_ref = viewforest . get (c_treeid) . unwrap ()
           . first_child () . unwrap ();

@@ -201,20 +201,14 @@ fn preserve_invisible_members (
   let member_key = |gnid : &ID| -> RelationshipMemberKey {
     graph . relationship_member_key (gnid) };
   let contains_visible = |gnid : &ID| -> bool {
-    disk_node . contains . iter ()
-      . find (|member| &member . member == gnid)
-      . is_some_and (|member| SkgrepoRestriction::record_is_visible (
-        restriction, &member . relRepo)) };
+    SkgrepoRestriction::member_record_is_visible (
+      restriction, &disk_node . contains, gnid ) };
   let subscribes_visible = |gnid : &ID| -> bool {
-    disk_node . subscribesTo . or_default () . iter ()
-      .find (|member| &member . member == gnid)
-      .is_some_and (|member| SkgrepoRestriction::record_is_visible (
-        restriction, &member . relRepo)) };
+    SkgrepoRestriction::member_record_is_visible (
+      restriction, disk_node . subscribesTo . or_default (), gnid ) };
   let overrides_visible = |gnid : &ID| -> bool {
-    disk_node . overrides . or_default () . iter ()
-      .find (|member| &member . member == gnid)
-      .is_some_and (|member| SkgrepoRestriction::record_is_visible (
-        restriction, &member . relRepo)) };
+    SkgrepoRestriction::member_record_is_visible (
+      restriction, disk_node . overrides . or_default (), gnid ) };
   // Rendering may canonicalize a resolvable extra ID to its primary PID.  The
   // comparison key says that is the same relationship, but the disk spelling
   // is load-bearing: restore it before the weave so an untouched round trip
@@ -265,10 +259,8 @@ fn preserve_invisible_members (
   { // The sticky pass after this gives each alias its relRepo again,
     // by its text.
     let alias_visible = |text : &String| -> bool {
-      disk_node . aliases . or_default () . iter ()
-        . find ( |alias| &alias . member == text )
-        . is_some_and ( |alias| SkgrepoRestriction::record_is_visible (
-          restriction, &alias . relRepo )) };
+      SkgrepoRestriction::member_record_is_visible (
+        restriction, disk_node . aliases . or_default (), text ) };
     let submitted_aliases : Vec<String> =
       members_of (supplemented . aliases . or_default ());
     let merged : Vec<String> = weave (

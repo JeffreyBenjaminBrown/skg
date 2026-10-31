@@ -1,7 +1,7 @@
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::stats::mentioner_is_substantive;
 use crate::dbs::in_rust_graph::relation_accessors::{
-  BinaryRolePosition, GnidPresence, NodeRelation, RelRepoLookup, RelationRole };
+  BinaryRolePosition, NodeRelation, RelRepoLookup, RelationRole };
 use crate::herald_tokens::{
   AncestorFlags, BirthFact, RelationshipHeralds, Side, relationship_heralds_sexp };
 use crate::skgrepo_sets::SkgrepoRestriction;
@@ -36,10 +36,10 @@ pub fn set_viewnodestats_in_viewforest (
   content_to_containers : &HashMap<ID, HashSet<ID>>,
   config                : &SkgConfig,
   restriction           : &SkgrepoRestriction,
+  relRepos              : &mut RelRepoLookup,
 ) {
   let multi_skgrepo : bool = config . skgrepos . len () > 1;
   let mut ancestor_gnids : HashSet<ID> = HashSet::new ();
-  let mut relRepos : RelRepoLookup = RelRepoLookup::default ();
   let root_treeid : NodeId = viewforest . root () . id ();
   set_viewnodestats_recursive (
     viewforest,
@@ -49,7 +49,7 @@ pub fn set_viewnodestats_in_viewforest (
     config,
     restriction,
     &mut ancestor_gnids,
-    &mut relRepos,
+    relRepos,
     container_to_contents,
     content_to_containers ); }
 
@@ -192,8 +192,7 @@ fn set_herald_strings_in_viewnode (
             node_pid, NodeRelation::Contains, restriction ),
           Some (&subscriber) )
           . into_iter ()
-          . filter ( |gnid| graph . gnid_presence_gated (gnid, restriction)
-                            == GnidPresence::Present )
+          . filter ( |gnid| graph . node_is_shown (gnid, restriction) )
           . collect ();
         for (gnid, generation) in &ancestors {
           if members . contains (gnid)
@@ -275,7 +274,7 @@ fn flag_ancestor_relations (
   let contains_rel_is_visible : &mut dyn FnMut (&ID, &ID) -> bool =
     &mut |recorder : &ID, target : &ID| -> bool {
     restriction . is_unrestricted ()
-    || relRepos . relRepo (graph, recorder, NodeRelation::Contains, target)
+    || relRepos . relRepo_memoized (recorder, NodeRelation::Contains, target)
        . is_some_and ( |relRepo| SkgrepoRestriction::record_is_visible (
          restriction, &relRepo )) };
   // Contains, via the maps. inbound: ancestor contains node.
@@ -319,7 +318,7 @@ fn relationship_is_visible (
     else { (node, member) };
   graph . relation_membership_is_real (node, member, member_role)
   && ( restriction . is_unrestricted ()
-       || relRepos . relRepo (graph, recorder, member_role . relation, target)
+       || relRepos . relRepo_memoized (recorder, member_role . relation, target)
           . is_some_and ( |relRepo| SkgrepoRestriction::record_is_visible (
             restriction, &relRepo )) ) }
 
@@ -484,7 +483,7 @@ fn set_relRepo (
           }},
         ParentKind::Other => break 'compute None, };
     let skgrepo : SkgrepoName =
-      match relRepos . relRepo (graph, &recorder_pid, relation, &target_pid) {
+      match relRepos . relRepo_memoized (&recorder_pid, relation, &target_pid) {
         Some (l) => l, None => break 'compute None, };
     let default : SkgrepoName = {
       let recorder_home : Option<SkgrepoName> =
@@ -553,7 +552,7 @@ mod relationship_default_tests {
 
     set_relRepo (
       &mut tree, member_treeid, true, &graph,
-      &mut RelRepoLookup::default (), &config );
+      &mut RelRepoLookup::over (&graph), &config );
     let ViewnodeKind::Vognode (Vognode::Occurrence (rendered_member)) =
       & tree . get (member_treeid) . unwrap () . value () . kind
     else { panic! ("member should be unrestricted"); };

@@ -261,11 +261,9 @@ fn unintegrated_content_gnids (
   subscriber_hidden   : &[ID],
   subscriber_contains : &[ID],
 ) -> Vec<ID> {
-  let resolve_pids : &dyn Fn (&[ID]) -> Vec<ID> = &|gnids : &[ID]| -> Vec<ID> {
-    gnids . iter () . map ( |gnid| graph . pid_else_raw_id (gnid) ) . collect () };
-  let contents : Vec<ID> = resolve_pids (content_gnids);
-  let hidden : Vec<ID> = resolve_pids (subscriber_hidden);
-  let contained : Vec<ID> = resolve_pids (subscriber_contains);
+  let contents : Vec<ID> = resolve_all (content_gnids, graph);
+  let hidden : Vec<ID> = resolve_all (subscriber_hidden, graph);
+  let contained : Vec<ID> = resolve_all (subscriber_contains, graph);
   setlike_vector_subtraction (
     setlike_vector_subtraction (contents, &hidden), &contained) }
 
@@ -385,7 +383,7 @@ pub(crate) fn hidden_in_subscribee (
       subscribee, NodeRelation::Contains, walk . truth . restriction ),
     &graph . outbound_gnids_for_relation_gated (
       subscriber, NodeRelation::HidesFromSubs, walk . truth . restriction ));
-  resolve_all (goal, graph) }
+  resolve_all (&goal, graph) }
 
 /// Goal list for a hiddenInSubscribeeFolder: the intersection of the
 /// subscriber's hides-list and the subscribee's contains-list, in the
@@ -395,11 +393,10 @@ fn goal_list_for_hiddenInSubscribee_folder (
   subscribee_contains : &[ID],
   subscriber_hides    : &[ID],
 ) -> Vec<ID> {
-  let contains_set : HashSet<RelationshipMemberKey> =
-    subscribee_contains . iter ()
-    . map ( |gnid| graph . relationship_member_key (gnid) ) . collect ();
+  let contains_set : HashSet<ID> =
+    resolve_all (subscribee_contains, graph) . into_iter () . collect ();
   subscriber_hides . iter ()
-    . filter ( |gnid| contains_set . contains (&graph . relationship_member_key (gnid)) )
+    . filter ( |gnid| contains_set . contains (&graph . pid_else_raw_id (gnid)) )
     . cloned () . collect () }
 
 /// What 'subscriber' hides outside the content of its subscribees, by
@@ -420,7 +417,7 @@ pub(crate) fn hidden_outside_of_subscribees (
     &graph . outbound_gnids_for_relation_gated (
       subscriber, NodeRelation::SubscribesTo, walk . truth . restriction ),
     walk . truth . restriction );
-  resolve_all (goal, graph) }
+  resolve_all (&goal, graph) }
 
 /// Goal list for a hiddenOutsideOfSubscribeeFolder: the subscriber's
 /// hides-list minus everything any subscribee contains by a record
@@ -434,14 +431,14 @@ fn goal_list_for_hiddenOutsideOfSubscribee_folder (
   let subscribee_content_of : &dyn Fn (&ID) -> Vec<ID> = &|subscribee : &ID| -> Vec<ID> {
     graph . outbound_gnids_for_relation_gated (
       &graph . pid_else_raw_id (subscribee), NodeRelation::Contains, restriction ) };
-  let all_subscribee_content : HashSet<RelationshipMemberKey> =
+  let all_subscribee_content : HashSet<ID> =
     subscribees . iter ()
       . flat_map ( |pid| subscribee_content_of (pid) )
-      . map ( |gnid| graph . relationship_member_key (&gnid) )
+      . map ( |gnid| graph . pid_else_raw_id (&gnid) )
       . collect ();
   subscriber_hides . iter ()
     . filter ( |gnid| ! all_subscribee_content
-              . contains (&graph . relationship_member_key (gnid)) )
+              . contains (&graph . pid_else_raw_id (gnid)) )
     . cloned () . collect () }
 
 /// A property folder's goal: the node's aliases whose records the
@@ -508,9 +505,10 @@ fn unknown_or_restricted_members_relRepos (
                        member . relRepo . clone () ))
     . collect () }
 
-/// Each ID as the graph resolves it ('InRustGraph::pid_else_raw_id').
+/// Each ID as the graph resolves it ('InRustGraph::pid_else_raw_id'),
+/// the one key by which the goal compares members.
 fn resolve_all (
-  gnids : Vec<ID>,
+  gnids : &[ID],
   graph : &InRustGraph,
 ) -> Vec<ID> {
   gnids . iter () . map ( |gnid| graph . pid_else_raw_id (gnid) ) . collect () }

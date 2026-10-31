@@ -5,6 +5,7 @@
 /// Statistics are graph-native after the uniform-heralds rewrite, so
 /// only the in-Rust graph path is exercised here.
 
+use skg::dbs::in_rust_graph::relation_accessors::RelRepoLookup;
 use skg::dbs::in_rust_graph::stats::{
   AllGraphnodeStats, fetch_all_graphnodestats_with_skgrepo_set, graphnodestats_for_pid};
 use skg::skgrepo_sets::SkgrepoRestriction;
@@ -51,7 +52,7 @@ fn in_rust_path_computes_hiding (
       let graph = graph_handle_from_config (config) ? . load_full ();
       let stats : AllGraphnodeStats =
         fetch_all_graphnodestats_with_skgrepo_set (
-          &graph,
+          &graph, &mut RelRepoLookup::over (&graph),
           & [ ID::from ("hider"), ID::from ("hidden"),
               ID::from ("bystander") ],
           &SkgrepoRestriction::unrestricted (config) ) ?;

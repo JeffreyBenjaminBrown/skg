@@ -16,6 +16,7 @@ use crate::serve::util::{
   tag_text_response};
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
 use crate::types::misc::ID;
+use crate::dbs::in_rust_graph::relation_accessors::GnidPresence;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::views_state::ViewforestId;
 
@@ -43,10 +44,10 @@ pub fn handle_single_root_view_request (
   match node_gnid_from_single_root_view_request (request) {
     Ok (gnid) => {
       let kept_out : bool =
-        match runtime . graph . pid_and_skgrepo (&gnid) {
-          Some ((_pid, home)) =>
-            SkgrepoRestriction::node_is_restricted (skgrepo_restriction, &home),
-          None => // the graph has no such node: refused under any skgrepo restriction
+        match runtime . graph . gnid_presence_gated (&gnid, skgrepo_restriction) {
+          GnidPresence::Present    => false,
+          GnidPresence::Restricted => true,
+          GnidPresence::Absent     => // refused under any skgrepo restriction
             ! skgrepo_restriction . is_unrestricted (), };
       if kept_out {
         let response_sexp : String =
