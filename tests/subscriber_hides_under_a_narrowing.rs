@@ -17,23 +17,15 @@
 // and every view is of r, under "public" alone.
 
 use crate::git_fixture::{
-  Fixture, OwnedSkgrepos, edit_line, open_content_view, skg_files, with_git_fixture,
-  write_unchanged_skgrepos};
-use crate::git_fixture_helpers::mk_test_tcp_stream_pair;
+  Fixture, edit_line, list_in, open_content_view, save_under, skg_files, under_public};
 
-use skg::from_text::strandeds::StrandedsReview;
 use skg::metadata_canon::without_viewnode_ids;
-use skg::serve::handlers::save_buffer::{
-  SaveResponse, update_from_and_rerender_buffer_with_approvals};
+use skg::save::DeleteFrom;
+use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::skgrepo_sets::SkgrepoRestriction;
-use skg::test_utils::skg_env_from_parts;
-use skg::types::env::SkgEnv;
-use skg::types::views_state::ViewforestId;
 
-use futures::executor::block_on;
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::BTreeMap;
 use std::error::Error;
-use std::net::TcpStream;
 
 const VIEW : &str = "view of r";
 
@@ -182,22 +174,6 @@ fn a_hide_of_what_the_subscribee_contains_restrictedly_stands_outside_and_its_ed
 // The fixture and the operations
 //
 
-/// Write 'public' and 'private' as the two skgrepos' files, then run
-/// 'body' with the skgrepo restriction "public".
-fn under_public (
-  public  : &[(&str, &str)],
-  private : &[(&str, &str)],
-  body    : impl FnOnce (&mut Fixture, &SkgrepoRestriction) -> Result<(), Box<dyn Error>>,
-) -> Result<(), Box<dyn Error>> {
-  let case : tempfile::TempDir = tempfile::TempDir::new () ?;
-  write_unchanged_skgrepos (case . path (), &[("public", public), ("private", private)]) ?;
-  with_git_fixture (
-    case . path (), OwnedSkgrepos::Named (&["public", "private"]), &[],
-    |f| {
-      let restriction : SkgrepoRestriction =
-        SkgrepoRestriction::named (&f . config, "public" . into ()) ?;
-      body (f, &restriction) } ) }
-
 /// The view of r with its subscribee folder requested, as saved.
 fn subscribee_folder_requested (
   f      : &mut Fixture,
@@ -231,15 +207,8 @@ fn save (
   text        : &str,
   restriction : &SkgrepoRestriction,
 ) -> Result<String, Box<dyn Error>> {
-  let (mut stream, _read_end) : (TcpStream, TcpStream) = mk_test_tcp_stream_pair ();
-  let mut env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
-  let response : SaveResponse = block_on (
-    update_from_and_rerender_buffer_with_approvals (
-      &mut stream, text, &mut env,
-      &Ok ( ViewforestId::ContentView (VIEW . into ()) ),
-      &mut f . views_state, Some (restriction),
-      true, &HashMap::new (), &HashSet::new (), &HashSet::new (),
-      &StrandedsReview::NotReviewed, &[] )) ?;
+  let response : SaveResponse = save_under (
+    f, VIEW, text, Some (restriction), true, DeleteFrom::NotChosen ) ?;
   assert! ( response . errors . is_empty (),
             "the buffer must save without errors, got {:?}\n\nbuffer:\n{}",
             response . errors, text );
@@ -252,24 +221,6 @@ fn has_line (
   prefix : &str,
 ) -> bool {
   without_viewnode_ids (view) . lines () . any ( |line| line . starts_with (prefix) ) }
-
-/// The members 'field' lists in the file 'file' ("SKGREPO/PID.skg"),
-/// as written: the "- " lines that follow the line "FIELD:". None
-/// when the file or the field is absent.
-fn list_in (
-  f     : &Fixture,
-  file  : &str,
-  field : &str,
-) -> Vec<String> {
-  let files : BTreeMap<String, String> = skg_files (f) . unwrap ();
-  let Some (text) : Option<&String> = files . get (file) else { return Vec::new (); };
-  let heading : String = format! ("{}:", field);
-  text . lines ()
-    . skip_while ( |line| *line != heading )
-    . skip (1)
-    . map_while ( |line| line . strip_prefix ("- ") )
-    . map ( |member| member . to_string () )
-    . collect () }
 
 /// The gnid of each member of the folder of what r hides outside its
 /// subscribees.

@@ -12,7 +12,9 @@ use crate::from_text::strandeds::{
 use crate::git_ops::diff::compute_diff_for_skgrepo;
 use crate::save::{
   apply_delete_propagation_cleanup,
+  DeleteFrom,
   PreparedSave, prepare_save_under_mutation_gate,
+  restricted_records_naming_deleted_graphnodes,
 };
 use crate::serve::ViewsState;
 use crate::skgrepo_sets::SkgrepoRestriction;
@@ -94,6 +96,12 @@ pub struct SaveResponse {
   /// handler sends a 'strandeds-confirmation' listing these. Checked
   /// before every other confirmation.
   pub strandeds_confirmation : Option<Vec<StrandedRelationship>>,
+  /// Some when the save's deletes would strip records the skgrepo
+  /// restriction keeps out and the request carried no
+  /// '(delete-from ...)': nothing was skgsave-committed, and the
+  /// handler sends a 'delete-from-confirmation' naming this count of
+  /// such records. Checked before every other confirmation.
+  pub delete_from_confirmation : Option<usize>,
   /// Some when the saved buffer is one of the diff view's: the
   /// readiness summary the client shows after the save.
   pub readiness_summary   : Option<BufferReadinessSummary>,
@@ -140,6 +148,17 @@ impl SaveResponse {
                    strandeds_confirmation : Some (strandeds),
                    .. SaveResponse::empty () } }
 
+  /// A save that skgsave-committed nothing, asking where its deletes
+  /// may strip the deleted IDs: 'count' records the skgrepo restriction
+  /// keeps out name a deleted graphnode.
+  pub fn delete_from_confirmation (
+    warnings : Vec<String>,
+    count    : usize,
+  ) -> SaveResponse {
+    SaveResponse { warnings,
+                   delete_from_confirmation : Some (count),
+                   .. SaveResponse::empty () } }
+
   /// A save that skgsave-committed nothing, asking to approve
   /// publishing overPrivateText telescopes.
   pub fn hoist_confirmation (
@@ -180,6 +199,7 @@ impl SaveResponse {
       hoist_confirmation        : None,
       text_release_confirmation : None,
       strandeds_confirmation    : None,
+      delete_from_confirmation  : None,
       readiness_summary         : None, } }
 
   /// Format: ((content "...") (errors (...)) (warnings (...))
@@ -229,6 +249,8 @@ pub fn handle_save_buffer_request (
     text_approved_pids_from_request (request);
   let strandeds_review : StrandedsReview =
     strandeds_review_from_request (request);
+  let delete_from : DeleteFrom =
+    delete_from_from_request (request);
   { // Send the early broad lock before reading the buffer, so the client's
     // one-shot save-lock handler always fires exactly once and balances its
     // pending-count -- even when the read below fails (otherwise only
@@ -263,10 +285,18 @@ pub fn handle_save_buffer_request (
             &approved_hoist_pids,
             &text_approved_pids,
             &strandeds_review,
+            delete_from,
             &envelope . other_views ))
         { Ok (mut save_response) => {
             save_response . save_point_position =
               save_point_position . clone ();
+            if let Some (count) = save_response . delete_from_confirmation {
+              send_response_with_length_prefix (
+                stream,
+                & tag_sexp_response (
+                  TcpToClient::DeleteFromConfirmation,
+                  & delete_from_confirmation_response (count) ));
+              return; }
             if let Some (strandeds) = &save_response . strandeds_confirmation {
               send_response_with_length_prefix (
                 stream,
@@ -633,6 +663,34 @@ fn strandeds_confirmation_response (
     Sexp::List ( vec! [ atom ("strandeds"), Sexp::List (entries) ] ),
     pair ("prompt", &prompt), ] ) . to_string () }
 
+/// The request's choice of where its deletes may strip the deleted
+/// IDs: '(delete-from . "visible")' or '(delete-from . "all")', present
+/// only on a retry after a 'delete-from-confirmation'. Absent or any
+/// other value, not chosen.
+fn delete_from_from_request (
+  request : &str,
+) -> DeleteFrom {
+  match value_from_request_sexp ("delete-from", request) . as_deref () {
+    Ok ("visible") => DeleteFrom::VisibleRecords,
+    Ok ("all")     => DeleteFrom::AllOwnedRecords,
+    _              => DeleteFrom::NotChosen, }}
+
+/// The delete-from-confirmation payload: how many records the
+/// skgrepo restriction keeps out name a graphnode the save deletes,
+/// and a prompt, after which the clients ask "Delete from: (c)ancel,
+/// (v)isible records only, (a)ll owned records". No IDs: the user
+/// could not see these records.
+fn delete_from_confirmation_response (
+  count : usize,
+) -> String {
+  let atom = |text : &str| -> Sexp { Sexp::Atom ( Atom::S ( text . to_string () )) };
+  let prompt : String = format! (
+    "{} record{} in skgrepos the skgrepo restriction keeps out name{} a graphnode this save deletes. Nothing was saved.",
+    count, if count == 1 { "" } else { "s" }, if count == 1 { "s" } else { "" } );
+  Sexp::List ( vec! [
+    Sexp::List ( vec! [ atom ("count"), Sexp::Atom ( Atom::I (count as i64) ) ] ),
+    Sexp::List ( vec! [ atom ("prompt"), atom (&prompt) ] ), ] ) . to_string () }
+
 /// Whether this save request carries '(approved-forks . "true")', set by
 /// the client when the user approves a fork-confirmation. Absent or any
 /// other value means not approved.
@@ -734,7 +792,8 @@ pub async fn update_from_and_rerender_buffer_with_hoist_approval (
     stream, org_buffer_text, env,
     viewforest_id_from_request_result, views_state, skgrepo_restriction,
     approved_forks, fork_skgrepos, approved_hoist_pids,
-    &HashSet::new (), &StrandedsReview::NotReviewed, &[] ) . await
+    &HashSet::new (), &StrandedsReview::NotReviewed, DeleteFrom::NotChosen,
+    &[] ) . await
 }
 
 pub async fn update_from_and_rerender_buffer_with_approvals (
@@ -749,6 +808,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
   approved_hoist_pids         : &HashSet<ID>,
   text_approved_pids        : &HashSet<ID>,
   strandeds_review          : &StrandedsReview,
+  delete_from               : DeleteFrom,
   other_views               : &[ClientViewSnapshot],
 ) -> Result<SaveResponse, Box<dyn Error>> {
   // Save-plan construction reads the current files and graph.  Hold the sole
@@ -796,12 +856,29 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
         &viewforest, &mut nonmerge_nodeInstructions,
         &runtime . graph, &straddle, &runtime . config )
     } else { Vec::new () };
+  let restricted_records_left : Option<&SkgrepoRestriction> =
   { // Delete propagation adds collateral writes. Derive them before the
     // disk Hoist classification so "touched pids" means every telescope
     // this save will actually rewrite, not only what appeared in the buffer.
+    // Where records the skgrepo restriction keeps out name a deleted
+    // graphnode, the user chooses first whether they go too.
     let graph_snap = working_graph . load_full ();
+    let restricted_count : usize =
+      restricted_records_naming_deleted_graphnodes (
+        &nonmerge_nodeInstructions, &graph_snap, &runtime . config,
+        skgrepo_restriction );
+    let restricted_records_left : Option<&SkgrepoRestriction> =
+      match (restricted_count, delete_from) {
+        (0, _) => None,
+        (_, DeleteFrom::NotChosen) =>
+          return Ok ( SaveResponse::delete_from_confirmation (
+            parse_warnings, restricted_count )),
+        (_, DeleteFrom::VisibleRecords) => skgrepo_restriction,
+        (_, DeleteFrom::AllOwnedRecords) => None, };
     apply_delete_propagation_cleanup (
-      &mut nonmerge_nodeInstructions, &graph_snap, &runtime . config ); }
+      &mut nonmerge_nodeInstructions, &graph_snap, &runtime . config,
+      restricted_records_left );
+    restricted_records_left };
   let strandeds_warnings : Vec<String> =
   { // What the home skgrepo moves strand (server/from_text/strandeds.rs). This
     // precedes the Hoist classification, which must see the recorders
@@ -880,7 +957,8 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
       &skgrepo_moves,
       &runtime . config,
       &working_graph,
-      approved_hoist_pids )
+      approved_hoist_pids,
+      restricted_records_left )
     // Warnings always accompany errors: a post-parse validation
     // failure (e.g. the override-invariant check) back-fills the
     // save's parse-time warnings, which the error itself did not see.

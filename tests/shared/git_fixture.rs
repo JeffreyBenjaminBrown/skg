@@ -11,7 +11,10 @@ use skg::dbs::init::create_empty_tantivy_index;
 use skg::graph_straddle::types::GraphStraddle;
 use skg::metadata_canon::{viewnode_id_atom_of, with_viewnode_id_atom, without_viewnode_ids};
 use skg::serve::ViewsState;
-use skg::serve::handlers::save_buffer::SaveResponse;
+use skg::from_text::strandeds::StrandedsReview;
+use skg::save::DeleteFrom;
+use skg::serve::handlers::save_buffer::{
+  SaveResponse, update_from_and_rerender_buffer_with_approvals};
 use skg::serve::handlers::skgrepo_sets::handle_skgrepo_set_request;
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::test_utils::{
@@ -26,7 +29,7 @@ use skg::types::views_state::{OpenViews, ViewforestId};
 
 use ego_tree::Tree;
 use futures::executor::block_on;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::error::Error;
 use std::fs;
 use std::io::BufReader;
@@ -231,6 +234,63 @@ pub fn open_content_view (
     &f . graph . load_full (), ViewforestId::ContentView (view . into ()),
     tree, &pids );
   Ok (text) }
+
+/// Write 'public' and 'private' as the files of two owned skgrepos,
+/// "public" then "private", then run 'body' with the skgrepo
+/// restriction "public".
+pub fn under_public (
+  public  : &[(&str, &str)],
+  private : &[(&str, &str)],
+  body    : impl FnOnce (&mut Fixture, &SkgrepoRestriction) -> Result<(), Box<dyn Error>>,
+) -> Result<(), Box<dyn Error>> {
+  let case : TempDir = TempDir::new () ?;
+  write_unchanged_skgrepos (case . path (), &[("public", public), ("private", private)]) ?;
+  with_git_fixture (
+    case . path (), OwnedSkgrepos::Named (&["public", "private"]), &[],
+    |f| {
+      let restriction : SkgrepoRestriction =
+        SkgrepoRestriction::named (&f . config, "public" . into ()) ?;
+      body (f, &restriction) } ) }
+
+/// Save 'text' as the content view 'view' through the save handler's
+/// own pipeline, under 'restriction' (None for no skgrepo
+/// restriction), its forks approved when 'approved_forks', with the
+/// delete-from choice 'delete_from'.
+pub fn save_under (
+  f              : &mut Fixture,
+  view           : &str,
+  text           : &str,
+  restriction    : Option<&SkgrepoRestriction>,
+  approved_forks : bool,
+  delete_from    : DeleteFrom,
+) -> Result<SaveResponse, Box<dyn Error>> {
+  let (mut stream, _read_end) : (TcpStream, TcpStream) = mk_test_tcp_stream_pair ();
+  let mut env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
+  Ok ( block_on (
+    update_from_and_rerender_buffer_with_approvals (
+      &mut stream, text, &mut env,
+      &Ok ( ViewforestId::ContentView (view . into ()) ),
+      &mut f . views_state, restriction,
+      approved_forks, &HashMap::new (), &HashSet::new (), &HashSet::new (),
+      &StrandedsReview::NotReviewed, delete_from, &[] )) ? ) }
+
+/// The members 'field' lists in the file 'file' ("SKGREPO/PID.skg"),
+/// as written: the "- " lines that follow the line "FIELD:". Empty
+/// when the file or the field is absent.
+pub fn list_in (
+  f     : &Fixture,
+  file  : &str,
+  field : &str,
+) -> Vec<String> {
+  let files : BTreeMap<String, String> = skg_files (f) . unwrap ();
+  let Some (text) : Option<&String> = files . get (file) else { return Vec::new (); };
+  let heading : String = format! ("{}:", field);
+  text . lines ()
+    . skip_while ( |line| *line != heading )
+    . skip (1)
+    . map_while ( |line| line . strip_prefix ("- ") )
+    . map ( |member| member . to_string () )
+    . collect () }
 
 /// Switch to the skgrepo-set 'name'; return 'view' as rerendered,
 /// and the "rerender-done" message.

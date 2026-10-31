@@ -10,6 +10,7 @@ use crate::types::env::SkgEnv;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::update_buffer::multi_root_view_via_runtime;
 use crate::from_text::strandeds::StrandedsReview;
+use crate::save::DeleteFrom;
 use crate::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
 use crate::from_text::buffer_to_viewnodes::uninterpreted::{headline_to_triple, HeadlineInfo, org_to_viewforest};
 use crate::org_to_text::viewforest_to_string;
@@ -498,7 +499,7 @@ pub async fn update_from_and_rerender_buffer_with_snapshots_test (
     viewforest_id_from_request_result, views_state, None,
     true, &HashMap::new (), &std::collections::HashSet::new (),
     &std::collections::HashSet::new (), &StrandedsReview::NotReviewed,
-    other_views ) . await
+    DeleteFrom::NotChosen, other_views ) . await
 }
 
 /// As 'update_from_and_rerender_buffer_test', but lets the test choose

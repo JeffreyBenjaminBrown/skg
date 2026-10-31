@@ -48,3 +48,6 @@ mod hidden_nodes;
 
 #[path = "subscriber_hides_under_a_narrowing.rs"]
 mod subscriber_hides_under_a_narrowing;
+
+#[path = "fork_merge_delete_under_a_narrowing.rs"]
+mod fork_merge_delete_under_a_narrowing;

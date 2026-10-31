@@ -85,7 +85,8 @@ with the review, carrying the attempt's other approvals."
           (should (equal resave-args
                          '(t (("n" . "public")) ("h") ("t")
                              (reviewed ("contains" "q" "n")
-                                       ("contains" "r" "n"))))))
+                                       ("contains" "r" "n"))
+                             nil))))
       (kill-buffer save-buffer))))
 
 (provide 'test-skg-strandeds-confirmation)

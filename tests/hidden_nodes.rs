@@ -23,25 +23,20 @@
 use crate::git_fixture::{
   Fixture, OwnedSkgrepos, edit_line, open_content_view, switch_skgrepo_set,
   switch_skgrepo_set_rerendering, with_git_fixture, write_unchanged_skgrepos};
-use crate::git_fixture_helpers::mk_test_tcp_stream_pair;
+use crate::git_fixture::save_under as save_under_restriction;
 use crate::pruned_change_view::common::open_all_changes_buffer;
 
-use skg::from_text::strandeds::StrandedsReview;
-use skg::serve::handlers::save_buffer::{
-  SaveResponse, update_from_and_rerender_buffer_with_approvals};
+use skg::save::DeleteFrom;
+use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::skgrepo_sets::SkgrepoRestriction;
-use skg::test_utils::skg_env_from_parts;
-use skg::types::env::SkgEnv;
 use skg::types::misc::{ID, RelPartner, SkgrepoName, members_of};
 use skg::types::nodes::rust::GraphnodeInRust;
 use skg::metadata_canon::without_viewnode_ids;
 use skg::org_to_text::viewforest_to_string;
 use skg::types::views_state::{DiffViewBufferKind, ViewforestId};
 
-use futures::executor::block_on;
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::BTreeMap;
 use std::error::Error;
-use std::net::TcpStream;
 use std::path::{Path, PathBuf};
 
 const VIEW : &str = "view of r";
@@ -1024,15 +1019,8 @@ fn save_view_under (
   text        : &str,
   restriction : &SkgrepoRestriction,
 ) -> Result<SaveResponse, Box<dyn Error>> {
-  let (mut stream, _read_end) : (TcpStream, TcpStream) = mk_test_tcp_stream_pair ();
-  let mut env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
-  Ok ( block_on (
-    update_from_and_rerender_buffer_with_approvals (
-      &mut stream, text, &mut env,
-      &Ok ( ViewforestId::ContentView (view . into ()) ),
-      &mut f . views_state, Some (restriction),
-      true, &HashMap::new (), &HashSet::new (), &HashSet::new (),
-      &StrandedsReview::NotReviewed, &[] )) ? ) }
+  save_under_restriction (
+    f, view, text, Some (restriction), true, DeleteFrom::NotChosen ) }
 
 /// Every '.skg' file of every skgrepo, by path, with its text.
 fn skg_files_on_disk (

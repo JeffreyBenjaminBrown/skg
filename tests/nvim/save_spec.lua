@@ -168,6 +168,101 @@ describe('skg.save strandeds confirmation', function ()
   end)
 end)
 
+describe('skg.save delete-from confirmation', function ()
+  local server
+  local real_list_uis = vim.api.nvim_list_uis
+  local real_confirm = vim.fn.confirm
+  local position = { lines_below_focused_headline = 0, column = 0,
+                     screen_lines_below_window_start = 0 }
+
+  before_each(function ()
+    helpers.install_fixture_herald_rules()
+    helpers.wipe_skg_buffers()
+    lock.end_stream()
+  end)
+
+  after_each(function ()
+    vim.api.nvim_list_uis = real_list_uis
+    vim.fn.confirm = real_confirm
+    if server then server.close() server = nil end
+    helpers.reset_client_state()
+    helpers.wipe_skg_buffers()
+    lock.end_stream()
+  end)
+
+  it('carries the choice only when one was made', function ()
+    assert.is_truthy(save.save_request_sexp('view_id-1', position,
+      nil, nil, nil, nil, nil, 'visible')
+      :find('(delete-from . "visible")', 1, true))
+    assert.is_falsy(save.save_request_sexp('view_id-1', position)
+                      :find('delete-from', 1, true))
+  end)
+
+  it('turns each button into a choice', function ()
+    assert.is_nil(save.delete_from_of_choice(1))
+    assert.are.equal('visible', save.delete_from_of_choice(2))
+    assert.are.equal('all', save.delete_from_of_choice(3))
+    assert.is_nil(save.delete_from_of_choice(0))
+  end)
+
+  local function resaves_after_choosing (button)
+    local requests = {}
+    local asked = {}
+    server = helpers.connect_to_fake_server(function (line, respond)
+      if line:find('save buffer', 1, true) then
+        table.insert(requests, line)
+        respond(helpers.framed(
+          '((response-type save-lock) (lock-views ()))'))
+        if #requests == 1 then
+          respond(helpers.framed(
+            '((response-type delete-from-confirmation) (count 2)'
+            .. ' (prompt "2 records in skgrepos the skgrepo restriction'
+            .. ' keeps out name a graphnode this save deletes.'
+            .. ' Nothing was saved."))'))
+        else
+          respond(helpers.framed(
+            '((response-type save-result)'
+            .. ' (content "* (skg node (gnid n) (skgRepos (nodeRepo public))) n")'
+            .. ' (errors ()) (warnings ()))'))
+        end
+      end
+    end)
+    vim.api.nvim_list_uis = function () return { {} } end
+    vim.fn.confirm = function (message, choices)
+      table.insert(asked, { message, choices })
+      return button end
+    open_view('* (skg node (gnid n) (skgRepos (nodeRepo public))) n',
+              'skg://delete-from', 'view_id-delete-from')
+    save.request_save_buffer()
+    vim.wait(3000, function ()
+      return #requests >= 2 or (#asked > 0 and button == 1) end, 10)
+    vim.wait(3000, function ()
+      return lock.stream_in_progress == nil end, 10)
+    assert.are.equal(0, state.lp_pending_count)
+    return requests, asked
+  end
+
+  it('asks where to delete from, and re-saves with the choice', function ()
+    local requests, asked = resaves_after_choosing(2)
+    assert.are.equal(2, #requests)
+    assert.is_falsy(requests[1]:find('(delete-from .', 1, true))
+    assert.is_truthy(requests[2]:find('(delete-from . "visible")', 1, true))
+    assert.is_truthy(asked[1][1]:find('Delete from:', 1, true))
+    assert.are.equal('&cancel\n&visible records only\n&all owned records',
+                     asked[1][2])
+  end)
+
+  it('re-saves with all owned records', function ()
+    local requests = resaves_after_choosing(3)
+    assert.is_truthy(requests[2]:find('(delete-from . "all")', 1, true))
+  end)
+
+  it('saves nothing on cancel', function ()
+    local requests = resaves_after_choosing(1)
+    assert.are.equal(1, #requests)
+  end)
+end)
+
 describe('skg.save pipeline', function ()
   local server
 

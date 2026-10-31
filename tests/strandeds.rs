@@ -12,6 +12,7 @@ use skg::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle, new_handle};
 use skg::dbs::in_rust_graph::relation_accessors::{NodeRelation, RelationshipKey};
 use skg::dbs::init::create_empty_tantivy_index;
 use skg::from_text::strandeds::StrandedsReview;
+use skg::save::DeleteFrom;
 use skg::diff_view::readiness_store::readiness_marks_path;
 use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::{
@@ -99,7 +100,7 @@ fn save (
     update_from_and_rerender_buffer_with_approvals (
       &mut stream, buffer, &mut env,  &Ok (viewforest_id . clone ()),
       &mut f . views_state, None, true, &HashMap::new (),
-      &HashSet::new (), &HashSet::new (), review, &[] )) ?;
+      &HashSet::new (), &HashSet::new (), review, DeleteFrom::NotChosen, &[] )) ?;
   // The test helper's env holds its own graph handle: carry the
   // swapped-in graph back to the fixture.
   f . graph . store ( env . runtime_snapshot () . graph . clone () );

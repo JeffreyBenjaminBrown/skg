@@ -16,6 +16,7 @@ use crate::dbs::in_rust_graph::{
 use crate::dbs::tantivy::background_writer::{enqueue_tantivy_write, lock_tantivy_writes, TantivyWriteTask};
 use crate::dbs::tantivy::write::{add_documents_to_tantivy_writer, tantivy_commit_with_status, delete_nodes_by_gnid_from_index};
 use crate::types::env::MutationGate;
+use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::{ID, MSV, RelPartner, SkgConfig, TantivyIndex};
 use crate::types::errors::{BufferValidationError, SaveError};
 use crate::types::nodes::rust::GraphnodeInRust;
@@ -81,7 +82,7 @@ pub(crate) fn update_graph_minus_nodeMerges_with_hoist_approval (
       "apply_delete_propagation_cleanup" ). entered();
     let graph_snap : Arc<InRustGraph> = graph . load_full ();
     apply_delete_propagation_cleanup (
-      &mut node_defs, &graph_snap, &config ); }
+      &mut node_defs, &graph_snap, &config, None ); }
   let base : Arc<InRustGraph> = graph . load_full ();
   let prepared : PreparedGraphUpdate = prepare_graph_update (
     &config, base . clone (), node_defs)
@@ -199,7 +200,7 @@ pub(crate) fn update_graph_including_nodeMerges_under_mutation_gate (
 ) -> Result<(), Box<dyn Error>> {
   let prepared : PreparedSave = prepare_save_under_mutation_gate (
     nodeInstructions, nodeMerge_instructions, skgrepo_moves, &config,
-    graph, approved_hoist_pids) ?;
+    graph, approved_hoist_pids, None) ?;
   prepared . apply (config, tantivy_index, graph)
 }
 
@@ -271,10 +272,12 @@ pub(crate) fn prepare_save_under_mutation_gate (
   config             : &SkgConfig,
   graph              : &InRustGraphHandle,
   approved_hoist_pids : &HashSet<ID>,
+  restricted_records_left : Option<&SkgrepoRestriction>, // as 'apply_delete_propagation_cleanup' takes it
 ) -> Result<PreparedSave, Box<dyn Error>> {
   let graph_before_save : Arc<InRustGraph> = graph . load_full ();
   apply_delete_propagation_cleanup (
-    &mut nodeInstructions, &graph_before_save, config );
+    &mut nodeInstructions, &graph_before_save, config,
+    restricted_records_left );
   let all_filesystem_outputs : Vec<NodeInstruction> =
     nodeInstructions . iter () . cloned ()
     . chain ( nodeMerge_instructions . iter ()
@@ -370,6 +373,18 @@ pub(crate) fn emit_telescope_warnings (
       "telescope warning after save" ); }
 }
 
+/// What a delete's propagation may strip under a skgrepo restriction,
+/// as the user chose it in the delete-from confirmation
+/// ('docs/api-and-formats.org', "Save buffer"). The choice rides one
+/// save request, as '(delete-from . "visible")' or
+/// '(delete-from . "all")', and is never cached.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum DeleteFrom {
+  NotChosen,       // the request carries no choice: a save that would strip restricted records stops to ask
+  VisibleRecords,  // "visible": strip only the records the skgrepo restriction shows
+  AllOwnedRecords, // "all": strip every owned record, restricted ones too
+}
+
 /// Two-phase cleanup so deletes don't leave dangling references on
 /// disk:
 ///
@@ -396,6 +411,14 @@ pub(crate) fn emit_telescope_warnings (
 /// list is whatever the buffer that wrote it had); we want all of
 /// them gone.
 ///
+/// 'restricted_records_left', when given, is the skgrepo restriction
+/// whose restricted records the cleanup leaves as they are: the user
+/// chose, in the delete-from confirmation, to delete from the visible
+/// records only. A referencer none of whose records naming a deleted ID
+/// is visible then gets no cleanup save, and the dangling ID shows as
+/// an unknown viewnode wherever its recorder is shown. None strips
+/// every owned record.
+///
 /// Skipped fields:
 /// - extra_ids of referencers: per the data model, an id can only
 ///   be an extra_id of one node, so a referencer cannot legitimately
@@ -404,10 +427,15 @@ pub(crate) fn emit_telescope_warnings (
 ///   rewriting. Dangling link targets render as Unknown
 ///   placeholders when followed, so this is non-fatal.
 pub(crate) fn apply_delete_propagation_cleanup (
-  node_defs  : &mut Vec<NodeInstruction>,
-  graph_snap : &Arc<InRustGraph>,
-  config     : &SkgConfig,
+  node_defs               : &mut Vec<NodeInstruction>,
+  graph_snap              : &Arc<InRustGraph>,
+  config                  : &SkgConfig,
+  restricted_records_left : Option<&SkgrepoRestriction>,
 ) {
+  let stripped = |record : &RelPartner<ID>, deleted_id_set : &HashSet<ID>| -> bool {
+    deleted_id_set . contains (&record . member)
+    && SkgrepoRestriction::record_is_visible (
+      restricted_records_left, &record . relRepo ) };
   let deleted_primary_pids : HashSet<ID> = node_defs . iter ()
     . filter_map ( |d| match d {
       NodeInstruction::Delete (dn) => Some ( dn . gnid . clone ()),
@@ -441,7 +469,9 @@ pub(crate) fn apply_delete_propagation_cleanup (
             referencer_pids . insert ( pid . clone () ); }} } }
     referencer_pids . retain ( |p|
       graph_snap . get (p)
-      . map ( |node| config . skgrepo_is_owned (&node . home_skgrepo) )
+      . map ( |node| config . skgrepo_is_owned (&node . home_skgrepo)
+              && records_of_graphnodeInRust (node) . into_iter ()
+                 . any ( |record| stripped (record, &deleted_id_set) ))
       . unwrap_or (false)
       && ! user_save_pids . contains (p)
       && ! deleted_primary_pids . contains (p) );
@@ -460,14 +490,68 @@ pub(crate) fn apply_delete_propagation_cleanup (
     for nd in node_defs . iter_mut () {
       if let NodeInstruction::Save ( SaveNode (nc) ) = nd {
         if ! config . skgrepo_is_owned (&nc . home_skgrepo) { continue; }
-        nc . contains . retain ( |gnid|
-          ! deleted_id_set . contains (& gnid . member) );
-        nc . subscribesTo = remove_from_msv (
-          &nc . subscribesTo, &deleted_id_set );
-        nc . hidesFromSubs = remove_from_msv (
-          &nc . hidesFromSubs, &deleted_id_set );
-        nc . overrides = remove_from_msv (
-          &nc . overrides, &deleted_id_set ); }} } }
+        nc . contains . retain ( |record|
+          ! stripped (record, &deleted_id_set) );
+        for list in [ &mut nc . subscribesTo,
+                      &mut nc . hidesFromSubs,
+                      &mut nc . overrides ] {
+          if let MSV::Specified (records) = list {
+            records . retain ( |record|
+              ! stripped (record, &deleted_id_set) ); }} }} } }
+
+/// How many records in sections the skgrepo restriction keeps out name
+/// a graphnode 'node_defs' deletes: the records of owned referencers,
+/// in any of the four outbound list fields, that the delete's
+/// propagation would strip and the user could not see. Zero without a
+/// skgrepo restriction.
+pub(crate) fn restricted_records_naming_deleted_graphnodes (
+  node_defs           : &[NodeInstruction],
+  graph_snap          : &Arc<InRustGraph>,
+  config              : &SkgConfig,
+  skgrepo_restriction : Option<&SkgrepoRestriction>,
+) -> usize {
+  let Some (restriction) = skgrepo_restriction else { return 0; };
+  let deleted_primary_pids : HashSet<ID> = node_defs . iter ()
+    . filter_map ( |d| match d {
+      NodeInstruction::Delete (dn) => Some ( graph_snap . pid_else_raw_id (&dn . gnid) ),
+      NodeInstruction::Save (_)    => None } )
+    . collect ();
+  let deleted_id_set : HashSet<ID> = deleted_primary_pids . iter ()
+    . flat_map ( |pid| std::iter::once (pid . clone ())
+                 . chain ( graph_snap . get (pid) . into_iter ()
+                           . flat_map ( |node| node . extra_ids . iter () . cloned () )) )
+    . collect ();
+  let referencer_pids : HashSet<&ID> = deleted_primary_pids . iter ()
+    . flat_map ( |deleted| [ &graph_snap . contained_by,
+                             &graph_snap . subscribers_of,
+                             &graph_snap . hiders_of,
+                             &graph_snap . overriders_of, ]
+                 . into_iter ()
+                 . filter_map ( move |inverse| inverse . get (deleted) )
+                 . flatten () )
+    . filter ( |pid| ! deleted_primary_pids . contains (*pid) )
+    . collect ();
+  referencer_pids . into_iter ()
+    . filter_map ( |pid| graph_snap . get (pid) )
+    . filter ( |node| config . skgrepo_is_owned (&node . home_skgrepo) )
+    . map ( |node| records_of_graphnodeInRust (node) . into_iter ()
+            . filter ( |record| deleted_id_set . contains (&record . member)
+                       && ! SkgrepoRestriction::record_is_visible (
+                         restriction, &record . relRepo ))
+            . count () )
+    . sum () }
+
+/// Every record of the four outbound list fields of 'node'.
+fn records_of_graphnodeInRust (
+  node : &GraphnodeInRust,
+) -> Vec<&RelPartner<ID>> {
+  node . contains . iter ()
+    . chain ( node . subscribesTo . or_default () . iter () )
+    . chain ( node . hidesFromSubs . or_default () . iter () )
+    . chain ( node . overrides . or_default () . iter () )
+    . collect () }
+
+
 
 /// Project a GraphnodeInRust back into a Graphnode verbatim. Stripping
 /// of deleted ids happens later, in 'apply_delete_propagation_cleanup'
@@ -489,18 +573,6 @@ pub(crate) fn graphnode_from_graphnodeInRust (
     overrides                    : rust . overrides . clone (),
     flags                        : rust . flags . clone (),
   }}
-
-fn remove_from_msv (
-  msv : &MSV<RelPartner<ID>>,
-  exclude : &HashSet<ID>
-) -> MSV<RelPartner<ID>> {
-  match msv {
-    MSV::Unspecified => MSV::Unspecified,
-    MSV::Specified (v) => MSV::Specified (
-      v . iter ()
-        . filter ( |gnid| ! exclude . contains (& gnid . member) )
-        . cloned ()
-        . collect ()), } }
 
 pub fn update_fs_from_nodeInstructions (
   node_defs     : &[NodeInstruction],
