@@ -139,6 +139,90 @@ node a
   node a wp
   node c" ); }
 
+/// a acquired b by a nodeMerge. r1 lists a, and the buffer shows none
+/// of r1's content, so the refresh draws a there; the user's one
+/// editable occurrence of a stands under q, written under the extra
+/// ID b, and its parent q is visited after the a drawn under r1 (both
+/// stand at depth 2, r1 first). The drawn a hears that the node's
+/// editability is held, whichever of its IDs holds it, and is drawn
+/// write-protected; the user's occurrence stays editable as a's.
+const AN_OCCURRENCE_UNDER_Q_WRITTEN_UNDER_AN_EXTRA_ID_OR_THE_PID : &str = "\
+node r1
+  node a wp
+node r2
+  node q
+    node a
+      node c";
+
+fn r1_and_q_list_a_which_acquired_b () -> InRustGraph {
+  graph (&[
+    Graphnode { extra_ids : vec! [ ID::from ("b") ],
+                contains  : ids (&["c"]), .. node ("a") },
+    node ("c"),
+    Graphnode { contains : ids (&["a"]), .. node ("r1") },
+    Graphnode { contains : ids (&["q"]), .. node ("r2") },
+    Graphnode { contains : ids (&["a"]), .. node ("q") } ]) }
+
+fn r1_and_r2_over_q_over (
+  gnid : &str,
+) -> String {
+  formatdoc! ("
+    * {} r1
+    * {} r2
+    ** {} q
+    *** {} {}
+    ", occurrence_metadata ("r1", ""), occurrence_metadata ("r2", ""),
+       occurrence_metadata ("q", ""), occurrence_metadata (gnid, ""), gnid ) }
+
+#[test]
+fn an_editable_occurrence_written_under_an_extra_id_keeps_its_editability () {
+  let run : Run = run_as_written_asserting_fixpoint_in (
+    &r1_and_r2_over_q_over ("b"), &r1_and_q_list_a_which_acquired_b (),
+    RefreshMode::ContentView );
+  assert_eq! ( run . outline (),
+               AN_OCCURRENCE_UNDER_Q_WRITTEN_UNDER_AN_EXTRA_ID_OR_THE_PID ); }
+
+/// The control: the same buffer with the user's occurrence written
+/// under the pid.
+#[test]
+fn an_editable_occurrence_written_under_the_pid_keeps_its_editability () {
+  let run : Run = run_as_written_asserting_fixpoint_in (
+    &r1_and_r2_over_q_over ("a"), &r1_and_q_list_a_which_acquired_b (),
+    RefreshMode::ContentView );
+  assert_eq! ( run . outline (),
+               AN_OCCURRENCE_UNDER_Q_WRITTEN_UNDER_AN_EXTRA_ID_OR_THE_PID ); }
+
+/// a acquired b by a nodeMerge, and p1 and p2 both contain it. The
+/// buffer holds an editable occurrence under p1 written under b, and
+/// under p2 a write-protected occurrence of a carrying an
+/// editable-view request: the request makes its occurrence a's
+/// editable one, and the occurrence written under b, though first in
+/// level order, is write-protected.
+#[test]
+fn an_editable_view_request_takes_the_editability_from_an_occurrence_under_an_extra_id () {
+  let graph : InRustGraph = graph (&[
+    Graphnode { extra_ids : vec! [ ID::from ("b") ],
+                contains  : ids (&["c"]), .. node ("a") },
+    node ("c"),
+    Graphnode { contains : ids (&["a"]), .. node ("p1") },
+    Graphnode { contains : ids (&["a"]), .. node ("p2") } ]);
+  let input : String = formatdoc! ("
+    * {} p1
+    ** {} b
+    * {} p2
+    ** {} a
+    ", occurrence_metadata ("p1", ""), occurrence_metadata ("b", ""),
+       occurrence_metadata ("p2", ""),
+       occurrence_metadata ("a", "writeProtected (viewRequests editableView)") );
+  let run : Run = run_as_written_asserting_fixpoint_in (
+    &input, &graph, RefreshMode::ContentView );
+  assert_eq! ( run . outline (), "\
+node p1
+  node a wp
+node p2
+  node a
+    node c" ); }
+
 #[test]
 fn a_deleted_node_that_its_parent_listed_by_an_extra_id_leaves_a_tombstone_and_an_unknown () {
   // n had the extra ID x, by which p lists it; a save deleted n. Its

@@ -35,7 +35,6 @@ mod visit;
 pub(crate) use tail::prune_childless_tombstones;
 
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::dbs::in_rust_graph::relation_accessors::GnidPresence;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::env::RuntimeGeneration;
 use crate::types::misc::{ID, SkgConfig};
@@ -98,7 +97,7 @@ pub fn refresh_viewforest (
                     "the input holds two editable occurrences of one gnid" );
     fulfill_editableView_requests (tree, &mut walk);
     keep_the_first_editable_occurrence_of_each_node (tree, &mut walk);
-    walk . editable_occurrence_of = editable_occurrences_in (tree);
+    walk . editable_occurrence_of = editable_occurrences_in (tree, &walk);
     walk_in_level_order (tree, &mut walk) ?; }
   tail::finish (viewforest, viewnode_id_record, walk) }
 
@@ -109,9 +108,11 @@ pub(crate) struct Walk<'a> {
   /// How many more editable occurrences may have their content drawn
   /// ('extent.rs').
   pub node_budget              : usize,
-  /// Where each gnid's one editable occurrence stands. Which
-  /// occurrences this refresh extends first the tree itself says: each
-  /// carries an editable-view request through its own visit
+  /// Where each node's one editable occurrence stands, by the key
+  /// 'editability_key' gives its gnid: the pid, whichever of the
+  /// node's IDs the occurrence is written under. Which occurrences
+  /// this refresh extends first the tree itself says: each carries an
+  /// editable-view request through its own visit
   /// ('consume_editableView_request').
   pub editable_occurrence_of   : HashMap<ID, NodeId>,
   /// The compound folders this refresh added. Their members are drawn
@@ -135,7 +136,22 @@ impl<'a> Walk<'a> {
   ) -> bool {
     matches! ( self . mode, RefreshMode::DiffView { .. } ) }
 
-  /// Let the occurrence of 'gnid' at 'treeid' hold the gnid's one
+  /// The key of the editability of an occurrence written under
+  /// 'gnid': the pid of the node 'gnid' names, else 'gnid' itself,
+  /// since the ID rule points every occurrence at its node's pid. In
+  /// the diff view, a gnid that named a node of HEAD's own before a
+  /// nodeMerge made it an extra ID ('acquired_since_head') is its own
+  /// key: the ID rule will make its occurrence that node's ghost, so
+  /// it does not hold the acquirer's editability.
+  pub fn editability_key (
+    &self,
+    gnid : &ID,
+  ) -> ID {
+    let pid : ID = self . truth . graph . pid_else_raw_id (gnid);
+    if id_rule::acquired_since_head (gnid, &pid, self) { gnid . clone () }
+    else { pid } }
+
+  /// Let the occurrence of 'gnid' at 'treeid' hold its node's one
   /// editability, unless another occurrence already does. Whether it
   /// may.
   pub fn hold_editability (
@@ -143,25 +159,29 @@ impl<'a> Walk<'a> {
     gnid   : &ID,
     treeid : NodeId,
   ) -> bool {
-    *self . editable_occurrence_of . entry ( gnid . clone () )
+    let key : ID = self . editability_key (gnid);
+    *self . editable_occurrence_of . entry (key)
       . or_insert (treeid) == treeid }
 
-  /// The occurrence of 'gnid' at 'treeid' holds the gnid's
+  /// The occurrence of 'gnid' at 'treeid' holds its node's
   /// editability no more, if it held it.
   pub fn release_editability (
     &mut self,
     gnid   : &ID,
     treeid : NodeId,
   ) {
-    if self . editable_occurrence_of . get (gnid) == Some (&treeid) {
-      self . editable_occurrence_of . remove (gnid); }}
+    let key : ID = self . editability_key (gnid);
+    if self . editable_occurrence_of . get (&key) == Some (&treeid) {
+      self . editable_occurrence_of . remove (&key); }}
 
-  /// Whether some occurrence of 'gnid' holds its editability.
+  /// Whether some occurrence of the node 'gnid' names holds its
+  /// editability.
   pub fn editability_is_held (
     &self,
     gnid : &ID,
   ) -> bool {
-    self . editable_occurrence_of . contains_key (gnid) }
+    self . editable_occurrence_of . contains_key (
+      &self . editability_key (gnid) ) }
 }
 
 /// Visit every parent in level order, starting at the buffer root:
@@ -191,13 +211,17 @@ fn at_most_one_editable_occurrence_per_gnid (
     . filter_map ( |node| node . value () . editable_gnid () )
     . all ( |gnid| seen . insert (gnid) ) }
 
-/// Where each gnid's editable occurrence stands in 'tree'.
+/// Where each node's editable occurrence stands in 'tree', by the
+/// key of its editability ('Walk::editability_key'). Run after
+/// 'keep_the_first_editable_occurrence_of_each_node', which leaves
+/// one editable occurrence per key.
 fn editable_occurrences_in (
   tree : &Tree<Viewnode>,
+  walk : &Walk,
 ) -> HashMap<ID, NodeId> {
   tree . root () . descendants ()
     . filter_map ( |node| node . value () . editable_gnid ()
-                   . map ( |gnid| ( gnid . clone (), node . id () )) )
+                   . map ( |gnid| ( walk . editability_key (gnid), node . id () )) )
     . collect () }
 
 /// Whether the occurrence at 'treeid' carries an editable-view
@@ -228,7 +252,9 @@ pub(crate) fn add_editableView_request (
 /// a save made one's gnid an extra ID of the other's node (a
 /// nodeMerge). The first in level order stays editable; the others
 /// are write-protected, before any visit, so that none of them draws
-/// content first.
+/// content first. They are compared by the key of their editability
+/// ('Walk::editability_key'), so that in the diff view an occurrence
+/// the ID rule will make a ghost does not take the acquirer's.
 fn keep_the_first_editable_occurrence_of_each_node (
   tree : &mut Tree<Viewnode>,
   walk : &mut Walk,
@@ -240,20 +266,17 @@ fn keep_the_first_editable_occurrence_of_each_node (
   while let Some (treeid) = queue . pop_front () {
     let node : NodeRef<Viewnode> = tree . get (treeid) . unwrap ();
     if let Some (gnid) = node . value () . editable_gnid () {
-      let pid : ID = match walk . truth . graph . gnid_presence_gated (
-                             gnid, walk . truth . restriction ) {
-        GnidPresence::Present => walk . truth . graph . pid_else_raw_id (gnid),
-        _ => gnid . clone (), };
-      if ! seen . insert (pid) { repeats . push (treeid); }}
+      if ! seen . insert ( walk . editability_key (gnid) ) {
+        repeats . push (treeid); }}
     queue . extend ( node . children () . map ( |child| child . id () )); }
   for repeat in repeats {
     write_protect_occurrence (tree, repeat, walk); }}
 
 /// An editable-view request in the text makes its occurrence the
 /// node's editable one, and any other editable occurrence of the node
-/// write-protected. Done before the walk, so that an occurrence
-/// write-protected here never draws content first, though it stand
-/// above the requester. (The input holds at most one such request per
+/// write-protected, whichever of the node's IDs it is written under.
+/// Done before the walk, so that an occurrence write-protected here
+/// never draws content first, though it stand above the requester. (The input holds at most one such request per
 /// gnid.) The request stays on the occurrence, for its own visit to
 /// consume as any other ('consume_editableView_request'): its content
 /// is drawn then, and the request passes on to what it extends.
@@ -270,10 +293,12 @@ fn fulfill_editableView_requests (
       _ => None, } )
     . collect ();
   for (treeid, gnid) in requested {
+    let key : ID = walk . editability_key (&gnid);
     let others : Vec<NodeId> =
       tree . root () . descendants ()
       . filter ( |node| node . id () != treeid
-                        && node . value () . editable_gnid () == Some (&gnid) )
+                        && node . value () . editable_gnid ()
+                           . is_some_and ( |other| walk . editability_key (other) == key ))
       . map ( |node| node . id () )
       . collect ();
     for other in others {

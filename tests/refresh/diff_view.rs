@@ -324,6 +324,50 @@ node p
     "n's occurrence is its ghost, where it stood, and by the ID rule \
      the worktree's x, which HEAD resolves to n, is that ghost too" ); }
 
+/// HEAD has a (containing c) and b apart, r1 containing a and r2
+/// containing b; the worktree has the nodeMerge, a holding b as an
+/// extra ID and r2 containing a. The buffer holds an editable root of
+/// each, b's first. HEAD had b as a node of its own, so the ID rule
+/// makes b's root the ghost of b, and the pass before the walk gives
+/// it none of a's editability: a's root, the acquirer, stays
+/// editable.
+#[test]
+fn the_acquirer_keeps_its_editable_occurrence_beside_the_ghost_of_the_acquiree () {
+  let straddle : GraphStraddle = straddle (
+    &[ Graphnode { contains : ids (&["c"]), .. node ("a") },
+       node ("b"), node ("c"),
+       Graphnode { contains : ids (&["a"]), .. node ("r1") },
+       Graphnode { contains : ids (&["b"]), .. node ("r2") } ],
+    &[ Graphnode { extra_ids : vec! [ ID::from ("b") ],
+                   contains  : ids (&["c"]), .. node ("a") },
+       node ("c"),
+       Graphnode { contains : ids (&["a"]), .. node ("r1") },
+       Graphnode { contains : ids (&["a"]), .. node ("r2") } ] );
+  let readiness_store : ReadinessStore = ReadinessStore::default ();
+  let input : String = formatdoc! ("
+    * {} b
+    * {} a
+    ", occurrence_metadata ("b", ""), occurrence_metadata ("a", "") );
+  let run : Run = run_as_written_asserting_fixpoint_in (
+    &input, &straddle . after,
+    RefreshMode::DiffView { straddle        : &straddle,
+                            buffer_kind     : DiffViewBufferKind::AllChanges,
+                            readiness_store : &readiness_store } );
+  assert_eq! ( run . outline (), "\
+ghost b noClaim
+  acquiredByFolder
+    node a wp noClaim
+node a
+  acquiredFolder
+    ghost b noClaim ᗣ
+  idFolder
+    id a noClaim
+    id b noClaim
+  containerFolder
+    node r1 wp noClaim
+    node r2 wp noClaim
+  node c wp" ); }
+
 #[test]
 fn a_buffer_of_many_changes_is_a_fixpoint () {
   // a acquired b by a nodeMerge; d was deleted; m left p's content;

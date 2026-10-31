@@ -73,11 +73,7 @@ pub(crate) fn id_rule (
   if presence == GnidPresence::Present {
     let pid : ID = walk . truth . graph . pid_of (gnid)
       . expect ("a present gnid resolves");
-    let acquired_since_head : bool =
-      pid != *gnid
-      && head . is_some_and ( |straddle|
-           straddle . before . nodes . contains_key (gnid) );
-    if ! acquired_since_head {
+    if ! acquired_since_head (gnid, &pid, walk) {
       return IdRuleAnswer::Occurrence (pid); }}
   let restricted_answer = || -> IdRuleAnswer {
     let named : bool = parent_goal . is_some_and ( |goal| goal . names_gnid (gnid) );
@@ -98,6 +94,20 @@ pub(crate) fn id_rule (
   if parent_goal . is_some_and ( |goal| goal . names_gnid (gnid) ) {
     return IdRuleAnswer::GnidOnly (GnidOnlyKind::Unknown); }
   IdRuleAnswer::Tombstone }
+
+/// Whether, in the diff view, 'gnid' named a node of HEAD's own that
+/// a nodeMerge has since made an extra ID of the node 'pid': then
+/// 'gnid' is its ghost's, not an occurrence of the acquirer. Never in
+/// a content view.
+pub(crate) fn acquired_since_head (
+  gnid : &ID,
+  pid  : &ID,
+  walk : &Walk,
+) -> bool {
+  match walk . mode {
+    RefreshMode::DiffView { straddle, .. } =>
+      pid != gnid && straddle . before . nodes . contains_key (gnid),
+    RefreshMode::ContentView => false, } }
 
 /// The relationship request the vognode carries, if any: a ghost
 /// has no slot for one.

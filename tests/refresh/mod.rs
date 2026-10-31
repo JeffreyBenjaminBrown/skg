@@ -135,9 +135,34 @@ pub(super) fn run_asserting_fixpoint_in (
   mode        : RefreshMode,
   budget      : usize,
 ) -> Run {
+  run_parsed_asserting_fixpoint (
+    parse (text, IdResolution::ThroughGraph (graph)),
+    graph, restriction, mode, budget ) }
+
+/// As 'run_asserting_fixpoint_in' with no skgrepo restriction and a
+/// large budget, for 'text' parsed as written
+/// ('IdResolution::AsWritten'), as a save parses its buffer against
+/// the graph before its nodeMerge: an occurrence keeps the ID it is
+/// written under until the refresh points it at its node's pid.
+pub(super) fn run_as_written_asserting_fixpoint_in (
+  text  : &str,
+  graph : &InRustGraph,
+  mode  : RefreshMode,
+) -> Run {
+  run_parsed_asserting_fixpoint (
+    parse (text, IdResolution::AsWritten), graph, None, mode, 100 ) }
+
+/// Refresh 'forest' over 'graph' in 'mode' with 'budget', then assert
+/// the fixpoint.
+fn run_parsed_asserting_fixpoint (
+  mut forest  : ViewForest,
+  graph       : &InRustGraph,
+  restriction : Option<&SkgrepoRestriction>,
+  mode        : RefreshMode,
+  budget      : usize,
+) -> Run {
   let config : SkgConfig = config ();
   let truth : Truth = Truth { graph, config : &config, restriction };
-  let mut forest : ViewForest = parse (text, IdResolution::ThroughGraph (graph));
   let mut record : ViewnodeIdRecord = ViewnodeIdRecord::of_viewforest (&forest);
   let text : String = refresh_and_render (
     &mut forest, &mut record, &truth, mode, budget )
