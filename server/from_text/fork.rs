@@ -16,7 +16,7 @@ use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use crate::org_to_text::skgRepos_form;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::errors::BufferValidationError;
-use crate::types::misc::{ID, MSV, SkgConfig, SkgrepoName, members_of, rel_partners_at_relRepo};
+use crate::types::misc::{ID, MSV, RelPartner, SkgConfig, SkgrepoName, members_of, rel_partners_at_relRepo};
 use crate::types::nodes::complete::{
   Flag, Graphnode, flag_is_true};
 use crate::types::save::{ForkSpec, SaveNode};
@@ -149,10 +149,12 @@ pub struct CloneSkgrepoInputs {
 /// confirmation buffer rather than dead-ending on
 /// 'ForkRepoRestricted'.)
 pub fn fork_spec_from_buffer_node (
-  buffer_node   : &Graphnode,
-  disk_title    : &str, // N's original title (before the edit), for the confirmation buffer's child line.
-  disk_contains : &[ID], // N's original contains (before the edit); children the edit deleted become the clone's hides.
-  skgrepos      : &CloneSkgrepoInputs,
+  buffer_node         : &Graphnode,
+  disk_title          : &str, // N's original title (before the edit), for the confirmation buffer's child line.
+  disk_contains       : &[RelPartner<ID>], // N's original contains records (before the edit); children the edit deleted become the clone's hides.
+  skgrepos            : &CloneSkgrepoInputs,
+  config              : &SkgConfig,
+  skgrepo_restriction : Option<&SkgrepoRestriction>,
 ) -> Result<ForkSpec, BufferValidationError> {
   let specified : Option<SkgrepoName> =
     skgrepos . user_set . get (& buffer_node . pid) . cloned ()
@@ -169,7 +171,7 @@ pub fn fork_spec_from_buffer_node (
         buffer_node . pid . clone () )) ?;
   Ok ( build_fork_clone (
     buffer_node, disk_title, disk_contains, clone_skgrepo,
-    skgrepo_confirmed ) ) }
+    skgrepo_confirmed, config, skgrepo_restriction ) ) }
 
 /// What 'docs/forks.org', "Adding new content under a foreign node",
 /// describes: when the fork-forcing edit is the addition of new children
@@ -387,15 +389,38 @@ pub fn validate_fork_specs (
 /// its subscribee-as-such view.)
 /// contains is stored raw (the child IDs as the buffer collected them);
 /// override substitution applies at render time.
+/// .
+/// The clone copies only the contains records the skgrepo restriction
+/// shows: what the user could not see, the user did not fork. The rest
+/// is N's still, and since C subscribes to N it shows under C as
+/// unintegrated content after a skgrepo widening. Each copied record,
+/// and each hide, stands at the more private of the clone's home and
+/// the relRepo of the record it comes from, when that relRepo is owned
+/// (a foreign section's privacy says nothing of an owned one), so that
+/// a private membership never lands in a more public section.
 pub fn build_fork_clone (
-  buffer_node       : &Graphnode,
-  disk_title        : &str, // N's original (pre-edit) title, kept for the confirmation buffer's child line.
-  disk_contains     : &[ID], // N's original (pre-edit) contains.
-  clone_skgrepo     : SkgrepoName,
-  skgrepo_confirmed : bool, // whether clone_repo was user-specified (vs inferred or defaulted)
+  buffer_node         : &Graphnode,
+  disk_title          : &str, // N's original (pre-edit) title, kept for the confirmation buffer's child line.
+  disk_contains       : &[RelPartner<ID>], // N's original (pre-edit) contains records.
+  clone_skgrepo       : SkgrepoName,
+  skgrepo_confirmed   : bool, // whether clone_repo was user-specified (vs inferred or defaulted)
+  config              : &SkgConfig,
+  skgrepo_restriction : Option<&SkgrepoRestriction>,
 ) -> ForkSpec {
+  let floored = |record : &RelPartner<ID>| -> RelPartner<ID> {
+    RelPartner::at_relRepo (
+      if config . skgrepo_is_owned (&record . relRepo) {
+        config . more_private_of (
+          record . relRepo . clone (), clone_skgrepo . clone () )
+      } else { clone_skgrepo . clone () },
+      record . member . clone () ) };
+  let visible = |record : &&RelPartner<ID>| -> bool {
+    SkgrepoRestriction::record_is_visible (
+      skgrepo_restriction, &record . relRepo ) };
+  let buffer_contains : Vec<RelPartner<ID>> =
+    buffer_node . contains . iter () . filter (visible) . map (floored) . collect ();
   let buffer_contains_gnids : Vec<ID> =
-    members_of (& buffer_node . contains);
+    members_of (&buffer_contains);
   let clone : Graphnode = Graphnode {
     title         : buffer_node . title . clone (),
     overPrivateText_telescope : false,
@@ -403,16 +428,15 @@ pub fn build_fork_clone (
     pid           : ID ( uuid::Uuid::new_v4 () . to_string () ),
     extra_ids     : Vec::new (),
     body          : buffer_node . body . clone (),
-    contains      : rel_partners_at_relRepo (
-      &clone_skgrepo, buffer_contains_gnids . clone () ),
+    contains      : buffer_contains,
     subscribesTo  : MSV::Specified ( rel_partners_at_relRepo (
       &clone_skgrepo, vec! [ buffer_node . pid . clone () ] )),
-    hidesFromSubs : MSV::Specified ( rel_partners_at_relRepo (
-      &clone_skgrepo,
+    hidesFromSubs : MSV::Specified (
       // The children the forking edit deleted.
       disk_contains . iter ()
-        . filter ( |gnid| ! buffer_contains_gnids . contains (gnid) )
-        . cloned () . collect () )),
+        . filter (visible)
+        . filter ( |record| ! buffer_contains_gnids . contains (&record . member) )
+        . map (floored) . collect () ),
     overrides : MSV::Specified ( rel_partners_at_relRepo (
       &clone_skgrepo, vec! [ buffer_node . pid . clone () ] )),
     // The clone preserves the original node's search-matching choice, but

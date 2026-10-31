@@ -17,7 +17,7 @@ pub mod validate;
 use crate::nodeMerge::nodeMergeInstructionTriple::nodeMerge_instructions_from_pairs;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::errors::{BufferValidationError, SaveError};
-use crate::types::misc::{ID, SkgConfig, members_of};
+use crate::types::misc::{ID, SkgConfig};
 use crate::types::save::{NodeMerge, NodeInstruction, SavePlan};
 use crate::types::tree::forest::ViewForest;
 
@@ -32,7 +32,10 @@ use fork::{
   owned_ancestor_skgrepos_for_foreign_vognodes,
   validate_fork_specs_in_graph};
 use local_fieldintent_collection::NonmergeSavePlan;
-use validate::{validate_and_filter_foreign_instructions, validate_no_simultaneous_move_and_nodeMerge};
+use validate::{
+  refuse_records_landing_restricted,
+  validate_and_filter_foreign_instructions,
+  validate_no_simultaneous_move_and_nodeMerge};
 
 use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
 use crate::types::nodes::complete::Graphnode;
@@ -209,9 +212,18 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
         graph,
         &clone_skgrepo_inputs,
         &adopt_clone_skgrepo,
-        config )
+        config,
+        skgrepo_restriction )
  } . map_err ( |errors| SaveError::BufferValidationErrors {
         errors, warnings : parsing_warnings . clone () } ) ?;
+  { // A record that would land where the skgrepo restriction keeps
+    // it out of sight is refused, before anything is written.
+    let errors : Vec<BufferValidationError> =
+      refuse_records_landing_restricted (
+        &node_instructions, graph, skgrepo_restriction );
+    if ! errors . is_empty () {
+      return Err ( SaveError::BufferValidationErrors {
+        errors, warnings : parsing_warnings . clone () } ); }}
   validate_no_simultaneous_move_and_nodeMerge (
     &nonmerge_plan . skgrepo_moves, &nodeMerge_instructions )
     . map_err ( |errors| SaveError::BufferValidationErrors {
@@ -227,7 +239,8 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
     let mut specs : Vec<ForkSpec> = fork_specs;
     specs . extend (
       explicit_fork_specs_from_viewforest (
-        &viewforest, graph, config, &clone_skgrepo_inputs )
+        &viewforest, graph, config, &clone_skgrepo_inputs,
+        skgrepo_restriction )
       . map_err ( |errors| SaveError::BufferValidationErrors {
           errors, warnings : parsing_warnings . clone () } ) ? );
     specs };
@@ -337,6 +350,7 @@ fn explicit_fork_specs_from_viewforest (
   graph                : &crate::dbs::in_rust_graph::InRustGraph,
   config               : &SkgConfig,
   clone_skgrepo_inputs : &CloneSkgrepoInputs,
+  skgrepo_restriction  : Option<&SkgrepoRestriction>,
 ) -> Result<Vec<ForkSpec>, Vec<BufferValidationError>> {
   let mut specs  : Vec<ForkSpec> = Vec::new ();
   let mut errors : Vec<BufferValidationError> = Vec::new ();
@@ -358,8 +372,8 @@ fn explicit_fork_specs_from_viewforest (
       // state, so the disk-contains diff is empty: an explicit fork
       // deletes nothing, hence hides nothing.
       & graph_snapshot, & graph_snapshot . title,
-      & members_of ( & graph_snapshot . contains ),
-      clone_skgrepo_inputs )
+      & graph_snapshot . contains,
+      clone_skgrepo_inputs, config, skgrepo_restriction )
     { Ok (spec) => specs . push (spec),
       Err (e)   => errors . push (e), }}
   if ! errors . is_empty () { return Err (errors); }

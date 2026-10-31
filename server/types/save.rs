@@ -232,6 +232,12 @@ fn buffer_validation_error_text (
     BufferValidationError::ForkSkgrepoRestricted(gnid, skgrepo) => {
       format!("Cannot fork into a restricted repo:\n- Foreign node: {}\n- Clone's resolved repo: {}\n- That repo is not in the skgrepo restriction. Activate it first; an invisible clone is never created silently.\n",
               gnid . 0, skgrepo) },
+    BufferValidationError::RecordSkgrepoRestricted(recorder, relation, member, skgrepo) => {
+      format!("Cannot save a record into a restricted repo:\n- Recorder: {}\n- Relation: {}\n- Member: {}\n- The record's repo: {}\n- That repo is not in the skgrepo restriction. Activate it first; an invisible record is never created silently.\n",
+              recorder . 0, relation, member, skgrepo) },
+    BufferValidationError::RecordMovedOutOfRestrictedSkgrepo(recorder, relation, member, skgrepo) => {
+      format!("Cannot move a record out of a restricted repo:\n- Recorder: {}\n- Relation: {}\n- Member: {}\n- The record's repo: {}\n- That repo is not in the skgrepo restriction. Activate it first; a record you cannot see is never moved silently.\n",
+              recorder . 0, relation, member, skgrepo) },
     BufferValidationError::ForkSkgrepoNotOwned(gnid, skgrepo) => {
       format!("Cannot fork into a repo you do not own:\n- Foreign node: {}\n- Clone's chosen repo: {}\n- Pick an owned repo for the clone (C-c s s in the confirmation buffer).\n",
               gnid . 0, skgrepo) },

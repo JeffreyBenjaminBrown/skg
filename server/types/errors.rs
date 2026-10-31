@@ -61,6 +61,14 @@ pub enum BufferValidationError {
                                   SkgrepoName),  // C's resolved owned skgrepo, which is restricted under the skgrepo restriction
   ForkSkgrepoNotOwned             (ID,           // N's pid
                                   SkgrepoName),  // C's chosen skgrepo, which the user does not own (a typed or hand-edited skgrepo the rotation would never offer)
+  RecordSkgrepoRestricted        (ID,           // the recorder's pid
+                                  String,       // the relation, as the file names it ("contains")
+                                  String,       // the member: an ID, or an alias's text
+                                  SkgrepoName), // the record's relRepo, which the skgrepo restriction keeps out
+  RecordMovedOutOfRestrictedSkgrepo (ID,        // the recorder's pid
+                                  String,       // the relation, as the file names it ("contains")
+                                  String,       // the member's ID
+                                  SkgrepoName), // the relRepo the graph holds the record at, which the skgrepo restriction keeps out
   ForkRequestOnUnknownNode       (ID, HeadlineName),  // An explicit 'skg-fork-node' request on a node whose id is not in the graph (an unsaved headline): nothing exists to override.
   ForkRequestMultiple            (ID, Vec<HeadlineName>),  // Two headlines for the same id both carry an explicit fork request; at most one is allowed.
   OverrideInvariantViolation     (String),
@@ -251,6 +259,10 @@ impl std::fmt::Display for BufferValidationError {
         write!(f, "Cannot fork node {:?}: you have already forked it. Your clone is {:?}. Edit that clone instead (a node may have at most one owned override).", original, existing),
       BufferValidationError::ForkSkgrepoRestricted(gnid, skgrepo) =>
         write!(f, "Cannot fork node {:?}: the clone's repo '{}' is restricted under the current repo-set. Activate it first; an invisible clone is never created silently.", gnid, skgrepo),
+      BufferValidationError::RecordSkgrepoRestricted(recorder, relation, member, skgrepo) =>
+        write!(f, "Cannot save node {:?}: its {} record of {} would land in repo '{}', which is restricted under the current repo-set. Activate it first; an invisible record is never created silently.", recorder, relation, member, skgrepo),
+      BufferValidationError::RecordMovedOutOfRestrictedSkgrepo(recorder, relation, member, skgrepo) =>
+        write!(f, "Cannot save node {:?}: its {} record of {} would leave repo '{}', which is restricted under the current repo-set. Activate it first; a record you cannot see is never moved silently.", recorder, relation, member, skgrepo),
       BufferValidationError::ForkSkgrepoNotOwned(gnid, skgrepo) =>
         write!(f, "Cannot fork node {:?}: the clone's repo '{}' is not one you own. Choose an owned repo for the clone (C-c s s in the confirmation buffer).", gnid, skgrepo),
       BufferValidationError::ForkRequestOnUnknownNode(gnid, headline) =>
@@ -320,6 +332,8 @@ impl BufferValidationError {
         | BufferValidationError::ForkSkgrepoUnresolved (_)
         | BufferValidationError::ForkAlreadyExists (..)
         | BufferValidationError::ForkSkgrepoRestricted (..)
+        | BufferValidationError::RecordSkgrepoRestricted (..)
+        | BufferValidationError::RecordMovedOutOfRestrictedSkgrepo (..)
         | BufferValidationError::ForkSkgrepoNotOwned (..)
         | BufferValidationError::OverrideInvariantViolation (_)
         | BufferValidationError::EmptyTitle (_)

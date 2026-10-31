@@ -1,10 +1,10 @@
 use crate::from_text::fork::{CloneSkgrepoInputs, fork_spec_from_buffer_node};
 use crate::skgrepo_sets::SkgrepoRestriction;
-use crate::dbs::node_lookup::opt_graphnode_by_gnid;
+use crate::dbs::node_lookup::{graphnode_from_graph, opt_graphnode_by_gnid};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::errors::BufferValidationError;
 use crate::types::misc::{
-  ID, MSV, RelPartner, SkgConfig, SkgrepoName, members_of};
+  ID, MSV, RelPartner, RelationshipMemberKey, SkgConfig, SkgrepoName};
 use crate::types::save::{NodeInstruction, SaveNode, DeleteNode, ForkSpec, NodeMerge, SkgrepoMove};
 use crate::types::nodes::complete::Graphnode;
 
@@ -38,6 +38,7 @@ pub fn validate_and_filter_foreign_instructions(
   clone_skgrepo_inputs : &CloneSkgrepoInputs, // everything clone-repo resolution can use, in priority order
   adopt_clone_skgrepo : &HashMap<ID, ID>, // new node -> forked N whose clone's repo it adopts (see 'new_foreign_nodes_adopting_clone_repos')
   config             : &SkgConfig,
+  skgrepo_restriction : Option<&SkgrepoRestriction>, // the clones copy only the records it shows ('build_fork_clone')
 ) -> Result<(Vec<NodeInstruction>, Vec<ForkSpec>),
             Vec<BufferValidationError>> {
   let mut outcomes : Vec<ForeignPolicyOutcome> =
@@ -75,8 +76,8 @@ pub fn validate_and_filter_foreign_instructions(
       = outcome {
       match fork_spec_from_buffer_node (
         buffer_node, & disk_node . title,
-        & members_of (& disk_node . contains),
-        clone_skgrepo_inputs )
+        & disk_node . contains,
+        clone_skgrepo_inputs, config, skgrepo_restriction )
       { Ok (spec)  => fork_specs . push (spec),
         Err (e)    => fork_errors . push (e), }}}
   if ! fork_errors . is_empty () { return Err (fork_errors); }
@@ -344,27 +345,37 @@ pub(super) fn validate_no_simultaneous_move_and_nodeMerge (
 /// fatal.  A stale buffer (rendered before a skgrepo-set switch) can
 /// legitimately hold whole now-restricted subtrees; aborting would
 /// force the user to delete them from view, which would itself be
-/// destructive.  Runs after the noop filter, so an untouched stale
-/// node (whose identical-to-disk nodeInstruction the noop filter already
-/// discarded) does not count as suppressed.  Returns whether
-/// anything was dropped, so the caller can attach the warning
-/// "Restricted nodes present in saved buffer remain unchanged in
-/// graph."
+/// destructive.  A node is restricted when the skgrepo restriction
+/// keeps out its home as the graph has it, or as the buffer gives it:
+/// a headline for a restricted graphnode, pasted with a visible
+/// nodeRepo, leaves the graphnode where it is.  Runs after the noop
+/// filter, so an untouched stale node (whose identical-to-disk
+/// nodeInstruction the noop filter already discarded) does not count
+/// as suppressed.  Returns whether anything was dropped, so the caller
+/// can attach the warning "Restricted nodes present in saved buffer
+/// remain unchanged in graph."
 pub fn suppress_writes_to_restricted_nodes (
   node_instructions : Vec<NodeInstruction>,
   skgrepo_moves : Vec<SkgrepoMove>,
+  graph : &InRustGraph,
   skgrepo_restriction : Option<&SkgrepoRestriction>,
 ) -> (Vec<NodeInstruction>, Vec<SkgrepoMove>, bool) {
   let Some (restriction) = skgrepo_restriction else {
     return (node_instructions, skgrepo_moves, false); };
+  let restricted = |gnid : &ID, buffer_home : &SkgrepoName| -> bool {
+    SkgrepoRestriction::node_is_restricted (restriction, buffer_home)
+    || graph . pid_and_skgrepo (gnid) . is_some_and (
+      |(_pid, graph_home)| SkgrepoRestriction::node_is_restricted (
+        restriction, &graph_home )) };
   let mut suppressed : bool = false;
   let node_instructions : Vec<NodeInstruction> =
     node_instructions . into_iter ()
     . filter ( |instruction| {
-        let skgrepo : &SkgrepoName = match instruction {
-          NodeInstruction::Save (SaveNode (node)) => &node . home_skgrepo,
-          NodeInstruction::Delete (d)             => &d . home_skgrepo };
-        let keep : bool = ! SkgrepoRestriction::node_is_restricted (restriction, skgrepo);
+        let keep : bool = ! match instruction {
+          NodeInstruction::Save (SaveNode (node)) =>
+            restricted (&node . pid, &node . home_skgrepo),
+          NodeInstruction::Delete (d) =>
+            restricted (&d . gnid, &d . home_skgrepo), };
         if ! keep { suppressed = true; }
         keep } )
     . collect ();
@@ -378,3 +389,81 @@ pub fn suppress_writes_to_restricted_nodes (
         keep } )
     . collect ();
   (node_instructions, skgrepo_moves, suppressed) }
+
+/// Under a skgrepo restriction, refuses each record a save would write
+/// into a section the skgrepo restriction keeps out, unless the graph
+/// already holds it there: a new record (a member typed or pasted, an
+/// inferred hide, the default floor of either landing in a restricted
+/// section) or a moved one (an explicit relRepo request). It refuses
+/// too each record the graph holds in such a section that the save
+/// would hold at another relRepo, moved out of sight's reach. What the
+/// user could not see, the user did not edit, and an invisible record
+/// is never created silently. 'node_instructions' are the save's, after
+/// the suppression of writes to restricted nodes, so each recorder
+/// checked is visible.
+pub fn refuse_records_landing_restricted (
+  node_instructions   : &[NodeInstruction],
+  graph               : &InRustGraph,
+  skgrepo_restriction : Option<&SkgrepoRestriction>,
+) -> Vec<BufferValidationError> {
+  let Some (restriction) = skgrepo_restriction else { return Vec::new (); };
+  let mut errors : Vec<BufferValidationError> = Vec::new ();
+  for instruction in node_instructions {
+    let NodeInstruction::Save (SaveNode (node)) = instruction else { continue; };
+    let disk : Option<Graphnode> = graphnode_from_graph (graph, &node . pid);
+    let mut refuse_new_restricted_records =
+      | relation : &str,
+        records  : &[RelPartner<ID>],
+        on_disk  : &[RelPartner<ID>] | {
+        for record in records {
+          if SkgrepoRestriction::record_is_visible (restriction, &record . relRepo)
+            { continue; }
+          let key : RelationshipMemberKey = graph . relationship_member_key (&record . member);
+          let already_there : bool = on_disk . iter () . any ( |held|
+            held . relRepo == record . relRepo
+            && graph . relationship_member_key (&held . member) == key );
+          if ! already_there {
+            errors . push ( BufferValidationError::RecordSkgrepoRestricted (
+              node . pid . clone (), relation . to_string (),
+              record . member . 0 . clone (), record . relRepo . clone () )); }}
+        for held in on_disk {
+          // A restricted record the save holds at another relRepo: a
+          // headline pasted for its member, with an explicit relRepo
+          // request, would move it into view.
+          if SkgrepoRestriction::record_is_visible (restriction, &held . relRepo)
+            { continue; }
+          let key : RelationshipMemberKey = graph . relationship_member_key (&held . member);
+          let same_member = |record : &&RelPartner<ID>| -> bool {
+            graph . relationship_member_key (&record . member) == key };
+          let moved : bool =
+            records . iter () . any ( |record| same_member (&record) )
+            && ! records . iter () . filter (same_member)
+                 . any ( |record| record . relRepo == held . relRepo );
+          if moved {
+            errors . push ( BufferValidationError::RecordMovedOutOfRestrictedSkgrepo (
+              node . pid . clone (), relation . to_string (),
+              held . member . 0 . clone (), held . relRepo . clone () )); }} };
+    let disk_list = |list : fn (&Graphnode) -> &[RelPartner<ID>]| -> Vec<RelPartner<ID>> {
+      disk . as_ref () . map ( |disk| list (disk) . to_vec () ) . unwrap_or_default () };
+    refuse_new_restricted_records (
+      "contains", &node . contains, &disk_list ( |n| &n . contains ));
+    refuse_new_restricted_records (
+      "subscribesTo", node . subscribesTo . or_default (),
+      &disk_list ( |n| n . subscribesTo . or_default () ));
+    refuse_new_restricted_records (
+      "hidesFromSubs", node . hidesFromSubs . or_default (),
+      &disk_list ( |n| n . hidesFromSubs . or_default () ));
+    refuse_new_restricted_records (
+      "overrides", node . overrides . or_default (),
+      &disk_list ( |n| n . overrides . or_default () ));
+    for alias in node . aliases . or_default () {
+      if SkgrepoRestriction::record_is_visible (restriction, &alias . relRepo)
+        { continue; }
+      let already_there : bool = disk . as_ref () . is_some_and ( |disk|
+        disk . aliases . or_default () . iter () . any ( |held|
+          held . relRepo == alias . relRepo && held . member == alias . member ));
+      if ! already_there {
+        errors . push ( BufferValidationError::RecordSkgrepoRestricted (
+          node . pid . clone (), "aliases" . to_string (),
+          alias . member . clone (), alias . relRepo . clone () )); }} }
+  errors }

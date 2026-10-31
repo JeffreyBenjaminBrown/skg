@@ -33,6 +33,8 @@ use skg::types::misc::{ID, RelPartner, SkgrepoName, members_of};
 use skg::types::nodes::rust::GraphnodeInRust;
 use skg::metadata_canon::without_viewnode_ids;
 use skg::org_to_text::viewforest_to_string;
+use skg::types::errors::SaveError;
+use skg::types::save::format_save_error_as_org;
 use skg::types::views_state::{DiffViewBufferKind, ViewforestId};
 
 use std::collections::BTreeMap;
@@ -171,11 +173,13 @@ fn deleting_a_restricted_vognodes_line_removes_its_record_alone (
 /// r contains x, private, and subscribes to e, which contains x too;
 /// r records both in its public file. Under "public" x stands in r's
 /// content as a Restricted vognode; its line deleted and the view
-/// saved, r no longer contains x, and, x being content of a node r
-/// subscribes to, r hides x from its subscriptions, as it would an
-/// occurrence's removal.
+/// saved, r would hide x from its subscriptions, x being content of a
+/// node r subscribes to, as it would on an occurrence's removal. That
+/// hide would land in r's private section, the more private of the
+/// endpoints' homes, which the skgrepo restriction keeps out: the save
+/// is refused, naming the skgrepo, and no file changes.
 #[test]
-fn deleting_a_restricted_vognode_from_a_subscribers_content_hides_it (
+fn deleting_a_restricted_vognode_whose_hide_would_land_restricted_is_refused (
 ) -> Result<(), Box<dyn Error>> {
   let case : tempfile::TempDir = tempfile::TempDir::new () ?;
   write_unchanged_skgrepos (case . path (), &[
@@ -195,21 +199,21 @@ fn deleting_a_restricted_vognode_from_a_subscribers_content_hides_it (
                         && line . contains ("restricted (gnid x)") )
         . unwrap_or_else ( || panic! ( "x stands in r's content:\n{}", opened ))
         . to_string ();
-      save_under (f, &opened . replacen ( &format! ("{}\n", x_line), "", 1 ),
-                  &public) ?;
-      let r : GraphnodeInRust = node_in_graph (f, "r");
-      assert_eq! ( members_of (&r . contains), Vec::<ID>::new () );
-      assert_eq! ( members_of ( r . hidesFromSubs . or_default () ),
-                   vec! [ ID::from ("x") ] );
+      let files_before : BTreeMap<PathBuf, String> = skg_files_on_disk (f) ?;
+      assert_refused_for_a_restricted_record (
+        save_view_under (f, VIEW, &opened . replacen ( &format! ("{}\n", x_line), "", 1 ),
+                         &public),
+        "- Relation: hidesFromSubs\n- Member: x\n- The record's repo: private" );
+      assert_eq! ( skg_files_on_disk (f) ?, files_before, "no file changed" );
       Ok (( )) } ) }
 
 /// Under "public", h stands in r's content as a restricted headline,
 /// recorded in r's public file. A request on its line to record the
-/// relationship in 'private' is applied by the save: r still contains
-/// h, now recorded in its private section, and the view, under
-/// "public", shows no headline for h, whose record it cannot show.
+/// relationship in 'private' would move the record where the skgrepo
+/// restriction keeps it out of sight: the save is refused, naming the
+/// skgrepo, and r's record of h stays public.
 #[test]
-fn a_relRepo_request_on_a_restricted_headline_moves_its_record (
+fn a_relRepo_request_on_a_restricted_headline_into_a_restricted_skgrepo_is_refused (
 ) -> Result<(), Box<dyn Error>> {
   let case : tempfile::TempDir = tempfile::TempDir::new () ?;
   write_fixture (case . path ()) ?;
@@ -222,24 +226,33 @@ fn a_relRepo_request_on_a_restricted_headline_moves_its_record (
       let requested : String = opened . replacen (
         "restricted (gnid h)", "restricted (gnid h) (editRequest (relRepo private))", 1 );
       assert_ne! ( requested, opened, "h stands in r's content:\n{}", opened );
-      let saved : SaveResponse = save_under (f, &requested, &public) ?;
-      assert! ( ! saved . saved_view . contains ("(gnid h)"),
-                "the record went where the skgrepo restriction keeps it out:\n{}",
-                saved . saved_view );
+      let files_before : BTreeMap<PathBuf, String> = skg_files_on_disk (f) ?;
+      assert_refused_for_a_restricted_record (
+        save_view_under (f, VIEW, &requested, &public),
+        "- Relation: contains\n- Member: h\n- The record's repo: private" );
+      assert_eq! ( skg_files_on_disk (f) ?, files_before, "no file changed" );
       let r : GraphnodeInRust = node_in_graph (f, "r");
       let h : &RelPartner<ID> = r . contains . iter ()
         . find ( |partner| partner . member == ID::from ("h") )
         . unwrap_or_else ( || panic! ("r still contains h: {:?}", r . contains) );
-      assert_eq! ( h . relRepo, SkgrepoName::from ("private") );
-      let files : BTreeMap<PathBuf, String> = skg_files_on_disk (f) ?;
-      let r_file = |skgrepo : &str| -> String {
-        files . iter ()
-          . find ( |(path, _)| path . ends_with ( Path::new (skgrepo) . join ("r.skg") ))
-          . map ( |(_, text)| text . clone () ) . unwrap_or_default () };
-      assert! ( r_file ("private") . contains ("- h\n")
-                && ! r_file ("public") . contains ("- h\n"),
-                "public:\n{}\nprivate:\n{}", r_file ("public"), r_file ("private") );
+      assert_eq! ( h . relRepo, SkgrepoName::from ("public") );
       Ok (( )) } ) }
+
+/// 'saved' is the refusal of a save for a record that would land in a
+/// restricted section; the refusal, as the client shows it, contains
+/// 'details'.
+fn assert_refused_for_a_restricted_record (
+  saved   : Result<SaveResponse, Box<dyn Error>>,
+  details : &str,
+) {
+  let refusal : String = match saved {
+    Err (e) => match e . downcast_ref::<SaveError> () {
+      Some (save_error) => format_save_error_as_org (save_error),
+      None => e . to_string (), },
+    Ok (response) => panic! ( "the save must be refused; errors {:?}", response . errors ), };
+  assert! ( refusal . contains ("Cannot save a record into a restricted repo")
+            && refusal . contains (details),
+            "the refusal names the record and its skgrepo:\n{}", refusal ); }
 
 /// A view of r drawn under "all", switched to "public": h's occurrence
 /// is a Restricted vognode, in place, holding s1, and nothing shows h's

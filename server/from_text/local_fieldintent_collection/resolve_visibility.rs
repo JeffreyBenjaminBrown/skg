@@ -53,7 +53,7 @@ pub fn resolve_visibility (
   skgrepo_restriction : Option<&SkgrepoRestriction>, // None means no skgrepo restriction; callers normalize 'all' to None.
 ) -> Result<(LoweredNodeIntents, Vec<PostSkgsaveCommitNoticeCandidate>), Box<dyn Error>> {
   validate_no_overlapping_subscribee_hiderel_conflicts (
-    visibility, graph, config ) ?;
+    visibility, graph, config, skgrepo_restriction ) ?;
   infer_hides_from_contains_removals (
     // Before the signal loop below, so that an explicit
     // subscribee-as-such gesture about the same child wins.
@@ -221,6 +221,11 @@ fn apply_hiddenoutside_edits (
 ///   the signal loop, so signal deltas also land last.
 /// - A node with no disk entry removes nothing (a fork clone's
 ///   creation-time hides are computed in 'build_fork_clone').
+/// - Only what the skgrepo restriction shows explains or blocks a
+///   hide: the subscriber's subscriptions, each subscribee's content
+///   and the subscriber's hides are read by their visible records. A
+///   member only a restricted record explains is not hidden, and
+///   re-adding a member drops no restricted hide of it.
 fn infer_hides_from_contains_removals (
   lowered                : &mut LoweredNodeIntents,
   visibility             : &[(ID, SubscribeeVisibility)],
@@ -259,10 +264,10 @@ fn infer_hides_from_contains_removals (
     let inferred_unhides : Vec<ID> = {
       let disk_contains : HashSet<&ID> =
         subscriber_contains . iter () . collect ();
-      let disk_hides : Vec<ID> =
-        members_of (
-          subscriber_from_disk . hidesFromSubs
-          . or_default () );
+      let disk_hides : Vec<ID> = // a restricted hide stays, as the buffer could not show it
+        members_with_visible_records (
+          subscriber_from_disk . hidesFromSubs . or_default (),
+          skgrepo_restriction );
       new_contains . iter ()
         . filter ( |gnid| ! disk_contains . contains (gnid) )
         . filter ( |gnid| disk_hides . contains (gnid) )
@@ -276,15 +281,18 @@ fn infer_hides_from_contains_removals (
             // the same save also stops hides being inferred from it.
             MSV::Specified (subs) => subs . clone (),
             MSV::Unspecified =>
-              members_of (
-                subscriber_from_disk . subscribesTo . or_default () ), };
+              members_with_visible_records (
+                subscriber_from_disk . subscribesTo . or_default (),
+                skgrepo_restriction ), };
           let mut content : HashSet<ID> = HashSet::new ();
           for subscribee in &subscribes {
             if let Some (subscribee_from_disk) =
               opt_graphnode_by_gnid (
                 graph, config, subscribee ) ?
             { content . extend (
-                members_of (& subscribee_from_disk . contains) ); }}
+                members_with_visible_records (
+                  & subscribee_from_disk . contains,
+                  skgrepo_restriction )); }}
           content };
         removed . into_iter ()
           . filter ( |gnid| subscribee_content . contains (gnid) )
@@ -298,11 +306,13 @@ fn infer_hides_from_contains_removals (
 /// Checks one subscriber + content node
 /// against all subscribee branches under the subscriber.
 /// Rejects the save if one subscribee says "hide it"
-/// and another says "show it".
+/// and another says "show it". A subscribee's content is read by the
+/// records the skgrepo restriction shows, as the view drew it.
 fn validate_no_overlapping_subscribee_hiderel_conflicts (
-  visibility : &[(ID, SubscribeeVisibility)],
-  graph      : &InRustGraph,
-  config     : &SkgConfig,
+  visibility          : &[(ID, SubscribeeVisibility)],
+  graph               : &InRustGraph,
+  config              : &SkgConfig,
+  skgrepo_restriction : Option<&SkgrepoRestriction>,
 ) -> Result<(), Box<dyn Error>> {
   // This needs the visibility signals plus disk contains lists,
   // because the conflict is per subscriber/subscribee-content pair,
@@ -316,7 +326,8 @@ fn validate_no_overlapping_subscribee_hiderel_conflicts (
         None                        => continue, };
     let visible_content : HashSet<ID> =
       signal . visible . iter() . cloned() . collect();
-    for content_gnid in members_of (&subscribee_from_disk . contains) {
+    for content_gnid in members_with_visible_records (
+      &subscribee_from_disk . contains, skgrepo_restriction ) {
       let content_gnid : ID = content_gnid;
       let key : (ID, ID) =
         (subscriber . clone(), content_gnid . clone());

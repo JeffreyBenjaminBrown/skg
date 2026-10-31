@@ -869,7 +869,7 @@ async fn subscribee_as_such_child_removal_is_not_foreign_contains_edit (
           &graph_handle_from_config (config)? . load_full (),
           &clone_skgrepo_inputs,
           &std::collections::HashMap::new(),
-          config)
+          config, None)
         . expect ("the subscribee-as-such edit must not error");
       assert!(
         ! save_gnids (&node_instructions) . contains (&ID::from ("e")),

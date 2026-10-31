@@ -125,7 +125,7 @@ fn fork_spec_n_edited (
     .. empty_graphnode () };
   build_fork_clone (
     & buffer_node, "N-original", &[], SkgrepoName::from ("owned2"),
-    skgrepo_confirmed ) }
+    skgrepo_confirmed, & config_two_owned_one_foreign (), None ) }
 
 #[test]
 fn fork_clone_hides_children_the_edit_deleted () {
@@ -142,8 +142,11 @@ fn fork_clone_hides_children_the_edit_deleted () {
     .. empty_graphnode () };
   let spec : ForkSpec = build_fork_clone (
     & buffer_node, "N-original",
-    & [ ID::from ("N1"), ID::from ("N2") ],
-    SkgrepoName::from ("owned2"), false );
+    & rel_partners_at_relRepo (
+      & SkgrepoName::from ("foreign"),
+      vec! [ ID::from ("N1"), ID::from ("N2") ] ),
+    SkgrepoName::from ("owned2"), false,
+    & config_two_owned_one_foreign (), None );
   assert_eq! (
     members_of (
       spec . clone . 0 . hidesFromSubs . or_default () ),
@@ -222,7 +225,8 @@ fn fork_clone_preserves_only_the_search_matching_flag () {
       flags,
       .. empty_graphnode () };
     let spec : ForkSpec = build_fork_clone (
-      &buffer_node, "N", &[], SkgrepoName::from ("owned2"), false );
+      &buffer_node, "N", &[], SkgrepoName::from ("owned2"), false,
+      & config_two_owned_one_foreign (), None );
     assert_eq! (
       spec . clone . 0 . flags,
       if no_search_matching { vec![Flag::NoSearchMatching] }

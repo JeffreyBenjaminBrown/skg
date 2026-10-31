@@ -290,15 +290,43 @@ pub fn refuse_delete_with_restricted_sections (
   restriction : &SkgrepoRestriction,
   pid    : &ID,
 ) -> Result<(), String> {
-  for skgrepo_name in config . ordered_skgrepos () {
-    if restriction . contains_skgrepo (&skgrepo_name) { continue; }
-    if let Ok (path) = crate::util::path_from_pid_and_skgrepo (
-      config, &skgrepo_name, pid . clone () ) {
-      if std::path::Path::new (&path) . is_file () {
-        return Err ( format! (
-          "Cannot delete '{}': it has telescope sections in restricted repos. Widen the repo-set (e.g. to 'all') and retry.",
-          pid )); }} }
+  if has_restricted_sections (config, restriction, pid) {
+    return Err ( format! (
+      "Cannot delete '{}': it has telescope sections in restricted repos. Widen the repo-set (e.g. to 'all') and retry.",
+      pid )); }
   Ok (( )) }
+
+/// A nodeMerge rewrites both graphnodes' whole telescopes, the
+/// acquiree's restricted sections moving into the acquirer's; refuse,
+/// as a delete is refused, when either graphnode has a section the
+/// skgrepo restriction cannot see.
+pub fn refuse_nodeMerge_with_restricted_sections (
+  config      : &SkgConfig,
+  restriction : &SkgrepoRestriction,
+  acquirer    : &ID,
+  acquiree    : &ID,
+) -> Result<(), String> {
+  for pid in [acquirer, acquiree] {
+    if has_restricted_sections (config, restriction, pid) {
+      return Err ( format! (
+        "Cannot merge '{}' into '{}': '{}' has telescope sections in restricted repos. Widen the repo-set (e.g. to 'all') and retry.",
+        acquiree, acquirer, pid )); }}
+  Ok (( )) }
+
+/// Whether the graphnode 'pid' has a section, a file, in a skgrepo the
+/// skgrepo restriction keeps out.
+fn has_restricted_sections (
+  config      : &SkgConfig,
+  restriction : &SkgrepoRestriction,
+  pid         : &ID,
+) -> bool {
+  config . ordered_skgrepos () . into_iter ()
+    . filter ( |skgrepo_name| ! SkgrepoRestriction::record_is_visible (
+      restriction, skgrepo_name ))
+    . any ( |skgrepo_name|
+      crate::util::path_from_pid_and_skgrepo (
+        config, &skgrepo_name, pid . clone () )
+      . is_ok_and ( |path| std::path::Path::new (&path) . is_file () )) }
 
 /// The sticky-else-default rule ('docs/telescopes.org', "Where new
 /// relationships land: the sticky-else-default rule"), with its
@@ -525,14 +553,16 @@ fn apply_sticky_relRepos_in_graph_with_prospective_homes (
   Ok (supplemented) }
 
 /// A new hide's relRepo: at least the more private of the endpoints'
-/// homes, and at least the most public subscription of the hider
-/// that explains it (one whose subscribee contains the hidden
-/// node). The most public explanation is the floor because the
+/// homes, and at least as private as some explanation of it. An
+/// explanation is a subscription of the hider whose subscribee
+/// contains the hidden node, and stands at the more private of the
+/// subscription's relRepo and the relRepo of the contains record: a
+/// hide more public than either would name what only that record
+/// tells. The most public explanation is the floor, because the
 /// inference "the hider subscribes to something containing X" is
-/// innocent whenever any explanation is visible; with no
-/// explanation found, fall back to the most private subscription
-/// skgrepo, and with no subscriptions at all, to the endpoint rule
-/// alone (junk-tolerant; the validators report residue).
+/// innocent whenever any explanation is visible; with no explanation
+/// found, the endpoint rule alone applies (junk-tolerant; the
+/// validators report residue).
 pub(crate) fn hide_skgrepo (
   graph         : &InRustGraph,
   config        : &SkgConfig,
@@ -548,16 +578,20 @@ pub(crate) fn hide_skgrepo (
         recorder_home . clone (), h ),
       None => recorder_home . clone (), }};
   let hidden_key : ID = resolve (hidden);
-  let explaining_skgrepos : Vec<SkgrepoName> = {
+  let explaining_skgrepos : Vec<SkgrepoName> =
     subscribes . iter ()
-      . filter ( |sub| {
+    . flat_map ( |sub| {
+      let explaining_records : Vec<SkgrepoName> =
         graph . pid_of ( & sub . member )
-          . and_then ( |p| graph . nodes . get (&p) )
-          . map ( |subscribee| subscribee . contains . iter ()
-                  . any ( |c| resolve ( &c . member ) == hidden_key ))
-          . unwrap_or (false) } )
-      . map ( |sub| sub . relRepo . clone () )
-      . collect () };
+        . and_then ( |p| graph . nodes . get (&p) )
+        . map ( |subscribee| subscribee . contains . iter ()
+                . filter ( |c| resolve ( &c . member ) == hidden_key )
+                . map ( |c| config . more_private_of (
+                  sub . relRepo . clone (), c . relRepo . clone () ))
+                . collect () )
+        . unwrap_or_default ();
+      explaining_records } )
+    . collect ();
   let subscription_floor : Option<SkgrepoName> =
     explaining_skgrepos . into_iter ()
     . reduce ( |a, b| // keep the more public of the two

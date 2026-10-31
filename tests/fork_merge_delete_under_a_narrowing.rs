@@ -1,12 +1,16 @@
 // cargo nextest run --test grouped_repos -E 'test(fork_merge_delete_under_a_narrowing::)'
 //
-// Writes built from the graph rather than the buffer leave alone
+// Three writes built from the graph rather than the buffer leave alone
 // what the skgrepo restriction keeps out ('docs/api-and-formats.org',
 // "Restricted-skgrepo nodes" and "Save buffer"):
+// - a fork copies into its clone only the records the skgrepo
+//   restriction shows, each no more public than the record it copies;
 // - a delete whose propagation would strip records the skgrepo
 //   restriction keeps out stops for the user's choice, the
 //   delete-from confirmation: cancel, the visible records only, or
-//   every owned record.
+//   every owned record;
+// - a nodeMerge is refused when either graphnode has a section the
+//   skgrepo restriction keeps out.
 //
 // Every fixture has the skgrepos "public" and "private", both owned.
 
@@ -21,6 +25,56 @@ use std::collections::BTreeMap;
 use std::error::Error;
 
 const VIEW : &str = "view";
+
+//
+// The fork
+//
+
+/// n contains a by a public record and p by a private one. Under
+/// "public" n is forked, and the fork approved: the clone, in
+/// "public", contains a alone, and no section of it names p.
+#[test]
+fn a_fork_under_a_narrowing_copies_only_the_visible_records (
+) -> Result<(), Box<dyn Error>> {
+  under_public (
+    &[ ("n", "pid: n\ntitle: n\ncontains:\n- a\n"),
+       ("a", "pid: a\ntitle: a\n"),
+       ("p", "pid: p\ntitle: p\n") ],
+    &[ ("n", "pid: n\ncontains:\n- p\n") ],
+    |f, public| {
+      let files_before : BTreeMap<String, String> = skg_files (f) ?;
+      let opened : String = open_content_view (f, "n", VIEW, Some (public)) ?;
+      save_cleanly (f, &with_fork_requested (&opened), Some (public)) ?;
+      let clone : String = the_clone (f, &files_before) ?;
+      assert_eq! ( list_in (f, &format! ("public/{}.skg", clone), "contains"), vec! ["a"],
+                   "the clone contains a alone" );
+      assert_eq! ( list_in (f, &format! ("public/{}.skg", clone), "subscribesTo"), vec! ["n"] );
+      assert! ( ! skg_files (f) ? . contains_key (&format! ("private/{}.skg", clone)),
+                "the clone has no private section" );
+      assert_eq! ( skg_files (f) ? . get ("private/n.skg"), files_before . get ("private/n.skg"),
+                   "n's private section is as it was" );
+      Ok (( )) } ) }
+
+/// The same fork with no skgrepo restriction: the clone copies both
+/// records, and p's stays private, in the clone's private section.
+#[test]
+fn a_fork_keeps_a_private_record_private (
+) -> Result<(), Box<dyn Error>> {
+  under_public (
+    &[ ("n", "pid: n\ntitle: n\ncontains:\n- a\n"),
+       ("a", "pid: a\ntitle: a\n"),
+       ("p", "pid: p\ntitle: p\n") ],
+    &[ ("n", "pid: n\ncontains:\n- p\n") ],
+    |f, _public| {
+      let files_before : BTreeMap<String, String> = skg_files (f) ?;
+      let opened : String = open_content_view (f, "n", VIEW, None) ?;
+      save_cleanly (f, &with_fork_requested (&opened), None) ?;
+      let clone : String = the_clone (f, &files_before) ?;
+      assert_eq! ( list_in (f, &format! ("public/{}.skg", clone), "contains"), vec! ["a"],
+                   "the clone's public file contains a alone" );
+      assert_eq! ( list_in (f, &format! ("private/{}.skg", clone), "contains"), vec! ["p"],
+                   "the clone's private section contains p" );
+      Ok (( )) } ) }
 
 //
 // The delete
@@ -105,6 +159,40 @@ fn a_delete_with_no_restriction_asks_nothing (
     Ok (( )) } ) }
 
 //
+// The nodeMerge
+//
+
+/// a (public; its private section hides h) acquires b (public;
+/// contains h publicly and q by a private record). Under "public"
+/// both homes are visible, but both graphnodes have private
+/// sections: the nodeMerge is refused, and no file changes.
+#[test]
+fn a_nodeMerge_of_graphnodes_with_restricted_sections_is_refused (
+) -> Result<(), Box<dyn Error>> {
+  under_public (
+    &[ ("a", "pid: a\ntitle: a\n"),
+       ("b", "pid: b\ntitle: b\ncontains:\n- h\n"),
+       ("h", "pid: h\ntitle: h\n"),
+       ("q", "pid: q\ntitle: q\n") ],
+    &[ ("a", "pid: a\nhidesFromSubs:\n- h\n"),
+       ("b", "pid: b\ncontains:\n- q\n") ],
+    |f, public| {
+      let files_before : BTreeMap<String, String> = skg_files (f) ?;
+      let opened : String = open_content_view (f, "a", VIEW, Some (public)) ?;
+      let requested : String = edit_line ( &opened, "* (skg node (gnid a)", |line|
+        line . replacen ( "(skg ", "(skg (editRequest (merge b)) ", 1 ));
+      let refusal : String = match save_under (
+        f, VIEW, &requested, Some (public), true, DeleteFrom::NotChosen ) {
+        Err (e) => e . to_string (),
+        Ok (response) => panic! ( "the nodeMerge must be refused; errors {:?}",
+                                  response . errors ), };
+      assert! ( refusal . contains ("Cannot merge 'b' into 'a'")
+                && refusal . contains ("telescope sections in restricted repos"),
+                "the refusal says why: {}", refusal );
+      assert_eq! ( skg_files (f) ?, files_before, "no file changed" );
+      Ok (( )) } ) }
+
+//
 // The fixtures and the operations
 //
 
@@ -136,3 +224,38 @@ fn with_delete_requested (
 ) -> String {
   edit_line ( view, "* (skg node (gnid x)", |line|
     line . replacen ( "(skg ", "(skg (editRequest delete) ", 1 )) }
+
+/// 'view' with a fork request on its root, n.
+fn with_fork_requested (
+  view : &str,
+) -> String {
+  edit_line ( view, "* (skg node (gnid n)", |line|
+    line . replacen ( "(skg ", "(skg (viewRequests fork) ", 1 )) }
+
+/// The pid of the one graphnode whose public file is new since
+/// 'files_before': the clone.
+fn the_clone (
+  f            : &Fixture,
+  files_before : &BTreeMap<String, String>,
+) -> Result<String, Box<dyn Error>> {
+  let new_public_files : Vec<String> = skg_files (f) ? . into_keys ()
+    . filter ( |path| path . starts_with ("public/") && ! files_before . contains_key (path) )
+    . collect ();
+  assert_eq! ( new_public_files . len (), 1,
+               "one new public file, the clone's: {:?}", new_public_files );
+  Ok ( new_public_files [0] . trim_start_matches ("public/")
+       . trim_end_matches (".skg") . to_string () ) }
+
+/// Save 'text' as VIEW under 'restriction', its forks approved; it
+/// must save without errors.
+fn save_cleanly (
+  f           : &mut Fixture,
+  text        : &str,
+  restriction : Option<&SkgrepoRestriction>,
+) -> Result<SaveResponse, Box<dyn Error>> {
+  let response : SaveResponse =
+    save_under (f, VIEW, text, restriction, true, DeleteFrom::NotChosen) ?;
+  assert! ( response . errors . is_empty (),
+            "the buffer must save without errors, got {:?}\n\nbuffer:\n{}",
+            response . errors, text );
+  Ok (response) }

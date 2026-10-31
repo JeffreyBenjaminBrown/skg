@@ -24,7 +24,8 @@ use crate::dbs::node_lookup::graphnode_from_graph;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::from_text::supplement_from_disk::{
   build_diskSupplemented_nodeInstructions,
-  NodeInstructions_with_Repomoves };
+  NodeInstructions_with_Repomoves,
+  refuse_nodeMerge_with_restricted_sections };
 use crate::from_text::validate::{buffernode_differs_from_disknode, suppress_writes_to_restricted_nodes};
 use crate::refresh::ancestry::parent_reads_claims;
 use crate::skgrepo_sets::SkgrepoRestriction;
@@ -92,7 +93,7 @@ pub fn extract_nonmergeSavePlan_locally_in_graph (
     : (Vec<NodeInstruction>, Vec<SkgrepoMove>, bool)
     = suppress_writes_to_restricted_nodes (
         sans_noops, with_disk . skgrepo_moves,
-        skgrepo_restriction );
+        graph, skgrepo_restriction );
   let (nodeMerge_acquisitions, suppressed_merges)
     : (Vec<(ID, ID)>, bool)
     = match skgrepo_restriction {
@@ -100,7 +101,8 @@ pub fn extract_nonmergeSavePlan_locally_in_graph (
         Some (restriction) => {
           // A nodeMerge writes both nodes' files; under a restricted
           // set it is suppressed unless the graph has both nodes and
-          // neither is restricted (the API doc's "Restricted-skgrepo
+          // neither is restricted, and refused when either has a
+          // restricted section (the API doc's "Restricted-skgrepo
           // nodes").
           let shown = |gnid : &ID| -> bool {
             graph . pid_and_skgrepo (gnid) . is_some_and (
@@ -112,6 +114,12 @@ pub fn extract_nonmergeSavePlan_locally_in_graph (
             . filter ( |(acquirer, acquiree)|
                 shown (acquirer) && shown (acquiree) )
             . collect ();
+          for (acquirer, acquiree) in &kept {
+            refuse_nodeMerge_with_restricted_sections (
+              config, restriction,
+              &graph . pid_else_raw_id (acquirer),
+              &graph . pid_else_raw_id (acquiree) )
+              . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?; }
           let suppressed : bool = kept . len () < before;
           (kept, suppressed) }};
   let mut warnings : Vec<String> =
