@@ -6786,7 +6786,7 @@ strip-and-export entry under "documented". The run began at
 four hours and four minutes, of which the slices took 38, 19,
 42, 25, 18, 52 and 29 minutes, launched to report, with one
 session break during slice 2. Commits since the plan's
-(9be1eed8): 30, of which 24 by the slices and 6 by the
-orchestrator. The review follows as
+(9be1eed8): 31, of which 24 by the slices and 7 by the
+orchestrator, this note's included. The review follows as
 'TODO/simplify-refresh/11_review.org', its reports in
 '11_1_review-reports/'.
