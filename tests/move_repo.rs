@@ -2,6 +2,7 @@
 // cargo nextest run --test grouped_repos -E 'test(move_repo::)'
 
 use indoc::indoc;
+use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use skg::dbs::filesystem::one_node::graphnode_from_gnid;
 use skg::dbs::tantivy::search::{SearchOptions, search_index};
@@ -101,7 +102,7 @@ async fn test_move_node_to_another_owned_skgrepo (
     let ( _viewforest, save_plan, _warnings )
       = buffer_to_validated_saveplan (
           org_text, &config
-          , None ) ?;
+          , &SkgrepoRestriction::unrestricted (&config) ) ?;
     assert_eq!(save_plan . skgrepo_moves . len(), 1,
                "Expected exactly 1 repo move");
     assert_eq!(save_plan . skgrepo_moves[0] . pid . 0, "b");
@@ -191,7 +192,7 @@ async fn test_move_node_referenced_by_extra_id (
     "};
     let ( _viewforest, save_plan, _warnings )
       = buffer_to_validated_saveplan (
-          org_text, &config , None ) ?;
+          org_text, &config , &SkgrepoRestriction::unrestricted (&config) ) ?;
 
     // repo_moves should use the PID, not the extra_id
     assert_eq!(save_plan . skgrepo_moves . len(), 1,
@@ -253,7 +254,7 @@ async fn test_move_multiple_nodes (
     let ( _viewforest, save_plan, _warnings )
       = buffer_to_validated_saveplan (
           org_text, &config
-          , None ) ?;
+          , &SkgrepoRestriction::unrestricted (&config) ) ?;
     assert_eq!(save_plan . skgrepo_moves . len(), 2,
                "Expected 2 repo moves");
 
@@ -309,7 +310,7 @@ async fn test_move_to_foreign_skgrepo_rejected (
     let result =
       buffer_to_validated_saveplan (
         org_text, &config
-        , None ) ;
+        , &SkgrepoRestriction::unrestricted (&config) ) ;
     assert!(result . is_err(),
             "Moving to foreign repo should be rejected");
     if let Err (SaveError::DatabaseError (e)) = &result {
@@ -342,7 +343,7 @@ async fn test_move_from_foreign_skgrepo_rejected (
     let result =
       buffer_to_validated_saveplan (
         org_text, &config
-        , None ) ;
+        , &SkgrepoRestriction::unrestricted (&config) ) ;
     assert!(result . is_err(),
             "Moving from foreign repo should be rejected");
 
@@ -367,7 +368,7 @@ async fn test_move_and_merge_simultaneously_rejected (
     let result =
       buffer_to_validated_saveplan (
         org_text, &config
-        , None ) ;
+        , &SkgrepoRestriction::unrestricted (&config) ) ;
     assert!(result . is_err(),
             "Moving and merging same node should be rejected");
     match result {
@@ -397,7 +398,7 @@ async fn test_no_skgrepo_change_produces_no_moves (
     let ( _viewforest, save_plan, _warnings )
       = buffer_to_validated_saveplan (
           org_text, &config
-          , None ) ?;
+          , &SkgrepoRestriction::unrestricted (&config) ) ?;
     assert_eq!(save_plan . skgrepo_moves . len(), 0,
                "No repo changes => no repo moves");
 
@@ -425,7 +426,7 @@ async fn test_skgrepo_only_change_with_populated_pool (
     "};
     let ( _viewforest, save_plan, _warnings )
       = buffer_to_validated_saveplan (
-          org_text, &config , None ) ?;
+          org_text, &config , &SkgrepoRestriction::unrestricted (&config) ) ?;
 
     // The skgrepo move must be detected even with populated pool.
     assert_eq!(save_plan . skgrepo_moves . len(), 1,

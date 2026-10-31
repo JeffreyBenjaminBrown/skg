@@ -118,7 +118,7 @@ fn flag_requests_apply_after_disk_misc_restore_and_survive_skgrepo_moves (
       save . flag_request = request . map (|value|
         (Flag::NoSearchMatching, value)); }
     let planned = build_diskSupplemented_nodeInstructions (
-      vec![intent], &graph, &config, None) . unwrap ();
+      vec![intent], &graph, &config, &SkgrepoRestriction::unrestricted (&config)) . unwrap ();
     let NodeInstruction::Save (SaveNode (saved)) = &planned . instructions [0]
       else { panic! ("expected SaveNode"); };
     assert_eq! (&saved . flags, &expected);
@@ -473,7 +473,7 @@ fn same_save_child_homeSkgrepoMove_allows_publicizing_its_parent_relationship (
     node_at ("child", "public"));
 
   let planned = build_diskSupplemented_nodeInstructions (
-    vec! [ parent_intent, child_intent ], &graph, &config, None )
+    vec! [ parent_intent, child_intent ], &graph, &config, &SkgrepoRestriction::unrestricted (&config) )
     . expect ("the same-save home skgrepo move makes public the relationship's default");
   let parent = planned . instructions . into_iter ()
     .find_map ( |instruction| match instruction {
@@ -506,7 +506,7 @@ fn same_save_hidden_node_homeSkgrepoMove_sets_the_new_hide_skgrepo (
     node_at ("hidden", "public"));
 
   let planned = build_diskSupplemented_nodeInstructions (
-    vec! [ hider_intent, hidden_intent ], &graph, &config, None )
+    vec! [ hider_intent, hidden_intent ], &graph, &config, &SkgrepoRestriction::unrestricted (&config) )
     . expect ("the pending hidden-node home participates in the hide floor");
   let hider = planned . instructions . into_iter ()
     .find_map ( |instruction| match instruction {
@@ -538,7 +538,7 @@ fn new_private_child_in_the_same_save_gets_a_private_relationship (
     node_at ("new-child", "pers-p"));
 
   let planned = build_diskSupplemented_nodeInstructions (
-    vec! [ parent_intent, child_intent ], &graph, &config, None )
+    vec! [ parent_intent, child_intent ], &graph, &config, &SkgrepoRestriction::unrestricted (&config) )
     . expect ("same-save new nodes supply their relationship endpoint homes");
   let parent = planned . instructions . into_iter ()
     .find_map ( |instruction| match instruction {

@@ -50,7 +50,7 @@ pub fn resolve_visibility (
   hidden_outside : &[(ID, HiddenOutsideEdit)],
   graph       : &InRustGraph,
   config      : &SkgConfig,
-  skgrepo_restriction : Option<&SkgrepoRestriction>, // None means no skgrepo restriction; callers normalize 'all' to None.
+  skgrepo_restriction : &SkgrepoRestriction,
 ) -> Result<(LoweredNodeIntents, Vec<PostSkgsaveCommitNoticeCandidate>), Box<dyn Error>> {
   validate_no_overlapping_subscribee_hiderel_conflicts (
     visibility, graph, config, skgrepo_restriction ) ?;
@@ -108,7 +108,7 @@ pub fn resolve_visibility (
 /// ('SkgrepoRestriction::record_is_visible'), as written.
 fn members_with_visible_records (
   list                : &[RelPartner<ID>],
-  skgrepo_restriction : Option<&SkgrepoRestriction>,
+  skgrepo_restriction : &SkgrepoRestriction,
 ) -> Vec<ID> {
   list . iter ()
     . filter ( |member| SkgrepoRestriction::record_is_visible (
@@ -133,7 +133,7 @@ fn apply_hiddenoutside_edits (
   edits                  : &[(ID, HiddenOutsideEdit)],
   graph                  : &InRustGraph,
   config                 : &SkgConfig,
-  skgrepo_restriction    : Option<&SkgrepoRestriction>,
+  skgrepo_restriction    : &SkgrepoRestriction,
 ) -> Result<Vec<PostSkgsaveCommitNoticeCandidate>, Box<dyn Error>> {
   let mut seen : HashSet<ID> = HashSet::new ();
   let mut candidates : Vec<PostSkgsaveCommitNoticeCandidate> = Vec::new ();
@@ -231,7 +231,7 @@ fn infer_hides_from_contains_removals (
   visibility             : &[(ID, SubscribeeVisibility)],
   graph                  : &InRustGraph,
   config                 : &SkgConfig,
-  skgrepo_restriction    : Option<&SkgrepoRestriction>,
+  skgrepo_restriction    : &SkgrepoRestriction,
 ) -> Result<(), Box<dyn Error>> {
   for (subscriber_pid, skgrepo, new_contains, subscribes_msv)
     in lowered . nodeSaveIntents_with_specified_contains () {
@@ -312,7 +312,7 @@ fn validate_no_overlapping_subscribee_hiderel_conflicts (
   visibility          : &[(ID, SubscribeeVisibility)],
   graph               : &InRustGraph,
   config              : &SkgConfig,
-  skgrepo_restriction : Option<&SkgrepoRestriction>,
+  skgrepo_restriction : &SkgrepoRestriction,
 ) -> Result<(), Box<dyn Error>> {
   // This needs the visibility signals plus disk contains lists,
   // because the conflict is per subscriber/subscribee-content pair,

@@ -558,7 +558,7 @@ async fn folder_request_scenarios (
 async fn saveplan_nodes (
   buf    : &str,
   config : &SkgConfig,
-  restriction : Option<&SkgrepoRestriction>,
+  restriction : &SkgrepoRestriction,
 ) -> Result<Vec<NodeInstruction>, Box<dyn Error>> {
   let (_vf, plan, _warnings) =
     buffer_to_validated_saveplan (buf, config, restriction)  ?;
@@ -584,7 +584,7 @@ async fn editable_subscribeeFolder (
     let reordered : String =
       swap_lines (&buf, "(gnid wSub-a)", "(gnid wSub-c)");
     let nodes : Vec<NodeInstruction> =
-      saveplan_nodes (&reordered, config, None) . await ?;
+      saveplan_nodes (&reordered, config, &SkgrepoRestriction::unrestricted (config)) . await ?;
     match saved_node_by_gnid (&nodes, "wSub-owner") {
       Some (n) => if members_msv (&n . subscribesTo) != MSV::Specified (vec![
           ID::from ("wSub-c"), ID::from ("wSub-b"), ID::from ("wSub-a")]) {
@@ -597,7 +597,7 @@ async fn editable_subscribeeFolder (
       line_containing (&buf, "(gnid wSub-b)") . to_string ();
     let edited : String = buf . replace (&format! ("{}\n", b_line), "");
     let nodes  : Vec<NodeInstruction> =
-      saveplan_nodes (&edited, config, None) . await ?;
+      saveplan_nodes (&edited, config, &SkgrepoRestriction::unrestricted (config)) . await ?;
     match saved_node_by_gnid (&nodes, "wSub-owner") {
       Some (n) => if members_msv (&n . subscribesTo) != MSV::Specified (vec![
           ID::from ("wSub-a"), ID::from ("wSub-c")]) {
@@ -611,7 +611,7 @@ async fn editable_subscribeeFolder (
     let edited : String = buf . replace (
       &c_line, &format! ("{}\n{}", c_line, member_line (stars, "wSub-d")) );
     let nodes : Vec<NodeInstruction> =
-      saveplan_nodes (&edited, config, None) . await ?;
+      saveplan_nodes (&edited, config, &SkgrepoRestriction::unrestricted (config)) . await ?;
     match saved_node_by_gnid (&nodes, "wSub-owner") {
       Some (n) => if members_msv (&n . subscribesTo) != MSV::Specified (vec![
           ID::from ("wSub-a"), ID::from ("wSub-b"),
@@ -640,7 +640,7 @@ async fn editable_overriddenFolder (
     let reordered : String =
       swap_lines (&buf, "(gnid wOvr-a)", "(gnid wOvr-b)");
     let nodes : Vec<NodeInstruction> =
-      saveplan_nodes (&reordered, config, None) . await ?;
+      saveplan_nodes (&reordered, config, &SkgrepoRestriction::unrestricted (config)) . await ?;
     match saved_node_by_gnid (&nodes, "wOvr-owner") {
       Some (n) => if override_set (n) != vec![
           ID::from ("wOvr-a"), ID::from ("wOvr-b")] {
@@ -653,7 +653,7 @@ async fn editable_overriddenFolder (
       line_containing (&buf, "(gnid wOvr-a)") . to_string ();
     let edited : String = buf . replace (&format! ("{}\n", a_line), "");
     let nodes  : Vec<NodeInstruction> =
-      saveplan_nodes (&edited, config, None) . await ?;
+      saveplan_nodes (&edited, config, &SkgrepoRestriction::unrestricted (config)) . await ?;
     match saved_node_by_gnid (&nodes, "wOvr-owner") {
       Some (n) => if override_set (n) != vec![ID::from ("wOvr-b")] {
         fails . record (s, format! (
@@ -666,7 +666,7 @@ async fn editable_overriddenFolder (
     let edited : String = buf . replace (
       &b_line, &format! ("{}\n{}", b_line, member_line (stars, "wOvr-c")) );
     let nodes : Vec<NodeInstruction> =
-      saveplan_nodes (&edited, config, None) . await ?;
+      saveplan_nodes (&edited, config, &SkgrepoRestriction::unrestricted (config)) . await ?;
     match saved_node_by_gnid (&nodes, "wOvr-owner") {
       Some (n) => if override_set (n) != vec![
           ID::from ("wOvr-a"), ID::from ("wOvr-b"), ID::from ("wOvr-c")] {
@@ -693,7 +693,7 @@ async fn hiddenFolder_delete_does_not_unhide (
     line_containing (&buf, "(gnid roHidden-a)") . to_string ();
   let edited : String = buf . replace (&format! ("{}\n", a_line), "");
   let nodes  : Vec<NodeInstruction> =
-    saveplan_nodes (&edited, config, None) . await ?;
+    saveplan_nodes (&edited, config, &SkgrepoRestriction::unrestricted (config)) . await ?;
   // Either the recorder is a no-op (absent from the plan), or its SaveNode
   // still hides roHidden-a; in no case is roHidden-a unhidden.
   if let Some (n) = saved_node_by_gnid (&nodes, "roHidden-owner") {
@@ -749,7 +749,7 @@ async fn omission_scenarios (
     let edited : String =
       buf . replace (&format! ("{}\n", unrestricted_line), "");
     let nodes : Vec<NodeInstruction> =
-      saveplan_nodes (&edited, config, Some (&restriction)) . await ?;
+      saveplan_nodes (&edited, config, &restriction) . await ?;
     match saved_node_by_gnid (&nodes, "omWsub-owner") {
       Some (n) => { let subs : Vec<ID> = match &n . subscribesTo {
           MSV::Specified (gnids) => members_of (gnids),

@@ -64,7 +64,7 @@ fn writes_to_restricted_nodes_are_suppressed_with_warning (
         "};
         let (_viewforest, plan, warnings) =
           buffer_to_validated_saveplan (
-            buffer, config, Some (&restriction) )  ?;
+            buffer, config, &restriction )  ?;
         assert! (
           ! save_gnids (&plan . node_instructions)
             . contains (&ID::from ("private-a")),
@@ -87,7 +87,7 @@ fn writes_to_restricted_nodes_are_suppressed_with_warning (
         "};
         let (_viewforest, plan, warnings) =
           buffer_to_validated_saveplan (
-            buffer, config, Some (&restriction) )  ?;
+            buffer, config, &restriction )  ?;
         assert! (
           ! save_gnids (&plan . node_instructions)
             . contains (&ID::from ("private-a")),
@@ -105,7 +105,7 @@ fn writes_to_restricted_nodes_are_suppressed_with_warning (
         "};
         let (_viewforest, plan, warnings) =
           buffer_to_validated_saveplan (
-            buffer, config, Some (&restriction) )  ?;
+            buffer, config, &restriction )  ?;
         assert! (
           plan . skgrepo_moves . is_empty (),
           "a move into a restricted repo must be suppressed" );

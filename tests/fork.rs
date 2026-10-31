@@ -119,7 +119,7 @@ async fn fork_specs_from (
   buffer : &str,
   config : &SkgConfig,
 ) -> Result<Vec<ForkSpec>, Box<dyn Error>> {
-  Ok ( buffer_to_validated_saveplan ( buffer, config, None )
+  Ok ( buffer_to_validated_saveplan ( buffer, config, &SkgrepoRestriction::unrestricted (config) )
         ? . 1 . fork_specs ) }
 
 fn node_from_disk (
@@ -255,7 +255,7 @@ async fn explicit_fork_on_unknown_node_errors (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
   let result = buffer_to_validated_saveplan (
-    EXPLICIT_FORK_UNKNOWN_BUFFER, config, None ) ;
+    EXPLICIT_FORK_UNKNOWN_BUFFER, config, &SkgrepoRestriction::unrestricted (config) ) ;
   match result {
     Err ( SaveError::BufferValidationErrors { errors, .. } ) => {
       assert! ( errors . iter () . any ( |e| matches! ( e,
@@ -297,7 +297,7 @@ async fn explicit_fork_round_trip_and_monogamy (
 
   // Forking P again is rejected: it now has an owned overrider.
   let result = buffer_to_validated_saveplan (
-    EXPLICIT_FORK_BUFFER, config, None ) ;
+    EXPLICIT_FORK_BUFFER, config, &SkgrepoRestriction::unrestricted (config) ) ;
   match result {
     Err ( SaveError::BufferValidationErrors { errors, .. } ) => {
       assert! ( errors . iter () . any ( |e| matches! ( e,
@@ -323,7 +323,7 @@ async fn fork_default_prefers_unrestricted_owned_skgrepo (
     skgrepos : BTreeSet::from ([ SkgrepoName::from ("owned2"),
                                SkgrepoName::from ("foreign") ]), };
   let ( _vf, save_plan, _w ) = buffer_to_validated_saveplan (
-    FORK_ROOT_BUFFER, config, Some (&restriction) )  ?;
+    FORK_ROOT_BUFFER, config, &restriction )  ?;
   assert_eq! ( save_plan . fork_specs . len (), 1,
     "the fork must resolve, not dead-end on a restricted default repo" );
   assert_eq! ( save_plan . fork_specs[0] . clone . 0 . home_skgrepo,
@@ -341,7 +341,7 @@ async fn fork_user_set_skgrepo_not_owned_rejected (
   let fork_skgrepos : HashMap<ID, SkgrepoName> =
     HashMap::from ([ ( ID::from ("N"), SkgrepoName::from ("foreign") ) ]);
   let result = buffer_to_validated_saveplan_with_fork_skgrepos (
-    FORK_BUFFER, config, None, &fork_skgrepos ) ;
+    FORK_BUFFER, config, &SkgrepoRestriction::unrestricted (config), &fork_skgrepos ) ;
   match result {
     Err ( SaveError::BufferValidationErrors { errors, .. } ) => {
       assert! ( errors . iter () . any ( |e| matches! ( e,
@@ -432,7 +432,7 @@ async fn explicit_new_child_skgrepo_confirms_clone_skgrepo (
     ** (skg node (skgRepos (nodeRepo owned2))) Can I add to this?
     "};
   let ( _vf, save_plan, _w ) = buffer_to_validated_saveplan (
-    buffer, config, None )  ?;
+    buffer, config, &SkgrepoRestriction::unrestricted (config) )  ?;
   assert_eq! ( save_plan . fork_specs . len (), 1 );
   let spec : &ForkSpec = & save_plan . fork_specs[0];
   assert_eq! ( spec . clone . 0 . home_skgrepo, SkgrepoName::from ("owned2"),
@@ -464,7 +464,7 @@ async fn disagreeing_new_child_skgrepos_leave_clone_skgrepo_unconfirmed (
     ** (skg node (skgRepos (nodeRepo owned2))) New thing two
     "};
   let ( _vf, save_plan, _w ) = buffer_to_validated_saveplan (
-    buffer, config, None )  ?;
+    buffer, config, &SkgrepoRestriction::unrestricted (config) )  ?;
   assert_eq! ( save_plan . fork_specs . len (), 1 );
   assert! ( ! save_plan . fork_specs[0] . skgrepo_confirmed,
     "disagreeing explicit child repos must not confirm a clone repo" );
@@ -548,7 +548,7 @@ async fn fork_from_bare_new_child_plan (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
   let ( _vf, save_plan, _warnings ) = buffer_to_validated_saveplan (
-    FORK_WITH_BARE_NEW_CHILD_BUFFER, config, None )  ?;
+    FORK_WITH_BARE_NEW_CHILD_BUFFER, config, &SkgrepoRestriction::unrestricted (config) )  ?;
   assert_eq! ( save_plan . fork_specs . len (), 1,
     "appending a bare new child must fork N: {:?}",
     save_plan . fork_specs );
@@ -576,7 +576,7 @@ async fn fork_new_parent_adopts_relationship_skgrepos (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
   let ( _vf, save_plan, _warnings ) = buffer_to_validated_saveplan (
-    FORK_WITH_NEW_PARENT_FOR_OLD_CHILD_BUFFER, config, None ) ?;
+    FORK_WITH_NEW_PARENT_FOR_OLD_CHILD_BUFFER, config, &SkgrepoRestriction::unrestricted (config) ) ?;
   let clone_skgrepo : SkgrepoName =
     save_plan . fork_specs . first ()
     . expect ("structural edit must fork N")
@@ -639,7 +639,7 @@ async fn explicitly_foreign_new_child_still_rejected (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
   let result = buffer_to_validated_saveplan (
-    FORK_WITH_EXPLICIT_FOREIGN_NEW_CHILD_BUFFER, config, None )
+    FORK_WITH_EXPLICIT_FOREIGN_NEW_CHILD_BUFFER, config, &SkgrepoRestriction::unrestricted (config) )
     ;
   match result {
     Err ( SaveError::BufferValidationErrors { errors, .. } ) => {
@@ -673,7 +673,7 @@ async fn fork_monogamy (
 
   // Save planning reloads the fixture graph and therefore sees the new clone.
   let result = buffer_to_validated_saveplan (
-    FORK_BUFFER, config, None ) ;
+    FORK_BUFFER, config, &SkgrepoRestriction::unrestricted (config) ) ;
   match result {
     Err ( SaveError::BufferValidationErrors { errors, .. } ) => {
       assert! ( errors . iter () . any ( |e| matches! ( e,
@@ -696,7 +696,7 @@ async fn fork_skgrepo_restricted (
     name    : SkgrepoSetName ("only-foreign" . to_string ()),
     skgrepos : BTreeSet::from ([ SkgrepoName::from ("foreign") ]), };
   let result = buffer_to_validated_saveplan (
-    FORK_BUFFER, config, Some (&restriction) ) ;
+    FORK_BUFFER, config, &restriction ) ;
   match result {
     Err ( SaveError::BufferValidationErrors { errors, .. } ) => {
       assert! ( errors . iter () . any ( |e| matches! ( e,

@@ -2,6 +2,7 @@
 
 use indoc::indoc;
 use regex::Regex;
+use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::test_utils::{strip_org_comments, cleanup_test_tantivy, graph_from_config,
                       index_folder_for_this_process};
 use skg::from_text::buffer_to_validated_saveplan;
@@ -113,7 +114,7 @@ fn test_foreign_node_modification_errors(
       let result = buffer_to_validated_saveplan(
         &buffer_text,
         &config,
-        None ) ;
+        &SkgrepoRestriction::unrestricted (&config) ) ;
 
       assert!(result . is_err(), "Expected errors for foreign node modifications");
 
@@ -187,7 +188,7 @@ fn test_foreign_node_modification_errors(
       let result = buffer_to_validated_saveplan(
         &buffer_text,
         &config,
-        None ) ;
+        &SkgrepoRestriction::unrestricted (&config) ) ;
 
       assert!(result . is_err(),
               "Expected errors for foreign merge operations");
@@ -257,7 +258,7 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
       let result = buffer_to_validated_saveplan(
         &buffer_text,
         &config,
-        None ) ;
+        &SkgrepoRestriction::unrestricted (&config) ) ;
 
       assert!(result . is_ok(),
               "Repo move between owned repos should succeed, got: {:?}",
@@ -287,7 +288,7 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
       let result = buffer_to_validated_saveplan(
         &buffer_text,
         &config,
-        None ) ;
+        &SkgrepoRestriction::unrestricted (&config) ) ;
       assert!(result . is_ok(),
               "A write-protected occurrence's skgrepo should be ignored, got: {:?}",
               result . err());
@@ -302,7 +303,7 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
       let result = buffer_to_validated_saveplan(
         buffer_with_stale_write_protected_skgrepo,
         &config,
-        None ) ;
+        &SkgrepoRestriction::unrestricted (&config) ) ;
       assert!(matches!(
                 &result,
                 Err (SaveError::BufferValidationErrors { errors, .. })

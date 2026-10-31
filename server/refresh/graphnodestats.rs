@@ -23,7 +23,7 @@ pub fn set_graphnodestats_in_viewforest (
   viewforest  : &mut Tree<Viewnode>,
   graph       : &InRustGraph,
   config      : &SkgConfig,
-  restriction : Option<&SkgrepoRestriction>,
+  restriction : &SkgrepoRestriction,
 ) -> Result < ( HashMap < ID, HashSet < ID > >,
                HashMap < ID, HashSet < ID > > ),
              Box<dyn Error> > {
@@ -55,7 +55,7 @@ pub fn set_metadata_relationships_in_node_recursive (
   graph       : &InRustGraph,
   stats       : &AllGraphnodeStats,
   config      : &SkgConfig,
-  restriction : Option<&SkgrepoRestriction>,
+  restriction : &SkgrepoRestriction,
 ) {
   let new_stats : Option < GraphnodeStats > =
     { match & tree . get (treeid) . unwrap () . value () . kind {

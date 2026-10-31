@@ -9,13 +9,13 @@
 //! - ownership is set-independent: a relationship is followed only if its
 //!   overrider's skgrepo is owned, regardless of the
 //!   skgrepo restriction.
-//! - VISIBILITY: when an 'ShowSkgrepoRestriction' is supplied, a relationship is
-//!   followed only if both its relRepo and its overrider's home skgrepo
-//!   are unrestricted. A restricted relationship cannot affect visible topology,
+//! - visibility: a relationship is followed only if the skgrepo
+//!   restriction shows both its relRepo and its overrider's home
+//!   skgrepo. A restricted relationship cannot affect visible topology,
 //!   and a restricted overrider cannot be shown; either one stops the walk
 //!   at the last visible node. Callers that ask "what fact would the
-//!   server have written, ever?" (the tamper check) pass None, i.e.
-//!   visibility-ungated.
+//!   server have written, ever?" (the tamper check) pass the
+//!   unrestricted skgrepo restriction ('SkgrepoRestriction::unrestricted').
 //!
 //! A path of any length is normal: an owned override chain
 //! (D overrides C overrides N, all owned) resolves to the end of the
@@ -62,7 +62,7 @@ pub struct OverrideResolution {
 pub fn resolve_override (
   config : &SkgConfig,
   graph  : &InRustGraph,
-  restriction : Option<&SkgrepoRestriction>,
+  restriction : &SkgrepoRestriction,
   gnid  : &ID,
 ) -> OverrideResolution {
   let input_pid : ID = // extra-ID safety: resolve before walking
@@ -113,7 +113,7 @@ pub fn resolve_override (
 /// node can be any link of the chain (a middle carrier, when a later
 /// link's skgrepo is hidden), not only the end, so it must accept any
 /// honest carrier and reject only an off-chain (faked/stale) fact.
-/// Visibility-ungated ('unrestricted' = None) so a fact that was honest
+/// Visibility-ungated (the unrestricted skgrepo restriction) so a fact that was honest
 /// when rendered does not start failing after a skgrepo-set switch;
 /// 'path' is the full owned chain (ownership still gates).
 pub fn carrier_on_owned_chain (
@@ -122,7 +122,8 @@ pub fn carrier_on_owned_chain (
   original : &ID,   // the fact's N
   carrier  : &ID,   // the shown node's own id
 ) -> bool {
-  resolve_override (config, graph, None, original)
+  resolve_override (
+    config, graph, &SkgrepoRestriction::unrestricted (config), original)
     . path . contains (carrier) }
 
 /// The overriders of 'pid' that substitution may follow: the relationship's
@@ -135,7 +136,7 @@ pub fn carrier_on_owned_chain (
 fn followable_overriders_of (
   config : &SkgConfig,
   graph  : &InRustGraph,
-  restriction : Option<&SkgrepoRestriction>,
+  restriction : &SkgrepoRestriction,
   pid    : &ID,
 ) -> Vec<ID> {
   let mut result : Vec<ID> = Vec::new ();

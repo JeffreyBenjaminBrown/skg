@@ -82,7 +82,8 @@ pub(crate) fn update_graph_minus_nodeMerges_with_hoist_approval (
       "apply_delete_propagation_cleanup" ). entered();
     let graph_snap : Arc<InRustGraph> = graph . load_full ();
     apply_delete_propagation_cleanup (
-      &mut node_defs, &graph_snap, &config, None ); }
+      &mut node_defs, &graph_snap, &config,
+      &SkgrepoRestriction::unrestricted (&config) ); }
   let base : Arc<InRustGraph> = graph . load_full ();
   let prepared : PreparedGraphUpdate = prepare_graph_update (
     &config, base . clone (), node_defs)
@@ -200,7 +201,8 @@ pub(crate) fn update_graph_including_nodeMerges_under_mutation_gate (
 ) -> Result<(), Box<dyn Error>> {
   let prepared : PreparedSave = prepare_save_under_mutation_gate (
     nodeInstructions, nodeMerge_instructions, skgrepo_moves, &config,
-    graph, approved_hoist_pids, None) ?;
+    graph, approved_hoist_pids,
+    &SkgrepoRestriction::unrestricted (&config) ) ?;
   prepared . apply (config, tantivy_index, graph)
 }
 
@@ -272,7 +274,7 @@ pub(crate) fn prepare_save_under_mutation_gate (
   config             : &SkgConfig,
   graph              : &InRustGraphHandle,
   approved_hoist_pids : &HashSet<ID>,
-  restricted_records_left : Option<&SkgrepoRestriction>, // as 'apply_delete_propagation_cleanup' takes it
+  restricted_records_left : &SkgrepoRestriction, // as 'apply_delete_propagation_cleanup' takes it
 ) -> Result<PreparedSave, Box<dyn Error>> {
   let graph_before_save : Arc<InRustGraph> = graph . load_full ();
   apply_delete_propagation_cleanup (
@@ -416,8 +418,8 @@ pub enum DeleteFrom {
 /// chose, in the delete-from confirmation, to delete from the visible
 /// records only. A referencer none of whose records naming a deleted ID
 /// is visible then gets no cleanup save, and the dangling ID shows as
-/// an unknown viewnode wherever its recorder is shown. None strips
-/// every owned record.
+/// an unknown viewnode wherever its recorder is shown. The
+/// unrestricted skgrepo restriction strips every owned record.
 ///
 /// Skipped fields:
 /// - extra_ids of referencers: per the data model, an id can only
@@ -430,7 +432,7 @@ pub(crate) fn apply_delete_propagation_cleanup (
   node_defs               : &mut Vec<NodeInstruction>,
   graph_snap              : &Arc<InRustGraph>,
   config                  : &SkgConfig,
-  restricted_records_left : Option<&SkgrepoRestriction>,
+  restricted_records_left : &SkgrepoRestriction,
 ) {
   let stripped = |record : &RelPartner<ID>, deleted_id_set : &HashSet<ID>| -> bool {
     deleted_id_set . contains (&record . member)
@@ -502,15 +504,16 @@ pub(crate) fn apply_delete_propagation_cleanup (
 /// How many records in sections the skgrepo restriction keeps out name
 /// a graphnode 'node_defs' deletes: the records of owned referencers,
 /// in any of the four outbound list fields, that the delete's
-/// propagation would strip and the user could not see. Zero without a
-/// skgrepo restriction.
+/// propagation would strip and the user could not see. Zero when the
+/// connection is unrestricted.
 pub(crate) fn restricted_records_naming_deleted_graphnodes (
   node_defs           : &[NodeInstruction],
   graph_snap          : &Arc<InRustGraph>,
   config              : &SkgConfig,
-  skgrepo_restriction : Option<&SkgrepoRestriction>,
+  skgrepo_restriction : &SkgrepoRestriction,
 ) -> usize {
-  let Some (restriction) = skgrepo_restriction else { return 0; };
+  if skgrepo_restriction . is_unrestricted () { return 0; }
+  let restriction : &SkgrepoRestriction = skgrepo_restriction;
   let deleted_primary_pids : HashSet<ID> = node_defs . iter ()
     . filter_map ( |d| match d {
       NodeInstruction::Delete (dn) => Some ( graph_snap . pid_else_raw_id (&dn . gnid) ),

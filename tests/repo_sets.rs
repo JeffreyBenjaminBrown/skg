@@ -176,7 +176,7 @@ fn override_substitute_across_skgrepo_switch_anonymizes_and_keeps_original (
       let public : SkgrepoRestriction =
         SkgrepoRestriction::named (config, SkgrepoSetName::from ("public")) ?;
       let plan = buffer_to_validated_saveplan (
-        &view_public, config, Some (&public) )  ? . 1;
+        &view_public, config, &public )  ? . 1;
       if let Some (c) = plan . node_instructions . iter () . find_map (
         |i| match i {
           NodeInstruction::Save (SaveNode (n))
@@ -389,7 +389,7 @@ async fn tombstone_in_buffer_does_not_drive_contains (
         "};
         let instructions : Vec<NodeInstruction> =
           buffer_to_validated_saveplan (
-            reordered, config, Some (&restriction) ) ?
+            reordered, config, &restriction ) ?
           . 1 . node_instructions;
         let graph = graph_handle_from_config (config)? . load_full ();
         assert_eq! (
@@ -438,7 +438,7 @@ async fn restricted_skgrepo_search_and_save_work_together_end_to_end (
       "};
       let instructions : Vec<NodeInstruction> =
         buffer_to_validated_saveplan (
-          edited_buffer, config, Some (&restriction) ) ?
+          edited_buffer, config, &restriction ) ?
         . 1 . node_instructions;
       let graph = graph_handle_from_config (config)? . load_full ();
       assert_eq! (
@@ -474,7 +474,7 @@ async fn the_containerward_chain_stops_before_a_restricted_container (
       attach_containerward_chains_under_members (
         &mut viewforest,
         &[child_gnid],
-        &Truth { graph : &graph, config, restriction : Some (&restriction) },
+        &Truth { graph : &graph, config, restriction : &restriction },
         RefreshMode::ContentView ) ?;
       let child_children : BTreeSet<ID> =
         occurrence_children_gnids (&viewforest, child_gnid);
@@ -621,7 +621,7 @@ async fn tombstones_under_folders_save_without_error (
           config, SkgrepoSetName ("public" . to_string ())) ?;
       let result =
         buffer_to_validated_saveplan (
-          buffer, config, Some (&restriction) ) ;
+          buffer, config, &restriction ) ;
       assert! ( result . is_ok (),
         "a tombstone under a folder must not block saving: {:?}",
         result . err () . map ( |e| format! ("{:?}", e)) );
@@ -648,7 +648,7 @@ async fn tombstone_in_subscribee_folder_does_not_contribute_to_subscribesTo (
           config, SkgrepoSetName ("public" . to_string ())) ?;
       let instructions : Vec<NodeInstruction> =
         buffer_to_validated_saveplan (
-          buffer, config, Some (&restriction) )  ?
+          buffer, config, &restriction )  ?
         . 1 . node_instructions;
       assert_eq! (
         members_of (
@@ -680,7 +680,7 @@ async fn weave_preserves_omitted_restricted_content_members (
         "};
         let instructions : Vec<NodeInstruction> =
           buffer_to_validated_saveplan (
-            buffer, config, Some (&restriction) )  ?
+            buffer, config, &restriction )  ?
           . 1 . node_instructions;
         assert_eq! (
           members_of (& saved_or_graph_node_by_gnid (
@@ -697,7 +697,7 @@ async fn weave_preserves_omitted_restricted_content_members (
         "};
         let instructions : Vec<NodeInstruction> =
           buffer_to_validated_saveplan (
-            buffer, config, Some (&restriction) )  ?
+            buffer, config, &restriction )  ?
           . 1 . node_instructions;
         assert_eq! (
           members_of (& saved_or_graph_node_by_gnid (
@@ -713,7 +713,7 @@ async fn weave_preserves_omitted_restricted_content_members (
         "};
         let instructions : Vec<NodeInstruction> =
           buffer_to_validated_saveplan (
-            buffer, config, Some (&restriction) )  ?
+            buffer, config, &restriction )  ?
           . 1 . node_instructions;
         assert_eq! (
           members_of (& saved_or_graph_node_by_gnid (
@@ -753,7 +753,7 @@ async fn restricted_save_preserves_invisible_override_targets (
         "};
         let instructions : Vec<NodeInstruction> =
           buffer_to_validated_saveplan (
-            unmodified, &config, Some (&restriction) ) ?
+            unmodified, &config, &restriction ) ?
           . 1 . node_instructions;
         if let Some (NodeInstruction::Save (SaveNode (recorder))) =
           instructions . iter () . find ( |i| matches! (
@@ -770,7 +770,7 @@ async fn restricted_save_preserves_invisible_override_targets (
         "};
         let instructions : Vec<NodeInstruction> =
           buffer_to_validated_saveplan (
-            deleted, &config, Some (&restriction) ) ?
+            deleted, &config, &restriction ) ?
           . 1 . node_instructions;
         assert_eq! (
           override_set ( saved_node_by_gnid (&instructions, "ovr-owner") ),

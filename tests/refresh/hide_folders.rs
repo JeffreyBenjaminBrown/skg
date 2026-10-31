@@ -65,10 +65,10 @@ fn where_h_stands (
     ", occurrence_metadata ("s", "(viewRequests (folder subscribesTo))"),
        occurrence_metadata ("e", "") );
   let restriction : SkgrepoRestriction = main_only ();
-  let under = |restriction : Option<&SkgrepoRestriction>| -> Vec<String> {
+  let under = |restriction : &SkgrepoRestriction| -> Vec<String> {
     viewparents_of_h ( &run_asserting_fixpoint_in (
       &input, graph, restriction, RefreshMode::ContentView, 100 ) . outline () ) };
-  ( under (None), under (Some (&restriction)) ) }
+  ( under (&unrestricted ()), under (&restriction) ) }
 
 /// The viewparent of each line of 'outline' that stands for h.
 fn viewparents_of_h (

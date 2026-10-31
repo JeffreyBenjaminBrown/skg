@@ -93,9 +93,9 @@ fn refused_after (
     &[],
     |f, public| {
       let files_before : BTreeMap<String, String> = skg_files (f) ?;
-      let opened : String = open_content_view (f, "r", VIEW, Some (public)) ?;
+      let opened : String = open_content_view (f, "r", VIEW, public) ?;
       let saved : Result<SaveResponse, Box<dyn Error>> = save_under (
-        f, VIEW, &edit (&opened), Some (public), true, DeleteFrom::NotChosen );
+        f, VIEW, &edit (&opened), public, true, DeleteFrom::NotChosen );
       let refusal : String = match saved {
         Err (e) => match e . downcast_ref::<SaveError> () {
           Some (save_error) => format_save_error_as_org (save_error),

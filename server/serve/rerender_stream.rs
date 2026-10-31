@@ -88,7 +88,7 @@ pub(crate) fn prepare_rerender_views (
   let integrates_unshown_changes : bool = matches! (
     request . selector, RerenderSelector::IntegratingUnshownChanges (_) );
   let mut context : RerenderPassContext = RerenderPassContext::new (
-    env, runtime, Some (request . restriction),
+    env, runtime, request . restriction,
     // A buffer of the diff view is refreshed over a graph straddle
     // brought up to date from the connection's. Streaming the
     // rerenders writes it back, as a save does.

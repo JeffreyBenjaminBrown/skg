@@ -35,7 +35,7 @@ pub fn set_viewnodestats_in_viewforest (
   container_to_contents : &HashMap<ID, HashSet<ID>>,
   content_to_containers : &HashMap<ID, HashSet<ID>>,
   config                : &SkgConfig,
-  restriction           : Option<&SkgrepoRestriction>,
+  restriction           : &SkgrepoRestriction,
 ) {
   let multi_skgrepo : bool = config . skgrepos . len () > 1;
   let mut ancestor_gnids : HashSet<ID> = HashSet::new ();
@@ -59,7 +59,7 @@ fn set_viewnodestats_recursive (
   multi_skgrepo         : bool,
   graph                 : &InRustGraph,
   config                : &SkgConfig,
-  restriction           : Option<&SkgrepoRestriction>,
+  restriction           : &SkgrepoRestriction,
   ancestor_gnids       : &mut HashSet<ID>,
   relRepos              : &mut RelRepoLookup,
   container_to_contents : &HashMap<ID, HashSet<ID>>,
@@ -145,7 +145,7 @@ fn set_herald_strings_in_viewnode (
   node_pid              : &ID,
   stands_as_member_here : bool, // see 'stands_as_member'
   graph                 : &InRustGraph,
-  restriction           : Option<&SkgrepoRestriction>,
+  restriction           : &SkgrepoRestriction,
   relRepos              : &mut RelRepoLookup,
   container_to_contents : &HashMap<ID, HashSet<ID>>,
   content_to_containers : &HashMap<ID, HashSet<ID>>,
@@ -264,7 +264,7 @@ fn generation_above_a_member (
 fn flag_ancestor_relations (
   flags                 : &mut AncestorFlags,
   graph                 : &InRustGraph,
-  restriction           : Option<&SkgrepoRestriction>,
+  restriction           : &SkgrepoRestriction,
   relRepos              : &mut RelRepoLookup,
   container_to_contents : &HashMap<ID, HashSet<ID>>,
   content_to_containers : &HashMap<ID, HashSet<ID>>,
@@ -274,7 +274,7 @@ fn flag_ancestor_relations (
 ) {
   let contains_rel_is_visible : &mut dyn FnMut (&ID, &ID) -> bool =
     &mut |recorder : &ID, target : &ID| -> bool {
-    restriction . is_none ()
+    restriction . is_unrestricted ()
     || relRepos . relRepo (graph, recorder, NodeRelation::Contains, target)
        . is_some_and ( |relRepo| SkgrepoRestriction::record_is_visible (
          restriction, &relRepo )) };
@@ -308,7 +308,7 @@ fn flag_ancestor_relations (
 /// list of whichever of the two plays the relation's first role.
 fn relationship_is_visible (
   graph       : &InRustGraph,
-  restriction : Option<&SkgrepoRestriction>,
+  restriction : &SkgrepoRestriction,
   relRepos    : &mut RelRepoLookup,
   node        : &ID,
   member      : &ID,
@@ -318,7 +318,7 @@ fn relationship_is_visible (
     if member_role . is_first_role () { (member, node) }
     else { (node, member) };
   graph . relation_membership_is_real (node, member, member_role)
-  && ( restriction . is_none ()
+  && ( restriction . is_unrestricted ()
        || relRepos . relRepo (graph, recorder, member_role . relation, target)
           . is_some_and ( |relRepo| SkgrepoRestriction::record_is_visible (
             restriction, &relRepo )) ) }

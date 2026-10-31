@@ -39,8 +39,8 @@ fn a_member_only_a_restricted_record_explains_is_not_hidden (
        ("y", "pid: y\ntitle: y\n") ],
     &[ ("e", "pid: e\ncontains:\n- y\n") ],
     |f, public| {
-      let opened : String = open_content_view (f, "r", VIEW, Some (public)) ?;
-      save_cleanly (f, &without_line (&opened, "** (skg node (gnid y)"), Some (public)) ?;
+      let opened : String = open_content_view (f, "r", VIEW, public) ?;
+      save_cleanly (f, &without_line (&opened, "** (skg node (gnid y)"), public) ?;
       assert_eq! ( list_in (f, "public/r.skg", "contains"), Vec::<String>::new (),
                    "y's line is gone from r" );
       assert_eq! ( list_in (f, "public/r.skg", "hidesFromSubs"), Vec::<String>::new (),
@@ -62,8 +62,10 @@ fn a_hide_lands_no_more_publicly_than_the_contains_record_that_explains_it (
        ("y", "pid: y\ntitle: y\n") ],
     &[ ("e", "pid: e\ncontains:\n- y\n") ],
     |f, _public| {
-      let opened : String = open_content_view (f, "r", VIEW, None) ?;
-      save_cleanly (f, &without_line (&opened, "** (skg node (gnid y)"), None) ?;
+      let unrestricted : SkgrepoRestriction =
+        SkgrepoRestriction::unrestricted (&f . config);
+      let opened : String = open_content_view (f, "r", VIEW, &unrestricted) ?;
+      save_cleanly (f, &without_line (&opened, "** (skg node (gnid y)"), &unrestricted) ?;
       assert_eq! ( list_in (f, "public/r.skg", "hidesFromSubs"), Vec::<String>::new (),
                    "r's public file names no hide of y" );
       assert_eq! ( list_in (f, "private/r.skg", "hidesFromSubs"), vec! ["y"],
@@ -86,8 +88,8 @@ fn a_restricted_subscription_explains_no_hide (
     |f, public| {
       let private_before : String =
         skg_files (f) ? . get ("private/r2.skg") . cloned () . unwrap ();
-      let opened : String = open_content_view (f, "r2", VIEW, Some (public)) ?;
-      save_cleanly (f, &without_line (&opened, "** (skg node (gnid z)"), Some (public)) ?;
+      let opened : String = open_content_view (f, "r2", VIEW, public) ?;
+      save_cleanly (f, &without_line (&opened, "** (skg node (gnid z)"), public) ?;
       assert_eq! ( list_in (f, "public/r2.skg", "contains"), Vec::<String>::new (),
                    "z's line is gone from r2" );
       assert_eq! ( skg_files (f) ? . get ("private/r2.skg") . cloned (),
@@ -108,10 +110,10 @@ fn re_adding_a_member_drops_no_restricted_hide (
        ("h", "pid: h\ntitle: h\n") ],
     &[ ("r", "pid: r\nhidesFromSubs:\n- h\n") ],
     |f, public| {
-      let opened : String = open_content_view (f, "r", VIEW, Some (public)) ?;
+      let opened : String = open_content_view (f, "r", VIEW, public) ?;
       let with_h : String = edit_line ( &opened, "** (skg node (gnid c)", |line|
         format! ("{}\n** (skg node (gnid h)) h", line) );
-      save_cleanly (f, &with_h, Some (public)) ?;
+      save_cleanly (f, &with_h, public) ?;
       assert_eq! ( list_in (f, "public/r.skg", "contains"), vec! ["c", "h"],
                    "r's public file contains h" );
       assert_eq! ( list_in (f, "private/r.skg", "hidesFromSubs"), vec! ["h"],
@@ -127,7 +129,7 @@ fn re_adding_a_member_drops_no_restricted_hide (
 fn save_cleanly (
   f           : &mut Fixture,
   text        : &str,
-  restriction : Option<&SkgrepoRestriction>,
+  restriction : &SkgrepoRestriction,
 ) -> Result<SaveResponse, Box<dyn Error>> {
   let response : SaveResponse =
     save_under (f, VIEW, text, restriction, true, DeleteFrom::NotChosen) ?;

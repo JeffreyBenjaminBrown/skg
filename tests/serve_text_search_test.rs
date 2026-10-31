@@ -5,14 +5,20 @@ use skg::from_text::buffer_to_viewnodes::uninterpreted::headline_to_triple;
 use skg::serve::parse_metadata_sexp::MetadataKind;
 use skg::org_to_text::viewforest_to_string;
 use skg::skgrepo_sets::SkgrepoRestriction;
-use skg::types::misc::{ID, MSV, RelPartner, SkgrepoName, SkgrepoSetName, TantivyIndex, rel_partners_at_relRepo_msv};
+use skg::types::misc::{ID, MSV, RelPartner, SkgConfig, SkgrepoName, SkgrepoSetName, TantivyIndex, rel_partners_at_relRepo_msv};
 use skg::types::nodes::complete::{Graphnode, empty_graphnode};
 use skg::dbs::init::wipe_then_init_tantivy_db;
 use skg::test_utils::remove_test_dir;
 use skg::serve::handlers::text_search::{
   group_matches_by_gnid, build_search_viewforest};
 
+use std::collections::HashMap;
 use std::path::Path;
+
+/// No skgrepo restriction, for an index built without a config.
+fn unrestricted () -> SkgrepoRestriction {
+  SkgrepoRestriction::unrestricted (
+    &SkgConfig::dummyFromSkgrepos (HashMap::new ())) }
 use skg::types::viewnode::{Folder, ViewnodeKind};
 
 #[test]
@@ -74,7 +80,7 @@ fn test_text_search_org_format (
       let matches_by_gnid =
         group_matches_by_gnid (
           best_matches, searcher, &tantivy_index,
-          search_terms, &SearchOptions::default (), None );
+          search_terms, &SearchOptions::default (), &unrestricted () );
       let (viewforest, _search_results) =
         build_search_viewforest (
           search_terms,
@@ -181,7 +187,7 @@ fn test_search_results_preserve_links_in_title (
                        &SearchOptions::default () ) ?;
       let matches_by_gnid = group_matches_by_gnid (
         best_matches, searcher, &tantivy_index,
-        "science", &SearchOptions::default (), None );
+        "science", &SearchOptions::default (), &unrestricted () );
       let (viewforest, _ids) = build_search_viewforest (
         "science", &matches_by_gnid, &std::collections::HashSet::new () );
       let result : String =
@@ -261,7 +267,7 @@ fn test_coverage_multiplier_rewards_matching_more_terms (
       let matches_by_gnid = group_matches_by_gnid (
         best_matches, searcher, &tantivy_index,
         "axiom thesis lemma",
-        &SearchOptions::default (), None );
+        &SearchOptions::default (), &unrestricted () );
       // Both should be in the result set.
       assert! ( matches_by_gnid . contains_key (&ID::new ("few")),
                 "few should appear among results" );
@@ -295,7 +301,7 @@ fn test_coverage_multiplier_rewards_matching_more_terms (
                        &regex_opts ) ?;
       let matches_re = group_matches_by_gnid (
         best_matches_re, searcher_re, &tantivy_index,
-        "axiom thesis lemma", &regex_opts, None );
+        "axiom thesis lemma", &regex_opts, &unrestricted () );
       assert! ( matches_re . contains_key (&ID::new ("few")),
                 "few should appear among regex results" );
       assert! ( matches_re . contains_key (&ID::new ("many")),
@@ -357,17 +363,17 @@ fn private_alias_documents_are_filtered_before_grouping (
         let matches_by_gnid = group_matches_by_gnid (
           best_matches, searcher, &tantivy_index,
           "zanzibar", &SearchOptions::default (),
-          Some (&public_only) );
+          &public_only );
         assert! ( ! matches_by_gnid . contains_key (
                     &ID::new ("id_leveled")),
                   "private alias doc leaked into a main-only search" ); }
-      { // No skgrepo restriction (None): the alias matches.
+      { // No skgrepo restriction: the alias matches.
         let ( best_matches, searcher ) =
           search_index ( &tantivy_index, "zanzibar",
                          &SearchOptions::default () ) ?;
         let matches_by_gnid = group_matches_by_gnid (
           best_matches, searcher, &tantivy_index,
-          "zanzibar", &SearchOptions::default (), None );
+          "zanzibar", &SearchOptions::default (), &unrestricted () );
         assert! ( matches_by_gnid . contains_key (
                     &ID::new ("id_leveled")) ); }
       { // The title doc still matches under the restricted set.
@@ -377,7 +383,7 @@ fn private_alias_documents_are_filtered_before_grouping (
         let matches_by_gnid = group_matches_by_gnid (
           best_matches, searcher, &tantivy_index,
           "public title", &SearchOptions::default (),
-          Some (&public_only) );
+          &public_only );
         assert! ( matches_by_gnid . contains_key (
                     &ID::new ("id_leveled")) ); }
       Ok (( )) } ) ();

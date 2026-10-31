@@ -114,7 +114,7 @@ pub fn decide_for_overPrivateText_pids (
   if overPrivateText_pids . is_empty () {
     return TextReleaseDecision::Allow; }
   let warning : String = warning_for (operation, &overPrivateText_pids);
-  if restriction . is_all ()
+  if restriction . is_unrestricted ()
      || overPrivateText_pids . iter () . all (
           |pid| approved_pids . contains (pid) ) {
     return TextReleaseDecision::AllowWithWarning { warning }; }

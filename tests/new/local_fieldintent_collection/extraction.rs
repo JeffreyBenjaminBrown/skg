@@ -4,6 +4,7 @@
 // ones that changed (the new recursion surface) say so in comments.
 
 use crate::parse_helpers::viewnode_tree_as_written;
+use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::from_text::buffer_to_viewnodes::add_missing_info::ParseProvenance;
 use indoc::indoc;
 use ego_tree::Tree;
@@ -131,7 +132,7 @@ async fn nodeInstructions_from_org_with_disk (
     org_to_viewforest (org_text, IdResolution::ThroughGraph (&graph_from_config (config) ?)) ?;
   let (save_plan, _nodeMerge_acquisitions) =
     extract_nonmergeSavePlan_locally (
-      &viewforest, config, None)?;
+      &viewforest, config, &SkgrepoRestriction::unrestricted (config))?;
   Ok (save_plan . node_instructions) }
 
 #[test]
@@ -869,7 +870,7 @@ async fn subscribee_as_such_child_removal_is_not_foreign_contains_edit (
           &graph_handle_from_config (config)? . load_full (),
           &clone_skgrepo_inputs,
           &std::collections::HashMap::new(),
-          config, None)
+          config, &SkgrepoRestriction::unrestricted (config))
         . expect ("the subscribee-as-such edit must not error");
       assert!(
         ! save_gnids (&node_instructions) . contains (&ID::from ("e")),

@@ -76,7 +76,7 @@ impl GraphnodeInRust {
   /// differs from the node's home: what an alias headline names.
   pub fn aliases_with_relRepo_unless_home (
     &self,
-    restriction : Option<&SkgrepoRestriction>,
+    restriction : &SkgrepoRestriction,
   ) -> Vec<(String, Option<SkgrepoName>)> {
     self . aliases . or_default () . iter ()
       . filter ( |alias| SkgrepoRestriction::record_is_visible (

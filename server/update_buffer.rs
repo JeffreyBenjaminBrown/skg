@@ -71,7 +71,7 @@ pub fn update_views_after_save (
   runtime                     : Arc<RuntimeGeneration>,
   viewforest_id_from_request_result : &Result<ViewforestId, String>,
   views_state                 : &mut ViewsState,
-  skgrepo_restriction         : Option<&SkgrepoRestriction>,
+  skgrepo_restriction         : &SkgrepoRestriction,
   text_approved_pids        : &HashSet<ID>,
   fork_specs                  : &[ForkSpec],
 ) -> Result<SaveResponse, Box<dyn Error>> {
@@ -99,7 +99,7 @@ pub fn update_views_after_save (
   // Gate the occurrences already in the forests before rendering, so even a
   // rendering error cannot echo protected title/body text. A second decision
   // below covers nodes introduced by the refresh.
-  if let Some (restriction) = skgrepo_restriction {
+  { let restriction : &SkgrepoRestriction = skgrepo_restriction;
     let mut input_candidates : Vec<ID> =
       occurrence_gnids_in_viewforest (&saved_view_mut);
     for viewforest_id in &collateral_viewforest_ids {
@@ -138,7 +138,7 @@ pub fn update_views_after_save (
   for collateral in &collateral_views {
     release_candidates . extend (
       occurrence_gnids_in_viewforest (&collateral . viewforest) ); }
-  if let Some (restriction) = skgrepo_restriction {
+  { let restriction : &SkgrepoRestriction = skgrepo_restriction;
     let release : TextReleaseDecision = decide (
       "save-rerender", restriction, &release_candidates,
       &context . runtime . graph, text_approved_pids );
@@ -255,7 +255,7 @@ pub(crate) fn rerender_open_view (
 pub(crate) fn multi_root_view_via_runtime (
   runtime            : &RuntimeGeneration,
   root_gnids        : &[ID],
-  skgrepo_restriction : Option<&SkgrepoRestriction>,
+  skgrepo_restriction : &SkgrepoRestriction,
 ) -> Result < (String, Vec<ID>, Tree<Viewnode>), Box<dyn Error> > {
   let (viewforest, buffer_content) : (ViewForest, String) =
     render_initial_view ( runtime, root_gnids, skgrepo_restriction ) ?;
@@ -275,7 +275,7 @@ pub(crate) fn multi_root_view_via_runtime (
 pub fn render_initial_view (
   runtime     : &RuntimeGeneration,
   root_gnids : &[ID],
-  restriction : Option<&SkgrepoRestriction>,
+  restriction : &SkgrepoRestriction,
 ) -> Result<(ViewForest, String), Box<dyn Error>> {
   let mut viewforest : ViewForest = stub_of_fresh_content_view (
     root_gnids, &runtime . graph );

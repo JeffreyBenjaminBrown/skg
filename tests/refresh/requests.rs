@@ -81,7 +81,7 @@ fn editableView_extends_content_shown_write_protected_within_the_budget () {
     ", occurrence_metadata ("p", "(viewRequests editableView)"),
        occurrence_metadata ("c", "writeProtected"),
        occurrence_metadata ("d", "writeProtected") );
-  assert_eq! ( run_asserting_fixpoint_in ( &input, &family (), None, RefreshMode::ContentView, 2 )
+  assert_eq! ( run_asserting_fixpoint_in ( &input, &family (), &unrestricted (), RefreshMode::ContentView, 2 )
                . outline (), "\
 node p
   node c
@@ -122,7 +122,7 @@ fn an_occurrence_shown_editable_charges_the_budget () {
     *** {} c1
     ", occurrence_metadata ("p", ""), occurrence_metadata ("c", ""),
        occurrence_metadata ("c1", "") );
-  assert_eq! ( run_asserting_fixpoint_in ( &input, &family (), None, RefreshMode::ContentView, 2 )
+  assert_eq! ( run_asserting_fixpoint_in ( &input, &family (), &unrestricted (), RefreshMode::ContentView, 2 )
                . outline (), "\
 node p
   node c
@@ -150,7 +150,7 @@ fn in_the_diff_view_a_node_of_u_charges_the_budget () {
     readiness_store : &readiness_store };
   let editable_members = |budget : usize| -> Vec<bool> {
     let run : Run = run_asserting_fixpoint_in (
-      &input, &straddle . after, None, mode, budget );
+      &input, &straddle . after, &unrestricted (), mode, budget );
     run . forest . roots () . next () . unwrap () . children ()
       . filter_map ( |child| match &child . value () . kind {
         ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =>

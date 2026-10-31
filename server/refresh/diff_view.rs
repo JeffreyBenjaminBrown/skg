@@ -144,7 +144,7 @@ pub(crate) fn property_goal (
       .. GoalItem::by_graph (member) } };
   Some ( match kind {
     Folder::Alias => {
-      let restriction : Option<&SkgrepoRestriction> = walk . truth . restriction;
+      let restriction : &SkgrepoRestriction = walk . truth . restriction;
       let texts : &dyn Fn (Option<&GraphnodeInRust>) -> Vec<String> =
         &|node : Option<&GraphnodeInRust>| -> Vec<String> {
         node . map ( |node| node . aliases_with_relRepo_unless_home (restriction)
@@ -226,7 +226,7 @@ fn partner_items<'a> (
   partners : impl Iterator<Item = &'a Partner>,
   walk     : &Walk,
 ) -> Vec<GoalItem> {
-  let restriction : Option<&SkgrepoRestriction> = walk . truth . restriction;
+  let restriction : &SkgrepoRestriction = walk . truth . restriction;
   let record_is_visible = |partner : &Partner| -> bool {
     partner . relRepo_after . as_ref ()
       . or ( partner . relRepo_before . as_ref () )

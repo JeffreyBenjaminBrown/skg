@@ -56,7 +56,7 @@ pub fn build_diskSupplemented_nodeInstructions (
   intents                : Vec<NodeIntent>,
   graph                  : &InRustGraph,
   config                 : &SkgConfig,
-  skgrepo_restriction    : Option<&SkgrepoRestriction>, // None means no skgrepo restriction; callers normalize 'all' to None.
+  skgrepo_restriction    : &SkgrepoRestriction,
 ) -> Result<NodeInstructions_with_Repomoves, Box<dyn Error>> {
   let mut result : NodeInstructions_with_Repomoves =
     NodeInstructions_with_Repomoves::with_capacity (intents . len());
@@ -88,15 +88,14 @@ fn supplement_nodeIntent_from_disk (
   intent                 : NodeIntent,
   graph                  : &InRustGraph,
   config                 : &SkgConfig,
-  skgrepo_restriction    : Option<&SkgrepoRestriction>,
+  skgrepo_restriction    : &SkgrepoRestriction,
   prospective_homes      : &HashMap<ID, SkgrepoName>,
 ) -> Result<NodeInstruction_with_Opt_Repomove, Box<dyn Error>> {
   match intent {
     NodeIntent::Delete (ref delete) => {
-      if let Some (restriction) = skgrepo_restriction {
-        refuse_delete_with_restricted_sections (
-          config, restriction, & delete . gnid )
-          . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?; }
+      refuse_delete_with_restricted_sections (
+        config, skgrepo_restriction, & delete . gnid )
+        . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
       Ok (NodeInstruction_with_Opt_Repomove {
         instruction : intent . into_node_instruction()
           . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?,
@@ -112,7 +111,7 @@ fn supplement_nodeSaveIntent_from_disk (
   from_buffer            : NodeSaveIntent,
   graph                  : &InRustGraph,
   config                 : &SkgConfig,
-  skgrepo_restriction    : Option<&SkgrepoRestriction>,
+  skgrepo_restriction    : &SkgrepoRestriction,
   prospective_homes      : &HashMap<ID, SkgrepoName>,
 ) -> Result<NodeInstruction_with_Opt_Repomove, Box<dyn Error>> {
   let pid : ID =
@@ -171,10 +170,9 @@ fn supplement_nodeSaveIntent_from_disk (
         if let Some ((flag, value)) = flag_request {
           set_flag (&mut supplemented . flags, flag, value); }
         let supplemented : Graphnode =
-          match skgrepo_restriction {
-            None => supplemented,
-            Some (restriction) => preserve_invisible_members (
-              supplemented, &disk_node, graph, restriction ) };
+          if skgrepo_restriction . is_unrestricted () { supplemented }
+          else { preserve_invisible_members (
+                   supplemented, &disk_node, graph, skgrepo_restriction ) };
         apply_sticky_relRepos_in_graph_with_prospective_homes (
           supplemented, &disk_node, &requested_relRepos,
           graph, config, prospective_homes )

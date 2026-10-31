@@ -236,7 +236,7 @@ fn partners_in_graph (
           Some ((recorder, relRepo)) } )
         . collect ()
     } else { // the node records the relationship
-      graph . outbound_member_keys_for_relation_gated (pid, role . relation, None)
+      graph . outbound_member_keys_for_relation (pid, role . relation)
         . into_iter ()
         . map ( |rel_partner| ( rel_partner . member . into_id (),
                                 rel_partner . relRepo ))
@@ -272,7 +272,7 @@ fn relRepo_of_recorded_relationship (
   relation : NodeRelation,
   member   : &ID,
 ) -> Option<SkgrepoName> {
-  graph . outbound_member_keys_for_relation_gated (recorder, relation, None)
+  graph . outbound_member_keys_for_relation (recorder, relation)
     . into_iter ()
     . find ( |rel_partner| rel_partner . member . id () == member )
     . map ( |rel_partner| rel_partner . relRepo ) }

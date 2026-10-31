@@ -71,7 +71,7 @@ fn a_view_of_a_list_under_a_skgrepo_restriction (
   let graph : InRustGraph = graph (&nodes);
   let forest : ViewForest = run_asserting_fixpoint_in (
     &format! ("* {} p\n", occurrence_metadata ("p", "")),
-    &graph, Some (&main_only ()), RefreshMode::ContentView, 1000 ) . forest;
+    &graph, &main_only (), RefreshMode::ContentView, 1000 ) . forest;
   assert_eq! ( forest . roots () . next () . unwrap () . children () . count (), members );
   (graph, forest) }
 
@@ -84,7 +84,7 @@ fn stored_list_reads_of_the_graphnode_stats_pass (
     a_view_of_a_list_under_a_skgrepo_restriction (members);
   STORED_LIST_READS . with ( |reads| reads . set (0) );
   set_graphnodestats_in_viewforest (
-    forest . as_internal_tree_mut (), &graph, &config (), Some (&main_only ()) )
+    forest . as_internal_tree_mut (), &graph, &config (), &main_only () )
     . unwrap ();
   STORED_LIST_READS . with ( |reads| reads . get () ) }
 
@@ -100,12 +100,12 @@ fn stored_list_reads_of_the_viewnode_stats_pass (
   let tree : &mut Tree<Viewnode> = forest . as_internal_tree_mut ();
   let (container_to_contents, content_to_containers)
     : (HashMap<ID, HashSet<ID>>, HashMap<ID, HashSet<ID>>) =
-    set_graphnodestats_in_viewforest (tree, &graph, &config, Some (&restriction))
+    set_graphnodestats_in_viewforest (tree, &graph, &config, &restriction)
     . unwrap ();
   STORED_LIST_READS . with ( |reads| reads . set (0) );
   set_viewnodestats_in_viewforest (
     tree, &graph, &container_to_contents, &content_to_containers,
-    &config, Some (&restriction) );
+    &config, &restriction );
   STORED_LIST_READS . with ( |reads| reads . get () ) }
 
 #[test]

@@ -6,6 +6,7 @@
 /// the old extraction path before its deletion. The cases marked
 /// "new recursion surface" are the deliberate behavior changes.
 
+use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::from_text::buffer_to_viewnodes::add_missing_info::ParseProvenance;
 use indoc::indoc;
 use skg::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
@@ -118,7 +119,7 @@ async fn pipeline_basic_mixed_tree (
       let (plan, nodeMerge_acquisitions)
         : (NonmergeSavePlan, Vec<(ID, ID)>) =
         extract_nonmergeSavePlan_locally (
-          &viewforest_as_written (input), config, None)?;
+          &viewforest_as_written (input), config, &SkgrepoRestriction::unrestricted (config))?;
       assert_eq!(
         save_gnids (&plan . node_instructions),
         vec![ ID::from ("root"), ID::from ("child"),
@@ -169,7 +170,7 @@ async fn pipeline_subscribee_hiderels (
           input, config) . await?;
       let (plan, _) =
         extract_nonmergeSavePlan_locally (
-          &forest, config, None)?;
+          &forest, config, &SkgrepoRestriction::unrestricted (config))?;
       assert_eq!(
         members_msv (&saved_node_by_gnid (&plan . node_instructions, "r")
           . hidesFromSubs),
@@ -197,7 +198,7 @@ async fn pipeline_write_protected_folder_member_edits (
             "};
       let (plan, _) =
         extract_nonmergeSavePlan_locally (
-          &viewforest_as_written (input), config, None)?;
+          &viewforest_as_written (input), config, &SkgrepoRestriction::unrestricted (config))?;
       assert_eq!(
         save_gnids (&plan . node_instructions),
         vec![ ID::from ("recorder"), ID::from ("intruder"),
@@ -222,7 +223,7 @@ async fn pipeline_restricted_subtree (
             "};
       let (plan, _) =
         extract_nonmergeSavePlan_locally (
-          &viewforest_as_written (input), config, None)?;
+          &viewforest_as_written (input), config, &SkgrepoRestriction::unrestricted (config))?;
       assert_eq!(
         save_gnids (&plan . node_instructions),
         // stowaway is on the new recursion surface.
@@ -248,7 +249,7 @@ async fn pipeline_ghost_subtree (
       let forest : ViewForest = viewforest_as_written (input);
       let (plan, _) =
         extract_nonmergeSavePlan_locally (
-          &forest, config, None)?;
+          &forest, config, &SkgrepoRestriction::unrestricted (config))?;
       assert_eq!(
         save_gnids (&plan . node_instructions),
         // underneath is on the new recursion surface; the ghost
@@ -275,7 +276,7 @@ async fn pipeline_nodeMerge_requests (
           input, config) . await?;
       let (_plan, nodeMerge_acquisitions) =
         extract_nonmergeSavePlan_locally (
-          &forest, config, None)?;
+          &forest, config, &SkgrepoRestriction::unrestricted (config))?;
       assert_eq!( nodeMerge_acquisitions,
                   vec![ (ID::from ("1"), ID::from ("2")) ]);
       let nodeMerges : Vec<NodeMerge> =
@@ -305,7 +306,7 @@ async fn pipeline_rejects_text_claim_mismatch (
           input, config) . await?;
       let error : String =
         extract_nonmergeSavePlan_locally (
-          &forest, config , None)
+          &forest, config , &SkgrepoRestriction::unrestricted (config))
         . err() . expect ("the title edit should be rejected")
         . to_string();
       assert!( error . contains ("Cannot edit title/body") );

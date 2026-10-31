@@ -154,7 +154,7 @@ pub fn fork_spec_from_buffer_node (
   disk_contains       : &[RelPartner<ID>], // N's original contains records (before the edit); children the edit deleted become the clone's hides.
   skgrepos            : &CloneSkgrepoInputs,
   config              : &SkgConfig,
-  skgrepo_restriction : Option<&SkgrepoRestriction>,
+  skgrepo_restriction : &SkgrepoRestriction,
 ) -> Result<ForkSpec, BufferValidationError> {
   let specified : Option<SkgrepoName> =
     skgrepos . user_set . get (& buffer_node . pid) . cloned ()
@@ -330,14 +330,13 @@ fn forked_original_headline (
 ///   touch restricted skgrepos, and an invisible clone is never created
 ///   silently; reject with 'ForkRepoRestricted'.
 ///
-/// 'restricted_repo_set' is None when nothing is restricted (the set
-/// 'all'). The monogamy check uses the explicit save-planning graph; the
+/// The monogamy check uses the explicit save-planning graph; the
 /// skgsave-commit-time invariant check remains a defense in depth.
 pub fn validate_fork_specs_in_graph (
   fork_specs             : &[ForkSpec],
   graph                  : &crate::dbs::in_rust_graph::InRustGraph,
   config                 : &SkgConfig,
-  skgrepo_restriction    : Option<&SkgrepoRestriction>,
+  skgrepo_restriction    : &SkgrepoRestriction,
 ) -> Vec<BufferValidationError> {
   let mut errors : Vec<BufferValidationError> = Vec::new ();
   for spec in fork_specs {
@@ -355,8 +354,7 @@ pub fn validate_fork_specs_in_graph (
           clone_skgrepo . clone () ));
       continue; }
     let unrestricted : bool =
-      skgrepo_restriction
-      . map_or ( true, |a| a . contains_skgrepo (clone_skgrepo) );
+      skgrepo_restriction . contains_skgrepo (clone_skgrepo);
     if ! unrestricted {
       errors . push (
         BufferValidationError::ForkSkgrepoRestricted (
@@ -367,7 +365,7 @@ pub fn validate_fork_specs_in_graph (
 pub fn validate_fork_specs (
   fork_specs             : &[ForkSpec],
   config                 : &SkgConfig,
-  skgrepo_restriction    : Option<&SkgrepoRestriction>,
+  skgrepo_restriction    : &SkgrepoRestriction,
 ) -> Vec<BufferValidationError> {
   let graph = match read_all_skg_files_from_skgrepos (config) {
     Ok (nodes) => InRustGraph::from_graphnodes (&nodes),
@@ -405,7 +403,7 @@ pub fn build_fork_clone (
   clone_skgrepo       : SkgrepoName,
   skgrepo_confirmed   : bool, // whether clone_repo was user-specified (vs inferred or defaulted)
   config              : &SkgConfig,
-  skgrepo_restriction : Option<&SkgrepoRestriction>,
+  skgrepo_restriction : &SkgrepoRestriction,
 ) -> ForkSpec {
   let floored = |record : &RelPartner<ID>| -> RelPartner<ID> {
     RelPartner::at_relRepo (

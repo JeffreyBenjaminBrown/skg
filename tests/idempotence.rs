@@ -118,17 +118,16 @@ fn every_content_view_fixture_is_a_fixpoint_of_the_refresh (
     let mut pids : Vec<ID> = runtime . graph . nodes . keys () . cloned () . collect ();
     pids . sort ();
     for restriction in restrictions_of (&runtime . config) {
-      if restriction . is_some () { restricted_folders . insert (folder . clone ()); }
+      if ! restriction . is_unrestricted () { restricted_folders . insert (folder . clone ()); }
       for pid in &pids {
-        if runtime . graph . gnid_presence_gated (pid, restriction . as_ref ())
+        if runtime . graph . gnid_presence_gated (pid, &restriction)
            == GnidPresence::Restricted {
           continue; }
         views += 1;
-        if let Err (failure) = refreshes_unchanged (&runtime, pid, restriction . as_ref ()) {
+        if let Err (failure) = refreshes_unchanged (&runtime, pid, &restriction) {
           failures . push ( format! (
             "{} {} under {}: {}", folder . display (), pid . 0,
-            restriction . as_ref () . map_or ("no skgrepo restriction" . to_string (),
-                                              |r| format! ("'{}'", r . name . 0) ),
+            in_the_report (&restriction),
             failure )); }}}}
   println! ( "{} views over {} fixture folders, {} of them restricted",
              views, folders, restricted_folders . len () );
@@ -146,7 +145,7 @@ fn every_content_view_fixture_is_a_fixpoint_of_the_refresh (
 fn refreshes_unchanged (
   runtime     : &RuntimeGeneration,
   pid         : &ID,
-  restriction : Option<&SkgrepoRestriction>,
+  restriction : &SkgrepoRestriction,
 ) -> Result<(), String> {
   let (_, text) : (ViewForest, String) =
     render_initial_view (runtime, &[ pid . clone () ], restriction)
@@ -161,15 +160,22 @@ fn refreshes_unchanged (
 /// skgrepo restriction).
 fn restrictions_of (
   config : &SkgConfig,
-) -> Vec<Option<SkgrepoRestriction>> {
+) -> Vec<SkgrepoRestriction> {
   let ordered : Vec<SkgrepoName> = config . ordered_skgrepos ();
   let narrower : usize = ordered . len () . saturating_sub (1);
-  std::iter::once (None)
+  std::iter::once (SkgrepoRestriction::unrestricted (config))
     . chain ( ordered . into_iter () . take (narrower)
               . filter_map ( |skgrepo| SkgrepoRestriction::named (
                   config, SkgrepoSetName ( skgrepo . 0 . clone () ))
-                . ok () . map (Some) ))
+                . ok () ))
     . collect () }
+
+/// How a failure names the skgrepo restriction it met.
+fn in_the_report (
+  restriction : &SkgrepoRestriction,
+) -> String {
+  if restriction . is_unrestricted () { "no skgrepo restriction" . to_string () }
+  else { format! ("'{}'", restriction . name . 0) } }
 
 /// Every folder named 'fixtures' under 'root', but the test results.
 fn fixture_folders (
@@ -256,14 +262,13 @@ fn every_diff_view_fixture_is_a_fixpoint_of_the_refresh (
         let Some (rendered) = rendered else { continue; };
         for restriction in restrictions_of (&runtime . config) {
           buffers += 1;
-          if restriction . is_some () { restricted_buffers += 1; }
+          if ! restriction . is_unrestricted () { restricted_buffers += 1; }
           if let Err (failure) = diff_view_buffer_refreshes_unchanged (
                &runtime, &straddle, &store, buffer_kind,
-               &rendered . text, restriction . as_ref () ) {
+               &rendered . text, &restriction ) {
             failures . push ( format! (
               "{} {:?} under {}: {}", case . display (), buffer_kind,
-              restriction . as_ref () . map_or ("no skgrepo restriction" . to_string (),
-                                                |r| format! ("'{}'", r . name . 0) ),
+              in_the_report (&restriction),
               failure )); }}}
       Ok (( )) }) ();
     cleanup_test_tantivy ( Some (&fixture . config . tantivy_folder) ) ?;
@@ -290,11 +295,11 @@ fn diff_view_buffer_refreshes_unchanged (
   store       : &ReadinessStore,
   buffer_kind : DiffViewBufferKind,
   text        : &str,
-  restriction : Option<&SkgrepoRestriction>,
+  restriction : &SkgrepoRestriction,
 ) -> Result<(), String> {
-  let switched : String = match restriction {
-    None => text . to_string (),
-    Some (_) => {
+  let switched : String =
+    if restriction . is_unrestricted () { text . to_string () }
+    else {
       let mut forest : ViewForest = parse_for_the_sweep (text, &runtime . graph) ?;
       let mut record : ViewnodeIdRecord = ViewnodeIdRecord::of_viewforest (&forest);
       refresh_diffView_viewforest (
@@ -302,7 +307,7 @@ fn diff_view_buffer_refreshes_unchanged (
         &mut forest, &mut record )
         . map_err ( |e| format! ("the switch's refresh failed: {}", e) ) ?;
       viewforest_to_string (&forest)
-        . map_err ( |e| format! ("the switch's render failed: {}", e) ) ? }, };
+        . map_err ( |e| format! ("the switch's render failed: {}", e) ) ? };
   refresh_reaches_fixpoint (
     &switched, &runtime . graph,
     |forest, record| refresh_diffView_viewforest (

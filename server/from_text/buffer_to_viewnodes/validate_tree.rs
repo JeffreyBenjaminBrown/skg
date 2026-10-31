@@ -13,6 +13,7 @@ use crate::types::tree::forest::ViewForest;
 use crate::types::tree::generic::do_everywhere_in_tree_dfs_readonly;
 use crate::types::errors::{BufferValidationError, HeadlineName, with_org_subheadlines};
 use crate::nodeMerge::validate_nodeMerge::validate_nodeMerge_requests;
+use crate::skgrepo_sets::SkgrepoRestriction;
 use contradictory_instructions::{
   find_contradictory_readiness_requests, find_inconsistent_instructions};
 use super::local;
@@ -203,7 +204,9 @@ fn overridesHere_part_errors (
       carrier_on_owned_chain (config, graph, &original, &carrier);
     if ! chain_ok {
       let effective : Option<ID> = // the chain end, for the message
-        Some (resolve_override (config, graph, None, &original) . effective);
+        Some (resolve_override (
+          config, graph, &SkgrepoRestriction::unrestricted (config), &original)
+          . effective);
       errors . push (
         BufferValidationError::OverridesHere_Mismatch (
           Some (carrier), original, effective,

@@ -62,7 +62,7 @@ pub fn buffer_to_validated_saveplan_in_graph (
   buffer_text        : &str,
   graph              : &crate::dbs::in_rust_graph::InRustGraph,
   config             : &SkgConfig,
-  skgrepo_restriction : Option<&SkgrepoRestriction>,
+  skgrepo_restriction : &SkgrepoRestriction,
 ) -> Result<(ViewForest, SavePlan, Vec<String>), SaveError> {
   // No user-set clone skgrepos: every fork's skgrepo resolves by
   // inference-else-default. The fork-confirmation re-save uses the
@@ -79,13 +79,9 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
   buffer_text        : &str,
   graph              : &crate::dbs::in_rust_graph::InRustGraph,
   config             : &SkgConfig,
-  skgrepo_restriction : Option<&SkgrepoRestriction>,
+  skgrepo_restriction : &SkgrepoRestriction,
   fork_skgrepos      : &HashMap<ID, SkgrepoName>,
 ) -> Result<(ViewForest, SavePlan, Vec<String>), SaveError> {
-  let skgrepo_restriction : Option<&SkgrepoRestriction> =
-    // The set 'all' restricts nothing; downstream stages treat None
-    // as "no skgrepo restriction", so normalize here, once.
-    skgrepo_restriction . filter ( |a| ! a . is_all () );
   let ( viewforest, parsing_errors, parsing_warnings, provenance )
     : ( ViewForest, Vec<BufferValidationError>, Vec<String>,
         ParseProvenance )
@@ -192,10 +188,10 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
     // ForkRepoUnresolved only when the user owns no skgrepo at all.
     let owned_in_order : Vec<SkgrepoName> =
       config . owned_skgrepos_in_config_order ();
-    let unrestricted_owned : Option<SkgrepoName> = skgrepo_restriction . and_then (
-      |restriction| owned_in_order . iter ()
-        . find ( |name| restriction . contains_skgrepo (name) )
-        . cloned () );
+    let unrestricted_owned : Option<SkgrepoName> =
+      owned_in_order . iter ()
+      . find ( |name| skgrepo_restriction . contains_skgrepo (name) )
+      . cloned ();
     unrestricted_owned . or_else ( || owned_in_order . into_iter () . next () ) };
   let clone_skgrepo_inputs : CloneSkgrepoInputs = CloneSkgrepoInputs {
     user_set          : fork_skgrepos . clone (),
@@ -274,7 +270,7 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
 pub fn buffer_to_validated_saveplan (
   buffer_text        : &str,
   config             : &SkgConfig,
-  skgrepo_restriction : Option<&SkgrepoRestriction>,
+  skgrepo_restriction : &SkgrepoRestriction,
 ) -> Result<(ViewForest, SavePlan, Vec<String>), SaveError> {
   let nodes = crate::dbs::filesystem::multiple_nodes
     ::read_all_skg_files_from_skgrepos (config)
@@ -287,7 +283,7 @@ pub fn buffer_to_validated_saveplan (
 pub fn buffer_to_validated_saveplan_with_fork_skgrepos (
   buffer_text        : &str,
   config             : &SkgConfig,
-  skgrepo_restriction : Option<&SkgrepoRestriction>,
+  skgrepo_restriction : &SkgrepoRestriction,
   fork_skgrepos      : &HashMap<ID, SkgrepoName>,
 ) -> Result<(ViewForest, SavePlan, Vec<String>), SaveError> {
   let nodes = crate::dbs::filesystem::multiple_nodes
@@ -350,7 +346,7 @@ fn explicit_fork_specs_from_viewforest (
   graph                : &crate::dbs::in_rust_graph::InRustGraph,
   config               : &SkgConfig,
   clone_skgrepo_inputs : &CloneSkgrepoInputs,
-  skgrepo_restriction  : Option<&SkgrepoRestriction>,
+  skgrepo_restriction  : &SkgrepoRestriction,
 ) -> Result<Vec<ForkSpec>, Vec<BufferValidationError>> {
   let mut specs  : Vec<ForkSpec> = Vec::new ();
   let mut errors : Vec<BufferValidationError> = Vec::new ();

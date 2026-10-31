@@ -44,7 +44,7 @@ fn an_unchanged_save_hides_nothing_that_only_a_restricted_record_explains (
        ("y", "pid: y\ntitle: y\n") ],
     &[ ("e", "pid: e\ncontains:\n- x\n- y\n") ],
     |f, public| {
-      let opened : String = open_content_view (f, "r", VIEW, Some (public)) ?;
+      let opened : String = open_content_view (f, "r", VIEW, public) ?;
       let files_before : BTreeMap<String, String> = skg_files (f) ?;
       let editable : String = save (f, &with_e_requested_editable (&opened), public) ?;
       assert! ( has_line (&editable, "**** (skg node (gnid c)"),
@@ -179,7 +179,7 @@ fn subscribee_folder_requested (
   f      : &mut Fixture,
   public : &SkgrepoRestriction,
 ) -> Result<String, Box<dyn Error>> {
-  let opened : String = open_content_view (f, "r", VIEW, Some (public)) ?;
+  let opened : String = open_content_view (f, "r", VIEW, public) ?;
   let requested : String = edit_line ( &opened, "* (skg node (gnid r)", |line|
     line . replacen ( "(skg ", "(skg (viewRequests (folder subscribesTo)) ", 1 ));
   save (f, &requested, public) }
@@ -208,7 +208,7 @@ fn save (
   restriction : &SkgrepoRestriction,
 ) -> Result<String, Box<dyn Error>> {
   let response : SaveResponse = save_under (
-    f, VIEW, text, Some (restriction), true, DeleteFrom::NotChosen ) ?;
+    f, VIEW, text, restriction, true, DeleteFrom::NotChosen ) ?;
   assert! ( response . errors . is_empty (),
             "the buffer must save without errors, got {:?}\n\nbuffer:\n{}",
             response . errors, text );

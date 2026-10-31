@@ -18,7 +18,7 @@ use ego_tree::NodeRef;
 /// Every write-protected occurrence of the saved view must agree with
 /// the graph: its title and home skgrepo equal the node's, and its
 /// alias folder, when present, shows the node's aliases whose records
-/// the skgrepo 'restriction' shows (each, under none) in order and
+/// the skgrepo 'restriction' shows (each, unrestricted) in order and
 /// takes no relRepo request. Under a write-protected parent no child
 /// claims membership, so what else stands there (an alias the node
 /// lacks, a child, a folder's members) is the user's note or the diff
@@ -29,7 +29,7 @@ use ego_tree::NodeRef;
 pub fn errors_for_writeProtected_occurrences (
   viewforest  : &ViewForest,
   graph       : &InRustGraph,
-  restriction : Option<&SkgrepoRestriction>,
+  restriction : &SkgrepoRestriction,
 ) -> Vec<BufferValidationError> {
   let mut errors : Vec<BufferValidationError> =
     flags_surface_errors_against_graph (viewforest, graph);
@@ -54,7 +54,7 @@ fn writeProtected_differences_from_graph (
   node                : NodeRef<Viewnode>,
   occurrence          : &Occurrence,
   graphnode           : &Graphnode,
-  restriction         : Option<&SkgrepoRestriction>,
+  restriction         : &SkgrepoRestriction,
 ) -> Vec<String> {
   let mut differences : Vec<String> = Vec::new ();
   if occurrence . title != graphnode . title {
@@ -271,7 +271,8 @@ mod tests {
   use crate::from_text::buffer_to_viewnodes::uninterpreted
     ::org_to_viewforest;
   use crate::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
-  use crate::types::misc::{MSV, rel_partners_at_relRepo};
+  use crate::types::misc::{MSV, SkgConfig, rel_partners_at_relRepo};
+  use std::collections::HashMap;
   use crate::types::nodes::complete::empty_graphnode;
   use indoc::indoc;
 
@@ -314,7 +315,7 @@ mod tests {
         .. node ("private_sub") } ]) }
 
   fn errors_in (text : &str) -> Vec<BufferValidationError> {
-    errors_for_writeProtected_occurrences ( &forest (text), &graph (), None ) }
+    errors_for_writeProtected_occurrences ( &forest (text), &graph (), &SkgrepoRestriction::unrestricted (&SkgConfig::dummyFromSkgrepos (HashMap::new ())) ) }
 
   #[test]
   fn an_occurrence_that_agrees_with_the_graph_passes () {

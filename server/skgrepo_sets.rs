@@ -53,39 +53,40 @@ impl SkgrepoRestriction {
   ) -> bool {
     self . skgrepos . contains (skgrepo) }
 
-  pub fn is_all (
+  pub fn is_unrestricted (
     &self,
   ) -> bool {
     self . name . 0 == "all" }
 
+  /// No skgrepo restriction: the set 'all', every skgrepo the config
+  /// names.
+  pub fn unrestricted (
+    config : &SkgConfig,
+  ) -> SkgrepoRestriction {
+    SkgrepoRestriction {
+      name     : SkgrepoSetName::from ("all"),
+      skgrepos : config . skgrepos . keys () . cloned () . collect (), } }
+
   /// Whether a record (a relationship as one node's file states it,
   /// in the section of the skgrepo 'relRepo') is visible: the
-  /// skgrepo restriction holds its skgrepo. No skgrepo restriction,
-  /// and the set 'all', hold every skgrepo, even one the config does
-  /// not name. The skgrepo restriction is taken as the caller holds
-  /// it, bare or as an 'Option' (None for no skgrepo restriction).
-  pub fn record_is_visible<'a> (
-    restriction : impl Into<Option<&'a SkgrepoRestriction>>,
+  /// skgrepo restriction holds its skgrepo. The set 'all' holds every
+  /// skgrepo, even one the config does not name.
+  pub fn record_is_visible (
+    restriction : &SkgrepoRestriction,
     relRepo     : &SkgrepoName,
   ) -> bool {
-    match restriction . into () {
-      None => true,
-      Some (restriction) => restriction . is_all ()
-                            || restriction . contains_skgrepo (relRepo), } }
+    restriction . is_unrestricted ()
+      || restriction . contains_skgrepo (relRepo) }
 
   /// Whether a node whose home skgrepo is 'home' is restricted: the
-  /// skgrepo restriction keeps its home out. No skgrepo restriction,
-  /// and the set 'all', restrict no node. The skgrepo restriction is
-  /// taken as the caller holds it, bare or as an 'Option' (None for
-  /// no skgrepo restriction).
-  pub fn node_is_restricted<'a> (
-    restriction : impl Into<Option<&'a SkgrepoRestriction>>,
+  /// skgrepo restriction keeps its home out. The set 'all' restricts
+  /// no node.
+  pub fn node_is_restricted (
+    restriction : &SkgrepoRestriction,
     home        : &SkgrepoName,
   ) -> bool {
-    match restriction . into () {
-      None => false,
-      Some (restriction) => ! restriction . is_all ()
-                            && ! restriction . contains_skgrepo (home), } }
+    ! restriction . is_unrestricted ()
+      && ! restriction . contains_skgrepo (home) }
 }
 
 /// Refuses unless the skgrepo restriction is 'all'. 'what' is the refused
@@ -94,7 +95,7 @@ pub fn require_skgrepo_set_all (
   what        : &str,
   restriction : &SkgrepoRestriction,
 ) -> Result<(), String> {
-  if restriction . is_all () { return Ok (( )); }
+  if restriction . is_unrestricted () { return Ok (( )); }
   Err ( format! (
     "{} requires no skgrepo restriction (the skgrepo-set all); current skgrepo restriction is {}. Switch the repo-set to all first.",
     what, restriction . name )) }

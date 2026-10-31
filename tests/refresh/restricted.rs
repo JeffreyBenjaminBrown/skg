@@ -28,7 +28,7 @@ fn refreshed_under_main_only (
 ) -> Run {
   let restriction : SkgrepoRestriction = main_only ();
   run_asserting_fixpoint_in (
-    input, graph, Some (&restriction), RefreshMode::ContentView, 100 ) }
+    input, graph, &restriction, RefreshMode::ContentView, 100 ) }
 
 #[test]
 fn an_unknown_whose_record_is_visible_is_drawn_under_a_restriction () {
@@ -139,8 +139,8 @@ fn a_narrowing_and_a_widening_re_kind_across_the_restriction_and_back () {
   let graph : InRustGraph = p_h_c ();
   let restriction : SkgrepoRestriction = main_only ();
   let narrowed : Truth = Truth { graph : &graph, config : &config,
-                                 restriction : Some (&restriction) };
-  let widened : Truth = Truth { graph : &graph, config : &config, restriction : None };
+                                 restriction : &restriction };
+  let widened : Truth = Truth { graph : &graph, config : &config, restriction : &SkgrepoRestriction::unrestricted (&config) };
   let refresh_after_a_switch = |text : &str, truth : &Truth| -> String {
     let mut forest : ViewForest = parse (text, IdResolution::ThroughGraph (&graph));
     let mut record : ViewnodeIdRecord = ViewnodeIdRecord::of_viewforest (&forest);
@@ -175,7 +175,7 @@ fn the_children_of_a_restricted_vognode_claim_again_when_it_becomes_an_occurrenc
        occurrence_metadata ("c", "") );
   let mut forest : ViewForest = parse (&input, IdResolution::ThroughGraph (&graph));
   let mut record : ViewnodeIdRecord = ViewnodeIdRecord::of_viewforest (&forest);
-  for restriction in [ Some (&restriction), None ] {
+  for restriction in [ &restriction, &unrestricted () ] {
     refresh_viewforest (
       &mut forest, &mut record,
       &Truth { graph : &graph, config : &config, restriction },
@@ -251,7 +251,7 @@ fn the_children_of_a_restricted_root_claim_again_when_it_becomes_an_occurrence (
   let mut forest : ViewForest = parse (&input, IdResolution::ThroughGraph (&graph));
   let mut record : ViewnodeIdRecord = ViewnodeIdRecord::of_viewforest (&forest);
   let mut texts : Vec<String> = Vec::new ();
-  for restriction in [ Some (&restriction), None ] {
+  for restriction in [ &restriction, &unrestricted () ] {
     let refreshed : String = refresh_and_render (
       &mut forest, &mut record,
       &Truth { graph : &graph, config : &config, restriction },
@@ -312,7 +312,7 @@ fn a_switch_takes_from_a_view_the_alias_whose_record_it_makes_restricted () {
   let mut record : ViewnodeIdRecord = ViewnodeIdRecord::of_viewforest (&forest);
   let narrowed : String = refresh_and_render (
     &mut forest, &mut record,
-    &Truth { graph : &graph, config : &config, restriction : Some (&restriction) },
+    &Truth { graph : &graph, config : &config, restriction : &restriction },
     RefreshMode::ContentView, 100 )
     . unwrap ();
   assert_eq! ( outline (&forest), "\
@@ -343,7 +343,7 @@ fn an_editable_folder_a_narrowing_empties_stays_and_fills_again_on_widening () {
   let mut forest : ViewForest = parse (&input, IdResolution::ThroughGraph (&graph));
   let mut record : ViewnodeIdRecord = ViewnodeIdRecord::of_viewforest (&forest);
   let mut outlines : Vec<String> = Vec::new ();
-  for restriction in [ Some (&restriction), None ] {
+  for restriction in [ &restriction, &unrestricted () ] {
     refresh_viewforest (
       &mut forest, &mut record,
       &Truth { graph : &graph, config : &config, restriction },

@@ -6,6 +6,7 @@
 // private node n, recorded at private (q's private section). Each
 // test views only the moved node, so the recorder is outside the view.
 
+use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use skg::dbs::filesystem::not_nodes::load_config_with_overrides;
 use skg::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle, new_handle};
@@ -99,7 +100,7 @@ fn save (
   let response : SaveResponse = block_on (
     update_from_and_rerender_buffer_with_approvals (
       &mut stream, buffer, &mut env,  &Ok (viewforest_id . clone ()),
-      &mut f . views_state, None, true, &HashMap::new (),
+      &mut f . views_state, &SkgrepoRestriction::unrestricted (&f . config), true, &HashMap::new (),
       &HashSet::new (), &HashSet::new (), review, DeleteFrom::NotChosen, &[] )) ?;
   // The test helper's env holds its own graph handle: carry the
   // swapped-in graph back to the fixture.

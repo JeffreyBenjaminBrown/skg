@@ -82,7 +82,7 @@ fn a_restricted_node_its_parent_lists_in_a_restricted_record_vanishes () {
     ", occurrence_metadata ("p", ""), occurrence_metadata ("k", ""),
        occurrence_metadata ("c", "") );
   let restriction : SkgrepoRestriction = main_only ();
-  let run : Run = run_asserting_fixpoint_in ( &input, &graph, Some (&restriction),
+  let run : Run = run_asserting_fixpoint_in ( &input, &graph, &restriction,
                            RefreshMode::ContentView, 100 );
   assert_eq! ( run . outline (), "\
 node p

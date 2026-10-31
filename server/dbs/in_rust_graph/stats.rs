@@ -45,7 +45,7 @@ pub fn graphnodestats_for_pid (
   pid         : &ID,
   stats       : &AllGraphnodeStats,
   graphnode   : Option<&Graphnode>,
-  restriction : Option<&SkgrepoRestriction>,
+  restriction : &SkgrepoRestriction,
 ) -> GraphnodeStats {
   let aliases : usize =
     graphnode
@@ -70,17 +70,10 @@ pub fn graphnodestats_for_pid (
     rels : stats . counts . get (pid) . cloned (), }}
 
 /// Compute graphnode statistics without I/O.
-pub fn fetch_all_graphnodestats (
-  graph : &InRustGraph,
-  pids    : &[ID],
-) -> Result < AllGraphnodeStats, Box<dyn Error> > {
-  fetch_all_graphnodestats_with_skgrepo_set (
-    graph, pids, None ) }
-
 pub fn fetch_all_graphnodestats_with_skgrepo_set (
   graph    : &InRustGraph,
   pids     : &[ID],
-  restriction : Option<&SkgrepoRestriction>,
+  restriction : &SkgrepoRestriction,
 ) -> Result < AllGraphnodeStats, Box<dyn Error> > {
   if pids . is_empty () {
     return Ok ( AllGraphnodeStats::empty() ); }
@@ -107,7 +100,7 @@ fn fetch_all_graphnodestats_in_rust (
   graph   : &InRustGraph,
   pids    : &[ID],
   pid_set : &HashSet<ID>,
-  restriction : Option<&SkgrepoRestriction>,
+  restriction : &SkgrepoRestriction,
 ) -> AllGraphnodeStats {
   let mut counts : HashMap<ID, RelationCounts> = HashMap::new ();
   let mut mentioner_link_facts : HashMap<ID, (HashSet<ID>, bool)> = HashMap::new ();
@@ -189,7 +182,7 @@ fn fetch_all_graphnodestats_in_rust (
 /// The graph already parsed title and body into linksTo.
 fn link_facts_for_mentioner (
   graph  : &InRustGraph,
-  restriction : Option<&SkgrepoRestriction>,
+  restriction : &SkgrepoRestriction,
   pid    : &ID,
 ) -> (HashSet<ID>, bool) {
   if ! node_is_shown (graph, restriction, pid) {
@@ -213,7 +206,7 @@ fn link_facts_for_mentioner (
 
 pub(crate) fn mentioner_is_substantive (
   graph  : &InRustGraph,
-  restriction : Option<&SkgrepoRestriction>,
+  restriction : &SkgrepoRestriction,
   pid    : &ID,
 ) -> bool {
   link_facts_for_mentioner (graph, restriction, pid) . 1 }
@@ -222,7 +215,7 @@ pub(crate) fn mentioner_is_substantive (
 /// skgrepo restriction shows it.
 fn node_is_shown (
   graph       : &InRustGraph,
-  restriction : Option<&SkgrepoRestriction>,
+  restriction : &SkgrepoRestriction,
   pid         : &ID,
 ) -> bool {
   graph . gnid_presence_gated (pid, restriction) == GnidPresence::Present }
@@ -231,8 +224,9 @@ fn node_is_shown (
 mod tests {
   use super::*;
   use crate::types::nodes::complete::{Flag, empty_graphnode};
-  use crate::types::misc::{RelPartner, SkgrepoName};
+  use crate::types::misc::{RelPartner, SkgConfig, SkgrepoName};
   use crate::dbs::filesystem::not_nodes::load_config;
+  use std::collections::HashMap;
   use crate::skgrepo_sets::SkgrepoSetName;
 
   fn node (
@@ -265,8 +259,10 @@ mod tests {
       node ("with-dangling", "[[id:target][x]] [[id:missing][z]]", None) ];
     let graph : InRustGraph = InRustGraph::from_graphnodes (&nodes);
     let pids : Vec<ID> = nodes . iter () . map (|n| n . pid . clone ()) . collect ();
-    let stats : AllGraphnodeStats = fetch_all_graphnodestats (
-      &graph, &pids) . unwrap ();
+    let stats : AllGraphnodeStats = fetch_all_graphnodestats_with_skgrepo_set (
+      &graph, &pids,
+      &SkgrepoRestriction::unrestricted (
+        &SkgConfig::dummyFromSkgrepos (HashMap::new ())) ) . unwrap ();
     let target_counts : &RelationCounts = stats . counts . get (&ID::from ("target")) . unwrap ();
     assert_eq! (target_counts . link_total, 6);
     assert_eq! (target_counts . link_substantive, 4);
@@ -298,7 +294,7 @@ mod tests {
       &[mentioner, target, child, private_target]);
     let stats : AllGraphnodeStats = fetch_all_graphnodestats_with_skgrepo_set (
       &graph, &[ID::from ("mentioner"), ID::from ("target")],
-      Some (&restriction)) . unwrap ();
+      &restriction) . unwrap ();
     assert_eq! (stats . counts [&ID::from ("target")] . link_total, 1);
     assert_eq! (stats . counts [&ID::from ("target")] . link_substantive, 0);
     assert_eq! (stats . counts [&ID::from ("mentioner")] . link_targets, 1);
@@ -315,7 +311,7 @@ mod tests {
         Flag::NoSearchMatching ],
       .. empty_graphnode () };
     let result = graphnodestats_for_pid (
-      &pid, &AllGraphnodeStats::empty (), Some (&node), None);
+      &pid, &AllGraphnodeStats::empty (), Some (&node), &SkgrepoRestriction::unrestricted (&SkgConfig::dummyFromSkgrepos (HashMap::new ())));
     assert_eq! (result . flags, 2);
   }
 }

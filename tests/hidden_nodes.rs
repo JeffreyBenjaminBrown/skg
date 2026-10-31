@@ -59,7 +59,7 @@ fn a_save_under_a_restriction_keeps_the_members_its_restricted_vognodes_stand_fo
       let public : SkgrepoRestriction =
         SkgrepoRestriction::named (&f . config, "public" . into ()) ?;
       { // drawn under "public"
-        let opened : String = open_view_of_r (f, Some (&public)) ?;
+        let opened : String = open_view_of_r (f, &public) ?;
         assert_restricted_vognodes_alone_stand_for ("the view drawn under public",
                                                     &opened, &["h", "hs"]);
         let edited : String = opened
@@ -83,7 +83,7 @@ fn a_save_under_a_restriction_keeps_the_members_its_restricted_vognodes_stand_fo
       { // drawn under "all", then switched to "public"
         let mut restriction : SkgrepoRestriction =
           SkgrepoRestriction::named (&f . config, "all" . into ()) ?;
-        open_view_of_r (f, None) ?;
+        open_view_of_r (f, &restriction) ?;
         let switched : String = switch (f, &mut restriction, "public") ?;
         assert_restricted_vognodes_alone_stand_for ("the switched view",
                                                     &switched, &["h", "hs"]);
@@ -192,7 +192,7 @@ fn deleting_a_restricted_vognode_whose_hide_would_land_restricted_is_refused (
     |f| {
       let public : SkgrepoRestriction =
         SkgrepoRestriction::named (&f . config, "public" . into ()) ?;
-      let opened : String = open_view_of_r (f, Some (&public)) ?;
+      let opened : String = open_view_of_r (f, &public) ?;
       assert_restricted_vognodes_alone_stand_for ("the view", &opened, &["x"]);
       let x_line : String = opened . lines ()
         . find ( |line| line . starts_with ("** ")
@@ -222,7 +222,7 @@ fn a_relRepo_request_on_a_restricted_headline_into_a_restricted_skgrepo_is_refus
     |f| {
       let public : SkgrepoRestriction =
         SkgrepoRestriction::named (&f . config, "public" . into ()) ?;
-      let opened : String = open_view_of_r (f, Some (&public)) ?;
+      let opened : String = open_view_of_r (f, &public) ?;
       let requested : String = opened . replacen (
         "restricted (gnid h)", "restricted (gnid h) (editRequest (relRepo private))", 1 );
       assert_ne! ( requested, opened, "h stands in r's content:\n{}", opened );
@@ -268,7 +268,7 @@ fn a_tightened_restriction_re_kinds_an_occurrence_of_a_restricted_node_in_place 
     |f| {
       let mut restriction : SkgrepoRestriction =
         SkgrepoRestriction::named (&f . config, "all" . into ()) ?;
-      let opened : String = open_view_of_r (f, None) ?;
+      let opened : String = open_view_of_r (f, &restriction) ?;
       assert! ( opened . contains ("h secret"),
                 "under all the view shows h:\n{}", opened );
       let switched : String = switch (f, &mut restriction, "public") ?;
@@ -315,8 +315,8 @@ fn a_switch_and_its_reverse_draw_these_buffers (
     |f| {
       let mut restriction : SkgrepoRestriction =
         SkgrepoRestriction::named (&f . config, "all" . into ()) ?;
-      open_view_of_r (f, None) ?;
-      let view_of_h : String = open_content_view (f, "h", VIEW_OF_H, None) ?;
+      open_view_of_r (f, &restriction) ?;
+      let view_of_h : String = open_content_view (f, "h", VIEW_OF_H, &restriction) ?;
       let (narrowed, _) : (Vec<String>, String) = switch_skgrepo_set_rerendering (
         f, &mut restriction, "public", &[VIEW, VIEW_OF_H] ) ?;
       let (widened, _) : (Vec<String>, String) = switch_skgrepo_set_rerendering (
@@ -342,7 +342,7 @@ fn a_switch_draws_restricted_vognodes_in_the_folders (
     |f| {
       let mut restriction : SkgrepoRestriction =
         SkgrepoRestriction::named (&f . config, "all" . into ()) ?;
-      let opened : String = open_view_of_r (f, None) ?;
+      let opened : String = open_view_of_r (f, &restriction) ?;
       let narrowed : String = switch (f, &mut restriction, "public") ?;
       let widened : String = switch (f, &mut restriction, "all") ?;
       assert! ( opened . contains ("hiddenOutsideOfSubscribeeFolder"),
@@ -425,7 +425,7 @@ fn a_narrowing_and_a_widening_give_the_view_back (
     |f| {
       let mut restriction : SkgrepoRestriction =
         SkgrepoRestriction::named (&f . config, "all" . into ()) ?;
-      let opened : String = open_view_of_r (f, None) ?;
+      let opened : String = open_view_of_r (f, &restriction) ?;
       let (narrowed, _) : (String, String) =
         switch_reporting (f, &mut restriction, "public") ?;
       assert! ( ! narrowed . contains ("secret"), "{}", narrowed );
@@ -448,7 +448,7 @@ fn a_narrowing_makes_a_member_whose_record_alone_is_restricted_vanish (
     |f| {
       let mut restriction : SkgrepoRestriction =
         SkgrepoRestriction::named (&f . config, "all" . into ()) ?;
-      let opened : String = open_view_of_r (f, None) ?;
+      let opened : String = open_view_of_r (f, &restriction) ?;
       assert! ( opened . contains ("node (gnid pc)") && ! opened . contains ("noClaim"),
                 "under all pc is r's member:\n{}", opened );
       let narrowed : String = switch (f, &mut restriction, "public") ?;
@@ -470,7 +470,9 @@ fn a_narrowing_and_a_widening_keep_rs_private_record (
 ) -> Result<(), Box<dyn Error>> {
   round_trip_keeps_the_private_record (
     PrivateRecordsOfR::Containment, false,
-    |f| open_view_of_r (f, None),
+    |f| { let unrestricted : SkgrepoRestriction =
+            SkgrepoRestriction::unrestricted (&f . config);
+          open_view_of_r (f, &unrestricted) },
     VIEW, |_f, _restriction| Ok (( )) ) }
 
 /// The all-changes buffer of the diff view, where r newly contains n
@@ -491,7 +493,9 @@ fn a_narrowing_and_a_widening_with_r_folded_keep_rs_private_record (
   round_trip_keeps_the_private_record (
     PrivateRecordsOfR::Containment, false,
     |f| {
-      let opened : String = open_content_view (f, "T", VIEW_OF_T, None) ?;
+      let unrestricted : SkgrepoRestriction =
+        SkgrepoRestriction::unrestricted (&f . config);
+      let opened : String = open_content_view (f, "T", VIEW_OF_T, &unrestricted) ?;
       let folded : String = edit_line (
         &opened, "** (skg node (gnid r)",
         |line| line . replacen ("(skg node", "(skg folded node", 1) );
@@ -508,11 +512,13 @@ fn a_narrowing_a_save_of_another_view_and_a_widening_keep_rs_private_record (
   round_trip_keeps_the_private_record (
     PrivateRecordsOfR::Containment, false,
     |f| {
-      open_content_view (f, "o", VIEW_OF_O, None) ?;
-      open_view_of_r (f, None) },
+      let unrestricted : SkgrepoRestriction =
+        SkgrepoRestriction::unrestricted (&f . config);
+      open_content_view (f, "o", VIEW_OF_O, &unrestricted) ?;
+      open_view_of_r (f, &unrestricted) },
     VIEW,
     |f, restriction| {
-      let o : String = open_content_view (f, "o", VIEW_OF_O, Some (restriction)) ?;
+      let o : String = open_content_view (f, "o", VIEW_OF_O, restriction) ?;
       save_view_cleanly_under (
         f, VIEW_OF_O, &o . replace (") o\n", ") o, edited\n"), restriction ) ?;
       Ok (( )) } ) }
@@ -524,7 +530,9 @@ fn a_save_under_the_narrowing_then_a_widening_keep_rs_private_record (
 ) -> Result<(), Box<dyn Error>> {
   round_trip_keeps_the_private_record (
     PrivateRecordsOfR::Containment, false,
-    |f| open_view_of_r (f, None),
+    |f| { let unrestricted : SkgrepoRestriction =
+            SkgrepoRestriction::unrestricted (&f . config);
+          open_view_of_r (f, &unrestricted) },
     VIEW,
     |f, restriction| {
       let narrowed : String = rendered_view (f, VIEW) ?;
@@ -543,7 +551,9 @@ fn a_narrowing_and_a_widening_keep_rs_private_subscription_and_override_records 
   round_trip_keeps_the_private_record (
     PrivateRecordsOfR::PartnerRecords, false,
     |f| {
-      let opened : String = open_view_of_r (f, None) ?;
+      let unrestricted : SkgrepoRestriction =
+        SkgrepoRestriction::unrestricted (&f . config);
+      let opened : String = open_view_of_r (f, &unrestricted) ?;
       let asking : String = edit_line (
         &opened, "* (skg node (gnid r)",
         |line| line . replacen (
@@ -698,7 +708,7 @@ fn a_restricted_headline_whose_record_a_save_removed_goes_quietly (
     |f| {
       let public : SkgrepoRestriction =
         SkgrepoRestriction::named (&f . config, "public" . into ()) ?;
-      let opened : String = open_view_of_r (f, Some (&public)) ?;
+      let opened : String = open_view_of_r (f, &public) ?;
       let requested : String = save_under (
         f, &opened . replacen (
           "node (gnid r)", "node (gnid r) (viewRequests (folder hidesFromSubs))", 1 ),
@@ -749,12 +759,14 @@ fn an_alias_recorded_in_a_restricted_section_is_shown_only_under_all (
       let mut restriction : SkgrepoRestriction =
         SkgrepoRestriction::named (&f . config, "all" . into ()) ?;
       let fresh_under_public : String =
-        open_content_view (f, "r", "fresh view of r", Some (&public)) ?;
+        open_content_view (f, "r", "fresh view of r", &public) ?;
       assert! ( fresh_under_public . contains ("(props (aliases 1))")
                 && ! fresh_under_public . contains ("secret"),
                 "a fresh view under public counts r's public alias alone:\n{}",
                 fresh_under_public );
-      let opened : String = open_view_of_r (f, None) ?;
+      let unrestricted : SkgrepoRestriction =
+        SkgrepoRestriction::unrestricted (&f . config);
+      let opened : String = open_view_of_r (f, &unrestricted) ?;
       assert! ( opened . contains ("(props (aliases 2))"),
                 "under all r counts both aliases:\n{}", opened );
       let with_aliases : String = save_under (
@@ -813,7 +825,7 @@ fn a_save_of_a_view_whose_root_is_a_restricted_headline_changes_nothing (
     |f| {
       let mut restriction : SkgrepoRestriction =
         SkgrepoRestriction::named (&f . config, "all" . into ()) ?;
-      open_content_view (f, "h", VIEW_OF_H, None) ?;
+      open_content_view (f, "h", VIEW_OF_H, &restriction) ?;
       let narrowed : String =
         switch_skgrepo_set (f, &mut restriction, "public", VIEW_OF_H) ? . 0;
       assert_eq! ( narrowed, VIEW_OF_H_SWITCHED_TO_PUBLIC );
@@ -864,7 +876,7 @@ fn a_requested_hidden_folder_holding_a_dangling_hide_saves (
       for name in ["all", "public"] {
         let restriction : SkgrepoRestriction =
           SkgrepoRestriction::named (&f . config, name . into ()) ?;
-        let opened : String = open_view_of_r (f, Some (&restriction)) ?;
+        let opened : String = open_view_of_r (f, &restriction) ?;
         let requested : String = save_under (
           f, &opened . replacen (
             "node (gnid r)", "node (gnid r) (viewRequests (folder hidesFromSubs))", 1 ),
@@ -947,7 +959,7 @@ fn switched_to_public (
 ) -> Result<String, Box<dyn Error>> {
   let mut restriction : SkgrepoRestriction =
     SkgrepoRestriction::named (&f . config, "all" . into ()) ?;
-  open_view_of_r (f, None) ?;
+  open_view_of_r (f, &restriction) ?;
   switch (f, &mut restriction, "public") }
 
 fn sorted (
@@ -1008,7 +1020,7 @@ fn write_fixture_where_r_hides (
 /// view as VIEW.
 fn open_view_of_r (
   f           : &mut Fixture,
-  restriction : Option<&SkgrepoRestriction>,
+  restriction : &SkgrepoRestriction,
 ) -> Result<String, Box<dyn Error>> {
   open_content_view (f, "r", VIEW, restriction) }
 
@@ -1033,7 +1045,7 @@ fn save_view_under (
   restriction : &SkgrepoRestriction,
 ) -> Result<SaveResponse, Box<dyn Error>> {
   save_under_restriction (
-    f, view, text, Some (restriction), true, DeleteFrom::NotChosen ) }
+    f, view, text, restriction, true, DeleteFrom::NotChosen ) }
 
 /// Every '.skg' file of every skgrepo, by path, with its text.
 fn skg_files_on_disk (

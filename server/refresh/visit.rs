@@ -59,6 +59,7 @@ use crate::refresh::tail::detach_viewnode_transferring_focus;
 use crate::types::nodes::rust::GraphnodeInRust;
 use crate::refresh::diff_view;
 use crate::refresh::chain::attach_containerward_chain;
+use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::ID;
 use crate::types::tree::moves::{move_after, move_to_first_child, move_to_last_child};
 use crate::types::viewnode::{
@@ -207,7 +208,8 @@ fn alias_whose_record_is_restricted (
   treeid : NodeId,
   walk   : &Walk,
 ) -> bool {
-  let Some (restriction) = walk . truth . restriction else { return false; };
+  let restriction : &SkgrepoRestriction = walk . truth . restriction;
+  if restriction . is_unrestricted () { return false; }
   let ViewnodeKind::PropertyMember (PropertyMember::Alias { text, .. }) =
     &tree . get (treeid) . unwrap () . value () . kind else { return false; };
   let Some (pid) : Option<ID> =
@@ -222,7 +224,7 @@ fn alias_whose_record_is_restricted (
   let has_it : bool = nodes . iter () . any (
     |node| node . alias_texts () . contains (text) );
   let shows_it : bool = nodes . iter () . any (
-    |node| node . aliases_with_relRepo_unless_home (Some (restriction)) . iter ()
+    |node| node . aliases_with_relRepo_unless_home (restriction) . iter ()
            . any ( |(visible, _)| visible == text ));
   has_it && ! shows_it }
 
@@ -786,7 +788,8 @@ fn is_overridden_and_shown_raw (
     &node . value () . kind else { return false; };
   raw_position
   && occurrence . overridesHere . is_none ()
-  && resolve_override ( walk . truth . config, walk . truth . graph, None,
+  && resolve_override ( walk . truth . config, walk . truth . graph,
+                        &SkgrepoRestriction::unrestricted (walk . truth . config),
                         &occurrence . gnid ) . effective != occurrence . gnid }
 
 //

@@ -14,6 +14,7 @@ use std::io::BufReader;
 use std::net::TcpStream;
 
 
+use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::dbs::in_rust_graph::{
   InRustGraphHandle};
 use skg::from_text::buffer_to_validated_saveplan;
@@ -203,7 +204,7 @@ fn dead_links_warn_on_save
         "* (skg node (gnid P) (skgRepos (nodeRepo main))) P links to [[id:does-not-exist][nowhere]] and [[id:X][to X]]\n";
       let ( _vf, _plan, warnings ) =
         buffer_to_validated_saveplan (
-          buffer, config, None )  ?;
+          buffer, config, &SkgrepoRestriction::unrestricted (config) )  ?;
       assert! ( warnings . iter () . any ( |w|
           w . contains ("Dangling link")
           && w . contains ("does-not-exist") ),

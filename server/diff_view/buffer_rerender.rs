@@ -32,7 +32,7 @@ use std::sync::{Arc, MutexGuard};
 /// 'store'. The goal holds what HEAD alone warrants, the change
 /// viewnodes are recomputed in place, and the buffer's sets choose
 /// what may be editable ('drawn_occurrence_editability'). The diff view opens only
-/// under the skgrepo set 'all', but a switch rerenders its open
+/// to an unrestricted connection, but a switch rerenders its open
 /// buffers under 'restriction', which the goal and the ID rule ask as
 /// in a content view: a restricted node is never a ghost.
 pub fn refresh_diffView_viewforest (
@@ -40,7 +40,7 @@ pub fn refresh_diffView_viewforest (
   straddle             : &GraphStraddle,
   diffView_buffer_kind : DiffViewBufferKind,
   store                : &ReadinessStore,
-  restriction          : Option<&SkgrepoRestriction>,
+  restriction          : &SkgrepoRestriction,
   viewforest           : &mut ViewForest,
   viewnode_id_record   : &mut ViewnodeIdRecord,
 ) -> Result<(), Box<dyn Error>> {
@@ -69,7 +69,7 @@ pub fn rerender_diffView_buffer (
 ) -> Result<(), Box<dyn Error>> {
   let integrate_unshown_changes : bool = context . integrates_unshown_changes;
   let runtime : &RuntimeGeneration = &context . runtime;
-  let restriction : Option<&SkgrepoRestriction> = context . skgrepo_restriction;
+  let restriction : &SkgrepoRestriction = context . skgrepo_restriction;
   let straddle : Arc<GraphStraddle> =
     current_graph_straddle_in_slot (
       &mut context . graph_straddle, &runtime . config, runtime . graph . clone () )

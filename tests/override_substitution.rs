@@ -97,7 +97,7 @@ async fn node_instructions_from (
   config : &SkgConfig,
 ) -> Result<Vec<NodeInstruction>, SaveError> {
   Ok ( buffer_to_validated_saveplan (
-         buffer, config, None )  ?
+         buffer, config, &SkgrepoRestriction::unrestricted (config) )  ?
        . 1 . node_instructions ) }
 
 fn read_fixture_file (
@@ -356,7 +356,7 @@ async fn save_under_set (
     skg::serve::handlers::save_buffer::update_from_and_rerender_buffer (
       &mut stream, buf, &mut env, 
       &Err (String::new ()), &mut views_state,
-      Some (set), true,
+      set, true,
       &std::collections::HashMap::new () ) . await ?;
   assert! ( response . errors . is_empty (),
     "save must not error; got: {:?}", response . errors );

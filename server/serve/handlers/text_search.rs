@@ -149,14 +149,14 @@ pub fn handle_text_search_request (
               stream,
               &format! ("Error checking search privacy: {}", error) );
             return; }};
-      if ! restriction . is_all ()
+      if ! restriction . is_unrestricted ()
          && index_has_overPrivateText
          && search_choice . is_none () {
         send_response_with_length_prefix (
           stream, &search_challenge_response () );
         return; }
       let include_overPrivateText_telescopes : bool =
-        restriction . is_all ()
+        restriction . is_unrestricted ()
         || search_choice == Some (SearchOverPrivateTextChoice::Include);
       let search_opts : SearchOptions = SearchOptions {
         regex     : bool_key ( &sexp, "regex" ),
@@ -179,7 +179,7 @@ pub fn handle_text_search_request (
               &runtime . tantivy_index,
               &search_terms,
               &search_opts,
-              Some (restriction) ),
+              restriction ),
               restriction );
           if matches_by_gnid . is_empty () {
             send_search_results_text (stream, "No matches found.");
@@ -292,7 +292,7 @@ fn filter_match_groups_to_unrestricted_skgrepos (
   matches_by_gnid : MatchGroups,
   restriction   : &SkgrepoRestriction,
 ) -> MatchGroups {
-  if restriction . is_all () {
+  if restriction . is_unrestricted () {
     return matches_by_gnid; }
   matches_by_gnid . into_iter ()
     . filter ( |(_, (skgrepo, _))|
@@ -336,7 +336,7 @@ pub fn draw_search_buffer (
     stub_root_of_hit (viewforest, *hit, graph, restriction); }
   refresh_content_viewforest (
     viewforest, viewnode_id_record,
-    &Truth { graph, config, restriction : Some (restriction) } ) ?;
+    &Truth { graph, config, restriction } ) ?;
   for hit in &hits {
     fold_what_was_drawn_under_hit (viewforest, *hit); }
   if ! include_overPrivateText_telescopes {
@@ -367,7 +367,7 @@ fn stub_root_of_hit (
       ViewRequest::Folder (FolderRelation::Containers) );
     occurrence . gnid . clone () };
   for folder in [ Folder::Overrider, Folder::Overridden ] {
-    if partnerFolder_members_in_graph (graph, &gnid, &folder, Some (restriction))
+    if partnerFolder_members_in_graph (graph, &gnid, &folder, restriction)
        . is_some_and ( |members| ! members . is_empty () ) {
       viewforest . get_mut (hit) . unwrap ()
         . append ( viewnode_of ( ViewnodeKind::Folder (folder) )); }}}
@@ -448,7 +448,7 @@ pub fn group_matches_by_gnid (
   tantivy_index : &TantivyIndex,
   search_terms  : &str,
   search_opts   : &SearchOptions,
-  restriction   : Option<&SkgrepoRestriction>,
+  restriction   : &SkgrepoRestriction,
 ) -> MatchGroups {
   let matcher : CoverageMatcher = // pre-build once
     build_coverage_matcher (search_terms, search_opts);
@@ -500,15 +500,14 @@ pub fn group_matches_by_gnid (
               . get_first ( tantivy_index . skgrepo_field )
               . and_then ( |v| v . as_str () )
               . unwrap_or ("") );
-        if let Some (a) = restriction {
-          // Per-document skgrepo filtering, before grouping: an
+        { // Per-document skgrepo filtering, before grouping: an
           // alias document carries the alias's relRepo as
           // its skgrepo, so a restricted search must drop it here
           // -- a private alias of a public node must neither match
           // nor shift ranking ('docs/api-and-formats.org', "Text search"). The
           // group-level filter below survives as a backstop.
-          if ! a . is_all ()
-          && ! a . contains_skgrepo (&skgrepo) {
+          if ! restriction . is_unrestricted ()
+          && ! restriction . contains_skgrepo (&skgrepo) {
             continue; }}
         let origin_type : Option < ProminenceSource > =
           retrieved_doc
@@ -562,7 +561,7 @@ pub fn suppressed_result_gnids (
     let mut seen  : HashSet<ID> = HashSet::from ([ owned . clone () ]);
     while let Some (cur) = stack . pop () {
       for target in graph . outbound_pids_for_relation_gated (
-        &cur, NodeRelation::Overrides, Some (restriction) ) {
+        &cur, NodeRelation::Overrides, restriction ) {
         if ! seen . insert (target . clone ()) { continue; }
         if candidates . contains (&target) {
           suppressed . insert (target . clone ()); }

@@ -1,5 +1,6 @@
 // cargo test --test save noClaim_and_write_protected
 
+use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::dbs::filesystem::one_node::graphnode_from_gnid;
 use skg::from_text::buffer_to_validated_saveplan;
 use skg::save::update_fs_from_nodeInstructions;
@@ -48,7 +49,7 @@ fn test_noClaim_and_write_protected(
         let ( _viewforest, save_plan, _warnings ) =
           buffer_to_validated_saveplan(
             org_text,
-            config, None ) ?;
+            config, &SkgrepoRestriction::unrestricted (config) ) ?;
         update_fs_from_nodeInstructions(
           &save_plan . node_instructions,
           &[],

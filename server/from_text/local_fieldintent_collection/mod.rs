@@ -61,7 +61,7 @@ pub fn extract_nonmergeSavePlan_locally_in_graph (
   viewforest             : &ViewForest,
   graph                  : &InRustGraph,
   config                 : &SkgConfig,
-  skgrepo_restriction    : Option<&SkgrepoRestriction>, // None means no skgrepo restriction; callers normalize 'all' to None.
+  skgrepo_restriction    : &SkgrepoRestriction,
 ) -> Result<(NonmergeSavePlan, Vec<(ID, ID)>), Box<dyn Error>> {
   let _span : tracing::span::EnteredSpan = tracing::info_span!(
     "extract_nonmergeSavePlan_locally" ). entered();
@@ -96,9 +96,10 @@ pub fn extract_nonmergeSavePlan_locally_in_graph (
         graph, skgrepo_restriction );
   let (nodeMerge_acquisitions, suppressed_merges)
     : (Vec<(ID, ID)>, bool)
-    = match skgrepo_restriction {
-        None => (nodeMerge_acquisitions, false),
-        Some (restriction) => {
+    = if skgrepo_restriction . is_unrestricted () {
+        (nodeMerge_acquisitions, false)
+      } else {
+          let restriction : &SkgrepoRestriction = skgrepo_restriction;
           // A nodeMerge writes both nodes' files; under a restricted
           // set it is suppressed unless the graph has both nodes and
           // neither is restricted, and refused when either has a
@@ -121,7 +122,7 @@ pub fn extract_nonmergeSavePlan_locally_in_graph (
               &graph . pid_else_raw_id (acquiree) )
               . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?; }
           let suppressed : bool = kept . len () < before;
-          (kept, suppressed) }};
+          (kept, suppressed) };
   let mut warnings : Vec<String> =
     if suppressed_writes || suppressed_merges {
       vec! [ "Restricted nodes present in saved buffer remain unchanged in graph."
@@ -185,7 +186,7 @@ fn is_created_as_an_orphan (
 pub fn extract_nonmergeSavePlan_locally (
   viewforest             : &ViewForest,
   config                 : &SkgConfig,
-  skgrepo_restriction    : Option<&SkgrepoRestriction>,
+  skgrepo_restriction    : &SkgrepoRestriction,
 ) -> Result<(NonmergeSavePlan, Vec<(ID, ID)>), Box<dyn Error>> {
   let nodes = crate::dbs::filesystem::multiple_nodes
     ::read_all_skg_files_from_skgrepos (config)?;

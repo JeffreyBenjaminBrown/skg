@@ -377,7 +377,7 @@ fn run_export_org (
     let pids : String = overPrivateText_pids . iter ()
       . map ( |pid| pid . as_str () )
       . collect::<Vec<&str>> () . join (", ");
-    if ! restriction . is_all () && ! include_overPrivateText_telescopes {
+    if ! restriction . is_unrestricted () && ! include_overPrivateText_telescopes {
       return Err (format! (
         "export-org would release title or body selected below home for PIDs {} under repo-set {}; rerun with --include-overPrivateText-telescopes to approve",
         pids, restriction . name ) . into ()); }

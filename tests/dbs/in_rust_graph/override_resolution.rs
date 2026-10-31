@@ -72,7 +72,7 @@ fn restricted_to (
 
 fn resolve (
   nodes  : Vec<Graphnode>,
-  restriction : Option<&SkgrepoRestriction>,
+  restriction : &SkgrepoRestriction,
   gnid  : &str,
 ) -> OverrideResolution {
   let graph : InRustGraph =
@@ -84,7 +84,7 @@ fn no_overrider_resolves_to_self () {
   assert_eq! (
     resolve (
       vec![ node ("target", "owned", &[]) ],
-      None, "target" ),
+      &SkgrepoRestriction::unrestricted (&config ()), "target" ),
     OverrideResolution {
       effective      : ID::from ("target"),
       path           : vec![],
@@ -99,7 +99,7 @@ fn foreign_overriders_are_ignored () {
         node ("target", "owned", &[]),
         node ("foreign-overrider", "foreign", &["target"]),
       ],
-      None, "target" ),
+      &SkgrepoRestriction::unrestricted (&config ()), "target" ),
     OverrideResolution {
       effective      : ID::from ("target"),
       path           : vec![],
@@ -114,7 +114,7 @@ fn a_single_owned_overrider_substitutes () {
         node ("target", "foreign", &[]),
         node ("overrider", "owned", &["target"]),
       ],
-      None, "target" ),
+      &SkgrepoRestriction::unrestricted (&config ()), "target" ),
     OverrideResolution {
       effective      : ID::from ("overrider"),
       path           : vec![ ID::from ("overrider") ],
@@ -132,7 +132,7 @@ fn an_restricted_owned_overrider_does_not_substitute () {
         node ("target", "owned", &[]),
         node ("overrider", "owned2", &["target"]),
       ],
-      Some (&restriction), "target" ),
+      &restriction, "target" ),
     OverrideResolution {
       effective      : ID::from ("target"),
       path           : vec![],
@@ -149,7 +149,7 @@ fn an_unrestricted_owned_overrider_substitutes_under_a_restricted_set () {
         node ("target", "owned", &[]),
         node ("overrider", "owned2", &["target"]),
       ],
-      Some (&restriction), "target" ),
+      &restriction, "target" ),
     OverrideResolution {
       effective      : ID::from ("overrider"),
       path           : vec![ ID::from ("overrider") ],
@@ -168,7 +168,7 @@ fn an_restricted_override_relationship_between_unrestricted_nodes_does_not_subst
   assert_eq! (
     resolve (
       vec![ node ("target", "owned", &[]), overrider ],
-      Some (&restriction), "target" ),
+      &restriction, "target" ),
     OverrideResolution {
       effective      : ID::from ("target"),
       path           : vec![],
@@ -186,7 +186,7 @@ fn a_chain_of_two_resolves_transitively_with_path () {
         node ("y", "owned", &["z"]),
         node ("x", "owned", &["y"]),
       ],
-      None, "z" ),
+      &SkgrepoRestriction::unrestricted (&config ()), "z" ),
     OverrideResolution {
       effective      : ID::from ("x"),
       path           : vec![ ID::from ("y"), ID::from ("x") ],
@@ -205,7 +205,7 @@ fn restricted_overrider_home_stops_a_chain_at_that_relationship () {
         node ("y", "owned2", &["z"]),
         node ("x", "owned", &["y"]),
       ],
-      Some (&restriction), "z" ),
+      &restriction, "z" ),
     OverrideResolution {
       effective      : ID::from ("z"),
       path           : vec![],
@@ -220,7 +220,7 @@ fn a_cycle_is_detected_and_substitutes_nothing () {
         node ("a", "owned", &["b"]),
         node ("b", "owned", &["a"]),
       ],
-      None, "a" ),
+      &SkgrepoRestriction::unrestricted (&config ()), "a" ),
     OverrideResolution {
       effective      : ID::from ("a"),
       path           : vec![],
@@ -241,7 +241,7 @@ fn extra_id_input_and_extra_id_relationship_both_resolve () {
     InRustGraph::from_graphnodes (&nodes);
   let by_extra_id : OverrideResolution = // input is the extra ID
     resolve_override (
-      &config (), &graph, None, &ID::from ("target-extra") );
+      &config (), &graph, &SkgrepoRestriction::unrestricted (&config ()), &ID::from ("target-extra") );
   assert_eq! (
     by_extra_id,
     OverrideResolution {
@@ -251,7 +251,7 @@ fn extra_id_input_and_extra_id_relationship_both_resolve () {
       cycle          : vec![], } );
   let by_pid : OverrideResolution =
     resolve_override (
-      &config (), &graph, None, &ID::from ("target") );
+      &config (), &graph, &SkgrepoRestriction::unrestricted (&config ()), &ID::from ("target") );
   assert_eq! (by_pid, by_extra_id); }
 
 #[test]
@@ -264,7 +264,7 @@ fn multiple_owned_overriders_substitute_nothing () {
         node ("one", "owned", &["target"]),
         node ("two", "owned", &["target"]),
       ],
-      None, "target" ),
+      &SkgrepoRestriction::unrestricted (&config ()), "target" ),
     OverrideResolution {
       effective      : ID::from ("target"),
       path           : vec![],
@@ -274,7 +274,7 @@ fn multiple_owned_overriders_substitute_nothing () {
 #[test]
 fn an_unknown_gnid_resolves_to_itself () {
   assert_eq! (
-    resolve ( vec![], None, "never-heard-of-it" ),
+    resolve ( vec![], &SkgrepoRestriction::unrestricted (&config ()), "never-heard-of-it" ),
     OverrideResolution {
       effective      : ID::from ("never-heard-of-it"),
       path           : vec![],

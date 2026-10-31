@@ -196,7 +196,7 @@ impl RelRepoLookup {
     graph       : &InRustGraph,
     pid         : &ID,
     relation    : NodeRelation,
-    restriction : Option<&SkgrepoRestriction>,
+    restriction : &SkgrepoRestriction,
   ) -> Vec<ID> {
     graph . inbound_pids_gated_by (
       pid, relation, restriction,
@@ -285,13 +285,13 @@ impl InRustGraph {
 
   /// Whether the gated graph has the node 'gnid' names (a pid or an
   /// extra ID): 'Present' when its home skgrepo is in the
-  /// skgrepo restriction, or there is none ('restriction' None or 'all');
+  /// skgrepo restriction;
   /// 'Restricted' when the graph has it and the skgrepo restriction
   /// excludes its home; 'Absent' when the graph has no such node.
   pub fn gnid_presence_gated (
     &self,
     gnid        : &ID,
-    restriction : Option<&SkgrepoRestriction>,
+    restriction : &SkgrepoRestriction,
   ) -> GnidPresence {
     match self . pid_and_skgrepo (gnid) {
       None => GnidPresence::Absent,
@@ -300,19 +300,33 @@ impl InRustGraph {
           GnidPresence::Restricted }
         else { GnidPresence::Present }, }}
 
-  /// Stored outbound members for one relationship. Unlike the PID-oriented
-  /// accessors, this preserves an unresolved raw ID and its relRepo.
-  /// Callers that require a current graphnode should keep using the existing
-  /// canonical-PID accessors instead.
+  /// Stored outbound members for one relationship whose relRepo the
+  /// skgrepo restriction shows ('outbound_rel_partners_for_relation').
   pub fn outbound_rel_partners_for_relation_gated (
     &self,
     pid      : &ID,
     relation : NodeRelation,
-    restriction : Option<&SkgrepoRestriction>,
+    restriction : &SkgrepoRestriction,
+  ) -> Vec<RelPartner<ID>> {
+    self . outbound_rel_partners_for_relation (pid, relation)
+      . into_iter ()
+      . filter ( |member| SkgrepoRestriction::record_is_visible (
+        restriction, &member . relRepo ))
+      . collect () }
+
+  /// Stored outbound members for one relationship, whatever skgrepo
+  /// records them. Unlike the PID-oriented accessors, this preserves
+  /// an unresolved raw ID and its relRepo. Callers that require a
+  /// current graphnode should keep using the existing canonical-PID
+  /// accessors instead.
+  pub fn outbound_rel_partners_for_relation (
+    &self,
+    pid      : &ID,
+    relation : NodeRelation,
   ) -> Vec<RelPartner<ID>> {
     let Some (node) : Option<&GraphnodeInRust> = self . nodes . get (pid) else {
       return Vec::new (); };
-    let members : Vec<RelPartner<ID>> = match relation {
+    match relation {
       NodeRelation::Contains =>
         node . contains . clone (),
       NodeRelation::SubscribesTo =>
@@ -322,9 +336,20 @@ impl InRustGraph {
       NodeRelation::Overrides =>
         node . overrides . or_default () . to_vec (),
       NodeRelation::LinksTo =>
-        return Vec::new (),
-    };
-    members . into_iter ()
+        Vec::new (), }}
+
+  /// The members 'pid' records under 'relation', each with its relRepo
+  /// and its comparison identity ('relationship_member_key'), whose
+  /// relRepo the skgrepo restriction shows
+  /// ('outbound_member_keys_for_relation').
+  pub fn outbound_member_keys_for_relation_gated (
+    &self,
+    pid         : &ID,
+    relation    : NodeRelation,
+    restriction : &SkgrepoRestriction,
+  ) -> Vec<RelPartner<RelationshipMemberKey>> {
+    self . outbound_member_keys_for_relation (pid, relation)
+      . into_iter ()
       . filter ( |member| SkgrepoRestriction::record_is_visible (
         restriction, &member . relRepo ))
       . collect () }
@@ -333,15 +358,13 @@ impl InRustGraph {
   /// and its comparison identity ('relationship_member_key'): the pid
   /// when this graph resolves the listed ID, else the raw ID tagged
   /// unresolved. A mention's relRepo is the recorder's home, because
-  /// links live in the text. Members whose relRepo is outside the
-  /// skgrepo restriction are left out; pass None for every member.
-  /// Rendering code reads the tag (an unresolved member is shown as an
-  /// unknown); comparisons take the ID from either variant.
-  pub fn outbound_member_keys_for_relation_gated (
+  /// links live in the text. Rendering code reads the tag (an
+  /// unresolved member is shown as an unknown); comparisons take the
+  /// ID from either variant.
+  pub fn outbound_member_keys_for_relation (
     &self,
     pid         : &ID,
     relation    : NodeRelation,
-    restriction : Option<&SkgrepoRestriction>,
   ) -> Vec<RelPartner<RelationshipMemberKey>> {
     let rel_partners : Vec<RelPartner<ID>> =
       if relation == NodeRelation::LinksTo {
@@ -349,12 +372,10 @@ impl InRustGraph {
           node . linksTo . iter ()
           . map ( |member| RelPartner::at_relRepo (
             node . home_skgrepo . clone (), member . clone () ))
-          . filter ( |member| SkgrepoRestriction::record_is_visible (
-            restriction, &member . relRepo ))
           . collect () )
         . unwrap_or_default ()
-      } else { self . outbound_rel_partners_for_relation_gated (
-                 pid, relation, restriction ) };
+      } else { self . outbound_rel_partners_for_relation (
+                 pid, relation ) };
     rel_partners . into_iter ()
       . map ( |member| RelPartner::at_relRepo (
         member . relRepo, self . relationship_member_key (&member . member) ))
@@ -367,7 +388,7 @@ impl InRustGraph {
     &self,
     pid      : &ID,
     relation : NodeRelation,
-    restriction : Option<&SkgrepoRestriction>,
+    restriction : &SkgrepoRestriction,
   ) -> Vec<ID> {
     if relation == NodeRelation::LinksTo {
       return self . outbound_gnids_for_relation (pid, relation); }
@@ -454,18 +475,19 @@ impl InRustGraph {
     relation : NodeRelation,
     raw_member : &ID,
   ) -> Option<SkgrepoName> {
-    self . outbound_rel_partners_for_relation_gated (
-      recorder, relation, None ) . into_iter ()
+    self . outbound_rel_partners_for_relation (
+      recorder, relation ) . into_iter ()
       . find ( |member| &member . member == raw_member )
       . map ( |member| member . relRepo ) }
 
   /// Outbound members whose relRepo is in the skgrepo restriction: the
-  /// visible composition of one relation. Pass None for the full composition.
+  /// visible composition of one relation ('outbound_pids_for_relation'
+  /// gives the full composition).
   pub fn outbound_pids_for_relation_gated (
     &self,
     pid      : &ID,
     relation : NodeRelation,
-    restriction : Option<&SkgrepoRestriction>,
+    restriction : &SkgrepoRestriction,
   ) -> Vec<ID> {
     self . outbound_gnids_for_relation_gated (
       pid, relation, restriction ) . iter ()
@@ -473,12 +495,13 @@ impl InRustGraph {
       . collect () }
 
   /// Inbound partners whose relationships to this node are visible at the
-  /// skgrepo restriction (see 'relRepo'). Pass None for all of them.
+  /// skgrepo restriction (see 'relRepo'); 'inbound_pids_for_relation'
+  /// gives all of them.
   pub fn inbound_pids_for_relation_gated (
     &self,
     pid      : &ID,
     relation : NodeRelation,
-    restriction : Option<&SkgrepoRestriction>,
+    restriction : &SkgrepoRestriction,
   ) -> Vec<ID> {
     self . inbound_pids_gated_by (
       pid, relation, restriction,
@@ -487,17 +510,17 @@ impl InRustGraph {
   /// The inbound partners of 'pid' under 'relation' whose records the
   /// skgrepo restriction shows, 'relRepo_of' giving the relRepo of a
   /// partner's record (see 'relRepo'). Asks nothing of a partner when
-  /// there is no skgrepo restriction.
+  /// the connection is unrestricted.
   fn inbound_pids_gated_by (
     &self,
     pid         : &ID,
     relation    : NodeRelation,
-    restriction : Option<&SkgrepoRestriction>,
+    restriction : &SkgrepoRestriction,
     mut relRepo_of : impl FnMut (&ID) -> Option<SkgrepoName>,
   ) -> Vec<ID> {
     self . inbound_pids_for_relation (pid, relation)
       . into_iter ()
-      . filter ( |partner| restriction . is_none ()
+      . filter ( |partner| restriction . is_unrestricted ()
         || relRepo_of (partner)
            . is_some_and ( |relRepo| SkgrepoRestriction::record_is_visible (
              restriction, &relRepo )) )
@@ -545,7 +568,10 @@ impl InRustGraph {
     pid  : &ID,
     role : RelationRole,
   ) -> Vec<ID> {
-    self . other_member_pids_gated (pid, role, None) }
+    if role . is_first_role () {
+      self . outbound_pids_for_relation (pid, role . relation)
+    } else {
+      self . inbound_pids_for_relation (pid, role . relation) } }
 
   /// 'other_member_pids' with relRepo gating: partners whose
   /// relationship is above the skgrepo restriction are omitted, in both
@@ -554,7 +580,7 @@ impl InRustGraph {
     &self,
     pid    : &ID,
     role   : RelationRole,
-    restriction : Option<&SkgrepoRestriction>,
+    restriction : &SkgrepoRestriction,
   ) -> Vec<ID> {
     if role . is_first_role () {
       self . outbound_pids_for_relation_gated (
@@ -572,8 +598,8 @@ impl InRustGraph {
     member_pid   : &ID,
     member_role  : RelationRole,
   ) -> bool {
-    self . other_member_pids_gated (
-      recorder_pid, member_role . opposite_role (), None )
+    self . other_member_pids (
+      recorder_pid, member_role . opposite_role () )
       . contains (member_pid) }
 }
 

@@ -1,6 +1,7 @@
 // cargo nextest run --test grouped_saves -E 'test(attach_containerward_chain::)'
 
 use indoc::indoc;
+use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::refresh::Truth;
 use skg::refresh::chain::attach_containerward_chains_under_members;
 use skg::refresh::mode::RefreshMode;
@@ -45,7 +46,7 @@ fn a_chain_branches_and_shows_a_repeat_as_a_leaf (
     &mut viewforest, &[a11],
     &Truth { graph       : &graph_handle_from_config (config) ? . load_full (),
              config,
-             restriction : None },
+             restriction : &SkgrepoRestriction::unrestricted (config) },
     RefreshMode::ContentView ) ?;
   let expected : &str = indoc! {"
     * (skg node (gnid a11) (skgRepos (nodeRepo main))) a11

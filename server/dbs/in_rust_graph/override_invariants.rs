@@ -1,5 +1,6 @@
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::override_resolution::resolve_override;
+use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::{ID, SkgConfig, SkgrepoName, members_of};
 
 use std::collections::{HashMap, HashSet};
@@ -80,13 +81,15 @@ pub fn validate_override_invariants (
     // violation. Different entry points into the same cycle yield
     // rotations of one trail, so canonicalizing collapses them.
     let mut seen_cycles : HashSet<Vec<ID>> = HashSet::new ();
+    let unrestricted : SkgrepoRestriction =
+      SkgrepoRestriction::unrestricted (config);
     for (pid, node) in graph . nodes . iter () {
       let owned : bool =
         config . skgrepos . get (&node . home_skgrepo)
         . map ( |sc| sc . owned )
         . unwrap_or (false); // unknown skgrepo reported by pass 1 above
       if ! owned { continue; }
-      let resolution = resolve_override (config, graph, None, pid);
+      let resolution = resolve_override (config, graph, &unrestricted, pid);
       if resolution . cycle_detected {
         let canonical : Vec<ID> =
           canonicalize_cycle (resolution . cycle);
@@ -177,13 +180,15 @@ pub(crate) fn validate_affected_override_invariants_with_counts (
           overridden : target . clone (),
           overriders,
         }); }}
+  let unrestricted : SkgrepoRestriction =
+    SkgrepoRestriction::unrestricted (config);
   for skgrepo in &scope . skgrepos {
     let Some (node) = graph . nodes . get (skgrepo) else { continue; };
     let Some (owned) = node_is_owned (
       config, skgrepo, &node . home_skgrepo, &mut violations)
       else { continue; };
     if ! owned { continue; }
-    let resolution = resolve_override (config, graph, None, skgrepo);
+    let resolution = resolve_override (config, graph, &unrestricted, skgrepo);
     chain_steps += if resolution . cycle_detected {
       resolution . cycle . len ()
     } else {

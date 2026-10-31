@@ -199,7 +199,7 @@ fn content_goal (
   walk   : &Walk,
 ) -> Goal {
   let graph : &InRustGraph = walk . truth . graph;
-  let restriction : Option<&SkgrepoRestriction> = walk . truth . restriction;
+  let restriction : &SkgrepoRestriction = walk . truth . restriction;
   let subscriber : Option<ID> = subscriber_of_subscribee_as_such (tree, parent);
   let unintegrated : &dyn Fn (Vec<ID>) -> Vec<ID> = &|contents : Vec<ID>| -> Vec<ID> {
     less_what_the_subscriber_integrates (
@@ -224,7 +224,7 @@ fn content_goal (
 /// from it, so that the count is what is drawn.
 pub(crate) fn content_goal_gnids (
   graph       : &InRustGraph,
-  restriction : Option<&SkgrepoRestriction>,
+  restriction : &SkgrepoRestriction,
   members     : &[RelPartner<RelationshipMemberKey>],
   subscriber  : Option<&ID>,
 ) -> Vec<ID> {
@@ -239,7 +239,7 @@ pub(crate) fn content_goal_gnids (
 /// subscriber.
 fn less_what_the_subscriber_integrates (
   graph       : &InRustGraph,
-  restriction : Option<&SkgrepoRestriction>,
+  restriction : &SkgrepoRestriction,
   subscriber  : Option<&ID>,
   contents    : &[ID],
 ) -> Vec<ID> {
@@ -351,7 +351,7 @@ pub(crate) fn partnerFolder_members_in_graph (
   graph               : &InRustGraph,
   viewparent_pid      : &ID,
   kind                : &Folder,
-  skgrepo_restriction : Option<&SkgrepoRestriction>,
+  skgrepo_restriction : &SkgrepoRestriction,
 ) -> Option<Vec<ID>> {
   let member_role : RelationRole = kind . relation_member_role () ?;
   let recorder_role : RelationRole =
@@ -429,7 +429,7 @@ fn goal_list_for_hiddenOutsideOfSubscribee_folder (
   graph             : &InRustGraph,
   subscriber_hides  : &[ID],
   subscribees       : &[ID],
-  restriction       : Option<&SkgrepoRestriction>,
+  restriction       : &SkgrepoRestriction,
 ) -> Vec<ID> {
   let subscribee_content_of : &dyn Fn (&ID) -> Vec<ID> = &|subscribee : &ID| -> Vec<ID> {
     graph . outbound_gnids_for_relation_gated (
@@ -490,7 +490,7 @@ fn gnid_items (
 /// keeps out.
 fn unknown_or_restricted_members_relRepos (
   graph       : &InRustGraph,
-  restriction : Option<&SkgrepoRestriction>,
+  restriction : &SkgrepoRestriction,
   recorder    : &ID,
   members     : &[RelPartner<RelationshipMemberKey>],
 ) -> HashMap<ID, SkgrepoName> {

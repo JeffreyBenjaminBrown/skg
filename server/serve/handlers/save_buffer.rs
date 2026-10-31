@@ -280,7 +280,7 @@ pub fn handle_save_buffer_request (
             env,
             &viewforest_id_from_request_result,
             views_state,
-            Some (skgrepo_restriction),
+            skgrepo_restriction,
             approved_forks,
             &fork_skgrepos,
             &approved_hoist_pids,
@@ -767,7 +767,7 @@ pub async fn update_from_and_rerender_buffer (
   env                         : &mut SkgEnv,
   viewforest_id_from_request_result : &Result<ViewforestId, String>,
   views_state                  : &mut ViewsState,
-  skgrepo_restriction         : Option<&SkgrepoRestriction>,
+  skgrepo_restriction         : &SkgrepoRestriction,
   approved_forks              : bool, // true once the user has approved the forks (a re-issued save); false on the first save, which returns a fork-confirmation instead of committing.
   fork_skgrepos               : &HashMap<ID, SkgrepoName>, // per-fork clone skgrepos the user chose in the confirmation buffer (keyed by N's pid); empty otherwise.
 ) -> Result<SaveResponse, Box<dyn Error>> {
@@ -784,7 +784,7 @@ pub async fn update_from_and_rerender_buffer_with_hoist_approval (
   env                         : &mut SkgEnv,
   viewforest_id_from_request_result : &Result<ViewforestId, String>,
   views_state                  : &mut ViewsState,
-  skgrepo_restriction         : Option<&SkgrepoRestriction>,
+  skgrepo_restriction         : &SkgrepoRestriction,
   approved_forks              : bool,
   fork_skgrepos               : &HashMap<ID, SkgrepoName>,
   approved_hoist_pids         : &HashSet<ID>,
@@ -803,7 +803,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
   env                         : &mut SkgEnv,
   viewforest_id_from_request_result : &Result<ViewforestId, String>,
   views_state                  : &mut ViewsState,
-  skgrepo_restriction         : Option<&SkgrepoRestriction>,
+  skgrepo_restriction         : &SkgrepoRestriction,
   approved_forks              : bool,
   fork_skgrepos               : &HashMap<ID, SkgrepoName>,
   approved_hoist_pids         : &HashSet<ID>,
@@ -845,12 +845,10 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
     // restriction may hide: refused unless the connection is
     // unrestricted.
     let unrestricted = |what : &str| -> Result<(), Box<dyn Error>> {
-      match skgrepo_restriction {
-        None => Ok (( )),
-        Some (restriction) => require_skgrepo_set_all (what, restriction)
-          . map_err ( |e| Box::new ( SaveError::BufferValidationErrors {
-              errors : vec! [ crate::types::errors::BufferValidationError::Other (e) ],
-              warnings : parse_warnings . clone (), } ) as Box<dyn Error> ), } };
+      require_skgrepo_set_all (what, skgrepo_restriction)
+        . map_err ( |e| Box::new ( SaveError::BufferValidationErrors {
+            errors : vec! [ crate::types::errors::BufferValidationError::Other (e) ],
+            warnings : parse_warnings . clone (), } ) as Box<dyn Error> ) };
     if viewforest_has_restore_requests (&viewforest) {
       unrestricted ("A restore request") ?; }
     if viewforest_has_readiness_requests (&viewforest) {
@@ -871,7 +869,9 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
         &viewforest, &mut nonmerge_nodeInstructions,
         &runtime . graph, &straddle, &runtime . config )
     } else { Vec::new () };
-  let restricted_records_left : Option<&SkgrepoRestriction> =
+  let unrestricted : SkgrepoRestriction =
+    SkgrepoRestriction::unrestricted (&runtime . config);
+  let restricted_records_left : &SkgrepoRestriction =
   { // Delete propagation adds collateral writes. Derive them before the
     // disk Hoist classification so "touched pids" means every telescope
     // this save will actually rewrite, not only what appeared in the buffer.
@@ -882,14 +882,14 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
       restricted_records_naming_deleted_graphnodes (
         &nonmerge_nodeInstructions, &graph_snap, &runtime . config,
         skgrepo_restriction );
-    let restricted_records_left : Option<&SkgrepoRestriction> =
+    let restricted_records_left : &SkgrepoRestriction =
       match (restricted_count, delete_from) {
-        (0, _) => None,
+        (0, _) => &unrestricted,
         (_, DeleteFrom::NotChosen) =>
           return Ok ( SaveResponse::delete_from_confirmation (
             parse_warnings, restricted_count )),
         (_, DeleteFrom::VisibleRecords) => skgrepo_restriction,
-        (_, DeleteFrom::AllOwnedRecords) => None, };
+        (_, DeleteFrom::AllOwnedRecords) => &unrestricted, };
     apply_delete_propagation_cleanup (
       &mut nonmerge_nodeInstructions, &graph_snap, &runtime . config,
       restricted_records_left );

@@ -6,9 +6,12 @@
 /// only the in-Rust graph path is exercised here.
 
 use skg::dbs::in_rust_graph::stats::{
-  AllGraphnodeStats, fetch_all_graphnodestats, graphnodestats_for_pid};
+  AllGraphnodeStats, fetch_all_graphnodestats_with_skgrepo_set, graphnodestats_for_pid};
+use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::test_utils::{graph_handle_from_config, run_with_test_stores};
-use skg::types::misc::ID;
+use skg::types::misc::{ID, SkgConfig};
+
+use std::collections::HashMap;
 use skg::types::viewnode::RelationCounts;
 
 use std::error::Error;
@@ -17,7 +20,10 @@ fn rels_for (
   pid   : &str,
   stats : &AllGraphnodeStats,
 ) -> RelationCounts {
-  graphnodestats_for_pid ( &ID::from (pid), stats, None, None )
+  graphnodestats_for_pid (
+    &ID::from (pid), stats, None,
+    &SkgrepoRestriction::unrestricted (
+      &SkgConfig::dummyFromSkgrepos (HashMap::new ())) )
     . rels
     . unwrap_or_else ( || panic! ("no rels for {}", pid) ) }
 
@@ -44,9 +50,10 @@ fn in_rust_path_computes_hiding (
     |config, _tantivy| Box::pin ( async move {
       let graph = graph_handle_from_config (config) ? . load_full ();
       let stats : AllGraphnodeStats =
-        fetch_all_graphnodestats (
+        fetch_all_graphnodestats_with_skgrepo_set (
           &graph,
           & [ ID::from ("hider"), ID::from ("hidden"),
-              ID::from ("bystander") ] ) ?;
+              ID::from ("bystander") ],
+          &SkgrepoRestriction::unrestricted (config) ) ?;
       assert_hiding_stats (&stats);
       Ok (( )) } ) ) }

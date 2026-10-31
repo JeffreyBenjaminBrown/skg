@@ -37,7 +37,7 @@ fn a_chain_node_is_what_the_id_rule_answers () {
     ** (skg containerFolder)
     ", occurrence_metadata ("m", "") );
   let run : Run = run_asserting_fixpoint_in (
-    &input, &graph, Some (&restriction), RefreshMode::ContentView, 100 );
+    &input, &graph, &restriction, RefreshMode::ContentView, 100 );
   assert_eq! ( run . outline (), "\
 node m
   containerFolder
@@ -50,7 +50,7 @@ node m
     assert! ( ! run . text . contains (secret), "{}: {}", secret, run . text ); }
   let config : SkgConfig = config ();
   let truth : Truth = Truth { graph : &graph, config : &config,
-                              restriction : Some (&restriction) };
+                              restriction : &restriction };
   let walk : Walk = Walk::new (&truth, RefreshMode::ContentView, 0);
   let mut chain_nodes : usize = 0;
   for node in run . forest . nodes () . filter ( |node| stands_in_containerward_chain (*node) ) {
@@ -83,7 +83,7 @@ fn a_chain_under_an_editable_occurrence_claims_nothing () {
   let mut forest : ViewForest = parse (&input, IdResolution::ThroughGraph (&graph));
   let config : SkgConfig = config ();
   let truth : Truth = Truth { graph : &graph, config : &config,
-                              restriction : Some (&restriction) };
+                              restriction : &restriction };
   let walk : Walk = Walk::new (&truth, RefreshMode::ContentView, 0);
   let m : NodeId = forest . roots () . next () . unwrap () . id ();
   attach_containerward_chain ( forest . as_internal_tree_mut (), m, &walk ) . unwrap ();

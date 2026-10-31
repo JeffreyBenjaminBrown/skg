@@ -4,6 +4,7 @@
 // then the node's skgrepo is not heralded,
 // even if the parent ignores it.
 
+use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::types::misc::{ ID, SkgrepoName, SkgConfig, Skgrepo };
 use skg::types::viewnode::{ Viewnode, ViewnodeKind, viewforest_root_viewnode, mk_editable_viewnode, mk_writeProtected_viewnode };
 use skg::types::viewnode::Vognode;
@@ -62,7 +63,7 @@ fn skgrepo_inheritance_across_non_content_same_skgrepo () {
     &container_to_contents,
     &content_to_containers,
     &config,
-    None );
+    &SkgrepoRestriction::unrestricted (&config) );
   // B has same skgrepo as A, so homeRepoAtBoundary should be false,
   // even though B claims nothing.
   let b_ref =
@@ -104,7 +105,7 @@ fn skgrepo_inheritance_across_non_content_different_skgrepo () {
     &container_to_contents,
     &content_to_containers,
     &config,
-    None );
+    &SkgrepoRestriction::unrestricted (&config) );
   let b_ref =
     viewforest . get (a_gnid) . unwrap ()
     . first_child () . unwrap ();

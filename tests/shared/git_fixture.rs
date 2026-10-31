@@ -21,7 +21,7 @@ use skg::test_utils::{
   cleanup_test_tantivy, copy_dir_all, extract_string_field_from_sexp,
   graph_handle_from_config, read_all_lp_messages, skg_env_from_parts,
   update_from_and_rerender_buffer_test};
-use skg::test_utils::{multi_root_view, multi_root_view_with_skgrepo_set};
+use skg::test_utils::multi_root_view_with_skgrepo_set;
 use skg::types::env::SkgEnv;
 use skg::types::misc::{ID, SkgConfig, Skgrepo, SkgrepoName, TantivyIndex};
 use skg::types::viewnode::Viewnode;
@@ -222,14 +222,12 @@ pub fn open_content_view (
   f           : &mut Fixture,
   root        : &str,
   view        : &str,
-  restriction : Option<&SkgrepoRestriction>,
+  restriction : &SkgrepoRestriction,
 ) -> Result<String, Box<dyn Error>> {
   let roots : [ID; 1] = [ ID::from (root) ];
   let (text, pids, tree) : (String, Vec<ID>, Tree<Viewnode>) =
-    match restriction {
-      Some (restriction) => multi_root_view_with_skgrepo_set (
-        &f . config, Some (&f . tantivy), &roots, restriction ) ?,
-      None => multi_root_view (&f . config, Some (&f . tantivy), &roots) ?, };
+    multi_root_view_with_skgrepo_set (
+      &f . config, Some (&f . tantivy), &roots, restriction ) ?;
   f . views_state . open_views . register_view (
     &f . graph . load_full (), ViewforestId::ContentView (view . into ()),
     tree, &pids );
@@ -253,14 +251,13 @@ pub fn under_public (
       body (f, &restriction) } ) }
 
 /// Save 'text' as the content view 'view' through the save handler's
-/// own pipeline, under 'restriction' (None for no skgrepo
-/// restriction), its forks approved when 'approved_forks', with the
+/// own pipeline, under 'restriction', its forks approved when 'approved_forks', with the
 /// delete-from choice 'delete_from'.
 pub fn save_under (
   f              : &mut Fixture,
   view           : &str,
   text           : &str,
-  restriction    : Option<&SkgrepoRestriction>,
+  restriction    : &SkgrepoRestriction,
   approved_forks : bool,
   delete_from    : DeleteFrom,
 ) -> Result<SaveResponse, Box<dyn Error>> {

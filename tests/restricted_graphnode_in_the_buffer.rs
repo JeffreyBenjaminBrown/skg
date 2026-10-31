@@ -39,11 +39,11 @@ fn a_restricted_graphnode_given_a_visible_nodeRepo_is_left_as_it_is (
 ) -> Result<(), Box<dyn Error>> {
   under_public ( R_AND_P_PUBLIC, R_AND_P_PRIVATE, |f, public| {
     let files_before : BTreeMap<String, String> = skg_files (f) ?;
-    let opened : String = open_content_view (f, "r", VIEW, Some (public)) ?;
+    let opened : String = open_content_view (f, "r", VIEW, public) ?;
     let text : String = format! (
       "{}* (skg node (gnid p) (skgRepos (nodeRepo public))) p typed\n", opened );
     let response : SaveResponse = save_under (
-      f, VIEW, &text, Some (public), true, DeleteFrom::NotChosen ) ?;
+      f, VIEW, &text, public, true, DeleteFrom::NotChosen ) ?;
     assert! ( response . errors . is_empty (), "{:?}", response . errors );
     assert! ( response . warnings . iter () . any ( |w| w . contains (
                 "Restricted nodes present in saved buffer remain unchanged in graph." )),
@@ -60,11 +60,11 @@ fn a_record_whose_default_floor_is_restricted_is_refused (
 ) -> Result<(), Box<dyn Error>> {
   under_public ( R_AND_P_PUBLIC, R_AND_P_PRIVATE, |f, public| {
     let files_before : BTreeMap<String, String> = skg_files (f) ?;
-    let opened : String = open_content_view (f, "r", VIEW, Some (public)) ?;
+    let opened : String = open_content_view (f, "r", VIEW, public) ?;
     let text : String = edit_line ( &opened, "** (skg node (gnid c)", |line|
       format! ("{}\n** (skg node (gnid p) (skgRepos (nodeRepo private))) p secret", line) );
     assert_refused_naming_private ( save_under (
-      f, VIEW, &text, Some (public), true, DeleteFrom::NotChosen ), "contains", "p" );
+      f, VIEW, &text, public, true, DeleteFrom::NotChosen ), "contains", "p" );
     assert_eq! ( skg_files (f) ?, files_before, "no file changed" );
     Ok (( )) } ) }
 
@@ -76,11 +76,11 @@ fn a_relRepo_request_into_a_restricted_skgrepo_is_refused (
 ) -> Result<(), Box<dyn Error>> {
   under_public ( R_AND_P_PUBLIC, R_AND_P_PRIVATE, |f, public| {
     let files_before : BTreeMap<String, String> = skg_files (f) ?;
-    let opened : String = open_content_view (f, "r", VIEW, Some (public)) ?;
+    let opened : String = open_content_view (f, "r", VIEW, public) ?;
     let text : String = edit_line ( &opened, "** (skg node (gnid c)", |line|
       line . replacen ( "(skg ", "(skg (editRequest (relRepo private)) ", 1 ));
     assert_refused_naming_private ( save_under (
-      f, VIEW, &text, Some (public), true, DeleteFrom::NotChosen ), "contains", "c" );
+      f, VIEW, &text, public, true, DeleteFrom::NotChosen ), "contains", "c" );
     assert_eq! ( skg_files (f) ?, files_before, "no file changed" );
     Ok (( )) } ) }
 
@@ -101,18 +101,18 @@ fn a_hide_only_a_restricted_subscription_explains_is_refused (
        ("o",  "pid: o\ntitle: o\n") ],
     &[ ("r", "pid: r\nsubscribesTo:\n- e\n") ],
     |f, public| {
-      let opened : String = open_content_view (f, "r", VIEW, Some (public)) ?;
+      let opened : String = open_content_view (f, "r", VIEW, public) ?;
       let requested : String = edit_line ( &opened, "* (skg node (gnid r)", |line|
         line . replacen ( "(skg ", "(skg (viewRequests (folder subscribesTo)) ", 1 ));
       let with_folder : SaveResponse = save_under (
-        f, VIEW, &requested, Some (public), true, DeleteFrom::NotChosen ) ?;
+        f, VIEW, &requested, public, true, DeleteFrom::NotChosen ) ?;
       assert! ( with_folder . errors . is_empty (), "{:?}", with_folder . errors );
       let files_before : BTreeMap<String, String> = skg_files (f) ?;
       let with_hide : String = edit_line (
         &with_folder . saved_view, "*** (skg hiddenOutsideOfSubscribeeFolder)", |line|
           format! ("{}\n**** (skg node (gnid h)) h", line) );
       assert_refused_naming_private ( save_under (
-        f, VIEW, &with_hide, Some (public), true, DeleteFrom::NotChosen ),
+        f, VIEW, &with_hide, public, true, DeleteFrom::NotChosen ),
         "hidesFromSubs", "h" );
       assert_eq! ( skg_files (f) ?, files_before, "no file changed" );
       assert_eq! ( list_in (f, "public/r.skg", "hidesFromSubs"), vec! ["o"] );
@@ -133,12 +133,12 @@ fn a_relRepo_request_that_would_move_a_restricted_record_out_is_refused (
     &[ ("r", "pid: r\ncontains:\n- m\n") ],
     |f, public| {
       let files_before : BTreeMap<String, String> = skg_files (f) ?;
-      let opened : String = open_content_view (f, "r", VIEW, Some (public)) ?;
+      let opened : String = open_content_view (f, "r", VIEW, public) ?;
       assert! ( ! opened . contains ("(gnid m)"), "m stands nowhere:\n{}", opened );
       let text : String = edit_line ( &opened, "** (skg node (gnid c)", |line|
         format! ("{}\n** (skg (editRequest (relRepo public)) node (gnid m)) m", line) );
       let refusal : String = refusal_text ( save_under (
-        f, VIEW, &text, Some (public), true, DeleteFrom::NotChosen ));
+        f, VIEW, &text, public, true, DeleteFrom::NotChosen ));
       assert! ( refusal . contains ("Cannot move a record out of a restricted repo")
                 && refusal . contains ("- Relation: contains")
                 && refusal . contains ("- Member: m")

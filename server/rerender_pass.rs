@@ -19,7 +19,7 @@ pub struct RerenderPassContext<'a> {
   pub runtime                   : Arc<RuntimeGeneration>,
   pub errors                    : Vec<String>,
   pub warnings                  : Vec<String>,
-  pub skgrepo_restriction       : Option<&'a SkgrepoRestriction>,
+  pub skgrepo_restriction       : &'a SkgrepoRestriction,
   /// The graph straddle a buffer of the diff view is refreshed
   /// over, brought up to date by 'current_graph_straddle_in_slot' when
   /// the first such buffer is rerendered. The caller sets the
@@ -35,7 +35,7 @@ impl<'a> RerenderPassContext<'a> {
   pub fn new (
     env                        : &'a SkgEnv,
     runtime                    : Arc<RuntimeGeneration>,
-    skgrepo_restriction        : Option<&'a SkgrepoRestriction>,
+    skgrepo_restriction        : &'a SkgrepoRestriction,
     graph_straddle             : Option<Arc<GraphStraddle>>,
     integrates_unshown_changes : bool,
   ) -> RerenderPassContext<'a> {

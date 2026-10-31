@@ -47,7 +47,7 @@ pub fn handle_single_root_view_request (
           Some ((_pid, home)) =>
             SkgrepoRestriction::node_is_restricted (skgrepo_restriction, &home),
           None => // the graph has no such node: refused under any skgrepo restriction
-            ! skgrepo_restriction . is_all (), };
+            ! skgrepo_restriction . is_unrestricted (), };
       if kept_out {
         let response_sexp : String =
           format_buffer_response_sexp (
@@ -88,7 +88,7 @@ pub fn handle_single_root_view_request (
             match multi_root_view_via_runtime (
               &runtime,
               &[gnid . clone ()],
-              Some (skgrepo_restriction) )
+              skgrepo_restriction )
             { Ok ( (buffer_content, pids, viewforest) ) => {
                 let release = decide_text_release (
                   "single-root-view",

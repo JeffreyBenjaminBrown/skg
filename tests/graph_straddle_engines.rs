@@ -5,6 +5,7 @@
 // in memory: before, c1 and c2 contain r; after, c1 and c3 do, and c2
 // is gone.
 
+use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::dbs::in_rust_graph::InRustGraph;
 use skg::dbs::init::create_empty_tantivy_index;
 use skg::graph_straddle::types::GraphStraddle;
@@ -103,7 +104,7 @@ fn a_container_folder_from_a_graph_straddle_holds_both_graphs_containers (
     &mut forest, &mut ViewnodeIdRecord::default (),
     &Truth { graph       : &f . runtime . graph,
              config      : &f . runtime . config,
-             restriction : None },
+             restriction : &SkgrepoRestriction::unrestricted (&f . runtime . config) },
     RefreshMode::DiffView { straddle        : &f . straddle,
                             buffer_kind     : DiffViewBufferKind::AllChanges,
                             readiness_store : &ReadinessStore::default () },
@@ -125,7 +126,7 @@ fn the_containerward_chain_walks_a_graph_straddles_union (
   let f : Fixture = fixture () ?;
   let truth : Truth = Truth { graph       : &f . runtime . graph,
                               config      : &f . runtime . config,
-                              restriction : None };
+                              restriction : &SkgrepoRestriction::unrestricted (&f . runtime . config) };
   let child_ids = |tree : &Tree<Viewnode>, node : NodeId| -> Vec<String> {
     let mut ids : Vec<String> =
       children_with_change (tree . get (node) . unwrap ()) . into_iter ()

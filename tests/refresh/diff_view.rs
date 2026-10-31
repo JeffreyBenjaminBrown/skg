@@ -14,7 +14,7 @@ fn diff_run_asserting_fixpoint (
   straddle : &GraphStraddle,
 ) -> Run {
   let readiness_store : ReadinessStore = ReadinessStore::default ();
-  run_asserting_fixpoint_in ( text, &straddle . after, None,
+  run_asserting_fixpoint_in ( text, &straddle . after, &unrestricted (),
            RefreshMode::DiffView { straddle,
                                    buffer_kind : DiffViewBufferKind::AllChanges,
                                    readiness_store : &readiness_store },
@@ -465,10 +465,10 @@ fn diff_view_narrowed_by_a_switch (
   let mut record : ViewnodeIdRecord = ViewnodeIdRecord::of_viewforest (&forest);
   let opened : String = refresh_and_render (
     &mut forest, &mut record,
-    &Truth { graph, config : &config, restriction : None },
+    &Truth { graph, config : &config, restriction : &SkgrepoRestriction::unrestricted (&config) },
     mode, 100 ) . unwrap ();
   let narrowed_truth : Truth = Truth { graph, config : &config,
-                                       restriction : Some (&restriction) };
+                                       restriction : &restriction };
   let narrowed : String = refresh_and_render (
     &mut forest, &mut record, &narrowed_truth, mode, 100 ) . unwrap ();
   if let Err (failure) = refresh_reaches_fixpoint (
@@ -509,7 +509,7 @@ node p
   let readiness_store : ReadinessStore = ReadinessStore::default ();
   let widened : String = refresh_and_render (
     &mut forest, &mut ViewnodeIdRecord::default (),
-    &Truth { graph : &straddle . after, config : &config, restriction : None },
+    &Truth { graph : &straddle . after, config : &config, restriction : &SkgrepoRestriction::unrestricted (&config) },
     RefreshMode::DiffView { straddle : &straddle,
                             buffer_kind : DiffViewBufferKind::AllChanges,
                             readiness_store : &readiness_store },

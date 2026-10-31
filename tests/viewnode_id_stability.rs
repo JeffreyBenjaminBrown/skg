@@ -97,7 +97,9 @@ fn write_fixture (
 fn open_view_of_r (
   f : &mut Fixture,
 ) -> Result<String, Box<dyn Error>> {
-  open_content_view (f, "r", VIEW, None) }
+  let unrestricted : SkgrepoRestriction =
+    SkgrepoRestriction::unrestricted (&f . config);
+  open_content_view (f, "r", VIEW, &unrestricted) }
 
 fn save (
   f    : &mut Fixture,

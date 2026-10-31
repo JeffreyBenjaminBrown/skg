@@ -43,8 +43,8 @@ fn a_fork_under_a_narrowing_copies_only_the_visible_records (
     &[ ("n", "pid: n\ncontains:\n- p\n") ],
     |f, public| {
       let files_before : BTreeMap<String, String> = skg_files (f) ?;
-      let opened : String = open_content_view (f, "n", VIEW, Some (public)) ?;
-      save_cleanly (f, &with_fork_requested (&opened), Some (public)) ?;
+      let opened : String = open_content_view (f, "n", VIEW, public) ?;
+      save_cleanly (f, &with_fork_requested (&opened), public) ?;
       let clone : String = the_clone (f, &files_before) ?;
       assert_eq! ( list_in (f, &format! ("public/{}.skg", clone), "contains"), vec! ["a"],
                    "the clone contains a alone" );
@@ -67,8 +67,10 @@ fn a_fork_keeps_a_private_record_private (
     &[ ("n", "pid: n\ncontains:\n- p\n") ],
     |f, _public| {
       let files_before : BTreeMap<String, String> = skg_files (f) ?;
-      let opened : String = open_content_view (f, "n", VIEW, None) ?;
-      save_cleanly (f, &with_fork_requested (&opened), None) ?;
+      let unrestricted : SkgrepoRestriction =
+        SkgrepoRestriction::unrestricted (&f . config);
+      let opened : String = open_content_view (f, "n", VIEW, &unrestricted) ?;
+      save_cleanly (f, &with_fork_requested (&opened), &unrestricted) ?;
       let clone : String = the_clone (f, &files_before) ?;
       assert_eq! ( list_in (f, &format! ("public/{}.skg", clone), "contains"), vec! ["a"],
                    "the clone's public file contains a alone" );
@@ -92,7 +94,7 @@ fn a_delete_whose_propagation_reaches_restricted_records_asks_first (
     let files_before : BTreeMap<String, String> = skg_files (f) ?;
     let requested : String = with_x_deleted (f, public) ?;
     let response : SaveResponse =
-      save_under (f, VIEW, &requested, Some (public), true,
+      save_under (f, VIEW, &requested, public, true,
                   DeleteFrom::NotChosen) ?;
     assert_eq! ( response . delete_from_confirmation, Some (2),
                  "the confirmation names the two restricted records" );
@@ -109,7 +111,7 @@ fn a_delete_from_the_visible_records_leaves_the_restricted_ones (
     let files_before : BTreeMap<String, String> = skg_files (f) ?;
     let requested : String = with_x_deleted (f, public) ?;
     let response : SaveResponse =
-      save_under (f, VIEW, &requested, Some (public), true,
+      save_under (f, VIEW, &requested, public, true,
                   DeleteFrom::VisibleRecords) ?;
     assert! ( response . errors . is_empty (), "{:?}", response . errors );
     assert_eq! ( response . delete_from_confirmation, None );
@@ -130,7 +132,7 @@ fn a_delete_from_all_owned_records_strips_the_restricted_ones_too (
   delete_fixture ( |f, public| {
     let requested : String = with_x_deleted (f, public) ?;
     let response : SaveResponse =
-      save_under (f, VIEW, &requested, Some (public), true,
+      save_under (f, VIEW, &requested, public, true,
                   DeleteFrom::AllOwnedRecords) ?;
     assert! ( response . errors . is_empty (), "{:?}", response . errors );
     let files : BTreeMap<String, String> = skg_files (f) ?;
@@ -149,9 +151,11 @@ fn a_delete_from_all_owned_records_strips_the_restricted_ones_too (
 fn a_delete_with_no_restriction_asks_nothing (
 ) -> Result<(), Box<dyn Error>> {
   delete_fixture ( |f, _public| {
-    let opened : String = open_content_view (f, "x", VIEW, None) ?;
+    let unrestricted : SkgrepoRestriction =
+      SkgrepoRestriction::unrestricted (&f . config);
+    let opened : String = open_content_view (f, "x", VIEW, &unrestricted) ?;
     let response : SaveResponse =
-      save_under (f, VIEW, &with_delete_requested (&opened), None, true,
+      save_under (f, VIEW, &with_delete_requested (&opened), &unrestricted, true,
                   DeleteFrom::NotChosen) ?;
     assert! ( response . errors . is_empty (), "{:?}", response . errors );
     assert_eq! ( response . delete_from_confirmation, None );
@@ -178,11 +182,11 @@ fn a_nodeMerge_of_graphnodes_with_restricted_sections_is_refused (
        ("b", "pid: b\ncontains:\n- q\n") ],
     |f, public| {
       let files_before : BTreeMap<String, String> = skg_files (f) ?;
-      let opened : String = open_content_view (f, "a", VIEW, Some (public)) ?;
+      let opened : String = open_content_view (f, "a", VIEW, public) ?;
       let requested : String = edit_line ( &opened, "* (skg node (gnid a)", |line|
         line . replacen ( "(skg ", "(skg (editRequest (merge b)) ", 1 ));
       let refusal : String = match save_under (
-        f, VIEW, &requested, Some (public), true, DeleteFrom::NotChosen ) {
+        f, VIEW, &requested, public, true, DeleteFrom::NotChosen ) {
         Err (e) => e . to_string (),
         Ok (response) => panic! ( "the nodeMerge must be refused; errors {:?}",
                                   response . errors ), };
@@ -215,7 +219,7 @@ fn with_x_deleted (
   f           : &mut Fixture,
   restriction : &SkgrepoRestriction,
 ) -> Result<String, Box<dyn Error>> {
-  let opened : String = open_content_view (f, "x", VIEW, Some (restriction)) ?;
+  let opened : String = open_content_view (f, "x", VIEW, restriction) ?;
   Ok ( with_delete_requested (&opened) ) }
 
 /// 'view' with a delete request on its root, x.
@@ -251,7 +255,7 @@ fn the_clone (
 fn save_cleanly (
   f           : &mut Fixture,
   text        : &str,
-  restriction : Option<&SkgrepoRestriction>,
+  restriction : &SkgrepoRestriction,
 ) -> Result<SaveResponse, Box<dyn Error>> {
   let response : SaveResponse =
     save_under (f, VIEW, text, restriction, true, DeleteFrom::NotChosen) ?;

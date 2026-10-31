@@ -1,6 +1,7 @@
 // cargo test validate_foreign_nodes
 
 use indoc::indoc;
+use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::from_text::buffer_to_validated_saveplan;
 use skg::test_utils::run_with_shared_test_stores;
 use skg::types::errors::{SaveError, BufferValidationError};
@@ -60,7 +61,7 @@ async fn test_unmodified_foreign_node_allowed (
         This is a foreign node
       "};
       let result: Result<_, _> = buffer_to_validated_saveplan(
-        org_text, config , None) ;
+        org_text, config , &SkgrepoRestriction::unrestricted (config)) ;
       assert!(result . is_ok(), "Unmodified foreign node should be allowed");
       let ( _viewforest, save_plan, _warnings ) = result?;
       // Foreign nodes should be filtered out (no need to write)
@@ -83,7 +84,7 @@ async fn test_modified_foreign_node_forks_with_default_skgrepo (
       "};
       let ( _viewforest, save_plan, _warnings ) =
         buffer_to_validated_saveplan (
-          org_text, config, None )  ?;
+          org_text, config, &SkgrepoRestriction::unrestricted (config) )  ?;
       assert_eq! ( save_plan . fork_specs . len (), 1,
         "editing the foreign node should produce one fork" );
       assert_eq! ( save_plan . fork_specs[0] . original_gnid, ID::from ("foreign2") );
@@ -108,7 +109,7 @@ async fn test_modified_foreign_node_body_forks_with_default_skgrepo (
       "};
       let ( _viewforest, save_plan, _warnings ) =
         buffer_to_validated_saveplan (
-          org_text, config, None )  ?;
+          org_text, config, &SkgrepoRestriction::unrestricted (config) )  ?;
       assert_eq! ( save_plan . fork_specs . len (), 1,
         "editing the body should produce one fork" );
       assert_eq! ( save_plan . fork_specs[0] . clone . 0 . home_skgrepo,
@@ -125,7 +126,7 @@ async fn test_writeProtected_foreign_node_filtered (
         * (skg node (gnid foreign3) (skgRepos (nodeRepo foreign)) writeProtected) Foreign write-protected node
       "};
       let result: Result<_, _> = buffer_to_validated_saveplan(
-        org_text, config, None) ;
+        org_text, config, &SkgrepoRestriction::unrestricted (config)) ;
       // Should succeed - write-protected foreign nodes are allowed but filtered
       assert!(result . is_ok(), "WriteProtected foreign node should be allowed");
       let ( _viewforest, save_plan, _warnings ) = result?;
@@ -145,7 +146,7 @@ async fn test_owned_node_unchanged_behavior (
         ** (skg node (gnid child2) (skgRepos (nodeRepo main))) _
       "};
       let result: Result<_, _> = buffer_to_validated_saveplan(
-        org_text, config , None) ;
+        org_text, config , &SkgrepoRestriction::unrestricted (config)) ;
       // Should succeed - owned nodes can be modified
       assert!(result . is_ok(), "Owned node modification should be allowed");
       let ( _viewforest, save_plan, _warnings ) = result?;
@@ -164,7 +165,7 @@ async fn test_delete_foreign_node_rejected (
         This is a foreign node
       "};
       let result: Result<_, _> = buffer_to_validated_saveplan(
-        org_text, config , None) ;
+        org_text, config , &SkgrepoRestriction::unrestricted (config)) ;
       // Should fail with ModifiedForeignNode error
       assert!(result . is_err(), "Deleting foreign node should be rejected");
       match result . unwrap_err() {
@@ -185,7 +186,7 @@ async fn test_new_foreign_node_rejected (
         This should not be allowed
       "};
       let result: Result<_, _> = buffer_to_validated_saveplan(
-        org_text, config , None) ;
+        org_text, config , &SkgrepoRestriction::unrestricted (config)) ;
       // Should fail with CreatedForeignNode error
       assert!(result . is_err(), "Creating new foreign node should be rejected");
       match result . unwrap_err() {
@@ -209,7 +210,7 @@ async fn test_mixed_owned_and_foreign_nodes (
         This is a foreign node
       "};
       let result: Result<_, _> = buffer_to_validated_saveplan(
-        org_text, config , None) ;
+        org_text, config , &SkgrepoRestriction::unrestricted (config)) ;
       // Should succeed
       assert!(result . is_ok(), "Mixed owned and unmodified foreign should be allowed");
       let ( _viewforest, save_plan, _warnings ) = result?;
@@ -237,7 +238,7 @@ async fn test_merge_with_foreign_acquirer_rejected (
         This is a foreign node
       "};
       let result: Result<_, _> = buffer_to_validated_saveplan(
-        org_text, config , None) ;
+        org_text, config , &SkgrepoRestriction::unrestricted (config)) ;
       // Should fail - can't merge into foreign node (would modify it)
       assert!(result . is_err(), "NodeMerge into foreign acquirer should be rejected");
       match result . unwrap_err() {
@@ -259,7 +260,7 @@ async fn test_merge_with_foreign_acquiree_rejected (
         * (skg node (gnid node1) (skgRepos (nodeRepo main))) Owned node
       "};
       let result: Result<_, _> = buffer_to_validated_saveplan(
-        org_text, config , None) ;
+        org_text, config , &SkgrepoRestriction::unrestricted (config)) ;
       // Should fail - can't merge foreign node (would delete it)
       assert!(result . is_err(), "NodeMerge with foreign acquiree should be rejected");
       match result . unwrap_err() {
@@ -280,7 +281,7 @@ async fn test_merge_with_both_owned_allowed (
         * (skg node (gnid child1) (skgRepos (nodeRepo main))) Child node
       "};
       let result: Result<_, _> = buffer_to_validated_saveplan(
-        org_text, config , None) ;
+        org_text, config , &SkgrepoRestriction::unrestricted (config)) ;
       // Should succeed - both nodes are owned
       assert!(result . is_ok(), "NodeMerge with both owned nodes should be allowed");
       Ok(())

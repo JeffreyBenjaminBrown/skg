@@ -496,7 +496,8 @@ pub async fn update_from_and_rerender_buffer_with_snapshots_test (
     skg_env_from_parts (config, tantivy_index, graph);
   update_from_and_rerender_buffer_with_approvals (
     stream, org_buffer_text, &mut env,
-    viewforest_id_from_request_result, views_state, None,
+    viewforest_id_from_request_result, views_state,
+    &SkgrepoRestriction::unrestricted (config),
     true, &HashMap::new (), &std::collections::HashSet::new (),
     &std::collections::HashSet::new (), &StrandedsReview::NotReviewed,
     DeleteFrom::NotChosen, other_views ) . await
@@ -545,7 +546,7 @@ pub async fn update_from_and_rerender_buffer_with_fork_skgrepos_test (
     &mut env,
     viewforest_id_from_request_result,
     views_state,
-    None,
+    &SkgrepoRestriction::unrestricted (config),
     approved_forks,
     fork_skgrepos ) . await }
 
@@ -912,7 +913,8 @@ pub fn multi_root_view (
 ) -> Result < (String, Vec<ID>, Tree<Viewnode>),
               Box<dyn Error> > {
   multi_root_view_inner (
-    config, tantivy_index, root_gnids, None )
+    config, tantivy_index, root_gnids,
+    &SkgrepoRestriction::unrestricted (config) )
 }
 
 /// 'multi_root_view' under a skgrepo restriction.
@@ -927,7 +929,7 @@ pub fn multi_root_view_with_skgrepo_set (
   // multi_root_view_via_env), so this wrapper just forwards it.
   multi_root_view_inner (
     config, tantivy_index, root_gnids,
-    Some (skgrepo_restriction) ) }
+    skgrepo_restriction ) }
 
 /// The parts-based de-novo entry -- a thin shim that assembles a
 /// SkgEnv and routes through the de-novo render (multi_root_view_via_env).
@@ -937,7 +939,7 @@ fn multi_root_view_inner (
   config             : &SkgConfig,
   tantivy_index      : Option<&TantivyIndex>,
   root_gnids        : &[ID],
-  skgrepo_restriction : Option<&SkgrepoRestriction>,
+  skgrepo_restriction : &SkgrepoRestriction,
 ) -> Result < (String, Vec<ID>, Tree<Viewnode>),
               Box<dyn Error> > {
   let tantivy_owned : TantivyIndex = match tantivy_index {
@@ -963,7 +965,7 @@ fn multi_root_view_inner (
 fn multi_root_view_via_env (
   env                : &SkgEnv,
   root_gnids        : &[ID],
-  skgrepo_restriction : Option<&SkgrepoRestriction>,
+  skgrepo_restriction : &SkgrepoRestriction,
 ) -> Result < (String, Vec<ID>, Tree<Viewnode>),
               Box<dyn Error> > {
   let runtime = env . runtime_snapshot ();

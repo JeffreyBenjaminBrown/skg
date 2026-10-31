@@ -32,7 +32,7 @@ use skg::refresh::Truth;
 use skg::refresh::chain::attach_containerward_chains_under_members;
 use skg::refresh::mode::RefreshMode;
 use skg::test_utils::multi_root_view_with_skgrepo_set;
-use skg::types::misc::ID;
+use skg::types::misc::{ID, SkgConfig};
 use skg::types::nodes::complete::Graphnode;
 use skg::types::viewnode::{RelationCounts, Viewnode, ViewnodeKind, Vognode};
 use skg::refresh::viewnodestats::set_viewnodestats_in_viewforest;
@@ -100,14 +100,14 @@ fn inbound_containerward_data_hides_N_at_public (
         InRustGraph::from_graphnodes (&nodes);
       let inbound_public : Vec<ID> =
         graph . inbound_pids_for_relation_gated (
-          &ID::from ("C"), NodeRelation::Contains, Some (&public) );
+          &ID::from ("C"), NodeRelation::Contains, &public );
       assert! (
         ! inbound_public . contains (&ID::from ("N")),
         "N's private containment of C must not surface inbound at \
          public: {:?}", inbound_public );
       let inbound_all : Vec<ID> =
         graph . inbound_pids_for_relation_gated (
-          &ID::from ("C"), NodeRelation::Contains, Some (&all) );
+          &ID::from ("C"), NodeRelation::Contains, &all );
       assert! (
         inbound_all . contains (&ID::from ("N")),
         "under 'all' N's containment of C is visible inbound: {:?}",
@@ -125,7 +125,7 @@ fn inbound_containerward_data_hides_N_at_public (
         let c_gnid : NodeId = first_root (&viewforest);
         attach_containerward_chains_under_members (
           &mut viewforest, &[c_gnid],
-          &Truth { graph : &graph, config, restriction : Some (&public) },
+          &Truth { graph : &graph, config, restriction : &public },
           RefreshMode::ContentView ) ?;
         let ancestors : BTreeSet<ID> = occurrence_children_gnids (&viewforest, c_gnid);
         assert! (
@@ -145,7 +145,7 @@ fn inbound_containerward_data_hides_N_at_public (
         let c_gnid : NodeId = first_root (&viewforest);
         attach_containerward_chains_under_members (
           &mut viewforest, &[c_gnid],
-          &Truth { graph : &graph, config, restriction : Some (&all) },
+          &Truth { graph : &graph, config, restriction : &all },
           RefreshMode::ContentView ) ?;
         let ancestors : BTreeSet<ID> = occurrence_children_gnids (&viewforest, c_gnid);
         assert! (
@@ -179,7 +179,7 @@ fn subscriberFolder_style_inbound_gates_privately_recorded_subscription (
       // fully public node.
       let subscribers_public : Vec<ID> =
         graph . other_member_pids_gated (
-          &ID::from ("C"), RelationRole::SUBSCRIBEE, Some (&public) );
+          &ID::from ("C"), RelationRole::SUBSCRIBEE, &public );
       assert! (
         ! subscribers_public . contains (&ID::from ("S")),
         "S's privately-recorded subscription to C must not surface \
@@ -187,7 +187,7 @@ fn subscriberFolder_style_inbound_gates_privately_recorded_subscription (
         subscribers_public );
       let subscribers_all : Vec<ID> =
         graph . other_member_pids_gated (
-          &ID::from ("C"), RelationRole::SUBSCRIBEE, Some (&all) );
+          &ID::from ("C"), RelationRole::SUBSCRIBEE, &all );
       assert! (
         subscribers_all . contains (&ID::from ("S")),
         "under 'all' S's subscription to C is visible: {:?}",
@@ -273,7 +273,7 @@ fn ancestor_heralds_gate_privately_recorded_relations (
           & HashMap::new (),
           & HashMap::new (),
           config,
-          Some (restriction) );
+          restriction );
         let c_treeid : NodeId = first_root (&viewforest);
         let s_ref = viewforest . get (c_treeid) . unwrap ()
           . first_child () . unwrap ();
@@ -327,13 +327,14 @@ fn a_lowered_relationship_is_governed_by_its_new_level (
     name    : SkgrepoSetName::from ("public"),
     skgrepos : [ SkgrepoName::from ("public") ]
       . into_iter () . collect () };
-  let contents_under = |restriction : Option<&SkgrepoRestriction>| -> Vec<ID> {
+  let contents_under = |restriction : &SkgrepoRestriction| -> Vec<ID> {
     graph . outbound_pids_for_relation_gated (
       & ID::from ("recorder"), NodeRelation::Contains, restriction ) };
-  assert! ( contents_under (Some (&public)) . contains (& ID::from ("lowered")),
+  assert! ( contents_under (&public) . contains (& ID::from ("lowered")),
     "an relationship lowered to its default renders under the set that \
      includes that default" );
-  assert! ( ! contents_under (Some (&public)) . contains (& ID::from ("kept")),
+  assert! ( ! contents_under (&public) . contains (& ID::from ("kept")),
     "a sibling relationship still above its default stays gated" );
-  assert! ( contents_under (None) . contains (& ID::from ("kept")),
+  assert! ( contents_under (&SkgrepoRestriction::unrestricted (
+              &SkgConfig::dummyFromSkgrepos (HashMap::new ())) ) . contains (& ID::from ("kept")),
     "the full fold sees everything" ); }

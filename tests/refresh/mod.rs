@@ -74,6 +74,10 @@ pub(super) fn config () -> SkgConfig {
       Skgrepo { name : SkgrepoName::from ("private"), abbreviation : None,
                 path : PathBuf::from ("private"), owned : true } ) ])) }
 
+/// No skgrepo restriction, under 'config'.
+pub(super) fn unrestricted () -> SkgrepoRestriction {
+  SkgrepoRestriction::unrestricted (&config ()) }
+
 /// The skgrepo restriction to 'main' alone.
 pub(super) fn main_only () -> SkgrepoRestriction {
   SkgrepoRestriction {
@@ -125,14 +129,14 @@ pub(super) fn run_asserting_fixpoint (
   graph : &InRustGraph,
 ) -> Run {
   run_asserting_fixpoint_in (
-    text, graph, None, RefreshMode::ContentView, 100 ) }
+    text, graph, &unrestricted (), RefreshMode::ContentView, 100 ) }
 
 /// Refresh 'text' over 'graph' in 'mode' with 'budget', then assert
 /// the fixpoint: its output, refreshed again, comes back as it was.
 pub(super) fn run_asserting_fixpoint_in (
   text        : &str,
   graph       : &InRustGraph,
-  restriction : Option<&SkgrepoRestriction>,
+  restriction : &SkgrepoRestriction,
   mode        : RefreshMode,
   budget      : usize,
 ) -> Run {
@@ -151,14 +155,14 @@ pub(super) fn run_as_written_asserting_fixpoint_in (
   mode  : RefreshMode,
 ) -> Run {
   run_parsed_asserting_fixpoint (
-    parse (text, IdResolution::AsWritten), graph, None, mode, 100 ) }
+    parse (text, IdResolution::AsWritten), graph, &unrestricted (), mode, 100 ) }
 
 /// Refresh 'forest' over 'graph' in 'mode' with 'budget', then assert
 /// the fixpoint.
 fn run_parsed_asserting_fixpoint (
   mut forest  : ViewForest,
   graph       : &InRustGraph,
-  restriction : Option<&SkgrepoRestriction>,
+  restriction : &SkgrepoRestriction,
   mode        : RefreshMode,
   budget      : usize,
 ) -> Run {
@@ -183,7 +187,7 @@ pub(super) fn refresh_once (
   graph  : &InRustGraph,
 ) -> String {
   let config : SkgConfig = config ();
-  let truth : Truth = Truth { graph, config : &config, restriction : None };
+  let truth : Truth = Truth { graph, config : &config, restriction : &unrestricted () };
   refresh_and_render (
     forest, &mut ViewnodeIdRecord::default (), &truth,
     RefreshMode::ContentView, 100 )

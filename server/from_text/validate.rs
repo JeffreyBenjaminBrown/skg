@@ -38,7 +38,7 @@ pub fn validate_and_filter_foreign_instructions(
   clone_skgrepo_inputs : &CloneSkgrepoInputs, // everything clone-repo resolution can use, in priority order
   adopt_clone_skgrepo : &HashMap<ID, ID>, // new node -> forked N whose clone's repo it adopts (see 'new_foreign_nodes_adopting_clone_repos')
   config             : &SkgConfig,
-  skgrepo_restriction : Option<&SkgrepoRestriction>, // the clones copy only the records it shows ('build_fork_clone')
+  skgrepo_restriction : &SkgrepoRestriction, // the clones copy only the records it shows ('build_fork_clone')
 ) -> Result<(Vec<NodeInstruction>, Vec<ForkSpec>),
             Vec<BufferValidationError>> {
   let mut outcomes : Vec<ForeignPolicyOutcome> =
@@ -358,10 +358,11 @@ pub fn suppress_writes_to_restricted_nodes (
   node_instructions : Vec<NodeInstruction>,
   skgrepo_moves : Vec<SkgrepoMove>,
   graph : &InRustGraph,
-  skgrepo_restriction : Option<&SkgrepoRestriction>,
+  skgrepo_restriction : &SkgrepoRestriction,
 ) -> (Vec<NodeInstruction>, Vec<SkgrepoMove>, bool) {
-  let Some (restriction) = skgrepo_restriction else {
-    return (node_instructions, skgrepo_moves, false); };
+  if skgrepo_restriction . is_unrestricted () {
+    return (node_instructions, skgrepo_moves, false); }
+  let restriction : &SkgrepoRestriction = skgrepo_restriction;
   let restricted = |gnid : &ID, buffer_home : &SkgrepoName| -> bool {
     SkgrepoRestriction::node_is_restricted (restriction, buffer_home)
     || graph . pid_and_skgrepo (gnid) . is_some_and (
@@ -404,9 +405,10 @@ pub fn suppress_writes_to_restricted_nodes (
 pub fn refuse_records_landing_restricted (
   node_instructions   : &[NodeInstruction],
   graph               : &InRustGraph,
-  skgrepo_restriction : Option<&SkgrepoRestriction>,
+  skgrepo_restriction : &SkgrepoRestriction,
 ) -> Vec<BufferValidationError> {
-  let Some (restriction) = skgrepo_restriction else { return Vec::new (); };
+  if skgrepo_restriction . is_unrestricted () { return Vec::new (); }
+  let restriction : &SkgrepoRestriction = skgrepo_restriction;
   let mut errors : Vec<BufferValidationError> = Vec::new ();
   for instruction in node_instructions {
     let NodeInstruction::Save (SaveNode (node)) = instruction else { continue; };

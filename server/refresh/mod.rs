@@ -54,14 +54,14 @@ use std::error::Error;
 pub struct Truth<'a> {
   pub graph       : &'a InRustGraph,
   pub config      : &'a SkgConfig,
-  pub restriction : Option<&'a SkgrepoRestriction>,
+  pub restriction : &'a SkgrepoRestriction,
 }
 
 impl<'a> Truth<'a> {
   /// The truth of a runtime generation, under 'restriction'.
   pub fn of_runtime (
     runtime     : &'a RuntimeGeneration,
-    restriction : Option<&'a SkgrepoRestriction>,
+    restriction : &'a SkgrepoRestriction,
   ) -> Truth<'a> {
     Truth { graph : &runtime . graph, config : &runtime . config, restriction } }
 }

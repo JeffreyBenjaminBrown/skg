@@ -27,6 +27,7 @@ use crate::diff_view::readiness_requests::set_ready_facts_in_viewforest;
 use crate::diff_view::change_viewnodes::mk_historical_viewnode;
 use crate::org_to_text::viewforest_to_string;
 use crate::types::env::RuntimeGeneration;
+use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::misc::{ID, SkgrepoChange};
 use crate::types::tree::forest::{ViewForest, editable_occurrences, in_content_position};
@@ -217,7 +218,9 @@ pub fn diffView_buffer_viewforest (
   let mut viewforest : ViewForest =
     stub_viewforest_of_roots (runtime, straddle, diffView_buffer_kind, roots) ?;
   refresh_diffView_viewforest (
-    runtime, straddle, diffView_buffer_kind, store, None, &mut viewforest,
+    runtime, straddle, diffView_buffer_kind, store,
+    &SkgrepoRestriction::unrestricted (&runtime . config), // the diff view opens unrestricted
+    &mut viewforest,
     // A new buffer's first viewnode IDs; 'register_view' reads the record
     // back from the forest.
     &mut ViewnodeIdRecord::default () ) ?;
