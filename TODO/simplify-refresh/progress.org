@@ -6748,3 +6748,45 @@ no longer does (1e32fe6f). 'bash/run-plan-slices.sh' names the
 plan it runs, by design. Nothing else.
 *** Headline
 DONE.
+** Orchestrator's notes after slice 6 (2026-10-31)
+Launched 07:45 UTC, reported 08:14 UTC: twenty-nine minutes;
+428k agent tokens over 220 tool uses. Three commits: the
+messages, the glossary, the rest of the docs. Two failures of
+its own: a row pinning the parser's old refusal, an expected
+adaptation, and a Lua spec that did not load for an apostrophe
+in a single-quoted string, the agent's bug, fixed. The reader's
+pass over the changed glossary entries and passages took 3 min
+12 s, listed 21 items, and 19 were fixed, three of them real
+contradictions about a restricted view root. The deviations
+are sound: where a message was false the agent made it true in
+code rather than document the falsehood (attach's message on a
+pending detachment, the relRepo gestures' refusal that also
+fires on a flag request), and it reworded messages beyond the
+plan's list where its greps found them. The commits again end
+"Co-Authored-By: Claude Opus 5.5", against the brief's explicit
+line; left as they are, with slice 5's, for Jeff to decide. For
+Jeff: 'coding-advice/code-reviews.org' (around line 67) says
+"a repo-set switch" and "a merge of siblings"; the unknown
+viewnode's herald still reads "Reference to unknown node.",
+since the plan keeps the heralds. The two questions are
+answered in the record: the plan's terms are in the glossary,
+marked as plan 10's, with the slices' coinages and the reuses
+that clash listed for the review; one citation of 'TODO/' in
+an assertion message was removed. Suites: nextest 1068 of 1068,
+Emacs 420 of 420, Neovim 463 passes, integration 35 of 36 with
+either client, 'bash/all-tests.sh' 70 of 72 runs, the two
+failures the pre-existing one.
+** The run is complete (2026-10-31)
+Every slice headline reads DONE; 'progress.org' holds the
+classification of every failure met and the two-question
+check's answer; every entry the plan's "Verification and
+completion" names has moved to 'TODO/DONE/problems.org', the
+strip-and-export entry under "documented". The run began at
+04:10 UTC with slice 0 and ended at 08:14 UTC with slice 6:
+four hours and four minutes, of which the slices took 38, 19,
+42, 25, 18, 52 and 29 minutes, launched to report, with one
+session break during slice 2. Commits since the plan's
+(9be1eed8): 30, of which 24 by the slices and 6 by the
+orchestrator. The review follows as
+'TODO/simplify-refresh/11_review.org', its reports in
+'11_1_review-reports/'.
