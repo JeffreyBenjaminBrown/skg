@@ -6154,3 +6154,31 @@ the comment stays. The API doc says the new rule
 ('docs/api-and-formats.org', "Content view", line 952).
 *** Headline
 DONE.
+** Orchestrator's notes after slice 4 (2026-10-31)
+Launched 06:28 UTC, reported 06:46 UTC: eighteen minutes; 276k
+agent tokens over 89 tool uses. One commit for the slice, since
+the type change breaks every reader of the parse at once; the
+plan's commit per stage had no step that compiled, and the
+agent said so. No failure met but the pre-existing one; no
+fixture of data changed, seven test files read the variants'
+fields. The deviations are sound: an occurrence's one edit
+request holds the relRepo request too, since the table has one
+'editRequest' field and two fields would admit a state the
+grammar does not; a ghost keeps its home skgrepo, which the
+plan's list omitted; a ghost without a gnid is refused where it
+used to parse to the empty gnid, a safer answer; the table
+holds only the user's fields and a per-kind list in the parser
+gives the rest, so the table does not change; two unpinned
+refusal texts of the ghost changed and are pinned now. Two
+coinages, parser-internal: 'NamedKind' and 'WrittenParts'. A
+slip of the plan, for the review: it said the printer reads
+the table; only the conformance test checks the printer's
+order against it. Corrections carried: to slice 5, where the
+restricted refusal sits and that the "accepts no edit request
+but" texts are built from the table for every kind, with the
+two parser comments its check's grep will find; to slice 6,
+three passages that still say "an unknown" or "a reference to
+an unknown node", and the table's comment that no longer says
+all the parser does with it. Suites: nextest 1061 of 1061,
+Emacs 414 of 414, Neovim 453 passes, integration 35 of 36 with
+either client, the pre-existing failure.

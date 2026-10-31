@@ -838,6 +838,17 @@ spare, beside 'heralds', the wire's '(delete-from . "all")'
 'types/viewnode.rs'; 'is_unrestricted' is the one "is this
 skgrepo unrestricted" (duplication 1), so that item is
 half done.
+*** Corrections carried from slice 4
+The refusal to reword sits in
+'server/serve/parse_metadata_sexp.rs' (around line 821), its
+row in 'tests/metadata_grammar.rs' (around 148). The texts
+"A headline of kind K accepts no edit request but ..." are
+built from the table by 'edit_request_refusal' for every kind,
+so rewording one rewords all, and 'tests/metadata_grammar.rs'
+pins them. The check's grep for 'Restricted vognode' also
+finds the comments of 'parse_metadata_sexp.rs' (around lines
+29 and 112, "Restricted vognode" and "an unknown"); they say
+"restricted viewnode" and "unknown viewnode".
 *** the clients
 The flag command's message after replacing a pending relRepo
 request says so, with a test in each client; the docs say the
@@ -926,6 +937,17 @@ and 196) and 'elisp/skg-keymaps-and-aliases.el'; they say
 "skgrepo-set" for the set a skgrepo restriction denotes stay.
 A grep for 'repo-set' over 'server elisp nvim' outside the
 wire's names joins the check.
+*** Corrections carried from slice 4
+'docs/api-and-formats.org' says "an unknown" around lines 948
+to 951, just above the sentence slice 4 rewrote (952);
+'server/types/viewnode.rs' (around 198) says "a reference to
+an unknown node". The comment of 'shared/metadata-fields.json'
+(line 2) says the server's parser is checked against the table
+by a conformance test; since slice 4 the parser also reads it,
+so the comment says both. The plan's claim that the printer
+reads the table was wrong: the conformance test checks the
+printer's order against it; a doc that repeats the claim says
+the true thing.
 *** the words
 "An unknown viewnode" and "a restricted viewnode" in user text,
 docs and messages, in place of "an unknown", "a reference to an
