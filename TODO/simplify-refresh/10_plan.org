@@ -709,6 +709,37 @@ sixty-one the plan counted: in
 and in 'members_with_visible_records'
 ('resolve_visibility.rs'); they become bare references with
 the rest.
+*** Corrections carried from slice 2
+Seventy-four 'Option<&SkgrepoRestriction>' parameters in the
+server now, not sixty-three: slice 2 added them in 'fork.rs'
+('fork_spec_from_buffer_node', 'build_fork_clone',
+'explicit_fork_specs_from_viewforest'), 'validate.rs'
+('validate_and_filter_foreign_instructions',
+'refuse_records_landing_restricted'),
+'supplement_from_disk.rs'
+('restricted_records_naming_deleted_graphnodes') and 'save.rs'
+('apply_delete_propagation_cleanup',
+'prepare_save_under_mutation_gate', whose
+'restricted_records_left' is None to strip every owned record);
+the tests hold more, in 'tests/shared/git_fixture.rs'
+('save_under') and the modules of 'grouped_repos'. Thirteen
+'require_skgrepo_set_all' sites, not nine: the
+delete-references handler, the restore and readiness refusals
+in 'save_buffer.rs', the import's handler. The tests pin the
+words "requires no skgrepo restriction", which survive; the
+message's "(the skgrepo-set all) ... Switch the repo-set to all
+first" does not. 'all' literals the code map missed:
+'main.rs:341,360' (the CLI's default), 'types/misc.rs:642-648'
+(the set a name denotes), 'dbs/filesystem/not_nodes.rs:307-309'
+(the config's refusal of a skgrepo named all), the import
+handler 'serve/handlers/import_md_and_org.rs:216', and the
+comments of 'protocol.rs' and 'save.rs'. Not the set's name,
+so they stay: the wire's '(delete-from . "all")' (every owned
+record), 'heralds.rs:286' (a herald) and 'viewnode.rs:1077'
+(the diff object). The two refusals in
+'supplement_from_disk.rs' (around 295 and 312) say "Widen the
+repo-set (e.g. to 'all') and retry"; they say the new words in
+this slice, since 'all' will not exist.
 *** the type
 'SkgrepoRestriction' ('server/skgrepo_sets.rs') holds the most
 private skgrepo shown and the set it denotes; 'named' takes a
@@ -744,6 +775,14 @@ doc's "skgrepo-sets" section say the new words.
 Read "The parser's natural shape" in the agreed behavior,
 Decide 9 of the review, and the pitfalls on the refusal texts
 and the table first.
+*** Corrections carried from slice 2
+The new tests write headlines with the edit request before
+'node': '(skg (editRequest delete) node ...)',
+'(skg (editRequest (relRepo private)) node ...)' and
+'(skg (editRequest restoreRel) node (gnid c) noClaim (diff (rel
+removed)))' ('tests/restricted_graphnode_in_the_buffer.rs',
+'tests/fork_merge_delete_under_a_narrowing.rs'); the
+table-driven parse accepts the fields in any order, as today.
 *** the shape
 'ViewnodeMetadata' keeps the viewnode ID, the fold and focus
 state, the readiness request and the derived facts;

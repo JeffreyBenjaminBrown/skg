@@ -37,6 +37,12 @@
   clone's skgrepo in the confirmation buffer, so this may be
   intended; it breaks the default floor rule for those two records.
   Under any skgrepo-set. Read, not run.
+** The moved-hide warning names restricted subscribees
+  The warning the save answers when a hide moves into a
+  subscribee's folder names the subscribees it moved among,
+  restricted ones included: a read leak, not a write. Found by
+  the slice's repeat of the search; filed by the orchestrator.
+  Read, not run.
 * Problems found by the review of plan 08 (2026-10-30)
   Found by the throwaway tests of 'TODO/simplify-refresh/
   09_review.org' (Open questions 1 and 2); the tests are in
@@ -360,23 +366,6 @@ gap too. Details, options and questions:
    (tests elsewhere, e.g. tests/hidden_from_subscriptions.rs, use
    exact assert_eq! and do pin them). Suggested fix: also compare
    the bare-atom sets of the two lines in 'line_matches'.
-** Subscribee-as-such hides may misfire under a restricted skgrepo-set
-   The signal loop in 'resolve_visibility'
-   (server/from_text/local_instruction_collection/resolve_visibility.rs)
-   infers hides as: subscribee's disk contains, minus the children the
-   buffer shows, minus the subscriber's post-save contains. Under a
-   RESTRICTED skgrepo-set, rendering omits a subscribee's
-   inactive-repo members from the view, so they are absent from the
-   signal's 'visible' list for a reason other than deletion -- yet the
-   loop would infer hides for them, silently writing
-   hides_from_its_subscriptions entries for members the user never
-   saw. The new sibling pass 'infer_hides_from_contains_removals'
-   guards exactly this with 'member_is_visible'; the older signal loop
-   does not. Narrow trigger (needs an editable subscribee-as-such
-   saved under a restricted set, with the subscribee containing
-   inactive-repo members); not fixed in the fork-fixes arc because
-   it is prior, separate behavior. Suggested fix: apply the same
-   member_is_visible filter to that loop's 'inferred_hides'.
 * Problems noted while writing forking-and-privacy.org
 ** Fork deliberate-pick rule is enforced only client-side
    docs/forks.org promises "approving before you have set every

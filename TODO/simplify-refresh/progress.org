@@ -5755,3 +5755,39 @@ skgrepo-set" (plan 08, slice 7) still stands in
 'TODO/problems.org', though slice 1 fixed it.
 *** Headline
 DONE.
+** Orchestrator's notes after slice 2 (2026-10-31)
+Launched 05:11 UTC; Jeff's computer restarted around 05:45 with
+nothing committed and the final tree in flight; the same agent
+resumed at 05:49 UTC and reported at 05:53: forty-two minutes
+in all, of which the resumed leg took 486k agent tokens over
+twenty tool uses (the first leg's count was lost with the
+session). Three commits, one per group of findings, twenty new
+server tests, six Emacs, five Neovim; two fixtures changed for
+what they now assert, four for the save's new argument. The
+deviations are sound: the confirmation comes first because the
+propagation is computed before the strandeds; the fork floors
+only by owned relRepos, since a foreign section says nothing
+of an owned one's privacy; one refusal more than the plan
+listed, found by the repeated search (a record moved out of a
+restricted section). Two consequences for Jeff, not stops: a
+restricted viewnode deleted from a subscriber's content is
+refused when a subscribee contains it, since the hide it would
+infer floors in the restricted skgrepo; and the warning of a
+hide that moved into a subscribee's folder names restricted
+subscribees, a read leak filed in 'TODO/problems.org' by me,
+with the agent's three findings (a strandeds reset can move a
+hide across the skgrepo restriction; a pasted headline for a
+member with a restricted record may reorder that section; an
+explicit fork of a private node names it at the clone's home).
+Housekeeping by me: the entry "Subscribee-as-such hides may
+misfire under a restricted skgrepo-set" moved to
+'TODO/DONE/problems.org', slice 1 having fixed it.
+Corrections carried: to slice 3, the counts (seventy-four
+'Option' parameters, thirteen 'require_skgrepo_set_all' sites),
+the 'all' literals the code map missed, the wire's
+'(delete-from . "all")' that is not the set's name, and the two
+refusal texts that say "Widen the repo-set (e.g. to 'all')";
+to slice 4, the headlines the new tests write with the edit
+request before 'node'. Suites: nextest 1058 of 1058, Emacs 413
+of 413, Neovim 451 passes, integration 35 of 36 with either
+client, the pre-existing failure.

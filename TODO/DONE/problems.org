@@ -1,3 +1,27 @@
+* Problems noted during the fork-fixes arc (fixed 2026-10-31)
+** Subscribee-as-such hides may misfire under a restricted skgrepo-set
+   The signal loop in 'resolve_visibility'
+   (server/from_text/local_instruction_collection/resolve_visibility.rs)
+   infers hides as: subscribee's disk contains, minus the children the
+   buffer shows, minus the subscriber's post-save contains. Under a
+   RESTRICTED skgrepo-set, rendering omits a subscribee's
+   inactive-repo members from the view, so they are absent from the
+   signal's 'visible' list for a reason other than deletion -- yet the
+   loop would infer hides for them, silently writing
+   hides_from_its_subscriptions entries for members the user never
+   saw. The new sibling pass 'infer_hides_from_contains_removals'
+   guards exactly this with 'member_is_visible'; the older signal loop
+   does not. Narrow trigger (needs an editable subscribee-as-such
+   saved under a restricted set, with the subscribee containing
+   inactive-repo members); not fixed in the fork-fixes arc because
+   it is prior, separate behavior. Suggested fix: apply the same
+   member_is_visible filter to that loop's 'inferred_hides'.
+   Fixed by slice 1 of 'TODO/simplify-refresh/10_plan.org': the
+   subscribee-visibility step reads the subscribee's content and
+   the subscriber's hides through the gate (commit 37174402), so
+   no hide is inferred for a member the skgrepo restriction kept
+   out of the view. Tests in
+   'tests/subscriber_hides_under_a_narrowing.rs'.
 * Problems found by the review of plan 08 (2026-10-30; fixed 2026-10-31)
   Found by the throwaway tests of 'TODO/simplify-refresh/
   09_review.org' (Open questions 1 and 2); the tests are in
