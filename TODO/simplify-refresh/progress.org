@@ -6499,3 +6499,38 @@ Neovim's switch refusal says "skgrepo-set". A comment of
 "restricted viewnode", the name slice 6 gives it.
 *** Headline
 DONE.
+** Orchestrator's notes after slice 5 (2026-10-31)
+Launched 06:50 UTC, reported 07:42 UTC: fifty-two minutes; 578k
+agent tokens over 317 tool uses, part of them in subagents the
+agent used for the clients' group, the stream-pair copies and
+the admission-rule tests, reviewing and committing their work
+itself. Nine commits, one per group of items, the suites run
+after each group. Two failures of its own tests, fixed; one bug
+of its own in the hides-folder rule, caught by eleven
+deliberate tests and the narrowing round trip before the final
+rule; ten fixtures gained ⊥ for the orphan graphnode under a
+tombstone. Items not done: two gaps of tests 9 that slices 0 and
+plan 08 made moot, and the acquired folder in the admission
+rule's test, whose code disagrees with the API doc (filed).
+The deviations are sound and recorded; three things for Jeff,
+none a stop. The rule for the orphan graphnode under a
+tombstone reaches every such graphnode, not only one the user
+typed, so a root under the tombstone of a restricted root's
+containers folder shows ⊥ now; the rule for the hides folder
+vanishes a member the graph's hides list names by no record at
+all, so a headline typed there vanishes after its save. Neovim's
+'call_showing_refusal' catches every Lua error, so a genuine bug
+in a command shows one line without its traceback; the review
+should ask whether the traceback belongs in a log. The commits
+end "Co-Authored-By: Claude Opus 5.5", the model that made them,
+not the "Claude Fable 5.1" the brief asked for; I left them so,
+since rewriting nine commits on Jeff's branch over his dirty
+tree is his call. Ten names coined, listed in the record under
+the deviations. Three entries filed in 'TODO/problems.org'
+under "plan 10, slice 5". Corrections carried to slice 6: the
+words left ("the folder's anchor" in COMMANDS, the folders'
+refusals and their pinned test, "Restricted vognode" in the
+docs, Neovim's switch refusal), and the glossary's references to
+the new modules to keep. Suites: nextest 1068 of 1068, Emacs 419
+of 419, Neovim 462 passes, integration 35 of 36 with either
+client, the pre-existing failure.

@@ -948,6 +948,28 @@ so the comment says both. The plan's claim that the printer
 reads the table was wrong: the conformance test checks the
 printer's order against it; a doc that repeats the claim says
 the true thing.
+*** Corrections carried from slice 5
+Words slice 5 left: 'docs/COMMANDS.org' says "the folder's
+anchor" once (around line 612); the folders' refusals in
+'server/from_text/buffer_to_viewnodes/local.rs' say
+"restricted headlines" and "references to unknown nodes", and
+'a_folder_refusing_a_childs_kind_says_nothing_of_noClaim' pins
+the words, so the test row changes with them; the docs say
+"Restricted vognode" twenty-nine times
+('docs/data-model_technical.org' around 186 to 296,
+'docs/diff-view.org' around 180, and the rest a grep finds),
+so the check's grep for 'Restricted vognode' runs over docs
+too; Neovim's switch refusal says "skgrepo-set"
+('nvim/lua/skg/repo_sets.lua' around 65). A comment of
+'server/types/viewnode.rs' already cites the glossary's entry
+as "restricted viewnode", the name this slice gives it. Slice 5
+wrote glossary text (warrant, holds, "by nothing else", the
+extent and budget pointers) and technical-model text that
+refer to 'server/refresh/editability.rs',
+'server/rerender_pass.rs' and 'buffer_rerender.rs', and said
+the two new rules of the orphan graphnode under a tombstone
+and of the hides folder; keep those references and rules when
+rewriting the entries.
 *** the words
 "An unknown viewnode" and "a restricted viewnode" in user text,
 docs and messages, in place of "an unknown", "a reference to an
