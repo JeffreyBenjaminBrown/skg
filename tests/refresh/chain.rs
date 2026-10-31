@@ -3,9 +3,9 @@
 // built as the refresh builds that kind.
 
 use super::*;
-use crate::refresh::chain::attach_containerward_chain;
+use crate::refresh::chain::draw_containerward_chain;
 use crate::refresh::goal::{Goal, chain_goal};
-use crate::refresh::id_rule::{IdRuleAnswer, id_rule};
+use crate::refresh::id_rule::{IdRuleAnswer, WhereTheHeadlineStands, id_rule};
 use crate::types::tree::forest::stands_in_containerward_chain;
 use indoc::formatdoc;
 
@@ -61,7 +61,7 @@ node m
     let ViewnodeKind::Vognode (vognode) = &node . value () . kind
       else { panic! ("a chain node is a vognode") };
     assert! ( ! vognode . claims (), "{:?} claims nothing", vognode );
-    match ( id_rule (vognode . gnid (), Some (&goal), false, &walk), vognode ) {
+    match ( id_rule (vognode . gnid (), WhereTheHeadlineStands::Under (&goal), &walk), vognode ) {
       ( IdRuleAnswer::Occurrence (pid), Vognode::Occurrence (occurrence) ) =>
         assert! ( occurrence . gnid == pid && occurrence . is_writeProtected () ),
       ( IdRuleAnswer::GnidOnly (kind), Vognode::GnidOnly (gnid_only) ) =>
@@ -86,7 +86,7 @@ fn a_chain_under_an_editable_occurrence_claims_nothing () {
                               restriction : &restriction };
   let walk : Walk = Walk::new (&truth, RefreshMode::ContentView, 0);
   let m : NodeId = forest . roots () . next () . unwrap () . id ();
-  attach_containerward_chain ( forest . as_internal_tree_mut (), m, &walk ) . unwrap ();
+  draw_containerward_chain ( forest . as_internal_tree_mut (), m, &walk ) . unwrap ();
   assert_eq! ( outline (&forest), "\
 node m
   node a wp noClaim

@@ -27,13 +27,15 @@ use crate::refresh::Walk;
 use crate::refresh::editability::{
   DrawnEditability, EditabilityAndClaim, drawn_occurrence_editability,
   forget_editable_occurrence, occurrence_from_truth, write_protect_occurrence};
+use crate::refresh::diff_view::fold_body_of_drawn_occurrence;
 use crate::refresh::visit::{children_of, vanish};
-use crate::refresh::goal::{Goal, GoalMember};
+use crate::refresh::goal::{Goal, GoalItem, GoalMember};
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::nodes::rust::GraphnodeInRust;
 use crate::types::viewnode::{
   ChangeFacts, Editability, Ghost, GnidOnlyKind, GnidOnlyVognode,
-  RelationshipEditRequest, Occurrence, Viewnode, ViewnodeKind, Vognode, Warrant};
+  RelationshipEditRequest, Occurrence, Viewnode, ViewnodeKind, ViewnodeStats, Vognode,
+  Warrant, viewnode_of};
 use crate::refresh::mode::RefreshMode;
 use crate::skgrepo_sets::SkgrepoRestriction;
 
@@ -55,16 +57,46 @@ pub(crate) enum IdRuleAnswer {
   Tombstone,
 }
 
-/// The ID rule for 'gnid', under a parent whose goal is
-/// 'parent_goal', or under the buffer root when 'is_view_root' (which
-/// has no goal). In the diff view, a node HEAD had under 'gnid' that
-/// a nodeMerge has since made an extra ID of another node is not back:
-/// 'gnid' is its ghost's, not an occurrence of the acquirer.
+/// Where the headline the ID rule answers for stands: a root of the
+/// view (under the buffer root, which has no goal), or under a parent
+/// with a goal, or under one without.
+#[derive(Clone, Copy)]
+pub(crate) enum WhereTheHeadlineStands<'a> {
+  ViewRoot,
+  Under (&'a Goal),
+  UnderNoGoal,
+}
+
+impl<'a> WhereTheHeadlineStands<'a> {
+  /// Where a child of the headline at 'parent', whose goal is
+  /// 'parent_goal', stands.
+  pub(crate) fn of_child_of (
+    tree        : &Tree<Viewnode>,
+    parent      : NodeId,
+    parent_goal : Option<&'a Goal>,
+  ) -> WhereTheHeadlineStands<'a> {
+    match ( &tree . get (parent) . unwrap () . value () . kind, parent_goal ) {
+      ( ViewnodeKind::BufferRoot, _ ) => WhereTheHeadlineStands::ViewRoot,
+      ( _, Some (goal) )              => WhereTheHeadlineStands::Under (goal),
+      ( _, None )                     => WhereTheHeadlineStands::UnderNoGoal, } }
+
+  /// Whether the parent's goal names 'gnid'.
+  fn goal_names (
+    &self,
+    gnid : &ID,
+  ) -> bool {
+    matches! ( self, WhereTheHeadlineStands::Under (goal)
+                       if goal . names_gnid (gnid) ) }
+}
+
+/// The ID rule for 'gnid', for a headline standing 'where_it_stands'.
+/// In the diff view, a node HEAD had under 'gnid' that a nodeMerge
+/// has since made an extra ID of another node is not back: 'gnid' is
+/// its ghost's, not an occurrence of the acquirer.
 pub(crate) fn id_rule (
-  gnid         : &ID,
-  parent_goal  : Option<&Goal>,
-  is_view_root : bool,
-  walk         : &Walk,
+  gnid            : &ID,
+  where_it_stands : WhereTheHeadlineStands,
+  walk            : &Walk,
 ) -> IdRuleAnswer {
   let head : Option<&GraphStraddle> = match walk . mode {
     RefreshMode::DiffView { straddle, .. } => Some (straddle),
@@ -77,8 +109,8 @@ pub(crate) fn id_rule (
     if ! acquired_since_head (gnid, &pid, walk) {
       return IdRuleAnswer::Occurrence (pid); }}
   let restricted_answer = || -> IdRuleAnswer {
-    let named : bool = parent_goal . is_some_and ( |goal| goal . names_gnid (gnid) );
-    if named || is_view_root {
+    if where_it_stands . goal_names (gnid)
+       || matches! ( where_it_stands, WhereTheHeadlineStands::ViewRoot ) {
       IdRuleAnswer::GnidOnly (GnidOnlyKind::Restricted) }
     else { IdRuleAnswer::Tombstone } };
   if presence == GnidPresence::Restricted {
@@ -92,7 +124,7 @@ pub(crate) fn id_rule (
               walk . truth . restriction, &home ));
         return if restricted_at_head { restricted_answer () }
                else { IdRuleAnswer::Ghost (pid) }; }}}
-  if parent_goal . is_some_and ( |goal| goal . names_gnid (gnid) ) {
+  if where_it_stands . goal_names (gnid) {
     return IdRuleAnswer::GnidOnly (GnidOnlyKind::Unknown); }
   IdRuleAnswer::Tombstone }
 
@@ -121,8 +153,8 @@ fn relationship_edit_request_of (
     Vognode::GnidOnly (gnid_only) => gnid_only . relationshipEditRequest . clone (), } }
 
 /// Re-kind the vognode at 'child' (a child of 'parent', whose goal
-/// is 'parent_goal') by the ID rule, where it stands. Its ten cases,
-/// by the answer and the kind the vognode was:
+/// is 'parent_goal') by the ID rule, where it stands. Its eleven
+/// cases, by the answer and the kind the vognode was:
 /// - an occurrence, from an occurrence: pointed at the pid as the
 ///   truth has it ('point_occurrence_at');
 /// - an occurrence, from a ghost or a gnid-only vognode: its node is
@@ -149,9 +181,9 @@ pub(crate) fn rekind_vognode (
     ViewnodeKind::Vognode (vognode) => vognode . clone (),
     _ => return Ok (( )), };
   let gnid : ID = vognode . gnid () . clone ();
-  let is_view_root : bool = matches! (
-    tree . get (parent) . unwrap () . value () . kind, ViewnodeKind::BufferRoot );
-  match ( id_rule (&gnid, parent_goal, is_view_root, walk), vognode ) {
+  let where_it_stands : WhereTheHeadlineStands =
+    WhereTheHeadlineStands::of_child_of (tree, parent, parent_goal);
+  match ( id_rule (&gnid, where_it_stands, walk), vognode ) {
     ( IdRuleAnswer::Occurrence (pid), Vognode::Occurrence (_) ) =>
       point_occurrence_at (tree, child, &pid, walk) ?,
     ( IdRuleAnswer::Occurrence (pid), other ) =>
@@ -331,6 +363,46 @@ fn refresh_ghost_in_place (
                            claimsMembership    : ghost . claimsMembership,
                            warrant             : ghost . warrant,
                            .. fresh }; }}}
+
+/// The vognode that stands for 'gnid', the member of the goal item
+/// 'item', as the ID rule answered 'answer': an occurrence as the
+/// truth has it, standing as 'editability_and_claim' says; a ghost
+/// from HEAD; a gnid-only vognode with the relRepo the item records.
+/// Each claims as 'editability_and_claim' says and carries the item's
+/// warrant. An occurrence that may be editable shows its body as the
+/// diff view folds it. None for a tombstone, which there is no point
+/// in drawing, or a ghost HEAD lacks.
+pub(crate) fn vognode_for_answer (
+  answer                : IdRuleAnswer,
+  gnid                  : &ID,
+  item                  : &GoalItem,
+  editability_and_claim : EditabilityAndClaim,
+  walk                  : &Walk,
+) -> Result<Option<Viewnode>, Box<dyn Error>> {
+  let claims : bool = editability_and_claim . claims;
+  Ok ( match answer {
+    IdRuleAnswer::Occurrence (pid) => {
+      let occurrence : Occurrence =
+        occurrence_from_truth (&pid, editability_and_claim, walk) ?;
+      let mut viewnode : Viewnode = viewnode_of ( ViewnodeKind::Vognode (
+        Vognode::Occurrence ( Occurrence {
+          viewStats : ViewnodeStats { warrant : item . warrant,
+                                      .. ViewnodeStats::default () },
+          .. occurrence } )));
+      if editability_and_claim . editability != DrawnEditability::WriteProtected {
+        fold_body_of_drawn_occurrence (&mut viewnode, &pid, walk); }
+      Some (viewnode) },
+    IdRuleAnswer::Ghost (pid) =>
+      ghost_from_head (&pid, walk) . map ( |ghost|
+        viewnode_of ( ViewnodeKind::Vognode (Vognode::Ghost ( Ghost {
+          claimsMembership : claims,
+          warrant          : item . warrant,
+          .. ghost } )))),
+    IdRuleAnswer::GnidOnly (kind) =>
+      Some ( viewnode_of ( ViewnodeKind::Vognode ( Vognode::GnidOnly (
+        GnidOnlyVognode::new (
+          kind, gnid . clone (), item . relRepo . clone (), claims, item . warrant ))))),
+    IdRuleAnswer::Tombstone => None, } ) }
 
 /// The ghost of 'pid', from HEAD. None outside the diff view, or if
 /// HEAD lacks the node.

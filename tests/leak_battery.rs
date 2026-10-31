@@ -29,7 +29,7 @@ use skg::org_to_text::viewforest_to_string;
 use skg::skgrepo_sets::{SkgrepoRestriction, run_with_skgrepo_set_test_db};
 use skg::test_utils::graph_handle_from_config;
 use skg::refresh::Truth;
-use skg::refresh::chain::attach_containerward_chains_under_members;
+use skg::test_utils::draw_containerward_chains_under_members;
 use skg::refresh::mode::RefreshMode;
 use skg::test_utils::multi_root_view_with_skgrepo_set;
 use skg::types::misc::{ID, SkgConfig, SkgrepoName};
@@ -123,7 +123,7 @@ fn inbound_containerward_data_hides_N_at_public (
           viewnode_tree_as_written (
             "* (skg node (gnid C) (skgRepos (nodeRepo public))) leak-battery-C\n" );
         let c_gnid : NodeId = first_root (&viewforest);
-        attach_containerward_chains_under_members (
+        draw_containerward_chains_under_members (
           &mut viewforest, &[c_gnid],
           &Truth { graph : &graph, config, restriction : &public },
           RefreshMode::ContentView ) ?;
@@ -143,7 +143,7 @@ fn inbound_containerward_data_hides_N_at_public (
           viewnode_tree_as_written (
             "* (skg node (gnid C) (skgRepos (nodeRepo public))) leak-battery-C\n" );
         let c_gnid : NodeId = first_root (&viewforest);
-        attach_containerward_chains_under_members (
+        draw_containerward_chains_under_members (
           &mut viewforest, &[c_gnid],
           &Truth { graph : &graph, config, restriction : &all },
           RefreshMode::ContentView ) ?;

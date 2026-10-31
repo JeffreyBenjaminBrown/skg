@@ -20,35 +20,17 @@
 use crate::dbs::in_rust_graph::containerward_role_tree::{
   ContainerwardRoleTree, containers_in_inRustGraph, full_containerward_role_tree};
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
-use crate::refresh::{Truth, Walk};
-use crate::refresh::editability::{
-  DrawnEditability, EditabilityAndClaim, occurrence_from_truth};
+use crate::refresh::Walk;
+use crate::refresh::editability::{DrawnEditability, EditabilityAndClaim};
 use crate::refresh::goal::{Goal, GoalItem, GoalMember, chain_goal};
-use crate::refresh::id_rule::{IdRuleAnswer, ghost_from_head, id_rule};
+use crate::refresh::id_rule::{WhereTheHeadlineStands, id_rule, vognode_for_answer};
 use crate::refresh::mode::RefreshMode;
 use crate::types::misc::ID;
-use crate::types::viewnode::{
-  Ghost, GnidOnlyVognode, Occurrence, Viewnode, ViewnodeKind, ViewnodeStats, Vognode,
-  viewnode_of};
+use crate::types::viewnode::{Viewnode, ViewnodeKind, Vognode};
 
 use ego_tree::{NodeId, Tree};
 use std::collections::HashSet;
 use std::error::Error;
-
-/// Draw the chain under each of 'members', outside a refresh, as a
-/// refresh of 'mode' under 'truth' draws it
-/// ('attach_containerward_chain'). Anything but an occurrence among
-/// 'members' is skipped.
-pub fn attach_containerward_chains_under_members (
-  tree    : &mut Tree<Viewnode>,
-  members : &[NodeId],
-  truth   : &Truth,
-  mode    : RefreshMode,
-) -> Result<(), Box<dyn Error>> {
-  let walk : Walk = Walk::new (truth, mode, 0);
-  for member in members {
-    attach_containerward_chain (tree, *member, &walk) ?; }
-  Ok (( )) }
 
 /// Draw the chain under the occurrence at 'member': its containers'
 /// role trees, each prepended so that the first container comes
@@ -57,7 +39,7 @@ pub fn attach_containerward_chains_under_members (
 /// chain node's parent says which of its containers stand
 /// ('chain_goal'), and the ID rule what each is. Anything but an
 /// occurrence at 'member' is skipped.
-pub(crate) fn attach_containerward_chain (
+pub(crate) fn draw_containerward_chain (
   tree   : &mut Tree<Viewnode>,
   member : NodeId,
   walk   : &Walk,
@@ -134,32 +116,20 @@ fn prepend_containerward_chain_node (
   let Some (item) : Option<&GoalItem> =
     goal . item_for ( &GoalMember::Gnid ( container . clone () ))
     else { return Ok (None); };
-  let (vognode, pid) : (Vognode, Option<ID>) =
-    match id_rule (container, Some (goal), false, walk) {
-      IdRuleAnswer::Occurrence (pid) => {
-        let occurrence : Occurrence = occurrence_from_truth (
-          &pid, EditabilityAndClaim {
-            editability : DrawnEditability::WriteProtected, claims : false }, walk ) ?;
-        ( Vognode::Occurrence ( Occurrence {
-            viewStats : ViewnodeStats { warrant : item . warrant,
-                                        .. ViewnodeStats::default () },
-            .. occurrence } ),
-          Some (pid) ) },
-      IdRuleAnswer::Ghost (pid) => {
-        let Some (ghost) : Option<Ghost> = ghost_from_head (&pid, walk)
-          else { return Ok (None); };
-        ( Vognode::Ghost ( Ghost { claimsMembership : false,
-                                   warrant          : item . warrant,
-                                   .. ghost } ),
-          None ) },
-      IdRuleAnswer::GnidOnly (kind) =>
-        ( Vognode::GnidOnly ( GnidOnlyVognode::new (
-            kind, container . clone (), item . relRepo . clone (),
-            false, item . warrant )),
-          None ),
-      IdRuleAnswer::Tombstone => return Ok (None), };
+  let Some (viewnode) : Option<Viewnode> =
+    vognode_for_answer (
+      id_rule (container, WhereTheHeadlineStands::Under (goal), walk),
+      container, item,
+      EditabilityAndClaim { editability : DrawnEditability::WriteProtected,
+                            claims      : false },
+      walk ) ?
+    else { return Ok (None); };
+  let pid : Option<ID> = match &viewnode . kind {
+    ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =>
+      Some ( occurrence . gnid . clone () ),
+    _ => None, };
   let chain_node : NodeId = tree . get_mut (parent)
     . ok_or ("prepend_containerward_chain_node: parent not found") ?
-    . prepend ( viewnode_of ( ViewnodeKind::Vognode (vognode) ))
+    . prepend (viewnode)
     . id ();
   Ok ( Some (( chain_node, pid )) ) }

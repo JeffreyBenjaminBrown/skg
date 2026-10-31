@@ -19,7 +19,7 @@ use skg::test_utils::run_with_shared_test_stores;
 use skg::from_text::buffer_to_validated_saveplan;
 use skg::org_to_text::viewforest_to_string;
 use skg::refresh::Truth;
-use skg::refresh::chain::attach_containerward_chains_under_members;
+use skg::test_utils::draw_containerward_chains_under_members;
 use skg::refresh::mode::RefreshMode;
 use skg::test_utils::multi_root_view_with_skgrepo_set;
 use skg::types::misc::{ID, MSV, SkgConfig, SkgrepoName, TantivyIndex, members_of, rel_partners_at_relRepo, rel_partners_at_relRepo_msv};
@@ -491,7 +491,7 @@ async fn the_containerward_chain_stops_before_a_restricted_container (
           * (skg node (gnid child-for-backpath) (skgRepos (nodeRepo public))) child-for-backpath
         "});
       let child_gnid : NodeId = first_root (&viewforest);
-      attach_containerward_chains_under_members (
+      draw_containerward_chains_under_members (
         &mut viewforest,
         &[child_gnid],
         &Truth { graph : &graph, config, restriction : &restriction },

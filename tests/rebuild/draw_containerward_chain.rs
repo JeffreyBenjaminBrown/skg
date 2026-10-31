@@ -1,9 +1,9 @@
-// cargo nextest run --test grouped_saves -E 'test(attach_containerward_chain::)'
+// cargo nextest run --test grouped_saves -E 'test(draw_containerward_chain::)'
 
 use indoc::indoc;
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::refresh::Truth;
-use skg::refresh::chain::attach_containerward_chains_under_members;
+use skg::test_utils::draw_containerward_chains_under_members;
 use skg::refresh::mode::RefreshMode;
 use skg::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewnode_tree;
@@ -42,7 +42,7 @@ fn a_chain_branches_and_shows_a_repeat_as_a_leaf (
     org_to_viewnode_tree (input, IdResolution::AsWritten) ? . 0;
   let a11 : NodeId =
     viewforest . root () . first_child () . unwrap () . id ();
-  attach_containerward_chains_under_members (
+  draw_containerward_chains_under_members (
     &mut viewforest, &[a11],
     &Truth { graph       : &graph_handle_from_config (config) ? . load_full (),
              config,

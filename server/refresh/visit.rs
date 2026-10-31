@@ -44,7 +44,7 @@ use crate::refresh::editability::{
   DrawnEditability, EditabilityAndClaim, carries_editableView_request,
   consume_editableView_request,
   drawn_occurrence_editability, drop_editableView_request, extend_requested_content,
-  merge_editability, occurrence_from_truth, write_protect_occurrence};
+  merge_editability, write_protect_occurrence};
 use crate::refresh::extent::{Extent, extent_of_parent};
 use crate::refresh::goal::{
   Goal, GoalItem, GoalMember, goal_of_parent, hidden_in_subscribee,
@@ -52,22 +52,21 @@ use crate::refresh::goal::{
   subscriber_of_subscribee_as_such};
 use crate::refresh::goal::partnerFolder_members_in_graph;
 use crate::refresh::id_rule::{
-  IdRuleAnswer, entombstone, ghost_from_head, id_rule, point_occurrence_at,
-  rekind_vognode};
+  IdRuleAnswer, WhereTheHeadlineStands, entombstone, id_rule, point_occurrence_at,
+  rekind_vognode, vognode_for_answer};
 use crate::refresh::Walk;
 use crate::refresh::ancestry::{described_node, is_unsayable, parent_reads_claims};
 use crate::refresh::mode::RefreshMode;
 use crate::refresh::tail::detach_viewnode_transferring_focus;
 use crate::types::nodes::rust::GraphnodeInRust;
 use crate::refresh::diff_view;
-use crate::refresh::chain::attach_containerward_chain;
+use crate::refresh::chain::draw_containerward_chain;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::ID;
 use crate::types::tree::moves::{move_after, move_to_first_child, move_to_last_child};
 use crate::types::viewnode::{
-  FoldAndFocus, Folder, FolderRelation, Ghost, GnidOnlyVognode, PropertyMember,
-  Occurrence,
-  ViewRequest, Viewnode, ViewnodeKind, ViewnodeStats, Vognode, Warrant, viewnode_of};
+  FoldAndFocus, Folder, FolderRelation, PropertyMember, ViewRequest, Viewnode,
+  ViewnodeKind, Vognode, Warrant, viewnode_of};
 
 use ego_tree::{NodeId, NodeMut, NodeRef, Tree};
 use std::collections::{HashMap, HashSet};
@@ -496,7 +495,7 @@ fn after_drawing (
                  if folder . members_carry_containerward_chain () )
     && tree . get (treeid) . unwrap () . value () . is_occurrence ();
   if carries_chain {
-    attach_containerward_chain (tree, treeid, walk) ?; }
+    draw_containerward_chain (tree, treeid, walk) ?; }
   if walk . added_compound_folders . contains (&parent) {
     // A folder's collapse lives on its members.
     tree . get_mut (treeid) . unwrap () . value () . foldAndFocus . folded = true; }
@@ -517,32 +516,15 @@ fn draw_item (
   let claims : bool =
     item . warrant == Warrant::ByGraph && parent_reads_claims (tree, parent);
   Ok ( match &item . member {
-    GoalMember::Gnid (gnid) => match id_rule (gnid, Some (goal), false, walk) {
-      IdRuleAnswer::Occurrence (pid) => {
-        let editability : DrawnEditability =
-          drawn_occurrence_editability (tree, parent, &pid, walk);
-        let occurrence : Occurrence =
-          occurrence_from_truth (
-            &pid, EditabilityAndClaim { editability, claims }, walk) ?;
-        let mut viewnode : Viewnode = viewnode_of ( ViewnodeKind::Vognode (
-          Vognode::Occurrence ( Occurrence {
-            viewStats : ViewnodeStats { warrant : item . warrant,
-                                        .. ViewnodeStats::default () },
-            .. occurrence } )));
-        if editability != DrawnEditability::WriteProtected {
-          diff_view::fold_body_of_drawn_occurrence (&mut viewnode, &pid, walk); }
-        Some (viewnode) },
-      IdRuleAnswer::Ghost (pid) =>
-        ghost_from_head (&pid, walk) . map ( |ghost|
-          viewnode_of ( ViewnodeKind::Vognode (Vognode::Ghost ( Ghost {
-            claimsMembership : claims,
-            warrant          : item . warrant,
-            .. ghost } )))),
-      IdRuleAnswer::GnidOnly (kind) =>
-        Some ( viewnode_of ( ViewnodeKind::Vognode ( Vognode::GnidOnly (
-          GnidOnlyVognode::new (
-            kind, gnid . clone (), item . relRepo . clone (), claims, item . warrant ))))),
-      IdRuleAnswer::Tombstone => None, },
+    GoalMember::Gnid (gnid) => {
+      let answer : IdRuleAnswer =
+        id_rule (gnid, WhereTheHeadlineStands::Under (goal), walk);
+      let editability : DrawnEditability = match &answer {
+        IdRuleAnswer::Occurrence (pid) =>
+          drawn_occurrence_editability (tree, parent, pid, walk),
+        _ => DrawnEditability::WriteProtected, };
+      vognode_for_answer (
+        answer, gnid, item, EditabilityAndClaim { editability, claims }, walk ) ? },
     GoalMember::Alias (text) =>
       Some ( viewnode_of ( ViewnodeKind::PropertyMember ( PropertyMember::Alias {
         text                    : text . clone (),

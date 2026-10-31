@@ -8,6 +8,9 @@ use crate::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle, new_handle};
 use crate::dbs::tantivy::search::{SearchOptions, search_index};
 use crate::types::env::SkgEnv;
 use crate::skgrepo_sets::SkgrepoRestriction;
+use crate::refresh::{Truth, Walk};
+use crate::refresh::chain::draw_containerward_chain;
+use crate::refresh::mode::RefreshMode;
 use crate::update_buffer::multi_root_view_via_runtime;
 use crate::from_text::strandeds::StrandedsReview;
 use crate::save::DeleteFrom;
@@ -29,7 +32,7 @@ use crate::types::nodes::complete::Graphnode;
 use crate::types::viewnode::{ Viewnode, ViewnodeKind };
 use crate::types::viewnode::{Vognode};
 
-use ego_tree::{Tree, NodeRef};
+use ego_tree::{NodeId, NodeRef, Tree};
 use futures::FutureExt;
 use futures::executor::block_on;
 use std::any::Any;
@@ -893,6 +896,21 @@ pub fn extract_string_field_from_sexp (
 // ======================================================
 
 /// A fresh content view of one root ('multi_root_view').
+/// Draw the containerward chain under each of 'members', outside a
+/// refresh, as a refresh of 'mode' under 'truth' draws it
+/// ('draw_containerward_chain'). Anything but an occurrence among
+/// 'members' is skipped.
+pub fn draw_containerward_chains_under_members (
+  tree    : &mut Tree<Viewnode>,
+  members : &[NodeId],
+  truth   : &Truth,
+  mode    : RefreshMode,
+) -> Result<(), Box<dyn Error>> {
+  let walk : Walk = Walk::new (truth, mode, 0);
+  for member in members {
+    draw_containerward_chain (tree, *member, &walk) ?; }
+  Ok (( )) }
+
 pub fn single_root_view (
   config            : &SkgConfig,
   tantivy_index     : Option<&TantivyIndex>,

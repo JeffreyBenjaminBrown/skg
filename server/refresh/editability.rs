@@ -277,6 +277,7 @@ fn in_the_diffViews_u (
 // plan 04.1 proposed, the flags every child has (its claim and its
 // warrant) beside 'FoldAndFocus', and that is not built. When it is,
 // this goes.
+#[derive(Clone, Copy)]
 pub(crate) struct EditabilityAndClaim {
   pub editability : DrawnEditability,
   pub claims      : bool,
