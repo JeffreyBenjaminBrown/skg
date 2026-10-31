@@ -917,7 +917,7 @@ The suites with every script; these greps empty:
 Move "A store test that panics leaves its fixture copy in
 /tmp" to 'TODO/DONE/'.
 
-** TODO Slice 6: the docs and the glossary
+** DONE Slice 6: the docs and the glossary
 Read "The docs and the glossary" in the agreed behavior, the
 user-docs report and the vocabulary report first. Every earlier
 slice brought the docs of what it changed; this slice does the

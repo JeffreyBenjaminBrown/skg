@@ -161,29 +161,31 @@ config), the mode (=RefreshMode= in
 =server/refresh/mode.rs=: a content view, or a buffer of
 the diff view over the graph straddle, with the readiness store) and
 the node budget (=initial_node_limit=). It
-returns the buffer's text and the list of what it corrected
-(=Refreshed=). A fresh content view is the refresh of a stub
+changes the viewforest in place and returns nothing of what it
+changed; each caller renders the viewforest once, when it is done
+with it. A fresh content view is the refresh of a stub
 (=stub_of_fresh_content_view= in =server/update_buffer.rs=: one
 editable occurrence per requested node, asking for its containers
 folder and to be the node's editable occurrence); a rerender, the
 saved view and every collateral view are refreshes of what the
 buffer holds (=refresh_view= in =server/rerender_pass.rs=); the search buffer is the refresh of
-a stub built from the hits (=draw_search_buffer=); the diff
+a stub built from the hits (=build_search_viewforest=, which
+=draw_search_buffer= refreshes); the diff
 view's buffers are refreshes in diff-view mode (=docs/diff-view.org=,
 "Rendering a buffer").
 
 The refresh decides everything from the buffer and the truth as they
 are now, never from what either was at an earlier save. So it is a
-fixpoint: refreshing its own output changes nothing and corrects
-nothing, up to the viewnode IDs it assigns. =tests/idempotence.rs=
+fixpoint: refreshing its own output changes nothing, up to the
+viewnode IDs it assigns. =tests/idempotence.rs=
 asserts this over every content-view and diff-view fixture.
 
 *** The kinds a refresh sees
 A *vognode* stands for a gnid (=Vognode=): an *occurrence*, of a node
 the truth has, editable or write-protected; a *ghost*, in the diff
-view only, of a node HEAD has and the worktree lacks; an *unknown*,
-of a gnid its viewparent's list names and no node answers to; a
-*Restricted vognode*, of a node the skgrepo restriction keeps out
+view only, of a node HEAD has and the worktree lacks; an *unknown
+viewnode*, of a gnid its viewparent's list names and no node answers to; a
+*restricted viewnode*, of a node the skgrepo restriction keeps out
 that a visible record names (a record is a relationship as one
 node's file states it, in one skgrepo's section, visible when the
 skgrepo restriction holds that skgrepo), showing nothing of the node but the
@@ -205,22 +207,22 @@ an occurrence of the node's pid. Otherwise, does the truth say the
 node is restricted (=Restricted=, =GnidPresence=: the
 skgrepo restriction keeps out its home)? Then, if its viewparent's
 goal names the gnid (its record is visible), or it is a root
-of the view (the view is the user's own request), it is a Restricted
-vognode; if not, a tombstone. Either reveals nothing of the node.
+of the view (the view is the user's own request), it is a restricted
+viewnode; if not, a tombstone. Either reveals nothing of the node.
 Otherwise, in the diff view, does HEAD have it? Then it is the node's
 ghost, unless the skgrepo restriction keeps out HEAD's node's home, when it
 is answered as a restricted node is: a restricted node is never a
 ghost. Otherwise,
-does its viewparent's list name the gnid? Then it is an unknown.
+does its viewparent's list name the gnid? Then it is an unknown viewnode.
 Otherwise it is a tombstone. In a content view an occurrence the
 rule answers so does not become one: it *vanishes*, removed with its
 subtree, a view root included, for its node is gone or restricted and
 its viewparent's list does not name it ('docs/glossary.org',
 "vanish"); in the diff view it becomes a tombstone. So an occurrence
-of a node a skgrepo narrowing keeps out becomes a Restricted vognode
+of a node a skgrepo narrowing keeps out becomes a restricted viewnode
 in place where its record is visible, and an occurrence again after a
 skgrepo widening; where its record is not visible it vanishes, and
-the skgrepo widening draws it again. When an unknown or a Restricted vognode
+the skgrepo widening draws it again. When an unknown viewnode or a restricted viewnode
 becomes an occurrence, each of its children claims again, as the
 text of its view, which writes no =noClaim= under it, would say, and
 the claims rung makes those vanish that the truth does not warrant
@@ -235,7 +237,7 @@ Each child of a vognode or a folder has two flags. It *claims
 membership* when the save will read it as a member of its
 viewparent's list. That is declared: the bare atom =noClaim= says no,
 its absence yes (=claimsMembership= on the occurrence, the ghost, the
-unknown, the Restricted vognode, the alias and the ID). The save reads claims only under an
+unknown viewnode, the restricted viewnode, the alias and the ID). The save reads claims only under an
 editable occurrence, and under an editable folder (subscribee,
 overridden, hidden-outside-of-subscribee, alias) of one
 (=parent_reads_claims= in =server/refresh/ancestry.rs=); under any
@@ -278,8 +280,8 @@ hidden-outside-of-subscribee folders: =Folder::goal_is_ordered=), and
 unordered elsewhere. In the diff view the goal is the union
 of the parent's lists in the two graphs of the straddle, an item only
 HEAD's list holds being warranted by HEAD. A parent whose position
-implies no relationship (the buffer root, a tombstone, an unknown, a
-Restricted vognode) has no goal.
+implies no relationship (the buffer root, a tombstone, an unknown
+viewnode, a restricted viewnode) has no goal.
 
 Under a skgrepo restriction a goal omits each member whose record is
 restricted: the gated accessors of the in-Rust graph leave it out;
@@ -289,13 +291,13 @@ skgrepo restriction too, though the diff view opens only on an
 unrestricted connection: a switch rerenders its open buffers.
 It keeps each member whose record is visible: a node the
 skgrepo restriction keeps out, which the ID rule, finding the node restricted and the
-gnid named by the goal, answers with a Restricted vognode; and a gnid
+gnid named by the goal, answers with a restricted viewnode; and a gnid
 nothing answers
-to, an unknown, as under no skgrepo restriction. The save is its mirror: it
+to, an unknown viewnode, as under no skgrepo restriction. The save is its mirror: it
 restores to a list only the members whose records are restricted,
 and to a node's aliases only those whose records are restricted,
 which the buffer could not show (=preserve_invisible_members= and
-=server/from_text/weave.rs=), so a Restricted vognode keeps its member
+=server/from_text/weave.rs=), so a restricted viewnode keeps its member
 while it claims, and deleting its line removes the record.
 
 The rule behind the mirror: the skgrepo restriction limits what the
@@ -305,7 +307,7 @@ gone from a list, a hide, an alias, an extra ID, a subscription or an
 override gone, a relRepo or a home that differs) asks the record's
 visibility first, and a record the skgrepo restriction keeps out is
 neither removed, moved nor rewritten, whatever the buffer shows in its
-place. A write that acts on the restriction's silence is a defect.
+place. A write that acts on the skgrepo restriction's silence is a defect.
 So the subscribee-visibility step, which rewrites a subscriber's
 hides from what an editable subscribee shows of its content under it
 (=resolve_visibility.rs=), reads the subscribee's content and the

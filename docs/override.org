@@ -34,8 +34,8 @@ automatic substitution.
 Visiting an ID opens that exact node as the raw root of a content view.
 It does not redirect to an overrider and does not stop at a choice
 buffer.  Re-visiting an ID that is already a root switches to its open
-content view.  A node whose home skgrepo is restricted in the current
-skgrepo-set cannot be visited.
+content view.  A node whose home skgrepo the current
+skgrepo restriction keeps out cannot be visited.
 
 This makes every viewnode used for navigation a stable destination.  In
 particular, selecting a node in search results or an override folder
@@ -106,10 +106,10 @@ subscribee-as-such is the exception: in addition to its ordinary
 content, it automatically includes a nonempty folder for content hidden
 there.
 
-Under a restricted skgrepo-set, both override folders omit relationships
+Under a skgrepo restriction, both override folders omit relationships
 whose relRepo is restricted, and show a partner whose home skgrepo is
-restricted, where its relationship's relRepo is not, as a Restricted
-vognode, which shows nothing of it. Saving the visible subset
+restricted, where its relationship's relRepo is not, as a restricted
+viewnode, which shows nothing of it. Saving the visible subset
 preserves memberships stored in restricted telescope sections.
 
 ** Automatic override substitution
@@ -249,8 +249,8 @@ relationship lists of owned referencers, including
 absent-reference cleanup can remove an exact dangling override partner
 from owned data.
 
-An unknown override target can otherwise remain visible as an unknown
-folder member.  It cannot substitute because there is no node to show.
+An override target that is an unknown graphnode can otherwise remain
+visible as an unknown viewnode, as a folder member.  It cannot substitute because there is no node to show.
 
 ** Skgrepo-set behavior
 

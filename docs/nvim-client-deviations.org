@@ -45,9 +45,9 @@ concerns each, which Neovim keeps apart: 'skg-id-search.el' is
 and 'picker.lua' (the prompts), 'skg-request-save.el' is 'save.lua'
 and 'messages.lua' (the report buffers).
 
-A message has the same words in both clients; Neovim's begins
-'skg: ' and in lowercase where Emacs's begins with a capital, and
-names Neovim's keys where Emacs's names a chord.
+A message has the same words in both clients, and names Neovim's
+keys where Emacs's names a chord. Some of Neovim's begin 'skg: ', in
+lowercase where Emacs's begins with a capital.
 
 A refusal shows as one line in both clients. Emacs signals it as a
 'user-error'; Neovim raises it as a Lua 'error ()', and every key and
@@ -82,8 +82,9 @@ refusal at error level without the Lua traceback and without the
   The Emacs shell-mode linkstack bindings have no terminal-mode
   equivalent here; paste the id from a buffer instead.
 - Emacs binds a few keys outside its content views: search, go-to-ID
-  and the skgrepo-set switch in every buffer, and go-to-node and
-  id-next/prev in magit. Neovim binds no key globally and none in
+  and the switch of the skgrepo restriction in every buffer, and
+  go-to-node and id-next/prev in magit. Neovim binds no key globally
+  in normal mode (only the command-line-mode linkstack keys above), and none in
   neogit; every ':Skg*' command works from any buffer instead. Its
   .skg file buffers and report buffers get the same subsets Emacs
   gives them (docs/COMMANDS-nvim.org, "keys outside content views").

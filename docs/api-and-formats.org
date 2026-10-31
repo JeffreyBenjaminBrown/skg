@@ -285,8 +285,8 @@ So far there are these endpoints:
     update. There is no save-anyway path.
   - Deleting under a skgrepo restriction: a delete's propagation strips
     the deleted IDs from every owned recorder ('apply_delete_propagation
-    _cleanup' in 'server/save.rs'). When records in sections the skgrepo
-    restriction keeps out name a deleted graphnode and the request
+    _cleanup' in 'server/save.rs'). When records in sections the
+    skgrepo restriction keeps out name a deleted graphnode and the request
     lacks =(delete-from ...)=, nothing is skgsave-committed and the
     server replies, before any other decision and in place of
     save-result, =((response-type delete-from-confirmation) (count N)
@@ -413,8 +413,8 @@ it are its body. A message that concerns a headline of the
 buffer names it as a level-3 subheadline, after the message's own
 lines:
 #+begin_example
-** A readiness request names no current change; it was dropped.
-*** b
+,** A readiness request names no current change; it was dropped.
+,*** b
 - graphnode ID: b
 - viewnode ID: 0z. To find it: C-c g v 0z
 #+end_example
@@ -434,7 +434,7 @@ subheadlines nest under them; a parse error ends with the headline it
 is in. The command, 'skg-goto-viewnode-id' on =C-c g v= in Emacs and
 =<localleader>gv= in Neovim (which the Neovim client writes in place
 of =C-c g v=), reads a viewnode ID and moves to the headline carrying
-it, while heralds hide it. The subheadline is written by
+it, while heralds stand in for its metadata. The subheadline is written by
 'HeadlineName::org_subheadline' (=server/types/errors.rs=). A save
 refused because another view's metadata is invalid lists that view's
 errors on one line, naming each headline by its viewnode ID or title,
@@ -656,7 +656,8 @@ since the command searches the current buffer.
     body, and trailing blank lines from each body's tail, in every
     owned skgrepo in the config. Foreign skgrepos are never written, so they are
     left untouched (stripping them would make them diverge from
-    their upstreams). Rewrites exactly the .skg files whose bodies
+    their upstreams). It ignores the skgrepo restriction: it rewrites
+    the bodies of nodes the skgrepo restriction keeps out too. Rewrites exactly the .skg files whose bodies
     changed (a clean file stays byte-identical); a body that strips
     to nothing is dropped from its file. The graph and Tantivy are refreshed
     to match. The clients suggest
@@ -675,8 +676,8 @@ TCP connection:
 - A destination the connection's skgrepo restriction keeps out is
   refused, at the preview and again at the apply, with
   =response-type= =import-md-and-org-result= and the error "Cannot
-  import into the repo 'REPO': it is restricted under the current
-  repo-set. ...". Nothing is written.
+  import into the repo 'REPO': the skgrepo restriction keeps it
+  out. ...". Nothing is written.
 - If absolute filesystem links to =.md= or =.org= files are found, the
   server responds with
   =response-type= =import-md-and-org-host-mapping-needed= and a =content=
@@ -741,7 +742,8 @@ one automatically.
     =# ROOT-PID=, then a fixed warning against editing the file. The
     importer ignores exactly this header.
     Existing files are overwritten; others are left untouched. Needs
-    neither the live graph nor Tantivy.
+    neither the live graph nor Tantivy. It ignores the connection's
+    skgrepo restriction: =NAME= alone decides what it exports.
     Before writing anything, a restricted export involving overPrivateText
     telescopes returns LP =overPrivateText-telescope-confirmation= with
     =(operation export-to-org)= and the exact PIDs. An approved retry
@@ -749,8 +751,8 @@ one automatically.
     the config's most private skgrepo (no skgrepo restriction), or an
     approved restricted export, returns the ordinary export response
     with the shared warning.
-  - An *export root* is a node one of whose =contains= children has
-    a title linking to the instruction node
+  - An *export root* is a node one of whose =contains= children, its
+    *export marker*, has a title linking to the export instruction node
     =3d9aa9be-d95a-48bc-b362-33f9e7ebdf6f= and a body yielding a
     =target_filepath= (a tolerant ~key = value~ parse; the value may
     be bare or quoted, but a bare value with whitespace is refused).
@@ -764,10 +766,11 @@ one automatically.
     headline's text in its file; only headlines targeted by
     =#PID= get a =:CUSTOM_ID: PID= drawer.
   - The same export is available as a CLI subcommand (no running server):
-    =cargo run --bin skg -- export-org [config-path] [skgrepo-set]
-    [output-dir] [--include-overPrivateText-telescopes]=; =skgrepo-set=,
-    the most private skgrepo to export, defaults to the config's most
-    private skgrepo. Under a restricted set it fails closed before
+    =cargo run --bin skg -- export-org [config-path] [skgrepo-restriction]
+    [output-dir] [--include-overPrivateText-telescopes]=; =skgrepo-restriction=,
+    the skgrepo restriction to export under, named as every
+    skgrepo restriction is by its most private skgrepo, defaults to the config's most
+    private skgrepo. Under a skgrepo restriction it fails closed before
     writing unless the flag is present; with no skgrepo restriction
     (and on an approved restricted run) it prints the warning.
 
@@ -777,8 +780,8 @@ one automatically.
     (id . "RAW-ID"))=. =RAW-ID= must still be absent.
   - Refused unless the connection is unrestricted, since the cleanup
     scans and rewrites every owned recorder: the error response
-    "Deleting the references to an absent ID requires no skgrepo
-    restriction ...", followed by an empty rerender stream.
+    "Deleting the references to an absent ID requires no
+    skgrepo restriction ...", followed by an empty rerender stream.
   - If owned title/body links point at the ID, response type
     =delete-references-confirmation= carries =(id ...)=, an opaque
     =(approved-preview ...)=, =(content "ORG WARNING")=, and a prompt,
@@ -787,7 +790,9 @@ one automatically.
     the ID ("Investigate unknown node").
   - Success response type =delete-references-result= carries Org =content=,
     =changed-nodes=, and =changed-memberships=, followed by rerender-lock,
-    rerender-view*, and rerender-done for every open view.
+    rerender-view*, and rerender-done for every open view that shows a
+    changed recorder or the absent ID; the other views are not
+    rerendered.
   - The mutation removes only exact raw-ID matches in owned =contains=,
     =subscribesTo=, =hidesFromSubs=, and
     =overrides= lists.  It leaves text links and foreign telescopes
@@ -850,23 +855,32 @@ one automatically.
        rerender-lock → rerender-view* → rerender-done. Each open view
        is re-rendered in place under the new set by the refresh alone:
        every occurrence of a node the new set keeps out becomes, in
-       place, a Restricted vognode where a record the set shows names
+       place, a restricted viewnode where a record the set shows names
        it, keeping its viewchildren, and vanishes elsewhere, with its
        subtree; a member whose record alone the new set keeps out
        vanishes too, where its parent reads claims; an editable
        folder whose every member's record the new set keeps out stays,
        empty, as any empty editable folder does; and the refresh fills
        every folder per the new set, so a skgrepo widening makes each
-       Restricted vognode an occurrence again and draws again the
-       members and folders it reveals. None of this is reported (see
-       "Restricted-skgrepo nodes" below).
-  - Behavior: The skgrepo restriction is per Emacs TCP connection. It
+       restricted viewnode an occurrence again and draws again the
+       members and folders it reveals. A view root the new set keeps
+       out stays, as a restricted viewnode, whether or not a record
+       names it. The folders under an occurrence that became a
+       restricted viewnode become tombstones, holding their members,
+       and stay tombstones after a skgrepo widening. None of this is
+       reported: the response names the new skgrepo restriction, and
+       nothing more (see "Restricted-skgrepo nodes" below).
+  - Behavior: The skgrepo restriction is per TCP connection. It
     defaults from =skgconfig.toml=, resets on reconnect, and is not
     written back to the config. Changing it requires confirmation in
-    Emacs, and re-renders (not closes) all active Skg buffers for that
+    either client, and re-renders (not closes) all active Skg buffers for that
     connection. The rerender starts from each view as the server last
     stored it, and the clients replace each buffer's text with the
-    result, so an unsaved edit in an open buffer is lost.
+    result, which would lose an unsaved edit; so each client refuses
+    the switch while any view has unsaved edits ("Save or revert
+    every skg view before switching the skgrepo restriction"), before
+    it sends the request. The server's own refusals are the two
+    below.
   - Refusal: the endpoint's error paths (a missing name, or one that
     names no skgrepo of the config: "'NAME' names no skgrepo of the
     config. The skgrepo restriction is the most private skgrepo to
@@ -945,11 +959,11 @@ parameter, a small form naming it (=(flag F)=, =(oldText ASPECT)=,
 the two moves, =(changesetMarker KIND)=). A headline naming no kind
 is a node. Each kind
 takes only its own parts; =(gnid ID)= names the node a node, a
-ghost or an unknown stands for, and =(skgRepos (nodeRepo REPO)
+ghost or an unknown viewnode stands for, and =(skgRepos (nodeRepo REPO)
 [(relRepo REPO)])= its home skgrepo and the skgrepo recording its
 relationship to its viewparent, the relRepo written only when it
-differs from the default (a ghost has no relRepo; an unknown and an
-alias have only one). A ghost, an unknown viewnode and a restricted
+differs from the default (a ghost has no relRepo; an unknown viewnode
+and an alias have only one). A ghost, an unknown viewnode and a restricted
 viewnode require their =(gnid ID)=. The fields a user sets
 (=noClaim=, =writeProtected=, the requests of =(editRequest ...)=
 and =(viewRequests ...)=) a kind takes as
@@ -1104,7 +1118,7 @@ one on a ghost:
   view-parent (or a writable folder's viewparent), so a write-protected headline
   may carry this request too; the save refuses it only when nothing editable
   writes that relationship, e.g. under a write-protected parent.
-  An alias and an unknown likewise show their relationship's relRepo
+  An alias and an unknown viewnode likewise show their relationship's relRepo
   in =(skgRepos (relRepo NAME))=, which the save does not read as a
   request, and carry a request only in =(editRequest ...)=; copying the
   fact is harmless, while copying a request deliberately requests it at
@@ -1317,13 +1331,13 @@ visibility-ungated walk out of N) aborts the save with an
 explanation. With chains the honest carrier may be a middle link
 (shown when a later link's mentioner is restricted), so the check accepts
 any node on the chain and rejects only off-chain facts. A
-skgrepo-set switch that makes a
+switch of the skgrepo restriction that makes a
 shown substitute's skgrepo restricted makes it vanish, with its
 subtree (the fact does not survive, and nothing stands where the
 substitute stood), and the refresh draws the original it stood for,
 which disk supplementation preserves in its container's contains. A
-restricted original whose record is visible stands as a Restricted
-vognode, never substituted. When the override itself is gone, the
+restricted original whose record is visible stands as a restricted
+viewnode, never substituted. When the override itself is gone, the
 refresh reinstates the original beside the overrider, which,
 unwarranted as itself, vanishes.
 
@@ -1385,8 +1399,8 @@ Skgrepo-sets are no longer declared; the retired =[[repo_sets]]=
 table is rejected with an error. The sets are exactly the
 *prefixes of the privacy order*: each skgrepo's name denotes the
 set consisting of itself and every more-public skgrepo; the most
-private skgrepo's set holds every skgrepo, and so is no skgrepo
-restriction. Choosing a set is choosing
+private skgrepo's set holds every skgrepo, and so is no
+skgrepo restriction. Choosing a set is choosing
 "the most private skgrepo to make available." =default_repo_set=
 (top-level field) names the skgrepo restriction when a client
 connects; left out, it is the most private skgrepo.
@@ -1579,18 +1593,18 @@ bodyDiff, tombstone, forestRoot, a folder atom
 #+end_example
 where READINESS is =(ready OBJECT...)= or =(unready OBJECT...)= (see
 "Metadata of the diff view"). =(gnid ID)= names the node a node, a
-ghost, an unknown or a Restricted vognode (=restricted=, see
+ghost, an unknown viewnode or a restricted viewnode (=restricted=, see
 "Restricted-skgrepo nodes") stands for, and =(skgRepos (nodeRepo REPO)
 [(relRepo REPO)])= its home skgrepo and the skgrepo recording its
 relationship to its viewparent, the relRepo written only when it
-differs from the default (a ghost has no relRepo; an unknown, a
-Restricted vognode and an alias have only one). A Restricted vognode
+differs from the default (a ghost has no relRepo; an unknown viewnode,
+a restricted viewnode and an alias have only one). A restricted viewnode
 carries no title, and text typed on its line is refused, as on an
-unknown's. =noClaim= on a node, a ghost, an alias, an ID, an unknown
-or a Restricted vognode says the save does not read it as a member of its
+unknown viewnode's. =noClaim= on a node, a ghost, an alias, an ID, an
+unknown viewnode or a restricted viewnode says the save does not read it as a member of its
 viewparent's list; a claiming child carries nothing, and so does every
 child of a viewparent whose claims the save does not read. A removed
-alias and a dangling partner the worktree lost (an unknown carrying
+alias and a dangling partner the worktree lost (an unknown viewnode carrying
 =(rel removed)=) carry =noClaim= where their viewparent's claims are
 read, so that the save, which skips the =(diff ...)= saying they were
 lost, leaves them out of the list.
@@ -1605,7 +1619,7 @@ base 36 (two characters at least, skipping any spelled like a number,
 such as =05= or =1e5=), to every viewnode that lacks one at the end of a
 refresh, and never reassigns or reuses one: a headline keeps the
 viewnode ID it carried through a save and a rerender, through a cut
-and paste, and through a skgrepo-set switch that leaves it standing. A
+and paste, and through a switch of the skgrepo restriction that leaves it standing. A
 headline typed without one gets one; of two headlines carrying one
 viewnode ID, the first in buffer order keeps it and the second (a copy)
 gets a fresh one; a headline carrying one the view does not know
@@ -1660,7 +1674,7 @@ are declared parts, which the save consumes. Saving a buffer reads
 none of the new viewnodes, which are save-inert, but for a ghost's
 restore request and the gnid of a ghost that claims membership (one
 its viewparent's worktree list still names), which the save keeps in
-the list, as it keeps an unknown's.
+the list, as it keeps an unknown viewnode's.
 The glossary's "Terms a user meets in the diff view" and "Terms of
 the diff view's implementation" define the vocabulary.
 
@@ -1674,7 +1688,7 @@ The first three parts are the three kinds of change, and say only
 what is true. The parts come in that order, and a part is absent when
 it has nothing to say; a headline with nothing to say carries no
 =(diff ...)=, and =(diff)= is never written. A node, a ghost, an
-unknown, a Restricted vognode, an alias, id or flag member and the
+unknown viewnode, a restricted viewnode, an alias, id or flag member and the
 change viewnodes other
 than =bodyDiff= may carry it; a folder never does (see "Changed
 folders" below).
@@ -1710,7 +1724,7 @@ single leaf). Absent when nothing is ready.
 **** =(homeSkgrepoMove (old OLD) (new NEW))=, =(movedLikeAncestor LETTER)= -- a node's home skgrepo moved
 In the skgrepo-changes buffer, on a node whose home skgrepo moved
 from OLD to NEW since HEAD; herald "-OLD +NEW". Beside it, when the
-nearest vognode ancestor whose home moved moved the same way,
+nearest vognode ancestor whose home skgrepo moved moved the same way,
 =(movedLikeAncestor LETTER)=, LETTER naming that ancestor as the
 relationship tokens do (a = the viewparent); herald "Δ⌂=LETTER".
 
@@ -1747,7 +1761,7 @@ commit-readiness of the home-skgrepo move of the node at point. Their
 recursive forms take a prefix argument: =C-u C-c r r= marks every
 change in the subtree at point, or unmarks them if the headline at
 point is ready, and =C-u C-c r h= does the same as =C-c r h= to every
-descendant whose home moved between the same two skgrepos; see
+descendant whose home skgrepo moved between the same two skgrepos; see
 =docs/COMMANDS.org=, "C-c r : commit readiness, in the diff view". The
 Neovim keys are in =docs/COMMANDS-nvim.org=. A gesture that would
 unmark more than one change first asks for a typed "yes".
@@ -1775,7 +1789,7 @@ Its headline is the alias or the ID: a member with a ghost warrant,
 which claims no membership. Saving reads no alias from it, and the
 ID folder, whose claims the save never reads, carries no =noClaim=;
 the save's check of an ID folder refuses only one lacking an ID of
-the node. A dangling partner the worktree lost, an unknown carrying
+the node. A dangling partner the worktree lost, an unknown viewnode carrying
 =(rel removed)=, likewise carries =noClaim= where its folder reads
 claims.
 **** =ghost (gnid ID) (skgRepos (nodeRepo REPO)) ...= -- a ghost
@@ -1837,7 +1851,7 @@ A readiness gesture on such a folder acts on each changed membership.
     about such a record as an edit: what the user could not see, the
     user did not edit. The rules below are its cases.
 
-Under a restricted skgrepo-set, a node whose home skgrepo the set
+Under a skgrepo restriction, a node whose home skgrepo the set
 keeps out is /restricted/, and the view shows nothing of it: no
 title, no body, no home skgrepo, no stats. What it shows where a
 relationship names such a node depends on the relationship's
@@ -1849,7 +1863,7 @@ content, subscribees, and every partner folder's members alike.
 Omission is recursive: an omitted container's whole branch is
 omitted, unrestricted descendants included (they stay reachable by
 search or direct visit). A member whose record the set shows, and
-whose node it keeps out, stands as a /Restricted vognode/, which
+whose node it keeps out, stands as a /restricted viewnode/, which
 carries the record's gnid and relRepo and nothing of the node:
 
 #+begin_example
@@ -1857,13 +1871,15 @@ carries the record's gnid and relRepo and nothing of the node:
 #+end_example
 
 Its herald is "restricted". It has no content of its own drawn: no
-goal, no folders. It claims membership as an unknown does, takes a
+goal, no folders. It claims membership as an unknown viewnode does, takes a
 relRepo request and a readiness request, and refuses text typed on
 its line. A member whose record the set shows and that resolves to
-no node at all is an unknown, as under no skgrepo restriction. A view rooted
-at a node the set keeps out shows its root as a Restricted vognode
-too, since the view is the user's own request; it is the node's
-occurrence again when the set widens. An alias whose record the set
+no node at all is an unknown viewnode, as under no skgrepo restriction. A view rooted
+at a node the set keeps out (one opened before a skgrepo narrowing;
+opening one under the skgrepo restriction is refused) shows its root
+as a restricted viewnode too, whether or not a record names it,
+since the view is the user's own request; it is the node's occurrence again after a
+skgrepo widening. An alias whose record the set
 keeps out is neither drawn nor counted in =(props (aliases N))=.
 The diff view opens only on an unrestricted connection, but a
 switch rerenders its buffers under the new set as a content view
@@ -1875,11 +1891,11 @@ buffer's visible lists with the disk lists -- order-preserving (the
 anchored weave) for =contains= and =subscribesTo=, set-difference
 for =overrides= -- restoring only the members whose records are
 restricted, and a node's aliases whose records are restricted. A
-Restricted vognode keeps its member in the list while
+restricted viewnode keeps its member in the list while
 it claims, and deleting its line removes the record, as deleting an
-unknown's does. The folder of what a subscriber hides outside its
+unknown viewnode's does. The folder of what a subscriber hides outside its
 subscribees replaces the hides with a visible record, each of which
-it showed, as an occurrence, an unknown or a Restricted vognode; a
+it showed, as an occurrence, an unknown viewnode or a restricted viewnode; a
 hide recorded in a restricted section is never replaced. Which hides
 stand outside the subscribees is what the visible records say: a
 hide of a node a subscribee contains only by a restricted record
@@ -1894,25 +1910,27 @@ visible members, including deletions, are honored. A member whose
 record is restricted needs no headline for this: the disk supplies
 it.
 
-When a skgrepo-set switch is applied to an open view (an
+When a switch of the skgrepo restriction is applied to an open view (an
 already-rendered buffer), every occurrence of a now-restricted node
-becomes, in place, a Restricted vognode where its record is visible,
+becomes, in place, a restricted viewnode where its record is visible,
 keeping the occurrence's viewnode ID, fold state and viewchildren, so
-its visible descendants keep their place; otherwise it vanishes, with
-its subtree, so nothing the user hid by restricting the skgrepo-set
-leaks. So does a member whose record alone the set keeps out, where
+its visible descendants keep their place, and so does a view root
+whether or not its record is visible; otherwise it vanishes, with
+its subtree, so nothing the skgrepo restriction keeps out leaks. So does a member whose record alone the set keeps out, where
 its parent reads claims: the graph as the set shows it no longer
 relates it to its parent. Neither is a detachment: a restricted
 record's membership in its parent's list is owned entirely by disk
 supplementation, not the buffer. The folders of a node that became a
-Restricted vognode are pruned as its property members and change
-viewnodes are. An editable folder whose every member's record the
-new set keeps out stays, empty. The children of a Restricted vognode
+restricted viewnode, like its property members and change viewnodes,
+cannot stand under it: each becomes a tombstone holding what stood
+under it, a childless one is pruned, and the tombstones stay after
+the switch back. An editable folder whose every member's record the
+new set keeps out stays, empty. The children of a restricted viewnode
 remain occurrences, claiming nothing. Switching back makes each
-Restricted vognode an occurrence again, where it stands, its children
+restricted viewnode an occurrence again, where it stands, its children
 claiming again where the node's lists name them, and draws again each
 node and member that vanished, where the graph puts it. A de-novo
-render under a restricted set draws no such member in the first
+render under a skgrepo restriction draws no such member in the first
 place -- members whose records are restricted are omitted and their
 content is never extended.
 

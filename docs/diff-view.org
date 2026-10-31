@@ -174,12 +174,15 @@ refresh so:
 - in the tail, the '(ready ...)' change facts are set from the
   store, and in the skgrepo-changes buffer the home skgrepo moves.
 The diff view opens only on an unrestricted connection, but a
-skgrepo-set switch rerenders its open buffers under the new
-skgrepo restriction, which the refresh then asks as in a content
-view: the goal omits a member whose record is restricted and keeps
-one whose node is restricted (the worktree's node, or HEAD's when
-the worktree has none), which stands as a Restricted vognode carrying its change
-facts and none of the change viewnodes that would show its text; a
+switch of the skgrepo restriction rerenders its open buffers under
+the new skgrepo restriction, and the refresh asks it there as in a
+content view. The goal omits a member whose record is restricted. It
+keeps a member whose record is visible and whose node is restricted
+(the worktree's node, or HEAD's when the worktree has none). That
+member stands as a restricted viewnode, carrying only its
+relationship's change fact ('(rel ...)', herald =~+= or =~-=), never
+a node's ('∃+', '∃-'), and none of the change viewnodes that would
+show its text ('tag_children' in 'server/refresh/diff_view.rs'). A
 restricted node is never a ghost.
 ** Change viewnodes and tags
 At each editable occurrence of a node in C, the refresh holds, ahead
@@ -207,8 +210,8 @@ with its node's existence ('(node added)', '(node removed)'), its
 node's other properties ('(properties changed)') and its
 relationship's existence ('(rel added)', '(rel removed)'), the last
 from the goal item it is; a ghost with its node's removal and its
-relationship's; an unknown or a property member with its
-relationship's. A root, and an occurrence the goal does not name, are
+relationship's; an unknown viewnode, a restricted viewnode or a
+property member with its relationship's. A root, and an occurrence the goal does not name, are
 tagged as a node only; a node of the containerward chain carries no
 change. Under a member whose relationship moved to another skgrepo
 stands its relRepo move, first.
@@ -295,7 +298,7 @@ node is an ordinary editable node with ∃+; its existence is one leaf.
 A ghost claims membership only where its parent's worktree list
 still names its gnid (a dangling reference to a node HEAD has): it
 carries no 'noClaim' there, and the save keeps its gnid in the list
-as it keeps an unknown's ('traverse.rs'). Anywhere else under an
+as it keeps an unknown viewnode's ('traverse.rs'). Anywhere else under an
 editable parent it claims nothing ('noClaim'), and contributes
 nothing to the save.
 ** What the refresh keeps
@@ -350,7 +353,7 @@ come sorted by ID.
 A removed dangling ID is not shown in a folder whose membership the
 save reads, nor in content when neither graph has the node: its leaf
 in content is under the content changeset marker. Elsewhere it is an
-unknown, with '(rel removed)'.
+unknown viewnode, with '(rel removed)'.
 
 The restore requests read where it stands: 'restoreRel' is accepted
 on an occurrence with a ghost warrant in content position or in a
@@ -531,7 +534,7 @@ aggregate there are named by the headlines under it, or are not
 shown there; the other objects such a headline lists are named. C-c r h
 ('skg-toggle-homeSkgrepo-move-commitReady') acts on the home skgrepo
 move of the node at point, and with a prefix argument on every
-descendant whose home moved between the same two skgrepos. Both work
+descendant whose home skgrepo moved between the same two skgrepos. Both work
 on write-protected occurrences. A gesture that would unmark more than
 one leaf, counting each request's leaves as '(leaves N ...)' does,
 first asks for a typed "yes".
@@ -662,9 +665,10 @@ the views that show them. Mentions carry no relRepo, so they are
 never stranded. The client writes only the new home; the analysis is
 the server's.
 
-* Investigating an unknown node
-An unknown stands for an ID nothing in the graph answers to.
+* Investigating an unknown graphnode
+An unknown viewnode stands for an unknown graphnode: an ID nothing
+in the graph answers to.
 C-c t r ('skg-investigate-unknown-node') asks the server what git
-history knows of it: when it was last present, the commit it vanished
+history knows of that unknown graphnode: when it was last present, the commit it vanished
 at, its title and relations then, and what referred to it (the API
 doc's "Investigate unknown node").

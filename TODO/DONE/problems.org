@@ -1,3 +1,33 @@
+* Problems found by the review of plan 08 (2026-10-30; documented 2026-10-31)
+  Found by the throwaway tests of 'TODO/simplify-refresh/
+  09_review.org' (Open questions 1 and 2); the tests are in
+  'tests/results/08/review/throwaway-tests/', each with its log
+  and the line to add to run it. Both run; neither loses data.
+** Writes that touch what the skgrepo restriction hides (the last of eleven)
+  Found by the review's search against Jeff's principle of
+  2026-10-30 (the skgrepo restriction limits what can be edited
+  as well as what can be seen); the report is
+  '09_1_review-reports/restriction-edits.org', the tests
+  'lead5_*' beside it, each case through the real save path on
+  disk fixtures under 'public' and 'private'. Run unless marked
+  read. Each is one problem; the report has file:line and the
+  fix for each.
+*** Strip body whitespace and the export ignore the skgrepo restriction
+  Read. Strip body whitespace is dispatched without the skgrepo
+  restriction ('serve.rs') and rewrites every owned graphnode whose
+  body changes, restricted ones included; the export to org takes
+  its skgrepo-set from the request, a read leak. Both stay as they
+  are by Jeff's choice (2026-10-31); slice 6 of
+  'TODO/simplify-refresh/10_plan.org' documents them so.
+  Documented by slice 6 of 'TODO/simplify-refresh/10_plan.org':
+  the entries of 'skg-strip-trailing-whitespace-from-bodies' and
+  'skg-export-some-to-org' in 'docs/COMMANDS.org', of
+  ':SkgStripBodyWhitespace' and ':SkgExportToOrg' in
+  'docs/COMMANDS-nvim.org', and the API doc's "Strip body
+  whitespace" and "Export to org" say that each ignores the skgrepo
+  restriction: the strip rewrites the bodies of graphnodes the
+  skgrepo restriction keeps out too, and the export exports what the
+  most private skgrepo it is given decides.
 * Problems noted during the fork-fixes arc (fixed 2026-10-31)
 ** Subscribee-as-such hides may misfire under a restricted skgrepo-set
    The signal loop in 'resolve_visibility'

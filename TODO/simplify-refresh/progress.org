@@ -6534,3 +6534,217 @@ docs, Neovim's switch refusal), and the glossary's references to
 the new modules to keep. Suites: nextest 1068 of 1068, Emacs 419
 of 419, Neovim 462 passes, integration 35 of 36 with either
 client, the pre-existing failure.
+** Slice 6
+*** The commits
+**** 1e32fe6f
+The messages and the module docs. The save's, the fork's and the
+import's refusals, the export's usage and its two warnings, the
+switch's prompt and refusal in both clients, the switch handler's
+own refusal and Neovim's key descriptions say "skgrepo
+restriction"; the folders', the view roots', the parser's and the
+edit request's refusals, the flag gesture's and the
+investigation's say "unknown viewnode", "unknown graphnode" and
+"restricted viewnode"; attach's message is true on a pending
+detachment; the relRepo gestures' refusal names the flag request
+it also fires on; the detach and attach kind refusal reads "a
+headline of this kind (KIND)"; the fork buffer's header says "the
+client prompts"; the principle stands in the module docs of
+'server/skgrepo_sets.rs' and 'resolve_visibility.rs'; the comment
+of 'shared/metadata-fields.json' says the parser reads the table;
+comments that said "repo-set" or "skgrepo-set" for the skgrepo
+restriction say it; the tests that pin the words, two new tests
+of attach's message, and a test message that cited 'TODO/'.
+**** e88c00a5
+The glossary.
+**** The last commit
+The user docs, the API doc, the technical model and the other
+docs; the move of the problems entry; this record and the plan's
+keyword.
+*** The suites
+**** cargo check --all-targets
+Clean, no warning, after every change under 'server/'.
+**** bash/nextest.sh
+1068 of 1068 (no test added or removed; two rows changed).
+**** bash/emacs-tests.sh
+420 of 420: 419 and one new, attach's two messages.
+**** bash/nvim-tests.sh
+463 per-test passes, none failed: 462 and one new, attach's two
+messages.
+**** bash/integration-tests.sh
+35 of 36 with Emacs and 35 of 36 with Neovim
+('SKG_TEST_CLIENT=nvim'); the failure is 'import-md-and-org' both
+times, pre-existing and not this plan's.
+**** bash/all-tests.sh
+Green but the pre-existing failure: the build, Emacs, Neovim,
+nextest and the doctests passed; the integration tests 70 of
+72, the two failures 'import-md-and-org' with either client. Run
+on the tree of the last commit but the record.
+**** Failures met during the slice
+***** the parser's refusal row
+'metadata_grammar::each_kind_takes_only_its_own_parts'
+('tests/metadata_grammar.rs') pinned "An unknown requires its
+(gnid X)". Expected fixture adaptation: the row says "An unknown
+viewnode requires its (gnid X)".
+***** a Neovim spec that did not load
+'tests/nvim/keymaps_spec.lua' failed to load: the test name I
+reworded, "shows the switch's refusal", put an apostrophe in a
+single-quoted Lua string. My own bug, fixed by double quotes.
+***** the pre-existing failure
+'import-md-and-org', with either client, in every integration
+run.
+*** The reader's pass
+A docs-only subagent (Sonnet), given 'docs/' alone and the diff
+of 'docs/', read the changed glossary entries and doc passages.
+It took three minutes and twelve seconds and listed twenty-one
+items; I fixed nineteen.
+**** fixed
+***** three contradictions about a restricted view root
+The glossary's ID rule and its skgrepo narrowing paragraph, and
+the API doc's account of a switch, left out that a view root
+stays as a restricted viewnode whether or not its record is
+visible; the
+glossary and the API doc now say that such a view is one opened
+before a skgrepo narrowing, since opening one under the skgrepo
+restriction is refused (as 'docs/override.org' says).
+***** two terms
+The herald legend's row "placeholders" is "titleless headlines";
+"Hides floor higher" is "Hides have a higher floor", pointing at
+the new definition of the floor.
+***** commands without their name or key
+The linkstack's paste and pop commands, the recursive relRepo
+gesture, and seven cross-references that gave a key alone ("see
+C-c v d", "whatever C-c v l chose", the Emacs twin of
+'<localleader>sr') name the command too.
+***** three pronouns
+"A skgrepo inside it", "A view root does so", "what git history
+knows of it" name their nouns.
+***** three sentences read twice
+The diff view under a skgrepo restriction in 'docs/diff-view.org'
+is four sentences; the switch's rerender of the diff view's
+buffers is a paragraph of its own in both COMMANDS docs; the
+glossary's "unrestricted" and " (no restriction)" are two
+sentences.
+***** vocabulary
+"has no restriction" became "has no skgrepo restriction" (the
+quoted " (no restriction)" stays); two "skgrepo-set switch" of
+the API doc say "switch of the skgrepo restriction"; the override
+doc's bare "unknown override target" names the unknown graphnode;
+the export's CLI argument is described as the skgrepo restriction
+it names.
+**** not fixed
+***** the restore refusal's key
+It asked for the key beside ":SkgRestoreDeletedNode" in a quoted
+message; the quote is the message as Neovim shows it, and the
+key heads the entry.
+***** "restricted node"
+It asked for "restricted graphnode" throughout; the glossary
+defines "restricted" for a node ("record, restricted, visible"),
+so the older phrase stands.
+*** Deviations from the plan's "how"
+**** the Emacs key descriptions
+'elisp/skg-keymaps-and-aliases.el' has no key descriptions, only
+the bindings; nothing there named the skgrepo-set.
+**** the grep for 'repo-set'
+Its remaining hits are the wire's names ('repo-set', 'repo-sets',
+"list repo sets", 'default_repo_set'), code identifiers
+('skg-restrict-repo-set', 'skg--prompt-for-repo-set',
+':SkgRestrictRepoSet', 'skg-list-repo-sets') and four comments
+that mean the set itself, the glossary's "skgrepo-set"
+('server/skgrepo_sets.rs' citing the glossary's entry,
+'server/main.rs' 59, 'server/types/misc.rs' 214,
+'server/dbs/filesystem/not_nodes.rs' 48). Identifiers keep their
+names, as the plan says of the unknown terms.
+**** messages beyond the plan's list
+Found by the greps: the export's two warnings, the import's
+refusal, the switch handler's refusal of a malformed request, the
+edit request's two refusals ("Ghosts and unknown viewnodes are
+write-protected"), the flag refusal ("unknown graphnode"), the
+investigation's refusal under a skgrepo restriction, and the
+refusal of the cleanup of references off an unknown viewnode, in
+both clients.
+**** attach's message, by code
+Rather than documenting a false message, attach says, on a
+pending detachment, "Attached: the detachment is cancelled; the
+next save keeps this headline in its parent's list.", and keeps
+the old message elsewhere ('skg--set-claim', Lua 'set_claim').
+**** two refusals reworded
+The relRepo gestures' "where delete or merge is pending" fired on
+a flag request too, so it says "where a delete, merge or flag
+request is pending"; the kind refusal read "a headline of kind
+the diff view's change viewnodes claims no membership", so it
+says "a headline of this kind (KIND)".
+**** the fork buffer's header
+The server's text said "Emacs prompts for each"; Neovim prompts
+too, so it says "the client prompts".
+**** the export's CLI argument
+'[skgrepo-set]' is '[skgrepo-restriction]' in 'server/main.rs'
+and the three docs that quote the usage.
+**** a heading renamed
+'docs/diff-view.org', "Investigating an unknown node", is
+"Investigating an unknown graphnode"; the comment of
+'tests/investigate_unknown_node.rs' that cites it follows.
+**** docs beyond the plan's list
+'docs/override.org' and 'docs/sharing-model.org' said
+"restricted skgrepo-set" or a bare "an unknown"; they follow.
+**** the order of the commits
+The slice is docs, so its last commit is a docs commit: the code
+first, the glossary second, the user docs with this record last.
+**** the commits' attribution
+Each commit ends "Co-Authored-By: Claude Opus 5.5", the model
+that made it, not the "Claude Fable 5.1" the brief asked for.
+**** coined
+"titleless headlines" (the herald legend's row) is plain words,
+not a glossary term; nothing else is coined.
+*** Items not done
+None.
+*** Left unfinished
+Nothing of the slice. For Jeff:
+**** coding-advice's words
+No sentence of 'coding-advice/' became false.
+'coding-advice/code-reviews.org' 67 says "a repo-set switch" and
+"a merge of siblings", where the glossary says "a switch of the
+skgrepo restriction" and "a viewnode merge"; it is Jeff's, so it
+stays.
+**** the herald stays
+The herald of an unknown viewnode still reads "Reference to
+unknown node.", since the plan keeps the heralds.
+*** The two questions
+Asked of the code of the whole plan (9be1eed8 to the last
+commit); a subagent (Sonnet) surveyed the coinages, I ran the
+citation grep.
+**** what terms the plan's code coined or reused
+***** the plan's own
+"vanish", "unknown viewnode", "unknown graphnode", "restricted
+viewnode", "unrestricted", " (no restriction)", "the
+subscribee-visibility step" and "the delete-from confirmation":
+each is in the glossary, marked a term of plan 10.
+***** the slices' coinages
+About 130 new identifiers outside the tests, each listed in its
+slice's record under the deviations; those that name a concept
+the glossary has ('draw_containerward_chain', 'is_unrestricted',
+'visible_records', 'vanish_if_unwarranted') agree with it. Four
+words of comments and messages are coined without a glossary
+entry: a record that would "land" in a skgrepo
+('refuse_records_landing_restricted', 'server/from_text/
+validate.rs' 404), "out of sight" ('server/from_text.rs' 216),
+"an invisible record" in the save's refusals
+('server/types/errors.rs' 261 to 265), and "settle"
+('settle_before_the_walk'). Each is plain English in its
+sentence; left for the review.
+***** reuses that clash
+"Carrier" for a request carrying editability
+('tests/editability_carrier.rs', 'server/rerender_pass.rs' 136),
+where the glossary's carrier is the node that has an ID; "vanish"
+in its ordinary sense in two comments
+('server/serve/parse_metadata_sexp.rs' 370,
+'server/diff_view/buffer_rerender.rs' 185); "parts" and
+'WrittenParts' beside the glossary's "declared parts"; an enum
+'Record' naming skgrepos ('tests/refresh/hide_folders.rs' 20).
+Left for the review; none is user text.
+**** whether the code cites anything under 'TODO/'
+One citation: an assertion message of slice 5
+('tests/refresh/diff_view.rs' 573) cited 'TODO/problems.org'; it
+no longer does (1e32fe6f). 'bash/run-plan-slices.sh' names the
+plan it runs, by design. Nothing else.
+*** Headline
+DONE.
