@@ -1,11 +1,11 @@
-/// PURPOSE: Serve the herald rule table (see server/heralds.rs) and,
-/// beside it, the skgrepo label table the clients render a
-/// 'repoBoundary' with. Each client requests both once per connection,
-/// caches them, and hands the rules to its lens engine; the table
-/// itself lives only in Rust.
-///
-/// Response: (("response-type" "herald-rules") (content "RULES")
-///            (skgrepoLabels ("REPO" "LABEL")...))
+//! PURPOSE: Serve the herald rule table (see server/heralds.rs) and,
+//! beside it, the skgrepo label table the clients render a
+//! 'repoBoundary' with. Each client requests both once per connection,
+//! caches them, and hands the rules to its lens engine; the table
+//! itself lives only in Rust.
+//!
+//! Response: (("response-type" "herald-rules") (content "RULES")
+//!            (skgrepoLabels ("REPO" "LABEL")...))
 
 use crate::heralds::{herald_rules_sexp, skgrepo_labels_sexp};
 use crate::serve::protocol::TcpToClient;

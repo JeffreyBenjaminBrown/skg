@@ -1,5 +1,5 @@
-/// Variations on a simple theme:
-/// Producing a Graphnode from different kinds of information.
+//! Variations on a simple theme:
+//! Producing a Graphnode from different kinds of information.
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::misc::{ID, SkgConfig, SkgrepoName};

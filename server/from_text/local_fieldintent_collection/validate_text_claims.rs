@@ -1,9 +1,9 @@
-/// This file defines text-claim validation, which is async because
-/// it consults disk. A 'SubscribeeTextClaim' is the title/body that
-/// an editable subscribee-as-such displayed in the buffer; since
-/// title/body edits in that position are forbidden, each claim must
-/// match the node's disk state. Claims for nodes absent from disk
-/// are ignored.
+//! This file defines text-claim validation, which is async because
+//! it consults disk. A 'SubscribeeTextClaim' is the title/body that
+//! an editable subscribee-as-such displayed in the buffer; since
+//! title/body edits in that position are forbidden, each claim must
+//! match the node's disk state. Claims for nodes absent from disk
+//! are ignored.
 
 use crate::dbs::node_lookup::opt_graphnode_by_gnid;
 use crate::dbs::in_rust_graph::InRustGraph;

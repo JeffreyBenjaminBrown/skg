@@ -1,10 +1,10 @@
-/// USAGE:
-/// There is an optional command-line argument: the config file path.
-/// See docs/api-and-formats.org § skgconfig.toml,
-/// or the example at data/skgconfig.toml.
-///
-/// Subcommand: import-org-roam <org-dir> <skg-output-dir> <repo-name>
-/// Converts org-roam .org files to .skg files.
+//! USAGE:
+//! There is an optional command-line argument: the config file path.
+//! See docs/api-and-formats.org § skgconfig.toml,
+//! or the example at data/skgconfig.toml.
+//!
+//! Subcommand: import-org-roam <org-dir> <skg-output-dir> <repo-name>
+//! Converts org-roam .org files to .skg files.
 
 use skg::consts::{BUSYSIGNAL_POLL_INTERVAL_MS, BUSYSIGNAL_READ_TIMEOUT_MS};
 use skg::prominence::{compute_and_store_prominence_sources, MapToContent, MapToContainers};

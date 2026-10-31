@@ -40,9 +40,10 @@ pub fn handle_skgrepo_set_request (
         skgrepo_restriction ),
     Ok (_) =>
       // Reachable only from malformed requests no current client
-      // sends, but Emacs may have locked buffers and set its
-      // stream-in-progress guard ('skg--stream-in-progress') before
-      // any repo-set request, so even these paths
+      // sends, but either client may have locked buffers and set its
+      // stream-in-progress guard (Emacs's 'skg--stream-in-progress',
+      // Neovim's 'stream_in_progress' in 'nvim/lua/skg/lock.lua')
+      // before any repo-set request, so even these paths
       // answer in the unwinding shape.
       refuse_unwinding (
         stream, skgrepo_restriction, "not a repo-set request"),
@@ -142,7 +143,7 @@ fn send_skgrepo_restriction_response (
 /// The unwinding refusal shape (the quiet shape): the endpoint's
 /// normal skgrepo-restriction response-type carrying explanatory text
 /// in 'content' and the unchanged skgrepo restriction, followed by an empty rerender
-/// stream.  Emacs locks all Skg buffers and sets its
+/// stream.  Each client locks all Skg buffers and sets its
 /// stream-in-progress guard before sending a switch request; a
 /// response-type it has no handler for would leave it wedged, so
 /// refusals and errors alike must answer in this shape.

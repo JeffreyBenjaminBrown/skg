@@ -1,46 +1,46 @@
-/// PURPOSE: The herald rule table for non-relationship '(skg ...)'
-/// metadata. Emacs and Neovim render semantic relationship facts and
-/// their per-character styles themselves.
-///
-/// The data lives here; the code that uses the data, the lens
-/// engine, lives in the clients ('elisp/skg-sexpr/skg-lens.el',
-/// 'nvim/lua/skg/sexpr/lens.lua'). Each client fetches the table over the
-/// "herald rules" endpoint at connect time and hands it, unchanged,
-/// to its engine. Rust never
-/// interprets labels, and takes each rule's style by name from
-/// 'shared/herald-styles.json'; the conformance test in
-/// 'tests/unit/heralds.rs' guarantees that the table and the metadata
-/// vocabulary the server emits stay in sync.
-///
-/// GRAMMAR (mirrored one-to-one by 'HeraldRule'; full display
-/// semantics are documented in skg-lens.el):
-///   RULE        ::= WHEN-BODY | [STYLE] (INTERC-BODY | SIMPLE-BODY)
-///   INTERC-BODY ::= INTERC SEP [LABEL] CHILDREN...
-///   WHEN-BODY   ::= WHEN LABEL... CHILDREN...
-///   SIMPLE-BODY ::= LABEL [ABUT] CHILDREN...
-/// where each child is a literal string, the IT directive, or a
-/// nested RULE. The special label ANY matches any leaf; IT echoes
-/// the matched value(s). A WHEN rule applies its children to the
-/// object it stands in when that object holds an element labeled
-/// one of its LABELs (an atom, or a list headed by one): the table
-/// keys a headline's parts on its kind atom, since every part
-/// stands beside the kind at the top level of '(skg ...)'. The WHEN
-/// directive stays because '(view ...)' and '(diff ...)' are the only
-/// nested forms and a '(diff ...)' reads differently by kind: a node's
-/// and a ghost's has two diff objects (∃+, ~+), an unknown's and a
-/// restricted viewnode's one relationship (~+), a property's or a
-/// change viewnode's one object
-/// (+). A WHEN emits nothing of its own, so it takes no style. The
-/// conformance tests check that a WHEN names only kind atoms and
-/// carries no style.
-///
-/// Three heralds need what one headline's metadata cannot say, so the
-/// clients supply it before or instead of the lens: the label of a
-/// node's home skgrepo ('repoBoundary'), from the table
-/// 'skgrepo_labels_sexp' serves beside the rules; a pending
-/// detachment, which depends on the parent; and a changed folder,
-/// which depends on the members, whose labels the clients take from
-/// 'folder_heralds' in 'shared/herald-styles.json'.
+//! PURPOSE: The herald rule table for non-relationship '(skg ...)'
+//! metadata. Emacs and Neovim render semantic relationship facts and
+//! their per-character styles themselves.
+//!
+//! The data lives here; the code that uses the data, the lens
+//! engine, lives in the clients ('elisp/skg-sexpr/skg-lens.el',
+//! 'nvim/lua/skg/sexpr/lens.lua'). Each client fetches the table over the
+//! "herald rules" endpoint at connect time and hands it, unchanged,
+//! to its engine. Rust never
+//! interprets labels, and takes each rule's style by name from
+//! 'shared/herald-styles.json'; the conformance test in
+//! 'tests/unit/heralds.rs' guarantees that the table and the metadata
+//! vocabulary the server emits stay in sync.
+//!
+//! GRAMMAR (mirrored one-to-one by 'HeraldRule'; full display
+//! semantics are documented in skg-lens.el):
+//!   RULE        ::= WHEN-BODY | [STYLE] (INTERC-BODY | SIMPLE-BODY)
+//!   INTERC-BODY ::= INTERC SEP [LABEL] CHILDREN...
+//!   WHEN-BODY   ::= WHEN LABEL... CHILDREN...
+//!   SIMPLE-BODY ::= LABEL [ABUT] CHILDREN...
+//! where each child is a literal string, the IT directive, or a
+//! nested RULE. The special label ANY matches any leaf; IT echoes
+//! the matched value(s). A WHEN rule applies its children to the
+//! object it stands in when that object holds an element labeled
+//! one of its LABELs (an atom, or a list headed by one): the table
+//! keys a headline's parts on its kind atom, since every part
+//! stands beside the kind at the top level of '(skg ...)'. The WHEN
+//! directive stays because '(view ...)' and '(diff ...)' are the only
+//! nested forms and a '(diff ...)' reads differently by kind: a node's
+//! and a ghost's has two diff objects (∃+, ~+), an unknown's and a
+//! restricted viewnode's one relationship (~+), a property's or a
+//! change viewnode's one object
+//! (+). A WHEN emits nothing of its own, so it takes no style. The
+//! conformance tests check that a WHEN names only kind atoms and
+//! carries no style.
+//!
+//! Three heralds need what one headline's metadata cannot say, so the
+//! clients supply it before or instead of the lens: the label of a
+//! node's home skgrepo ('repoBoundary'), from the table
+//! 'skgrepo_labels_sexp' serves beside the rules; a pending
+//! detachment, which depends on the parent; and a changed folder,
+//! which depends on the members, whose labels the clients take from
+//! 'folder_heralds' in 'shared/herald-styles.json'.
 
 use crate::sexp_string::quote_sexp_string;
 use crate::types::misc::{ID, SkgConfig, SkgrepoChange, SkgrepoName};

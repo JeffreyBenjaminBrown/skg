@@ -1,5 +1,5 @@
-/// Generation utilities for ego_tree::Tree.
-/// Functions for navigating and collecting nodes at specific generations.
+//! Generation utilities for ego_tree::Tree.
+//! Functions for navigating and collecting nodes at specific generations.
 
 use ego_tree::{Tree, NodeRef, NodeId};
 use std::error::Error;

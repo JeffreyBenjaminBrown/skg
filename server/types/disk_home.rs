@@ -1,5 +1,5 @@
-/// Finding the home of a node the graph may not know,
-/// such as one a ghost stands for.
+//! Finding the home of a node the graph may not know,
+//! such as one a ghost stands for.
 
 use std::path::PathBuf;
 

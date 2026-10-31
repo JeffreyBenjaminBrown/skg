@@ -1,13 +1,13 @@
-/// This file defines the types of local fieldIntent collection
-/// (the glossary's "local fieldIntent collection"), plus the
-/// instructionMerge insert function that accumulates emissions.
-/// .
-/// TERMINOLOGY: 'merge' is always qualified. 'nodeMerge' is the
-/// acquirer/acquiree operation on graphnodes; 'instructionMerge' is
-/// the combining of emitted fieldIntents into the accumulator map. What
-/// collection emits are *fieldIntents* -- some are unresolved signals --
-/// and they become NodeInstruction *instructions* only after downstream
-/// resolution and disk supplementation.
+//! This file defines the types of local fieldIntent collection
+//! (the glossary's "local fieldIntent collection"), plus the
+//! instructionMerge insert function that accumulates emissions.
+//! .
+//! TERMINOLOGY: 'merge' is always qualified. 'nodeMerge' is the
+//! acquirer/acquiree operation on graphnodes; 'instructionMerge' is
+//! the combining of emitted fieldIntents into the accumulator map. What
+//! collection emits are *fieldIntents* -- some are unresolved signals --
+//! and they become NodeInstruction *instructions* only after downstream
+//! resolution and disk supplementation.
 
 use crate::types::errors::{HeadlineName, with_org_subheadlines};
 use crate::types::misc::{ID, SkgrepoName};

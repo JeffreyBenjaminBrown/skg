@@ -1,13 +1,13 @@
-/// This file defines the membership predicates of save-instruction
-/// extraction.
-/// .
-/// These small functions encode hard-won policy about which buffer
-/// positions count as members of the folder their parent
-/// represents.
-/// .
-/// None of them dedups: duplicate content members are a validation
-/// error ('claiming_children_have_distinct_gnids'), and duplicate
-/// defining-folder members are silently deduplicated at emission.
+//! This file defines the membership predicates of save-instruction
+//! extraction.
+//! .
+//! These small functions encode hard-won policy about which buffer
+//! positions count as members of the folder their parent
+//! represents.
+//! .
+//! None of them dedups: duplicate content members are a validation
+//! error ('claiming_children_have_distinct_gnids'), and duplicate
+//! defining-folder members are silently deduplicated at emission.
 
 use crate::types::viewnode::{NodeEditRequest, Occurrence};
 

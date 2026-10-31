@@ -261,7 +261,7 @@ pub(crate) fn rerender_open_view (
     views_state . open_views . viewnode_id_record_of (viewforest_id);
   let mode : RerenderMode = RerenderMode::of_buffer (
     views_state . open_views . diffView_buffer_kind_of_view (viewforest_id) );
-  let in_the_view = |e : Box<dyn Error>| -> String {
+  let in_the_view : &dyn Fn (Box<dyn Error>) -> String = &|e : Box<dyn Error>| -> String {
     format! ( "View {}: {}", viewforest_id . repr_in_client (), e ) };
   refresh_view (
     &mut viewforest, &mut viewnode_id_record, context, mode )

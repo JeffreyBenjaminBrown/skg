@@ -1,39 +1,39 @@
-/// Parse an org-roam `.org` file into a flat Vec of Graphnodes.
-///
-/// # Strategy
-///
-/// 1. **Extract OrgSections.** Scan the file line by line. Each org
-///    headline (`*`, `**`, …) becomes an `OrgSection`; the file-level
-///    preamble (`:PROPERTIES:` block + `#+title:`) becomes a level-0
-///    section. An `OrgSection` records the headline text, its nesting
-///    level, any `:ID:` and `:ROAM_ALIASES:` from its property drawer,
-///    and the line range of its body text.
-///
-/// 2. **Build a section viewforest.** Push sections onto a stack, popping
-///    whenever a same-or-shallower headline arrives, to produce a tree
-///    of `SectionTree` nodes that mirrors the org outline.
-///
-/// 3. **Insert super-indentation groups.**
-///    (This is described in more detail in ./super-indentation-rules.org .)
-///    And the test 'test_super_indentation_creates_grouping_nodes'
-///    might be clearer than any explanation.)
-///    Org-roam allows "super-indentation": a headline like `*** c`
-///    as a child of `* a`, skipping level 2. When a node's children span
-///    more than one headline level, we wrap them in **synthetic
-///    grouping nodes** — `SectionTree` nodes that do not correspond
-///    to any line in the file. They carry an `override_body` instead
-///    of a line range, and their `:ID:` is filled in later by
-///    `assign_missing_ids`. The two groups are:
-///      - "These are special!" — the most-indented children.
-///      - "These are normal." — the rest (recursively grouped if
-///        they still span multiple levels).
-///
-/// 4. **Assign missing IDs.** Any section (original or synthetic)
-///    that lacks an `:ID:` gets a fresh UUID.
-///
-/// 5. **Emit Graphnodes.** Walk the viewforest depth-first, converting each
-///    `SectionTree` into a flat `Graphnode` whose `contains` field lists
-///    its children by ID.
+//! Parse an org-roam `.org` file into a flat Vec of Graphnodes.
+//!
+//! # Strategy
+//!
+//! 1. **Extract OrgSections.** Scan the file line by line. Each org
+//!    headline (`*`, `**`, …) becomes an `OrgSection`; the file-level
+//!    preamble (`:PROPERTIES:` block + `#+title:`) becomes a level-0
+//!    section. An `OrgSection` records the headline text, its nesting
+//!    level, any `:ID:` and `:ROAM_ALIASES:` from its property drawer,
+//!    and the line range of its body text.
+//!
+//! 2. **Build a section viewforest.** Push sections onto a stack, popping
+//!    whenever a same-or-shallower headline arrives, to produce a tree
+//!    of `SectionTree` nodes that mirrors the org outline.
+//!
+//! 3. **Insert super-indentation groups.**
+//!    (This is described in more detail in ./super-indentation-rules.org .)
+//!    And the test 'test_super_indentation_creates_grouping_nodes'
+//!    might be clearer than any explanation.)
+//!    Org-roam allows "super-indentation": a headline like `*** c`
+//!    as a child of `* a`, skipping level 2. When a node's children span
+//!    more than one headline level, we wrap them in **synthetic
+//!    grouping nodes** — `SectionTree` nodes that do not correspond
+//!    to any line in the file. They carry an `override_body` instead
+//!    of a line range, and their `:ID:` is filled in later by
+//!    `assign_missing_ids`. The two groups are:
+//!      - "These are special!" — the most-indented children.
+//!      - "These are normal." — the rest (recursively grouped if
+//!        they still span multiple levels).
+//!
+//! 4. **Assign missing IDs.** Any section (original or synthetic)
+//!    that lacks an `:ID:` gets a fresh UUID.
+//!
+//! 5. **Emit Graphnodes.** Walk the viewforest depth-first, converting each
+//!    `SectionTree` into a flat `Graphnode` whose `contains` field lists
+//!    its children by ID.
 
 use crate::types::misc::{
   ID, MSV, RelPartner, SkgrepoName, rel_partners_at_relRepo, rel_partners_at_relRepo_msv};

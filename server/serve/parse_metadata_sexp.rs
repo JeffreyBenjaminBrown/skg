@@ -1,61 +1,61 @@
-/// PURPOSE: Parse (skg ...) metadata s-expressions from org headlines.
-///
-/// Format ('METADATA_GRAMMAR'): one shape for every headline,
-///   (skg (vnid X) [focused] [folded] [bodyFolded] KIND DECLARED...
-///        [(view FACT...)] [(diff FACT...)])
-/// KIND a bare atom, or for a few kinds a small form naming its
-/// parameter, and every part beside it at the top level, in any order.
-/// '(view ...)' and '(diff ...)' hold the derived facts the server
-/// writes, which nobody reads back: the parser skips each whole.
-/// The kinds and the declared parts each takes. The fields a user sets
-/// (noClaim, writeProtected, the requests of '(editRequest ...)',
-/// '(viewRequests ...)') a kind takes as 'shared/metadata-fields.json'
-/// lists them for it ('metadata_fields.rs'); the other parts as
-/// 'parts_the_table_leaves_out' says:
-///   node [(gnid ID)] [(skgRepos [(nodeRepo REPO)] [(relRepo REPO)])]
-///        [noClaim]          ; the occurrence claims no membership
-///        [writeProtected]   ; marks the occurrence write-protected
-///        [(overridesHere ID)]
-///        [(editRequest [<delete | (merge ID) | (relRepo REPO)
-///                       | (flag FLAG true|false) | restoreRel>]
-///                      [(ready OBJECT...) | (unready OBJECT...)])]
-///        [(viewRequests REQUEST...)]
-///     where OBJECT is node, rel or all. A headline naming no kind is
-///     a node.
-///   ghost (gnid ID) [(skgRepos (nodeRepo REPO))] [noClaim]
-///         [(editRequest [restoreNode] [READINESS])]
-///   unknown (gnid ID) [(skgRepos (relRepo REPO))] [noClaim]
-///           [(editRequest [(relRepo REPO)] [READINESS])]
-///   restricted, the restricted viewnode, with the parts an
-///     unknown viewnode takes
-///   alias [(skgRepos (relRepo REPO))] [noClaim]
-///         [(editRequest [(relRepo REPO)] [READINESS])]
-///   id [noClaim] [(editRequest READINESS)],
-///   (flag hadId | wasOverloaded | noSearchMatching) [(editRequest READINESS)],
-///   and the diff view's own viewnodes
-///     (oldText titleAndBody | title | body)
-///     (homeSkgrepoMove (old REPO) (new REPO))
-///     (relRepoMove (old REPO) (new REPO))
-///     (changesetMarker content | relRepo | orderOnly)
-///   each of which may carry '(editRequest READINESS)';
-///   bodyDiff, tombstone, forestRoot and the folders' bare atoms,
-///   which carry nothing.
-/// READINESS is '(ready OBJECT...)' or '(unready OBJECT...)'.
-/// A node, a ghost, an alias, an id and a flag may carry '(view ...)';
-/// every kind that takes an editRequest may carry '(diff ...)'.
-/// 'restoreRel' asks to restore a removed membership; where it may
-/// stand the save checks ('restoreRel_stands_where_it_may', local.rs),
-/// and the save drops one that names no relationship HEAD records. It
-/// may sit beside 'writeProtected'.
-/// The viewnode ID, '(vnid X)', X being one or more lowercase letters
-/// and digits, comes first when written.
-/// A retired spelling ('(node ...)', '(ghost ...)' or '(unknown ...)' as
-/// a form, '(deleted ...)', '(historical ...)', '(id X)', '(repo R)', a
-/// top-level '(relRepo R)', '(FOLDER changed)', '(rels ...)',
-/// '(viewStats ...)', 'omittedBody' or '(homeRepoHerald ...)' outside
-/// '(view ...)', '(readyRequest ...)', '(unreadyRequest ...)',
-/// 'nonMember', 'restrictedNode') is refused with a message naming the
-/// grammar.
+//! PURPOSE: Parse (skg ...) metadata s-expressions from org headlines.
+//!
+//! Format ('METADATA_GRAMMAR'): one shape for every headline,
+//!   (skg (vnid X) [focused] [folded] [bodyFolded] KIND DECLARED...
+//!        [(view FACT...)] [(diff FACT...)])
+//! KIND a bare atom, or for a few kinds a small form naming its
+//! parameter, and every part beside it at the top level, in any order.
+//! '(view ...)' and '(diff ...)' hold the derived facts the server
+//! writes, which nobody reads back: the parser skips each whole.
+//! The kinds and the declared parts each takes. The fields a user sets
+//! (noClaim, writeProtected, the requests of '(editRequest ...)',
+//! '(viewRequests ...)') a kind takes as 'shared/metadata-fields.json'
+//! lists them for it ('metadata_fields.rs'); the other parts as
+//! 'parts_the_table_leaves_out' says:
+//!   node [(gnid ID)] [(skgRepos [(nodeRepo REPO)] [(relRepo REPO)])]
+//!        [noClaim]          ; the occurrence claims no membership
+//!        [writeProtected]   ; marks the occurrence write-protected
+//!        [(overridesHere ID)]
+//!        [(editRequest [<delete | (merge ID) | (relRepo REPO)
+//!                       | (flag FLAG true|false) | restoreRel>]
+//!                      [(ready OBJECT...) | (unready OBJECT...)])]
+//!        [(viewRequests REQUEST...)]
+//!     where OBJECT is node, rel or all. A headline naming no kind is
+//!     a node.
+//!   ghost (gnid ID) [(skgRepos (nodeRepo REPO))] [noClaim]
+//!         [(editRequest [restoreNode] [READINESS])]
+//!   unknown (gnid ID) [(skgRepos (relRepo REPO))] [noClaim]
+//!           [(editRequest [(relRepo REPO)] [READINESS])]
+//!   restricted, the restricted viewnode, with the parts an
+//!     unknown viewnode takes
+//!   alias [(skgRepos (relRepo REPO))] [noClaim]
+//!         [(editRequest [(relRepo REPO)] [READINESS])]
+//!   id [noClaim] [(editRequest READINESS)],
+//!   (flag hadId | wasOverloaded | noSearchMatching) [(editRequest READINESS)],
+//!   and the diff view's own viewnodes
+//!     (oldText titleAndBody | title | body)
+//!     (homeSkgrepoMove (old REPO) (new REPO))
+//!     (relRepoMove (old REPO) (new REPO))
+//!     (changesetMarker content | relRepo | orderOnly)
+//!   each of which may carry '(editRequest READINESS)';
+//!   bodyDiff, tombstone, forestRoot and the folders' bare atoms,
+//!   which carry nothing.
+//! READINESS is '(ready OBJECT...)' or '(unready OBJECT...)'.
+//! A node, a ghost, an alias, an id and a flag may carry '(view ...)';
+//! every kind that takes an editRequest may carry '(diff ...)'.
+//! 'restoreRel' asks to restore a removed membership; where it may
+//! stand the save checks ('restoreRel_stands_where_it_may', local.rs),
+//! and the save drops one that names no relationship HEAD records. It
+//! may sit beside 'writeProtected'.
+//! The viewnode ID, '(vnid X)', X being one or more lowercase letters
+//! and digits, comes first when written.
+//! A retired spelling ('(node ...)', '(ghost ...)' or '(unknown ...)' as
+//! a form, '(deleted ...)', '(historical ...)', '(id X)', '(repo R)', a
+//! top-level '(relRepo R)', '(FOLDER changed)', '(rels ...)',
+//! '(viewStats ...)', 'omittedBody' or '(homeRepoHerald ...)' outside
+//! '(view ...)', '(readyRequest ...)', '(unreadyRequest ...)',
+//! 'nonMember', 'restrictedNode') is refused with a message naming the
+//! grammar.
 
 use crate::serve::metadata_fields::{
   kind_takes_field, kind_takes_value, values_written_for_a_message};

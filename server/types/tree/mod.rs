@@ -1,4 +1,4 @@
-/// Utilities for working with ego_tree::Tree<T>.
+//! Utilities for working with ego_tree::Tree<T>.
 
 pub mod viewnode_graphnode;
 pub mod generic;

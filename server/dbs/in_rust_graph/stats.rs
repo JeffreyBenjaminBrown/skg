@@ -1,15 +1,15 @@
-/// PURPOSE: Fetch all graphnode statistics for a set of PIDs from the
-/// in-Rust graph: directional member counts for the five relations, the
-/// alias / extra-id / true-flag counts, and the substantive-mentioner subset.
-/// These feed the uniform-herald token grammar (server/herald_tokens.rs).
-///
-/// PITFALL: Assumes input IDs are primary IDs, not extra IDs. Always
-/// true on the graphnodestats path (PIDs come from the built viewnode
-/// tree).
-///
-/// Statistics are computed directly from the explicit graph snapshot. The
-/// directional counts and link facts are graph-native
-/// operations used by the uniform-herald grammar.
+//! PURPOSE: Fetch all graphnode statistics for a set of PIDs from the
+//! in-Rust graph: directional member counts for the five relations, the
+//! alias / extra-id / true-flag counts, and the substantive-mentioner subset.
+//! These feed the uniform-herald token grammar (server/herald_tokens.rs).
+//!
+//! PITFALL: Assumes input IDs are primary IDs, not extra IDs. Always
+//! true on the graphnodestats path (PIDs come from the built viewnode
+//! tree).
+//!
+//! Statistics are computed directly from the explicit graph snapshot. The
+//! directional counts and link facts are graph-native
+//! operations used by the uniform-herald grammar.
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::{
@@ -109,14 +109,16 @@ fn fetch_all_graphnodestats_in_rust (
     : HashMap<ID, HashSet<ID>> = HashMap::new ();
   for pid in pids {
     // Inbound partners: gated, further repo-filtered.
-    let mut inbound_shown = | relation : NodeRelation | -> HashSet<ID> {
+    let inbound_shown : &mut dyn FnMut (NodeRelation) -> HashSet<ID> =
+      &mut | relation : NodeRelation | -> HashSet<ID> {
       relRepos . inbound_pids_for_relation_gated_memoized (
         pid, relation, restriction )
       . into_iter ()
       . filter ( |p| graph . node_is_shown (p, restriction) )
       . collect () };
     // Outbound partners: gated, further repo-filtered.
-    let outbound_shown = | relation : NodeRelation | -> HashSet<ID> {
+    let outbound_shown : &dyn Fn (NodeRelation) -> HashSet<ID> =
+      &| relation : NodeRelation | -> HashSet<ID> {
       graph . outbound_pids_for_relation_gated (pid, relation, restriction)
       . into_iter ()
       . filter ( |p| graph . node_is_shown (p, restriction) )

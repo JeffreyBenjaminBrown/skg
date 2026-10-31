@@ -15,6 +15,7 @@ use crate::skgrepo_sets::{SkgrepoRestriction, require_unrestricted};
 use crate::types::env::SkgEnv;
 use crate::types::misc::ID;
 use crate::types::tree::forest::ViewForest;
+use crate::types::viewnode::{GnidOnlyKind, ViewnodeKind, Vognode};
 use crate::types::views_state::pids_from_viewforest;
 use crate::serve::ViewsState;
 
@@ -120,16 +121,15 @@ fn stream_rerender_views_after_absent_reference_cleanup (
 /// so inspect both representations rather than introducing a new view index.
 fn view_can_display_absent_reference_change (
   viewforest             : &ViewForest,
-  raw_gnid              : &crate::types::misc::ID,
-  affected_recorder_pids : &HashSet<crate::types::misc::ID>,
+  raw_gnid              : &ID,
+  affected_recorder_pids : &HashSet<ID>,
 ) -> bool {
   pids_from_viewforest (viewforest) . iter ()
     .any (|pid| affected_recorder_pids . contains (pid))
   || viewforest . nodes () . any (|node| matches! (
        &node . value () . kind,
-       crate::types::viewnode::ViewnodeKind::Vognode (
-         crate::types::viewnode::Vognode::GnidOnly (unknown))
-       if unknown . kind == crate::types::viewnode::GnidOnlyKind::Unknown
+       ViewnodeKind::Vognode (Vognode::GnidOnly (unknown))
+       if unknown . kind == GnidOnlyKind::Unknown
           && unknown . gnid == *raw_gnid ))
 }
 

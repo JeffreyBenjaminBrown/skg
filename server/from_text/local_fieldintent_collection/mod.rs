@@ -1,17 +1,17 @@
-/// This module implements 'local fieldIntent collection', which is
-/// how the save path extracts instructions from a buffer. The name
-/// refers to its central property: extraction is one pure traversal
-/// in which each buffer position reads only itself and its direct
-/// children, plus a context that flows down from its ancestors. The
-/// glossary's "local fieldIntent collection" defines it.
-/// .
-/// Beyond listing the submodules, this mod file defines the composed
-/// pipeline, 'extract_nonmergeSavePlan_locally'. That function runs
-/// the traversal ('traverse'), and then the downstream stages in
-/// order: text-claim validation ('validate_text_claims'), lowering
-/// ('lower'), visibility resolution ('resolve_visibility'), disk
-/// supplementation (from 'super::supplement_from_disk'), and finally
-/// the noop filter (defined below).
+//! This module implements 'local fieldIntent collection', which is
+//! how the save path extracts instructions from a buffer. The name
+//! refers to its central property: extraction is one pure traversal
+//! in which each buffer position reads only itself and its direct
+//! children, plus a context that flows down from its ancestors. The
+//! glossary's "local fieldIntent collection" defines it.
+//! .
+//! Beyond listing the submodules, this mod file defines the composed
+//! pipeline, 'extract_nonmergeSavePlan_locally'. That function runs
+//! the traversal ('traverse'), and then the downstream stages in
+//! order: text-claim validation ('validate_text_claims'), lowering
+//! ('lower'), visibility resolution ('resolve_visibility'), disk
+//! supplementation (from 'super::supplement_from_disk'), and finally
+//! the noop filter (defined below).
 
 pub mod predicates;
 pub mod types;
@@ -105,7 +105,7 @@ pub fn extract_nonmergeSavePlan_locally_in_graph (
           // neither is restricted, and refused when either has a
           // restricted section (the API doc's "Restricted-skgrepo
           // nodes").
-          let shown = |gnid : &ID| -> bool {
+          let shown : &dyn Fn (&ID) -> bool = &|gnid : &ID| -> bool {
             graph . node_is_shown (gnid, restriction) };
           let before : usize = nodeMerge_acquisitions . len ();
           let kept : Vec<(ID, ID)> =

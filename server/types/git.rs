@@ -1,4 +1,4 @@
-/// Git-related types.
+//! Git-related types.
 
 use crate::types::misc::ID;
 use crate::types::nodes::complete::Graphnode;

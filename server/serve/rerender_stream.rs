@@ -187,11 +187,12 @@ pub(crate) fn write_graph_straddle_back (
 
 /// Send an empty rerender stream: a "rerender-lock" naming no views,
 /// then "rerender-done" with no errors or warnings.  Used after a
-/// refusal: Emacs locks every Skg buffer and sets its
-/// stream-in-progress guard ('skg--stream-in-progress') before
-/// sending a skgrepo-set switch, and only the rerender stream unwinds
-/// them.  The empty lock list makes
-/// Emacs unlock every buffer; the done message clears the guard.
+/// refusal: each client locks every Skg buffer and sets its
+/// stream-in-progress guard (Emacs's 'skg--stream-in-progress',
+/// Neovim's 'stream_in_progress' in 'nvim/lua/skg/lock.lua') before
+/// sending a switch of the skgrepo restriction, and only the rerender
+/// stream unwinds them.  The empty lock list makes the client unlock
+/// every buffer; the done message clears the guard.
 pub fn stream_empty_rerender (
   stream : &mut TcpStream,
 ) {

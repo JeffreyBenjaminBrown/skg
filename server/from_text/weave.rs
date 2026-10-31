@@ -1,24 +1,24 @@
-/// Pure merge functions letting a save under a restricted
-/// skgrepo-set preserve relationship-list members the user could not
-/// see (the API doc's "Restricted-skgrepo nodes").
-///
-/// VOCABULARY (shared by both functions):
-/// - A disk member is visible iff its record is: the skgrepo restriction
-///   holds its relRepo ('SkgrepoRestriction::record_is_visible'). A
-///   visible member has a headline the user could delete: an
-///   occurrence, or a gnid-only vognode (a reference to an unknown
-///   node, or a restricted headline: a member whose node the
-///   skgrepo restriction keeps out).
-/// - A disk member is positioned iff it appears in the buffer list.
-///   Only visible members ever do: save extraction never puts a
-///   member whose record is restricted (an invisible one) into a
-///   container's list (see 'content_members' /
-///   'partnerFolder_members' in local_fieldintent_collection/
-///   traverse.rs), so every invisible disk member is non-positioned
-///   and the weave alone decides its presence and position.
-/// - A visible disk member absent from the buffer was deleted by
-///   the user; an invisible one absent from the buffer was omitted
-///   by rendering and must survive.
+//! Pure merge functions letting a save under a restricted
+//! skgrepo-set preserve relationship-list members the user could not
+//! see (the API doc's "Restricted-skgrepo nodes").
+//!
+//! VOCABULARY (shared by both functions):
+//! - A disk member is visible iff its record is: the skgrepo restriction
+//!   holds its relRepo ('SkgrepoRestriction::record_is_visible'). A
+//!   visible member has a headline the user could delete: an
+//!   occurrence, or a gnid-only vognode (a reference to an unknown
+//!   node, or a restricted headline: a member whose node the
+//!   skgrepo restriction keeps out).
+//! - A disk member is positioned iff it appears in the buffer list.
+//!   Only visible members ever do: save extraction never puts a
+//!   member whose record is restricted (an invisible one) into a
+//!   container's list (see 'content_members' /
+//!   'partnerFolder_members' in local_fieldintent_collection/
+//!   traverse.rs), so every invisible disk member is non-positioned
+//!   and the weave alone decides its presence and position.
+//! - A visible disk member absent from the buffer was deleted by
+//!   the user; an invisible one absent from the buffer was omitted
+//!   by rendering and must survive.
 
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;

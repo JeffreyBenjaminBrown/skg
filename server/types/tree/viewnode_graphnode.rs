@@ -1,4 +1,4 @@
-/// Node access utilities for ego_tree::Tree<Viewnode>
+//! Node access utilities for ego_tree::Tree<Viewnode>
 
 use crate::types::misc::ID;
 use crate::types::viewnode::{Viewnode, ViewnodeKind};

@@ -1,4 +1,4 @@
-/// Generic list diff types and utilities.
+//! Generic list diff types and utilities.
 
 use similar::{Algorithm, ChangeTag, DiffOp, capture_diff_slices};
 use std::collections::HashSet;

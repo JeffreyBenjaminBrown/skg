@@ -1,17 +1,17 @@
-/// PURPOSE: 'shared/metadata-fields.json', the metadata fields a user
-/// may set on each kind of headline, as the server's parser reads it.
-/// Both clients' metadata editors read the same file, so the parser
-/// and the editors agree on which kind takes which field, and which
-/// values, by construction. The file's own comments describe it;
-/// 'tests/metadata_fields_table.rs' checks it against the parser and
-/// the printer.
-///
-/// A kind is known by its atom. A field the table does not list for
-/// a kind is one the kind does not take, and a value it does not list
-/// for a field is one the field does not take there. The table lists
-/// only what a user sets; the parts the server writes (the gnid, the
-/// skgrepos, 'overridesHere', the derived facts) and the readiness
-/// request are the parser's to place ('parse_metadata_sexp.rs').
+//! PURPOSE: 'shared/metadata-fields.json', the metadata fields a user
+//! may set on each kind of headline, as the server's parser reads it.
+//! Both clients' metadata editors read the same file, so the parser
+//! and the editors agree on which kind takes which field, and which
+//! values, by construction. The file's own comments describe it;
+//! 'tests/metadata_fields_table.rs' checks it against the parser and
+//! the printer.
+//!
+//! A kind is known by its atom. A field the table does not list for
+//! a kind is one the kind does not take, and a value it does not list
+//! for a field is one the field does not take there. The table lists
+//! only what a user sets; the parts the server writes (the gnid, the
+//! skgrepos, 'overridesHere', the derived facts) and the readiness
+//! request are the parser's to place ('parse_metadata_sexp.rs').
 
 use serde::Deserialize;
 use std::sync::LazyLock;

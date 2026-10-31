@@ -1,6 +1,6 @@
-/// Local validation functions for Viewnode trees.
-/// These check structural flags of individual nodes
-/// without requiring global context.
+//! Local validation functions for Viewnode trees.
+//! These check structural flags of individual nodes
+//! without requiring global context.
 
 use crate::types::viewnode::{Viewnode, ViewnodeKind, Occurrence};
 use crate::types::viewnode::{Vognode};

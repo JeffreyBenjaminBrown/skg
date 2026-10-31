@@ -1,12 +1,12 @@
-/// Generic many-to-many map.
-///
-/// The bimap crate (BiHashMap) enforces strict 1:1 — inserting
-/// (id2, same_viewforest_id) would evict (id1, same_viewforest_id). We need multiple
-/// left values mapping to the same right value (e.g. a view has
-/// multiple root IDs) and potentially multiple right values for
-/// a single left value (e.g. an ID roots multiple views). No
-/// well-maintained crate on crates.io provides many-to-many, so
-/// we roll this small wrapper over two HashMaps.
+//! Generic many-to-many map.
+//!
+//! The bimap crate (BiHashMap) enforces strict 1:1 — inserting
+//! (id2, same_viewforest_id) would evict (id1, same_viewforest_id). We need multiple
+//! left values mapping to the same right value (e.g. a view has
+//! multiple root IDs) and potentially multiple right values for
+//! a single left value (e.g. an ID roots multiple views). No
+//! well-maintained crate on crates.io provides many-to-many, so
+//! we roll this small wrapper over two HashMaps.
 
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;

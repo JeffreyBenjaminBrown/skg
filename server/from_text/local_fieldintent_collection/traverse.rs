@@ -1,44 +1,44 @@
-/// This file defines the pure traversal at the heart of local
-/// instruction collection (the glossary's "local fieldIntent collection").
-/// .
-/// The traversal is one recursive DFS preorder over the placed
-/// viewforest. Recursion is unconditional: every node's children are
-/// visited, whatever the node's kind, because the user can attach
-/// independent nodes anywhere. Only emission is conditional, on the
-/// pair (kind, context). Each visit reads the node and its direct
-/// children, nothing deeper, nothing upward; everything an
-/// fieldIntent emission needs from above arrives in its
-/// 'LocalContext'.
-/// .
-/// The traversal assumes that 'find_buffer_errors_for_saving' has
-/// passed. In particular it assumes that:
-/// - every vognode has a PID and a config-valid skgrepo;
-/// - each ID has at most one editable instance
-///   ('Multiple_Defining_Viewnodes');
-/// - same-ID instances have consistent toDelete values and skgrepos;
-/// - folder shapes are valid: each folder holds only the child kinds it
-///   permits, each folder is unique among its siblings, content members
-///   have distinct IDs per
-///   'claiming_children_have_distinct_gnids', and write-protected-folder
-///   members have distinct IDs per
-///   'partnerFolder_children_have_distinct_gnids'. The defining folders
-///   (aliasFolder, subscribeeFolder, overriddenFolder) may contain
-///   duplicates; emission dedups them silently.
-/// Collection performs no ancestry re-verification. On shapes that
-/// validation precludes, it stays total, emitting nothing rather
-/// than erroring.
-/// .
-/// DEFINITION: a vognode is *save-eligible* iff it is an occurrence,
-/// editable, lacks a Delete edit request, and is not in
-/// subscribee-as-such position. (Its position may be anywhere else --
-/// including as a member of a write-protected folder, where it is
-/// save-eligible for itself but invisible to the folder's recorder.)
-/// .
-/// DEFINITION: a vognode is *in subscribee-as-such position* iff it
-/// is an occurrence member direct child of a subscribeeFolder.
-/// A child of a subscribeeFolder claiming nothing is not a member of the
-/// folder, hence not shown *as* a subscribee: it is an ordinary
-/// self-writer that stands there claiming nothing.
+//! This file defines the pure traversal at the heart of local
+//! instruction collection (the glossary's "local fieldIntent collection").
+//! .
+//! The traversal is one recursive DFS preorder over the placed
+//! viewforest. Recursion is unconditional: every node's children are
+//! visited, whatever the node's kind, because the user can attach
+//! independent nodes anywhere. Only emission is conditional, on the
+//! pair (kind, context). Each visit reads the node and its direct
+//! children, nothing deeper, nothing upward; everything an
+//! fieldIntent emission needs from above arrives in its
+//! 'LocalContext'.
+//! .
+//! The traversal assumes that 'find_buffer_errors_for_saving' has
+//! passed. In particular it assumes that:
+//! - every vognode has a PID and a config-valid skgrepo;
+//! - each ID has at most one editable instance
+//!   ('Multiple_Defining_Viewnodes');
+//! - same-ID instances have consistent toDelete values and skgrepos;
+//! - folder shapes are valid: each folder holds only the child kinds it
+//!   permits, each folder is unique among its siblings, content members
+//!   have distinct IDs per
+//!   'claiming_children_have_distinct_gnids', and write-protected-folder
+//!   members have distinct IDs per
+//!   'partnerFolder_children_have_distinct_gnids'. The defining folders
+//!   (aliasFolder, subscribeeFolder, overriddenFolder) may contain
+//!   duplicates; emission dedups them silently.
+//! Collection performs no ancestry re-verification. On shapes that
+//! validation precludes, it stays total, emitting nothing rather
+//! than erroring.
+//! .
+//! DEFINITION: a vognode is *save-eligible* iff it is an occurrence,
+//! editable, lacks a Delete edit request, and is not in
+//! subscribee-as-such position. (Its position may be anywhere else --
+//! including as a member of a write-protected folder, where it is
+//! save-eligible for itself but invisible to the folder's recorder.)
+//! .
+//! DEFINITION: a vognode is *in subscribee-as-such position* iff it
+//! is an occurrence member direct child of a subscribeeFolder.
+//! A child of a subscribeeFolder claiming nothing is not a member of the
+//! folder, hence not shown *as* a subscribee: it is an ordinary
+//! self-writer that stands there claiming nothing.
 
 use crate::from_text::local_fieldintent_collection::predicates::{
   occurrence_child_counts_as_content,

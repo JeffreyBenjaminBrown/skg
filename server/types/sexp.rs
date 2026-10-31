@@ -1,6 +1,6 @@
-/// General-purpose S-expression utilities.
-/// These functions work with any S-expressions,
-/// not specific to org-mode or the application domain.
+//! General-purpose S-expression utilities.
+//! These functions work with any S-expressions,
+//! not specific to org-mode or the application domain.
 
 use sexp::{Sexp, Atom};
 

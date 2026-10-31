@@ -1,5 +1,5 @@
-/// DANGER: This was vibe-coded without much oversight.
-/// I *believe* the tests constrain its behavior sufficiently.
+//! DANGER: This was vibe-coded without much oversight.
+//! I *believe* the tests constrain its behavior sufficiently.
 
 use crate::types::sexp::find_sexp_end;
 use crate::types::errors::{BufferValidationError, HeadlineName, with_org_subheadlines};

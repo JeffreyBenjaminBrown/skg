@@ -1,9 +1,9 @@
-/// The 'buffer' referred to here
-/// is a Skg buffer from the Emacs client,
-/// read by the Rust server when the user saves it.
-/// The sole purpose of all the sub-libraries in 'from_text::'
-/// is the function 'buffer_to_validated_saveplan'
-/// defined here.
+//! The 'buffer' referred to here
+//! is a Skg buffer from the Emacs client,
+//! read by the Rust server when the user saves it.
+//! The sole purpose of all the sub-libraries in 'from_text::'
+//! is the function 'buffer_to_validated_saveplan'
+//! defined here.
 
 pub mod buffer_to_viewnodes;
 pub mod fork;

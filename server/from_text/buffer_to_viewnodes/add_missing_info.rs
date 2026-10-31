@@ -1,13 +1,13 @@
-/// PURPOSE:
-/// What the parse ('org_to_viewforest') supplies, as it builds the
-/// tree, that a headline may leave out:
-/// - an occurrence's gnid becomes its pid;
-/// - an occurrence typed under an alias folder becomes an alias;
-/// - an occurrence without a skgrepo gets one: the graph's, or that
-///   of its nearest occurrence ancestor;
-/// and a note of what the parse supplied ('WhatTheParseSupplied').
-/// An occurrence without a gnid gets a fresh one from
-/// 'viewnode_from_metadata'.
+//! PURPOSE:
+//! What the parse ('org_to_viewforest') supplies, as it builds the
+//! tree, that a headline may leave out:
+//! - an occurrence's gnid becomes its pid;
+//! - an occurrence typed under an alias folder becomes an alias;
+//! - an occurrence without a skgrepo gets one: the graph's, or that
+//!   of its nearest occurrence ancestor;
+//! and a note of what the parse supplied ('WhatTheParseSupplied').
+//! An occurrence without a gnid gets a fresh one from
+//! 'viewnode_from_metadata'.
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::serve::parse_metadata_sexp::{MetadataKind, OccurrenceMetadata, ViewnodeMetadata};

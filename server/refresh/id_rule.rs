@@ -108,7 +108,7 @@ pub(crate) fn id_rule (
       . expect ("a present gnid resolves");
     if ! acquired_since_head (gnid, &pid, walk) {
       return IdRuleAnswer::Occurrence (pid); }}
-  let restricted_answer = || -> IdRuleAnswer {
+  let restricted_answer : &dyn Fn () -> IdRuleAnswer = &|| -> IdRuleAnswer {
     if where_it_stands . goal_names (gnid)
        || matches! ( where_it_stands, WhereTheHeadlineStands::ViewRoot ) {
       IdRuleAnswer::GnidOnly (GnidOnlyKind::Restricted) }

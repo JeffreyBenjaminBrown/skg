@@ -1,12 +1,12 @@
-/// PURPOSE: Compute each prominent node's "prominence source", which
-/// search uses to rank results.
-/// Prominent nodes (roots, mentioned nodes, multiply-contained nodes,
-/// cycle members, nodes with Had_ID_Before_Import) get score multipliers
-/// at search time. Each is the 'origin' of a region of the containment
-/// graph: the origin (usually a single rootlike node, but maybe a cycle)
-/// and potentially a lot of other nodes in its recursive content.
-/// Regions serve only to find the nodes no treelike region covers,
-/// which lie in or under containment cycles.
+//! PURPOSE: Compute each prominent node's "prominence source", which
+//! search uses to rank results.
+//! Prominent nodes (roots, mentioned nodes, multiply-contained nodes,
+//! cycle members, nodes with Had_ID_Before_Import) get score multipliers
+//! at search time. Each is the 'origin' of a region of the containment
+//! graph: the origin (usually a single rootlike node, but maybe a cycle)
+//! and potentially a lot of other nodes in its recursive content.
+//! Regions serve only to find the nodes no treelike region covers,
+//! which lie in or under containment cycles.
 
 use crate::consts::{
   MULTIPLIER_CYCLE_MEMBER,

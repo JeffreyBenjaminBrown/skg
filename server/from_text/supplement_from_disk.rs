@@ -1,12 +1,12 @@
-/// PURPOSE:
-/// When a Graphnode is created from user input,
-/// it might not mention every Graphnode field.
-/// If it contains Some([]) for that field,
-/// then the user is asking to empty the field.
-/// But if it has None for that field,
-/// then the field should not be changed --
-/// which means it must be read from disk
-/// and inserted into the Graphnode.
+//! PURPOSE:
+//! When a Graphnode is created from user input,
+//! it might not mention every Graphnode field.
+//! If it contains Some([]) for that field,
+//! then the user is asking to empty the field.
+//! But if it has None for that field,
+//! then the field should not be changed --
+//! which means it must be read from disk
+//! and inserted into the Graphnode.
 
 use crate::from_text::local_fieldintent_collection::lower::{
   RequestedRelRepos, NodeIntent, NodeSaveIntent };
@@ -200,13 +200,13 @@ fn preserve_invisible_members (
 ) -> Graphnode {
   let member_key = |gnid : &ID| -> RelationshipMemberKey {
     graph . relationship_member_key (gnid) };
-  let contains_visible = |gnid : &ID| -> bool {
+  let contains_visible : &dyn Fn (&ID) -> bool = &|gnid : &ID| -> bool {
     SkgrepoRestriction::member_record_is_visible (
       restriction, &disk_node . contains, gnid ) };
-  let subscribes_visible = |gnid : &ID| -> bool {
+  let subscribes_visible : &dyn Fn (&ID) -> bool = &|gnid : &ID| -> bool {
     SkgrepoRestriction::member_record_is_visible (
       restriction, disk_node . subscribesTo . or_default (), gnid ) };
-  let overrides_visible = |gnid : &ID| -> bool {
+  let overrides_visible : &dyn Fn (&ID) -> bool = &|gnid : &ID| -> bool {
     SkgrepoRestriction::member_record_is_visible (
       restriction, disk_node . overrides . or_default (), gnid ) };
   // Rendering may canonicalize a resolvable extra ID to its primary PID.  The
@@ -258,7 +258,7 @@ fn preserve_invisible_members (
         MSV::Specified (rel_partners_at_relRepo (&recorder_skgrepo, merged)); }}
   { // The sticky pass after this gives each alias its relRepo again,
     // by its text.
-    let alias_visible = |text : &String| -> bool {
+    let alias_visible : &dyn Fn (&String) -> bool = &|text : &String| -> bool {
       SkgrepoRestriction::member_record_is_visible (
         restriction, disk_node . aliases . or_default (), text ) };
     let submitted_aliases : Vec<String> =

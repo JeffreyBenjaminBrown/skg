@@ -1,21 +1,21 @@
-/// This file defines lowering, which converts 'CollectedFieldIntents'
-/// (the traversal's output) into ordered 'NodeIntent's -- the shape
-/// that the downstream stages (visibility resolution, disk
-/// supplementation, and the noop filter) consume. Lowering is pure
-/// and synchronous, and reads no disk.
-/// .
-/// Entries lower as follows:
-/// - A delete entry lowers to 'NodeIntent::Delete'.
-/// - An entry with a title/body (that is, one owned by a
-///   save-eligible editable occurrence) lowers to
-///   'NodeIntent::Save', with its empty slots lowering to
-///   'MSV::Unspecified'.
-/// - An entry holding only unresolved signals (visibility fieldIntents
-///   and text claims) lowers to no NodeIntent; the signals are
-///   returned beside the nodeIntents, for the downstream stages that
-///   consume them. ('node_merge' slots are likewise not lowered
-///   here: nodeMerge extraction reads them via 'nodeMerge_pairs'
-///   before lowering consumes the map.)
+//! This file defines lowering, which converts 'CollectedFieldIntents'
+//! (the traversal's output) into ordered 'NodeIntent's -- the shape
+//! that the downstream stages (visibility resolution, disk
+//! supplementation, and the noop filter) consume. Lowering is pure
+//! and synchronous, and reads no disk.
+//! .
+//! Entries lower as follows:
+//! - A delete entry lowers to 'NodeIntent::Delete'.
+//! - An entry with a title/body (that is, one owned by a
+//!   save-eligible editable occurrence) lowers to
+//!   'NodeIntent::Save', with its empty slots lowering to
+//!   'MSV::Unspecified'.
+//! - An entry holding only unresolved signals (visibility fieldIntents
+//!   and text claims) lowers to no NodeIntent; the signals are
+//!   returned beside the nodeIntents, for the downstream stages that
+//!   consume them. ('node_merge' slots are likewise not lowered
+//!   here: nodeMerge extraction reads them via 'nodeMerge_pairs'
+//!   before lowering consumes the map.)
 
 use crate::from_text::local_fieldintent_collection::types::{
   CollectedFieldIntents, HiddenOutsideEdit, FieldIntentsForOneId, SubscribeeVisibility };

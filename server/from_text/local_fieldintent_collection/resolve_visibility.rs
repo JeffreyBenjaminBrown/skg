@@ -1,32 +1,32 @@
-/// This file defines visibility resolution, which consumes the
-/// 'SubscribeeVisibility' signals that collection put in the map.
-/// It is async because it consults disk.
-/// .
-/// The policy of the subscribee-visibility step, for subscriber R
-/// viewing subscribee E, is:
-/// .
-/// - If N is graph-content of subscribee E,
-///   and E has a viewchild with ID N and claimsMembership,
-///   then N is intended to be visible through this subscription,
-///   so it is removed from the hides of subscriber R.
-/// - If N is graph-content of E, E has no viewchild with ID N and
-///   claimsMembership, and N is not graph-content of R after the
-///   save, then N is hidden from R.
-/// - If N is a claimsMembership viewchild of E but is not
-///   graph-content of E, then it is not a hiderel edit.
-///   This does not touch it. The refresh of the save's rerender
-///   makes it vanish.
-/// .
-/// Both E's content and R's hides are read by the records the
-/// skgrepo restriction shows, as the view drew them: a hide whose
-/// record is restricted is neither removed nor moved, and no hide is
-/// inferred of a member that only a restricted record of E's
-/// explains.
-/// .
-/// Resolution cannot run during collection, even in principle: it
-/// needs disk (the subscribee's contains, the subscriber's hides)
-/// and the subscriber's own post-save contains -- a finished entry
-/// elsewhere in the same map.
+//! This file defines visibility resolution, which consumes the
+//! 'SubscribeeVisibility' signals that collection put in the map.
+//! It is async because it consults disk.
+//! .
+//! The policy of the subscribee-visibility step, for subscriber R
+//! viewing subscribee E, is:
+//! .
+//! - If N is graph-content of subscribee E,
+//!   and E has a viewchild with ID N and claimsMembership,
+//!   then N is intended to be visible through this subscription,
+//!   so it is removed from the hides of subscriber R.
+//! - If N is graph-content of E, E has no viewchild with ID N and
+//!   claimsMembership, and N is not graph-content of R after the
+//!   save, then N is hidden from R.
+//! - If N is a claimsMembership viewchild of E but is not
+//!   graph-content of E, then it is not a hiderel edit.
+//!   This does not touch it. The refresh of the save's rerender
+//!   makes it vanish.
+//! .
+//! Both E's content and R's hides are read by the records the
+//! skgrepo restriction shows, as the view drew them: a hide whose
+//! record is restricted is neither removed nor moved, and no hide is
+//! inferred of a member that only a restricted record of E's
+//! explains.
+//! .
+//! Resolution cannot run during collection, even in principle: it
+//! needs disk (the subscribee's contains, the subscriber's hides)
+//! and the subscriber's own post-save contains -- a finished entry
+//! elsewhere in the same map.
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::node_lookup::opt_graphnode_by_gnid;

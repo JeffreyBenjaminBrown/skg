@@ -215,19 +215,19 @@ pub(crate) fn acquisition_goal (
 
 /// The goal items of 'partners' over the straddle, as the
 /// skgrepo restriction lets them be seen. The diff view opens only
-/// to an unrestricted connection, but a switch rerenders its open buffers, so its goal
-/// asks the skgrepo restriction as a content view's does
-/// ('gnid_items' in 'goal.rs'): a partner whose record the
-/// skgrepo restriction keeps out (the worktree's record, or HEAD's
-/// when the worktree has none) is left out; one whose node it keeps
-/// out (the worktree's node, or HEAD's when the worktree has none)
-/// stays, and the ID rule makes it a restricted viewnode.
+/// to an unrestricted connection, but a switch rerenders its open
+/// buffers, so its goal leaves out what a content view's gated reads
+/// leave out: a partner whose record the skgrepo restriction keeps
+/// out (the worktree's record, or HEAD's when the worktree has none)
+/// is left out, asked here of the partner's relRepo; one whose node
+/// it keeps out (the worktree's node, or HEAD's when the worktree has
+/// none) stays, and the ID rule makes it a restricted viewnode.
 fn partner_items<'a> (
   partners : impl Iterator<Item = &'a Partner>,
   walk     : &Walk,
 ) -> Vec<GoalItem> {
   let restriction : &SkgrepoRestriction = walk . truth . restriction;
-  let record_is_visible = |partner : &Partner| -> bool {
+  let record_is_visible : &dyn Fn (&Partner) -> bool = &|partner : &Partner| -> bool {
     partner . relRepo_after . as_ref ()
       . or ( partner . relRepo_before . as_ref () )
       . is_none_or ( |relRepo| SkgrepoRestriction::record_is_visible (
@@ -238,7 +238,9 @@ fn partner_items<'a> (
     . collect () }
 
 /// The goal item of a partner over the straddle: warranted by the
-/// truth when the worktree's list holds it, else by HEAD.
+/// truth when the worktree's list holds it, else by HEAD. It names no
+/// relRepo, where a content view's goal names one for an unknown or
+/// restricted member ('gnid_items' in 'goal.rs').
 fn partner_item (
   partner : &Partner,
 ) -> GoalItem {

@@ -1,8 +1,8 @@
-/// PURPOSE: Serve the warnings the server raised as it started (see
-/// 'unknown_top_level_config_key_warnings' and
-/// 'foreign_manifest_order_warnings'). Each client asks once per
-/// connection, before it requests any view, and shows a non-empty
-/// answer in a buffer of its own.
+//! PURPOSE: Serve the warnings the server raised as it started (see
+//! 'unknown_top_level_config_key_warnings' and
+//! 'foreign_manifest_order_warnings'). Each client asks once per
+//! connection, before it requests any view, and shows a non-empty
+//! answer in a buffer of its own.
 
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{send_response_with_length_prefix, sexp_to_client_string, tag_sexp_response};

@@ -1,18 +1,18 @@
-/// Simple org-mode format parser for general trees (not Skg-specific).
-///
-/// This parser is for testing tree utilities with ego_tree.
-/// It reads simple org-mode headlines and builds a Tree<String>.
-///
-/// Format:
-/// ```text
-/// * Root
-/// ** Child 1
-/// *** Grandchild
-/// ** Child 2
-/// ```
-///
-/// Each line becomes a node, with depth determined by the number of asterisks.
-/// The title (text after asterisks and spaces) becomes the node's value.
+//! Simple org-mode format parser for general trees (not Skg-specific).
+//!
+//! This parser is for testing tree utilities with ego_tree.
+//! It reads simple org-mode headlines and builds a Tree<String>.
+//!
+//! Format:
+//! ```text
+//! * Root
+//! ** Child 1
+//! *** Grandchild
+//! ** Child 2
+//! ```
+//!
+//! Each line becomes a node, with depth determined by the number of asterisks.
+//! The title (text after asterisks and spaces) becomes the node's value.
 
 use ego_tree::{Tree, NodeId};
 use std::error::Error;

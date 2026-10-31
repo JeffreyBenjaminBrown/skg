@@ -1,10 +1,10 @@
-/// Skg lets users control a graph, viewing it through a tree view in a text editor.
-/// Nodes of the graph are represented via the 'Graphnode' type.
-/// Nodes of the tree are represented via the 'Viewnode' type.
-/// Some 'Viewnode's represent graphnodes, which need not exist; these are
-/// 'Vognode's (an occurrence, a ghost or a gnid-only vognode).
-/// Others encode information about neighboring tree nodes, such as
-/// aliases, IDs, and partner folders.
+//! Skg lets users control a graph, viewing it through a tree view in a text editor.
+//! Nodes of the graph are represented via the 'Graphnode' type.
+//! Nodes of the tree are represented via the 'Viewnode' type.
+//! Some 'Viewnode's represent graphnodes, which need not exist; these are
+//! 'Vognode's (an occurrence, a ghost or a gnid-only vognode).
+//! Others encode information about neighboring tree nodes, such as
+//! aliases, IDs, and partner folders.
 
 use super::errors::HeadlineName;
 use super::misc::{ID, SkgrepoChange, SkgrepoName};

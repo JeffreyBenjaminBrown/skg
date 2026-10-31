@@ -1,6 +1,6 @@
-/// Git operations: reading skgrepos at HEAD for the diff view,
-/// staging and committing, and searching history for vanished nodes.
-/// Uses the git2 crate for programmatic access to gitrepos.
+//! Git operations: reading skgrepos at HEAD for the diff view,
+//! staging and committing, and searching history for vanished nodes.
+//! Uses the git2 crate for programmatic access to gitrepos.
 
 pub mod misc;
 pub mod read_gitrepo;
