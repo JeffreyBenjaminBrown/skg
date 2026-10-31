@@ -5438,3 +5438,28 @@ unknown node" and "a restricted headline" stand where they
 stood, for slice 6.
 *** Headline
 DONE.
+
+** Orchestrator's notes after slice 0 (2026-10-31)
+Launched 04:10 UTC, reported 04:48 UTC: thirty-eight minutes;
+549k agent tokens over 240 tool uses. Two commits: the
+corrections' machinery gone, then the vanish rule with the six
+probe variants as tests. No correction carried. The deviations
+are sound: the viewnode merge leaves the merged sibling's
+children to the result's own visit; the original is drawn
+before the overrider vanishes; one 'entombstone'; the integrate
+request picks its roots before its one refresh; the docs reach
+'sharing-model.org', 'nvim-client-deviations.org' and
+'coding-advice/architecture.md', whose sentences on 'noClaim'
+and tombstones were false after the slice. One consequence for
+Jeff, not a stop: a headline typed where its parent cannot
+contain it (under a ghost whose node is back, under a
+subscribee shown under its subscriber) is saved as an orphan
+graphnode and warned of, as before, and now vanishes from the
+rerendered view, where it stayed shown ⊥ before; the warning
+names its gnid. One naming note for slice 6: "vanish" is also
+the word of 'server/git_ops/vanished.rs' and the API doc's
+"the commit it vanished at", unrelated, which the glossary says.
+Suites: nextest 1022 of 1022 (twelve tests gone, eight new),
+Emacs 407, Neovim 446, integration 35 of 36 with either client,
+the pre-existing failure. The two greps of slice 5 and 6 on the
+corrections are already empty.
