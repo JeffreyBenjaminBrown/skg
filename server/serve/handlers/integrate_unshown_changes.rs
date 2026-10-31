@@ -9,7 +9,6 @@
 //! as a save's does, and is followed by a rerender stream: the one
 //! view, or nothing when the request was refused.
 
-use crate::refresh::buffer_corrections::BufferCorrectionPolicy;
 use crate::diff_view::change_leaves::{BufferReadinessSummary, readiness_response_sexp};
 use crate::diff_view::readiness_requests::buffer_readiness_summary_for;
 use crate::graph_straddle::types::GraphStraddle;
@@ -75,9 +74,8 @@ fn integrate_unshown_changes (
   let prepared : PreparedRerenders = prepare_rerender_views (
     env, env . runtime_snapshot (), views_state,
     RerenderRequest {
-      restriction              : skgrepo_restriction,
-      buffer_correction_policy : BufferCorrectionPolicy::ReportAll,
-      selector                 : RerenderSelector::IntegratingUnshownChanges (viewforest_id), } );
+      restriction : skgrepo_restriction,
+      selector    : RerenderSelector::IntegratingUnshownChanges (viewforest_id), } );
   let (Some (view), Some (straddle)) :
     (Option<&RerenderedView>, Option<&Arc<GraphStraddle>>) =
     (prepared . views . first (), prepared . graph_straddle . as_ref ())

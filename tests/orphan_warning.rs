@@ -7,9 +7,9 @@
 // warning, and a root typed at top level, where no list is, draws
 // none either.
 //
-// Fixture (shared with corrections_channel): one contains two and
-// three; two contains four; five contains two. The view of four shows
-// its containers folder, which holds two, write-protected.
+// Fixture: one contains two and three; two contains four; five
+// contains two. The view of four shows its containers folder, which
+// holds two, write-protected.
 
 use std::error::Error;
 use std::net::{TcpListener, TcpStream};
@@ -31,7 +31,7 @@ fn a_headline_typed_where_no_list_is_read_is_warned_of_as_an_orphan
   () -> Result<(), Box<dyn Error>> {
   run_with_test_stores (
     "skg-test-orphan-warning",
-    "tests/corrections_channel/fixtures",
+    "tests/orphan_warning/fixtures",
     "/tmp/tantivy-test-orphan-warning",
     |config, tantivy| Box::pin ( async move {
       let four : String = view_of_four_with_two_write_protected (config, tantivy) ?;
@@ -71,7 +71,7 @@ fn headlines_under_a_tombstone_a_ghost_and_a_write_protected_folder_are_orphans
   () -> Result<(), Box<dyn Error>> {
   run_with_test_stores (
     "skg-test-orphan-warning-kinds",
-    "tests/corrections_channel/fixtures",
+    "tests/orphan_warning/fixtures",
     "/tmp/tantivy-test-orphan-warning-kinds",
     |config, tantivy| Box::pin ( async move {
       let four : String = view_of_four_with_two_write_protected (config, tantivy) ?;

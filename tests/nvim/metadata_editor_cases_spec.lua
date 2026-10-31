@@ -4,7 +4,6 @@
 local fields = require('skg.sexpr.metadata_fields')
 local sexpr_edit = require('skg.sexpr_edit')
 local metadata = require('skg.metadata')
-local server_warnings = require('skg.server_warnings')
 local sexpr = require('skg.sexpr.parse')
 
 ---Each case of the file, which the Emacs tests read too: a table from
@@ -64,12 +63,6 @@ describe('the metadata editor', function ()
                             sexpr.read(request))) })
           end
         end
-      end
-      if case.corrections then
-        assert.are.same(
-          { case.name, case.display },
-          { case.name, server_warnings.corrections_to_org_string(
-              sexpr.read(case.corrections)) })
       end
     end
   end)

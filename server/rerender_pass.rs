@@ -6,7 +6,6 @@
 //! view ('server/diff_view/buffer_rerender.rs') read it.
 
 use crate::graph_straddle::types::GraphStraddle;
-use crate::refresh::buffer_corrections::BufferCorrectionPolicy;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
 
@@ -26,12 +25,6 @@ pub struct RerenderPassContext<'a> {
   /// the first such buffer is rerendered. The caller sets the
   /// connection's, and keeps what it becomes.
   pub graph_straddle            : Option<Arc<GraphStraddle>>,
-  /// Which changes the rerenders report as no buffer corrections: a
-  /// save's rerender says what the save deleted and what its
-  /// nodeMerge requests touched, a
-  /// skgrepo-set switch whether the skgrepo restriction changed; every other
-  /// rerender reports every change.
-  pub buffer_correction_policy  : BufferCorrectionPolicy,
   /// True only for the "integrate unshown changes" request, which
   /// rerenders the one buffer of the diff view it names
   /// ('rerender_diffView_buffer').
@@ -44,12 +37,11 @@ impl<'a> RerenderPassContext<'a> {
     runtime                    : Arc<RuntimeGeneration>,
     skgrepo_restriction        : Option<&'a SkgrepoRestriction>,
     graph_straddle             : Option<Arc<GraphStraddle>>,
-    buffer_correction_policy   : BufferCorrectionPolicy,
     integrates_unshown_changes : bool,
   ) -> RerenderPassContext<'a> {
     RerenderPassContext {
       env, runtime, skgrepo_restriction, graph_straddle,
-      buffer_correction_policy, integrates_unshown_changes,
+      integrates_unshown_changes,
       errors   : Vec::new (),
       warnings : Vec::new (), } }
 }

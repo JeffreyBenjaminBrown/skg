@@ -35,7 +35,7 @@ use crate::refresh::ancestry::described_node;
 use crate::refresh::extent::is_chain_parent;
 use crate::refresh::goal::{
   Goal, GoalItem, GoalMember, member_of_child};
-use crate::refresh::id_rule::entombstone_gone_change;
+use crate::refresh::id_rule::entombstone;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::refresh::visit::children_of;
 use crate::types::misc::{ID, SkgrepoName};
@@ -352,12 +352,11 @@ fn expected_change_viewnodes (
 /// the expected one before it (or first), and bring those it keeps up
 /// to date with the straddle. Folders are drawn empty: their own
 /// visits fill them from their goals. A change viewnode describes the
-/// straddle and is recomputed at every refresh, so drawing one is no
-/// buffer correction ('entombstone_gone_change').
+/// straddle and is recomputed at every refresh.
 pub(crate) fn draw_change_viewnodes (
   tree   : &mut Tree<Viewnode>,
   parent : NodeId,
-  walk   : &mut Walk,
+  walk   : &Walk,
 ) -> Result<(), Box<dyn Error>> {
   let expected : Vec<Viewnode> = expected_change_viewnodes (tree, parent, walk);
   if expected . is_empty () { return Ok (( )); }
@@ -377,9 +376,6 @@ pub(crate) fn draw_change_viewnodes (
       None => {
         let drawn : NodeId =
           tree . get_mut (parent) . unwrap () . append (model) . id ();
-        if matches! ( tree . get (drawn) . unwrap () . value () . kind,
-                      ViewnodeKind::Folder (_) ) {
-          walk . added_folders . insert (drawn); }
         created . insert (drawn);
         order . push (drawn); }, }}
   place_created_children_after_their_model_predecessors (
@@ -449,7 +445,7 @@ pub(crate) fn tag_children (
       let moved : Option<Viewnode> =
         item . as_ref () . and_then ( |item| item . partner . as_ref () )
         . and_then (mk_relRepo_move_viewnode);
-      keep_one_relRepo_move (tree, child, moved, walk); }}
+      keep_one_relRepo_move (tree, child, moved); }}
   Ok (( )) }
 
 /// Under the member at 'member', exactly the relRepo move 'moved'
@@ -458,7 +454,6 @@ fn keep_one_relRepo_move (
   tree   : &mut Tree<Viewnode>,
   member : NodeId,
   moved  : Option<Viewnode>,
-  walk   : &mut Walk,
 ) {
   let present : Vec<NodeId> =
     tree . get (member) . unwrap () . children ()
@@ -476,7 +471,7 @@ fn keep_one_relRepo_move (
         move_to_first_child (tree, member, drawn)
           . expect ("keep_one_relRepo_move: the move was just drawn"); }, }}
   for stale in extra {
-    entombstone_gone_change (tree, stale, walk); }}
+    entombstone (tree, stale); }}
 
 /// A drawn editable occurrence's body starts folded unless its node
 /// is in C: it is context.

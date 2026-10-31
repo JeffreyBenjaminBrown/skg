@@ -10,7 +10,6 @@ use crate::from_text::strandeds::{
   raised_relationship_warning, reset_to_default_relationships,
   stranded_relationships};
 use crate::git_ops::diff::compute_diff_for_skgrepo;
-use crate::refresh::buffer_corrections::{BufferCorrectionPolicy, ViewBufferCorrections, corrections_entry_sexp};
 use crate::save::{
   apply_delete_propagation_cleanup,
   PreparedSave, prepare_save_under_mutation_gate,
@@ -98,9 +97,6 @@ pub struct SaveResponse {
   /// Some when the saved buffer is one of the diff view's: the
   /// readiness summary the client shows after the save.
   pub readiness_summary   : Option<BufferReadinessSummary>,
-  /// What the refresh corrected in each view the save refreshed, the
-  /// saved view and the collateral ones.
-  pub buffer_corrections         : Vec<ViewBufferCorrections>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -130,10 +126,8 @@ impl SaveResponse {
     errors             : Vec<String>,
     warnings           : Vec<String>,
     readiness_summary  : Option<BufferReadinessSummary>,
-    buffer_corrections : Vec<ViewBufferCorrections>,
   ) -> SaveResponse {
     SaveResponse { saved_view, errors, warnings, readiness_summary,
-                   buffer_corrections,
                    .. SaveResponse::empty () } }
 
   /// A save that skgsave-committed nothing, asking to review the
@@ -186,17 +180,15 @@ impl SaveResponse {
       hoist_confirmation        : None,
       text_release_confirmation : None,
       strandeds_confirmation    : None,
-      readiness_summary         : None,
-      buffer_corrections        : Vec::new (), } }
+      readiness_summary         : None, } }
 
   /// Format: ((content "...") (errors (...)) (warnings (...))
-  /// (corrections (...)) POINT... (readiness-summary ...)), where the
+  /// POINT... (readiness-summary ...)), where the
   /// point entries and the readiness summary are there when the save
   /// has them.
   fn to_sexp_string (&self) -> String {
     let mut items : Vec<Sexp> = buffer_response_entries (
       & self . saved_view, & self . errors, & self . warnings );
-    items . push ( corrections_entry_sexp (& self . buffer_corrections) );
     if let Some (point_position) = &self . save_point_position {
       push_save_point_position_to_sexp_items (&mut items, point_position); }
     if let Some (readiness_summary) = &self . readiness_summary {
@@ -978,13 +970,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
         views_state,
         skgrepo_restriction,
         text_approved_pids,
-        &fork_specs,
-        BufferCorrectionPolicy::after_a_save (
-          affected_gnids . deleted . clone (),
-          nodeMerges . iter ()
-          . flat_map ( |nodeMerge| [ nodeMerge . acquirer_gnid () . clone (),
-                                     nodeMerge . acquiree_gnid () . clone () ] )
-          . collect () )) ?;
+        &fork_specs ) ?;
     { // Nonfatal parse warnings (e.g. discarded folder headline text)
       // precede the rerender's warnings.
       let mut warnings : Vec<String> = parse_warnings;

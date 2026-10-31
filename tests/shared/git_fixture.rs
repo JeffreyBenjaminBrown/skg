@@ -233,8 +233,7 @@ pub fn open_content_view (
   Ok (text) }
 
 /// Switch to the skgrepo-set 'name'; return 'view' as rerendered,
-/// and the "rerender-done" message, which carries the buffer
-/// corrections.
+/// and the "rerender-done" message.
 pub fn switch_skgrepo_set (
   f           : &mut Fixture,
   restriction : &mut SkgrepoRestriction,
@@ -246,8 +245,7 @@ pub fn switch_skgrepo_set (
   Ok (( rerendered . remove (0), done )) }
 
 /// Switch to the skgrepo-set 'name'; return each of 'views' as
-/// rerendered, in order, and the "rerender-done" message, which
-/// carries the buffer corrections.
+/// rerendered, in order, and the "rerender-done" message.
 pub fn switch_skgrepo_set_rerendering (
   f           : &mut Fixture,
   restriction : &mut SkgrepoRestriction,

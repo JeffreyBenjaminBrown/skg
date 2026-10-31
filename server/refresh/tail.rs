@@ -2,16 +2,14 @@
 //! facts (the stats of each occurrence: its props, rels and birth,
 //! 'cycle', 'repoBoundary', 'omittedBody'; in the diff view the
 //! '(ready ...)' change facts and the home skgrepo moves), prune every childless
-//! tombstone, roots included (so a buffer may end with no roots), give
-//! a vnid to every viewnode that lacks one, and name each buffer
-//! correction's headline by the vnid it holds then. The tail renders
+//! tombstone, roots included (so a buffer may end with no roots), and
+//! give a vnid to every viewnode that lacks one. The tail renders
 //! nothing: each caller renders the forest once, when it is done with
 //! it ('viewforest_to_string'). The warrants the refresh's rungs set
 //! are kept: the stats pass does not recompute them.
 
 use crate::diff_view::pruned_change_view::set_diffView_facts_in_viewforest;
 use crate::refresh::{Truth, Walk};
-use crate::refresh::buffer_corrections::BufferCorrection;
 use crate::refresh::visit::folder_goes_when_empty;
 use crate::types::misc::ID;
 use crate::types::tree::forest::ViewForest;
@@ -27,23 +25,16 @@ use ego_tree::{NodeId, NodeRef, Tree};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 
-/// See the module comment. Returns the buffer corrections, none when
-/// nobody reads them ('BufferCorrectionPolicy::is_read'). They are
-/// named after the prune and the vnids, which decide whether a
-/// headline is still in the buffer and what it is called there.
+/// See the module comment.
 pub(crate) fn finish (
   viewforest         : &mut ViewForest,
   viewnode_id_record : &mut ViewnodeIdRecord,
   walk               : Walk,
-) -> Result<Vec<BufferCorrection>, Box<dyn Error>> {
+) -> Result<(), Box<dyn Error>> {
   set_derived_facts (viewforest, &walk) ?;
   prune_childless_tombstones (viewforest . as_internal_tree_mut ()) ?;
   viewnode_id_record . assign_viewnode_ids (viewforest . as_internal_tree_mut ());
-  Ok ( if walk . buffer_correction_policy . is_read () {
-         walk . buffer_corrections . into_buffer_corrections (
-           viewforest . as_internal_tree_mut (),
-           walk . buffer_correction_policy . reports_what_the_tail_pruned () ) }
-       else { Vec::new () } ) }
+  Ok (( )) }
 
 fn set_derived_facts (
   viewforest : &mut ViewForest,

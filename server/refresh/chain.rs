@@ -21,7 +21,6 @@ use crate::dbs::in_rust_graph::containerward_role_tree::{
   ContainerwardRoleTree, containers_in_inRustGraph, full_containerward_role_tree};
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::refresh::{Truth, Walk};
-use crate::refresh::buffer_corrections::BufferCorrectionPolicy;
 use crate::refresh::extent::DrawnEditability;
 use crate::refresh::goal::{Goal, GoalItem, GoalMember, chain_goal};
 use crate::refresh::id_rule::{
@@ -46,8 +45,7 @@ pub fn attach_containerward_chains_under_members (
   truth   : &Truth,
   mode    : RefreshMode,
 ) -> Result<(), Box<dyn Error>> {
-  let policy : BufferCorrectionPolicy = BufferCorrectionPolicy::Unread;
-  let walk : Walk = Walk::new (truth, mode, 0, &policy);
+  let walk : Walk = Walk::new (truth, mode, 0);
   for member in members {
     attach_containerward_chain (tree, *member, &walk) ?; }
   Ok (( )) }

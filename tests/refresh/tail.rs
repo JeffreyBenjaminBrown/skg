@@ -16,8 +16,7 @@ fn a_root_whose_node_vanished_is_pruned_and_the_buffer_may_end_empty () {
   let run : Run = run_asserting_fixpoint (
     &format! ("* {} gone\n", occurrence_metadata ("gone", "")), &graph );
   assert_eq! ( run . outline (), "" );
-  assert_eq! ( run . text, "" );
-  assert_eq! ( run . buffer_correction_kinds (), vec! [ BufferCorrectionKind::Entombstoned ] ); }
+  assert_eq! ( run . text, "" ); }
 
 #[test]
 fn a_tombstone_root_that_holds_something_stays () {
@@ -39,9 +38,7 @@ fn every_viewnode_gets_a_vnid () {
     &format! ("* {} p\n", occurrence_metadata ("p", "(viewRequests (folder aliases))")),
                         &graph );
   assert! ( run . forest . nodes () . all ( |node| node . value () . viewnode_id . is_some () ),
-            "{}", run . text );
-  assert! ( run . buffer_corrections . iter () . all ( |c| c . vnid . is_some () ),
-            "{:?}", run . buffer_corrections ); }
+            "{}", run . text ); }
 
 #[test]
 fn a_folder_the_prune_leaves_childless_goes_too () {

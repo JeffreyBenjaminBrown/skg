@@ -35,7 +35,6 @@ use crate::types::viewnode::{
   Vognode, mk_editable_viewnode, viewnode_of};
 use crate::types::views_state::{DiffViewBufferKind, ViewnodeIdRecord, pids_from_viewforest};
 use crate::diff_view::buffer_rerender::refresh_diffView_viewforest;
-use crate::refresh::buffer_corrections::BufferCorrectionPolicy;
 
 use ego_tree::{NodeId, NodeRef};
 use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
@@ -207,8 +206,7 @@ pub struct RenderedDiffViewBuffer {
 /// The buffer of kind 'diffView_buffer_kind' over 'straddle', with
 /// roots 'roots' (for a pruned change view, its D in order), and
 /// readiness from 'store': the refresh of a stub of its roots
-/// ('stub_viewforest_of_roots'). A first rendering's buffer
-/// corrections go unread ('BufferCorrectionPolicy::Unread').
+/// ('stub_viewforest_of_roots').
 pub fn diffView_buffer_viewforest (
   runtime              : &RuntimeGeneration,
   straddle             : &GraphStraddle,
@@ -219,8 +217,7 @@ pub fn diffView_buffer_viewforest (
   let mut viewforest : ViewForest =
     stub_viewforest_of_roots (runtime, straddle, diffView_buffer_kind, roots) ?;
   refresh_diffView_viewforest (
-    runtime, straddle, diffView_buffer_kind, store, None,
-    &BufferCorrectionPolicy::Unread, &mut viewforest,
+    runtime, straddle, diffView_buffer_kind, store, None, &mut viewforest,
     // A new buffer's first viewnode IDs; 'register_view' reads the record
     // back from the forest.
     &mut ViewnodeIdRecord::default () ) ?;
@@ -401,18 +398,18 @@ pub fn contentOrigins_missing_from_buffer (
 
 /// Append 'content_origins' at the end of the buffer, each stubbed as the first
 /// rendering stubs a root ('append_stub_root'), for the refresh to
-/// draw. Returns their treeids.
+/// draw.
 pub fn append_contentOrigins_to_buffer (
   runtime              : &RuntimeGeneration,
   straddle             : &GraphStraddle,
   diffView_buffer_kind : DiffViewBufferKind,
   viewforest           : &mut ViewForest,
   content_origins      : &[ID],
-) -> Result<Vec<NodeId>, Box<dyn Error>> {
-  content_origins . iter ()
-    . map ( |content_origin| append_stub_root (
-      runtime, straddle, diffView_buffer_kind, viewforest, content_origin ) )
-    . collect () }
+) -> Result<(), Box<dyn Error>> {
+  for content_origin in content_origins {
+    append_stub_root (
+      runtime, straddle, diffView_buffer_kind, viewforest, content_origin ) ?; }
+  Ok (( )) }
 
 /// The IDs of the buffer's roots, whatever kind of vognode each is.
 pub fn root_gnids_of_buffer (

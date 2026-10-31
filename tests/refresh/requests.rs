@@ -6,7 +6,7 @@
 // from their goals; 'fork' is the save's and stays. ('tombstone', on a
 // ghost, is the diff view's: 'diff_view.rs'.) An edit request is
 // carried through unchanged, unless the child's new kind has no slot
-// for it: then it is dropped, and reported.
+// for it: then it is dropped.
 
 use super::*;
 use crate::types::nodes::complete::Flag;
@@ -91,7 +91,7 @@ node p
 /// Two siblings stand for c, the second asking to be c's editable
 /// occurrence. The viewnode merge keeps the first, which takes the
 /// second's editability and its request: c's content is drawn as c is
-/// first extended, not reported as reinstated.
+/// first extended.
 #[test]
 fn editableView_on_a_merged_sibling_passes_to_the_result () {
   let input : String = formatdoc! ("
@@ -108,9 +108,7 @@ fn editableView_on_a_merged_sibling_passes_to_the_result () {
 node p
   node c
     node c1
-  node d" );
-  assert_eq! ( run . buffer_correction_kinds (),
-               vec! [ BufferCorrectionKind::ViewnodeMerged ] ); }
+  node d" ); }
 
 /// An occurrence the buffer already shows editable charges the budget
 /// when its content is drawn, though the budget never write-protects
@@ -274,11 +272,10 @@ fn an_edit_request_is_carried_through () {
        occurrence_metadata ("d", "(editRequest delete)") );
   let run : Run = run_asserting_fixpoint (&input, &graph);
   assert_eq! ( occurrence_at (&run, &[0]) . edit_request (),
-               Some (&NodeEditRequest::Delete) );
-  assert! ( run . buffer_corrections . is_empty (), "{:?}", run . buffer_corrections ); }
+               Some (&NodeEditRequest::Delete) ); }
 
 #[test]
-fn an_edit_request_the_new_kind_has_no_slot_for_is_dropped_and_reported () {
+fn an_edit_request_the_new_kind_has_no_slot_for_is_dropped () {
   let graph : InRustGraph = graph (&[
     Graphnode { contains : ids (&["x"]), .. node ("p") } ]);
   let input : String = formatdoc! ("
@@ -294,16 +291,13 @@ node p
     run . forest . roots () . next () . unwrap () . first_child () . unwrap ();
   let ViewnodeKind::Vognode (Vognode::GnidOnly (unknown)) = &x . value () . kind
     else { panic! ("x is no unknown: {:?}", x . value () . kind) };
-  assert_eq! ( unknown . relationshipEditRequest, None );
-  assert_eq! ( run . buffer_correction_kinds (),
-               vec! [ BufferCorrectionKind::EditRequestDropped,
-                      BufferCorrectionKind::Rekinded (VognodeKind::GnidOnly (GnidOnlyKind::Unknown)) ] ); }
+  assert_eq! ( unknown . relationshipEditRequest, None ); }
 
 /// x is in no graph and p's list does not name it, so its occurrence
 /// becomes a tombstone, which has no slot for a request; being
 /// childless, the tombstone is pruned.
 #[test]
-fn an_edit_request_on_what_becomes_a_tombstone_is_dropped_and_reported () {
+fn an_edit_request_on_what_becomes_a_tombstone_is_dropped () {
   let graph : InRustGraph = graph (&[ node ("p") ]);
   let input : String = formatdoc! ("
     * {} p
@@ -311,15 +305,12 @@ fn an_edit_request_on_what_becomes_a_tombstone_is_dropped_and_reported () {
     ", occurrence_metadata ("p", ""),
        occurrence_metadata ("x", "(editRequest delete)") );
   let run : Run = run_asserting_fixpoint (&input, &graph);
-  assert_eq! ( run . outline (), "node p" );
-  assert_eq! ( run . buffer_correction_kinds (),
-               vec! [ BufferCorrectionKind::Entombstoned,
-                      BufferCorrectionKind::EditRequestDropped ] ); }
+  assert_eq! ( run . outline (), "node p" ); }
 
 /// A subtree view request write-protects c, whose new state has no
 /// slot for the delete it carried.
 #[test]
-fn an_edit_request_on_what_becomes_write_protected_is_dropped_and_reported () {
+fn an_edit_request_on_what_becomes_write_protected_is_dropped () {
   let input : String = formatdoc! ("
     * {} p
     ** {} c
@@ -332,8 +323,7 @@ fn an_edit_request_on_what_becomes_write_protected_is_dropped_and_reported () {
 node p wp
   node c wp noClaim
   node d wp noClaim" );
-  assert_eq! ( occurrence_at (&run, &[0]) . edit_request (), None );
-  assert_eq! ( run . count (BufferCorrectionKind::EditRequestDropped), 1 ); }
+  assert_eq! ( occurrence_at (&run, &[0]) . edit_request (), None ); }
 
 #[test]
 fn a_search_stub_of_write_protected_hits_draws_each_hits_containers () {

@@ -14,27 +14,25 @@
 //!
 //! The headline is re-kinded where it stands, keeping its vnid, its
 //! fold state, its children and, for an occurrence, its editability.
-//! An edit request its new kind has no slot for is dropped, and
-//! reported.
+//! An edit request its new kind has no slot for is dropped.
 
 use crate::dbs::in_rust_graph::relation_accessors::GnidPresence;
 use crate::diff_view::change_viewnodes::mk_historical_viewnode;
 use crate::graph_straddle::types::GraphStraddle;
 use crate::refresh::{Walk, write_protect_occurrence};
-use crate::refresh::buffer_corrections::BufferCorrectionKind;
 use crate::refresh::extent::{DrawnEditability, drawn_occurrence_editability};
 use crate::refresh::visit::children_of;
 use crate::refresh::goal::{Goal, GoalMember};
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::nodes::rust::GraphnodeInRust;
 use crate::types::viewnode::{
-  ChangeFacts, Editability, Ghost, GnidOnlyKind, GnidOnlyVognode, NodeEditRequest,
-  PropertyMember, RelationshipEditRequest, Occurrence, ViewRequest, Viewnode, ViewnodeKind,
-  Vognode, VognodeKind, Warrant, default_occurrence};
+  ChangeFacts, Editability, Ghost, GnidOnlyKind, GnidOnlyVognode,
+  RelationshipEditRequest, Occurrence, ViewRequest, Viewnode, ViewnodeKind,
+  Vognode, Warrant, default_occurrence};
 use crate::refresh::mode::RefreshMode;
 use crate::skgrepo_sets::SkgrepoRestriction;
 
-use ego_tree::{NodeId, NodeMut, NodeRef, Tree};
+use ego_tree::{NodeId, NodeMut, Tree};
 use std::error::Error;
 
 /// What the ID rule makes of a gnid.
@@ -97,51 +95,15 @@ pub(crate) fn id_rule (
     return IdRuleAnswer::GnidOnly (GnidOnlyKind::Unknown); }
   IdRuleAnswer::Tombstone }
 
-/// The edit requests a vognode carries, by their slots.
-#[derive(Default)]
-struct EditRequests {
-  node_edit_request         : Option<NodeEditRequest>,
-  relationship_edit_request : Option<RelationshipEditRequest>,
-  restore_node              : bool,
-}
-
-impl EditRequests {
-  fn of (
-    vognode : &Vognode,
-  ) -> EditRequests {
-    match vognode {
-      Vognode::Occurrence (occurrence) => EditRequests {
-        node_edit_request         : occurrence . edit_request () . cloned (),
-        relationship_edit_request : occurrence . relationshipEditRequest . clone (),
-        restore_node              : false, },
-      Vognode::Ghost (ghost) => EditRequests {
-        restore_node : ghost . restoreNode_request,
-        .. EditRequests::default () },
-      Vognode::GnidOnly (gnid_only) => EditRequests {
-        relationship_edit_request : gnid_only . relationshipEditRequest . clone (),
-        .. EditRequests::default () }, } }
-
-  /// What a gnid-only vognode keeps of these requests: a relRepo
-  /// request, the one request it takes; and whether it drops any
-  /// other.
-  fn the_relRepo_request_only (
-    &self,
-  ) -> (Option<RelationshipEditRequest>, bool) {
-    let kept : Option<RelationshipEditRequest> =
-      self . relationship_edit_request . clone ()
-      . filter ( |request| matches! ( request, RelationshipEditRequest::RelRepo (_) ));
-    let dropped : bool =
-      self . node_edit_request . is_some () || self . restore_node
-      || kept != self . relationship_edit_request;
-    (kept, dropped) }
-
-  fn any (
-    &self,
-  ) -> bool {
-    self . node_edit_request . is_some ()
-    || self . relationship_edit_request . is_some ()
-    || self . restore_node }
-}
+/// The relationship request the vognode carries, if any: a ghost
+/// has no slot for one.
+fn relationship_edit_request_of (
+  vognode : &Vognode,
+) -> Option<RelationshipEditRequest> {
+  match vognode {
+    Vognode::Occurrence (occurrence) => occurrence . relationshipEditRequest . clone (),
+    Vognode::Ghost (_) => None,
+    Vognode::GnidOnly (gnid_only) => gnid_only . relationshipEditRequest . clone (), } }
 
 /// Re-kind the vognode at 'child' (a child of 'parent', whose goal
 /// is 'parent_goal') by the ID rule, where it stands. Its ten cases,
@@ -192,7 +154,7 @@ pub(crate) fn rekind_vognode (
       rekind_to_gnid_only (tree, child, &gnid, kind, other, parent_goal, walk),
     ( IdRuleAnswer::Tombstone, other ) => {
       forget_editable_occurrence (&other, child, walk);
-      entombstone (tree, child, walk); }, }
+      entombstone (tree, child); }, }
   Ok (( )) }
 
 /// Make the ghost or gnid-only vognode 'other' at 'child' (a child of
@@ -200,11 +162,8 @@ pub(crate) fn rekind_vognode (
 /// back, or the skgrepo restriction widened to show it. It stands as an
 /// occurrence drawn there would ('drawn_occurrence_editability'). It keeps its claim (a ghost's
 /// becomes a claim) and its relationship request; a restoreNode
-/// request it drops, and reports. Under what was a gnid-only vognode,
-/// every child claims again ('reset_the_claims_of_children'). Its
-/// re-kind from a Restricted vognode is no buffer correction after a
-/// change of the skgrepo restriction, which widened
-/// ('BufferCorrectionPolicy').
+/// request it drops. Under what was a gnid-only vognode, every child
+/// claims again ('reset_the_claims_of_children').
 fn rekind_to_occurrence (
   tree   : &mut Tree<Viewnode>,
   parent : NodeId,
@@ -213,40 +172,28 @@ fn rekind_to_occurrence (
   other  : Vognode,
   walk   : &mut Walk,
 ) -> Result<(), Box<dyn Error>> {
-  let requests : EditRequests = EditRequests::of (&other);
-  let (claims, was_gnid_only, quiet) : (bool, bool, bool) = match &other {
-    Vognode::GnidOnly (gnid_only) =>
-      ( gnid_only . claimsMembership,
-        true,
-        // the skgrepo restriction widened
-        gnid_only . kind == GnidOnlyKind::Restricted
-        && ! walk . buffer_correction_policy . reports_rekind_across_the_restriction () ),
-    _ => (true, false, false), };
+  let (claims, was_gnid_only) : (bool, bool) = match &other {
+    Vognode::GnidOnly (gnid_only) => ( gnid_only . claimsMembership, true ),
+    _ => (true, false), };
   let editability : DrawnEditability =
     drawn_occurrence_editability (tree, parent, pid, walk);
   let occurrence : Occurrence =
     occurrence_from_truth (
       pid, EditabilityAndClaim { editability, claims }, walk) ?;
   let occurrence : Occurrence = Occurrence {
-    relationshipEditRequest : requests . relationship_edit_request . clone (),
+    relationshipEditRequest : relationship_edit_request_of (&other),
     .. occurrence };
   set_vognode_keeping_readiness (tree, child, Vognode::Occurrence (occurrence));
   if was_gnid_only {
     reset_the_claims_of_children (tree, child); }
   if editability == DrawnEditability::Editable {
     walk . hold_editability (pid, child); }
-  if requests . restore_node {
-    walk . buffer_corrections . record (tree, child, BufferCorrectionKind::EditRequestDropped); }
-  if ! quiet {
-    walk . buffer_corrections . record (tree, child, BufferCorrectionKind::Rekinded (VognodeKind::Occurrence)); }
   Ok (( )) }
 
 /// Make the occurrence or gnid-only vognode 'other' at 'child' the
 /// ghost of 'pid', where it stands. It keeps the claim it carried,
 /// where the list still names it; every edit request it carried it
-/// drops, and reports. Its re-kind from a Restricted vognode is no
-/// buffer correction after a change of the skgrepo restriction, which
-/// widened ('BufferCorrectionPolicy').
+/// drops.
 fn rekind_to_ghost (
   tree        : &mut Tree<Viewnode>,
   child       : NodeId,
@@ -255,11 +202,6 @@ fn rekind_to_ghost (
   parent_goal : Option<&Goal>,
   walk        : &mut Walk,
 ) -> Result<(), Box<dyn Error>> {
-  let requests : EditRequests = EditRequests::of (&other);
-  let quiet : bool = // the skgrepo restriction widened
-    matches! ( &other, Vognode::GnidOnly (gnid_only)
-                       if gnid_only . kind == GnidOnlyKind::Restricted )
-    && ! walk . buffer_correction_policy . reports_rekind_across_the_restriction ();
   forget_editable_occurrence (&other, child, walk);
   let named_by_the_list : bool =
     parent_goal . and_then ( |goal| goal . item_for ( &GoalMember::Gnid ( pid . clone () )))
@@ -271,18 +213,12 @@ fn rekind_to_ghost (
     .. ghost_from_head (pid, walk)
        . ok_or ("rekind_vognode: HEAD lacks the node it has") ? };
   set_vognode_keeping_readiness (tree, child, Vognode::Ghost (ghost));
-  if requests . any () {
-    walk . buffer_corrections . record (tree, child, BufferCorrectionKind::EditRequestDropped); }
-  if ! quiet {
-    walk . buffer_corrections . record (tree, child, BufferCorrectionKind::Rekinded (VognodeKind::Ghost)); }
   Ok (( )) }
 
 /// Make the vognode 'other' at 'child' a gnid-only vognode of 'kind'
 /// for 'gnid', where it stands, keeping its claim, its relRepo request
-/// (an edit request of another kind it drops, and reports) and its
-/// readiness request. Its re-kind to kind Restricted is no buffer
-/// correction after a change of the skgrepo restriction, which made
-/// its node restricted ('BufferCorrectionPolicy').
+/// (an edit request of another kind it drops) and its readiness
+/// request.
 fn rekind_to_gnid_only (
   tree        : &mut Tree<Viewnode>,
   child       : NodeId,
@@ -292,8 +228,10 @@ fn rekind_to_gnid_only (
   parent_goal : Option<&Goal>,
   walk        : &mut Walk,
 ) {
-  let (relationship_edit_request, dropped) : (Option<RelationshipEditRequest>, bool) =
-    EditRequests::of (&other) . the_relRepo_request_only ();
+  let relationship_edit_request : Option<RelationshipEditRequest> =
+    // a relRepo request, the one request a gnid-only vognode takes
+    relationship_edit_request_of (&other)
+    . filter ( |request| matches! ( request, RelationshipEditRequest::RelRepo (_) ));
   forget_editable_occurrence (&other, child, walk);
   set_vognode_keeping_readiness (
     tree, child, Vognode::GnidOnly ( GnidOnlyVognode {
@@ -301,14 +239,7 @@ fn rekind_to_gnid_only (
       .. GnidOnlyVognode::new (
         kind, gnid . clone (), goal_relRepo (parent_goal, gnid),
         other . claims (),
-        Warrant::ByGraph ) } )); // the warrant rung sets it
-  if dropped {
-    walk . buffer_corrections . record (tree, child, BufferCorrectionKind::EditRequestDropped); }
-  let quiet : bool = // the skgrepo restriction narrowed
-    kind == GnidOnlyKind::Restricted
-    && ! walk . buffer_correction_policy . reports_rekind_across_the_restriction ();
-  if ! quiet {
-    walk . buffer_corrections . record (tree, child, BufferCorrectionKind::Rekinded (VognodeKind::GnidOnly (kind))); }}
+        Warrant::ByGraph ) } )); } // the warrant rung sets it
 
 /// Each child of the headline at 'treeid', which stood as a gnid-only
 /// vognode and is now an occurrence, claims membership again. Under
@@ -327,58 +258,11 @@ fn reset_the_claims_of_children (
     tree . get_mut (grandchild) . unwrap () . value () . set_claim (true); }}
 
 /// Make the headline at 'treeid' a tombstone, keeping its children,
-/// and report it, and any edit request it carried. Its entombstoning
-/// is no buffer correction when the policy says so of the gnid it
-/// stood for, or when its viewparent was entombstoned quietly
-/// ('Walk::quiet_tombstones').
+/// dropping any request it carried.
 pub(crate) fn entombstone (
   tree   : &mut Tree<Viewnode>,
   treeid : NodeId,
-  walk   : &mut Walk,
 ) {
-  let reported : bool = {
-    let node : NodeRef<Viewnode> = tree . get (treeid) . unwrap ();
-    let gnid : Option<&ID> = match &node . value () . kind {
-      ViewnodeKind::Vognode (vognode) => Some ( vognode . gnid () ),
-      _ => None, };
-    walk . buffer_correction_policy . reports_entombstoning (gnid)
-    && ! node . parent () . is_some_and (
-         |parent| walk . quiet_tombstones . contains (&parent . id ()) ) };
-  if reported {
-    walk . buffer_corrections . record (tree, treeid, BufferCorrectionKind::Entombstoned); }
-  else { walk . quiet_tombstones . insert (treeid); }
-  entombstone_reporting_requests_only (tree, treeid, walk); }
-
-/// Make the change viewnode at 'treeid', whose change is gone, a
-/// tombstone, keeping its children. In the diff view a change viewnode
-/// describes the straddle and is recomputed at every refresh, so its
-/// going is no buffer correction; only a request it carried, dropped, is
-/// reported. In a content view, where it can describe nothing, it is
-/// reported as any entombstoned headline is.
-pub(crate) fn entombstone_gone_change (
-  tree   : &mut Tree<Viewnode>,
-  treeid : NodeId,
-  walk   : &mut Walk,
-) {
-  if walk . is_diff_view () {
-    entombstone_reporting_requests_only (tree, treeid, walk); }
-  else { entombstone (tree, treeid, walk); }}
-
-fn entombstone_reporting_requests_only (
-  tree   : &mut Tree<Viewnode>,
-  treeid : NodeId,
-  walk   : &mut Walk,
-) {
-  let carried_requests : bool = {
-    let viewnode : &Viewnode = tree . get (treeid) . unwrap () . value ();
-    viewnode . readiness_request . is_some ()
-    || match &viewnode . kind {
-      ViewnodeKind::Vognode (vognode) => EditRequests::of (vognode) . any (),
-      ViewnodeKind::PropertyMember (PropertyMember::Alias {
-        relationshipEditRequest, .. }) => relationshipEditRequest . is_some (),
-      _ => false, } };
-  if carried_requests {
-    walk . buffer_corrections . record (tree, treeid, BufferCorrectionKind::EditRequestDropped); }
   tree . get_mut (treeid) . unwrap () . value ()
     . replace_kind (ViewnodeKind::Tombstone); }
 

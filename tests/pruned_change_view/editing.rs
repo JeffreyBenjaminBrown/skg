@@ -11,7 +11,7 @@ use crate::pruned_change_view::common::{
 use crate::git_fixture_helpers::{
   mk_test_tcp_stream_pair, read_graphnode, without_lines_containing};
 
-use skg::refresh::buffer_corrections::{BufferCorrectionKind, ViewBufferCorrections};
+use skg::org_to_text::viewforest_to_string;
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::test_utils::{
   extract_string_field_from_sexp, read_all_lp_messages,
@@ -228,31 +228,24 @@ fn override_substitution_is_off (
               "no member is shown in place of another:\n{}", buffer );
     Ok (( )) }) }
 
-/// The diff view's buffer corrections ride the save response like a content
-/// view's ('SaveResponse.buffer_corrections'). A plain save of the "all
-/// changes" buffer reports nothing, and nor does a save that retitles
-/// a node: drawing the old text a change calls for is no buffer correction.
-/// In the 'shared' fixture n, editable under x in the diff view, gains
-/// a child in a content view of n; the diff view, rerendered as
-/// collateral, draws it where n's list already drawn lacked it, and
-/// reports that, tagged with the diff view.
+/// In the 'shared' fixture a plain save of the "all changes" buffer
+/// and a save that retitles a node both succeed. Then n, editable
+/// under x in the diff view, gains a child in a content view of n; the
+/// diff view, rerendered as collateral, draws it where n's list
+/// already drawn lacked it.
 #[test]
-fn the_diff_views_buffer_corrections_ride_the_save_response (
+fn a_diff_view_rerendered_as_collateral_draws_the_child_a_save_added (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("shared", &["main"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
     let plain : SaveResponse = save (f, &buffer) ?;
     assert! ( plain . errors . is_empty (), "{:?}", plain . errors );
-    assert! ( plain . buffer_corrections . is_empty (),
-              "a plain save corrects nothing: {:?}", plain . buffer_corrections );
     let retitled : SaveResponse = save ( f, &edit_line (
       &plain . saved_view, "* (skg node (gnid x) (skgRepos (nodeRepo main))",
       |line| format! ("{}, retitled", line) )) ?;
     assert! ( retitled . errors . is_empty (), "{:?}", retitled . errors );
     assert! ( without_viewnode_ids (&retitled . saved_view) . contains ("x, retitled\n"),
               "{}", retitled . saved_view );
-    assert! ( retitled . buffer_corrections . is_empty (),
-              "a retitle corrects nothing: {:?}", retitled . buffer_corrections );
     let view_of_n : ViewforestId = ViewforestId::ContentView ("content view of n" . into ());
     let (text, pids, tree) : (String, Vec<ID>, Tree<Viewnode>) =
       multi_root_view ( &f . config, Some (&f . tantivy), &[ ID::from ("n") ] ) ?;
@@ -265,12 +258,11 @@ fn the_diff_views_buffer_corrections_ride_the_save_response (
         &f . config, &f . tantivy, &f . graph,
         &Ok (view_of_n), &mut f . views_state )) ?;
     assert! ( response . errors . is_empty (), "{:?}", response . errors );
-    assert_eq! ( response . buffer_corrections . len (), 1,
-                 "only the diff view is corrected: {:?}", response . buffer_corrections );
-    let diff_view : &ViewBufferCorrections = &response . buffer_corrections [0];
-    assert_eq! ( diff_view . viewforest_id, viewforest_id_of (DiffViewBufferKind::AllChanges) );
-    assert_eq! ( diff_view . buffer_corrections . iter () . map ( |c| ( c . kind, c . title . as_str () ))
-                 . collect::<Vec<(BufferCorrectionKind, &str)>> (),
-                 vec! [ (BufferCorrectionKind::Reinstated, "new child") ],
-                 "{:?}", diff_view . buffer_corrections );
+    let diff_view : String = viewforest_to_string (
+      f . views_state . open_views
+      . viewforest_id_to_view ( &viewforest_id_of (DiffViewBufferKind::AllChanges) )
+      . expect ("the diff view stays open") ) ?;
+    assert! ( diff_view . lines () . any ( |line| line . ends_with (" new child") ),
+              "the diff view draws n's new child:
+{}", diff_view );
     Ok (( )) }) }

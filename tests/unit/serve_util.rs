@@ -8,8 +8,6 @@ use super::{
   ViewforestId,
 };
 
-use crate::refresh::buffer_corrections::{BufferCorrection, BufferCorrectionKind, ViewBufferCorrections};
-use crate::types::viewnode::ViewnodeId;
 
 use sexp::{Atom, Sexp};
 
@@ -38,21 +36,12 @@ fn format_buffer_response_separates_errors_and_warnings () {
 }
 
 #[test]
-fn rerender_done_carries_each_views_buffer_corrections_under_its_view_id () {
+fn rerender_done_carries_the_errors_and_the_warnings () {
   let warnings : Vec<String> =
     vec! [ "rerender note" . to_string () ];
-  let buffer_corrections : Vec<ViewBufferCorrections> = vec! [ ViewBufferCorrections {
-    viewforest_id : ViewforestId::ContentView ("content-view:5" . to_string ()),
-    buffer_corrections   : vec! [ BufferCorrection {
-      kind  : BufferCorrectionKind::Reinstated,
-      vnid  : Some ( ViewnodeId ("0c" . to_string ()) ),
-      title : "new child" . to_string () } ] } ];
   assert_eq!(
-    format_rerender_done_sexp (&[], &warnings, &[]),
-    "((errors ()) (warnings (\"rerender note\")) (corrections ()))" );
-  assert_eq!(
-    format_rerender_done_sexp (&[], &[], &buffer_corrections),
-    "((errors ()) (warnings ()) (corrections ((content-view:5 \"Drew what the graph says belongs here.\n*** new child\n- viewnode ID: 0c. To find it: C-c g v 0c\n\"))))" );
+    format_rerender_done_sexp (&[], &warnings),
+    "((errors ()) (warnings (\"rerender note\")))" );
 }
 
 #[test]

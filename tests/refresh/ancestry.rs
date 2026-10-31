@@ -60,8 +60,7 @@ fn an_unsayable_property_member_is_entombstoned () {
   let run : Run = run_asserting_fixpoint (&input, &graph);
   assert_eq! ( run . outline (), "\
 node p
-  aliasFolder" );
-  assert_eq! ( run . buffer_correction_kinds (), vec! [ BufferCorrectionKind::Entombstoned ] ); }
+  aliasFolder" ); }
 
 #[test]
 fn a_body_diff_stands_only_under_an_old_text () {

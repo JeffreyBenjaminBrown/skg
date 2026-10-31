@@ -46,14 +46,12 @@
 (ert-deftest test-skg-metadata-editor-shared-cases ()
   "The editor shows each case's metadata as its fill-in, saves it
 untouched as its strip, and the request writers place a request as
-the case says; the buffer corrections display as the case says. The
-cases are shared with Neovim."
+the case says. The cases are shared with Neovim."
   (let ((cases (test-skg-metadata-editor--cases)))
     (should (> (length cases) 10))
     (dolist (case cases)
       (let ((name (test-skg-metadata-editor--field case "name"))
-            (metadata (test-skg-metadata-editor--field case "metadata"))
-            (corrections (test-skg-metadata-editor--field case "corrections")))
+            (metadata (test-skg-metadata-editor--field case "metadata")))
         (when metadata
           (let* ((sexp (car (read-from-string metadata)))
                  (shown (skg-sexp-edit--org-text-to-show
@@ -78,13 +76,7 @@ cases are shared with Neovim."
                                        (funcall (nth 2 writer) sexp
                                                 (car (read-from-string request)))))
                            (list name (test-skg-metadata-editor--field
-                                       case (nth 1 writer))))))))))
-        (when corrections
-          (should (equal (list name (string-trim-right
-                                     (skg--corrections-to-org-string
-                                      (car (read-from-string corrections)))))
-                         (list name (test-skg-metadata-editor--field
-                                     case "display")))))))))
+                                       case (nth 1 writer))))))))))))))
 
 (provide 'test-skg-metadata-editor-cases)
 ;;; test-skg-metadata-editor-cases.el ends here

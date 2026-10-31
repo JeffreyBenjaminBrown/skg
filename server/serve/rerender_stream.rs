@@ -1,18 +1,16 @@
 //! The rerender pipeline every request that rerenders open views
 //! outside a save shares: prepare, answer, stream. The request says
-//! under which skgrepo restriction, with which buffer correction
-//! policy and which views ('RerenderRequest'). Each rerender is
+//! under which skgrepo restriction and which views
+//! ('RerenderRequest'). Each rerender is
 //! prepared in memory first ('prepare_rerender_views'), so that
 //! a text-release decision ('authorize_prepared_rerenders') can
 //! precede any visible change, and then streamed: "rerender-lock",
 //! one "rerender-view" per view, "rerender-done", which carries the
-//! errors, the warnings and each view's buffer corrections
-//! ('stream_prepared_rerenders'). The graph straddle the rerenders
+//! errors and the warnings ('stream_prepared_rerenders'). The graph straddle the rerenders
 //! brought up to date is written back to the connection
 //! ('write_graph_straddle_back'), as a save does with its own.
 
 use crate::graph_straddle::types::GraphStraddle;
-use crate::refresh::buffer_corrections::{BufferCorrectionPolicy, ViewBufferCorrections};
 use crate::serve::ViewsState;
 use crate::serve::handlers::text_release::{
   TextReleaseDecision,
@@ -41,12 +39,10 @@ pub(crate) struct PreparedRerenders {
 }
 
 /// What a request that rerenders open views asks of the pass: the
-/// skgrepo restriction to rerender under, which changes are no buffer
-/// corrections, and which views.
+/// skgrepo restriction to rerender under, and which views.
 pub(crate) struct RerenderRequest<'a> {
-  pub restriction              : &'a SkgrepoRestriction,
-  pub buffer_correction_policy : BufferCorrectionPolicy,
-  pub selector                 : RerenderSelector<'a>,
+  pub restriction : &'a SkgrepoRestriction,
+  pub selector    : RerenderSelector<'a>,
 }
 
 /// Which open views a rerender request rerenders, chosen from what
@@ -97,7 +93,7 @@ pub(crate) fn prepare_rerender_views (
     // brought up to date from the connection's. Streaming the
     // rerenders writes it back, as a save does.
     views_state . graph_straddle . clone (),
-    request . buffer_correction_policy, integrates_unshown_changes );
+    integrates_unshown_changes );
   let mut rendered_views : Vec<RerenderedView> = Vec::new ();
   for viewforest_id in &viewforest_ids {
     let _span : tracing::span::EnteredSpan =
@@ -157,10 +153,7 @@ pub(crate) fn stream_prepared_rerenders (
       TcpToClient::RerenderLock,
       & format_lock_views_sexp (&prepared . viewforest_ids) ));
   write_graph_straddle_back (views_state, prepared . graph_straddle);
-  let mut buffer_corrections : Vec<ViewBufferCorrections> = Vec::new ();
   for view in prepared . views {
-    buffer_corrections . extend ( ViewBufferCorrections::of (
-      &view . viewforest_id, view . buffer_corrections ));
     views_state . open_views . update_view (
       &prepared . runtime . graph,
       &view . viewforest_id, view . viewforest, view . viewnode_id_record );
@@ -176,8 +169,7 @@ pub(crate) fn stream_prepared_rerenders (
       TcpToClient::RerenderDone,
       & format_rerender_done_sexp (
         &prepared . errors,
-        &prepared . warnings,
-        &buffer_corrections ) )); }
+        &prepared . warnings ) )); }
 
 /// Keep the graph straddle a rerender brought up to date as the
 /// connection's. A rerender that rendered no buffer of the diff view
@@ -190,7 +182,7 @@ pub(crate) fn write_graph_straddle_back (
     views_state . graph_straddle = graph_straddle; }}
 
 /// Send an empty rerender stream: a "rerender-lock" naming no views,
-/// then "rerender-done" with no errors, warnings or buffer corrections.  Used after a
+/// then "rerender-done" with no errors or warnings.  Used after a
 /// refusal: Emacs locks every Skg buffer and sets its
 /// stream-in-progress guard ('skg--stream-in-progress') before
 /// sending a skgrepo-set switch, and only the rerender stream unwinds
@@ -208,4 +200,4 @@ pub fn stream_empty_rerender (
     stream,
     & tag_sexp_response (
       TcpToClient::RerenderDone,
-      & format_rerender_done_sexp ( &[], &[], &[] ) )); }
+      & format_rerender_done_sexp ( &[], &[] ) )); }

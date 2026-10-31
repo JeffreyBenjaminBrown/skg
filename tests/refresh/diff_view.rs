@@ -96,13 +96,12 @@ fn a_ghost_whose_node_is_back_becomes_an_occurrence_in_place () {
   let run : Run = diff_run_asserting_fixpoint (&input, &straddle);
   assert_eq! ( run . outline (), "\
 node p
-  node g wp" );
-  assert_eq! ( run . buffer_correction_kinds (), vec! [ BufferCorrectionKind::Rekinded (VognodeKind::Occurrence) ] ); }
+  node g wp" ); }
 
 /// The ghost asked that its node be restored, and the node is back:
 /// the occurrence it becomes has no slot for the request.
 #[test]
-fn a_restoreNode_request_on_a_ghost_whose_node_is_back_is_dropped_and_reported () {
+fn a_restoreNode_request_on_a_ghost_whose_node_is_back_is_dropped () {
   let straddle : GraphStraddle = straddle (
     &[ Graphnode { contains : ids (&["g"]), .. node ("p") }, node ("g") ],
     &[ Graphnode { contains : ids (&["g"]), .. node ("p") }, node ("g") ] );
@@ -113,15 +112,12 @@ fn a_restoreNode_request_on_a_ghost_whose_node_is_back_is_dropped_and_reported (
   let run : Run = diff_run_asserting_fixpoint (&input, &straddle);
   assert_eq! ( run . outline (), "\
 node p
-  node g wp" );
-  assert_eq! ( run . buffer_correction_kinds (),
-               vec! [ BufferCorrectionKind::EditRequestDropped,
-                      BufferCorrectionKind::Rekinded (VognodeKind::Occurrence) ] ); }
+  node g wp" ); }
 
 /// d, marked for deletion, was deleted since HEAD by another means:
-/// its ghost carries no delete, and the dropped request is reported.
+/// its ghost carries no delete.
 #[test]
-fn a_delete_on_an_occurrence_that_becomes_a_ghost_is_dropped_and_reported () {
+fn a_delete_on_an_occurrence_that_becomes_a_ghost_is_dropped () {
   let straddle : GraphStraddle = straddle (
     &[ Graphnode { contains : ids (&["d"]), .. node ("p") }, node ("d") ],
     &[ node ("p") ] );
@@ -139,10 +135,7 @@ node p
     . children () . nth (1) . unwrap ();
   let ViewnodeKind::Vognode (Vognode::Ghost (ghost)) = &d . value () . kind
     else { panic! ("d is no ghost: {:?}", d . value () . kind) };
-  assert! ( ! ghost . restoreNode_request );
-  assert_eq! ( run . buffer_correction_kinds (),
-               vec! [ BufferCorrectionKind::EditRequestDropped,
-                      BufferCorrectionKind::Rekinded (VognodeKind::Ghost) ] ); }
+  assert! ( ! ghost . restoreNode_request ); }
 
 #[test]
 fn a_property_head_alone_has_is_a_member_with_a_ghost_warrant () {
@@ -394,7 +387,7 @@ node p
 fn diff_view_narrowed_by_a_switch (
   text     : &str,
   straddle : &GraphStraddle,
-) -> (String, Refreshed, ViewForest) {
+) -> (String, String, ViewForest) {
   let config : SkgConfig = config ();
   let restriction : SkgrepoRestriction = main_only ();
   let readiness_store : ReadinessStore = ReadinessStore::default ();
@@ -404,29 +397,26 @@ fn diff_view_narrowed_by_a_switch (
   let graph : &InRustGraph = &straddle . after;
   let mut forest : ViewForest = parse (text, IdResolution::ThroughGraph (graph));
   let mut record : ViewnodeIdRecord = ViewnodeIdRecord::of_viewforest (&forest);
-  let opened : Refreshed = refresh_and_render (
+  let opened : String = refresh_and_render (
     &mut forest, &mut record,
     &Truth { graph, config : &config, restriction : None },
-    mode, 100, &BufferCorrectionPolicy::ReportAll ) . unwrap ();
+    mode, 100 ) . unwrap ();
   let narrowed_truth : Truth = Truth { graph, config : &config,
                                        restriction : Some (&restriction) };
-  let narrowed : Refreshed = refresh_and_render (
-    &mut forest, &mut record, &narrowed_truth, mode, 100,
-    &BufferCorrectionPolicy::AfterRestrictionChange ) . unwrap ();
+  let narrowed : String = refresh_and_render (
+    &mut forest, &mut record, &narrowed_truth, mode, 100 ) . unwrap ();
   if let Err (failure) = refresh_reaches_fixpoint (
-    &narrowed . text, graph,
+    &narrowed, graph,
     |again, again_record| refresh_viewforest (
-      again, again_record, &narrowed_truth, mode, 100,
-      &BufferCorrectionPolicy::ReportAll )) {
+      again, again_record, &narrowed_truth, mode, 100 )) {
     panic! ( "the narrowed diff view is no fixpoint: {}", failure ); }
-  (opened . text, narrowed, forest) }
+  (opened, narrowed, forest) }
 
 /// p contained k, private, at HEAD; the worktree deleted k. Under
 /// 'all' the diff view shows k's ghost, with its HEAD title; narrowed,
 /// k is a restricted node, which is never a ghost: p's record of k is
 /// visible, so k stands as a Restricted vognode, its title gone.
-/// Widened again, it is k's ghost again, and neither switch reports a
-/// buffer correction.
+/// Widened again, it is k's ghost again.
 #[test]
 fn a_switch_makes_the_ghost_of_a_deleted_private_node_a_restricted_vognode () {
   let straddle : GraphStraddle = straddle (
@@ -436,7 +426,7 @@ fn a_switch_makes_the_ghost_of_a_deleted_private_node_a_restricted_vognode () {
                    .. node ("k") },
        node ("c") ],
     &[ Graphnode { contains : ids (&["c"]), .. node ("p") }, node ("c") ] );
-  let (opened, narrowed, forest) : (String, Refreshed, ViewForest) =
+  let (opened, narrowed, forest) : (String, String, ViewForest) =
     diff_view_narrowed_by_a_switch (
       &format! ("* {} p\n", occurrence_metadata ("p", "")), &straddle );
   assert! ( opened . contains ("ghost (gnid k)")
@@ -446,21 +436,19 @@ node p
   changesetMarker content
   restricted k noClaim ᗣ
   node c wp" );
-  assert! ( ! narrowed . text . contains ("ghost")
-            && ! narrowed . text . contains ("secret"), "{}", narrowed . text );
-  assert_eq! ( narrowed . buffer_corrections, Vec::new () );
+  assert! ( ! narrowed . contains ("ghost")
+            && ! narrowed . contains ("secret"), "{}", narrowed );
   let mut forest : ViewForest = forest;
   let config : SkgConfig = config ();
   let readiness_store : ReadinessStore = ReadinessStore::default ();
-  let widened : Refreshed = refresh_and_render (
+  let widened : String = refresh_and_render (
     &mut forest, &mut ViewnodeIdRecord::default (),
     &Truth { graph : &straddle . after, config : &config, restriction : None },
     RefreshMode::DiffView { straddle : &straddle,
                             buffer_kind : DiffViewBufferKind::AllChanges,
                             readiness_store : &readiness_store },
-    100, &BufferCorrectionPolicy::AfterRestrictionChange ) . unwrap ();
-  assert_eq! ( widened . text, opened );
-  assert_eq! ( widened . buffer_corrections, Vec::new () ); }
+    100 ) . unwrap ();
+  assert_eq! ( widened, opened ); }
 
 /// The worktree added h, private, to p's content, recording it in
 /// p's file. Narrowed, h is a Restricted vognode carrying the change
@@ -479,7 +467,7 @@ fn a_switch_makes_a_private_member_with_a_visible_record_a_restricted_vognode_wi
        Graphnode { title        : "h's secret title" . into (),
                    home_skgrepo : SkgrepoName::from ("private"),
                    .. node ("h") } ] );
-  let (opened, narrowed, forest) : (String, Refreshed, ViewForest) =
+  let (opened, narrowed, forest) : (String, String, ViewForest) =
     diff_view_narrowed_by_a_switch (
       &format! ("* {} p\n", occurrence_metadata ("p", "")), &straddle );
   assert! ( opened . contains ("h's secret title")
@@ -494,7 +482,7 @@ node p
   let h : NodeRef<Viewnode> = forest . roots () . next () . unwrap ()
     . children () . nth (1) . unwrap ();
   assert_eq! ( h . value () . change_facts . change . rel, Some (Existence::Added) );
-  assert! ( narrowed . text . contains ("restricted (gnid h)")
-            && narrowed . text . contains ("restricted (gnid h) (diff (rel added)")
-            && ! narrowed . text . contains ("oldText")
-            && ! narrowed . text . contains ("secret"), "{}", narrowed . text ); }
+  assert! ( narrowed . contains ("restricted (gnid h)")
+            && narrowed . contains ("restricted (gnid h) (diff (rel added)")
+            && ! narrowed . contains ("oldText")
+            && ! narrowed . contains ("secret"), "{}", narrowed ); }

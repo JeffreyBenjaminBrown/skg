@@ -29,7 +29,6 @@ use skg::dbs::filesystem::not_nodes::load_config_with_overrides;
 use skg::dbs::init::empty_in_ram_tantivy_index;
 use skg::org_to_text::viewforest_to_string;
 use skg::refresh::{Truth, refresh_content_viewforest};
-use skg::refresh::buffer_corrections::BufferCorrectionPolicy;
 use skg::test_utils::{graph_from_config, main_skgrepo_config, refresh_reaches_fixpoint};
 use skg::types::env::RuntimeGeneration;
 use skg::skgrepo_sets::SkgrepoRestriction;
@@ -155,8 +154,7 @@ fn refreshes_unchanged (
   refresh_reaches_fixpoint (
     &text, &runtime . graph,
     |forest, record| refresh_content_viewforest (
-      forest, record, &Truth::of_runtime (runtime, restriction),
-      &BufferCorrectionPolicy::ReportAll )) }
+      forest, record, &Truth::of_runtime (runtime, restriction) )) }
 
 /// No skgrepo restriction, then the skgrepo restriction through
 /// each skgrepo but the most private (through which it would be no
@@ -301,7 +299,7 @@ fn diff_view_buffer_refreshes_unchanged (
       let mut record : ViewnodeIdRecord = ViewnodeIdRecord::of_viewforest (&forest);
       refresh_diffView_viewforest (
         runtime, straddle, buffer_kind, store, restriction,
-        &BufferCorrectionPolicy::AfterRestrictionChange, &mut forest, &mut record )
+        &mut forest, &mut record )
         . map_err ( |e| format! ("the switch's refresh failed: {}", e) ) ?;
       viewforest_to_string (&forest)
         . map_err ( |e| format! ("the switch's render failed: {}", e) ) ? }, };
@@ -309,7 +307,7 @@ fn diff_view_buffer_refreshes_unchanged (
     &switched, &runtime . graph,
     |forest, record| refresh_diffView_viewforest (
       runtime, straddle, buffer_kind, store, restriction,
-      &BufferCorrectionPolicy::ReportAll, forest, record )) }
+      forest, record )) }
 
 /// 'text' parsed over 'graph', as a buffer the sweep refreshes.
 fn parse_for_the_sweep (

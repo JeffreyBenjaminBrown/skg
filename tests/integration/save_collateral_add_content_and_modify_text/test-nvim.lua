@@ -8,7 +8,7 @@
 -- a random UUID). Verifies that buffer B's save response reflects the
 -- changes (title, new node with UUID). Then checks collateral buffer
 -- A, which the refresh of its collateral rerender gives the new title
--- and the new child c, reporting c as a buffer correction of A.
+-- and the new child c.
 
 local T = dofile('../test-nvim-lib.lua')
 T.arm_timeout(20)
@@ -314,20 +314,5 @@ assert_headline_titles(buf_a,
     { 3, 'member', 'Node a was given this longer title' },
     { 2, 'member', 'c' } },
   'phase 5: buffer A after collateral update')
-
-print('=== PHASE 6: Verify the buffer correction in the warnings buffer ===')
--- Buffer A's editable a lacked c, which the save drew there: a
--- buffer correction of buffer A, shown under a headline naming buffer A.
-do
-  local warnings_name = require('skg.server_warnings').buffer_name
-  local warnings_buf = T.wait_for_buffer(warnings_name, 5)
-  T.check(warnings_buf, 'phase 6: the warnings buffer exists')
-  local text = T.buffer_text(warnings_buf)
-  print('Warnings buffer content: ' .. text)
-  T.check(text:find('\n?%* Buffer corrections in skg://a\n%*%* Drew what the graph says belongs here%.\n%*%*%* c\n') ~= nil,
-          'phase 6: the buffer correction drawing c is under buffer A\'s headline')
-  T.check(text:find('%* Buffer corrections in skg://b\n') == nil,
-          'phase 6: the saved buffer B reported no buffer correction')
-end
 
 T.pass('PASS: All phases completed successfully!')

@@ -1,4 +1,3 @@
-use crate::refresh::buffer_corrections::{ViewBufferCorrections, corrections_entry_sexp};
 use crate::serve::protocol::{RequestType, TcpToClient};
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
 use crate::types::views_state::ViewforestId;
@@ -191,16 +190,14 @@ pub(crate) fn format_lock_views_sexp (
       Sexp::List ( viewforest_id_sexps ) ] ) ] )) }
 
 /// The "rerender-done" message: ((errors ("e1" ...)) (warnings ("w1"
-/// ...)) (corrections (("VIEW_ID" "c1" ...) ...))).
+/// ...))).
 pub(crate) fn format_rerender_done_sexp (
-  errors      : &[String],
-  warnings    : &[String],
-  buffer_corrections : &[ViewBufferCorrections],
+  errors   : &[String],
+  warnings : &[String],
 ) -> String {
   sexp_to_client_string ( &Sexp::List ( vec! [
     format_string_list_sexp ("errors", errors),
-    format_string_list_sexp ("warnings", warnings),
-    corrections_entry_sexp (buffer_corrections) ] )) }
+    format_string_list_sexp ("warnings", warnings) ] )) }
 
 /// Format: (KEY . t)
 pub(crate) fn true_entry_sexp (

@@ -26,10 +26,7 @@ node p
   node a
     node a1
   node b
-    node b1" );
-  assert_eq! ( run . count (BufferCorrectionKind::Reinstated), 2,
-               "p's list, already drawn, lacked a and b; what a and b \
-                hold is drawn as they are first extended, not corrected" ); }
+    node b1" ); }
 
 #[test]
 fn a_write_protected_occurrences_content_is_not_drawn () {

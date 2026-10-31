@@ -50,9 +50,7 @@ fn when_the_override_is_gone_the_overrider_is_unwarranted_and_the_original_retur
   assert_eq! ( run . outline (), "\
 node p
   node o noClaim ⊥
-  node n" );
-  assert_eq! ( run . buffer_correction_kinds (),
-               vec! [ BufferCorrectionKind::MarkedNoClaim, BufferCorrectionKind::Reinstated ] ); }
+  node n" ); }
 
 /// n, a root, is overridden by o; q, a member of n's containers
 /// folder, is overridden by v. Each is shown as itself.

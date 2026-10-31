@@ -30,9 +30,7 @@ node p
   let x : NodeRef<Viewnode> = run . forest . roots () . next () . unwrap ()
     . children () . nth (1) . unwrap ();
   assert_eq! ( x . value () . viewnode_id, Some ( ViewnodeId ("zz" . into ()) ),
-               "the unknown keeps the occurrence's vnid" );
-  assert_eq! ( run . buffer_correction_kinds (),
-               vec! [ BufferCorrectionKind::Rekinded (VognodeKind::GnidOnly (GnidOnlyKind::Unknown)) ] ); }
+               "the unknown keeps the occurrence's vnid" ); }
 
 #[test]
 fn an_occurrence_no_node_answers_to_and_no_list_names_becomes_a_tombstone () {
@@ -52,8 +50,7 @@ node p
   node c
   tombstone
     node k noClaim",
-    "the tombstone keeps x's child; y, childless, is pruned" );
-  assert_eq! ( run . count (BufferCorrectionKind::Entombstoned), 2 ); }
+    "the tombstone keeps x's child; y, childless, is pruned" ); }
 
 #[test]
 fn a_restricted_node_its_parent_lists_in_a_restricted_record_becomes_a_tombstone () {
@@ -95,8 +92,7 @@ fn an_unknown_whose_node_appeared_becomes_an_occurrence () {
   let run : Run = run_asserting_fixpoint (&input, &graph);
   assert_eq! ( run . outline (), "\
 node p
-  node u" );
-  assert_eq! ( run . buffer_correction_kinds (), vec! [ BufferCorrectionKind::Rekinded (VognodeKind::Occurrence) ] ); }
+  node u" ); }
 
 #[test]
 fn an_occurrence_whose_gnid_became_an_extra_id_stands_for_its_node () {
@@ -109,7 +105,7 @@ fn an_occurrence_whose_gnid_became_an_extra_id_stands_for_its_node () {
     ** {} b
     ", occurrence_metadata ("p", ""), occurrence_metadata ("b", "writeProtected") );
   let mut forest : ViewForest = parse (&input, IdResolution::AsWritten);
-  refresh_once (&mut forest, &graph, &BufferCorrectionPolicy::ReportAll);
+  refresh_once (&mut forest, &graph);
   assert_eq! ( outline (&forest), "\
 node p
   node a wp" ); }
@@ -129,7 +125,7 @@ fn of_two_editable_occurrences_a_nodeMerge_made_one_nodes_the_first_stays_editab
     ** {} a
     ", occurrence_metadata ("b", ""), occurrence_metadata ("a", "") );
   let mut forest : ViewForest = parse (&input, IdResolution::AsWritten);
-  refresh_once (&mut forest, &graph, &BufferCorrectionPolicy::ReportAll);
+  refresh_once (&mut forest, &graph);
   assert_eq! ( outline (&forest), "\
 node a
   node a wp
@@ -180,5 +176,4 @@ fn a_change_viewnode_in_a_content_view_is_entombstoned () {
     ** (skg (changesetMarker content))
     ", occurrence_metadata ("p", "") );
   let run : Run = run_asserting_fixpoint (&input, &graph);
-  assert_eq! ( run . outline (), "node p" );
-  assert_eq! ( run . buffer_correction_kinds (), vec! [ BufferCorrectionKind::Entombstoned ] ); }
+  assert_eq! ( run . outline (), "node p" ); }

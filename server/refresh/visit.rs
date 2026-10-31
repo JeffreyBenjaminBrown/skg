@@ -37,7 +37,6 @@
 
 use crate::dbs::in_rust_graph::override_resolution::{
   carrier_on_owned_chain, resolve_override};
-use crate::refresh::buffer_corrections::BufferCorrectionKind;
 use crate::refresh::extent::{
   DrawnEditability, Extent, consume_editableView_request, drawn_occurrence_editability,
   drop_editableView_request, extent_of_parent};
@@ -47,7 +46,7 @@ use crate::refresh::goal::{
   subscriber_of_subscribee_as_such};
 use crate::refresh::goal::partnerFolder_members_in_graph;
 use crate::refresh::id_rule::{
-  EditabilityAndClaim, IdRuleAnswer, entombstone, entombstone_gone_change,
+  EditabilityAndClaim, IdRuleAnswer, entombstone,
   ghost_from_head, id_rule, occurrence_from_truth, point_occurrence_at,
   rekind_vognode};
 use crate::refresh::{
@@ -82,7 +81,7 @@ pub(crate) fn visit_parent (
   rekind_children (tree, parent, goal . as_ref (), walk) ?;
   viewnode_merge (tree, parent, walk) ?;
   set_warrants (tree, parent, goal . as_ref ());
-  mark_claims (tree, parent, goal . as_ref (), walk);
+  mark_claims (tree, parent, goal . as_ref ());
   if let Some (goal) = &goal {
     if extent_of_parent (tree, parent, walk) == Extent::All {
       reinstate (tree, parent, goal, walk) ?; }}
@@ -167,8 +166,7 @@ fn add_default_folders (
         . id ();
       move_to_first_child (tree, parent, folder)
         . expect ("add_default_folders: the folder was just added");
-      walk . added_compound_folders . insert (folder);
-      walk . added_folders . insert (folder); }}}
+      walk . added_compound_folders . insert (folder); }}}
 
 //
 // 1. re-kind
@@ -188,10 +186,9 @@ fn rekind_children (
         | ViewnodeKind::PropertyMember (_)
         | ViewnodeKind::ChangeViewnode (_) =>
         if is_unsayable (tree, child)
-           || alias_whose_record_is_restricted (tree, child, walk) {
-          entombstone (tree, child, walk); }
-        else if diff_view::change_is_gone (tree, child, walk) {
-          entombstone_gone_change (tree, child, walk); },
+           || alias_whose_record_is_restricted (tree, child, walk)
+           || diff_view::change_is_gone (tree, child, walk) {
+          entombstone (tree, child); },
       ViewnodeKind::Tombstone | ViewnodeKind::BufferRoot => {}, }}
   Ok (( )) }
 
@@ -234,24 +231,18 @@ fn alias_whose_record_is_restricted (
 /// for one gnid) into one viewnode, the result, which stands where
 /// the first of them stood ('merge_into' says how the result is
 /// made). The result's vnid is cleared, so that the tail mints a
-/// fresh one, and the "merged" buffer correction names it, unless the
-/// policy says the merge is no buffer correction
-/// ('BufferCorrectionPolicy'): after a save's nodeMerge, the
-/// acquirer's occurrences merge by the user's own request. Only
-/// siblings, standing for one gnid under one parent, are ever merged:
+/// fresh one. Only siblings, standing for one gnid under one parent, are ever merged:
 /// two occurrences of a node elsewhere in the buffer stay apart.
 fn viewnode_merge (
   tree   : &mut Tree<Viewnode>,
   parent : NodeId,
   walk   : &mut Walk,
 ) -> Result<(), Box<dyn Error>> {
-  for (gnid, duplicates) in duplicate_viewnode_siblings (tree, parent) {
+  for (_gnid, duplicates) in duplicate_viewnode_siblings (tree, parent) {
     let result : NodeId = duplicates [0];
     for merged_sibling in &duplicates [1..] {
       merge_into (tree, result, *merged_sibling, walk) ?; }
-    tree . get_mut (result) . unwrap () . value () . viewnode_id = None;
-    if walk . buffer_correction_policy . reports_viewnode_merge (&gnid) {
-      walk . buffer_corrections . record (tree, result, BufferCorrectionKind::ViewnodeMerged); }}
+    tree . get_mut (result) . unwrap () . value () . viewnode_id = None; }
   Ok (( )) }
 
 /// The children of 'parent' grouped by the gnid they stand for, each
@@ -320,7 +311,7 @@ fn merge_into (
     move_to_last_child (tree, result, grandchild) ?;
     let warrant : Option<Warrant> =
       warrant_of_child (goal . as_ref (), tree . get (grandchild) . unwrap () . value ());
-    mark_noClaim_unless_warranted (tree, grandchild, warrant, walk); }
+    mark_noClaim_unless_warranted (tree, grandchild, warrant); }
   tree . get_mut (merged_sibling) . unwrap () . detach ();
   Ok (( )) }
 
@@ -431,7 +422,6 @@ fn mark_claims (
   tree   : &mut Tree<Viewnode>,
   parent : NodeId,
   goal   : Option<&Goal>,
-  walk   : &mut Walk,
 ) {
   let is_root : bool = matches! ( tree . get (parent) . unwrap () . value () . kind,
                                   ViewnodeKind::BufferRoot );
@@ -444,27 +434,20 @@ fn mark_claims (
         tree . get_mut (child) . unwrap () . value () . set_claim (true); }}
     else if claims_are_read {
       let warrant : Option<Warrant> = warrant_of_child (goal, viewnode);
-      mark_noClaim_unless_warranted (tree, child, warrant, walk); }
+      mark_noClaim_unless_warranted (tree, child, warrant); }
     else if claims {
       tree . get_mut (child) . unwrap () . value () . set_claim (false); }}}
 
 /// Where the save reads claims: the child at 'treeid', if it claims
-/// and its warrant is not 'ByGraph', is marked 'noClaim', and that is
-/// reported, unless the policy says the marking is no buffer
-/// correction ('BufferCorrectionPolicy'): after a skgrepo narrowing,
-/// a member whose record alone the skgrepo restriction now keeps out
-/// loses its claim.
+/// and its warrant is not 'ByGraph', is marked 'noClaim'.
 fn mark_noClaim_unless_warranted (
   tree    : &mut Tree<Viewnode>,
   treeid  : NodeId,
   warrant : Option<Warrant>,
-  walk    : &mut Walk,
 ) {
   if tree . get (treeid) . unwrap () . value () . claims () == Some (true)
      && warrant != Some (Warrant::ByGraph) {
-    tree . get_mut (treeid) . unwrap () . value () . set_claim (false);
-    if walk . buffer_correction_policy . reports_marking_noClaim () {
-      walk . buffer_corrections . record (tree, treeid, BufferCorrectionKind::MarkedNoClaim); }}}
+    tree . get_mut (treeid) . unwrap () . value () . set_claim (false); }}
 
 //
 // 5. reinstate
@@ -514,8 +497,8 @@ fn reinstate (
 
 /// Book what a drawn child is: an editable occurrence holds its
 /// node's editability ('Walk::hold_editability'); a folder member
-/// carries its chain. Then report it, unless drawing it is extent
-/// ('Walk::record_drawn').
+/// carries its chain; under a compound folder the refresh added, it
+/// is drawn folded.
 fn after_drawing (
   tree   : &mut Tree<Viewnode>,
   parent : NodeId,
@@ -534,7 +517,6 @@ fn after_drawing (
   if walk . added_compound_folders . contains (&parent) {
     // A folder's collapse lives on its members.
     tree . get_mut (treeid) . unwrap () . value () . foldAndFocus . folded = true; }
-  walk . record_drawn (tree, parent, treeid);
   Ok (( )) }
 
 /// The viewnode that stands for 'item' under 'parent': for a gnid,
@@ -730,7 +712,7 @@ fn stop_substituting (
     Some (goal), tree . get (child) . unwrap () . value () )
     . unwrap_or (Warrant::No);
   tree . get_mut (child) . unwrap () . value () . set_warrant (warrant);
-  mark_noClaim_unless_warranted (tree, child, Some (warrant), walk);
+  mark_noClaim_unless_warranted (tree, child, Some (warrant));
   let member : GoalMember = GoalMember::Gnid ( original . clone () );
   let stands : bool = tree . get (parent) . unwrap () . children ()
     . any ( |sibling| member_of_child (sibling . value ()) . as_ref () == Some (&member) );
@@ -868,7 +850,6 @@ fn add_folders (
         let new : NodeId = tree . get_mut (treeid) . unwrap ()
           . append ( viewnode_of ( ViewnodeKind::Folder (folder . clone ()) )) . id ();
         added . push (new);
-        walk . added_folders . insert (new);
         new }, };
     let hides_outside_its_subscribees : &dyn Fn () -> bool = &|| -> bool {
       tree . get (treeid) . unwrap () . value () . occurrence_gnid ()
@@ -880,8 +861,7 @@ fn add_folders (
     { let hidden_outside : NodeId = tree . get_mut (folder_treeid) . unwrap ()
         . append ( viewnode_of (
           ViewnodeKind::Folder (Folder::HiddenOutsideOfSubscribee) )) . id ();
-      walk . added_compound_folders . insert (hidden_outside);
-      walk . added_folders . insert (hidden_outside); }}
+      walk . added_compound_folders . insert (hidden_outside); }}
   for folder_treeid in added . into_iter () . rev () {
     move_to_first_child (tree, treeid, folder_treeid)
       . expect ("add_folders: the folder was just added"); }}

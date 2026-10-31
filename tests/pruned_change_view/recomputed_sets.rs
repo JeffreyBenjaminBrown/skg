@@ -157,16 +157,13 @@ fn a_change_under_a_new_origin_is_appended_as_a_root_by_the_command (
                  "a further command adds nothing" );
     Ok (( )) }) }
 
-/// w1a, under the write-protected member w, changes: the command's
-/// first refresh makes w editable and draws its content, which the
-/// user asked for, so its buffer corrections go unread, and it appends
-/// no root. Then s1, under s, an origin the buffer does not show,
-/// changes: the command appends s and refreshes again, reporting by
-/// the request's policy, but for what it draws under s, a first
-/// rendering of s ('rerender_diffView_buffer'). Neither finds anything
-/// the buffer got wrong.
+/// w1a, under the write-protected member w, changes: the command
+/// makes w editable and its refresh draws w's content; it appends no
+/// root. Then s1, under s, an origin the buffer does not show,
+/// changes: the command appends s, and its one refresh draws s's
+/// content ('rerender_diffView_buffer').
 #[test]
-fn the_command_reports_its_second_refresh_and_not_its_first (
+fn the_command_makes_a_member_editable_then_appends_an_origin_not_shown (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("fresh", &["main"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
@@ -176,20 +173,15 @@ fn the_command_reports_its_second_refresh_and_not_its_first (
       send_integrate_unshown_changes_request (f, DiffViewBufferKind::AllChanges) ?;
     let shown : String = rerendered_view_content (&response);
     assert! ( shown_editable (&shown, "w") && shown_editable (&shown, "w1a"),
-              "the first refresh drew w's content:\n{}", shown );
+              "the command drew w's content:\n{}", shown );
     assert_eq! ( root_ids (&shown), vec! [ "q", "r" ], "{}", shown );
-    assert! ( response . contains ("(corrections ())"),
-              "the first refresh reports no buffer correction:\n{}", response );
     let buffer : String = retitle_in_a_content_view (f, "s1", "s1 retitled", &shown) ?;
     save_cleanly (f, &all_changes_view (), &buffer) ?;
     let response : String =
       send_integrate_unshown_changes_request (f, DiffViewBufferKind::AllChanges) ?;
     let shown : String = rerendered_view_content (&response);
     assert_eq! ( root_ids (&shown), vec! [ "q", "r", "s" ],
-                 "the second refresh drew s:\n{}", shown );
-    assert! ( response . contains ("(corrections ())"),
-              "the second refresh reports nothing of s's first rendering:\n{}",
-              response );
+                 "the command appended s:\n{}", shown );
     Ok (( )) }) }
 
 /// The new cycle of p and q gains a member: q now contains z, which

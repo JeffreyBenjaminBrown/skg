@@ -1,13 +1,13 @@
 # How each client's metadata editor (C-c v m, <localleader>vm) shows a
-# headline's '(skg ...)' metadata, what it saves, where a command
-# writing a request puts it, and how the buffer corrections are shown.
+# headline's '(skg ...)' metadata, what it saves, and where a command
+# writing a request puts it.
 # One contract, two implementations, each tested against these cases:
 #   Emacs:  elisp/skg-sexpr-edit.el, elisp/skg-sexpr/skg-metadata-fields.el,
-#           elisp/skg-metadata.el, elisp/skg-request-server-warnings.el
+#           elisp/skg-metadata.el
 #           (tests/elisp/test-skg-metadata-editor-cases.el)
 #   Neovim: nvim/lua/skg/sexpr_edit.lua,
 #           nvim/lua/skg/sexpr/metadata_fields.lua,
-#           nvim/lua/skg/metadata.lua, nvim/lua/skg/server_warnings.lua
+#           nvim/lua/skg/metadata.lua
 #           (tests/nvim/metadata_editor_cases_spec.lua)
 # Both read the fields and the order of the parts from
 # shared/metadata-fields.json.
@@ -30,11 +30,6 @@
 #     after a command makes REQUEST its edit request;
 #   readiness request and with the readiness request (optional): the
 #     metadata after a gesture makes REQUEST its readiness request.
-# A case of the buffer corrections gives:
-#   corrections: the (corrections ...) field of a save-result, for a
-#     view no buffer shows;
-#   display (a block): the org text appended to the server-warnings
-#     buffer.
 
 ==== occurrence: a member at every default, with its title
 ---- metadata: (skg (vnid 0a) node (gnid x) (skgRepos (nodeRepo main)))
@@ -298,11 +293,3 @@
 ** folded
 ** tombstone
 ---- strip: (skg folded tombstone)
-
-==== buffer corrections: one message
----- corrections: (("content-view:5" "Drew what the graph says belongs here.\n*** new child\n- viewnode ID: 0d."))
----- display:
-* Buffer corrections in content-view:5
-** Drew what the graph says belongs here.
-*** new child
-- viewnode ID: 0d.

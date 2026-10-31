@@ -48,11 +48,10 @@ node p
     node d",
     "the result is editable, by the second, and unfolded, since the \
      second was; at its own visit the two copies of e merge in turn, \
-     and e, unwarranted, stays first, ahead of the content" );
-  assert_eq! ( run . count (BufferCorrectionKind::ViewnodeMerged), 2 ); }
+     and e, unwarranted, stays first, ahead of the content" ); }
 
 #[test]
-fn the_result_has_a_fresh_vnid_which_the_buffer_correction_names () {
+fn the_result_has_a_fresh_vnid () {
   let input : String = formatdoc! ("
     * (skg (vnid p1) node (gnid p) (skgRepos (nodeRepo main))) p
     ** (skg (vnid c1) node (gnid c) (skgRepos (nodeRepo main)) writeProtected) c
@@ -63,11 +62,7 @@ fn the_result_has_a_fresh_vnid_which_the_buffer_correction_names () {
   let vnid : ViewnodeId = result . value () . viewnode_id . clone ()
     . expect ("the tail gives the result a vnid");
   assert! ( vnid != ViewnodeId ("c1" . into ()) && vnid != ViewnodeId ("c2" . into ()),
-            "the result's vnid is fresh, not {}", vnid );
-  let merged : Vec<&BufferCorrection> = run . buffer_corrections . iter ()
-    . filter ( |c| c . kind == BufferCorrectionKind::ViewnodeMerged ) . collect ();
-  assert_eq! ( merged . len (), 1 );
-  assert_eq! ( merged [0] . vnid, Some (vnid) ); }
+            "the result's vnid is fresh, not {}", vnid ); }
 
 #[test]
 fn the_result_claims_when_the_claiming_sibling_is_second () {
@@ -155,9 +150,7 @@ fn an_appended_child_the_truth_does_not_warrant_under_the_result_is_marked_noCla
 node p
   node c
     node d
-    node e noClaim ⊥" );
-  assert_eq! ( run . buffer_correction_kinds (),
-               vec! [ BufferCorrectionKind::MarkedNoClaim, BufferCorrectionKind::ViewnodeMerged ] ); }
+    node e noClaim ⊥" ); }
 
 #[test]
 fn copies_of_one_folder_member_are_merged () {

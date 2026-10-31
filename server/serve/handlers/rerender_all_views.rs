@@ -2,7 +2,6 @@
 //! every one the request does not exclude, through the shared
 //! rerender pipeline ('server/serve/rerender_stream.rs').
 
-use crate::refresh::buffer_corrections::BufferCorrectionPolicy;
 use crate::serve::ViewsState;
 use crate::serve::handlers::text_release::approved_pids_from_request;
 use crate::serve::protocol::TcpToClient;
@@ -33,7 +32,7 @@ pub fn handle_rerender_all_views_request (
             &format_lock_views_sexp (&[])));
         send_response_with_length_prefix (
           stream, &tag_sexp_response (TcpToClient::RerenderDone,
-            &format_rerender_done_sexp (&[error], &[], &[])));
+            &format_rerender_done_sexp (&[error], &[])));
         return; } };
   stream_rerender_views_excluding (
     stream, env, views_state, skgrepo_restriction,
@@ -84,9 +83,8 @@ fn stream_rerender_views_excluding (
   let mut prepared : PreparedRerenders = prepare_rerender_views (
     env, env . runtime_snapshot (), views_state,
     RerenderRequest {
-      restriction              : skgrepo_restriction,
-      buffer_correction_policy : BufferCorrectionPolicy::ReportAll,
-      selector                 : RerenderSelector::All, } );
+      restriction : skgrepo_restriction,
+      selector    : RerenderSelector::All, } );
   prepared . viewforest_ids . retain (|viewforest_id| ! excluded . contains (viewforest_id));
   prepared . views . retain (|view| ! excluded . contains (&view . viewforest_id));
   if ! authorize_prepared_rerenders (

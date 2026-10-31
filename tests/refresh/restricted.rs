@@ -109,8 +109,6 @@ node p
     . children () . next () . unwrap ();
   assert_eq! ( h . value () . viewnode_id, Some ( ViewnodeId ("zz" . into ()) ),
                "it keeps its vnid" );
-  assert_eq! ( run . buffer_correction_kinds (),
-               vec! [ BufferCorrectionKind::Rekinded (VognodeKind::GnidOnly (GnidOnlyKind::Restricted)) ] );
   assert! ( ! run . text . contains ("secret title"), "{}", run . text ); }
 
 #[test]
@@ -133,26 +131,21 @@ node p
     . children () . next () . unwrap ();
   assert_eq! ( h . value () . viewnode_id, Some ( ViewnodeId ("zz" . into ()) ),
                "it keeps its vnid" );
-  assert_eq! ( run . buffer_correction_kinds (),
-               vec! [ BufferCorrectionKind::Rekinded (VognodeKind::Occurrence),
-                      BufferCorrectionKind::Reinstated ],
-               "hh, recorded in 'private', is drawn too" );
   assert! ( run . text . contains ("h's secret title"), "{}", run . text ); }
 
 #[test]
-fn after_a_restriction_change_the_re_kinds_across_it_are_no_buffer_corrections () {
+fn a_narrowing_and_a_widening_re_kind_across_the_restriction_and_back () {
   let config : SkgConfig = config ();
   let graph : InRustGraph = p_h_c ();
   let restriction : SkgrepoRestriction = main_only ();
   let narrowed : Truth = Truth { graph : &graph, config : &config,
                                  restriction : Some (&restriction) };
   let widened : Truth = Truth { graph : &graph, config : &config, restriction : None };
-  let refresh_after_a_switch = |text : &str, truth : &Truth| -> Refreshed {
+  let refresh_after_a_switch = |text : &str, truth : &Truth| -> String {
     let mut forest : ViewForest = parse (text, IdResolution::ThroughGraph (&graph));
     let mut record : ViewnodeIdRecord = ViewnodeIdRecord::of_viewforest (&forest);
     refresh_and_render (
-      &mut forest, &mut record, truth, RefreshMode::ContentView, 100,
-      &BufferCorrectionPolicy::AfterRestrictionChange )
+      &mut forest, &mut record, truth, RefreshMode::ContentView, 100 )
       . unwrap () };
   let shown : String = formatdoc! ("
     * {} p
@@ -161,12 +154,10 @@ fn after_a_restriction_change_the_re_kinds_across_it_are_no_buffer_corrections (
     ", occurrence_metadata ("p", ""),
        "(skg node (gnid h) (skgRepos (nodeRepo private)))",
        occurrence_metadata ("c", "") );
-  let narrowed_run : Refreshed = refresh_after_a_switch (&shown, &narrowed);
-  assert! ( narrowed_run . text . contains ("restricted (gnid h)"), "{}", narrowed_run . text );
-  assert_eq! ( narrowed_run . buffer_corrections, Vec::new () );
-  let widened_run : Refreshed = refresh_after_a_switch (&narrowed_run . text, &widened);
-  assert! ( widened_run . text . contains ("h's secret title"), "{}", widened_run . text );
-  assert_eq! ( widened_run . buffer_corrections, Vec::new () ); }
+  let narrowed_run : String = refresh_after_a_switch (&shown, &narrowed);
+  assert! ( narrowed_run . contains ("restricted (gnid h)"), "{}", narrowed_run );
+  let widened_run : String = refresh_after_a_switch (&narrowed_run, &widened);
+  assert! ( widened_run . contains ("h's secret title"), "{}", widened_run ); }
 
 #[test]
 fn the_children_of_a_restricted_vognode_claim_again_when_it_becomes_an_occurrence () {
@@ -188,7 +179,7 @@ fn the_children_of_a_restricted_vognode_claim_again_when_it_becomes_an_occurrenc
     refresh_viewforest (
       &mut forest, &mut record,
       &Truth { graph : &graph, config : &config, restriction },
-      RefreshMode::ContentView, 100, &BufferCorrectionPolicy::AfterRestrictionChange )
+      RefreshMode::ContentView, 100 )
       . unwrap (); }
   assert_eq! ( outline (&forest), "\
 node p
@@ -224,8 +215,6 @@ restricted r folded
   let r : NodeRef<Viewnode> = run . forest . roots () . next () . unwrap ();
   assert_eq! ( r . value () . viewnode_id, Some ( ViewnodeId ("rr" . into ()) ),
                "it keeps its vnid" );
-  assert_eq! ( run . buffer_correction_kinds (),
-               vec! [ BufferCorrectionKind::Rekinded (VognodeKind::GnidOnly (GnidOnlyKind::Restricted)) ] );
   assert! ( run . text . contains ("restricted (gnid r)"), "{}", run . text );
   assert! ( ! run . text . contains ("secret"), "{}", run . text ); }
 
@@ -245,8 +234,6 @@ node r folded
   let r : NodeRef<Viewnode> = run . forest . roots () . next () . unwrap ();
   assert_eq! ( r . value () . viewnode_id, Some ( ViewnodeId ("rr" . into ()) ),
                "it keeps its vnid" );
-  assert_eq! ( run . buffer_correction_kinds (),
-               vec! [ BufferCorrectionKind::Rekinded (VognodeKind::Occurrence) ] );
   assert! ( run . text . contains ("r's secret title"), "{}", run . text ); }
 
 #[test]
@@ -265,15 +252,12 @@ fn the_children_of_a_restricted_root_claim_again_when_it_becomes_an_occurrence (
   let mut record : ViewnodeIdRecord = ViewnodeIdRecord::of_viewforest (&forest);
   let mut texts : Vec<String> = Vec::new ();
   for restriction in [ Some (&restriction), None ] {
-    let refreshed : Refreshed = refresh_and_render (
+    let refreshed : String = refresh_and_render (
       &mut forest, &mut record,
       &Truth { graph : &graph, config : &config, restriction },
-      RefreshMode::ContentView, 100, &BufferCorrectionPolicy::AfterRestrictionChange )
+      RefreshMode::ContentView, 100 )
       . unwrap ();
-    assert_eq! ( refreshed . buffer_corrections, Vec::new (),
-                 "a switch's re-kinds across the skgrepo restriction are no buffer \
-                  corrections" );
-    texts . push (refreshed . text); }
+    texts . push (refreshed); }
   assert! ( texts [0] . contains ("restricted (gnid r)")
             && ! texts [0] . contains ("secret"), "{}", texts [0] );
   assert_eq! ( outline (&forest), "\
@@ -326,18 +310,16 @@ fn a_switch_takes_from_a_view_the_alias_whose_record_it_makes_restricted () {
     ", occurrence_metadata ("r", "") );
   let mut forest : ViewForest = parse (&shown, IdResolution::ThroughGraph (&graph));
   let mut record : ViewnodeIdRecord = ViewnodeIdRecord::of_viewforest (&forest);
-  let narrowed : Refreshed = refresh_and_render (
+  let narrowed : String = refresh_and_render (
     &mut forest, &mut record,
     &Truth { graph : &graph, config : &config, restriction : Some (&restriction) },
-    RefreshMode::ContentView, 100, &BufferCorrectionPolicy::AfterRestrictionChange )
+    RefreshMode::ContentView, 100 )
     . unwrap ();
   assert_eq! ( outline (&forest), "\
 node r
   aliasFolder
     alias r public alias" );
-  assert! ( ! narrowed . text . contains ("secret"), "{}", narrowed . text );
-  assert_eq! ( narrowed . buffer_corrections, Vec::new (),
-               "what the skgrepo restriction takes is no buffer correction" ); }
+  assert! ( ! narrowed . contains ("secret"), "{}", narrowed ); }
 
 #[test]
 fn an_editable_folder_a_narrowing_empties_stays_and_fills_again_on_widening () {
@@ -362,13 +344,11 @@ fn an_editable_folder_a_narrowing_empties_stays_and_fills_again_on_widening () {
   let mut record : ViewnodeIdRecord = ViewnodeIdRecord::of_viewforest (&forest);
   let mut outlines : Vec<String> = Vec::new ();
   for restriction in [ Some (&restriction), None ] {
-    let refreshed : Refreshed = refresh_and_render (
+    refresh_viewforest (
       &mut forest, &mut record,
       &Truth { graph : &graph, config : &config, restriction },
-      RefreshMode::ContentView, 100, &BufferCorrectionPolicy::AfterRestrictionChange )
+      RefreshMode::ContentView, 100 )
       . unwrap ();
-    assert_eq! ( refreshed . buffer_corrections, Vec::new (),
-                 "what the skgrepo restriction empties or fills is no buffer correction" );
     outlines . push ( outline (&forest) ); }
   assert_eq! ( outlines, vec! [ "\
 node s

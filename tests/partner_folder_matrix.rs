@@ -31,7 +31,6 @@ use skg::test_utils::graph_handle_from_config;
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::test_utils::{
   multi_root_view, multi_root_view_with_skgrepo_set};
-use skg::refresh::buffer_corrections::BufferCorrectionKind;
 use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::types::views_state::{OpenViews, ViewforestId};
@@ -125,7 +124,7 @@ async fn save (
     TcpStream::connect (listener . local_addr () . unwrap ()) . unwrap ();
   update_from_and_rerender_buffer (
     &mut stream, buf, config, tantivy, graph,
-    // A view ID, which the save's buffer corrections are tagged with.
+    // The saved view's ID.
     &Ok ( ViewforestId::ContentView ("matrix view" . to_string ()) ),
     &mut views_state ) . await }
 
@@ -250,10 +249,6 @@ async fn write_protected_reorder (
       &scenario, &resp . saved_view,
       &format! ("(gnid {})", spec . member_b),
       &format! ("(gnid {})", spec . member_a) ); }
-  // Reordering is not a buffer correction.
-  if ! resp . buffer_corrections . is_empty () {
-    fails . record (&scenario, format! (
-      "reorder should not be corrected: {:?}", resp . buffer_corrections)); }
   Ok (( )) }
 
 async fn write_protected_insert (
@@ -317,14 +312,6 @@ async fn write_protected_delete (
   fails . want_contains (
     &scenario, &resp . saved_view,
     &format! ("(gnid {})", spec . member_a) );
-  // ... reported as a buffer correction.
-  if ! resp . buffer_corrections . iter ()
-       . flat_map ( |view| view . buffer_corrections . iter () )
-       . any ( |buffer_correction| buffer_correction . kind == BufferCorrectionKind::Reinstated
-                            && buffer_correction . title . contains (spec . member_a) ) {
-    fails . record (&scenario, format! (
-      "expected a buffer correction reinstating {}: {:?}",
-      spec . member_a, resp . buffer_corrections )); }
   Ok (( )) }
 
 //////////////////////////////////////////////////////////////

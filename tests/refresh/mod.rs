@@ -1,7 +1,6 @@
 // The unit suite of the refresh ('server/refresh/'): a file per rung
 // of the refresh, and one each for the ancestry rows, the diff view,
-// the tail, the buffer corrections ('buffer_corrections.rs') and the
-// skgrepo restriction ('restricted.rs'). Each
+// the tail and the skgrepo restriction ('restricted.rs'). Each
 // test builds a small graph and an input buffer, refreshes it, and
 // asserts the output, as an outline ('outline'). A refresh is checked
 // for the fixpoint, that refreshing its output again changes nothing
@@ -20,7 +19,7 @@ use crate::types::misc::{
   MSV, RelPartner, Skgrepo, SkgrepoName, SkgrepoSetName, rel_partners_at_relRepo};
 use crate::types::nodes::complete::{Graphnode, empty_graphnode};
 use crate::types::viewnode::{
-  ChangeViewnode, GnidOnlyKind, PropertyMember, ViewnodeId, VognodeKind, Warrant};
+  ChangeViewnode, PropertyMember, ViewnodeId, Warrant};
 use crate::types::views_state::DiffViewBufferKind;
 
 use ego_tree::{NodeId, NodeRef};
@@ -29,7 +28,6 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 mod ancestry;
-mod buffer_corrections;
 mod chain;
 mod claims;
 mod diff_view;
@@ -94,32 +92,22 @@ pub(super) fn straddle (
   GraphStraddle::new ( Arc::new (graph (before)), Arc::new (graph (after)),
                        "head" . to_string (), 0 ) }
 
-/// What a refresh gives back in these tests: its buffer corrections,
-/// and the forest's text, rendered after it as every caller of the
-/// refresh renders it ('refresh_and_render').
-pub(super) struct Refreshed {
-  pub text               : String,
-  pub buffer_corrections : Vec<BufferCorrection>,
-}
-
-/// 'refresh_viewforest', then the render of the forest.
+/// 'refresh_viewforest', then the render of the forest, as every
+/// caller of the refresh renders it.
 pub(super) fn refresh_and_render (
-  forest                   : &mut ViewForest,
-  record                   : &mut ViewnodeIdRecord,
-  truth                    : &Truth,
-  mode                     : RefreshMode,
-  budget                   : usize,
-  buffer_correction_policy : &BufferCorrectionPolicy,
-) -> Result<Refreshed, Box<dyn Error>> {
-  let buffer_corrections : Vec<BufferCorrection> = refresh_viewforest (
-    forest, record, truth, mode, budget, buffer_correction_policy ) ?;
-  Ok ( Refreshed { text : viewforest_to_string (forest) ?, buffer_corrections } ) }
+  forest : &mut ViewForest,
+  record : &mut ViewnodeIdRecord,
+  truth  : &Truth,
+  mode   : RefreshMode,
+  budget : usize,
+) -> Result<String, Box<dyn Error>> {
+  refresh_viewforest (forest, record, truth, mode, budget) ?;
+  viewforest_to_string (forest) }
 
 /// What one refresh made.
 pub(super) struct Run {
-  pub forest      : ViewForest,
-  pub text        : String,
-  pub buffer_corrections : Vec<BufferCorrection>,
+  pub forest : ViewForest,
+  pub text   : String,
 }
 
 impl Run {
@@ -127,19 +115,6 @@ impl Run {
     &self,
   ) -> String {
     outline (&self . forest) }
-
-  /// The kinds of buffer correction made, in order.
-  pub fn buffer_correction_kinds (
-    &self,
-  ) -> Vec<BufferCorrectionKind> {
-    self . buffer_corrections . iter () . map ( |c| c . kind ) . collect () }
-
-  /// How many buffer corrections of 'kind' were made.
-  pub fn count (
-    &self,
-    kind : BufferCorrectionKind,
-  ) -> usize {
-    self . buffer_corrections . iter () . filter ( |c| c . kind == kind ) . count () }
 }
 
 /// Refresh 'text' as a content view over 'graph', with no
@@ -152,8 +127,7 @@ pub(super) fn run_asserting_fixpoint (
     text, graph, None, RefreshMode::ContentView, 100 ) }
 
 /// Refresh 'text' over 'graph' in 'mode' with 'budget', then assert
-/// the fixpoint: its output, refreshed again, comes back as it was,
-/// correcting nothing.
+/// the fixpoint: its output, refreshed again, comes back as it was.
 pub(super) fn run_asserting_fixpoint_in (
   text        : &str,
   graph       : &InRustGraph,
@@ -165,32 +139,28 @@ pub(super) fn run_asserting_fixpoint_in (
   let truth : Truth = Truth { graph, config : &config, restriction };
   let mut forest : ViewForest = parse (text, IdResolution::ThroughGraph (graph));
   let mut record : ViewnodeIdRecord = ViewnodeIdRecord::of_viewforest (&forest);
-  let first : Refreshed = refresh_and_render (
-    &mut forest, &mut record, &truth, mode, budget,
-    &BufferCorrectionPolicy::ReportAll )
+  let text : String = refresh_and_render (
+    &mut forest, &mut record, &truth, mode, budget )
     . unwrap ();
   if let Err (failure) = refresh_reaches_fixpoint (
-    &first . text, graph,
+    &text, graph,
     |again, again_record| refresh_viewforest (
-      again, again_record, &truth, mode, budget,
-      &BufferCorrectionPolicy::ReportAll )) {
+      again, again_record, &truth, mode, budget )) {
     panic! ( "the refresh of a refresh's output is no fixpoint: {}", failure ); }
-  Run { forest, text : first . text, buffer_corrections : first . buffer_corrections } }
+  Run { forest, text } }
 
 /// Refresh 'forest' once, as a content view over 'graph' with no
-/// skgrepo restriction, a large budget and 'policy', asserting no
-/// fixpoint: for a forest parsed as written, a stub, or a policy that
-/// a second refresh would not share.
+/// skgrepo restriction and a large budget, asserting no fixpoint: for
+/// a forest parsed as written, or a stub. Returns the rendered text.
 pub(super) fn refresh_once (
   forest : &mut ViewForest,
   graph  : &InRustGraph,
-  policy : &BufferCorrectionPolicy,
-) -> Refreshed {
+) -> String {
   let config : SkgConfig = config ();
   let truth : Truth = Truth { graph, config : &config, restriction : None };
   refresh_and_render (
     forest, &mut ViewnodeIdRecord::default (), &truth,
-    RefreshMode::ContentView, 100, policy )
+    RefreshMode::ContentView, 100 )
     . unwrap () }
 
 pub(super) fn parse (

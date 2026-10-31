@@ -1,4 +1,3 @@
-use crate::refresh::buffer_corrections::BufferCorrectionPolicy;
 use crate::serve::ViewsState;
 use crate::serve::rerender_stream::{
   PreparedRerenders,
@@ -58,8 +57,7 @@ pub fn handle_skgrepo_set_request (
 /// pruned; and what a skgrepo widening reveals is drawn. A folder the
 /// skgrepo restriction empties stays, empty, as any empty editable folder
 /// does. The rest keeps its
-/// viewnode IDs. When the skgrepo restriction changed, none of that is a
-/// buffer correction ('BufferCorrectionPolicy'). Results stream via
+/// viewnode IDs. Results stream via
 /// the rerender-all message flow (lock, per-view, done).
 fn set_skgrepo_restriction (
   stream           : &mut TcpStream,
@@ -86,10 +84,8 @@ fn set_skgrepo_restriction (
     prepare_rerender_views (
       env, runtime, views_state,
       RerenderRequest {
-        restriction              : &restriction,
-        buffer_correction_policy : BufferCorrectionPolicy::after_a_switch (
-          skgrepo_restriction, &restriction ),
-        selector                 : RerenderSelector::All, } );
+        restriction : &restriction,
+        selector    : RerenderSelector::All, } );
   if ! authorize_prepared_rerenders (
     stream, &mut prepared, &restriction,
     "repo-set-switch-rerender",

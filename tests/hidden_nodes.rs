@@ -401,11 +401,11 @@ const VIEW_OF_H_SWITCHED_BACK_TO_ALL : &str = "\
 ** (skg (vnid 0d) node (gnid s1) (skgRepos (nodeRepo public)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)) repoBoundary)) s1
 ";
 
-/// A switch's rerender reports no buffer corrections: narrowed, the
-/// Restricted vognodes are the skgrepo restriction's doing, and widened, the
-/// occurrences drawn again are too ('BufferCorrectionPolicy').
+/// A skgrepo narrowing and the skgrepo widening after it give the
+/// view of r back as it was opened: narrowed, the private nodes are
+/// Restricted vognodes; widened, they are occurrences again.
 #[test]
-fn a_switch_reports_no_buffer_corrections (
+fn a_narrowing_and_a_widening_give_the_view_back (
 ) -> Result<(), Box<dyn Error>> {
   let case : tempfile::TempDir = tempfile::TempDir::new () ?;
   write_fixture (case . path ()) ?;
@@ -414,13 +414,13 @@ fn a_switch_reports_no_buffer_corrections (
     |f| {
       let mut restriction : SkgrepoRestriction =
         SkgrepoRestriction::named (&f . config, "all" . into ()) ?;
-      open_view_of_r (f, None) ?;
-      for name in ["public", "all"] {
-        let (view, done) : (String, String) =
-          switch_reporting (f, &mut restriction, name) ?;
-        assert! ( done . contains ("(corrections ())"),
-                  "the switch to {} reports no buffer corrections: {}\n\nview:\n{}",
-                  name, done, view ); }
+      let opened : String = open_view_of_r (f, None) ?;
+      let (narrowed, _) : (String, String) =
+        switch_reporting (f, &mut restriction, "public") ?;
+      assert! ( ! narrowed . contains ("secret"), "{}", narrowed );
+      let (widened, _) : (String, String) =
+        switch_reporting (f, &mut restriction, "all") ?;
+      assert_eq! ( widened, opened );
       Ok (( )) } ) }
 
 /// r, public, contains a in its public file and pc, public, in its
@@ -447,14 +447,11 @@ fn a_narrowing_marks_noClaim_quietly_a_member_whose_record_alone_is_restricted (
       let opened : String = open_view_of_r (f, None) ?;
       assert! ( opened . contains ("node (gnid pc)") && ! opened . contains ("noClaim"),
                 "under all pc is r's member:\n{}", opened );
-      let (view, done) : (String, String) =
+      let (view, _) : (String, String) =
         switch_reporting (f, &mut restriction, "public") ?;
       assert! ( view . lines () . any ( |line| line . contains ("node (gnid pc)")
                                                && line . contains (" noClaim ") ),
                 "narrowed, pc stays, marked noClaim:\n{}", view );
-      assert! ( done . contains ("(corrections ())"),
-                "the skgrepo narrowing reports no buffer correction: {}\n\nview:\n{}",
-                done, view );
       Ok (( )) } ) }
 
 /// r hides s1 and hh, private, from its subscribers, recording both in
@@ -462,9 +459,7 @@ fn a_narrowing_marks_noClaim_quietly_a_member_whose_record_alone_is_restricted (
 /// requested, hh stands as a restricted headline there and in the
 /// folder of what r hides outside its subscribees. Its line deleted
 /// from the second and the view saved, r no longer hides hh, and the
-/// first folder's restricted headline goes: the save's own doing,
-/// which reports nothing, and names no headline the buffer no longer
-/// holds ('BufferCorrectionPolicy::reports_what_the_tail_pruned').
+/// first folder's restricted headline goes.
 #[test]
 fn a_restricted_headline_whose_record_a_save_removed_goes_quietly (
 ) -> Result<(), Box<dyn Error>> {
@@ -506,9 +501,6 @@ fn a_restricted_headline_whose_record_a_save_removed_goes_quietly (
                    "r no longer hides hh" );
       assert! ( ! saved . saved_view . contains ("(gnid hh)"),
                 "hh's restricted headline goes:\n{}", saved . saved_view );
-      assert! ( saved . buffer_corrections . is_empty (),
-                "the save's own removal is no buffer correction: {:?}",
-                saved . buffer_corrections );
       Ok (( )) } ) }
 
 /// r, public, records the alias "r public alias" in its public file
@@ -857,8 +849,7 @@ fn switch (
   Ok ( switch_skgrepo_set (f, restriction, name, VIEW) ? . 0 ) }
 
 /// Switch to the skgrepo-set 'name'; return the view as rerendered,
-/// and the "rerender-done" message, which carries the buffer
-/// corrections.
+/// and the "rerender-done" message.
 fn switch_reporting (
   f           : &mut Fixture,
   restriction : &mut SkgrepoRestriction,
