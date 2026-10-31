@@ -9,7 +9,7 @@
 // view of a shows p in a's containers folder, b and c as members, and
 // c's subscribee folder holding d.
 
-use crate::git_fixture_helpers::mk_test_tcp_stream_pair;
+use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::metadata_canon::{viewnode_id_atom_of, without_viewnode_ids};

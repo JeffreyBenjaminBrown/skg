@@ -9,7 +9,7 @@
 // subscribeeFolder content read it), so it belongs among the
 // grouped_overrides installers.
 
-use crate::git_fixture_helpers::mk_test_tcp_stream_pair;
+use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use std::error::Error;
 use std::net::TcpStream;
 

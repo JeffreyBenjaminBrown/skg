@@ -11,7 +11,7 @@ use crate::git_fixture::{Fixture, skg_files};
 use crate::pruned_change_view::common::{
   line_start_of, node_lines, open_all_changes_buffer, requesting_editable_at, save,
   with_fixture};
-use crate::git_fixture_helpers::mk_test_tcp_stream_pair;
+use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::test_utils::update_from_and_rerender_buffer_test;

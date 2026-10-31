@@ -4,7 +4,7 @@
 // last such view closes. A rerender-all writes back the straddle it
 // brought up to date.
 
-use crate::git_fixture_helpers::mk_test_tcp_stream_pair;
+use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use crate::git_fixture::{Fixture, everything_written};
 use crate::pruned_change_view::common::{open_all_changes_buffer, with_fixture};
 

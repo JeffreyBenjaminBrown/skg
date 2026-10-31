@@ -8,7 +8,7 @@ use crate::types::misc::ID;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{Viewnode, ViewnodeId, ViewnodeKind};
 use super::add_missing_info::{
-  ParseProvenance,
+  WhatTheParseSupplied,
   IdResolution,
   complete_occurrence_skgrepo,
   make_occurrence_an_alias,
@@ -43,9 +43,9 @@ pub fn org_to_viewnode_tree (
 ) -> Result < ( Tree<Viewnode>,
                 Vec<BufferValidationError> ),
               String > {
-  let (viewforest, parsing_errors, _warnings, _provenance)
+  let (viewforest, parsing_errors, _warnings, _supplied)
     : (ViewForest, Vec<BufferValidationError>, Vec<String>,
-       ParseProvenance) =
+       WhatTheParseSupplied) =
     org_to_viewforest (input, id_resolution)?;
   Ok ( ( viewforest . into_internal_tree (), parsing_errors ) ) }
 
@@ -58,10 +58,10 @@ pub fn org_to_viewnode_tree (
 /// one where one can be found, and an occurrence typed under an alias
 /// folder becomes an alias.
 ///
-/// Returns (viewforest, parsing_errors, parsing_warnings, provenance).
+/// Returns (viewforest, parsing_errors, parsing_warnings, supplied).
 /// The warnings are nonfatal (e.g. discarded headline text on a
-/// folder), destined for 'SaveResponse.warnings'. The provenance
-/// records what the parse invented.
+/// folder), destined for 'SaveResponse.warnings'. 'supplied' says
+/// what the parse invented ('WhatTheParseSupplied').
 ///
 /// Shares responsibility for error detection
 /// with 'find_buffer_errors_for_saving', which runs later.
@@ -76,7 +76,7 @@ pub fn org_to_viewforest (
 ) -> Result < ( ViewForest,
                 Vec<BufferValidationError>,
                 Vec<String>,
-                ParseProvenance ),
+                WhatTheParseSupplied ),
               String > {
   let mut viewforest: ViewForest =
     ViewForest::new();
@@ -104,8 +104,8 @@ pub fn org_to_viewforest (
       if ! viewnode_ids_seen . insert (viewnode_id . clone ()) {
         metadata . viewnode_id = None; }}
     replace_gnid_with_pid (metadata, id_resolution); }
-  let mut provenance : ParseProvenance =
-    ParseProvenance::new (
+  let mut supplied : WhatTheParseSupplied =
+    WhatTheParseSupplied::new (
       skgrepos_after_save_of_writeProtected_occurrences (
         viewnode_line_cols . iter ()
           . filter_map ( |line_col| line_col . headline . 1 . as_ref () ),
@@ -140,7 +140,7 @@ pub fn org_to_viewforest (
       = complete_linecol_to_viewnode (
           viewnode_line_col,
           viewforest . get (parent_treeid) . unwrap (),
-          id_resolution, &mut provenance )?;
+          id_resolution, &mut supplied )?;
     if let Some (error) = error_opt {
       parsing_errors . push (error); }
     if let Some (warning) = warning_opt {
@@ -151,7 +151,7 @@ pub fn org_to_viewforest (
           viewforest . get_mut (parent_treeid) . unwrap();
         parent_mut . append (viewnode) . id() };
       new_treeid } ); }
-  Ok ( ( viewforest, parsing_errors, parsing_warnings, provenance ) ) }
+  Ok ( ( viewforest, parsing_errors, parsing_warnings, supplied ) ) }
 
 /// The viewnode a headline under VIEWPARENT stands for, with what the
 /// headline leaves out supplied ('add_missing_info.rs'), recording in
@@ -161,7 +161,7 @@ fn complete_linecol_to_viewnode (
   viewnode_line_col : &mut ViewnodeLineCol,
   viewparent        : NodeRef<Viewnode>,
   id_resolution     : IdResolution,
-  provenance        : &mut ParseProvenance,
+  supplied        : &mut WhatTheParseSupplied,
 ) -> Result < ( Viewnode,
                 Option<BufferValidationError>,
                 Option<String> ),
@@ -176,7 +176,7 @@ fn complete_linecol_to_viewnode (
           ! is_alias
           && complete_occurrence_skgrepo (
                occurrence, viewparent, id_resolution,
-               & provenance . writeProtected_skgrepos_after_save );
+               & supplied . writeProtected_skgrepos_after_save );
         ( is_alias, skgrepo_inherited, occurrence . gnid . is_none () ) },
       _ => (false, false, false), };
   let (_level, mut viewnode, error_opt, warning_opt)
@@ -185,7 +185,7 @@ fn complete_linecol_to_viewnode (
   if is_alias {
     make_occurrence_an_alias (&mut viewnode);
   } else {
-    provenance . record (&viewnode, gnid_minted, skgrepo_inherited); }
+    supplied . note (&viewnode, gnid_minted, skgrepo_inherited); }
   Ok (( viewnode, error_opt, warning_opt )) }
 
 /// Parse input text into org node line collections.

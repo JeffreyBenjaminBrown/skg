@@ -2,7 +2,10 @@ mod guard;
 pub use guard::TestStoreGuard;
 
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
-use crate::dbs::filesystem::not_nodes::load_config_with_overrides;
+use crate::dbs::filesystem::not_nodes::{
+  config_from_file_before_checking_paths,
+  validate_skgrepo_paths_creating_owned_ones_if_needed};
+
 use crate::dbs::init::{create_empty_tantivy_index, empty_in_ram_tantivy_index};
 use crate::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle, new_handle};
 use crate::dbs::tantivy::search::{SearchOptions, search_index};
@@ -36,7 +39,7 @@ use ego_tree::{NodeId, NodeRef, Tree};
 use futures::FutureExt;
 use futures::executor::block_on;
 use std::any::Any;
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::error::Error;
 use std::fs;
 use std::io::ErrorKind;
@@ -129,24 +132,29 @@ where
   result
 }
 
-/// Where a test copies its fixtures, so that saves don't corrupt
-/// the originals. The process ID keeps two processes running a
-/// test of the same name (nextest beside a plain 'cargo test', say)
+/// 'path' with this process's ID appended: the one spelling of a
+/// test's temporary folder. The process ID keeps two processes running
+/// a test of the same name (nextest beside a plain 'cargo test', say)
 /// out of each other's way.
+pub fn path_for_this_process (
+  path : &str,
+) -> PathBuf {
+  PathBuf::from ( format! ( "{}-{}", path, std::process::id () )) }
+
+/// Where a test copies its fixtures, so that saves don't corrupt
+/// the originals ('path_for_this_process').
 fn temp_fixtures_folder (
   test_name : &str,
 ) -> PathBuf {
-  PathBuf::from ( format! ( "/tmp/{}-fixtures-{}",
-                            test_name, std::process::id () )) }
+  path_for_this_process ( &format! ( "/tmp/{}-fixtures", test_name )) }
 
-/// Where a test keeps its search index: the folder it names, with the
-/// process ID appended, as 'temp_fixtures_folder' does, so that two
-/// processes running one test never share an index.
+/// Where a test keeps its search index: the folder it names
+/// ('path_for_this_process'), so that two processes running one test
+/// never share an index.
 pub fn index_folder_for_this_process (
   tantivy_folder : &str,
 ) -> PathBuf {
-  PathBuf::from ( format! ( "{}-{}",
-                            tantivy_folder, std::process::id () )) }
+  path_for_this_process (tantivy_folder) }
 
 /// A test's own search-index folder, at
 /// 'index_folder_for_this_process', removed when the value drops. A
@@ -375,7 +383,7 @@ where
   R : FnOnce (&mut ViewForest, &mut ViewnodeIdRecord)
               -> Result<(), Box<dyn Error>>,
 {
-  let (mut forest, errors, _warnings, _provenance) =
+  let (mut forest, errors, _warnings, _supplied) =
     org_to_viewforest (text, IdResolution::ThroughGraph (graph))
     . map_err ( |e| format! ("the parse failed: {}", e) ) ?;
   if ! errors . is_empty () {
@@ -990,3 +998,146 @@ fn multi_root_view_via_env (
   let runtime = env . runtime_snapshot ();
   multi_root_view_via_runtime (
     &runtime, root_gnids, skgrepo_restriction ) }
+
+/// Load config from TOML file with optional overrides for testing.
+///
+/// - If `test_name` is Some, sets tantivy_folder to /tmp/tantivy-{test_name}
+///   with the process ID appended ('index_folder_for_this_process')
+/// - `repo_overrides` replaces paths for the specified skgrepo names
+///
+/// # Examples
+/// ```ignore
+/// // Override just skgrepo paths:
+/// let config = load_config_with_overrides(
+///   "tests/my_test/fixtures/skgconfig.toml",
+///   None,
+///   &[("output", PathBuf::from("/tmp/output"))],
+/// ).unwrap();
+///
+/// // Select a unique test Tantivy folder:
+/// let config = load_config_with_overrides(
+///   "tests/my_test/fixtures/skgconfig.toml",
+///   Some("skg-test-my-test"),
+///   &[],
+/// ).unwrap();
+///
+/// // Override both (for tests that copy fixtures to temp):
+/// let config = load_config_with_overrides(
+///   "tests/my_test/fixtures/skgconfig.toml",
+///   Some("skg-test-my-test"),
+///   &[("main", PathBuf::from("/tmp/fixtures-copy"))],
+/// ).unwrap();
+/// ```
+pub fn load_config_with_overrides (
+  path              : &str,
+  test_name         : Option<&str>,
+  skgrepo_overrides : &[(&str, PathBuf)],
+) -> Result <SkgConfig, Box<dyn Error>> {
+  let (mut config, _contents) : (SkgConfig, String) =
+    config_from_file_before_checking_paths (path) ?;
+  if let Some (name) = test_name {
+    config . tantivy_folder = index_folder_for_this_process (
+      &format! ("/tmp/tantivy-{}", name)); }
+  for (skgrepo_name, new_path) in skgrepo_overrides {
+    let key : SkgrepoName = SkgrepoName::from (*skgrepo_name);
+    if let Some (skgrepo) = config . skgrepos . get_mut (&key) {
+      skgrepo . path = new_path . clone();
+    } else {
+      return Err(format!(
+        "Repo '{}' not found in config", skgrepo_name) . into()); }}
+  validate_skgrepo_paths_creating_owned_ones_if_needed(
+    &config . skgrepos)?;
+  Ok (config) }
+
+pub fn titles_for_skgrepo_set_for_test (
+  config : &SkgConfig,
+  restriction : &SkgrepoRestriction,
+  gnids    : &[ID],
+) -> Result<HashMap<ID, String>, Box<dyn Error>> {
+  let nodes : Vec<Graphnode> =
+    read_all_skg_files_from_skgrepos (config)?;
+  let wanted : BTreeSet<ID> =
+    gnids . iter () . cloned () . collect ();
+  let mut result : HashMap<ID, String> = HashMap::new ();
+  for node in nodes {
+    if ! SkgrepoRestriction::node_is_restricted (restriction, &node . home_skgrepo)
+    && wanted . contains (&node . pid) {
+      result . insert (node . pid, node . title); }}
+  Ok (result) }
+
+pub fn search_gnids_for_skgrepo_set_for_test (
+  _tantivy : &TantivyIndex,
+  config   : &SkgConfig,
+  restriction : &SkgrepoRestriction,
+  terms    : &str,
+  limit    : usize,
+) -> Result<Vec<ID>, Box<dyn Error>> {
+  let mut hits : Vec<ID> =
+    read_all_skg_files_from_skgrepos (config)?
+    . into_iter ()
+    . filter ( |n| ! SkgrepoRestriction::node_is_restricted (restriction, &n . home_skgrepo) )
+    . filter ( |n| {
+      n . title . contains (terms)
+      || n . aliases . or_default () . iter () . any ( |a|
+           a . member . contains (terms)) })
+    . map ( |n| n . pid )
+    . collect ();
+  hits . sort ();
+  hits . truncate (limit);
+  Ok (hits) }
+
+pub fn run_with_skgrepo_set_test_db<F>(
+  test_name        : &str,
+  config_path    : &str,
+  tantivy_folder : &str,
+  test_fn        : F,
+) -> Result<(), Box<dyn Error>>
+where
+  F: for<'a>
+  FnOnce(&'a SkgConfig, &'a mut TantivyIndex)
+         -> Pin<Box<dyn Future<Output = Result
+                               <(), Box<dyn Error>>> + 'a>>,
+{
+  block_on ( async {
+    let fixture_config_path : PathBuf =
+      prepare_skgrepo_set_fixture_copy (test_name, config_path)?;
+    let mut config : SkgConfig =
+      load_config_with_overrides (
+        fixture_config_path . to_str ()
+        . ok_or ("fixture config path is not UTF-8")?,
+        Some (test_name),
+        &[])?;
+    config . tantivy_folder =
+      index_folder_for_this_process (tantivy_folder);
+    let mut tantivy : TantivyIndex =
+      create_empty_tantivy_index (&config . tantivy_folder)?;
+    let result : Result<(), Box<dyn Error>> =
+      test_fn (&config, &mut tantivy) . await;
+    drop (tantivy); // before its folder goes
+    cleanup_test_tantivy (
+      Some (config . tantivy_folder . as_path ())) ?;
+    remove_test_dir (
+      fixture_config_path . parent ()
+      . ok_or ("repo set fixture config has no parent")?) ?;
+    result }) }
+
+/// A copy of the fixture folder that holds 'config_path', for
+/// 'test_name', in a folder of this process's own
+/// ('path_for_this_process'). Returns the copied config's path.
+fn prepare_skgrepo_set_fixture_copy (
+  test_name   : &str,
+  config_path : &str,
+) -> Result<PathBuf, Box<dyn Error>> {
+  let skgrepo_config_path : PathBuf =
+    PathBuf::from (config_path);
+  let skgrepo_root : &Path =
+    skgrepo_config_path . parent ()
+    . ok_or ("repo set fixture config has no parent")?;
+  let target_root : PathBuf = path_for_this_process (
+    &format! ( "/tmp/skg-repo-set-fixtures-{}", test_name ));
+  if target_root . exists () {
+    fs::remove_dir_all (&target_root)?; }
+  copy_dir_all (skgrepo_root, &target_root)?;
+  Ok (target_root . join (
+    skgrepo_config_path . file_name ()
+    . ok_or ("repo set fixture config has no filename")?)) }

@@ -25,7 +25,8 @@ use skg::metadata_canon::without_viewnode_ids;
 use std::error::Error;
 use std::net::TcpStream;
 
-use skg::skgrepo_sets::{SkgrepoRestriction, run_with_skgrepo_set_test_db};
+use skg::skgrepo_sets::SkgrepoRestriction;
+use skg::test_utils::run_with_skgrepo_set_test_db;
 use skg::types::misc::SkgrepoName;
 use skg::test_utils::graph_handle_from_config;
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;

@@ -85,13 +85,13 @@ pub(crate) fn prune_childless_tombstones (
     . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
   for treeid in prunable {
     if tree . get (treeid) . unwrap () . children () . next () . is_none () {
-      detach_viewnode_transferring_focus (tree, treeid) ?; }}
+      remove_viewnode_transferring_focus (tree, treeid) ?; }}
   Ok (( )) }
 
-/// Detach a viewnode, transferring focus to its parent first if the
-/// detached subtree contained the focused node. The refresh's prune
-/// uses it.
-pub(crate) fn detach_viewnode_transferring_focus (
+/// Remove a viewnode and its subtree from the tree, transferring focus
+/// to its parent first if the removed subtree contained the focused
+/// node. The refresh's prune and the vanish rule use it.
+pub(crate) fn remove_viewnode_transferring_focus (
   tree : &mut Tree<Viewnode>,
   node : NodeId,
 ) -> Result<(), Box<dyn Error>> {

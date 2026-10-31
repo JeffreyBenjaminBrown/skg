@@ -8,7 +8,7 @@
 
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
-use skg::dbs::filesystem::not_nodes::load_config_with_overrides;
+use skg::test_utils::load_config_with_overrides;
 use skg::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle, new_handle};
 use skg::dbs::in_rust_graph::relation_accessors::{NodeRelation, RelationshipKey};
 use skg::dbs::init::create_empty_tantivy_index;

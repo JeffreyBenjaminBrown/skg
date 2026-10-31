@@ -4,7 +4,7 @@
 // These tests verify that when a node has a "Editable" view request,
 // its content children are extended from disk using BFS with truncation.
 
-use crate::git_fixture_helpers::mk_test_tcp_stream_pair;
+use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use indoc::indoc;
 use std::error::Error;
 use std::net::TcpStream;

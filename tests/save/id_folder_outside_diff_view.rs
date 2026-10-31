@@ -7,7 +7,7 @@
 //
 // Fixture: two unrelated nodes, n and x.
 
-use crate::git_fixture_helpers::mk_test_tcp_stream_pair;
+use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use std::error::Error;
 use std::net::TcpStream;
 

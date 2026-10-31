@@ -1,4 +1,3 @@
-use crate::test_utils::index_folder_for_this_process;
 use crate::types::misc::{SkgConfig, Skgrepo, SkgrepoName};
 
 use serde::Deserialize;
@@ -191,13 +190,27 @@ pub fn load_config (
   path: &str )
   -> Result <(SkgConfig, Vec<String>),
              Box<dyn std::error::Error>>
-{ if !Path::new (path) . exists() {
+{ let (config, contents) : (SkgConfig, String) =
+    config_from_file_before_checking_paths (path) ?;
+  validate_skgrepo_paths_creating_owned_ones_if_needed(
+    &config . skgrepos)?;
+  Ok (( config,
+        unknown_top_level_config_key_warnings (&contents) )) }
+
+/// The config the TOML file at 'path' states, its paths made absolute,
+/// with the file's text; its skgrepo paths are not yet checked
+/// ('validate_skgrepo_paths_creating_owned_ones_if_needed'), so that a
+/// test can replace them first ('load_config_with_overrides' in
+/// 'server/test_utils.rs').
+pub(crate) fn config_from_file_before_checking_paths (
+  path : &str,
+) -> Result <(SkgConfig, String), Box<dyn std::error::Error>> {
+  if !Path::new (path) . exists() {
     return Err(format!("Config file not found: {}",
                        path)
                . into( )); }
   let contents: String = fs::read_to_string (path) ?;
   reject_retired_config_keys (&contents) ?;
-  
   let mut config: SkgConfig =
     toml::from_str (&contents) ?;
   config . skgrepo_order = skgrepo_order_from_toml (&contents);
@@ -224,82 +237,7 @@ pub fn load_config (
   make_paths_absolute (&mut config);
   derive_ownership_and_labels (&mut config, &raw_paths);
   validate_skgrepo_sets (&config)?;
-  validate_skgrepo_paths_creating_owned_ones_if_needed(
-    &config . skgrepos)?;
-  Ok (( config,
-        unknown_top_level_config_key_warnings (&contents) )) }
-
-/// Load config from TOML file with optional overrides for testing.
-///
-/// - If `test_name` is Some, sets tantivy_folder to /tmp/tantivy-{test_name}
-///   with the process ID appended ('index_folder_for_this_process')
-/// - `repo_overrides` replaces paths for the specified skgrepo names
-///
-/// # Examples
-/// ```ignore
-/// // Override just skgrepo paths:
-/// let config = load_config_with_overrides(
-///   "tests/my_test/fixtures/skgconfig.toml",
-///   None,
-///   &[("output", PathBuf::from("/tmp/output"))],
-/// ).unwrap();
-///
-/// // Select a unique test Tantivy folder:
-/// let config = load_config_with_overrides(
-///   "tests/my_test/fixtures/skgconfig.toml",
-///   Some("skg-test-my-test"),
-///   &[],
-/// ).unwrap();
-///
-/// // Override both (for tests that copy fixtures to temp):
-/// let config = load_config_with_overrides(
-///   "tests/my_test/fixtures/skgconfig.toml",
-///   Some("skg-test-my-test"),
-///   &[("main", PathBuf::from("/tmp/fixtures-copy"))],
-/// ).unwrap();
-/// ```
-pub fn load_config_with_overrides (
-  path              : &str,
-  test_name         : Option<&str>,
-  skgrepo_overrides : &[(&str, std::path::PathBuf)],
-) -> Result <SkgConfig, Box<dyn std::error::Error>> {
-  if !Path::new (path) . exists() {
-    return Err(format!("Config file not found: {}", path) . into()); }
-  let contents: String = fs::read_to_string (path)?;
-  reject_retired_config_keys (&contents)?;
-  let mut config: SkgConfig =
-    toml::from_str (&contents)?;
-  config . skgrepo_order = skgrepo_order_from_toml (&contents);
-  let raw_paths : HashMap<SkgrepoName, PathBuf> =
-    config . skgrepos . iter ()
-    . map ( |(name, s)| (name . clone (), s . path . clone ()) )
-    . collect ();
-  config . config_path =
-    fs::canonicalize (path)
-    . unwrap_or_else ( |_| PathBuf::from (path) );
-  config . data_root = {
-    // See load_config above for why canonicalize is necessary here.
-    let raw : PathBuf = Path::new (path)
-      . parent ()
-      . unwrap_or ( Path::new (".") )
-      . to_path_buf ();
-    fs::canonicalize (&raw) . unwrap_or (raw) };
-  make_paths_absolute (&mut config);
-  derive_ownership_and_labels (&mut config, &raw_paths);
-  validate_skgrepo_sets (&config)?;
-  if let Some (name) = test_name {
-    config . tantivy_folder = index_folder_for_this_process (
-      &format! ("/tmp/tantivy-{}", name)); }
-  for (skgrepo_name, new_path) in skgrepo_overrides {
-    let key : SkgrepoName = SkgrepoName::from (*skgrepo_name);
-    if let Some (skgrepo) = config . skgrepos . get_mut (&key) {
-      skgrepo . path = new_path . clone();
-    } else {
-      return Err(format!(
-        "Repo '{}' not found in config", skgrepo_name) . into()); }}
-  validate_skgrepo_paths_creating_owned_ones_if_needed(
-    &config . skgrepos)?;
-  Ok (config) }
+  Ok (( config, contents )) }
 
 fn validate_skgrepo_sets (
   config : &SkgConfig,

@@ -1,4 +1,4 @@
-use skg::dbs::filesystem::not_nodes::load_config_with_overrides;
+use skg::test_utils::load_config_with_overrides;
 use skg::test_utils::single_root_view;
 use skg::types::misc::{ID, SkgConfig};
 use std::error::Error;

@@ -165,7 +165,7 @@ fn relationship_edit_request_of (
 /// - a ghost, from an occurrence or a gnid-only vognode: its node was
 ///   deleted since HEAD ('rekind_to_ghost'), two cases;
 /// - a gnid-only vognode, from one of the same kind: its relRepo taken
-///   from the goal, where the goal records one;
+///   from the goal, where the goal's item names one;
 /// - a gnid-only vognode, from one of the other kind, an occurrence or
 ///   a ghost ('rekind_to_gnid_only'), three cases;
 /// - a tombstone, from any kind ('entombstone'), but for an
@@ -416,7 +416,7 @@ pub(crate) fn ghost_from_head (
     ViewnodeKind::Vognode (Vognode::Ghost (ghost)) => Some (ghost),
     _ => None, } }
 
-/// The relRepo the goal records for a gnid-only vognode's 'gnid'.
+/// The relRepo the goal's item names for a gnid-only vognode's 'gnid'.
 fn goal_relRepo (
   goal : Option<&Goal>,
   gnid : &ID,

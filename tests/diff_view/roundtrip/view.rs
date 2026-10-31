@@ -209,7 +209,7 @@ fn the_new_viewnodes_cross_the_wire (
                 "the buffer should hold {}:\n{}", facts, buffer ); }
     let graph : Arc<InRustGraph> = f . graph . load_full ();
     let across_the_wire = |text : &str| -> String {
-      let (forest, errors, _warnings, _provenance) =
+      let (forest, errors, _warnings, _supplied) =
         org_to_viewforest (text, IdResolution::ThroughGraph (&graph)) . unwrap ();
       assert! ( errors . is_empty (), "{:?}\n\nbuffer:\n{}", errors, text );
       viewforest_to_string (&forest) . unwrap () };

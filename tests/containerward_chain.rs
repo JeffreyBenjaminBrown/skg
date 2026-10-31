@@ -10,7 +10,7 @@
 // Fixture: m contains r; b and c contain m; d contains b and c (a
 // diamond above m). x and y contain each other (a cycle).
 
-use crate::git_fixture_helpers::mk_test_tcp_stream_pair;
+use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::metadata_canon::without_viewnode_ids;

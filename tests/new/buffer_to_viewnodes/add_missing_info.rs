@@ -10,7 +10,7 @@ use skg::types::errors::BufferValidationError;
 use skg::test_utils::{run_with_shared_test_stores, compare_viewnode_trees_modulo_gnid, compare_viewnode_trees, graph_from_config};
 use skg::types::viewnode::{
   PropertyMember, Viewnode, ViewnodeKind, Vognode};
-use skg::from_text::buffer_to_viewnodes::add_missing_info::ParseProvenance;
+use skg::from_text::buffer_to_viewnodes::add_missing_info::WhatTheParseSupplied;
 use skg::types::misc::{SkgConfig, ID, SkgrepoName, TantivyIndex};
 use skg::types::tree::forest::{
   ViewForest,
@@ -77,7 +77,7 @@ async fn test_provenance_records_what_the_parse_invented (
   "};
   let (viewforest, errors, _warnings, provenance)
     : (ViewForest, Vec<BufferValidationError>, Vec<String>,
-       ParseProvenance)
+       WhatTheParseSupplied)
     = org_to_viewforest (input, IdResolution::ThroughGraph (&graph_from_config (config) ?)) ?;
   assert! (errors . is_empty (), "{:?}", errors);
   let gnid_of = |title : &str| -> ID {

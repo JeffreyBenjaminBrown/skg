@@ -1,19 +1,10 @@
-use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
-use crate::dbs::filesystem::not_nodes::load_config_with_overrides;
-use crate::dbs::init::create_empty_tantivy_index;
-use crate::types::misc::{ID, RelPartner, SkgConfig, SkgrepoName, TantivyIndex};
-use crate::types::nodes::complete::Graphnode;
-use crate::test_utils::{
-  cleanup_test_tantivy, index_folder_for_this_process, remove_test_dir};
+//! The skgrepo restriction and its two questions
+//! ('SkgrepoRestriction', 'record_is_visible', 'node_is_restricted').
 
-use futures::executor::block_on;
-use std::collections::{BTreeSet, HashMap};
+use crate::types::misc::{RelPartner, SkgConfig, SkgrepoName};
+
+use std::collections::BTreeSet;
 use std::error::Error;
-use std::fs;
-use std::future::Future;
-use std::path::Path;
-use std::path::PathBuf;
-use std::pin::Pin;
 
 /// The skgrepo restriction: the skgrepos a connection currently shows
 /// ('docs/glossary.org', "skgrepo, home skgrepo, skgrepo-set,
@@ -190,113 +181,3 @@ pub fn require_unrestricted (
     "{} requires no skgrepo restriction; the skgrepo restriction is {}. Switch it to {}, the most private skgrepo, first.",
     what, restriction . most_private_shown,
     restriction . most_private_of_the_config () )) }
-
-pub fn titles_for_skgrepo_set_for_test (
-  config : &SkgConfig,
-  restriction : &SkgrepoRestriction,
-  gnids    : &[ID],
-) -> Result<HashMap<ID, String>, Box<dyn Error>> {
-  let nodes : Vec<Graphnode> =
-    read_all_skg_files_from_skgrepos (config)?;
-  let wanted : BTreeSet<ID> =
-    gnids . iter () . cloned () . collect ();
-  let mut result : HashMap<ID, String> = HashMap::new ();
-  for node in nodes {
-    if ! SkgrepoRestriction::node_is_restricted (restriction, &node . home_skgrepo)
-    && wanted . contains (&node . pid) {
-      result . insert (node . pid, node . title); }}
-  Ok (result) }
-
-pub fn search_gnids_for_skgrepo_set_for_test (
-  _tantivy : &TantivyIndex,
-  config   : &SkgConfig,
-  restriction : &SkgrepoRestriction,
-  terms    : &str,
-  limit    : usize,
-) -> Result<Vec<ID>, Box<dyn Error>> {
-  let mut hits : Vec<ID> =
-    read_all_skg_files_from_skgrepos (config)?
-    . into_iter ()
-    . filter ( |n| ! SkgrepoRestriction::node_is_restricted (restriction, &n . home_skgrepo) )
-    . filter ( |n| {
-      n . title . contains (terms)
-      || n . aliases . or_default () . iter () . any ( |a|
-           a . member . contains (terms)) })
-    . map ( |n| n . pid )
-    . collect ();
-  hits . sort ();
-  hits . truncate (limit);
-  Ok (hits) }
-
-pub fn run_with_skgrepo_set_test_db<F>(
-  test_name        : &str,
-  config_path    : &str,
-  tantivy_folder : &str,
-  test_fn        : F,
-) -> Result<(), Box<dyn Error>>
-where
-  F: for<'a>
-  FnOnce(&'a SkgConfig, &'a mut TantivyIndex)
-         -> Pin<Box<dyn Future<Output = Result
-                               <(), Box<dyn Error>>> + 'a>>,
-{
-  block_on ( async {
-    let fixture_config_path : PathBuf =
-      prepare_skgrepo_set_fixture_copy (test_name, config_path)?;
-    let mut config : SkgConfig =
-      load_config_with_overrides (
-        fixture_config_path . to_str ()
-        . ok_or ("fixture config path is not UTF-8")?,
-        Some (test_name),
-        &[])?;
-    config . tantivy_folder =
-      index_folder_for_this_process (tantivy_folder);
-    let mut tantivy : TantivyIndex =
-      create_empty_tantivy_index (&config . tantivy_folder)?;
-    let result : Result<(), Box<dyn Error>> =
-      test_fn (&config, &mut tantivy) . await;
-    drop (tantivy); // before its folder goes
-    cleanup_test_tantivy (
-      Some (config . tantivy_folder . as_path ())) ?;
-    remove_test_dir (
-      fixture_config_path . parent ()
-      . ok_or ("repo set fixture config has no parent")?) ?;
-    result }) }
-
-fn prepare_skgrepo_set_fixture_copy (
-  test_name     : &str,
-  config_path : &str,
-) -> Result<PathBuf, Box<dyn Error>> {
-  let skgrepo_config_path : PathBuf =
-    PathBuf::from (config_path);
-  let skgrepo_root : &Path =
-    skgrepo_config_path . parent ()
-    . ok_or ("repo set fixture config has no parent")?;
-  let target_root : PathBuf = // the process ID, as the index folder has it
-    PathBuf::from (format! (
-      "/tmp/skg-repo-set-fixtures-{}-{}",
-      test_name, std::process::id () ));
-  if target_root . exists () {
-    fs::remove_dir_all (&target_root)?; }
-  copy_dir_recursively (skgrepo_root, &target_root)?;
-  Ok (target_root . join (
-    skgrepo_config_path . file_name ()
-    . ok_or ("repo set fixture config has no filename")?)) }
-
-fn copy_dir_recursively (
-  skgrepo : &Path,
-  target : &Path,
-) -> Result<(), Box<dyn Error>> {
-  fs::create_dir_all (target)?;
-  for entry in fs::read_dir (skgrepo)? {
-    let entry : fs::DirEntry = entry?;
-    let skgrepo_path : PathBuf =
-      entry . path ();
-    let target_path : PathBuf =
-      target . join (entry . file_name ());
-    if entry . file_type ()? . is_dir () {
-      copy_dir_recursively (&skgrepo_path, &target_path)?;
-    } else {
-      fs::copy (&skgrepo_path, &target_path)?; }}
-  Ok (( )) }
-

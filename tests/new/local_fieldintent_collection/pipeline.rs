@@ -7,7 +7,7 @@
 /// "new recursion surface" are the deliberate behavior changes.
 
 use skg::skgrepo_sets::SkgrepoRestriction;
-use skg::from_text::buffer_to_viewnodes::add_missing_info::ParseProvenance;
+use skg::from_text::buffer_to_viewnodes::add_missing_info::WhatTheParseSupplied;
 use indoc::indoc;
 use skg::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewforest;
@@ -33,8 +33,8 @@ async fn placed_forest_from_org_with_disk (
   input  : &str,
   config : &SkgConfig,
 ) -> Result<ViewForest, Box<dyn Error>> {
-  let (viewforest, _parsing_errors, _warnings, _provenance)
-    : (ViewForest, Vec<BufferValidationError>, Vec<String>, ParseProvenance) =
+  let (viewforest, _parsing_errors, _warnings, _supplied)
+    : (ViewForest, Vec<BufferValidationError>, Vec<String>, WhatTheParseSupplied) =
     org_to_viewforest (input, IdResolution::ThroughGraph (&graph_from_config (config) ?)) ?;
   Ok ( viewforest ) }
 

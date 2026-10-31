@@ -209,7 +209,7 @@ pub enum GnidOnlyKind {
   /// An unknown: no node answers to the gnid.
   ///
   /// ARISES: when some node's `contains` (or similar list) names an
-  /// ID that has no record anywhere -- not a primary pid or extra_id
+  /// ID that no graphnode answers to anywhere -- not a primary pid or extra_id
   /// in the graph, not on disk, and not recoverable through any diff
   /// procedure. A genuine dangling pointer. Can result from bad data,
   /// or from a reference to another user's node that has since been
@@ -217,7 +217,7 @@ pub enum GnidOnlyKind {
   /// reference as its own kind, rather than erroring, is what keeps a
   /// single bad reference deep in a subtree from killing the whole
   /// view at its root. That emptiness is the information: a
-  /// reference exists, but we have no record of its target.
+  /// reference exists, but nothing knows its target.
   Unknown,
   /// A restricted viewnode: the node is one the skgrepo restriction
   /// keeps out, and a record the skgrepo restriction shows names it

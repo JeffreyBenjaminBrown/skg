@@ -1,4 +1,4 @@
-use crate::from_text::buffer_to_viewnodes::add_missing_info::ParseProvenance;
+use crate::from_text::buffer_to_viewnodes::add_missing_info::WhatTheParseSupplied;
 use super::*;
 use crate::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewforest;
 use crate::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
@@ -203,8 +203,8 @@ fn every_kind_prints_its_viewnode_id_first_and_parses_it_back () {
 // the second, a copy, loses it. A headline with no viewnode ID has none.
 #[test]
 fn a_repeated_viewnode_id_stays_with_its_first_headline () {
-  let (forest, errors, _warnings, _provenance)
-    : (ViewForest, Vec<BufferValidationError>, Vec<String>, ParseProvenance) =
+  let (forest, errors, _warnings, _supplied)
+    : (ViewForest, Vec<BufferValidationError>, Vec<String>, WhatTheParseSupplied) =
     org_to_viewforest (concat! (
       "* (skg (vnid 0a) node (gnid a) (skgRepos (nodeRepo main))) a\n",
       "** (skg (vnid 0b) node (gnid b) (skgRepos (nodeRepo main))) b\n",

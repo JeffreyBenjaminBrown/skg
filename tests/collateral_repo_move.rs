@@ -1,9 +1,9 @@
 // cargo nextest run --test grouped_overrides -E 'test(collateral_repo_move::)'
 
-use crate::git_fixture_helpers::mk_test_tcp_stream_pair;
+use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use futures::executor::block_on;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
-use skg::dbs::filesystem::not_nodes::load_config_with_overrides;
+use skg::test_utils::load_config_with_overrides;
 use skg::dbs::init::create_empty_tantivy_index;
 use skg::dbs::in_rust_graph::{
   InRustGraph,

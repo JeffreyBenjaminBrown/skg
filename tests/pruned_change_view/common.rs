@@ -5,7 +5,7 @@
 use crate::git_fixture::{
   Fixture, OwnedSkgrepos, graph_straddle, save_view, skg_files,
   with_git_fixture};
-use crate::git_fixture_helpers::mk_test_tcp_stream_pair;
+use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 
 use skg::diff_view::change_leaves::LeafKey;
 use skg::metadata_canon::without_viewnode_ids;

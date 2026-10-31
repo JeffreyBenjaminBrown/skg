@@ -18,7 +18,8 @@ use std::error::Error;
 use std::io::BufReader;
 use std::net::TcpStream;
 
-use crate::git_fixture_helpers::{mk_test_tcp_stream_pair, without_lines_containing};
+use crate::git_fixture_helpers::without_lines_containing;
+use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewnode_tree;

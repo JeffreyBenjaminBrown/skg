@@ -5,7 +5,7 @@
 
 use crate::parse_helpers::viewnode_tree_as_written;
 use skg::skgrepo_sets::SkgrepoRestriction;
-use skg::from_text::buffer_to_viewnodes::add_missing_info::ParseProvenance;
+use skg::from_text::buffer_to_viewnodes::add_missing_info::WhatTheParseSupplied;
 use indoc::indoc;
 use ego_tree::Tree;
 use skg::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
@@ -127,8 +127,8 @@ async fn nodeInstructions_from_org_with_disk (
   config   : &skg::types::misc::SkgConfig,
 
 ) -> Result<Vec<NodeInstruction>, Box<dyn Error>> {
-  let (viewforest, _parsing_errors, _warnings, _provenance)
-    : (ViewForest, Vec<BufferValidationError>, Vec<String>, ParseProvenance) =
+  let (viewforest, _parsing_errors, _warnings, _supplied)
+    : (ViewForest, Vec<BufferValidationError>, Vec<String>, WhatTheParseSupplied) =
     org_to_viewforest (org_text, IdResolution::ThroughGraph (&graph_from_config (config) ?)) ?;
   let (save_plan, _nodeMerge_acquisitions) =
     extract_nonmergeSavePlan_locally (

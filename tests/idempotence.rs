@@ -25,7 +25,7 @@ use skg::test_utils::run_with_test_stores;
 use skg::test_utils::multi_root_view;
 use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 
-use skg::dbs::filesystem::not_nodes::load_config_with_overrides;
+use skg::test_utils::load_config_with_overrides;
 use skg::dbs::init::empty_in_ram_tantivy_index;
 use skg::org_to_text::viewforest_to_string;
 use skg::refresh::{Truth, refresh_content_viewforest};
@@ -319,7 +319,7 @@ fn parse_for_the_sweep (
   text  : &str,
   graph : &InRustGraph,
 ) -> Result<ViewForest, String> {
-  let (forest, errors, _warnings, _provenance) =
+  let (forest, errors, _warnings, _supplied) =
     org_to_viewforest (text, IdResolution::ThroughGraph (graph))
     . map_err ( |e| format! ("the parse failed: {}", e) ) ?;
   if ! errors . is_empty () {

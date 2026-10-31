@@ -10,10 +10,7 @@ use crate::serve::handlers::save_buffer::compute_diff_for_every_skgrepo;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{send_response_with_length_prefix, sexp_to_client_string};
 use crate::sexp_string::quote_sexp_string;
-use crate::skgrepo_sets::{
-  SkgrepoRestriction,
-  titles_for_skgrepo_set_for_test,
-};
+use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::disk_home::home_from_disk;
 use crate::types::git::SkgrepoDiff;
 use crate::types::misc::{ID, SkgrepoName, SkgConfig, TantivyIndex};
@@ -22,13 +19,6 @@ use crate::types::sexp::extract_string_list_from_sexp;
 use sexp::{Sexp, Atom};
 use std::collections::{HashMap, HashSet};
 use std::net::TcpStream;
-
-pub fn titles_by_gnids_for_skgrepo_set_for_test (
-  config : &SkgConfig,
-  restriction : &SkgrepoRestriction,
-  gnids    : &[ID],
-) -> Result<HashMap<ID, String>, Box<dyn std::error::Error>> {
-  titles_for_skgrepo_set_for_test (config, restriction, gnids) }
 
 /// Handle a "titles by ids" request from Emacs.
 /// Parses the ID list, performs a bulk Tantivy lookup, supplements

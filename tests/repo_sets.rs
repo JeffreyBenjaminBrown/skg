@@ -2,7 +2,7 @@
 //
 // Tests of skgrepo-sets ('docs/api-and-formats.org', "skgrepo-sets").
 
-use crate::git_fixture_helpers::mk_test_tcp_stream_pair;
+use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use crate::parse_helpers::{first_root, occurrence_children_gnids, viewnode_tree_as_written};
 use indoc::indoc;
 use ego_tree::{NodeId, Tree};
@@ -11,7 +11,10 @@ use skg::dbs::filesystem::not_nodes::load_config;
 use skg::serve::ViewsState;
 use skg::serve::handlers::skgrepo_sets::handle_skgrepo_set_request;
 use skg::serve::handlers::text_search::TitleOrAlias;
-use skg::skgrepo_sets::{SkgrepoRestriction, run_with_skgrepo_set_test_db};
+use skg::skgrepo_sets::SkgrepoRestriction;
+use skg::test_utils::{
+  run_with_skgrepo_set_test_db, search_gnids_for_skgrepo_set_for_test,
+  titles_for_skgrepo_set_for_test};
 use skg::dbs::node_lookup::graphnode_from_graph;
 use skg::test_utils::multi_root_view;
 use skg::test_utils::{set_skgrepo_retagging_relRepos, graph_handle_from_config};
@@ -371,7 +374,7 @@ async fn search_filters_restricted_skgrepos_before_ranking_and_truncation (
           &config,
           SkgrepoName::from ("public"))?;
       let gnids : Vec<ID> =
-        skg::serve::handlers::text_search::search_gnids_for_skgrepo_set_for_test (
+        search_gnids_for_skgrepo_set_for_test (
           &tantivy,
           &config,
           &restriction,
@@ -432,7 +435,7 @@ async fn restricted_skgrepo_search_and_save_work_together_end_to_end (
           &config,
           SkgrepoName::from ("public"))?;
       let gnids : Vec<ID> =
-        skg::serve::handlers::text_search::search_gnids_for_skgrepo_set_for_test (
+        search_gnids_for_skgrepo_set_for_test (
           tantivy,
           &config,
           &restriction,
@@ -609,7 +612,7 @@ fn titles_by_gnids_omits_restricted_skgrepo_titles (
       &config,
       SkgrepoName::from ("public"))?;
   let titles =
-    skg::serve::handlers::titles_by_gnids::titles_by_gnids_for_skgrepo_set_for_test (
+    titles_for_skgrepo_set_for_test (
       &config,
       &restriction,
       &[ ID::from ("active-a"),

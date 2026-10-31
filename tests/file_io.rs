@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use skg::dbs::filesystem::one_node::{
   fetch_aliases_from_file,
   graphnode_from_pid_and_skgrepo, write_graphnode_to_skgrepo};
-use skg::dbs::filesystem::not_nodes::load_config_with_overrides;
+use skg::test_utils::load_config_with_overrides;
 use skg::save::update_fs_from_nodeInstructions;
 use skg::types::nodes::complete::{Graphnode, empty_graphnode};
 use skg::types::nodes::fs::GraphnodeOnDisk;

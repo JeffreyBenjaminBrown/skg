@@ -5,7 +5,7 @@
 /// - an occurrence typed under an alias folder becomes an alias;
 /// - an occurrence without a skgrepo gets one: the graph's, or that
 ///   of its nearest occurrence ancestor;
-/// and the record of what the parse invented ('ParseProvenance').
+/// and a note of what the parse supplied ('WhatTheParseSupplied').
 /// An occurrence without a gnid gets a fresh one from
 /// 'viewnode_from_metadata'.
 
@@ -53,8 +53,8 @@ impl IdResolution<'_> {
       IdResolution::AsWritten => None, }}
 }
 
-/// Which nodes the parse invented data for, as opposed to reading it
-/// from the buffer: 'new_nodes' had no id (so they got fresh UUIDs);
+/// What the parse supplied that the buffer does not say: which nodes
+/// it invented data for, as opposed to reading it from the buffer: 'new_nodes' had no id (so they got fresh UUIDs);
 /// 'inherited_skgrepo_nodes' had no skgrepo (so they inherited that of
 /// their nearest occurrence ancestor). Downstream policy needs the
 /// distinction the parsed tree itself has erased -- e.g. a new node
@@ -64,24 +64,24 @@ impl IdResolution<'_> {
 /// It also needs a fact the tree does not show:
 /// 'writeProtected_skgrepos_after_save' (see
 /// 'skgrepos_after_save_of_writeProtected_occurrences').
-pub struct ParseProvenance {
+pub struct WhatTheParseSupplied {
   pub new_nodes               : HashSet<ID>,
   pub inherited_skgrepo_nodes : HashSet<ID>,
   pub writeProtected_skgrepos_after_save : HashMap<ID, SkgrepoName>,
 }
 
-impl ParseProvenance {
+impl WhatTheParseSupplied {
   /// Nothing invented yet.
   pub fn new (
     writeProtected_skgrepos_after_save : HashMap<ID, SkgrepoName>,
-  ) -> ParseProvenance {
-    ParseProvenance {
+  ) -> WhatTheParseSupplied {
+    WhatTheParseSupplied {
       new_nodes               : HashSet::new (),
       inherited_skgrepo_nodes : HashSet::new (),
       writeProtected_skgrepos_after_save, }}
 
-  /// Record what the parse invented for 'viewnode', an occurrence.
-  pub fn record (
+  /// Note what the parse invented for 'viewnode', an occurrence.
+  pub fn note (
     &mut self,
     viewnode          : &Viewnode,
     gnid_minted       : bool,

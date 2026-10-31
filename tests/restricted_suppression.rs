@@ -17,7 +17,8 @@
 use indoc::indoc;
 
 use skg::from_text::buffer_to_validated_saveplan;
-use skg::skgrepo_sets::{SkgrepoRestriction, run_with_skgrepo_set_test_db};
+use skg::skgrepo_sets::SkgrepoRestriction;
+use skg::test_utils::run_with_skgrepo_set_test_db;
 use skg::types::misc::SkgrepoName;
 use skg::types::misc::{ID, members_of};
 use skg::types::nodes::complete::Graphnode;

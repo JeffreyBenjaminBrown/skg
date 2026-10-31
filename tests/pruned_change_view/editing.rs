@@ -8,8 +8,8 @@ use crate::git_fixture::{Fixture, edit_line, skg_files};
 use crate::pruned_change_view::common::{
   insert_after_line_starting, open_all_changes_buffer, save, viewforest_id_of,
   with_fixture, without_subtree_starting};
-use crate::git_fixture_helpers::{
-  mk_test_tcp_stream_pair, read_graphnode, without_lines_containing};
+use crate::git_fixture_helpers::{read_graphnode, without_lines_containing};
+use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 
 use skg::org_to_text::viewforest_to_string;
 use skg::serve::handlers::save_buffer::SaveResponse;

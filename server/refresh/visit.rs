@@ -57,7 +57,7 @@ use crate::refresh::id_rule::{
 use crate::refresh::Walk;
 use crate::refresh::ancestry::{described_node, is_unsayable, parent_reads_claims};
 use crate::refresh::mode::RefreshMode;
-use crate::refresh::tail::detach_viewnode_transferring_focus;
+use crate::refresh::tail::remove_viewnode_transferring_focus;
 use crate::types::nodes::rust::GraphnodeInRust;
 use crate::refresh::diff_view;
 use crate::refresh::chain::draw_containerward_chain;
@@ -429,7 +429,7 @@ pub(crate) fn vanish (
     . collect ();
   for (gnid, occurrence) in editable {
     walk . release_editability (&gnid, occurrence); }
-  detach_viewnode_transferring_focus (tree, treeid) }
+  remove_viewnode_transferring_focus (tree, treeid) }
 
 //
 // 5. reinstate

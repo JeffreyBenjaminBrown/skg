@@ -67,7 +67,7 @@ fn deleting_the_flags_folder_is_accepted_and_inert (
 fn whitespace_only_body_under_writeProtected_is_not_an_edit () {
   let input : &str =
     "* (skg node (gnid shown) (skgRepos (nodeRepo main)) writeProtected) shown\n\n";
-  let (_viewforest, parsing_errors, _warnings, _provenance) =
+  let (_viewforest, parsing_errors, _warnings, _supplied) =
     org_to_viewforest (input, IdResolution::AsWritten) . unwrap ();
   assert! ( ! parsing_errors . iter () . any ( |error| matches! (
     error, BufferValidationError::EditedWriteProtectedOccurrence { .. }) ),

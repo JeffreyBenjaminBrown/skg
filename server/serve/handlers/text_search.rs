@@ -31,7 +31,7 @@ use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{ send_response_with_length_prefix, tag_text_response};
 use crate::types::views_state::{ViewforestId, ViewnodeIdRecord, pids_from_viewforest};
 use crate::types::misc::{TantivyIndex, SkgConfig, ID, SkgrepoName};
-use crate::skgrepo_sets::{SkgrepoRestriction, search_gnids_for_skgrepo_set_for_test as search_ids_for_skgrepo_set_for_test_impl};
+use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{ Viewnode, ViewnodeKind, mk_writeProtected_viewnode};
@@ -78,16 +78,6 @@ impl TitleOrAlias {
   ) -> bool {
     matches! ( self, TitleOrAlias::Alias (_) ) }
 }
-
-pub fn search_gnids_for_skgrepo_set_for_test (
-  tantivy_index : &TantivyIndex,
-  config        : &SkgConfig,
-  restriction   : &SkgrepoRestriction,
-  terms         : &str,
-  limit         : usize,
-) -> Result<Vec<ID>, Box<dyn std::error::Error>> {
-  search_ids_for_skgrepo_set_for_test_impl (
-    tantivy_index, config, restriction, terms, limit ) }
 
 pub fn search_buffer_for_skgrepo_set_for_test (
   graph            : &InRustGraph,

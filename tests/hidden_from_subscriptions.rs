@@ -6,7 +6,7 @@
 // 2. After saving with editable view requests, HiddenInSubscribeeFolder is shown
 
 use skg::metadata_canon::without_viewnode_ids;
-use crate::git_fixture_helpers::mk_test_tcp_stream_pair;
+use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use indoc::indoc;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use skg::assert_metadata_eq;

@@ -197,7 +197,7 @@ pub(super) fn parse (
   text          : &str,
   id_resolution : IdResolution,
 ) -> ViewForest {
-  let (forest, errors, _warnings, _provenance) =
+  let (forest, errors, _warnings, _supplied) =
     org_to_viewforest (text, id_resolution) . unwrap ();
   assert! ( errors . is_empty (), "parse errors: {:?}", errors );
   forest }

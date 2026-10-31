@@ -7,6 +7,7 @@
 // 'tests/grouped_views.rs', 'tests/grouped_overrides.rs' and
 // 'tests/grouped_saves.rs'.
 
+use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use git2::Repository;
 use std::error::Error;
 use std::fs;
@@ -84,22 +85,6 @@ pub fn without_lines_containing(buffer: &str, substring: &str) -> String {
     . collect::<Vec<_>>()
     . join ("\n") + "\n"
 }
-
-/// Create a connected TCP stream pair for testing.
-/// Returns (write_end, read_end). The write_end is passed
-/// to 'update_from_and_rerender_buffer'; the read_end can
-/// be used to read streamed collateral-view messages.
-pub fn mk_test_tcp_stream_pair ()
-  -> (TcpStream, TcpStream)
-{ let listener : std::net::TcpListener =
-    std::net::TcpListener::bind ("127.0.0.1:0") . unwrap ();
-  let addr : std::net::SocketAddr =
-    listener . local_addr () . unwrap ();
-  let write_end : TcpStream =
-    TcpStream::connect (addr) . unwrap ();
-  let (read_end, _) =
-    listener . accept () . unwrap ();
-  (write_end, read_end) }
 
 /// Save the buffer attributed to 'viewforest_id', returning the
 /// SaveResponse and the collateral views' rendered contents.

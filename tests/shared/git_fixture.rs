@@ -4,7 +4,8 @@
 // Declared in 'tests/grouped_repos.rs', and in
 // 'tests/grouped_overrides.rs' for the fixpoint in 'tests/idempotence.rs'.
 
-use crate::git_fixture_helpers::{mk_test_tcp_stream_pair, setup_gitrepo_with_fixtures};
+use crate::git_fixture_helpers::setup_gitrepo_with_fixtures;
+use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::dbs::init::create_empty_tantivy_index;

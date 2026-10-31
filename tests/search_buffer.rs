@@ -14,7 +14,7 @@ use indoc::indoc;
 use std::collections::HashSet;
 use std::error::Error;
 
-use crate::git_fixture_helpers::mk_test_tcp_stream_pair;
+use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use std::io::BufReader;
 use std::net::TcpStream;
 

@@ -275,7 +275,7 @@ mod tests {
   use indoc::indoc;
 
   fn forest (text : &str) -> ViewForest {
-    let (forest, errors, _warnings, _provenance) =
+    let (forest, errors, _warnings, _supplied) =
       org_to_viewforest (text, IdResolution::AsWritten) . unwrap ();
     assert! (errors . is_empty (), "unexpected parse errors: {:?}", errors);
     forest
@@ -420,7 +420,7 @@ mod tests {
 
   #[test]
   fn body_on_an_writeProtected_occurrence_is_a_parse_error () {
-    let (_forest, errors, _warnings, _provenance) = org_to_viewforest (
+    let (_forest, errors, _warnings, _supplied) = org_to_viewforest (
       indoc! {"
         * (skg node (gnid recorder) (skgRepos (nodeRepo main)) writeProtected) recorder
         body that would otherwise disappear
