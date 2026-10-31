@@ -43,10 +43,12 @@ function M.maybe_activate_link_from_search_mode ()
   vim.b[buf].skg_link_target_buf = M.pending.buf
   vim.b[buf].skg_link_target_cursor = M.pending.cursor
   M.pending = nil
-  vim.keymap.set('n', '<localleader>cc', M.finish,
+  local function finish ()
+    require('skg.keymaps').call_showing_refusal(M.finish) end
+  vim.keymap.set('n', '<localleader>cc', finish,
                  { buffer = buf,
                    desc = 'Pick this result; insert a link to it' })
-  vim.keymap.set('n', '<CR>', M.finish,
+  vim.keymap.set('n', '<CR>', finish,
                  { buffer = buf,
                    desc = 'Pick this result; insert a link to it' })
   vim.notify('Pick a result with <CR> (or <localleader>cc)'

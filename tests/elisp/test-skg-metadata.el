@@ -12,6 +12,7 @@
 (require 'skg-id-search)
 (require 'skg-modify-graph)
 (require 'skg-compare-sexpr)
+(require 'skg-sexpr-cycling)
 (skg-test-install-herald-rules)
 
 (defun test-skg--extract-metadata-sexp ()
@@ -879,3 +880,73 @@ facts."
                    "* (skg node (gnid k) (editRequest (ready node))) k"))
     (should (equal (write "* k" 'delete 'node)
                    "* (skg node (editRequest delete)) k"))))
+
+(ert-deftest test-skg-metadata-a-title-opening-with-skg-is-no-metadata ()
+  "Metadata opens with '(skg' and then a space or ')'
+\(`skg--metadata-opening-regexp'), so a title such as '(skgrepos are
+cool)' is read as a title by the splitter, the reader and the writers,
+which put metadata before it."
+  (should (equal (skg-split-as-stars-metadata-title
+                  "* (skgrepos are cool) title")
+                 '("* " "" "(skgrepos are cool) title")))
+  (should (equal (skg-extract-top-headline-title
+                  "* (skgrepos are cool) title\nbody")
+                 "(skgrepos are cool) title"))
+  (with-temp-buffer
+    (insert "* (skgrepos are cool) title")
+    (org-mode)
+    (goto-char (point-min))
+    (should-not (skg--metadata-sexp-at-point-or-nil))
+    (should (skg--headline-metadata-empty-p))
+    (skg--write-edit-request 'delete 'node)
+    (should (equal (buffer-string)
+                   "* (skg node (editRequest delete)) (skgrepos are cool) title"))
+    (should (equal (skg--metadata-sexp-at-point-or-nil)
+                   '(skg node (editRequest delete)))))
+  (with-temp-buffer
+    (insert "* (skgrepos are cool) title")
+    (org-mode)
+    (goto-char (point-min))
+    (skg-edit-metadata-at-point '(skg node))
+    (should (equal (buffer-string)
+                   "* (skg node) (skgrepos are cool) title"))))
+
+(ert-deftest test-skg-metadata-editor-cycle-a-blank-answer-changes-nothing-more ()
+  "In the metadata editor's cycle, a blank answer to an argument's
+prompt leaves the value without arguments
+\(`skg-sexp-edit--read-arguments'), and a blank 'Repo:' leaves the
+nodeRepo as it was, as in Neovim."
+  (let ((answers (list " a " "  " "c")))
+    (cl-letf (((symbol-function 'skg-sexp-edit--read-argument)
+               (lambda (&rest _) (pop answers))))
+      (should-not (skg-sexp-edit--read-arguments "merge" '(1 2 3)))))
+  (cl-letf (((symbol-function 'skg-sexp-edit--read-argument)
+             (lambda (&rest _) " x ")))
+    (should (equal (skg-sexp-edit--read-arguments "merge" '(1 2))
+                   '("x" "x"))))
+  (with-temp-buffer
+    (org-mode)
+    (insert "* nodeRepo\n** main")
+    (cl-letf (((symbol-function 'skg--owned-repos) (lambda () nil))
+              ((symbol-function 'read-string) (lambda (&rest _) "  ")))
+      (skg-sexp-edit-cycle-right))
+    (should (equal (buffer-string) "* nodeRepo\n** main"))
+    (cl-letf (((symbol-function 'skg--owned-repos) (lambda () nil))
+              ((symbol-function 'read-string) (lambda (&rest _) " other ")))
+      (skg-sexp-edit-cycle-right))
+    (should (equal (buffer-string) "* nodeRepo\n** other"))))
+
+(ert-deftest test-skg-metadata-a-line-of-bare-stars-is-no-headline ()
+  "A headline is stars and then a space or a tab
+\(`skg--headline-level-on-line'), as for `org-at-heading-p', in
+Neovim and in the server's parse."
+  (with-temp-buffer
+    (insert "** two\n***\n***\tthree")
+    (goto-char (point-min))
+    (should (equal (skg--headline-level-on-line) 2))
+    (forward-line 1)
+    (should-not (skg--headline-level-on-line))
+    (should (equal (skg--ancestor-headline-starts-on-line 1) '(nil)))
+    (forward-line 1)
+    (should (equal (skg--headline-level-on-line) 3))
+    (should (equal (skg--ancestor-headline-starts-on-line 1) '(1)))))

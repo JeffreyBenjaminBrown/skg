@@ -24,7 +24,7 @@ vim.api.nvim_set_hl(0, 'SkgTitle',
                     { fg = '#6495ed', default = true }) -- cornflower
 
 ---FIFO queue of pending titles-by-ids requests, each {generation,
----buf}. The server responds on the one connection in request order,
+---buf, gnids}, the gnids it asked for. The server responds on the one connection in request order,
 ---so a response matches the oldest pending entry.
 ---@type table[]
 M.pending_title_requests = {}
@@ -144,7 +144,7 @@ function M.place_title_annotations (buf)
     if type(title) == 'string' then
       pcall(vim.api.nvim_buf_set_extmark,
             buf, M.title_namespace, position.row, position.end_col, {
-              virt_text = { { ' ' .. M.format_title(title),
+              virt_text = { { ' ' .. require('skg.buffer').normalize_id_links(title),
                               'SkgTitle' } },
               virt_text_pos = 'inline' })
     end
@@ -236,14 +236,6 @@ function M.handle_response (response, generation, buf, requested_gnids)
   if not vim.api.nvim_buf_is_valid(buf) then return end
   if generation ~= vim.b[buf].skg_readable_ids_generation then return end
   M.place_title_annotations(buf)
-end
-
----The display form of TITLE: '[[id:X][LABEL]]' renders as '[[LABEL]]',
----so link-bearing titles read as links without exposing the id.
----@param title string
----@return string
-function M.format_title (title)
-  return (title:gsub('%[%[id:[^%]]+%]%[([^%]]+)%]%]', '[[%1]]'))
 end
 
 return M

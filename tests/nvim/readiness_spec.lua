@@ -90,6 +90,22 @@ describe('skg.readiness', function ()
       write('** (skg (homeSkgrepoMove (old x) (new b))) ', true, {}))
   end)
 
+  it('refuses to write a request on a headline without metadata, as'
+     .. ' skg--write-readiness-request does', function ()
+    for _, line in ipairs({ '* plain', '* (skgrepos are cool) title' }) do
+      local buf = vim.api.nvim_create_buf(true, false)
+      vim.api.nvim_buf_set_lines(buf, 0, -1, false, { line })
+      vim.api.nvim_set_current_buf(buf)
+      local ok, refusal = pcall(readiness.write_readiness_request,
+                                1, true, { 'rel' })
+      local after = vim.api.nvim_buf_get_lines(buf, 0, 1, false)[1]
+      vim.api.nvim_buf_delete(buf, { force = true })
+      assert.is_false(ok)
+      assert.are.equal('Headline has no skg metadata', refusal)
+      assert.are.equal(line, after)
+    end
+  end)
+
   it('names every listed object, without asking', function ()
     -- A new member lists two objects, one of them ready: the gesture
     -- names both and marks them.
@@ -405,7 +421,7 @@ describe('skg.readiness', function ()
       '* (skg node (gnid after)) after',
       '** (skg node (gnid nephew)) nephew' })
     vim.api.nvim_set_current_buf(buf)
-    local lines = readiness.child_lines(2)
+    local lines = require('skg.modify_graph').immediate_viewchildren(2)
     vim.api.nvim_buf_delete(buf, { force = true })
     assert.are.same({ 4, 6 }, lines)
   end)

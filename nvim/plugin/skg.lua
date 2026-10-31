@@ -7,8 +7,11 @@
 if vim.g.loaded_skg then return end
 vim.g.loaded_skg = true
 
+-- Each command calls through 'call_showing_refusal' (lua/skg/keymaps.lua),
+-- as the ':Skg*' commands of lua/skg/keymaps.lua do, so that a refusal
+-- shows as one line.
 vim.api.nvim_create_user_command('SkgInit', function (opts)
-  require('skg').init(opts.args)
+  require('skg.keymaps').call_showing_refusal(require('skg').init, opts.args)
 end, {
   nargs = 1,
   complete = 'file',
@@ -16,19 +19,21 @@ end, {
 })
 
 vim.api.nvim_create_user_command('SkgReload', function ()
-  require('skg.reload').reload()
+  require('skg.keymaps').call_showing_refusal(require('skg.reload').reload)
 end, {
   desc = 'Reload all skg Lua modules from disk (dev convenience)',
 })
 
 vim.api.nvim_create_user_command('SkgConnectionVerify', function ()
-  require('skg.misc_requests').connection_verify()
+  require('skg.keymaps').call_showing_refusal(
+    require('skg.misc_requests').connection_verify)
 end, {
   desc = 'Ping the skg server and echo its reply',
 })
 
 vim.api.nvim_create_user_command('SkgConnectionEnd', function ()
-  require('skg.client').connection_end()
+  require('skg.keymaps').call_showing_refusal(
+    require('skg.client').connection_end)
 end, {
   desc = 'Close the TCP connection to the skg server',
 })

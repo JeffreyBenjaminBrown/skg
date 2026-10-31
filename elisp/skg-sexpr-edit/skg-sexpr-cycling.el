@@ -90,6 +90,19 @@ accepted), a skgrepo, or one of a fixed list."
           (t (completing-read (format "%s: " value)
                               (alist-get 'one_of argument) nil t)))))
 
+(defun skg-sexp-edit--read-arguments (value arguments)
+  "Prompt for each of ARGUMENTS of the field value VALUE
+\(`skg-sexp-edit--read-argument'), returning the answers, trimmed; or
+nil at the first blank answer, so that the value is left without
+arguments."
+  (catch 'blank
+    (mapcar (lambda (argument)
+              (let ((answer (string-trim
+                             (skg-sexp-edit--read-argument value argument))))
+                (when (string-empty-p answer) (throw 'blank nil))
+                answer))
+            arguments)))
+
 (defun skg-sexp-edit--source-sexp ()
   "The metadata sexp the edit buffer was opened on, as its source
 buffer still holds it, or nil."
@@ -125,17 +138,15 @@ Dispatch is based on the parent headline text."
                            skg-sexp-edit--kind parent new-val)))
           (org-edit-headline new-val)
           (when arguments
-            (org-edit-headline
-             (mapconcat #'identity
-                        (cons new-val
-                              (mapcar (lambda (argument)
-                                        (skg-sexp-edit--read-argument
-                                         new-val argument))
-                                      arguments))
-                        " ")))))
-       ;; Skgrepo with no config: prompt
+            (let ((answers (skg-sexp-edit--read-arguments new-val arguments)))
+              (when answers
+                (org-edit-headline
+                 (mapconcat #'identity (cons new-val answers) " ")))))))
+       ;; Skgrepo with no config: prompt; a blank answer changes nothing
        ((string= parent "nodeRepo")
-        (org-edit-headline (read-string "Repo: " field-value)))
+        (let ((answer (string-trim (read-string "Repo: " field-value))))
+          (unless (string-empty-p answer)
+            (org-edit-headline answer))))
        (t
         (user-error "Field '%s' is not cycleable" parent))))))
 

@@ -42,13 +42,6 @@ function M.set_relRepo (recursive)
   M.set_relRepo_at_line(metadata.current_line_number())
 end
 
----@param line_number integer
----@return integer|nil the line of the headline's viewparent
-local function parent_line (line_number)
-  local level = metadata.outline_level(line_number)
-  return level and metadata.parent_headline_line(line_number, level)
-end
-
 ---The single-relationship path of M.set_relRepo: classify the
 ---relationship at LINE_NUMBER, ask the server for its default and
 ---current repos, and prompt from the reply. An alias's default is its
@@ -58,8 +51,8 @@ end
 function M.set_relRepo_at_line (line_number)
   local buf = vim.api.nvim_get_current_buf()
   if metadata.alias_headline_p(line_number) then
-    local folder = parent_line(line_number)
-    local owner = folder and parent_line(folder)
+    local folder = metadata.parent_line(line_number)
+    local owner = folder and metadata.parent_line(folder)
     if not owner then error('Alias has no owning node headline', 0) end
     local default = metadata.node_repo(
       metadata.metadata_sexp_at_line_or_nil(owner))

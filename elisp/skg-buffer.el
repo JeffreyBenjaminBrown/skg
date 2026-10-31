@@ -5,6 +5,7 @@
 (require 'subr-x)
 (require 'heralds-minor-mode)
 (require 'skg-link-annotations)
+(require 'skg-metadata)
 (require 'skg-sexpr-search)
 (require 'skg-keymaps-and-aliases)
 (require 'skg-shared)
@@ -161,7 +162,7 @@ view-forest edits do not change it.")
   (let ((title (skg-extract-top-headline-title org-text)))
     (if title
         (concat "*" (skg-sanitize-buffer-name
-                     (skg-normalize-buffer-name-links title)) "*")
+                     (skg-normalize-id-links title)) "*")
       (error "skg: content view has no headline (first 200 chars: %s)"
              (substring (or org-text "") 0 (min 200 (length (or org-text ""))))))))
 
@@ -219,27 +220,26 @@ buffer."
   "Generate buffer name for title search with SEARCH-TERMS."
   (concat "*?" (skg-sanitize-buffer-name search-terms) "*"))
 
-(defun skg-normalize-buffer-name-links (name)
-  "Return NAME with org id links shortened for buffer display.
-Every [[id:ID][LABEL]] link is rendered as [[LABEL]], which keeps
-the buffer name readable when a title starts with a link."
+(defun skg-normalize-id-links (text)
+  "Return TEXT with org id links shortened for display.
+Every [[id:ID][LABEL]] link is rendered as [[LABEL]], which keeps a
+buffer name readable when a title starts with a link, and lets a
+title annotation (`skg-readable-ids-mode') read as links without
+exposing the ids. Plain text passes through unchanged."
   (replace-regexp-in-string
    "\\[\\[id:[^]]+\\]\\[\\([^]]+\\)\\]\\]"
    "[[\\1]]"
-   name))
+   text))
 
 (defun skg-extract-top-headline-title (org-text)
   "Extract the title from the first headline in ORG-TEXT.
 Strips any leading (skg ...) metadata from the title.
 Returns nil if no headline is found."
   (when (and org-text (string-match "^\\*+ +\\(.+\\)$" org-text))
-    (let ((after-stars (match-string 1 org-text)))
-      (if (string-prefix-p "(skg" after-stars)
-          (let ((sexp-end-pos (skg-find-sexp-end after-stars)))
-            (if sexp-end-pos
-                (string-trim (substring after-stars sexp-end-pos))
-              after-stars))
-        after-stars))))
+    (let ((split (skg-split-as-stars-metadata-title
+                  (match-string 0 org-text))))
+      (if split (nth 2 split)
+        (match-string 1 org-text))))) ;; metadata whose parentheses do not close
 
 (defun skg-sanitize-buffer-name (name)
   "Sanitize NAME for use as a buffer name.

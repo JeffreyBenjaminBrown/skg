@@ -93,19 +93,34 @@ true-content subtree.  This modifies metadata but does not save."
                     (desired (string= choice "no search matching")))
                (if recursive
                    (skg--stage-flag-search-matching-recursive desired)
-                 (skg--stamp-search-matching-request desired)
-                 (message "Search matching staged for 1 node. Save to apply."))))))))))
+                 (message "Search matching staged for 1 node%s. Save to apply."
+                          (skg--flag-replaced-relRepo-requests-phrase
+                           (if (skg--stamp-search-matching-request desired)
+                               1 0))))))))))))
 
 (defun skg--stamp-search-matching-request (no-search-matching)
-  (skg--write-edit-request
-   `(flag noSearchMatching ,(if no-search-matching 'true 'false))
-   'node))
+  "Make the flag request the edit request of the headline at point.
+It replaces a pending relRepo request there, as the delete and merge
+commands do. Returns non-nil when it replaced one."
+  (let ((replaced-relRepo-request (skg--relRepo-requested-value)))
+    (skg--write-edit-request
+     `(flag noSearchMatching ,(if no-search-matching 'true 'false))
+     'node)
+    (and replaced-relRepo-request t)))
+
+(defun skg--flag-replaced-relRepo-requests-phrase (count)
+  "The part of the flag command's message that says it replaced COUNT
+pending relRepo requests: empty when COUNT is zero."
+  (cond ((= count 0) "")
+        ((= count 1) "; replaced a pending relRepo request")
+        (t (format "; replaced %d pending relRepo requests" count))))
 
 (defun skg--stage-flag-search-matching-recursive (desired)
   "Stage DESIRED uniformly through the true-content subtree at point."
   (let ((targets (skg--flag-recursive-targets))
         (seen (make-hash-table :test #'equal))
         (changed 0)
+        (replaced 0)
         (skipped nil))
     (dolist (marker targets)
       (save-excursion
@@ -125,11 +140,13 @@ true-content subtree.  This modifies metadata but does not save."
            ((equal reason "duplicate occurrence") nil)
            (reason (push (format "%s (%s)" (or gnid "no-id") reason) skipped))
            (t (puthash gnid t seen)
-              (skg--stamp-search-matching-request desired)
+              (when (skg--stamp-search-matching-request desired)
+                (setq replaced (1+ replaced)))
               (setq changed (1+ changed))))))
       (set-marker marker nil))
-    (message "Search matching staged for %d node%s; skipped: %s. Save to apply."
+    (message "Search matching staged for %d node%s%s; skipped: %s. Save to apply."
              changed (if (= changed 1) "" "s")
+             (skg--flag-replaced-relRepo-requests-phrase replaced)
              (if skipped (mapconcat #'identity (nreverse skipped) ", ") "none"))))
 
 (defun skg--flag-recursive-targets ()

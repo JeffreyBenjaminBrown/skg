@@ -59,12 +59,8 @@ If no focused headline is found, does nothing."
 Assumes point is at the beginning of a headline.
 Verifies the structure is (skg ... focused ...)."
   (when (org-at-heading-p)
-    (let* ((headline-text (skg-get-current-headline-text))
-           (match-result (skg-split-as-stars-metadata-title headline-text)))
-      (when match-result
-        (let ((metadata-sexp (nth 1 match-result)))
-          (when (and metadata-sexp
-                     (not (string-empty-p metadata-sexp)))
-            (skg-sexp-subtree-p (read metadata-sexp) '(skg focused))))))))
+    (let ((metadata-sexp (skg--metadata-sexp-at-point-or-nil)))
+      (and metadata-sexp
+           (skg-sexp-subtree-p metadata-sexp '(skg focused))))))
 
 (provide 'skg-focus)

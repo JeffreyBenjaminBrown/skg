@@ -46,6 +46,15 @@ function M.biggest_branch_candidates ()
   return children
 end
 
+---The lines of the headlines one level below the one at LINE, its
+---immediate viewchildren. Mirrors skg--immediate-viewchildren.
+---@param line integer
+---@return integer[]
+function M.immediate_viewchildren (line)
+  return M.headlines_with_level_between(
+    metadata.outline_level(line) + 1, line, M.subtree_end(line))
+end
+
 ---The last line of the subtree rooted at LINE (inclusive).
 ---@param line integer
 ---@return integer

@@ -17,7 +17,7 @@ describe('skg.buffer naming', function ()
 
   it('shortens id links in buffer names', function ()
     assert.are.equal('[[label]] rest',
-      buffer.normalize_buffer_name_links('[[id:abc][label]] rest'))
+      buffer.normalize_id_links('[[id:abc][label]] rest'))
   end)
 
   it('sanitizes and truncates names', function ()

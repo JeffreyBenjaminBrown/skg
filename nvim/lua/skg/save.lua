@@ -957,18 +957,25 @@ function M.show_fork_confirmation (content, save_buf)
   vim.b[buf].skg_fork_suppress_strip = false
   require('skg.heralds').enable(buf)
   require('skg.keymaps').attach_content_view(buf)
-  vim.keymap.set('n', '<localleader>cc', M.approve_fork,
+  local keymaps = require('skg.keymaps')
+  local approve_key = '<localleader>'
+    .. keymaps.fork_confirmation_bindings.approve
+  local decline_key = '<localleader>'
+    .. keymaps.fork_confirmation_bindings.decline
+  vim.keymap.set('n', approve_key,
+                 function () keymaps.call_showing_refusal(M.approve_fork) end,
                  { buffer = buf, desc = 'Approve the listed forks' })
-  vim.keymap.set('n', '<localleader>ck', M.decline_fork,
+  vim.keymap.set('n', decline_key,
+                 function () keymaps.call_showing_refusal(M.decline_fork) end,
                  { buffer = buf, desc = 'Decline the forks' })
   if not vim.b[buf].skg_fork_autocmds then
     vim.b[buf].skg_fork_autocmds = true
     vim.api.nvim_create_autocmd('BufWriteCmd', {
       buffer = buf,
       callback = function ()
-        vim.notify('This is the fork-confirmation buffer; approve'
-                   .. ' with <localleader>cc or decline with'
-                   .. ' <localleader>ck')
+        vim.notify(string.format('This is the fork-confirmation buffer;'
+                                 .. ' approve with %s or decline with %s',
+                                 approve_key, decline_key))
       end })
     vim.api.nvim_create_autocmd({ 'BufDelete', 'BufWipeout' }, {
       buffer = buf,

@@ -37,12 +37,8 @@ call `skg-request-save-buffer' afterward."
       (outline-next-heading)
       (while (and (not (eobp))
                   (> (org-outline-level) start-level))
-        (let* ((parts (skg-split-as-stars-metadata-title
-                       (skg-get-current-headline-text)))
-               (meta (and parts (nth 1 parts))))
-          (when (and meta (not (string-empty-p meta))
-                     (skg-sexp-subtree-p (read meta) '(skg node)))
-            (skg--write-edit-request 'delete 'node))) ;; mark a descendent
+        (when (skg--occurrence-sexp-p (skg--metadata-sexp-at-point-or-nil))
+          (skg--write-edit-request 'delete 'node)) ;; mark a descendent
         (outline-next-heading))))
   (message "This change will only be applied when you save the buffer."))
 
@@ -240,7 +236,7 @@ when write-protected occurrences were skipped."
                         (if (= (length write-protected-gnids) 1) "" "s")))))))
 
 (defun skg--change-repo-at-point-unless-write-protected (new-skgrepo)
-  "Set the repo at point to NEW-REPO, unless the occurrence is
+  "Set the repo at point to NEW-SKGREPO, unless the occurrence is
 write-protected -- the save would refuse that edit. Returns
 (CHANGED-COUNT . WRITE-PROTECTED-IDS), matching `skg--change-repo-recursive'."
   (let ((meta (skg--metadata-sexp-at-point-or-nil)))
@@ -267,15 +263,15 @@ be meaningless.")
   "The partner folder atoms whose members' relationships are writable
 from this side, each mapped to its relation's wire name
 (NodeRelation::relation_name, server/dbs/in_rust_graph/
-relation_accessors.rs). The folder's viewparent (the anchor) owns the
-outbound relationship to each member.")
+relation_accessors.rs). The folder's viewparent owns the outbound
+relationship to each member.")
 
 (defun skg--rel-at-point ()
   "Classify the relationship the headline at point represents.
 Returns a plist (:recorder RECORDER-ID :member MEMBER-ID :relation NAME):
 for a content child, the viewparent contains the node at point; for
-a writable-folder member, the folder's anchor (the folder's viewparent) owns
-the folder's relation toward the node at point. Signals `user-error'
+a writable-folder member, the folder's viewparent owns the folder's
+relation toward the node at point. Signals `user-error'
 when point represents no writable relationship: not on an occurrence,
 a reference to an unknown node or a restricted headline, on a root
 headline (no viewparent, so no relationship), on a member of a write-protected folder, or with
@@ -311,17 +307,18 @@ an ID missing."
                             skg--writable-folder-relations))))
         (cond
          (writable-folder
-          (let* ((anchor-sexp
+          (let* ((folder-viewparent-sexp
                   (save-excursion
                     (and (org-up-heading-safe) ;; to the folder
-                         (org-up-heading-safe) ;; to its anchor
+                         (org-up-heading-safe) ;; to its viewparent
                          (skg--metadata-sexp-at-point-or-nil))))
-                 (anchor-gnid (skg--node-id anchor-sexp)))
-            (unless anchor-gnid
-              (user-error "Could not find the folder's anchor headline"))
-            (when (skg--node-write-protected-p anchor-sexp)
-              (user-error "The folder's anchor is write-protected here, so the save would not write this relationship; set it from a view where the anchor is editable"))
-            (list :recorder anchor-gnid
+                 (folder-viewparent-gnid
+                  (skg--node-id folder-viewparent-sexp)))
+            (unless folder-viewparent-gnid
+              (user-error "Could not find the folder's viewparent"))
+            (when (skg--node-write-protected-p folder-viewparent-sexp)
+              (user-error "The folder's viewparent is write-protected here, so the save would not write this relationship; set it from a view where the folder's viewparent is editable"))
+            (list :recorder folder-viewparent-gnid
                   :member member-gnid
                   :relation (cdr writable-folder))))
          ((skg--occurrence-sexp-p parent-sexp)
@@ -482,7 +479,7 @@ Then prompts for a repo over the whole ladder, plus the
 no-override choice that instead removes existing `(relRepo ...)'
 atoms. Unlike `skg-set-relRepo', no per-relationship default is
 fetched: the subtree's relationships have different defaults, so the save's
-floor check (see `apply_sticky_relRepos') is what validates each one.
+floor check (see 'apply_sticky_relRepos_in_graph') is what validates each one.
 
 The walk starts at the node at point (inclusive: its own relationship to
 its view-parent counts when it matches) and recurses only on
@@ -593,7 +590,7 @@ where edits still affect the graph: it prunes below write-protected
 nodes and subscribee-as-such members, prunes noClaim
 nodes -- except the walk's root, which the
 user chose deliberately -- and prunes non-vognodes other than the two
-writable folders. Returns the number of relationships true."
+writable folders. Returns how many headlines it applied CHOICE to."
   (let ((targets (skg--relRepo-recursive-targets kind)))
     ;; Do not let a late conflict leave earlier targets edited.  This
     ;; preflight is deliberately before the first metadata rewrite.
@@ -610,7 +607,9 @@ writable folders. Returns the number of relationships true."
     (length targets)))
 
 (defun skg--relRepo-recursive-targets (kind)
-  "Return markers for the writable relationship targets below point.
+  "Return markers for the writable relationship targets in the subtree
+at point, the headline at point included when its own relationship
+matches KIND.
 The traversal mirrors the extraction-aware walk used by the recursive
 command, but does not edit anything."
   (save-excursion
@@ -654,7 +653,7 @@ editable occurrence not in subscribee-as-such position (an
 write-protected or subscribee-as-such parent's contains is not
 collected at save, so a relRepo request under one would be
 inert); for `subscribee' and `overridden', the viewparent must be
-the matching writable folder with a editable anchor."
+the matching writable folder with an editable viewparent."
   (let ((meta (skg--metadata-sexp-at-point-or-nil)))
     (and (or (and (skg--occurrence-sexp-p meta)
                   (skg--claims-membership-p meta))
@@ -670,11 +669,11 @@ the matching writable folder with a editable anchor."
                    ((skg--non-vognode-atom-present-p parent-sexp
                                                   'subscribeeFolder)
                     (and (eq kind 'subscribee)
-                         (skg--folder-anchor-editable-p)))
+                         (skg--folder-viewparent-editable-p)))
                    ((skg--non-vognode-atom-present-p parent-sexp
                                                   'overriddenFolder)
                     (and (eq kind 'overridden)
-                         (skg--folder-anchor-editable-p)))
+                         (skg--folder-viewparent-editable-p)))
                    (t nil))))))))
 
 (defun skg--relRepo-prune-below-p (metadata-sexp)
@@ -698,16 +697,16 @@ position: an true occurrence member of a subscribeeFolder."
                  (skg--metadata-sexp-at-point-or-nil)
                  'subscribeeFolder))))))
 
-(defun skg--folder-anchor-editable-p ()
+(defun skg--folder-viewparent-editable-p ()
   "Non-nil iff the folder headline at point has an editable occurrence
-anchor (its viewparent). A write-protected anchor's writable folders are
+for its viewparent. A write-protected viewparent's writable folders are
 not collected at save (the folder recorder is not save-eligible), so
 atoms on their members have no effect."
   (save-excursion
     (and (org-up-heading-safe)
-         (let ((anchor-sexp (skg--metadata-sexp-at-point-or-nil)))
-           (and (skg--occurrence-sexp-p anchor-sexp)
-                (not (skg--node-write-protected-p anchor-sexp)))))))
+         (let ((viewparent-sexp (skg--metadata-sexp-at-point-or-nil)))
+           (and (skg--occurrence-sexp-p viewparent-sexp)
+                (not (skg--node-write-protected-p viewparent-sexp)))))))
 
 (defun skg--non-vognode-atom-present-p (metadata-sexp atom)
   "Non-nil iff METADATA-SEXP is a (skg ...) sexp carrying the bare ATOM."
@@ -730,7 +729,8 @@ bare ID or an org id link like [[id:ID][label]].
 Does not save; call `skg-request-save-buffer' afterward."
   (interactive
    (list (skg--read-id-or-link "Acquiree ID or link: ")))
-  (let ((acquiree-gnid (skg--id-from-link-or-text acquiree-id-or-link)))
+  (let ((acquiree-gnid (skg-metadata-fields--extract-id-from-text
+                        acquiree-id-or-link)))
     (when (string-empty-p acquiree-gnid)
       (user-error "Acquiree ID cannot be empty"))
     (skg--write-edit-request `(merge ,(intern acquiree-gnid)) 'node)
@@ -739,7 +739,9 @@ Does not save; call `skg-request-save-buffer' afterward."
 
 ;;; The diff view's restore requests ('docs/diff-view.org',
 ;;; "Restoring what a change removed"). The server refuses them on the
-;;; wrong kind of headline with the same texts.
+;;; wrong kind of headline with the same texts, except that its refusal of
+;;; a restoreRel without a removed membership goes on to say where a
+;;; restoreRel belongs.
 
 (defconst skg--restore-rel-on-a-deleted-node
   "This node is deleted; restore it first (skg-restore-deleted-node)"
@@ -819,8 +821,8 @@ buffer_to_viewnodes/local.rs)."
   "Non-nil iff the headline at point is a node of the containerward
 chain: a vognode claiming nothing under a member of a partner folder whose
 members carry the chain (every one but the two acquisition folders),
-or under another such node ('is_in_containerward_chain',
-server/refresh/chain.rs)."
+or under another such node ('stands_in_containerward_chain',
+server/types/tree/forest.rs)."
   (save-excursion
     (catch 'answer
       (while t
@@ -1001,7 +1003,7 @@ warrants is no detachment."
   "Non-nil when a parent with PARENT-SEXP, whose own parent has
 GRANDPARENT-SEXP, reads its children's claims: a node that is not
 write-protected, or a folder 'shared/herald-styles.json' does not list
-as write-protected whose anchor is such a node."
+as write-protected whose viewparent is such a node."
   (let ((editable-node-p
          (lambda (sexp)
            (and (skg--occurrence-sexp-p sexp)
@@ -1048,7 +1050,7 @@ headline levels by their stars, so it works in any buffer."
         (if (and level
                  (> level 1)
                  (re-search-backward
-                  (format "^\\*\\{1,%d\\}\\(?: \\|$\\)" (1- level))
+                  (format "^\\*\\{1,%d\\}[ \t]" (1- level))
                   nil t))
             (progn (setq level (skg--headline-level-on-line))
                    (push (point) ancestor-starts))
@@ -1058,11 +1060,18 @@ headline levels by their stars, so it works in any buffer."
 
 (defun skg--headline-level-on-line ()
   "The number of stars of the headline on the line at point, or nil
-when the line is no headline."
+when the line is no headline: a headline is stars and then a space or
+a tab, as for `org-at-heading-p', so a line of bare stars is none."
   (save-excursion
     (beginning-of-line)
-    (when (looking-at "\\(\\*+\\)\\(?: \\|$\\)")
+    (when (looking-at "\\(\\*+\\)[ \t]")
       (length (match-string 1)))))
+
+(defconst skg--metadata-opening-regexp "(skg[ )]"
+  "How a headline's '(skg ...)' metadata opens, after the stars: '(skg'
+then a space or the closing parenthesis, so that a title such as
+'(skgrepos are cool)' is not read as metadata. The one test both
+`skg--metadata-on-line' and `skg-split-as-stars-metadata-title' make.")
 
 (defun skg--metadata-on-line (&optional start)
   "The '(skg ...)' metadata on the line at point: (START END SEXP),
@@ -1075,7 +1084,7 @@ parentheses (`skg-find-sexp-end'; see 'elisp/PITFALLs.org')."
   (save-excursion
     (unless start
       (beginning-of-line)
-      (when (looking-at "\\*+ +(skg[ )]")
+      (when (looking-at (concat "\\*+ +" skg--metadata-opening-regexp))
         (setq start (- (match-end 0) 5))))
     (when start
       (let* ((text (buffer-substring-no-properties
@@ -1115,20 +1124,13 @@ HEAD has and the worktree lacks, '(skg ghost (gnid X) ...)'."
     (define-key map (kbd "C-c O l") #'skg-pop-link)
     (use-local-map map)))
 
-(defun skg--id-from-link-or-text (text)
-  "Extract an ID from TEXT, accepting org id links or bare IDs."
-  (let ((trimmed (string-trim text)))
-    (if (string-match "\\[\\[id:\\([^]]+\\)\\]\\[" trimmed)
-        (match-string 1 trimmed)
-      trimmed)))
-
 (defun skg--validate-repo-name (skgrepo)
-  "Signal an error if REPO cannot be represented in skg metadata."
+  "Signal an error if SKGREPO cannot be represented in skg metadata."
   (when (string-match-p "[[:space:]]" skgrepo)
     (user-error "Repo names cannot contain whitespace")))
 
 (defun skg--change-repo-recursive (old-skgrepo new-skgrepo)
-  "Change OLD-REPO to NEW-REPO in this content subtree.
+  "Change OLD-SKGREPO to NEW-SKGREPO in this content subtree.
 Returns (CHANGED-COUNT . WRITE-PROTECTED-IDS).  The root node is inclusive;
 only member descendents (no noClaim atom) are traversed.
 A write-protected occurrence is not edited -- the save would refuse
@@ -1161,7 +1163,7 @@ their repo edits take effect even under a write-protected parent."
   "Call FN, with point on each headline a recursive repo move from
 the headline at point covers: that root, and every viewdescendant
 reached through member occurrences whose repo is
-OLD-REPO. Restores point afterward."
+OLD-SKGREPO. Restores point afterward."
   (save-excursion
     (let ((start-level (org-outline-level)))
       (funcall fn) ;; the root
@@ -1258,7 +1260,7 @@ unknown node or a restricted headline."
   (skg-sexp-subtree-p metadata-sexp '(skg node writeProtected)))
 
 (defun skg--change-repo-at-point (new-skgrepo)
-  "Set the repo at point to NEW-REPO.
+  "Set the repo at point to NEW-SKGREPO.
 Returns 1 if the current line was edited. The headline's derived
 '(view repoBoundary)' is left as it is: the save recomputes it."
   (skg-edit-metadata-at-point
@@ -1290,18 +1292,12 @@ atom does not silently re-fork on the next save."
     (goto-char (point-min))
     (while (re-search-forward org-heading-regexp nil t)
       (beginning-of-line)
-      (let* ((headline-text (skg-get-current-headline-text))
-             (match (skg-split-as-stars-metadata-title headline-text)))
-        (when (and match (not (string-empty-p (nth 1 match))))
-          (let* ((stars (nth 0 match))
-                 (sexp (read (nth 1 match)))
-                 (title (nth 2 match))
-                 (stripped (skg--remove-fork-from-viewrequests sexp)))
+      (let ((sexp (skg--metadata-sexp-at-point-or-nil)))
+        (when sexp
+          (let ((stripped (skg--remove-fork-from-viewrequests sexp)))
             (unless (equal stripped sexp)
-              (skg-replace-current-line
-               (skg-format-headline
-                stars (substring-no-properties (format "%S" stripped))
-                title))))))
+              (skg--rewrite-metadata-at-point
+               (lambda (_metadata-sexp) stripped))))))
       (forward-line 1))))
 
 (defun skg-edit-metadata-at-point (edits)
@@ -1322,17 +1318,11 @@ checks\" entry in PITFALLs.org."
              headline-text)))
       (if (and match-result
                (not (string-empty-p (nth 1 match-result))))
-          (let* ((stars (nth 0 match-result))
-                 (metadata-sexp (nth 1 match-result))
-                 (title (nth 2 match-result))
-                 (host-sexp (read metadata-sexp))
-                 (merged-sexp (skg--metadata-with-new-parts-at-their-ranks
-                               host-sexp
-                               (skg-edit-nested-sexp host-sexp edits))))
-            (let ((new-metadata-sexp (substring-no-properties
-                                      (format "%S" merged-sexp))))
-              (skg-replace-current-line
-               (skg-format-headline stars new-metadata-sexp title))))
+          (skg--rewrite-metadata-at-point
+           (lambda (host-sexp)
+             (skg--metadata-with-new-parts-at-their-ranks
+              host-sexp
+              (skg-edit-nested-sexp host-sexp edits))))
         (progn ;; Headline has no metadata.
           (when (string-match "^\\(\\*+\\s-+\\)\\(.*\\)" headline-text)
           (let* ((stars (match-string 1 headline-text))
@@ -1411,7 +1401,7 @@ the rewrite through `skg-replace-current-line' (see
            (metadata-text (nth 1 split))
            (metadata-sexp (if (string-empty-p metadata-text)
                               (cons 'skg (and kind (list kind)))
-                            (read metadata-text))))
+                            (skg--current-headline-metadata-sexp))))
       (skg-replace-current-line
        (skg-format-headline
         (nth 0 split)
@@ -1422,15 +1412,16 @@ the rewrite through `skg-replace-current-line' (see
 (defun skg--metadata-part-rank (part)
   "The position in `skg-shared-metadata-parts' of the name
 'shared/metadata-fields.json' gives PART, a part of '(skg ...)': a
-list's head, an atom's name, or \"KIND\" for a kind's atom. Nil when
-the list does not name it."
+list's head, or an atom's name, a kind's atom standing at \"KIND\"'s
+\(`skg-metadata-fields--part-rank'). Nil when the list does not name
+it."
   (let ((name (cond ((consp part)
                      (and (symbolp (car part)) (symbol-name (car part))))
-                    ((symbolp part)
-                     (if (skg-shared-metadata-kind (symbol-name part))
-                         "KIND"
-                       (symbol-name part))))))
-    (and name (seq-position skg-shared-metadata-parts name))))
+                    ((symbolp part) (symbol-name part)))))
+    (and name
+         (let ((rank (skg-metadata-fields--part-rank name)))
+           ;; that function ranks an unlisted name after every listed one
+           (and (< rank (length skg-shared-metadata-parts)) rank)))))
 
 (defun skg--metadata-with-part-at-its-rank (metadata-sexp part)
   "METADATA-SEXP with PART, a part of '(skg ...)' it lacks, where the
@@ -1493,7 +1484,8 @@ Handles nested parentheses in metadata correctly."
     (when (string-match "^\\(\\*+\\s-+\\)" trimmed)
       (let* ((stars (match-string 1 trimmed))
              (after-stars (substring trimmed (match-end 1))))
-        (if (string-prefix-p "(skg" after-stars)
+        (if (string-match-p (concat "\\`" skg--metadata-opening-regexp)
+                            after-stars)
             ;; Has metadata - find matching close paren
             (let ((sexp-end-pos (skg-find-sexp-end after-stars)))
               (when sexp-end-pos

@@ -134,4 +134,59 @@ request after it."
                     "* (skg node (gnid root) (skgRepos (nodeRepo main)) (editRequest (flag noSearchMatching true) (ready node))) root\n"
                     "** (skg node (gnid child) (skgRepos (nodeRepo main)) (editRequest (flag noSearchMatching true) (unready rel)) (diff (rel added))) child")))))
 
+(ert-deftest test-skg-flag-says-it-replaced-a-pending-relRepo-request ()
+  "The flag request replaces a pending relRepo request, and the message
+says so: once for the one headline, counted for the recursive form; a
+headline without one gets the plain message."
+  (with-temp-buffer
+    (insert "* (skg node (gnid root) (skgRepos (nodeRepo main)) (editRequest (relRepo priv))) root")
+    (org-mode)
+    (goto-char (point-min))
+    (let (shown)
+      (cl-letf (((symbol-function 'run-at-time)
+                 (lambda (_secs _repeat function &rest args)
+                   (apply function args)))
+                ((symbol-function 'skg--completing-read-with-cycle)
+                 (lambda (&rest _args) "no search matching"))
+                ((symbol-function 'message)
+                 (lambda (format-string &rest args)
+                   (setq shown (apply #'format format-string args)))))
+        (skg--set-flag-search-matching-from-state
+         (current-buffer) (point-marker) "root" nil
+         "((response-type flag-state) (id \"root\") (flag \"noSearchMatching\") (value \"false\") (repo \"main\") (owned \"true\"))"))
+      (should (equal shown "Search matching staged for 1 node; replaced a pending relRepo request. Save to apply."))
+      (should (equal (buffer-string)
+                     "* (skg node (gnid root) (skgRepos (nodeRepo main)) (editRequest (flag noSearchMatching true))) root"))))
+  (dolist (case
+           '(("** (skg node (gnid b) (skgRepos (nodeRepo main)) (editRequest (relRepo priv))) b\n"
+              "Search matching staged for 3 nodes; replaced 2 pending relRepo requests; skipped: none. Save to apply.")
+             ("** (skg node (gnid b) (skgRepos (nodeRepo main))) b\n"
+              "Search matching staged for 3 nodes; replaced a pending relRepo request; skipped: none. Save to apply.")))
+    (with-temp-buffer
+      (insert "* (skg node (gnid root) (skgRepos (nodeRepo main)) (editRequest (relRepo priv))) root\n"
+              (car case)
+              "** (skg node (gnid c) (skgRepos (nodeRepo main))) c")
+      (org-mode)
+      (goto-char (point-min))
+      (let (shown)
+        (cl-letf (((symbol-function 'skg--owned-repos)
+                   (lambda () '("main")))
+                  ((symbol-function 'message)
+                   (lambda (format-string &rest args)
+                     (setq shown (apply #'format format-string args)))))
+          (skg--stage-flag-search-matching-recursive t))
+        (should (equal shown (cadr case))))))
+  (with-temp-buffer
+    (insert "* (skg node (gnid root) (skgRepos (nodeRepo main))) root")
+    (org-mode)
+    (goto-char (point-min))
+    (let (shown)
+      (cl-letf (((symbol-function 'skg--owned-repos)
+                 (lambda () '("main")))
+                ((symbol-function 'message)
+                 (lambda (format-string &rest args)
+                   (setq shown (apply #'format format-string args)))))
+        (skg--stage-flag-search-matching-recursive t))
+      (should (equal shown "Search matching staged for 1 node; skipped: none. Save to apply.")))))
+
 (provide 'test-skg-flag)

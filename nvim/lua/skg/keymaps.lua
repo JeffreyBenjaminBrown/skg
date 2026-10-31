@@ -213,7 +213,35 @@ M.commands = {
                       desc = 'Toggle between line start and title start' },
 }
 
----Invoke command NAME, resolving its module lazily.
+---REFUSAL, what a command's 'error ()' raised, as the one line the
+---user sees: its text without the "FILE:LINE: " prefixes 'error ()'
+---adds when its level is not 0, one for each time it was raised again.
+---@param refusal any
+---@return string
+function M.refusal_line (refusal)
+  local text, stripped = tostring(refusal), 1
+  while stripped > 0 do
+    text, stripped = text:gsub('^%S-%.lua:%d+: ', '', 1) end
+  return text
+end
+
+---Call FN with ARGUMENT. A refusal, an 'error ()' FN raises, is shown
+---as one line at error level (M.refusal_line), as Emacs shows a
+---'user-error', not as a Lua error with its traceback. Every key and
+---':Skg*' command calls its function through this.
+---@param fn function
+---@param argument any|nil
+---@return any what FN returns, or nil after a refusal
+function M.call_showing_refusal (fn, argument)
+  local succeeded, result = pcall(fn, argument)
+  if not succeeded then
+    vim.notify(M.refusal_line(result), vim.log.levels.ERROR)
+    return nil end
+  return result
+end
+
+---Invoke command NAME, resolving its module lazily, through
+---M.call_showing_refusal.
 ---@param name string a key of M.commands
 function M.invoke (name)
   local spec = M.commands[name]
@@ -229,8 +257,7 @@ function M.invoke (name)
     vim.notify(string.format('skg: %s.%s is missing',
                              spec.module, spec.fn))
     return end
-  if spec.pass_buf then return fn(0) end
-  return fn()
+  return M.call_showing_refusal(fn, spec.pass_buf and 0 or nil)
 end
 
 ---Define every :Skg* Ex command. Called once from plugin/skg.lua.
@@ -322,6 +349,10 @@ M.content_view_bindings = {
   { 'On', 'PopNode' },                   -- C-c O n
   { 'tr', 'InvestigateUnknownNode' },    -- C-c t r
 }
+
+---The keys, under <localleader>, of the fork-confirmation buffer
+---(skg.save.show_fork_confirmation): Emacs's C-c C-c and C-c C-k there.
+M.fork_confirmation_bindings = { approve = 'cc', decline = 'ck' }
 
 ---The subset used by .skg file buffers (the file-minor-mode analog).
 M.file_bindings = {

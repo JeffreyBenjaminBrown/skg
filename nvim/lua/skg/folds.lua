@@ -209,14 +209,16 @@ function M.headline_has_bare_atom_p (line_number, atom)
 end
 
 ---@param line_number integer
----@return boolean
-function M.headline_has_folded_p (line_number)
+---@return boolean does the headline carry the bare 'folded' atom?
+---Mirrors skg-headline-has-folded-in-view-p.
+function M.headline_has_folded_in_view_p (line_number)
   return M.headline_has_bare_atom_p(line_number, 'folded')
 end
 
 ---@param line_number integer
----@return boolean
-function M.headline_has_bodyfolded_p (line_number)
+---@return boolean does the headline carry the bare 'bodyFolded' atom?
+---Mirrors skg-headline-has-bodyfolded-in-view-p.
+function M.headline_has_bodyfolded_in_view_p (line_number)
   return M.headline_has_bare_atom_p(line_number, 'bodyFolded')
 end
 
@@ -258,7 +260,7 @@ function M.fold_marked_headlines ()
     for line = 1, last do
       if metadata.at_headline_p(line)
          and not M.line_invisible_p(line)
-         and M.headline_has_folded_p(line) then
+         and M.headline_has_folded_in_view_p(line) then
         found = line
         break end
     end
@@ -282,7 +284,7 @@ function M.fold_bodies_of_bodyfolded_headlines ()
   local last = vim.api.nvim_buf_line_count(0)
   for line = 1, last do
     if metadata.at_headline_p(line)
-       and M.headline_has_bodyfolded_p(line) then
+       and M.headline_has_bodyfolded_in_view_p(line) then
       M.hide_entry(line)
     end
   end
@@ -321,24 +323,24 @@ function M.remove_folded_metadata ()
   local last = vim.api.nvim_buf_line_count(0)
   for line = 1, last do
     if metadata.at_headline_p(line) then
-      if M.headline_has_folded_p(line) then
+      if M.headline_has_folded_in_view_p(line) then
         local level = metadata.outline_level(line)
         local parent = metadata.parent_headline_line(line, level)
         if parent and not parent_seen[parent] then
           parent_seen[parent] = true
           table.insert(parent_lines, parent) end
       end
-      if M.headline_has_bodyfolded_p(line) then
+      if M.headline_has_bodyfolded_in_view_p(line) then
         table.insert(bodyfolded_lines, line) end
     end
   end
   M.show_all()
   for line = 1, last do
     if metadata.at_headline_p(line) then
-      if M.headline_has_folded_p(line) then
+      if M.headline_has_folded_in_view_p(line) then
         metadata.edit_metadata_at_line(line,
           sexpr.read('(skg (DELETE folded))')) end
-      if M.headline_has_bodyfolded_p(line) then
+      if M.headline_has_bodyfolded_in_view_p(line) then
         metadata.edit_metadata_at_line(line,
           sexpr.read('(skg (DELETE bodyFolded))')) end
     end

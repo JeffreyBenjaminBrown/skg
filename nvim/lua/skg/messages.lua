@@ -3,6 +3,8 @@
 -- elisp/skg-request-save.el (skg-big-nonfatal-message and friends),
 -- which content views, saves, and the stream consumers all share.
 
+local keymaps = require('skg.keymaps')
+
 local M = {}
 
 ---@param message_list string[]|nil
@@ -11,29 +13,66 @@ function M.message_list_nonempty_p (message_list)
   return type(message_list) == 'table' and #message_list > 0
 end
 
----The Emacs chords that server messages name, each with the Neovim
----binding that plays it (skg.keymaps).
-M.neovim_bindings_of_emacs_chords = {
-  ['C-c s d'] = '<localleader>sd',
-  ['C-c s w'] = '<localleader>sw',
-  ['C-c s s'] = '<localleader>ss',
-  ['C-c s r'] = '<localleader>sr',
-  ['C-c g RET'] = '<localleader>gg',
-  ['C-c g v'] = '<localleader>gv',
-  -- the fork-confirmation buffer's own keys (save.show_fork_confirmation)
-  ['C-c C-c'] = '<localleader>cc',
-  ['C-c C-k'] = '<localleader>ck',
+---The Emacs chords of content views that server messages name, each
+---with the name in skg.keymaps of the command it runs.
+local command_names_of_emacs_chords = {
+  ['C-c s d'] = 'SetEditable',
+  ['C-c s w'] = 'RequestWriteProtected',
+  ['C-c s s'] = 'SetRepo',
+  ['C-c s r'] = 'SetRelRepo',
+  ['C-c g RET'] = 'Goto',
+  ['C-c g v'] = 'GotoViewnodeId',
 }
+
+---The Emacs commands that server messages name. Each one's Neovim
+---twin is the Ex command its name gives by the rule of
+---'docs/nvim-client-deviations.org', "The two clients' names match".
+local emacs_commands_messages_name = {
+  'skg-restore-deleted-node', 'skg-restore-removed-membership',
+  'skg-investigate-unknown-node', 'skg-set-relRepo',
+  'skg-set-flag-search-matching',
+}
+
+---The content-view binding of the command COMMAND_NAME names in
+---skg.keymaps, with its '<localleader>'.
+---@param command_name string
+---@return string
+local function content_view_binding_of (command_name)
+  for _, binding in ipairs(keymaps.content_view_bindings) do
+    if binding[2] == command_name then return '<localleader>' .. binding[1] end
+  end
+  error('skg.keymaps binds no key to ' .. command_name)
+end
+
+---The name in skg.keymaps of the Neovim twin of EMACS_COMMAND: without
+---its 'skg-', each word capitalized ('skg-set-relRepo' is 'SetRelRepo').
+---@param emacs_command string
+---@return string
+local function command_name_of_emacs_command (emacs_command)
+  local name = emacs_command:gsub('^skg%-', ''):gsub(
+    '(%w)([%w]*)%-?', function (first, rest) return first:upper() .. rest end)
+  if not keymaps.commands[name] then
+    error('skg.keymaps has no command ' .. name) end
+  return name
+end
+
+---The Emacs chords that server messages name, each with the Neovim
+---binding that plays it, from skg.keymaps.
+M.neovim_bindings_of_emacs_chords = {
+  -- the fork-confirmation buffer's own keys (save.show_fork_confirmation)
+  ['C-c C-c'] = '<localleader>' .. keymaps.fork_confirmation_bindings.approve,
+  ['C-c C-k'] = '<localleader>' .. keymaps.fork_confirmation_bindings.decline,
+}
+for emacs_chord, command_name in pairs(command_names_of_emacs_chords) do
+  M.neovim_bindings_of_emacs_chords[emacs_chord] =
+    content_view_binding_of(command_name) end
 
 ---The Emacs commands that server messages name, each with the Ex
 ---command that is its Neovim twin.
-M.neovim_commands_of_emacs_commands = {
-  ['skg-restore-deleted-node'] = ':SkgRestoreDeletedNode',
-  ['skg-restore-removed-membership'] = ':SkgRestoreRemovedMembership',
-  ['skg-investigate-unknown-node'] = ':SkgInvestigateUnknownNode',
-  ['skg-set-relRepo'] = ':SkgSetRelRepo',
-  ['skg-set-flag-search-matching'] = ':SkgSetFlagSearchMatching',
-}
+M.neovim_commands_of_emacs_commands = {}
+for _, emacs_command in ipairs(emacs_commands_messages_name) do
+  M.neovim_commands_of_emacs_commands[emacs_command] =
+    ':Skg' .. command_name_of_emacs_command(emacs_command) end
 
 ---MESSAGE with each Emacs chord it names replaced by its Neovim
 ---binding, and each Emacs command by its Neovim twin.

@@ -233,14 +233,8 @@ Verifies the structure is (skg ... bodyFolded ...)."
   "Return t if the current headline's metadata contains the bare atom ATOM.
 Assumes point is at the beginning of a headline."
   (when (org-at-heading-p)
-    (let* ((headline-text (skg-get-current-headline-text))
-           (match-result (skg-split-as-stars-metadata-title
-                          headline-text)))
-      (when match-result
-        (let ((metadata-sexp (nth 1 match-result)))
-          (when (and metadata-sexp
-                     (not (string-empty-p metadata-sexp)))
-            (skg-sexp-subtree-p (read metadata-sexp)
-                                (list 'skg atom))))))))
+    (let ((metadata-sexp (skg--metadata-sexp-at-point-or-nil)))
+      (and metadata-sexp
+           (skg-sexp-subtree-p metadata-sexp (list 'skg atom))))))
 
 (provide 'skg-org-fold)

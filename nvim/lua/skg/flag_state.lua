@@ -27,10 +27,30 @@ local function flag_eligible_root_id (line)
   return gnid
 end
 
+---Make the flag request the edit request of the headline at LINE. It
+---replaces a pending relRepo request there, as the delete and merge
+---commands do.
+---@param line integer
+---@param desired boolean
+---@return boolean did it replace a pending relRepo request?
 local function stamp_search_matching_request (line, desired)
+  local replaced_relRepo_request =
+    metadata.relRepo_requested_value(line) ~= nil
   metadata.write_edit_request_at_line(line, {
     sexpr.symbol('flag'), sexpr.symbol('noSearchMatching'),
     sexpr.symbol(desired and 'true' or 'false') }, 'node')
+  return replaced_relRepo_request
+end
+
+---The part of the flag command's message that says it replaced COUNT
+---pending relRepo requests: empty when COUNT is zero. Mirrors
+---skg--flag-replaced-relRepo-requests-phrase.
+---@param count integer
+---@return string
+local function flag_replaced_relRepo_requests_phrase (count)
+  if count == 0 then return '' end
+  if count == 1 then return '; replaced a pending relRepo request' end
+  return string.format('; replaced %d pending relRepo requests', count)
 end
 
 local function flag_recursive_targets (root_line)
@@ -52,13 +72,14 @@ end
 
 local function apply (root_line, desired, recursive)
   if not recursive then
-    stamp_search_matching_request(root_line, desired)
-    vim.notify('Search matching staged for 1 node. Save to apply.')
+    local replaced = stamp_search_matching_request(root_line, desired)
+    vim.notify(string.format('Search matching staged for 1 node%s. Save to apply.',
+      flag_replaced_relRepo_requests_phrase(replaced and 1 or 0)))
     return
   end
   local owned = {}
   for _, name in ipairs(config.owned_repos() or {}) do owned[name] = true end
-  local seen, skipped, changed = {}, {}, 0
+  local seen, skipped, changed, replaced = {}, {}, 0, 0
   for _, line in ipairs(flag_recursive_targets(root_line)) do
     local meta = metadata.metadata_sexp_at_line_or_nil(line)
     local gnid = metadata.node_id(meta)
@@ -74,13 +95,15 @@ local function apply (root_line, desired, recursive)
       table.insert(skipped, string.format('%s (%s)', gnid or 'no-id', reason))
     else
       seen[gnid] = true
-      stamp_search_matching_request(line, desired)
+      if stamp_search_matching_request(line, desired) then
+        replaced = replaced + 1 end
       changed = changed + 1
     end
   end
   vim.notify(string.format(
-    'Search matching staged for %d node%s; skipped: %s. Save to apply.',
+    'Search matching staged for %d node%s%s; skipped: %s. Save to apply.',
     changed, changed == 1 and '' or 's',
+    flag_replaced_relRepo_requests_phrase(replaced),
     #skipped > 0 and table.concat(skipped, ', ') or 'none'))
 end
 

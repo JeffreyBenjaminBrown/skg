@@ -94,8 +94,10 @@ end
 
 ---Cycle the headline value at point by DIRECTION (1 or -1); dispatch
 ---is based on the parent headline text. Choosing a value that takes
----arguments prompts for each. FIELD_VALUE is found among the values
----whole, or by its first word when it carries arguments ('merge ID').
+---arguments prompts for each; a blank answer leaves the value without
+---arguments, and a blank 'Repo:' changes nothing, as in Emacs.
+---FIELD_VALUE is found among the values whole, or by its first word
+---when it carries arguments ('merge ID').
 ---@param direction integer
 function M.cycle (direction)
   if not metadata.at_headline_p() then error('Not on a headline') end
@@ -138,7 +140,7 @@ function M.cycle (direction)
         string.rep('*', level) .. ' ' .. table.concat(texts, ' '))
     end
   elseif parent == 'nodeRepo' then
-    local answer = vim.fn.input('Repo: ', field_value)
+    local answer = vim.trim(vim.fn.input('Repo: ', field_value))
     if answer ~= '' then
       metadata.replace_line(line,
         string.rep('*', level) .. ' ' .. answer)

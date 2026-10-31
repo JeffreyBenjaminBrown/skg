@@ -7,6 +7,7 @@
 ;;; PITFALL: The after-string overlays break home/end navigation
 ;;; when lines are truncated. See PITFALLs.org for details and mitigations.
 
+(require 'skg-buffer)
 (require 'skg-id-search)
 (require 'skg-state)
 (require 'skg-length-prefix)
@@ -24,7 +25,7 @@ The response handler drops stale responses.")
 
 (defvar skg-readable-ids--pending-title-requests nil
   "FIFO queue of pending titles-by-ids requests.
-Each entry is (BUFFER-GENERATION BUFFER REQUESTED-IDS). The server
+Each entry is (BUFFER-GENERATION BUFFER REQUESTED-GNIDS). The server
 responds on the same TCP connection in request order, so a
 response is matched to the oldest pending request.")
 
@@ -105,7 +106,7 @@ a cache update never doubles an annotation."
            (title  (gethash id-str skg-readable-ids--title-cache)))
       (when (and title (not (eq title :missing)))
         (let* ((display-title
-                (skg-readable-ids--format-title title))
+                (skg-normalize-id-links title))
                (ov (make-overlay start end nil t nil)))
           (overlay-put ov 'skg-magit-title t)
           (overlay-put ov 'skg-magit-title-annotation t)
@@ -134,7 +135,7 @@ the full id. POSITIONS is a list of (start end id-string) triples."
 
 (defun skg-readable-ids--request-titles (gnids buffer-generation buf
                                              &optional approved-pids)
-  "Send a titles-by-ids request for IDS.
+  "Send a titles-by-ids request for GNIDS.
 BUFFER-GENERATION and BUF are captured for the response handler."
   (condition-case err
       (let ((entry (list buffer-generation buf gnids)))
@@ -205,11 +206,11 @@ BUFFER-GENERATION and BUF are captured for the response handler."
   "Handle the titles-by-ids response.
 PAYLOAD is the tagged LP response; its titles merge into
 `skg-readable-ids--title-cache' unconditionally (they are true
-regardless of buffer state), and each of REQUESTED-IDS the server
+regardless of buffer state), and each of REQUESTED-GNIDS the server
 did not answer for is cached as `:missing' so it is not
 re-requested. BUFFER-GENERATION is checked against the buffer's current
 buffer-generation before annotating, to drop stale responses. BUF is the
-magit buffer to annotate."
+buffer to annotate: a magit buffer or a .skg file's."
   (let* ((response (read payload))
          (content  (cadr (assoc 'content response)))
          (warnings (cadr (assoc 'warnings response))))
@@ -227,16 +228,6 @@ magit buffer to annotate."
     (with-current-buffer buf
       (when (= buffer-generation skg-readable-ids--buffer-generation)
         (skg-readable-ids--place-title-annotations)))))
-
-(defun skg-readable-ids--format-title (title)
-  "Return the display form of TITLE for annotation.
-Every '[[id:X][LABEL]]' sub-expression in TITLE is replaced
-by '[[LABEL]]', so link-bearing titles render as links without
-exposing the id. Plain titles pass through unchanged."
-  (replace-regexp-in-string
-   "\\[\\[id:[^]]+\\]\\[\\([^]]+\\)\\]\\]"
-   "[[\\1]]"
-   title))
 
 (defun skg-readable-ids--skg-file-buffer-p (buf)
   "Return non-nil if BUF visits a .skg file."

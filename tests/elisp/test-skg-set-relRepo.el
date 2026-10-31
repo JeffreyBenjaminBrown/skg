@@ -80,8 +80,8 @@ skg-config-dir is set and `skg--repo-names' works."
                       :relation "contains"))))))
 
 (ert-deftest test-rel-writable-folder-member ()
-  "A subscribeeFolder member's relationship: recorder = the folder's anchor (its
-viewparent), relation = the folder's relation."
+  "A subscribeeFolder member's relationship: recorder = the folder's
+viewparent, relation = the folder's relation."
   (test--with-skg-content-view
    (concat
     "* (skg node (gnid anchor) (skgRepos (nodeRepo public))) anchor\n"
@@ -95,6 +95,28 @@ viewparent), relation = the folder's relation."
      (should (equal (skg--rel-at-point)
                     '(:recorder "anchor" :member "seen"
                       :relation "subscribesTo"))))))
+
+(ert-deftest test-rel-writable-folder-member-refusals-name-the-folders-viewparent ()
+  "A writable folder's member under a write-protected viewparent, or
+with none, is refused in words that name the folder's viewparent."
+  (dolist (case
+           '(("* (skg node (gnid fv) (skgRepos (nodeRepo public)) writeProtected) fv\n"
+              "The folder's viewparent is write-protected here, so the save would not write this relationship; set it from a view where the folder's viewparent is editable")
+             ("* (skg aliasFolder) not a node\n"
+              "Could not find the folder's viewparent")))
+    (test--with-skg-content-view
+     (concat (car case)
+             "** (skg subscribeeFolder)\n"
+             "*** (skg node (gnid seen) (skgRepos (nodeRepo public))) seen\n")
+     test--config-public-private-trusted
+     (lambda ()
+       (goto-char (point-min))
+       (search-forward "(gnid seen)" nil t)
+       (beginning-of-line)
+       (let ((text-quoting-style 'straight))
+         (should (equal (cadr (should-error (skg--rel-at-point)
+                                            :type 'user-error))
+                        (cadr case))))))))
 
 (ert-deftest test-rel-write-protected-child-of-editable-parent ()
   "A write-protected child's relationship belongs to its editable parent,
@@ -635,11 +657,11 @@ member's content children are not reached."
        (should-not (string-match-p "relRepo"
                                    (test--line-of-id gnid)))))))
 
-(ert-deftest test-recursive-walk-write-protected-folder-anchor ()
-  "A writable folder under an WRITE_PROTECTED anchor is not collected at
-save, so its members do not match -- whether the walk starts at the
-anchor (pruned below the write-protected node) or at the folder itself
-(refused by the anchor-editableness check)."
+(ert-deftest test-recursive-walk-write-protected-folder-viewparent ()
+  "A writable folder under a write-protected viewparent is not collected
+at save, so its members do not match -- whether the walk starts at the
+folder's viewparent (pruned below the write-protected node) or at the
+folder itself (refused by `skg--folder-viewparent-editable-p')."
   (let ((tree (concat
                "* (skg node (gnid anchor) (skgRepos (nodeRepo public)) writeProtected) anchor\n"
                "** (skg subscribeeFolder)\n"

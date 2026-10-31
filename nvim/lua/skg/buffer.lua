@@ -32,7 +32,7 @@ function M.content_view_buffer_name (org_text)
       'skg: content view has no headline (first 200 chars: %s)',
       (org_text or ''):sub(1, 200))) end
   return 'skg://'
-         .. M.sanitize_buffer_name(M.normalize_buffer_name_links(title))
+         .. M.sanitize_buffer_name(M.normalize_id_links(title))
 end
 
 ---@param search_terms string
@@ -41,12 +41,14 @@ function M.search_buffer_name (search_terms)
   return 'skg://?' .. M.sanitize_buffer_name(search_terms)
 end
 
----NAME with org id links shortened for display: every
----[[id:ID][LABEL]] becomes [[LABEL]].
----@param name string
+---TEXT with org id links shortened for display: every
+---[[id:ID][LABEL]] becomes [[LABEL]], for a buffer's name and for a
+---title annotation (skg.readable_ids), which then reads as links
+---without exposing the ids. Mirrors skg-normalize-id-links.
+---@param text string
 ---@return string
-function M.normalize_buffer_name_links (name)
-  return (name:gsub('%[%[id:[^%]]+%]%[([^%]]+)%]%]', '[[%1]]'))
+function M.normalize_id_links (text)
+  return (text:gsub('%[%[id:[^%]]+%]%[([^%]]+)%]%]', '[[%1]]'))
 end
 
 ---The title of the first headline in ORG_TEXT, with any leading
@@ -61,12 +63,10 @@ function M.extract_top_headline_title (org_text)
     after_stars = org_text:match('\n%*+ +(.-)[\r]?\n')
                   or org_text:match('\n%*+ +(.+)$') end
   if not after_stars then return nil end
-  if after_stars:sub(1, 4) == '(skg' then
-    local sexp_end = sexpr.find_sexp_end(after_stars)
-    if sexp_end then
-      return vim.trim(after_stars:sub(sexp_end + 1)) end
-  end
-  return after_stars
+  local split = require('skg.metadata').split_as_stars_metadata_title(
+    '* ' .. after_stars)
+  -- nil for metadata whose parentheses do not close
+  return split and split.title or after_stars
 end
 
 ---NAME sanitized for use as a buffer name: no nulls or newlines,
@@ -232,7 +232,9 @@ function M.configure_view_buffer (buf, view_id)
       buffer = buf,
       callback = function ()
         local ok, save = pcall(require, 'skg.save')
-        if ok then save.request_save_buffer()
+        if ok then
+          require('skg.keymaps').call_showing_refusal(
+            save.request_save_buffer)
         else vim.notify('skg: save is not available: '
                         .. tostring(save)) end
       end })

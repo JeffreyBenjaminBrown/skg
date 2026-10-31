@@ -6,15 +6,15 @@
 -- The elisp file's biggest hazard -- org-fold's fragility check
 -- crashing on programmatic edits to folded headline lines, worked
 -- around by 'skg-replace-current-line' -- does not exist here:
--- replacing a line with nvim_buf_set_lines is always safe, and vim
--- folds recompute from the foldexpr. The helper survives as
--- replace_current_line for shape parity.
+-- replacing a line with nvim_buf_set_lines (M.replace_line) is always
+-- safe, and vim folds recompute from the foldexpr.
 --
 -- Cursor-and-line conventions: like the elisp, the commands operate
 -- on the current buffer around the cursor. Lines are 1-based.
 
 local compare = require('skg.sexpr.compare')
 local edit_dsl = require('skg.sexpr.edit_dsl')
+local metadata_fields = require('skg.sexpr.metadata_fields')
 local picker = require('skg.picker')
 local sexpr = require('skg.sexpr.parse')
 local shared = require('skg.shared')
@@ -76,17 +76,26 @@ function M.line_text (line_number)
   return vim.api.nvim_buf_get_lines(0, row, row + 1, false)[1] or ''
 end
 
+---The level of the headline LINE, a buffer line's text (its star
+---count), or nil when LINE is no headline: stars and then whitespace.
+---The one test of a headline. Mirrors skg--headline-level-on-line.
+---@param line string|nil
+---@return integer|nil
+function M.headline_level_on_line (line)
+  local stars = line and line:match('^(%*+)%s')
+  return stars and #stars or nil
+end
+
 ---@param line_number integer|nil defaults to the cursor line
 ---@return boolean is that line an org headline?
 function M.at_headline_p (line_number)
-  return M.line_text(line_number):match('^%*+%s') ~= nil
+  return M.headline_level_on_line(M.line_text(line_number)) ~= nil
 end
 
 ---@param line_number integer|nil
 ---@return integer|nil the headline's level (star count), or nil
 function M.outline_level (line_number)
-  local stars = M.line_text(line_number):match('^(%*+)%s')
-  return stars and #stars or nil
+  return M.headline_level_on_line(M.line_text(line_number))
 end
 
 ---The current headline in its entirety, including asterisks and
@@ -95,12 +104,6 @@ end
 ---@return string
 function M.get_current_headline_text ()
   return M.line_text()
-end
-
----Replace the current line with NEW_CONTENT.
----@param new_content string
-function M.replace_current_line (new_content)
-  M.replace_line(M.current_line_number(), new_content)
 end
 
 ---@param line_number integer
@@ -165,6 +168,12 @@ end
 
 -- ── headline splitting and reconstruction ──────────────────────────
 
+---How a headline's '(skg ...)' metadata opens, after the stars, as a
+---Lua pattern: '(skg' then a space or the closing parenthesis, so that a
+---title such as '(skgrepos are cool)' is not read as metadata. Mirrors
+---skg--metadata-opening-regexp.
+M.metadata_opening_pattern = '^%(skg[ )]'
+
 ---Split HEADLINE_TEXT into { stars, metadata, title }, where metadata
 ---is the complete (skg ...) sexp text or '' when na. Returns nil
 ---when HEADLINE_TEXT is not a headline. Handles nested parens.
@@ -175,7 +184,7 @@ function M.split_as_stars_metadata_title (headline_text)
   local stars = trimmed:match('^(%*+%s+)')
   if not stars then return nil end
   local after_stars = trimmed:sub(#stars + 1)
-  if after_stars:sub(1, 4) == '(skg' then
+  if after_stars:match(M.metadata_opening_pattern) then
     local sexp_end = sexpr.find_sexp_end(after_stars)
     if not sexp_end then return nil end
     return { stars = stars,
@@ -263,38 +272,49 @@ function M.sexp_cdr_at_path (sexp, path)
   return nil
 end
 
+---The first value after PATH in SEXP (M.sexp_cdr_at_path), as text,
+---or nil.
+---@param sexp any
+---@param path string[]
+---@return string|nil
+local function first_value_at_path (sexp, path)
+  local values = M.sexp_cdr_at_path(sexp, path)
+  if values and values[1] ~= nil then
+    return sexpr.atom_text(values[1]) end
+  return nil
+end
+
 ---@param metadata_sexp any
 ---@return string|nil the node's skgrepo, if METADATA_SEXP is a node's
 function M.node_repo (metadata_sexp)
   if not M.occurrence_sexp_p(metadata_sexp) then return nil end
-  local values = M.sexp_cdr_at_path(metadata_sexp,
-                                    { 'skg', 'skgRepos', 'nodeRepo' })
-  if values and values[1] ~= nil then
-    return sexpr.atom_text(values[1]) end
-  return nil
+  return first_value_at_path(metadata_sexp,
+                             { 'skg', 'skgRepos', 'nodeRepo' })
+end
+
+---@param metadata_sexp any
+---@return string|nil METADATA_SEXP's '(gnid X)' value, whatever the
+---headline's kind. Mirrors skg--metadata-gnid.
+function M.metadata_gnid (metadata_sexp)
+  return first_value_at_path(metadata_sexp, { 'skg', 'gnid' })
 end
 
 ---@param metadata_sexp any
 ---@return string|nil the node's id, if METADATA_SEXP is a node's
 function M.node_id (metadata_sexp)
   if not M.occurrence_sexp_p(metadata_sexp) then return nil end
-  local values = M.sexp_cdr_at_path(metadata_sexp, { 'skg', 'gnid' })
-  if values and values[1] ~= nil then
-    return sexpr.atom_text(values[1]) end
-  return nil
+  return M.metadata_gnid(metadata_sexp)
 end
 
----@return string|nil the ID of the unknown whose headline is
----at point
+---@return string|nil the ID of the unknown graphnode whose unknown
+---viewnode is the headline at point. Acts at the cursor, as its twin
+---skg--unknown-node-id-at-point acts at point.
 function M.unknown_node_id_at_point ()
   local metadata_sexp = M.metadata_sexp_at_line_or_nil(nil)
   if not (metadata_sexp and compare.subtree_p(
             metadata_sexp, { SKG, sexpr.symbol('unknown') })) then
     return nil end
-  local values = M.sexp_cdr_at_path(metadata_sexp, { 'skg', 'gnid' })
-  if values and values[1] ~= nil then
-    return sexpr.atom_text(values[1]) end
-  return nil
+  return M.metadata_gnid(metadata_sexp)
 end
 
 ---@param metadata_sexp any
@@ -380,16 +400,11 @@ function M.rewrite_metadata_at_line (line_number, rewrite, kind)
     split.stars, sexpr.to_string(rewrite(metadata_sexp)), split.title))
 end
 
----Each name of 'shared/metadata-fields.json''s 'parts' list, mapped to
----its position there.
-local METADATA_PART_RANK = {}
-for rank, name in ipairs(shared.metadata_parts) do
-  METADATA_PART_RANK[name] = rank end
-
 ---The position in 'shared/metadata-fields.json''s 'parts' list of the
----name it gives PART, a part of '(skg ...)': a list's head, an atom's
----name, or 'KIND' for a kind's atom. Nil when the list does not name
----it. Mirrors skg--metadata-part-rank.
+---name it gives PART, a part of '(skg ...)': a list's head, or an
+---atom's name, a kind's atom standing at 'KIND''s
+---(metadata_fields.part_rank). Nil when the list does not name it.
+---Mirrors skg--metadata-part-rank.
 ---@param part any
 ---@return integer|nil
 function M.metadata_part_rank (part)
@@ -399,9 +414,11 @@ function M.metadata_part_rank (part)
            and sexpr.atom_text(part[1]) or nil
   else
     name = sexpr.atom_text(part)
-    if shared.metadata_kind(name) then name = 'KIND' end
   end
-  return name and METADATA_PART_RANK[name] or nil
+  if not name then return nil end
+  local rank = metadata_fields.part_rank(name)
+  -- that function ranks an unlisted name after every listed one
+  return rank <= #shared.metadata_parts and rank or nil
 end
 
 ---METADATA_SEXP with PART, a part of '(skg ...)' it lacks, where the
@@ -569,9 +586,14 @@ end
 -- ── user commands ──────────────────────────────────────────────────
 
 ---Mark the headline at point for deletion: 'delete' becomes its edit
----request (M.write_edit_request). Does not save.
+---request (M.write_edit_request). Then moves the cursor to the next
+---line, as skg-delete does. Does not save. Its recursive form is its own
+---command, M.delete_recursive, where Emacs takes a prefix argument.
 function M.delete ()
   M.write_edit_request(sexpr.symbol('delete'), 'node')
+  local line = M.current_line_number()
+  if line < vim.api.nvim_buf_line_count(0) then
+    vim.api.nvim_win_set_cursor(0, { line + 1, 0 }) end
   vim.notify(
     'This change will only be applied when you save the buffer.')
 end
@@ -777,7 +799,7 @@ function M.change_repo_and_report (old_skgrepo, new_skgrepo, recursive)
       vim.log.levels.WARN) end
 end
 
----Set the skgrepo at LINE_NUMBER to NEW_REPO, unless the occurrence
+---Set the skgrepo at LINE_NUMBER to NEW_SKGREPO, unless the occurrence
 ---is write-protected -- the save would refuse that edit.
 ---@param line_number integer
 ---@param new_skgrepo string
@@ -791,7 +813,7 @@ function M.change_repo_at_line_unless_write_protected (line_number,
   return M.change_repo_at_line(line_number, new_skgrepo), {}
 end
 
----Change OLD_REPO to NEW_REPO in this content subtree (root
+---Change OLD_SKGREPO to NEW_SKGREPO in this content subtree (root
 ---inclusive; only member descendants (no noClaim atom) are
 ---traversed).
 ---A write-protected occurrence is not edited -- the save would
@@ -840,7 +862,7 @@ function M.change_repo_recursive (old_skgrepo, new_skgrepo)
                         writeProtected_gnids)
 end
 
----Set the skgrepo at LINE_NUMBER to NEW_REPO. The save recomputes the
+---Set the skgrepo at LINE_NUMBER to NEW_SKGREPO. The save recomputes the
 ---headline's '(view repoBoundary)'.
 ---@param line_number integer
 ---@param new_skgrepo string
@@ -860,7 +882,7 @@ function M.set_merge_request (acquiree_id_or_link)
                  or vim.fn.input('Acquiree ID or link: ')
   if answer == nil or answer == '' then
     error('Acquiree ID cannot be empty') end
-  local acquiree_gnid = M.id_from_link_or_text(answer)
+  local acquiree_gnid = metadata_fields.extract_id_from_text(answer)
   if acquiree_gnid == '' then
     error('Acquiree ID cannot be empty') end
   M.write_edit_request(
@@ -871,8 +893,10 @@ end
 
 -- The diff view's restore requests ('docs/diff-view.org', "Restoring
 -- what a change removed"). The server refuses them on the wrong kind of
--- headline with the same texts, which Neovim shows naming its own
--- commands (messages.with_neovim_bindings). Mirrors elisp/skg-metadata.el.
+-- headline with the same texts, except that its refusal of a restoreRel
+-- without a removed membership goes on to say where a restoreRel
+-- belongs; Neovim shows them naming its own commands
+-- (messages.with_neovim_bindings). Mirrors elisp/skg-metadata.el.
 
 M.restore_rel_on_a_deleted_node = messages.with_neovim_bindings(
   'This node is deleted; restore it first (skg-restore-deleted-node)')
@@ -1026,15 +1050,6 @@ function M.membership_change_readiness (member_sexp, child_sexps)
   return ready
 end
 
----The level of the headline LINE (its star count), or nil when LINE
----is no headline.
----@param line string|nil
----@return integer|nil
-local function headline_level (line)
-  local stars = line and line:match('^(%*+)%s')
-  return stars and #stars or nil
-end
-
 ---Whether the folder whose headline is LINES[INDEX] is changed, and
 ---if so whether it is ready. LINES are a buffer's lines, 1-based. The
 ---folder is changed when one of its members (its direct child
@@ -1046,12 +1061,12 @@ end
 ---@param index integer
 ---@return table|nil
 function M.folder_change_readiness_in_lines (lines, index)
-  local level = headline_level(lines[index])
+  local level = M.headline_level_on_line(lines[index])
   if not (level and M.folder_atom(M.metadata_on_line(lines[index]))) then
     return nil end
   local members = {} -- each { sexp, child_sexps }
   for i = index + 1, #lines do
-    local line_level = headline_level(lines[i])
+    local line_level = M.headline_level_on_line(lines[i])
     if line_level then
       if line_level <= level then break end
       if line_level == level + 1 then
@@ -1129,7 +1144,7 @@ end
 ---@return boolean does a parent with PARENT_SEXP, whose own parent has
 ---GRANDPARENT_SEXP, read its children's claims: a node that is not
 ---write-protected, or a folder 'shared/herald-styles.json' does not
----list as write-protected whose anchor is such a node?
+---list as write-protected whose viewparent is such a node?
 function M.reads_claims_p (parent_sexp, grandparent_sexp)
   local folder = M.folder_atom(parent_sexp)
   if folder then
@@ -1178,15 +1193,15 @@ end
 ---@return integer[]
 function M.ancestor_headline_indices_in_lines (lines, index, count)
   local ancestor_indices = {}
-  local level = headline_level(lines[index])
+  local level = M.headline_level_on_line(lines[index])
   local ancestor_index = index
   for _ = 1, count do
     if not (level and level > 1) then break end
     repeat ancestor_index = ancestor_index - 1
     until ancestor_index < 1
-          or (headline_level(lines[ancestor_index]) or level) < level
+          or (M.headline_level_on_line(lines[ancestor_index]) or level) < level
     if ancestor_index < 1 then break end
-    level = headline_level(lines[ancestor_index])
+    level = M.headline_level_on_line(lines[ancestor_index])
     table.insert(ancestor_indices, ancestor_index)
   end
   return ancestor_indices
@@ -1219,7 +1234,7 @@ end
 
 ---@param line_number integer
 ---@return integer|nil the line of the headline's viewparent
-local function parent_line (line_number)
+function M.parent_line (line_number)
   local level = M.outline_level(line_number)
   if not level then return nil end
   return M.parent_headline_line(line_number, level)
@@ -1228,8 +1243,8 @@ end
 ---Is the headline at LINE_NUMBER a node of the containerward chain: a
 ---vognode claiming nothing under a member of a partner folder whose members
 ---carry the chain (every one but the two acquisition folders), or under
----another such node ('is_in_containerward_chain',
----server/refresh/chain.rs)?
+---another such node ('stands_in_containerward_chain',
+---server/types/tree/forest.rs)?
 ---@param line_number integer
 ---@return boolean
 function M.containerward_chain_node_at_line_p (line_number)
@@ -1240,11 +1255,11 @@ function M.containerward_chain_node_at_line_p (line_number)
             and (not M.occurrence_sexp_p(metadata)
                  or not M.claims_membership_p(metadata))) then
       return false end
-    local parent = parent_line(line)
+    local parent = M.parent_line(line)
     if not (parent
             and M.vognode_sexp_p(M.metadata_sexp_at_line_or_nil(parent)))
     then return false end
-    local grandparent = parent_line(parent)
+    local grandparent = M.parent_line(parent)
     local grandparent_folder = grandparent
       and M.partner_folder_atom(M.metadata_sexp_at_line_or_nil(grandparent))
     if grandparent_folder
@@ -1265,7 +1280,7 @@ end
 ---@return boolean
 function M.restoreRel_position_at_line_p (line_number)
   local line = line_number or M.current_line_number()
-  local parent = parent_line(line)
+  local parent = M.parent_line(line)
   if not parent then return false end
   local parent_sexp = M.metadata_sexp_at_line_or_nil(parent)
   if M.partner_folder_atom(parent_sexp) then return true end
@@ -1299,15 +1314,6 @@ function M.restore_removed_membership ()
     error(M.restore_rel_without_a_removed_membership, 0) end
   M.write_edit_request(sexpr.symbol('restoreRel'), 'node')
   vim.notify('Restore request set. Save to apply.')
-end
-
----An ID from TEXT, accepting org id links or bare IDs.
----@param text string
----@return string
-function M.id_from_link_or_text (text)
-  local trimmed = vim.trim(text)
-  local gnid = trimmed:match('%[%[id:([^%]]+)%]%[')
-  return gnid or trimmed
 end
 
 ---HOST_SEXP with the 'fork' symbol removed from its
@@ -1432,7 +1438,7 @@ M.relRepo_unsupported_folder_atoms = {
 
 ---The partner folder atoms whose members' relationships are writable
 ---from this side, each with its relation's wire name. The folder's
----viewparent (the anchor) records the relationship to each member.
+---viewparent records the relationship to each member.
 ---Mirrors skg--writable-folder-relations.
 M.writable_folder_relations = {
   { atom = 'subscribeeFolder', relation = 'subscribesTo' },
@@ -1485,20 +1491,18 @@ function M.relationship_member_id (metadata_sexp)
   if not (M.occurrence_sexp_p(metadata_sexp)
           or M.gnid_only_vognode_sexp_p(metadata_sexp)) then
     return nil end
-  local values = M.sexp_cdr_at_path(metadata_sexp, { 'skg', 'gnid' })
-  if values and values[1] ~= nil then
-    return sexpr.atom_text(values[1]) end
-  return nil
+  return M.metadata_gnid(metadata_sexp)
 end
 
 ---Classify the relationship the headline at LINE_NUMBER represents:
 ---{ recorder, member, relation }. For a content child, the viewparent
 ---contains the headline's node; for a writable folder's member, the
----folder's anchor (its viewparent) records the folder's relation toward
+---folder's viewparent records the folder's relation toward
 ---it. Errors where the headline represents no writable relationship:
 ---off an occurrence, a reference to an unknown node or a restricted
 ---headline, on a root headline, under a write-protected folder,
----parent or anchor, or with an ID missing. Mirrors skg--rel-at-point.
+---parent or folder's viewparent, or with an ID missing. Mirrors
+---skg--rel-at-point.
 ---@param line_number integer
 ---@return table
 function M.rel_at_line (line_number)
@@ -1510,7 +1514,7 @@ function M.rel_at_line (line_number)
     error('Not on an occurrence, a reference to an unknown node'
           .. ' or a restricted headline', 0) end
   local member_gnid = M.relationship_member_id(member_sexp)
-  local parent = parent_line(line_number)
+  local parent = M.parent_line(line_number)
   local parent_sexp = parent and M.metadata_sexp_at_line_or_nil(parent)
   if not member_gnid then
     error("No id in this headline's metadata", 0) end
@@ -1524,16 +1528,17 @@ function M.rel_at_line (line_number)
   end
   local writable_folder = writable_folder_relation(parent_sexp)
   if writable_folder then
-    local anchor = parent_line(parent)
-    local anchor_sexp = anchor and M.metadata_sexp_at_line_or_nil(anchor)
-    local anchor_gnid = M.node_id(anchor_sexp)
-    if not anchor_gnid then
-      error("Could not find the folder's anchor headline", 0) end
-    if M.node_write_protected_p(anchor_sexp) then
-      error("The folder's anchor is write-protected here, so the save"
+    local folder_viewparent = M.parent_line(parent)
+    local folder_viewparent_sexp = folder_viewparent
+      and M.metadata_sexp_at_line_or_nil(folder_viewparent)
+    local folder_viewparent_gnid = M.node_id(folder_viewparent_sexp)
+    if not folder_viewparent_gnid then
+      error("Could not find the folder's viewparent", 0) end
+    if M.node_write_protected_p(folder_viewparent_sexp) then
+      error("The folder's viewparent is write-protected here, so the save"
             .. ' would not write this relationship; set it from a view'
-            .. ' where the anchor is editable', 0) end
-    return { recorder = anchor_gnid, member = member_gnid,
+            .. " where the folder's viewparent is editable", 0) end
+    return { recorder = folder_viewparent_gnid, member = member_gnid,
              relation = writable_folder.relation }
   end
   if M.occurrence_sexp_p(parent_sexp) then
@@ -1556,11 +1561,8 @@ end
 ---@param path string[]
 ---@return string|nil
 local function metadata_value_at_line (line_number, path)
-  local values = M.sexp_cdr_at_path(
+  return first_value_at_path(
     M.metadata_sexp_at_line_or_nil(line_number) or { SKG }, path)
-  if values and values[1] ~= nil then
-    return sexpr.atom_text(values[1]) end
-  return nil
 end
 
 ---@param line_number integer
@@ -1853,7 +1855,7 @@ end
 ---relationship to its view-parent is of KIND and is collected at save from this position?
 ---For 'content', the view-parent is an editable occurrence not in
 ---subscribee-as-such position; for 'subscribee' and 'overridden', it is
----the matching writable folder with an editable anchor. Mirrors
+---the matching writable folder with an editable viewparent. Mirrors
 ---skg--relationship-kind-matches-p.
 ---@param line_number integer
 ---@param kind string
@@ -1863,7 +1865,7 @@ function M.relationship_kind_matches_p (line_number, kind)
   if not ((M.occurrence_sexp_p(meta) and M.claims_membership_p(meta))
           or M.gnid_only_vognode_sexp_p(meta)) then
     return false end
-  local parent = parent_line(line_number)
+  local parent = M.parent_line(line_number)
   if not parent then return false end
   local parent_sexp = M.metadata_sexp_at_line_or_nil(parent)
   if M.occurrence_sexp_p(parent_sexp) then
@@ -1871,9 +1873,9 @@ function M.relationship_kind_matches_p (line_number, kind)
            and not M.node_write_protected_p(parent_sexp)
            and not M.subscribee_as_such_at_line_p(parent) end
   if M.non_vognode_atom_present_p(parent_sexp, 'subscribeeFolder') then
-    return kind == 'subscribee' and M.folder_anchor_editable_p(parent) end
+    return kind == 'subscribee' and M.folder_viewparent_editable_p(parent) end
   if M.non_vognode_atom_present_p(parent_sexp, 'overriddenFolder') then
-    return kind == 'overridden' and M.folder_anchor_editable_p(parent) end
+    return kind == 'overridden' and M.folder_viewparent_editable_p(parent) end
   return false
 end
 
@@ -1897,21 +1899,22 @@ function M.subscribee_as_such_at_line_p (line_number)
   local meta = M.metadata_sexp_at_line_or_nil(line_number)
   if not (M.occurrence_sexp_p(meta) and M.claims_membership_p(meta)) then
     return false end
-  local parent = parent_line(line_number)
+  local parent = M.parent_line(line_number)
   return parent ~= nil and M.non_vognode_atom_present_p(
     M.metadata_sexp_at_line_or_nil(parent), 'subscribeeFolder')
 end
 
 ---@param line_number integer
 ---@return boolean has the folder headline at LINE_NUMBER an editable
----occurrence anchor (its viewparent)? A write-protected anchor's
+---occurrence for its viewparent? A write-protected viewparent's
 ---writable folders are not collected at save. Mirrors
----skg--folder-anchor-editable-p.
-function M.folder_anchor_editable_p (line_number)
-  local anchor = parent_line(line_number)
-  local anchor_sexp = anchor and M.metadata_sexp_at_line_or_nil(anchor)
-  return M.occurrence_sexp_p(anchor_sexp)
-         and not M.node_write_protected_p(anchor_sexp)
+---skg--folder-viewparent-editable-p.
+function M.folder_viewparent_editable_p (line_number)
+  local viewparent = M.parent_line(line_number)
+  local viewparent_sexp = viewparent
+    and M.metadata_sexp_at_line_or_nil(viewparent)
+  return M.occurrence_sexp_p(viewparent_sexp)
+         and not M.node_write_protected_p(viewparent_sexp)
 end
 
 return M

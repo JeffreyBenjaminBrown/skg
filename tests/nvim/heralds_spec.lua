@@ -282,7 +282,7 @@ describe('skg.heralds', function ()
     -- Mirrors test-heralds-a-pending-detachment-renders-as-a-request: a
     -- child that is 'noClaim' and warranted under an editable parent (a
     -- node that is not write-protected, or an editable folder whose
-    -- anchor is one) shows "detach". Under a write-protected parent or
+    -- viewparent is one) shows "detach". Under a write-protected parent or
     -- folder, or unwarranted, it shows no request.
     local child = '** (skg node (gnid c) (skgRepos (nodeRepo r)) noClaim) c'
     local editable = '* (skg node (gnid r) (skgRepos (nodeRepo r))) r'

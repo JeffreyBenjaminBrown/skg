@@ -224,7 +224,7 @@ field childless, so an untouched save yields just
          ( headline (skg-get-current-headline-text) )
          ( split (skg-split-as-stars-metadata-title headline) )
          ( metadata-str (cadr split) )
-         ( skgrepo (skg--node-repo (read metadata-str)) )
+         ( skgrepo (skg--node-repo (skg--metadata-sexp-at-point-or-nil)) )
          ( sexp-start (+ (line-beginning-position)
                          (length (car split))) )
          ( sexp-end (+ sexp-start (length metadata-str)) )
@@ -332,7 +332,7 @@ Kill the buffer to cancel without saving."
       (if no-metadata
           (skg-view-metadata--open-empty-node-view (caddr split))
         (let* (( source-buffer (current-buffer) )
-               (sexp (read metadata-str))
+               (sexp (skg--current-headline-metadata-sexp))
                (sexp-start (+ (line-beginning-position)
                               (length (car split))) )
                (sexp-end (+ sexp-start (length metadata-str)) ))

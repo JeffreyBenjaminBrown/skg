@@ -139,16 +139,19 @@ function M.open_edit_buffer (org_text, source_buf, line_number,
   -- The kind is kept by its first atom, a string, since a buffer
   -- variable holds a copy of what it is given.
   vim.b[buf].skg_edit_kind_atom = kind and kind.atoms[1] or nil
+  local call_showing_refusal = require('skg.keymaps').call_showing_refusal
   vim.api.nvim_create_autocmd('BufWriteCmd', {
     buffer = buf,
-    callback = function () M.apply(buf) end })
+    callback = function () call_showing_refusal(M.apply, buf) end })
   vim.keymap.set('n', '<localleader>cc',
-                 function () M.apply(buf) end,
+                 function () call_showing_refusal(M.apply, buf) end,
                  { buffer = buf,
                    desc = 'Apply the edited metadata' })
-  vim.keymap.set('n', '<S-Left>', sexpr_cycling.cycle_left,
+  vim.keymap.set('n', '<S-Left>',
+                 function () call_showing_refusal(sexpr_cycling.cycle_left) end,
                  { buffer = buf, desc = 'Cycle this value left' })
-  vim.keymap.set('n', '<S-Right>', sexpr_cycling.cycle_right,
+  vim.keymap.set('n', '<S-Right>',
+                 function () call_showing_refusal(sexpr_cycling.cycle_right) end,
                  { buffer = buf, desc = 'Cycle this value right' })
   vim.api.nvim_set_current_buf(buf)
   M.decorate_with_heralds(buf)

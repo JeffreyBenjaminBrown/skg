@@ -59,6 +59,18 @@ describe('skg.metadata commands', function ()
       '(skg node (editRequest delete))'))
   end)
 
+  it('delete moves the cursor to the next line, as skg-delete does',
+     function ()
+    buffer_with({ '* (skg node (gnid 1)) one', 'body', '* (skg node (gnid 2)) two' })
+    metadata.delete()
+    assert.are.equal(2, metadata.current_line_number())
+    vim.api.nvim_win_set_cursor(0, { 3, 0 })
+    metadata.delete()
+    assert.are.equal(3, metadata.current_line_number())
+    assert.is_true(subtree_p(metadata.metadata_sexp_at_line_or_nil(3),
+      '(skg node (editRequest delete))'))
+  end)
+
   it('delete_recursive skips non-occurrence descendants', function ()
     buffer_with(table.concat({
       '* (skg node (gnid root)) root',
@@ -695,6 +707,23 @@ describe('skg.metadata relRepo gesture', function ()
                       relation = 'subscribesTo' }, metadata.rel_at_line(3))
   end)
 
+  it("refuses a writable folder's member in words that name the"
+     .. " folder's viewparent", function ()
+    for _, case in ipairs({
+        { '* (skg node (gnid fv) (skgRepos (nodeRepo public)) writeProtected) fv',
+          "The folder's viewparent is write-protected here, so the save would"
+          .. ' not write this relationship; set it from a view where the'
+          .. " folder's viewparent is editable" },
+        { '* (skg aliasFolder) not a node',
+          "Could not find the folder's viewparent" } }) do
+      buffer_with({ case[1], '** (skg subscribeeFolder)',
+        '*** (skg node (gnid seen) (skgRepos (nodeRepo public))) seen' })
+      local ok, refusal = pcall(metadata.rel_at_line, 3)
+      assert.is_false(ok)
+      assert.are.equal(case[2], refusal)
+    end
+  end)
+
   it('classifies a write-protected child of an editable parent', function ()
     buffer_with({
       '* (skg node (gnid recorder) (skgRepos (nodeRepo public))) recorder',
@@ -922,7 +951,7 @@ describe('skg.metadata relRepo gesture', function ()
     assert.is_falsy(buffer_text():find('relRepo'))
   end)
 
-  it("skips a writable folder's members under a write-protected anchor",
+  it("skips a writable folder's members under a write-protected viewparent",
      function ()
     local tree = {
       '* (skg node (gnid anchor) (skgRepos (nodeRepo public)) writeProtected) anchor',
@@ -1013,5 +1042,41 @@ describe('skg.metadata relRepo gesture', function ()
     assert.are.same(
       { "relRepo set to 'trusted' on 3 'content' relationships. Save to apply." },
       notified)
+  end)
+end)
+
+describe('a title opening with (skg', function ()
+  -- Mirrors test-skg-metadata-a-title-opening-with-skg-is-no-metadata:
+  -- metadata opens with '(skg' and then a space or ')'
+  -- (metadata.metadata_opening_pattern), so a title such as
+  -- '(skgrepos are cool)' is read as a title by the splitter, the
+  -- reader and the writers, which put metadata before it.
+  it('is no metadata', function ()
+    assert.are.same(
+      { stars = '* ', metadata = '', title = '(skgrepos are cool) title' },
+      metadata.split_as_stars_metadata_title('* (skgrepos are cool) title'))
+    assert.are.equal('(skgrepos are cool) title',
+      require('skg.buffer').extract_top_headline_title(
+        '* (skgrepos are cool) title\nbody'))
+    assert.is_nil(metadata.metadata_on_line('* (skgrepos are cool) title'))
+    buffer_with({ '* (skgrepos are cool) title' })
+    assert.is_true(metadata.headline_metadata_empty_p())
+    metadata.write_edit_request_at_line(1, sexpr.symbol('delete'), 'node')
+    assert.are.same(
+      { '* (skg node (editRequest delete)) (skgrepos are cool) title' },
+      vim.api.nvim_buf_get_lines(0, 0, -1, false))
+    buffer_with({ '* (skgrepos are cool) title' })
+    metadata.edit_metadata_at_line(1, sexpr.read('(skg node)'))
+    assert.are.same({ '* (skg node) (skgrepos are cool) title' },
+      vim.api.nvim_buf_get_lines(0, 0, -1, false))
+  end)
+end)
+
+describe('a line of bare stars', function ()
+  -- Mirrors test-skg-metadata-a-line-of-bare-stars-is-no-headline.
+  it('is no headline', function ()
+    assert.are.equal(2, metadata.headline_level_on_line('** two'))
+    assert.is_nil(metadata.headline_level_on_line('***'))
+    assert.are.equal(3, metadata.headline_level_on_line('***\tthree'))
   end)
 end)

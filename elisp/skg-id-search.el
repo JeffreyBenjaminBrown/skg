@@ -274,18 +274,15 @@ ID and label. Otherwise push the headline's metadata ID and title."
               ( label (cdr link-hit) ))
           (push (list gnid label) skg-linkstack)
           (message "pushed to stack: %s" label) )
-      (let* (( headline (skg-get-current-headline-text) )
-             ( split (skg-split-as-stars-metadata-title headline) )
-             ( metadata-sexp (when split (cadr split)) )
-             ( title (when split (caddr split)) ))
-        (if (and metadata-sexp
-                 (not (string-empty-p metadata-sexp)) )
-            (let (( sexp (read metadata-sexp) ))
-              (if (skg--metadata-sexp-contains-id-p sexp)
-                  (let (( gnid (skg--extract-id-from-metadata-sexp sexp) ))
-                    (push (list gnid title) skg-linkstack)
-                    (message "pushed to stack: %s" title) )
-                (message "No ID in metadata on this line") ))
+      (let* (( sexp (skg--metadata-sexp-at-point-or-nil) )
+             ( title (caddr (skg-split-as-stars-metadata-title
+                             (skg-get-current-headline-text))) ))
+        (if sexp
+            (if (skg--metadata-sexp-contains-id-p sexp)
+                (let (( gnid (skg--extract-id-from-metadata-sexp sexp) ))
+                  (push (list gnid title) skg-linkstack)
+                  (message "pushed to stack: %s" title) )
+              (message "No ID in metadata on this line") )
           (message "No metadata on this line") )) )))
 
 (defun skg--linkstack-top-or-message ()

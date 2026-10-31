@@ -149,8 +149,8 @@ otherwise. Editing a member rerenders the folder's herald."
 
 (ert-deftest test-heralds-a-pending-detachment-renders-as-a-request ()
   "A child that is 'noClaim' and warranted under an editable parent (a
-node that is not write-protected, or an editable folder whose anchor
-is one) shows \"detach\". Under a write-protected parent or folder, or
+node that is not write-protected, or an editable folder whose
+viewparent is one) shows \"detach\". Under a write-protected parent or folder, or
 unwarranted, it shows no request."
   (let ((child "** (skg node (gnid c) (skgRepos (nodeRepo r)) noClaim) c")
         (editable "* (skg node (gnid r) (skgRepos (nodeRepo r))) r")

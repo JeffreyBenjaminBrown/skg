@@ -160,7 +160,7 @@ function M.homeSkgrepo_move_at_line (line_number)
   local metadata_sexp = metadata.metadata_sexp_at_line_or_nil(line_number)
   local pair = metadata_sexp and M.homeSkgrepo_move(metadata_sexp)
   if pair then return line_number, pair end
-  for _, line in ipairs(M.child_lines(line_number)) do
+  for _, line in ipairs(modify_graph.immediate_viewchildren(line_number)) do
     local child = metadata.metadata_sexp_at_line_or_nil(line)
     pair = child and M.homeSkgrepo_move(child)
     if pair then return line, pair end
@@ -169,15 +169,6 @@ function M.homeSkgrepo_move_at_line (line_number)
 end
 
 -- ── walking headlines ──────────────────────────────────────────────
-
----The lines of the headlines one level below the one at LINE_NUMBER.
----@param line_number integer
----@return integer[]
-function M.child_lines (line_number)
-  return modify_graph.headlines_with_level_between(
-    metadata.outline_level(line_number) + 1,
-    line_number, modify_graph.subtree_end(line_number))
-end
 
 ---The line at LINE_NUMBER and the lines of every headline below it.
 ---@param line_number integer
@@ -218,7 +209,7 @@ function M.requests_at_line (line_number)
   if folder_change then
     local ready = not folder_change.ready
     local requests = {}
-    for _, line in ipairs(M.child_lines(line_number)) do
+    for _, line in ipairs(modify_graph.immediate_viewchildren(line_number)) do
       local child = metadata.metadata_sexp_at_line_or_nil(line)
       local child_leaves = child and M.leaves_below(child)
       if child_leaves then
@@ -300,24 +291,24 @@ end
 ---Replace the readiness request of the headline at LINE_NUMBER with
 ---one that marks (READY true) or unmarks the leaves on OBJECTS: '(ready
 ---OBJECTS)' or '(unready OBJECTS)' in its '(editRequest ...)'
----(metadata.metadata_with_readiness_request).
+---(metadata.metadata_with_readiness_request). Refuses a line that is
+---no headline or a headline without metadata, as
+---skg--write-readiness-request does.
 ---@param line_number integer
 ---@param ready boolean
 ---@param objects string[]
 function M.write_readiness_request (line_number, ready, objects)
-  local split = metadata.split_as_stars_metadata_title(
-    metadata.line_text(line_number))
-  local metadata_sexp = metadata.metadata_sexp_at_line_or_nil(line_number)
-  if not (split and metadata_sexp) then return end
+  if not metadata.at_headline_p(line_number) then
+    error('Not on a headline', 0) end
+  if not metadata.metadata_sexp_at_line_or_nil(line_number) then
+    error('Headline has no skg metadata', 0) end
   local request = { sexpr.symbol(ready and 'ready' or 'unready') }
   for _, object in ipairs(objects) do
     table.insert(request, sexpr.symbol(object))
   end
-  metadata.replace_line(line_number, metadata.format_headline(
-    split.stars,
-    sexpr.to_string(
-      metadata.metadata_with_readiness_request(metadata_sexp, request)),
-    split.title))
+  metadata.rewrite_metadata_at_line(line_number, function (metadata_sexp)
+    return metadata.metadata_with_readiness_request(metadata_sexp, request)
+  end)
 end
 
 -- ── moving between headlines with change facts ─────────────────────────────

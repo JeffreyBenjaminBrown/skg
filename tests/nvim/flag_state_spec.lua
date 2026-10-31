@@ -115,4 +115,39 @@ describe('skg.flag_state staging', function ()
     assert.are.equal('search matching', initial)
     assert.is_true(has_request(2, 'true'))
   end)
+
+  it('says when it replaced a pending relRepo request', function ()
+    -- Mirrors test-skg-flag-says-it-replaced-a-pending-relRepo-request:
+    -- once for the one headline, counted for the recursive form, and
+    -- the plain message where there was none.
+    local shown
+    vim.notify = function (message) shown = message end
+    buffer_with({
+      '* (skg node (gnid root) (skgRepos (nodeRepo main)) (editRequest (relRepo priv))) root' })
+    flag._apply(1, true, false)
+    assert.are.equal('Search matching staged for 1 node; replaced a'
+                     .. ' pending relRepo request. Save to apply.', shown)
+    assert.are.same({
+      '* (skg node (gnid root) (skgRepos (nodeRepo main)) (editRequest (flag noSearchMatching true))) root' },
+      vim.api.nvim_buf_get_lines(0, 0, -1, false))
+    for _, case in ipairs({
+        { '** (skg node (gnid b) (skgRepos (nodeRepo main)) (editRequest (relRepo priv))) b',
+          'Search matching staged for 3 nodes; replaced 2 pending relRepo'
+          .. ' requests; skipped: none. Save to apply.' },
+        { '** (skg node (gnid b) (skgRepos (nodeRepo main))) b',
+          'Search matching staged for 3 nodes; replaced a pending relRepo'
+          .. ' request; skipped: none. Save to apply.' } }) do
+      buffer_with({
+        '* (skg node (gnid root) (skgRepos (nodeRepo main)) (editRequest (relRepo priv))) root',
+        case[1],
+        '** (skg node (gnid c) (skgRepos (nodeRepo main))) c' })
+      flag._apply(1, true, true)
+      assert.are.equal(case[2], shown)
+    end
+    buffer_with({ '* (skg node (gnid root) (skgRepos (nodeRepo main))) root' })
+    flag._apply(1, true, true)
+    assert.are.equal(
+      'Search matching staged for 1 node; skipped: none. Save to apply.',
+      shown)
+  end)
 end)
