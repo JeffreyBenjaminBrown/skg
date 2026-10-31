@@ -64,6 +64,23 @@ before '(editRequest ...)' and '(viewRequests ...)'."
     (should (string-match-p "^\\*\\* (skg node (gnid c) (skgRepos (nodeRepo r))) c$"
                             (cdr result)))))
 
+(ert-deftest test-skg-attach-says-what-the-save-does ()
+  "On a pending detachment (warranted), attach cancels it and the save
+keeps the headline in the list; on an unwarranted child, the save
+puts it there."
+  (let ((pending (test-skg-detach-attach--run
+                  (concat test-skg-detach-attach--editable-parent
+                          "** (skg node (gnid c) (skgRepos (nodeRepo r)) noClaim) c\n")
+                  2 #'skg-attach))
+        (unwarranted (test-skg-detach-attach--run
+                      (concat test-skg-detach-attach--editable-parent
+                              "** (skg node (gnid c) (skgRepos (nodeRepo r)) noClaim (view noWarrant)) c\n")
+                      2 #'skg-attach)))
+    (should (equal (car pending)
+                   "Attached: the detachment is cancelled; the next save keeps this headline in its parent's list."))
+    (should (equal (car unwarranted)
+                   "Attached: the next save puts this headline in its parent's list."))))
+
 (ert-deftest test-skg-detach-a-headline-without-metadata ()
   "A headline the user typed is a node claiming membership; detaching
 it gives it the node's atom and 'noClaim'."

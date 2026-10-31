@@ -240,9 +240,9 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
       . map_err ( |errors| SaveError::BufferValidationErrors {
           errors, warnings : parsing_warnings . clone () } ) ? );
     specs };
-  { // Reject forks monogamy or the skgrepo-set forbids (before any
-    // skgsave-commit). Monogamy reads the live graph; the skgrepo-set check uses
-    // the skgrepo restriction.
+  { // Reject forks monogamy or the skgrepo restriction forbids (before
+    // any skgsave-commit). Monogamy reads the live graph; the other check
+    // reads the skgrepo restriction.
     let fork_errors : Vec<BufferValidationError> =
       validate_fork_specs_in_graph (
         &fork_specs, graph, config, skgrepo_restriction);

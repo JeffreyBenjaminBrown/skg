@@ -182,7 +182,7 @@ fn supplement_nodeSaveIntent_from_disk (
         skgrepo_move   : maybe_move,
       }) }}}
 
-/// Under a restricted skgrepo-set, the buffer shows only some of a
+/// Under a skgrepo restriction, the buffer shows only some of a
 /// node's relationship-list members, so its lists describe only the
 /// visible subset.  This merges each list with its disk counterpart
 /// (the API doc's "Restricted-skgrepo nodes"): the anchored

@@ -191,7 +191,7 @@ describe('skg stream consumers', function ()
         assert.is_false(refused)
         assert.is_truthy(tostring(refusal):find(
           'skg: save or revert every skg view before switching the'
-          .. ' skgrepo-set', 1, true))
+          .. ' skgrepo restriction', 1, true))
       end
       assert.is_false(name_prompted)
       assert.are.same({}, questions)
@@ -200,7 +200,7 @@ describe('skg stream consumers', function ()
       repo_sets.restrict_repo_set()
       assert.is_true(name_prompted)
       assert.are.same(
-        { 'Switch repo-set and re-render all SKG buffers?' }, questions)
+        { 'Switch the skgrepo restriction and re-render all SKG buffers?' }, questions)
       assert.are.equal(1, #sent)
       assert.is_truthy(sent[1]:find('set skgrepo restriction', 1, true))
     end)

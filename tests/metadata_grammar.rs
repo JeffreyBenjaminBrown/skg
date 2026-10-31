@@ -142,7 +142,7 @@ fn each_kind_takes_only_its_own_parts (
     ( "(skg unknown (gnid u) (skgRepos (nodeRepo main)))",
       "The skgRepos of a headline of kind unknown holds only (relRepo R)" ),
     ( "(skg unknown (skgRepos (relRepo pub)))",
-      "An unknown requires its (gnid X)" ),
+      "An unknown viewnode requires its (gnid X)" ),
     ( "(skg restricted (gnid r) writeProtected)",
       "A headline of kind restricted does not take writeProtected" ),
     ( "(skg restricted (gnid r) (skgRepos (nodeRepo main)))",

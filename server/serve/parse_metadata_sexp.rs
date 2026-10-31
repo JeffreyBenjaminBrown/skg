@@ -818,7 +818,7 @@ fn kind_with_its_parts (
       let relRepo_request : Option<SkgrepoName> =
         relRepo_request_alone (atom, written . edit_request) ?;
       let gnid : ID = written . gnid . ok_or_else ( || match kind {
-        GnidOnlyKind::Unknown    => "An unknown requires its (gnid X)",
+        GnidOnlyKind::Unknown    => "An unknown viewnode requires its (gnid X)",
         GnidOnlyKind::Restricted => "A restricted viewnode requires its (gnid X)", }
         . to_string () ) ?;
       Ok ( MetadataKind::GnidOnly ( GnidOnlyMetadata {

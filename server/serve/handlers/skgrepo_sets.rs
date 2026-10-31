@@ -43,18 +43,18 @@ pub fn handle_skgrepo_set_request (
       // sends, but either client may have locked buffers and set its
       // stream-in-progress guard (Emacs's 'skg--stream-in-progress',
       // Neovim's 'stream_in_progress' in 'nvim/lua/skg/lock.lua')
-      // before any repo-set request, so even these paths
+      // before any switch request, so even these paths
       // answer in the unwinding shape.
       refuse_unwinding (
-        stream, skgrepo_restriction, "not a repo-set request"),
+        stream, skgrepo_restriction, "not a request to switch the skgrepo restriction"),
     Err (e) =>
       refuse_unwinding (stream, skgrepo_restriction, &e), }}
 
-/// Under a skgrepo restriction (the API doc's "Restricted-skgrepo nodes"): a repo-set switch
+/// Under a skgrepo restriction (the API doc's "Restricted-skgrepo nodes"): a switch
 /// re-renders open views in place rather than closing them. The
 /// refresh brings each view under the new skgrepo restriction: an occurrence
 /// of a node the skgrepo restriction now keeps out becomes a restricted
-/// headline where its record is visible, and vanishes elsewhere; a
+/// viewnode where its record is visible, and vanishes elsewhere; a
 /// member whose record it keeps out vanishes; and what a skgrepo
 /// widening reveals is drawn. A folder the
 /// skgrepo restriction empties stays, empty, as any empty editable folder

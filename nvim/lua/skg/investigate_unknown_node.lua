@@ -15,7 +15,7 @@ local M = {}
 
 local BUFFER_NAME = 'skg://unknown-node'
 
----Investigate the unknown headline at point; elsewhere, prompt for
+---Investigate the unknown viewnode at point; elsewhere, prompt for
 ---the ID.
 ---@param gnid string|nil for tests; taken from point or prompted when nil
 function M.investigate_unknown_node (gnid)

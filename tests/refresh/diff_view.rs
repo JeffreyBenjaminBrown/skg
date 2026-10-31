@@ -569,6 +569,5 @@ fn a_switch_leaves_out_a_member_whose_record_is_private () {
   assert_eq! ( outline (&forest), "\
 node p
   changesetMarker content",
-    "c is left out; the changeset marker of p's content stays (filed in \
-     'TODO/problems.org': it says that p's content changed by a \
-     restricted record)" ); }
+    "c is left out; the changeset marker of p's content stays, though \
+     the change it tells of is a restricted record's" ); }

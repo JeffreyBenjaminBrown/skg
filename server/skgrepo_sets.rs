@@ -1,5 +1,10 @@
 //! The skgrepo restriction and its two questions
 //! ('SkgrepoRestriction', 'record_is_visible', 'node_is_restricted').
+//! .
+//! The principle: the skgrepo restriction limits what can be edited
+//! as well as what can be seen. What the user could not see the user
+//! did not edit, so no write may change a record, a section or a node
+//! file it keeps out, nor act on the buffer's silence about one.
 
 use crate::types::misc::{RelPartner, SkgConfig, SkgrepoName};
 

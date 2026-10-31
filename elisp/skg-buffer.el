@@ -155,7 +155,7 @@ view-forest edits do not change it.")
   (setq skg-clean-baseline
         (buffer-substring-no-properties (point-min) (point-max)))
   (setq skg-clean-baseline-context
-        (list :repo-set "unavailable")))
+        (list :skgrepo-restriction "unavailable")))
 
 (defun skg-content-view-buffer-name (org-text)
   "Generate buffer name for content view from ORG-TEXT."

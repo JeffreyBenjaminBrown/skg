@@ -1,5 +1,5 @@
 -- PURPOSE: Export Skg data to plain .org files. All the logic is in
--- Rust; this command picks a skgrepo-set (client-side, with the
+-- Rust; this command picks a skgrepo restriction (client-side, with the
 -- cycling selector) and an output dir, sends the request, and shows
 -- the server's report. The Lua port of elisp/skg-request-export-org.el.
 

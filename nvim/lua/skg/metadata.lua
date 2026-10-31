@@ -634,7 +634,7 @@ function M.set_claim (claims)
   local kind = fields.kind_of_sexp(metadata_sexp or { SKG })
   if not vim.tbl_contains(fields.field_names(kind), 'noClaim') then
     error(string.format(
-      'Cannot %s: a headline of kind %s claims no membership',
+      'Cannot %s: a headline of this kind (%s) claims no membership',
       verb, kind.kind), 0) end
   local ancestors = M.ancestor_metadata_sexps_in_lines(
     vim.api.nvim_buf_get_lines(0, 0, -1, false),
@@ -651,7 +651,13 @@ function M.set_claim (claims)
     return 'This headline claims nothing already; nothing to detach.'
   end
   if claims then
+    local pending = M.pending_detachment_p(
+      metadata_sexp, ancestors[1], ancestors[2])
     M.edit_metadata_at_point(sexpr.read('(skg (DELETE noClaim))'))
+    if pending then
+      return 'Attached: the detachment is cancelled; the next save keeps'
+        .. " this headline in its parent's list."
+    end
     return "Attached: the next save puts this headline in its parent's list."
   end
   M.edit_metadata_at_point(sexpr.read(
@@ -1209,7 +1215,7 @@ end
 
 ---@param metadata_sexp any
 ---@return boolean is it a gnid-only vognode's, one that shows only
----its gnid: a reference to an unknown node or a restricted headline?
+---its gnid: an unknown viewnode or a restricted viewnode?
 ---Either takes a relRepo request, as a relationship member. Mirrors
 ---skg--gnid-only-vognode-sexp-p.
 function M.gnid_only_vognode_sexp_p (metadata_sexp)
@@ -1484,8 +1490,8 @@ function M.writable_folder_sexp_p (metadata_sexp)
 end
 
 ---@param metadata_sexp any|nil
----@return string|nil the raw member ID of an occurrence, a reference
----to an unknown node or a restricted headline. Mirrors
+---@return string|nil the raw member ID of an occurrence, an unknown
+---viewnode or a restricted viewnode. Mirrors
 ---skg--relationship-member-id.
 function M.relationship_member_id (metadata_sexp)
   if not (M.occurrence_sexp_p(metadata_sexp)
@@ -1499,8 +1505,8 @@ end
 ---contains the headline's node; for a writable folder's member, the
 ---folder's viewparent records the folder's relation toward
 ---it. Errors where the headline represents no writable relationship:
----off an occurrence, a reference to an unknown node or a restricted
----headline, on a root headline, under a write-protected folder,
+---off an occurrence, an unknown viewnode or a restricted viewnode,
+---on a root headline, under a write-protected folder,
 ---parent or folder's viewparent, or with an ID missing. Mirrors
 ---skg--rel-at-point.
 ---@param line_number integer
@@ -1511,8 +1517,8 @@ function M.rel_at_line (line_number)
   local member_sexp = M.metadata_sexp_at_line_or_nil(line_number)
   if not (M.occurrence_sexp_p(member_sexp)
           or M.gnid_only_vognode_sexp_p(member_sexp)) then
-    error('Not on an occurrence, a reference to an unknown node'
-          .. ' or a restricted headline', 0) end
+    error('Not on an occurrence, an unknown viewnode or a restricted'
+          .. ' viewnode', 0) end
   local member_gnid = M.relationship_member_id(member_sexp)
   local parent = M.parent_line(line_number)
   local parent_sexp = parent and M.metadata_sexp_at_line_or_nil(parent)
@@ -1620,7 +1626,7 @@ end
 ---@return string what the next save will do with the relationship
 function M.apply_relRepo_choice (line_number, choice)
   if M.node_edit_request_at_line_p(line_number) then
-    error('Cannot request a relRepo where delete or merge is pending', 0) end
+    error('Cannot request a relRepo where a delete, merge or flag request is pending', 0) end
   if choice == M.relRepo_no_override then
     if not M.relRepo_requested_value(line_number) then
       return 'No override present; nothing to remove.' end
@@ -1796,7 +1802,7 @@ function M.set_relRepo_recursive_walk (line_number, kind, choice)
   -- Do not let a late conflict leave earlier targets edited.
   for _, target in ipairs(targets) do
     if M.node_edit_request_at_line_p(target) then
-      error('Cannot request a relRepo where delete or merge is pending', 0)
+      error('Cannot request a relRepo where a delete, merge or flag request is pending', 0)
     end
   end
   for _, target in ipairs(targets) do
@@ -1850,8 +1856,8 @@ function M.relRepo_recursive_targets (line_number, kind)
   return targets
 end
 
----Is the headline at LINE_NUMBER an occurrence claiming membership, a
----reference to an unknown node or a restricted headline, whose
+---Is the headline at LINE_NUMBER an occurrence claiming membership,
+---an unknown viewnode or a restricted viewnode, whose
 ---relationship to its view-parent is of KIND and is collected at save from this position?
 ---For 'content', the view-parent is an editable occurrence not in
 ---subscribee-as-such position; for 'subscribee' and 'overridden', it is

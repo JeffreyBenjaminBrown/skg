@@ -17,7 +17,9 @@
 //!   This does not touch it. The refresh of the save's rerender
 //!   makes it vanish.
 //! .
-//! Both E's content and R's hides are read by the records the
+//! The skgrepo restriction limits what can be edited as well as what
+//! can be seen ('server/skgrepo_sets.rs'), so both E's content and R's
+//! hides are read by the records the
 //! skgrepo restriction shows, as the view drew them: a hide whose
 //! record is restricted is neither removed nor moved, and no hide is
 //! inferred of a member that only a restricted record of E's
@@ -209,10 +211,10 @@ fn apply_hiddenoutside_edits (
 /// dismissed (docs/sharing-model.org: branches deleted from a clone
 /// become hides). Symmetrically, re-adding such a child to F's
 /// contains drops a stale hide of it by F. Details:
-/// - Members whose records the restricted skgrepo-set keeps out were
+/// - Members whose records the skgrepo restriction keeps out were
 ///   omitted from the buffer, not removed, so they never count as
 ///   removals ('SkgrepoRestriction::record_is_visible'). A member
-///   with a visible record had a headline (a restricted headline,
+///   with a visible record had a headline (a restricted viewnode,
 ///   where the skgrepo restriction keeps out its node), so its absence
 ///   is a removal.
 /// - A child the same save explicitly shows through one of F's

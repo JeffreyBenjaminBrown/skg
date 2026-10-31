@@ -337,8 +337,8 @@ fn run_import (
 /// 'skg-export-some-to-org' (the "export to org" TCP endpoint); this
 /// subcommand runs the same core for scripting and testing.
 ///
-/// USAGE: cargo run --bin skg -- export-org [config-path] [skgrepo-set] [output-dir] [--include-overPrivateText-telescopes]
-/// (skgrepo-set, the most private skgrepo to export, defaults to the
+/// USAGE: cargo run --bin skg -- export-org [config-path] [skgrepo-restriction] [output-dir] [--include-overPrivateText-telescopes]
+/// (skgrepo-restriction, the most private skgrepo to export, defaults to the
 /// config's most private skgrepo, output-dir to "org-exports").
 /// output-dir is resolved against the current working directory; an
 /// absolute path is used as-is.

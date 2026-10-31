@@ -144,7 +144,7 @@ pub struct CloneSkgrepoInputs {
 /// all -- only then does 'ForkRepoUnresolved' fire. (The chosen
 /// skgrepo is validated owned + unrestricted later, in
 /// 'validate_fork_specs'; resolution here only fills it. The default
-/// is active-aware so that, under a restricted skgrepo-set with both
+/// is active-aware so that, under a skgrepo restriction with both
 /// a restricted and an unrestricted owned skgrepo, the fork still reaches the
 /// confirmation buffer rather than dead-ending on
 /// 'ForkRepoRestricted'.)
@@ -259,7 +259,7 @@ pub fn build_fork_confirmation_buffer (
      it).\n\
      APPROVE with C-c C-c: the source buffer is re-saved, skgsave-committing\n\
      each fork into the repo its clone-to-be shows. A clone still\n\
-     showing PICK-A-REPO needs a real repo first: Emacs prompts\n\
+     showing PICK-A-REPO needs a real repo first: the client prompts\n\
      for each, or set one yourself with C-c s s on the clone-to-be's\n\
      headline.\n\
      DECLINE with C-c C-k (or kill this buffer): nothing is written.\n" );
@@ -312,7 +312,7 @@ fn forked_original_headline (
     . collect ();
   format! ( "** (skg {}) {}\n", parts . join (" "), title ) }
 
-/// Reject any fork that monogamy or the skgrepo-set forbids. Run after
+/// Reject any fork that monogamy or the skgrepo restriction forbids. Run after
 /// the clones are built (their skgrepos resolved) but before the save
 /// skgsave-commits anything:
 /// - *monogamy*: a node may have at most one owned overrider, so
@@ -325,7 +325,7 @@ fn forked_original_headline (
 ///   Inference and the default only ever yield owned skgrepos, but a
 ///   user-set skgrepo (typed, or hand-edited) might not be -- reject with
 ///   'ForkRepoNotOwned'.
-/// - *skgrepo-set*: the clone's owned skgrepo must be unrestricted under the
+/// - *skgrepo restriction*: the clone's owned skgrepo must be unrestricted under the
 ///   skgrepo restriction. Under a restricted set the user is not meant to
 ///   touch restricted skgrepos, and an invisible clone is never created
 ///   silently; reject with 'ForkRepoRestricted'.

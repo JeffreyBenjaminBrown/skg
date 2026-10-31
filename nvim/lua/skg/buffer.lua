@@ -143,7 +143,7 @@ end
 function M.capture_clean_baseline (buf)
   vim.b[buf].skg_clean_baseline = M.text(buf)
   vim.b[buf].skg_clean_baseline_context =
-    'repo-set unavailable'
+    'skgrepo restriction unavailable'
 end
 
 -- ── lifecycle ──────────────────────────────────────────────────────

@@ -40,7 +40,7 @@ describe('skg.keymaps refusals', function ()
                         level = vim.log.levels.ERROR } }, shown)
   end)
 
-  it('shows the skgrepo-set switch refusal of an unsaved view as one line,'
+  it("shows the switch's refusal of an unsaved view as one line,"
      .. ' from its key and from its Ex command', function ()
     local buf = helpers.buffer_with({ '* (skg node (gnid a)) a' })
     vim.b[buf].skg_view_id = 'view-a'
@@ -53,7 +53,7 @@ describe('skg.keymaps refusals', function ()
     keymaps.define_ex_commands()
     vim.cmd('SkgRestrictRepoSet')
     local refusal = 'skg: save or revert every skg view before switching'
-      .. ' the skgrepo-set'
+      .. ' the skgrepo restriction'
     assert.are.same({ { message = refusal, level = vim.log.levels.ERROR },
                       { message = refusal, level = vim.log.levels.ERROR } },
                     shown)

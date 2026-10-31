@@ -105,7 +105,7 @@ fn refuse_a_restricted_destination (
 ) -> Result<(), String> {
   if SkgrepoRestriction::node_is_restricted (skgrepo_restriction, destination) {
     return Err ( format! (
-      "Cannot import into the repo '{}': it is restricted under the current repo-set. Activate it first; nothing invisible is written silently.",
+      "Cannot import into the repo '{}': the skgrepo restriction keeps it out. Activate it first; nothing invisible is written silently.",
       destination )); }
   Ok (( )) }
 

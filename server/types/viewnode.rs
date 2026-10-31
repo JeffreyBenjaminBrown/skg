@@ -190,7 +190,7 @@ pub enum VognodeKind {
 
 impl VognodeKind {
   /// What a message says a headline became: "an occurrence", "a
-  /// ghost", "a reference to an unknown node", "restricted". A message
+  /// ghost", "an unknown viewnode", "a restricted viewnode". A message
   /// to the user never names the type.
   pub fn what_a_headline_becomes (
     &self,
@@ -199,8 +199,9 @@ impl VognodeKind {
       VognodeKind::Occurrence => "an occurrence",
       VognodeKind::Ghost      => "a ghost",
       VognodeKind::GnidOnly (GnidOnlyKind::Unknown)    =>
-        "a reference to an unknown node",
-      VognodeKind::GnidOnly (GnidOnlyKind::Restricted) => "restricted", } }
+        "an unknown viewnode",
+      VognodeKind::GnidOnly (GnidOnlyKind::Restricted) =>
+        "a restricted viewnode", } }
 }
 
 /// Why a gnid-only vognode shows nothing of a node.

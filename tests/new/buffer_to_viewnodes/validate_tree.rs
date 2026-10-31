@@ -1021,8 +1021,8 @@ fn a_folder_refusing_a_childs_kind_says_nothing_of_noClaim () {
       . expect_err ("an alias folder is no child of these folders")
       . message;
     assert! ( message . contains ("children")
-              && message . contains ("restricted headlines")
-              && message . contains ("references to unknown nodes")
+              && message . contains ("restricted viewnodes")
+              && message . contains ("unknown viewnodes")
               && ! message . contains ("noClaim"),
               "{}", message ); }}
 

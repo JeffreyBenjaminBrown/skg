@@ -1,5 +1,5 @@
 -- PURPOSE: The rerender stream (rerender-lock -> rerender-view* ->
--- rerender-done), shared by the skgrepo-set switch, the explicit
+-- rerender-done), shared by the switch of the skgrepo restriction, the explicit
 -- rerender-all request, and the requests a rerender stream follows,
 -- with the prologue those requests share (send_streaming_request).
 -- The Lua port of elisp/skg-request-rerender-all-views.el.

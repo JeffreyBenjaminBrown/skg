@@ -62,13 +62,13 @@ end
 ---@param name string|nil
 function M.restrict_repo_set (name, approved_pids)
   if #buffer.unsaved_view_buffers(nil) > 0 then
-    error('skg: save or revert every skg view before switching the skgrepo-set')
+    error('skg: save or revert every skg view before switching the skgrepo restriction')
   end
   name = name or picker.prompt_for_repo_set()
   if not name then return end
   if not approved_pids and #vim.api.nvim_list_uis() > 0
      and vim.fn.confirm(
-       'Switch repo-set and re-render all SKG buffers?',
+       'Switch the skgrepo restriction and re-render all SKG buffers?',
        '&Yes\n&No', 2) ~= 1 then
     return end
   local request = {

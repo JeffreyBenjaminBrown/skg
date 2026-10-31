@@ -19,7 +19,7 @@ use crate::types::nodes::complete::Graphnode;
 use std::net::TcpStream;
 use std::path::PathBuf;
 
-/// Export every export root, restricted to the requested skgrepo-set,
+/// Export every export root, under the requested skgrepo restriction,
 /// into a chosen directory. Two required request fields:
 /// `(repo-set . "NAME")` -- the set the client picked (with its
 /// circular selector) -- and `(output-dir . "PATH")` -- where to

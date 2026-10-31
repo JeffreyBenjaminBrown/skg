@@ -48,6 +48,23 @@ describe('skg.metadata detach and attach', function ()
     assert.is_truthy(notified[1]:match('^Attached'))
   end)
 
+  it('attach says what the save does: keeps a pending detachment,'
+     .. ' puts an unwarranted child', function ()
+    buffer_with(editable_parent
+      .. '\n** (skg node (gnid c) (skgRepos (nodeRepo r)) noClaim) c', 2)
+    metadata.attach()
+    vim.api.nvim_buf_delete(vim.api.nvim_get_current_buf(), { force = true })
+    buffer_with(editable_parent
+      .. '\n** (skg node (gnid c) (skgRepos (nodeRepo r)) noClaim'
+      .. ' (view noWarrant)) c', 2)
+    metadata.attach()
+    assert.are.same({
+      "Attached: the detachment is cancelled; the next save keeps this"
+        .. " headline in its parent's list.",
+      "Attached: the next save puts this headline in its parent's list." },
+      notified)
+  end)
+
   it('detach gives a headline without metadata the node atom', function ()
     buffer_with(editable_parent .. '\n** a typed child', 2)
     metadata.detach()

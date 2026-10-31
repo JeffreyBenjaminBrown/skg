@@ -11,7 +11,7 @@
   "Capture a literal Skg link's target ID and label in a view buffer.")
 
 (defvar skg-link-annotations--cache (make-hash-table :test 'equal)
-  "Status by literal ID for the current graph and repo-set lifetime.")
+  "Status by literal ID for the current graph and skgrepo restriction.")
 (defvar skg-link-annotations--requests (make-hash-table :test 'equal)
   "Outstanding request ID to (buffer buffer-generation tick epoch ids).")
 (defvar skg-link-annotations--next-request 0)
@@ -251,7 +251,7 @@ character."
                (skg-link-annotations--scan)))))))))
 
 (defun skg-link-annotations-invalidate-all ()
-  "Expire lookup results after a graph or repo-set change."
+  "Expire lookup results after a change of the graph or of the skgrepo restriction."
   (cl-incf skg-link-annotations--epoch)
   (clrhash skg-link-annotations--cache)
   (dolist (buffer (buffer-list))

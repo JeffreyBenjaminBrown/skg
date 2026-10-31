@@ -13,8 +13,8 @@
 (require 'skg-request-save) ; for skg-big-nonfatal-message, skg-report-mode
 
 (defun skg-investigate-unknown-node ()
-  "Show what git history says about an unknown node.
-The ID is the one of the unknown headline at point; elsewhere, it is
+  "Show what git history says about an unknown graphnode.
+The ID is the one of the unknown viewnode at point; elsewhere, it is
 read from the minibuffer."
   (interactive)
   (let ((gnid (or (skg--unknown-node-id-at-point)

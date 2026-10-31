@@ -956,7 +956,7 @@ pub fn multi_root_view_with_skgrepo_set (
   skgrepo_restriction : &SkgrepoRestriction,
 ) -> Result < (String, Vec<ID>, Tree<Viewnode>),
               Box<dyn Error> > {
-  // multi_root_view_inner applies the skgrepo set during rendering (inside
+  // multi_root_view_inner applies the skgrepo restriction during rendering (inside
   // multi_root_view_via_env), so this wrapper just forwards it.
   multi_root_view_inner (
     config, tantivy_index, root_gnids,

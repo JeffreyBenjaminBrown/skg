@@ -177,7 +177,7 @@ fn idFolder_membership_errors (
 /// must be on N's owned override chain
 /// ('carrier_on_owned_chain', visibility-ungated so ownership
 /// still gates but a part honest when rendered does not start
-/// failing after a skgrepo-set switch). With chains the shown node can
+/// failing after a switch of the skgrepo restriction). With chains the shown node can
 /// be a middle link (when a later link's mentioner is hidden), so the
 /// check accepts any honest carrier and rejects only an off-chain
 /// fact.
@@ -262,7 +262,7 @@ fn validate_view_roots (
         | ViewnodeKind::Vognode (Vognode::Ghost (_)))
     { errors . push (
         BufferValidationError::Other (
-          "View roots must be Occurrences, tombstones, restricted headlines, references to unknown nodes or ghosts."
+          "View roots must be Occurrences, tombstones, restricted viewnodes, unknown viewnodes or ghosts."
           . to_string () )); }}}
 
 /// No two nodes with the same ID may carry editable view requests,

@@ -26,7 +26,7 @@ Does not save; call `skg-request-save-buffer' afterward."
 (defun skg-delete-recursive ()
   "Mark the headline at point, and every occurrence viewdescendant of it,
 for deletion. Descendent headlines that are not occurrences (ghosts,
-unknowns, aliasFolder, id-folder, etc.) are skipped. Does not save;
+unknown viewnodes, aliasFolder, id-folder, etc.) are skipped. Does not save;
 call `skg-request-save-buffer' afterward."
   (interactive)
   (unless (org-at-heading-p)
@@ -59,7 +59,8 @@ afterward."
 
 (defun skg-attach ()
   "Remove 'noClaim' from the headline at point, so that the next save
-puts it in its parent's list. Refuses a headline whose parent reads
+puts it in its parent's list, or, on a pending detachment
+\(`skg--pending-detachment-p'), keeps it there. Refuses a headline whose parent reads
 no claims (`skg--reads-claims-p'), and one that claims
 membership already. Does not save; call `skg-request-save-buffer'
 afterward."
@@ -80,7 +81,7 @@ reads no claims."
          (kind (skg-metadata-fields-kind-of-sexp (or metadata-sexp '(skg))))
          (ancestors (skg--ancestor-metadata-sexps-on-line 2)))
     (unless (member "noClaim" (skg-metadata-fields-field-names kind))
-      (user-error "Cannot %s: a headline of kind %s claims no membership"
+      (user-error "Cannot %s: a headline of this kind (%s) claims no membership"
                   verb (alist-get 'kind kind)))
     (unless (skg--reads-claims-p (nth 0 ancestors) (nth 1 ancestors))
       (user-error "Cannot %s: the parent reads no claims (it is write-protected, or no editable node), so no child claims membership of it"
@@ -90,8 +91,12 @@ reads no claims."
                "This headline claims membership already; nothing to attach."
              "This headline claims nothing already; nothing to detach."))
           (claims
-           (skg-edit-metadata-at-point '(skg (DELETE noClaim)))
-           "Attached: the next save puts this headline in its parent's list.")
+           (let ((pending (skg--pending-detachment-p
+                           metadata-sexp (nth 0 ancestors) (nth 1 ancestors))))
+             (skg-edit-metadata-at-point '(skg (DELETE noClaim)))
+             (if pending
+                 "Attached: the detachment is cancelled; the next save keeps this headline in its parent's list."
+               "Attached: the next save puts this headline in its parent's list.")))
           (t
            (skg-edit-metadata-at-point
             (if metadata-sexp '(skg noClaim) '(skg node noClaim)))
@@ -273,7 +278,7 @@ for a content child, the viewparent contains the node at point; for
 a writable-folder member, the folder's viewparent owns the folder's
 relation toward the node at point. Signals `user-error'
 when point represents no writable relationship: not on an occurrence,
-a reference to an unknown node or a restricted headline, on a root
+an unknown viewnode or a restricted viewnode, on a root
 headline (no viewparent, so no relationship), on a member of a write-protected folder, or with
 an ID missing."
   (unless (org-at-heading-p)
@@ -281,7 +286,7 @@ an ID missing."
   (let ((member-sexp (skg--metadata-sexp-at-point-or-nil)))
     (unless (or (skg--occurrence-sexp-p member-sexp)
                 (skg--gnid-only-vognode-sexp-p member-sexp))
-      (user-error "Not on an occurrence, a reference to an unknown node or a restricted headline"))
+      (user-error "Not on an occurrence, an unknown viewnode or a restricted viewnode"))
     (let ((member-gnid (skg--relationship-member-id member-sexp))
           (parent-sexp (save-excursion
                          (and (org-up-heading-safe)
@@ -396,7 +401,7 @@ explicitly.")
 Edits only the buffer; returns a message string describing what the
 next save will do with the relationship."
   (when (skg--node-edit-request-at-point-p)
-    (user-error "Cannot request a relRepo where delete or merge is pending"))
+    (user-error "Cannot request a relRepo where a delete, merge or flag request is pending"))
   (if (equal choice skg--relRepo-no-override)
       (if (skg--relRepo-requested-value)
           (progn
@@ -598,7 +603,7 @@ writable folders. Returns how many headlines it applied CHOICE to."
       (save-excursion
         (goto-char marker)
         (when (skg--node-edit-request-at-point-p)
-          (user-error "Cannot request a relRepo where delete or merge is pending"))))
+          (user-error "Cannot request a relRepo where a delete, merge or flag request is pending"))))
     (dolist (marker targets)
       (save-excursion
         (goto-char marker)
@@ -640,13 +645,13 @@ command, but does not edit anything."
               (outline-next-heading))
              ((skg--writable-folder-sexp-p meta)
               (outline-next-heading))
-             (t ;; write-protected folders, alias/ID folders, ghosts and unknowns.
+             (t ;; write-protected folders, alias/ID folders, ghosts.
               (skg--goto-next-headline-after-subtree))))))
       (nreverse targets))))
 
 (defun skg--relationship-kind-matches-p (kind)
-  "Non-nil iff the headline at point is a true occurrence, a
-reference to an unknown node or a restricted headline whose
+  "Non-nil iff the headline at point is a true occurrence, an
+unknown viewnode or a restricted viewnode whose
 relationship to its view-parent is of KIND, writable-and-collected
 from this position: for `content', the view-parent must be a
 editable occurrence not in subscribee-as-such position (an
@@ -1098,7 +1103,7 @@ parentheses (`skg-find-sexp-end'; see 'elisp/PITFALLs.org')."
 
 (defun skg--vognode-sexp-p (metadata-sexp)
   "Non-nil iff METADATA-SEXP is a vognode's: an occurrence,
-a ghost, a reference to an unknown node or a restricted headline."
+a ghost, an unknown viewnode or a restricted viewnode."
   (and (consp metadata-sexp)
        (or (skg--occurrence-sexp-p metadata-sexp)
            (skg--ghost-sexp-p metadata-sexp)
@@ -1224,12 +1229,12 @@ METADATA-SEXP is not an occurrence's)."
        (skg--metadata-gnid metadata-sexp)))
 
 (defun skg--unknown-headline-p (metadata-sexp)
-  "Return non-nil when METADATA-SEXP is an unknown."
+  "Return non-nil when METADATA-SEXP is an unknown viewnode's."
   (and metadata-sexp
        (skg-sexp-subtree-p metadata-sexp '(skg unknown))))
 
 (defun skg--restricted-headline-p (metadata-sexp)
-  "Return non-nil when METADATA-SEXP is a restricted headline's: one
+  "Return non-nil when METADATA-SEXP is a restricted viewnode's: one
 standing for a node the skgrepo restriction keeps out, which a visible
 record names."
   (and metadata-sexp
@@ -1237,20 +1242,20 @@ record names."
 
 (defun skg--gnid-only-vognode-sexp-p (metadata-sexp)
   "Return non-nil when METADATA-SEXP is a vognode's that shows only
-its gnid: a reference to an unknown node or a restricted headline.
+its gnid: an unknown viewnode or a restricted viewnode.
 Either takes a relRepo request, as a relationship member."
   (or (skg--unknown-headline-p metadata-sexp)
       (skg--restricted-headline-p metadata-sexp)))
 
 (defun skg--relationship-member-id (metadata-sexp)
-  "Return the raw member ID for an occurrence, a reference to an
-unknown node or a restricted headline."
+  "Return the raw member ID for an occurrence, an unknown viewnode
+or a restricted viewnode."
   (and (or (skg--occurrence-sexp-p metadata-sexp)
            (skg--gnid-only-vognode-sexp-p metadata-sexp))
        (skg--metadata-gnid metadata-sexp)))
 
 (defun skg--unknown-node-id-at-point ()
-  "The ID of the unknown whose headline is at point, or nil."
+  "The ID of the unknown viewnode at point, or nil."
   (let ((metadata (skg--metadata-sexp-at-point-or-nil)))
     (when (skg--unknown-headline-p metadata)
       (skg--metadata-gnid metadata))))

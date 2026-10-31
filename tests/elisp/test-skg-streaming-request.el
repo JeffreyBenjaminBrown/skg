@@ -166,7 +166,7 @@ view clean it asks its question and sends the request."
                                           #'skg-restrict-repo-set))))
           (let ((err (should-error (funcall switch) :type 'user-error)))
             (should (equal (cadr err)
-                           "Save or revert every skg view before switching the skgrepo-set"))))
+                           "Save or revert every skg view before switching the skgrepo restriction"))))
         (should-not name-prompted)
         (should (null questions))
         (should (null sent))
@@ -174,7 +174,7 @@ view clean it asks its question and sends the request."
         (call-interactively #'skg-restrict-repo-set)
         (should name-prompted)
         (should (equal questions
-                       '("Switch repo-set and re-render all SKG buffers? ")))
+                       '("Switch the skgrepo restriction and re-render all SKG buffers? ")))
         (should (= 1 (length sent)))
         (should (string-match-p "set skgrepo restriction" (car sent)))))))
 

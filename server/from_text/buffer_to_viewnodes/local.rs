@@ -220,7 +220,7 @@ fn validate_hiddenInSubscribee_folder (
            || matches! ( &node . kind,
                          ViewnodeKind::Vognode (Vognode::GnidOnly (_)) )))
     { errors . push(
-        "HiddenInSubscribeeFolder's children can only be Occurrences, tombstones, restricted headlines or references to unknown nodes (to hide)."
+        "HiddenInSubscribeeFolder's children can only be Occurrences, tombstones, restricted viewnodes or unknown viewnodes (to hide)."
         . to_string()); }
   if !siblings_cannot_include(
     tree, treeid,
@@ -253,7 +253,7 @@ fn validate_hiddenOutsideOfSubscribee_folder (
     tombstone_or (|node| node . is_occurrence ()
            || matches! ( &node . kind,
                          ViewnodeKind::Vognode (Vognode::GnidOnly (_)) )))
-    { errors . push("HiddenOutsideOfSubscribeeFolder's children must include only Occurrences, tombstones, restricted headlines or references to unknown nodes." . to_string()); }
+    { errors . push("HiddenOutsideOfSubscribeeFolder's children must include only Occurrences, tombstones, restricted viewnodes or unknown viewnodes." . to_string()); }
   if !siblings_cannot_include(
     tree, treeid,
     |node| matches!(&node . kind,
@@ -285,7 +285,7 @@ fn validate_subscribeefolder (
                       | ViewnodeKind::Vognode (Vognode::Ghost (_)) // a former member, in the diff view; save-inert
                       | ViewnodeKind::Folder (
                           Folder::HiddenOutsideOfSubscribee) )))
-    { errors . push( "SubscribeeFolder's children must include only Occurrences, tombstones, ghosts, restricted headlines, references to unknown nodes, or HiddenOutsideOfSubscribeeFolder." . to_string()); }
+    { errors . push( "SubscribeeFolder's children must include only Occurrences, tombstones, ghosts, restricted viewnodes, unknown viewnodes, or HiddenOutsideOfSubscribeeFolder." . to_string()); }
   // There is no duplicate-member check here: subscribeeFolder is a
   // defining folder, and duplicate members of defining folders are
   // silently deduplicated at emission rather than bouncing the save.
@@ -314,7 +314,7 @@ fn validate_relation_folder (
                        // a member whose node no graph has, or the
                        // skgrepo restriction keeps out
                        | ViewnodeKind::Vognode (Vognode::GnidOnly (_)))))
-    { errors . push(format!("{}'s children must include only Occurrences, tombstones, ghosts, restricted headlines or references to unknown nodes.", label)); }
+    { errors . push(format!("{}'s children must include only Occurrences, tombstones, ghosts, restricted viewnodes or unknown viewnodes.", label)); }
   if !siblings_cannot_include(
     tree, treeid,
     |node| matches!(&node . kind,

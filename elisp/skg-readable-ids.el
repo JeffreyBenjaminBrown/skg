@@ -32,10 +32,10 @@ response is matched to the oldest pending request.")
 (defvar skg-readable-ids--title-cache (make-hash-table :test 'equal)
   "Session-global map from node ID to its title, or to `:missing'
 for an ID the server did not resolve (unknown to it, or restricted
-under the current repo-set). Retained across magit refreshes so
+by the current skgrepo restriction). Retained across magit refreshes so
 that a staging event re-requests nothing it has already seen; a
 refresh whose IDs are all cached sends no request at all. Can go
-stale -- a node retitled, the repo-set widened -- in which case
+stale -- a node retitled, a skgrepo widening -- in which case
 `skg-readable-ids-refresh' rebuilds it.")
 
 (defun skg-readable-ids-refresh ()

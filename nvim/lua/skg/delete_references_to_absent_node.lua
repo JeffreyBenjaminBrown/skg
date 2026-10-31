@@ -59,7 +59,7 @@ end
 
 function M.delete_references_to_absent_node ()
   local gnid = metadata.unknown_node_id_at_point()
-  if not gnid then error('skg: point must be on an Unknown headline') end
+  if not gnid then error('skg: point must be on an unknown viewnode') end
   if #buffer.unsaved_view_buffers(nil) > 0 then
     error('skg: save or revert every skg view before global reference cleanup') end
   send(gnid, nil)

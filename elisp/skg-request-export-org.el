@@ -2,7 +2,7 @@
 ;;;
 ;;; PURPOSE: skg-export-some-to-org -- export Skg data to plain .org
 ;;; files under org-exports/. All the logic is in Rust; this command
-;;; picks a skgrepo-set (client-side, with the circular selector) and
+;;; picks a skgrepo restriction (client-side, with the circular selector) and
 ;;; sends the "export to org" request, then shows the server's report.
 
 (require 'skg-config)         ; skg--prompt-for-repo-set

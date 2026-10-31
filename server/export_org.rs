@@ -5,7 +5,7 @@
 //! the instruction node EXPORT_MARKER_ID and whose body yields a
 //! `target_filepath` -- is written to
 //! `<output_base>/<target_filepath>.org` as a recursive content
-//! view, restricted to a chosen skgrepo-set, stripped of skg metadata,
+//! view, under a chosen skgrepo restriction, stripped of skg metadata,
 //! with `[[id:..][label]]` links rewritten to relative org links.
 //!
 //! The core (`export_to_org`) takes nodes + an SkgrepoRestriction + an
@@ -359,8 +359,8 @@ fn discover_roots (
         parent . pid, target ) ); }
     if SkgrepoRestriction::node_is_restricted (restriction, &parent . home_skgrepo) {
       warnings . push ( format! (
-        "export root {} is in repo {} which is restricted under \
-         repo-set {}; skipping",
+        "export root {} is in skgrepo {}, which the skgrepo restriction \
+         {} keeps out; skipping",
         parent . pid, parent . home_skgrepo, restriction . most_private_shown ) );
       continue; }
     if let Some (owner) = target_owner . get (&target) {
@@ -639,7 +639,7 @@ fn rewrite_links (
           None => {
             warnings . push ( format! (
               "broken link to {} ({:?}): not exported under this \
-               repo-set, and the broken-link note is not either; \
+               skgrepo restriction, and the broken-link note is not either; \
                emitting the label as plain text",
               pid, label ) );
             label . to_string () }, }}, } ); }

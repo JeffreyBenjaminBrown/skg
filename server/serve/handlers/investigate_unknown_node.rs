@@ -47,7 +47,7 @@ fn investigation_as_org (
   runtime     : &RuntimeGeneration,
   restriction : &SkgrepoRestriction,
 ) -> Result<String, String> {
-  require_unrestricted ("Investigating an unknown node", restriction) ?;
+  require_unrestricted ("Investigating an unknown graphnode", restriction) ?;
   let gnid : ID = ID::from ( value_from_request_sexp ("id", request) ? );
   if let Some (pid) = runtime . graph . pid_of (&gnid) {
     let node : &GraphnodeInRust = runtime . graph . get (&pid)

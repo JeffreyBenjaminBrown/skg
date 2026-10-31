@@ -258,11 +258,11 @@ impl std::fmt::Display for BufferValidationError {
       BufferValidationError::ForkAlreadyExists(original, existing) =>
         write!(f, "Cannot fork node {:?}: you have already forked it. Your clone is {:?}. Edit that clone instead (a node may have at most one owned override).", original, existing),
       BufferValidationError::ForkSkgrepoRestricted(gnid, skgrepo) =>
-        write!(f, "Cannot fork node {:?}: the clone's repo '{}' is restricted under the current repo-set. Activate it first; an invisible clone is never created silently.", gnid, skgrepo),
+        write!(f, "Cannot fork node {:?}: the clone's repo '{}' is kept out by the skgrepo restriction. Activate it first; an invisible clone is never created silently.", gnid, skgrepo),
       BufferValidationError::RecordSkgrepoRestricted(recorder, relation, member, skgrepo) =>
-        write!(f, "Cannot save node {:?}: its {} record of {} would land in repo '{}', which is restricted under the current repo-set. Activate it first; an invisible record is never created silently.", recorder, relation, member, skgrepo),
+        write!(f, "Cannot save node {:?}: its {} record of {} would land in repo '{}', which the skgrepo restriction keeps out. Activate it first; an invisible record is never created silently.", recorder, relation, member, skgrepo),
       BufferValidationError::RecordMovedOutOfRestrictedSkgrepo(recorder, relation, member, skgrepo) =>
-        write!(f, "Cannot save node {:?}: its {} record of {} would leave repo '{}', which is restricted under the current repo-set. Activate it first; a record you cannot see is never moved silently.", recorder, relation, member, skgrepo),
+        write!(f, "Cannot save node {:?}: its {} record of {} would leave repo '{}', which the skgrepo restriction keeps out. Activate it first; a record you cannot see is never moved silently.", recorder, relation, member, skgrepo),
       BufferValidationError::ForkSkgrepoNotOwned(gnid, skgrepo) =>
         write!(f, "Cannot fork node {:?}: the clone's repo '{}' is not one you own. Choose an owned repo for the clone (C-c s s in the confirmation buffer).", gnid, skgrepo),
       BufferValidationError::ForkRequestOnUnknownNode(gnid, headline) =>
@@ -282,7 +282,7 @@ impl std::fmt::Display for BufferValidationError {
       BufferValidationError::IDFolder_Edited(recorder, buffer_gnids, real_gnids, headline) =>
         write!(f, "The idFolder under node {:?} ({}) was edited (buffer claims {:?}; real ids are {:?}). Reordering is fine, but IDs cannot be added, removed or edited through the buffer; edit the .skg file directly.", recorder, headline, buffer_gnids, real_gnids),
       BufferValidationError::EditRequestOnWriteProtectedOccurrence (gnid, headline) =>
-        write!(f, "Edit request on write-protected node {:?} ({}). Ghosts and unknowns are write-protected; write-protected nodes cannot carry write instructions. Visit an editable view of the node first (C-c g RET).", gnid, headline),
+        write!(f, "Edit request on write-protected node {:?} ({}). Ghosts and unknown viewnodes are write-protected; write-protected nodes cannot carry write instructions. Visit an editable view of the node first (C-c g RET).", gnid, headline),
       BufferValidationError::EditedWriteProtectedOccurrence {
         gnid, title, changes, headline } =>
         write!(f, "The write-protected occurrence of node {:?} ({:?}, {}) differs from the graph ({}). A write-protected occurrence saves nothing of its own; edit an editable occurrence instead, or request this one editable (C-c s d).",
@@ -294,7 +294,7 @@ impl std::fmt::Display for BufferValidationError {
       BufferValidationError::FlagEditOnForeignNode (gnid, skgrepo) =>
         write! (f, "Cannot change flags of node {:?} from foreign repo '{}'; this gesture never creates an implicit fork.", gnid, skgrepo),
       BufferValidationError::FlagEditOnUnknownNode (gnid) =>
-        write! (f, "Cannot change flags of unsaved or unknown node {:?}; save the node first.", gnid),
+        write! (f, "Cannot change flags of unsaved or unknown graphnode {:?}; save the node first.", gnid),
       BufferValidationError::OverridesHere_Mismatch(carrier, original, effective, headline) =>
         write!(f, "Node {:?} ({}) carries the fact (overridesHere {:?}), but it is not on the override chain of that original (which resolves to {:?}). The fact looks hand-edited or stale; saving it would rewrite a contains list. Re-render the view and retry.", carrier, headline, original, effective),
       BufferValidationError::Other (msg) =>

@@ -65,7 +65,7 @@ replace."
                       (list (skg--prompt-for-repo-set))))
   (skg--refuse-repo-set-switch-while-views-unsaved)
   (when (or approved-pids
-            (yes-or-no-p "Switch repo-set and re-render all SKG buffers? "))
+            (yes-or-no-p "Switch the skgrepo restriction and re-render all SKG buffers? "))
     (skg--send-streaming-request
      "rerender" 'skgrepo-restriction
      (append `((request . "set skgrepo restriction")
@@ -92,6 +92,6 @@ names the skgrepo restriction, shown by its label."
 (defun skg--refuse-repo-set-switch-while-views-unsaved ()
   "Signal `user-error' while any view has unsaved edits."
   (when (skg--unsaved-view-buffers)
-    (user-error "Save or revert every skg view before switching the skgrepo-set")))
+    (user-error "Save or revert every skg view before switching the skgrepo restriction")))
 
 (provide 'skg-request-repo-sets)

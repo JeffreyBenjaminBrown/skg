@@ -8,11 +8,11 @@
 (require 'skg-request-save) ; for skg-big-nonfatal-message
 
 (defun skg-delete-references-to-absent-node ()
-  "Remove owned structured references to the Unknown headline at point."
+  "Remove owned structured references to the unknown viewnode at point."
   (interactive)
   (let ((gnid (skg--unknown-node-id-at-point)))
     (unless gnid
-      (user-error "Point must be on an Unknown headline"))
+      (user-error "Point must be on an unknown viewnode"))
     (when (skg--unsaved-view-buffers)
       (user-error "Save or revert every skg view before global reference cleanup"))
     (skg--delete-absent-send gnid nil)))

@@ -1,4 +1,5 @@
--- PURPOSE: The interactive skgrepo/skgrepo-set pickers.
+-- PURPOSE: The interactive pickers of a skgrepo and of the skgrepo
+-- restriction.
 -- The Lua port of the prompt half of elisp/skg-config.el
 -- ('skg--completing-read-with-cycle' and friends). The elisp built
 -- them on completing-read with S-left/S-right cycling in the

@@ -73,7 +73,7 @@ describe('skg absent-reference cleanup', function ()
       '* (skg node (gnid recorder)) recorder', 'skg://recorder', 'normal-view_id')
     local ok, err = pcall(cleanup.delete_references_to_absent_node)
     assert.is_false(ok)
-    assert.is_truthy(tostring(err):find('Unknown headline', 1, true))
+    assert.is_truthy(tostring(err):find('unknown viewnode', 1, true))
     vim.api.nvim_buf_set_lines(normal, 0, -1, false, {
       '* (skg unknown (gnid gone))' })
     vim.bo[normal].modified = true
