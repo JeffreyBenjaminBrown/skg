@@ -23,7 +23,7 @@ use crate::serve::util::{
 use crate::skgrepo_sets::{SkgrepoRestriction, require_unrestricted};
 use crate::types::env::SkgEnv;
 use crate::types::views_state::ViewforestId;
-use crate::update_buffer::RerenderedView;
+use crate::rerender_pass::{DiffViewBufferRerender, RerenderedView};
 
 use std::net::TcpStream;
 use std::sync::Arc;
@@ -54,7 +54,7 @@ pub fn handle_integrate_unshown_changes_request (
 
 /// The named buffer's registered viewforest, rerendered over the
 /// connection's graph straddle, brought up to date, with its unshown
-/// changes integrated ('RerenderSelector::IntegratingUnshownChanges'),
+/// changes integrated ('DiffViewBufferRerender::IntegratingUnshownChanges'),
 /// and the readiness summary of the result. Nothing is registered or sent. Refused
 /// unless the connection is unrestricted, as the diff view
 /// is, and unless the view is a buffer of the diff view.
@@ -75,7 +75,8 @@ fn integrate_unshown_changes (
     env, env . runtime_snapshot (), views_state,
     RerenderRequest {
       restriction : skgrepo_restriction,
-      selector    : RerenderSelector::IntegratingUnshownChanges (viewforest_id), } );
+      selector    : RerenderSelector::One (viewforest_id),
+      diffView_buffer_rerender : DiffViewBufferRerender::IntegratingUnshownChanges, } );
   let (Some (view), Some (straddle)) :
     (Option<&RerenderedView>, Option<&Arc<GraphStraddle>>) =
     (prepared . views . first (), prepared . graph_straddle . as_ref ())

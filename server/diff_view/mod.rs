@@ -1,10 +1,10 @@
 //! The diff view (C-c v d): up to four buffers, each rendered over the
 //! graph straddle ('server/graph_straddle/'). 'docs/diff-view.org'
 //! describes it; this module implements it:
-//! - 'pruned_change_view.rs': C, R, U and D, each buffer's sets, and
-//!   its stub roots;
-//! - 'buffer_rerender.rs': rendering and rerendering a whole buffer,
-//!   each a refresh in diff-view mode ('server/refresh/diff_view.rs');
+//! - 'pruned_change_view.rs': C, R, U and D, and each buffer's sets;
+//! - 'buffer_rerender.rs': a whole buffer, its stub roots, its first
+//!   rendering and its refresh, each a refresh in diff-view mode
+//!   ('server/refresh/diff_view.rs');
 //! - 'changes.rs': what changed about a node, and the change viewnodes
 //!   that say it;
 //! - 'change_viewnodes.rs': the diff view's own viewnodes;

@@ -17,6 +17,9 @@ use skg::types::viewnode::{
   Vognode, Warrant,
   mk_editable_viewnode, mk_writeProtected_viewnode, viewnode_of};
 
+/// The claim of a vognode built by hand that claims membership.
+const CLAIMS_MEMBERSHIP : bool = true;
+
 
 /// An editable node n of 'main' whose relationship to its viewparent
 /// is recorded in 'pub', and which stands for the original o.
@@ -55,7 +58,7 @@ fn each_kind_prints_its_parts_beside_its_atom (
   assert_eq! (
     rendered ( viewnode_of ( ViewnodeKind::Vognode ( Vognode::GnidOnly ( GnidOnlyVognode::new (
       GnidOnlyKind::Unknown, ID::from ("u"), Some ( SkgrepoName::from ("pub") ),
-      true, Warrant::ByGraph ) )))),
+      CLAIMS_MEMBERSHIP, Warrant::ByGraph ) )))),
     "unknown (gnid u) (skgRepos (relRepo pub))" );
   assert_eq! (
     rendered ( viewnode_of ( ViewnodeKind::PropertyMember ( PropertyMember::alias ( "an alias" . into (), Some ( SkgrepoName::from ("pub") ), None ) ))),

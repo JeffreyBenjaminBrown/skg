@@ -12,6 +12,7 @@
 //! ('stream_rerender_diffView_views'). Its roots stay, so a buffer whose
 //! changes were all committed comes back as plain context.
 
+use crate::rerender_pass::DiffViewBufferRerender;
 use crate::diff_view::change_leaves::{
   BufferReadinessSummary, ReadinessSummary, readiness_response_sexp,
   readiness_response_trailing_entries};
@@ -99,7 +100,8 @@ fn stream_rerender_diffView_views (
     RerenderRequest {
       restriction : skgrepo_restriction,
       selector    : RerenderSelector::Where ( Box::new (
-        |_, state| state . diffView_buffer_kind . is_some () )), } );
+        |_, state| state . diffView_buffer_kind . is_some () )),
+      diffView_buffer_rerender : DiffViewBufferRerender::RefreshOnly, } );
   stream_prepared_rerenders (stream, views_state, prepared);
 }
 

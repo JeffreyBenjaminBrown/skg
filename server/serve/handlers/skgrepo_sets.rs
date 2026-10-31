@@ -1,3 +1,4 @@
+use crate::rerender_pass::DiffViewBufferRerender;
 use crate::serve::ViewsState;
 use crate::serve::rerender_stream::{
   PreparedRerenders,
@@ -85,7 +86,8 @@ fn set_skgrepo_restriction (
       env, runtime, views_state,
       RerenderRequest {
         restriction : &restriction,
-        selector    : RerenderSelector::All, } );
+        selector    : RerenderSelector::All,
+        diffView_buffer_rerender : DiffViewBufferRerender::RefreshOnly, } );
   if ! authorize_prepared_rerenders (
     stream, &mut prepared, &restriction,
     "repo-set-switch-rerender",

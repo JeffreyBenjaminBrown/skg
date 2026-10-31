@@ -2,6 +2,7 @@
 //! every one the request does not exclude, through the shared
 //! rerender pipeline ('server/serve/rerender_stream.rs').
 
+use crate::rerender_pass::DiffViewBufferRerender;
 use crate::serve::ViewsState;
 use crate::serve::handlers::text_release::approved_pids_from_request;
 use crate::serve::protocol::TcpToClient;
@@ -84,7 +85,8 @@ fn stream_rerender_views_excluding (
     env, env . runtime_snapshot (), views_state,
     RerenderRequest {
       restriction : skgrepo_restriction,
-      selector    : RerenderSelector::All, } );
+      selector    : RerenderSelector::All,
+      diffView_buffer_rerender : DiffViewBufferRerender::RefreshOnly, } );
   prepared . viewforest_ids . retain (|viewforest_id| ! excluded . contains (viewforest_id));
   prepared . views . retain (|view| ! excluded . contains (&view . viewforest_id));
   if ! authorize_prepared_rerenders (

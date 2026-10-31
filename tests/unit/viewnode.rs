@@ -8,6 +8,9 @@ use crate::types::errors::BufferValidationError;
 use crate::types::viewnode::Viewnode;
 use crate::types::tree::forest::{ViewForest, editable_gnids};
 
+/// The claim of a vognode built by hand that claims membership.
+const CLAIMS_MEMBERSHIP : bool = true;
+
 // 'Folder::goal_is_ordered', 'Folder::is_editable' and
 // 'Folder::members_are_properties' are the per-kind rules that the
 // save, the refresh and the heralds consult; this pins them.
@@ -69,7 +72,8 @@ fn consuming_edit_requests_covers_every_carrier_but_not_view_requests () {
       GnidOnlyVognode {
         relationshipEditRequest : Some (RelationshipEditRequest::RelRepo (SkgrepoName::from ("private"))),
         .. GnidOnlyVognode::new (
-          GnidOnlyKind::Unknown, ID::from ("unknown"), None, true, Warrant::ByGraph ) }))) };
+          GnidOnlyKind::Unknown, ID::from ("unknown"), None, CLAIMS_MEMBERSHIP,
+          Warrant::ByGraph ) }))) };
   unknown . consume_edit_request_after_save ();
   assert_eq! (unknown . readiness_request, None);
   let ViewnodeKind::Vognode (Vognode::GnidOnly (unknown)) = &unknown . kind

@@ -6,9 +6,9 @@
 use crate::diff_view::change_leaves::readiness_response_sexp;
 use crate::graph_straddle::build::current_graph_straddle_in_slot;
 use crate::graph_straddle::types::GraphStraddle;
-use crate::diff_view::pruned_change_view::{
-  RenderedDiffViewBuffer, diffView_buffer_viewforest,
-  prunedChangeView_sets_of_buffer};
+use crate::diff_view::buffer_rerender::{
+  RenderedDiffViewBuffer, diffView_buffer_viewforest};
+use crate::diff_view::pruned_change_view::prunedChangeView_sets_of_buffer;
 use crate::diff_view::readiness_store::ReadinessStore;
 use crate::serve::ViewsState;
 use crate::serve::protocol::TcpToClient;

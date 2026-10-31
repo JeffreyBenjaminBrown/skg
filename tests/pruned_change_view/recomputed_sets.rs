@@ -18,7 +18,7 @@ use crate::pruned_change_view::common::{
   send_stage_and_commit_request, with_fixture};
 
 use skg::graph_straddle::types::GraphStraddle;
-use skg::diff_view::pruned_change_view::ensure_editableOccurrences_exist;
+use skg::diff_view::buffer_rerender::ensure_editableOccurrences_exist;
 use skg::diff_view::readiness_store::ReadinessStore;
 use skg::serve::handlers::diff_view::diffView_buffer;
 use skg::serve::handlers::save_buffer::SaveResponse;
@@ -161,7 +161,7 @@ fn a_change_under_a_new_origin_is_appended_as_a_root_by_the_command (
 /// makes w editable and its refresh draws w's content; it appends no
 /// root. Then s1, under s, an origin the buffer does not show,
 /// changes: the command appends s, and its one refresh draws s's
-/// content ('rerender_diffView_buffer').
+/// content ('refresh_diffView_buffer_over_current_straddle').
 #[test]
 fn the_command_makes_a_member_editable_then_appends_an_origin_not_shown (
 ) -> Result<(), Box<dyn Error>> {

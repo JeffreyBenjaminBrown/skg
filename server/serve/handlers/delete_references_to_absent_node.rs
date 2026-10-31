@@ -1,3 +1,4 @@
+use crate::rerender_pass::DiffViewBufferRerender;
 use crate::delete_references_to_absent_node::{
   preview, preview_warning_org, result_org, rewrite };
 use crate::dbs::in_rust_graph::new_handle;
@@ -108,7 +109,8 @@ fn stream_rerender_views_after_absent_reference_cleanup (
       restriction : skgrepo_restriction,
       selector    : RerenderSelector::Where ( Box::new (
         |_, state| view_can_display_absent_reference_change (
-          &state . viewforest, raw_gnid, affected_recorder_pids ))), } );
+          &state . viewforest, raw_gnid, affected_recorder_pids ))),
+      diffView_buffer_rerender : DiffViewBufferRerender::RefreshOnly, } );
   stream_prepared_rerenders (stream, views_state, prepared);
 }
 

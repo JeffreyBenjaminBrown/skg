@@ -59,7 +59,7 @@ use crate::types::save::{
   NodeInstruction, PostSkgsaveCommitNoticeCandidate, SavePlan, format_save_error_as_org };
 use crate::types::tree::forest::ViewForest;
 use crate::types::views_state::ViewforestId;
-use crate::update_buffer::update_views_after_save;
+use crate::rerender_pass::update_views_after_save;
 
 use futures::executor::block_on;
 use sexp::{Sexp, Atom};

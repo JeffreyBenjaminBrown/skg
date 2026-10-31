@@ -20,6 +20,9 @@ use skg::types::viewnode::{
 
 use std::collections::BTreeSet;
 
+/// The claim of a vognode built by hand that claims membership.
+const CLAIMS_MEMBERSHIP : bool = true;
+
 fn objects (
   objects : &[DiffObject],
 ) -> BTreeSet<DiffObject> {
@@ -109,7 +112,8 @@ fn ghosts_and_unknowns_round_trip_their_readiness_requests () {
   assert_round_trip (
     with_facts (
       viewnode_of ( ViewnodeKind::Vognode ( Vognode::GnidOnly ( GnidOnlyVognode::new (
-          GnidOnlyKind::Unknown, ID::from ("u"), None, true, Warrant::ByGraph ) ))),
+          GnidOnlyKind::Unknown, ID::from ("u"), None, CLAIMS_MEMBERSHIP,
+          Warrant::ByGraph ) ))),
       facts ( None, Some (Existence::Added), None ),
       request (true, &[]) ),
     "unknown (gnid u) (editRequest (ready)) (diff (rel added))" ); }

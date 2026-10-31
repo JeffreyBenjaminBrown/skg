@@ -1443,16 +1443,17 @@ pub fn mk_editable_viewnode (
                               edit_request : None },
                             HashSet::new () ) } // view_requests
 
-/// Build an unknown. Use when a referenced ID resolves
-/// to nothing in in_rust_graph, on disk, or via any diff procedure
-/// -- the unknown lets the view render the line as a herald
-/// rather than aborting the whole BFS extension.
+/// Build an unknown viewnode, claiming membership as a parsed one
+/// does. Its one production caller is the stub of a fresh content
+/// view ('stub_of_fresh_content_view'), for a requested gnid no node
+/// answers to, which the refresh then entombstones.
 pub fn mk_unknown_viewnode (
   gnid : ID,
 ) -> Viewnode {
+  let claimsMembership : bool = true;
   viewnode_of ( ViewnodeKind::Vognode (Vognode::GnidOnly (
     GnidOnlyVognode::new (
-      GnidOnlyKind::Unknown, gnid, None, true, Warrant::ByGraph )) )) }
+      GnidOnlyKind::Unknown, gnid, None, claimsMembership, Warrant::ByGraph )) )) }
 
 /// Create a write-protected Viewnode from disk data.
 /// Body is always None since write-protected nodes don't have editable content.

@@ -1,8 +1,10 @@
 //! The rerender pipeline every request that rerenders open views
 //! outside a save shares: prepare, answer, stream. The request says
-//! under which skgrepo restriction and which views
-//! ('RerenderRequest'). Each rerender is
-//! prepared in memory first ('prepare_rerender_views'), so that
+//! under which skgrepo restriction, which views, and what a rerender
+//! of a buffer of the diff view does beyond its refresh
+//! ('RerenderRequest'). Each rerender is prepared in memory first by
+//! the rerender pass ('prepare_rerender_views', 'server/rerender_pass.rs',
+//! which the save's rerender shares), so that
 //! a text-release decision ('authorize_prepared_rerenders') can
 //! precede any visible change, and then streamed: "rerender-lock",
 //! one "rerender-view" per view, "rerender-done", which carries the
@@ -21,9 +23,11 @@ use crate::serve::util::{ format_lock_views_sexp, format_rerender_done_sexp, for
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::types::views_state::{ViewforestId, ViewState};
-use crate::types::views_state::pids_from_viewforest;
-use crate::rerender_pass::RerenderPassContext;
-use crate::update_buffer::{RerenderedView, rerender_open_view};
+use crate::dbs::in_rust_graph::InRustGraph;
+use crate::rerender_pass::{
+  DiffViewBufferRerender, RerenderPassContext, RerenderedView, release_candidates,
+  rerender_open_views};
+use crate::types::misc::ID;
 
 use std::net::TcpStream;
 use std::collections::HashSet;
@@ -39,10 +43,12 @@ pub(crate) struct PreparedRerenders {
 }
 
 /// What a request that rerenders open views asks of the pass: the
-/// skgrepo restriction to rerender under, and which views.
+/// skgrepo restriction to rerender under, which views, and what the
+/// rerender of a buffer of the diff view does beyond its refresh.
 pub(crate) struct RerenderRequest<'a> {
-  pub restriction : &'a SkgrepoRestriction,
-  pub selector    : RerenderSelector<'a>,
+  pub restriction              : &'a SkgrepoRestriction,
+  pub selector                 : RerenderSelector<'a>,
+  pub diffView_buffer_rerender : DiffViewBufferRerender,
 }
 
 /// Which open views a rerender request rerenders, chosen from what
@@ -53,10 +59,8 @@ pub(crate) enum RerenderSelector<'a> {
   All,
   /// The open views the predicate selects.
   Where (Box<dyn Fn (&ViewforestId, &ViewState) -> bool + 'a>),
-  /// The one buffer of the diff view an "integrate unshown changes"
-  /// request names, which is rerendered integrating them
-  /// ('RerenderPassContext::integrates_unshown_changes').
-  IntegratingUnshownChanges (ViewforestId),
+  /// The one open view named.
+  One (ViewforestId),
 }
 
 impl RerenderSelector<'_> {
@@ -68,7 +72,7 @@ impl RerenderSelector<'_> {
     match self {
       RerenderSelector::All => true,
       RerenderSelector::Where (include) => include (viewforest_id, state),
-      RerenderSelector::IntegratingUnshownChanges (named) => viewforest_id == named, } }
+      RerenderSelector::One (named) => viewforest_id == named, } }
 }
 
 /// Complete every rerender 'request' asks for in memory, against
@@ -85,22 +89,15 @@ pub(crate) fn prepare_rerender_views (
   let viewforest_ids : Vec<ViewforestId> = views_state . open_views . views . iter ()
     .filter (|(viewforest_id, state)| request . selector . selects (viewforest_id, state))
     .map (|(viewforest_id, _)| viewforest_id . clone ()) . collect ();
-  let integrates_unshown_changes : bool = matches! (
-    request . selector, RerenderSelector::IntegratingUnshownChanges (_) );
   let mut context : RerenderPassContext = RerenderPassContext::new (
     env, runtime, request . restriction,
     // A buffer of the diff view is refreshed over a graph straddle
     // brought up to date from the connection's. Streaming the
     // rerenders writes it back, as a save does.
     views_state . graph_straddle . clone (),
-    integrates_unshown_changes );
-  let mut rendered_views : Vec<RerenderedView> = Vec::new ();
-  for viewforest_id in &viewforest_ids {
-    let _span : tracing::span::EnteredSpan =
-      tracing::info_span! ( "rerender_view (rerender-all)" ) . entered ();
-    match rerender_open_view (viewforest_id, views_state, &mut context)
-    { Ok (rendered) => rendered_views . push (rendered),
-      Err (e) => context . errors . push (e), }}
+    request . diffView_buffer_rerender );
+  let rendered_views : Vec<RerenderedView> =
+    rerender_open_views (&viewforest_ids, views_state, &mut context);
   PreparedRerenders {
     runtime : context . runtime . clone (),
     viewforest_ids,
@@ -119,13 +116,10 @@ pub(crate) fn authorize_prepared_rerenders (
   prepared      : &mut PreparedRerenders,
   restriction   : &SkgrepoRestriction,
   operation     : &str,
-  approved_pids : &HashSet<crate::types::misc::ID>,
+  approved_pids : &HashSet<ID>,
 ) -> bool {
-  let candidates : Vec<crate::types::misc::ID> =
-    prepared . views . iter ()
-    . flat_map ( |view|
-      pids_from_viewforest (&view . viewforest) . into_iter () )
-    . collect ();
+  let candidates : Vec<ID> = release_candidates (
+    prepared . views . iter () . map ( |view| &view . viewforest ));
   let release = decide_text_release (
     operation, restriction, &candidates,
     &prepared . runtime . graph, approved_pids );
@@ -153,16 +147,9 @@ pub(crate) fn stream_prepared_rerenders (
       TcpToClient::RerenderLock,
       & format_lock_views_sexp (&prepared . viewforest_ids) ));
   write_graph_straddle_back (views_state, prepared . graph_straddle);
-  for view in prepared . views {
-    views_state . open_views . update_view (
-      &prepared . runtime . graph,
-      &view . viewforest_id, view . viewforest, view . viewnode_id_record );
-    send_response_with_length_prefix (
-      stream,
-      & tag_sexp_response (
-        TcpToClient::RerenderView,
-        & format_single_view_sexp (&view . viewforest_id, &view . text) )); }
-
+  register_and_send_rerendered_views (
+    stream, views_state, &prepared . runtime . graph, prepared . views,
+    TcpToClient::RerenderView );
   send_response_with_length_prefix (
     stream,
     & tag_sexp_response (
@@ -170,6 +157,23 @@ pub(crate) fn stream_prepared_rerenders (
       & format_rerender_done_sexp (
         &prepared . errors,
         &prepared . warnings ) )); }
+
+/// Register each of 'views' in place of the open view it rerenders,
+/// and send it to the client under 'tag'.
+pub(crate) fn register_and_send_rerendered_views (
+  stream      : &mut TcpStream,
+  views_state : &mut ViewsState,
+  graph       : &InRustGraph,
+  views       : Vec<RerenderedView>,
+  tag         : TcpToClient,
+) {
+  for view in views {
+    views_state . open_views . update_view (
+      graph, &view . viewforest_id, view . viewforest, view . viewnode_id_record );
+    send_response_with_length_prefix (
+      stream,
+      & tag_sexp_response (
+        tag, & format_single_view_sexp (&view . viewforest_id, &view . text) )); }}
 
 /// Keep the graph straddle a rerender brought up to date as the
 /// connection's. A rerender that rendered no buffer of the diff view
