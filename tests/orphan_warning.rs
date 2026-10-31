@@ -65,7 +65,10 @@ fn a_headline_typed_where_no_list_is_read_is_warned_of_as_an_orphan
 /// nearest occurrence above, four, and is saved and warned of; so are
 /// one typed under a ghost and one typed in four's containers folder,
 /// which is write-protected. A root typed at top level, with its
-/// skgrepo, is saved and not warned of.
+/// skgrepo, is saved and not warned of. In a content view the ghost of
+/// three, whose node the graph has, becomes an occurrence of three,
+/// which reads claims and whose list does not hold the headline typed
+/// under it; so that headline, saved, vanishes from the view.
 #[test]
 fn headlines_under_a_tombstone_a_ghost_and_a_write_protected_folder_are_orphans
   () -> Result<(), Box<dyn Error>> {
@@ -105,7 +108,10 @@ fn headlines_under_a_tombstone_a_ghost_and_a_write_protected_folder_are_orphans
                           "*** typed under a ghost" . to_string (),
                           "*** typed under a tombstone" . to_string () ],
                    "{:?}", response . warnings );
-      for title in [ "typed in the containers folder", "typed under a ghost",
+      assert! ( ! response . saved_view . contains ("typed under a ghost"),
+                "the headline typed under the ghost vanishes:\n{}",
+                response . saved_view );
+      for title in [ "typed in the containers folder",
                      "typed under a tombstone", "a typed root" ] {
         assert! ( response . saved_view . lines () . any ( |line|
                     line . ends_with (&format! (") {}", title))

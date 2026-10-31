@@ -1,15 +1,15 @@
 ;;; Integration test: a save deletes a node another buffer shows, and
-;;; that buffer, now holding tombstones, is edited and saved.
+;;; that buffer, from which the node vanished, is edited and saved.
 ;;;
 ;;; Buffer 1: a view of node 1, plus a second root, subee.
 ;;; Buffer 2: written by hand (write-protected 11, subee, subee-1).
 ;;;
-;;; Phase 4: delete 11 from buffer 2; in buffer 1 its occurrence and
-;;;   its folders become tombstones, keeping what stood under them.
+;;; Phase 4: delete 11 from buffer 2; in buffer 1 its occurrence
+;;;   vanishes, with its folders and what stood under them.
 ;;; Phase 6: add subee-2 under buffer 1's root subee; buffer 2 shows
 ;;;   it too.
-;;; Phase 8: add a root, new-root, to buffer 1; its tombstones
-;;;   round-trip through the save unchanged.
+;;; Phase 8: add a root, new-root, to buffer 1; the rest of it
+;;;   round-trips through the save unchanged.
 ;;;
 ;;; README/detail.org says what each phase checks.
 
@@ -143,8 +143,8 @@ which takes priority over subee.skg on disk."
   (message "=== PHASE 5: Verify both buffers after delete ===")
   (setq integration-test-phase "phase-5-verify-after-delete")
 
-  ;; Verify buffer 2: '11', a root the save deleted, became a
-  ;; childless tombstone, which the prune removed; 'subee' is unchanged
+  ;; Verify buffer 2: '11', a root the save deleted, vanished;
+  ;; 'subee' is unchanged
   (let ((buf2 (get-buffer "*skg-test-buf2*")))
     (unless buf2
       (message "✗ FAIL [phase 5]: Buffer 2 no longer exists")
@@ -160,9 +160,9 @@ which takes priority over subee.skg on disk."
 
   ;; Verify buffer 1 (collateral): the delete of 11 propagates to
   ;; node 1 (which contained it). 1.skg's contains has had 11
-  ;; stripped, so on rerender 11's occurrence is a tombstone, which
-  ;; keeps what stood under it: its two folders, entombstoned in
-  ;; turn, holding the subee and also-hidden drawn there.
+  ;; stripped, so on rerender 11's occurrence vanishes, with what
+  ;; stood under it: its folders, and the subee and also-hidden
+  ;; drawn there.
   (let ((buf1 (get-buffer "*1*")))
     (unless buf1
       (message "✗ FAIL [phase 5]: Buffer 1 no longer exists")
@@ -173,11 +173,6 @@ which takes priority over subee.skg on disk."
     (assert-headline-types-and-titles
      buf1
      '((1 node "1")
-       (2 tombstone "")
-       (3 tombstone "")
-       (4 node "subee")
-       (4 tombstone "")
-       (5 node "also-hidden")
        (1 node "subee")
        (2 node "subee-1"))
      "phase 5: buffer 1 after collateral delete")))
@@ -187,9 +182,8 @@ which takes priority over subee.skg on disk."
   (message "=== PHASE 6: Add subee-2 in buffer 1 ===")
   (setq integration-test-phase "phase-6-add-subee-2")
   (with-current-buffer "*1*"
-    ;; Find the standalone subee root: the second match, the first
-    ;; being the one under the tombstone where 11 stood.
-    (when (goto-nth-headline-with-title "subee" 2)
+    ;; Find the standalone subee root, the only headline so titled.
+    (when (goto-nth-headline-with-title "subee" 1)
       (let ((subee-depth
              (let* ((line (buffer-substring-no-properties
                            (line-beginning-position) (line-end-position)))
@@ -229,11 +223,6 @@ which takes priority over subee.skg on disk."
     (assert-headline-types-and-titles
      buf1
      '((1 node "1")
-       (2 tombstone "")
-       (3 tombstone "")
-       (4 node "subee")
-       (4 tombstone "")
-       (5 node "also-hidden")
        (1 node "subee")
        (2 node "subee-1")
        (2 node "subee-2"))
@@ -257,12 +246,12 @@ which takes priority over subee.skg on disk."
 
 (defun phase-8-add-new-root ()
   "Add new-root as a root after the standalone subee in buffer 1, and
-save the buffer, tombstones and all. A root inherits no skgrepo, so
+save the buffer. A root inherits no skgrepo, so
 the headline carries (skgRepos (nodeRepo main))."
   (message "=== PHASE 8: Add new-root in buffer 1 ===")
   (setq integration-test-phase "phase-8-add-new-root")
   (with-current-buffer "*1*"
-    (when (goto-nth-headline-with-title "subee" 2)
+    (when (goto-nth-headline-with-title "subee" 1)
       (let ((subee-depth
              (let* ((line (buffer-substring-no-properties
                            (line-beginning-position) (line-end-position)))
@@ -304,11 +293,6 @@ the headline carries (skgRepos (nodeRepo main))."
     (assert-headline-types-and-titles
      buf1
      '((1 node "1")
-       (2 tombstone "")
-       (3 tombstone "")
-       (4 node "subee")
-       (4 tombstone "")
-       (5 node "also-hidden")
        (1 node "subee")
        (2 node "subee-1")
        (2 node "subee-2")

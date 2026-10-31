@@ -11,7 +11,7 @@ use crate::refresh::viewnodestats::set_viewnodestats_in_viewforest;
 use indoc::formatdoc;
 
 #[test]
-fn a_root_whose_node_vanished_is_pruned_and_the_buffer_may_end_empty () {
+fn a_root_whose_node_is_gone_vanishes_and_the_buffer_may_end_empty () {
   let graph : InRustGraph = graph (&[]);
   let run : Run = run_asserting_fixpoint (
     &format! ("* {} gone\n", occurrence_metadata ("gone", "")), &graph );
@@ -22,10 +22,10 @@ fn a_root_whose_node_vanished_is_pruned_and_the_buffer_may_end_empty () {
 fn a_tombstone_root_that_holds_something_stays () {
   let graph : InRustGraph = graph (&[ node ("k") ]);
   let input : String = formatdoc! ("
-    * {} gone
+    * (skg tombstone)
     ** {} k
     * (skg tombstone)
-    ", occurrence_metadata ("gone", ""), occurrence_metadata ("k", "") );
+    ", occurrence_metadata ("k", "") );
   assert_eq! ( run_asserting_fixpoint (&input, &graph) . outline (), "\
 tombstone
   node k noClaim" ); }

@@ -10,7 +10,11 @@
 //! skgrepo restriction keeps out HEAD's node's home, which is answered as a
 //! restricted node is: a restricted node is never a ghost. Otherwise,
 //! does the list of the headline's parent name this gnid? Then a
-//! gnid-only vognode of kind Unknown. Otherwise a tombstone.
+//! gnid-only vognode of kind Unknown. Otherwise a tombstone; but an
+//! occurrence the rule answers so in a content view, a view root
+//! included, vanishes with its subtree ('vanish' in 'visit.rs'): its
+//! node is gone, or restricted, and its viewparent's list does not
+//! name it.
 //!
 //! The headline is re-kinded where it stands, keeping its vnid, its
 //! fold state, its children and, for an occurrence, its editability.
@@ -21,7 +25,7 @@ use crate::diff_view::change_viewnodes::mk_historical_viewnode;
 use crate::graph_straddle::types::GraphStraddle;
 use crate::refresh::{Walk, write_protect_occurrence};
 use crate::refresh::extent::{DrawnEditability, drawn_occurrence_editability};
-use crate::refresh::visit::children_of;
+use crate::refresh::visit::{children_of, vanish};
 use crate::refresh::goal::{Goal, GoalMember};
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::nodes::rust::GraphnodeInRust;
@@ -121,7 +125,8 @@ fn relationship_edit_request_of (
 ///   from the goal, where the goal records one;
 /// - a gnid-only vognode, from one of the other kind, an occurrence or
 ///   a ghost ('rekind_to_gnid_only'), three cases;
-/// - a tombstone, from any kind ('entombstone').
+/// - a tombstone, from any kind ('entombstone'), but for an
+///   occurrence in a content view, which vanishes ('vanish').
 pub(crate) fn rekind_vognode (
   tree        : &mut Tree<Viewnode>,
   parent      : NodeId,
@@ -152,6 +157,8 @@ pub(crate) fn rekind_vognode (
       { gnid_only_mut . relRepo = relRepo . or ( gnid_only . relRepo ); }},
     ( IdRuleAnswer::GnidOnly (kind), other ) =>
       rekind_to_gnid_only (tree, child, &gnid, kind, other, parent_goal, walk),
+    ( IdRuleAnswer::Tombstone, Vognode::Occurrence (_) ) if ! walk . is_diff_view () =>
+      vanish (tree, child, walk) ?,
     ( IdRuleAnswer::Tombstone, other ) => {
       forget_editable_occurrence (&other, child, walk);
       entombstone (tree, child); }, }
@@ -249,7 +256,7 @@ fn rekind_to_gnid_only (
 /// child claims, while a view kept between refreshes (a switch's
 /// rerender) said none did, which a save would read as the removal of
 /// every member. Each claims, as parsed text would; the claims rung
-/// then marks 'noClaim' those the truth does not warrant.
+/// then makes those vanish that the truth does not warrant.
 fn reset_the_claims_of_children (
   tree   : &mut Tree<Viewnode>,
   treeid : NodeId,

@@ -7,8 +7,8 @@ node a previous run created, and starts a server of its own.
 Each check lists, for every headline that carries metadata, its
 depth, its kind and its title ('assert-headline-types-and-titles' in
 '../save_collateral_break_cycle/test-helpers.el', and its Lua port in
-'test-nvim.lua'). A folder and a tombstone carry no title, so they
-are checked by kind and depth. Viewnode IDs and the derived facts
+'test-nvim.lua'). A folder carries no title, so it is checked by
+kind and depth. Viewnode IDs and the derived facts
 vary from run to run and are not checked.
 
 * Phases 1 and 2: buffer 1
@@ -42,36 +42,28 @@ Phase 4 removes 'writeProtected' from 11 in buffer 2, adds
 '(editRequest delete)', and saves. 11's file is deleted, and 1's
 contents lose 11.
 
-Phase 5 checks both buffers. In buffer 2, 11's root became a
-tombstone, which held nothing, so the refresh pruned it:
+Phase 5 checks both buffers. In buffer 2, 11's root vanished:
 
 #+begin_example
   1 node "subee"
   2 node "subee-1"
 #+end_example
 
-Buffer 1 is a collateral view of that save. Where 11 stood stands a
-tombstone, which keeps what stood under it. Its subscribee folder
-and hidden-outside folder cannot stand under a tombstone, so each
-became a tombstone too, holding the occurrences drawn in it. The
-alias folder and its alias became tombstones that held nothing, and
-were pruned:
+Buffer 1 is a collateral view of that save. The occurrence of 11
+vanished, and with it everything that stood under it: its alias,
+subscribee and hidden-outside folders and what they held
+('docs/glossary.org', "vanish"):
 
 #+begin_example
   1 node "1"
-  2 tombstone
-  3 tombstone
-  4 node "subee"
-  4 tombstone
-  5 node "also-hidden"
   1 node "subee"
   2 node "subee-1"
 #+end_example
 
-* Phases 6 and 7: an edit in the buffer holding tombstones
+* Phases 6 and 7: an edit in the buffer the delete changed
 Phase 6 adds a headline subee-2, with no metadata, as the last child
-of buffer 1's root subee (the second headline titled subee), and
-saves buffer 1, tombstones and all. The save creates subee-2 and
+of buffer 1's root subee (now the only headline titled subee), and
+saves buffer 1. The save creates subee-2 and
 adds it to subee's contents. Phase 7 checks that buffer 1 shows it
 under its root subee and is otherwise as in phase 5, and that buffer
 2, rerendered as a collateral view, shows it too:
@@ -82,14 +74,14 @@ under its root subee and is otherwise as in phase 5, and that buffer
   2 node "subee-2"
 #+end_example
 
-* Phases 8 and 9: tombstones round-trip
+* Phases 8 and 9: the buffer round-trips
 Phase 8 adds a root, new-root, after buffer 1's root subee and its
 children, and saves. A root has no viewparent to inherit a skgrepo
 from, so the headline carries '(skgRepos (nodeRepo main))'. Phase 9
-checks that the save gave new-root an ID and kept the buffer's
-tombstones as they were: buffer 1 is as in phase 7, with
+checks that the save gave new-root an ID and kept the rest of the
+buffer as it was: buffer 1 is as in phase 7, with
 '1 node "new-root"' last.
 
 * What it does not check
-No phase edits under a tombstone, nor under the subee drawn beneath
-one: subee-2 and new-root are added beside the tombstones.
+No phase edits where 11 stood: nothing stands there after the
+delete.

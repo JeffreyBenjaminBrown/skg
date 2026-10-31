@@ -1183,8 +1183,9 @@ impl Viewnode {
   /// round-trips must leave requests in the user's buffer. `view_requests` are
   /// deliberately separate -- the refresh fulfills those.
   /// A 'restoreRel' the save fulfilled leaves its headline claiming the
-  /// relationship it restored, so that the next save keeps it (the
-  /// refresh marks 'noClaim' again where the save did not restore it).
+  /// relationship it restored, so that the next save keeps it (where
+  /// the save did not restore it, the refresh's claims rung makes the
+  /// headline vanish, and the diff view draws it again from HEAD).
   pub fn consume_edit_request_after_save (
     &mut self,
   ) {

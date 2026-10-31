@@ -212,13 +212,19 @@ ghost, unless the skgrepo restriction keeps out HEAD's node's home, when it
 is answered as a restricted node is: a restricted node is never a
 ghost. Otherwise,
 does its viewparent's list name the gnid? Then it is an unknown.
-Otherwise it is a tombstone. So an occurrence of a node a
-skgrepo narrowing keeps out becomes a Restricted vognode in place where its
-record is visible, and an occurrence again after a skgrepo widening;
-after either, neither re-kind is a buffer correction. When an unknown or a Restricted vognode
+Otherwise it is a tombstone. In a content view an occurrence the
+rule answers so does not become one: it *vanishes*, removed with its
+subtree, a view root included, for its node is gone or restricted and
+its viewparent's list does not name it ('docs/glossary.org',
+"vanish"); in the diff view it becomes a tombstone. So an occurrence
+of a node a skgrepo narrowing keeps out becomes a Restricted vognode
+in place where its record is visible, and an occurrence again after a
+skgrepo widening; where its record is not visible it vanishes, and
+the skgrepo widening draws it again. When an unknown or a Restricted vognode
 becomes an occurrence, each of its children claims again, as the
 text of its view, which writes no =noClaim= under it, would say, and
-the claims rung marks those the truth does not warrant there. In the diff view, a gnid that HEAD had
+the claims rung makes those vanish that the truth does not warrant
+there. In the diff view, a gnid that HEAD had
 as a node and that a nodeMerge has since made an extra ID of another
 node stays that node's ghost. The headline is re-kinded where it
 stands, keeping its viewnode ID, its fold state, its children and,
@@ -244,14 +250,15 @@ alone may warrant it, a *ghost warrant*. The warrant is derived
 written in =(view ...)= as =noWarrant= or =ghostWarrant=, nothing
 meaning warranted by the truth; a root carries none.
 
-Under an editable parent at rest the two agree: the refresh marks
-=noClaim= on every child it keeps that the truth does not warrant, and
-the next save makes every claim warranted. They differ only for what
+Under an editable parent at rest the two agree: every child that
+claims and that the truth does not warrant vanishes at the refresh,
+with its subtree, and the next save makes every claim warranted. They differ only for what
 the user typed since the last save: a new child claims and is not yet
 warranted, and a child the user marked =noClaim= to detach it is
 warranted and claims nothing (a *pending detachment*, herald
-"detach"). The refresh never removes a child and sets no claim but a
-root's: the user's claims are the user's to make.
+"detach"). The refresh sets no claim but a root's: the user's claims
+are the user's to make, and a claim the truth does not warrant the
+refresh does not mark but removes, with the child that made it.
 
 *** The goal
 A parent's *goal* is what the truth says its children should be
@@ -321,7 +328,8 @@ consumes P's editable-view request and charges the node budget
 P's default folders, computes P's
 goal, and runs the *refresh's rungs* in order, weakest first (older
 text calls them the ladder):
-1. re-kind: each vognode child becomes what the ID rule says; each
+1. re-kind: each vognode child becomes what the ID rule says (in a
+   content view, an occurrence it makes a tombstone vanishes); each
    descriptor whose position the ancestry table forbids is
    *unsayable* and becomes a tombstone, and so does a change viewnode
    whose change is gone, and an alias whose record the
@@ -332,13 +340,12 @@ text calls them the ladder):
    only if every sibling was, and focused, editable and claiming if
    any was (but not editable where it stands for another node whose
    editable occurrence is elsewhere in the buffer); it carries the siblings' requests; every sibling's
-   children are appended to it in sibling order, each marked
-   =noClaim= unless the truth warrants it there (the glossary's
-   "viewnode merge");
+   children are appended to it in sibling order, for the claims
+   rung of its own visit to judge (the glossary's "viewnode merge");
 3. warrant: each child's warrant is set from P's goal;
 4. claims: under a parent whose claims are read, each child that
-   claims and that the truth does not warrant is marked =noClaim=;
-   under any other, no child claims;
+   claims and that the truth does not warrant vanishes, with its
+   subtree; under any other, no child claims;
 5. reinstate: each goal item no child stands for is drawn, as far as
    the extent allows (below); what it draws is what the ID rule makes
    of the item, and a member of a folder whose members carry the
@@ -426,31 +433,9 @@ nothing: each caller renders the viewforest once, when it is done
 with it (=viewforest_to_string=), the search after it has folded
 what it drew and excluded the overPrivateText nodes.
 
-*** Buffer corrections
-The refresh reports what it changed because the buffer contradicted
-the truth; it does not warn (=server/refresh/buffer_corrections.rs=). A
-buffer correction is a headline reinstated, entombstoned, marked =noClaim=,
-the result of a viewnode merge, re-kinded, or stripped of an edit
-request its new kind has no slot for, named as a subtree is named,
-by viewnode ID and title. What the refresh draws as extent is no buffer correction: the content
-of an occurrence it extends first, the members of a folder it added,
-a fresh view's content; nor, in the diff view, a change viewnode
-drawn or gone, since those describe the straddle. Nor is a change
-the buffer was not wrong about, which the caller names by the
-situation it calls the refresh in (=BufferCorrectionPolicy=): after a
-save (=AfterSave=), a tombstone left where the save deleted the node,
-the viewnode merge of the occurrences of the nodes its nodeMerge
-requests touched and the members drawn under them, and whatever the
-tail pruned; after a change of the skgrepo restriction
-(=AfterRestrictionChange=), a member drawn, a headline entombstoned
-or marked =noClaim=, or a headline re-kinded to a Restricted vognode
-or back. A first drawing (=Unread=: a fresh content view, a buffer
-of the diff view, the search buffer, the first refresh of the
-"integrate unshown changes" request) is corrected as always and
-reports nothing; every other refresh (=ReportAll=) reports every
-buffer correction. So a fresh view and a plain save report
-nothing. The callers tag each view's buffer corrections
-with its view ID (=ViewBufferCorrections=), the =save-result= and
-=rerender-done= responses carry them, and both clients append them to
-their warnings buffer, under one headline per view
-(=docs/api-and-formats.org=, "Save buffer").
+*** The refresh reports nothing
+The refresh changes a view and says nothing of it: no response
+carries what it changed, and neither client shows it
+('docs/glossary.org', "what the refresh changes silently"). It does
+not warn either; the warnings a save or a rerender sends are the
+save's and the rerender's own.

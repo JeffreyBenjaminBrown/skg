@@ -219,7 +219,6 @@ node p
   overriddenFolder
   flagsFolder
   aliasFolder
-    alias gone noClaim ⊥
     alias alias
   node c wp
     node q wp noClaim ⊥

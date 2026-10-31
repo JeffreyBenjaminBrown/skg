@@ -318,13 +318,13 @@ fn all_tests
         "tests/hidden_from_subscriptions/fixtures-subscribee-edit") ?;
       test_moving_foreign_subscribee_content_elsewhere_still_hides (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_extra_view_child_under_foreign_subscribee_is_kept_unwarranted",
+      s . reset ("test_extra_view_child_under_foreign_subscribee_vanishes",
         "tests/hidden_from_subscriptions/fixtures-subscribee-edit") ?;
-      test_extra_view_child_under_foreign_subscribee_is_kept_unwarranted (
+      test_extra_view_child_under_foreign_subscribee_vanishes (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_extra_view_child_under_owned_subscribee_is_kept_unwarranted",
+      s . reset ("test_extra_view_child_under_owned_subscribee_vanishes",
         "tests/hidden_from_subscriptions/fixtures-subscribee-edit") ?;
-      test_extra_view_child_under_owned_subscribee_is_kept_unwarranted (
+      test_extra_view_child_under_owned_subscribee_vanishes (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset_from_config ("test_subscribee_and_compound_partner_folders",
         "tests/hidden_from_subscriptions/fixtures-every-kind-of-folder/skgconfig.toml") ?;
@@ -550,37 +550,21 @@ async fn test_collateral_view_reflects_newly_hidden_subscribee_content (
       collateral_views . len(), 1,
       "Expected one collateral view:\n{:?}",
       collateral_views);
-    // e1 was hidden, so it appears under the HiddenInSubscribeeFolder. But e1's
-    // in-view subtree (e11) is a user branch, so the glossary's "retain
-    // as noClaim or tombstone, then prune" retains the visible
-    // occurrence, claiming nothing,
-    // rather than deleting it -- chaos-monkey safety: the user may
-    // have deliberately placed content there, and we must not lose it. So e1
-    // shows twice: once hidden (write-protected), once as a preserved
-    // branch claiming nothing, still editable with e11 its content, whose stats
-    // say, as the hidden folder's member's do, that its viewparent (the
-    // subscribee) contains it and the subscriber, three generations up,
-    // hides it.
+    // e1 was hidden, so it appears under the HiddenInSubscribeeFolder.
+    // Its occurrence in the subscribee's content, which claimed
+    // membership there and is no longer warranted, vanishes with its
+    // subtree (e11): e1 shows once, hidden, write-protected and folded.
     let collateral : &str = &collateral_views[0];
     assert! (
       without_viewnode_ids (collateral) . contains (
         "**** (skg hiddenInSubscribeeFolder)\n***** (skg folded node (gnid e1) (skgRepos (nodeRepo foreign)) writeProtected"),
       "Expected e1 under HiddenInSubscribeeFolder:\n{}", collateral );
-    let retained_e1 : &str = collateral . lines ()
-      . find ( |line| without_viewnode_ids (line) . starts_with ("**** (skg node (gnid e1)")
-                      && line . contains ("noClaim") )
-      . unwrap_or_else ( || panic! (
-        "Expected hidden branch e1 marked noClaim (subtree preserved):\n{}",
-        collateral ));
-    assert! ( ! retained_e1 . contains ("writeProtected"),
-      "the retained e1 keeps its editability:\n{}", collateral );
-    assert! ( collateral . lines ()
-                . any ( |line| without_viewnode_ids (line) . starts_with ("***** (skg node (gnid e11)")
-                               && ! line . contains ("noClaim") ),
-      "e11 stays the retained e1's content:\n{}", collateral );
-    assert! ( retained_e1 . contains ("(contains (in 1 (ancestors 1))")
-              && retained_e1 . contains ("(hidesFromSubs (in 1 (ancestors 3)))"),
-      "the retained e1 says who contains and who hides it:\n{}", collateral );
+    assert_eq! ( collateral . lines ()
+                   . filter ( |line| line . contains ("(gnid e1)") ) . count (),
+                 1,
+      "e1's occurrence in the subscribee's content vanishes:\n{}", collateral );
+    assert! ( ! collateral . contains ("(gnid e11)"),
+      "e11 vanishes with it:\n{}", collateral );
 
     Ok (( )) }
 
@@ -662,7 +646,7 @@ async fn test_moving_foreign_subscribee_content_elsewhere_still_hides (
       rerendered );
     Ok (( )) }
 
-async fn test_extra_view_child_under_foreign_subscribee_is_kept_unwarranted (
+async fn test_extra_view_child_under_foreign_subscribee_vanishes (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -696,12 +680,10 @@ async fn test_extra_view_child_under_foreign_subscribee_is_kept_unwarranted (
       ) . await?;
 
     // The extra viewchild 'a' (not in e's contains, claiming
-    // membership) is kept, claiming nothing and unwarranted.
+    // membership) vanishes.
     assert!(
-      rerendered . lines() . any ( |line| line . contains ("(gnid a)")
-                                         && line . contains ("noClaim")
-                                         && line . contains ("noWarrant") ),
-      "Extra view-child 'a' should be kept, unwarranted:\n{}",
+      ! rerendered . contains ("(gnid a)"),
+      "Extra view-child 'a' should vanish:\n{}",
       rerendered );
     assert_line_order (&rerendered, "(gnid e1)", "(gnid e2)");
     assert_does_not_hide_e1 (&rerendered);
@@ -714,7 +696,7 @@ async fn test_extra_view_child_under_foreign_subscribee_is_kept_unwarranted (
 
     Ok (( )) }
 
-async fn test_extra_view_child_under_owned_subscribee_is_kept_unwarranted (
+async fn test_extra_view_child_under_owned_subscribee_vanishes (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -739,12 +721,10 @@ async fn test_extra_view_child_under_owned_subscribee_is_kept_unwarranted (
       ) . await?;
 
     // The extra viewchild 'e' (not in r's contains, claiming
-    // membership) is kept, claiming nothing and unwarranted.
+    // membership) vanishes.
     assert!(
-      rerendered . lines() . any ( |line| line . contains ("(gnid e)")
-                                         && line . contains ("noClaim")
-                                         && line . contains ("noWarrant") ),
-      "Extra view-child 'e' should be kept, unwarranted:\n{}",
+      ! rerendered . contains ("(gnid e)"),
+      "Extra view-child 'e' should vanish:\n{}",
       rerendered );
     assert_line_order (&rerendered, "(gnid r1)", "(gnid r2)");
     assert!(
@@ -1169,10 +1149,9 @@ async fn test_adding_to_hiddenoutside_folder_hides_and_moves_inside (
       "Expected original hidden-outside viewnode H to remain:\n{}",
       rerendered );
     assert! (
-      rerendered . lines () . filter ( |line| line . contains ("(gnid E11)") )
-        . all ( |line| line . contains ("noClaim") && line . contains ("noWarrant") ),
-      "E11, now hidden inside a collapsed subscribee, stays where it was \
-       typed only as an unwarranted child claiming nothing:\n{}",
+      ! rerendered . contains ("(gnid E11)"),
+      "E11, now hidden inside a collapsed subscribee, vanishes from \
+       where it was typed:\n{}",
       rerendered );
     let subscriber : Graphnode = node_from_disk (config, "R") ?;
     assert! (

@@ -80,12 +80,11 @@ fn all_tests
 /// PIN (the override-substitution-across-switch case,
 /// 'docs/api-and-formats.org', "Restricted-skgrepo nodes: omission,
 /// retention, and save preservation"): a shown override substitute whose
-/// skgrepo goes restricted on a skgrepo-set switch becomes a tombstone;
-/// the rerender shows the original directly (a
-/// restricted overrider does not substitute) with no leak of the
-/// overrider's title or id, retaining the overrider's unrestricted
-/// descendant; and the container's contains still saves to the original,
-/// never to the overrider.
+/// skgrepo goes restricted on a skgrepo-set switch vanishes with its
+/// subtree; the rerender shows the original directly (a restricted
+/// overrider does not substitute) with no leak of the overrider's
+/// title or id; and the container's contains still saves to the
+/// original, never to the overrider.
 ///
 /// Fixtures: public 'ovr-sub-container' -> 'ovr-sub-original' (N);
 /// private 'ovr-sub-overrider' (R) overrides ovr-sub-original and
@@ -149,14 +148,14 @@ fn override_substitute_across_skgrepo_switch_anonymizes_and_keeps_original (
             "((request . \"set skgrepo restriction\") (name . \"public\"))",
             &env, &mut views_state, &mut restriction); } ); } );
 
-      // 3. The re-rendered view: N shown directly, R anonymized.
+      // 3. The re-rendered view: N shown directly, R gone.
       let view_public : String = {
         let forest = views_state . open_views
           . viewforest_id_to_view (&viewforest_id)
           . expect ("the switched view should still be registered");
         viewforest_to_string (forest) ? };
-      assert! ( view_public . contains ("tombstone"),
-        "the overrider should become a tombstone:\n{}",
+      assert! ( ! view_public . contains ("tombstone"),
+        "the overrider vanishes, leaving no tombstone:\n{}",
         view_public );
       assert! ( view_public . contains ("ovr-sub-original"),
         "the original N should be shown directly:\n{}", view_public );
@@ -166,10 +165,10 @@ fn override_substitute_across_skgrepo_switch_anonymizes_and_keeps_original (
       assert! ( ! view_public . contains ("ovr-sub-overrider"),
         "the restricted overrider's id must not leak:\n{}", view_public );
       assert! ( ! view_public . contains ("overridesHere"),
-        "a tombstone carries no override marker:\n{}",
+        "nothing carries an override marker:\n{}",
         view_public );
-      assert! ( view_public . contains ("ovr-sub-child"),
-        "the overrider's unrestricted descendant is retained:\n{}",
+      assert! ( ! view_public . contains ("ovr-sub-child"),
+        "the overrider's descendant vanishes with it:\n{}",
         view_public );
 
       // 4. Saving the switched view keeps N in the container's

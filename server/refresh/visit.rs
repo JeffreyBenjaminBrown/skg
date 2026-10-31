@@ -2,17 +2,19 @@
 //! parent P to its children, in order ('docs/data-model_technical.org',
 //! "The walk and the refresh's rungs"):
 //!  1. re-kind: each child that stands for a gnid becomes what the ID
-//!     rule says, where it stands; each descriptor (folder, property
-//!     member, change viewnode) whose position the ancestry table
-//!     forbids, or whose change is gone, is entombstoned, and so is an
-//!     alias whose record the skgrepo restriction keeps out;
+//!     rule says, where it stands (in a content view an occurrence
+//!     the rule makes a tombstone vanishes instead); each descriptor
+//!     (folder, property member, change viewnode) whose position the
+//!     ancestry table forbids, or whose change is gone, is
+//!     entombstoned, and so is an alias whose record the skgrepo
+//!     restriction keeps out;
 //!  2. viewnode merge: duplicate viewnode siblings, standing for one
 //!     gnid, are merged into one;
 //!  3. the goal and the warrant: each child's warrant is set from P's
 //!     goal;
 //!  4. claims: under an editable parent, every child that claims and
-//!     that the truth does not warrant is marked 'noClaim'; under any
-//!     other, no child claims;
+//!     that the truth does not warrant vanishes, with its subtree;
+//!     under any other, no child claims;
 //!  5. reinstate: every goal item without a child is drawn, within the
 //!     extent;
 //!  6. reorder: where the goal has an order, the warranted children
@@ -53,6 +55,7 @@ use crate::refresh::{
   Walk, add_editableView_request, carries_editableView_request, write_protect_occurrence};
 use crate::refresh::ancestry::{described_node, is_unsayable, parent_reads_claims};
 use crate::refresh::mode::RefreshMode;
+use crate::refresh::tail::detach_viewnode_transferring_focus;
 use crate::types::nodes::rust::GraphnodeInRust;
 use crate::refresh::diff_view;
 use crate::refresh::chain::attach_containerward_chain;
@@ -81,7 +84,7 @@ pub(crate) fn visit_parent (
   rekind_children (tree, parent, goal . as_ref (), walk) ?;
   viewnode_merge (tree, parent, walk) ?;
   set_warrants (tree, parent, goal . as_ref ());
-  mark_claims (tree, parent, goal . as_ref ());
+  mark_claims (tree, parent, goal . as_ref (), walk) ?;
   if let Some (goal) = &goal {
     if extent_of_parent (tree, parent, walk) == Extent::All {
       reinstate (tree, parent, goal, walk) ?; }}
@@ -280,9 +283,8 @@ fn vognode_member (
 /// membership if either did, carries the requests of both
 /// ('merge_requests') and its own readiness request, else the merged
 /// sibling's, and is editable if either was ('merge_editability'). It
-/// takes the merged
-/// sibling's children after its own, each marked 'noClaim' unless
-/// the truth warrants it under the result.
+/// takes the merged sibling's children after its own; the claims rung
+/// of its own visit judges them, as it judges its own children.
 fn merge_into (
   tree           : &mut Tree<Viewnode>,
   result         : NodeId,
@@ -306,12 +308,8 @@ fn merge_into (
     // claim is lost.
     tree . get_mut (result) . unwrap () . value () . set_claim (true); }
   merge_editability (tree, result, merged_sibling, &sibling_viewnode, walk);
-  let goal : Option<Goal> = goal_of_parent (tree, result, walk);
   for grandchild in children_of (tree, merged_sibling) {
-    move_to_last_child (tree, result, grandchild) ?;
-    let warrant : Option<Warrant> =
-      warrant_of_child (goal . as_ref (), tree . get (grandchild) . unwrap () . value ());
-    mark_noClaim_unless_warranted (tree, grandchild, warrant); }
+    move_to_last_child (tree, result, grandchild) ?; }
   tree . get_mut (merged_sibling) . unwrap () . detach ();
   Ok (( )) }
 
@@ -413,16 +411,18 @@ fn set_warrants (
 //
 
 /// Under the buffer root every occurrence root claims; any other root
-/// keeps what it carries. Under an editable
-/// occurrence or an editable folder, each child that claims and that
-/// the truth does not warrant (a ghost warrant included: the worktree
-/// lacks that relationship) is marked 'noClaim'. Under any other
-/// parent no child claims.
+/// keeps what it carries. Under an editable occurrence or an editable
+/// folder, each child that claims and that the truth does not warrant
+/// (a ghost warrant included: the worktree lacks that relationship)
+/// vanishes ('vanish_if_unwarranted'); a child that claims nothing (a
+/// pending detachment the user wrote) stays. Under any other parent
+/// no child claims.
 fn mark_claims (
   tree   : &mut Tree<Viewnode>,
   parent : NodeId,
   goal   : Option<&Goal>,
-) {
+  walk   : &mut Walk,
+) -> Result<(), Box<dyn Error>> {
   let is_root : bool = matches! ( tree . get (parent) . unwrap () . value () . kind,
                                   ViewnodeKind::BufferRoot );
   let claims_are_read : bool = parent_reads_claims (tree, parent);
@@ -434,20 +434,48 @@ fn mark_claims (
         tree . get_mut (child) . unwrap () . value () . set_claim (true); }}
     else if claims_are_read {
       let warrant : Option<Warrant> = warrant_of_child (goal, viewnode);
-      mark_noClaim_unless_warranted (tree, child, warrant); }
+      vanish_if_unwarranted (tree, child, warrant, walk) ?; }
     else if claims {
-      tree . get_mut (child) . unwrap () . value () . set_claim (false); }}}
+      tree . get_mut (child) . unwrap () . value () . set_claim (false); }}
+  Ok (( )) }
 
 /// Where the save reads claims: the child at 'treeid', if it claims
-/// and its warrant is not 'ByGraph', is marked 'noClaim'.
-fn mark_noClaim_unless_warranted (
+/// and its warrant is not 'ByGraph', vanishes with its subtree.
+///
+/// Marking it 'noClaim' and keeping it instead would lose data: a
+/// member whose record alone a skgrepo narrowing keeps out would be
+/// marked so, the mark would outlive the skgrepo widening, and a save
+/// would read it as a detachment and delete the record. Vanished, the
+/// member is drawn again by the widening's refresh, where the goal
+/// names it.
+fn vanish_if_unwarranted (
   tree    : &mut Tree<Viewnode>,
   treeid  : NodeId,
   warrant : Option<Warrant>,
-) {
+  walk    : &mut Walk,
+) -> Result<(), Box<dyn Error>> {
   if tree . get (treeid) . unwrap () . value () . claims () == Some (true)
      && warrant != Some (Warrant::ByGraph) {
-    tree . get_mut (treeid) . unwrap () . value () . set_claim (false); }}
+    vanish (tree, treeid, walk) ?; }
+  Ok (( )) }
+
+/// Remove the headline at 'treeid' and its subtree from the view: it
+/// vanishes. Each editable occurrence in the subtree gives up its
+/// node's editability, and focus inside the subtree moves to its
+/// viewparent.
+pub(crate) fn vanish (
+  tree   : &mut Tree<Viewnode>,
+  treeid : NodeId,
+  walk   : &mut Walk,
+) -> Result<(), Box<dyn Error>> {
+  let editable : Vec<(ID, NodeId)> =
+    tree . get (treeid) . unwrap () . descendants ()
+    . filter_map ( |node| node . value () . editable_gnid ()
+                   . map ( |gnid| ( gnid . clone (), node . id () )) )
+    . collect ();
+  for (gnid, occurrence) in editable {
+    walk . release_editability (&gnid, occurrence); }
+  detach_viewnode_transferring_focus (tree, treeid) }
 
 //
 // 5. reinstate
@@ -641,7 +669,7 @@ fn keep_hidden_outside_folder_last (
 /// a folder other than the subscribee folder): there its children are
 /// raw too. When the override is gone, the shown overrider loses
 /// 'overridesHere', is warranted only as itself (and so, unwarranted,
-/// marked 'noClaim'), and the original is reinstated beside it. The
+/// vanishes), and the original is reinstated beside it. The
 /// diff view substitutes nothing.
 fn substitute_overriders (
   tree   : &mut Tree<Viewnode>,
@@ -695,8 +723,9 @@ fn show_overrider (
   Ok (( )) }
 
 /// The override that 'child' stood for is gone: it shows itself, is
-/// warranted only as itself, and the original is reinstated right
-/// after it, unless a sibling already stands for it.
+/// warranted only as itself (and so, unwarranted, vanishes, as the
+/// claims rung says), and the original is reinstated right after it,
+/// unless a sibling already stands for it.
 fn stop_substituting (
   tree     : &mut Tree<Viewnode>,
   parent   : NodeId,
@@ -712,7 +741,19 @@ fn stop_substituting (
     Some (goal), tree . get (child) . unwrap () . value () )
     . unwrap_or (Warrant::No);
   tree . get_mut (child) . unwrap () . value () . set_warrant (warrant);
-  mark_noClaim_unless_warranted (tree, child, Some (warrant));
+  reinstate_original_after (tree, parent, child, original, goal, walk) ?;
+  vanish_if_unwarranted (tree, child, Some (warrant), walk) }
+
+/// Draw 'original' right after 'child', unless a sibling already
+/// stands for it or the goal does not name it.
+fn reinstate_original_after (
+  tree     : &mut Tree<Viewnode>,
+  parent   : NodeId,
+  child    : NodeId,
+  original : &ID,
+  goal     : &Goal,
+  walk     : &mut Walk,
+) -> Result<(), Box<dyn Error>> {
   let member : GoalMember = GoalMember::Gnid ( original . clone () );
   let stands : bool = tree . get (parent) . unwrap () . children ()
     . any ( |sibling| member_of_child (sibling . value ()) . as_ref () == Some (&member) );

@@ -37,7 +37,7 @@ node p
   assert_eq! ( shown . value () . viewnode_id, Some ( ViewnodeId ("n1" . into ()) )); }
 
 #[test]
-fn when_the_override_is_gone_the_overrider_is_unwarranted_and_the_original_returns () {
+fn when_the_override_is_gone_the_overrider_vanishes_and_the_original_returns () {
   let graph : InRustGraph = graph (&[
     Graphnode { contains : ids (&["n"]), .. node ("p") },
     node ("n"), node ("o"), ]);
@@ -49,7 +49,6 @@ fn when_the_override_is_gone_the_overrider_is_unwarranted_and_the_original_retur
   let run : Run = run_asserting_fixpoint (&input, &graph);
   assert_eq! ( run . outline (), "\
 node p
-  node o noClaim ⊥
   node n" ); }
 
 /// n, a root, is overridden by o; q, a member of n's containers

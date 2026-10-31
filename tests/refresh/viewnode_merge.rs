@@ -29,7 +29,8 @@ fn children_of_first_root (
 #[test]
 fn duplicate_siblings_are_merged_into_one_where_the_first_stood () {
   // c2 is a pending detachment: p contains c, and c2 claims nothing.
-  // c1 claims, so the result claims.
+  // c1 claims, so the result claims. Neither e claims, so that,
+  // unwarranted under c, they stay.
   let input : String = formatdoc! ("
     * {} p
     ** (skg (vnid c1) folded node (gnid c) (skgRepos (nodeRepo main)) writeProtected) c
@@ -37,9 +38,9 @@ fn duplicate_siblings_are_merged_into_one_where_the_first_stood () {
     ** (skg (vnid c2) node (gnid c) (skgRepos (nodeRepo main)) noClaim) c
     *** {} d
     *** {} e
-    ", occurrence_metadata ("p", ""), occurrence_metadata ("e", "writeProtected"),
+    ", occurrence_metadata ("p", ""), occurrence_metadata ("e", "writeProtected noClaim"),
        occurrence_metadata ("d", ""),
-       occurrence_metadata ("e", "writeProtected") );
+       occurrence_metadata ("e", "writeProtected noClaim") );
   let run : Run = run_asserting_fixpoint (&input, &family ());
   assert_eq! ( run . outline (), "\
 node p
@@ -134,7 +135,7 @@ node p
       node q wp noClaim" ); }
 
 #[test]
-fn an_appended_child_the_truth_does_not_warrant_under_the_result_is_marked_noClaim () {
+fn an_appended_child_the_truth_does_not_warrant_under_the_result_vanishes () {
   let input : String = formatdoc! ("
     * {} p
     ** {} c
@@ -149,8 +150,7 @@ fn an_appended_child_the_truth_does_not_warrant_under_the_result_is_marked_noCla
   assert_eq! ( run . outline (), "\
 node p
   node c
-    node d
-    node e noClaim ⊥" ); }
+    node d" ); }
 
 #[test]
 fn copies_of_one_folder_member_are_merged () {

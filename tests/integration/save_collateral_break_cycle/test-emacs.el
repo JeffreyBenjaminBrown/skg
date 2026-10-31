@@ -1,9 +1,9 @@
 ;;; Integration test for collateral buffer updates via save pipeline
 ;;;
 ;;; Opens two buffers over a containment cycle (a contains b, b contains a),
-;;; removes 'a' from b's children and saves. The collateral a-view keeps
-;;; the now-unwarranted 'a' underneath 'b', claiming nothing: the refresh
-;;; never removes a child.
+;;; removes 'a' from b's children and saves. In the collateral a-view
+;;; the now-unwarranted 'a' underneath 'b', which claimed membership
+;;; of b, vanishes.
 ;;;
 ;;; This test does not exercise DeletedNode — no nodes are deleted from disk,
 ;;; only a containment relationship is modified.
@@ -84,15 +84,14 @@
     (assert-headline-structure
      buf
      '((1 member "a")
-       ;; b no longer contains a. The refresh keeps what stood there,
-       ;; unwarranted: b stays in a's containers folder, with its
-       ;; chain (a, then b, which no longer contains a), and a stays
-       ;; under b, claiming nothing.
+       ;; b no longer contains a. b stays in a's containers folder,
+       ;; unwarranted, with its chain (a, then b, which no longer
+       ;; contains a), since that folder reads no claims; the a
+       ;; under b claimed membership of b, and vanishes.
        (3 member "b")
        (4 container "a")
        (5 noClaim "b")
-       (2 member     "b")
-       (3 noClaim    "a"))
+       (2 member     "b"))
      "phase 4: buffer A after collateral update")))
 
 (defun run-all-tests ()

@@ -29,59 +29,18 @@ leaves the save skgsave-committed but sends no new view text and changes no
 open-view registry entry.
 *** what a save does to other views
 A save rerenders every other open view that shows what it changed,
-and corrects what that view now says wrongly (see "buffer
-corrections" below). A child that one view's save removed from its
-parent's content stays where it stands in another view, marked
-=noClaim= and shown unwarranted (⊥), so that saving that other view
-does not put it back; delete it there, or attach it (C-c s a) to put
-the relationship back at that view's next save. A member that one
-view's save added is drawn into every other view that shows its
-list, as a fresh view draws its members: editable where no other
-occurrence of its node is and the node budget allows, and then
-with its subscribee folder when it subscribes to something the
-skgrepo restriction shows. A headline standing for a node the save
-deleted becomes a tombstone ("something stood here") in every view,
-holding whatever stood under it; a tombstone that holds nothing
-goes.
-*** buffer corrections
-A save or a rerender that finds a buffer saying something the graph
-contradicts corrects the buffer, and says so: each such change is a
-buffer correction. A buffer correction is not an error, and writes
-nothing to disk; it tells you what changed in a view, which may be
-one you are not looking at. Emacs appends them to the buffer
-=*SKG Server Warnings*=, under a headline "Buffer corrections in" and
-the view's buffer name, each buffer correction a headline under it
-naming the headline it concerns (C-c g v finds it), shows that
-buffer, and moves point to what it appended. The buffer keeps what
-it held: the server's startup warnings, under "Startup warnings", and
-the buffer corrections of earlier saves and rerenders. A buffer
-correction says one of these six things:
-- "Drew what the graph says belongs here." The graph has a member
-  the view lacked: one another view's save added, say, or one you
-  deleted from a write-protected folder.
-- "Entombstoned a headline that can stand here for nothing." The
-  headline became a tombstone, keeping its children: its node is
-  gone, or it describes its viewparent from a place where it cannot.
-- "Marked noClaim a child the graph does not relate to its parent."
-  A child of an editable parent that the graph does not put there,
-  such as one another view's save removed: it stays, shown ⊥, and the
-  next save leaves it out of the parent's list.
-- "Merged duplicate viewnode siblings into this one." Two or more
-  siblings stood for one node under one parent (a pasted copy, say);
-  they became one headline, holding all their children.
-- "Made a headline a reference to an unknown node, as the graph has
-  it." (or an occurrence, a ghost, or restricted). The headline is
-  now the kind of headline the graph says it is: a reference to an
-  unknown node where no node answers to its ID, say.
-- "Dropped an edit request its headline has no slot for." After such
-  a change of kind, a request the new kind cannot carry was dropped.
-What the server draws because you asked for it (the content of a
-node you made editable, a folder you requested, a new view) is no
-buffer correction, nor is what your own save did: a tombstone where
-it deleted a node, what a nodeMerge it asked for joined or drew, a
-headline it took out of the view; nor what a change of the
-skgrepo-set (C-c v l) draws, entombstones, re-kinds, marks noClaim
-or prunes.
+and brings it up to date with the graph, saying nothing of what it
+changed there. A child the graph no longer relates to its parent
+vanishes from that view, with everything under it, wherever its
+parent reads claims: one that another view's save removed from its
+parent's content, say. A member that one view's save added is drawn
+into every other view that shows its list, as a fresh view draws its
+members: editable where no other occurrence of its node is and the
+node budget allows, and then with its subscribee folder when it
+subscribes to something the skgrepo restriction shows. A headline
+standing for a node the save deleted vanishes from every content
+view, with whatever stood under it; in the diff view it becomes the
+node's ghost.
 *** where a save's warnings go
 A save's own warnings and errors go to a buffer of their own,
 replaced at each save that has any: =*SKG Save Warnings*=,
@@ -96,8 +55,7 @@ not warned of.
 A rerender that follows a command (C-c v l, a commit, an import, the
 cleanup of references to an absent node, the integration of unshown
 changes, or M-x skg-request-rerender-all-views) has errors and
-warnings of its own, which go to =*skg rerender messages*=; its
-buffer corrections go to =*SKG Server Warnings*= as a save's do.
+warnings of its own, which go to =*skg rerender messages*=.
 ** C-a : skg-beginning-of-line
 On a headline, moves point to the start of its title, after the stars
 and the metadata; pressed again, to the true start of the line. On
@@ -1017,15 +975,14 @@ restriction limits what you can edit as it limits what you can see:
 a save never removes, moves or rewrites a relationship the set keeps
 out, however the buffer looks. A
 skgrepo narrowing (a switch to a smaller set) turns an open view's headline
-of such a node into a restricted headline (or, where nothing the set
-shows names it, a tombstone, "something stood here") in place, its
-children kept, and a skgrepo widening (a switch to a larger set)
-turns the restricted headline back. Where a tombstone took the
-node's place, a skgrepo widening draws the node anew where the graph
-puts it, and the tombstone stays beside it, holding what stood under
-the old headline, until nothing is left under it. None of this is
-reported as a buffer correction, nor is a tombstone the switch
-leaves holding nothing, which goes.
+of such a node into a restricted headline in place, its children
+kept, and a skgrepo widening (a switch to a larger set) turns the
+restricted headline back. Where nothing the set shows names the node,
+its headline vanishes with what stood under it, and so does a member
+whose record alone the set keeps out (a public node that a private
+record says the headline's parent contains); a skgrepo widening
+draws each again where the graph puts it. The switch reports none of
+this.
 
 The re-render redraws each open buffer from the view the server last
 saved or rendered for it, which would lose an unsaved edit; so while

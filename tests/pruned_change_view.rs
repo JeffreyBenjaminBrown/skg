@@ -5,7 +5,7 @@
 // cargo nextest run --test grouped_repos -E 'test(pruned_change_view::)'
 
 #[path = "pruned_change_view/common.rs"]
-mod common;
+pub(crate) mod common;
 #[path = "pruned_change_view/sets.rs"]
 mod sets;
 #[path = "pruned_change_view/buffer.rs"]

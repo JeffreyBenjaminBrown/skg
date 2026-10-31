@@ -31,7 +31,6 @@ use skg::types::viewnode::Viewnode;
 use skg::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewnode_tree;
 use ego_tree::Tree;
-use skg::metadata_canon::without_viewnode_ids;
 
 #[test]
 fn deleting_a_node_present_in_another_view_reports_no_errors
@@ -79,7 +78,7 @@ fn deleting_a_node_present_in_another_view_reports_no_errors
         // multi-root content view can contain the same PID more than
         // once; the later occurrence is write-protected (and the
         // refresh merges such roots). Every image of a node deleted by
-        // this save must become a tombstone.
+        // this save must vanish.
         let (view, pids, vf) =
           multi_root_view (
             config, Some (tantivy),
@@ -117,22 +116,19 @@ fn deleting_a_node_present_in_another_view_reports_no_errors
         . find ( |msg| msg . contains ("response-type collateral-view")
                        && msg . contains ("collat-del-write-protected-L") )
         . expect ("write-protected collateral view should be rerendered");
-      // The two roots of L merge; the tombstone where L stood keeps
-      // what was drawn under it (its containers folder, itself
-      // entombstoned, holding P).
+      // The two roots of L merge, and L, deleted, vanishes with what
+      // was drawn under it (its containers folder, holding P).
       assert! (
-        ! write_protected_update . contains ("(gnid L)")
-        && without_viewnode_ids (write_protected_update) . contains (
-             "(content \"* (skg tombstone)\n** (skg tombstone)\n*** (skg node (gnid P)"),
-        "the image of L becomes a tombstone, holding what stood under it: {}",
+        write_protected_update . contains ("(content \"\")"),
+        "the image of L vanishes, with what stood under it: {}",
         write_protected_update );
       Ok (( )) } )) }
 
-/// A root whose node a save deleted becomes a tombstone, which the prune
-/// removes when it holds nothing, so a buffer may end with no roots: the
-/// saved view of L alone ends empty. A collateral view of L and P keeps
-/// P, which no longer contains L, and the tombstone where L stood holds
-/// what was drawn under L (X, shown there as L's note).
+/// A root whose node a save deleted vanishes with its subtree, so a
+/// buffer may end with no roots: the saved view of L alone ends empty.
+/// A collateral view of L and P keeps P, which no longer contains L;
+/// the root L vanishes there with what was drawn under it (X, shown
+/// there as L's note), and nothing stands for it.
 #[test]
 fn a_deleted_root_vanishes_and_a_buffer_may_end_with_no_roots
   () -> Result<(), Box<dyn Error>> {
@@ -185,9 +181,8 @@ fn a_deleted_root_vanishes_and_a_buffer_may_end_with_no_roots
                        && msg . contains ("collat-del-root-both") )
         . expect ("the view of L and P should be rerendered");
       assert! ( ! both . contains ("(gnid L)"), "L is gone:\n{}", both );
-      assert! ( without_viewnode_ids (both) . contains ("* (skg tombstone")
-                && without_viewnode_ids (both) . contains ("** (skg node (gnid X)"),
-        "the tombstone where L stood holds X:\n{}", both );
+      assert! ( ! both . contains ("tombstone") && ! both . contains ("(gnid X)"),
+        "L vanishes with X, and no tombstone stands for it:\n{}", both );
       assert! ( both . contains ("(gnid P)"), "P stays:\n{}", both );
       Ok (( )) } )) }
 

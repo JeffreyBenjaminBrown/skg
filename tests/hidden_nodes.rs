@@ -21,9 +21,10 @@
 // after b and hides hp ("hp secret", private).
 
 use crate::git_fixture::{
-  Fixture, OwnedSkgrepos, open_content_view, switch_skgrepo_set,
+  Fixture, OwnedSkgrepos, edit_line, open_content_view, switch_skgrepo_set,
   switch_skgrepo_set_rerendering, with_git_fixture, write_unchanged_skgrepos};
 use crate::git_fixture_helpers::mk_test_tcp_stream_pair;
+use crate::pruned_change_view::common::open_all_changes_buffer;
 
 use skg::from_text::strandeds::StrandedsReview;
 use skg::serve::handlers::save_buffer::{
@@ -33,7 +34,9 @@ use skg::test_utils::skg_env_from_parts;
 use skg::types::env::SkgEnv;
 use skg::types::misc::{ID, RelPartner, SkgrepoName, members_of};
 use skg::types::nodes::rust::GraphnodeInRust;
-use skg::types::views_state::ViewforestId;
+use skg::metadata_canon::without_viewnode_ids;
+use skg::org_to_text::viewforest_to_string;
+use skg::types::views_state::{DiffViewBufferKind, ViewforestId};
 
 use futures::executor::block_on;
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -425,20 +428,13 @@ fn a_narrowing_and_a_widening_give_the_view_back (
 
 /// r, public, contains a in its public file and pc, public, in its
 /// private section. Narrowed to "public", pc's record is restricted
-/// while pc is not: pc stays drawn, marked 'noClaim', and the switch
-/// reports no buffer correction, for the skgrepo narrowing did it
-/// ('BufferCorrectionPolicy::AfterRestrictionChange').
+/// while pc is not: pc, claiming membership of r, which the graph as
+/// the skgrepo restriction shows it no longer warrants, vanishes.
 #[test]
-fn a_narrowing_marks_noClaim_quietly_a_member_whose_record_alone_is_restricted (
+fn a_narrowing_makes_a_member_whose_record_alone_is_restricted_vanish (
 ) -> Result<(), Box<dyn Error>> {
   let case : tempfile::TempDir = tempfile::TempDir::new () ?;
-  write_unchanged_skgrepos ( case . path (), &[
-    ( "public", &[
-      ("r",  "pid: r\ntitle: r\ncontains:\n- a\n"),
-      ("a",  "pid: a\ntitle: a\n"),
-      ("pc", "pid: pc\ntitle: pc\n") ] ),
-    ( "private", &[
-      ("r",  "pid: r\ncontains:\n- pc\n") ] ) ]) ?;
+  write_fixture_where_r_records_pc_privately (case . path (), PrivateRecordsOfR::Containment) ?;
   with_git_fixture (
     case . path (), OwnedSkgrepos::Named (&["public", "private"]), &[],
     |f| {
@@ -447,12 +443,229 @@ fn a_narrowing_marks_noClaim_quietly_a_member_whose_record_alone_is_restricted (
       let opened : String = open_view_of_r (f, None) ?;
       assert! ( opened . contains ("node (gnid pc)") && ! opened . contains ("noClaim"),
                 "under all pc is r's member:\n{}", opened );
-      let (view, _) : (String, String) =
-        switch_reporting (f, &mut restriction, "public") ?;
-      assert! ( view . lines () . any ( |line| line . contains ("node (gnid pc)")
-                                               && line . contains (" noClaim ") ),
-                "narrowed, pc stays, marked noClaim:\n{}", view );
+      let narrowed : String = switch (f, &mut restriction, "public") ?;
+      assert! ( ! narrowed . contains ("(gnid pc)"),
+                "narrowed, pc vanishes:\n{}", narrowed );
+      assert! ( narrowed . contains ("node (gnid a)"), "a stays:\n{}", narrowed );
       Ok (( )) } ) }
+
+//
+// A skgrepo narrowing, then a skgrepo widening, then a save of the
+// view unchanged: r's private record survives. The fixture is
+// 'write_fixture_where_r_records_pc_privately'; each test is one of the
+// variants the review's probes tried ('probe_noclaim_*').
+//
+
+/// The base case: the view of r.
+#[test]
+fn a_narrowing_and_a_widening_keep_rs_private_record (
+) -> Result<(), Box<dyn Error>> {
+  round_trip_keeps_the_private_record (
+    PrivateRecordsOfR::Containment, false,
+    |f| open_view_of_r (f, None),
+    VIEW, |_f, _restriction| Ok (( )) ) }
+
+/// The all-changes buffer of the diff view, where r newly contains n
+/// since HEAD, so that r and its members are shown.
+#[test]
+fn a_narrowing_and_a_widening_of_the_diff_view_keep_rs_private_record (
+) -> Result<(), Box<dyn Error>> {
+  round_trip_keeps_the_private_record (
+    PrivateRecordsOfR::Containment, true,
+    |f| open_all_changes_buffer (f),
+    &format! ( "diff-view: {}", DiffViewBufferKind::AllChanges . wire_name () ),
+    |_f, _restriction| Ok (( )) ) }
+
+/// r folded in a view of its container T.
+#[test]
+fn a_narrowing_and_a_widening_with_r_folded_keep_rs_private_record (
+) -> Result<(), Box<dyn Error>> {
+  round_trip_keeps_the_private_record (
+    PrivateRecordsOfR::Containment, false,
+    |f| {
+      let opened : String = open_content_view (f, "T", VIEW_OF_T, None) ?;
+      let folded : String = edit_line (
+        &opened, "** (skg node (gnid r)",
+        |line| line . replacen ("(skg node", "(skg folded node", 1) );
+      let all : SkgrepoRestriction =
+        SkgrepoRestriction::named (&f . config, "all" . into ()) ?;
+      Ok ( save_view_cleanly_under (f, VIEW_OF_T, &folded, &all) ? . saved_view ) },
+    VIEW_OF_T, |_f, _restriction| Ok (( )) ) }
+
+/// A save of another view, of o, between the skgrepo narrowing and the
+/// skgrepo widening, with the view of r open.
+#[test]
+fn a_narrowing_a_save_of_another_view_and_a_widening_keep_rs_private_record (
+) -> Result<(), Box<dyn Error>> {
+  round_trip_keeps_the_private_record (
+    PrivateRecordsOfR::Containment, false,
+    |f| {
+      open_content_view (f, "o", VIEW_OF_O, None) ?;
+      open_view_of_r (f, None) },
+    VIEW,
+    |f, restriction| {
+      let o : String = open_content_view (f, "o", VIEW_OF_O, Some (restriction)) ?;
+      save_view_cleanly_under (
+        f, VIEW_OF_O, &o . replace (") o\n", ") o, edited\n"), restriction ) ?;
+      Ok (( )) } ) }
+
+/// A save of the view of r unchanged under the skgrepo narrowing,
+/// before the skgrepo widening.
+#[test]
+fn a_save_under_the_narrowing_then_a_widening_keep_rs_private_record (
+) -> Result<(), Box<dyn Error>> {
+  round_trip_keeps_the_private_record (
+    PrivateRecordsOfR::Containment, false,
+    |f| open_view_of_r (f, None),
+    VIEW,
+    |f, restriction| {
+      let narrowed : String = rendered_view (f, VIEW) ?;
+      let saved : SaveResponse = save_view_cleanly_under (f, VIEW, &narrowed, restriction) ?;
+      assert_eq! ( saved . saved_view, narrowed,
+                   "saved unchanged under the narrowing, the view comes back as it was" );
+      Ok (( )) } ) }
+
+/// r's private section records that r subscribes to s, hides s1 from
+/// its subscribers and overrides o, each a public graphnode. The view
+/// of r asks for its overrides and hidesFromSubs folders; the
+/// subscribee folder is drawn by default.
+#[test]
+fn a_narrowing_and_a_widening_keep_rs_private_subscription_and_override_records (
+) -> Result<(), Box<dyn Error>> {
+  round_trip_keeps_the_private_record (
+    PrivateRecordsOfR::PartnerRecords, false,
+    |f| {
+      let opened : String = open_view_of_r (f, None) ?;
+      let asking : String = edit_line (
+        &opened, "* (skg node (gnid r)",
+        |line| line . replacen (
+          "node (gnid r)",
+          "node (gnid r) (viewRequests (folder overrides) (folder hidesFromSubs))", 1 ));
+      let all : SkgrepoRestriction =
+        SkgrepoRestriction::named (&f . config, "all" . into ()) ?;
+      let shown : String = save_view_cleanly_under (f, VIEW, &asking, &all) ? . saved_view;
+      for member in [ "(gnid s)", "(gnid o)", "(gnid s1)" ] {
+        assert! ( shown . contains (member), "under all {} shows:\n{}", member, shown ); }
+      Ok (shown) },
+    VIEW, |_f, _restriction| Ok (( )) ) }
+
+const VIEW_OF_T : &str = "view of T";
+const VIEW_OF_O : &str = "view of o";
+
+/// What r's private section records in
+/// 'write_fixture_where_r_records_pc_privately'.
+#[derive(Clone, Copy)]
+enum PrivateRecordsOfR {
+  /// r contains pc.
+  Containment,
+  /// r subscribes to s, hides s1 from its subscribers and overrides o.
+  PartnerRecords,
+}
+
+/// public: r ("r") contains a, T contains r, and a, pc, o, s (which
+/// contains s1 and s2), s1 and s2; private: r's section, as
+/// 'private_records' says.
+fn write_fixture_where_r_records_pc_privately (
+  dir             : &Path,
+  private_records : PrivateRecordsOfR,
+) -> Result<(), Box<dyn Error>> {
+  let private_r : &str = match private_records {
+    PrivateRecordsOfR::Containment => "pid: r\ncontains:\n- pc\n",
+    PrivateRecordsOfR::PartnerRecords =>
+      "pid: r\nsubscribesTo:\n- s\nhidesFromSubs:\n- s1\noverrides:\n- o\n", };
+  write_unchanged_skgrepos ( dir, &[
+    ( "public", &[
+      ("r",  "pid: r\ntitle: r\ncontains:\n- a\n"),
+      ("a",  "pid: a\ntitle: a\n"),
+      ("pc", "pid: pc\ntitle: pc\n"),
+      ("T",  "pid: T\ntitle: T\ncontains:\n- r\n"),
+      ("o",  "pid: o\ntitle: o\n"),
+      ("s",  "pid: s\ntitle: s\ncontains:\n- s1\n- s2\n"),
+      ("s1", "pid: s1\ntitle: s1\n"),
+      ("s2", "pid: s2\ntitle: s2\n") ] ),
+    ( "private", &[ ("r", private_r) ] ) ]) }
+
+/// In the worktree, r newly contains n since HEAD.
+fn change_r_since_head (
+  dir : &Path,
+) -> Result<(), Box<dyn Error>> {
+  let worktree : PathBuf = dir . join ("public") . join ("worktree");
+  std::fs::write ( worktree . join ("r.skg"), "pid: r\ntitle: r\ncontains:\n- a\n- n\n" ) ?;
+  std::fs::write ( worktree . join ("n.skg"), "pid: n\ntitle: n\n" ) ?;
+  Ok (( )) }
+
+/// Open 'view' ('open'), narrow to "public", do 'between' under the
+/// narrowing, widen to "all", and save 'view' unchanged under "all".
+/// The widened view is the view as opened (but for viewnode IDs and
+/// the edits 'between' made elsewhere), and every file of r is as it
+/// was before the narrowing; so is every other file but o's, which
+/// 'between' may edit.
+fn round_trip_keeps_the_private_record (
+  private_records      : PrivateRecordsOfR,
+  r_changed_since_head : bool,
+  open                 : impl FnOnce (&mut Fixture) -> Result<String, Box<dyn Error>>,
+  view                 : &str,
+  between              : impl FnOnce (&mut Fixture, &SkgrepoRestriction) -> Result<(), Box<dyn Error>>,
+) -> Result<(), Box<dyn Error>> {
+  let case : tempfile::TempDir = tempfile::TempDir::new () ?;
+  write_fixture_where_r_records_pc_privately (case . path (), private_records) ?;
+  if r_changed_since_head { change_r_since_head (case . path ()) ?; }
+  with_git_fixture (
+    case . path (), OwnedSkgrepos::Named (&["public", "private"]), &[],
+    |f| {
+      let all : SkgrepoRestriction =
+        SkgrepoRestriction::named (&f . config, "all" . into ()) ?;
+      let mut restriction : SkgrepoRestriction = all . clone ();
+      let opened : String = open (f) ?;
+      let files_before : BTreeMap<PathBuf, String> = skg_files_on_disk (f) ?;
+      let narrowed : String = switch_skgrepo_set (f, &mut restriction, "public", view) ? . 0;
+      // pc, a member of r; s, of its subscribee folder; o, of its
+      // overridden folder. (The hidden folder, write-protected, reads
+      // no claims: its member s1 stays, unwarranted, with its chain.)
+      for member in [ "** (skg node (gnid pc)", "*** (skg node (gnid s)",
+                      "*** (skg node (gnid o)" ] {
+        assert! ( ! without_viewnode_ids (&narrowed) . lines ()
+                    . any ( |line| line . starts_with (member) ),
+                  "narrowed, {} vanishes:\n{}", member, narrowed ); }
+      between (f, &restriction) ?;
+      let widened : String = switch_skgrepo_set (f, &mut restriction, "all", view) ? . 0;
+      assert_eq! ( without_viewnode_ids (&widened), without_viewnode_ids (&opened),
+                   "widened, the view is as it was opened" );
+      let saved : SaveResponse = save_view_cleanly_under (f, view, &widened, &all) ?;
+      assert_eq! ( saved . saved_view, widened, "saved unchanged, it comes back as it went" );
+      let files_after : BTreeMap<PathBuf, String> = skg_files_on_disk (f) ?;
+      let but_o = |files : &BTreeMap<PathBuf, String>| -> BTreeMap<PathBuf, String> {
+        files . iter ()
+        . filter ( |(path, _)| ! path . ends_with ("o.skg") )
+        . map ( |(path, text)| ( path . clone (), text . clone () ))
+        . collect () };
+      assert_eq! ( but_o (&files_after), but_o (&files_before),
+                   "every file of r, and every other but o's, is as it was" );
+      Ok (( )) } ) }
+
+/// The text of the open view 'view', as the server holds it.
+fn rendered_view (
+  f    : &Fixture,
+  view : &str,
+) -> Result<String, Box<dyn Error>> {
+  Ok ( viewforest_to_string (
+    f . views_state . open_views
+    . viewforest_id_to_view ( &ViewforestId::ContentView (view . into ()) )
+    . ok_or ("the view is open") ? ) ? ) }
+
+/// Save 'text' as 'view' under 'restriction'; it must save without
+/// errors.
+fn save_view_cleanly_under (
+  f           : &mut Fixture,
+  view        : &str,
+  text        : &str,
+  restriction : &SkgrepoRestriction,
+) -> Result<SaveResponse, Box<dyn Error>> {
+  let response : SaveResponse = save_view_under (f, view, text, restriction) ?;
+  assert! ( response . errors . is_empty (),
+            "the buffer must save without errors, got {:?}\n\nbuffer:\n{}",
+            response . errors, text );
+  Ok (response) }
 
 /// r hides s1 and hh, private, from its subscribers, recording both in
 /// its public file. Under "public", with the folder of what r hides

@@ -1,3 +1,35 @@
+* Problems noticed while executing plan 08, slice 7 (2026-10-30; fixed 2026-10-31)
+** A skgrepo widening keeps a skgrepo narrowing's noClaim
+  Run, not traced, by a throwaway test in
+  'tests/hidden_nodes.rs', deleted after the run. r, public,
+  contains a, and records in its private section that it contains
+  pc, public. A view of r drawn under 'all' and switched to
+  'public' (a skgrepo narrowing) marks pc 'noClaim', quietly, as
+  slice 3 of plan 08 made it. Switched back to 'all' (a skgrepo
+  widening), pc stays 'noClaim', warranted, and no buffer
+  correction says so. Saved unchanged under 'all', the save reads
+  the 'noClaim' as a detachment: r's private file is deleted, and
+  with it the record that r contains pc, which nothing the user
+  typed asked for.
+  The claims rung never promotes a claim
+  ('mark_noClaim_unless_warranted', 'server/refresh/visit.rs'),
+  since a 'noClaim' may be the user's pending detachment, so the
+  refresh cannot tell the skgrepo narrowing's marking from the
+  user's. A fix needs a design: the skgrepo narrowing could
+  leave the claim (a save under a skgrepo restriction already
+  keeps the records it cannot show,
+  'preserve_invisible_members'), or the skgrepo widening could
+  restore the claim of a member whose record it shows again, or
+  the skgrepo narrowing could mark such a member in a way the
+  skgrepo widening can undo.
+  Fixed by slice 0 of 'TODO/simplify-refresh/10_plan.org': the
+  claims rung makes a claiming child the graph does not warrant
+  vanish, with its subtree, in place of marking it 'noClaim'
+  ('vanish_if_unwarranted', 'server/refresh/visit.rs'), so the
+  skgrepo narrowing leaves no mark and the skgrepo widening draws
+  pc again. The six variants the review's probes tried are tests
+  in 'tests/hidden_nodes.rs' ('a_narrowing_and_a_widening_*' and
+  'a_save_under_the_narrowing_then_a_widening_*').
 * Problems noticed while executing plan 19, slice 12 (2026-10-24; fixed 2026-10-30)
 ** Emacs's relRepo info request always sends a nil recorder
   'skg-set-relRepo' asks the server which skgrepos a relationship may

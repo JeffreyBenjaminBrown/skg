@@ -1,14 +1,14 @@
 // Rung 4: claims. Under an editable occurrence or an editable folder,
-// every child that claims and that the truth does not warrant is
-// marked 'noClaim'; a warranted child the user marked 'noClaim' (to
-// detach it) stays so. Under a write-protected parent no child claims,
+// every child that claims and that the truth does not warrant
+// vanishes, with its subtree; a warranted child the user marked
+// 'noClaim' (to detach it) stays so. Under a write-protected parent no child claims,
 // whatever it carried. A root claims.
 
 use super::*;
 use indoc::formatdoc;
 
 #[test]
-fn under_an_editable_occurrence_an_unwarranted_claiming_child_is_marked_noClaim () {
+fn under_an_editable_occurrence_an_unwarranted_claiming_child_vanishes () {
   let graph : InRustGraph = graph (&[
     Graphnode { contains : ids (&["c", "d"]), .. node ("p") },
     node ("c"), node ("d"), node ("z"), ]);
@@ -17,16 +17,17 @@ fn under_an_editable_occurrence_an_unwarranted_claiming_child_is_marked_noClaim 
     ** {} c
     ** {} d
     ** {} z
+    *** {} c
     ", occurrence_metadata ("p", ""), occurrence_metadata ("c", ""),
-       occurrence_metadata ("d", "noClaim"), occurrence_metadata ("z", "") );
+       occurrence_metadata ("d", "noClaim"), occurrence_metadata ("z", ""),
+       occurrence_metadata ("c", "writeProtected") );
   let run : Run = run_asserting_fixpoint (&input, &graph);
   assert_eq! ( run . outline (), "\
 node p
   node c
-  node d noClaim
-  node z noClaim ⊥",
-    "z is marked; d, detached by the user, stays detached, and is not \
-     drawn again" ); }
+  node d noClaim",
+    "z vanishes with what it held; d, detached by the user, stays \
+     detached, and is not drawn again" ); }
 
 #[test]
 fn under_a_write_protected_occurrence_no_child_claims () {
@@ -56,7 +57,7 @@ fn a_root_claims () {
   assert_eq! ( run_asserting_fixpoint (&input, &graph) . outline (), "node p" ); }
 
 #[test]
-fn in_an_editable_folder_an_unwarranted_member_is_marked_noClaim () {
+fn in_an_editable_folder_an_unwarranted_member_vanishes () {
   let graph : InRustGraph = graph (&[
     Graphnode { subscribesTo : msv_ids (&["e"]), .. node ("s") },
     node ("e"), node ("z"), ]);
@@ -71,8 +72,7 @@ fn in_an_editable_folder_an_unwarranted_member_is_marked_noClaim () {
   assert_eq! ( run . outline (), "\
 node s
   subscribeeFolder
-    node e wp
-    node z wp noClaim ⊥" ); }
+    node e wp" ); }
 
 #[test]
 fn in_an_editable_folder_of_a_write_protected_node_no_member_claims () {

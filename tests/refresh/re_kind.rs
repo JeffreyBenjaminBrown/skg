@@ -33,7 +33,7 @@ node p
                "the unknown keeps the occurrence's vnid" ); }
 
 #[test]
-fn an_occurrence_no_node_answers_to_and_no_list_names_becomes_a_tombstone () {
+fn an_occurrence_no_node_answers_to_and_no_list_names_vanishes_with_its_subtree () {
   let graph : InRustGraph = graph (&[ p_lists (&["c"]), node ("c"), node ("k") ]);
   let input : String = formatdoc! ("
     * {} p
@@ -47,13 +47,23 @@ fn an_occurrence_no_node_answers_to_and_no_list_names_becomes_a_tombstone () {
   let run : Run = run_asserting_fixpoint (&input, &graph);
   assert_eq! ( run . outline (), "\
 node p
-  node c
-  tombstone
-    node k noClaim",
-    "the tombstone keeps x's child; y, childless, is pruned" ); }
+  node c",
+    "x vanishes, and k with it; so does y" ); }
 
 #[test]
-fn a_restricted_node_its_parent_lists_in_a_restricted_record_becomes_a_tombstone () {
+fn a_root_no_node_answers_to_vanishes_with_its_subtree () {
+  let graph : InRustGraph = graph (&[ node ("c"), node ("k") ]);
+  let input : String = formatdoc! ("
+    * {} x
+    ** {} k
+    * {} c
+    ", occurrence_metadata ("x", ""), occurrence_metadata ("k", ""),
+       occurrence_metadata ("c", "") );
+  let run : Run = run_asserting_fixpoint (&input, &graph);
+  assert_eq! ( run . outline (), "node c" ); }
+
+#[test]
+fn a_restricted_node_its_parent_lists_in_a_restricted_record_vanishes () {
   // p lists h in its 'private' section, which the skgrepo restriction
   // keeps out: no record the skgrepo restriction shows names h. (Where
   // one does, h becomes a Restricted vognode: 'restricted.rs'.)
@@ -76,8 +86,6 @@ fn a_restricted_node_its_parent_lists_in_a_restricted_record_becomes_a_tombstone
                            RefreshMode::ContentView, 100 );
   assert_eq! ( run . outline (), "\
 node p
-  tombstone
-    node k noClaim
   node c" );
   assert! ( ! run . text . contains ("(gnid h)"),
             "nothing of the restricted node shows: {}", run . text ); }

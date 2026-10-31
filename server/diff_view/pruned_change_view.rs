@@ -428,8 +428,8 @@ pub fn root_gnids_of_buffer (
 /// occurrence (a root, a member of a vognode's content, or a removed
 /// member). Its children claim membership, as the buffer read back
 /// says (under a write-protected parent no claim atom is written); the
-/// refresh then marks 'noClaim' on those the graph does not warrant,
-/// gives it its body and draws its content list. A node of U with no occurrence is reached through
+/// refresh then makes those the graph does not warrant vanish, gives
+/// it its body and draws its content list. A node of U with no occurrence is reached through
 /// the node above it on its walk, once that one is editable. A node
 /// shown only as a write-protected member of a folder counts as shown
 /// nowhere: a folder's members stay write-protected, and if the node

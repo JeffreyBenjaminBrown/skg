@@ -207,35 +207,11 @@ So far there are these endpoints:
        =Content-Length: N\r\n\r\n((response-type collateral-view) (view-id "VIEW_ID") (content "..."))=
        Emacs unlocks and updates each buffer as it arrives.
     4. Final save response:
-       =Content-Length: N\r\n\r\n((response-type save-result) (content "...") (errors ("..." ...)) (warnings ("..." ...)) (corrections (("VIEW_ID" "..." ...) ...)) (point-lines-below-focused-headline N) (point-column C) (point-screen-lines-below-window-start M))=
+       =Content-Length: N\r\n\r\n((response-type save-result) (content "...") (errors ("..." ...)) (warnings ("..." ...)) (point-lines-below-focused-headline N) (point-column C) (point-screen-lines-below-window-start M))=
        =content= is the re-rendered saved buffer (nil on failure). =errors= is a list of failure-explaining strings. =warnings= is a list of nonfatal messages. Both lists are present and empty if none.
-       =corrections= holds what the refresh corrected in each view the
-       save refreshed, the saved view and the collateral ones: one
-       list per view with buffer corrections, its view ID first, then one
-       message per buffer correction (see "How a message names a headline"
-       below), such as =("content-view:5" "Drew what the graph says
-       belongs here.\n*** new child\n- viewnode ID: 0d. ...")=. A
-       buffer correction is a headline the refresh changed because the
-       buffer contradicted the graph (reinstated, entombstoned, marked
-       =noClaim=, joined by a viewnode merge, re-kinded, or an edit
-       request dropped). What
-       the refresh draws as extent is not one: the content of an
-       occurrence it extends first, the members of a folder first
-       requested, a fresh view's content. Nor is what the save itself
-       did: a tombstone where it deleted a node, the viewnode merge
-       and the members drawn that its nodeMerge requests caused, and
-       a headline the refresh took out of a view; nor, at a
-       skgrepo-set switch, what the change of the skgrepo restriction drew,
-       entombstoned, marked =noClaim= or re-kinded. So a reinstatement is
-       reported only where a list already drawn lacked a member, and a
-       plain save reports nothing. The list is present and empty if
-       none; a failed save's response has no =corrections=. A buffer
-       of the diff view reports its buffer corrections too, but for its change
-       viewnodes, which describe the straddle and are recomputed at
-       every refresh. Each client appends them to its
-       warnings buffer (see "Server warnings" below), under one level-1
-       headline per view naming the view's buffer (or its view ID when
-       no buffer shows it).
+       The refresh of each view the save rerenders says nothing of
+       what it changed there ('docs/glossary.org', "what the refresh
+       changes silently").
        Each message names the headlines it concerns as subheadlines
        (see "How a message names a headline" below). A failed save
        sends one error, =NOTHING WAS SAVED=, whose validation errors
@@ -403,10 +379,10 @@ So far there are these endpoints:
     both directions. It pins atom coverage only, not presentation.
 
 ** How a message names a headline
-Every message in an =errors=, =warnings= or =corrections= list is Org
+Every message in an =errors= or =warnings= list is Org
 text. Its first line is the message's headline text, which both
-clients write as a level-2 headline (=** =) under =* errors=, =*
-warnings= or the headline naming a corrected view; the lines after
+clients write as a level-2 headline (=** =) under =* errors= or =*
+warnings=; the lines after
 it are its body. A message that concerns a headline of the
 buffer names it as a level-3 subheadline, after the message's own
 lines:
@@ -456,11 +432,6 @@ since the command searches the current buffer.
     headline "Startup warnings", each warning a level-2 headline:
     =*SKG Server Warnings*= in Emacs, =skg://messages/server-warnings=
     in Neovim. An empty answer opens nothing.
-  - The same buffer receives the buffer corrections that a =save-result= or
-    a =rerender-done= carries: each client appends them, keeping
-    what the buffer holds, under one level-1 headline per view,
-    "Buffer corrections in" and the view's buffer name, each buffer
-    correction a level-2 headline under it.
 
 ** Link statuses
   - Request: =((request . "link statuses") (request-id . "TOKEN") (ids "ID" ...))=.
@@ -576,15 +547,12 @@ since the command searches the current buffer.
     level order, its children claiming as the buffer read back would; a
     node shown only as a write-protected folder member counts as shown
     nowhere, since a folder's members stay write-protected. The buffer
-    is then refreshed as after a save, which gives each node made
-    editable its body and draws its content list. Last, each origin of
-    D that the buffer shows nowhere is appended as a root, at the end,
-    in ID order, and the buffer refreshed again; R is deduplicated with
-    the buffer's roots pinned, so that a changed cycle that already has
-    a root gains no second one. What the request draws is what the user
-    asked for: the first refresh reports no buffer correction, and the
-    second reports what the buffer got wrong, but for what it draws
-    under the appended roots.
+    then gains, as roots at the end in ID order, the origins of D it
+    makes editable nowhere; R is deduplicated with the buffer's roots
+    pinned, so that a changed cycle that already has a root gains no
+    second one. Last, the buffer is refreshed once, as after a save,
+    which gives each node made editable its body and draws its content
+    list and the content of each appended root.
     =server/serve/handlers/integrate_unshown_changes.rs=, =server/diff_view/pruned_change_view.rs=
     ('ensure_editableOccurrences_exist',
     'contentOrigins_missing_from_buffer'), and 'rerender_view' in
@@ -797,12 +765,9 @@ one automatically.
        =Content-Length: N\r\n\r\n((response-type rerender-view) (view-id "VIEW_ID") (content "..."))=
        Emacs unlocks and updates each buffer as it arrives.
     3. Done message:
-       =Content-Length: N\r\n\r\n((response-type rerender-done) (errors ("..." ...)) (warnings ("..." ...)) (corrections (("VIEW_ID" "..." ...) ...)))=
+       =Content-Length: N\r\n\r\n((response-type rerender-done) (errors ("..." ...)) (warnings ("..." ...)))=
        Emacs removes the rerender-view handler and unlocks any remaining buffers.
-       =corrections= holds what the refresh corrected in each view it
-       rerendered, as in the save's =save-result= (see "Save buffer"
-       above), and is present and empty if none. Every rerender stream
-       ends with this message.
+       Every rerender stream ends with this message.
   - Behavior: Re-renders every open view from server memory, each a
     refresh of what it holds; a buffer of the diff view is refreshed
     over the graph straddle.
@@ -844,14 +809,15 @@ one automatically.
        is re-rendered in place under the new set by the refresh alone:
        every occurrence of a node the new set keeps out becomes, in
        place, a Restricted vognode where a record the set shows names
-       it, and a tombstone elsewhere, either keeping its viewchildren;
-       a tombstone is pruned unless it holds something; an editable
+       it, keeping its viewchildren, and vanishes elsewhere, with its
+       subtree; a member whose record alone the new set keeps out
+       vanishes too, where its parent reads claims; an editable
        folder whose every member's record the new set keeps out stays,
        empty, as any empty editable folder does; and the refresh fills
        every folder per the new set, so a skgrepo widening makes each
-       Restricted vognode an occurrence again and reveals members and
-       folders. When the set changed, none of this is reported as a
-       buffer correction (see "Restricted-skgrepo nodes" below).
+       Restricted vognode an occurrence again and draws again the
+       members and folders it reveals. None of this is reported (see
+       "Restricted-skgrepo nodes" below).
   - Behavior: The skgrepo restriction is per Emacs TCP connection. It
     defaults from =skgconfig.toml=, resets on reconnect, and is not
     written back to the config. Changing it requires confirmation in
@@ -1041,9 +1007,9 @@ no folder unasked but where something changed.
   Either write-protect request together with =editableView= on one
   occurrence is refused; on two occurrences of a node they move
   editability. The children of a write-protected occurrence carry no
-  =noClaim=, so when it becomes editable again each claims, and the
-  refresh marks =noClaim= on those its content list does not name:
-  moving editability back restores the content.
+  =noClaim=, so when it becomes editable again each claims, and
+  those its content list does not name vanish: moving editability
+  back restores the content.
 - =flags= — add one write-protected =flagsFolder=, retained even when empty.
   Its true-only viewnodes use =(flag hadId)=, =(flag wasOverloaded)=, and
   =(flag noSearchMatching)= metadata in that order. Viewnodes have no Org title;
@@ -1301,14 +1267,14 @@ explanation. With chains the honest carrier may be a middle link
 (shown when a later link's mentioner is restricted), so the check accepts
 any node on the chain and rejects only off-chain facts. A
 skgrepo-set switch that makes a
-shown substitute's skgrepo restricted turns it into a tombstone (the
-fact does not survive -- a tombstone says nothing of what stood
-there); the original it stood for is preserved in its container's
-contains by disk supplementation. A restricted original whose record
-is visible stands as a Restricted vognode, never substituted. When the override itself is gone,
-the refresh shows the overrider as itself, without the fact,
-unwarranted and so claiming nothing, and reinstates the original
-beside it.
+shown substitute's skgrepo restricted makes it vanish, with its
+subtree (the fact does not survive, and nothing stands where the
+substitute stood), and the refresh draws the original it stood for,
+which disk supplementation preserves in its container's contains. A
+restricted original whose record is visible stands as a Restricted
+vognode, never substituted. When the override itself is gone, the
+refresh reinstates the original beside the overrider, which,
+unwarranted as itself, vanishes.
 
 * skgconfig.toml
 
@@ -1869,31 +1835,24 @@ it.
 When a skgrepo-set switch is applied to an open view (an
 already-rendered buffer), every occurrence of a now-restricted node
 becomes, in place, a Restricted vognode where its record is visible,
-and otherwise a tombstone; either keeps the occurrence's viewnode ID,
-fold state and viewchildren, so its visible descendants keep their
-place:
-
-#+begin_example
-(skg tombstone)
-#+end_example
-
-A tombstone says nothing of what stood there: no id, skgrepo or
-title, so nothing the user hid by restricting the skgrepo-set leaks.
-A childless one is pruned, as are the property members and change
-viewnodes of the node it replaced and the folders that prune empties;
-the folders of a node that became a Restricted vognode are pruned
-the same way. An editable folder whose every member's record the new
-set keeps out stays, empty. A tombstone is save-inert: it emits no
-fieldIntent (a restricted record's membership in its parent's list
-is owned entirely by disk supplementation, not the buffer), and it is
-not a collateral re-render target. The children of a tombstone or a
-Restricted vognode remain occurrences, claiming nothing. Switching
-back makes each Restricted vognode an occurrence again, where it
-stands, its children claiming again where the node's lists name them,
-and draws a node whose record was restricted again; a tombstone
-stays beside it until its children are gone. A de-novo render under
-a restricted set never produces one -- members whose records are
-restricted are omitted and their content is never extended.
+keeping the occurrence's viewnode ID, fold state and viewchildren, so
+its visible descendants keep their place; otherwise it vanishes, with
+its subtree, so nothing the user hid by restricting the skgrepo-set
+leaks. So does a member whose record alone the set keeps out, where
+its parent reads claims: the graph as the set shows it no longer
+relates it to its parent. Neither is a detachment: a restricted
+record's membership in its parent's list is owned entirely by disk
+supplementation, not the buffer. The folders of a node that became a
+Restricted vognode are pruned as its property members and change
+viewnodes are. An editable folder whose every member's record the
+new set keeps out stays, empty. The children of a Restricted vognode
+remain occurrences, claiming nothing. Switching back makes each
+Restricted vognode an occurrence again, where it stands, its children
+claiming again where the node's lists name them, and draws again each
+node and member that vanished, where the graph puts it. A de-novo
+render under a restricted set draws no such member in the first
+place -- members whose records are restricted are omitted and their
+content is never extended.
 
 Edits to restricted nodes themselves are /suppressed/ at save, not
 fatal: any nodeInstruction that would write a restricted skgrepo is

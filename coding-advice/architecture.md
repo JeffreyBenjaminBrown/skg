@@ -32,7 +32,8 @@ queues the Tantivy update, and sends updated views to the client.
 Every buffer the server sends is drawn by one operation, the refresh
 (`refresh_viewforest` in `server/refresh/`): it takes a parsed,
 validated buffer and the graph, decides from the two as they are now
-what the buffer should say, corrects it, and reports its corrections.
+what the buffer should say, and corrects it, saying nothing of what
+it changed.
 A fresh view, every rerender after a save or a request, the search
 enrichment and the diff view's buffers are all refreshes. Its model is
 in [the technical data model](../docs/data-model_technical.org),

@@ -84,6 +84,28 @@ node p
       node p wp noClaim ᗣ" );
   assert! ( run . text . contains ("ghostWarrant"), "{}", run . text ); }
 
+/// x is in neither HEAD nor the worktree, and p's list does not name
+/// it. Where a content view's refresh would make its occurrence vanish,
+/// the diff view keeps the tombstone, with what stands under it.
+#[test]
+fn in_the_diff_view_an_occurrence_no_node_answers_to_stays_a_tombstone () {
+  let straddle : GraphStraddle = straddle (
+    &[ Graphnode { contains : ids (&["c"]), .. node ("p") }, node ("c"), node ("k") ],
+    &[ Graphnode { contains : ids (&["c"]), .. node ("p") }, node ("c"), node ("k") ] );
+  let input : String = formatdoc! ("
+    * {} p
+    ** {} c
+    ** {} x
+    *** {} k
+    ", occurrence_metadata ("p", ""), occurrence_metadata ("c", "writeProtected"),
+       occurrence_metadata ("x", ""), occurrence_metadata ("k", "writeProtected") );
+  let run : Run = diff_run_asserting_fixpoint (&input, &straddle);
+  assert_eq! ( run . outline (), "\
+node p
+  node c wp
+  tombstone
+    node k wp noClaim" ); }
+
 #[test]
 fn a_ghost_whose_node_is_back_becomes_an_occurrence_in_place () {
   let straddle : GraphStraddle = straddle (

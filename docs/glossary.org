@@ -282,12 +282,12 @@ parent, being deeper than its parent allows. The weave's "orphan
 run" and the database's
 "orphan record" keep their nouns too.
 
-Under an editable parent the refresh marks =noClaim= on every child
-it keeps that the graph does not relate to its viewparent (see
-"warranted, 'noWarrant', 'ghostWarrant'"): one whose relationship a
-save in another view removed, a removed member in the diff view, a
-child a viewnode merge moved there. A child the graph does relate
-there and that claims nothing is one the user marked =noClaim= to
+Under an editable parent a child that claims and that the graph
+does not relate to its viewparent (see "warranted, 'noWarrant',
+'ghostWarrant'") vanishes (see "vanish"): one whose relationship a
+save in another view removed, one whose record alone a skgrepo
+narrowing keeps out, a child a viewnode merge moved there. A child
+there that claims nothing is one the user marked =noClaim= to
 detach it: a *pending detachment*, herald "detach", which the next
 save takes out of the list. No wire says it; each client sees it and
 writes the atom =pendingDetachment= into the metadata it hands the
@@ -567,11 +567,11 @@ search".
 A *tombstone* is a viewnode with no title, no ID and no change facts,
 shown as "something stood here", left where a headline stood that can
 stand there for nothing, and holding that headline's children. The
-refresh *entombstones* a headline (makes it one) when its gnid names
-nothing the view may show (a node a save deleted, which in the diff
-view becomes its ghost instead, or a restricted node that no record
-the skgrepo restriction shows names, which where one does becomes a
-restricted headline), when it describes its viewparent from where it cannot (see
+refresh *entombstones* a headline (makes it one) when, in the diff
+view, its gnid names nothing the view may show (a node HEAD lacks
+too, or a restricted node that no record the skgrepo restriction
+shows names; in a content view such an occurrence vanishes instead,
+see "vanish"), when it describes its viewparent from where it cannot (see
 "the refresh's rungs, unsayable" among the terms of the implementation), when
 the change it described is gone, and when it is a folder left with
 nothing in it that the save does not read and that is not the flags
@@ -594,120 +594,60 @@ occurrence's content. So a member the user deleted from a
 write-protected folder comes back at the next save, since its
 membership is a fact of the graph, edited from the other side of the
 relationship; and a member that a save in another view added appears
-in this one. The buffer correction "Drew what the graph says belongs here."
-reports it, naming the headline ('BufferCorrectionKind::Reinstated' in
-'server/refresh/buffer_corrections.rs'), except where drawing it is extent
-(see "extent, extension, node budget"). "Reinstate" names only this:
+in this one. "Reinstate" names only this:
 a child the buffer already holds is never drawn again, but re-kinded
 and re-warranted where it stands.
 
-*** buffer corrections
+*** what the refresh changes silently
+The refresh brings a view up to date with the graph and says nothing
+of what it changed: no save or rerender response reports it, and no
+client shows it. A *buffer correction* (a term of plan 06, gone with
+plan 10) was such a change, recorded and reported; the six kinds it
+named remain things the refresh does.
+**** a member drawn
+It draws a member the graph has and a list the view already showed
+lacks (see "reinstated").
+**** a headline entombstoned
+It entombstones a headline that can stand where it is for nothing,
+keeping its children (see "tombstone, entombstone"); where, in a
+content view, an occurrence's node is gone or restricted and its
+viewparent's list does not name it, the occurrence vanishes instead
+(see "vanish").
+**** an unwarranted child
+It makes a child that claims and that the graph does not relate to
+its viewparent vanish, where the viewparent reads claims (see
+"vanish").
+**** duplicate siblings merged
+It merges duplicate viewnode siblings, siblings standing for one
+node under one parent, into one headline holding all their children
+(see "viewnode merge" among the terms of the implementation).
+**** a headline re-kinded
+It re-kinds a headline to what the graph says it is, where it
+stands (see "the ID rule").
+**** an edit request dropped
+It drops an edit request a headline's new kind has no slot for.
 
-**** What a buffer correction is
-A *buffer correction* is one change the refresh made to a view
-because the view said something the graph contradicts. It is not an
-error and writes nothing to disk; it tells you that a headline
-of a view changed, which may be a view you are not looking at.
-Code: 'BufferCorrection' and 'BufferCorrectionKind' in
-'server/refresh/buffer_corrections.rs'.
-
-**** What is never a buffer correction
-What the refresh draws because you asked for it: the content of
-a headline you made editable, a folder you requested, a fresh
-view. That is extent (see "extent, extension, node budget"),
-not a correction of anything you said.
-
-**** The six kinds
-Each kind has one message; the message names the headline it
-concerns, by its title and its viewnode ID ('C-c g v' finds
-it).
-
-***** reinstated
-"Drew what the graph says belongs here." A list the view already
-showed lacks a member the graph has, and the refresh draws it:
-one another view's save added, say, or one you deleted from a
-write-protected folder.
-
-***** entombstoned
-"Entombstoned a headline that can stand here for nothing." The
-headline became a tombstone, keeping its children: its node is
-gone, or it stood in a place where its kind cannot stand.
-
-***** marked noClaim
-"Marked noClaim a child the graph does not relate to its
-parent." A child of an editable parent claimed membership, and
-the graph does not put it there (another view's save removed
-it, say): it stays, shown ⊥, and the next save leaves it out of
-the parent's list.
-
-***** merged
-"Merged duplicate viewnode siblings into this one." Two or more
-siblings stood for one node under one parent (a pasted copy,
-say); they became one headline, holding all their children.
-
-***** re-kinded
-"Made a headline an occurrence, as the graph has it." (or "a
-ghost", "a reference to an unknown node", "restricted"). The
-headline became the kind of headline the graph says it is:
-restricted where the skgrepo restriction now keeps its node
-out, an occurrence again where the node is back or shown
-again, and so on (see "the ID rule").
-
-***** an edit request dropped
-"Dropped an edit request its headline has no slot for." After a
-change of kind, a request the new kind cannot carry was
-dropped: a delete request on a headline that became a ghost,
-say.
-
-**** The buffer correction policy
-The refresh does not know why it was called; its caller tells
-it, by naming the situation, the *buffer correction policy*
-('BufferCorrectionPolicy'). Under each policy some changes are
-not reported, because the view was not wrong about them: they
-follow from what the user just did. The four policies, each
-with what it does not report; everything else is reported.
-
-***** report everything ('ReportAll')
-Nothing is left out. A rerender that no save and no switch
-caused, such as the rerender-all-views command.
-
-***** after a save ('AfterSave')
-The save's own consequences are not reported: a headline
-entombstoned because it stood for a node the save deleted; for
-the nodes a nodeMerge the save requested touched (the acquirer
-and the acquiree), the merge of their occurrences and the
-members drawn under them; and any correction of a headline the
-refresh then pruned from the view. Reported: markings of
-noClaim, re-kinds, dropped edit requests, and every other
-reinstatement, entombstoning and merge.
-
-***** after a skgrepo-set switch ('AfterRestrictionChange')
-Every open view was up to date before the switch, so what the
-switch changes is the skgrepo restriction's doing and is not
-reported: every reinstatement (a skgrepo widening shows members
-again), every entombstoning and every marking of noClaim (a
-skgrepo narrowing hides members), every re-kind across the
-skgrepo restriction (a headline made restricted, or made an
-occurrence or a ghost again), and any correction of a headline
-the refresh then pruned. Reported: merges, re-kinds for another
-reason, and dropped edit requests.
-
-***** a first drawing ('Unread', a term of plan 08)
-A buffer nobody wrote and nobody reads corrections of: a fresh
-content view, a buffer of the diff view when first drawn, the
-search view, the first refresh of the integrate request. The
-refresh corrects as always, and nothing is reported.
-
-**** Where they appear
-The refresh reports buffer corrections; it does not warn. The
-save and rerender responses carry each view's buffer
-corrections, tagged with its view ID ('ViewBufferCorrections'),
-in their field =(corrections ...)=. The clients show them in
-their warnings buffer, under a headline "Buffer corrections in"
-followed by the view's buffer name, one headline per correction
-(see "startup warnings channel" among the terms of the
-implementation). 'docs/COMMANDS.org', "buffer corrections",
-has the user's account.
+*** vanish
+A headline of a view *vanishes* (a term of plan 10) when the refresh
+removes it, and everything under it, from the view, for one of two
+reasons. The graph no longer relates it to its viewparent: a child
+that claims membership under a viewparent whose claims the save
+reads, and whose warrant is not 'ByGraph' (the claims rung,
+'vanish_if_unwarranted' in 'server/refresh/visit.rs'). Or the graph
+no longer has its node: an occurrence in a content view, a view root
+included, whose node is gone or restricted and whose viewparent's
+list does not name it (the ID rule's tombstone answer,
+'rekind_vognode' in 'server/refresh/id_rule.rs'). A view whose roots
+all vanish is an empty buffer. What vanishes is not detached: the
+graph, as the view sees it, already lacks the relationship, so a save
+of the view has nothing to remove; a record a skgrepo narrowing keeps
+out the save keeps, as it keeps every restricted record, and the
+skgrepo widening draws the member again, where the goal names it. A
+=noClaim= the user wrote on a warranted child (a pending detachment)
+stays; so do the children of a viewparent that reads no claims, a
+chain node, and, in the diff view, a ghost and a tombstone. The word
+is unrelated to 'server/git_ops/vanished.rs', which asks at what
+commit a node's file left the git history.
 
 *** ghost, unknown
 
@@ -751,8 +691,8 @@ node, for one of two reasons, its kind ('GnidOnlyKind'): an unknown
 (no node answers to the gnid) or a Restricted vognode (the
 skgrepo restriction keeps the node out). The two take the same parts on the
 wire under their own atoms, =unknown= and =restricted=; validation
-and the save treat them alike, and the ID rule, the heralds, the
-parser's refusal of text and the buffer corrections tell them apart.
+and the save treat them alike, and the ID rule, the heralds and the
+parser's refusal of text tell them apart.
 User text says "a reference to an unknown
 node" or "a restricted headline", never the type.
 
@@ -894,9 +834,11 @@ skgrepo-set, and a *skgrepo widening* a switch to a larger one (both
 terms of plan 08). The words "restriction", "narrowing" and
 "widening" always take the modifier "skgrepo". Where an occurrence of
 a node stood when a skgrepo narrowing kept it out, a restricted
-headline stands in its place where its record is visible, and a
-tombstone where it is not, either holding the occurrence's
-children.
+headline stands in its place where its record is visible, holding
+the occurrence's children; where it is not, the occurrence vanishes
+with them (see "vanish"), as does a member whose record alone the
+skgrepo narrowing keeps out, and the skgrepo widening draws each
+again where the graph puts it.
 
 *** owned, foreign
 
@@ -1377,8 +1319,7 @@ kin) move between headlines with change facts.
 To *tag* a headline of the diff view with its change is to give it
 the change facts of its change: the refresh tags each member of a
 list with the three kinds of change. Elsewhere "tag" has its
-ordinary sense (the callers of the refresh tag each view's buffer
-corrections with the view's ID).
+ordinary sense.
 
 **** interleaved diff
 
@@ -1432,8 +1373,9 @@ vognode*, of a node the skgrepo restriction keeps out (a restricted
 node) that a visible record names (see "record, restricted
 headline, Restricted vognode"). An occurrence of a restricted node
 becomes a Restricted
-vognode where its record is visible, and a tombstone where it is
-not.
+vognode where its record is visible; where it is not, in a content
+view, it vanishes (see "vanish"), and in the diff view it becomes a
+tombstone.
 
 The other viewnodes are *non-vognodes*: the *descriptors* -- folders,
 property members and change viewnodes, which describe their
@@ -1484,7 +1426,7 @@ acquire inconsistent treatment in different layers:
   =MSV::Unspecified=, filled from disk); a present-but-empty one, an
   explicit empty set (=MSV::Specified(vec![])=). Every other folder is
   write-protected: its membership follows from the graph, and the
-  refresh reports its buffer corrections (see [[*write-protected set][write-protected set]]).
+  refresh redraws it from the graph (see [[*write-protected set][write-protected set]]).
 - =goal_is_ordered=: the viewparent's own file records the members'
   order, which the warranted members take: the editable folders and
   =hiddenFolder=. In every other folder the refresh moves no child:
@@ -1607,7 +1549,8 @@ view, does HEAD (a ghost); does its viewparent's list name the gnid
 (an unknown); else a tombstone. The
 refresh *re-kinds* a headline by it where it stands, keeping its
 viewnode ID, fold state, children and, for an occurrence, its
-editability.
+editability; but an occurrence the rule makes a tombstone in a
+content view vanishes, with its subtree (see "vanish").
 
 *** goal
 
@@ -1655,11 +1598,10 @@ node and its shown overrider stand for one gnid) whose editable
 occurrence is elsewhere in the buffer; it claims membership if any
 sibling did. It carries the union of the siblings' view requests,
 and the edit request and relationship request of whichever sibling
-carried one. It holds every sibling's children in sibling order,
-each marked =noClaim= unless the graph warrants it there. So a copy
-pasted beside a member is joined to it. The buffer correction
-"Merged duplicate viewnode siblings into this one." names the
-result. A viewnode merge is neither a nodeMerge,
+carried one. It holds every sibling's children in sibling order;
+at its own visit the claims rung makes those vanish that claim and
+that the graph does not warrant there. So a copy pasted beside a
+member is joined to it. A viewnode merge is neither a nodeMerge,
 which joins two graphnodes, nor an instructionMerge, and is never
 called a bare "merge". Both terms are coined by plan 06 ("tidy the
 refresh").
@@ -1825,9 +1767,8 @@ runtime ('record_startup_warnings' in 'server/types/env.rs'), the
 server serves them on request ("server warnings"), and each client
 appends them on connect to its warnings buffer ('*SKG Server
 Warnings*' in Emacs, 'skg://messages/server-warnings' in Neovim),
-under a headline "Startup warnings". The same buffer receives the buffer
-corrections a save or a rerender reports, under a headline per view;
-neither erases what the buffer holds.
+under a headline "Startup warnings", erasing nothing the buffer
+holds.
 
 *** "snapshot" is always qualified: graph, git or buffer snapshot
 
@@ -1943,9 +1884,7 @@ change viewnodes are recomputed in place from the straddle: kept
 while the change exists, drawn when missing, entombstoned when the
 change is gone, the tombstone keeping what the user drew under it
 ('server/refresh/diff_view.rs'). The acquisition folders and the
-changed folders are drawn the same way. Drawing one, or entombstoning
-one whose change is gone, is no buffer correction, since a change viewnode
-describes the straddle.
+changed folders are drawn the same way.
 
 *** Terms of Tantivy, the search index
 

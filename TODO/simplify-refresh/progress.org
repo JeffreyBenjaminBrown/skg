@@ -5250,3 +5250,191 @@ files, 14,104 lines added and 4,591 removed since acf65e4e,
 from 16:53 UTC on 2026-10-29 to 01:05 UTC on 2026-10-30 with
 one session break. Next: the review, as 'code-reviews.org'
 says, as '09_review.org' beside this file.
+* Plan 10
+** Slice 0
+*** The commits
+**** 36bf809d
+The end of the buffer corrections: the types, the policy, the
+log and the wire's '(corrections ...)' field go, in the server
+and in both clients; the integrate request refreshes once; the
+tests that asserted a correction assert the view.
+**** The last commit
+The vanish rule in the claims rung and in the ID rule, the six
+probe variants as tests in 'tests/hidden_nodes.rs', the
+adapted tests, the docs, the move of the problems entry, this
+record and the plan's keyword.
+*** The suites
+**** cargo check --all-targets
+Clean, no warning.
+**** bash/nextest.sh
+1022 of 1022. The plan started at 1026: the first commit
+removed 12 (the files 'tests/refresh/buffer_corrections.rs'
+and 'tests/corrections_channel.rs'; the rerender-done test of
+'tests/unit/serve_util.rs' was rewritten, not removed), and
+the last added 8 (the six round trips, a root that vanishes in
+'re_kind.rs', a tombstone the diff view keeps in
+'diff_view.rs').
+**** bash/emacs-tests.sh
+407 of 407; 412 at the start, less the five tests of the
+corrections display.
+**** bash/nvim-tests.sh
+446 per-test passes, none failed; 452 at the start, less the
+six tests of the corrections display.
+**** bash/integration-tests.sh
+35 of 36 with Emacs and 35 of 36 with Neovim
+('SKG_TEST_CLIENT=nvim'). The failure is 'import-md-and-org'
+both times, pre-existing and not this plan's.
+**** Failures met during the slice
+Every one an expected fixture adaptation: a test that asserted
+a correction kind, or that a claiming child the graph no longer
+warrants is kept marked 'noClaim', or that an occurrence of a
+deleted or restricted node becomes a tombstone in a content
+view. They are listed under "Fixtures changed". No regression,
+no flake, nothing new. The fixpoint sweeps
+('tests/idempotence.rs' and the refresh unit tests) ran first
+after each change to the rungs and passed both times.
+**** The TCP surface
+The verify skill's isolated servers (ports 1773 to 1779, on
+scratch data under 'tests/results/10/slice0/scratch/') ran
+copies of the review's probes, in
+'tests/results/10/slice0/probes/'; each server was stopped by
+its recorded PID. After the first commit the base variant
+still lost 'priv/r.skg', as expected, and no response carried
+a '(corrections ...)' field.
+*** The probe variants
+Each after the last commit: r (home 'pub') contains a in
+'pub' and, by its 'priv' section, pc (home 'pub'); a view
+opened under 'all', switched to 'pub' and back to 'all', then
+saved unchanged.
+**** base
+Before: 'pub/r.skg' contains a; 'priv/r.skg' contains pc.
+Narrowed, pc vanishes; widened, pc is drawn again with
+'(relRepo priv)'. After the save both files are as before.
+**** diff
+The all-changes buffer (r newly contains n since HEAD).
+Before: 'pub/r.skg' contains a and n; 'priv/r.skg' contains
+pc. Narrowed, pc vanishes; widened, it is drawn again,
+write-protected under the editable r. After the save both
+files are as before, and pc carries no '(diff (rel removed))'.
+**** folded
+r folded in a view of T. Both files as before; pc drawn again.
+**** other
+A save of the view of o under the narrowing, the view of r
+open, its collateral rerender without pc. Both files of r as
+before after the final save.
+**** same
+The view of r saved unchanged under 'pub' first (both files
+kept, the view back as it went), then widened and saved: both
+files as before.
+**** folders
+'priv/r.skg' records subscribesTo s, hidesFromSubs s1 and
+overrides o. Narrowed, s leaves the subscribee folder (which
+stays, empty) and o the overridden folder; s1 stays in the
+write-protected hidden folder, unwarranted. Widened, s and o
+are drawn again with '(relRepo priv)'. After the save
+'priv/r.skg' holds all three records, as before.
+*** Deviations from the plan's "how"
+**** the viewnode merge leaves its children to the result
+'merge_into' marked each of the merged sibling's children
+'noClaim' unless warranted, without asking whether the result
+reads claims. Made to vanish, a claiming child of a
+write-protected result would have been removed where the save
+reads no claim. The result's own visit runs the claims rung
+over all its children, which decides the same thing correctly,
+so 'merge_into' no longer judges them.
+**** the overrider vanishes after the original is drawn
+'stop_substituting' placed the reinstated original after the
+overrider; the original is now drawn first
+('reinstate_original_after'), then the overrider vanishes.
+**** one way to entombstone
+With nothing reported, 'entombstone_gone_change' and the
+helper that reported requests did what 'entombstone' does, so
+both went and 'entombstone' takes no walk. 'EditRequests'
+kept one slot that anyone read and became
+'relationship_edit_request_of'.
+**** what the policy alone used went with it
+'SaveAffectedIds::deleted' and 'ids_of_deleted_nodes', read
+only by the save's policy; the 'walk' parameter of
+'keep_one_relRepo_move'; the treeids that
+'append_contentOrigins_to_buffer' returned, read only by
+'outside_the_appended_roots'.
+**** the integrate request picks its roots before its refresh
+The roots it appends are now computed after
+'ensure_editableOccurrences_exist' and before the one refresh,
+not after a first one. A content origin has no container in U,
+so the refresh cannot draw one editable; the tests of
+'tests/pruned_change_view/recomputed_sets.rs' give the same
+buffers.
+**** a fixture folder moved
+'tests/corrections_channel/fixtures/' served
+'tests/orphan_warning.rs' too; it is now
+'tests/orphan_warning/fixtures/'.
+**** a test module made visible
+'tests/pruned_change_view.rs' declares 'common' 'pub(crate)',
+so that the diff-view variant in 'tests/hidden_nodes.rs' opens
+the all-changes buffer as the other tests do.
+**** more docs than the plan lists
+Slice 6 says each earlier slice brings the docs of what it
+changed, and its grep for "buffer correction" outside the
+glossary must come back empty; it does now. Besides the files
+the plan names, the passages that said the refresh marks
+'noClaim', never removes a child, or leaves a tombstone for a
+deleted or restricted node in a content view changed in the
+glossary ("claims membership", "tombstone, entombstone",
+"skgrepo narrowing", the ID rule, the viewnode merge, the
+vognode entry), 'docs/data-model_technical.org' (the ID rule,
+claim and warrant, the rungs), 'docs/api-and-formats.org' (the
+switch, "Restricted-skgrepo nodes", the override substitute,
+the write-protect requests), 'docs/diff-view.org',
+'docs/sharing-model.org', 'docs/nvim-client-deviations.org'
+and 'coding-advice/architecture.md'. The glossary's entry
+"vanish" says that the word is unrelated to
+'server/git_ops/vanished.rs'.
+*** Fixtures changed
+**** the refresh's unit tests
+'claims.rs', 're_kind.rs', 'tail.rs', 'substitution.rs',
+'viewnode_merge.rs', 'warrant.rs' and 'reinstate.rs': the
+outlines lose the children that now vanish, and the tests are
+renamed where their names said "marked noClaim" or "becomes a
+tombstone". Two inputs changed to keep their point: the merged
+copies of e in 'viewnode_merge.rs' and the alias b in
+'warrant.rs' now carry 'noClaim', so that, unwarranted, they
+stay; 'a_tombstone_root_that_holds_something_stays' starts
+from a tombstone root, a gone root now vanishing.
+**** the integration tests of the server
+'tests/what_the_refresh_keeps.rs' (its four tests of kept
+stale children now assert the vanishing, and that the nodes
+survive on disk), 'tests/collateral_delete.rs',
+'tests/collateral_subscribee_staleness.rs',
+'tests/hidden_from_subscriptions.rs' (three subtests),
+'tests/orphan_warning.rs' (a headline typed under a ghost of a
+node the graph has vanishes after the save, still warned of)
+and 'tests/repo_sets.rs' (a restricted override substitute
+vanishes with its descendant).
+**** the corrections' tests
+The assertions of correction kinds went from the refresh's
+unit tests; the tests that only the corrections showed were
+rewritten to assert the view: 'tests/hidden_nodes.rs' (a
+narrowing and a widening give the view back),
+'tests/pruned_change_view/editing.rs' (the diff view, a
+collateral rerender, draws the child a save added),
+'recomputed_sets.rs', 'partner_folder_warnings.rs',
+'partner_folder_matrix.rs', 'collateral_partner_folder.rs'.
+**** the clients
+The corrections display's tests in 'tests/elisp/' and
+'tests/nvim/', and its case in
+'tests/shared/metadata-editor-cases.txt'.
+**** the client integration tests
+'save_collateral_add_content_and_modify_text' lost its phase
+that read the correction in the warnings buffer (its phase 5
+already checks the view); 'save_collateral_break_cycle' no
+longer expects the a under b; in
+'save_collateral_delete_then_edit_under_it' the deleted node's
+occurrence vanishes with its folders, so the phases find the
+one subee root, and its README says so.
+*** Left unfinished
+Nothing of the slice. The old phrases "a reference to an
+unknown node" and "a restricted headline" stand where they
+stood, for slice 6.
+*** Headline
+DONE.

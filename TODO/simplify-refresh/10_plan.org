@@ -492,7 +492,7 @@ and 'bash/integration-tests.sh' with both clients green (but
 the pre-existing failure) where the slice says so. Serialize
 full runs.
 
-** TODO Slice 0: the vanishing child and the end of corrections
+** DONE Slice 0: the vanishing child and the end of corrections
 Read "A child the graph no longer relates vanishes" and "No
 buffer correction is reported" in the agreed behavior, the two
 pitfalls on the pending detachment and the diff view, and the

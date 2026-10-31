@@ -75,7 +75,7 @@ fn a_property_member_is_warranted_when_its_node_has_the_property () {
     * {} p
     ** (skg aliasFolder)
     *** (skg alias) a
-    *** (skg alias) b
+    *** (skg alias noClaim) b
     ", occurrence_metadata ("p", "") );
   let run : Run = run_asserting_fixpoint (&input, &graph);
   assert_eq! ( run . outline (), "\

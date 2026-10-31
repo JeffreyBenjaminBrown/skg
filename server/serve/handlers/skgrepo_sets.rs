@@ -52,9 +52,9 @@ pub fn handle_skgrepo_set_request (
 /// re-renders open views in place rather than closing them. The
 /// refresh brings each view under the new skgrepo restriction: an occurrence
 /// of a node the skgrepo restriction now keeps out becomes a restricted
-/// headline where its record is visible, and a tombstone elsewhere; a
-/// member whose record it keeps out leaves; childless tombstones are
-/// pruned; and what a skgrepo widening reveals is drawn. A folder the
+/// headline where its record is visible, and vanishes elsewhere; a
+/// member whose record it keeps out vanishes; and what a skgrepo
+/// widening reveals is drawn. A folder the
 /// skgrepo restriction empties stays, empty, as any empty editable folder
 /// does. The rest keeps its
 /// viewnode IDs. Results stream via

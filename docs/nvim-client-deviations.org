@@ -139,10 +139,6 @@ names Neovim's keys where Emacs's names a chord.
 - Readable-ids shortens UUIDs by concealing the tail to an ellipsis
   and renders titles as inline virtual text; same behavior, same
   server round-trip, different mechanism.
-- The buffer corrections a save or a rerender reports are appended to
-  'skg://messages/server-warnings', shown in a split, with the cursor
-  left where it was; Emacs moves point in '*SKG Server Warnings*' to
-  what it appended.
 - Server messages name Emacs chords and Emacs commands. The client
   rewrites those it has a twin for, in the messages it shows and in
   the fork-confirmation buffer and the absent-reference warning

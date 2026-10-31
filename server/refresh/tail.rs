@@ -88,7 +88,7 @@ pub(crate) fn prune_childless_tombstones (
 /// Detach a viewnode, transferring focus to its parent first if the
 /// detached subtree contained the focused node. The refresh's prune
 /// uses it.
-fn detach_viewnode_transferring_focus (
+pub(crate) fn detach_viewnode_transferring_focus (
   tree : &mut Tree<Viewnode>,
   node : NodeId,
 ) -> Result<(), Box<dyn Error>> {
