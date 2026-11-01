@@ -190,8 +190,8 @@ fn a_rebuild_drops_the_straddle_and_the_next_reads_foreign_files_afresh (
     "tantivy_folder = \"tantivy\"\n",
     "port = 1730\n",
     "beep_when_server_becomes_available = false\n",
-    "[[repos]]\nname = \"main\"\npath = \"owned/main\"\n",
-    "[[repos]]\nname = \"foreign\"\npath = \"foreign\"\n" )) ?;
+    "[[repos]]\nname = \"foreign\"\npath = \"foreign\"\nforeign = true\n",
+    "[[repos]]\nname = \"main\"\npath = \"owned/main\"\n" )) ?;
   let config : SkgConfig = load_config (
     root . path () . join ("skgconfig.toml") . to_str () . unwrap () ) ? . 0;
   let tantivy : TantivyIndex =

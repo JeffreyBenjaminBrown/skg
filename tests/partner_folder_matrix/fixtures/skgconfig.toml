@@ -1,13 +1,14 @@
 tantivy_folder = "/tmp/placeholder"
 
 [[repos]]
+name = "foreign"
+path = "foreign"
+foreign = true
+
+[[repos]]
 name = "public"
 path = "owned/public"
 
 [[repos]]
 name = "private"
 path = "owned/private"
-
-[[repos]]
-name = "foreign"
-path = "foreign"

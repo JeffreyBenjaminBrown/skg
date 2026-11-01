@@ -157,70 +157,51 @@ The config's most private repo, which shows every repo, gets
         (string-to-number (match-string 1))
       (error "No port setting found in %s" file)) ))
 
-(defun skg-owned-folder-from-toml (file)
-  "Return the `owned_folder' setting from FILE, defaulting to \"owned\".
-Repos whose path sits under this folder are owned; all others are
-foreign. Replaces the retired per-repo `user_owns_it' key."
+(defun skg-owned-repos-from-toml (file)
+  "Return the names of the owned repos in FILE, in declaration order.
+A repo is owned unless its entry says `foreign = true', mirroring
+the server. A repo with no `name' key defaults its name to its
+path, also mirroring the server."
   (with-temp-buffer
     (insert-file-contents file)
     (goto-char (point-min))
-    (if (re-search-forward
-         "^[ \t]*owned_folder[ \t]*=[ \t]*\"\\([^\"]+\\)\""
-         nil t)
-        (match-string 1)
-      "owned")))
-
-(defun skg-owned-repos-from-toml (file)
-  "Return the names of the owned repos in FILE, in declaration order.
-A repo is owned iff its path (resolved against FILE's directory,
-the data root) sits under the data root's `owned_folder' (default
-\"owned\") -- the author-folder layout, mirroring the server's
-`derive_ownership_and_labels'. A repo with no `name' key defaults
-its name to its path, also mirroring the server."
-  (let* ((owned-folder (skg-owned-folder-from-toml file))
-         (data-root (file-name-directory file))
-         (owned-root (file-name-as-directory
-                      (expand-file-name owned-folder data-root))))
-    (with-temp-buffer
-      (insert-file-contents file)
-      (goto-char (point-min))
-      (let ((skgrepos '())
-            (in-skgrepos nil)
-            (current-name nil)
-            (current-path nil)
-            (flush nil))
-        (setq flush
-              (lambda ()
-                (when (and in-skgrepos current-path)
-                  (let ((abs (file-name-as-directory
-                              (expand-file-name current-path data-root))))
-                    (when (or (equal abs owned-root)
-                              (string-prefix-p owned-root abs))
-                      (push (or current-name current-path) skgrepos))))
-                (setq current-name nil current-path nil)))
-        (while (not (eobp))
-          (let ((line (string-trim
-                       (buffer-substring-no-properties
-                        (line-beginning-position)
-                        (line-end-position)))))
-            (cond
-             ((string-match "^\\[\\[repos\\]\\]" line)
-              (funcall flush)
-              (setq in-skgrepos t))
-             ((string-match "^\\[\\[" line) ;; a different array table
-              (funcall flush)
-              (setq in-skgrepos nil))
-             ((and in-skgrepos
-                   (string-match
-                    "^name[ \t]*=[ \t]*\"\\([^\"]+\\)\"" line))
-              (setq current-name (match-string 1 line)))
-             ((and in-skgrepos
-                   (string-match
-                    "^path[ \t]*=[ \t]*\"\\([^\"]+\\)\"" line))
-              (setq current-path (match-string 1 line)))))
-          (forward-line 1))
-        (funcall flush)
-        (nreverse skgrepos)))))
+    (let ((skgrepos '())
+          (in-skgrepos nil)
+          (current-name nil)
+          (current-path nil)
+          (current-foreign nil)
+          (flush nil))
+      (setq flush
+            (lambda ()
+              (when (and in-skgrepos current-path (not current-foreign))
+                (push (or current-name current-path) skgrepos))
+              (setq current-name nil current-path nil current-foreign nil)))
+      (while (not (eobp))
+        (let ((line (string-trim
+                     (buffer-substring-no-properties
+                      (line-beginning-position)
+                      (line-end-position)))))
+          (cond
+           ((string-match "^\\[\\[repos\\]\\]" line)
+            (funcall flush)
+            (setq in-skgrepos t))
+           ((string-match "^\\[\\[" line) ;; a different array table
+            (funcall flush)
+            (setq in-skgrepos nil))
+           ((and in-skgrepos
+                 (string-match
+                  "^name[ \t]*=[ \t]*\"\\([^\"]+\\)\"" line))
+            (setq current-name (match-string 1 line)))
+           ((and in-skgrepos
+                 (string-match
+                  "^path[ \t]*=[ \t]*\"\\([^\"]+\\)\"" line))
+            (setq current-path (match-string 1 line)))
+           ((and in-skgrepos
+                 (string-match "^foreign[ \t]*=[ \t]*true\\b" line))
+            (setq current-foreign t))))
+        (forward-line 1))
+      (funcall flush)
+      (nreverse skgrepos))))
 
 (defun skg--toml-array-table-line-name (line)
   "Return the array-table name from LINE, or nil if LINE is not one."

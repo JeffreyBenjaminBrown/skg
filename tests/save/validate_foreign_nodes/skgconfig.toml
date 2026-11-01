@@ -3,9 +3,10 @@ port = 3047
 beep_when_server_becomes_available = false
 
 [[repos]]
-name = "main"
-path = "owned/fixtures/main"
-
-[[repos]]
 name = "foreign"
 path = "fixtures/foreign"
+foreign = true
+
+[[repos]]
+name = "main"
+path = "owned/fixtures/main"

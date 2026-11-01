@@ -926,8 +926,9 @@ visible (see "restricted viewnode").
 
 *** owned, foreign
 
-A skgrepo is *owned* iff its directory lies under the config's
-=owned_folder= (default =owned/=); every other skgrepo is *foreign*.
+A skgrepo is *owned* unless its config entry says =foreign = true=,
+which makes it *foreign*. Every foreign skgrepo is more public than
+every owned one (the server refuses a config where it is not).
 Only owned sections are ever written. A real edit to a foreign node is
 read as a request to fork it (see "clone, and the fork operation").
 Say "owned" rather than "editable", and "foreign" rather than

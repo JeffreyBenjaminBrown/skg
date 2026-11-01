@@ -7,17 +7,22 @@ default_repo_set = "public"
 # repo names the set consisting of itself and everything more
 # public (a prefix of this list); the last repo, the most private,
 # means every repo, no restriction. default_repo_set above names the
-# skgrepo restriction when a client connects: here, just the
-# "public" repo. Left out, it is the most private repo.
-
-[[repos]]
-name = "public"
-path = "owned/public"
-
-[[repos]]
-name = "private"
-path = "owned/private"
+# skgrepo restriction when a client connects: here, Fred's repo and
+# your "public" one. Left out, it is the most private repo.
+#
+# A repo is yours (owned, writable) unless its entry says
+# foreign = true. Every foreign repo must be more public than every
+# owned one, so foreign repos come first.
 
 [[repos]]
 name = "Fred"
-path = "Fred"
+path = "fred/public"
+foreign = true
+
+[[repos]]
+name = "public"
+path = "me/public"
+
+[[repos]]
+name = "private"
+path = "me/private"

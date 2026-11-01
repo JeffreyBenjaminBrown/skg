@@ -52,9 +52,8 @@ initial_node_limit = 5000
 timing_log = true
 
 [[repos]]
-nickname = "main"
+name = "main"
 path = "$DATA_DIR"
-user_owns_it = true
 EOF
 
   start_skg_server

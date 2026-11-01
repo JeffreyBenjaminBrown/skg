@@ -5,6 +5,7 @@ beep_when_server_becomes_available = false
 [[repos]]
 name = "foreign"
 path = "foreign"
+foreign = true
 
 [[repos]]
 name = "owned"

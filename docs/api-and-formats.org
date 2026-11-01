@@ -1357,11 +1357,11 @@ Pass its path as a command-line argument (default: =data/skgconfig.toml=) when s
 | =timing_log=         | no       | false   | When true, writes a JSON log to =<data_root>/logs/server.jsonl=. |
 | =beep_when_server_becomes_available= | no | true | When true, plays a local sound after server initialization finishes. |
 | =default_repo_set= | no | the most private skgrepo | The skgrepo restriction when a client connects: the most private skgrepo to show. The default is no skgrepo restriction. Runtime changes are per connection and are not written back. |
-| =owned_folder= | no | =owned= | The top-level folder under the data root whose skgrepos the user owns (see Skgrepos, below). |
 | =max_roleTree_depth= | no | 20 | Max breadth-first depth of a containerward chain. |
 
 The retired keys =db_name=, =delete_on_quit=, and =auto_audit_daily= are
 rejected with a migration error; remove them from older configurations.
+So is =owned_folder=; see Skgrepos, below.
 
 Any other top-level key the server does not know is not refused: it
 has no effect, and the server warns about it, naming the current
@@ -1382,16 +1382,31 @@ available skgrepo-sets (below).
 |----------------+----------+-------------|
 | =path=         | yes      | Directory containing =.skg= files. Relative to data root. |
 | =name=         | no       | Unique name for this skgrepo (used in metadata, provenance). Defaults to =path=. |
-| =abbreviation= | no       | Short label for heralds. Owned skgrepos with defaulted names abbreviate to the path minus the owned folder. |
+| =abbreviation= | no       | Short label for heralds. Owned skgrepos with defaulted names abbreviate to the path minus its first component (the author folder). |
+| =foreign=      | no       | =true= marks a skgrepo the user does not own. Defaults to =false=. |
 
 Two skgrepos of one name are rejected.
 
-*Ownership is by location, not declaration*: a skgrepo is owned
-(writable) iff its path lies under =<data_root>/<owned_folder>=,
-where =owned_folder= is a top-level config field defaulting to
-="owned"=. Everything else is foreign (never written). The old
-=user_owns_it= field is retired and rejected with an error naming
-the migration script (=bash/migrate-to-author-folders.sh=).
+*Ownership is declared per entry*: a skgrepo is owned (writable)
+unless its entry says =foreign = true=; a foreign skgrepo is never
+written. No folder name means anything to the server. The intended
+layout is =<data_root>/AUTHOR/REPO=, one author folder per person, so
+that people sharing one data tree list the same skgrepos and differ
+only in which entries say =foreign= (and so, by the rule below, in
+their order).
+
+*Every foreign skgrepo must be more public than every owned one*
+(earlier in the list). The server refuses a config that breaks this,
+naming the two skgrepos; it is what keeps each person's privacy order
+straight.
+
+The retired =user_owns_it= field and the retired top-level
+=owned_folder= key are rejected with an error.
+=bash/migrate-to-foreign-flag.sh= rewrites a config that relied on
+=owned_folder= (or its default, =owned/=):
+it renames the owned folder (to =jeff/= unless told otherwise),
+rewrites the paths under it, and adds =foreign = true= to every
+other entry.
 
 ** skgrepo-sets
 
@@ -1410,23 +1425,24 @@ Example:
 #+begin_src toml
 default_repo_set = "public"
 
-# Privacy order: most public first.
+# Privacy order: most public first. Foreign skgrepos come first.
+[[repos]]
+name = "Fred"
+path = "fred/public"
+foreign = true          # write-protected
+
 [[repos]]
 name = "public"
-path = "owned/public"   # under owned/ => writable
+path = "me/public"      # owned => writable
 
 [[repos]]
 name = "private"
-path = "owned/private"
-
-[[repos]]
-name = "Fred"
-path = "Fred"           # foreign => write-protected
+path = "me/private"
 #+end_src
 
-Here the available skgrepo-sets are =public= = {public},
-=private= = {public, private}, =Fred= = {public, private, Fred};
-=Fred=, the most private, is no skgrepo restriction.
+Here the available skgrepo-sets are =Fred= = {Fred},
+=public= = {Fred, public}, =private= = {Fred, public, private};
+=private=, the most private, is no skgrepo restriction.
 
 ** OTHER_SKGREPO_DEPENDENCIES.toml
 
@@ -1443,8 +1459,8 @@ the =git-remote= values itself. For example:
 
 #+begin_src toml
 dependencies = [
-  { path = "owned/public", git-remote = "git@github.com:me/public.git" },
-  { path = "owned/private", git-remote = "git@github.com:me/private.git" },
+  { path = "me/public", git-remote = "git@github.com:me/public.git" },
+  { path = "me/private", git-remote = "git@github.com:me/private.git" },
 ]
 #+end_src
 

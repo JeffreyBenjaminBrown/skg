@@ -4,7 +4,7 @@ use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs;
 use std::io;
-use std::path::{Path, PathBuf};
+use std::path::{Components, Path, PathBuf};
 
 /// If a skgrepo path does not exist:
 /// - If it is marked owned (in the config), create it.
@@ -30,7 +30,9 @@ pub fn validate_skgrepo_paths_creating_owned_ones_if_needed (
 /// loses order, so the loaders re-extract it here to fill
 /// 'SkgConfig.repo_order'. LOAD-BEARING: declaration order is the
 /// privacy order, most public first (see the chokepoint methods on
-/// 'SkgConfig'). Empty when the TOML has no parseable skgrepos array.
+/// 'SkgConfig'). An entry without a 'name' is named by its 'path' as
+/// written, as 'SkgrepoToml' names it. Empty when the TOML has no
+/// parseable skgrepos array.
 fn skgrepo_order_from_toml (
   contents : &str,
 ) -> Vec<SkgrepoName> {
@@ -40,6 +42,7 @@ fn skgrepo_order_from_toml (
     . and_then ( |s| s . as_array () )
     . map ( |arr| arr . iter ()
             . filter_map ( |t| t . get ("name")
+                           . or ( t . get ("path") )
                            . and_then ( |n| n . as_str () )
                            . map (SkgrepoName::from) )
             . collect () )
@@ -50,10 +53,9 @@ fn skgrepo_order_from_toml (
 /// order"). A config still defining
 /// '[[repo_sets]]' would silently mean something else than its
 /// author intended, so its presence is a hard error. Likewise
-/// 'user_owns_it': ownership is now derived from the skgrepo's path
-/// (under 'owned_folder' = owned), and serde would silently ignore
-/// the unknown key -- a silent ownership flip -- so it too is a hard
-/// error.
+/// 'user_owns_it' and 'owned_folder': ownership is the per-entry
+/// 'foreign' flag, and serde would silently ignore either key -- a
+/// silent ownership flip -- so each is a hard error.
 fn reject_retired_config_keys (
   contents : &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -94,37 +96,40 @@ fn reject_retired_config_keys (
   if has_user_owns_it {
     return Err ( concat! (
       "This config sets 'user_owns_it' on a repo, a retired key. ",
-      "Ownership is now derived from the repo's path: repos ",
-      "under the config's owned_folder (default \"owned\", intended ",
-      "layout DATA_ROOT/AUTHOR/REPO) are owned; all others are ",
-      "foreign. Move each owned repo's directory under that ",
-      "folder, update its 'path', and delete the 'user_owns_it' ",
-      "lines. bash/migrate-to-author-folders.sh does this for a ",
-      "whole config at once. See ",
-      "docs/telescopes.org, \"The privacy order\"." ) . into () ); }
+      "Each [[repos]] entry is owned unless it says ",
+      "'foreign = true'. Delete the 'user_owns_it' lines, and add ",
+      "'foreign = true' to each entry that had ",
+      "'user_owns_it = false'. See docs/api-and-formats.org, ",
+      "\"Skgrepos\"." ) . into () ); }
+  let has_owned_folder : bool =
+    parsed . as_ref ()
+    . map ( |v| v . get ("owned_folder") . is_some () )
+    . unwrap_or (false);
+  if has_owned_folder {
+    return Err ( concat! (
+      "This config sets 'owned_folder', a retired key. No folder ",
+      "name means anything to skg: each [[repos]] entry is owned ",
+      "unless it says 'foreign = true'. ",
+      "bash/migrate-to-foreign-flag.sh rewrites a config this way ",
+      "(and renames its owned folder). See ",
+      "docs/api-and-formats.org, \"Skgrepos\"." ) . into () ); }
   Ok (( )) }
 
-/// Fills the derived parts of each skgrepo. Must run after
-/// 'make_paths_absolute' (so 'data_root' and absolute paths exist),
-/// with 'raw_paths' captured from the skgrepos before it:
-/// - 'owned': true iff the skgrepo's absolute path sits under
-///   DATA_ROOT/OWNED_FOLDER (the author-folder layout: the user's
-///   own author folder holds exactly the owned skgrepos).
-/// - herald-label defaulting: a skgrepo whose 'name' was defaulted
-///   (== its raw path string) and which has no configured
-///   abbreviation gets one -- for an owned skgrepo, the path
-///   relative to the owned folder (e.g. "owned/notes" reads as
-///   "notes"); a foreign skgrepo keeps the full "author/repo" form,
-///   mirroring the folder layout.
-fn derive_ownership_and_labels (
+/// Herald-label defaulting. Must run after 'make_paths_absolute' (so
+/// 'data_root' and absolute paths exist), with 'raw_paths' captured
+/// from the skgrepos before it. A skgrepo whose 'name' was defaulted
+/// (== its raw path string) and which has no configured abbreviation
+/// gets one if it is owned: its path below the data root, minus the
+/// first component, which in the intended layout DATA_ROOT/AUTHOR/REPO
+/// is the author folder (e.g. "jeff/notes" reads as "notes"). A
+/// foreign skgrepo keeps the full "author/repo" form, mirroring the
+/// folder layout.
+fn derive_default_abbreviations (
   config    : &mut SkgConfig,
   raw_paths : &HashMap<SkgrepoName, PathBuf>,
 ) {
-  let owned_root : PathBuf =
-    config . data_root . join ( &config . owned_folder );
+  let data_root : PathBuf = config . data_root . clone ();
   for skgrepo in config . skgrepos . values_mut () {
-    skgrepo . owned =
-      skgrepo . path . starts_with (&owned_root);
     let raw_path_string : Option<String> =
       raw_paths . get ( &skgrepo . name )
       . map ( |p| p . to_string_lossy () . into_owned () );
@@ -134,12 +139,44 @@ fn derive_ownership_and_labels (
     if name_was_defaulted
     && skgrepo . abbreviation . is_none ()
     && skgrepo . owned {
-      let trimmed : String =
-        skgrepo . path . strip_prefix (&owned_root)
-        . map ( |p| p . to_string_lossy () . into_owned () )
-        . unwrap_or_default ();
-      if ! trimmed . is_empty () { // path == owned folder: keep full
-        skgrepo . abbreviation = Some (trimmed); }}}}
+      skgrepo . abbreviation =
+        path_below_data_root_minus_author_folder (
+          &skgrepo . path, &data_root ); }}}
+
+/// The part of 'path' below 'data_root' after its first component
+/// (the author folder), or None if 'path' is not below 'data_root'
+/// or has no component after the first.
+fn path_below_data_root_minus_author_folder (
+  path      : &Path,
+  data_root : &Path,
+) -> Option<String> {
+  let below_data_root : &Path =
+    path . strip_prefix (data_root) . ok () ?;
+  let mut components : Components =
+    below_data_root . components ();
+  components . next () ?;
+  let rest : String =
+    components . as_path () . to_string_lossy () . into_owned ();
+  if rest . is_empty () { None } else { Some (rest) }}
+
+/// Every foreign skgrepo must be strictly more public (earlier in
+/// the privacy order) than every owned one, so that each person's
+/// privacy ladder keeps the nodes they own above everything they
+/// only read. This is what keeps the per-entry 'foreign' flag honest.
+fn validate_foreign_skgrepos_more_public_than_owned (
+  config : &SkgConfig,
+) -> Result<(), Box<dyn std::error::Error>> {
+  let ordered : Vec<SkgrepoName> = config . ordered_skgrepos ();
+  for foreign in ordered . iter ()
+    . filter ( |name| ! config . skgrepo_is_owned (name) )
+  { if let Some (owned) = ordered . iter ()
+      . filter ( |name| config . skgrepo_is_owned (name) )
+      . find ( |owned| ! config . is_strictly_more_public (
+                         foreign, owned ) )
+    { return Err ( format! (
+        "Foreign repo '{}' is listed after owned repo '{}'. Every foreign repo must be more public (earlier in [[repos]]) than every owned repo; move '{}' above '{}', or correct a 'foreign' flag.",
+        foreign, owned, foreign, owned ) . into () ); }}
+  Ok (( )) }
 
 /// Top-level keys that skg once read under another spelling, each
 /// beside its current spelling, so that the warning about the old one
@@ -235,8 +272,9 @@ pub(crate) fn config_from_file_before_checking_paths (
       . to_path_buf ();
     fs::canonicalize (&raw) . unwrap_or (raw) };
   make_paths_absolute (&mut config);
-  derive_ownership_and_labels (&mut config, &raw_paths);
+  derive_default_abbreviations (&mut config, &raw_paths);
   validate_skgrepo_sets (&config)?;
+  validate_foreign_skgrepos_more_public_than_owned (&config)?;
   Ok (( config, contents )) }
 
 fn validate_skgrepo_sets (

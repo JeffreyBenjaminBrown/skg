@@ -9,6 +9,7 @@ use skg::types::nodes::complete::empty_graphnode;
 
 use std::sync::Arc;
 use std::collections::HashMap;
+use std::path::PathBuf;
 
 fn config () -> SkgConfig {
   SkgConfig::dummyFromSkgrepos (HashMap::new ())
@@ -24,7 +25,7 @@ fn graph_with (pid : &str) -> InRustGraph {
 #[test]
 fn cloned_runtime_observes_atomic_generations_while_old_snapshot_stays_stable () {
   let mut old_config = config ();
-  old_config . owned_folder = "old-config" . to_string ();
+  old_config . tantivy_folder = PathBuf::from ("old-config");
   let old_index = empty_in_ram_tantivy_index () . unwrap ();
   let runtime = Arc::new (SharedRuntime::new (
     old_config, Arc::new (graph_with ("old-node")), old_index . clone ()));
@@ -32,7 +33,7 @@ fn cloned_runtime_observes_atomic_generations_while_old_snapshot_stays_stable ()
   let captured_old = runtime . graph_snapshot ();
 
   let mut new_config = (*captured_old . config) . clone ();
-  new_config . owned_folder = "new-config" . to_string ();
+  new_config . tantivy_folder = PathBuf::from ("new-config");
   let new_index = empty_in_ram_tantivy_index () . unwrap ();
   let swapped_in = runtime . swap_in (
     Arc::new (new_config), Arc::new (graph_with ("new-node")),
@@ -41,12 +42,12 @@ fn cloned_runtime_observes_atomic_generations_while_old_snapshot_stays_stable ()
   assert_eq! (swapped_in . generation, 1);
   let observed = other_connection . graph_snapshot ();
   assert_eq! (observed . generation, 1);
-  assert_eq! (observed . config . owned_folder, "new-config");
+  assert_eq! (observed . config . tantivy_folder, PathBuf::from ("new-config"));
   assert! (observed . graph . nodes . contains_key (&ID::from ("new-node")));
   assert! (Arc::ptr_eq (&observed . tantivy_index . index, &new_index . index));
 
   assert_eq! (captured_old . generation, 0);
-  assert_eq! (captured_old . config . owned_folder, "old-config");
+  assert_eq! (captured_old . config . tantivy_folder, PathBuf::from ("old-config"));
   assert! (captured_old . graph . nodes . contains_key (&ID::from ("old-node")));
   assert! (Arc::ptr_eq (
     &captured_old . tantivy_index . index, &old_index . index));

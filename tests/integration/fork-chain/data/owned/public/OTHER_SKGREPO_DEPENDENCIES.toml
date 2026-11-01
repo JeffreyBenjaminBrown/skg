@@ -13,5 +13,6 @@
 # the remote only when it is not the conventional "origin".
 # skg makes no use of the git-remote values itself.
 dependencies = [
+  { path = "foreign" },
   { path = "owned/public" },
 ]

@@ -104,16 +104,17 @@ port = $AVAILABLE_PORT
 beep_when_server_becomes_available = false
 
 [[repos]]
+name = "gamma"
+path = "foreign/gamma"
+foreign = true
+
+[[repos]]
 name = "alpha"
 path = "owned/alpha"
 
 [[repos]]
 name = "beta"
 path = "owned/beta"
-
-[[repos]]
-name = "gamma"
-path = "foreign/gamma"
 EOF
 
 start_skg_server

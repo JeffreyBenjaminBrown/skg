@@ -3,13 +3,14 @@ port = 1730
 beep_when_server_becomes_available = false
 
 [[repos]]
+name = "ext"
+path = "ext"
+foreign = true
+
+[[repos]]
 name = "public"
 path = "owned/public"
 
 [[repos]]
 name = "private"
 path = "owned/private"
-
-[[repos]]
-name = "ext"
-path = "ext"

@@ -28,16 +28,17 @@ on scratch data instead. Instances share nothing but the binary.
 
    [[repos]]
    name = "main"
-   path = "owned/main"
+   path = "me/main"
    ```
    Paths are relative to the data root, the config file's directory.
-   A repo is writable iff its path lies under `owned/` (the
-   `owned_folder` config field); any other path is write-protected. The old
-   `user_owns_it` and `db_name` keys are rejected, and there is no
-   TypeDB anymore.
+   A repo is writable unless its entry says `foreign = true`; no folder
+   name is special. Foreign repos must be listed before (more public
+   than) every owned one, or the config is refused. The old
+   `user_owns_it`, `owned_folder` and `db_name` keys are rejected, and
+   there is no TypeDB anymore.
    `./target/debug/skg check-config <scratch>/skgconfig.toml` validates
    a config without starting a server.
-2. Seed `owned/main/1.skg` (a repo folder may also start empty):
+2. Seed `me/main/1.skg` (a repo folder may also start empty):
    ```yaml
    title: "verify root"
    pid: "1"
@@ -79,7 +80,7 @@ The essentials:
   buffer as an LP body. A new child is just a bare headline
   (`** some title`) under the metadata-carrying root line; the
   save-result echoes it back with a fresh UUID, and its `.skg` file
-  appears in `owned/main/`.
+  appears in `me/main/`.
 
 Org export needs no server: `./target/debug/skg export-org
 <scratch>/skgconfig.toml <repo-set> <output-dir>` (run it from the

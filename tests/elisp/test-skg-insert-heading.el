@@ -34,7 +34,7 @@ skg-config-dir is set and skg--owned-repos works."
           "name = \"private\"\n"
           "path = \"owned/private\"\n"
           "")
-  "Config text with two owned repos (paths under owned/ = owned).")
+  "Config text with two owned repos.")
 
 (ert-deftest test-insert-heading-at-root ()
   "C-return on a root headline prompts for repo in the minibuffer

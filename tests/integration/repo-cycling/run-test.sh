@@ -34,6 +34,11 @@ port = $AVAILABLE_PORT
 beep_when_server_becomes_available = false
 
 [[repos]]
+name = "foreign"
+path = "$TEST_DIR/data/foreign"
+foreign = true
+
+[[repos]]
 name = "public"
 path = "$TEST_DIR/data/owned/public"
 
@@ -44,10 +49,6 @@ path = "$TEST_DIR/data/owned/personal"
 [[repos]]
 name = "private"
 path = "$TEST_DIR/data/owned/private"
-
-[[repos]]
-name = "foreign"
-path = "$TEST_DIR/data/foreign"
 EOF
 
 start_skg_server

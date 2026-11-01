@@ -49,45 +49,20 @@ function M.port_from_toml (file)
   error('No port setting found in ' .. file)
 end
 
----The `owned_folder' setting from FILE, defaulting to 'owned'.
----Repos whose path sits under this folder are owned; all others
----are foreign. Replaces the retired per-repo 'user_owns_it' key.
----@param file string
----@return string
-function M.owned_folder_from_toml (file)
-  for _, line in ipairs(trimmed_lines(file)) do
-    local folder = line:match('^owned_folder[ \t]*=[ \t]*"([^"]+)"')
-    if folder then return folder end
-  end
-  return 'owned'
-end
-
 ---Names of the owned skgrepos in FILE, in declaration order. A skgrepo
----is owned iff its path (resolved against FILE's directory, the data
----root) sits under the data root's owned_folder (default 'owned') --
----the author-folder layout, mirroring the server's rule. A skgrepo
----with no 'name' key defaults its name to its path, also mirroring
----the server.
+---is owned unless its entry says 'foreign = true', mirroring the
+---server. A skgrepo with no 'name' key defaults its name to its path,
+---also mirroring the server.
 ---@param file string
 ---@return string[]
 function M.owned_repos_from_toml (file)
-  local owned_folder = M.owned_folder_from_toml(file)
-  local data_root = file:match('^(.*/)') or './'
-  local owned_root = data_root .. owned_folder .. '/'
   local skgrepos = {}
   local in_skgrepos = false
-  local current_name, current_path = nil, nil
+  local current_name, current_path, current_foreign = nil, nil, false
   local function flush ()
-    if in_skgrepos and current_path then
-      local abs = current_path
-      if not abs:match('^/') then abs = data_root .. abs end
-      if not abs:match('/$') then abs = abs .. '/' end
-      if abs == owned_root
-         or abs:sub(1, #owned_root) == owned_root
-      then
-        table.insert(skgrepos, current_name or current_path) end
-    end
-    current_name, current_path = nil, nil
+    if in_skgrepos and current_path and not current_foreign then
+      table.insert(skgrepos, current_name or current_path) end
+    current_name, current_path, current_foreign = nil, nil, false
   end
   for _, line in ipairs(trimmed_lines(file)) do
     if line:match('^%[%[repos%]%]') then
@@ -99,6 +74,8 @@ function M.owned_repos_from_toml (file)
       local path = line:match('^path[ \t]*=[ \t]*"([^"]+)"')
       if name then current_name = name end
       if path then current_path = path end
+      if line:match('^foreign[ \t]*=[ \t]*true%f[^%w_]') then
+        current_foreign = true end
     end
   end
   flush()

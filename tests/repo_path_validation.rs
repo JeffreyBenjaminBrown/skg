@@ -6,8 +6,8 @@ use std::io::{Result as IoResult, Error as IoError, ErrorKind as IoErrorKind};
 use std::path::PathBuf;
 use tempfile::{tempdir, TempDir};
 
-use skg::dbs::filesystem::not_nodes::validate_skgrepo_paths_creating_owned_ones_if_needed;
-use skg::types::misc::{Skgrepo, SkgrepoName};
+use skg::dbs::filesystem::not_nodes::{load_config, validate_skgrepo_paths_creating_owned_ones_if_needed};
+use skg::types::misc::{SkgConfig, Skgrepo, SkgrepoName};
 
 #[test]
 fn test_validate_existing_owned_skgrepo() {
@@ -197,3 +197,86 @@ fn test_validate_multiple_skgrepos_with_foreign_failure() {
   assert_eq!(err . kind(), IoErrorKind::NotFound);
   assert!(err . to_string() . contains ("foreign"));
 }
+
+/// Write CONFIG_TEXT as the skgconfig.toml of a fresh data root, with
+/// a directory for each of SKGREPO_FOLDERS, and load it.
+fn load_config_text_in_data_root (
+  data_root       : &TempDir,
+  skgrepo_folders : &[&str],
+  config_text     : &str,
+) -> Result<(SkgConfig, Vec<String>), Box<dyn std::error::Error>> {
+  for folder in skgrepo_folders {
+    fs::create_dir_all ( data_root . path () . join (folder) ) ?; }
+  let config_path : PathBuf =
+    data_root . path () . join ("skgconfig.toml");
+  fs::write ( &config_path, config_text ) ?;
+  load_config ( config_path . to_str () . unwrap () ) }
+
+#[test]
+fn a_skgrepo_is_owned_unless_its_entry_says_foreign (
+) -> Result<(), Box<dyn std::error::Error>> {
+  let data_root : TempDir = tempdir () ?;
+  let (config, _warnings) : (SkgConfig, Vec<String>) =
+    load_config_text_in_data_root (
+      &data_root, &["eggman/eggs", "jeff/notes", "jeff/work"],
+      concat! (
+        "tantivy_folder = \"tantivy\"\n",
+        "[[repos]]\npath = \"eggman/eggs\"\nforeign = true\n",
+        "[[repos]]\npath = \"jeff/notes\"\n",
+        "[[repos]]\nname = \"work\"\npath = \"jeff/work\"\n",
+        "foreign = false\n" )) ?;
+  let eggs : &Skgrepo =
+    &config . skgrepos [&SkgrepoName::from ("eggman/eggs")];
+  let notes : &Skgrepo =
+    &config . skgrepos [&SkgrepoName::from ("jeff/notes")];
+  let work : &Skgrepo =
+    &config . skgrepos [&SkgrepoName::from ("work")];
+  assert! ( ! eggs . owned );
+  assert! ( notes . owned );
+  assert! ( work . owned );
+  { // An unnamed entry is named by its path, in the privacy order too.
+    assert_eq! ( config . ordered_skgrepos (),
+                 vec! [ SkgrepoName::from ("eggman/eggs"),
+                        SkgrepoName::from ("jeff/notes"),
+                        SkgrepoName::from ("work") ] ); }
+  { // The default abbreviation of an owned skgrepo drops its author
+    // folder; a foreign one keeps the full path; a named one gets none.
+    assert_eq! ( notes . herald_label (), "notes" );
+    assert_eq! ( eggs . herald_label (), "eggman/eggs" );
+    assert_eq! ( work . abbreviation, None ); }
+  Ok (( )) }
+
+#[test]
+fn a_foreign_skgrepo_more_private_than_an_owned_one_is_refused (
+) -> Result<(), Box<dyn std::error::Error>> {
+  let data_root : TempDir = tempdir () ?;
+  let refusal : String = load_config_text_in_data_root (
+    &data_root, &["eggman/eggs", "jeff/public", "jeff/private"],
+    concat! (
+      "tantivy_folder = \"tantivy\"\n",
+      "[[repos]]\nname = \"public\"\npath = \"jeff/public\"\n",
+      "[[repos]]\nname = \"eggs\"\npath = \"eggman/eggs\"\n",
+      "foreign = true\n",
+      "[[repos]]\nname = \"private\"\npath = \"jeff/private\"\n" ))
+    . err () . expect ("a foreign repo after an owned one must be refused")
+    . to_string ();
+  assert! ( refusal . contains ("'eggs'") && refusal . contains ("'public'"),
+            "the refusal names both repos: {}", refusal );
+  Ok (( )) }
+
+#[test]
+fn the_retired_owned_folder_key_is_refused (
+) -> Result<(), Box<dyn std::error::Error>> {
+  let data_root : TempDir = tempdir () ?;
+  let refusal : String = load_config_text_in_data_root (
+    &data_root, &["owned/public"],
+    concat! (
+      "tantivy_folder = \"tantivy\"\n",
+      "owned_folder = \"owned\"\n",
+      "[[repos]]\nname = \"public\"\npath = \"owned/public\"\n" ))
+    . err () . expect ("a config setting owned_folder must be refused")
+    . to_string ();
+  assert! ( refusal . contains ("owned_folder")
+            && refusal . contains ("foreign = true"),
+            "the refusal names the key and the flag: {}", refusal );
+  Ok (( )) }

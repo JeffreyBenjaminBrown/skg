@@ -40,12 +40,13 @@ port = $AVAILABLE_PORT
 beep_when_server_becomes_available = false
 
 [[repos]]
-name = "public"
-path = "$TEST_DIR/data/owned/skg"
-
-[[repos]]
 name = "Cheese"
 path = "$TEST_DIR/data/cheese"
+foreign = true
+
+[[repos]]
+name = "public"
+path = "$TEST_DIR/data/owned/skg"
 
 [[repos]]
 name = "private"

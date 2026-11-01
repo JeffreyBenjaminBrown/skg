@@ -1,11 +1,12 @@
 tantivy_folder = "/tmp/placeholder"
 
-# owned/ is the default owned_folder, so "main" is owned and
-# "foreign" is write-protected. See docs/api-and-formats.org, "Skgrepos".
-[[repos]]
-name = "main"
-path = "owned/main"
-
+# "foreign" says foreign = true, so it is write-protected; "main" is
+# owned. See docs/api-and-formats.org, "Skgrepos".
 [[repos]]
 name = "foreign"
 path = "foreign"
+foreign = true
+
+[[repos]]
+name = "main"
+path = "owned/main"

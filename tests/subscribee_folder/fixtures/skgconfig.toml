@@ -3,9 +3,10 @@ port = 1730
 beep_when_server_becomes_available = false
 
 [[repos]]
-name = "home"
-path = "owned/home"
-
-[[repos]]
 name = "away"
 path = "away"
+foreign = true
+
+[[repos]]
+name = "home"
+path = "owned/home"

@@ -13,7 +13,7 @@
 # the remote only when it is not the conventional "origin".
 # skg makes no use of the git-remote values itself.
 dependencies = [
-  { path = "owned/skg" },
   { path = "cheese" },
+  { path = "owned/skg" },
   { path = "owned/private" },
 ]

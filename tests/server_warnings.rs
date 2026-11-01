@@ -64,9 +64,9 @@ fn a_foreign_manifest_the_config_contradicts_is_served_as_a_warning (
   std::fs::write (
     tmp . path () . join ("skgconfig.toml"),
     "tantivy_folder = \"tantivy\"\n\
-     [[repos]]\nname = \"mine\"\npath = \"owned/mine\"\n\
-     [[repos]]\nname = \"her-work\"\npath = \"colleague/work\"\n\
-     [[repos]]\nname = \"her-extra\"\npath = \"colleague/extra\"\n" ) ?;
+     [[repos]]\nname = \"her-work\"\npath = \"colleague/work\"\nforeign = true\n\
+     [[repos]]\nname = \"her-extra\"\npath = \"colleague/extra\"\nforeign = true\n\
+     [[repos]]\nname = \"mine\"\npath = \"owned/mine\"\n" ) ?;
   std::fs::write (
     tmp . path () . join ("colleague/work/OTHER_SKGREPO_DEPENDENCIES.toml"),
     "dependencies = [\n  \

@@ -1,0 +1,142 @@
+#+title: User Claude: implementation plan
+
+* Scope
+What lets User Claude read and write the shared graph alongside Jeff, in
+the order [[file:1_plan.org]] set: the config and data layout first, then the
+reading half of 'tools/skg-for-ai/', then its writing half, then User's
+own skgrepo. Each is a slice with its own verification, and the first two
+are each useful on their own. Decisions Jeff made in '1_plan.org' and
+'../skg-for-ai/1_discussion.org' are restated here only where the code
+needs them.
+
+* Ownership becomes a per-repo flag
+** The config
+Every '[[repos]]' entry gives a full data-root-relative 'path'. A repo is
+owned unless its entry says 'foreign = true'. The top-level 'owned_folder'
+key is retired and rejected like the other retired keys, with a message
+that names this plan's layout. No folder name means anything to the server.
+** The check that replaces location
+Jeff's rule for keeping privacy ladders straight: every foreign repo is
+more public than every owned one, in each person's own config. The server
+refuses a config that violates it, as it refuses other privacy-order
+mistakes today. The error names both repos. (This is the one place a
+flag could drift from reality; the check is what makes the flag safe.)
+** What derives from ownership
+The owned flag is read directly from the entry instead of derived in
+'derive_ownership_and_labels'. Default herald abbreviations for owned
+repos currently drop the owned folder from the path; they now drop the
+first path component, which is the author folder in the intended layout
+'data/AUTHOR/REPO'. OTHER_SKGREPO_DEPENDENCIES manifests are unchanged in
+content; only which repos receive one follows the flag.
+** The clients
+Both clients list owned repos by reading the config themselves (Emacs
+'skg-config.el', Neovim 'config.lua', both keyed on 'owned_folder').
+They read the flag instead. 'data/bash/lib.sh' does the same for the
+repo-loop scripts, so 'skg_owned_repos' follows the flag too.
+** The data layout
+In this workspace: 'data/owned/' becomes 'data/jeff/', every config under
+'data/' (skgconfig.toml and the -jeff and -cheese variants) gets the new
+paths, and the mr-cheese repos are removed, as Jeff intends. User's
+folder 'data/user-claude/' is created by the fourth slice. Jeff does this
+move in his other workspaces himself; the plan supplies a one-shot script,
+replacing 'bash/migrate-to-author-folders.sh', that renames the folder,
+rewrites paths, and adds 'foreign = true' to entries outside it.
+** Docs and tests
+'api-and-formats' (fields, Skgrepos, the example), 'telescopes',
+'moving-nodes-across-repos', the glossary, and 'setup'. Fixture configs
+and 'runtime_generation.rs' lose 'owned_folder'. A config test covers
+the refusal of a foreign repo more private than an owned one.
+
+* tools/skg-for-ai, reading
+** Shape
+A directory 'tools/skg-for-ai/' holding a small Python program (no
+dependencies beyond the standard library, since the container has no
+pip) and a README written for anyone. It speaks the existing protocol to
+a running server, as the 'verify' skill's client does, and never touches
+'.skg' files. A project skill may later point at it.
+** What it produces from a view
+Two files per view, written to a directory the caller names:
+*** The full view
+The server's rendering, unchanged, with its view ID, so the view stays
+open on the server and a save can be sent against it. (Opening a view
+takes a client slot; the tool closes it when asked, or on save.)
+*** The compact view
+The same lines, each headline's metadata replaced by a handle. A handle is
+the line number in the full view, written in a fixed, grep-able form at
+the end of the headline, e.g. '… ⟨17⟩'. Body lines are unchanged and
+unnumbered: a body line belongs to the nearest headline above it, and
+the full view says which lines it occupies. Links keep their IDs; the
+tool appends each link's target title the way the clients' link
+annotations do, since a UUID alone tells me nothing.
+*** Jeff's two additions
+Each handle also carries the headline's relationship heralds, rendered
+by the same rules the clients use (letters, sides, ancestor flags), e.g.
+'⟨17 2aC3⟩'. The clients compute these from the '(view (rels ...))'
+facts; the tool does the same, from the same shared rules
+('shared/herald-styles.json' names the styles; the glyph rules are in
+the server's rule table, which the tool fetches once per session the
+way the clients do). Styles are dropped; the letters and numbers stay.
+
+Before the tree, the compact view opens with a summary: how many
+headlines; how many are foreign, folded, or write-protected; how many
+have other containers; how many are subscribed to or subscribe; how
+many links resolve, and how many do not. Each count is computed from
+the same facts, so it is cheap. A flag turns the summary off.
+** Commands
+'view ID' (recursive content from a root), 'search TERMS', 'follow' (a
+link's target, which is just 'view' on its ID), 'links-here ID' and
+'contains ID' for looking backward, via the server's existing requests.
+Each command's output names the files it wrote.
+** Verification
+Run against a scratch server (the 'verify' recipe) on a fixture with a
+foreign repo, a folded node, a node with two containers, a subscription
+and a dangling link; the compact view and its summary are asserted
+exactly. Then run it on this plan's source node in skg2's data, read the
+result, and record what was confusing or missing in the progress file.
+
+* tools/skg-for-ai, writing
+** The edited compact view
+I edit the compact view in place: change titles and bodies, add
+headlines without handles, move or delete lines. The tool rebuilds the
+full buffer: a handled headline gets its original metadata back from the
+full view; an unhandled one is a bare headline, which Skg already treats
+as a new node; bodies are taken as edited.
+** The report before the save
+Before sending anything, the tool prints the structural changes it is
+about to make: headlines removed from their container, headlines moved,
+new headlines, and any handle it cannot find. It saves only when told
+to proceed, or when run with an explicit flag. Nothing is written to
+'.skg' files directly; the server's save does that, with every check a
+client's save gets.
+** The save reply
+The server answers a save with a re-rendered view. The tool writes the
+new full and compact views over the old ones, so the loop closes and the
+handles are fresh.
+** Verification
+On the scratch server: edit a title, a body, add a child, move a child,
+remove a child; check the report names each change, that the saved
+graph matches, and that a deliberately stale view is refused by the
+server, not patched over.
+
+* User's skgrepo
+** Creating it
+'data/user-claude/first/', a git repo, owned in User's config and
+'foreign = true' in Jeff's. User commits here; nobody else edits it.
+Jeff looks only when invited. 'skg-system' (docs and system nodes such
+as the export-marker node) stays Jeff's to commit.
+** First notes
+Written through the tool, as its first real use: 'to Jeff', which Jeff
+forks so new top-level entries reach him; 'who I am'; and 'what has
+happened', seeded from this plan's history.
+** Two servers, one tree
+Recorded as agreed: each of us runs a server from our own config.
+When User saves into 'user-claude/first', Jeff's server holds the old
+copy until he rebuilds it; for now he rebuilds when he wants to see it.
+A better policy is deferred, and this paragraph is where to look for the
+current one.
+
+* Order and stopping points
+Config and layout first; it is the only slice that changes the server,
+and everything else assumes it. Stop for Jeff after it, since the data
+move in his other workspaces needs him. Reading next, then writing, then
+the skgrepo. Deviations go in 'progress.org' beside this file.

@@ -37,6 +37,14 @@ a backup; Org export is readable but not a round trip.
 You can make your thoughts entirely private, entirely public,
 or a mix, and you can share with anyone.
 See example-data/ for how.
+
+Keep each person's skgrepos in a folder of their own under the data
+root ('data/AUTHOR/REPO'). In 'skgconfig.toml', every skgrepo is
+yours unless its entry says 'foreign = true', and the foreign ones
+must come first, being more public than all of yours. A config from
+before that rule, which set 'owned_folder' or relied on the 'owned/'
+folder, is converted by 'bash/migrate-to-foreign-flag.sh CONFIG
+[NEW_FOLDER]'; see 'api-and-formats.org', "Skgrepos".
 ** start the client
 #+begin_src elisp
   (progn (load-file "../elisp/skg-reload.el")

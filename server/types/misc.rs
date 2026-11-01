@@ -94,24 +94,27 @@ pub struct Skgrepo {
   pub name         : SkgrepoName,
   pub abbreviation : Option<String>,
   pub path         : PathBuf,
-  // Derived at config load, never written in TOML (a raw
-  // 'user_owns_it' key is rejected): true iff the skgrepo's
-  // as-written path sits under the config's 'owned_folder' (its
-  // first component equals it). See 'derive_ownership_and_labels'
-  // in server/dbs/filesystem/not_nodes.rs. Rust constructors (tests)
-  // may still set it directly.
+  // True unless the TOML entry says 'foreign = true'. No folder
+  // name bears on it. The config loader refuses a foreign skgrepo
+  // more private than an owned one
+  // ('validate_foreign_skgrepos_more_public_than_owned' in
+  // server/dbs/filesystem/not_nodes.rs). Rust constructors (tests)
+  // set it directly.
   pub owned : bool,
 }
 
 /// The TOML shape of a '[[repos]]' entry: 'name' is optional,
 /// defaulting to the path as written (e.g. "eggman/eggs"), which the
 /// herald-label defaulting then abbreviates for owned skgrepos.
+/// 'foreign' is optional too, defaulting to false: owned.
 #[derive(Deserialize)]
 struct SkgrepoToml {
   name         : Option<SkgrepoName>,
   #[serde(default)]
   abbreviation : Option<String>,
   path         : PathBuf,
+  #[serde(default)]
+  foreign      : bool,
 }
 
 impl From<SkgrepoToml> for Skgrepo {
@@ -126,7 +129,7 @@ impl From<SkgrepoToml> for Skgrepo {
       name,
       abbreviation : raw . abbreviation,
       path         : raw . path,
-      owned        : false, // derived later; see the field's comment
+      owned        : ! raw . foreign,
     }}}
 
 /// One entry in a node's relationship list: the member and the
@@ -225,14 +228,6 @@ pub struct SkgConfig {
   #[serde(rename = "default_repo_set", default)]
   pub default_skgrepo_set : Option<SkgrepoName>,
 
-  // The directory (as a first path component under the data root)
-  // whose skgrepos the user owns; every other skgrepo is foreign
-  // (write-protected). Replaces the retired per-repo 'user_owns_it'
-  // TOML key. The intended layout is data/AUTHOR/REPO, with this
-  // field naming the user's own author folder.
-  #[serde(default = "default_owned_folder")]
-  pub owned_folder : String,
-
   pub tantivy_folder : PathBuf,
 
   #[serde(default = "default_port")]
@@ -326,9 +321,6 @@ where
         format! ("Duplicate repo name '{}'", skgrepo . name))); }}
   Ok (map)
 }
-
-fn default_owned_folder () -> String {
-  "owned" . to_string () }
 
 fn default_port() -> u16 {
   DEFAULT_PORT }
@@ -464,7 +456,6 @@ impl SkgConfig {
       skgrepos,
       skgrepo_order       : Vec::new (),
       default_skgrepo_set : None,
-      owned_folder       : "owned" . to_string (),
       tantivy_folder     : PathBuf::from ("/tmp/unused"),
       port               : 0,
       initial_node_limit : DEFAULT_INITIAL_NODE_LIMIT,
@@ -483,7 +474,6 @@ impl SkgConfig {
       skgrepos,
       skgrepo_order       : Vec::new (),
       default_skgrepo_set : None,
-      owned_folder       : "owned" . to_string (),
       tantivy_folder     : PathBuf::from (tantivy_folder),
       port               : DEFAULT_PORT,
       initial_node_limit : DEFAULT_INITIAL_NODE_LIMIT,

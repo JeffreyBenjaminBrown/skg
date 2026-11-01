@@ -34,6 +34,7 @@
           "path = \"" (expand-file-name
                        "test-skg-insert-heading-repo-prompt/foreign"
                        (file-name-directory load-file-name)) "\"\n"
+          "foreign = true\n"
           "")
   "Config text with two owned repos and one foreign repo.")
 
@@ -306,6 +307,15 @@ or alone; deleting it there clears it."
          (should (equal (buffer-substring-no-properties
                          (point-min) (point-max))
                         "* (skg node (gnid x) (skgRepos (nodeRepo public)) (editRequest delete)) x\n")))))))
+
+(ert-deftest test-owned-repos-exclude-the-foreign-one ()
+  "skg--owned-repos should list every repo whose entry does not say
+foreign = true, in declaration order."
+  (test--with-skg-content-view
+   "* (skg node (gnid x) (skgRepos (nodeRepo public))) x\n"
+   test--config-with-foreign-repo
+   (lambda ()
+     (should (equal (skg--owned-repos) '("public" "private"))))))
 
 (ert-deftest test-view-repo-list-includes-all-repos ()
   "skg-view-repo-list should list every configured repo and path."

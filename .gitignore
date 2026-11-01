@@ -29,13 +29,14 @@
 !/data/bash/
 
 # Ignore example-data/, with the (marked by a leading "!")
-# exception of the two files that ensure subfolders public/ and private/
+# exception of the files that ensure the example repo folders exist
 /example-data
 !/example-data/
-!/example-data/public/
-!/example-data/private/
-!/example-data/public/.gitkeep
-!/example-data/private/.gitkeep
+!/example-data/me/
+!/example-data/me/public/
+!/example-data/me/private/
+!/example-data/me/public/.gitkeep
+!/example-data/me/private/.gitkeep
 
 /target
 /tests/results
@@ -57,3 +58,5 @@ tools/introspect/code-map/output/
 tools/introspect/profile-with-org-report/raw/
 tools/introspect/profile-with-org-report/result.org
 tools/md-to-org/.org-id-db.json
+
+export/

@@ -25,6 +25,7 @@ local interleaved_config = table.concat({
   '[[repos]]',
   'name = "foreign"',
   'path = "foreign-dir"',
+  'foreign = true',
   '',
   'port = 1741',
 }, '\n')

@@ -1,0 +1,134 @@
+#+title: User Claude: progress
+
+* Ownership becomes a per-repo flag: DONE, uncommitted
+** What was done
+A '[[repos]]' entry is owned unless it says 'foreign = true'
+('SkgrepoToml.foreign'). 'owned_folder' is gone from 'SkgConfig' and
+rejected like 'user_owns_it', whose message now names the flag. The
+loader refuses a config in which a foreign repo is not strictly more
+public than every owned one, naming both
+('validate_foreign_skgrepos_more_public_than_owned' in
+'server/dbs/filesystem/not_nodes.rs'). 'derive_ownership_and_labels'
+became 'derive_default_abbreviations': an owned repo with a defaulted
+name abbreviates to its path below the data root minus the first
+component. Three tests in 'tests/repo_path_validation.rs' cover the
+flag and the abbreviation, the refusal, and the retired key.
+
+Emacs, Neovim and 'data/bash/lib.sh' read the flag. The new
+'bash/migrate-to-foreign-flag.sh' replaces
+'bash/migrate-to-author-folders.sh'. The docs the plan names, the
+verify skill and 'example-data/' (now 'me/' plus a foreign
+'fred/public' listed first) follow the new layout.
+
+In 'data/': 'owned/' is now 'jeff/', all three configs were migrated,
+'data/mr-cheese/' is deleted (its 'private' repo had four uncommitted
+changes, which are gone with it), and the 'Mr Cheese' entry is out of
+'skgconfig-jeff.toml', which 'skgconfig.toml' links to. The main
+server restarted on the new config ("Server ready"); its telescope
+warnings went from 16 to 2.
+** Deviations from the plan
+*** Fixtures were reordered as well as flagged
+Nearly every test config with a foreign repo listed it last, which
+the new check refuses. Each one now lists its foreign repos first,
+with 'foreign = true'. That includes the inline configs in Rust tests
+and the integration 'run-test.sh' files. All suites pass on the new
+order. Configs that were entirely foreign by location
+('link-annotations', 'subscribee_heralds') got the flag so they keep
+their meaning.
+*** The privacy order now includes unnamed repos
+'skgrepo_order_from_toml' used to skip an entry without 'name', so
+such a repo was missing from the privacy order and counted as
+infinitely private. The new check would have refused every unnamed
+foreign repo for that reason, so an unnamed entry is now ordered
+under its path, matching how it is named.
+*** The migration script decides idempotency from three signs
+A config gets rewritten if it sets 'owned_folder', if some path lies
+under the owned folder, or if that folder still exists. A config that
+owned nothing, run after the folder was renamed, looks the same as an
+already-migrated config where everything is owned. The script warns
+in that case. It also warns when the result lists a foreign repo after
+an owned one, and it keeps a 'default_repo_set' that names a moved
+unnamed repo pointing at it. Because of the first rule I ran it on
+'skgconfig-cheese.toml' first, before the folder was renamed.
+** What's imperfect
+*** 'skgconfig-cheese.toml'
+Under the old rule all four of its repos were foreign, since none sat
+under 'owned/'. The migration kept that, so all four now say 'foreign
+= true'. That is probably not what the file meant: its order (skg,
+jeff-public, then cheese/public and cheese/private) reads like a Mr
+Cheese config written for the new scheme. It also cannot load,
+because 'skg-system' and 'cheese/' do not exist, which was already
+true. I removed only the entries under 'mr-cheese/' and it has none.
+It is probably best deleted.
+*** A foreign repo that cites an owned node is now leak-shaped
+Because foreign repos must be more public, any relationship that a
+foreign repo records to one of your nodes is a "leak-shaped
+membership" warning. This showed up in the 'overridden-direct-visit'
+fixture, where the foreign 'Cheese' overrides an owned node. The test
+passes, but the server now writes a 'telescope-warnings.org' there.
+The same thing will happen when User's repo, foreign to Jeff, links
+to Jeff's public nodes.
+*** Generated files in tracked fixtures changed
+Running the integration suite regenerated the
+'OTHER_SKGREPO_DEPENDENCIES.toml' manifests and the
+'telescope-warnings.org' reports of the reordered integration
+fixtures. The changes match the new order and are left in the tree.
+'import-md-and-org' still fails, as it did before this work
+('TODO/problems.org').
+** What Jeff must do
+Run 'bash/migrate-to-foreign-flag.sh CONFIG [NEW_FOLDER]' on each
+config in your other workspaces (skg, production). When several
+configs share a data root, run first any config that owned nothing,
+since only the first run sees the folder before it is renamed. Then
+move each foreign entry above the owned ones if the script warns, and
+check the result with 'skg check-config'. The old 'TODO.org' item
+"don't force that we keep owned files under 'owned/'" is resolved by
+this slice.
+* Only owned files leak: DONE, uncommitted
+** What was done
+A leak is data the user intends to share revealing data the user
+intends not to share, so only a relationship recorded in an owned
+skgrepo can be one. 'telescope_violations_of' in
+'server/telescope/invariants.rs' skips any relationship whose relRepo
+is not owned before judging its privacy, so neither
+'LeakShapedMembership' nor 'AbsentTargetLeakShapedMembership' is ever
+reported for a foreign recorder, at startup, rebuild, save or
+nodeMerge. An owned skgrepo naming a foreign node was already never
+reported, because every foreign skgrepo is more public than every
+owned one. 'stranded_relationships' in 'server/from_text/strandeds.rs'
+likewise skips relationships recorded in foreign skgrepos, so a save
+never raises, offers to reset, or rewrites one.
+
+The unit test 'a_foreign_recorder_never_leaks_but_an_owned_one_still_can'
+in 'tests/unit/telescope_invariants.rs' puts a foreign node that
+contains, subscribes to, hides, overrides and links to owned nodes
+(one of them dangling) beside an owned node that overrides it and an
+owned public node containing an owned private one; only the last is
+reported. The 'overridden-direct-visit' integration fixture no longer
+writes a 'telescope-warnings.org', and the stale one is deleted.
+'data/skgconfig-cheese.toml' and its backup are deleted.
+
+The principle is stated in 'docs/telescopes.org' ("What leaks, and
+what repair fixes"), in the telescope-warning paragraph of
+'docs/data-model_technical.org', and in the strandeds section of
+'docs/diff-view.org'.
+** Where leak logic lives
+Recorded-data leaks are judged in one place, 'telescope_violations_of',
+which both the whole-graph audit and the save-time audit call. The
+save-side rules that keep new data from leaking
+('apply_sticky_relRepos_in_graph_with_prospective_homes' and the hide
+floor in 'server/from_text/supplement_from_disk.rs', the nodeMerge
+relRepo merge in 'server/nodeMerge/nodeMergeInstructionTriple.rs')
+only ever write owned recorders, so they needed no change. The other
+uses of "leak" and "reveal" in the code and docs (the leak battery in
+'tests/leak_battery.rs', the overPrivateText release prompt, view
+heralds under a restricted skgrepo-set) concern what a view shows
+under a skgrepo restriction, not what a file records, and every
+section they gate is owned.
+** What's imperfect
+The guard in 'stranded_relationships' is defensive: a foreign
+relationship's relRepo never equals its pre-move default (that default
+is an owned skgrepo whenever the member is owned, and only owned nodes
+move), so no test can exercise it. It keeps 'reset_to_default_relationships'
+from ever adding a save of a foreign recorder should that reasoning
+stop holding.

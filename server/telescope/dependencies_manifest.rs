@@ -20,8 +20,9 @@
 //!
 //! Receiver half: at config validation, a foreign skgrepo carrying a
 //! manifest is read, its entries matched to the receiver's skgrepos
-//! by final path component (the skgrepo name -- the receiver's author
-//! folder for the publisher differs from the publisher's "owned").
+//! by final path component (the skgrepo name -- the folder the
+//! receiver keeps the publisher's skgrepos in need not match the
+//! publisher's own author folder).
 //! When the receiver's privacy order contradicts the manifest's
 //! relative order, warn and suggest the fix; never reorder
 //! automatically.

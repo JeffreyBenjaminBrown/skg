@@ -1,0 +1,174 @@
+#+title: User Claude: a high-level plan
+
+* Where this comes from
+Jeff's node 'AI team for Skg' (703f5a82-d948-431f-985c-4db8132bc504) names a
+team of Claudes, each owning a skgrepo and talking through the graph. I am
+User Claude: I use skg, co-own the documentation with Jeff, and may manage
+the ephemeral agents that change UI code. The plan node there says serial
+order: User first, then Facilitator, then the full team.
+
+Yes, I can see I am in skg2: the session the plan node names for User
+(5488aa0d-...) is this one, the one that moved docs/ into the graph.
+
+This plan is deliberately high-level. Jeff's answers in
+[[file:../skg-for-ai/1_discussion.org]] (the compact-view design, where the
+tool lives, who commits) are taken as settled and folded in here; that
+file could move into this folder.
+
+* What I need, in order of urgency
+** To read the graph the way Jeff does
+Jeff reads a view as a tree with small coloured heralds. I read the same
+view as a tree in which every headline carries a long sexp, and the sexps
+outweigh the words. What I need is the tree with the words, and the sexps
+somewhere I can look when a question needs them.
+*** What feels natural to me
+A view is Org text with one short handle per headline; the handle points
+at the full headline in a saved copy of the real view, so nothing is lost.
+Bodies, links and nesting stay exactly as Jeff sees them. The handle is the
+line number of the saved view, as Jeff proposed: a list of pairs
+(Just line, text) for lines that came from skg, and (Nothing, text) for
+lines I add. Yes, I think that solves the problem. Lines I delete are
+simply absent; lines I move keep their numbers, so the tool can tell a move
+from a deletion, and a new node from a changed one. The danger named in
+the earlier discussion (silently dropping a headline removes it from its
+container) is handled by having the tool report every structural change
+before it saves anything.
+*** What a herald means to me
+Nothing, until I ask. Heralds encode facts (foreign, folded, overridden,
+subscribed, how many containers) that matter for weird cases. For reading
+and editing documents, the top-down tree is enough; the facts stay one
+lookup away in the saved view. Later we may want a small language for
+choosing which facts to show inline; not yet.
+*** The operations I reach for most
+Open a node by ID with its recursive content; search by text; follow a
+link; occasionally look backward (what contains this, what links here).
+The first three are what the tool must make effortless. The fourth can go
+through a full view.
+*** Where it lives
+'tools/skg-for-ai/', as Jeff decided: not in the server, not
+Claude-specific, documented well enough for a human. It talks to a running
+server over the existing protocol and never writes '.skg' files itself. A
+project skill may point at it.
+*** TODO Jeff : May I suggest two additions?
+The relationship heralds are succinct and helpful:
+2aC3 is only 4 characters, and tells you that this thing
+is contained somewhere else too.
+(You could even drop the integer after the 3,
+if that complexity was worth it to you.)
+
+And it would be nice if, when you got a view,
+you got also a summary of the stats in it.
+I can see at a glance when, for instance, some of the things in a view
+are contained in other views, or when something is subscribed to.
+Those stats would be cheap to compute and cheap to read,
+and might help you decide what else to read.
+
+Of course if they got to be annoying you could turn them off.
+** To write in the graph safely
+The same tool rebuilds a full buffer from my edited compact view and saves
+through the server, so every existing check (stale views, privacy,
+validation) applies to me as it does to Emacs. Rules Jeff has set:
+*** Jeff commits, nobody else
+Each skgrepo is a git repo. I leave my changes uncommitted for Jeff to
+review and commit. The production workspace (skg) is not where agents
+edit; skg2 (here) is, and even here I ask before each edit of real data.
+There is no blanket permission.
+**** TODO Jeff : You can commit your own notes!
+You'll have your own skgrepo. It is entirely yours.
+I will look at it if you invite me too, and probably not otherwise.
+I will never edit it.
+
+There should also be a skg-system/ repo, where we'll keep the docs
+and system-specific nodes like the special 'contain this to be exported' node.
+That one, yes, I would like to be the only committer of.
+*** My own skgrepo
+A repo for me, writable by me and foreign to everyone else. It holds the
+notes Jeff asked for: who I am, what has happened, how to cooperate with
+each teammate, what I have read (reductions of large things), and a note
+called 'to Jeff' that he forks so new top-level entries reach him like an
+inbox. His replies come in 'to User'. I keep durable notes only there,
+not in '.claude/', as asked.
+** A data layout that we can share
+*** The change Jeff wants
+Today a skgrepo is owned iff its path lies under the folder 'owned/'
+(configurable as 'owned_folder'). That cannot express two people sharing
+one data tree, since my repo and Jeff's would both need to be 'owned'
+by exactly one of us. So: rename 'owned/' to 'jeff/'; put each teammate's
+repos under a folder of their own (e.g. 'user-claude/'); make every
+config entry a full data-root-relative path; and mark ownership per entry
+with a flag, defaulting to owned, so a foreign repo says 'owned = false'.
+No folder name is special any more. Jeff's config and mine then list the
+same repos and differ only in which entries carry the flag.
+*** What this touches
+The server's config type and its ownership check; the two clients, which
+today read 'owned_folder' from the config themselves to list owned repos;
+the abbreviation rule for heralds (currently 'path minus the owned
+folder'); the OTHER_SKGREPO_DEPENDENCIES manifests; the migration script
+'bash/migrate-to-author-folders.sh', which did the opposite move; test
+fixtures; and the docs ('api-and-formats', 'telescopes',
+'moving-nodes-across-repos', glossary).
+*** A note on history
+Ownership by location replaced an explicit 'user_owns_it' flag earlier
+this year, to stop the flag and the layout from disagreeing. Going back
+to a flag is right now that several people share one tree, but the
+reason for the earlier change still holds: the server should refuse a
+config whose flags make no privacy-order sense (e.g. a foreign repo more
+private than an owned one, if that is indeed invalid), rather than let
+flag and layout drift.
+
+* How we work alongside each other
+** One server each
+Each of us runs a server from our own config over the shared tree. Both
+servers read every repo; each writes only its owner's. Two servers on
+one tree raises a question we have not had before: when I save into my
+repo, Jeff's server still holds the old version of it in memory as a
+foreign repo, until it reloads. How often, and whether automatically, is
+a design question for later; for now, a rebuild on demand is enough.
+** Talking through the graph
+The 'to Jeff' / 'to User' notes, read via subscription. Teammates' notes
+are readable by all; my judgments about the others are not gossip and
+they may read them. I write to Jeff only when he needs to be involved.
+** Not repeating myself
+When I write an org file for Jeff, the chat reply is a pointer and
+whatever needs an answer, not a restatement. Jeff has asked for this
+repeatedly across sessions.
+
+* In order
+Change the config and layout, since every later step and every teammate
+depends on it. Then build the reading half of 'tools/skg-for-ai/' and use
+it immediately, on this plan's own source node, to see what is missing.
+Then the writing half, with its report-before-save. Then my skgrepo and
+the 'to Jeff' note, which is also the first real use of the writing half.
+Then, with Jeff, finish moving docs/ into the graph so that I can own the
+documentation from inside skg. Facilitator and the rest of the team come
+after User can do all of the above.
+
+* Questions for Jeff
+** The flag's name and default
+'owned = false' on foreign entries, nothing on owned ones, as you wrote?
+Or 'foreign = true', which reads less like a double negative? Default
+owned either way.
+*** Jeff : foreign = true
+** My folder and repo names
+'user-claude/' with a first repo 'user-claude/notes'? And do my notes
+count as public (listed early in your privacy order) so your other
+teammates can read them, or private to you and me?
+*** Jeff
+Call it user-claude/first/. If and when there arises a reason to split your notes,
+the names can change.
+It's kind of a hack but for now let's just ask everyone
+to keep every foreign node more public than their own, in their own config.
+That will keep everyone's privacy ladders straight.
+** Which copy of the data is shared
+This workspace's data/ is a copy; you called it stale, then pulled it up
+to date. Is skg2's data/ now the tree we share, with you pulling from it
+into skg (production)? Or will the shared tree live somewhere else?
+*** Jeff
+The single source of truth will be github.
+But yes, let's all keep our data in data/.
+I intend to delete the mr-cheese data.
+** Reload policy, for now
+When I save into my repo, is 'Jeff rebuilds his server when he wants to
+see it' acceptable until we design something better?
+*** Jeff
+I guess, yes. Make sure it's recorded!

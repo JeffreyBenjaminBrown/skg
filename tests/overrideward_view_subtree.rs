@@ -6,9 +6,8 @@
 // Fixture (tests/overrideward_view_subtree/fixtures): owned skgrepo
 // "main" holds U, which overrides foreign F, which overrides foreign
 // G; foreign M1 and M2 mutually override; foreign B overrides foreign
-// E; foreign D overrides "gone", which no file defines. Ownership is
-// by location -- "main" lives under owned/, so it is
-// owned; "foreign" is not.
+// E; foreign D overrides "gone", which no file defines. The config
+// marks "foreign" with 'foreign = true'; "main" is owned.
 
 use std::collections::HashSet;
 use std::error::Error;
