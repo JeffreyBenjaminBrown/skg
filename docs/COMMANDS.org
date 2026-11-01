@@ -760,7 +760,8 @@ Save the view afterward to apply the changes.
 In a buffer of the diff view (C-c v d), each change can be
 marked commit-ready. A mark approves the change as it is now: editing
 the changed thing again makes the mark lapse. Marks live on the
-server, in '<data_root>/readiness-marks.json'. A headline whose
+server, in a file beside its config ('<data_root>/readiness-marks-CONFIGSTEM.json',
+unless the config names another). A headline whose
 change is ready shows ✓ after it; a commit readiness aggregate (a
 folder of changes, a changeset marker) shows ✓ when all of its changes are. A node that
 existed at HEAD and whose file records a change shows M ("modified"),

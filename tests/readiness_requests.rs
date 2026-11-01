@@ -30,7 +30,7 @@ fn save (
 fn marked_keys (
   f : &Fixture,
 ) -> HashSet<LeafKey> {
-  ReadinessStore::load (&f . config . data_root) . marks
+  ReadinessStore::load ( &f . config . readiness_marks_path () ) . marks
     . into_keys () . collect () }
 
 fn r_text () -> LeafKey {
@@ -68,7 +68,7 @@ fn a_save_marks_and_unmarks_the_leaves_its_requests_name (
       { // Each mark holds the fingerprint of the change it approved.
         let straddle = f . views_state . graph_straddle . clone ()
           . expect ("consuming requests built the graph straddle");
-        let store : ReadinessStore = ReadinessStore::load (&f . config . data_root);
+        let store : ReadinessStore = ReadinessStore::load ( &f . config . readiness_marks_path () );
         for key in [ r_contains_a (), a_alias () ] {
           assert! ( store . is_ready (
             &key, straddle . change_leaves () . leaf_fingerprint (&key) . unwrap () )); }} }

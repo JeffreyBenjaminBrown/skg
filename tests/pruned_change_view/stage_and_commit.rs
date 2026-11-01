@@ -153,7 +153,7 @@ fn a_complete_summary_commits_without_confirmation_and_lapses_the_marks (
               "{:?}", answer );
     assert_everything_committed (f, "all ready") ?;
     assert! ( env . runtime . readiness_store . lock () . unwrap () . marks . is_empty () );
-    assert! ( ReadinessStore::load (&f . config . data_root) . marks . is_empty () );
+    assert! ( ReadinessStore::load ( &f . config . readiness_marks_path () ) . marks . is_empty () );
     Ok (( )) }) }
 
 /// A file the user staged in one gitrepo before the request stops even

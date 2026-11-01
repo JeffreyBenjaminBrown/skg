@@ -2,8 +2,9 @@
 //! has marked commit-ready ('docs/diff-view.org',
 //! "Marks, fingerprints and the store"). Each mark keeps the fingerprint of the change it
 //! approved; a mark whose fingerprint no longer matches the current
-//! change counts as absent. The store lives server-side, in
-//! '<data_root>/readiness-marks.json', rewritten after every change.
+//! change counts as absent. The store lives server-side, in the file
+//! 'SkgConfig::readiness_marks_path' names, rewritten after every
+//! change.
 
 use crate::diff_view::change_leaves::{ChangeLeaves, LeafKey};
 
@@ -11,9 +12,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::io;
-use std::path::{Path, PathBuf};
-
-pub const READINESS_MARKS_FILE : &str = "readiness-marks.json";
+use std::path::Path;
 
 /// See the module comment.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
@@ -51,30 +50,25 @@ impl ReadinessStore {
   ) {
     self . marks . retain ( |key, _| leaves . leaf (key) . is_some () ); }
 
-  /// The store saved under 'data_root'. A missing or unreadable file
+  /// The store saved in 'marks_file'. A missing or unreadable file
   /// means an empty store.
   pub fn load (
-    data_root : &Path,
+    marks_file : &Path,
   ) -> ReadinessStore {
-    fs::read_to_string ( readiness_marks_path (data_root) )
+    fs::read_to_string (marks_file)
       . ok ()
       . and_then ( |text| serde_json::from_str (&text) . ok () )
       . unwrap_or_default () }
 
   pub fn save (
     &self,
-    data_root : &Path,
+    marks_file : &Path,
   ) -> io::Result<()> {
     let text : String =
       serde_json::to_string_pretty (self)
       . map_err ( |e| io::Error::new (io::ErrorKind::InvalidData, e) ) ?;
-    fs::write ( readiness_marks_path (data_root), text ) }
+    fs::write (marks_file, text) }
 }
-
-pub fn readiness_marks_path (
-  data_root : &Path,
-) -> PathBuf {
-  data_root . join (READINESS_MARKS_FILE) }
 
 /// JSON object keys must be strings, so the marks are stored as a
 /// list of '{ "leaf": ..., "fingerprint": ... }' entries.

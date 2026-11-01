@@ -74,7 +74,7 @@ impl SharedRuntime {
         generation ) };
     legacy_graph . store (graph . clone ());
     let readiness_store : ReadinessStore =
-      ReadinessStore::load (&config . data_root);
+      ReadinessStore::load ( &config . readiness_marks_path () );
     SharedRuntime {
       current : ArcSwap::from_pointee (RuntimeGeneration {
         config : Arc::new (config), graph, tantivy_index, generation,

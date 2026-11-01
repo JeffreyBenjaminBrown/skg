@@ -26,7 +26,9 @@ In order, it:
   checks the diff view's compact buffer exactly, marks the new child
   ready, restores the deleted node, and commits (refused unconfirmed,
   then confirmed with '--yes'), checking 'git log' and that the diff
-  view is then empty; a blank commit message is refused unsent.
+  view is then empty; then integrates a change a diff buffer does not
+  make editable, and saves an edit of it; a blank commit message is
+  refused unsent.
 '--update-expected' rewrites the expected files instead of comparing.
 """
 
@@ -522,6 +524,7 @@ def failures_of_reviewing (scratch, data_root):
   for case in [ check_edits_to_review, check_diff_shows_the_changes,
                 check_marking_ready, check_unconfirmed_commit,
                 check_restoring_a_deleted_node, check_confirmed_commit,
+                check_integrating_unshown_changes,
                 check_blank_commit_message ]:
     try:
       case (context)
@@ -644,6 +647,50 @@ def check_confirmed_commit (context):
                 os . path . join ( context [ "scratch" ], "review", "after" ) ]),
     EMPTY_DIFF_VIEW )
 
+def check_integrating_unshown_changes (context):
+  """A buffer of the diff view shows a retitled root and, write-protected
+  beneath it, a child whose own child another view then retitles. The
+  buffer, as it stands, does not make that change editable; 'integrate'
+  makes the child editable, which draws the retitled grandchild,
+  editable too, and a save of the buffer then retitles it again."""
+  root_view = fresh_root_view (context, "integrate-root")
+  edit_compact ( root_view, [ ( "* The fixture root ⟨1 ",
+                                "* The fixture root, retitled ⟨1 " ) ])
+  require_save_succeeds (root_view)
+  folder = run_diff (context, "integrate")
+  require_in_diff_compact (folder, "*** First child, renamed ⟨7 aC2⟩\n")
+  require_equal ( "the write-protection of the first child's headline",
+                  "writeProtected" in diff_full_line (folder, 7), True )
+  grandchild_view = fresh_root_view (context, "integrate-grandchild")
+  edit_compact ( grandchild_view, [ ( "*** A new grandchild ⟨",
+                                      "*** A grandchild, retitled ⟨" ) ])
+  require_save_succeeds (grandchild_view)
+  require_output (
+    run_tool ([ "integrate", sidecar_of_diff (folder) ]),
+    "Before integrating: 0 of 2 changed files are ready, 1 changes are "
+    "not editable in this buffer.\n"
+    "Integrated: 0 of 2 changed files are ready.\n" +
+    diff_written_paths (folder) )
+  require_in_diff_compact (
+    folder, "*** First child, renamed ⟨7 aC2⟩\n"
+    "A body line that stays unnumbered.\n"
+    "**** Contained twice ⟨9 2aC⟩\n"
+    "**** A grandchild, retitled ⟨10 M⟩\n"
+    "***** A new grandchild ⟨11 oldText title⟩\n" )
+  for line_number in [ 7, 10 ]:
+    require_equal ( f"the write-protection of line {line_number}",
+                    "writeProtected" in diff_full_line (folder, line_number),
+                    False )
+  grandchild_id = UUID_PATTERN . search ( diff_full_line (folder, 10) ) . group (0)
+  edit_compact (
+    folder, [ ( "**** A grandchild, retitled ⟨10 M⟩",
+                "**** A grandchild, retitled twice ⟨10 M⟩" ) ],
+    DIFF_BASE_NAME )
+  require_save_succeeds (folder)
+  require_equal ( "the grandchild's title",
+                  skg_title (context, grandchild_id),
+                  "A grandchild, retitled twice" )
+
 def check_blank_commit_message (context):
   """A blank message is refused before anything is sent: no server
   answers on port 1."""
@@ -664,6 +711,16 @@ def run_diff (context, name):
   require_equal ( "the files 'diff' wrote", completed . stdout,
                   diff_written_paths (folder) )
   return folder
+
+def require_in_diff_compact (folder, text):
+  compact = read_diff_compact (folder)
+  if text not in compact:
+    raise CaseFailure ( f"the diff view's compact buffer lacks {text!r}:\n{compact}" )
+
+def diff_full_line (folder, line_number):
+  """Line LINE_NUMBER (1-based) of the diff view's full buffer."""
+  return read_file ( os . path . join ( folder, DIFF_BASE_NAME + ".full.org" )
+                   ) . split ("\n") [ line_number - 1 ]
 
 def sidecar_of_diff (folder):
   return os . path . join (folder, DIFF_BASE_NAME + ".view.json")

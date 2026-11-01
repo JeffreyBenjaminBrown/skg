@@ -456,8 +456,13 @@ the change it approved, a hash of the leaf's before and after values.
 A mark whose fingerprint no longer matches the change counts as
 absent: editing a marked change unmarks it, and nothing signals that
 an earlier version was approved. The store lives on the server, is
-written to '<data_root>/readiness-marks.json' after every change, and
-is read at startup; a missing or unreadable file is an empty store.
+written to its file after every change, and is read at startup; a
+missing or unreadable file is an empty store. The file is the
+config's 'readiness_marks_file', or else
+'<data_root>/readiness-marks-STEM.json', STEM the config file's name
+without '.toml' (a symlink to a config resolved first), so that
+servers over one data root keep their marks apart
+('SkgConfig::readiness_marks_path').
 The file serializes the leaf keys, aspect names included, so their
 spelling is kept stable. After a git-commit, the store keeps exactly
 the marks whose leaves still exist in the rebuilt straddle.
@@ -548,9 +553,12 @@ when its '(ready ...)' names every object its '(leaves ...)' lists.
 They do not wrap: at the end they say "No further change" (or "No
 earlier change", with "unready" or "ready" for the filtered forms).
 ** The readiness summary
-After every save of a buffer of the diff view, after C-c r u, and
-before a stage-and-commit that would leave changes behind, the client
-shows the readiness summary: "12 of 14 changed files are ready", or
+The answer to each "diff view" request for a nonempty buffer, to each
+save of a buffer of the diff view, and to C-c r u carries the
+readiness summary, as does the answer to a stage-and-commit that
+would leave changes behind. After every save of a buffer of the diff
+view, after C-c r u, and before such a stage-and-commit, the client
+shows it: "12 of 14 changed files are ready", or
 "Commit ready. All 14 of 14 changed files are ready.". A changed file
 is ready when every change it records is marked; order-only files
 count as changed and ready. It is computed over every leaf of the
@@ -558,7 +566,7 @@ change-forest, whatever buffer is open. It adds the changed files of
 the foreign skgrepos, and the changes not editable in this view:
 the leaves whose recorder the buffer does not make editable (see
 "What counts as editable here"), with the command that integrates
-them. A save and C-c r u compute it alike
+them. The diff view's answer, a save and C-c r u compute it alike
 ('buffer_readiness_summary_for', 'server/diff_view/readiness_requests.rs').
 
 * Restoring what a change removed

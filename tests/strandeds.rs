@@ -14,7 +14,6 @@ use skg::dbs::in_rust_graph::relation_accessors::{NodeRelation, RelationshipKey}
 use skg::dbs::init::create_empty_tantivy_index;
 use skg::from_text::strandeds::StrandedsReview;
 use skg::save::DeleteFrom;
-use skg::diff_view::readiness_store::readiness_marks_path;
 use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::{
   SaveResponse, update_from_and_rerender_buffer_with_approvals};
@@ -186,7 +185,7 @@ fn a_publicizing_move_asks_about_a_relationship_recorded_outside_the_view (
       assert_eq! ( stranded [0] . relRepo,     SkgrepoName::from ("private") );
       assert_eq! ( stranded [0] . new_default, SkgrepoName::from ("public") );
       assert_eq! ( home_of (&f, "n"), Some (SkgrepoName::from ("private")) );
-      assert! ( ! readiness_marks_path (&f . config . data_root) . exists (),
+      assert! ( ! f . config . readiness_marks_path () . exists (),
                 "a save that stops for confirmation consumes nothing" ); }
     { // The approving re-save resets the chosen relationship to default.
       let (response, _) : (SaveResponse, HashMap<String, String>) =

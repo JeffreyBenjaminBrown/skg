@@ -1,14 +1,18 @@
 // The "diff view" request at the handler: it registers each
 // nonempty buffer as a view of the diff view, answers an empty
 // buffer with '(empty . t)', and the graph straddle is dropped when the
-// last such view closes. A rerender-all writes back the straddle it
+// last such view closes. A buffer's answer carries the readiness
+// summary its save would. A rerender-all writes back the straddle it
 // brought up to date.
 
 use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
-use crate::git_fixture::{Fixture, everything_written};
+use crate::git_fixture::{Fixture, everything_written, save_view};
 use crate::pruned_change_view::common::{open_all_changes_buffer, with_fixture};
 
 use skg::graph_straddle::types::GraphStraddle;
+use skg::serve::handlers::save_buffer::SaveResponse;
+use skg::serve::util::sexp_to_client_string;
+use skg::test_utils::extract_string_field_from_sexp;
 use skg::serve::handlers::close_view::handle_close_view_request;
 use skg::serve::handlers::rerender_all_views::handle_rerender_all_views_request;
 use skg::serve::handlers::diff_view::handle_diffView_request;
@@ -67,6 +71,31 @@ fn a_request_registers_its_buffer_and_the_last_close_drops_the_straddle (
       &mut stream, "((request . \"close view\") (view-id . \"diff-view-1\"))\n",
       &mut f . views_state );
     assert! ( f . views_state . graph_straddle . is_none () );
+    Ok (( )) }) }
+
+/// The answer to a buffer's request ends with the readiness summary
+/// that saving the buffer unchanged reports, so a client need not save
+/// to learn it.
+#[test]
+fn a_buffers_answer_carries_the_readiness_summary_of_its_save (
+) -> Result<(), Box<dyn Error>> {
+  with_fixture ("sets", &["main"], |f| {
+    let (response, _registered) : (String, bool) = request_all_changes (f) ?;
+    let payload : &str = &response [ response . find ("((") . unwrap () .. ];
+    let content : String = extract_string_field_from_sexp (payload, "content")
+      . expect ("the buffer's answer has content");
+    let saved : SaveResponse = save_view (
+      f, &ViewforestId::ContentView ("diff-view-1" . to_string ()), &content ) ?;
+    let summary_of_the_save : String = sexp_to_client_string (
+      &saved . readiness_summary
+        . expect ("a save of a buffer of the diff view reports its summary")
+        . to_sexp () );
+    assert! ( summary_of_the_save . starts_with ("(readiness-summary (ready 0)"),
+              "{}", summary_of_the_save );
+    assert! ( payload . trim_end () . ends_with (
+                &format! ( "{})", summary_of_the_save )),
+              "the answer:\n{}\nthe save's summary:\n{}",
+              payload, summary_of_the_save );
     Ok (( )) }) }
 
 #[test]

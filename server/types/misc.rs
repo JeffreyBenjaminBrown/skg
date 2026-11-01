@@ -244,11 +244,34 @@ pub struct SkgConfig {
 
   #[serde(default = "default_max_roleTree_depth")]
   pub max_roleTree_depth : usize, // Max BFS depth for full containerward role tree.
+
+  #[serde (default)]
+  pub readiness_marks_file : Option<PathBuf>, // The readiness store's file, as the config states it; see 'readiness_marks_path'.
 }
 
 impl SkgConfig {
   pub fn logs_dir ( &self ) -> PathBuf {
-    self . data_root . join ("logs") } }
+    self . data_root . join ("logs") }
+
+  /// The readiness store's file: 'readiness_marks_file' resolved
+  /// against the data root, or else 'readiness-marks-STEM.json' in the
+  /// data root, STEM the config file's name without its extension, so
+  /// that servers over one data root keep separate marks.
+  /// 'config_path' is canonical, so a symlink to a config file shares
+  /// that file's marks. A config read from no file (a test's) uses the
+  /// stem of the default config file, 'skgconfig'.
+  pub fn readiness_marks_path (
+    &self,
+  ) -> PathBuf {
+    match &self . readiness_marks_file {
+      Some (stated) => self . data_root . join (stated),
+      None => {
+        let stem : String =
+          self . config_path . file_stem ()
+          . map ( |stem| stem . to_string_lossy () . to_string () )
+          . unwrap_or_else ( || "skgconfig" . to_string () );
+        self . data_root . join (
+          format! ("readiness-marks-{}.json", stem) ) }, }} }
 
 /// Each skgrepo has a unique name, defined in the SkgConfig,
 /// used in Viewnode metadata to track provenance.
@@ -461,7 +484,8 @@ impl SkgConfig {
       initial_node_limit : DEFAULT_INITIAL_NODE_LIMIT,
       timing_log         : false,
       beep_when_server_becomes_available : false,
-      max_roleTree_depth : default_max_roleTree_depth(), }}
+      max_roleTree_depth : default_max_roleTree_depth(),
+      readiness_marks_file : None, }}
 
   /// Creates a SkgConfig with a test-specific Tantivy folder.
   pub fn fromSkgreposAndTantivyFolder (
@@ -479,7 +503,8 @@ impl SkgConfig {
       initial_node_limit : DEFAULT_INITIAL_NODE_LIMIT,
       timing_log         : false,
       beep_when_server_becomes_available : false,
-      max_roleTree_depth : default_max_roleTree_depth(), }}
+      max_roleTree_depth : default_max_roleTree_depth(),
+      readiness_marks_file : None, }}
 
   pub fn skgrepo_is_owned (
     &self,

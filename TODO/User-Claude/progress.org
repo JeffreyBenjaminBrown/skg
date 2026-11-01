@@ -896,3 +896,100 @@ anyway. Is a command wanted?
 The server rewrites it, the stage-and-commit stages only '.skg'
 files, so it stays modified in 'first' after every commit. Should
 stage-and-commit include it, or git ignore it?
+* After the diff-view slice: per-config marks, the diff view's summary, 'integrate': DONE, uncommitted
+** The readiness marks file is per config
+'SkgConfig::readiness_marks_path' ('server/types/misc.rs') names the
+store's file: the optional top-level key 'readiness_marks_file',
+resolved against the data root, or else
+'<data_root>/readiness-marks-STEM.json', STEM the stem of the
+canonical 'config_path'. So Jeff's server (started with the symlink
+'data/skgconfig.toml' or with 'data/skgconfig-jeff.toml') uses
+'data/readiness-marks-skgconfig-jeff.json', and User's
+'data/readiness-marks-skgconfig-user-claude.json'. 'ReadinessStore'
+'load' and 'save' now take the file, not the data root;
+'READINESS_MARKS_FILE' and the free 'readiness_marks_path' are gone.
+The unit test 'each_config_keeps_its_own_marks_file'
+('tests/unit/readiness_store.rs') writes three configs and a symlink
+into one temp data root and checks the paths and that marks saved
+under each load back separately. api-and-formats (the Fields table,
+"Readiness marks file"), diff-view.org, the glossary and both
+COMMANDS files say where the file is.
+*** No old file to leave
+There was no 'data/readiness-marks.json' when this ran, so nothing was
+migrated or left behind. Should one reappear (from a server built
+before this change), the servers no longer read it; Jeff may delete it,
+or rename it to 'readiness-marks-skgconfig-jeff.json' to keep its marks.
+*** The file sits in the data root, not beside the canonical config
+The stem comes from the canonical config path, but the file is joined
+to the data root (the directory of the path the server was given).
+The two differ only for a symlink into another directory. Joining to
+the data root keeps tests that replace 'data_root' with a temp folder
+from writing marks beside a fixture's config.
+*** A config read from no file
+'dummyFromSkgrepos' and 'fromSkgreposAndTantivyFolder' have an empty
+'config_path'; for them the stem is 'skgconfig'.
+*** Three test files read the data root as the marks file
+'tests/readiness_requests.rs', 'tests/diff_view/roundtrip/view.rs' and
+'tests/pruned_change_view/stage_and_commit.rs' called
+'ReadinessStore::load (&f . config . data_root)', which still
+compiles once 'load' takes a path ('&PathBuf' is a '&Path'), and read
+the folder as an empty store: two failed, and the stage-and-commit
+assertion of an empty store passed vacuously. They now load
+'readiness_marks_path ()'.
+** The diff view's answer carries the readiness summary
+'handle_diffView_request' computes 'buffer_readiness_summary_for' over
+the buffer it drew (after releasing the store's lock, which that
+function takes again) and answers
+'((content ...) (errors ()) (warnings ()) (rendered-at "N") (readiness-summary ...))',
+the save's order. An '(empty . t)' answer carries none. Test:
+'a_buffers_answer_carries_the_readiness_summary_of_its_save'
+('tests/pruned_change_view/request.rs') compares the answer's summary
+with that of saving the buffer unchanged.
+
+Neither client needed a change: both ignore the extra entry, and
+neither saved a buffer to learn the summary; they show it only after
+a save, C-c r u and an unconfirmed commit, as before. Whether they
+should also show it when the diff view opens is open below.
+
+'skg_for_ai.py diff' reads the summary from the answer;
+'diff_view_with_readiness_summary' (the unchanged save) is gone. The
+expected files did not change.
+** 'integrate' in the tool
+'integrate SIDECAR' sends "integrate unshown changes" for a diff
+buffer's view ID, reads the rerender stream to its 'rerender-done',
+and writes the 'rerender-view' for that ID over the three files. It
+prints "Before integrating: SUMMARY" and "Integrated: SUMMARY".
+
+The server integrates the viewforest it registered under the view ID,
+and the tool's connection is new. So it first registers the buffer
+kind under the sidecar's view ID (as 'save' does, through
+'register_diff_view_buffer', renamed from
+'register_diff_view_buffer_for_save' since both use it), then saves
+the full view back unchanged, so that the server holds this buffer
+(its roots, what it makes editable) and not a fresh one, which would
+already make every change editable. That save gives the "before"
+summary. It refuses a compact view with edits, as a client refuses a
+modified buffer.
+
+The test case 'check_integrating_unshown_changes' runs after the
+confirmed commit: it retitles the root, writes the diff view (its
+child 'First child, renamed' drawn write-protected, without content),
+retitles that child's child 'A new grandchild' through a content
+view, and expects "1 changes are not editable" before and none after
+integrating; the child and the grandchild lose 'writeProtected', the
+grandchild is drawn with its 'oldText title', and a save of the diff
+buffer retitles it again.
+*** It cannot integrate a change to a write-protected occurrence
+The case the plan described first, a change to a node the buffer
+shows write-protected, cannot work in the tool: its full view still
+has the old text, and the server refuses the unchanged save
+("Write-protected occurrence differs from the graph"). A client's
+buffer would have been rerendered by then. The tool refuses with a
+message saying to run 'diff' again, which makes every change
+editable. The test uses a change to a node the buffer does not show,
+under a write-protected one, instead.
+** Open questions
+*** Should the clients show the readiness summary on opening the diff view?
+The answer carries it now; showing it would need one line in each
+client's diff view handler. Today they show it only after a save,
+C-c r u and an unconfirmed commit.

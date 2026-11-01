@@ -2070,7 +2070,9 @@ does, and none when both do. A view shows it as
 
 **** fingerprint, the readiness store
 
-Marks are stored in '<data_root>/readiness-marks.json', each with a
+Marks are stored in the server's readiness marks file
+('<data_root>/readiness-marks-CONFIGSTEM.json' unless the config names
+another; 'docs/api-and-formats.org', "Readiness marks file"), each with a
 *fingerprint* of the change it approved. A mark whose fingerprint no
 longer matches the change counts as absent, which is how editing a
 marked change unmarks it.

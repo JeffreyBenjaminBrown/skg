@@ -153,7 +153,7 @@ pub fn stage_and_commit (
       let mut store : MutexGuard<ReadinessStore> =
         env . runtime . lock_readiness_store ();
       store . drop_marks_of_vanished_leaves (rebuilt . change_leaves ());
-      if let Err (e) = store . save (&runtime . config . data_root) {
+      if let Err (e) = store . save ( &runtime . config . readiness_marks_path () ) {
         errors . push ( format! (
           "The readiness marks were not written to disk: {}", e )); }}, }
   StageAndCommitAnswer::Committed { outcomes, errors } }

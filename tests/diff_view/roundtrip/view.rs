@@ -249,7 +249,7 @@ fn readiness_requests_on_the_new_viewnodes_name_their_leaves (
         recorder : ID::from ("p"), member : ID::from ("gone") },
       aspect       : RelationshipAspect::Existence };
     assert_eq! (
-      ReadinessStore::load (&f . config . data_root) . marks
+      ReadinessStore::load ( &f . config . readiness_marks_path () ) . marks
         . into_keys () . collect::<HashSet<LeafKey>> (),
       [ LeafKey::Node { pid : ID::from ("a"), aspect : NodeAspect::Text },
         LeafKey::Node { pid : ID::from ("gone"), aspect : NodeAspect::Existence } ]
@@ -263,7 +263,7 @@ fn readiness_requests_on_the_new_viewnodes_name_their_leaves (
         "(changesetMarker content))",
         "(changesetMarker content) (editRequest (ready all)))", 1 )) ?;
     assert! ( response . errors . is_empty (), "{:?}", response . errors );
-    assert! ( ReadinessStore::load (&f . config . data_root) . marks
+    assert! ( ReadinessStore::load ( &f . config . readiness_marks_path () ) . marks
               . contains_key (&p_contains_gone) );
     Ok (( )) }) }
 

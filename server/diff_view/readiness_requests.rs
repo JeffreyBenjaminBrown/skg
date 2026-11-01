@@ -72,7 +72,7 @@ pub fn consume_readiness_requests (
     env . runtime . lock_readiness_store ();
   let mut warnings : Vec<String> =
     apply_readiness_requests (&requests, straddle . change_leaves (), &mut store);
-  if let Err (e) = store . save (&runtime . config . data_root) {
+  if let Err (e) = store . save ( &runtime . config . readiness_marks_path () ) {
     warnings . push ( format! (
       "The readiness marks were applied but not written to disk: {}", e )); }
   warnings }

@@ -61,6 +61,10 @@ committing".
 
 'save SIDECAR' saves an edited compact view; see "Writing".
 
+'integrate SIDECAR' makes editable, in a buffer of the diff view, the
+changes it does not make editable, as the clients' 'C-c r u' does,
+and writes the buffer again; see "Reviewing and committing".
+
 'commit MESSAGE' stages and git-commits every change in the owned
 skgrepos with MESSAGE, asking first when not everything is marked
 ready; see "Reviewing and committing".
@@ -95,7 +99,8 @@ tool answers with the empty one, leaving those links unresolved.
 '--preview-only' cancels instead of applying. It prints the responses
 as 'raw' does.
 
-Options, after the command: '--port N' for every command; '--yes' for
+Options, after the command: '--port N' for every command ('save' and
+'integrate' require the sidecar's); '--yes' for
 'save' and 'commit'; for the view commands also '--out-dir DIR', '--name BASE' to name the files
 'BASE.full.org' and so on instead of 'COMMAND_ARGUMENT', and
 '--no-summary' to leave the summary out of the compact view.
@@ -304,7 +309,12 @@ with the text expected, marks the new child 'ready' and sees it ready
 in a fresh 'diff', checks the question before an 'unready' of two
 changes, commits unconfirmed (nothing happens), restores the deleted
 node with 'restoreNode', commits with '--yes' and reads 'git log' and
-an empty diff view, and checks that a blank message is refused.
+an empty diff view. Then it retitles the root, writes the diff view
+(the root's first child write-protected in it), retitles that child's
+new child through a content view, runs 'integrate' on the diff buffer
+and checks its output, that the child and the grandchild are now
+editable there, and that a save of the buffer retitles the grandchild
+again. Last, it checks that a blank commit message is refused.
 
 It prints PASS or each failure, and keeps the scratch files when
 something fails. '--update-expected' rewrites the expected
@@ -502,6 +512,30 @@ s l' do. 'restoreNode' on a ghost writes the deleted node back as
 HEAD has it, and back into each list that named it at HEAD. 'restoreRel' on a
 removed membership (a '~-' member) puts it back in its list, where
 HEAD had it. The server refuses either anywhere else.
+** Integrating changes the buffer does not make editable
+A buffer of the diff view makes a change editable where it holds an
+editable occurrence of the node that records it. A fresh buffer
+('diff') makes every change editable, but a save makes nothing
+editable and adds no root, so a change made since (by another view's
+save, or by this save itself) may not be editable in the buffer the
+save writes. The readiness summary then says "N changes are not
+editable in this buffer".
+
+'integrate SIDECAR' makes them editable, as the clients' 'C-c r u'
+does: the server makes each changed node editable at its first
+occurrence in the buffer (drawing its body and content), and appends
+as roots the origins of changes the buffer shows nowhere. It refuses
+a compact view with edits (save them first, as a client refuses a
+buffer with unsaved changes), prints the readiness summary before and
+after, and writes the server's rerendered buffer over the three files.
+#+begin_example
+python3 tools/skg-for-ai/skg_for_ai.py integrate DIR/diff_all-changes.view.json
+#+end_example
+The server integrates the buffer it holds under the view ID, so the
+tool first opens the buffer again under that ID and saves the full
+view back unchanged (which writes nothing). The server refuses that
+save when a node the buffer shows has changed since it was written;
+'diff' then gives a fresh buffer, in which every change is editable.
 ** Committing
 'commit MESSAGE' sends "stage and commit". The server stages every
 changed '.skg' file of every owned skgrepo, deletions included, and
@@ -524,11 +558,10 @@ User Claude's server ('data/skgconfig-user-claude.toml'), only the
 owned repo 'first' can show changes or be committed.
 ** How it talks to the server
 The server keeps the diff view's buffers, and the comparison behind
-them, per connection, and its answer to "diff view" carries no
-readiness summary. So 'diff' opens one connection, requests the
-buffers in the clients' order, saves each nonempty buffer unchanged
-(it saves back to itself and writes nothing) to get the summary, and
-writes the save's rendering. A later 'save' of a diff buffer first
-requests that buffer again under the sidecar's view ID on its own
-connection, so that the server re-renders the save as a buffer of the
-diff view, with the readiness summary.
+them, per connection. 'diff' opens one connection, requests the
+buffers in the clients' order, and writes each nonempty one, with the
+readiness summary the server's answer carries. A later 'save' or
+'integrate' of a diff buffer first requests that buffer again under
+the sidecar's view ID on its own connection, so that the server
+re-renders it as a buffer of the diff view, with the readiness
+summary.
