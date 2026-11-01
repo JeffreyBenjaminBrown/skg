@@ -216,6 +216,45 @@ fn subscriberFolder_style_inbound_gates_privately_recorded_subscription (
       Ok (( )) } )) }
 
 #[test]
+fn default_subscribeeFolder_requires_an_active_subscription_edge (
+) -> Result<(), Box<dyn Error>> {
+  run_with_source_set_test_db (
+    "skg-test-leak-battery-default-subscribee-folder",
+    "tests/leak_battery/fixtures/skgconfig.toml",
+    "/tmp/tantivy-test-leak-battery-default-subscribee-folder",
+    |config, tantivy| Box::pin ( async move {
+      let public : ActiveSourceSet =
+        ActiveSourceSet::named (config, SourceSetName::from ("public"))?;
+      let all : ActiveSourceSet =
+        ActiveSourceSet::named (config, SourceSetName::from ("all"))?;
+
+      // S and C are both public, but S's subscription to C is recorded
+      // only in private.  The default folder's existence must follow the
+      // edge source, not merely the visibility of its endpoints.
+      let (at_public, _pids, _tree) : (String, Vec<ID>, Tree<ViewNode>) =
+        multi_root_view_with_source_set (
+          config, Some (tantivy),
+          &[ ID::from ("S") ], false, &public ) ?;
+      assert! (
+        ! at_public . contains ("subscribeeFolder"),
+        "an inactive subscription must not leave an empty default \
+         subscribeeFolder behind:\n{}", at_public );
+
+      let (at_all, _pids, _tree) : (String, Vec<ID>, Tree<ViewNode>) =
+        multi_root_view_with_source_set (
+          config, Some (tantivy),
+          &[ ID::from ("S") ], false, &all ) ?;
+      assert! (
+        at_all . contains ("subscribeeFolder"),
+        "the active subscription must create the default folder under all:\n{}",
+        at_all );
+      assert! (
+        at_all . contains ("leak-battery-C"),
+        "the active subscription's member must render under all:\n{}",
+        at_all );
+      Ok (( )) } )) }
+
+#[test]
 fn ancestor_heralds_gate_privately_recorded_relations (
 ) -> Result<(), Box<dyn Error>> {
   run_with_source_set_test_db (

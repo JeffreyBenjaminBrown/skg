@@ -135,7 +135,7 @@ pub fn maybe_add_subscribeeFolder_branch (
     { return Ok (( )); }}
   let ( subscriber_pid, subscribee_ids ) : ( ID, Vec < ID > ) =
     pids_for_subscriber_and_its_subscribees (
-      tree, node_id, graph, config ) ?;
+      tree, node_id, graph, config, active_source_set ) ?;
   let subscriber_source : SourceName =
     read_at_node_in_tree (
       tree, node_id,
