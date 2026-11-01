@@ -123,7 +123,7 @@ C1 1/L bS ⌂:fred⟩'. Every view gets it, the diff view included.
 I don't know if this applies to you, but I have noticed other LLMs
 can lose the plot deep in an org tree. skg-view-ancestry
 is a convenient way to immediately see where you are.
-*** User : yes, in a cheaper form
+*** TODO Jeff : User's reply: yes, in a cheaper form
 I read a compact view whole, so I rarely lose my place inside it; where
 I lose the plot is at its root: a search hit or a linked node arrives
 without its surroundings. So the tool will gain the equivalent as a
