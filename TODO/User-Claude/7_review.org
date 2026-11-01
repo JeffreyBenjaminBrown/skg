@@ -1,7 +1,5 @@
 #+title: User Claude: what a handle is, and why it kept changing
 
-* TODO Jeff : read this one; it answers "what do you mean by handle"
-
 * The two files the tool writes for every view
 When I ask 'tools/skg-for-ai' for a view, it asks the server for the
 same buffer Emacs would get, and writes it to disk unchanged as the
@@ -19,7 +17,26 @@ mark put at the end of the headline instead. The same line reads
 That mark, between the angle brackets, is what I have been calling the
 handle. I read and edit the compact view; the tool uses the handle to
 find the headline's metadata in the full view again when I save.
+** TODO [jeff] Is that a natural bundling?
+It's all metadata. The author and the counts are heralds.
+The vnid is uniquely not visible to a human user,
+ but I guess it has to be to you.
 
+I suppose it's not of much consequence; you'll understand what you're looking at.
+Or I think you will. The different heralds inside the angle brackets
+can't be confused with each other, right? (I think not;
+the vnid is lowercase, the others uppercase.)
+*** TODO Jeff : User: natural enough, and yes, unconfusable in practice
+It is all metadata, agreed; the bundling is "everything I need from the
+metadata, nothing I don't". The vnid is first, always, and is base-36
+lowercase ('0c', '1q'). Heralds are uppercase letters with digits and
+lowercase ancestor flags ('aC10', '2aS', '1/2L'), glyphs ('☮', '⟳'), or
+labelled words ('⌂:public', folder labels). The only other lowercase-
+only tokens are the request words ('delete', 'ready', ...) and 'folded',
+which are known words in a known place after the ID. A vnid could spell
+one of them only in a view with tens of thousands of headlines; the tool
+refuses the one case that matters ('new'). So I read a handle as
+"ID, then facts, then my requests", and have not yet misread one.
 * What is inside a handle
 ** First, the headline's identity: the viewnode ID
 The first thing in the handle is the headline's viewnode ID, exactly as
