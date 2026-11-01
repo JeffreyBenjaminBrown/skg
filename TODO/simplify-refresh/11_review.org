@@ -1,0 +1,1521 @@
+#+title: Review of plan 10, 2026-10-31
+
+* Verdict
+The plan did what it set out to do. Seven slices in four hours,
+31 commits, every suite green at every slice's end but the one
+failure older than the plan, eleven entries of the problems file
+closed, the data loss of plan 08's review gone in every variant
+the probes drove, the buffer corrections gone with their
+machinery, the three defects of the review's tests fixed, nine
+writes of the skgrepo restriction refused or floored and a tenth
+found and refused by the slice itself, one encoding of the
+skgrepo restriction with no 'Option' and no reserved set, the
+parser one match per kind over the table, the tidy's thirty-odd
+items done in nine commits, and the docs and glossary brought to
+the new words with a reader's pass. The reviewers grade most of
+plan 08's findings fixed: of its eighty-odd items, about fifty
+fixed, the rest in part or moot by decision. What needs work the
+review found by running: an explicit fork copies a restricted
+graphnode's title and body into a visible clone and publishes
+text stored below home with no Hoist confirmation; a connection
+narrowed before a config reload shows a skgrepo the reload
+added; a strandeds raise creates a restricted record and a
+pasted member rewrites a private file (two entries slice 2 filed
+as traced); two advisory reads and four refusals tell of
+restricted homes; Neovim's dispatcher hides a bug's traceback and
+swallows the fork's refusals (Decide 1, 2, 3, 7). Beside them,
+two glossary sentences false since slice 0 that no reader caught,
+the words' residue where phrases broke across lines, the save's
+confirmation plumbing that slice 2 copied once more, and
+twenty-two behaviors with no test. Every fix the reports name is
+cheap but one (the weave's rewrite of restricted sections, which
+I recommend documenting). Decide 1 to 3 and 7 are the corrective
+slice; 4 to 10 are your judgments on what the slices did beyond
+the plan; 11 to 18 are the next words, tidy, docs and tests.
+
+* What I checked myself
+** The launches and the record
+I launched each of the seven slices as one Opus agent at high
+effort, with the runner's prompt, the context carried forward,
+the suites, Jeff's dirty and untracked files, the record's shape
+and the word rules, as 'coding-advice/orchestration.org' says,
+and read each report, the commits, the plan's keyword and the
+record before the next launch. Five slices got a "Corrections
+carried from slice N" stage from the findings of a slice before
+(slices 2, 3, 4, 5 and 6). Every orchestrator's note in
+'progress.org' gives the launch and report times and the
+agent's tokens. No slice stopped and no condition of
+'when-to-stop.org' arose; one session ended with Jeff's restart
+while slice 2 worked, with nothing committed and the final tree
+in flight, and the same agent was resumed with its context, as
+'orchestration.org' says to; it found the tree one commit
+behind its own split and restored a file it had emptied.
+** The central code
+I read 'server/skgrepo_sets.rs' in full (the type with its
+three fields, the two questions sharing 'keeps_out',
+'is_unrestricted' as "keeps none out", 'require_unrestricted');
+the walk's warrant, orphan, claims, hides-folder and vanish
+functions ('set_warrants' to 'vanish' in
+'server/refresh/visit.rs'); the ID rule's header, its answer
+type, 'WhereTheHeadlineStands' and 'id_rule' in
+'server/refresh/id_rule.rs'; 'DeleteFrom' and the delete
+propagation's cleanup in 'server/save.rs', with the handler's
+reading of the choice and the confirmation's payload in
+'server/serve/handlers/save_buffer.rs'; the parser's
+'NamedKind', 'parts_the_table_leaves_out', 'takes_part',
+'WrittenParts', 'edit_request_refusal' and
+'kind_with_its_parts' in 'server/serve/parse_metadata_sexp.rs';
+and the Emacs save's threading of the delete-from choice. Each
+does what its record says. Two things I noticed are in Decide:
+the hides folder keeps a member whose hide the skgrepo
+restriction keeps out, unwarranted, where every other such
+member vanishes (Decide 4); and the cleanup's parameter
+'restricted_records_left' is a skgrepo restriction whose
+unrestricted value means "strip everything", a name that says
+the opposite of its type (Decide 12).
+** The docs' statement of the model
+The glossary's entries "the subscribee-visibility step",
+"vanish", "ghost, unknown viewnode", "unknown graphnode,
+dangling ID", "record, restricted, visible" and "restricted
+viewnode" say what the code I read does, name the functions,
+and mark the plan's terms as plan 10's. The vanish entry gives
+the two reasons and what does not vanish; the restricted
+viewnode entry's last paragraph states from the plan, not from
+a run, that the folders under a restricted root stay
+tombstones after a skgrepo widening (the probes report says
+whether that holds).
+** The suites, by the record
+Every slice's record gives 'cargo check --all-targets' clean,
+nextest green, and the client and integration scripts as the
+plan asked, with every failure met classified: nineteen
+expected fixture adaptations (slices 2, 5 and 6), five bugs of
+the agents' own fixed before the commit (one in slice 2, three
+in slice 5, one in slice 6), one environment problem (the build
+cache after the break), and the one pre-existing integration
+failure, 'import-md-and-org', at every run; slices 0, 1, 3 and
+4 met none. Slice 6 ran
+'bash/all-tests.sh': 70 of 72 integration runs, the two
+failures that one. The counts grew from 1026 nextest tests
+before the plan to 1068, from 407 Emacs tests to 420, from 446
+Neovim passes to 463.
+
+* Results
+** The run
+Seven slices in four hours and four minutes of wall time (04:10
+to 08:14 UTC, 2026-10-31), 31 commits (24 by the slices, 7 by the
+orchestrator, the last closing the run), every slice DONE at its
+first report, one session break (Jeff's restart, during slice 2),
+no stop. Every entry the plan's "Verification and completion"
+names has moved to 'TODO/DONE/problems.org'.
+** Durations, launched to report, in minutes
+*** slice 0, the vanishing child and the end of corrections: 38
+*** slice 1, the three defects of the review's tests: 19
+*** slice 2, every write obeys the skgrepo restriction: 42
+Of which about four minutes after the restart; the first leg's
+length is the launch to the break, about 35 minutes.
+*** slice 3, one encoding of the skgrepo restriction: 25
+*** slice 4, the parser's natural shape: 18
+*** slice 5, the tidy: 52
+*** slice 6, the docs and the glossary: 29
+*** total: 3 hours 43 minutes of agent time
+In 4 hours 4 minutes of wall time; the gaps are my triage
+between slices, two to eight minutes each.
+** Counts
+*** the range
+313 files changed, 12,471 lines added and 8,090 removed,
+'TODO/' included; the seven orchestrator commits add 396 lines
+of notes and corrections.
+*** the tests
+42 nextest tests more (1026 to 1068; twelve went with the
+corrections in slice 0), 13 Emacs tests more (407 to 420), 17
+Neovim passes more (446 to 463); the integration suites
+unchanged at 35 of 36 with either client.
+*** the agents' tokens
+About 3.06 million tokens and 1,234 tool uses over the seven
+slices, without slice 2's first leg, whose count the break
+lost: 549k, 319k, 486k (the second leg), 425k, 276k, 578k and
+428k.
+** The commit rule
+Every slice's last code commit carried its docs and its
+keyword, and no slice made a separate commit for them. Slice 4
+made one commit for the whole slice, since its type change
+broke every reader of the parse at once and no smaller step
+compiled; it said so. Slice 5 committed per group as the plan
+asked, nine commits. The twelve commits of slices 5 and 6 end
+"Co-Authored-By: Claude Opus 5.5", the model that made them,
+where the brief asked for the "Claude Fable 5.1" line the
+earlier slices carry; slice 6's agent did so against an
+explicit sentence of its brief (Decide 10).
+** The problems file
+Eleven entries moved to 'TODO/DONE/problems.org': the noClaim
+loss of the skgrepo widening (slice 0); the editable occurrence
+under an extra ID, the hidden-outside goal and the save that
+deleted a restricted hide (slice 1); the nine fixed writes
+under "Writes that touch what the skgrepo restriction hides",
+the strip and export under "documented" (slices 2 and 6); the
+store test's fixture copy (slice 5); and, by me, the older
+"Subscribee-as-such hides may misfire under a restricted
+skgrepo-set", which slice 1 had fixed. Seven entries filed:
+four by slice 2 (a strandeds reset moving a hide across the
+skgrepo restriction; a pasted headline reordering a restricted
+section; an explicit fork of a private graphnode named at the
+clone's home; the moved-hide warning naming restricted
+subscribees, this one by me from the agent's report) and three
+by slice 5 (a title starting "(skg" read as metadata; the diff
+view's content marker telling of a restricted record; the
+acquired folder refusing what the API doc says it accepts).
+** What the record lost
+Slice 2's first leg: its tokens and tool uses went with the
+session. Every record has every subtree the shape asks for.
+
+* Know: what the run did beyond the plan's words
+Each slice's deviations, judged sound at the time and recorded
+in 'progress.org'; the ones Jeff may want to reverse are in
+Decide, named here by number.
+** Slice 0: the vanishing child and the end of corrections
+The viewnode merge leaves the merged sibling's children to the
+result's own visit; the original is drawn before its overrider
+vanishes; one 'entombstone'; the integrate request picks its
+roots before its one refresh. The docs reached
+'docs/sharing-model.org', 'docs/nvim-client-deviations.org'
+and 'coding-advice/architecture.md', whose sentences on
+'noClaim' and tombstones were false after the slice. A
+headline typed where its parent cannot contain it (under a
+ghost whose node is back; under a subscribee shown under its
+subscriber) is saved as an orphan graphnode and warned of, as
+before, and now vanishes from the rerendered view, where it
+stayed shown with ⊥ before (Decide 5).
+*** TODO jeff
+**** explain "the original is drawn before its overrider vanishes"
+**** explain "one tombstone"
+**** never say "the inntegrate request"
+Is that in the codease or the docs that way?
+It's not clear. Say what we're integrating.
+** Slice 1: the three defects of the review's tests
+One key, 'Walk::editability_key', answers what an ID names for
+the pass before the walk, the map and the visits alike, with
+the diff view's ghost case inside it. The hidden-outside
+folder's save follows its goal, so a hide of what a subscribee
+contains only by a restricted record can be removed from the
+folder. The save tests live in a module of the 'grouped_repos'
+binary. Under a skgrepo narrowing, where the subscriber's hide
+of a graphnode is restricted and the subscribee contains it by
+a visible record, deleting that graphnode's line under the
+subscribee writes nothing and the refresh draws it again
+(Decide 5).
+** Slice 2: every write obeys the skgrepo restriction
+The delete-from confirmation comes before every other
+confirmation, since the propagation is computed before the
+strandeds; its response type is 'delete-from-confirmation'
+with a count and a prompt, and the clients append the three
+choices. The fork floors only by owned relRepos, since a
+record in a foreign section says nothing of an owned section's
+privacy. The repeated search found and the slice refused one
+write more than the plan listed: a pasted headline with an
+explicit relRepo request moved a restricted record out of its
+section. Finding 7's refusal is a validation error of its own,
+'RecordSkgrepoRestricted', ending with the fork's "Activate it
+first"; the nodeMerge's refusal takes the delete's path and is
+shown under "Database error found"; restore and readiness
+requests refuse the whole save. The tests are four new modules
+of 'grouped_repos'. The docs reached 'docs/forks.org' and
+'docs/telescopes.org'; the old doc of 'hide_skgrepo' promised a
+fallback the code never had. Deleting a restricted viewnode
+from a subscriber's content is refused when a subscribee
+contains it, since the hide it would infer floors in the
+restricted skgrepo (Decide 5).
+*** TODO jeff
+**** explain "The fork floors only by owned relRepos"
+** Slice 3: one encoding of the skgrepo restriction
+'SkgrepoRestriction' has a third field, 'kept_out', the
+config's skgrepos more private than the one shown, so a
+skgrepo the config does not name is in neither set and the two
+questions ask one field. A config naming no skgrepo gets an
+unrestricted skgrepo restriction showing the empty name
+(Decide 13). Where None used to skip a step, the step asks
+'is_unrestricted' first. The ungated accessors read the graph
+directly through 'outbound_rel_partners_for_relation' and
+'outbound_member_keys_for_relation'; 'fetch_all_graphnodestats'
+went. The display and a successful switch answer the skgrepo
+name alone, and each client builds its label from the config
+file it already reads for the prompt (Decide 13).
+'SkgrepoSetName' went, so a skgrepo may be named "all". The
+text search asks the two questions. The export shares the
+switch's prompt. The docs beyond the switch and the API doc's
+section: seven files, the export field '(repo-set . "NAME")'
+as the server reads it.
+** Slice 4: the parser's natural shape
+One commit. An occurrence's one edit request holds the relRepo
+request too ('OccurrenceEditRequest': 'OfTheNode' or
+'OfTheRelationship'), since the table has one 'editRequest'
+field. A ghost keeps its home skgrepo, which the plan's list
+omitted. A ghost without its gnid is refused, where it parsed
+to the empty gnid before (Decide 8). The table holds only the
+user's fields; 'parts_the_table_leaves_out' gives the rest per
+kind, so the table does not change. Two unpinned refusal texts
+of the ghost changed and are pinned now. Two parser-internal
+coinages, 'NamedKind' and 'WrittenParts'; 'MetadataKind::Node'
+became 'Occurrence'. The plan said the printer reads the
+table; it does not, only the conformance test checks its order
+against it (a slip of mine).
+** Slice 5: the tidy
+The agent gave the clients' group, the stream-pair copies and
+the admission-rule tests to subagents of its own and reviewed
+their work. Neovim's 'call_showing_refusal' catches every Lua
+error, so a genuine bug shows one line without its traceback
+(Decide 7). 'ParseProvenance' became 'WhatTheParseSupplied',
+not the review's 'WhatTheParseInvented', since the skgrepos
+map stays inside it. 'RelRepoLookup''s methods are
+'*_memoized'. The rule for the orphan graphnode under a
+tombstone reaches every such graphnode, not only one the user
+typed, so a root under the tombstone of a restricted root's
+containers folder shows ⊥ (Decide 6). In the hides folder a
+member the graph's hides list names by no record at all
+vanishes, so a headline typed there vanishes after its save; a
+member whose hide the skgrepo restriction keeps out stays,
+unwarranted (Decide 4). Ten names coined, listed in the
+record. Two items of tests 9 were moot and the acquired folder
+was left out of the admission rule's test, since the code
+there disagrees with the API doc (filed).
+** Slice 6: the docs and the glossary
+Where a message was false the agent made it true in code
+rather than document the falsehood: attach on a pending
+detachment says "Attached: the detachment is cancelled; the
+next save keeps this headline in its parent's list."; the
+relRepo gestures' refusal says "a delete, merge or flag request
+is pending"; detach and attach's refusal by kind says "a
+headline of this kind (KIND)"; the fork buffer's header says
+"the client prompts" (Decide 9). The export's CLI argument is
+'[skgrepo-restriction]'. 'docs/override.org' and
+'docs/sharing-model.org' were fixed beyond the list. The
+docs-only reader listed 21 items and 19 were fixed, three of
+them contradictions about a restricted view root. The grep for
+'repo-set' still hits identifiers and four comments that mean
+the set a skgrepo restriction denotes. 'coding-advice/
+code-reviews.org' says "a repo-set switch" (Decide 14). The
+unknown viewnode's herald still reads "Reference to unknown
+node.", as the plan keeps the heralds (Decide 11).
+
+* The churn ledger
+What this plan removed or rewrote of what earlier plans built,
+and what it built and rewrote within itself.
+** The buffer corrections, 2,172 lines removed
+Born 1de8fc14 (2026-10-26, plan 04.1's run), given its policy
+enum ca7a5354 and its four situations by plan 08's slice 3,
+and removed whole in 36bf809d (366 added, 2,172 removed, 68
+files), with two test files. Cause: a requirement the human
+changed with new information, Jeff's question "what if we
+reported none of them?" at the review of plan 08 (its Decide
+2).
+** The two encodings of no skgrepo restriction, 946 lines
+'Option<&SkgrepoRestriction>' and the reserved set 'all'
+('SkgrepoSetName', born 4b6aa6fb and c702796b, 2026-10-05;
+'is_all', 5b95a5b5, May 2026; 'require_skgrepo_set_all',
+f4017fa0, 2026-10-20) went in aa2e00f7 (586 added, 493
+removed, 75 files) and 85520981 (468 added, 453 removed, 53
+files). Cause: duplication the review of plan 08 found (its
+Decide 7), with the quadratic stats of plan 08's slice 3 as
+the lesson that two encodings cost.
+** The parser's flat fields, 600 lines
+'ViewnodeMetadata' carried every kind's parts flat, and plan
+08's slice 6 moved half of them into 'MetadataKind'; dbd6afa2
+(1,063 added, 600 removed) gave each kind its variant. Cause:
+a design plan 08's agent left half done and its review
+rejected (readability 9).
+** The editability account and the rerender, 1,035 lines
+Plan 08's slice 6 carried editability by the request atom and
+made 'RerenderMode' and 'RerenderRequest' (b8e5a3f5,
+2026-10-29); 017196df (476 added, 428 removed) moved the
+account into 'server/refresh/editability.rs' and ff4af8d0
+(656 added, 607 removed) made one rerender pass for the save
+and the other requests. 'RerenderRequest' survives at
+thirteen sites; the duplication report says whether it is
+redundant now. Cause: arrangement the review of plan 08 asked
+for (readability 1 and 2, duplication 6).
+** Within the plan: the hides folder's rule, three times
+Slice 5's agent wrote a rule that dropped unnamed members of any
+write-protected folder, which eleven deliberate tests refused;
+then one by the folder's goal, which the skgrepo narrowing round
+trip refused; then the rule that vanishes only a member the
+graph's hides list names by no record. No commit saw the first
+two. Cause: a mechanism built on a false belief about the
+folders, caught by the suite inside the slice.
+** Within the plan: the stage carried from slice 1
+Slice 1 left two ungated reads in 'resolve_visibility.rs' that
+slice 2 gated, and gave 'members_with_visible_records' an
+'Option' that slice 3 removed with the rest; a few lines each.
+** Totals
+About 4,750 lines removed in the six commits that rewrote
+earlier plans' code, for about 3,600 added, every item asked
+for by the review of plan 08; within the plan, no regression
+reached a commit, and one rule was written three times inside
+one slice.
+
+* Cost
+** Your time
+The review of plan 08 was handed over on the evening of
+2026-10-30 and you committed the plan at 04:09 UTC on
+2026-10-31; by your messages, about twenty rounds in between,
+most of the wall time my reprocessing passes between them.
+During the run, one message, after your restart. This review
+waits for you now.
+** The machine's time
+3 hours 43 minutes of agent time in 4 hours 4 minutes of wall
+time, about 3.06 million agent tokens and 1,234 tool uses over
+the slices, slice 2's first leg uncounted; the eight reviewers
+on top of that.
+
+* What the user sees differently
+** By decision
+No buffer correction is reported after any save or switch. A
+child the graph no longer relates to its viewparent vanishes
+with its subtree, and so does an occurrence in a content view
+whose graphnode is gone or restricted and whose viewparent's
+list does not name it, a view root included; a view whose
+roots all vanish is an empty buffer; the diff view keeps its
+ghosts. A delete whose propagation would strip records the
+skgrepo restriction keeps out stops first with "Delete from:
+(c)ancel, (v)isible records only, (a)ll owned records". The
+save refuses, naming the skgrepo, a record that would land in
+or leave a restricted section, a nodeMerge where either
+graphnode has a restricted section, a fork whose clone would
+be restricted, and, unless the connection is unrestricted, a
+restore or readiness request, the delete-references cleanup
+and an import into a restricted destination; a new hide is at
+least as private as the records that explain it; a fork's
+clone copies only visible records. The switch's prompt lists
+the skgrepo names in privacy order, the most private with
+" (no restriction)", and a successful switch or display shows
+"Skgrepo restriction: NAME"; "all" is no set's name and a
+skgrepo may be named so. The flag command's message says it
+replaced a pending relRepo request. Neovim shows every refusal
+as one line. Messages say "skgrepo restriction", "unknown
+viewnode", "unknown graphnode" and "restricted viewnode". The
+strip of body whitespace and the export are documented as
+ignoring the skgrepo restriction.
+** By accident, or unforeseen
+A headline typed where its parent cannot contain it vanishes
+after its save instead of staying with ⊥ (Decide 5). Under a
+skgrepo narrowing, deleting a line under a subscribee whose
+hide of it is restricted writes nothing and the line is drawn
+again; deleting a restricted viewnode from a subscriber's
+content is refused when a subscribee contains it (Decide 5).
+Every orphan graphnode under a tombstone shows ⊥, a root under
+the tombstone of a restricted root's containers folder
+included (Decide 6). A headline typed in the hides folder
+vanishes after its save; a member whose hide the skgrepo
+restriction keeps out stays there, unwarranted (Decide 4). A
+ghost written without its gnid is refused, and two of the
+ghost's refusal texts changed (Decide 8). Attach on a pending
+detachment says the detachment is cancelled; the relRepo
+gestures' refusal names the flag request (Decide 9). A Lua
+error in a Neovim command shows one line without its
+traceback (Decide 7). The display and switch answers carry no
+content; a config naming no skgrepo gets an unrestricted
+skgrepo restriction showing the empty name (Decide 13). A
+fork's clone floors only by owned relRepos, so a record in a
+foreign section lands at the clone's home.
+
+* The reviewers' reports
+Eight Opus agents, one question each as 'code-reviews.org'
+asks, read the range read-only and wrote their reports beside
+this file in '11_1_review-reports/' (the probes' scripts and
+exchanges in 'probe-scripts/', the throwaway tests with their
+logs in 'throwaway-tests/'). Each graded the findings of the
+review of plan 08 first; the grades are summed up under each
+heading. Every finding below is covered by an item of Decide,
+so each is marked DONE-CLAUDE with the item it lives in; you
+can read Decide and skip this section.
+** Awkwardness ('awkwardness.org')
+Of plan 08's nine findings: four fixed, one fixed by decision,
+one in part, two moot by decision, one not (the client twins'
+shapes).
+*** DONE-CLAUDE 1. The skgrepo restriction caches a config
+WHY-CLAUDE: Decide 1 (the reload) and 13. The connection
+builds its skgrepo restriction once and the rebuild request
+reloads the config without rebuilding it; since slice 3 a
+skgrepo absent from 'kept_out' is visible, so a skgrepo the
+reload adds is shown under a skgrepo narrowing. Run as lead7:
+true. 'contains_skgrepo' answers the opposite.
+*** DONE-CLAUDE 2. A save's approvals, positional
+WHY-CLAUDE: Decide 12. Six approvals, thirteen parameters, five
+'Option' confirmations, seven teardown lists per client.
+*** DONE-CLAUDE 3. A delete's propagation is derived three times
+WHY-CLAUDE: Decide 12. The count, the cleanup, and the cleanup
+again; the user's choice becomes a skgrepo restriction named
+'restricted_records_left'.
+*** DONE-CLAUDE 4. The parse's edit requests, tighter
+WHY-CLAUDE: Decide 17. 'OccurrenceEditRequest' is split back
+into the two slots 'Occurrence' keeps; the printer drops one
+silently; an alias's request reads as 'ForAnOccurrence'.
+*** DONE-CLAUDE 5. "No restriction" is computed in three places
+WHY-CLAUDE: Decide 13. The server knows 'is_unrestricted' and
+sends the name alone; each client compares it with its own
+reading of the config file.
+*** DONE-CLAUDE 6. One ID-rule answer, three outcomes
+WHY-CLAUDE: Decide 17. 'Tombstone' means a tombstone, a vanish
+or nothing by the caller; two rungs know tombstones and hides
+folders by kind.
+*** DONE-CLAUDE 7. The parser's second kind and table
+WHY-CLAUDE: Decide 17. 'NamedKind' shadows 'MetadataKind'; the
+parts a kind takes are split between the table and a Rust
+list; an element is a tuple with an empty string for "read".
+*** DONE-CLAUDE 8. Neovim cannot tell a refusal from a bug
+WHY-CLAUDE: Decide 7.
+*** DONE-CLAUDE 9. The integrate axis on the whole pass
+WHY-CLAUDE: Decide 17.
+*** DONE-CLAUDE 10. Smaller
+WHY-CLAUDE: Decide 17 (the editability map by hand, the goal
+beside the enum, the graph passed twice) and 11 ("all" on the
+wire again).
+** Duplication ('duplication.org')
+Of plan 08's twelve findings: four fixed, one fixed by
+decision, one mostly fixed, one moot, five in part.
+*** DONE-CLAUDE 1. The confirmations, copied per layer
+WHY-CLAUDE: Decide 12. The strandeds doc's "checked before every
+other confirmation" is false now.
+*** DONE-CLAUDE 2. Delete propagation computed twice
+WHY-CLAUDE: Decide 12. The two copies resolve a delete's ID
+differently.
+*** DONE-CLAUDE 3. Visible subscribee content, three ways
+WHY-CLAUDE: Decide 13. The hide inference compares raw IDs where
+the folder's goal and the hidden-outside save compare keys, so
+a member listed by an extra ID can be inside for one and
+outside for the other.
+*** DONE-CLAUDE 4. Visible records filtered at seven sites
+WHY-CLAUDE: Decide 13. 'visible_records' exists; six copies.
+*** DONE-CLAUDE 5. The looked-up relRepo's gate, four ways
+WHY-CLAUDE: Decide 13. Three hide a member whose relRepo is
+missing, the diff view shows it.
+*** DONE-CLAUDE 6. Test helpers copied in the new test modules
+WHY-CLAUDE: Decide 15.
+*** DONE-CLAUDE 7. "Is this skgrepo shown" keeps a third question
+WHY-CLAUDE: Decide 13. 'contains_skgrepo' at three sites; the
+glossary's "by nothing else" is false again.
+*** DONE-CLAUDE 8. Request atoms spelled in three places
+WHY-CLAUDE: Decide 17.
+*** DONE-CLAUDE 9. The text-release decision, three times
+WHY-CLAUDE: Decide 17.
+*** DONE-CLAUDE 10. The pre-walk pass keys the tree thrice
+WHY-CLAUDE: Decide 17.
+*** DONE-CLAUDE 11. Smaller
+WHY-CLAUDE: Decide 13 ('of_privacy_order_for_test', the empty
+config inline five times, the two gated accessors' rules) and
+17 (the rest).
+** Vocabulary and reification ('vocabulary.org')
+Of plan 08's twelve findings and its tail: six fixed, one moot,
+five in part; the reification's empty gnid fixed.
+*** DONE-CLAUDE 1. "Unrestricted", two senses
+WHY-CLAUDE: Decide 11. The connection's new sense beside the
+older sense of a skgrepo or graphnode the skgrepo restriction
+shows; "skgrepo restriction" names the setting every connection
+has and one narrower than the config.
+*** DONE-CLAUDE 2. The step named with the hides' word
+WHY-CLAUDE: Decide 11.
+*** DONE-CLAUDE 3. The new refusals use five words for "kept out"
+WHY-CLAUDE: Decide 11. "Invisible", "cannot see", "land",
+"leave", "out of sight"; "Activate it first", though no gesture
+activates a skgrepo; a bare "repo".
+*** DONE-CLAUDE 4. Old phrases the line-based greps could not see
+WHY-CLAUDE: Decide 11. "Restricted vognode" across a line break
+at three sites; "an unknown" in about twenty comments;
+"restricted node" nineteen times, one a save warning;
+"Repo-set: unavailable" in the recovery report.
+*** DONE-CLAUDE 5. "Tombstone" can mean "vanish"
+WHY-CLAUDE: Decide 17.
+*** DONE-CLAUDE 6. "Vanish" in its ordinary sense beside the term
+WHY-CLAUDE: Decide 11. Four user messages and four code sites.
+*** DONE-CLAUDE 7. "Unknown viewnode ID" misreads now
+WHY-CLAUDE: Decide 11.
+*** DONE-CLAUDE 8. "Carrier" has four senses
+WHY-CLAUDE: Decide 11.
+*** DONE-CLAUDE 9. "Skgrepo-set" for the skgrepo restriction
+WHY-CLAUDE: Decide 11. Six doc passages; about ninety
+identifiers say 'skgrepo_set' of a 'SkgrepoRestriction'.
+*** DONE-CLAUDE 10. 'contains_skgrepo', a third question
+WHY-CLAUDE: Decide 13.
+*** DONE-CLAUDE 11. The parser's new types misname what they hold
+WHY-CLAUDE: Decide 17.
+*** DONE-CLAUDE 12. 'what_a_headline_becomes' has no caller
+WHY-CLAUDE: Decide 11.
+*** DONE-CLAUDE 13. Smaller
+WHY-CLAUDE: Decide 11 (the words) and 17 (the rest).
+*** DONE-CLAUDE Reification
+WHY-CLAUDE: Decide 17 (the skgRepos tuple, the kind atoms in
+four tables, the relRepo request's two encodings, the vanish
+split) and 13 (the empty name, the test helper in production,
+'RerenderMode' beside 'RefreshMode').
+** Readability and arrangement ('readability.org')
+Of plan 08's ten findings: four fixed with the nineteen stale
+comments and the two same-named methods; five in part; one
+moot. The editability module holds the whole account and is
+pointed to; the two module docs state the principle.
+*** DONE-CLAUDE 1. The vanish rule's third case, one docstring
+WHY-CLAUDE: Decide 4 and 5. The rung list, the technical model
+and the glossary omit the hides folder's member; the glossary
+still says the refresh never removes a child.
+*** DONE-CLAUDE 2. The confirmations' order, unstated by type
+WHY-CLAUDE: Decide 12.
+*** DONE-CLAUDE 3. Neovim's dispatcher hides a bug's traceback
+WHY-CLAUDE: Decide 7. A bare 'pcall'; nothing reaches the log;
+three key groups bypass it.
+*** DONE-CLAUDE 4. The table rule's edges are not findable
+WHY-CLAUDE: Decide 17. Part names in three lists; three refusal
+arms that cannot fire; the texts in four places.
+*** DONE-CLAUDE 5. Visible records filtered seven ways
+WHY-CLAUDE: Decide 13.
+*** DONE-CLAUDE 6. The two view modules' names differ
+WHY-CLAUDE: Decide 17.
+*** DONE-CLAUDE 7. Test code left in production modules
+WHY-CLAUDE: Decide 13.
+*** DONE-CLAUDE 8. The clients: parallel, but for small residue
+WHY-CLAUDE: Decide 17. Two messages apart, five twins missing
+or named apart; Emacs refuses unreadable metadata where Neovim
+raises.
+*** DONE-CLAUDE 9. Formatting in the range
+WHY-CLAUDE: Decide 17.
+*** DONE-CLAUDE 10. Smaller, and the stale doc comments
+WHY-CLAUDE: Decide 14 (the comments, the citations with no
+heading, 'architecture.md') and 17.
+** User documentation ('user-docs.org')
+Every Emacs key and every Neovim key and Ex command is
+documented under its binding and each of the 26 requests has
+its section. Of plan 08's fourteen findings: eleven fixed, two
+with a residue; three in part.
+*** DONE-CLAUDE 1. "The refresh never removes a child"
+WHY-CLAUDE: Decide 5.
+*** DONE-CLAUDE 2. "vanish" says a restricted view root vanishes
+WHY-CLAUDE: Decide 5. The ID rule keeps it as a restricted
+viewnode; "vognode" and "tombstone" omit the exception too.
+*** DONE-CLAUDE 3. The restricted root's folders, run once
+WHY-CLAUDE: Decide 6. Traced, the docs omit that restricted
+members under the tombstone vanish and that after the skgrepo
+widening an orphan graphnode under it shows ⊥.
+*** DONE-CLAUDE 4. The Neovim fork flow is the one Emacs lost
+WHY-CLAUDE: Decide 14.
+*** DONE-CLAUDE 5. Unrestricted-only refusals, not listed
+WHY-CLAUDE: Decide 14. Six commands in each COMMANDS doc.
+*** DONE-CLAUDE 6. Neovim: not every refusal is one line
+WHY-CLAUDE: Decide 7. The fork approval runs inside the
+dispatcher's error guard; its refusals go to the log and the
+approval does nothing. Confirmed by reading.
+*** DONE-CLAUDE 7. The confirmations' order, in no user doc
+WHY-CLAUDE: Decide 14.
+*** DONE-CLAUDE 8. Three refusals not under their keys
+WHY-CLAUDE: Decide 14.
+*** DONE-CLAUDE 9. Two glossary entries left half true
+WHY-CLAUDE: Decide 11 ("unrestricted") and 14 (the hides' floor).
+*** DONE-CLAUDE 10. New messages say a bare "repo"
+WHY-CLAUDE: Decide 11.
+*** DONE-CLAUDE 11. Two reads ignore the skgrepo restriction
+WHY-CLAUDE: Decide 3.
+*** DONE-CLAUDE 12. Smaller gaps, missing terms, residue
+WHY-CLAUDE: Decide 14 and 11.
+** Tests ('tests.org')
+Of plan 08's nine findings: seven fixed, one unchanged by
+decision, one in part. Twenty-two behaviors of the plan have
+no test and two are tested in part; every lead of plan 08's
+review but lead6 is in the suite.
+*** DONE-CLAUDE 1. The delete-from choice's retry chain
+WHY-CLAUDE: Decide 15. Emacs tests the strandeds retry alone,
+Neovim none.
+*** DONE-CLAUDE 2. Delete-from never crosses the wire
+WHY-CLAUDE: Decide 15. A misspelt "visible" passes every suite.
+*** DONE-CLAUDE 3. What "visible" shows; the order
+WHY-CLAUDE: Decide 15.
+*** DONE-CLAUDE 4. The list and the display, untested
+WHY-CLAUDE: Decide 15.
+*** DONE-CLAUDE 5. lead6 never joined the suite
+WHY-CLAUDE: Decide 15.
+*** DONE-CLAUDE 6 to 10. The other gaps
+WHY-CLAUDE: Decide 15 ('restoreNode' under a skgrepo narrowing,
+the hide's floor by its subscription, the behaviors seen by the
+records only, the childless tombstones, the smaller ones).
+*** DONE-CLAUDE 11. Names
+WHY-CLAUDE: Decide 11. Bare "merge", "narrowing", "widening",
+"restriction" in new names; the retired set 'all' in names;
+42 lines under 'tests/' with the old phrases, which slice 6's
+greps spared.
+** Probes and performance ('probes.org')
+Sixty-six behaviors driven: 59 as the model says, 6 differ,
+one not reachable at the wire. The data loss plan 10 set out
+to fix is gone in all five variants; no response of 916 carried
+a buffer correction. Of plan 08's four findings: two fixed and
+two of the third's three items; the rest unchanged by decision.
+*** DONE-CLAUDE 1. A strandeds raise creates a restricted record
+WHY-CLAUDE: Decide 2. Run.
+*** DONE-CLAUDE 2. A pasted member rewrites a private file
+WHY-CLAUDE: Decide 2. Run: an anchor added, a record moved,
+the line vanished, no warning.
+*** DONE-CLAUDE 3. "Never removes a child", again
+WHY-CLAUDE: Decide 5.
+*** DONE-CLAUDE 4. Typed text refused by the kind's atom
+WHY-CLAUDE: Decide 11.
+*** DONE-CLAUDE 5. "vanish" reads as if a restricted root goes
+WHY-CLAUDE: Decide 5.
+*** DONE-CLAUDE 6. A typed ghost claims unnamed
+WHY-CLAUDE: Decide 8.
+*** DONE-CLAUDE 7. No ⊥ under an unknown viewnode
+WHY-CLAUDE: Decide 6.
+*** DONE-CLAUDE 8. Wrong refusal under a root's tombstone
+WHY-CLAUDE: Decide 6.
+*** DONE-CLAUDE 9. Outside the plan: imports after a fork
+WHY-CLAUDE: Decide 18.
+*** DONE-CLAUDE Performance
+WHY-CLAUDE: nothing to decide. Nothing is built per occurrence;
+the stats pass is linear and the skgrepo narrowing costs within
+6%; the refresh, the search and the stats are at or below plan
+08's numbers; the diff view's fixed 1.7 s to open predates the
+plan and may merit a profile (Decide 18 notes it).
+** The skgrepo restriction's writes ('restriction-edits.org')
+Twenty-eight write paths enumerated: three not gated and not by
+decision (the explicit fork, the anchored weave's sections, the
+strandeds reset), the strip and the export by decision. Of
+plan 08's eleven: ten fixed, the strip by decision; two fixes
+with gaps (the fork's text; the strandeds after the landing
+check).
+*** DONE-CLAUDE 1. A fork copies a restricted graphnode's text
+WHY-CLAUDE: Decide 1. Run: a visible clone holds the restricted
+title and body; the gesture cannot reach it, a typed or pasted
+headline can.
+*** DONE-CLAUDE 2. A fork publishes text below home
+WHY-CLAUDE: Decide 1. Run, under every skgrepo restriction.
+*** DONE-CLAUDE 3. The weave rewrites restricted sections
+WHY-CLAUDE: Decide 16. Run: a swap of two visible siblings
+reordered the private records; no loss, no leak.
+*** DONE-CLAUDE 4. Two reads answer of restricted graphnodes
+WHY-CLAUDE: Decide 3.
+*** DONE-CLAUDE 5. Refusals that name a restricted home
+WHY-CLAUDE: Decide 3.
+*** DONE-CLAUDE 6. A typed hide under a restricted one vanishes
+WHY-CLAUDE: Decide 2.
+*** DONE-CLAUDE The filed entries, confirmed
+WHY-CLAUDE: Decide 2 (the strandeds, now run; the paste) and 3
+(the moved-hide warning); the explicit fork's naming of a
+private graphnode is Decide 1's case; the diff view's content
+marker is pinned by a suite test and stays filed.
+
+* The states and the words
+The two sections after this one, the open questions and Decide,
+use the states and the words below. Read this section first.
+** The states
+*** Open
+Nothing has been decided; the item ends with my recommendation.
+*** Accepted at slice N; you may reverse it
+An executing agent changed a behavior beyond the plan's words in
+slice N of plan 10; I accepted the change during the run; the
+item is your chance to reverse it.
+*** Outside the plan
+Found by the review in code the plan did not touch.
+** The words
+*** plan 10, its slices, the run, the runner
+'TODO/simplify-refresh/10_plan.org', run on 2026-10-31 as seven
+slices (0 to 6), one agent each; "slice N" names the slice whose
+agent made a change. The records are under '* Plan 10' in
+'progress.org'. The runner is the script that launches each
+slice's agent, 'bash/run-plan-slices.sh'.
+*** the reports; run, read, traced, filed
+The eight files in '11_1_review-reports/': awkwardness,
+duplication, vocabulary, readability, user-docs, tests, probes
+(with performance) and restriction-edits (the search of every
+write path against your principle that the skgrepo restriction
+limits what can be edited as well as what can be seen). "Run"
+means a reviewer drove the case against an isolated server or in
+a throwaway test and saw the result; "read" or "traced" means it
+followed the code only. "Filed" means an entry was written into
+'TODO/problems.org' for later.
+*** the throwaway tests; lead1 to lead8
+Tests written for a review and kept beside its reports with their
+logs. lead1 to lead6 were written for plan 08's review; all but
+lead6 are in the suite now. lead7 and lead8 were written for this
+review: lead7 runs the config reload of open question 1, lead8
+the hides folder of open question 2. Four more, by the
+restriction-edits reviewer, run the explicit fork of a restricted
+graphnode, the fork of text below home, the weave's rewrite of a
+restricted section and the strandeds raise; each of those four
+asserts your principle, so it fails while the finding stands and
+passes once fixed. Skg's build names its test files one by one,
+so a test file dropped into 'tests/' is not built; these tests
+run by a one-line wiring in an existing test module, or by the
+small build manifest kept beside them. When you take a finding's
+fix, its test joins the suite.
+*** the skgrepo restriction, the two questions, the third
+A connection's skgrepo restriction is one skgrepo, the most
+private shown; it denotes that skgrepo and every more public one
+(what the glossary calls the skgrepo-set), and it keeps out every
+more private skgrepo of the config. A record is restricted when
+its skgrepo is kept out, and visible otherwise. A graphnode is
+restricted when its home skgrepo is kept out; a restricted
+viewnode is the headline that stands for a restricted graphnode.
+The code asks the skgrepo restriction two questions, "is this
+record visible" and "is this graphnode restricted". A third
+question, "is this skgrepo among the ones shown", survives at
+three sites: the get-file-path request, the fork's choice of a
+clone's skgrepo, and one check in the save. For a skgrepo the
+config does not name the two questions answer visible and not
+restricted (slice 3's rule), and the third answers "not shown". A
+connection is unrestricted when its most private skgrepo shown is
+the config's most private; the clients then show that skgrepo's
+name with " (no restriction)" appended. Slice 3 made this the one
+encoding of the skgrepo restriction, in place of two (a set named
+'all' and the absence of a set); "the one encoding" below means
+that work.
+*** the rebuild request
+'skg-rebuild-session-lifetime-stores' (by M-x;
+':SkgRebuildSessionLifetimeStores' in Neovim) reloads the config
+and the graph from disk for every connection.
+*** the explicit fork, the implicit fork, the clone
+A fork makes a clone of a graphnode: a new graphnode that
+subscribes to and overrides the original and copies its title and
+body. The explicit fork is asked by the user, by the fork command
+('skg-fork-node', 'C-c m f'; '<localleader>mf' in Neovim) or by a
+fork request written by hand into a headline's metadata (the
+wire's '(viewRequests fork)'); the save then shows the fork-
+confirmation buffer and asks for approval, in Neovim with the
+question "Fork the listed node(s)?". The implicit fork is the
+save's own, when the user edits a graphnode they do not own.
+*** text below home, the Hoist confirmation, the text release
+A graphnode's title or body may be stored in a section of its
+file more private than its home skgrepo; the glossary calls that
+text overPrivateText, and this review says "text below home".
+Moving such text up to the home skgrepo's section is the
+glossary's Hoist repair; a save that would make that repair stops
+first with the Hoist confirmation, which asks whether to. The
+text-release confirmation is the save's other question about such
+text: whether to include it or keep it withheld where the save
+would publish it.
+*** the strandeds, the raise, the reset
+After a save moves a graphnode's home or drops a subscription, a
+hide or other relationship may be left recorded in a skgrepo more
+private than its new default; such a relationship is stranded.
+The save moves some to their new skgrepo itself (a strandeds
+raise) and lists the rest in the strandeds confirmation, where
+the user may reset them to their new defaults.
+*** the anchored weave
+A private section of a graphnode's file stores its contains and
+subscribesTo records as runs: short lists, each placed after a
+placement anchor (the glossary's word) that names a more public
+member, so that the private members keep their place among the
+public ones. When a save rewrites the public list, it weaves each
+private run back in after the anchor it followed.
+*** land, the landing check
+A record lands in a skgrepo when the save writes it into that
+skgrepo's section. The landing check is slice 2's check, in the
+save, that no record would land in a skgrepo the skgrepo
+restriction keeps out and none would leave one; either is
+refused, naming the skgrepo.
+*** the delete-from confirmation
+A save whose deletes would strip (remove from other graphnodes'
+lists) records the skgrepo restriction keeps out stops with
+"Delete from: (c)ancel, (v)isible records only, (a)ll owned
+records" (slice 2); the owned records are those in the user's own
+skgrepos.
+*** the two advisory reads
+Two requests of the wire, named in the API doc, that a client
+sends to the server before a prompt: 'relRepo info', which the
+relRepo gesture ('skg-set-relRepo', 'C-c s r'; '<localleader>sr'
+in Neovim) asks to fill its prompt's default and current skgrepo,
+and 'flag state', which the flag gesture ('skg-set-flag-search-
+matching', 'C-c s x'; '<localleader>sx') asks for a graphnode's
+home skgrepo, its flag's value and whether the user owns it.
+*** the hides folder, the hidden-outside folder
+Under an occurrence of a graphnode s, the hides folder ('skg-
+show-folderOf-hidesFromSubs', 'C-c l h'; '<localleader>lh') lists
+the graphnodes s hides from its subscribers, write-protected; the
+hidden-outside folder lists the hides of graphnodes no subscribee
+of s contains, and is editable.
+*** the switched view, the fresh view
+A switched view is a buffer drawn under one skgrepo restriction
+and refreshed after a switch to another ('skg-restrict-repo-set',
+'C-c v l'; '<localleader>vl'); a fresh view is drawn under the
+current skgrepo restriction from nothing. I take it as a rule
+that the two should show the same, since the refresh is meant to
+bring a buffer to what a fresh drawing would show.
+*** the tombstone, ⊥, the orphan graphnode, the pinned buffer
+A tombstone is a headline that stands where a folder or a
+viewnode can no longer be said, holding its children if it has
+any (a childless tombstone is pruned). ⊥ is the mark a client
+draws for a member no relationship the view can see explains (the
+server's word for it is 'noWarrant'). An orphan graphnode is a
+graphnode that no list the skgrepo restriction shows contains. A
+pinned buffer is a test's expected buffer text, compared whole.
+*** the dispatcher, the response dispatcher
+Neovim has two guards against errors. The dispatcher is the
+function every key and Ex command runs through since slice 5
+('call_showing_refusal'); it catches an error and shows its
+message as one line. The response dispatcher is the older code
+that routes each of the server's answers to its handler, inside a
+guard of its own that only logs an error; the Neovim deviations
+doc names the first and not the second.
+*** the attribution line
+The last line of a commit message, "Co-Authored-By: ...". The
+earlier slices wrote "Co-Authored-By: Claude Fable 5.1
+<noreply@anthropic.com>"; slices 5 and 6 wrote "Claude Opus 5.5",
+the name of the model that made their commits.
+*** the next tidy, the corrective slice, the post-mortem
+The next plan's slices, as item 19 proposes them: the corrective
+slice fixes the leaks and the swallowed refusals; the next tidy
+takes the cheap structural items of the reports, as plan 10's
+slice 5 took plan 08's. The post-mortem is the review of a whole
+feature that 'coding-advice/code-reviews.org' describes, done
+once the feature's behavior has stopped changing.
+*** the twins, the stats pass, the approvals
+The twins are the two clients' functions of one purpose, which
+are meant to share a name and a shape. The stats pass is the step
+of the refresh that fills the counts a headline's metadata shows,
+such as how many graphnodes contain its graphnode. A save's
+approvals are the answers to earlier confirmations (fork, Hoist,
+text release, strandeds, delete-from) that the client carries
+when it sends the save again after a confirmation; that second
+sending is a retry.
+* Open questions, answered by the review's tests
+Two leads of this review were traced through complex code and
+then run as throwaway tests (lead7 and lead8). The stories below
+are what the tests saw, told without the code.
+** 1. A skgrepo narrowing after a config reload
+*** The setup
+Two skgrepos, "public" then "private". Four graphnodes: P, a and
+S, homed in "public", and h, homed in "private". P's file says P
+contains a and S in its "public" section and contains h in its
+"private" section; P's private section also contains hc, a fifth
+graphnode homed in "private". The connection is narrowed to
+"public", so h and hc are restricted. Then, with the connection
+still open, the config file gains a third skgrepo, "secret",
+after "private". S's file moves S's home to "secret". P's file
+gains a "secret" section that contains a sixth graphnode, a2,
+homed in "public". The rebuild request runs.
+*** What the test saw
+The connection keeps its old skgrepo narrowing to "public". Under
+it, a view of P shows S by its title, with the home "secret"; it
+shows a2, by the record in P's "secret" section; and a view
+rooted at S opens. h is still drawn as a restricted viewnode and
+hc is still absent, as they were before the reload. Asked about a
+record in "secret" and about a graphnode homed in "secret", the
+two questions answer visible and not restricted. The get-file-
+path request, which asks the third question, refuses "secret"; so
+the server disagrees with its own rendering. For contrast the
+test then built a skgrepo restriction by name from the reloaded
+config, as the fix would. That one keeps "secret" out: S is drawn
+as a restricted viewnode, a2 is not drawn, and a view rooted at S
+is refused. Last, a connection with no skgrepo restriction that
+was open before the reload still answers unrestricted and shows
+everything; but it still names "private" as the config's most
+private skgrepo, where the config's most private is now "secret".
+*** What the fix does
+At every swap of the config, the server rebuilds each
+connection's skgrepo restriction by its name, so a skgrepo added
+more private than the one shown is kept out; and the third
+question is removed in favor of the two. The fix is cheap. It is
+Decide 1 (c).
+** 2. The hides folder under a skgrepo narrowing
+*** The rules in play
+Since slice 0 a member of a view whose record alone the skgrepo
+narrowing keeps out vanishes from the switched view, and the
+skgrepo widening draws it again. Since slice 5 the hides folder
+has a rule of its own: a member whose hide the graph records by
+no record at all vanishes, but a member whose hide the skgrepo
+restriction keeps out stays, unwarranted. A headline's '(relRepo
+R)' metadata names the skgrepo of the record that places it.
+*** The setup
+One skgrepo, "public", holds s, e, x and y. s subscribes to e by
+a public record, and e contains x by a public record. s's file
+has a "private" section saying s contains y and s hides x from
+its subscribers. A view of s is drawn with no skgrepo restriction
+and the hides folder is requested: x stands in the hides folder
+with '(relRepo private)', and y stands under s, also with
+'(relRepo private)'. Then the connection is narrowed to "public".
+*** What the test saw
+y's line vanished from the switched view. x's line stayed in the
+hides folder, marked ⊥, and its '(relRepo private)' was no longer
+shown. The count of hides on s's line was gone. e's count of
+unintegrated members, the members of e that s has not taken into
+its own content, went from zero to one. A save of the switched
+buffer, unchanged, wrote nothing: every file byte-identical, the
+private hide of x and the private record of y still there. After
+the skgrepo widening back to no skgrepo restriction, the buffer
+was as first drawn: x once in the hides folder, y once under s. A
+fresh view of s drawn under the same skgrepo narrowing to
+"public", with the hides folder requested, shows no hides folder
+at all and no line naming x.
+*** What it means
+No data is lost and nothing is written. But the switched view
+tells the user that s hides x, a fact only s's private section
+records, and a fresh view under the same skgrepo narrowing does
+not. If the hides folder's member followed slice 0's rule, the
+rule every other member follows (vanish, and let the skgrepo
+widening draw it again), the switched view and the fresh view
+would agree. That is the change I recommend in Decide 4.
+* Claude says: Decide
+** AWAITS 1. Three leaks of restricted text, run
+Open. Three ways a connection learns, or publishes, text the
+skgrepo restriction keeps out; each run by a throwaway test.
+*** (a) An explicit fork of a restricted graphnode
+Under the skgrepo narrowing to "public", take a graphnode p homed
+in "private", and a headline for p with a fork request written by
+hand into its metadata, typed or pasted into a view. On approval
+the save makes a new file in "public" holding p's title and body,
+subscribing to and overriding p. The fork-confirmation buffer
+shows p's title before approval.
+**** why the fork command cannot reach it
+On a restricted viewnode the fork command writes a second kind
+word into the headline's metadata, and the parse refuses a
+headline with two kinds. A typed or pasted headline has one kind
+and reaches the leak.
+*** (b) An explicit fork of text below home
+A graphnode whose title or body is text below home, forked, gives
+its clone that text with no Hoist confirmation. This happens
+under every skgrepo restriction and with none.
+**** jeff : explain "below home"
+Below in the parent-child sense?
+Below meaning more private or less private?
+Home as in home skgrepo?
+***** claude : more private than the home skgrepo
+Home is the home skgrepo. Below is the privacy order: the
+config lists the skgrepos most public first, so a more private
+skgrepo stands lower in the list. Nothing parent-child.
+****** what the phrase names
+A graphnode's title or body stored in a section of its file
+for a skgrepo more private than its home skgrepo. The glossary
+calls such text overPrivateText; "text below home" was my
+shorthand for it in this review.
+****** the case of (b), in those words
+The original's title or body is overPrivateText. The fork
+copies that text into the clone with no Hoist confirmation,
+so the clone's home skgrepo now holds, in plain sight, text
+the original kept in a more private section.
+****** the word to use
+I will replace "text below home" with the glossary's
+overPrivateText everywhere in the review when the main doc is
+free, unless you prefer the shorthand.
+******* TODO jeff : yes please
+*** (c) A config reload under a skgrepo narrowing
+A connection narrowed before a config reload shows a skgrepo the
+reload adds, even one more private than the skgrepo shown: its
+records are drawn, a graphnode homed there is drawn with its
+title, and a view of it opens. Open question 1 tells the whole
+story.
+*** suggested fixes, each cheap
+**** DONE AGREED : for (a)
+Refuse a fork request whose original the skgrepo restriction
+answers restricted.
+**** for (b)
+Take the clone's text from the section of the original's home
+skgrepo, or put the clone through the Hoist confirmation.
+***** TODO jeff : ask to confirm hoist
+**** DONE AGREED : for (c)
+Rebuild every connection's skgrepo restriction by name at every
+swap of the config, and remove the third question.
+** 2. Three writes under a skgrepo narrowing, two of them run
+Open. Three ways a save writes into, or around, a restricted
+section without asking; the first two were filed by slice 2 as
+traced, and this review ran them.
+*** (a) A strandeds raise creates a restricted record
+With three skgrepos "pub", "semi" and "priv" and the skgrepo
+narrowing to "semi", one save that drops a subscription and moves
+a graphnode y's home to "semi" created a file in "priv" holding a
+hide of y, with a warning naming "priv"; the view shows no hide.
+Run by the probes and by a throwaway test.
+*** (b) A pasted member rewrites a private file
+A headline pasted for a member whose record is restricted, with
+no relRepo request (the relRepo gesture's request, 'skg-set-
+relRepo', 'C-c s r'), rewrites the private file: an anchor is
+added to the private section and the restricted record is moved
+after it. The pasted line then vanishes from the view and nothing
+is said. Run by the probes.
+**** its twin is already refused
+The same paste with a relRepo request has been refused since
+slice 2, with "Cannot move a record out of a restricted repo".
+*** (c) A typed hide under a restricted one vanishes
+In the hidden-outside folder, a hide typed for a member that a
+restricted hide already hides vanishes after the save, with
+nothing written and nothing said. Read, not run.
+*** The fixes, each cheap
+**** for (a)
+Run the landing check after the raise, or refuse the raise there,
+naming the skgrepo.
+**** for (b) and (c)
+Refuse the paste as the paste with a relRepo request is refused;
+refuse the typed hide the same way, or warn.
+*** My recommendation
+All three fixes, in the corrective slice.
+** 3. Reads that tell of restricted records or homes
+Open. None of these leaks text; each tells the user that a
+restricted record or home exists.
+*** The two advisory reads take no skgrepo restriction
+The relRepo gesture, on a restricted viewnode or on a pasted
+headline whose member a restricted record holds, prompts with
+"default private" or "currently private", naming the restricted
+home or record. The flag gesture, on a pasted occurrence of a
+restricted graphnode, reports its home and its flag's value.
+Read; I confirmed in the code that the two handlers take no
+skgrepo restriction.
+*** Four refusals name a restricted home
+The relRepo request's floor ("this relationship's floor is
+'private'"); the flag request on a graphnode the user does not
+own; the get-file-path request; and the import's refusal when the
+file it would write already belongs to an export root.
+*** One warning names restricted subscribees
+The warning of a hide that moved into a subscribee's folder names
+the subscribees, restricted ones included. Filed by slice 2.
+*** The fix, cheap
+The two reads take the skgrepo restriction and answer nothing of
+a restricted member or record; the refusals and the warning say
+"a restricted skgrepo" in place of the name. I recommend it in
+the corrective slice.
+** 4. The hides folder keeps a member whose hide is restricted
+Accepted at slice 5; you may reverse it, and I recommend
+reversing it. Open question 2 tells the whole story.
+*** What happens
+After a skgrepo narrowing, a member of the hides folder whose
+hide only a restricted record explains stays in the switched
+view, marked ⊥ and without its '(relRepo R)'. A member of the
+content whose record is restricted vanishes (slice 0's rule), and
+a fresh view under the same skgrepo narrowing shows no hides
+folder.
+*** Why it matters, and why it does not
+The save writes nothing and the skgrepo widening draws the member
+once, so no data moves. But the switched view tells of a private
+hide, and disagrees with a fresh one.
+*** The reversal, cheap
+The hides folder's member vanishes as every other such member
+does, and the skgrepo widening draws it again.
+*** The docs, whichever way you decide
+Today the glossary's "warranted" entry and the function's own
+docstring state the hides folder's rule, while the glossary's
+"vanish" entry, the list of the refresh's rungs at the top of
+'server/refresh/visit.rs' and 'docs/data-model_technical.org'
+omit it. Those three should say the rule you choose.
+** 5. Consequences of the vanish rule, and two false sentences
+Accepted at slices 0, 1 and 2; you may reverse them, and I
+recommend keeping them. Each follows from the plan's rules; the
+probes confirmed the first and the third.
+*** First: a headline typed where its parent cannot contain it
+Under a ghost whose graphnode is back in the worktree, or under a
+subscribee's headline shown under the subscriber, such a headline
+is saved as an orphan graphnode, warned of, and vanishes from the
+rerendered view, where it stayed with ⊥ before. Slice 0.
+*** Second: deleting under a subscribee with a restricted hide
+Under a skgrepo narrowing, deleting a graphnode's line under a
+subscribee whose hide of it is restricted writes nothing, and the
+refresh draws the line again. Slice 1.
+*** Third: deleting a restricted viewnode from a subscriber
+Deleting a restricted viewnode from a subscriber's content is
+refused when a subscribee contains it, since the hide the save
+would infer belongs in the restricted skgrepo. Slice 2.
+*** Two sentences of the glossary, false since slice 0
+**** under "warranted"
+"The refresh keeps an unwarranted child where it stands; it never
+removes a child." No reader caught it.
+**** in the "vanish" entry
+"A view root included, whose node is gone or restricted": a view
+root the skgrepo narrowing keeps out does not vanish but stays as
+a restricted viewnode (the probes drove it; the glossary's
+"restricted viewnode" entry says so). The "vognode" and
+"tombstone" entries repeat the rule without that exception.
+*** The fix, cheap
+Two sentences and two entries; the docs slice.
+** 6. ⊥ on every orphan graphnode under a tombstone
+Accepted at slice 5; you may reverse it, and I recommend keeping
+the rule and completing it in two places.
+*** The rule's reach
+The plan asked that an orphan graphnode a user typed under a
+tombstone show ⊥. The rule marks every orphan graphnode under a
+tombstone. So a graphnode that is a root of the graph, standing
+under the tombstone of a restricted root's containers folder,
+shows ⊥ after the skgrepo widening, as the pinned buffers of two
+tests now say.
+*** The same gap in a third place
+An orphan graphnode under an unknown viewnode is shown without
+the ⊥ mark. Plan 08's review found the gap under a tombstone and
+under a write-protected occurrence; the probes found this one.
+*** A wrong refusal under a restricted root's tombstone
+A headline typed there is refused with "Occurrence must have a
+repo that exists in the config", though the user named no
+skgrepo.
+*** What the docs say, and leave out
+The docs say that the tombstones hold their members and stay
+tombstones after the skgrepo widening, for every restricted
+viewnode; one test checked that, for a view root's containers
+folder. Traced, two things are missing: a restricted member under
+such a tombstone vanishes rather than being held, and after the
+skgrepo widening an orphan graphnode under it shows ⊥.
+*** The fix, cheap
+The mark under an unknown viewnode, the refusal's words, two
+sentences in the docs, a test of a folder below the root.
+** 7. Neovim's dispatcher hides bugs, swallows refusals
+Open. Two faults of Neovim's error handling since slice 5; I
+confirmed each in the two Lua files.
+*** A bug shows as a refusal
+Every key and Ex command runs through the dispatcher, an error
+guard that treats every error alike and strips every "file and
+line" prefix from the message. So a genuine Lua error in a
+command (an attempt to index a missing value, say) shows as one
+line with neither traceback nor file, and nothing reaches the
+log. Emacs keeps a refusal ('user-error') apart from a bug
+('error'), which its debugger can trace.
+*** The fork's approval is swallowed
+The fork's approval (the "Yes" to "Fork the listed node(s)?")
+runs inside the response dispatcher's own guard, so its refusals
+("Pick a repo for each clone first") go to the log and the
+approval silently does nothing. A comment beside it says this was
+fixed, and the Neovim deviations doc's claim that every refusal
+shows as one line is untrue for this one.
+*** The fix, cheap
+The dispatcher logs the traceback of an error that is not a
+refusal and shortens only a refusal's message (a refusal marked
+as such, or starting with "skg:"); the fork's approval moves out
+of the response dispatcher's guard. I recommend it in the
+corrective slice.
+** 8. A ghost requires its gnid; a typed ghost claims
+Accepted at slice 4; you may reverse it, and I recommend keeping
+it. One choice is yours.
+*** The refusal
+Since slice 4 a ghost headline written without its gnid is
+refused ("A ghost requires its (gnid X)"), where before it was
+read as a ghost with an empty gnid; and two refusal texts of the
+ghost that no test pinned changed and are pinned now.
+*** The typed ghost
+The probes found that a ghost headline (the diff view's kind of
+headline) typed by hand into a content view, under an editable
+parent whose list lacks its gnid, has that gnid saved into the
+parent's list and is then drawn as an unknown viewnode: its claim
+of membership is honored, where the glossary says a ghost claims
+membership only where the list names its gnid. Rare, since a
+ghost is written by the diff view, not by hand.
+*** The choice, cheap either way
+The save ignores the typed ghost's claim of membership, or the
+glossary says a typed ghost's claim is read as written. I
+recommend ignoring the claim.
+** 9. Slice 6's messages, made true in code
+Accepted at slice 6; you may reverse them, and I recommend
+keeping them. Where a message was false the agent changed the
+code rather than document the falsehood. Each message is true now
+and the clients' tests pin the messages.
+*** attach on a pending detachment
+Attach ('skg-attach', 'C-c s a'; '<localleader>sa') says
+"Attached: the detachment is cancelled; the next save keeps this
+headline in its parent's list."
+*** the relRepo gesture's refusal
+'skg-set-relRepo' ('C-c s r') refuses with "a delete, merge or
+flag request is pending", since it also fires on a flag request.
+*** detach and attach's refusal by kind
+Detach ('skg-detach', 'C-c s t'; '<localleader>st') and attach,
+on a headline of a kind they do not take, say "a headline of this
+kind (KIND)".
+*** the fork-confirmation buffer's header
+It says "the client prompts", since Neovim prompts too. The
+Neovim COMMANDS doc that says otherwise is item 14's first
+finding.
+*** the command-line export's argument
+The server's command-line export, the companion of 'skg-export-
+some-to-org' (by M-x), names its argument for the most private
+skgrepo to export '[skgrepo-restriction]' in its usage.
+** 10. The attribution line of twelve commits
+Open.
+*** What happened
+The nine commits of slice 5 and the three of slice 6 end "Co-
+Authored-By: Claude Opus 5.5 <noreply@anthropic.com>", the name
+of the model that made them, where the brief asked for the "Co-
+Authored-By: Claude Fable 5.1" line the earlier slices carry.
+Slice 6's agent did so against an explicit sentence of its brief.
+*** Why I left them
+Rewriting twelve commits on your branch while your '.gitignore'
+and 'TODO.org' sit uncommitted is your call. The rewrite would
+change only the messages: a message filter over the range, or a
+reword rebase once you have committed or stashed those two files.
+*** Your choice, and my recommendation
+Leave them as the record of which model worked, or have me
+rewrite the trailers. I recommend leaving them, and letting the
+runner stamp the line itself from now on (Suggestions).
+** 11. The words
+Open. The vocabulary report, with the user-docs and tests
+reports, lists the residue of the plan's words; a words slice
+would take it, with checks that grep across line breaks and over
+'tests/' too. The largest items follow.
+*** Two words with two senses each
+"Unrestricted" has two senses: the connection's, slice 3's
+coinage, and the older one of a skgrepo or graphnode the skgrepo
+restriction shows, ten lines apart in the glossary. So the
+glossary says an unrestricted connection "has no skgrepo
+restriction" one sentence after saying every connection has one.
+"Skgrepo restriction" likewise names the setting every connection
+has and a setting narrower than the config.
+*** The step named with the skgrepo restriction's word
+The subscribee-visibility step, slice 1's name for the step of
+the save that rewrites a subscriber's hides from what the view
+shows of a subscribee, is named with the skgrepo restriction's
+word "visibility" though it is about hides, and the code calls it
+"visibility resolution".
+*** The new refusals' words
+They say "invisible", "a record you cannot see", "would land in",
+"would leave" and "out of sight" where the glossary's word is
+"restricted". They tell the user to "Activate it first" where no
+gesture activates a skgrepo. They say a bare "repo". Text typed
+on a restricted viewnode's line is refused as "restricted content
+cannot be edited." where the plan's words say "a restricted
+viewnode".
+*** What the greps missed
+**** phrases split across two lines
+"Restricted vognode" at three sites; "an unknown" in about twenty
+comments; "restricted node" nineteen times, one of them the save
+warning "Restricted nodes present in saved buffer remain
+unchanged in graph.".
+**** 'tests/'
+42 lines keep the old phrases, and new test names say a bare
+"merge", "narrowing", "widening" or "restriction", or carry the
+retired set name 'all'.
+*** Other words
+"Vanish" is used in its ordinary sense in four user messages
+("headline vanished before the prompt") and four code sites.
+"Carrier" has four senses: the glossary's graphnode that has an
+ID, the override check's occurrence bearing an '(overridesHere
+...)' fact, the save's "request carriers", and slice 5's "carrier
+of editability". Six doc passages say "skgrepo-set" for the
+skgrepo restriction. A function of the server that said what a
+headline becomes has had no caller since slice 0.
+*** The herald
+The herald "Reference to unknown node." plan 10 kept on purpose;
+whether it should say "unknown graphnode" is your call.
+*** My recommendation
+The words slice; and that the glossary give "unrestricted" and
+"skgrepo restriction" their two senses each, or retire one of the
+senses.
+** 12. The save's confirmations and the propagation
+Open. The awkwardness, duplication and readability reports each
+rank this shape first.
+*** The approvals ride by position
+A save's six approvals ride as positional arguments through a
+thirteen-parameter function on the server and through every
+confirmation handler of each client. The server's save answer
+holds five optional confirmations whose order only the handler's
+code states, and the doc comments of two of the five each claim
+to be checked first. Each client writes its list of terminal
+response types seven times. Slice 2 added the sixth approval, the
+delete-from choice, to every one of these places.
+*** The propagation is derived three times
+The delete's propagation (the records of other graphnodes that
+name a deleted graphnode, which the save must strip) is derived
+once to count the restricted ones for the delete-from
+confirmation, once to strip, and once more on the same save's
+instructions. The count's derivation and the cleanup's resolve a
+delete's ID differently. The user's choice becomes a skgrepo
+restriction held in a variable named 'restricted_records_left',
+whose unrestricted value means "strip everything".
+*** Cheap, and moderate
+Cheap: one propagation value built once and used for the count
+and the strip; one teardown list per client; one enum of the
+save's terminal outcomes on the server; the two false doc
+comments. Moderate: one record holding all six approvals, carried
+through the three layers in place of the six positional
+arguments.
+*** My recommendation
+The cheap parts in the next tidy; the approvals record when a
+seventh confirmation comes.
+** 13. The one encoding's residue
+Open. Item 1 (c) removes the third question; the rest of this
+item is separate, and all of it is cheap, for the next tidy.
+*** The label, computed in the wrong place
+" (no restriction)" is computed in each client from its own
+reading of the config file, where the server knows whether the
+connection is unrestricted and could say so in its answer (read).
+*** Filters and spellings
+The visible records of a list are filtered at seven sites beside
+the one helper slice 5 added. The question "is this looked-up
+record visible" is spelled four ways; three of them hide a member
+whose record's skgrepo could not be looked up, and the diff
+view's copy shows such a member. A subscriber's visible
+subscribee content is computed three ways, one of them comparing
+raw IDs where the other two resolve an extra ID to its graphnode.
+*** Three small ones
+A config naming no skgrepo gets a skgrepo restriction showing the
+empty name (slice 3's corner, repeated inline five times in
+tests); a helper that exists only for tests sits in the
+production module to reach a private field; 'RerenderMode'
+restates 'RefreshMode'.
+** 14. The docs beyond the words
+Open. Cheap; the docs slice, ending with the docs-only reader's
+pass over the glossary, as slice 6 did.
+*** The Neovim fork flow
+The Neovim COMMANDS doc still describes the fork flow the Emacs
+doc lost (set the clone's skgrepo, then approve), where Neovim
+prompts at once.
+*** Six refusals missing from their entries
+Six commands whose refusal requires an unrestricted connection
+lack that refusal in their entries, though a user meets it in the
+diff view's buffers after a switch: 'skg-stage-and-commit' ('C-c
+r c'), 'skg-diffView-integrate-unshown-changes' ('C-c r u'),
+'skg-restore-deleted-node' ('C-c s n'), 'skg-restore-removed-
+membership' ('C-c s l'), 'skg-cycle-commit-ready' ('C-c r r') and
+'skg-toggle-homeSkgrepo-move-commitReady' ('C-c r h'), and the
+Neovim commands of the same purpose.
+*** The save's confirmations
+Their order (delete-from, strandeds, Hoist, fork, the text
+release) is in the API doc only; the delete's entry does not say
+its prompt comes first; the delete, nodeMerge and fork refusals
+are not under their keys; the text-release confirmation's buttons
+are misnamed in the Neovim doc.
+*** The glossary
+Its "hides have a higher floor ... see floor below" points at a
+paragraph that never names hides. It lacks "restricted section",
+"flag request", "relRepo request", "fork-confirmation buffer",
+"raw ID", "land" and "invisible record", among others.
+*** Stale comments, each its own small fix
+The clients' save stream "ends in save-result or fork-
+confirmation" (six terminal answers now); a module said to be
+"async" that is not; three test citations pointing at headings
+that do not exist; 'coding-advice/architecture.md' saying "an
+unknown" and "a Restricted vognode"; 'coding-advice/code-
+reviews.org' saying "a repo-set switch" ('skg-restrict-repo-set',
+'C-c v l') and "a merge of siblings".
+** 15. The tests
+Open. Twenty-two behaviors of plan 10 have no test and two are
+tested in part; the tests report lists each. All cheap; a tests
+slice.
+*** The delete-from confirmation
+It is never sent over the connection in any test: the server's
+tests hand the choice straight to the save, the clients' tests
+answer hand-written server replies. So if the server's handler
+misspelt the word "visible" it reads from the client, every suite
+would still pass. Whether the choice is carried on the Hoist,
+text-release and fork retries is untested in each client, and on
+the strandeds retry in Neovim. What the view shows after "visible
+records only" (the dangling ID as an unknown viewnode), and that
+the confirmation comes before every other, are untested.
+*** The one encoding
+The list and display answers of the skgrepo restriction, a switch
+to a name the config lacks through the handler, and the clients'
+list displays have no test.
+*** Other behaviors with no test
+'restoreNode' under a skgrepo narrowing; the rule that a new hide
+is at least as private as the subscription that explains it; a
+nodeMerge where one graphnode alone has a restricted section; the
+import's refusal at approval; the hides folder's rule by a save;
+slice 6's reworded refusals.
+*** Tests waiting to join the suite
+lead6 never joined. This review's six throwaway tests join it
+when their findings are fixed.
+*** Copies
+New test files copy the "save under a skgrepo restriction
+asserting no error" helper five times and read a folder's members
+as raw text where a parsed reader exists.
+** 16. The anchored weave rewrites restricted sections
+Open. Two choices; I recommend the second.
+*** What the test saw
+Under a skgrepo narrowing, swapping two visible siblings of a
+graphnode n reordered the private records of n's file, each
+restricted run following its anchor to the anchor's new place.
+Removing a visible anchor rewrote the run that followed it so
+that it follows another. An unchanged save wrote nothing.
+*** Against the principle
+This is a write to a restricted section, against your principle
+as the glossary states it. The reviewer judged it no loss and no
+leak, but a restricted section of the worktree changes out of the
+user's sight, and a later commit shows the change.
+*** The first choice: the fix, costly
+The save would keep a restricted section verbatim whenever
+weaving the old section over the new public list gives the same
+order. The rewrite on a removed anchor cannot be avoided.
+*** The second choice: decide it and document it
+As you decided for the strip of body whitespace ('skg-strip-
+trailing-whitespace-from-bodies', by M-x, which ignores the
+skgrepo restriction by your choice): the weave may rewrite a
+restricted section, and the docs say so.
+** 17. Smaller structure, cheap
+Open. This item is for the next tidy's agent as much as for you;
+its names are the code's, and your decision is only whether the
+tidy takes them.
+*** The ID rule's answer
+The ID rule answers "tombstone" for three different outcomes (a
+tombstone, a vanish, or nothing drawn), and the caller decides
+which; the glossary calls the vanish "the ID rule's tombstone
+answer". An answer "vanish" from the rule itself would say what
+happens.
+*** The parser
+It keeps a second kind type beside the first with a second table
+of atoms; it lists the part names in three places; it has three
+refusal arms the table rule makes unreachable; it reads an
+element into a pair whose empty string means "already read"; and
+it names an alias's request as an occurrence's. An occurrence's
+one edit request is split back into the two slots the runtime's
+occurrence type keeps, and the printer, given a request in each
+slot, writes one and drops the other in silence. The kind atoms
+are spelled in four tables.
+*** The rerender and the walk
+The integrate request's setting rides the whole rerender pass
+where one view reads it; the pass before the walk keys the tree
+three times; the text-release decision is matched three times;
+the content view's and the diff view's modules mirror in their
+docs and not in their function names; the editability map is kept
+by hand at ten sites.
+*** The clients and the formatting
+The clients differ in two messages and in five twins missing or
+named apart. The formatting pass left the small faults the
+readability report lists.
+** 18. Outside the plan: two things the probes met
+Outside the plan.
+*** The import after a fork or a nodeMerge
+After any fork or nodeMerge, every import preview on that server
+('skg-import-md-and-org', by M-x; ':SkgImportMdAndOrg') answers
+"Configured repo files differ from the runtime graph; rebuild and
+preview again" until a restart, while the views render the same
+live and after a restart (run by the probes). The difference lies
+in what the import's check of disk against the runtime graph
+compares. Cheap to find.
+*** The diff view's 1.7 seconds
+A fresh buffer of the diff view takes 1.7 seconds to open
+whatever its size, 3.7 seconds on the first request (measured by
+the probes on a copy of your data): opening the diff view is the
+one wait a user notices. It predates the plan and may merit a
+profile of its git reads.
+*** Nothing else is worth optimizing
+The stats pass is linear in the number of children, a skgrepo
+narrowing costs within 6% of no skgrepo restriction, and the
+refresh and the search are at or below plan 08's numbers
+(measured the same way).
+** 19. What next
+Open. I recommend one plan of five slices, in this order.
+*** The five slices
+**** the corrective slice
+Items 1, 2, 3 and 7, the ignored claim of 8, and the reversal of
+4 if you take the reversal; with the six throwaway tests as suite
+tests. This is the slice with leaks behind it.
+**** the words: item 11
+**** the tidy: items 12, 13 and 17
+With the weave's fix of 16, if you choose the fix over
+documenting.
+**** the docs
+The two glossary sentences of 5, the two doc sentences of 6, and
+item 14.
+**** the tests: item 15
+*** The cost
+Every item the reports name is cheap, except the weave's fix
+(costly) and the approvals record of 12 (moderate).
+*** After that plan
+The post-mortem of the whole feature, since the skgrepo
+restriction's behavior has stopped changing.
+
+* Suggestions for coding-advice
+** orchestration.org: the runner stamps the attribution line
+Two of seven agents wrote the model's own name in the trailer
+against the brief. If the line matters, the runner (or a commit
+hook) should add it, not the agent's judgment.
+** orchestration.org: the checks grep across lines
+Four reports found phrases the slices' greps missed because the
+phrase broke across two lines, and 'tests/' outside the greps'
+paths. A plan's check says 'rg -U' and names every tree.
+** code-reviews.org: the throwaway tests need a harness line
+Skg names its test binaries, so a throwaway test needs a
+'#[path]' line in an existing module or the out-of-workspace
+package kept in 'throwaway-tests/lead_harness_Cargo.toml'; two
+agents adding '#[path]' lines to one module collide. Say which
+to use.
+** code-reviews.org: a filed "traced, not run" entry gets run
+Two entries slice 2 filed as traced were run by this review and
+one wrote more than filed. The slice that files an entry it did
+not run should leave the throwaway test that would run it, or
+the review's probes list should start from the problems file.
+** plans.org: a reload is a write path
+No plan listed the config reload among the paths the skgrepo
+restriction gates; the leak of Decide 1 (c) sat there. The
+write-path enumeration of 'restriction-edits.org' should name
+every swap of runtime state, not only the saves and handlers.

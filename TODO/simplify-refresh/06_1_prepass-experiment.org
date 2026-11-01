@@ -1,0 +1,243 @@
+#+title: Skipping the switch step: an experiment
+* The question
+A skgrepo-set switch runs 'convert_and_prune_for_skgrepo_switch'
+(server/update_buffer/skgrepo_switch.rs) on each open view before
+the ordinary refresh. Review item 1 in
+05_1_review-reports/duplication.org says the refresh does all of
+it already, except perhaps pruning an editable folder the step
+emptied. Which tests change when the step is skipped, and how?
+* Short answer
+- No test changes. The whole nextest suite passes with the step
+  skipped: 956 of 956, the same as the baseline.
+- The buffers do change. With the step skipped, an editable
+  folder that the switch empties stays, empty. That is the
+  difference the review predicted, kind (a). No case of kind (b)
+  turned up.
+- That empty folder matters in one case I probed (not in the
+  suite): an empty hiddenOutsideOfSubscribeeFolder, saved under
+  the new restriction, deletes the hidden member from the
+  subscriber's hidesFromSubs. With the step, the folder is pruned
+  and the save keeps the member. So the refresh alone does not
+  cover the switch yet; the suite has no test that would notice.
+* What I ran and what I only read
+** Ran
+- All of it in a throwaway worktree of HEAD 8ae8263c, built with
+  its own target directory. Both are deleted now.
+- The full suite, unchanged, as the baseline (nextest).
+- The full suite with the step skipped (the edit below).
+- The four tests that drive the switch handler, before and after
+  the edit, with a print added to capture each switched buffer
+  (print only; it changes no behavior).
+- Three throwaway probe tests with my own fixture (below).
+** Only read
+- skgrepo_switch.rs, the handler in
+  serve/handlers/skgrepo_sets.rs,
+  serve/rerender_stream.rs, refresh/mod.rs, refresh/tail.rs,
+  refresh/id_rule.rs, parts of refresh/ladder.rs and goal.rs.
+- The save's hidesFromSubs path in
+  from_text/local_fieldintent_collection/resolve_visibility.rs,
+  for the cause of the lost hide (see "Why the hide is lost").
+* The edit
+In set_skgrepo_restriction (serve/handlers/skgrepo_sets.rs), the
+prepass argument to 'prepare_rerender_views_with_runtime' went
+from 'Some (&prepass)' to 'None'. Nothing else in the server
+changed. The step's three unit tests (tests/unit/repo_switch.rs)
+call the step directly, so this edit cannot affect them; they
+passed both times.
+* Which tests drive the switch
+Grepping tests/ for the handler, the step and 'restrict' finds
+these as the only callers of 'handle_skgrepo_set_request':
+- hidden_nodes::a_save_under_a_restriction_keeps_the_hidden_
+  members
+- hidden_nodes::a_tightened_restriction_leaves_a_tombstone_over_
+  the_hidden_nodes_children
+- skgrepo_sets::override_substitute_across_skgrepo_switch_
+  anonymizes_and_keeps_original
+- viewnode_id_stability::viewnode_ids_survive_a_save_a_request_
+  and_a_switch
+- skgrepo_sets::all_tests, through
+  skgrepo_set_switch_rerenders_views_and_cancels_stale_search_
+  enrichment (an empty view, switched to "all": the step has
+  nothing to do there)
+Many other tests mention 'restrict', but they render or save
+under a restriction and never switch; the full-suite run covers
+them.
+* Baseline
+- Full suite: 956 tests run, 956 passed.
+- The four switch tests above: pass.
+* With the step skipped
+** Pass/fail
+- Full suite: 956 run, 956 passed. No test fails.
+** How the switched buffers differ
+I compared the captured buffers before and after the edit. Apart
+from random UUIDs of newly typed nodes, they differ in one
+place: the hidden_nodes fixture, where r subscribes to the
+private hs.
+*** a_save_under_a_restriction_keeps_the_hidden_members
+The view opened under "all" has a subscribeeFolder (vnid 0b)
+holding hs. Switched to "public" (metadata trimmed):
+#+begin_example
+with the step:
+ * (vnid 0a) node (gnid r) ... r edited
+ ** (vnid 0d) node ... a typed child
+ ** (vnid 0e) node (gnid a) ... a
+ ** (vnid 0f) tombstone
+ *** (vnid 0g) node (gnid s1) ... s1
+ ** (vnid 0h) node (gnid b) ... b
+without the step: the same, plus, after r,
+ ** (vnid 0b) subscribeeFolder
+#+end_example
+The test still passes. It checks for no trace of hs and h, and
+then saves, keeping hs in r.subscribesTo either way.
+Classification: (a), an emptied editable folder that the step
+pruned and the refresh keeps.
+*** a_tightened_restriction_leaves_a_tombstone_...
+Same difference: an empty subscribeeFolder (vnid 0b) under r
+after the switch to "public". Switched back to "all", the buffers
+differ more:
+- With the step, the folder is gone, so the switch back does not
+  bring it back, and hs is not drawn.
+- Without the step, the kept folder refills:
+#+begin_example
+ ** (vnid 0b) subscribeeFolder
+ *** (vnid 0h) node (gnid hs) ... hs secret
+#+end_example
+  So h, drawn again beside the tombstone, gets vnid 0i, not 0h.
+The test asserts only that h is drawn and the tombstone stays,
+so it passes. Classification: (a), plus the round-trip
+consequence.
+*** The other two switch tests
+override_substitute_... and viewnode_ids_survive_...: identical
+buffers. Neither fixture has an editable folder that the switch
+empties. (c's subscribeeFolder in the stability fixture holds
+the public d, so it stays either way.)
+* Probes beyond the suite (run, throwaway)
+** Fixture
+- public: r contains a, h, b, c and the absent missing-pub; r
+  subscribes to hs; r hides hh from subs; c overrides ho; a; b;
+  s1.
+- private: h ("h secret", alias "h alias secret") contains s1
+  and the absent missing-priv; hs; hh; ho.
+Opened under "all", then saved with requests for r's
+hidesFromSubs folders, c's overrides folders and h's aliases.
+Then the same view went to "public" twice: once with the step
+applied by hand before the (step-less) handler, which reproduces
+the shipped behavior, and once with the refresh alone.
+** Buffers after the switch to "public"
+#+begin_example
+with the step:
+ * (vnid 0a) node (gnid r) ... r
+ ** (vnid 0f) node (gnid a) ... a
+ ** (vnid 0g) tombstone
+ *** (vnid 0h) node (gnid s1) ... s1
+ ** (vnid 0j) node (gnid b) ... b
+ ** (vnid 0k) node (gnid c) ... c
+the refresh alone:
+ * (vnid 0a) node (gnid r) ... r
+ ** (vnid 0b) subscribeeFolder
+ *** (vnid 0d) hiddenOutsideOfSubscribeeFolder
+ ** (vnid 0f) node (gnid a) ... a
+ ** (vnid 0g) tombstone
+ *** (vnid 0h) node (gnid s1) ... s1
+ ** (vnid 0j) node (gnid b) ... b
+ ** (vnid 0k) node (gnid c) ... c
+ *** (vnid 0q) overriddenFolder
+#+end_example
+** What agrees
+- Every occurrence of a hidden node is a tombstone or gone in
+  both: hs, hh, ho pruned; h a tombstone holding s1.
+- h's aliasFolder and its alias are gone in both. In the
+  refresh, a folder or property member under a tombstone is
+  unsayable, so the ladder entombstones it ('rekind_children')
+  and the tail prunes it.
+- The unknown missing-priv, recorded by h, is gone in both. In
+  the refresh, the tombstone parent has no goal, so the ID rule
+  answers Tombstone.
+- r's hiddenFolder (non-editable, held hh) is gone in both: the
+  tail's 'folder_goes_when_empty' prunes it.
+- No kind (b) difference: nothing hidden is drawn in either.
+** What differs: three emptied editable folders
+subscribeeFolder, hiddenOutsideOfSubscribeeFolder (inside it)
+and overriddenFolder stay, empty. Kind (a).
+Switched back to "all", the refresh-alone buffer refills all
+three (hs, hh, ho drawn again). The step's buffer has lost them.
+** An aside, the same in both
+The unknown missing-pub (recorded by r, in public) is drawn
+under "all" and gone under "public" in both variants. I did not
+look into why.
+** Saving the switched buffer: the hide is lost
+A second probe, on a fresh copy of the fixture each time: switch
+to "public", edit r's and c's titles, save under "public", read
+the graph.
+#+begin_example
+with the step:
+  r.subscribesTo [hs]  r.hidesFromSubs [hh]  c.overrides [ho]
+the refresh alone:
+  r.subscribesTo [hs]  r.hidesFromSubs []    c.overrides [ho]
+#+end_example
+So the empty subscribeeFolder and overriddenFolder save without
+harm; the save keeps their hidden members. The empty
+hiddenOutsideOfSubscribeeFolder deletes hh from hidesFromSubs.
+** Control: a view drawn under "public"
+A third probe opened r under "public", requested its
+subscribesTo and hidesFromSubs folders and c's overrides
+folders, saved, edited, saved again. The view shows an empty
+subscribeeFolder and an empty overriddenFolder, but no
+hiddenOutsideOfSubscribeeFolder. hidesFromSubs keeps hh. So
+empty editable folders are normal under a restriction, and the
+lost hide comes from the empty hiddenOutsideOfSubscribeeFolder,
+which only the step-less switch produced here.
+* Why the tail does not prune these folders (read)
+'prune_childless_tombstones' (refresh/tail.rs) prunes, postorder,
+every childless tombstone and every childless folder for which
+'folder_goes_when_empty' (refresh/ladder.rs) holds. That is any
+folder that is neither editable ('Folder::is_editable': the
+subscribee, overridden, hiddenOutsideOfSubscribee and alias
+folders) nor a flags folder. Its comment gives the reason: the
+user could add members to these, and the save reads them. So the
+refresh keeps them on purpose. A view drawn under a restriction
+shows them empty, as the control shows.
+
+The step prunes a folder of any kind, those included, when its
+own prune emptied it ('should_prune', 'is_leaf && had_children').
+That covers both review exceptions: the editable folders and the
+flags folder. No probe emptied a flags folder.
+* Why the hide is lost (read; matches the run)
+'apply_hiddenoutside_edits' (resolve_visibility.rs) treats the
+submitted hiddenOutsideOfSubscribeeFolder as the whole of the
+replaceable hides. A hide is replaceable when the restriction
+holds its relRepo ('restriction . contains_skgrepo
+(&member . relRepo)'). hh is homed in private, but r records the
+hide in public (relRepo public), so it counts as replaceable.
+The submitted folder is empty, so hh is unhidden. The filter
+looks at where the relationship is recorded, not at whether the
+member is visible. The subscribesTo and overrides saves evidently
+keep hidden members some other way; I did not trace how.
+
+Whether this is a save bug, separate from the switch, depends on
+whether a buffer can otherwise carry an empty
+hiddenOutsideOfSubscribeeFolder while the subscriber hides a
+hidden node, for instance one the user typed. I did not test
+that.
+* What I could not determine
+- Whether some other editable-folder case loses data the same
+  way: the alias folder of a visible node whose alias the
+  restriction excludes (I found no easy way to record an alias
+  in another skgrepo), or a flags folder.
+- Why missing-pub goes under "public" (it does with and without
+  the step).
+- Whether keeping the empty folders is wanted. It makes a switch
+  and its reverse round-trip (the folders refill), but it shows
+  structure the view drawn fresh under the restriction would not
+  show, and it triggers the lost hide above.
+* What follows for review item 1
+The refresh covers the entombstoning and the tombstone prune. It
+does not cover pruning emptied editable and flags folders. Before
+the step can go, one of these is needed:
+- the refresh prunes an editable folder that the switch emptied
+  (it would have to know what the folder held before), or
+- the save keeps hidden hides when given an empty
+  hiddenOutsideOfSubscribeeFolder, and empty editable folders
+  after a switch are accepted.
+Either way, a regression test is needed: switch, save, check
+hidesFromSubs. The suite has none.

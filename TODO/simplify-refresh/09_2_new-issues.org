@@ -1,0 +1,260 @@
+* New issues
+Things that came up while writing
+'TODO/simplify-refresh/10_plan.org', the plan that carries out
+the decisions of '09_review.org', and that those decisions did
+not cover. Each issue gives the problem and the choice the plan
+makes; you may reverse any choice.
+** The words
+*** the plan, its slices
+'10_plan.org', seven slices numbered 0 to 6, each run by one
+agent; "slice 5" is its tidy of small renames and fixes, "the
+docs slice" its slice 6. The orchestrator is me, launching one
+agent per slice and adjusting the plan between slices.
+*** the review, its reports, the probes, the findings
+'09_review.org' and the eight reports in '09_1_review-reports/'.
+The probes are the review's runs against an isolated server; a
+"finding" is a numbered item of a report. The report on the
+skgrepo restriction's writes is 'restriction-edits.org'; the
+probes' report is 'probes.org'. "Decide 11" is an item of the
+review's Decide section, which you closed.
+*** filed
+Written as an entry of 'TODO/problems.org', to be fixed by some
+later plan.
+*** the vanish rule
+Slice 0's rule, your decision in the review: a child of a view
+that claims membership under a parent whose claims the save
+reads, and whose relationship the graph no longer has, is
+removed from the view at the refresh together with everything
+under it. Before the plan such a child was kept, marked
+=noClaim= and shown ⊥, until the next save left it out of the
+list. The glossary and the technical model still say the
+refresh never removes a child; slice 6 changes them.
+*** unrestricted, "no restriction"
+Slice 3's words, your decision in the review. After slice 3 the
+skgrepo restriction is one skgrepo, the most private one shown,
+and the reserved set name "all" is gone; a connection is
+unrestricted when the most private skgrepo it shows is the most
+private the config has, and the clients write "no restriction"
+beside that skgrepo wherever they show the skgrepo restriction.
+Where this document says "unrestricted", today's code says the
+set "all".
+*** the hiddenFolder
+The write-protected folder of what a node hides from its
+subscriptions, which 'C-c l h'
+('skg-show-folderOf-hidesFromSubs'; '<localleader>lh') requests
+together with its twin, the hiderFolder.
+** DONE The delete's propagation into a restricted recorder
+*** the problem
+When a save carries a delete request ('C-c <backspace>',
+'skg-delete'), the server deletes the graphnode and then
+rewrites every file that recorded a relationship to it, so that
+no file names the deleted ID. Under a skgrepo restriction some
+of those recorders may have their record in a section the
+restriction keeps out. Today the server rewrites those sections
+too, against the principle that a write never touches what the
+skgrepo restriction hides. The report offered two fixes: refuse
+the delete whenever a restricted record names the graphnode, or
+leave such a record as it is.
+**** jeff : make the user an offer: "c/v/a"
+They can Cancel, or they can delete it only from Visible nodes,
+or they can delete it from All (owned) nodes.
+***** Claude says: noted; the plan's slice 2 now says so
+****** the flow
+A save that carries a delete request under a skgrepo
+restriction, where a record the restriction keeps out names the
+graphnode, stops before writing with a confirmation response,
+as a save stops today for strandeds or a telescope hoist. The
+response says how many records in restricted sections name the
+graphnode, and nothing else of them. The client asks "Delete
+from: (c)ancel, (v)isible records only, (a)ll owned records";
+cancel sends nothing; the other two re-issue the save with a
+field '(delete-from . "visible")' or '(delete-from . "all")',
+which is never cached. Under "visible" the restricted records
+stay as they are (the plan's earlier choice, now one of the
+three); under "all" the server rewrites them too, as today,
+with your leave.
+****** what the user learns
+The offer tells the user that some restricted record names the
+graphnode, which a silent choice would not have; you chose that
+knowingly.
+*** the plan's choice
+Leave the record as it is. The deleted ID then stays in the
+restricted recorder's list, and where that recorder is shown
+under a connection that can see the record, the ID appears as
+an unknown viewnode, which 'C-c d a'
+('skg-delete-references-to-absent-node'; '<localleader>da') can
+remove under an unrestricted connection. A refusal would have
+told the user that a restricted recorder exists.
+
+** DONE AGREED : A vanished root in a content view
+*** the problem
+A view may be rooted at a graphnode that another view's save
+deletes. Today that root becomes a tombstone, which is removed
+when nothing stands under it, so the view may end with no
+roots. Under the vanish rule the root is removed at the refresh
+with everything under it, so the view may end with no roots the
+same way, and sooner.
+**** jeff : is that right?
+The vanish rule, I believe, is
+"a claiming node with a claim-aware parent vanishes".
+A root has no parent, hence no claim-aware parent.
+***** Claude says: right; the root falls under a second rule
+****** the two rules of slice 0
+The plan's slice 0 changes two places, and this issue named
+only the first.
+******* the claims rung
+A claiming child under a parent whose claims the save reads,
+whose relationship the graph no longer has, vanishes with its
+subtree. This is the rule you state, and it cannot reach a
+root, which has no parent.
+******* the ID rule
+An occurrence whose graphnode the graph no longer has, in a
+content view, vanishes with its subtree where today it becomes
+a tombstone. This is your decision under Decide 6's thread
+("the occurrence of a node another view deleted vanishes with
+its subtree too"), and it asks about the node, not about a
+parent, so it reaches a root as it reaches any occurrence.
+****** the issue's text, corrected
+The problem should read: "A view may be rooted at a graphnode
+that another view's save deletes. Today the ID rule makes that
+root a tombstone, which is removed when nothing stands under
+it, so the view may end with no roots. Under slice 0's second
+rule, the ID rule removes the root at the refresh with
+everything under it, so the view may end with no roots the
+same way, and sooner." I have not touched the file, since you
+are in it; paste it or tell me when the file is free.
+****** the plan's word
+The plan's entry "vanish" under "Words this plan uses" gives
+only the first reason, the lost relationship; I have widened it
+to both reasons, the lost relationship and the lost graphnode,
+in the working tree, uncommitted. The glossary's entry, written
+by slice 6, follows the plan's.
+*** the plan's choice
+Keep it: a view with no roots is shown as an empty buffer, as
+today ('(content "")' on the wire).
+** DONE AGREED : The diff view keeps its tombstones
+*** the problem
+The vanish rule speaks of content views. In the diff view a
+deleted graphnode is shown as a ghost, not removed, and a
+tombstone also stands where a folder, an alias or ID headline,
+or a change viewnode was found in a place where its kind cannot
+stand (the unsayable rule of the ancestry table). Neither case
+is a child whose relationship the graph no longer has.
+*** the plan's choice
+The vanish rule does not reach the diff view's ghosts nor the
+tombstones of the unsayable rule; they stay as they are.
+
+** DONE AGREED : The hiddenFolder a save prunes is not drawn again
+*** the problem
+Under a skgrepo restriction a requested hiddenFolder shows only
+the hides whose records the restriction shows. If a save removes
+the last of those, the folder is left empty and the refresh
+removes it, with the request that drew it. A later skgrepo
+widening, which would show the remaining hides, draws no
+hiddenFolder, since nothing asks for one; the API doc's "a
+skgrepo widening reveals members and folders" holds for folders
+still present, not for one that was removed. The probes'
+report lists this as its finding 4c.
+*** the plan's choice
+Left filed, by the judgment you gave on Decide 11 for the
+restricted root's folders: a user who wants the folder asks for
+it again with 'C-c l h'.
+
+** DONE The whitespace strip and the export
+*** the problem
+Two commands ignore the skgrepo restriction, as findings 11 and
+the out-of-scope note of 'restriction-edits.org' say.
+'skg-strip-trailing-whitespace-from-bodies'
+(':SkgStripBodyWhitespace') rewrites every owned node file whose
+body has trailing whitespace or trailing blank lines, files in
+restricted skgrepos included, which the principle forbids as
+worded, though the change is to whitespace alone and it loses
+no word. 'skg-export-some-to-org' (':SkgExportToOrg') takes the
+skgrepo-set to export from its request, so a connection under a
+skgrepo restriction can export everything.
+*** the plan's choice
+The strip stays as it is, by your choice in the review; the
+export's leak stays filed for a later plan.
+**** Jeff : just make sure they're documented
+The user-facing docs on those commands should note
+how they don't respect skgrepo restriction.
+Don't even file a plan for a fix; I don't think anyone will care.
+***** Claude says: noted
+Slice 6 adds to the two commands' entries in both COMMANDS docs
+and to the API doc that they ignore the skgrepo restriction:
+the strip rewrites bodies in every owned skgrepo, restricted
+ones included, and the export exports the skgrepo-set its
+request names, whatever the connection shows. The export's
+entry in 'TODO/problems.org' is removed, and the strip's half
+of its entry; the import's half stays, since slice 2 fixes it.
+** DONE AGREED : The size of slice 5
+*** the problem
+Slice 5, the tidy, holds three groups of small items: the
+clients', the server's and the tests'. It may be too large for
+one agent's run.
+*** the plan's choice
+Its agent commits per group. If the slice proves too large, I
+split it into two slices at the boundary between the server's
+group and the tests' group, and renumber the docs slice.
+** DONE "No restriction" as the clients' word only
+*** the problem
+After slice 3 the wire and the config carry a skgrepo's name
+where today they carry "all"; the words "no restriction" appear
+only where the clients show the skgrepo restriction: the prompt
+of 'C-c v l' ('skg-restrict-repo-set'; '<localleader>vl') and
+the displays of 'skg-show-skgrepo-restriction' and
+'skg-list-repo-sets'. A skgrepo named "no restriction" would
+then read the same as that word in the prompt.
+*** the plan's choice
+No refusal of such a name: the word is the clients' and the
+confusion would be in the prompt alone.
+*** Jeff : better yet
+Just show the actual name of the skgrepo,
+and if it is the most private one, append " (no restriction)"
+in the prompt in the client (but don't use that over the wire).
+**** Claude says: noted; the plan's slice 3 says so
+The clients show every skgrepo by its name, and append
+" (no restriction)" to the most private one, in the prompt of
+'skg-restrict-repo-set' and in the displays of the skgrepo
+restriction and the list of sets; the wire and the config carry
+the name alone. A skgrepo named "no restriction" then reads as
+itself, and the collision this issue feared is gone.
+** Records in skgrepos the config does not name
+*** the problem
+Today the set "all" shows every record, even one whose relRepo
+names a skgrepo the config does not have ('record_is_visible'
+in 'server/skgrepo_sets.rs'). After slice 3 an unrestricted
+connection is "the most private skgrepo the config has, and
+every more public one", which read strictly would omit such a
+record.
+*** the plan's choice
+An unrestricted connection shows every record, one whose
+relRepo the config does not name included, as "all" does today;
+slice 3's text says so. Found by the reader of this document.
+*** Jeff
+Those would be Uknown nodes, right?
+Those should show even in restricted views.
+If we can't find a repo for an ID, we assume the user
+wants to see it.
+**** Claude says: two things, and yes to the principle
+***** what the record is
+A record whose relRepo names a skgrepo the config does not have
+is a relationship written in a section of a node's file whose
+label matches no configured skgrepo (one removed from the
+config, say). Its member may be a graphnode the graph has, or
+an ID no graphnode answers to; only in the second case is the
+member an unknown viewnode. An unknown viewnode already shows
+under any skgrepo restriction when its record is visible; the
+question here is whether such a record is visible.
+***** the principle, applied
+"If we cannot find a skgrepo for it, the user wants to see it."
+Applied to the two questions the code asks: a record whose
+relRepo the config does not name is visible under every skgrepo
+restriction, not only an unrestricted connection; and a
+graphnode whose home skgrepo the config does not name is not
+restricted under any skgrepo restriction. Today the first holds
+under "all" alone and the second never. The plan's slice 3 now
+says both, and the glossary's "record, restricted headline"
+entry will say so under slice 6. If you meant the record only,
+and not the node, say so and the second drops out.
+****** jeff : perfect

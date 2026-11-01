@@ -1,6 +1,43 @@
 * REMEMBER
 ** not to dirty the production skg's code.
 ** to set the model
+* the ignorant review trick
+*** [Jeff] How can I avoid having to constantly ask you to restate things less ambiguously?
+I'm imagining some kind of adversarial review,
+but that seems hard -- if the reviewer can wander through the code
+as ambitiously as you, they won't get confused where I do,
+and there's no obvious way to make them
+know exactly what I remember.
+**** Claude says: a reader who knows only what you know
+The reviewer you imagine need not wander through the code: give
+it only what you have, the glossary and the user docs
+('docs/'), and the document, with no access to the code or to
+this discussion. Its job is to list every phrase it cannot
+resolve from those: a term neither in the glossary nor defined
+in the document; a command named by less than its full name
+and key; a pronoun, a "both", a "the latter" or a "this" whose
+noun is not in the same sentence; a claim it cannot check
+against the docs. I fix each before the document reaches you.
+That matches its knowledge to yours (you read the docs, not
+the code) at the cost of a cheap agent per document, a few
+minutes. Beside it, three rules for my writing: the first
+mention of a command gives its full name and key; "both", "the
+latter" and "the former" are never used; every term of the
+implementation is either in the glossary or defined under a
+headline of its own before it is used. If you want, I run the
+reader now over the review's Decide section and put its fixes
+here, since the main document is yours at the moment; and the
+habit goes into 'coding-advice/org-discussions.org' as a step
+before any document is handed to you.
+***** TODO jeff : okay let's try it
+but please report in the CLI
+how long each stage of that pipeline takes,
+at least until I've decided it's worth it.
+****** TODO Claude says: running on the Decide section
+The reader started at 22:57 UTC on 2026-10-30, with the docs
+and this section and nothing else. Its list, my fixes to the
+section, and the time each stage took go to you in the
+terminal.
 * migrate .skg format
 python3 tools/migrate-skg-keys-2026-10/migrate.py data/owned
 * TODO TODO/diff-mode_complete/1_discussion.org

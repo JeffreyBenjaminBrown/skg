@@ -962,7 +962,10 @@ filesystem edit). A telescope with no owned section remains wholly foreign.
 
 *** overPrivateText
 
-A privacy telescope is *overPrivateText* when its composed title or body is
+This is kind of an error. Skg can handle it if it sees it in your data,
+but it's a good thing to fix.
+
+A privacy telescope has *overPrivateText* when its composed title or body is
 selected from a section more private than its home (most public retained)
 section. The flag applies to the whole telescope, even if only one text
 field is below home. This violates the rule that the node's text lives at
@@ -972,7 +975,38 @@ An unrestricted connection can show that text with a warning. A restricted reque
 asks for approval scoped to the affected node IDs and that request before
 releasing it; search asks whether to include or exclude such telescopes.
 Approval to display the text does not authorize *Hoist*, the separate
-repair that moves the selected title and body to home.
+repair that moves the selected title and body to home (see "Hoist").
+
+*** Hoist, the Hoist confirmation, Abort
+
+*Hoist* is the save's repair of overPrivateText: it moves the
+selected title and body of a privacy telescope up to its home
+section, removes the lower copies of the title and body, and keeps
+the lower sections' relationships and aliases where they are. The
+name is the docs' and the wire's (=telescope-hoist-confirmation=,
+=approved-hoist-pids=); the code is
+=server/serve/handlers/telescope_hoist.rs=.
+
+The *Hoist confirmation* is how a save offers the repair. After
+validation and before any write, the save rereads every telescope it
+would write; if one currently selects a title or body from below its
+home, nothing is skgsave-committed and the client is asked to choose
+*Hoist* or *Abort*, with the IDs and homes of the telescopes
+concerned and no text. Hoist re-issues the same save carrying the
+exact IDs the user approved; the server rereads and reclassifies them
+as one batch on that retry, and a telescope that has become dirty in
+the meantime raises a new confirmation. Abort writes nothing and
+leaves every file as it was; the repair is then a hand edit of the
+=.skg= sections. Among the save's confirmations the Hoist
+confirmation comes after the delete-from and strandeds confirmations
+and before the fork confirmation. Scripts and maintenance writers
+have no answer to give and refuse the save instead.
+
+Approving a Hoist publishes text on disk; it does not authorize
+showing overPrivateText in a view, which is the text-release
+approval's separate question (see "overPrivateText"). See
+[[file:./telescopes.org][privacy telescopes]] for the invariant the
+repair restores.
 
 *** privacy order and relRepo
 
