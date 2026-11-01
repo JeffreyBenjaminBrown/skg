@@ -24,3 +24,40 @@ order the manifest and the config disagree about, naming the node and
 both repos. A bare disagreement of orderings is not warned about; the
 docs ('api-and-formats', the manifest section; 'telescopes') say why.
 Being built; nothing for you to do.
+** TODO Jeff : is there a deeper problem here?
+Privacy as a concept really shouldn't encompass foreign nodes.
+*** TODO Jeff : User's answer: yes, there is a more natural structure
+**** Your reversal is right, but the private fact lives in your file
+Subscribing to a shady writer is a private fact about you; it is recorded
+in your '.skg' file, in whichever of your repos you choose, and it is
+that repo's privacy that protects it. Nothing about the shady writer's
+own repo needs a privacy rank for this to work. The same holds for every
+relationship to a foreign node: the recorder is yours, the target is
+not, and only the recorder's level matters.
+**** What a foreign repo's position in the ladder buys today
+Almost nothing. Leaks are judged on owned recorders only (done). A node
+with a section in an owned repo has its foreign sections ignored, so an
+owned and a foreign repo never fold together. The default relRepo for a
+relationship to a foreign node is the recorder's home. What remains is
+the repo restriction ("show through X"), which can hide a foreign repo
+only because it sits on the ladder, and the manifest ordering, which is
+where the warning you hit came from.
+**** The natural structure
+Two things in the config instead of one list with a rule: an ordered
+list of the repos you own (the privacy ladder, as now, but only yours),
+and a set of foreign repos you read, with no order among them or against
+yours. The restriction picks a rung of your ladder; whether foreign repos
+are shown is a separate toggle (all or none, or per repo), not a rung.
+Then the "every foreign repo before every owned one" rule goes, the
+check that enforces it goes, the manifest no longer orders your repos
+against anyone else's, and two teammates' configs cannot disagree,
+because they never say anything about each other's order. The leak and
+telescope code need no change; they already behave this way.
+**** Cost and when
+A refactor of the config type, the restriction type and the two
+clients' pickers, plus docs; a day of agent time, with the risk that
+the restriction's semantics for foreign repos surprise someone. Not
+urgent: the rule works. I would do it before the next teammate joins,
+since each new config under the current rule adds another inverted
+ordering and another chance for the manifest to confuse someone.
+Yes or no, and if yes, now or later?
