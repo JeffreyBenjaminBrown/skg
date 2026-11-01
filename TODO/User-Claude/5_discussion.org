@@ -1,0 +1,26 @@
+* DONE [Jeff] I restarted and got his warning.
+```
+  * Startup warnings
+  ** Repo 'user-claude' ships a OTHER_SKGREPO_DEPENDENCIES.toml placing 'personal-deprecated' more public than 'first', but this config orders them the other way. Telescopes spanning them will fold in the publisher-unintended order; consider reordering [[repos]].
+```
+What's the natural fix?
+** User : the warning is right in general and wrong here; narrow it
+*** Why it fires
+My manifest is written from my config, where your repos are more public
+than 'first'; your config says the opposite. Under the rule we chose
+(every foreign repo more public than every owned one), two teammates'
+configs always order their shared repos in opposite ways, so this
+warning fires on every teammate's server for every other teammate, and
+no reordering can satisfy it. It is not actionable as written.
+*** What it is protecting
+A telescope that spans two repos (one node with sections in both) folds
+in privacy order, so if our configs disagree, the same node folds in
+opposite orders on our two servers. That is worth a warning. But it
+only matters if such a node exists. Today none does: my repo holds only
+my own nodes, and links to yours are text, not telescope sections.
+*** The fix
+The server warns only when an actual telescope spans two repos whose
+order the manifest and the config disagree about, naming the node and
+both repos. A bare disagreement of orderings is not warned about; the
+docs ('api-and-formats', the manifest section; 'telescopes') say why.
+Being built; nothing for you to do.
