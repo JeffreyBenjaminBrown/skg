@@ -72,3 +72,12 @@ and new headlines are numbered past the highest. For a view the server
 does hold nothing changes. This makes every handle stable across saves,
 and it also helps you: an Emacs buffer saved after a server restart
 keeps its viewnode IDs instead of being renumbered.
+** TODO Jeff : done, with one remaining case
+Built and committed. Handles in a content view now survive every save,
+removals included. The one buffer that can still renumber is a diff-view
+buffer: the server re-renders it as a diff view (with its readiness
+summary) only while it holds it, so the tool must reopen it, and a
+reopened buffer is numbered fresh; the report warns when that could
+move a handle. Making the diff view behave like content views here
+needs the server to accept a diff-view save from an unheld buffer; I
+have put it in the last slice of '6_plan', which is server work anyway.
