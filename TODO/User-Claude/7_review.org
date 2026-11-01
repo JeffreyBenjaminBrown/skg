@@ -1,0 +1,74 @@
+#+title: User Claude: what a handle is, and why it kept changing
+
+* TODO Jeff : read this one; it answers "what do you mean by handle"
+
+* The two files the tool writes for every view
+When I ask 'tools/skg-for-ai' for a view, it asks the server for the
+same buffer Emacs would get, and writes it to disk unchanged as the
+"full view". That file is what you see with heralds expanded. The third
+line of the team node's full view, for instance, is
+
+: *** (skg (vnid 0c) node (gnid 2a934cea-24db-4d6f-86d2-33a068fe4dbc) (skgRepos (nodeRepo public)) (view (rels (contains (in 1 (ancestors 1))) (linksTo (out 1))) (birth (contains in 1)))) Taste Claude
+
+Beside it the tool writes the "compact view": the same lines, in the same
+order, but with that metadata removed from each headline and a short
+mark put at the end of the headline instead. The same line reads
+
+: *** Taste Claude ⟨0c L1⟩
+
+That mark, between the angle brackets, is what I have been calling the
+handle. I read and edit the compact view; the tool uses the handle to
+find the headline's metadata in the full view again when I save.
+
+* What is inside a handle
+** First, the headline's identity: the viewnode ID
+The first thing in the handle is the headline's viewnode ID, exactly as
+the server wrote it in the metadata: 'vnid 0c' above becomes the '0c'
+in '⟨0c L1⟩'. It is the same short ID your Emacs buffer carries. So a
+handle is not a new kind of identifier; it is the viewnode ID made
+visible, plus a few heralds.
+** Then the heralds, as text
+After the ID come the headline's heralds, rendered as plain text from the
+same rule table your client uses, without colours. 'L1' above is the
+relationship herald "links to one node". A write-protected headline shows
+'☮', a folded one 'folded', a node at a skgrepo boundary '⌂:public', and
+so on. The one herald left out is the bare 'aC' ("my parent contains
+me"), which nearly every headline would carry.
+** Words I add are requests
+I may write a word into a handle to ask for something, in place of a key
+you would press: 'delete', 'ready', 'unready', 'restoreNode',
+'restoreRel'. On save the tool turns each into the matching
+'(editRequest ...)' in the metadata. Many such words, one save: your
+"subheadings with special syntax, sent as a batch".
+
+* Why the handle is what makes editing safe
+When I save, the tool rebuilds the full buffer: for each headline in my
+edited compact view it looks up the handle's viewnode ID in the saved
+full view and puts that headline's metadata back, title and nesting as I
+left them. A headline I moved keeps its handle, so its graphnode ID
+travels with it. A headline I add has no handle, so it reaches the server
+bare, which makes a new node. A headline whose handle is missing because
+I retyped it is a new node too, which is the mistake the report catches
+(and the next slice catches fuzzily).
+
+* Why the handles kept changing, and what changed
+** Line numbers
+At first the handle was the headline's line number in the full view.
+That renumbers at every save, since a save re-renders the view, so a
+compact view edited over two saves lost its bearings. You saw this
+problem coming when you suggested viewnode IDs.
+** Viewnode IDs, and the server's memory of a view
+So the handle became the viewnode ID. But the server keeps a view's
+viewnode IDs only while it holds the view, and it holds views per
+connection; the tool opens a fresh connection for each command, so by the
+time it saves, the server has forgotten the view and treats every ID in
+the buffer as unknown, giving each headline a fresh one. The tool worked
+around that by reopening the view before saving, which kept most handles
+but let the highest ones change after a removal.
+** The fix now being built
+A save against a view the server does not hold takes the buffer's own
+viewnode IDs as the view's record: each headline keeps the ID it carries,
+and new headlines are numbered past the highest. For a view the server
+does hold nothing changes. This makes every handle stable across saves,
+and it also helps you: an Emacs buffer saved after a server restart
+keeps its viewnode IDs instead of being renumbered.
