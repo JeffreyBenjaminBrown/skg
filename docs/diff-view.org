@@ -630,6 +630,9 @@ C-c r c ('skg-stage-and-commit') prompts once for a message and sends
 "stage and commit". The server stages the changed '.skg' files of
 every owned skgrepo, deletions included, and git-commits each gitrepo
 that has changes with that message, by the gitrepo's configured user.
+It never stages 'OTHER_SKGREPO_DEPENDENCIES.toml', which the diff view
+does not cover: committing that generated manifest is a deliberate,
+manual act.
 It refuses unless the connection is unrestricted, for a blank
 message, and when the straddle cannot be built. It commits whole
 skgrepos, never less: a partial commit can leave HEAD inconsistent
