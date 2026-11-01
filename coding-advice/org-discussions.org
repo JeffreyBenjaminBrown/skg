@@ -46,3 +46,6 @@ Prefer headlines to bullets, and let the tree be as irregular as the
 content; see [[file:ORIENTATION.org][ORIENTATION]]. Use single apostrophes around code
 references. Do not commit planning files during discussion rounds;
 Jeff stages and commits them himself.
+** Clarity
+Every sentence should have a subject and a verb.
+Every new term should be introduced/defined before it is used.

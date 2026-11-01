@@ -165,21 +165,23 @@ more case for the same machinery: raised automatically, or listed.
 ** Option C: fix the client in place
 Patch each defect above in Elisp, then port all of it to Lua. This keeps
 the duplication, and still cannot see out-of-view relationships.
-* TODO Claude says: questions for you
-** TODO Which option?
+* DONE Claude says: questions for you
+** DONE Which option?
 ANSWER:
 I'll default to: B, after your answers to the next two questions.
-** TODO When a node moves more private, should relationships into it rise automatically?
+*** Claude says: B, confirmed
+Jeff confirmed B on 2026-10-17 in TODO/total-diff-view/1_discussion.org
+("went with all your suggestions"). The TDV plan, TODO/total-diff-view/2_plan.org,
+implements it in slice 3.
+** DONE When a node moves more private, should relationships into it rise automatically?
 Today they keep their old, more public repo, leaving the moved node's ID
 in the more public repo. Raising them automatically matches what the
 clamp already does for the node's own relationships, but means writing
 containers the user did not touch. Alternatively, list them in the
 confirmation and let the user choose.
-ANSWER:
-I'll default to: raise automatically (privacy errs toward private),
+*** raise automatically (privacy errs toward private),
 and say so in the save's warnings.
-** TODO Should the confirmation cover relationships outside the view?
+** DONE Should the confirmation cover relationships outside the view?
 Option B can reach them; listing them reveals graph structure the user
 is not looking at, but that's their own data.
-ANSWER:
-I'll default to: yes, every relationship touching a moved node.
+*** yes, every relationship touching a moved node.

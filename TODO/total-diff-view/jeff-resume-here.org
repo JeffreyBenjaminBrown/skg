@@ -1,0 +1,71 @@
+#+title: Jeff, resume here: the overnight run of the TDV plan
+
+* What ran overnight
+'bash/run-plan-slices.sh' ran the slices of [[file:2_plan.org][2_plan.org]] in order, each
+in a fresh Claude Code session (Opus 5.5, effort high, permissions
+bypassed). After each slice it checked whether the agent had marked
+that slice's headline DONE in the plan, and it stopped at the first
+slice that did not end that way. Everything it wrote is under
+'run-logs/' in this directory.
+
+* First look: three files
+** run-logs/run.out
+The script's own output. Its last line tells you how the night ended:
+"all requested slices are DONE", "slice N ended without DONE", "slice
+N: claude exited nonzero", or the refusal "tracked files have
+uncommitted changes" (then nothing ran; see "If nothing ran").
+** run-logs/sessions.log
+One line per slice start ("slice N  session UUID") and one per slice
+finish ("slice N DONE"). The UUID is what you need to resume a session.
+** the plan's headlines
+#+begin_example
+grep '^\*\* ' TODO/total-diff-view/2_plan.org
+#+end_example
+Every slice that finished reads "** DONE Slice N: ...".
+
+* If every slice is DONE
+Review the commits ('git log --oneline' since your planning commit;
+each message names its slice) and run the suites once yourself:
+'cargo nextest run', 'bash/emacs-tests.sh', 'bash/nvim-tests.sh'. Open
+a TDV with the new command and try the gestures. Then read
+'progress.org' if it exists: it holds any deviation from the plan the
+agents chose to record.
+
+* If a slice ended without DONE
+The agent stopped for a question. Its report is in [[file:progress.org][progress.org]]
+(the headlines "What's done and went well", "Changes to the plan's
+envisioned order", "What's imperfect about what's done", "Choices
+determining the future"). Its last message is in 'run-logs/slice-N.txt'.
+** Answer it in the session that asked, with its context intact
+#+begin_example
+claude --resume UUID
+#+end_example
+Take the UUID from 'run-logs/sessions.log'. Add
+'--dangerously-skip-permissions' if you do not want to approve each
+tool call by hand. Answer the question, let it finish the slice, and ask
+it to mark the slice DONE in the plan and commit.
+** Then continue the run
+#+begin_example
+nohup bash/run-plan-slices.sh > TODO/total-diff-view/run-logs/run.out 2>&1 &
+#+end_example
+It skips every slice already marked DONE. Give it a range ('bash/run-plan-slices.sh 6 9') to be explicit.
+
+* If claude exited nonzero
+Read 'run-logs/slice-N.err'. Usual causes are a network or
+authentication failure, or a crash. Resume the same session as above;
+if it has no useful context, delete nothing and just rerun the script,
+which starts that slice afresh.
+
+* If nothing ran
+The script refuses to start while tracked files have uncommitted
+changes. Commit (or stash) and start it again with the 'nohup' line
+above. Untracked files do not block it.
+
+* Where things are
+- 'run-logs/slice-N.json' is the raw result of each run; 'slice-N.txt'
+  is the agent's final message; 'slice-N.err' is its stderr.
+- The plan is the specification; 'progress.org' is the agents'
+  deviation and stop log; 'run-logs/' is the run's bookkeeping. None of
+  the three is meant to be committed except the plan's DONE keywords.
+- The discussion that produced the plan is [[file:1_discussion.org][1_discussion.org]]; the agents
+  were told to treat it as background only.

@@ -1,0 +1,798 @@
+#+title: Total diff view (TDV) — execution plan
+#+TODO: TODO ONGOING | DONE
+
+* Assignment and authority
+Implement this plan. It is a complete, settled specification: every
+decision needed to execute it is in this document, and nothing here is
+open for discussion. [[file:1_discussion.org][The discussion]] that produced it is background only;
+where the two differ, this document wins. Writing this plan has
+implemented nothing.
+
+Read [[file:../../coding-advice/ORIENTATION.org][the orientation]] and its code-change, architecture, testing and
+execution advice before starting. Preserve unrelated edits. Commit
+granularly, one or a few commits per slice, each message naming the
+slice it implements. Do not change branches or git configuration. Build
+every client-facing piece for Emacs and Neovim in the same slice. Finish
+the agreed work and its verification without stopping for routine
+choices. Resolve ordinary implementation choices yourself; stopping to
+ask is for the rare conditions that [[file:../../coding-advice/when-to-stop.org][when-to-stop.org]] describes, an
+architectural decision this plan did not anticipate or a goal you cannot
+reach without something ugly. Record meaningful deviations, and any
+such question, in 'progress.org' beside this plan, in the shape that
+file prescribes; this plan itself stays as it is. Mark each slice
+headline DONE when its tests pass and its commit is made.
+
+** Scope and completion
+The deliverable is the four diff-view buffers, the commit-readiness
+store with its gestures and summary, the stage-and-commit command, the
+general-purpose tools of slices 0 to 3, the retirement of the old diff
+view and of the diff report, the "investigate unknown node" request
+that replaces the report's one unique feature, the tests named under
+"verification", and the documentation named there.
+
+** What stays as it is
+The '.skg' file format, the save meaning of every existing viewnode,
+exact-ID navigation, override substitution, the privacy telescopes,
+the skgrepo-set machinery, the stage-moves command and the
+delete-references-to-absent-node command.
+
+* Vocabulary
+Every term below is used in the plan, and each gets a glossary entry in
+slice 9.
+
+** TDV, PCSVF
+The TDV is the total diff view: four buffers that show every change
+in the owned skgrepos since the last commits, with the context needed
+to understand them. The PCSVF ("pruned change-spanning viewforest";
+type 'PCSVF', functions 'pcsvf_...') is the viewforest that the "all
+changes" buffer draws, and the merges and skgrepo-changes buffers draw
+PCSVFs over subsets of the changes.
+
+** graph pair, before-graph, after-graph, union walk, presence
+The graph pair is 'GraphPair { before, after }': the before-graph is an
+'InRustGraph' built from each skgrepo's HEAD; the after-graph is the
+live graph. The union walk is the API over the pair that answers
+questions about the union of the two graphs; each node and each
+relationship it reports carries a presence: 'Both', 'OnlyBefore' or
+'OnlyAfter'.
+
+** C, R, U, D, content origin
+C is the set of changed graphnodes (rightward and leftward changes;
+see "the PCSVF"). R is the set of content origins reached from C by
+walking containerward: a content origin is a node with no container, a
+multiply-contained node, or a member of a rootlike cycle (the stop rule
+of 'server/prominence.rs'; "origin" in code, "content origin" wherever
+the term is introduced and in user-facing text). U is the set of nodes
+to unfold: R, C and every node on a containerward path from a c in C
+to an origin. D is R minus the origins that another kept origin reaches
+containerward inside U.
+
+** change-forest, change-forest leaf
+The change-forest is the tree of everything commit-readiness can be
+asked about, built from the graph pair, independent of any view
+(type 'ChangeForest'). Its roots are the changed graphnodes; under each
+come its changed aspects; its leaves, the change-forest leaves, are the
+individual changes a user marks.
+
+** mark, fingerprint, readiness, derived commit-readiness aggregate
+A mark says that one change-forest leaf is commit-ready. It is stored
+with a fingerprint of the change it approved, and a mark whose
+fingerprint no longer matches counts as absent. An aggregate (a folder,
+a changeset marker, a node, a file, the whole changeset) is ready iff
+every one of its leaves that CAN be ready is ready; that derived value
+is its derived commit-readiness aggregate, or "its readiness" where
+the context is clear.
+
+** changeset marker
+A changeset marker is a childless property viewnode
+('Property::ChangesetMarker') that stands for a set of changes
+recorded in its parent's files and carries their derived readiness.
+Three kinds exist: the content changeset marker ("its content
+changed"), the relRepo changeset marker ("some content relationships
+changed skgrepo") and the order-only marker ("order-only change",
+which is always ready).
+
+** readiness summary, gesture, readiness request
+The readiness summary is the line the client shows after every save of
+a TDV buffer: "12 of 14 changed files are ready", or "COMMIT READY.
+All 14 of 14 changed files are ready." A gesture is a client command
+that writes readiness requests on one or many headlines; a readiness
+request is a metadata form that the save consumes to set or clear
+marks.
+
+** in, out, "(this file)", "(other files)"
+A relationship is out from its recorder (the node whose file records
+it) and in to its member. A folder of out-relationships is labelled
+"... (this file)"; a folder of in-relationships is labelled "... (other
+files)". Changeset markers carry no suffix.
+
+** unknown node, dangling ID
+An unknown node is an ID that some node's contains, subscribesTo,
+hidesFromSubs or overrides list names but that no node of the graph
+answers to, as primary or extra ID; such an ID is dangling. A view
+draws it as an unknown phantom ("Parent references unknown node").
+
+* Agreed behavior
+** One command, four buffers
+One client command ('skg-diff-view' in Emacs, ':SkgDiffView' or the
+Lua equivalent in Neovim) opens up to four buffers, in the order below,
+and skips any that would be empty. The client sends one request per
+buffer; the server answers each with a buffer or with an empty reply,
+which the client does not open. Each buffer is an ordinary registered
+view ('OpenViews', a client-generated view id), so saves and collateral
+rerenders reach it.
+*** "diff-view: all changes"
+It draws the PCSVF over all of C.
+*** "diff-view: merges"
+It draws a PCSVF over the nodes involved in nodeMerges: for each
+deleted pid that a surviving node lists as an extra ID, the acquiree,
+the acquirer and the acquiree's text preserver.
+*** "diff-view: skgrepo changes"
+It draws a PCSVF over the nodes whose home skgrepo changed.
+*** "diff-view: order-only changes"
+It is a flat list of the nodes whose file changed but whose
+change-forest has no leaf (the only change is the order of a list),
+each with an order-only marker under it.
+
+** Refusals
+The request is refused unless the skgrepo restriction is 'all' (the
+refusal text the old diff-mode toggle used), and if any owned skgrepo
+is not a gitrepo or has no HEAD commit. A merge commit at HEAD is not
+a reason to refuse (slice 0 removes that refusal). Foreign skgrepos
+are excluded from C, from the change-forest and from readiness; the
+readiness summary reports their changed-file count.
+
+** No stages
+The TDV compares HEAD with the worktree. The index never enters: the
+graph pair's before endpoint is HEAD, the atoms carry no stage, and
+the stage-and-commit command stages everything before it commits. The
+old view's per-stage machinery goes with the old view (slice 9).
+
+** The PCSVF
+*** C
+C is the union of the rightward set (every node with a change recorded
+in its own files: text, aliases, extra IDs, flags, home skgrepo; any
+member of its contains, subscribesTo, overrides or hidesFromSubs lists;
+any relRepo of those; and every new or deleted node) and the leftward
+set (every node whose set of containers, mentioners, subscribers,
+overriders or hiders changed). Both come from the union walk. Order
+changes do not put a node in C.
+*** R, U, D
+R: from each c in C walk containerward through the union graph until a
+content origin; collect the origins. Reuse the stop rule of
+'find_roots_and_multiply_contained' and 'extend_regions_for_cycles'
+('server/prominence.rs'), lifted to run over the union walk's
+'partners' rather than 'contained_by'. A changed node that is itself an
+origin is its own root. U is R, C and every node on those walks. D:
+process R sorted by ID; from each r walk containerward within U; if the
+walk reaches an origin that is still kept, discard r. This tie-break
+keeps exactly one of two origins on a shared cycle.
+*** Unfolding
+Unfold contentward from each d in D over the union graph. A node in U
+is editable, and its content list is drawn WHOLE, with each member
+tagged by its node presence and its relationship presence; members in U
+unfold further, members outside U are write-protected leaves. A node in
+C also gets its change folders and changeset markers (below). Nodes in
+U but not in C are context: editable, bodies folded ('body_folded').
+Nodes in C have bodies open. No editable node in a TDV gets the
+ordinary default partner folders; folders appear only where something
+changed. The first occurrence the BFS reaches is editable, the rest
+write-protected (today's rule). The node budget is off for a TDV; the
+depth bound 'max_roleTree_depth' applies only to the containerward
+forests under container folders. A TDV has no size cap.
+*** Non-root origins
+A multiply-contained origin at the top level gets a container folder
+holding its whole containerward forest (the diffed full containerward
+tree), drawn folded.
+
+** What each kind of change looks like
+Every label below is a herald rule on a metadata atom (slice 5 and the
+heralds table in "wire format"). In every list, a removed member sits
+where 'phantom_insertion_plan' places it (immediately before the next
+surviving member of the old order); membership is decided by set
+difference, and the LCS only positions removed members, so a reorder
+never shows.
+*** text
+A changed title or body adds an old-text property viewnode under the
+node: "old title and body" (headline = old title, body = old body),
+"old title" or "old body", and under it a "body diff" property viewnode
+whose body is the line diff. The text change is one leaf; its ✓ sits
+on the old-text headline.
+*** content
+No content folder. The content members are direct children; a member
+carries ∃+ / ∃- for its node's presence and ~+ / ~- for its
+relationship's presence, each a separate leaf with its own ✓. The
+content changeset marker "its content changed" sits before the
+members and aggregates only the ~ leaves.
+*** containers, mentioners, subscribers, overriders, hiders (in-folders)
+A changed in-set adds a write-protected set folder labelled "its
+containers changed (other files)" (likewise mentioners, subscribers,
+overriders, hiders). Its members are the partners in either graph,
+tagged by presence. Under each member hangs the role-tree engine's
+continuation over the union graph: under a container member, the full
+containerward tree; under a mentioner, subscriber, overrider or hider
+member, the role tree of that role plus a full containerward tree
+under each graft. 'PartnerFolder::Container' and
+'PartnerFolder::Mentioner' are new kinds (slice 3); Subscriber,
+Overrider and Hider exist.
+*** subscribees, overridden, hidden (out-folders)
+The existing 'Subscribee', 'Overridden' and 'Hidden' folders, drawn
+only when their membership changed, labelled "its subscribees changed
+(this file)" and so on, with members tagged by presence and the same
+continuation under each changed member. The folder kinds do not
+change; the label is a herald rule on the folder's diff state.
+*** aliases, IDs
+The existing alias and ID folders, filled from the diff in list order
+(a removed entry where the LCS puts it), labelled "its aliases changed
+(this file)" and "its IDs changed (this file)"; each entry carries +
+or - and is a leaf.
+*** flags
+The flags folder, drawn only when a flag changed, each changed flag a
+leaf.
+*** home skgrepo
+One property viewnode under the node, "⌂ -old +new", one leaf. In the
+skgrepo-changes buffer the same fact is also drawn in the vognode's
+heralds as "-old +new". When the nearest moved vognode ancestor moved
+the same way, the node also carries the herald 'Δ⌂=a' (the ancestor
+letter in place of 'a'), in the 'nonstandard' style.
+*** relRepo of a relationship
+Under the member whose relationship moved: the property viewnode
+"relationship moved from X to Y", with the skgrepo names in the normal
+style; one leaf, keyed by the relationship, so the same move seen from
+the other end is the same mark. The relRepo changeset marker "some
+content relationships changed skgrepo" sits under the recorder, drawn
+only when some content relationship's relRepo changed. Mentions are
+excluded.
+*** deleted node
+A historical phantom ('Phantom::Historical'): write-protected, with the
+before-graph's title and body, drawn under each former container (even
+deleted ones) as a ~- member, and with its old content beneath it as
+~- members, recursing into deleted members. Its existence is one leaf
+(∃-). If it was an acquiree, it gets a derived, save-inert folder "it
+was acquired by" holding the acquirer; the acquirer gets "it acquired".
+*** new node
+Drawn as an ordinary editable node with ∃+ on its node axis; its
+existence is one leaf.
+*** added IDs
+The IDs folder in the all-changes buffer, as above; the merges buffer
+shows the same event. One store entry serves both.
+
+** Readiness
+*** marks
+The store holds marks only for change-forest leaves. A leaf key is one
+of: (pid, Existence), (pid, Text), (pid, Home), (pid, Alias(text)),
+(pid, ExtraId(id)), (pid, Flag(name)), (relation, recorder, member,
+Existence), (relation, recorder, member, RelRepo). A relationship leaf
+lives under its recorder. The value is the fingerprint: a hash of the
+leaf's before and after values. A mark whose fingerprint does not match
+the current change is absent; nothing signals that an earlier version
+was approved, and a commit lapses every mark.
+*** aggregates
+Readiness of a folder, a changeset marker, a node, a file, a buffer or
+the changeset is derived over the leaves that can be ready; an
+unchanged member has no leaf and is never asked. The content changeset
+marker aggregates only ~ leaves; a member's ∃ leaf belongs to the
+member's own file. The relRepo changeset marker aggregates the relRepo
+leaves of the recorder's content relationships.
+*** gestures
+One command, 'skg-cycle-commit-ready' in Emacs and its Neovim twin,
+bound in the view keymaps (not S-left/S-right). On a leaf it toggles
+that leaf's mark; on a content member with two leaves it asks which
+axis unless only one applies; on an aggregate it writes requests on its
+leaves one level down, and with the prefix argument recursively, as a
+client-side walk that writes one request per headline (the pattern of
+'skg-set-relRepo-recursive'). A second command,
+'skg-mark-gnode-skgrepo-changes-commitReady', marks a node's home-move
+leaf, and with the prefix argument every descendant whose move has the
+same (old, new) pair. Both work on write-protected occurrences.
+*** persistence
+The store is server-side and keyed as above. It is written to
+'<data_root>/readiness-marks.json' after every change and read at
+startup; a missing or unreadable file means an empty store.
+*** the summary and the commit
+After every save of a TDV buffer the save response carries the
+readiness summary, and the client shows it: "12 of 14 changed files
+are ready", or "COMMIT READY. All 14 of 14 changed files are ready."
+Files whose only change is order count as ready. The summary adds the
+unshown-change count (below) and the foreign skgrepos' changed-file
+count. One command, 'skg-stage-and-commit', prompts once for a commit
+message and asks the server to stage everything and commit, in every
+owned skgrepo that has changes, with that message. When the summary is
+not complete the client asks for confirmation, and only the typed word
+"yes" proceeds.
+
+** Saving a TDV buffer
+A TDV buffer saves like any view. Afterwards the buffer is reconciled,
+not rebuilt: at each vognode's visit in view completion, its presence
+and change facts are recomputed from the graph pair, its changeset
+markers and change folders are added or removed, its phantoms
+re-derived, and its readiness heralds refreshed from the store. The
+roots and editability stay as the saved buffer has them. The save
+response also counts the changes that the fresh change set contains
+and the buffer does not show, reports that count in the summary, and
+suggests reopening the view when it is nonzero.
+
+** Moving a node between skgrepos: the server decides what the move strands
+This replaces the client-side analysis in 'skg-request-relRepo-info.el'
+and its Neovim counterpart. The client writes only the new home. At
+save, for each home move, the server finds every relationship touching
+the moved node, of every relation and in both directions, in view or
+not, whose relRepo the sticky-else-default rule would leave stranded.
+Inbound relationships of a privatizing move are raised automatically to
+the new home, and the save's warnings say so. Every other stranded
+relationship is listed in a confirmation response (the fork
+confirmation and the overPrivateText-telescope confirmation are the
+precedents), and the approving re-save carries the chosen relationships
+back, after which the server re-levels them, rewrites the telescopes of
+the nodes that record them, and rerenders the views that show them
+through the collateral machinery.
+
+** Investigating an unknown node
+A request "investigate unknown node" takes an ID. If the ID resolves to
+a node of the live graph, the response says so. Otherwise the server
+walks each skgrepo's first-parent git history from HEAD and reports,
+as org text: the most recent commit whose tree held the ID's file, the
+commit it vanished at, its title then, its own relation lists then, and
+every node of that tree that referred to it, links included; or that
+the ID was never present in any skgrepo's history. The logic is the
+existing 'server/diff_report/vanished.rs', unchanged in substance. Each
+client has a command, 'skg-investigate-unknown-node' and its Neovim
+twin, that takes the ID from the headline at point when that headline
+is an unknown phantom and prompts for it otherwise, and shows the org
+text in a read-only buffer. The delete-references-to-absent-node
+preview ends with one line naming this command.
+
+** Wire format
+*** atoms
+**** presence
+'(diff ATOMS)' sits on a vognode, a phantom or a property leaf, with
+ATOMS from 'node+ node- rel+ rel-'. It replaces '(staged ...)' and
+'(unstaged ...)'.
+**** readiness, displayed
+'(ready AXES)' is a display fact: '(ready node rel)', '(ready rel)',
+'(ready node)'; '(ready)' on a single-axis leaf; absent when nothing
+is ready. An aggregate carries the same form, derived.
+**** readiness, requested
+'(readyRequest AXES)' and '(unreadyRequest AXES)' are requests, in
+their own field ('readiness_request', beside 'relRepo_request'), so
+that they ride with a merge or delete request. 'all' as the axis is
+the one-level gesture on an aggregate.
+**** the new viewnodes
+'(oldText)', '(bodyDiff)', '(homeMove OLD NEW)', '(relRepoMove OLD
+NEW)', '(movedLikeAncestor GEN)', '(changesetMarker KIND)' and
+'(historical)' mark the new property viewnodes and the phantom.
+**** folders
+'(containerFolder)' and '(mentionerFolder)' name the new folder kinds.
+A '(changed)' fact on any folder drawn because of a change is what the
+label rule turns into "its X changed (this file)" or "(other files)".
+**** notInGit
+The existing 'notInGit' stays until the old view goes, then goes.
+*** heralds and styles
+∃+ ∃- ~+ ~- for the four diff atoms (nonstandard); on an alias or ID
+leaf the same atoms render as + and -. ✓ (go) after each ready axis:
+'∃+✓ ~+✓'. ✗ is retired. 'Δ⌂=a' (nonstandard) for movedLikeAncestor.
+"⌂ -old +new" with skgrepo names in normal. Labels in message. Property
+counts in the new 'boring' style. The style 'yucky' is renamed 'ugly'
+everywhere. Tiers: '☮' crucial, '⊥' crucial, 'ĥ' crucial, 'B' high,
+'⟳' medium, the birth letter low; relationship-herald tiers otherwise
+as the shared file has them today.
+*** requests and responses
+Request type "total diff view" with '(buffer . "all changes")',
+'"merges"', '"skgrepo changes"' or '"order-only changes"' and a
+'view-id'; response "total-diff-view" carrying a content view or
+'(empty . t)'. Request "stage and commit" with '(message . "...")' and
+optionally '(confirmed . t)'; response "stage-and-commit" carrying
+either the per-skgrepo commit results, or, when the readiness summary
+is incomplete and 'confirmed' is absent, the summary alone with
+'(needs-confirmation . t)' and no change made.
+Request "investigate unknown node" with '(id . "ID")'; response
+"investigate-unknown-node" with '((content "ORG") (errors (...))
+(warnings (...)))'. The save response gains a '(readiness-summary ...)'
+field. The requests "git diff mode toggle" and "diff report" are
+removed.
+
+* Code map
+** Diff machinery today (retired in slice 9)
+'server/git_ops/diff.rs' ('compute_diff_for_skgrepo'), 'server/types/git.rs'
+('SkgrepoDiff', 'NodeAxes', 'RelationshipAxes', per-stage helpers),
+'server/to_org/render/diff.rs' ('process_unrestrictedVognode_diff',
+'phantom_insertion_plan', 'insert_phantoms_for_missing_contains'),
+'server/update_buffer.rs' ('render_initial_view', 'rerender_view',
+'strip_stale_diff_state', 'remove_diff_only_properties'),
+'server/update_buffer/complete.rs' ('CompletionContext', 'dispatch_node_update',
+'visit_normal_node'), the diff-aware reconcilers in
+'server/update_buffer/reconcile/' (aliasfolder, id_folder, partner_folder,
+content), 'server/to_org/complete/partner_folder/' (goal_list,
+inverse_scan, child_data, kind), 'server/serve/handlers/rerender_all_views.rs'
+('handle_git_diff_toggle_and_rerender'), 'ViewsState::diff_mode_enabled'
+in 'server/serve.rs'. Tests: 'tests/git_diff_view/', 'tests/git_diff_view.rs',
+'tests/git_diff_view_partner_folders.rs', 'tests/diff_mode_refusals.rs',
+'tests/unit/render_diff.rs', 'tests/unit/types_git.rs',
+'tests/unit/three_snapshots.rs', 'tests/unit/inverse_scan.rs'.
+** The diff report (retired in slice 9, except what the graph pair and the investigation keep)
+'server/diff_report/' ('mod.rs', 'diff.rs', 'render.rs', 'types.rs',
+'vanished.rs', 'git_snapshot.rs'), 'server/serve/handlers/diff_report.rs',
+'elisp/skg-request-diff-report.el', 'nvim/lua/skg/diff_report.lua',
+the binding 'C-c t r', 'tests/diff_report.rs', 'tests/diff_report/',
+'tests/elisp/test-skg-diff-report.el', the "Diff report" section of
+'docs/api-and-formats.org' and its mentions in 'docs/COMMANDS.org' and
+'docs/COMMANDS-nvim.org'.
+** The HEAD snapshot (kept)
+'server/diff_report/git_snapshot.rs' ('read_graph_snapshot_maybe_cached',
+'SNAPSHOT_CACHE' keyed by HEAD id, 'parse_blob_node',
+'validate_skgrepos_for_selection'); 'server/diff_report/types.rs'
+('GraphSnapshot', 'GitSnapshotKind').
+** The graph
+'server/dbs/in_rust_graph.rs' ('InRustGraph::from_graphnodes', the
+recorderward relmaps 'contained_by', 'subscribers_of', 'hiders_of',
+'overriders_of', 'mentioners_of'), 'relation_accessors.rs'
+('outbound_rel_partners_for_relation_gated', 'relRepo',
+'relationship_member_key'), 'containerward_role_tree.rs',
+'complete_validation.rs' ('validated_graph').
+** Views and completion
+'server/types/viewnode.rs' ('ViewnodeKind', 'Vognode', 'Phantom',
+'Property', 'PartnerFolder', 'FolderPolicy', 'NodeEditRequest',
+'ViewRequest'), 'server/types/views_state.rs', 'server/to_org/render/content_view.rs'
+('multi_root_view_via_env'), 'server/to_org/util.rs'
+('stub_viewforest_from_root_skgids', 'build_node_branch_minus_content'),
+'server/to_org/expand/role_tree.rs', 'server/serve/parse_metadata_sexp.rs',
+the metadata serializer in 'server/to_org/' (grep 'metadata_to_string').
+** Protocol and handlers
+'server/serve/protocol.rs' ('RequestType', 'TcpToClient'), 'server/serve.rs'
+dispatch, 'server/serve/handlers/' (single_root_view, save_buffer,
+stage_moves, delete_references_to_absent_node). Save response types in
+'server/serve/handlers/save_buffer.rs' and 'server/types/save.rs'.
+** Heralds
+'server/heralds.rs', 'shared/herald-styles.json', 'tests/unit/heralds.rs',
+'tests/shared/herald-rules.sexp' (regenerate with 'cargo run --bin
+emit-herald-rules'), 'elisp/heralds-minor-mode.el', 'elisp/skg-shared.el',
+'nvim/lua/skg/heralds.lua', 'nvim/lua/skg/shared.lua', 'docs/heralds.org'.
+** Clients
+Emacs: 'skg-request-git-diff-mode.el', 'skg-request-single-root-content-view.el'
+(the view-request pattern), 'skg-request-save.el' (save result
+handling, 'skg--save-result-handler'), 'skg-request-relRepo-info.el'
+('skg-set-relRepo', recursive walk), 'skg-request-stage-moves.el',
+'skg-request-diff-report.el' (the pattern for showing server org text
+in a buffer), 'skg-keymaps-and-aliases.el', 'skg-state.el' (response
+handler registry). Neovim: 'diff_mode.lua', 'content_view.lua',
+'save.lua', 'stage_moves.lua', 'diff_report.lua', 'keymaps.lua',
+'state.lua'. Tests: 'tests/elisp/', 'tests/nvim/', runners
+'bash/emacs-tests.sh', 'bash/nvim-tests.sh'.
+** Config and docs
+'server/types/misc.rs' ('SkgConfig'), 'docs/api-and-formats.org',
+'docs/glossary.org', 'docs/heralds.org', 'docs/COMMANDS.org',
+'docs/COMMANDS-nvim.org', 'data/bash/'.
+
+* Implementation sequence
+Each slice ends with its tests passing ('cargo nextest run' for Rust,
+'bash/emacs-tests.sh', 'bash/nvim-tests.sh'), the docs it names
+updated, and a commit. Slices 0 to 3 are general-purpose tools; the
+TDV proper starts at slice 4.
+
+** Slice 0: housekeeping
+Rename 'full_containerward_role_tree_from_in_rust_graph',
+'full_containerward_ancestry_from_in_rust_graph' and
+'prominence_sources_for_saved_from_in_rust_graph' to end in
+'from_inRustGraph'. Rename 'max_role_tree_depth' to 'max_roleTree_depth'
+in 'SkgConfig', its serde default, every config file under 'data/' and
+'tests/', and the docs. Add the rows 'owned_folder' and
+'max_roleTree_depth' to the skgconfig table in 'docs/api-and-formats.org'.
+Remove the merge-commit refusal from 'validate_skgrepos_for_selection'
+and remove 'validate_no_merge_commits' from 'save_buffer.rs', with
+'head_is_merge_commit' if nothing else uses it, and adjust or delete
+the tests that assert the refusal. Update the first entry under
+"Problems noticed while discussing the total diff view" in
+'TODO/problems.org' to say the refusals are gone.
+
+** Slice 1: herald tiers from one source, the 'boring' style, and 'yucky' to 'ugly'
+*** the file
+In 'shared/herald-styles.json': rename the style 'yucky' to 'ugly'
+(same look); add a 'boring' style (white text on dark gray, "#3a3a3a",
+with its 'what_it_looks_like'); add a 'node_heralds' table mapping
+each styled atom of the rule table to a style name, with these tiers:
+'writeProtected' crucial, 'affectsParent_false' crucial,
+'overrides_here' crucial (already present), 'omittedBody' high, 'cycle'
+medium, 'restrictedNode' message, 'relRepo' ugly, 'homeRepoHerald'
+normal, the diff atoms and request atoms nonstandard, the labels
+message, 'ready' go. Set 'birth_letter' to low and 'property_counts' to
+boring. Update the top-level comment: the server embeds the file at
+compile time.
+*** the server
+'include_str!("../shared/herald-styles.json")' into a parsed static
+('std::sync::OnceLock'); the rule table in 'heralds.rs' looks each
+style up by atom name from 'node_heralds'. Replace 'HeraldStyle' with
+the style name as a string (the sexp already carries names, uppercased
+by 'repr_in_client'). Replace 'herald_styles_match_the_shared_style_file'
+with an internal-consistency check (every tier named anywhere in the
+file is a key of 'styles'; every styled atom in the rule table has an
+entry in 'node_heralds'), run as a unit test and asserted once at
+startup. 'herald_rules_cover_the_emittable_vocabulary' stays.
+Regenerate 'tests/shared/herald-rules.sexp'.
+*** the clients and docs
+Both clients build faces from 'styles', so 'boring' needs no client
+code; 'yucky' is named explicitly in 'elisp/skg-link-annotations.el',
+'nvim/lua/skg/link_annotations.lua', 'tests/elisp/test-skg-link-annotations.el',
+'tests/nvim/link_annotations_spec.lua', 'docs/COMMANDS.org',
+'docs/COMMANDS-nvim.org', 'docs/api-and-formats.org' and
+'docs/heralds.org', and every occurrence becomes 'ugly'. Verify with
+'test-heralds-minor-mode.el', 'test-skg-lens.el', the link-annotation
+tests and the nvim herald specs; update 'docs/heralds.org' (the tiers
+table, the new style, the rename, where the tiers live).
+
+** Slice 2: the graph pair and relRepo-aware diffs
+*** module
+New module 'server/graph_pair/' with 'GraphPair { before : Arc<InRustGraph>,
+after : Arc<InRustGraph> }', built by 'GraphPair::from_head_and_live
+(config, runtime)': read the HEAD snapshot of every owned skgrepo
+through 'read_graph_snapshot_maybe_cached (config, GitSnapshotKind::Head)',
+compose its telescopes into Graphnodes (the diff report does this
+today), run 'validated_graph' over them so a duplicate ID at HEAD is
+refused with the usual message, and build with
+'InRustGraph::from_graphnodes'. Foreign skgrepos are excluded from both
+halves. Move 'git_snapshot.rs' and the snapshot types it needs out of
+'server/diff_report/' into 'server/git_ops/' in this slice, so that
+slice 9 can delete the rest of 'diff_report/' cleanly.
+*** union walk
+'enum Presence { Both, OnlyBefore, OnlyAfter }' and methods on the pair:
+'node_presence (id)'; 'node_changes (id) -> NodeChanges' (text changed,
+aliases ±, extra IDs ±, flags ±, home (old, new)); 'partners (id, role)
+-> Vec<Partner { id, presence, relRepo_before, relRepo_after }>' over
+the union, for every 'RelationRole' in both directions, reading
+'outbound_rel_partners_for_relation_gated' on each graph and the
+recorderward relmaps for the inbound side; 'changed_pids () ->
+ChangedPids { rightward, leftward }' computed once and cached in the
+pair; 'order_only_pids ()' (file changed, no change-forest leaf,
+computed with slice 3's forest). Relationship comparison is at the
+level of 'RelPartner' (member plus relRepo), so a relRepo-only change
+is a 'relRepoMove'.
+*** lifetime
+The pair lives in the connection's 'ViewsState' as 'Option<Arc<GraphPair>>',
+built when a TDV buffer is requested, rebuilt when the HEAD id of any
+owned skgrepo changes (the snapshot cache key) or after the
+stage-and-commit command, and dropped when the last TDV buffer closes.
+*** tests
+'tests/graph_pair/' with git fixtures (the helpers in
+'tests/git_diff_view/common.rs', which this slice copies to a shared
+location because slice 9 deletes 'tests/git_diff_view/'): a removed
+container is reachable from the deleted node; a relRepo-only change is
+reported; 'changed_pids' splits rightward and leftward correctly; a
+duplicate ID at HEAD refuses.
+
+** Slice 3: change-forest, readiness store, partner folders, strand computation
+*** change-forest
+'server/change_forest.rs': 'ChangeForest' built from the graph pair,
+with 'LeafKey' (the keys under "marks"), 'leaf_fingerprint (key) -> u64'
+(hash of before and after values with 'DefaultHasher', as the snapshot
+cache does), 'leaves_under (pid)', 'leaves_in_file (skgrepo, pid)',
+'files_changed () -> per skgrepo', and the derived readiness functions
+over a store: 'readiness_of_leaves (keys)', 'readiness_of_file',
+'readiness_summary () -> ReadinessSummary { ready_files, changed_files,
+foreign_changed_files, order_only_files }'.
+*** store
+'server/readiness_store.rs': 'ReadinessStore { marks : HashMap<LeafKey,
+u64> }' with 'is_ready (key, fingerprint)', 'mark', 'unmark', serde
+derive, 'load (data_root)' and 'save (data_root)' to
+'<data_root>/readiness-marks.json', held in 'SharedRuntime' behind a
+'Mutex'. Document the file in 'docs/api-and-formats.org' next to the
+"Log files" section.
+*** metadata
+Parse and serialize '(diff ...)', '(ready ...)', '(readyRequest ...)',
+'(unreadyRequest ...)' and the new property atoms in
+'parse_metadata_sexp.rs' and the serializer; add 'readiness_request' to
+the unrestricted vognode, the phantom kinds and the property leaves;
+extend 'emittable_metadata_atoms' and the rule table (labels and
+glyphs per "wire format"). The save consumes readiness requests after
+the graph edits succeed: compute the leaf's fingerprint from the fresh
+graph pair and write the mark; a save that stops for confirmation
+consumes nothing.
+*** partner folders
+Add 'PartnerFolder::Container' and 'PartnerFolder::Mentioner', both
+'FolderPolicy::WriteProtectedSet', with 'relation_member_role'
+(Contains first role; LinksTo first role), 'caller_label', parse and
+serialize atoms, and the view requests '(folder containers)' and
+'(folder mentioners)' so they are also available outside the TDV.
+Teach 'reconcile_partnerFolder_children' to accept a goal list from a
+presence-tagged source (the graph pair) as well as from the live graph,
+and let 'build_and_integrate_role_tree_with_skgrepo_set' and
+'full_containerward_role_tree_from_inRustGraph' take a partners
+function, so the same engine walks either the live graph or the union.
+*** strand computation on the server
+Implement "Moving a node between skgrepos" under "agreed behavior":
+the strand analysis at save over every relationship touching a moved
+node, the automatic raise of inbound relationships of a privatizing
+move with a warning, the confirmation response listing the rest, and
+the approving re-save that carries the chosen relationships. Remove the
+client-side analysis from 'skg-request-relRepo-info.el' and its Neovim
+counterpart once the server path passes the existing relRepo tests.
+*** tests
+Unit tests for the forest and store (keys, fingerprints lapse on edit,
+aggregate over leaves that can be ready, persistence round trip);
+metadata round-trip tests for every new atom; folder tests in the
+pattern of 'tests/partner_folder_matrix'; strand tests in the pattern
+of 'tests/collateral_repo_move.rs', including one privatizing move that
+raises an inbound relationship and one move whose confirmation lists a
+relationship recorded by a node outside the view.
+
+** Slice 4: new viewnodes
+Add 'Property::ChangesetMarker { kind }', 'Property::OldText { title,
+body }', 'Property::BodyDiff', 'Property::HomeSkgrepoMove { old, new }',
+'Property::RelRepoMove { old, new }', 'Phantom::Historical
+{ skgid, home_skgrepo, title, body, presence }', and the derived folders
+'PartnerFolder::AcquiredBy' and 'PartnerFolder::Acquired'
+('WriteProtectedSet', derived membership from extra IDs over the pair).
+Each new kind: parse, serialize, 'emittable_metadata_atoms', herald
+rule, save-inertness (the validator ignores them; the reconciler owns
+them), and a round-trip test (render, save back unchanged, expect a
+no-op), in a new 'tests/tdv/roundtrip/' modelled on today's
+'tests/git_diff_view/roundtrip/'. Historical phantoms render their old
+content as ~- members, recursing into deleted members; the renderer
+must allow phantoms under a write-protected historical node.
+
+** Slice 5: the PCSVF and the "all changes" buffer
+*** builder
+'server/pcsvf.rs': 'PCSVF' with 'pcsvf_sets (pair) -> Sets { c, r, u, d }'
+and 'pcsvf_viewforest (pair, forest, store, roots)'. The builder makes a
+stub forest of D (write-protected repeats as usual), then view
+completion draws it: a new 'CompletionContext' field 'graph_pair :
+Option<&GraphPair>' (replacing 'skgrepo_diffs' when set) drives a new
+inline step 'process_unrestrictedVognode_changes' at each visit, which
+does for the pair what 'process_unrestrictedVognode_diff' does for the
+per-stage diffs: tags the content members, inserts historical phantoms
+at 'phantom_insertion_plan' positions, adds or removes the change
+folders and changeset markers, attaches old-text properties, sets
+'body_folded' on context nodes, and reads the store for '(ready ...)'.
+Unfolding stops at nodes outside U (write-protected leaves). The node
+budget is bypassed when 'graph_pair' is set.
+*** request and handler
+'RequestType::TotalDiffView', 'TcpToClient::TotalDiffView',
+'server/serve/handlers/total_diff_view.rs': refuse unless restriction is
+'all'; build or reuse the pair; build the forest for the named buffer;
+register the view; answer with the buffer or '(empty . t)'.
+*** clients
+'skg-request-total-diff-view.el' and 'total_diff_view.lua': one command
+sends the four requests in order and opens each nonempty buffer, named
+"diff-view: ..."; keymap entries where 'skg-view-diff-mode' is bound
+today ('C-c v d' in Emacs).
+*** tests
+'tests/pcsvf/': the sets on fixtures with a cycle, a multiply-contained
+node, a deleted subtree, a leftward-only change; a rendered buffer
+fixture per change kind; round trip of a full TDV buffer. Client tests:
+the command opens only nonempty buffers.
+
+** Slice 6: readiness in the view, saving a TDV, the summary
+*** save reconcile
+'rerender_view' detects a TDV buffer (its 'ViewState' records the
+buffer kind) and completes it with 'graph_pair' set, after rebuilding
+the pair if HEAD moved. Readiness requests are consumed as slice 3
+describes. The save response gains '(readiness-summary (ready N)
+(changed M) (foreign F) (order-only O) (unshown K))', where K is the
+count of leaves in the fresh change-forest whose owning node is not in
+the buffer's pids.
+*** gestures
+'skg-cycle-commit-ready' and 'skg-mark-gnode-skgrepo-changes-commitReady'
+in Emacs ('skg-readiness.el'), and 'readiness.lua' in Neovim: edit the
+headline metadata with 'skg-edit-metadata-at-point' and the Lua
+metadata editor, walk subtrees for the recursive forms, then save.
+*** summary display
+Both clients show the summary after a TDV save in the minibuffer or
+'vim.notify': "12 of 14 changed files are ready" or "COMMIT READY. All
+14 of 14 changed files are ready.", followed by ", K changes are not
+shown in this view; reopen it" when K > 0 and by the foreign count when
+it is nonzero.
+*** tests
+Rust: mark a leaf, save, see '(ready ...)' on both images of the
+relationship; edit the node, see the mark lapse; the summary counts.
+Clients: the gesture writes the right request on a leaf, a member with
+two axes, and an aggregate; the recursive form touches only matching
+descendants; the summary message is shown.
+
+** Slice 7: merges, skgrepo changes, order-only buffers
+'pcsvf_sets_for_merges (pair)' (acquiree, acquirer, text preserver per
+acquired pid) and 'pcsvf_sets_for_home_moves (pair)' feed the same
+builder. The skgrepo-changes buffer adds the "-old +new" herald on the
+vognode and the 'movedLikeAncestor' fact (computed like
+'homeSkgrepoAtBoundary' against the nearest moved vognode ancestor).
+The order-only buffer is a flat list from 'order_only_pids', each node
+with bodies folded and an order-only changeset marker. Tests per buffer,
+plus the one-command behavior end to end.
+
+** Slice 8: stage and commit
+'RequestType::StageAndCommit', handler in 'server/serve/handlers/stage_and_commit.rs':
+compute the readiness summary; if it is incomplete and the request
+lacks '(confirmed . t)', answer with the summary and
+'(needs-confirmation . t)' and change nothing; otherwise, for every
+owned skgrepo with changes, 'git2' index 'add_all' then a commit with
+the given message and the repo's configured author (the pattern of
+'commit_all' in today's 'tests/git_diff_view/common.rs'), respond with
+per-skgrepo results and errors, and rebuild the graph pair so open TDV
+buffers rerender empty or shrunken. Clients: 'skg-stage-and-commit'
+prompts for the message and sends the request; on a
+'needs-confirmation' response it shows the summary and requires the
+typed word "yes" ('read-string', compared exactly) before resending
+with '(confirmed . t)'. Tests: a fixture with two owned skgrepos commits
+both with one message; an incomplete summary answers needs-confirmation
+and commits nothing; a confirmed resend commits.
+
+** Slice 9: retire the old diff view and the diff report, add the investigation request, finish docs
+*** the old diff view
+Remove 'RequestType::GitDiffModeToggle', 'TcpToClient::GitDiffMode',
+'diff_mode_enabled', 'handle_git_diff_toggle_and_rerender', the
+per-stage types and helpers in 'server/types/git.rs' and
+'server/git_ops/diff.rs' that nothing else uses,
+'process_unrestrictedVognode_diff', 'PhantomDiff' and
+'Property::TextChanged' (now 'Phantom::Historical' and 'OldText'),
+'strip_stale_diff_state' as far as it concerns the old atoms, the
+'notInGit' atom, 'inverse_scan.rs' and 'three_git_snapshots_of_relation_list'
+if the pair-driven folders no longer use them, and the Emacs and Neovim
+toggle commands with their bindings. Port the old view's tests that
+still apply to the TDV fixtures and delete the rest.
+*** the diff report
+Remove 'server/diff_report/diff.rs', 'render.rs', the report structs in
+'types.rs' ('DiffReport', 'NodeBucket', 'NodeDiffReport',
+'DuplicateIDReport', 'ValueSetDiff', 'RelationshipDiff', 'TextDiffLine',
+'ListDiffItem', 'DiffSelection'), 'server/serve/handlers/diff_report.rs',
+'RequestType::DiffReport', 'TcpToClient::DiffReport',
+'elisp/skg-request-diff-report.el', 'nvim/lua/skg/diff_report.lua', the
+binding 'C-c t r' and its Neovim counterpart, 'tests/diff_report.rs',
+'tests/diff_report/', 'tests/elisp/test-skg-diff-report.el' and the
+nvim spec if one exists, and the "Diff report" section of
+'docs/api-and-formats.org' with its mentions in 'docs/COMMANDS.org' and
+'docs/COMMANDS-nvim.org'. Keep 'GraphSnapshot', 'GitSnapshotKind' and
+the snapshot reader where slice 2 moved them. Move 'vanished.rs' to
+'server/git_ops/vanished.rs' unchanged in substance; it keeps
+'investigate_vanished_skgids', 'sighting_at_commit' and the rendering
+of one ID's section, which moves with it from 'render.rs'.
+*** the investigation request
+'RequestType::InvestigateUnknownNode' ("investigate unknown node"),
+'TcpToClient::InvestigateUnknownNode' ("investigate-unknown-node"),
+handler 'server/serve/handlers/investigate_unknown_node.rs': parse the
+ID; if 'runtime.graph.pid_of (id)' is Some, answer with content
+"ID resolves to node TITLE (PID) in SKGREPO"; otherwise answer with the
+org text of 'investigate_vanished_skgids (config, {id})' for that ID.
+Clients: 'skg-investigate-unknown-node' in 'skg-request-investigate-unknown-node.el'
+and 'investigate_unknown_node.lua', taking the ID from the headline at
+point when its metadata is an unknown phantom and prompting otherwise,
+and showing the content in a read-only org buffer as the diff report
+did; bind them where 'C-c t r' was. The delete-references-to-absent-node
+preview ('server/serve/handlers/delete_references_to_absent_node.rs',
+'preview_warning_org') ends with the line "To see this node's history,
+run skg-investigate-unknown-node on it." Tests: a Rust test that moves
+the vanished-node case out of 'tests/diff_report.rs' (a committed node
+deleted in a later commit is reported with its title, commit and
+referrers; a never-committed ID reports no sightings; a resolvable ID
+reports its node); an ERT test and an nvim spec that the command sends
+the request with the ID at point.
+*** documentation
+Glossary entries for every term under "vocabulary", plus "unknown
+node". 'docs/api-and-formats.org': the new requests and responses
+("total diff view", "stage and commit", "investigate unknown node"),
+the save response field, the metadata section rewritten for
+'(diff ...)', '(ready ...)' and the new atoms, the config rows, the
+marks file, and the removal of the "Git diff mode toggle" and "Diff
+report" sections. 'docs/heralds.org': new heralds, tiers, 'boring',
+'ugly'. 'docs/COMMANDS.org' and 'docs/COMMANDS-nvim.org': the new
+commands, the removed ones; in particular each documents
+'skg-investigate-unknown-node' (or its Neovim twin), with its binding,
+what it takes from the headline at point, and what the response shows.
+Mark both entries under "Problems noticed
+while discussing the total diff view" in 'TODO/problems.org' resolved.
+
+* Verification and completion
+** Rust
+'cargo nextest run' after every slice. The round-trip invariant is
+tested for every new viewnode kind and for a full TDV buffer of each of
+the four kinds: render, save back unchanged, expect no graph change and
+no validation error.
+** Clients
+'bash/emacs-tests.sh' and 'bash/nvim-tests.sh' after every client
+slice; the shared lens fixtures in 'tests/shared/' regenerated once per
+herald change.
+** Integration
+One scenario under 'tests/integration/': a fixture with two owned
+skgrepos and one foreign skgrepo, a text edit, a move, a deletion and a
+merge; open the TDV; mark everything through the gestures; see "COMMIT
+READY"; stage and commit; see empty buffers; then reference a deleted
+ID by hand and investigate it.
+** Done when
+Every slice is committed, every suite passes, the docs above are
+updated, and 'TODO/problems.org' records the two resolved entries.
