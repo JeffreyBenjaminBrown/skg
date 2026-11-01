@@ -80,20 +80,37 @@ name directly."
      (lambda ()
        (local-set-key (kbd "C-?") #'skg-view-repo-list)))))
 
-(defun skg--prompt-for-repo-set ()
+(defconst skg--foreign-repos-choices
+  '(("foreign: shown" . foreign-shown)
+    ("foreign: hidden" . foreign-hidden))
+  "The skgrepo restriction picker's foreign-repos choices: label . choice.")
+
+(defun skg--prompt-for-repo-set (&optional offer-foreign-repos)
   "Prompt for the skgrepo restriction, with completion and S-left/S-right cycling.
-The skgrepo restriction is the most private skgrepo to show: choosing
-a repo shows it and everything more public.  Each choice is shown by
-its name, the most private one with \" (no restriction)\" appended,
-the default.  Returns the chosen repo's name."
+The skgrepo restriction's rung is the most private owned repo to
+show: choosing one shows it and every more public owned repo.  Each
+choice is shown by its name, the most private one with \" (no
+restriction)\" appended, the default.  Returns the chosen repo's name.
+When OFFER-FOREIGN-REPOS is non-nil and the config has a foreign
+repo, the choices also include \"foreign: shown\" and \"foreign:
+hidden\", which return the symbol `foreign-shown' or
+`foreign-hidden': foreign repos are shown or hidden apart from the
+rung."
   (let* ((names (skg--repo-set-names))
-         (labels (mapcar #'skg--skgrepo-restriction-label names)))
+         (rung-labels (mapcar #'skg--skgrepo-restriction-label names))
+         (foreign-choices (when (and offer-foreign-repos
+                                     (skg--foreign-repo-names))
+                            skg--foreign-repos-choices))
+         (labels (append rung-labels (mapcar #'car foreign-choices))))
     (unless names
-      (user-error "No skg repos found"))
+      (user-error "No owned skg repos found"))
     (let ((label (skg--completing-read-with-cycle
-                  "Most private repo to show (S-left/right cycle): "
-                  labels nil t nil nil (car (last labels)) nil labels)))
-      (nth (cl-position label labels :test #'string=) names))))
+                  (if foreign-choices
+                      "Most private repo to show, or foreign: shown/hidden (S-left/right cycle): "
+                    "Most private repo to show (S-left/right cycle): ")
+                  labels nil t nil nil (car (last rung-labels)) nil labels)))
+      (or (cdr (assoc label foreign-choices))
+          (nth (cl-position label rung-labels :test #'string=) names)))))
 
 (defun skg--repo-paths ()
   "Return an alist of (repo-name . absolute-path) from skgconfig.toml."
@@ -108,17 +125,25 @@ the default.  Returns the chosen repo's name."
       (skg-repo-names-from-toml config-file))))
 
 (defun skg--repo-set-names ()
-  "Return the skgrepo restriction's choices: the repo names, in privacy order.
-Each names the most private repo to show, that repo and everything
-more public (a prefix of the config's privacy order); the last
-shows every repo, no skgrepo restriction."
-  (skg--repo-names))
+  "Return the skgrepo restriction's rungs: the owned repo names, in privacy order.
+Each names the most private owned repo to show, that repo and every
+more public owned one (a prefix of the config's privacy ladder); the
+last, with foreign repos shown, is no skgrepo restriction.  Foreign
+repos are on no rung, wherever the config lists them."
+  (skg--owned-repos))
+
+(defun skg--foreign-repo-names ()
+  "Return the names of the configured foreign repos, in config order, or nil."
+  (let ((config-file (skg-config-file)))
+    (when config-file
+      (skg-foreign-repos-from-toml config-file))))
 
 (defun skg--skgrepo-restriction-label (name)
-  "How the clients show the skgrepo restriction NAME, a repo name.
-The config's most private repo, which shows every repo, gets
-\" (no restriction)\" appended; the words never reach the server."
-  (if (equal name (car (last (skg--repo-names))))
+  "How the clients show the skgrepo restriction's rung NAME, a repo name.
+The config's most private owned repo, which with foreign repos shown
+shows every repo, gets \" (no restriction)\" appended; the words never
+reach the server."
+  (if (equal name (car (last (skg--owned-repos))))
       (concat name " (no restriction)")
     name))
 
@@ -159,9 +184,20 @@ The config's most private repo, which shows every repo, gets
 
 (defun skg-owned-repos-from-toml (file)
   "Return the names of the owned repos in FILE, in declaration order.
-A repo is owned unless its entry says `foreign = true', mirroring
-the server. A repo with no `name' key defaults its name to its
-path, also mirroring the server."
+That order is the privacy ladder, wherever foreign entries sit among
+them.  A repo is owned unless its entry says `foreign = true',
+mirroring the server. A repo with no `name' key defaults its name to
+its path, also mirroring the server."
+  (skg--repo-names-by-ownership-from-toml file t))
+
+(defun skg-foreign-repos-from-toml (file)
+  "Return the names of the foreign repos in FILE, in declaration order.
+Named as `skg-owned-repos-from-toml' names them."
+  (skg--repo-names-by-ownership-from-toml file nil))
+
+(defun skg--repo-names-by-ownership-from-toml (file owned)
+  "Return the names of the owned repos in FILE if OWNED, else the foreign ones.
+In declaration order; see `skg-owned-repos-from-toml'."
   (with-temp-buffer
     (insert-file-contents file)
     (goto-char (point-min))
@@ -173,7 +209,8 @@ path, also mirroring the server."
           (flush nil))
       (setq flush
             (lambda ()
-              (when (and in-skgrepos current-path (not current-foreign))
+              (when (and in-skgrepos current-path
+                         (if owned (not current-foreign) current-foreign))
                 (push (or current-name current-path) skgrepos))
               (setq current-name nil current-path nil current-foreign nil)))
       (while (not (eobp))

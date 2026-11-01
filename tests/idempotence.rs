@@ -156,18 +156,22 @@ fn refreshes_unchanged (
       forest, record, &Truth::of_runtime (runtime, restriction) )) }
 
 /// No skgrepo restriction, then the skgrepo restriction through
-/// each skgrepo but the most private (through which it would be no
-/// skgrepo restriction).
+/// each owned skgrepo but the most private (through which it would be
+/// no skgrepo restriction), then, when the config has a foreign
+/// skgrepo, every owned one with the foreign ones hidden.
 fn restrictions_of (
   config : &SkgConfig,
 ) -> Vec<SkgrepoRestriction> {
-  let ordered : Vec<SkgrepoName> = config . ordered_skgrepos ();
-  let narrower : usize = ordered . len () . saturating_sub (1);
+  let ladder : Vec<SkgrepoName> = config . privacy_ladder ();
+  let narrower : usize = ladder . len () . saturating_sub (1);
+  let has_foreign : bool = config . skgrepos . values () . any ( |s| ! s . owned );
   std::iter::once (SkgrepoRestriction::unrestricted (config))
-    . chain ( ordered . into_iter () . take (narrower)
+    . chain ( ladder . into_iter () . take (narrower)
               . filter_map ( |skgrepo| SkgrepoRestriction::named (
-                  config, SkgrepoName ( skgrepo . 0 . clone () ))
-                . ok () ))
+                  config, skgrepo ) . ok () ))
+    . chain ( has_foreign . then ( ||
+                SkgrepoRestriction::unrestricted (config)
+                . with_foreign_shown (config, false) . ok () ) . flatten () )
     . collect () }
 
 /// How a failure names the skgrepo restriction it met.
@@ -175,6 +179,8 @@ fn in_the_report (
   restriction : &SkgrepoRestriction,
 ) -> String {
   if restriction . is_unrestricted () { "no skgrepo restriction" . to_string () }
+  else if ! restriction . foreign_shown {
+    format! ("'{}', foreign skgrepos hidden", restriction . most_private_shown . 0) }
   else { format! ("'{}'", restriction . most_private_shown . 0) } }
 
 /// Every folder named 'fixtures' under 'root', but the test results.

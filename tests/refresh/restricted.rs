@@ -368,3 +368,72 @@ node s
     node e wp" . to_string () ],
     "the editable folder stays, empty, where a save would read it, and \
      the skgrepo widening fills it again, claiming" ); }
+
+/// p, in 'main', lists f in its 'main' section; f is foreign, its
+/// home 'theirs', and lists g in its own section; g is foreign too.
+fn p_with_foreign_f () -> InRustGraph {
+  let in_theirs = |pid : &str| -> Graphnode {
+    Graphnode { title        : format! ("{}'s foreign title", pid),
+                home_skgrepo : SkgrepoName::from ("theirs"),
+                .. node (pid) } };
+  graph (&[
+    Graphnode { contains : ids (&["f", "c"]), .. node ("p") },
+    Graphnode { contains : rel_partners_at_relRepo (
+                  &SkgrepoName::from ("theirs"), vec! [ ID::from ("g") ] ),
+                .. in_theirs ("f") },
+    in_theirs ("g"),
+    node ("c") ]) }
+
+#[test]
+fn hiding_foreign_skgrepos_keeps_a_foreign_node_out_of_sight_and_out_of_reach () {
+  let hidden : SkgrepoRestriction = foreign_hidden ();
+  let theirs : SkgrepoName = SkgrepoName::from ("theirs");
+  assert! ( SkgrepoRestriction::node_is_restricted (&hidden, &theirs) );
+  assert! ( ! SkgrepoRestriction::record_is_visible (&hidden, &theirs) );
+  assert! ( ! hidden . is_unrestricted (),
+            "the most private rung with foreign repos hidden still restricts" );
+  let input : String = formatdoc! ("
+    * {} p
+    ", occurrence_metadata ("p", "") );
+  let shown_text : String = {
+    let run : Run = run_asserting_fixpoint (&input, &p_with_foreign_f ());
+    assert_eq! ( run . outline (), "\
+node p
+  node f
+    node g
+  node c",
+      "shown, the foreign node is drawn, as an edit to it would fork it" );
+    run . text };
+  let mut forest : ViewForest =
+    parse (&shown_text, IdResolution::ThroughGraph (&p_with_foreign_f ()));
+  let across : Vec<(String, String)> = refresh_across_switches (
+    &mut forest, &p_with_foreign_f (),
+    &[ &hidden, &unrestricted () ], RefreshMode::ContentView );
+  assert_eq! ( across [0] . 1, "\
+node p
+  restricted f
+  node c",
+    "hidden, the view re-renders with f a Restricted vognode, since \
+     p's 'main' section records it, and without g, which only f's \
+     foreign section records" );
+  for secret in [ "foreign title", "(gnid g)" ] {
+    assert! ( ! across [0] . 0 . contains (secret),
+              "{}: {}", secret, across [0] . 0 ); }
+  assert_eq! ( across [1] . 1, "\
+node p
+  node f
+    node g
+  node c",
+    "shown again, f and g come back" ); }
+
+#[test]
+fn a_rung_with_foreign_skgrepos_shown_shows_a_foreign_node_as_before () {
+  let input : String = formatdoc! ("
+    * {} p
+    ", occurrence_metadata ("p", "") );
+  let run : Run = refreshed_under_main_only (&input, &p_with_foreign_f ());
+  assert_eq! ( run . outline (), "\
+node p
+  node f
+    node g
+  node c" ); }

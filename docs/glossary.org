@@ -853,8 +853,8 @@ folders.
 A *skgrepo* is a directory of =.skg= files, configured by one
 =[[repos]]= entry in =skgconfig.toml=. A node's *home skgrepo* is the
 skgrepo that holds its home section (see below). A *skgrepo-set* is a
-prefix of the config's privacy order: the skgrepos made available
-together. A *gitrepo* is a Git repository. Skgrepos are usually gitrepos
+prefix of the config's privacy ladder, the owned skgrepos in privacy
+order: the owned skgrepos made available together. A *gitrepo* is a Git repository. Skgrepos are usually gitrepos
 too, but they need not be.
 
 In prose, always say "skgrepo" or "gitrepo", never a bare "repo", so the
@@ -873,15 +873,20 @@ with. A skgrepo's *skgrepo label* is the short name its heralds
 show: its =abbreviation= in the config, or else its name
 ('herald_label' in code).
 
-The *skgrepo restriction* ('SkgrepoRestriction') is the skgrepo-set a
-connection currently shows, named by the most private skgrepo it
-shows. When that is the config's most private skgrepo it holds every
-skgrepo and restricts nothing: the connection is *unrestricted* (a
-term of plan 10), and has no skgrepo restriction. The clients show
-it so by appending *" (no restriction)"* (a term of plan 10) to that
-skgrepo's name where they show the skgrepo restriction, words that
-never travel on the wire or sit in the config. To *switch* the skgrepo restriction is to choose
-another with 'skg-restrict-repo-set' (=C-c v l=; =<localleader>vl=
+The *skgrepo restriction* ('SkgrepoRestriction') is what a connection
+currently shows: a skgrepo-set, named by the most private owned
+skgrepo it shows (its *rung*), and whether the foreign skgrepos are
+shown, all of them or none, which they are unless the connection
+hides them ('foreign_shown'). When the rung is the config's most
+private owned skgrepo and the foreign skgrepos are shown it holds
+every skgrepo and restricts nothing: the connection is
+*unrestricted* (a term of plan 10), and has no skgrepo restriction.
+The clients show the most private rung so by appending *" (no
+restriction)"* (a term of plan 10) to that skgrepo's name where they
+show the skgrepo restriction, words that never travel on the wire or
+sit in the config. To *switch* the skgrepo restriction is to choose
+another rung, or to show or hide the foreign skgrepos, with
+'skg-restrict-repo-set' (=C-c v l=; =<localleader>vl=
 in Neovim): the clients refuse while a view has unsaved edits, and
 the server rerenders every open view under the new one, saying
 nothing of what the rerender changed. A skgrepo inside the
@@ -911,9 +916,9 @@ of plan 10): the user cancels, deletes from the visible records only,
 or deletes from all owned records ('docs/api-and-formats.org', "Save
 buffer").
 
-A *skgrepo narrowing* is a switch to a smaller
-skgrepo-set, and a *skgrepo widening* a switch to a larger one (both
-terms of plan 08). The words "restriction", "narrowing" and
+A *skgrepo narrowing* is a switch that shows fewer skgrepos (a
+smaller skgrepo-set, or the foreign skgrepos hidden), and a *skgrepo
+widening* one that shows more (both terms of plan 08). The words "restriction", "narrowing" and
 "widening" always take the modifier "skgrepo". Where an occurrence of
 a node stood when a skgrepo narrowing kept it out, a restricted
 viewnode stands in its place where its record is visible, holding
@@ -927,8 +932,11 @@ visible (see "restricted viewnode").
 *** owned, foreign
 
 A skgrepo is *owned* unless its config entry says =foreign = true=,
-which makes it *foreign*. Every foreign skgrepo is more public than
-every owned one (the server refuses a config where it is not).
+which makes it *foreign*. Only owned skgrepos have privacy levels;
+the foreign ones are an unordered set, listed anywhere in the config
+(see "privacy order and relRepo"). Every skgrepo has an *owner*
+('SkgrepoOwner'): the user, for an owned one; for foreign ones, one
+owner per set of skgrepos that dependencies manifests chain together.
 Only owned sections are ever written. A real edit to a foreign node is
 read as a request to fork it (see "clone, and the fork operation").
 Say "owned" rather than "editable", and "foreign" rather than
@@ -956,10 +964,13 @@ look past. There is no linking relationship between sections —
 sharing an ID is being the same node. See =docs/telescopes.org=
 and =server/types/nodes/fs.rs=.
 
-Before composing, an owned-PID collision is normalized: if any owned
-section exists for a PID, the entire owned telescope is retained and all
-same-PID foreign sections are ignored (with a deterministic warning and no
-filesystem edit). A telescope with no owned section remains wholly foreign.
+A telescope's sections are all one owner's (see "owned, foreign").
+Before composing, sections of one PID in skgrepos of different owners
+are separated: the home owner's are the telescope, and the rest are
+*illegal edits to a foreign node* — shown, when in an owned skgrepo,
+as an =illegalEditFolder= child of the node, and otherwise ignored,
+with a startup warning and no filesystem edit (=docs/telescopes.org=,
+"Illegal edits").
 
 *** overPrivateText
 
@@ -1011,8 +1022,16 @@ repair restores.
 
 *** privacy order and relRepo
 
-The position of a skgrepo in the config's privacy order (most public
-first) is its privacy level. Live code does not use "level" for the
+The position of an owned skgrepo in the config's privacy order (most
+public first), the order of the owned entries, is its privacy level;
+the owned skgrepos in that order are the *privacy ladder*
+('SkgConfig::privacy_ladder'). A foreign skgrepo has no level, and
+no comparison of privacy involves one: it is neither more nor less
+public than anything. The order the sections of one node fold in is
+its *fold order* ('SkgConfig::ordered_skgrepos'): the privacy order
+for an owned node, and for a foreign one the order its owner's
+dependencies manifests give ('docs/api-and-formats.org',
+"OTHER_SKGREPO_DEPENDENCIES.toml"). Live code does not use "level" for the
 value carried by a relationship: every relationship member carries its
 *relRepo*, the skgrepo whose section records it. In code
 that is =RelPartner { relRepo, member }=; a collection of them is

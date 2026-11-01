@@ -13,9 +13,9 @@ local state = require('skg.state')
 
 local M = {}
 
----Export REPO_SET, the most private repo to export, and every more
----public repo (prompted when absent; choose a public-facing repo so
----private notes stay private) to OUTPUT_DIR, which the server
+---Export REPO_SET, the most private owned repo to export, every more
+---public owned repo and the foreign repos (prompted when absent;
+---choose a public-facing repo so private notes stay private) to OUTPUT_DIR, which the server
 ---resolves against its own project root -- possibly inside a
 ---container whose filesystem differs from this editor's, hence no
 ---path completion on the prompt. Defaults to 'org-exports'.
@@ -30,7 +30,7 @@ function M.export_some_to_org (repo_set, output_dir, approved_pids)
       .. ' [org-exports]: ')
     if output_dir == '' then output_dir = 'org-exports' end
   end
-  local names = config.repo_names()
+  local names = config.owned_repos()
   if names and names[#names] == repo_set then
     vim.notify('Exporting with no skgrepo restriction; consider a more'
                .. ' public repo so private notes are not exported.')

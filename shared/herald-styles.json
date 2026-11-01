@@ -84,6 +84,7 @@
     "mentionerFolder":                 "message",
     "acquiredByFolder":                "message",
     "acquiredFolder":                  "message",
+    "illegalEditFolder":               "message",
     "oldText":                         "message",
     "bodyDiff":                        "message",
     "homeSkgrepoMove":                 "message",
@@ -98,7 +99,8 @@
     "write_protected": [ "flagsFolder", "subscriberFolder", "overriderFolder",
                          "hiderFolder", "hiddenFolder", "hiddenInSubscribeeFolder",
                          "containerFolder", "mentionerFolder",
-                         "acquiredByFolder", "acquiredFolder" ],
+                         "acquiredByFolder", "acquiredFolder",
+                         "illegalEditFolder" ],
     "changed_labels": {
       "aliasFolder":      "its aliases changed (this file)",
       "idFolder":         "its IDs changed (this file)",

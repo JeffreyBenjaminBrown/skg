@@ -59,18 +59,22 @@ describe('skg.config', function ()
   it('does not confuse [[repos]] and [[repo_sets]]', function ()
     assert.are.same({ 'public', 'private', 'foreign' },
                     config.repo_names())
-    assert.are.same({ 'public', 'private', 'foreign' },
-                    config.repo_set_names())
+    assert.are.same({ 'public', 'private' }, config.repo_set_names(),
+                    'the rungs are the owned repos alone')
+    assert.are.same({ 'foreign' }, config.foreign_repos())
     local path_names = {}
     for _, entry in ipairs(config.repo_paths()) do
       table.insert(path_names, entry.name) end
     assert.are.same({ 'public', 'private', 'foreign' }, path_names)
   end)
 
-  -- Mirrors test-skgrepo-restriction-label-marks-the-most-private-repo.
-  it('marks the most private repo as no restriction', function ()
+  -- Mirrors test-skgrepo-restriction-label-marks-the-most-private-repo
+  -- and test-skgrepo-restriction-label-ignores-a-later-foreign-repo.
+  it('marks the most private owned repo as no restriction', function ()
     assert.are.equal('public', config.skgrepo_restriction_label('public'))
-    assert.are.equal('foreign (no restriction)',
+    assert.are.equal('private (no restriction)',
+                     config.skgrepo_restriction_label('private'))
+    assert.are.equal('foreign',
                      config.skgrepo_restriction_label('foreign'))
     assert.are.equal('elsewhere',
                      config.skgrepo_restriction_label('elsewhere'))
@@ -78,8 +82,12 @@ describe('skg.config', function ()
     local sexpr = require('skg.sexpr.parse')
     local message = function (text)
       return repo_sets.skgrepo_restriction_message((sexpr.read(text))) end
-    assert.are.equal('Skgrepo restriction: foreign (no restriction)',
-      message('((response-type skgrepo-restriction) (restriction "foreign"))'))
+    assert.are.equal('Skgrepo restriction: private (no restriction)',
+      message('((response-type skgrepo-restriction) (restriction "private")'
+              .. ' (foreign-repos "shown"))'))
+    assert.are.equal('Skgrepo restriction: private; foreign repos hidden',
+      message('((response-type skgrepo-restriction) (restriction "private")'
+              .. ' (foreign-repos "hidden"))'))
     assert.are.equal('Skgrepo restriction: public',
       message('((response-type skgrepo-restriction) (restriction "public"))'))
     assert.are.equal('refused', message(
@@ -87,25 +95,36 @@ describe('skg.config', function ()
       .. ' (content "refused"))'))
   end)
 
-  -- Mirrors test-repo-set-prompt-completes-configured-repo-sets.
-  it('prompts for the skgrepo restriction by the repos\' labels',
-     function ()
+  -- Mirrors test-repo-set-prompt-completes-configured-repo-sets and
+  -- test-repo-set-prompt-offers-the-owned-rungs-and-the-foreign-toggle.
+  it('prompts for the skgrepo restriction by the owned repos\' labels,'
+     .. ' and when asked, the foreign toggle', function ()
     local picker = require('skg.picker')
     local real = picker.completing_read_with_cycle
-    for label, name in pairs({ ['public'] = 'public',
-                               ['foreign (no restriction)'] = 'foreign' }) do
+    local rungs = { 'public', 'private (no restriction)' }
+    local toggles = { 'foreign: shown', 'foreign: hidden' }
+    for _, case in ipairs({
+        { offer = false, label = 'public', chosen = 'public' },
+        { offer = true, label = 'private (no restriction)', chosen = 'private' },
+        { offer = true, label = 'foreign: shown',
+          chosen = picker.foreign_repos_choices[1] },
+        { offer = true, label = 'foreign: hidden',
+          chosen = picker.foreign_repos_choices[2] } }) do
       picker.completing_read_with_cycle = function (prompt, collection, opts)
         assert.is_truthy(prompt:find('Most private repo', 1, true))
-        assert.are.same({ 'public', 'private', 'foreign (no restriction)' },
+        assert.are.same(case.offer
+                          and vim.list_extend(vim.list_extend({}, rungs), toggles)
+                          or rungs,
                         collection)
         assert.are.same(collection, opts.cycle_values)
-        assert.are.equal('foreign (no restriction)', opts.initial_input)
+        assert.are.equal('private (no restriction)', opts.initial_input)
         assert.is_true(opts.require_match)
-        return label end
-      local ok, chosen = pcall(picker.prompt_for_repo_set)
+        return case.label end
+      local ok, chosen = pcall(picker.prompt_for_repo_set,
+                               { offer_foreign_repos = case.offer })
       picker.completing_read_with_cycle = real
       assert.is_true(ok, chosen)
-      assert.are.equal(name, chosen)
+      assert.are.equal(case.chosen, chosen)
     end
   end)
 

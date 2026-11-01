@@ -32,8 +32,9 @@ on scratch data instead. Instances share nothing but the binary.
    ```
    Paths are relative to the data root, the config file's directory.
    A repo is writable unless its entry says `foreign = true`; no folder
-   name is special. Foreign repos must be listed before (more public
-   than) every owned one, or the config is refused. The old
+   name is special. The owned repos are listed most public first (the
+   privacy ladder); foreign repos have no place on it and may be
+   listed anywhere. `default_repo_set` must name an owned repo. The old
    `user_owns_it`, `owned_folder` and `db_name` keys are rejected, and
    there is no TypeDB anymore.
    `./target/debug/skg check-config <scratch>/skgconfig.toml` validates

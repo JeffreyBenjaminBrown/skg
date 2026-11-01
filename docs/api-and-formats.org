@@ -514,10 +514,17 @@ buffer's =rendered-at=.
   - Response: LP =((response-type server-warnings) (warnings ("WARNING" ...)))=,
     or =(warnings ())= when there are none. The warnings are the ones
     the server raised as it started: one per top-level key of
-    skgconfig.toml it does not know (see "skgconfig.toml", below), and
-    one per pair of skgrepos that a foreign skgrepo's dependencies
-    manifest orders differently than the config does while some
-    telescope spans both (see "OTHER_SKGREPO_DEPENDENCIES.toml", below).
+    skgconfig.toml it does not know (see "skgconfig.toml", below); one
+    per skgrepo holding an illegal edit to a foreign node — a section
+    of a node in a skgrepo of another owner than its home's — naming
+    the first such node (ID and title), how many more there are, the
+    skgrepo and the home, and saying that an owned one is shown only
+    under the node and a foreign one ignored (=docs/telescopes.org=,
+    "Illegal edits"); and one per pair of one foreign owner's
+    skgrepos that some node spans and whose dependencies manifests
+    disagree about their order, naming the node, the disagreeing
+    manifests and which skgrepo this server folds first (see
+    "OTHER_SKGREPO_DEPENDENCIES.toml", below).
     A reload of the config ("Rebuild session-lifetime stores") does
     not change them.
   - Each client sends this once per connection, as soon as the
@@ -687,13 +694,15 @@ buffer's =rendered-at=.
     not rewrite =.skg= files. Failure, an invalid config included, leaves
     the old generation live. Success rewrites the owned skgrepos'
     =OTHER_SKGREPO_DEPENDENCIES.toml= as a startup does, and warns, as
-    a startup does, of unknown config keys and contradicted foreign
-    manifests, and of a changed =port= or =timing_log=, which take
+    a startup does, of unknown config keys, illegal edits to foreign
+    nodes and disputed foreign fold orders, and of a changed =port= or
+    =timing_log=, which take
     effect only at a restart; the server's startup warnings ("Server
     warnings") stay as they were. Each connection's skgrepo restriction
     follows the new config at its next request: none stays none, and
     a restriction keeps its most private skgrepo shown, or, if the
-    config no longer names it, becomes the config's default. Success
+    config no longer names it as owned, becomes the config's default;
+    either way foreign skgrepos stay shown or hidden as they were. Success
     closes existing views, drops the graph straddle of the diff
     view, and recomputes context rankings for search. Every node of
     the rebuilt graph last changed at the new runtime generation, so a save
@@ -740,18 +749,21 @@ buffer's =rendered-at=.
 ** Repos
   - Request: ((request . "repos"))
   - Response: LP =((response-type repos) (restriction "NAME")
-    (repos ((name "NAME") (path "PATH") (abbreviation "ABBR")
-    (owned "true")) ...))=, one entry per configured skgrepo, in
-    privacy order (most public first; see "skgconfig.toml >
-    Skgrepos"). =PATH= is the skgrepo's path as the config writes it:
+    (foreign-repos "shown") (repos ((name "NAME") (path "PATH")
+    (abbreviation "ABBR") (owned "true") (shown "true")) ...))=, one
+    entry per configured skgrepo, in fold order: config order, the
+    owned ones in privacy order (most public first; see "skgconfig.toml
+    > Skgrepos"). =PATH= is the skgrepo's path as the config writes it:
     relative to the data root when it lies below it, else absolute.
     =(abbreviation ...)= appears only when the skgrepo has one,
     configured or derived (the =abbreviation= field of "Skgrepos").
     =owned= is "false" for a skgrepo whose entry says
-    =foreign = true=. =(restriction ...)= is the connection's skgrepo
-    restriction, as "skgrepo restriction" reports it.
-  - The endpoint is read-only and ignores the skgrepo restriction: it
-    lists every skgrepo of the config, restricted or not.
+    =foreign = true=. =shown= is whether the connection's skgrepo
+    restriction shows the skgrepo. =(restriction ...)= and
+    =(foreign-repos ...)= are that restriction, as "skgrepo
+    restriction" reports it.
+  - The endpoint is read-only and lists every skgrepo of the config,
+    restricted or not; =shown= says which the restriction keeps out.
   - Logic: =server/serve/handlers/repos.rs=.
 
 ** Runtime generation
@@ -836,7 +848,8 @@ one automatically.
 ** Export to org
   - Request: =((request . "export to org") (repo-set . "NAME")
     (output-dir . "PATH") (approved-overPrivateText-pids "PID" ...))=.
-    - NAME is a skgrepo name, the most private skgrepo to export.
+    - NAME is an owned skgrepo name, the most private owned skgrepo to
+      export. The foreign skgrepos are exported too.
     - Both fields are required; a missing or blank =output-dir= is an
       error (the server applies no default -- the client supplies the
       user a default but always sends a value). =output-dir= is
@@ -867,7 +880,7 @@ one automatically.
     telescopes returns LP =overPrivateText-telescope-confirmation= with
     =(operation export-to-org)= and the exact PIDs. An approved retry
     carries those PIDs in =approved-overPrivateText-pids=. An export of
-    the config's most private skgrepo (no skgrepo restriction), or an
+    the config's most private owned skgrepo (no skgrepo restriction), or an
     approved restricted export, returns the ordinary export response
     with the shared warning.
   - An *export root* is a node one of whose =contains= children, its
@@ -888,8 +901,9 @@ one automatically.
     =cargo run --bin skg -- export-org [config-path] [skgrepo-restriction]
     [output-dir] [--include-overPrivateText-telescopes]=; =skgrepo-restriction=,
     the skgrepo restriction to export under, named as every
-    skgrepo restriction is by its most private skgrepo, defaults to the config's most
-    private skgrepo. Under a skgrepo restriction it fails closed before
+    skgrepo restriction is by its most private owned skgrepo (foreign
+    skgrepos shown), defaults to the config's most private owned
+    skgrepo. Under a skgrepo restriction it fails closed before
     writing unless the flag is present; with no skgrepo restriction
     (and on an approved restricted run) it prints the warning.
 
@@ -951,26 +965,33 @@ one automatically.
     it.
 
 ** skgrepo-sets
-  - Skgrepo-sets are the prefixes of the config's privacy order (see
-    "skgconfig.toml > skgrepo-sets" below): each skgrepo name denotes
-    itself plus everything more public. The skgrepo restriction is one
-    skgrepo, the most private one shown; a connection that shows the
-    config's most private skgrepo is unrestricted.
+  - Skgrepo-sets are the prefixes of the config's privacy ladder, the
+    owned skgrepos (see "skgconfig.toml > skgrepo-sets" below): each
+    owned skgrepo's name denotes itself plus every more public owned
+    one. The skgrepo restriction is two things: one such rung, the
+    most private owned skgrepo shown, and whether the foreign
+    skgrepos are shown ("shown" unless a connection hides them). Its
+    set is the rung's prefix, plus every foreign skgrepo when they
+    are shown. A connection that shows the config's most private
+    owned skgrepo and the foreign skgrepos is unrestricted.
   - Request: ((request . "list repo sets"))
   - Response: LP response-type "repo-sets" with
-    =((restriction "NAME") (sets ("NAME1" "NAME2" ...)))=. The sets are
-    the skgrepo names in privacy order (most public first), the last
-    of them no skgrepo restriction; order is meaningful (it is the
-    privacy ladder), so clients should preserve it.
+    =((restriction "NAME") (foreign-repos "shown"|"hidden") (sets
+    ("NAME1" "NAME2" ...)))=. The sets are the owned skgrepo names in
+    privacy order (most public first), the last of them no skgrepo
+    restriction when foreign skgrepos are shown; order is meaningful
+    (it is the privacy ladder), so clients should preserve it.
   - Request: ((request . "skgrepo restriction"))
   - Response: LP response-type "skgrepo-restriction" with
-    =((restriction "NAME"))=.
+    =((restriction "NAME") (foreign-repos "shown"|"hidden"))=.
   - Request: =((request . "set skgrepo restriction") (name . "NAME")
-    (approved-overPrivateText-pids "PID" ...))=, NAME the most private
-    skgrepo to show.
+    (foreign-repos . "shown"|"hidden") (approved-overPrivateText-pids
+    "PID" ...))=, NAME the most private owned skgrepo to show. Either
+    of =name= and =foreign-repos= may be left out, and then stays as
+    it is; one of them must be present.
   - Response: Multiple length-prefixed messages, sent sequentially:
     1. Skgrepo-set response:
-       =Content-Length: N\r\n\r\n((response-type skgrepo-restriction) (restriction "NAME"))=
+       =Content-Length: N\r\n\r\n((response-type skgrepo-restriction) (restriction "NAME") (foreign-repos "shown"))=
     2. The rerender stream, as in "rerender all views":
        rerender-lock → rerender-view* → rerender-done. Each open view
        is re-rendered in place under the new set by the refresh alone:
@@ -1001,10 +1022,13 @@ one automatically.
     every skg view before switching the skgrepo restriction"), before
     it sends the request. The server's own refusals are the two
     below.
-  - Refusal: the endpoint's error paths (a missing name, or one that
-    names no skgrepo of the config: "'NAME' names no skgrepo of the
-    config. The skgrepo restriction is the most private skgrepo to
-    show.") answer in the normal skgrepo-restriction response-type,
+  - Refusal: the endpoint's error paths (neither a name nor
+    =foreign-repos=; a =foreign-repos= other than "shown" or "hidden";
+    or a name that names no owned skgrepo of the config, a foreign one
+    included: "'NAME' names no owned skgrepo of the config. The
+    skgrepo restriction is the most private owned skgrepo to show;
+    foreign skgrepos are shown or hidden apart from it.") answer in
+    the normal skgrepo-restriction response-type,
     carrying the explanatory text as =content= and the unchanged set
     as =restriction=, followed by an empty rerender stream (a
     rerender-lock naming no views, then rerender-done), so the
@@ -1478,7 +1502,7 @@ Pass its path as a command-line argument (default: =data/skgconfig.toml=) when s
 | =initial_node_limit= | no       | 1000    | Max nodes to render in initial content views.                    |
 | =timing_log=         | no       | false   | When true, writes a JSON log to =<data_root>/logs/server.jsonl=. |
 | =beep_when_server_becomes_available= | no | true | When true, plays a local sound after server initialization finishes. |
-| =default_repo_set= | no | the most private skgrepo | The skgrepo restriction when a client connects: the most private skgrepo to show. The default is no skgrepo restriction. Runtime changes are per connection and are not written back. |
+| =default_repo_set= | no | the most private owned skgrepo | The skgrepo restriction when a client connects: the most private owned skgrepo to show, foreign skgrepos shown. It must name an owned skgrepo; a foreign one is refused. The default is no skgrepo restriction. Runtime changes are per connection and are not written back. |
 | =max_roleTree_depth= | no | 20 | Max breadth-first depth of a containerward chain. |
 | =readiness_marks_file= | no | =readiness-marks-STEM.json= | The diff view's readiness marks file (see "Readiness marks file"). Relative to data root. |
 
@@ -1496,10 +1520,13 @@ still exits 0; the server logs them and serves them to each client
 ** Skgrepos
 
 Each =[[repos]]= entry defines a directory of =.skg= files.
-*Order is load-bearing*: skgrepos must be listed in privacy order,
-most public first, most private last. That order defines the privacy
-levels of the telescope model (see =docs/telescopes.org=) and the
-available skgrepo-sets (below).
+*The order of the owned entries is load-bearing*: owned skgrepos must
+be listed in privacy order, most public first, most private last.
+That order, the privacy ladder, defines the privacy levels of the
+telescope model (see =docs/telescopes.org=) and the available
+skgrepo-sets (below). The foreign entries form an unordered set: they
+have no place on the ladder and may be listed anywhere, before,
+between or after the owned ones.
 
 | Field          | Required | Description |
 |----------------+----------+-------------|
@@ -1515,13 +1542,16 @@ unless its entry says =foreign = true=; a foreign skgrepo is never
 written. No folder name means anything to the server. The intended
 layout is =<data_root>/AUTHOR/REPO=, one author folder per person, so
 that people sharing one data tree list the same skgrepos and differ
-only in which entries say =foreign= (and so, by the rule below, in
-their order).
+only in which entries say =foreign=. Since a config orders only its
+owned skgrepos, two people's configs never disagree about an order:
+each states only its own ladder.
 
-*Every foreign skgrepo must be more public than every owned one*
-(earlier in the list). The server refuses a config that breaks this,
-naming the two skgrepos; it is what keeps each person's privacy order
-straight.
+A node's sections are all one owner's: the user's owned skgrepos, or
+the foreign skgrepos of one foreign owner, which the foreign
+skgrepos' dependencies manifests identify, and whose order they give
+(see "OTHER_SKGREPO_DEPENDENCIES.toml", below). A section in another
+owner's skgrepo is an illegal edit to the node (=docs/telescopes.org=,
+"Illegal edits").
 
 The retired =user_owns_it= field and the retired top-level
 =owned_folder= key are rejected with an error.
@@ -1535,44 +1565,53 @@ other entry.
 
 Skgrepo-sets are no longer declared; the retired =[[repo_sets]]=
 table is rejected with an error. The sets are exactly the
-*prefixes of the privacy order*: each skgrepo's name denotes the
-set consisting of itself and every more-public skgrepo; the most
-private skgrepo's set holds every skgrepo, and so is no
-skgrepo restriction. Choosing a set is choosing
-"the most private skgrepo to make available." =default_repo_set=
-(top-level field) names the skgrepo restriction when a client
-connects; left out, it is the most private skgrepo.
+*prefixes of the privacy ladder*: each owned skgrepo's name denotes
+the set consisting of itself and every more-public owned skgrepo; the
+most private owned skgrepo's set holds every owned skgrepo. Choosing
+a set is choosing "the most private owned skgrepo to make
+available." Apart from that choice, a connection shows or hides the
+foreign skgrepos, all of them at once; they are shown unless it hides
+them. The most private set with the foreign skgrepos shown is no
+skgrepo restriction. =default_repo_set= (top-level field) names the
+set when a client connects, with the foreign skgrepos shown; left
+out, it is the most private owned skgrepo. Naming a foreign skgrepo
+there is refused.
 
 Example:
 
 #+begin_src toml
 default_repo_set = "public"
 
-# Privacy order: most public first. Foreign skgrepos come first.
+# The owned skgrepos in privacy order: most public first.
+# Foreign skgrepos may sit anywhere.
+[[repos]]
+name = "public"
+path = "me/public"      # owned => writable
+
 [[repos]]
 name = "Fred"
 path = "fred/public"
 foreign = true          # write-protected
 
 [[repos]]
-name = "public"
-path = "me/public"      # owned => writable
-
-[[repos]]
 name = "private"
 path = "me/private"
 #+end_src
 
-Here the available skgrepo-sets are =Fred= = {Fred},
-=public= = {Fred, public}, =private= = {Fred, public, private};
-=private=, the most private, is no skgrepo restriction.
+Here the available skgrepo-sets are =public= = {public} and
+=private= = {public, private}, each with Fred's skgrepo added while
+foreign skgrepos are shown; =private= with them shown is no skgrepo
+restriction.
 
 ** OTHER_SKGREPO_DEPENDENCIES.toml
 
 At every server start the server writes an =OTHER_SKGREPO_DEPENDENCIES.toml=
 manifest into each owned skgrepo directory. Its =dependencies= is a
-list of pairs, one per skgrepo that skgrepo may reference — itself and
-everything more public, in privacy order, the skgrepo itself last.
+list of pairs, one per rung of the privacy ladder through that
+skgrepo — itself and every more public owned skgrepo, in privacy
+order, the skgrepo itself last. Foreign skgrepos never appear in it:
+an owned skgrepo does not depend on one (a relationship to a foreign
+node is recorded in the owned file and names an ID, not an order).
 Each pair has a =path= (data-root-relative directory) and, unless the
 skgrepo is not a gitrepo or has no remote, a =git-remote= (the fetch
 URL =git remote -v= prints, =origin= preferred), so a receiver knows
@@ -1591,22 +1630,33 @@ It is generated output — hand edits are clobbered — and lets someone
 who receives one of your skgrepos see what it depends on and where to get
 it.
 
-The server warns when a foreign skgrepo's manifest orders two skgrepos
-differently than this config does /and/ some node has a section in
-each of them that this server composes into one telescope (see
-=telescopes.org=). Such a node folds its sections in opposite orders on
-this server and on the publisher's. The warning names the node (its ID
-and title, and how many more nodes span the pair), both skgrepos and
-the two orders; it appears at init, in the log and in the startup
-warnings each client shows on connect (see "Server warnings", above).
-A bare disagreement of orders is not warned about: every foreign
-skgrepo is more public than every owned one, so two teammates' configs
-necessarily order their shared skgrepos oppositely, and no reordering
-could satisfy both. Nor is a node whose sections sit in an owned and a
-foreign skgrepo: the owned telescope wins and the foreign sections are
-ignored, so no telescope spans the pair. (The receiver also
-still reads the older bare-string =dependencies= shape, so manifests
-published before this change keep working.)
+A receiver reads the manifest of each of its foreign skgrepos when
+its config loads. An entry names the receiver's foreign skgrepo at
+the same data-root-relative path, else the one foreign skgrepo whose
+folder has the same name (the receiver may keep a publisher's
+skgrepos in another author folder); an entry matching neither way, or
+several foreign skgrepos by folder name, is skipped. The manifests do
+two things:
+- *Ownership.* Foreign skgrepos that manifests chain together (a
+  manifest's own skgrepo and every one it lists, transitively) are
+  one owner's ('SkgrepoOwner', 'SkgConfig::skgrepo_owner'); foreign
+  skgrepos no manifest chains are different owners'. Only one owner's
+  sections of a node fold together; the rest are illegal edits.
+- *Fold order.* A foreign node's sections fold in its owner's order:
+  a pair that some manifest lists, and no manifest lists the other way
+  round, in the manifest's order; a pair two manifests disagree about,
+  as the manifest of the more private one says (the one whose own
+  manifest lists the other; failing that, the one listed first in the
+  config); and any other pair in config order, so far as the ordered
+  pairs allow.
+
+The server warns at startup about a disagreeing pair when some node
+of that owner has a section in each, naming the node (its ID and
+title, and how many more nodes span the pair), both skgrepos, the
+disagreeing manifests, and which one this server folds first; it
+appears at init, in the log and in the startup warnings each client
+shows on connect (see "Server warnings", above). (The receiver also
+reads the bare-string =dependencies= shape.)
 
 ** Log files
 
@@ -1688,7 +1738,8 @@ Fields:
   across sections; each entry's relRepo is its section's
   skgrepo.
 
-The composition of all same-pid sections (most public first) yields the
+The composition of all same-pid sections (in fold order: an owned
+node's most public first) yields the
 node; saving decomposes the node back into sections, byte-stably, so
 untouched sections do not change on disk. An owned section emptied
 by a save is deleted; foreign sections are never touched.
@@ -1808,7 +1859,20 @@ remains the established bare non-vognode atom:
 =subscribeeFolder=, =subscriberFolder=, =overriddenFolder=, =overriderFolder=,
 =hiderFolder=, =hiddenFolder=, =hiddenInSubscribeeFolder=,
 =hiddenOutsideOfSubscribeeFolder=, =containerFolder=, =mentionerFolder=,
-or, in the diff view only, =acquiredByFolder= or =acquiredFolder=.
+or, in the diff view only, =acquiredByFolder= or =acquiredFolder=;
+and, outside the diff view, =illegalEditFolder=.
+
+An =illegalEditFolder= stands first under an occurrence of a foreign
+node into which one of the user's skgrepos writes a section: an
+illegal edit to a foreign node ('IllegalEdit'; =docs/telescopes.org=,
+"Illegal edits"). The server draws it at every refresh while the
+graph holds such a section in a skgrepo the skgrepo restriction
+shows, and removes it otherwise. Its headline text is the section's
+title, its body the section's body (several sections' joined), and its
+children the section's =contains= members, write-protected. It is
+write-protected and save-inert: the parser keeps its text only for the
+refresh to replace, and a save reads nothing in it. Herald: =☮ ILLEGAL
+EDIT TO FOREIGN NODE=, in the message style.
 
 A tombstone is written =(skg (vnid X) tombstone)=: it has
 no ID, no change facts and no title (the parser discards text typed on

@@ -9,7 +9,7 @@ use crate::dbs::init::rebuild_tantivy_as_generation;
 use crate::git_ops::git_snapshot::forget_cached_git_snapshots;
 use crate::telescope::invariants::{TelescopeViolation, report_telescope_violations};
 use crate::telescope::dependencies_manifest::{
-  foreign_manifest_order_warnings, write_dependencies_manifests};
+  foreign_section_warnings, write_dependencies_manifests};
 use crate::dbs::in_rust_graph::complete_validation::validated_graph;
 use crate::types::env::SkgEnv;
 use crate::serve::ViewsState;
@@ -79,9 +79,10 @@ pub fn rebuild_session_lifetime_stores_in_place (
       : (Vec<Graphnode>, Vec<(ID, TelescopeViolation)>) =
       read_all_skg_files_from_skgrepos_collecting_violations (&fresh_config)
       . map_err ( |e| format! ("Reading .skg files: {}", e) ) ?;
-    let (fresh_graph, mut graph_warnings) =
+    let (mut fresh_graph, mut graph_warnings) =
       validated_graph (&fresh_config, &nodes)
       . map_err (|e| format! ("Complete graph validation failed:\n{}", e)) ?;
+    fresh_graph . record_illegal_edits (&load_violations);
     graph_warnings . extend (load_violations);
     graph_warnings . sort_by (|(pid_a, a), (pid_b, b)|
       pid_a . cmp (pid_b)
@@ -120,7 +121,7 @@ pub fn rebuild_session_lifetime_stores_in_place (
         error = %e, "could not write OTHER_SKGREPO_DEPENDENCIES.toml manifests" ); }
     let warnings : Vec<String> =
       config_warnings . into_iter ()
-      . chain ( foreign_manifest_order_warnings (&fresh_config) )
+      . chain ( foreign_section_warnings (&fresh_config) )
       . chain ( restart_only_warnings )
       . collect ();
     for warning in &warnings {

@@ -469,6 +469,10 @@ pub fn herald_rule_table () -> HeraldRule {
             "it was acquired by"),
       write_protected_leaves (Folder::Acquired . repr_in_client (),
             "it acquired"),
+      // A section the user wrote into another owner's node: shown
+      // under the node, never part of it ('IllegalEdit').
+      write_protected_leaves (Folder::illegal_edit () . repr_in_client (),
+            "ILLEGAL EDIT TO FOREIGN NODE"),
       vec! [
       leaf (Folder::ID . repr_in_client (), "IDs"),
       leaf ("id", "ID"), // PropertyMember::ID

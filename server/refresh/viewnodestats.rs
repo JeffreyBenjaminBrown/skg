@@ -404,7 +404,9 @@ fn birth_facts_for_folder (
             generation_above_a_member (tree, folder_treeid, subscribee) )) )
         . collect () },
     // 'ParentKind::Folder' holds partner folders only.
-    Folder::Alias | Folder::ID | Folder::Flags { .. } => Vec::new (), } }
+    Folder::Alias | Folder::ID | Folder::Flags { .. } => Vec::new (),
+    // What an illegal section contains is no relationship of the node's.
+    Folder::IllegalEdit { .. } => Vec::new (), } }
 
 /// Sets omitted_body on the occurrence at treeid: true iff the node
 /// is shown WRITE_PROTECTED here while its graphnode has a body -- one

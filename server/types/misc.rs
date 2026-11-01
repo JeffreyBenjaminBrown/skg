@@ -95,11 +95,9 @@ pub struct Skgrepo {
   pub abbreviation : Option<String>,
   pub path         : PathBuf,
   // True unless the TOML entry says 'foreign = true'. No folder
-  // name bears on it. The config loader refuses a foreign skgrepo
-  // more private than an owned one
-  // ('validate_foreign_skgrepos_more_public_than_owned' in
-  // server/dbs/filesystem/not_nodes.rs). Rust constructors (tests)
-  // set it directly.
+  // name bears on it. Only an owned skgrepo has a rung in the
+  // privacy order; the foreign ones are an unordered set. Rust
+  // constructors (tests) set it directly.
   pub owned : bool,
 }
 
@@ -212,19 +210,38 @@ pub struct SkgConfig {
   // The skgrepo names in TOML declaration order ('repos' is a HashMap,
   // which loses it). Filled at parse time by the config loaders; empty
   // for dummy/test configs, where the config-order helpers fall back to
-  // alphabetical. LOAD-BEARING: declaration order is the privacy order
-  // (most public first); the composition, the relRepo defaults, the
-  // validators, and prefix skgrepo-sets all read it, through the
-  // comparison chokepoint methods below ('ordered_skgrepos',
-  // 'repo_position', 'is_strictly_more_public', 'more_private_of',
-  // 'privacy_order_split_after'). No other code may compare skgrepo
+  // alphabetical. LOAD-BEARING: the owned entries' declaration order
+  // is the privacy order (most public first); the foreign entries
+  // have none, and may sit anywhere. The composition, the relRepo
+  // defaults, the validators, and the skgrepo restriction all read it
+  // through the methods below ('ordered_skgrepos', 'privacy_ladder',
+  // 'skgrepo_position', 'is_strictly_more_public', 'more_private_of',
+  // 'privacy_ladder_split_after'). No other code may compare skgrepo
   // positions.
   #[serde (skip)]
   pub skgrepo_order   : Vec<SkgrepoName>,
 
+  // What each foreign skgrepo's OTHER_SKGREPO_DEPENDENCIES.toml says
+  // of the order of this config's foreign skgrepos, and the fold order
+  // of the foreign skgrepos that follows from it. Both are set by
+  // 'set_foreign_manifest_orders', which the config loaders call once
+  // paths are final; empty for dummy/test configs. They order only
+  // the folding of a node no owned skgrepo has a section of.
+  #[serde (skip)]
+  pub foreign_manifest_orders : Vec<ForeignManifestOrder>,
+  #[serde (skip)]
+  pub foreign_fold_order      : Vec<SkgrepoName>,
+  // Each foreign skgrepo that a foreign manifest chains to another,
+  // mapped to the first in declaration order of the skgrepos so
+  // chained: one owner's ladder ('skgrepo_owner'). Set with the two
+  // fields above.
+  #[serde (skip)]
+  pub foreign_owner_groups    : HashMap<SkgrepoName, SkgrepoName>,
+
   // The skgrepo restriction a connection starts with: the most
-  // private skgrepo it shows ('SkgrepoRestriction'). Absent, the most
-  // private skgrepo of the config: no skgrepo restriction.
+  // private owned skgrepo it shows ('SkgrepoRestriction'), foreign
+  // skgrepos shown. Absent, the most private owned skgrepo: no
+  // skgrepo restriction. It must name an owned skgrepo.
   #[serde(rename = "default_repo_set", default)]
   pub default_skgrepo_set : Option<SkgrepoName>,
 
@@ -247,6 +264,45 @@ pub struct SkgConfig {
 
   #[serde (default)]
   pub readiness_marks_file : Option<PathBuf>, // The readiness store's file, as the config states it; see 'readiness_marks_path'.
+}
+
+/// The foreign skgrepos of this config that one foreign skgrepo's
+/// OTHER_SKGREPO_DEPENDENCIES.toml lists, in the manifest's order
+/// (most public first). The manifest names its publisher's own
+/// ladder, so the order is that publisher's privacy order.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ForeignManifestOrder {
+  pub manifest_skgrepo : SkgrepoName,
+  pub listed           : Vec<SkgrepoName>,
+}
+
+/// What the foreign manifests say of the relative order of two
+/// foreign skgrepos.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ForeignPairOrder {
+  /// At least one manifest lists both, and every one that does puts
+  /// 'first' first.
+  Agreed { first : SkgrepoName },
+  /// No manifest lists both.
+  Unlisted,
+  /// Manifests that list both disagree: 'first_by' puts 'a' first,
+  /// 'second_by' puts 'b' first. 'first' is the one folded first:
+  /// as the manifest of the more private of the two says, the one
+  /// whose own manifest lists the other; else ('a' and 'b' each
+  /// list the other, or neither's manifest is among the disputants)
+  /// the one declared first.
+  Disputed { first_by  : SkgrepoName,
+             second_by : SkgrepoName,
+             first     : SkgrepoName },
+}
+
+/// Whose a skgrepo is: the user's (owned), or one foreign owner's,
+/// named by the first in declaration order of that owner's skgrepos
+/// that this config lists ('SkgConfig::skgrepo_owner').
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum SkgrepoOwner {
+  User,
+  Foreign (SkgrepoName),
 }
 
 impl SkgConfig {
@@ -478,6 +534,9 @@ impl SkgConfig {
       data_root          : PathBuf::from ("."),
       skgrepos,
       skgrepo_order       : Vec::new (),
+      foreign_manifest_orders : Vec::new (),
+      foreign_fold_order      : Vec::new (),
+      foreign_owner_groups    : HashMap::new (),
       default_skgrepo_set : None,
       tantivy_folder     : PathBuf::from ("/tmp/unused"),
       port               : 0,
@@ -497,6 +556,9 @@ impl SkgConfig {
       data_root          : PathBuf::from ("."),
       skgrepos,
       skgrepo_order       : Vec::new (),
+      foreign_manifest_orders : Vec::new (),
+      foreign_fold_order      : Vec::new (),
+      foreign_owner_groups    : HashMap::new (),
       default_skgrepo_set : None,
       tantivy_folder     : PathBuf::from (tantivy_folder),
       port               : DEFAULT_PORT,
@@ -515,13 +577,12 @@ impl SkgConfig {
       . unwrap_or (false)
   }
 
-  /// The owned skgrepo names in privacy order (see 'ordered_skgrepos').
+  /// The owned skgrepo names in privacy order, most public first: the
+  /// privacy ladder (see 'privacy_ladder').
   pub fn owned_skgrepos_in_config_order (
     &self,
   ) -> Vec<SkgrepoName> {
-    self . ordered_skgrepos () . into_iter ()
-      . filter ( |name| self . skgrepo_is_owned (name) )
-      . collect () }
+    self . privacy_ladder () }
 
   /// The default owned skgrepo for a fork's clone when its skgrepo could
   /// not be inferred or user-set: the user's config-first owned skgrepo
@@ -540,13 +601,11 @@ impl SkgConfig {
   ) -> Option<SkgrepoName> {
     self . first_owned_skgrepo_in_config_order () }
 
-  /// The comparison chokepoint, with the methods below it. Every
-  /// skgrepo name, in privacy order: most public first, most private
-  /// last (TOML declaration order). Falls back to alphabetical when
+  /// Every skgrepo name in declaration order, or alphabetical when
   /// declaration order is unavailable (a dummy/test config, whose
-  /// 'repo_order' is empty), so the result is always deterministic.
-  /// No code outside these methods may compare skgrepo positions.
-  pub fn ordered_skgrepos (
+  /// 'skgrepo_order' is empty), so the result is always
+  /// deterministic.
+  pub fn skgrepos_in_declaration_order (
     &self,
   ) -> Vec<SkgrepoName> {
     if self . skgrepo_order . is_empty () {
@@ -557,8 +616,173 @@ impl SkgConfig {
       names
     } else { self . skgrepo_order . clone () }}
 
-  /// Position in the privacy order: 0 = most public.
-  /// None for a skgrepo absent from the config.
+  /// The comparison chokepoint, with the methods below it. Every
+  /// skgrepo name, in fold order: the order in which a telescope's
+  /// sections fold, and so the order to walk the skgrepos in. It is
+  /// declaration order, except that the foreign entries are permuted
+  /// among their own places into 'foreign_fold_order'. Its owned
+  /// entries are the privacy ladder, in order; where an owned entry
+  /// sits relative to a foreign one says nothing, since no telescope
+  /// folds an owned section with a foreign one.
+  /// No code outside these methods may compare skgrepo positions.
+  pub fn ordered_skgrepos (
+    &self,
+  ) -> Vec<SkgrepoName> {
+    let declared : Vec<SkgrepoName> =
+      self . skgrepos_in_declaration_order ();
+    let declared_foreign : Vec<&SkgrepoName> =
+      declared . iter ()
+      . filter ( |name| self . skgrepo_is_foreign (name) )
+      . collect ();
+    let fold_order_is_current : bool = // a test may edit the config after loading it
+      self . foreign_fold_order . len () == declared_foreign . len ()
+      && self . foreign_fold_order . iter ()
+         . all ( |name| declared_foreign . contains (&name) );
+    if ! fold_order_is_current {
+      return declared; }
+    let mut foreign_in_fold_order =
+      self . foreign_fold_order . iter () . cloned ();
+    declared . into_iter ()
+      . map ( |name|
+        if self . skgrepo_is_foreign (&name) {
+          foreign_in_fold_order . next ()
+            . expect ("the fold order permutes the foreign entries") }
+        else { name } )
+      . collect () }
+
+  /// The privacy ladder: the owned skgrepos in declaration order, most
+  /// public first. Foreign skgrepos have no rung.
+  pub fn privacy_ladder (
+    &self,
+  ) -> Vec<SkgrepoName> {
+    self . skgrepos_in_declaration_order () . into_iter ()
+      . filter ( |name| self . skgrepo_is_owned (name) )
+      . collect () }
+
+  /// Record what the foreign manifests say ('ForeignManifestOrder'),
+  /// and the fold order of the foreign skgrepos that follows.
+  pub fn set_foreign_manifest_orders (
+    &mut self,
+    orders : Vec<ForeignManifestOrder>,
+  ) {
+    self . foreign_manifest_orders = orders;
+    self . foreign_fold_order = self . foreign_fold_order_from_manifests ();
+    self . foreign_owner_groups = self . foreign_owner_groups_from_manifests (); }
+
+  /// Each foreign skgrepo a manifest chains to another (the manifest's
+  /// own skgrepo and every one it lists, transitively), mapped to the
+  /// first so chained in declaration order.
+  fn foreign_owner_groups_from_manifests (
+    &self,
+  ) -> HashMap<SkgrepoName, SkgrepoName> {
+    let declared : Vec<SkgrepoName> =
+      self . skgrepos_in_declaration_order () . into_iter ()
+      . filter ( |name| self . skgrepo_is_foreign (name) )
+      . collect ();
+    let mut group_of : HashMap<SkgrepoName, usize> = // index into 'declared'
+      declared . iter () . enumerate ()
+      . map ( |(i, name)| ( name . clone (), i )) . collect ();
+    for manifest in &self . foreign_manifest_orders {
+      let members : Vec<&SkgrepoName> =
+        std::iter::once (&manifest . manifest_skgrepo)
+        . chain ( manifest . listed . iter () )
+        . filter ( |name| group_of . contains_key (*name) )
+        . collect ();
+      let Some (lowest) : Option<usize> =
+        members . iter () . map ( |name| group_of [*name] ) . min ()
+        else { continue; };
+      let merged : Vec<usize> =
+        members . iter () . map ( |name| group_of [*name] ) . collect ();
+      for group in group_of . values_mut () {
+        if merged . contains (group) { *group = lowest; }} }
+    group_of . into_iter ()
+      . map ( |(name, group)| ( name, declared [group] . clone () ))
+      . collect () }
+
+  /// Whose 'skgrepo' is: the user's when owned, else its foreign
+  /// owner's ('SkgrepoOwner'). Foreign skgrepos no manifest chains
+  /// together have different owners.
+  pub fn skgrepo_owner (
+    &self,
+    skgrepo : &SkgrepoName,
+  ) -> SkgrepoOwner {
+    if self . skgrepo_is_owned (skgrepo) { return SkgrepoOwner::User; }
+    SkgrepoOwner::Foreign (
+      self . foreign_owner_groups . get (skgrepo) . cloned ()
+        . unwrap_or_else ( || skgrepo . clone () )) }
+
+  /// The foreign skgrepos in the order a foreign node's sections
+  /// fold in (only one owner's fold together; 'skgrepo_owner'). A
+  /// pair the foreign manifests order folds in their order
+  /// ('ForeignPairOrder::Agreed'), or, when they disagree, as the
+  /// more private one's manifest says ('ForeignPairOrder::Disputed');
+  /// every other pair, in declaration order, so far as the ordered
+  /// pairs allow: repeatedly take the first foreign skgrepo in
+  /// declaration order that no remaining one must precede. Should the
+  /// ordered pairs form a cycle, the first remaining one is taken
+  /// regardless.
+  fn foreign_fold_order_from_manifests (
+    &self,
+  ) -> Vec<SkgrepoName> {
+    let mut remaining : Vec<SkgrepoName> =
+      self . skgrepos_in_declaration_order () . into_iter ()
+      . filter ( |name| self . skgrepo_is_foreign (name) )
+      . collect ();
+    if self . foreign_manifest_orders . is_empty () {
+      return remaining; }
+    let must_precede = |a : &SkgrepoName, b : &SkgrepoName| -> bool {
+      match self . foreign_pair_order (a, b) {
+        ForeignPairOrder::Agreed { first }
+          | ForeignPairOrder::Disputed { first, .. } => &first == a,
+        ForeignPairOrder::Unlisted => false, } };
+    let mut ordered : Vec<SkgrepoName> = Vec::new ();
+    while ! remaining . is_empty () {
+      let next : usize =
+        remaining . iter ()
+        . position ( |candidate|
+          ! remaining . iter () . any ( |other|
+            other != candidate && must_precede (other, candidate) ))
+        . unwrap_or (0);
+      ordered . push ( remaining . remove (next) ); }
+    ordered }
+
+  /// What the foreign manifests say of the order of foreign skgrepos
+  /// 'a' and 'b'.
+  pub fn foreign_pair_order (
+    &self,
+    a : &SkgrepoName,
+    b : &SkgrepoName,
+  ) -> ForeignPairOrder {
+    let mut a_first_by : Vec<SkgrepoName> = Vec::new ();
+    let mut b_first_by : Vec<SkgrepoName> = Vec::new ();
+    for manifest in &self . foreign_manifest_orders {
+      let position_of = |name : &SkgrepoName| -> Option<usize> {
+        manifest . listed . iter () . position ( |l| l == name ) };
+      if let (Some (pa), Some (pb)) = (position_of (a), position_of (b)) {
+        if pa < pb { a_first_by . push ( manifest . manifest_skgrepo . clone () ); }
+        else       { b_first_by . push ( manifest . manifest_skgrepo . clone () ); }} }
+    match ( a_first_by . first () . cloned (), b_first_by . first () . cloned () ) {
+      (None, None) => ForeignPairOrder::Unlisted,
+      (Some (_), None) => ForeignPairOrder::Agreed { first : a . clone () },
+      (None, Some (_)) => ForeignPairOrder::Agreed { first : b . clone () },
+      (Some (first_by), Some (second_by)) => {
+        // A manifest of b putting a first says b is the more private.
+        let b_says_a_first : bool = a_first_by . contains (b);
+        let a_says_b_first : bool = b_first_by . contains (a);
+        let first : SkgrepoName = match (b_says_a_first, a_says_b_first) {
+          (true, false) => a . clone (),
+          (false, true) => b . clone (),
+          _ => {
+            let declared : Vec<SkgrepoName> =
+              self . skgrepos_in_declaration_order ();
+            if declared . iter () . position ( |n| n == a )
+               <= declared . iter () . position ( |n| n == b )
+            { a . clone () } else { b . clone () } }, };
+        ForeignPairOrder::Disputed { first_by, second_by, first } }, }}
+
+  /// Position in the fold order ('ordered_skgrepos').
+  /// None for a skgrepo absent from the config. Not a privacy rank:
+  /// for that, see 'privacy_rank'.
   pub fn skgrepo_position (
     &self,
     skgrepo : &SkgrepoName,
@@ -566,30 +790,58 @@ impl SkgConfig {
     self . ordered_skgrepos () . iter ()
       . position ( |s| s == skgrepo ) }
 
-  /// True iff 'a' is strictly more public than 'b' (earlier in the
-  /// privacy order). A skgrepo absent from the config counts as
-  /// maximally private, so nothing is less public than it.
+  /// Position on the privacy ladder: 0 = most public. None for a
+  /// foreign skgrepo, which has no rung, and for one absent from the
+  /// config.
+  fn privacy_rank (
+    &self,
+    skgrepo : &SkgrepoName,
+  ) -> Option<usize> {
+    self . privacy_ladder () . iter ()
+      . position ( |s| s == skgrepo ) }
+
+  /// Whether 'skgrepo' is configured and foreign.
+  fn skgrepo_is_foreign (
+    &self,
+    skgrepo : &SkgrepoName,
+  ) -> bool {
+    self . skgrepos . get (skgrepo)
+      . is_some_and ( |s| ! s . owned ) }
+
+  /// True iff 'a' is strictly more public than 'b' (earlier on the
+  /// privacy ladder). A skgrepo absent from the config counts as
+  /// maximally private, so nothing is less public than it. A foreign
+  /// skgrepo has no rung, so it is neither more nor less public than
+  /// anything: false whenever either is foreign.
   pub fn is_strictly_more_public (
     &self,
     a : &SkgrepoName,
     b : &SkgrepoName,
   ) -> bool {
-    match ( self . skgrepo_position (a),
-            self . skgrepo_position (b) ) {
+    if self . skgrepo_is_foreign (a) || self . skgrepo_is_foreign (b) {
+      return false; }
+    match ( self . privacy_rank (a),
+            self . privacy_rank (b) ) {
       (Some (pa), Some (pb)) => pa < pb,
       (Some (_),  None     ) => true,
       _                      => false, }}
 
-  /// The more private of the two (the later in the privacy order);
+  /// The more private of the two (the later on the privacy ladder);
   /// 'b' on a tie. This is the relRepo default rule's core: a
   /// relationship instance normally defaults to the skgrepo of the more private
-  /// of its two endpoints' homes.
+  /// of its two endpoints' homes. A foreign skgrepo has no rung, so
+  /// beside an owned one the owned one is returned: a foreign
+  /// skgrepo never raises an owned floor.
   pub fn more_private_of (
     &self,
     a : SkgrepoName,
     b : SkgrepoName,
   ) -> SkgrepoName {
-    if self . is_strictly_more_public (&b, &a) { a } else { b }}
+    match ( self . skgrepo_is_foreign (&a),
+            self . skgrepo_is_foreign (&b) ) {
+      (true, false) => b,
+      (false, true) => a,
+      _ => if self . is_strictly_more_public (&b, &a) { a } else { b }, }}
 
   /// The default relRepo for an editable node-to-node
   /// relationship. Between owned nodes, use the more-private home.
@@ -608,20 +860,20 @@ impl SkgConfig {
       self . more_private_of (
         recorder_home . clone (), member_home . clone () ) }}
 
-  /// The privacy order split after 'skgrepo': the prefix through it,
-  /// inclusive (that skgrepo and everything more public), and the
-  /// rest (everything more private). Errors if the skgrepo is not
-  /// configured.
-  pub fn privacy_order_split_after (
+  /// The privacy ladder split after 'skgrepo': the rungs through it,
+  /// inclusive (that skgrepo and every more public owned one), and
+  /// the rest (every more private owned one). Errors if the skgrepo
+  /// is not an owned skgrepo of the config.
+  pub fn privacy_ladder_split_after (
     &self,
     skgrepo : &SkgrepoName,
   ) -> Result<(Vec<SkgrepoName>, Vec<SkgrepoName>), String> {
     let mut ordered : Vec<SkgrepoName> =
-      self . ordered_skgrepos ();
+      self . privacy_ladder ();
     let position : usize =
       ordered . iter () . position ( |s| s == skgrepo )
       . ok_or_else ( || format! (
-        "Repo '{}' not found in config", skgrepo )) ?;
+        "Repo '{}' is not an owned repo of the config", skgrepo )) ?;
     let more_private : Vec<SkgrepoName> =
       ordered . split_off (position + 1);
     Ok (( ordered, more_private )) }

@@ -2,17 +2,19 @@ tantivy_folder = ".index.tantivy"
 port = 1730 # TCP port for Rust-Emacs API communication.
 default_repo_set = "public"
 
-# Repos are listed in PRIVACY ORDER: most public first, most
-# private last. That order defines the available repo-sets: each
-# repo names the set consisting of itself and everything more
-# public (a prefix of this list); the last repo, the most private,
-# means every repo, no restriction. default_repo_set above names the
-# skgrepo restriction when a client connects: here, Fred's repo and
-# your "public" one. Left out, it is the most private repo.
-#
 # A repo is yours (owned, writable) unless its entry says
-# foreign = true. Every foreign repo must be more public than every
-# owned one, so foreign repos come first.
+# foreign = true.
+#
+# Your owned repos are listed in PRIVACY ORDER: most public first,
+# most private last. That order defines the available repo-sets:
+# each owned repo names the set consisting of itself and every more
+# public owned repo (a prefix of the owned list); the last, the most
+# private, means every owned repo. Foreign repos have no place in
+# that order and may be listed anywhere; they are shown unless a
+# connection hides them, apart from the repo-set. default_repo_set
+# above names the repo-set when a client connects: here, your
+# "public" repo (and Fred's, shown). Left out, it is the most
+# private owned repo: no restriction. It must name an owned repo.
 
 [[repos]]
 name = "Fred"

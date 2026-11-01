@@ -1,6 +1,6 @@
 use crate::telescope::compose::compose_telescope_collecting_warnings;
 use crate::telescope::types::{
-  CompositionWarning, Telescope, retain_owned_sections_when_pid_folderlides,
+  CompositionWarning, Telescope, separate_illegal_sections,
 };
 use crate::telescope::invariants::TelescopeViolation;
 use crate::dbs::filesystem::one_node::{
@@ -56,8 +56,9 @@ pub(crate) fn read_all_skg_files_from_skgrepos_read_only (
 /// Two kinds arise here and nowhere else, because only here are a
 /// node's section list and the config both in hand:
 /// - every 'CompositionWarning' (wrapped as 'TelescopeViolation::Composition'),
-/// - 'IgnoredForeignPidFolderlision', where owned and non-owned files
-///   use the same pid. The owned telescope wins before composition.
+/// - 'IllegalEditToForeignNode', where files of one pid sit in
+///   skgrepos of different owners. The home owner's telescope is
+///   composed; the rest are illegal edits ('separate_illegal_sections').
 pub fn read_all_skg_files_from_skgrepos_collecting_violations (
   config: &SkgConfig
 ) -> io::Result<(Vec<Graphnode>, Vec<(ID, TelescopeViolation)>)> {
@@ -100,23 +101,23 @@ fn read_all_skg_files_from_skgrepos_impl (
       io::ErrorKind::InvalidData,
       format! ("{} unreadable file(s)",
                load_errors . len() ))); }
-  let collision_violations : Vec<(ID, TelescopeViolation)> =
-    retain_owned_telescopes (
+  let illegal_section_violations : Vec<(ID, TelescopeViolation)> =
+    separate_illegal_telescope_sections (
       &mut sections_by_pid, &pid_order, config );
   let (nodes, composition_violations)
     : (Vec<Graphnode>, Vec<(ID, TelescopeViolation)>) =
     compose_grouped_sections (sections_by_pid, pid_order, config) ?;
   Ok (( nodes,
         { let mut all : Vec<(ID, TelescopeViolation)> =
-            collision_violations;
+            illegal_section_violations;
           all . extend (composition_violations);
           all . sort_by ( |a, b| a . 0 . cmp ( &b . 0 ));
           all } )) }
 
-/// When owned and non-owned files use one pid, retain only the
-/// owned files before composition or building the extra-id map. A pid
-/// represented entirely by non-owned files remains readable.
-fn retain_owned_telescopes (
+/// When files of one pid sit in skgrepos of different owners, retain
+/// only the home owner's before composition or building the extra-id
+/// map ('separate_illegal_sections'); the rest are reported.
+fn separate_illegal_telescope_sections (
   sections_by_pid : &mut HashMap<ID, Vec<(SkgrepoName, GraphnodeOnDisk)>>,
   pid_order       : &[ID],
   config          : &SkgConfig,
@@ -125,15 +126,13 @@ fn retain_owned_telescopes (
   for pid in pid_order {
     let Some (sections) = sections_by_pid . remove (pid)
       else { continue; };
-    let (retained, collision) =
-      retain_owned_sections_when_pid_folderlides (sections, config);
-    sections_by_pid . insert (pid . clone (), retained);
-    if let Some (collision) = collision {
+    let (legitimate, illegal) =
+      separate_illegal_sections (sections, config);
+    sections_by_pid . insert (pid . clone (), legitimate);
+    if let Some (illegal) = illegal {
       violations . push ((
         pid . clone (),
-        TelescopeViolation::IgnoredForeignPidFolderlision {
-          ignored_skgrepos : collision . ignored_skgrepos,
-        } )); }}
+        TelescopeViolation::IllegalEditToForeignNode { illegal } )); }}
   violations }
 
 /// One telescope, read fresh from disk by pid (all its sections,
@@ -147,7 +146,7 @@ pub fn graphnode_from_telescope_on_disk (
     & SkgrepoName::from ("(any)") ) }
 
 /// Compose each telescope (already grouped by pid; sections arrive in
-/// privacy order because the caller iterated 'ordered_skgrepos').
+/// fold order because the caller iterated 'ordered_skgrepos').
 /// Anchors resolve through the extra-id map built from every
 /// section, so a nodeMerge cannot dangle an anchor. A telescope
 /// with no title in any section is a hard load error; every other

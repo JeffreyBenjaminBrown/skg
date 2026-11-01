@@ -14,7 +14,7 @@
 //! hard-error, and those live in the parser, not here.
 
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::telescope::types::CompositionWarning;
+use crate::telescope::types::{CompositionWarning, IllegalSections};
 use crate::types::misc::{ID, MSV, RelPartner, SkgConfig, SkgrepoName};
 use crate::types::nodes::rust::GraphnodeInRust;
 
@@ -58,11 +58,12 @@ pub enum TelescopeViolation {
     relRepo: SkgrepoName,
     member   : ID,
   },
-  /// Non-owned sections used the same pid as at least one owned
-  /// section. The owned telescope won and these skgrepos were
-  /// ignored before composition or id-claim collection.
-  IgnoredForeignPidFolderlision {
-    ignored_skgrepos : Vec<SkgrepoName>,
+  /// Sections of the pid sit in skgrepos of another owner than its
+  /// home's ('separate_illegal_sections'): illegal edits to the node.
+  /// The owned ones are drawn under it as illegal edits; the foreign
+  /// ones were ignored before composition or id-claim collection.
+  IllegalEditToForeignNode {
+    illegal : IllegalSections,
   },
   /// Anything the composition noticed while combining a node's sections
   /// (a dangling anchor, a title below the home, a stray second
@@ -70,6 +71,26 @@ pub enum TelescopeViolation {
   /// belong in the report with the rest.
   Composition ( CompositionWarning ),
 }
+
+/// What a report says of a node's illegal sections.
+pub fn illegal_sections_message (
+  illegal : &IllegalSections,
+) -> String {
+  let quoted = |names : Vec<&SkgrepoName>| -> String {
+    names . iter () . map ( |name| format! ("'{}'", name) )
+      . collect::<Vec<String>> () . join (", ") };
+  let mut parts : Vec<String> = Vec::new ();
+  if ! illegal . owned . is_empty () {
+    parts . push ( format! (
+      "your repo(s) [{}] hold a section of this node, whose home '{}' has another owner: an illegal edit to a foreign node. Skg shows it under the node as an ILLEGAL EDIT TO FOREIGN NODE child, and nowhere else; move what it says into a node of your own and delete the file.",
+      quoted ( illegal . owned . iter () . map ( |edit| &edit . skgrepo ) . collect () ),
+      illegal . home )); }
+  if ! illegal . foreign . is_empty () {
+    parts . push ( format! (
+      "foreign repo(s) [{}] hold a section of this node, whose home '{}' has another owner: an illegal edit to a foreign node. Skg ignores it and leaves the file untouched.",
+      quoted ( illegal . foreign . iter () . collect () ),
+      illegal . home )); }
+  parts . join (" ") }
 
 impl fmt::Display for TelescopeViolation {
   fn fmt (
@@ -92,13 +113,8 @@ impl fmt::Display for TelescopeViolation {
         write! ( f,
           "leak-shaped {} membership with absent target: relationship at relRepo '{}' names '{}'; because the target is absent, privacy is judged against the extant recorder's home '{}'. Move the membership with skg-set-relRepo (C-c s r).",
           relation, relRepo, member, recorder_home ),
-      TelescopeViolation::IgnoredForeignPidFolderlision {
-        ignored_skgrepos } =>
-        write! ( f,
-          "non-owned repo(s) [{}] use the same pid as one or more of your files. Skg kept your owned telescope, ignored those non-owned files, and left them untouched. Their contents are unreachable within Skg; inspect the raw .skg files if you need them.",
-          ignored_skgrepos . iter ()
-            . map ( |skgrepo| format! ("'{}'", skgrepo) )
-            . collect::<Vec<String>> () . join (", ") ),
+      TelescopeViolation::IllegalEditToForeignNode { illegal } =>
+        write! ( f, "{}", illegal_sections_message (illegal) ),
       TelescopeViolation::Composition (w) =>
         write! ( f, "{}", w ), }}}
 
@@ -131,6 +147,11 @@ pub fn telescope_violations_of (
         graph . pid_of ( &m . member )
         . and_then ( |p| graph . nodes . get (&p) )
         . map ( |n| n . home_skgrepo . clone () );
+      if target_home . as_ref ()
+        . is_some_and ( |home| ! config . skgrepo_is_owned (home) ) {
+        // A foreign node is not the user's to withhold, and has no
+        // rung to compare against, so naming it leaks nothing.
+        continue; }
       let privacy_ceiling : &SkgrepoName = target_home . as_ref ()
         . unwrap_or (&node . home_skgrepo);
       if config . is_strictly_more_public ( &m . relRepo, privacy_ceiling ) {

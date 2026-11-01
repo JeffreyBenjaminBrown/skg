@@ -234,7 +234,7 @@ fn a_skgrepo_is_owned_unless_its_entry_says_foreign (
   assert! ( ! eggs . owned );
   assert! ( notes . owned );
   assert! ( work . owned );
-  { // An unnamed entry is named by its path, in the privacy order too.
+  { // An unnamed entry is named by its path, in the fold order too.
     assert_eq! ( config . ordered_skgrepos (),
                  vec! [ SkgrepoName::from ("eggman/eggs"),
                         SkgrepoName::from ("jeff/notes"),
@@ -247,21 +247,68 @@ fn a_skgrepo_is_owned_unless_its_entry_says_foreign (
   Ok (( )) }
 
 #[test]
-fn a_foreign_skgrepo_more_private_than_an_owned_one_is_refused (
+fn foreign_entries_may_sit_anywhere_and_only_owned_ones_are_ranked (
 ) -> Result<(), Box<dyn std::error::Error>> {
   let data_root : TempDir = tempdir () ?;
+  let (config, _warnings) : (SkgConfig, Vec<String>) =
+    load_config_text_in_data_root (
+      &data_root,
+      &["eggman/eggs", "jeff/public", "fred/notes", "jeff/private"],
+      concat! (
+        "tantivy_folder = \"tantivy\"\n",
+        "[[repos]]\nname = \"public\"\npath = \"jeff/public\"\n",
+        "[[repos]]\nname = \"eggs\"\npath = \"eggman/eggs\"\n",
+        "foreign = true\n",
+        "[[repos]]\nname = \"private\"\npath = \"jeff/private\"\n",
+        "[[repos]]\nname = \"notes\"\npath = \"fred/notes\"\n",
+        "foreign = true\n" )) ?;
+  let name = |n : &str| SkgrepoName::from (n);
+  assert_eq! ( config . privacy_ladder (),
+               vec! [ name ("public"), name ("private") ] );
+  assert_eq! ( config . ordered_skgrepos (),
+               vec! [ name ("public"), name ("eggs"),
+                      name ("private"), name ("notes") ],
+               "no foreign manifest: declaration order" );
+  { // A foreign repo has no rung: it is neither more nor less public
+    // than anything, and never the more private of a pair.
+    assert! ( config . is_strictly_more_public (
+                &name ("public"), &name ("private") ));
+    for owned in ["public", "private"] {
+      assert! ( ! config . is_strictly_more_public (
+                  &name ("eggs"), &name (owned) ));
+      assert! ( ! config . is_strictly_more_public (
+                  &name (owned), &name ("eggs") ));
+      assert_eq! ( config . more_private_of ( name ("eggs"), name (owned) ),
+                   name (owned) );
+      assert_eq! ( config . more_private_of ( name (owned), name ("eggs") ),
+                   name (owned) ); }}
+  Ok (( )) }
+
+#[test]
+fn a_default_repo_set_naming_a_foreign_repo_is_refused (
+) -> Result<(), Box<dyn std::error::Error>> {
+  let data_root : TempDir = tempdir () ?;
+  let config_text = |default : &str| -> String { format! (
+    "tantivy_folder = \"tantivy\"\n\
+     default_repo_set = \"{}\"\n\
+     [[repos]]\nname = \"eggs\"\npath = \"eggman/eggs\"\nforeign = true\n\
+     [[repos]]\nname = \"public\"\npath = \"jeff/public\"\n\
+     [[repos]]\nname = \"private\"\npath = \"jeff/private\"\n",
+    default ) };
   let refusal : String = load_config_text_in_data_root (
     &data_root, &["eggman/eggs", "jeff/public", "jeff/private"],
-    concat! (
-      "tantivy_folder = \"tantivy\"\n",
-      "[[repos]]\nname = \"public\"\npath = \"jeff/public\"\n",
-      "[[repos]]\nname = \"eggs\"\npath = \"eggman/eggs\"\n",
-      "foreign = true\n",
-      "[[repos]]\nname = \"private\"\npath = \"jeff/private\"\n" ))
-    . err () . expect ("a foreign repo after an owned one must be refused")
+    &config_text ("eggs") )
+    . err () . expect ("a default_repo_set naming a foreign repo must be refused")
     . to_string ();
-  assert! ( refusal . contains ("'eggs'") && refusal . contains ("'public'"),
-            "the refusal names both repos: {}", refusal );
+  assert! ( refusal . contains ("'eggs'") && refusal . contains ("foreign"),
+            "the refusal names the repo and says it is foreign: {}", refusal );
+  let (config, _warnings) : (SkgConfig, Vec<String>) =
+    load_config_text_in_data_root (
+      &data_root, &["eggman/eggs", "jeff/public", "jeff/private"],
+      &config_text ("public") ) ?;
+  assert_eq! ( config . default_skgrepo_set,
+               Some ( SkgrepoName::from ("public") ),
+               "an owned one is accepted" );
   Ok (( )) }
 
 #[test]

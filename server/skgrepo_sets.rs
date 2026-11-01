@@ -13,13 +13,15 @@ use std::error::Error;
 
 /// The skgrepo restriction: the skgrepos a connection currently shows
 /// ('docs/glossary.org', "skgrepo, home skgrepo, skgrepo-set,
-/// gitrepo"). It is one skgrepo, the most private one shown, and
-/// denotes that skgrepo and every more public one, a prefix of the
-/// config's privacy order. A connection is unrestricted when the most
-/// private skgrepo shown is the most private the config has
-/// ('is_unrestricted'); the clients then show that skgrepo's name with
-/// " (no restriction)" appended, words that never reach the wire or
-/// the config.
+/// gitrepo"). It is two things: a rung of the privacy ladder (the
+/// owned skgrepos, most public first), the most private owned skgrepo
+/// shown; and whether the foreign skgrepos are shown, which they are
+/// unless the connection hides them. It denotes the rungs through the
+/// chosen one, plus every foreign skgrepo if they are shown. A
+/// connection is unrestricted when it shows the most private rung and
+/// the foreign skgrepos ('is_unrestricted'); the clients then show the
+/// rung's name with " (no restriction)" appended, words that never
+/// reach the wire or the config.
 ///
 /// It limits what can be edited as well as what can be
 /// seen: no save, nodeMerge, fork, deletion, commit or other write may
@@ -30,19 +32,28 @@ use std::error::Error;
 /// connection is unrestricted ('require_unrestricted').
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SkgrepoRestriction {
+  /// The most private owned skgrepo shown; the empty name when the
+  /// config owns no skgrepo.
   pub most_private_shown : SkgrepoName,
+  /// Whether the foreign skgrepos are shown.
+  pub foreign_shown      : bool,
   /// The set it denotes: 'most_private_shown' and every more public
-  /// skgrepo of the config.
+  /// owned skgrepo, and every foreign skgrepo if 'foreign_shown'.
   pub skgrepos           : BTreeSet<SkgrepoName>,
-  /// The config's skgrepos more private than 'most_private_shown', in
-  /// privacy order. A skgrepo the config does not name is in neither
+  /// The config's skgrepos it keeps out: the owned ones more private
+  /// than 'most_private_shown', in privacy order, then the foreign
+  /// ones if hidden. A skgrepo the config does not name is in neither
   /// set, and neither shown nor kept out.
   kept_out               : Vec<SkgrepoName>,
+  /// The config's most private owned skgrepo, which an unrestricted
+  /// connection shows.
+  most_private_owned     : SkgrepoName,
 }
 
 impl SkgrepoRestriction {
   /// The skgrepo restriction a connection starts with: the config's
-  /// 'default_repo_set', else no skgrepo restriction.
+  /// 'default_repo_set' with foreign skgrepos shown, else no skgrepo
+  /// restriction.
   pub fn default_from_config (
     config : &SkgConfig,
   ) -> Result<SkgrepoRestriction, Box<dyn Error>> {
@@ -52,60 +63,104 @@ impl SkgrepoRestriction {
       None => Ok ( SkgrepoRestriction::unrestricted (config) ), } }
 
   /// The skgrepo restriction whose most private skgrepo shown is
-  /// 'most_private_shown', which the config must name.
+  /// 'most_private_shown', which must be an owned skgrepo of the
+  /// config, with foreign skgrepos shown.
   pub fn named (
     config             : &SkgConfig,
     most_private_shown : SkgrepoName,
   ) -> Result<SkgrepoRestriction, Box<dyn Error>> {
-    let (shown, kept_out) : (Vec<SkgrepoName>, Vec<SkgrepoName>) =
-      config . privacy_order_split_after (&most_private_shown)
-      . map_err ( |_| format! (
-        "'{}' names no skgrepo of the config. The skgrepo restriction is the most private skgrepo to show.",
-        most_private_shown )) ?;
-    Ok ( SkgrepoRestriction {
-      skgrepos : shown . into_iter () . collect (),
-      kept_out,
-      most_private_shown } ) }
+    SkgrepoRestriction::named_with_foreign_shown (
+      config, most_private_shown, true ) }
 
-  /// No skgrepo restriction: the most private skgrepo of the config
-  /// shown, and with it every skgrepo. A config that names no skgrepo
-  /// has nothing to restrict; its skgrepo restriction shows the empty
-  /// name.
+  /// The skgrepo restriction whose most private skgrepo shown is
+  /// 'most_private_shown', which must be an owned skgrepo of the
+  /// config (or the empty name, when the config owns none), showing
+  /// the foreign skgrepos iff 'foreign_shown'.
+  pub fn named_with_foreign_shown (
+    config             : &SkgConfig,
+    most_private_shown : SkgrepoName,
+    foreign_shown      : bool,
+  ) -> Result<SkgrepoRestriction, Box<dyn Error>> {
+    let (shown_owned, more_private_owned)
+      : (Vec<SkgrepoName>, Vec<SkgrepoName>) =
+      if most_private_shown . 0 . is_empty ()
+         && config . privacy_ladder () . is_empty ()
+      { (Vec::new (), Vec::new ()) }
+      else { config . privacy_ladder_split_after (&most_private_shown)
+             . map_err ( |_| format! (
+               "'{}' names no owned skgrepo of the config. The skgrepo restriction is the most private owned skgrepo to show; foreign skgrepos are shown or hidden apart from it.",
+               most_private_shown )) ? };
+    let foreign : Vec<SkgrepoName> =
+      config . ordered_skgrepos () . into_iter ()
+      . filter ( |name| config . skgrepos . contains_key (name)
+                        && ! config . skgrepo_is_owned (name) )
+      . collect ();
+    let most_private_owned : SkgrepoName =
+      more_private_owned . last () . or ( shown_owned . last () )
+      . cloned ()
+      . unwrap_or_else ( || SkgrepoName::from ("") );
+    let mut skgrepos : BTreeSet<SkgrepoName> =
+      shown_owned . into_iter () . collect ();
+    let mut kept_out : Vec<SkgrepoName> = more_private_owned;
+    if foreign_shown { skgrepos . extend (foreign); }
+    else             { kept_out . extend (foreign); }
+    Ok ( SkgrepoRestriction {
+      most_private_shown,
+      foreign_shown,
+      skgrepos,
+      kept_out,
+      most_private_owned } ) }
+
+  /// No skgrepo restriction: the most private owned skgrepo of the
+  /// config shown, and with it every skgrepo, foreign ones included. A
+  /// config that owns no skgrepo has no rung to show; its skgrepo
+  /// restriction shows the empty name.
   pub fn unrestricted (
     config : &SkgConfig,
   ) -> SkgrepoRestriction {
-    match config . ordered_skgrepos () . last () {
-      Some (most_private) =>
-        SkgrepoRestriction::named (config, most_private . clone ())
-        . expect ("the config names its own most private skgrepo"),
-      None => SkgrepoRestriction {
-        most_private_shown : SkgrepoName::from (""),
-        skgrepos           : BTreeSet::new (),
-        kept_out           : Vec::new (), }, } }
+    let most_private : SkgrepoName =
+      config . privacy_ladder () . last () . cloned ()
+      . unwrap_or_else ( || SkgrepoName::from ("") );
+    SkgrepoRestriction::named (config, most_private)
+      . expect ("the config names its own most private owned skgrepo") }
+
+  /// The same rung with foreign skgrepos shown iff 'foreign_shown',
+  /// under 'config'.
+  pub fn with_foreign_shown (
+    &self,
+    config        : &SkgConfig,
+    foreign_shown : bool,
+  ) -> Result<SkgrepoRestriction, Box<dyn Error>> {
+    SkgrepoRestriction::named_with_foreign_shown (
+      config, self . most_private_shown . clone (), foreign_shown ) }
 
   /// The same skgrepo restriction under 'config', which a config
   /// reload may have made differ from the one it was made under: no
   /// skgrepo restriction stays none, and a restriction stays at its
-  /// most private skgrepo shown. If 'config' no longer names that
-  /// skgrepo, it is the restriction a connection starts with, as if
-  /// the connection were new.
+  /// most private skgrepo shown, foreign skgrepos shown or hidden as
+  /// before. If 'config' no longer names that skgrepo as owned, it is
+  /// the rung a connection starts with, as if the connection were new,
+  /// foreign skgrepos still shown or hidden as before.
   pub fn under_config (
     &self,
     config : &SkgConfig,
   ) -> SkgrepoRestriction {
     if self . is_unrestricted () {
       return SkgrepoRestriction::unrestricted (config); }
-    SkgrepoRestriction::named (config, self . most_private_shown . clone ())
+    self . with_foreign_shown (config, self . foreign_shown)
       . unwrap_or_else ( |_| {
         tracing::warn! (
           skgrepo = %self . most_private_shown,
-          "the reloaded config no longer names the skgrepo restriction's most private skgrepo shown; starting over from its default");
+          "the reloaded config no longer names the skgrepo restriction's most private skgrepo shown as owned; starting over from its default");
         SkgrepoRestriction::default_from_config (config)
+          . unwrap_or_else ( |_| SkgrepoRestriction::unrestricted (config) )
+          . with_foreign_shown (config, self . foreign_shown)
           . unwrap_or_else ( |_| SkgrepoRestriction::unrestricted (config) ) } ) }
 
-  /// The skgrepo restriction over the privacy order 'order' (most
-  /// public first) whose most private skgrepo shown is
-  /// 'most_private_shown', for a test without a config.
+  /// The skgrepo restriction over the privacy ladder 'order' (most
+  /// public first), with no foreign skgrepos, whose most private
+  /// skgrepo shown is 'most_private_shown', for a test without a
+  /// config.
   pub fn of_privacy_order_for_test (
     order              : &[&str],
     most_private_shown : &str,
@@ -115,10 +170,13 @@ impl SkgrepoRestriction {
       . expect ("the order names the most private skgrepo shown");
     SkgrepoRestriction {
       most_private_shown : SkgrepoName::from (most_private_shown),
+      foreign_shown      : true,
       skgrepos : order [..= position] . iter ()
         . map ( |s| SkgrepoName::from (*s) ) . collect (),
       kept_out : order [position + 1 ..] . iter ()
-        . map ( |s| SkgrepoName::from (*s) ) . collect (), } }
+        . map ( |s| SkgrepoName::from (*s) ) . collect (),
+      most_private_owned : SkgrepoName::from (
+        *order . last () . expect ("the order names a skgrepo") ), } }
 
   /// Whether the set it denotes holds 'skgrepo', a skgrepo of the
   /// config.
@@ -128,20 +186,20 @@ impl SkgrepoRestriction {
   ) -> bool {
     self . skgrepos . contains (skgrepo) }
 
-  /// Whether the most private skgrepo shown is the most private the
-  /// config has: no skgrepo restriction.
+  /// Whether it keeps nothing out: the most private skgrepo shown is
+  /// the most private owned one, and foreign skgrepos are shown. No
+  /// skgrepo restriction.
   pub fn is_unrestricted (
     &self,
   ) -> bool {
     self . kept_out . is_empty () }
 
-  /// The most private skgrepo of the config, which an unrestricted
-  /// connection shows.
+  /// The most private owned skgrepo of the config, which an
+  /// unrestricted connection shows.
   pub fn most_private_of_the_config (
     &self,
   ) -> &SkgrepoName {
-    self . kept_out . last ()
-      . unwrap_or ( &self . most_private_shown ) }
+    &self . most_private_owned }
 
   /// Whether a record (a relationship as one node's file states it,
   /// in the section of the skgrepo 'relRepo') is visible: the
@@ -202,7 +260,10 @@ pub fn require_unrestricted (
   restriction : &SkgrepoRestriction,
 ) -> Result<(), String> {
   if restriction . is_unrestricted () { return Ok (( )); }
+  let foreign_hidden : &str =
+    if restriction . foreign_shown { "" }
+    else { ", foreign repos hidden" };
   Err ( format! (
-    "{} requires no skgrepo restriction; the skgrepo restriction is {}. Switch it to {}, the most private skgrepo, first.",
-    what, restriction . most_private_shown,
+    "{} requires no skgrepo restriction; the skgrepo restriction is {}{}. Switch it to {}, the most private skgrepo, with foreign repos shown, first.",
+    what, restriction . most_private_shown, foreign_hidden,
     restriction . most_private_of_the_config () )) }

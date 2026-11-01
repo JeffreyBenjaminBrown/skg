@@ -598,6 +598,12 @@ pub enum Folder {
   /// Its title and body are what the user typed there; a fresh
   /// rendering has neither.
   Flags { title : String, body : Option<String> },
+  /// Child of an occurrence of a foreign node: the user's illegal
+  /// edits to it, sections of the node in owned skgrepos
+  /// ('InRustGraph::illegal_edits'). Its title and body are theirs,
+  /// redrawn from the graph at every refresh; its members, what they
+  /// contain. Write-protected and save-inert.
+  IllegalEdit { title : String, body : Option<String> },
 }
 
 /// Requests for editing operations on a node.
@@ -743,6 +749,9 @@ impl Folder {
   pub fn is_flags (&self) -> bool {
     matches! (self, Folder::Flags { .. }) }
 
+  pub fn illegal_edit () -> Folder {
+    Folder::IllegalEdit { title : String::new (), body : None } }
+
   /// Whether the members are properties of the viewparent (its
   /// aliases, IDs or true flags) rather than nodes.
   pub fn members_are_properties (&self) -> bool {
@@ -759,7 +768,8 @@ impl Folder {
   pub fn goal_is_ordered (&self) -> bool {
     match self {
       Folder::Subscribee | Folder::Overridden | Folder::Hidden
-        | Folder::HiddenOutsideOfSubscribee | Folder::Alias => true,
+        | Folder::HiddenOutsideOfSubscribee | Folder::Alias
+        | Folder::IllegalEdit { .. } => true,
       Folder::Subscriber | Folder::Overrider | Folder::Hider
         | Folder::HiddenInSubscribee
         | Folder::Container | Folder::Mentioner
@@ -780,7 +790,8 @@ impl Folder {
         | Folder::Hidden | Folder::HiddenInSubscribee
         | Folder::Container | Folder::Mentioner
         | Folder::AcquiredBy | Folder::Acquired
-        | Folder::ID | Folder::Flags { .. } => false, } }
+        | Folder::ID | Folder::Flags { .. }
+        | Folder::IllegalEdit { .. } => false, } }
 
   /// Whether each member of a folder of this kind carries its
   /// containerward chain: every kind whose members are live nodes,
@@ -789,7 +800,8 @@ impl Folder {
   /// not, nor do the property folders.
   pub fn members_carry_containerward_chain (&self) -> bool {
     ! ( self . members_are_properties ()
-        || matches! ( self, Folder::AcquiredBy | Folder::Acquired )) }
+        || matches! ( self, Folder::AcquiredBy | Folder::Acquired
+                            | Folder::IllegalEdit { .. } )) }
 
   pub fn repr_in_client (&self) -> &'static str {
     match self {
@@ -808,6 +820,7 @@ impl Folder {
       Folder::Alias                     => "aliasFolder",
       Folder::ID                        => "idFolder",
       Folder::Flags { .. }              => "flagsFolder",
+      Folder::IllegalEdit { .. }        => "illegalEditFolder",
     }}
 
   /// The folder a folder atom names ('repr_in_client'); a flags
@@ -816,9 +829,10 @@ impl Folder {
     Folder::all () . into_iter ()
       . find ( |folder| folder . repr_in_client () == s ) }
 
-  /// Every kind of folder: the twelve partner folders, then the three
-  /// property folders, a flags folder with no text.
-  pub fn all () -> [Folder; 15] {
+  /// Every kind of folder: the twelve partner folders, the three
+  /// property folders, a flags folder with no text, and an
+  /// illegal-edit folder with none.
+  pub fn all () -> [Folder; 16] {
     fn guard ( folder : &Folder ) { // compile error here = update the list below
       match folder {
         Folder::Subscribee | Folder::Subscriber
@@ -828,7 +842,8 @@ impl Folder {
         | Folder::HiddenOutsideOfSubscribee
         | Folder::Container | Folder::Mentioner
         | Folder::AcquiredBy | Folder::Acquired
-        | Folder::ID | Folder::Alias | Folder::Flags { .. } => () }}
+        | Folder::ID | Folder::Alias | Folder::Flags { .. }
+        | Folder::IllegalEdit { .. } => () }}
     let _ = guard;
     [ Folder::Subscribee, Folder::Subscriber,
       Folder::Overridden, Folder::Overrider,
@@ -837,16 +852,19 @@ impl Folder {
       Folder::HiddenOutsideOfSubscribee,
       Folder::Container, Folder::Mentioner,
       Folder::AcquiredBy, Folder::Acquired,
-      Folder::ID, Folder::Alias, Folder::flags () ] }
+      Folder::ID, Folder::Alias, Folder::flags (),
+      Folder::illegal_edit () ] }
 
   pub fn title (&self) -> &str {
     match self {
-      Folder::Flags { title, .. } => title,
+      Folder::Flags { title, .. }
+        | Folder::IllegalEdit { title, .. } => title,
       _ => "", } }
 
   pub fn body (&self) -> Option<&String> {
     match self {
-      Folder::Flags { body, .. } => body . as_ref (),
+      Folder::Flags { body, .. }
+        | Folder::IllegalEdit { body, .. } => body . as_ref (),
       _ => None, } }
 
   /// The role its members play in the relation the folder shows, of
@@ -889,6 +907,10 @@ impl Folder {
         None,
       // A property is no relation.
       Folder::Alias | Folder::ID | Folder::Flags { .. } =>
+        None,
+      // Its members are what an illegal section contains, which is
+      // no relationship of the node's.
+      Folder::IllegalEdit { .. } =>
         None,
     } }
 }

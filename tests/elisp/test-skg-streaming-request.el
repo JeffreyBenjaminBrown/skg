@@ -139,6 +139,26 @@ the approved PIDs."
                        '("p1" "p2"))))
       (should (assq 'skgrepo-restriction skg-response-handler-map)))))
 
+(ert-deftest test-skg-restrict-repo-set-sends-a-foreign-choice-without-a-name ()
+  "A foreign choice asks the server to show or hide the foreign repos,
+naming no repo, so the rung stays as it is."
+  (dolist (case '((foreign-hidden . "hidden") (foreign-shown . "shown")))
+    (let ((skg-response-handler-map nil)
+          (skg-lp--pending-count 0)
+          (skg--stream-in-progress nil)
+          (sent nil))
+      (cl-letf (((symbol-function 'skg-tcp-connect-to-rust) (lambda () 'fake-proc))
+                ((symbol-function 'skg--lock-all-skg-buffers) #'ignore)
+                ((symbol-function 'yes-or-no-p) (lambda (&rest _) t))
+                ((symbol-function 'process-send-string)
+                 (lambda (_proc text) (push text sent))))
+        (skg-restrict-repo-set (car case))
+        (should (= 1 (length sent)))
+        (let ((request (read (car sent))))
+          (should (equal (cdr (assq 'request request)) "set skgrepo restriction"))
+          (should (equal (cdr (assq 'foreign-repos request)) (cdr case)))
+          (should-not (assq 'name request)))))))
+
 (ert-deftest test-skg-restrict-repo-set-refuses-while-a-view-is-unsaved ()
   "The repo-set switch refuses while any view has unsaved edits, before
 it prompts for a name, with the message of stage-and-commit; with every
@@ -152,7 +172,7 @@ view clean it asks its question and sends the request."
     (cl-letf (((symbol-function 'skg-tcp-connect-to-rust) (lambda () 'fake-proc))
               ((symbol-function 'skg--lock-all-skg-buffers) #'ignore)
               ((symbol-function 'skg--prompt-for-repo-set)
-               (lambda () (setq name-prompted t) "rs"))
+               (lambda (&rest _) (setq name-prompted t) "rs"))
               ((symbol-function 'yes-or-no-p)
                (lambda (question) (push question questions) t))
               ((symbol-function 'process-send-string)

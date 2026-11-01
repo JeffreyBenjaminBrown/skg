@@ -946,18 +946,32 @@ The suffixes start off. Links confirmed missing are ugly and underlined
 even with suffixes off. See [[file:heralds.org::*Link annotations][link annotations]].
 *** <localleader>vl : :SkgRestrictRepoSet
 Switches the skgrepo restriction of display and search for this
-Neovim connection. The skgrepo restriction shows a skgrepo-set, a
-prefix of the config's privacy order.
+Neovim connection. The skgrepo restriction is two things: a
+skgrepo-set, a prefix of the config's privacy ladder (the owned
+skgrepos), and whether the foreign skgrepos are shown. Foreign
+skgrepos have no place on the ladder; they are shown or hidden all at
+once, apart from the rung, and are shown until you hide them.
 
-The command asks for the most private skgrepo to show, which
-activates it and everything more public. The prompt, "Most private
-repo to show (S-left/right cycle): ", lists the skgrepos by name in
-privacy order, the most private as "NAME (no restriction)", which is
-the default; TAB completes and S-Left / S-Right cycles. It then asks
-"Switch the skgrepo restriction and re-render all SKG buffers?", and
-on yes tells the server to use that skgrepo-set, and the server
-rerenders every open Skg buffer in place. Choose the most private skgrepo
-to remove the skgrepo restriction.
+The command asks for the most private owned skgrepo to show, which
+activates it and every more public owned skgrepo, or for the foreign
+skgrepos to be shown or hidden. The prompt, "Most private repo to
+show, or foreign: shown/hidden (S-left/right cycle): ", lists the
+owned skgrepos by name in privacy order, the most private as "NAME
+(no restriction)", which is the default, then "foreign: shown" and
+"foreign: hidden" (only when the config has a foreign skgrepo;
+otherwise the prompt is "Most private repo to show (S-left/right
+cycle): "); TAB completes and S-Left / S-Right cycles. Choosing a
+skgrepo changes the rung and leaves the foreign skgrepos as they
+were; choosing a foreign choice shows or hides them and leaves the
+rung. It then asks "Switch the skgrepo restriction and re-render all
+SKG buffers?", and on yes tells the server, and the server rerenders
+every open Skg buffer in place. The confirmation reads "Skgrepo
+restriction: NAME", with "; foreign repos hidden" while they are.
+Choose the most private skgrepo, with foreign skgrepos shown, to
+remove the skgrepo restriction.
+
+Hidden, a foreign node is treated as any node outside the set, below:
+an open view that showed it re-renders without it.
 
 Under a skgrepo restriction, a node in a skgrepo outside the set
 shows nothing of itself. Where a relationship recorded in a skgrepo
@@ -1244,9 +1258,10 @@ that direct edits will be clobbered by the next export; the importer
 ignores them.
 
 It asks two things:
-- which skgrepo-set to export, as the most private skgrepo to
+- which skgrepo-set to export, as the most private owned skgrepo to
   export (command-line input with TAB completion and S-Left /
-  S-Right cycling); only nodes from that set are included. Choose a
+  S-Right cycling); only nodes from that set, and from the foreign
+  skgrepos, are included. Choose a
   public-facing skgrepo so private notes are not exported; exporting
   the most private skgrepo (no skgrepo restriction) warns you about
   this.

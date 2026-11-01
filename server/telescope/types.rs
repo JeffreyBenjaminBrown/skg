@@ -16,15 +16,16 @@
 
 use serde::{Serialize, Deserialize};
 
-use crate::types::misc::{ID, SkgConfig, SkgrepoName};
+use crate::types::misc::{ID, SkgConfig, SkgrepoName, SkgrepoOwner};
 use crate::types::nodes::complete::Flag;
 use crate::types::nodes::fs::GraphnodeOnDisk;
 
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 
-/// One node, as it sits on disk: its sections, in privacy order,
-/// most public first.
+/// One node, as it sits on disk: its sections, in fold order
+/// ('SkgConfig::ordered_skgrepos'): an owned telescope's most public
+/// first, a foreign one's as the foreign manifests order them.
 ///
 /// The point of the type is that "several files, one node" is a
 /// value rather than a condition to be discovered. Before it,
@@ -68,35 +69,99 @@ pub enum TelescopeConstructionError {
   },
 }
 
+/// What one illegal section of a node says: a section in a skgrepo
+/// of an owner other than the node's home's ('separate_illegal_sections').
+/// An owned one is drawn, under the node, as an "ILLEGAL EDIT TO
+/// FOREIGN NODE" child; this is what that child shows.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct IgnoredForeignPidFolderlision {
-  pub ignored_skgrepos : Vec<SkgrepoName>,
+pub struct IllegalEdit {
+  pub skgrepo  : SkgrepoName,
+  pub title    : Option<String>,
+  pub body     : Option<String>,
+  pub contains : Vec<ID>,
 }
 
-/// If a pid has any owned section, its owned sections are the
-/// telescope and every non-owned same-pid section is ignored. A pid
-/// with no owned section remains an ordinary foreign telescope.
-/// Input order is preserved.
-pub fn retain_owned_sections_when_pid_folderlides (
+impl IllegalEdit {
+  pub fn of_section (
+    skgrepo : SkgrepoName,
+    section : &GraphnodeOnDisk,
+  ) -> IllegalEdit {
+    IllegalEdit {
+      skgrepo,
+      title    : section . title . clone (),
+      body     : section . body . clone (),
+      contains : section . contains . iter ()
+        . filter_map ( |item| match item {
+          ListItem::Member (gnid) => Some ( gnid . clone () ),
+          ListItem::Anchor { .. } => None } )
+        . collect () } }
+}
+
+/// The sections of one PID that its home's owner did not write: each
+/// a section in a skgrepo of another owner ('SkgrepoOwner'). Sections
+/// of one PID in skgrepos of different owners are not one telescope;
+/// the ones outside the home's owner's are illegal edits to it. The
+/// owned ones are kept, to be drawn as illegal edits; the foreign ones
+/// are ignored.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct IllegalSections {
+  pub home    : SkgrepoName, // a skgrepo of the node's legitimate sections
+  pub owned   : Vec<IllegalEdit>,
+  pub foreign : Vec<SkgrepoName>,
+}
+
+/// The owner of the legitimate sections of a PID whose sections sit
+/// in 'skgrepos': their one owner, if they have one; else the owner of
+/// the foreign one declared first. A node with owned and foreign
+/// sections is the foreign owner's, since only the user can have
+/// written into another's node here: the user's sections are the
+/// illegal edits. None for no skgrepos.
+pub fn home_owner_of_sections<'a> (
+  config   : &SkgConfig,
+  skgrepos : impl Iterator<Item = &'a SkgrepoName>,
+) -> Option<SkgrepoOwner> {
+  let skgrepos : Vec<&SkgrepoName> = skgrepos . collect ();
+  let owners : Vec<SkgrepoOwner> = skgrepos . iter ()
+    . map ( |skgrepo| config . skgrepo_owner (skgrepo) )
+    . collect ();
+  let first : &SkgrepoOwner = owners . first () ?;
+  if owners . iter () . all ( |owner| owner == first ) {
+    return Some ( first . clone () ); }
+  config . skgrepos_in_declaration_order () . iter ()
+    . find ( |declared| skgrepos . contains (declared)
+                        && ! config . skgrepo_is_owned (declared) )
+    . map ( |declared| config . skgrepo_owner (declared) ) }
+
+/// The sections of one PID that form its telescope, those of its
+/// home's owner ('home_owner_of_sections'), in input order, and the
+/// rest, its illegal sections, if any.
+pub fn separate_illegal_sections (
   sections : Vec<(SkgrepoName, GraphnodeOnDisk)>,
   config   : &SkgConfig,
 ) -> ( Vec<(SkgrepoName, GraphnodeOnDisk)>,
-       Option<IgnoredForeignPidFolderlision> ) {
-  let has_owned : bool = sections . iter ()
-    . any ( |(skgrepo, _)| config . skgrepo_is_owned (skgrepo) );
-  if ! has_owned {
-    return (sections, None); }
-  let mut retained : Vec<(SkgrepoName, GraphnodeOnDisk)> = Vec::new ();
-  let mut ignored_skgrepos : Vec<SkgrepoName> = Vec::new ();
+       Option<IllegalSections> ) {
+  let Some (home_owner) : Option<SkgrepoOwner> =
+    home_owner_of_sections (
+      config, sections . iter () . map ( |(skgrepo, _)| skgrepo ))
+    else { return (sections, None); };
+  let mut legitimate : Vec<(SkgrepoName, GraphnodeOnDisk)> = Vec::new ();
+  let mut owned : Vec<IllegalEdit> = Vec::new ();
+  let mut foreign : Vec<SkgrepoName> = Vec::new ();
   for (skgrepo, node_fs) in sections {
-    if config . skgrepo_is_owned (&skgrepo) {
-      retained . push (( skgrepo, node_fs )); }
+    if config . skgrepo_owner (&skgrepo) == home_owner {
+      legitimate . push (( skgrepo, node_fs )); }
+    else if config . skgrepo_is_owned (&skgrepo) {
+      owned . push ( IllegalEdit::of_section (skgrepo, &node_fs) ); }
     else {
-      ignored_skgrepos . push (skgrepo); }}
-  let warning : Option<IgnoredForeignPidFolderlision> =
-    if ignored_skgrepos . is_empty () { None }
-    else { Some ( IgnoredForeignPidFolderlision { ignored_skgrepos } ) };
-  (retained, warning) }
+      foreign . push (skgrepo); }}
+  let illegal : Option<IllegalSections> =
+    if owned . is_empty () && foreign . is_empty () { None }
+    else { Some ( IllegalSections {
+      home : legitimate . first ()
+        . map ( |(skgrepo, _)| skgrepo . clone () )
+        . expect ("the home owner has a section"),
+      owned, foreign } ) };
+  (legitimate, illegal) }
 
 impl fmt::Display for TelescopeConstructionError {
   fn fmt (
@@ -121,7 +186,7 @@ impl fmt::Display for TelescopeConstructionError {
           skgrepo ),
       TelescopeConstructionError::OutOfOrder { previous, next } =>
         write! ( f,
-          "Telescope sections are out of privacy order: '{}' precedes '{}'.",
+          "Telescope sections are out of fold order: '{}' precedes '{}'.",
           previous, next ), }} }
 
 impl std::error::Error for TelescopeConstructionError {

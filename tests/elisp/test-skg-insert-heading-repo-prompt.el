@@ -390,6 +390,56 @@ and returns the chosen repo's name."
          (should (equal (skg--prompt-for-repo-set)
                         (cdr case))))))))
 
+(ert-deftest test-repo-set-prompt-offers-the-owned-rungs-and-the-foreign-toggle ()
+  "With a foreign repo listed after the owned ones, the rungs are the
+owned repos alone; asked to, the prompt also offers \"foreign: shown\"
+and \"foreign: hidden\", which return a symbol, not a name."
+  (test--with-skg-content-view
+   "* (skg node (gnid x) (skgRepos (nodeRepo public))) x\n"
+   test--config-with-foreign-repo
+   (lambda ()
+     (should (equal (skg--repo-set-names) '("public" "private")))
+     (should (equal (skg--foreign-repo-names) '("foreign")))
+     (dolist (case '((nil "public" . "public")
+                     (t "private (no restriction)" . "private")
+                     (t "foreign: shown" . foreign-shown)
+                     (t "foreign: hidden" . foreign-hidden)))
+       (let ((offer (car case))
+             (label (cadr case))
+             (expected (cddr case)))
+         (cl-letf (((symbol-function 'completing-read)
+                    (lambda (_prompt collection _predicate require-match
+                             _initial-input &optional _hist def
+                             _inherit-input-method)
+                      (should (equal collection
+                                     (append '("public" "private (no restriction)")
+                                             (when offer
+                                               '("foreign: shown" "foreign: hidden")))))
+                      (should require-match)
+                      (should (equal def "private (no restriction)"))
+                      label)))
+           (should (equal (skg--prompt-for-repo-set offer) expected))))))))
+
+(ert-deftest test-skgrepo-restriction-label-ignores-a-later-foreign-repo ()
+  "The most private owned repo is no restriction, though a foreign repo
+is listed after it; with foreign repos hidden, the message names the
+rung alone and says so."
+  (test--with-skg-content-view
+   "* (skg node (gnid x) (skgRepos (nodeRepo public))) x\n"
+   test--config-with-foreign-repo
+   (lambda ()
+     (should (equal (skg--skgrepo-restriction-label "private")
+                    "private (no restriction)"))
+     (should (equal (skg--skgrepo-restriction-label "foreign") "foreign"))
+     (should (equal (skg--skgrepo-restriction-message
+                     '((response-type skgrepo-restriction)
+                       (restriction "private") (foreign-repos "shown")))
+                    "Skgrepo restriction: private (no restriction)"))
+     (should (equal (skg--skgrepo-restriction-message
+                     '((response-type skgrepo-restriction)
+                       (restriction "private") (foreign-repos "hidden")))
+                    "Skgrepo restriction: private; foreign repos hidden")))))
+
 (ert-deftest test-skgrepo-restriction-label-marks-the-most-private-repo ()
   "The most private repo is shown with \" (no restriction)\"; the
 others, and a name the config lacks, by their names."

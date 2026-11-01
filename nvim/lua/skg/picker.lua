@@ -112,22 +112,46 @@ function M.prompt_for_repo_change (current_skgrepo)
       initial_input = current_skgrepo, cycle_values = owned })
 end
 
----Choose the skgrepo restriction, the most private repo to show,
----with completion and cycling. Each choice is shown by its name, the
----most private one with ' (no restriction)' appended, the default.
----@return string|nil the chosen repo's name
-function M.prompt_for_repo_set ()
+---The skgrepo restriction picker's foreign-repos choices, by label.
+---Each is a table, so that no repo name can be mistaken for one.
+M.foreign_repos_choices = {
+  { label = 'foreign: shown',  foreign_repos = 'shown' },
+  { label = 'foreign: hidden', foreign_repos = 'hidden' } }
+
+---Choose the skgrepo restriction's rung, the most private owned repo
+---to show, with completion and cycling. Each choice is shown by its
+---name, the most private one with ' (no restriction)' appended, the
+---default. With OPTS.offer_foreign_repos, when the config has a
+---foreign repo, the choices also include 'foreign: shown' and
+---'foreign: hidden', which return their entry of
+---'foreign_repos_choices' instead of a name: foreign repos are shown
+---or hidden apart from the rung.
+---@param opts table|nil
+---@return string|table|nil the chosen repo's name, or a foreign choice
+function M.prompt_for_repo_set (opts)
+  opts = opts or {}
   local names = config.repo_set_names()
   if not names or #names == 0 then
-    vim.notify('No skg repos found')
+    vim.notify('No owned skg repos found')
     return nil end
-  local labels = vim.tbl_map(config.skgrepo_restriction_label, names)
+  local rung_labels = vim.tbl_map(config.skgrepo_restriction_label, names)
+  local foreign_choices =
+    (opts.offer_foreign_repos and #(config.foreign_repos() or {}) > 0)
+    and M.foreign_repos_choices or {}
+  local labels = vim.list_extend(vim.list_extend({}, rung_labels),
+    vim.tbl_map(function (choice) return choice.label end, foreign_choices))
   local label = M.completing_read_with_cycle(
-    'Most private repo to show (S-left/right cycle): ', labels, {
+    #foreign_choices > 0
+      and 'Most private repo to show, or foreign: shown/hidden (S-left/right cycle): '
+      or 'Most private repo to show (S-left/right cycle): ',
+    labels, {
       require_match = true, cycle_values = labels,
-      initial_input = labels[#labels] })
+      initial_input = rung_labels[#rung_labels] })
   if not label then return nil end
-  for i, candidate in ipairs(labels) do
+  for _, choice in ipairs(foreign_choices) do
+    if choice.label == label then return choice end
+  end
+  for i, candidate in ipairs(rung_labels) do
     if candidate == label then return names[i] end
   end
 end

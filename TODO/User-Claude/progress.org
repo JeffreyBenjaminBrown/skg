@@ -1100,3 +1100,138 @@ tantivy in the scratchpad) started with no manifest warning;
 'check-config' does not compute these warnings, so it could not
 serve. The scratch server's own log lines went to
 'data/logs/server-to-user.log', beside the live server's.
+* Foreign repos leave the privacy ladder; illegal edits to foreign nodes: DONE, uncommitted
+** What was done
+*** The config
+The privacy ladder is the owned '[[repos]]' entries in declaration
+order ('SkgConfig::privacy_ladder'); foreign entries may sit anywhere.
+'validate_foreign_skgrepos_more_public_than_owned' is gone, and so is
+the migration script's "foreign first" warning. 'default_repo_set'
+naming a foreign repo is refused. Jeff's and User's live configs pass
+'check-config' unchanged.
+
+The comparison chokepoint in 'server/types/misc.rs' now separates two
+orders. 'ordered_skgrepos' is the *fold order*: declaration order, the
+foreign entries permuted among their own places into the order the
+foreign manifests give. 'privacy_ladder', 'is_strictly_more_public',
+'more_private_of' and 'privacy_ladder_split_after' (renamed from
+'privacy_order_split_after', since it now splits the ladder) see owned
+repos only: a foreign repo is neither more nor less public than
+anything, and beside an owned one 'more_private_of' returns the owned
+one.
+*** Auditing the privacy comparisons
+Every caller was read. The leak check ('telescope_violations_of') and
+'strandeds' now skip a foreign target home explicitly; 'hide_skgrepo'
+skips a foreign home and a foreign subscribee's contains record
+explicitly (both were safe before only because foreign repos ranked
+more public). The relRepo resolution in 'supplement_from_disk' checks
+ownership before comparing; 'nodeMerge' merges owned nodes; fork
+already guarded. The telescope's own order checks ('Telescope::try_new',
+'decompose_node') use the fold order, which is not a privacy rank.
+*** The restriction
+'SkgrepoRestriction' carries 'foreign_shown' (default true); its set is
+the rungs through 'most_private_shown' plus every foreign repo if
+shown; 'kept_out' is the more private rungs plus the foreign repos if
+hidden. 'is_unrestricted' needs both the top rung and foreign shown.
+'under_config' keeps the flag, also when it falls back to the default
+rung. The switch request takes 'name', 'foreign-repos' ("shown" or
+"hidden"), or both, each defaulting to the current value; every
+restriction response carries '(foreign-repos ...)'. The 'repos'
+response carries '(foreign-repos ...)' and a per-repo '(shown ...)'.
+'skg-for-ai''s test pins the new 'repos' text.
+*** The picker
+One prompt, both clients: the owned rungs (the most private labelled
+"(no restriction)", the default), then "foreign: shown" and "foreign:
+hidden" when the config has a foreign repo. A rung choice keeps the
+foreign flag; a foreign choice keeps the rung. Chosen over a separate
+command because it needs no new key and keeps one place to change
+what you see; the export prompt offers rungs only (export includes
+foreign repos, as before). The confirmation reads "Skgrepo
+restriction: NAME; foreign repos hidden" while they are hidden.
+*** Manifests
+An owned repo's manifest lists its owned ladder through itself; foreign
+repos never appear. A receiver reads its foreign repos' manifests at
+config load ('read_foreign_manifest_orders'), matching an entry by
+data-root-relative path, else by a unique final path component among
+the foreign repos (the old matcher took any repo by final component,
+which two authors' "public" folders would confuse).
+*** Folding foreign repos, and illegal edits (Jeff's rule)
+The plan's "two foreign repos sharing a node" rule was replaced,
+mid-slice, by Jeff's rule from '5_discussion.org'. What was built:
+
+- Owners. Owned repos are the user's. Foreign repos that manifests
+  chain (a manifest's own repo and every repo it lists, transitively)
+  are one foreign owner's; unchained foreign repos are different
+  owners' ('SkgrepoOwner', 'SkgConfig::skgrepo_owner').
+- One owner's repos fold together, in the manifests' order. A pair two
+  manifests disagree about folds as the manifest of the more private
+  one says (the one whose own manifest lists the other; failing that,
+  config order), with a startup warning naming the node. This is how
+  Jeff's ladder, all foreign on User's server, folds; User's server,
+  run once on a scratch copy of its config, started with no warnings.
+- Sections of one PID in different owners' repos are not one
+  telescope ('separate_illegal_sections' in
+  'server/telescope/types.rs', replacing the "owned wins" collision
+  rule). The home owner: the foreign owner of the foreign section
+  listed first in the config (so with an owned and a foreign section,
+  the foreign one). An owned illegal section is kept in
+  'InRustGraph::illegal_edits' and drawn under every occurrence of the
+  node as an 'illegalEditFolder' child, heralded "☮ ILLEGAL EDIT TO
+  FOREIGN NODE" in the message style, with the section's title, body
+  and contains members; it is write-protected and save-inert, redrawn
+  at each refresh, and hidden when its repo is restricted. A foreign
+  illegal section is ignored. Each is a startup warning, one per repo
+  holding illegal sections, naming the first node and the count of
+  others ('foreign_section_warnings', which replaces
+  'foreign_manifest_order_warnings'), and a per-node entry in
+  'telescope-warnings.org'. 'home_from_disk' follows the same rule.
+** Tests
+New or rewritten: config (foreign anywhere, foreign after owned, a
+foreign 'default_repo_set' refused) in 'tests/repo_path_validation.rs';
+the restriction's set and reload in 'tests/repo_sets.rs'; refresh
+units (foreign hidden: a foreign node becomes Restricted, its foreign
+content vanishes, and comes back; foreign shown unchanged); an
+end-to-end switch with 'foreign-repos' and an edit of the hidden node
+refused ('tests/foreign_hidden.rs'); the 'repos' response; manifests,
+owner chaining, disputed folding, the two-owner illegal section
+ignored, in 'tests/unit/dependencies_manifest.rs'; an owned illegal
+section drawn and not saved ('tests/illegal_edits.rs'); the served
+warning; both clients' pickers, label and messages; the herald
+rendering case; the idempotence sweep now also runs with foreign
+repos hidden.
+
+Counts: cargo test 1099 passed (396 lib + 703 in the grouped
+binaries); Emacs 432; Neovim 469; skg-for-ai PASS; integration 69 of
+70, 'import-md-and-org' failing as before. The live server rebuilt to
+"Server ready" with only its two pre-existing leak warnings.
+** Deviations
+*** The illegal edit is a folder, not a '(view ...)' fact
+The coordinator's brief suggested a '(view ...)' fact. The child has a
+headline, a body and children of its own, so it is a new folder kind
+('Folder::IllegalEdit', atom 'illegalEditFolder'), drawn like the other
+derived folders; its herald comes from the folder atom. It is listed
+as write-protected, so it carries ☮ before the label.
+*** Fixtures
+'link-annotations' (integration) had two foreign repos used as rungs;
+they are owned now, since a foreign repo is no rung. One Rust telescope
+test ('test_telescope_is_not_a_conflict_but_two_pids_are') folded an
+owned and a foreign section, which is now an illegal edit; its second
+repo is owned. Integration runs regenerated the tracked fixture
+manifests (owned-only, new header).
+*** Two owners sharing a node, all foreign: home by config order
+For two unchained foreign repos the home is the owner of the one
+listed first in the config, as Jeff's rule says; the other's section
+is ignored.
+** What's imperfect
+*** "(no restriction)" in the picker
+The label sits on the top rung whatever the foreign flag; with
+foreign repos hidden, picking it still leaves them hidden. The
+confirmation message says so.
+*** Live data touched
+Jeff's live server regenerated his repos' manifests (owned-only). My
+scratch run of User's config rewrote 'data/user-claude/first''s
+manifest with an absolute path; I restored it from that repo's HEAD,
+so it still holds the old ladder-with-Jeff's-repos content until
+User's server next starts.
+*** A disputed pair whose both own manifests list each other
+Each claims to be the more private; config order decides.

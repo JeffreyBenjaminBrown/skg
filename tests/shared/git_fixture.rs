@@ -63,7 +63,7 @@ pub enum OwnedSkgrepos<'a> {
 }
 
 /// The fixture of the case whose folder is 'case': its owned skgrepos,
-/// then its foreign skgrepos 'foreign', in privacy order. A foreign
+/// in privacy order, then its foreign skgrepos 'foreign'. A foreign
 /// skgrepo '<case>/<skgrepo>' is made a gitrepo as an owned one is
 /// when it has a 'head' folder, and is copied as a plain folder
 /// otherwise.

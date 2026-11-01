@@ -82,7 +82,7 @@ fn every_kind_atom (
     Folder::HiddenInSubscribee,
     Folder::HiddenOutsideOfSubscribee,
     Folder::Container, Folder::Mentioner,
-    Folder::AcquiredBy, Folder::Acquired ];
+    Folder::AcquiredBy, Folder::Acquired, Folder::illegal_edit () ];
   for folder in &folders {
     match folder {
       Folder::Alias | Folder::ID | Folder::Flags { .. }
@@ -92,7 +92,8 @@ fn every_kind_atom (
         | Folder::HiddenInSubscribee
         | Folder::HiddenOutsideOfSubscribee
         | Folder::Container | Folder::Mentioner
-        | Folder::AcquiredBy | Folder::Acquired => (), } }
+        | Folder::AcquiredBy | Folder::Acquired
+        | Folder::IllegalEdit { .. } => (), } }
   [ "node", "ghost", "unknown", "restricted",
     "tombstone", "forestRoot" ]
     . iter () . map ( |atom| atom . to_string () )

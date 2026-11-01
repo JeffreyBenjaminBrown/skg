@@ -167,6 +167,24 @@ describe('skg stream consumers', function ()
     assert(ok, err)
   end)
 
+  it('sends a foreign choice of the repo-set switch without a name',
+     function ()
+    -- Mirrors test-skg-restrict-repo-set-sends-a-foreign-choice-without-a-name.
+    local sent = {}
+    local original_send, original_confirm =
+      client.send_string, vim.fn.confirm
+    client.send_string = function (text) table.insert(sent, text) end
+    vim.fn.confirm = function () return 1 end
+    local ok, err = pcall(function ()
+      repo_sets.restrict_repo_set(picker.foreign_repos_choices[2])
+      assert.are.equal(
+        '((request . "set skgrepo restriction") (foreign-repos . "hidden"))\n',
+        sent[1])
+    end)
+    client.send_string, vim.fn.confirm = original_send, original_confirm
+    assert(ok, err)
+  end)
+
   it('refuses the repo-set switch while a view is unsaved, before it'
      .. ' prompts for a name', function ()
     -- Mirrors test-skg-restrict-repo-set-refuses-while-a-view-is-unsaved.

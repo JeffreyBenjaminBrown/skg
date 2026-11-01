@@ -117,12 +117,4 @@ for table in tables:
 new_tables = list (map (migrated_table, tables))
 config_path . write_text (new_header + "" . join (new_tables))
 print (f"rewrote {config_path}")
-kinds = [ bool (re . search (r'(?m)^[ \t]*foreign[ \t]*=[ \t]*true', t))
-          for t in new_tables if entry_path (t) ]
-if any ( not kinds[i] and kinds[j]
-         for i in range (len (kinds))
-         for j in range (i + 1, len (kinds)) ):
-  print ("  warning: a foreign entry is listed after an owned one. skg "
-         "refuses that: every foreign repo must be more public (earlier) "
-         "than every owned repo. Reorder the entries.")
 PYTHON

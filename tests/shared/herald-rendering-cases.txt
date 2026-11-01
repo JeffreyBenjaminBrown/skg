@@ -360,6 +360,10 @@
 (skg acquiredFolder)
 ---- text: ☮ it acquired
 ---- styles: crucial*1 -*1 message*11
+==== an illegal edit to a foreign node
+(skg illegalEditFolder)
+---- text: ☮ ILLEGAL EDIT TO FOREIGN NODE
+---- styles: crucial*1 -*1 message*28
 ==== diff view: a folder of recorders shown because of a change, ready
 (skg containerFolder)
 ---- context: folderChange ready

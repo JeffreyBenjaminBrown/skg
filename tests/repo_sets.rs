@@ -25,7 +25,7 @@ use skg::refresh::Truth;
 use skg::test_utils::draw_containerward_chains_under_members;
 use skg::refresh::mode::RefreshMode;
 use skg::test_utils::multi_root_view_with_skgrepo_set;
-use skg::types::misc::{ID, MSV, SkgConfig, SkgrepoName, TantivyIndex, members_of, rel_partners_at_relRepo, rel_partners_at_relRepo_msv};
+use skg::types::misc::{ID, MSV, SkgConfig, Skgrepo, SkgrepoName, TantivyIndex, members_of, rel_partners_at_relRepo, rel_partners_at_relRepo_msv};
 use skg::types::nodes::complete::Graphnode;
 use skg::types::save::{NodeInstruction, SaveNode};
 use skg::types::viewnode::{
@@ -36,6 +36,7 @@ use skg::types::views_state::{OpenViews, ViewState, ViewforestId, ViewnodeIdReco
 use std::collections::{BTreeSet, HashSet};
 use std::error::Error;
 use std::net::TcpStream;
+use std::path::PathBuf;
 use skg::metadata_canon::without_viewnode_ids;
 
 #[test]
@@ -248,6 +249,76 @@ fn config_loads_default_skgrepo_set_and_prefix_skgrepo_sets (
   assert_eq! ( private, SkgrepoRestriction::unrestricted (&config) );
   assert! ( SkgrepoRestriction::named (&config, SkgrepoName::from ("all")) . is_err (),
             "'all' names no skgrepo of this config" );
+  Ok (( )) }
+
+/// 'names' as skgrepos of a config, in that declaration order; each
+/// owned unless listed in 'foreign'.
+fn config_of (
+  names   : &[&str],
+  foreign : &[&str],
+) -> SkgConfig {
+  let mut config : SkgConfig = SkgConfig::dummyFromSkgrepos (
+    names . iter ()
+    . map ( |name| ( SkgrepoName::from (*name), Skgrepo {
+      name : SkgrepoName::from (*name), abbreviation : None,
+      path : PathBuf::from (*name), owned : ! foreign . contains (name) } ))
+    . collect () );
+  config . skgrepo_order = names . iter () . map ( |n| SkgrepoName::from (*n) ) . collect ();
+  config }
+
+#[test]
+fn a_restriction_is_a_rung_of_the_owned_ladder_and_a_foreign_flag (
+) -> Result<(), Box<dyn Error>> {
+  let config : SkgConfig =
+    config_of (&["public", "fred", "private", "sue"], &["fred", "sue"]);
+  let set = |names : &[&str]| -> BTreeSet<SkgrepoName> {
+    names . iter () . map ( |n| SkgrepoName::from (*n) ) . collect () };
+  let public : SkgrepoRestriction =
+    SkgrepoRestriction::named (&config, SkgrepoName::from ("public")) ?;
+  assert! ( public . foreign_shown, "foreign repos are shown by default" );
+  assert_eq! ( public . skgrepos, set (&["public", "fred", "sue"]) );
+  assert! ( SkgrepoRestriction::node_is_restricted (
+              &public, &SkgrepoName::from ("private") ));
+  let hidden : SkgrepoRestriction =
+    public . with_foreign_shown (&config, false) ?;
+  assert_eq! ( hidden . skgrepos, set (&["public"]) );
+  for kept_out in ["private", "fred", "sue"] {
+    assert! ( SkgrepoRestriction::node_is_restricted (
+                &hidden, &SkgrepoName::from (kept_out) ), "{}", kept_out ); }
+  let unrestricted : SkgrepoRestriction =
+    SkgrepoRestriction::unrestricted (&config);
+  assert_eq! ( unrestricted . most_private_shown, SkgrepoName::from ("private"),
+               "the most private owned repo, though a foreign one is listed after it" );
+  assert! ( unrestricted . is_unrestricted () );
+  assert! ( ! unrestricted . with_foreign_shown (&config, false) ?
+              . is_unrestricted (),
+            "the top rung with foreign repos hidden still restricts" );
+  assert! ( SkgrepoRestriction::named (&config, SkgrepoName::from ("fred"))
+            . is_err (), "a foreign repo is no rung" );
+  Ok (( )) }
+
+#[test]
+fn a_config_reload_keeps_the_foreign_flag (
+) -> Result<(), Box<dyn Error>> {
+  let before : SkgConfig = config_of (&["fred", "public", "private"], &["fred"]);
+  let after : SkgConfig =
+    config_of (&["fred", "public", "private", "sue"], &["fred", "sue"]);
+  let hidden_at_public : SkgrepoRestriction =
+    SkgrepoRestriction::named_with_foreign_shown (
+      &before, SkgrepoName::from ("public"), false ) ?;
+  let reloaded : SkgrepoRestriction = hidden_at_public . under_config (&after);
+  assert_eq! ( reloaded . most_private_shown, SkgrepoName::from ("public") );
+  assert! ( ! reloaded . foreign_shown );
+  assert! ( SkgrepoRestriction::node_is_restricted (
+              &reloaded, &SkgrepoName::from ("sue") ),
+            "a foreign repo the reload adds is hidden too" );
+  { // The rung gone, the default rung, the flag kept.
+    let without_public : SkgConfig =
+      config_of (&["fred", "private"], &["fred"]);
+    let fallen_back : SkgrepoRestriction =
+      hidden_at_public . under_config (&without_public);
+    assert_eq! ( fallen_back . most_private_shown, SkgrepoName::from ("private") );
+    assert! ( ! fallen_back . foreign_shown ); }
   Ok (( )) }
 
 #[test]

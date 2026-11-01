@@ -49,18 +49,36 @@ function M.port_from_toml (file)
   error('No port setting found in ' .. file)
 end
 
----Names of the owned skgrepos in FILE, in declaration order. A skgrepo
----is owned unless its entry says 'foreign = true', mirroring the
----server. A skgrepo with no 'name' key defaults its name to its path,
----also mirroring the server.
+---Names of the owned skgrepos in FILE, in declaration order, which is
+---the privacy ladder wherever foreign entries sit among them. A
+---skgrepo is owned unless its entry says 'foreign = true', mirroring
+---the server. A skgrepo with no 'name' key defaults its name to its
+---path, also mirroring the server.
 ---@param file string
 ---@return string[]
 function M.owned_repos_from_toml (file)
+  return M.repo_names_by_ownership_from_toml(file, true)
+end
+
+---Names of the foreign skgrepos in FILE, in declaration order, named
+---as 'owned_repos_from_toml' names them.
+---@param file string
+---@return string[]
+function M.foreign_repos_from_toml (file)
+  return M.repo_names_by_ownership_from_toml(file, false)
+end
+
+---Names of the owned skgrepos in FILE if OWNED, else the foreign
+---ones, in declaration order; see 'owned_repos_from_toml'.
+---@param file string
+---@param owned boolean
+---@return string[]
+function M.repo_names_by_ownership_from_toml (file, owned)
   local skgrepos = {}
   local in_skgrepos = false
   local current_name, current_path, current_foreign = nil, nil, false
   local function flush ()
-    if in_skgrepos and current_path and not current_foreign then
+    if in_skgrepos and current_path and (owned ~= current_foreign) then
       table.insert(skgrepos, current_name or current_path) end
     current_name, current_path, current_foreign = nil, nil, false
   end
@@ -163,25 +181,34 @@ function M.repo_names ()
   return file and M.repo_names_from_toml(file) or nil
 end
 
----The skgrepo restriction's choices: the repo names, in privacy
----order. Each names the most private repo to show, that repo and
----everything more public (a prefix of the config's privacy order);
----the last shows every repo, no skgrepo restriction.
----@return string[]|nil the choices, or nil without config
+---The skgrepo restriction's rungs: the owned repo names, in privacy
+---order. Each names the most private owned repo to show, that repo
+---and every more public owned one (a prefix of the config's privacy
+---ladder); the last, with foreign repos shown, is no skgrepo
+---restriction. Foreign repos are on no rung, wherever the config
+---lists them.
+---@return string[]|nil the rungs, or nil without config
 function M.repo_set_names ()
-  return M.repo_names()
+  return M.owned_repos()
 end
 
----How the clients show the skgrepo restriction NAME, a repo name:
----the config's most private repo, which shows every repo, gets
----' (no restriction)' appended; the words never reach the server.
+---How the clients show the skgrepo restriction's rung NAME, a repo
+---name: the config's most private owned repo, which with foreign
+---repos shown shows every repo, gets ' (no restriction)' appended;
+---the words never reach the server.
 ---@param name string
 ---@return string
 function M.skgrepo_restriction_label (name)
-  local names = M.repo_names()
+  local names = M.owned_repos()
   if names and #names > 0 and names[#names] == name then
     return name .. ' (no restriction)' end
   return name
+end
+
+---@return string[]|nil foreign skgrepo names, or nil without config
+function M.foreign_repos ()
+  local file = M.config_file()
+  return file and M.foreign_repos_from_toml(file) or nil
 end
 
 ---@return string[]|nil owned skgrepo names, or nil without config

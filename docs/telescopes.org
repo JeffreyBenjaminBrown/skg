@@ -12,14 +12,19 @@ term's rejected predecessor — expands uniformly.)
 
 ** The privacy order
 
-Your =skgconfig.toml= lists skgrepos in privacy order, most public
-first (see =api-and-formats.org=). That order is the ladder of
-*privacy levels*. A *skgrepo-set* is a prefix of the ladder —
-choosing one is answering "what is the most private skgrepo I want
-visible right now?" — and the most private skgrepo's set is the
-whole ladder, no skgrepo restriction. Screen-sharing with a
-colleague, you might switch to the =public= prefix; alone, back to
-the most private skgrepo.
+Your =skgconfig.toml= lists the skgrepos you own in privacy order,
+most public first (see =api-and-formats.org=). That order is the
+ladder of *privacy levels*. Foreign skgrepos have no level: privacy
+is about what you share and withhold, and a foreign skgrepo is not
+yours to share or withhold, so they form an unordered set beside the
+ladder and may be listed anywhere. A *skgrepo-set* is a prefix of
+the ladder — choosing one is answering "what is the most private
+skgrepo I want visible right now?" — and the most private skgrepo's
+set is the whole ladder. Apart from that, the foreign skgrepos are
+shown or hidden, all at once; they are shown unless you hide them.
+The whole ladder with the foreign skgrepos shown is no skgrepo
+restriction. Screen-sharing with a colleague, you might switch to
+the =public= prefix; alone, back to the most private skgrepo.
 
 ** What lives where
 
@@ -42,7 +47,9 @@ membership, a subscription, a hide, an override) carries its own
 relRepo: the skgrepo of the section that records it.
 
 Reading the node *composes* the sections, most public first, into one
-effective node. Under a restricted skgrepo-set you see the *visible
+effective node. (A foreign node has no privacy levels here; its
+sections fold in the order its publisher's manifests give — see
+"Ownership and folders", below.) Under a restricted skgrepo-set you see the *visible
 composition* — only the unrestricted sections' contributions — while with no
 skgrepo restriction you see the *full composition*. A more private section can both /add/ members and
 /place/ them: its members interleave into the more public list via
@@ -52,13 +59,9 @@ the node back into sections, byte-stably: sections you did not
 affect do not change on disk, and foreign sections are never
 written.
 
-One normalization rule determines what "retained" means when raw
-repositories collide. If any owned section uses a PID, Skg keeps the
-complete owned telescope for that PID and ignores every same-PID foreign
-section before composing, ID-conflict checks, indexing, or any other semantic
-read. It emits a deterministic warning naming the ignored skgrepos and never
-edits those files; their contents are visible only by inspecting the raw
-foreign repository. A wholly foreign telescope is retained normally.
+A telescope's sections are all one owner's: yours, or one foreign
+owner's. Sections of one PID in skgrepos of different owners are not
+one telescope; see "Illegal edits", below.
 
 If composing has to select a title or body below home, Skg marks the
 whole telescope *overPrivateText*. An unrestricted connection displays that
@@ -159,23 +162,47 @@ starts with telescopes in place.)
 ** Ownership and folders
 
 A skgrepo is yours unless its config entry says =foreign = true=;
-no folder name is special. Every foreign skgrepo must be more public
-than every owned one, and the server refuses a config where it is
-not — see =api-and-formats.org=, "Skgrepos". Only
+no folder name is special, and a foreign entry may sit anywhere in
+the list — see =api-and-formats.org=, "Skgrepos". Only
 owned sections are ever written; a save that empties an owned
 section deletes the file, and re-privatizing later recreates it.
 Each owned skgrepo also receives a generated =OTHER_SKGREPO_DEPENDENCIES.toml=
-naming the skgrepos it may reference (everything at least as public),
-so a skgrepo you share carries its own dependency claim.
+naming the rungs of your ladder it may reference (itself and every
+more public owned skgrepo), so a skgrepo you share carries its own
+dependency claim. It never names a foreign skgrepo.
 
-A receiver's config can order those skgrepos differently than the
-publisher's did. That matters only for a node with sections in two
-of them: reading composes sections most public first, so the two
-servers would fold that node in opposite orders. The server warns
-at startup exactly then, naming the node and both skgrepos. It does
-not warn about the disagreement alone, which is the normal case:
-each teammate's foreign skgrepos are more public than their owned
-ones, so any two teammates order their shared skgrepos oppositely.
-A node with an owned and a foreign section is not warned about
-either, since the owned telescope wins and the foreign sections are
-ignored. See =api-and-formats.org=, "OTHER_SKGREPO_DEPENDENCIES.toml".
+A receiver, to whom those skgrepos are foreign, has no order of its
+own for them; the manifests supply it, and say whose they are. Two
+foreign skgrepos that manifests chain together (one's manifest lists
+the other, directly or through others) are one owner's ladder, and a
+node with sections in both is a telescope of that owner's, folded in
+the manifest's order. Should two manifests disagree about a pair, the
+receiver folds it as the manifest of the more private one says (the
+one whose own manifest lists the other) and warns at startup, naming
+the node. Foreign skgrepos no manifest chains are different owners'.
+See =api-and-formats.org=, "OTHER_SKGREPO_DEPENDENCIES.toml".
+
+** Illegal edits
+
+A node belongs to one owner, and only its owner writes it: a save
+never writes into another owner's node (an edit to a foreign node
+forks it). A section of a node in a skgrepo of another owner than its
+home's, which only a hand-written file can make, is therefore an
+*illegal edit to a foreign node*, not part of the node. Which section
+is the node: where your skgrepos and a foreign one share a PID, the
+foreign one, since only you can have written into another's node here;
+where two foreign owners' skgrepos share one, the owner of the one
+listed first in the config.
+
+The server reports each at startup, naming the node and the skgrepo
+holding the illegal section ("Server warnings" in
+=api-and-formats.org=; the per-node report is
+=telescope-warnings.org=). It never edits the file. Beyond that:
+- An illegal section in one of your skgrepos — one you wrote into
+  someone else's node — is shown to you alone, under every occurrence
+  of the node, as a child headline heralded *ILLEGAL EDIT TO FOREIGN
+  NODE*, holding its title, body and what it contains
+  (=illegalEditFolder=, write-protected and never saved). It is no
+  part of the node: the node's owner, and everyone else, does not see
+  it. Move what it says into a node of your own, and delete the file.
+- An illegal section in a foreign skgrepo is ignored.

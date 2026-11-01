@@ -51,8 +51,9 @@ use crate::refresh::extent::{Extent, extent_of_parent};
 use crate::refresh::goal::{
   Goal, GoalItem, GoalMember, goal_of_parent, hidden_in_subscribee,
   hidden_outside_of_subscribees, member_of_child,
-  subscriber_of_subscribee_as_such};
+  subscriber_of_subscribee_as_such, visible_illegal_edits};
 use crate::refresh::goal::partnerFolder_members_in_graph;
+use crate::telescope::types::IllegalEdit;
 use crate::refresh::id_rule::{
   IdRuleAnswer, WhereTheHeadlineStands, entombstone, id_rule, point_occurrence_at,
   rekind_vognode, vognode_for_answer};
@@ -84,6 +85,7 @@ pub(crate) fn visit_parent (
   consume_editableView_request (tree, parent, walk);
   extend_requested_content (tree, parent, walk);
   add_default_folders (tree, parent, walk);
+  add_illegal_edit_folder (tree, parent, walk);
   let goal : Option<Goal> = goal_of_parent (tree, parent, walk);
   rekind_children (tree, parent, goal . as_ref (), walk) ?;
   viewnode_merge (tree, parent, walk) ?;
@@ -151,6 +153,64 @@ fn add_default_folders (
         . expect ("add_default_folders: the folder was just added");
       walk . added_compound_folders . insert (folder); }}}
 
+/// Under an occurrence of a foreign node that the user illegally
+/// edited ('InRustGraph::illegal_edits'), in a skgrepo the skgrepo
+/// restriction shows, the illegal-edit folder, first, its title and
+/// body those of the illegal sections, redrawn at every refresh. Not
+/// in the diff view.
+fn add_illegal_edit_folder (
+  tree   : &mut Tree<Viewnode>,
+  parent : NodeId,
+  walk   : &mut Walk,
+) {
+  if walk . is_diff_view () { return; }
+  let Some (pid) : Option<ID> = occurrence_pid (tree, parent) else { return; };
+  let edits : Vec<IllegalEdit> = visible_illegal_edits (&pid, walk);
+  if edits . is_empty () { return; }
+  let drawn : Folder = Folder::IllegalEdit {
+    title : edits . iter ()
+      . filter_map ( |edit| edit . title . clone () )
+      . collect::<Vec<String>> () . join (" / "),
+    body : { let bodies : Vec<String> = edits . iter ()
+               . filter_map ( |edit| edit . body . clone () ) . collect ();
+             if bodies . is_empty () { None } else { Some ( bodies . join ("\n") ) }}, };
+  match child_folder (tree, parent, &drawn) {
+    Some (present) => {
+      tree . get_mut (present) . unwrap () . value () . kind =
+        ViewnodeKind::Folder (drawn); },
+    None => {
+      let new : NodeId = tree . get_mut (parent) . unwrap ()
+        . append ( viewnode_of ( ViewnodeKind::Folder (drawn) )) . id ();
+      move_to_first_child (tree, parent, new)
+        . expect ("add_illegal_edit_folder: the folder was just added"); }, }}
+
+/// The pid of the occurrence at 'treeid', if it is one.
+fn occurrence_pid (
+  tree   : &Tree<Viewnode>,
+  treeid : NodeId,
+) -> Option<ID> {
+  match &tree . get (treeid) . unwrap () . value () . kind {
+    ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =>
+      Some ( occurrence . gnid . clone () ),
+    _ => None, }}
+
+/// Whether the illegal-edit folder at 'child', under 'parent', no
+/// longer stands for an illegal edit: its viewparent is no occurrence
+/// of a node the user illegally edited, as the skgrepo restriction
+/// lets it be seen, or this is the diff view.
+fn illegal_edit_is_gone (
+  tree   : &Tree<Viewnode>,
+  parent : NodeId,
+  child  : NodeId,
+  walk   : &Walk,
+) -> bool {
+  if ! matches! ( tree . get (child) . unwrap () . value () . kind,
+                  ViewnodeKind::Folder (Folder::IllegalEdit { .. }) ) {
+    return false; }
+  walk . is_diff_view ()
+  || occurrence_pid (tree, parent)
+     . is_none_or ( |pid| visible_illegal_edits (&pid, walk) . is_empty () ) }
+
 //
 // 1. re-kind
 //
@@ -170,7 +230,8 @@ fn rekind_children (
         | ViewnodeKind::ChangeViewnode (_) =>
         if is_unsayable (tree, child)
            || alias_whose_record_is_restricted (tree, child, walk)
-           || diff_view::change_is_gone (tree, child, walk) {
+           || diff_view::change_is_gone (tree, child, walk)
+           || illegal_edit_is_gone (tree, parent, child, walk) {
           entombstone (tree, child); },
       ViewnodeKind::Tombstone | ViewnodeKind::BufferRoot => {}, }}
   Ok (( )) }
@@ -950,14 +1011,15 @@ fn entombstone_if_an_empty_folder (
 
 /// Whether the viewnode is a folder that goes when it holds nothing:
 /// any but one whose membership the save reads, where the user could
-/// add something, or a flags folder, which shows that the node has no
-/// true flag.
+/// add something, a flags folder, which shows that the node has no
+/// true flag, or an illegal-edit folder, whose text says something.
 pub(crate) fn folder_goes_when_empty (
   viewnode : &Viewnode,
 ) -> bool {
   matches! ( &viewnode . kind,
              ViewnodeKind::Folder (folder)
-               if ! folder . is_editable () && ! folder . is_flags () ) }
+               if ! folder . is_editable () && ! folder . is_flags ()
+                  && ! matches! ( folder, Folder::IllegalEdit { .. } )) }
 
 /// The children of 'parent', in order.
 pub(crate) fn children_of (

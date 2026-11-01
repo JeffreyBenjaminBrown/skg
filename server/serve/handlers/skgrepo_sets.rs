@@ -50,6 +50,10 @@ pub fn handle_skgrepo_set_request (
     Err (e) =>
       refuse_unwinding (stream, skgrepo_restriction, &e), }}
 
+/// The request names the most private owned skgrepo to show
+/// ('name'), whether to show the foreign skgrepos ('foreign-repos',
+/// "shown" or "hidden"), or both; what it leaves out stays as it was.
+///
 /// Under a skgrepo restriction (the API doc's "Restricted-skgrepo nodes"): a switch
 /// re-renders open views in place rather than closing them. The
 /// refresh brings each view under the new skgrepo restriction: an occurrence
@@ -69,18 +73,12 @@ fn set_skgrepo_restriction (
   views_state      : &mut ViewsState,
   skgrepo_restriction : &mut SkgrepoRestriction,
 ) {
-  let name : SkgrepoName = // the most private skgrepo to show
-    match value_from_request_sexp ("name", request) {
-      Ok (name) => SkgrepoName::from (name),
-      Err (e) => {
-        refuse_unwinding (stream, skgrepo_restriction, &e);
-        return; }};
   let restriction : SkgrepoRestriction =
-    match SkgrepoRestriction::named (&runtime . config, name) {
+    match requested_skgrepo_restriction (
+      request, &runtime . config, skgrepo_restriction ) {
       Ok (restriction) => restriction,
       Err (e) => {
-        refuse_unwinding (
-          stream, skgrepo_restriction, &e . to_string ());
+        refuse_unwinding (stream, skgrepo_restriction, &e);
         return; }};
   let mut prepared : PreparedRerenders =
     prepare_rerender_views (
@@ -98,18 +96,55 @@ fn set_skgrepo_restriction (
   send_skgrepo_restriction_response (stream, skgrepo_restriction);
   stream_prepared_rerenders (stream, views_state, prepared); }
 
+/// The skgrepo restriction a switch request asks for: its 'name' (the
+/// most private owned skgrepo to show) and its 'foreign-repos'
+/// ("shown" or "hidden"), each defaulting to the current one's.
+fn requested_skgrepo_restriction (
+  request : &str,
+  config  : &SkgConfig,
+  current : &SkgrepoRestriction,
+) -> Result<SkgrepoRestriction, String> {
+  if let Err (e) = sexp::parse (request) {
+    return Err ( format! ("Failed to parse S-expression: {}", e) ); }
+  let name : Option<SkgrepoName> =
+    value_from_request_sexp ("name", request) . ok ()
+    . map (SkgrepoName::from);
+  let foreign_shown : Option<bool> =
+    match value_from_request_sexp ("foreign-repos", request) . ok ()
+    . as_deref () {
+      None           => None,
+      Some ("shown")  => Some (true),
+      Some ("hidden") => Some (false),
+      Some (other)   => return Err ( format! (
+        "'foreign-repos' must be \"shown\" or \"hidden\", not {:?}.",
+        other )), };
+  if name . is_none () && foreign_shown . is_none () {
+    return Err ( "A skgrepo restriction switch names a repo ('name'), whether foreign repos are shown ('foreign-repos'), or both." . to_string () ); }
+  SkgrepoRestriction::named_with_foreign_shown (
+    config,
+    name . unwrap_or_else ( || current . most_private_shown . clone () ),
+    foreign_shown . unwrap_or ( current . foreign_shown ))
+    . map_err ( |e| e . to_string () ) }
+
+/// How the wire says whether foreign skgrepos are shown.
+fn foreign_repos_word (
+  restriction : &SkgrepoRestriction,
+) -> &'static str {
+  if restriction . foreign_shown { "shown" } else { "hidden" } }
+
 fn send_skgrepo_sets_response (
   stream      : &mut TcpStream,
   config      : &SkgConfig,
   restriction : &SkgrepoRestriction,
 ) {
-  // The skgrepo restriction is one skgrepo, the most private one
-  // shown, so the choices are the skgrepos themselves, in privacy
-  // order (each meaning "this skgrepo and everything more public"),
-  // the last of them no skgrepo restriction. Order is meaningful; do
-  // not sort.
+  // The skgrepo restriction's rung is one owned skgrepo, the most
+  // private one shown, so the choices are the owned skgrepos
+  // themselves, in privacy order (each meaning "this skgrepo and
+  // every more public owned one"), the last of them no skgrepo
+  // restriction when foreign skgrepos are shown. Order is
+  // meaningful; do not sort.
   let names : Vec<String> =
-    config . ordered_skgrepos () . iter ()
+    config . privacy_ladder () . iter ()
     . map ( |name| name . 0 . clone () )
     . collect ();
   let names_sexp : String =
@@ -119,15 +154,17 @@ fn send_skgrepo_sets_response (
     . join (" ");
   let response : String =
     format! (
-      "((response-type {}) (restriction {}) (sets ({})))",
+      "((response-type {}) (restriction {}) (foreign-repos {}) (sets ({})))",
       TcpToClient::SkgrepoSets . repr_in_client (),
       quote_sexp_string (&restriction . most_private_shown . 0),
+      quote_sexp_string ( foreign_repos_word (restriction) ),
       names_sexp );
   send_response_with_length_prefix (stream, &response); }
 
-/// The skgrepo restriction, as the most private skgrepo it shows. The
-/// clients say whether that is no skgrepo restriction (" (no
-/// restriction)" appended to the config's most private skgrepo); the
+/// The skgrepo restriction, as the most private owned skgrepo it shows
+/// and whether it shows the foreign ones. The clients say whether that
+/// is no skgrepo restriction (" (no restriction)" appended to the
+/// config's most private owned skgrepo, foreign repos shown); the
 /// response carries no words for them to show.
 fn send_skgrepo_restriction_response (
   stream : &mut TcpStream,
@@ -135,9 +172,10 @@ fn send_skgrepo_restriction_response (
 ) {
   let response : String =
     format! (
-      "((response-type {}) (restriction {}))",
+      "((response-type {}) (restriction {}) (foreign-repos {}))",
       TcpToClient::SkgrepoRestriction . repr_in_client (),
-      quote_sexp_string (&restriction . most_private_shown . 0) );
+      quote_sexp_string (&restriction . most_private_shown . 0),
+      quote_sexp_string ( foreign_repos_word (restriction) ));
   send_response_with_length_prefix (stream, &response); }
 
 /// The unwinding refusal shape (the quiet shape): the endpoint's
@@ -154,9 +192,10 @@ fn refuse_unwinding (
 ) {
   let response : String =
     format! (
-      "((response-type {}) (restriction {}) (content {}))",
+      "((response-type {}) (restriction {}) (foreign-repos {}) (content {}))",
       TcpToClient::SkgrepoRestriction . repr_in_client (),
       quote_sexp_string (&restriction . most_private_shown . 0),
+      quote_sexp_string ( foreign_repos_word (restriction) ),
       quote_sexp_string (msg));
   send_response_with_length_prefix (stream, &response);
   stream_empty_rerender (stream); }

@@ -40,7 +40,7 @@ pub struct DecompositionInput<'a> {
 /// A complete on-disk telescope prepared by the decomposition boundary.
 /// Construction proves that it is nonempty, starts at home, and
 /// contains same-pid sections at configured unique skgrepos in
-/// privacy order. Ownership is deliberately not part of this type;
+/// fold order. Ownership is deliberately not part of this type;
 /// the filesystem writer checks it before mutation.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DecomposedTelescope {

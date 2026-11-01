@@ -319,6 +319,11 @@ pub fn viewnode_from_metadata (
       MetadataKind::Folder (Folder::Flags { .. }) =>
         ( ViewnodeKind::Folder ( Folder::Flags { title, body } ),
           None, None ),
+      // Its text is the illegal sections', which the refresh redraws
+      // from the graph; nothing saves it.
+      MetadataKind::Folder (Folder::IllegalEdit { .. }) =>
+        ( ViewnodeKind::Folder ( Folder::IllegalEdit { title, body } ),
+          None, None ),
       MetadataKind::Folder (folder) => {
         let error : Option<BufferValidationError> =
           body_refusal (&body, &title, folder . repr_in_client (), &headline);

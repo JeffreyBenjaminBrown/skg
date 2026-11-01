@@ -1,3 +1,4 @@
+use crate::telescope::dependencies_manifest::read_foreign_manifest_orders;
 use crate::types::misc::{SkgConfig, Skgrepo, SkgrepoName};
 
 use serde::Deserialize;
@@ -28,9 +29,9 @@ pub fn validate_skgrepo_paths_creating_owned_ones_if_needed (
 /// The skgrepo names in TOML declaration order, read from the raw
 /// '[[repos]]' array. The parsed 'SkgConfig.repos' is a HashMap and
 /// loses order, so the loaders re-extract it here to fill
-/// 'SkgConfig.repo_order'. LOAD-BEARING: declaration order is the
-/// privacy order, most public first (see the chokepoint methods on
-/// 'SkgConfig'). An entry without a 'name' is named by its 'path' as
+/// 'SkgConfig.skgrepo_order'. LOAD-BEARING: the owned entries'
+/// declaration order is the privacy order, most public first (see the
+/// chokepoint methods on 'SkgConfig'). An entry without a 'name' is named by its 'path' as
 /// written, as 'SkgrepoToml' names it. Empty when the TOML has no
 /// parseable skgrepos array.
 fn skgrepo_order_from_toml (
@@ -49,7 +50,7 @@ fn skgrepo_order_from_toml (
     . unwrap_or_default () }
 
 /// Named skgrepo-sets are retired: skgrepo-sets are now the prefixes of
-/// the config's privacy order (see 'docs/telescopes.org', "The privacy
+/// the config's privacy ladder (see 'docs/telescopes.org', "The privacy
 /// order"). A config still defining
 /// '[[repo_sets]]' would silently mean something else than its
 /// author intended, so its presence is a hard error. Likewise
@@ -79,9 +80,9 @@ fn reject_retired_config_keys (
   if has_skgrepo_sets {
     return Err ( concat! (
       "This config defines [[repo_sets]], a retired mechanism. ",
-      "Repo-sets are now the prefixes of the [[repos]] order: ",
-      "list your repos most-public-first, and select a set by ",
-      "naming the most private repo to show. ",
+      "Repo-sets are now the prefixes of the owned [[repos]] order: ",
+      "list your owned repos most-public-first, and select a set by ",
+      "naming the most private owned repo to show. ",
       "See docs/telescopes.org, \"The privacy order\". ",
       "Delete the [[repo_sets]] entries and, if a ",
       "deleted set was your default_repo_set, replace that with a ",
@@ -159,25 +160,6 @@ fn path_below_data_root_minus_author_folder (
     components . as_path () . to_string_lossy () . into_owned ();
   if rest . is_empty () { None } else { Some (rest) }}
 
-/// Every foreign skgrepo must be strictly more public (earlier in
-/// the privacy order) than every owned one, so that each person's
-/// privacy ladder keeps the nodes they own above everything they
-/// only read. This is what keeps the per-entry 'foreign' flag honest.
-fn validate_foreign_skgrepos_more_public_than_owned (
-  config : &SkgConfig,
-) -> Result<(), Box<dyn std::error::Error>> {
-  let ordered : Vec<SkgrepoName> = config . ordered_skgrepos ();
-  for foreign in ordered . iter ()
-    . filter ( |name| ! config . skgrepo_is_owned (name) )
-  { if let Some (owned) = ordered . iter ()
-      . filter ( |name| config . skgrepo_is_owned (name) )
-      . find ( |owned| ! config . is_strictly_more_public (
-                         foreign, owned ) )
-    { return Err ( format! (
-        "Foreign repo '{}' is listed after owned repo '{}'. Every foreign repo must be more public (earlier in [[repos]]) than every owned repo; move '{}' above '{}', or correct a 'foreign' flag.",
-        foreign, owned, foreign, owned ) . into () ); }}
-  Ok (( )) }
-
 /// Top-level keys that skg once read under another spelling, each
 /// beside its current spelling, so that the warning about the old one
 /// can name the new one.
@@ -227,12 +209,22 @@ pub fn load_config (
   path: &str )
   -> Result <(SkgConfig, Vec<String>),
              Box<dyn std::error::Error>>
-{ let (config, contents) : (SkgConfig, String) =
+{ let (mut config, contents) : (SkgConfig, String) =
     config_from_file_before_checking_paths (path) ?;
   validate_skgrepo_paths_creating_owned_ones_if_needed(
     &config . skgrepos)?;
+  read_foreign_manifests_into_config (&mut config);
   Ok (( config,
         unknown_top_level_config_key_warnings (&contents) )) }
+
+/// What the foreign skgrepos' manifests say of their fold order
+/// ('read_foreign_manifest_orders'), recorded in 'config'. Runs once
+/// the skgrepo paths are final.
+pub(crate) fn read_foreign_manifests_into_config (
+  config : &mut SkgConfig,
+) {
+  let orders = read_foreign_manifest_orders (config);
+  config . set_foreign_manifest_orders (orders); }
 
 /// The config the TOML file at 'path' states, its paths made absolute,
 /// with the file's text; its skgrepo paths are not yet checked
@@ -274,7 +266,6 @@ pub(crate) fn config_from_file_before_checking_paths (
   make_paths_absolute (&mut config);
   derive_default_abbreviations (&mut config, &raw_paths);
   validate_skgrepo_sets (&config)?;
-  validate_foreign_skgrepos_more_public_than_owned (&config)?;
   Ok (( config, contents )) }
 
 fn validate_skgrepo_sets (
@@ -283,7 +274,11 @@ fn validate_skgrepo_sets (
   if let Some (default) = &config . default_skgrepo_set {
     if ! config . skgrepos . contains_key (default) {
       return Err (format! (
-        "default_repo_set '{}' names no configured repo. It must name the most private repo to show; left out, it is the config's most private repo.",
+        "default_repo_set '{}' names no configured repo. It must name the most private owned repo to show; left out, it is the config's most private owned repo.",
+        default ) . into ()); }
+    if ! config . skgrepo_is_owned (default) {
+      return Err (format! (
+        "default_repo_set '{}' names a foreign repo. It must name the most private owned repo to show: foreign repos are not on the privacy ladder, and are shown unless a connection hides them.",
         default ) . into ()); }}
   Ok (()) }
 

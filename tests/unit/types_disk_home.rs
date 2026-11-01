@@ -6,10 +6,10 @@ fn skgrepo_name (s: &str) -> SkgrepoName { SkgrepoName ( s . to_string () ) }
 fn gnid        (s: &str) -> ID         { ID ( s . to_string () ) }
 
 /// A node with sections in several skgrepos has exactly one home: the
-/// most public retained section. The privacy order here is declaration
-/// order (foreign, zed, alpha), deliberately not alphabetical. The
-/// foreign section is discarded by the owned-pid collision rule, so
-/// "zed" wins over the retained "alpha" section. Rebuilding the config
+/// most public section of its home's owner. The privacy order here is
+/// declaration order (zed, alpha), deliberately not alphabetical. A
+/// node with a foreign section and owned ones is the foreign owner's:
+/// the owned sections are illegal edits to it. Rebuilding the config
 /// for every assertion also gives its HashMap a fresh randomized state,
 /// catching any accidental return to raw map iteration.
 #[test]
@@ -40,7 +40,7 @@ fn home_from_disk_is_the_most_public_section () {
              skgrepo_name ("zed"),
              skgrepo_name ("alpha") ];
     config };
-  { // The foreign collision is ignored; most-public retained wins.
+  { // The foreign section is the home; the owned ones are illegal edits.
     std::fs::write ( foreign_path . join ("N.skg"),
                      "pid: N\ntitle: unrelated foreign N\n" ) . unwrap ();
     std::fs::write ( public_path  . join ("N.skg"),
@@ -50,6 +50,15 @@ fn home_from_disk_is_the_most_public_section () {
     for _ in 0 .. 20 {
       let config : SkgConfig = make_config ();
       assert_eq! ( home_from_disk ( &gnid ("N"), &config ),
+                   Some ( skgrepo_name ("foreign") ) ); }}
+  { // Owned sections alone: the most public one is the home.
+    std::fs::write ( public_path  . join ("O.skg"),
+                     "pid: O\ntitle: O\n" ) . unwrap ();
+    std::fs::write ( private_path . join ("O.skg"),
+                     "pid: O\ncontains:\n- C\n" ) . unwrap ();
+    for _ in 0 .. 20 {
+      let config : SkgConfig = make_config ();
+      assert_eq! ( home_from_disk ( &gnid ("O"), &config ),
                    Some ( skgrepo_name ("zed") ) ); }}
   { // A section in only the more private skgrepo: that is the home.
     std::fs::write ( private_path . join ("P.skg"),

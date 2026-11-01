@@ -211,9 +211,10 @@ def failures_of_one_run (base_name, tool_arguments, output_folder,
 def failures_of_raw_and_import (scratch):
   failures = []
   raw = run_tool ([ "raw", '((request . "repos"))' ])
-  expected_repos = ( '((response-type repos) (restriction "main") (repos ('
-                     '((name "fred") (path "fred/public") (owned "false")) '
-                     '((name "main") (path "me/main") (owned "true")))))' )
+  expected_repos = ( '((response-type repos) (restriction "main") '
+                     '(foreign-repos "shown") (repos ('
+                     '((name "fred") (path "fred/public") (owned "false") (shown "true")) '
+                     '((name "main") (path "me/main") (owned "true") (shown "true")))))' )
   if raw . returncode != 0 or raw . stdout . split ("\n") [1] != expected_repos:
     failures . append ( f"'raw' printed {raw . stdout!r}, {raw . stderr!r}" )
   import_folder = os . path . join (scratch, "import")

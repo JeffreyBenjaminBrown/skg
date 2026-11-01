@@ -14,7 +14,7 @@ use skg::heralds::herald_styles_inconsistencies;
 use skg::export_org::{
   export_candidate_pids, export_to_org, ExportReport};
 use skg::skgrepo_sets::SkgrepoRestriction;
-use skg::telescope::dependencies_manifest::foreign_manifest_order_warnings;
+use skg::telescope::dependencies_manifest::foreign_section_warnings;
 use skg::dbs::init::{InitContextHandoff, initialize_dbs};
 use skg::types::env::SkgEnv;
 use skg::import_org_roam::{ImportStats, import_org_roam_directory};
@@ -152,7 +152,7 @@ fn main() -> Result<(), Box<dyn Error>> {
       initialize_dbs (&config) };
   drop (nodes); // 'initialize_dbs' checked and used them; nothing here needs them.
   let manifest_warnings : Vec<String> =
-    foreign_manifest_order_warnings (&config);
+    foreign_section_warnings (&config);
   for warning in &manifest_warnings {
     tracing::warn! ("{}", warning); }
   env . runtime . record_startup_warnings (

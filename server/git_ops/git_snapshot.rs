@@ -5,7 +5,7 @@ use crate::dbs::filesystem::multiple_nodes::{
   read_skg_sections_from_folder};
 use crate::telescope::compose::compose_telescope;
 use crate::telescope::types::{
-  Telescope, retain_owned_sections_when_pid_folderlides,
+  Telescope, separate_illegal_sections,
 };
 use crate::git_ops::git_snapshot_types::{GraphSnapshot, GitSnapshotKind};
 use crate::git_ops::misc::path_relative_to_gitrepo;
@@ -125,8 +125,8 @@ pub fn foreign_changed_skg_file_count (
         . map ( |paths| paths . len () ) } )
     . sum () }
 
-/// Sections arrive in privacy order ('ordered_skgrepos') so each
-/// telescope composes with its most public section first.
+/// Sections arrive in fold order ('ordered_skgrepos') so each
+/// telescope composes with its home section first.
 fn read_graph_snapshot_per_skgrepo (
   config            : &SkgConfig,
   kind_for_skgrepo  : impl Fn (&SkgrepoName) -> GitSnapshotKind,
@@ -256,7 +256,7 @@ fn profile_log (
     duration . as_secs (),
     duration . subsec_millis ()); }
 
-/// Group sections by pid (sections must arrive in privacy order),
+/// Group sections by pid (sections must arrive in fold order),
 /// normalize owned/non-owned pid collisions, and compose each telescope.
 fn git_snapshot_from_sections (
   config   : &SkgConfig,
@@ -271,14 +271,13 @@ fn git_snapshot_from_sections (
   for (pid, telescope_sections) in &mut sections_by_pid {
     let sections : Vec<(SkgrepoName, GraphnodeOnDisk)> =
       std::mem::take (telescope_sections);
-    let (retained, collision) =
-      retain_owned_sections_when_pid_folderlides (sections, config);
-    *telescope_sections = retained;
-    if let Some (collision) = collision {
+    let (legitimate, illegal) =
+      separate_illegal_sections (sections, config);
+    *telescope_sections = legitimate;
+    if illegal . is_some () {
       tracing::warn! (
         pid = %pid,
-        ignored_skgrepos = ?collision . ignored_skgrepos,
-        "git snapshot ignored non-owned files colliding with an owned telescope" ); }}
+        "git snapshot ignored the sections of an illegal edit to a foreign node" ); }}
   let pid_of : HashMap<ID, ID> = {
     let mut m : HashMap<ID, ID> = HashMap::new ();
     for (pid, sections) in sections_by_pid . iter () {

@@ -1270,7 +1270,8 @@ function M.containerward_chain_node_at_line_p (line_number)
       and M.partner_folder_atom(M.metadata_sexp_at_line_or_nil(grandparent))
     if grandparent_folder
        and grandparent_folder ~= 'acquiredByFolder'
-       and grandparent_folder ~= 'acquiredFolder' then
+       and grandparent_folder ~= 'acquiredFolder'
+       and grandparent_folder ~= 'illegalEditFolder' then
       return true end
     line = parent
   end
@@ -1439,7 +1440,7 @@ end
 M.relRepo_unsupported_folder_atoms = {
   'subscriberFolder', 'overriderFolder', 'hiderFolder', 'hiddenFolder',
   'containerFolder', 'mentionerFolder', 'acquiredByFolder',
-  'acquiredFolder', 'hiddenInSubscribeeFolder',
+  'acquiredFolder', 'illegalEditFolder', 'hiddenInSubscribeeFolder',
   'hiddenOutsideOfSubscribeeFolder' }
 
 ---The partner folder atoms whose members' relationships are writable

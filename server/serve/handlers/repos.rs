@@ -1,11 +1,13 @@
-//! PURPOSE: Report the configured skgrepos, in privacy order, and the
-//! connection's skgrepo restriction. A client that needs to know which
-//! skgrepos are owned, or what they are called, asks this instead of
-//! inferring it from nodes.
+//! PURPOSE: Report the configured skgrepos, in fold order (the owned
+//! ones in privacy order), and the connection's skgrepo restriction.
+//! A client that needs to know which skgrepos are owned, which are
+//! shown, or what they are called, asks this instead of inferring it
+//! from nodes.
 //!
 //! Response: ((response-type repos) (restriction "NAME")
+//!            (foreign-repos "shown"|"hidden")
 //!            (repos ((name "NAME") (path "PATH") [(abbreviation "ABBR")]
-//!                    (owned "true"|"false")) ...))
+//!                    (owned "true"|"false") (shown "true"|"false")) ...))
 
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{send_response_with_length_prefix, tag_sexp_response};
@@ -30,34 +32,43 @@ pub fn repos_response (
   skgrepo_restriction : &SkgrepoRestriction,
 ) -> String {
   let entries : Vec<String> =
-    // Privacy order, most public first. Order is meaningful; do not sort.
+    // Fold order: the owned ones in privacy order, most public first.
+    // Order is meaningful; do not sort.
     config . ordered_skgrepos () . iter ()
     . filter_map ( |name| config . skgrepos . get (name) )
-    . map ( |skgrepo| skgrepo_entry_sexp (skgrepo, &config . data_root) )
+    . map ( |skgrepo| skgrepo_entry_sexp (
+      skgrepo, &config . data_root,
+      skgrepo_restriction . contains_skgrepo (&skgrepo . name) ))
     . collect ();
   tag_sexp_response (
     TcpToClient::Repos,
-    & format! ( "((restriction {}) (repos ({})))",
+    & format! ( "((restriction {}) (foreign-repos {}) (repos ({})))",
                 quote_sexp_string (
                   &skgrepo_restriction . most_private_shown . 0 ),
+                quote_sexp_string (
+                  if skgrepo_restriction . foreign_shown { "shown" }
+                  else { "hidden" } ),
                 entries . join (" ") )) }
 
 fn skgrepo_entry_sexp (
   skgrepo   : &Skgrepo,
   data_root : &Path,
+  shown     : bool, // whether the skgrepo restriction shows it
 ) -> String {
   let abbreviation : String =
     match &skgrepo . abbreviation {
       Some (abbreviation) =>
         format! ( " (abbreviation {})", quote_sexp_string (abbreviation) ),
       None => String::new (), };
-  format! ( "((name {}) (path {}){} (owned {}))",
+  format! ( "((name {}) (path {}){} (owned {}) (shown {}))",
             quote_sexp_string (&skgrepo . name . 0),
             quote_sexp_string (
               &path_as_the_config_writes_it (&skgrepo . path, data_root) ),
             abbreviation,
             quote_sexp_string (
-              if skgrepo . owned { "true" } else { "false" } )) }
+              if skgrepo . owned { "true" } else { "false" } ),
+            quote_sexp_string (
+              if shown { "true" } else { "false" } )) }
 
 /// The config loader resolves a relative skgrepo path against the
 /// data root ('make_paths_absolute'). This undoes that: a path below

@@ -156,7 +156,7 @@ fn test_telescope_is_not_a_conflict_but_two_pids_are() {
         name: SkgrepoName::from ("shared"),
         abbreviation: None,
         path: shared_path,
-        owned: false, } );
+        owned: true, } );
     test_config (skgrepos, temp_dir . path () . to_path_buf ()) };
 
   // Same pid in both skgrepos: no longer a duplicate -- they are the

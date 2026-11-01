@@ -1,6 +1,6 @@
 use crate::telescope::compose::compose_telescope;
 use crate::telescope::types::{
-  Telescope, retain_owned_sections_when_pid_folderlides,
+  Telescope, separate_illegal_sections,
 };
 use crate::telescope::decompose::{
   DecompositionInput, DecomposedTelescope, decompose_node,
@@ -53,8 +53,8 @@ pub fn graphnode_from_pid_and_skgrepo (
                pid, skgrepo ))); };
   compose_telescope ( telescope, & |gnid : &ID| gnid . clone () ) }
 
-/// PID's telescope as it sits on disk, in privacy order: for each
-/// configured skgrepo (most public first), pid.skg if present. The
+/// PID's telescope as it sits on disk, in fold order: for each
+/// configured skgrepo (in 'ordered_skgrepos' order), pid.skg if present. The
 /// order is what makes the first section the home, so it comes from
 /// 'ordered_skgrepos' and nowhere else.
 pub(crate) fn telescope_from_disk (
@@ -73,13 +73,8 @@ pub(crate) fn telescope_from_disk (
     sections . push (( skgrepo_name, node_fs )); }
   if sections . is_empty () {
     return Ok (None); }
-  let (sections, collision) =
-    retain_owned_sections_when_pid_folderlides (sections, config);
-  if let Some (collision) = collision {
-    tracing::warn! (
-      pid = %pid,
-      ignored_skgrepos = ?collision . ignored_skgrepos,
-      "owned telescope won a collision with non-owned files" ); }
+  let (sections, _illegal) = // reported at load ('IllegalEditToForeignNode')
+    separate_illegal_sections (sections, config);
   Telescope::try_new ( pid . clone (), sections, config )
     . map (Some)
     . map_err ( |e| io::Error::new (

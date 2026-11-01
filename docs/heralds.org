@@ -73,6 +73,7 @@ assumes 'termguicolors', since the styles are given as RGB colors.
 |                      | normal      | the skgrepo names in =⌂ -OLD +NEW= and =relationship moved from OLD to NEW=   |
 | diff labels          | message     | =old title=, =body diff=, =its content changed=, =its X changed (this file)=  |
 | titleless headlines  | message     | =Reference to unknown node.=, =restricted=, =something stood here=            |
+| illegal edits        | message     | =ILLEGAL EDIT TO FOREIGN NODE=                                                |
 | link annotations     | normal      | a resolved target's =[⌂:pub]=                                                 |
 |                      | ugly        | =[⌂:restricted]=, =[⌂:…]=, =[⌂:lookup failed]=, a dangling link's label           |
 
@@ -213,6 +214,13 @@ restricted viewnode, standing where a record the skgrepo restriction
 shows names a node the skgrepo restriction keeps out, is labeled
 =restricted=, with its record's relRepo (=~NAME=) where that differs
 from the default, and reveals no node title or home skgrepo.
+=☮ ILLEGAL EDIT TO FOREIGN NODE=, in the message style (black on
+white), labels the illegal-edit folder (=illegalEditFolder=): a child of
+a foreign node holding a section of it in one of your skgrepos, which
+no save of yours could have made and which is no part of the node. Its
+headline carries that section's title, its body the section's body,
+and its children what the section contains; nothing in it is saved.
+See "Illegal edits" in =telescopes.org=.
 =something stood here= marks a tombstone: a headline with no title,
 left where a headline stood that can stand there for nothing, and
 holding that headline's children. The refresh leaves one where a

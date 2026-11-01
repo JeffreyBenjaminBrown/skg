@@ -171,7 +171,7 @@ pub fn required_ancestry (
         | Folder::Overridden | Folder::Overrider
         | Folder::Hider | Folder::Hidden
         | Folder::Container | Folder::Mentioner
-        | Folder::Acquired => ANC_OCCURRENCE,
+        | Folder::Acquired | Folder::IllegalEdit { .. } => ANC_OCCURRENCE,
       Folder::AcquiredBy => ANC_GHOST,
       Folder::HiddenOutsideOfSubscribee => ANC_HIDDEN_OUTSIDE,
       Folder::HiddenInSubscribee => ANC_HIDDEN_IN, },

@@ -40,11 +40,12 @@ See example-data/ for how.
 
 Keep each person's skgrepos in a folder of their own under the data
 root ('data/AUTHOR/REPO'). In 'skgconfig.toml', every skgrepo is
-yours unless its entry says 'foreign = true', and the foreign ones
-must come first, being more public than all of yours. A config from
-before that rule, which set 'owned_folder' or relied on the 'owned/'
-folder, is converted by 'bash/migrate-to-foreign-flag.sh CONFIG
-[NEW_FOLDER]'; see 'api-and-formats.org', "Skgrepos".
+yours unless its entry says 'foreign = true'. List yours most public
+first: their order is your privacy ladder. The foreign ones have no
+place on it and may be listed anywhere. A config which sets
+'owned_folder' or relies on the 'owned/' folder is converted by
+'bash/migrate-to-foreign-flag.sh CONFIG [NEW_FOLDER]'; see
+'api-and-formats.org', "Skgrepos".
 
 Two people (or a person and an AI teammate) can share one data tree,
 each running a server from a config of their own: both configs list

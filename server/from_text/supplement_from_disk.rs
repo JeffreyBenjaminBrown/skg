@@ -564,9 +564,11 @@ pub(crate) fn hide_skgrepo (
 ) -> SkgrepoName {
   let endpoint_floor : SkgrepoName = {
     match home_of (hidden) {
-      Some (h) => config . more_private_of (
-        recorder_home . clone (), h ),
-      None => recorder_home . clone (), }};
+      // A foreign home has no rung on the privacy ladder, so it
+      // raises no floor.
+      Some (h) if config . skgrepo_is_owned (&h) =>
+        config . more_private_of ( recorder_home . clone (), h ),
+      _ => recorder_home . clone (), }};
   let hidden_key : ID = resolve (hidden);
   let explaining_skgrepos : Vec<SkgrepoName> =
     subscribes . iter ()
@@ -576,8 +578,13 @@ pub(crate) fn hide_skgrepo (
         . and_then ( |p| graph . nodes . get (&p) )
         . map ( |subscribee| subscribee . contains . iter ()
                 . filter ( |c| resolve ( &c . member ) == hidden_key )
-                . map ( |c| config . more_private_of (
-                  sub . relRepo . clone (), c . relRepo . clone () ))
+                . map ( |c|
+                  // A foreign subscribee's contains record has no
+                  // rung, so the subscription alone explains the hide.
+                  if config . skgrepo_is_owned (&c . relRepo) {
+                    config . more_private_of (
+                      sub . relRepo . clone (), c . relRepo . clone () )
+                  } else { sub . relRepo . clone () } )
                 . collect () )
         . unwrap_or_default ();
       explaining_records } )

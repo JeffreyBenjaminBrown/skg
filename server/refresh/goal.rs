@@ -30,6 +30,7 @@ use crate::refresh::ancestry::{
 use crate::refresh::diff_view;
 use crate::refresh::extent::is_chain_parent;
 use crate::skgrepo_sets::SkgrepoRestriction;
+use crate::telescope::types::IllegalEdit;
 use crate::types::misc::{ID, RelPartner, RelationshipMemberKey, SkgrepoName};
 use crate::types::nodes::complete::Flag;
 use crate::types::nodes::rust::GraphnodeInRust;
@@ -304,6 +305,13 @@ fn folder_goal (
     Folder::AcquiredBy | Folder::Acquired =>
       Some ( diff_view::acquisition_goal (tree, folder, kind, walk)
              . unwrap_or_else ( || Goal::unordered (Vec::new ()) )),
+    Folder::IllegalEdit { .. } =>
+      Some ( Goal::ordered ( gnid_items (
+        visible_illegal_edits (&described_pid () ?, walk) . iter ()
+          . flat_map ( |edit| edit . contains . iter () )
+          . map ( |gnid| graph . pid_else_raw_id (gnid) )
+          . collect (),
+        &HashMap::new () ))),
     Folder::HiddenInSubscribee => {
       let parties : CompoundFolderParties = compound_folder_parties (tree, folder) ?;
       Some ( Goal::unordered ( gnid_items (
@@ -471,6 +479,18 @@ fn property_goal (
 
 /// Goal items of gnids, each warranted by the truth, with its relRepo
 /// from 'relRepos' where that holds one.
+/// The illegal edits to the node 'pid' ('InRustGraph::illegal_edits')
+/// in skgrepos the skgrepo restriction shows.
+pub(crate) fn visible_illegal_edits (
+  pid  : &ID,
+  walk : &Walk,
+) -> Vec<IllegalEdit> {
+  walk . truth . graph . illegal_edits . get (pid) . into_iter () . flatten ()
+    . filter ( |edit| SkgrepoRestriction::record_is_visible (
+      walk . truth . restriction, &edit . skgrepo ))
+    . cloned ()
+    . collect () }
+
 fn gnid_items (
   gnids    : Vec<ID>,
   relRepos : &HashMap<ID, SkgrepoName>,

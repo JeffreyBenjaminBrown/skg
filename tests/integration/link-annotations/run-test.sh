@@ -20,13 +20,11 @@ default_repo_set = "public"
 name = "public"
 abbreviation = "PUB"
 path = "$DATA_DIR/public"
-foreign = true
 
 [[repos]]
 name = "private"
 abbreviation = "PRIV"
 path = "$DATA_DIR/private"
-foreign = true
 EOF
 trap 'cleanup; rm -rf "$DATA_DIR"' EXIT
 export SKG_TEST_DATA_DIR="$DATA_DIR"

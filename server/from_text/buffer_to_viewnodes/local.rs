@@ -85,6 +85,8 @@ pub fn validate_local_structure (
         validate_acquiredBy_folder (tree, treeid),
       ViewnodeKind::Folder (Folder::Acquired) =>
         validate_acquired_folder (tree, treeid),
+      ViewnodeKind::Folder (Folder::IllegalEdit { .. }) =>
+        validate_illegal_edit_folder (tree, treeid),
       ViewnodeKind::ChangeViewnode (ChangeViewnode::OldText { .. }) =>
         validate_old_text (tree, treeid),
       ViewnodeKind::ChangeViewnode (ChangeViewnode::BodyDiff { .. }) =>
@@ -381,6 +383,29 @@ fn validate_acquired_folder (
     |node| matches!(&node . kind,
                     ViewnodeKind::Vognode (
                       Vognode::Ghost (_) | Vognode::Occurrence (_)))) }
+
+/// An illegal-edit folder stands under an occurrence, once, and
+/// holds vognodes: what the illegal sections contain, or a note the
+/// user put there, which, the folder being write-protected, claims
+/// nothing.
+fn validate_illegal_edit_folder (
+  tree    : &Tree<Viewnode>,
+  treeid  : NodeId,
+) -> Vec<String> {
+  let mut errors : Vec<String> = Vec::new();
+  if !generation_exists_and_includes(
+    tree, treeid, -1, false,
+    |node| matches!(&node . kind, ViewnodeKind::Vognode (Vognode::Occurrence (_))))
+    { errors . push("illegalEditFolder has the wrong kind of parent." . to_string()); }
+  if !generation_includes_only(
+    tree, treeid, 1, false,
+    tombstone_or (|node| matches!(&node . kind, ViewnodeKind::Vognode (_))))
+    { errors . push("illegalEditFolder has the wrong kind of child." . to_string()); }
+  if !siblings_cannot_include(
+    tree, treeid,
+    |node| matches!(&node . kind, ViewnodeKind::Folder (Folder::IllegalEdit { .. })))
+    { errors . push("illegalEditFolder must be unique among its siblings." . to_string()); }
+  errors }
 
 /// The checks shared by the two derived acquisition folders: which
 /// parent, which children, one per parent.

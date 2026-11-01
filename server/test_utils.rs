@@ -1,9 +1,12 @@
 mod guard;
 pub use guard::TestStoreGuard;
 
-use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
+use crate::dbs::filesystem::multiple_nodes::{
+  read_all_skg_files_from_skgrepos,
+  read_all_skg_files_from_skgrepos_collecting_violations};
 use crate::dbs::filesystem::not_nodes::{
   config_from_file_before_checking_paths,
+  read_foreign_manifests_into_config,
   validate_skgrepo_paths_creating_owned_ones_if_needed};
 
 use crate::dbs::init::{create_empty_tantivy_index, empty_in_ram_tantivy_index};
@@ -431,9 +434,11 @@ pub fn graph_handle_from_config (
 pub fn graph_from_config (
   config : &SkgConfig,
 ) -> Result<InRustGraph, Box<dyn Error>> {
-  let nodes : Vec<Graphnode> =
-    read_all_skg_files_from_skgrepos (config) ?;
-  Ok ( InRustGraph::from_graphnodes (&nodes) ) }
+  let (nodes, violations) =
+    read_all_skg_files_from_skgrepos_collecting_violations (config) ?;
+  let mut graph : InRustGraph = InRustGraph::from_graphnodes (&nodes);
+  graph . record_illegal_edits (&violations);
+  Ok (graph) }
 
 /// Bundle a test's existing handles into a 'SkgEnv'.
 pub fn skg_env_from_parts (
@@ -984,11 +989,9 @@ fn multi_root_view_inner (
   // reference another node by an extra_id. Production's env carries the real
   // graph already; this shim is test-only, so a per-call file read is
   // fine.
-  let nodes : Vec<Graphnode> =
-    read_all_skg_files_from_skgrepos (config) ?;
   let env : SkgEnv = SkgEnv::new (
     config . clone (),
-    Arc::new (InRustGraph::from_graphnodes (&nodes)),
+    Arc::new ( graph_from_config (config) ? ),
     tantivy_owned);
   multi_root_view_via_env (
     &env, root_gnids, skgrepo_restriction ) }
@@ -1054,6 +1057,7 @@ pub fn load_config_with_overrides (
         "Repo '{}' not found in config", skgrepo_name) . into()); }}
   validate_skgrepo_paths_creating_owned_ones_if_needed(
     &config . skgrepos)?;
+  read_foreign_manifests_into_config (&mut config);
   Ok (config) }
 
 pub fn titles_for_skgrepo_set_for_test (

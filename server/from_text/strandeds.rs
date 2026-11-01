@@ -140,7 +140,9 @@ pub fn stranded_relationships (
         strandeds . push ( StrandedRelationship {
           raised_automatically :
             home_after (&member) . is_some_and ( |member_home|
-              config . is_strictly_more_public (&partner . relRepo, &member_home) ),
+              // A foreign home has no rung, so it raises nothing.
+              config . skgrepo_is_owned (&member_home)
+              && config . is_strictly_more_public (&partner . relRepo, &member_home) ),
           relationship,
           relRepo     : partner . relRepo . clone (),
           new_default : default_after, } ); }} }

@@ -63,6 +63,8 @@ fn strip_body_whitespace_and_refresh_caches (
     let mut new_graph : InRustGraph = InRustGraph::from_graphnodes (&all_nodes);
     { // Only the stripped nodes changed; the rest keep their last-change generations.
       new_graph . last_changes = runtime . graph . last_changes . clone ();
+      // Nor do the illegal edits, which no body strip touches.
+      new_graph . illegal_edits = runtime . graph . illegal_edits . clone ();
       for node in &changed {
         new_graph . last_changes . note_written (&node . pid); }}
     new_graph });

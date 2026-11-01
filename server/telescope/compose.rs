@@ -124,8 +124,8 @@ pub fn graphnode_from_composition (
     overrides                    : msv ( composed . overrides ),
     flags, } ) }
 
-/// Compose sections (already sorted most public first -- the caller
-/// orders them via 'SkgConfig::ordered_skgrepos') into effective
+/// Compose sections (already in fold order, most public first -- the
+/// caller orders them via 'SkgConfig::ordered_skgrepos') into effective
 /// lists. 'resolve' maps any ID to its primary ID ('pid_of');
 /// anchors and members are compared through it.
 pub fn compose_sections (
@@ -135,7 +135,7 @@ pub fn compose_sections (
   let mut warnings : Vec<CompositionWarning> = Vec::new ();
   let mut composed : ComposedNode = ComposedNode::default ();
   { // Title/body text select independently: the first title and first body
-    // in privacy order win. The home remains the first section,
+    // in fold order win. The home remains the first section,
     // whether or not it carries either scalar.
     composed . home = sections . first ()
       . map ( |(skgrepo, _)| skgrepo . clone () );

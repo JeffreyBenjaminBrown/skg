@@ -23,6 +23,8 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use crate::dbs::in_rust_graph::last_change_generations::LastChangeGenerations;
+use crate::telescope::invariants::TelescopeViolation;
+use crate::telescope::types::IllegalEdit;
 use crate::types::misc::{ID, SkgrepoName, members_of};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::nodes::rust::GraphnodeInRust;
@@ -65,6 +67,12 @@ pub struct InRustGraph {
   /// When each node last changed, as runtime generation numbers.
   /// Not part of any node, so never written to a '.skg' file.
   pub last_changes     : LastChangeGenerations,
+  /// The user's illegal edits to foreign nodes, by the node's pid:
+  /// sections in owned skgrepos of a node whose home has another
+  /// owner ('separate_illegal_sections'). Not part of the node; a
+  /// view draws each under it ('Folder::IllegalEdit'). Read with the
+  /// files, so a save leaves it as it was.
+  pub illegal_edits    : im::HashMap<ID, Vec<IllegalEdit>>,
 }
 
 impl InRustGraph {
@@ -77,7 +85,19 @@ impl InRustGraph {
       overriders_of    : im::HashMap::new (),
       mentioners_of     : im::HashMap::new (),
       extra_id_to_pid  : im::HashMap::new (),
-      last_changes     : LastChangeGenerations::default (), } }
+      last_changes     : LastChangeGenerations::default (),
+      illegal_edits    : im::HashMap::new (), } }
+
+  /// Record the illegal edits among the load-time 'violations'.
+  pub fn record_illegal_edits (
+    &mut self,
+    violations : &[(ID, TelescopeViolation)],
+  ) {
+    for (pid, violation) in violations {
+      if let TelescopeViolation::IllegalEditToForeignNode { illegal } = violation {
+        if ! illegal . owned . is_empty () {
+          self . illegal_edits . insert (
+            pid . clone (), illegal . owned . clone () ); }} }}
 
   /// Build from a slice of Graphnodes. Typically called at
   /// startup after reading all .skg files from disk.

@@ -52,10 +52,11 @@ pub fn initialize_dbs (
     . unwrap_or_else (|e| {
       tracing::error! ("Failed to read .skg files: {}", e);
       std::process::exit (1); });
-  let (graph, mut graph_warnings) = validated_graph (config, &nodes)
+  let (mut graph, mut graph_warnings) = validated_graph (config, &nodes)
     . unwrap_or_else (|e| {
       tracing::error! ("Complete graph validation failed:\n{}", e);
       std::process::exit (1); });
+  graph . record_illegal_edits (&load_violations);
   graph_warnings . extend (load_violations);
   graph_warnings . sort_by (|(pid_a, a), (pid_b, b)|
     pid_a . cmp (pid_b)

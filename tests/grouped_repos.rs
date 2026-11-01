@@ -51,6 +51,12 @@ mod editability_carrier;
 #[path = "hidden_nodes.rs"]
 mod hidden_nodes;
 
+#[path = "foreign_hidden.rs"]
+mod foreign_hidden;
+
+#[path = "illegal_edits.rs"]
+mod illegal_edits;
+
 #[path = "subscriber_hides_under_a_narrowing.rs"]
 mod subscriber_hides_under_a_narrowing;
 

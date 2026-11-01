@@ -1,8 +1,8 @@
 //! Unit tests for the 'repos' endpoint ('repos_response';
 //! 'docs/api-and-formats.org', "Repos"): every configured skgrepo in
-//! privacy order, with its path as the config writes it, its
-//! abbreviation when it has one, and whether it is owned; and the
-//! connection's skgrepo restriction.
+//! fold order, with its path as the config writes it, its
+//! abbreviation when it has one, whether it is owned, and whether the
+//! connection's skgrepo restriction shows it; and that restriction.
 
 use super::repos_response;
 use crate::serve::protocol::RequestType;
@@ -22,27 +22,27 @@ fn config () -> SkgConfig {
               owned } );
   let mut config : SkgConfig = SkgConfig::dummyFromSkgrepos (
     HashMap::from ([
-      skgrepo ("fred", "/data/fred/public", None, false),
       skgrepo ("shared", "/elsewhere/shared", Some ("sh"), true),
+      skgrepo ("fred", "/data/fred/public", None, false),
       skgrepo ("main", "/data/me/main", Some ("m"), true) ]));
   config . data_root = PathBuf::from ("/data");
-  config . skgrepo_order = vec! [ SkgrepoName::from ("fred"),
-                                  SkgrepoName::from ("shared"),
+  config . skgrepo_order = vec! [ SkgrepoName::from ("shared"),
+                                  SkgrepoName::from ("fred"),
                                   SkgrepoName::from ("main") ];
   config }
 
 #[test]
-fn repos_request_lists_every_skgrepo_in_privacy_order () {
+fn repos_request_lists_every_skgrepo_in_config_order () {
   let config : SkgConfig = config ();
   assert_eq! ( RequestType::from_client_string ("repos"),
                Ok (RequestType::Repos) );
   assert_eq! (
     repos_response ( &config, &SkgrepoRestriction::unrestricted (&config) ),
     concat! (
-      r#"((response-type repos) (restriction "main") (repos ("#,
-      r#"((name "fred") (path "fred/public") (owned "false")) "#,
-      r#"((name "shared") (path "/elsewhere/shared") (abbreviation "sh") (owned "true")) "#,
-      r#"((name "main") (path "me/main") (abbreviation "m") (owned "true"))"#,
+      r#"((response-type repos) (restriction "main") (foreign-repos "shown") (repos ("#,
+      r#"((name "shared") (path "/elsewhere/shared") (abbreviation "sh") (owned "true") (shown "true")) "#,
+      r#"((name "fred") (path "fred/public") (owned "false") (shown "true")) "#,
+      r#"((name "main") (path "me/main") (abbreviation "m") (owned "true") (shown "true"))"#,
       ")))" )); }
 
 #[test]
@@ -51,6 +51,27 @@ fn repos_response_names_the_skgrepo_restriction () {
   let restriction : SkgrepoRestriction =
     SkgrepoRestriction::named ( &config, SkgrepoName::from ("shared") )
     . unwrap ();
-  assert! ( repos_response (&config, &restriction)
-            . starts_with (
-              r#"((response-type repos) (restriction "shared") (repos ("# )); }
+  assert_eq! (
+    repos_response (&config, &restriction),
+    concat! (
+      r#"((response-type repos) (restriction "shared") (foreign-repos "shown") (repos ("#,
+      r#"((name "shared") (path "/elsewhere/shared") (abbreviation "sh") (owned "true") (shown "true")) "#,
+      r#"((name "fred") (path "fred/public") (owned "false") (shown "true")) "#,
+      r#"((name "main") (path "me/main") (abbreviation "m") (owned "true") (shown "false"))"#,
+      ")))" )); }
+
+#[test]
+fn repos_response_says_when_foreign_repos_are_hidden () {
+  let config : SkgConfig = config ();
+  let restriction : SkgrepoRestriction =
+    SkgrepoRestriction::named_with_foreign_shown (
+      &config, SkgrepoName::from ("main"), false )
+    . unwrap ();
+  assert_eq! (
+    repos_response (&config, &restriction),
+    concat! (
+      r#"((response-type repos) (restriction "main") (foreign-repos "hidden") (repos ("#,
+      r#"((name "shared") (path "/elsewhere/shared") (abbreviation "sh") (owned "true") (shown "true")) "#,
+      r#"((name "fred") (path "fred/public") (owned "false") (shown "false")) "#,
+      r#"((name "main") (path "me/main") (abbreviation "m") (owned "true") (shown "true"))"#,
+      ")))" )); }
