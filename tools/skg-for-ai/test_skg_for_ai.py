@@ -38,14 +38,18 @@ In order, it:
   view is then empty; then integrates a change a diff buffer does not
   make editable, and saves an edit of it; a blank commit message is
   refused unsent;
-- on a fourth scratch server, runs a daemon: commands through it write
-  what they write on their own connections; it rewrites a held view
-  after a save through it changes a node the view shows, and after a
-  second server over the same data root saves one (the first server's
-  watcher integrates the file), logging each, but keeps a view with
-  unsaved edits; it logs the warning of a file the watcher cannot
-  read; 'close' and 'daemon --stop' release its views; a socket a
-  killed daemon left is replaced, and SIGTERM stops a daemon.
+- on a fourth scratch server, also over a gitrepo, runs a daemon:
+  commands through it write what they write on their own connections;
+  it rewrites a held view after a save through it changes a node the
+  view shows, and after a second server over the same data root saves
+  one (the first server's watcher integrates the file), logging each,
+  but keeps a view with unsaved edits; it logs the warning of a file
+  the watcher cannot read; a command for its port writing into another
+  folder runs through it, and that view is rewritten after a save; a
+  second daemon for the port is refused; 'commit --yes' through it, and
+  an interactive 'commit' beside it, each rewrite its held buffer of
+  the diff view; 'close' and 'daemon --stop' release its views; a
+  socket a killed daemon left is replaced, and SIGTERM stops a daemon.
 '--update-expected' rewrites the expected files instead of comparing.
 """
 
@@ -104,10 +108,17 @@ TOOL_RUNS = [
 
 def main (argv):
   update_expected = "--update-expected" in argv
+  # The tool's commands find a daemon by a socket in XDG_RUNTIME_DIR,
+  # and take a port from SKG_PORT: the test's own folder, and no
+  # SKG_PORT, keep its commands and daemons apart from any others.
+  os . environ [ "XDG_RUNTIME_DIR" ] = tempfile . mkdtemp (
+    prefix = "skg-for-ai-test-runtime-" )
+  os . environ . pop ( "SKG_PORT", None )
   failures = []
   failures += failures_of_title_matching ()
   failures += failures_of_shared_herald_cases ()
   failures += failures_against_scratch_servers (update_expected)
+  shutil . rmtree ( os . environ [ "XDG_RUNTIME_DIR" ], ignore_errors = True )
   for failure in failures:
     print ( "FAIL: " + failure )
   if failures:
@@ -153,13 +164,25 @@ TITLE_MATCH_CASES = [
   # Equal titles are the exact case, not the fuzzy one
   ( "Fred likes apples", "Fred likes apples", False ),
   # At the thresholds: Dice 0.6 (ratio 0.70) asks, Dice 0.57 (ratio
-  # 0.69) does not; ratio 0.75 (Dice 0) asks, ratio 0.625 does not;
+  # 0.69) does not; ratio 0.75 (Dice 0) asks, ratio 0.69 does not;
   # Dice 0.5 with ratio 0.61 does not
   ( "one two three six seven", "one two three four five", True ),
   ( "red green yellow purple", "red green blue", False ),
-  ( "abcdefxy", "abcdefgh", True ),
-  ( "abcdexyz", "abcdefgh", False ),
-  ( "Second child", "First child", False ) ]
+  ( "abcdefxy kmn pqr", "abcdefgh kmo pqs", True ),
+  ( "abcdexyz kmn pqr", "abcdefgh kmo pqs", False ),
+  ( "Second child", "First child", False ),
+  # The ratio alone counts only when each title has three normalized
+  # words: misspellings in three words ask (Dice 0.5 and 0.33, ratio
+  # 0.93 and 0.9), in two do not (ratio 0.92), nor two words beside
+  # three (ratio 0.87), nor the short titles that prompted the rule
+  # (Dice 0.5, ratio 0.76), nor one word (ratio 0.75)
+  ( "Recieve the quarterly budjet report",
+    "Receive the quarterly budget report", True ),
+  ( "Recieve the budjet report", "Receive the budget report", True ),
+  ( "budjet report", "budget reports", False ),
+  ( "Recieve the budjet report", "Receive the budgetreport", False ),
+  ( "Budget meeting", "Budget notes", False ),
+  ( "abcdefxy", "abcdefgh", False ) ]
 
 def failures_of_title_matching ():
   failures = []
@@ -178,7 +201,8 @@ def failures_of_title_matching ():
     "one two three six seven", "one two three four five" )
   if dice != 0.6 or ratio >= skg_for_ai . REWORDED_RATIO_THRESHOLD:
     failures . append ( f"the Dice threshold case gives {( dice, ratio )}" )
-  dice, ratio = skg_for_ai . title_similarity ( "abcdefxy", "abcdefgh" )
+  dice, ratio = skg_for_ai . title_similarity (
+    "abcdefxy kmn pqr", "abcdefgh kmo pqs" )
   if dice != 0 or ratio != 0.75:
     failures . append ( f"the ratio threshold case gives {( dice, ratio )}" )
   return failures + failures_of_reworded_pairing ()
@@ -266,9 +290,9 @@ def shared_herald_cases ():
 
 def failures_against_scratch_servers (update_expected):
   """The reading checks on one scratch server, then the writing
-  checks on another, then the reviewing checks on a third, whose owned
-  skgrepo is a gitrepo, then the daemon's on a fourth; each on its own
-  copy of the fixture."""
+  checks on another, then the reviewing checks on a third, then the
+  daemon's on a fourth, the last two with their owned skgrepo a
+  gitrepo; each on its own copy of the fixture."""
   if not os . path . exists (SERVER_BINARY):
     return [ f"no server binary at {SERVER_BINARY}; run 'cargo build --bin skg'" ]
   return ( failures_on_a_scratch_server (
@@ -277,7 +301,8 @@ def failures_against_scratch_servers (update_expected):
            + failures_on_a_scratch_server (failures_of_writing)
            + failures_on_a_scratch_server (
                failures_of_reviewing, owned_skgrepo_in_git = True )
-           + failures_on_a_scratch_server (failures_of_daemon) )
+           + failures_on_a_scratch_server (
+               failures_of_daemon, owned_skgrepo_in_git = True ) )
 
 def failures_on_a_scratch_server (check, owned_skgrepo_in_git = False):
   """CHECK (SCRATCH, DATA_ROOT)'s failures, run against a server on a
@@ -1175,6 +1200,10 @@ def failures_of_daemon (scratch, data_root):
                   check_daemon_rewrites_after_a_change_on_disk,
                   check_daemon_keeps_unsaved_edits,
                   check_daemon_logs_an_integration_warning,
+                  check_daemon_takes_a_command_for_its_port,
+                  check_second_daemon_on_the_port_refused,
+                  check_daemon_commits_and_rewrites_a_diffView_buffer,
+                  check_interactive_commit_tells_the_daemon,
                   check_daemon_closes_a_view, check_daemon_stops,
                   check_daemon_replaces_a_stale_socket ]:
       try:
@@ -1195,7 +1224,8 @@ def check_daemon_starts (context):
 
 def check_daemon_writes_what_a_command_writes (context):
   """Each command, run once through the daemon (with no '--port': it
-  talks to the daemon's server) and once on its own connection, writes
+  talks to the daemon's server) and once on its own connection (with
+  no daemon's socket to find), writes
   the same full and compact views; the sidecars differ only in
   whether the view is still open, which the daemon's is, and in the
   generation it was rendered at, which the save of 'links-here'
@@ -1206,7 +1236,8 @@ def check_daemon_writes_what_a_command_writes (context):
       ( [ "links-here", "child-b-id" ], "links-here_child-b-id" ),
       ( [ "search", "Fred" ], "search_Fred" ) ]:
     require_routed_run ( context, tool_arguments )
-    require_tool_run ( tool_arguments + [ "--out-dir", plain_folder ] )
+    require_tool_run ( tool_arguments + [ "--out-dir", plain_folder ],
+                       bypassing_daemons = True )
     for suffix in ( ".full.org", ".compact.org" ):
       require_equal (
         base_name + suffix + " through the daemon",
@@ -1295,6 +1326,114 @@ def check_daemon_logs_an_integration_warning (context):
                               "previous version" )
   os . remove (bad_path)
 
+def check_daemon_takes_a_command_for_its_port (context):
+  """A command for the daemon's port that writes into another folder
+  runs through the daemon, which writes its files there and holds its
+  view: a later save through the daemon of a node that view shows
+  rewrites it."""
+  other_folder = os . path . join ( context [ "scratch" ], "daemon-other" )
+  context [ "other_folder" ] = other_folder
+  completed = require_tool_run ([ "view", "shared-id", "--out-dir", other_folder ])
+  require_equal ( "the files the routed command wrote", completed . stdout,
+                  "" . join ( os . path . join ( other_folder, "view_shared-id" + suffix )
+                              + "\n"
+                              for suffix in ( ".full.org", ".compact.org",
+                                              ".view.json" )))
+  require_equal ( "the routed sidecar's 'closed'",
+                  read_sidecar (other_folder, "view_shared-id") [ "closed" ], False )
+  other_stem = os . path . join ( os . path . realpath (other_folder), "view_shared-id" )
+  require_log_line ( context, f"holding {other_stem} (view ID content-view:shared-id)" )
+  folder = context [ "daemon_folder" ]
+  edit_compact ( folder, [ ( "** Contained twice ⟨",
+                             "** Contained twice, retitled through the daemon ⟨" ) ],
+                 "view_child-a-id" )
+  completed = run_tool ( [ "save", os . path . join (folder, "view_child-a-id.view.json"),
+                           "--yes" ], port = None )
+  if completed . returncode != 0 or "Server: saved," not in completed . stdout:
+    raise CaseFailure ( f"the save printed {completed . stdout!r}, {completed . stderr!r}" )
+  require_log_line (
+    context,
+    f"re-rendered {other_stem} because of 'save view_child-a-id.view.json --yes' "
+    "on the daemon's connection; 'Contained twice, retitled through the daemon' "
+    "changed: title, was 'Contained twice'" )
+  require_in_file ( other_folder, "view_shared-id",
+                    "* Contained twice, retitled through the daemon ⟨" )
+
+def check_second_daemon_on_the_port_refused (context):
+  """A second daemon for the same port, in another folder, refuses to
+  start, naming the first one's process; the first keeps its
+  sockets."""
+  second_folder = os . path . join ( context [ "scratch" ], "daemon-second" )
+  completed = run_tool ([ "daemon", "--out-dir", second_folder ])
+  expected = ( f"A daemon already runs for port {PORT}: process "
+               f"{context [ 'daemon' ] . pid}, started with '--out-dir "
+               f"{os . path . realpath ( context [ 'daemon_folder' ] )} --port {PORT}'" )
+  if completed . returncode == 0 or expected not in completed . stderr:
+    raise CaseFailure ( f"the second daemon exited {completed . returncode}, "
+                        f"printed {completed . stdout!r}, {completed . stderr!r}" )
+  for socket_path in ( os . path . join ( context [ "daemon_folder" ], "skg-for-ai.sock" ),
+                       port_socket_path () ):
+    require_equal ( "whether " + socket_path + " remains",
+                    os . path . lexists (socket_path), True )
+  require_equal ( "whether the second daemon left a socket",
+                  os . path . lexists ( os . path . join (second_folder, "skg-for-ai.sock") ),
+                  False )
+
+# What the summary of a buffer of the diff view says once a git-commit
+# leaves it showing no change.
+NO_CHANGE_FACTS = "# Headlines with change facts 0, "
+
+def check_daemon_commits_and_rewrites_a_diffView_buffer (context):
+  """'commit --yes' runs through the daemon, so the server rerenders
+  the buffer of the diff view the daemon holds, and the daemon
+  rewrites it: after the git-commit the buffer's headlines carry no
+  change facts."""
+  diff_folder = os . path . join ( context [ "scratch" ], "daemon-diff" )
+  context [ "diff_folder" ] = diff_folder
+  require_tool_run ([ "diff", "--out-dir", diff_folder ])
+  require_in_diff_compact ( diff_folder, "Contained twice, retitled through the daemon" )
+  require_not_in_diff_compact ( diff_folder, NO_CHANGE_FACTS )
+  require_equal ( "the held diff buffer's 'closed'",
+                  read_sidecar (diff_folder, DIFF_BASE_NAME) [ "closed" ], False )
+  completed = require_tool_run ([ "commit", "Commit through the daemon.", "--yes" ])
+  if "Committed in main (" not in completed . stdout:
+    raise CaseFailure ( f"the commit printed {completed . stdout!r}" )
+  require_equal ( "the git log after the commit through the daemon",
+                  git ( context [ "main_repo" ], [ "log", "--format=%s" ] ),
+                  "Commit through the daemon.\nThe fixture\n" )
+  diff_stem = os . path . join ( os . path . realpath (diff_folder), DIFF_BASE_NAME )
+  require_log_line (
+    context, f"re-rendered {diff_stem} because of 'commit Commit through the "
+             f"daemon. --yes --port {PORT}' on the daemon's connection" )
+  require_in_diff_compact ( diff_folder, NO_CHANGE_FACTS )
+
+def check_interactive_commit_tells_the_daemon (context):
+  """A 'commit' that waits for a typed "yes" runs on its own
+  connection; when it has committed, it asks the daemon to rerender
+  its buffers of the diff view, which the daemon rewrites. (The new
+  'diff' writes over the held buffer's files, which closes the view
+  ID they showed.)"""
+  diff_folder = context [ "diff_folder" ]
+  folder = context [ "daemon_folder" ]
+  edit_compact ( folder, [ ( "** Contained twice, retitled through the daemon ⟨",
+                             "** Contained twice, committed interactively ⟨" ) ],
+                 "view_child-a-id" )
+  completed = run_tool ( [ "save", os . path . join (folder, "view_child-a-id.view.json"),
+                           "--yes" ], port = None )
+  if completed . returncode != 0 or "Server: saved," not in completed . stdout:
+    raise CaseFailure ( f"the save printed {completed . stdout!r}, {completed . stderr!r}" )
+  require_tool_run ([ "diff", "--out-dir", diff_folder ])
+  require_in_diff_compact ( diff_folder, "Contained twice, committed interactively" )
+  require_not_in_diff_compact ( diff_folder, NO_CHANGE_FACTS )
+  completed = run_tool ( [ "commit", "Commit interactively." ],
+                         standard_input = "yes\n" )
+  if completed . returncode != 0 or "Committed in main (" not in completed . stdout:
+    raise CaseFailure ( f"the commit printed {completed . stdout!r}, {completed . stderr!r}" )
+  require_log_line (
+    context, f"re-rendered {os . path . join ( os . path . realpath (diff_folder), DIFF_BASE_NAME )} "
+             "because of a git-commit on another connection" )
+  require_in_diff_compact ( diff_folder, NO_CHANGE_FACTS )
+
 def check_daemon_closes_a_view (context):
   folder = context [ "daemon_folder" ]
   sidecar_path = os . path . join (folder, "view_child-a-id.view.json")
@@ -1318,12 +1457,16 @@ def check_daemon_stops (context):
   require_equal ( "whether the socket remains",
                   os . path . lexists ( os . path . join (folder, "skg-for-ai.sock") ),
                   False )
-  for name in os . listdir (folder):
-    if name . endswith (".view.json"):
-      require_equal ( name + "'s 'closed'",
-                      read_sidecar ( folder, name [ : - len (".view.json") ] ) [ "closed" ],
-                      True )
-  require_log_line ( context, "stopped: released 3 views" )
+  for held_folder in ( folder, context [ "other_folder" ], context [ "diff_folder" ] ):
+    for name in os . listdir (held_folder):
+      if name . endswith (".view.json"):
+        require_equal ( name + "'s 'closed'",
+                        read_sidecar ( held_folder,
+                                       name [ : - len (".view.json") ] ) [ "closed" ],
+                        True )
+  require_equal ( "whether the port's socket remains",
+                  os . path . lexists ( port_socket_path () ), False )
+  require_log_line ( context, "stopped: released 5 views" )
   edit_compact ( folder, [ ( "* Second child, renamed on the second server ⟨0a ",
                              "* Second child, saved after the daemon stopped ⟨0a " ) ],
                  "links-here_child-b-id" )
@@ -1426,6 +1569,15 @@ def save_through_second_server (context, base_name, replacement):
                         f"{completed . stderr!r}" )
   return folder
 
+def port_socket_path ():
+  return os . path . join ( os . environ [ "XDG_RUNTIME_DIR" ],
+                            f"skg-for-ai-{PORT}.sock" )
+
+def require_not_in_diff_compact (folder, text):
+  compact = read_diff_compact (folder)
+  if text in compact:
+    raise CaseFailure ( f"the diff view's compact buffer still has {text!r}:\n{compact}" )
+
 def require_routed_run (context, tool_arguments):
   """Run the command with the daemon folder as its '--out-dir' and no
   '--port', so that it runs through the daemon."""
@@ -1474,8 +1626,8 @@ def fresh_root_view (context, name):
   require_tool_run ([ "view", "root-id", "--out-dir", folder, "--no-summary" ])
   return folder
 
-def require_tool_run (tool_arguments):
-  completed = run_tool (tool_arguments)
+def require_tool_run (tool_arguments, bypassing_daemons = False):
+  completed = run_tool ( tool_arguments, bypassing_daemons = bypassing_daemons )
   if completed . returncode != 0:
     raise CaseFailure (
       f"'{' ' . join (tool_arguments)}' failed: {completed . stderr}" )
@@ -1598,12 +1750,23 @@ def skg_files (context):
            for name in sorted ( os . listdir ( context [ "main_repo" ] ))
            if name . endswith (".skg") }
 
-def run_tool (tool_arguments, standard_input = "", port = PORT):
-  """Run the tool; with PORT None, without '--port'."""
-  return subprocess . run (
-    [ sys . executable, os . path . join (TOOL_FOLDER, "skg_for_ai.py") ]
-    + tool_arguments + ( [ "--port", str (port) ] if port is not None else [] ),
-    input = standard_input, capture_output = True, text = True )
+def run_tool (tool_arguments, standard_input = "", port = PORT,
+              bypassing_daemons = False):
+  """Run the tool; with PORT None, without '--port'. BYPASSING_DAEMONS:
+  where it finds no daemon for its port."""
+  environment = dict (os . environ)
+  if bypassing_daemons:
+    environment [ "XDG_RUNTIME_DIR" ] = tempfile . mkdtemp (
+      prefix = "skg-for-ai-test-no-daemon-" )
+  try:
+    return subprocess . run (
+      [ sys . executable, os . path . join (TOOL_FOLDER, "skg_for_ai.py") ]
+      + tool_arguments + ( [ "--port", str (port) ] if port is not None else [] ),
+      input = standard_input, capture_output = True, text = True,
+      env = environment )
+  finally:
+    if bypassing_daemons:
+      os . rmdir ( environment [ "XDG_RUNTIME_DIR" ] )
 
 def commit_fixture_in_new_gitrepo (folder):
   """Make FOLDER a gitrepo, with a local author, whose one commit

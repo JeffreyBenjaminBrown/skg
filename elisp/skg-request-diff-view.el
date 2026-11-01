@@ -84,6 +84,10 @@ summary, as a save does, and any errors and warnings. Returns
           (skg-open-org-buffer-from-text
            tcp-proc content (concat "diff-view: " buffer) view-id
            (skg--rendered-at-in response))
+          (let ((opened-buffer (skg-find-buffer-by-view-id view-id)))
+            (when opened-buffer
+              (with-current-buffer opened-buffer
+                (setq skg-diffView-buffer-kind buffer))))
           (let ((summary (assq 'readiness-summary response)))
             (when summary
               (message "%s" (skg--readiness-summary-message summary)))))

@@ -140,6 +140,14 @@ new empty view, which no view response drew, holds the generation the
 server answered when the view was opened (`skg-view-new-empty').")
 (put 'skg-rendered-at 'permanent-local t)
 
+(defvar-local skg-diffView-buffer-kind nil
+  "Which buffer of the diff view this skg buffer is, by the name its
+\"diff view\" request gave (\"all changes\", say); nil for any other
+view. A save sends it as (diff-view-buffer . NAME), so that a server
+that does not hold the view (after a restart) re-renders the save as
+that buffer of the diff view.")
+(put 'skg-diffView-buffer-kind 'permanent-local t)
+
 (defun skg--rendered-at-in (response)
   "RESPONSE's (rendered-at \"N\") as the string N, or nil if it has none."
   (let ((entry (assoc 'rendered-at response)))

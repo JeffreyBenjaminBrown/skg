@@ -280,12 +280,16 @@ rides out as (strandeds-reviewed . \"true\") and, unless it chose
 none, (reset-strandeds (RELATION RECORDER MEMBER) ...). DELETE-FROM,
 when non-nil, rides out as (delete-from . DELETE-FROM). The current
 buffer's `skg-rendered-at' rides out as (rendered-at . N); a buffer
-without one sends no such field, and the server refuses its save."
+without one sends no such field, and the server refuses its save. A
+buffer of the diff view names itself, by `skg-diffView-buffer-kind',
+as (diff-view-buffer . NAME)."
   (append
    `((request . "save buffer")
      (view-id . ,view-id))
    (when skg-rendered-at
      `((rendered-at . ,skg-rendered-at)))
+   (when skg-diffView-buffer-kind
+     `((diff-view-buffer . ,skg-diffView-buffer-kind)))
    `((point-lines-below-focused-headline
       . ,(number-to-string
           (plist-get save-point-position

@@ -48,20 +48,52 @@ though no request registered one."
   (should (eq (alist-get 'repo-files-integrated skg-unprompted-response-handler-map)
               #'skg--repo-files-integrated-handler)))
 
-(ert-deftest test-skg-repo-files-integrated-warnings-go-to-the-warnings-buffer ()
+;; '(warnings ...)' and '(view-ids ())' of a repo-files-integrated
+;; message, printed.
+(defun test-skg-repo-files-integrated--payload (warnings)
+  (prin1-to-string
+   `((response-type repo-files-integrated)
+     (warnings ,warnings)
+     (view-ids ()))))
+
+(ert-deftest test-skg-repo-files-integrated-counts-alone-are-an-echo ()
+  "A message whose warnings only count the files integrated is echoed,
+one clause per skgrepo; the warnings buffer is neither made nor shown."
+  (test-skg-repo-files-integrated--kill-warnings-buffer)
+  (let ((echoed nil))
+    (cl-letf (((symbol-function 'display-buffer)
+               (lambda (&rest _) (error "nothing may be shown")))
+              ((symbol-function 'message)
+               (lambda (format-string &rest args)
+                 (setq echoed (apply #'format format-string args)))))
+      (skg--repo-files-integrated-handler
+       nil
+       (test-skg-repo-files-integrated--payload
+        '("Integrated 2 files that changed on disk in skgrepo 'first'."
+          "Integrated 1 file that changed on disk in skgrepo 'main'."))))
+    (should (equal echoed
+                   "skg: repo first: 2 files integrated; repo main: 1 file integrated"))
+    (should-not (get-buffer skg-server-warnings-buffer-name))))
+
+(ert-deftest test-skg-repo-files-integrated-real-warnings-go-to-the-warnings-buffer ()
+  "A message carrying any other warning goes whole to the warnings
+buffer, which is shown."
   (test-skg-repo-files-integrated--kill-warnings-buffer)
   (unwind-protect
-      (cl-letf (((symbol-function 'display-buffer) (lambda (&rest _) nil)))
-        (skg--repo-files-integrated-handler
-         nil
-         (prin1-to-string
-          '((response-type repo-files-integrated)
-            (warnings ("Integrated 2 files that changed on disk in skgrepo 'first'."))
-            (view-ids ()))))
+      (let ((shown nil))
+        (cl-letf (((symbol-function 'display-buffer)
+                   (lambda (buffer &rest _) (setq shown buffer) nil)))
+          (skg--repo-files-integrated-handler
+           nil
+           (test-skg-repo-files-integrated--payload
+            '("Integrated 2 files that changed on disk in skgrepo 'first'."
+              "Node bad-id changed on disk but could not be read."))))
+        (should (equal (buffer-name shown) skg-server-warnings-buffer-name))
         (with-current-buffer skg-server-warnings-buffer-name
           (should (equal (buffer-string)
                          (concat "* Repo changes\n"
-                                 "** Integrated 2 files that changed on disk in skgrepo 'first'.\n")))))
+                                 "** Integrated 2 files that changed on disk in skgrepo 'first'.\n"
+                                 "** Node bad-id changed on disk but could not be read.\n")))))
     (test-skg-repo-files-integrated--kill-warnings-buffer)))
 
 (ert-deftest test-skg-repo-files-integrated-rerenders-the-clean-views-it-names ()

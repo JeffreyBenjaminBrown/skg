@@ -29,10 +29,12 @@ draw, is never stale. Your edits stay in the view: archive them if
 needed (M-x skg-show-unsaved-changes), open a fresh view, and reapply them.
 
 When the server integrates files changed on disk, it says so in the
-server-warnings buffer (=*SKG Server Warnings*=), under "Repo changes", naming each
-skgrepo and how many of its files it integrated, or what it could not
-read, and rerenders every open view showing a changed node that holds
-no unsaved edits. A view with unsaved edits keeps them, and its save
+echo area, naming each skgrepo and how many of its files it integrated
+("skg: repo first: 2 files integrated"), and rerenders every open view
+showing a changed node that holds no unsaved edits. When something
+could not be integrated (a file it could not read, say), the whole
+notice goes instead to the server-warnings buffer
+(=*SKG Server Warnings*=), under "Repo changes", which is shown. A view with unsaved edits keeps them, and its save
 is refused if it would write a changed node. No rebuild is needed after
 a 'git pull'. A changed config still needs one ('M-x skg-rebuild-session-lifetime-stores').
 

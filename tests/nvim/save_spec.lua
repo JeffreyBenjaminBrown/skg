@@ -679,6 +679,42 @@ describe('skg.save rendered-at', function ()
         :find('changed after the buffer was rendered', 1, true))
       vim.api.nvim_buf_delete(found, { force = true }) end
   end)
+
+  it('names a buffer of the diff view on its save, and no other view',
+     function ()
+    local requests = {}
+    server = helpers.connect_to_fake_server(function (line, respond)
+      if line:find('save buffer', 1, true) then
+        table.insert(requests, line)
+        respond(helpers.framed(
+          '((response-type save-lock) (lock-views ()))'))
+        respond(helpers.framed(
+          '((response-type save-result) (content "* (skg node (gnid a)) a")'
+          .. ' (errors ()) (warnings ()) (rendered-at "5"))'))
+      end
+    end)
+    local real_notify = vim.notify
+    vim.notify = function () end
+    require('skg.diff_view').handle_diffView_response(
+      sexpr.read('((response-type diff-view) (content "* (skg node (gnid a)) a")'
+                 .. ' (errors ()) (warnings ()) (rendered-at "4"))'),
+      'all changes', 'view_id-diff')
+    vim.notify = real_notify
+    folds.set_up_window()
+    save.request_save_buffer()
+    vim.wait(3000, function ()
+      return lock.stream_in_progress == nil and #requests == 1 end, 10)
+    buffer.open_org_buffer_from_text(
+      '* (skg node (gnid a)) a', 'skg://content-view', 'view_id-content', '4')
+    folds.set_up_window()
+    save.request_save_buffer()
+    vim.wait(3000, function ()
+      return lock.stream_in_progress == nil and #requests == 2 end, 10)
+    assert.is_truthy(requests[1]:find('(view-id . "view_id-diff")', 1, true))
+    assert.is_truthy(requests[1]:find('(diff-view-buffer . "all changes")', 1, true))
+    assert.is_truthy(requests[2]:find('(view-id . "view_id-content")', 1, true))
+    assert.is_falsy(requests[2]:find('diff-view-buffer', 1, true))
+  end)
 end)
 
 describe('skg.save fork confirmation', function ()

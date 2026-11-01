@@ -1,5 +1,66 @@
 #+title: skg-for-ai: reading and writing the skg graph as plain files
 
+* Start here
+skg-for-ai lets you read and change a skg graph as plain Org files,
+without an editor client. Everything below this page is reference;
+this page is the whole working loop. Every command is
+'python3 tools/skg-for-ai/skg_for_ai.py COMMAND ...', run against the
+server whose port 'SKG_PORT' (or '--port') names.
+
+First, start a daemon, and leave it running for the session:
+'daemon --out-dir DIR &'. It keeps one connection to the server, so
+the views you write stay current: when a save, a git-commit or a
+teammate's change touches a node a view shows, it rewrites that
+view's files, and it notes each such event in 'DIR/skg-for-ai.log'.
+Every later command for that server runs through it, wherever it
+writes. 'daemon --stop --out-dir DIR' ends it.
+
+To read, view a node: 'view ID --out-dir DIR' writes 'view_ID.full.org'
+(the view exactly as the server drew it), 'view_ID.compact.org' (the
+same tree, each headline ending in a short handle such as '⟨0d aC1⟩')
+and a sidecar, 'view_ID.view.json'. Read the compact file. Following
+a link is 'view' again on the link's ID; 'search WORDS' finds nodes.
+
+To change the graph, edit the compact file in place. Change a title
+or a body by editing its text. Add a node by writing a new headline,
+with no handle, where it belongs. Move a node by moving its line,
+handle and all, and its subtree with it. Remove a headline to take
+the node out of its parent; write 'delete' in its handle,
+'⟨0d aC1 delete⟩', to delete the node itself.
+
+Then save with the report: 'save DIR/view_ID.view.json' prints, line
+by line, what the save would do, and changes nothing. Read it. If it
+says what you meant, run it again with '--yes' to save; the files
+are then rewritten with the server's new rendering. If it reports an
+error or asks a question, answer it as it says and run it again.
+
+One rule matters more than the rest: never retype a handled headline.
+The handle is the only thing that ties a headline to its node. A
+headline typed afresh, without the handle, is a new node with a new
+ID, and the old node leaves its parent, taking with it the links to
+it, its other relationships and its history, to a place the view no
+longer shows. So move or reword a headline by editing or moving its
+line, never by writing it again; if you must retype one, copy its
+handle onto the new line. The save stops at a retyped title it
+recognizes, and asks about one that resembles a removed one, but do
+not count on it.
+
+When a piece of work is done, review and commit it. 'diff --out-dir
+DIR' writes the diff view: every change since the last git-commit,
+each handle carrying its change facts. Fix anything wrong by editing
+and saving, as above; write 'ready' in the handles of the changes you
+approve and save that buffer; then 'commit "MESSAGE" --yes' stages
+and git-commits every change in the owned skgrepos.
+
+The rest of this file is reference. "Running it" lists every command
+and option; "The files it writes" explains the compact view, its
+handles and heralds, and its summary; "The daemon" says what the
+daemon does and what its log means; "Writing" covers saving in
+detail, the report, and "Retyped headlines"; "Reviewing and
+committing" covers the diff view, readiness and the commit. The
+protocol is in 'docs/api-and-formats.org', and the diff view in
+'docs/diff-view.org'.
+
 * What it is for
 A client such as Emacs shows a skg view as a tree of headlines, each
 with a few short coloured heralds, and hides the long '(skg ...)'
@@ -27,8 +88,9 @@ itself; only the server does.
 
 Each command opens its own connection and closes it when done. A
 daemon ('daemon --out-dir DIR') instead keeps one connection open, as
-an editor session does, and keeps the files of the views in DIR
-current as the graph changes; see "The daemon".
+an editor session does: every command for its server runs through
+it, and it keeps the files of the views they write current as the
+graph changes; see "The daemon".
 
 * Running it
 ** Commands
@@ -67,14 +129,14 @@ see "How 'forest' draws a folder".
 'forest mentioners ID', each named after itself ('contains_ID',
 'links-here_ID').
 
-'close SIDECAR' sends 'close view' for the view ID a sidecar records and
-marks the sidecar closed. See "Views and connections" for why it is
-needed only with a daemon.
+'close SIDECAR' sends 'close view' for the view ID a sidecar records,
+to the sidecar's server, and marks the sidecar closed. See "Views and
+connections" for why it is needed only with a daemon.
 
-'daemon --out-dir DIR' runs until stopped, holding on one connection
-every view written into DIR and rewriting a view's files when the
-server rerenders it; 'daemon --stop --out-dir DIR' stops it. See "The
-daemon".
+'daemon --out-dir DIR' runs until stopped, taking every command for
+its server, holding on one connection every view they write, and
+rewriting a view's files when the server rerenders it; 'daemon --stop
+--out-dir DIR' stops it. See "The daemon".
 
 Following a link is just 'view' on the link's ID.
 
@@ -124,9 +186,10 @@ tool answers with the empty one, leaving those links unresolved.
 '--preview-only' cancels instead of applying. It prints the responses
 as 'raw' does.
 
-Options, after the command: '--port N' for every command ('save' and
-'integrate' require the sidecar's; a command run through a daemon
-talks to the daemon's server unless it names one); '--yes' for
+Options, after the command: '--port N' for every command ('save',
+'integrate' and 'close' require the sidecar's; a command run through
+a daemon's folder talks to the daemon's server unless it names one);
+'--yes' for
 'save' and 'commit'; '--keep-ids' or '--all-new' for 'save' (see
 "Retyped headlines"); for the view commands also '--out-dir DIR', '--name BASE' to name the files
 'BASE.full.org' and so on instead of 'COMMAND_ARGUMENT', and
@@ -336,9 +399,10 @@ It tells only connected clients its warnings. Files written by a
 command therefore go stale silently, and nobody hears the warnings.
 
 The daemon is a client that stays connected, as an editor session
-does. It holds every view written into one folder, rewrites a view's
-files when the server rerenders it, and logs what happened and why.
-Nothing changes for a reader who never starts one.
+does. Every command for its server runs through it; it holds every
+view they write, wherever they write it, rewrites a view's files when
+the server rerenders it, and logs what happened and why. Nothing
+changes for a reader who never starts one.
 ** Starting and stopping
 #+begin_example
 python3 tools/skg-for-ai/skg_for_ai.py daemon --out-dir DIR --port P &
@@ -346,45 +410,56 @@ python3 tools/skg-for-ai/skg_for_ai.py daemon --out-dir DIR --port P &
 python3 tools/skg-for-ai/skg_for_ai.py daemon --stop --out-dir DIR
 #+end_example
 The daemon connects to the server ('--port', else 'SKG_PORT', else
-1730), logs the server's startup warnings, listens on the Unix socket
-'DIR/skg-for-ai.sock', and prints one line saying so; it runs in the
-foreground until stopped. 'daemon --stop --out-dir DIR', SIGTERM and
-SIGINT each stop it: it closes every view it holds (each sidecar then
-says 'closed'), its connection and its socket, and exits. A stop
-signal is noticed between commands, not during one.
+1730), logs the server's startup warnings, listens on two Unix
+sockets, 'DIR/skg-for-ai.sock' and the port's,
+'skg-for-ai-PORT.sock' in 'XDG_RUNTIME_DIR' (or in '/tmp' when that
+is unset), and prints one line saying so; it runs in the foreground
+until stopped. DIR holds its log and its socket; the views it holds
+may be anywhere. 'daemon --stop --out-dir DIR', SIGTERM and SIGINT
+each stop it: it closes every view it holds (each sidecar then says
+'closed'), its connection and its sockets, and exits. A stop signal
+is noticed between commands, not during one.
 
-One daemon holds a folder: starting a second where one answers is
-refused. A daemon that was killed outright leaves its socket behind;
-commands then run on their own connections, and the next daemon
-started there removes the socket and makes its own. A daemon whose
-server goes away (stops, restarts, is rebuilt) logs it and stops,
-since the server has forgotten its views.
+One daemon runs per folder and one per port: starting a second where
+one answers, in the same folder or for the same port, is refused,
+naming the running one's process, folder and port. A daemon that was
+killed outright leaves its sockets behind; commands then run on their
+own connections, and the next daemon started there removes each and
+makes its own. A daemon whose server goes away (stops, restarts, is
+rebuilt) logs it and stops, since the server has forgotten its views.
 ** Commands run through it
-While a daemon's socket is in a folder, every command whose folder it
-is runs through the daemon: a view command ('view', 'search',
-'forest', 'contains', 'links-here', 'diff', 'new') whose '--out-dir'
-it is, and 'save', 'integrate' and 'close' whose sidecar is there. The
-command sends its command line and current directory over the socket;
-the daemon runs it exactly as the command would run, but on the
-daemon's connection, and answers with what it printed and its exit
-code, which the command prints and exits with. So the output and the
-files are those of the command run without a daemon, but for the
-sidecar's 'closed', which is false while the daemon holds the view.
+While a daemon runs for a port, every command for that port runs
+through it, whatever folder it writes into: a view command ('view',
+'search', 'forest', 'contains', 'links-here', 'diff', 'new'), and
+'save', 'integrate' and 'close', whose port is their sidecar's, and
+'commit --yes'. A command's port is the one its '--port' or
+'SKG_PORT' names, or the sidecar's. A command that names no port and
+has no sidecar runs through the daemon of its '--out-dir', if one
+runs there, on that daemon's server; otherwise through the daemon for
+the default port, 1730. The command sends its command line, its
+current directory and the port it named over the socket; the daemon
+runs it exactly as the command would run, but on the daemon's
+connection, writing its files where the command asked, and answers
+with what it printed and its exit code, which the command prints and
+exits with. So the output and the files are those of the command run
+without a daemon, but for the sidecar's 'closed', which is false
+while the daemon holds the view.
 
 The daemon runs one command at a time; the others wait their turn.
 Between commands it reads what the server sends unprompted; what
 arrives while a command waits for its answer is handled after that
 command.
 
-A command run through a daemon talks to the daemon's server unless
-its command line names '--port' ('SKG_PORT' is not consulted). One
-naming another port, or a 'save' or 'integrate' whose sidecar came
-from another server, runs on its own connection, as without a daemon.
-'raw', 'import' and 'commit' write no view, have no folder, and always
-run on their own connection.
+'raw' and 'import' always run on their own connection: 'raw' speaks
+the protocol directly, and 'import' binds its approval to a
+connection of its own. So does a 'commit' without '--yes', since the
+typed "yes" it may ask for cannot cross the socket; once it has
+committed, it asks the daemon for its port to rerender the buffers
+of the diff view it holds, which the server rerenders after a
+git-commit only on the committing connection.
 ** What happens to the views
-Every view a command writes into the daemon's folder stays open on the
-daemon's connection. A save of one is the ordinary case for the
+Every view a command run through the daemon writes stays open on the
+daemon's connection, in whatever folder its files are. A save of one is the ordinary case for the
 server: a save of a view the connection holds, the case of an editor's
 buffer. The rules for a view the server does not hold (the handles
 taken from the buffer, the diff-view buffer named in the request; see
@@ -401,6 +476,9 @@ The server rerenders a held view
   that changes a node the view shows: a collateral rerender, which
   arrives with the save's answer, and which the daemon writes before
   the command returns;
+- after a git-commit on the daemon's connection ('commit --yes'), and
+  of the buffers of the diff view after one on another ('commit'
+  without '--yes', which then asks the daemon);
 - after it integrates files that changed on disk, of which it tells
   the connection with a 'repo-files-integrated' message naming the
   views that show a changed node (and every buffer of the diff view):
@@ -425,29 +503,33 @@ a node again into the same files replaces the held view with a fresh
 one, and a new 'diff' replaces the buffers written under the same
 names. 'close SIDECAR' releases one view.
 ** What it does not see
-A save on another connection to the same server (a command run with
-another '--out-dir', or an editor on that server) writes files the
-server knows as its own, so no message reaches the daemon, and the
-views it holds that show those nodes go stale; a save of one is then
-refused if it would write a node that changed. So run every command
-of a session through the daemon. A change on disk by anything else,
-another server's save or a 'git pull', reaches it. 'commit' runs on
-its own connection, so the held buffers of the diff view do not learn
-of the git-commit; 'diff' again after one.
+A save on another connection to the same server (an editor on that
+server, or a command that reached no daemon: an 'import', or one run
+while the daemon was down) writes files the server knows as its own,
+so no message reaches the daemon, and the views it holds that show
+those nodes go stale; a save of one is then refused if it would write
+a node that changed. Commands for the daemon's port run through it,
+so this happens only with another client on the same server. A
+change on disk by anything else, another server's save or a 'git
+pull', reaches it.
 ** The log
 'DIR/skg-for-ai.log' is appended to, one line per event, each starting
 with the local time ('2026-11-01 21:34:33'); a message of several
 lines is joined into one with ' | '. The events:
 - 'started: process N, server port P', with '; replaced the socket a
-  dead daemon left' when it did; 'stopped: released N views'.
-- 'holding BASE (view ID ID)' when a command writes a view into the
-  folder; 'released BASE: its view ID now shows OTHER'; 'closed BASE'.
+  dead daemon left at PATH' for each it replaced; 'stopped: released
+  N views'.
+- 'holding BASE (view ID ID)' when a command writes a view;
+  'released BASE: its view ID now shows OTHER'; 'closed BASE'. BASE
+  is the files' base name in the daemon's folder, and their folder's
+  real path joined to it elsewhere ('/home/me/notes/view_ID').
 - 'saved BASE', 'saved new root TITLE', 'integrated BASE', for the
   commands that write to the graph.
 - 're-rendered BASE because CAUSE; CHANGES': the daemon rewrote a
   view's files. CAUSE is "of 'COMMAND' on the daemon's connection" for
-  a collateral rerender, or "files changed on disk (WARNINGS)" with the
-  server's notice. CHANGES compares the old full view with the new,
+  a collateral rerender or one after 'commit --yes', "of a git-commit
+  on another connection" after a 'commit' without '--yes', or "files
+  changed on disk (WARNINGS)" with the server's notice. CHANGES compares the old full view with the new,
   node by node, by title: "new 'T'", "gone 'T'", "'T' changed: title,
   was 'OLD', body, metadata" (the metadata holds its relationships,
   among other facts), the first six and a count of the rest, or "no
@@ -568,10 +650,13 @@ and checks its output, that the child and the grandchild are now
 editable there, and that a save of the buffer retitles the grandchild
 again. Last, it checks that a blank commit message is refused.
 
-Then, on a fourth server over a fresh copy of the fixture, it starts a
-daemon in a scratch folder and runs commands through it (with no
-'--port'). 'view', 'links-here' and 'search' write the same full and
-compact views through it as on their own connection, and sidecars that
+Then, on a fourth server over a fresh copy of the fixture whose owned
+skgrepo is a gitrepo, it starts a daemon in a scratch folder and runs
+commands through it (with no '--port'). It runs every command with
+'XDG_RUNTIME_DIR' its own scratch folder, and without 'SKG_PORT', so
+that no daemon outside the test is reached. 'view', 'links-here' and
+'search' write the same full and compact views through it as on their
+own connection (with no daemon's socket to find), and sidecars that
 differ only in 'closed' (and the generation, which the save of
 'links-here' advances). A save through the daemon retitles a node
 another held view shows; the daemon rewrites that view and logs the
@@ -582,8 +667,17 @@ and the daemon logs the integration warning, rewrites the views that
 show the node and logs why. A view whose compact view has unsaved
 edits is kept as it is when another such change touches it. A file
 written into the owned skgrepo that the watcher cannot read is a
-logged warning. 'close' releases a view; 'daemon --stop' releases the
-rest, every sidecar then says closed, the socket is gone, and a save of
+logged warning. A 'view' for the daemon's port into another folder
+runs through the daemon, which writes its files there and holds the
+view: a save through the daemon of a node it shows rewrites it. A
+second daemon for the same port is refused, naming the first's
+process. A 'diff' through the daemon is held; 'commit --yes' runs
+through it, and the daemon rewrites the buffer, whose headlines then
+carry no change facts; after another save and 'diff', a 'commit'
+answered "yes" on standard input runs on its own connection and asks
+the daemon to rewrite the buffer again. 'close' releases a view;
+'daemon --stop' releases the rest, wherever their files are, every
+sidecar then says closed, both sockets are gone, and a save of
 a view the daemon held then runs on its own connection, keeping its
 handles. Last, a daemon killed outright leaves its socket: a command
 then runs on its own connection, a new daemon replaces the socket and
@@ -768,7 +862,11 @@ prepositions, conjunctions, pronouns and verbs like 'is', 'are',
 when their sets of words share enough, by the Dice coefficient
 (twice the shared words over the sum of the two counts) of at least
 0.6, or when the remaining texts are alike letter by letter, by
-'difflib''s ratio, at least 0.75. The test errs toward asking: a
+'difflib''s ratio, at least 0.75. The ratio counts only when each
+title has at least three words left: on shorter ones a shared word
+is most of the text ("budget meeting" and "budget notes" reach
+0.76), so two short titles match by the Dice coefficient alone.
+The test errs toward asking: a
 needless question costs one flag, a missed one costs an ID. When a
 new headline resembles several removed ones it is paired with the
 closest, and the question names the others; each removed headline is
@@ -901,7 +999,9 @@ readiness summary and the staged paths, and asks for a typed "yes" on
 standard input; '--yes' answers yes. Any other answer, or no input,
 commits nothing. Then it prints 'Committed in SKGREPO (COMMIT ID)'
 per git-commit, or 'Nothing was committed.', and any error. A blank
-message is refused before anything is sent.
+message is refused before anything is sent. With a daemon for the
+port, the buffers of the diff view it holds are rewritten after the
+git-commit (see "The daemon").
 ** Where it works
 The diff view and the commit need a connection with no skgrepo
 restriction, and each owned skgrepo in a gitrepo with a HEAD commit;
@@ -911,7 +1011,7 @@ User Claude's server ('data/skgconfig-user-claude.toml'), only the
 owned repo 'first' can show changes or be committed.
 ** How it talks to the server
 The server keeps the diff view's buffers, and the comparison behind
-them, per connection. 'diff' opens one connection (or uses a daemon's),
+them, per connection. 'diff' opens one connection (or runs through a daemon),
 requests the buffers in the clients' order, and writes each nonempty
 one, with the readiness summary the server's answer carries. A later
 'save' or 'integrate' of a diff buffer names its buffer of the diff

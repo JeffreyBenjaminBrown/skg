@@ -91,4 +91,38 @@ Returns (REQUESTED-BUFFERS OPENED-BUFFER-NAMES)."
                    (concat "1 of 3 changed files are ready, 2 changes are "
                            "not editable in this view; C-c r u integrates them")))))
 
+(ert-deftest test-skg-diff-view-a-buffer-names-itself-on-save ()
+  "A buffer of the diff view keeps its buffer's name and sends it on
+save as (diff-view-buffer . NAME); a content view sends none."
+  (let ((point-position '(:point-lines-below-focused-headline 0
+                          :point-column 0
+                          :point-screen-lines-below-window-start 0))
+        (diffView-buffer nil)
+        (content-buffer nil))
+    (unwind-protect
+        (progn
+          (cl-letf (((symbol-function 'message) #'ignore))
+            (skg--handle-diffView-response
+             nil (test-skg-diff-view--content "* (skg node (gnid a)) a\n")
+             "all changes" "diff-view-id"))
+          (setq diffView-buffer (skg-find-buffer-by-view-id "diff-view-id"))
+          (setq content-buffer (skg-open-org-buffer-from-text
+                                nil "* (skg node (gnid b)) b\n"
+                                "*test-skg-content-view*" "content-view-id" "1"))
+          (with-current-buffer diffView-buffer
+            (should (equal (assoc 'diff-view-buffer
+                                  (skg--save-request-sexp
+                                   skg-view-id point-position))
+                           '(diff-view-buffer . "all changes"))))
+          (with-current-buffer content-buffer
+            (should-not (assoc 'diff-view-buffer
+                               (skg--save-request-sexp
+                                skg-view-id point-position)))))
+      (dolist (buffer (list diffView-buffer content-buffer))
+        (when (buffer-live-p buffer)
+          (with-current-buffer buffer
+            (setq-local kill-buffer-hook nil)
+            (set-buffer-modified-p nil))
+          (kill-buffer buffer))))))
+
 (provide 'test-skg-diff-view)

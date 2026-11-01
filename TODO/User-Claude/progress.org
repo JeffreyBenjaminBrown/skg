@@ -1845,3 +1845,135 @@ rerender across connections, would close it.
 *** Should 'commit' route through the daemon?
 With '--yes' only, say; it would keep held diff buffers current after
 a git-commit.
+* Small things of plan 8: the fuzzy guard, routing by port, quieter integrations, the buffer kind, the front page: DONE, uncommitted
+** What was done
+*** The fuzzy test on short titles
+'titles_probably_reworded' counts the difflib ratio without a Dice
+match only when both titles have 'REWORDED_RATIO_MINIMUM_WORDS' (3)
+normalized words. Dice alone is unchanged; the ranking of candidate
+pairs still uses the larger signal. The ratio's threshold case moved
+to three-word titles ("abcdefxy kmn pqr" / "abcdefgh kmo pqs", ratio
+0.75, Dice 0); new cases on both sides of the line: misspellings in
+three and four words ask; two words, two beside three, "Budget
+meeting" / "Budget notes", and one word do not. One README sentence
+in "Retyped headlines".
+*** Routing by port
+The daemon also listens on 'skg-for-ai-PORT.sock' in 'XDG_RUNTIME_DIR'
+(else '/tmp'), bound and renamed into place as the folder's socket
+is ('listening_unix_socket' now takes a socket path, as do
+'unix_socket_connected_at', 'daemon_reply' and
+'remove_stale_daemon_socket'). Before it connects, it checks both
+sockets: a dead one is replaced and logged ("replaced the socket a
+dead daemon left at PATH"); a live one refuses the start, naming the
+running daemon, which a new '{"describe": true}' request returns:
+"A daemon already runs for port 1732: process N, started with
+'--out-dir DIR --port 1732'; stop it with ...". Its connection holds
+every view written on it ('holds_views_it_writes'), keyed by a files
+stem, the real path of the folder joined to the base name
+('files_stem_of_held_view' replaces 'base_name_of_held_view'); it
+rewrites and releases those files wherever they are, and the log
+names files outside its folder by stem. 'exit_code_of_command_sent_to_daemon':
+a command whose port is known (named by '--port' or 'SKG_PORT', or a
+sidecar's for 'save', 'integrate', 'close') goes to that port's
+daemon; one with neither tries its folder's daemon, then the default
+port's. The request carries the named port, which the daemon uses;
+an unnamed one takes the daemon's port, as before.
+*** commit
+'commit --yes' routes through the daemon and runs on its connection
+('connect_to_server'), so the rerender stream after the git-commit
+reaches the held views. An interactive 'commit' runs locally and,
+when it committed something, sends the daemon for its port
+'{"rerender_diffView_buffers": true, "cause": ...}'; the daemon asks
+for the rerender of its held diff-view buffers ("rerender all views"
+excluding the rest) and logs "re-rendered ... because of a git-commit
+on another connection".
+*** Quieter integrations in the clients
+Both clients ('skg--show-repo-files-integrated-warnings',
+'repo_files_integrated.show_warnings') echo a message whose warnings
+all match the server's count line ("Integrated N files that changed
+on disk in skgrepo 'X'.") as "skg: repo X: N files integrated; repo
+Y: 1 file integrated", and otherwise append all of them to the
+warnings buffer under "Repo changes" and show it, as before. The
+rerender of named views is unchanged. Docs: COMMANDS.org,
+COMMANDS-nvim.org, api-and-formats "Repo files integrated" (the
+"Server warnings" section does not describe integrations).
+*** The clients send the buffer kind
+Emacs: 'skg-diffView-buffer-kind' (permanent-local, 'skg-buffer.el'),
+set when 'skg--handle-diffView-response' opens a buffer, sent by
+'skg--save-request-sexp'. Neovim: 'vim.b.skg_diffView_buffer_kind',
+set in 'diff_view.handle_diffView_response', passed by
+'send_save_buffer' as the new last argument of 'save_request_sexp'.
+One sentence in api-and-formats under '(diff-view-buffer ...)'.
+*** The README front page
+"Start here", before "What it is for": the daemon, viewing, editing
+the compact file, saving with the report, the one rule, diff and
+commit, and a paragraph of where the rest is. About fifty lines of
+prose.
+** Tests
+The tool's test: PASS, twice in a row on the final code (about 35 s). The daemon's
+scratch server is now a gitrepo, and four cases are new: a 'view'
+for the port into another folder runs through the daemon, is held,
+and is rewritten after a save through the daemon; a second daemon
+for the port is refused, naming the first's PID, which keeps both
+sockets; 'diff' through the daemon is held, 'commit --yes' through it
+rewrites the buffer (its summary then says "change facts 0"); after
+another save and 'diff', an interactive 'commit' answered "yes" asks
+the daemon, which rewrites it again. 'daemon --stop' now checks the
+sidecars in all three folders and that the port's socket is gone
+("released 5 views"). Emacs: 440 (two new: counts alone echo, real
+warnings fill the buffer, replacing one; the diff buffer names
+itself on save); Neovim: 477 (likewise). 'cargo check --all-targets'
+clean; no Rust changed.
+** The live check on 1732
+User's server started as PID 61859 and was stopped by PID; Jeff's
+1731 server untouched. A daemon (PID 61929) with its out-dir in the
+scratchpad; 'view' of 'what has happened' into the daemon's folder,
+the same view with '--port 1732' into a second folder, and 'search'
+with 'SKG_PORT=1732' into a third: all three ran through the daemon
+(the log says "holding" for each, the second and third by path; the
+two later sidecars say '"closed": false'). A second daemon for 1732
+was refused, naming 61929. 'daemon --stop' removed '/tmp/skg-for-ai-1732.sock'.
+Nothing was saved.
+** Deviations
+*** 'raw' and 'import' never route
+The plan says every command for the port. 'raw' speaks the protocol
+directly (its own saves and reads would tangle with the daemon's
+queue), and 'import' binds its approval token to its connection; both
+run locally as before. An import's writes therefore do not rerender
+the daemon's views.
+*** 'close' has its own '--port', and talks to the sidecar's server
+It had the view commands' options ('--out-dir', '--name', which it
+ignored, and '--port' defaulting to 'SKG_PORT'). Its port is now the
+sidecar's, like 'save', so that it routes by port.
+*** 'SKG_PORT' now counts as naming a port
+The daemon section said it was not consulted for a routed command;
+the brief says it names the port, so the sender sends the port it
+named and the daemon uses it.
+*** The interactive commit asks only when something was committed
+"Nothing was committed." sends nothing.
+*** A rewritten diff buffer after a git-commit is not empty
+The server's rerender of a held diff buffer after the git-commit
+shows its old tree with no change facts, not an empty buffer; the
+test checks the summary's "change facts 0".
+*** The tests isolate the per-port socket
+'test_skg_for_ai.py' sets 'XDG_RUNTIME_DIR' to a temporary folder and
+drops 'SKG_PORT' for the run; the "on its own connection" comparison
+runs with an empty 'XDG_RUNTIME_DIR' of its own, since a command for
+the daemon's port can no longer avoid it otherwise.
+** What's imperfect
+*** The clients recognize the count line by its wording
+The wire format has one 'warnings' list; the clients match the
+server's sentence ('warnings_of_notice'). If the server rewords it,
+every integration opens the buffer again: the failure is loud, not
+silent.
+*** Reopening a held view ID into other files logs no "released"
+'release_view_to_reopen' closes the earlier files silently (as
+before this slice); the live run showed only the new "holding".
+*** '/tmp' is shared
+Without 'XDG_RUNTIME_DIR', the per-port socket is in '/tmp'; another
+user's daemon socket there for the same port would make a command
+fail on permission rather than run locally.
+** Open questions
+*** A structured count in the integration message?
+'(integrated (("first" . 2)))' beside '(warnings ...)' would let the
+clients stop matching text. A Rust change; not done.
