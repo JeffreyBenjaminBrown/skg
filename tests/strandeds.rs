@@ -99,7 +99,7 @@ fn save (
   let mut env : SkgEnv =
     skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
   let rendered_at : RenderedAt = // as if the buffer were rendered now
-    RenderedAt::Generation ( env . runtime_snapshot () . generation );
+    RenderedAt ( env . runtime_snapshot () . generation );
   let response : SaveResponse = block_on (
     update_from_and_rerender_buffer_with_approvals (
       &mut stream, buffer, &mut env,  &Ok (viewforest_id . clone ()),

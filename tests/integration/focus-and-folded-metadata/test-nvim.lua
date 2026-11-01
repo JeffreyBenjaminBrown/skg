@@ -31,7 +31,8 @@ local content = table.concat({
   '** (skg node (gnid 6)) 6',
 }, '\n')
 local buf = buffer.open_org_buffer_from_text(
-  content, 'skg://focus-and-folded-metadata-test')
+  content, 'skg://focus-and-folded-metadata-test', nil,
+  T.runtime_generation())
 print('Created buffer with 6 headlines')
 
 T.write_file('initial.log', T.buffer_text(buf))

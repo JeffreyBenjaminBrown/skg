@@ -55,6 +55,7 @@
         "rfs-c3 body\n"))
       (skg-content-view-mode)
       (setq skg-view-id (org-id-uuid))
+      (setq skg-rendered-at (skg-test-runtime-generation))
       (goto-char (point-min))
 
       (message "=== visibility after mode activation (org-startup-folded=t) ===")

@@ -26,7 +26,8 @@ local function test_invalid_save ()
 
   local view_id = buffer.generate_uuid()
   local content_buf = buffer.open_org_buffer_from_text(
-    original_content, content_buffer_name, view_id)
+    original_content, content_buffer_name, view_id,
+    T.runtime_generation())
   print('created ' .. content_buffer_name .. ' buffer with invalid'
        .. ' content')
 

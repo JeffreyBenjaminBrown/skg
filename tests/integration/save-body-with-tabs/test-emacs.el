@@ -47,6 +47,7 @@
       (insert org-text)
       (skg-content-view-mode)
       (setq skg-view-id (org-id-uuid))
+      (setq skg-rendered-at (skg-test-runtime-generation))
       (goto-char (point-min))
 
       (message "=== PHASE 2: save buffer ===")

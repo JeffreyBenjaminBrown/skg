@@ -208,13 +208,13 @@ So far there are these endpoints:
       different decisions.
     - =rendered-at= is mandatory: the runtime generation the saved
       buffer's text was rendered at, as the last response that drew
-      it said (see "The rendered-at of a view" below). A buffer no
-      response drew, such as a client's new empty view or a buffer a
-      test builds, sends ="never"=: its text is the user's own, so the
-      staleness check below finds nothing in it stale. A request
-      without the field, or with a value that is neither a number nor
-      ="never"=, is refused after the envelope is read, with one error
-      naming the field, and nothing is written.
+      it said, or, for a buffer no view response drew (a client's new
+      empty view, a buffer a test builds), as the "Runtime generation"
+      request answered when the buffer was opened (see "The
+      rendered-at of a view" below). A request without the field, or
+      with a value that is not a number, is refused after the envelope
+      is read, with one error naming the field, and nothing is
+      written.
     - =point-lines-below-focused-headline= is global to the buffer save: the number of text lines from the focused headline to point before save.
     - =point-column= is global to the buffer save: the column of point within its line, echoed back so the client can restore the exact cursor position.
     - =point-screen-lines-below-window-start= is global to the buffer save: the number of screen lines from the window's top line to point before save. The server echoes all three point fields in the final save response so Emacs can restore point and scroll position after replacing the buffer text.
@@ -443,7 +443,8 @@ So far there are these endpoints:
     colors and placement. Both clients render the semantic =(rels ...)=,
     =(props ...)= and =(birth ...)= facts of =(view ...)= themselves,
     including fractions and per-character styles.
-    Each client fetches both at connection setup and re-fetches on reconnect.
+    Each client fetches both at connection setup and re-fetches on
+    reconnect and after a rebuild of the session-lifetime stores.
     If the fetch fails, its herald display disables after bounded retries;
     there is no client-side fallback table. The user-facing legend is
     [[file:./heralds.org][heralds.org]].
@@ -498,8 +499,10 @@ rebuilding") the buffer was drawn at: =content-view=,
 headline's metadata. Each client keeps it per buffer (Emacs's
 'skg-rendered-at', Neovim's 'vim.b.skg_rendered_at', the tool's
 sidecar), replaces it whenever a response redraws the buffer, and
-sends it back with the buffer's save as =(rendered-at . "N")=, or as
-=(rendered-at . "never")= for a buffer no response drew. The
+sends it back with the buffer's save as =(rendered-at . "N")=. A
+buffer no view response drew, such as a new empty view, is dated
+instead by the "Runtime generation" request, which its client sends
+as it opens the buffer and whose answer it keeps the same way. The
 numbers grow across server processes as well as within one, so a
 buffer an earlier server process drew counts as older than every
 node a later one read. The fork-confirmation buffer carries none: it
@@ -671,19 +674,31 @@ buffer's =rendered-at=.
 ** Rebuild session-lifetime stores
   - Request: ((request . "rebuild session-lifetime stores"))
   - Response: LP response-type "rebuild-session-lifetime-stores" with =((content "..."))=.
-    Content reports that the graph and Tantivy were rebuilt on success,
-    or "Rebuild failed: ..." on error.
-  - Behavior: Reads the authoritative =.skg= files once, validates a complete
+    Content reports that the config was reloaded and the graph and
+    Tantivy rebuilt on success, followed by one line "Warning: ..." per
+    warning of the reload, or "Rebuild failed: ..." on error.
+  - Behavior: Re-reads the config file the server started with (an
+    edited skgrepo list included), then reads the authoritative =.skg= files once, validates a complete
     candidate graph, builds that graph and a fresh Tantivy index from the same
     node vector, then atomically swaps in the new runtime generation. It does
-    not rewrite =.skg= files. Failure leaves the old generation live. Success
+    not rewrite =.skg= files. Failure, an invalid config included, leaves
+    the old generation live. Success rewrites the owned skgrepos'
+    =OTHER_SKGREPO_DEPENDENCIES.toml= as a startup does, and warns, as
+    a startup does, of unknown config keys and contradicted foreign
+    manifests, and of a changed =port= or =timing_log=, which take
+    effect only at a restart; the server's startup warnings ("Server
+    warnings") stay as they were. Each connection's skgrepo restriction
+    follows the new config at its next request: none stays none, and
+    a restriction keeps its most private skgrepo shown, or, if the
+    config no longer names it, becomes the config's default. Success
     closes existing views, drops the graph straddle of the diff
     view, and recomputes context rankings for search. Every node of
     the rebuilt graph last changed at the new runtime generation, so a save
     of any buffer rendered before the rebuild is refused if it would
     write an existing node (see "Save buffer"); the clients do not
     re-render after a rebuild, but tell the user to close the old
-    views.
+    views, and fetch the herald rules again ("Herald rules"), whose
+    skgrepo labels the reloaded config may have changed.
 
 ** relRepo info
   - Request: ((request . "relRepo info") (recorder . "ID")
@@ -735,6 +750,18 @@ buffer's =rendered-at=.
   - The endpoint is read-only and ignores the skgrepo restriction: it
     lists every skgrepo of the config, restricted or not.
   - Logic: =server/serve/handlers/repos.rs=.
+
+** Runtime generation
+  - Request: ((request . "runtime generation"))
+  - Response: LP =((response-type runtime-generation) (content "N"))=,
+    the current runtime generation.
+  - A client opening a buffer no view response drew (a new empty
+    view: Emacs's 'skg-view-new-empty', Neovim's 'view_new_empty', the
+    tool's 'new') asks this first and keeps the answer as the buffer's
+    =rendered-at= (see "The rendered-at of a view"), so the buffer's
+    save refuses to write a node that changed after the buffer was
+    opened.
+  - Logic: =server/serve/handlers/runtime_generation.rs=.
 
 ** Strip body whitespace
   - Request: ((request . "strip body whitespace"))
@@ -1013,6 +1040,8 @@ one automatically.
   - Response: LP =((response-type shutdown) (content "Server shutting down..."))=.
   - Behavior: exits after sending the response. Derived graph and search state
     are reconstructed from disk at the next startup.
+    Under 'bash/start-servers.sh' the server then starts again at once,
+    as after any exit; 'bash/stop-servers.sh' stops it for good.
   - TODO | PITFALL: Any client can shut down the server. If ever multiple users share a server, one could bother the other. The server exits immediately after sending the response, which interrupts any in-flight requests from other clients.
 
 ** Busy-initializing signal

@@ -279,13 +279,14 @@ field (fork-repos ((N . REPO) ...)). STRANDEDS-REVIEW, when non-nil,
 rides out as (strandeds-reviewed . \"true\") and, unless it chose
 none, (reset-strandeds (RELATION RECORDER MEMBER) ...). DELETE-FROM,
 when non-nil, rides out as (delete-from . DELETE-FROM). The current
-buffer's `skg-rendered-at' rides out as (rendered-at . N), or as
-\"never\" in a buffer no server response drew."
+buffer's `skg-rendered-at' rides out as (rendered-at . N); a buffer
+without one sends no such field, and the server refuses its save."
   (append
    `((request . "save buffer")
-     (view-id . ,view-id)
-     (rendered-at . ,(or skg-rendered-at "never"))
-     (point-lines-below-focused-headline
+     (view-id . ,view-id))
+   (when skg-rendered-at
+     `((rendered-at . ,skg-rendered-at)))
+   `((point-lines-below-focused-headline
       . ,(number-to-string
           (plist-get save-point-position
                      :point-lines-below-focused-headline)))

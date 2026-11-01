@@ -1296,9 +1296,12 @@ Displays the result in the echo area.
 *** :SkgConnectionEnd
 Closes the TCP connection to the Rust server.
 *** :SkgRebuildSessionLifetimeStores
-Re-reads the authoritative =.skg= files, validates and replaces the in-memory
-graph, and rebuilds the derived Tantivy search index. It does not rewrite the
-=.skg= files.
+Re-reads the config file and the authoritative =.skg= files, validates and
+replaces the in-memory graph, and rebuilds the derived Tantivy search index.
+It does not rewrite the =.skg= files. So an edited config (a skgrepo added,
+removed or reordered, say) takes effect without restarting the server, except
+for its 'port' and 'timing_log', which the answer warns about. An invalid
+config fails the rebuild, and the server keeps serving the old one.
 Existing skg views are now invalid; run ':SkgCloseAllSkgBuffers'
 to close them.
 *** :SkgStripBodyWhitespace

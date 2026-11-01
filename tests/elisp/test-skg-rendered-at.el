@@ -26,14 +26,14 @@
                          "7")))
       (kill-buffer buf))))
 
-(ert-deftest test-a-buffer-no-response-drew-saves-as-rendered-never ()
-  "An empty view carries no rendered-at, so its save sends \"never\"."
+(ert-deftest test-a-buffer-without-rendered-at-sends-none ()
+  "A buffer no response dated sends no rendered-at; the server refuses
+its save."
   (with-temp-buffer
     (should-not skg-rendered-at)
-    (should (equal (cdr (assoc 'rendered-at
-                               (skg--save-request-sexp
-                                "view-1" test--rendered-at-point-position)))
-                   "never"))))
+    (should-not (assoc 'rendered-at
+                       (skg--save-request-sexp
+                        "view-1" test--rendered-at-point-position)))))
 
 (ert-deftest test-a-streamed-view-update-replaces-rendered-at ()
   "A collateral or rerender view carries the generation of its rerender."

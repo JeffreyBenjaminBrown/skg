@@ -19,6 +19,7 @@ use crate::serve::handlers::investigate_unknown_node::handle_investigate_unknown
 use crate::serve::handlers::repos::handle_repos_request;
 use crate::serve::handlers::rebuild_session_lifetime_stores::handle_rebuild_session_lifetime_stores_request;
 use crate::serve::handlers::rerender_all_views::handle_rerender_all_views_request;
+use crate::serve::handlers::runtime_generation::handle_runtime_generation_request;
 use crate::serve::handlers::save_buffer::handle_save_buffer_request;
 use crate::serve::handlers::server_warnings::handle_server_warnings_request;
 use crate::serve::handlers::single_root_view::handle_single_root_view_request;
@@ -113,6 +114,8 @@ fn handle_emacs (
       Ok (_n) => {
         tracing::info! ( request = request_header . trim_end (), "Received request" );
         let runtime = env . runtime_snapshot ();
+        skgrepo_restriction = // A rebuild may have reloaded a config with other skgrepos.
+          skgrepo_restriction . under_config (&runtime . config);
         match request_type_from_request (&request_header) {
           // For most types of requests, the header is the entire request, and the reader is no longer needed. For saving, though, the reader still contains the buffer content, so it is passed along.
           Ok (RequestType::SingleRootContentView) =>
@@ -205,6 +208,8 @@ fn handle_emacs (
           Ok (RequestType::Repos) =>
             handle_repos_request (
               &mut stream, &runtime . config, &skgrepo_restriction ),
+          Ok (RequestType::RuntimeGeneration) =>
+            handle_runtime_generation_request ( &mut stream, &env ),
           Ok (RequestType::ServerWarnings) =>
             handle_server_warnings_request (
               &mut stream, env . runtime . startup_warnings () ),

@@ -30,7 +30,6 @@ describe('skg.save request strings', function ()
       screen_lines_below_window_start = 3 }, nil, nil)
     assert.are.equal(
       '((request . "save buffer") (view-id . "view_id-1")'
-      .. ' (rendered-at . "never")'
       .. ' (point-lines-below-focused-headline . "2")'
       .. ' (point-column . "5")'
       .. ' (point-screen-lines-below-window-start . "3"))\n',
@@ -613,13 +612,13 @@ describe('skg.save rendered-at', function ()
     lock.end_stream()
   end)
 
-  it('carries the generation the buffer was rendered at, "never" if none',
+  it('carries the generation the buffer was rendered at, none if none',
      function ()
     assert.is_truthy(save.save_request_sexp('view_id-1', position,
       nil, nil, nil, nil, nil, nil, '7')
       :find('(rendered-at . "7")', 1, true))
-    assert.is_truthy(save.save_request_sexp('view_id-1', position)
-      :find('(rendered-at . "never")', 1, true))
+    assert.is_falsy(save.save_request_sexp('view_id-1', position)
+      :find('rendered-at', 1, true))
   end)
 
   it('sends the view\'s rendered-at, and keeps each response\'s',

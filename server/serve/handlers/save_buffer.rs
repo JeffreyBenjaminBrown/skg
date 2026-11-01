@@ -813,7 +813,7 @@ pub async fn update_from_and_rerender_buffer_with_hoist_approval (
   approved_hoist_pids         : &HashSet<ID>,
 ) -> Result<SaveResponse, Box<dyn Error>> {
   let current_generation : RenderedAt = // This entry point saves a buffer as if rendered now: only the handler knows a client's rendering.
-    RenderedAt::Generation ( env . runtime_snapshot () . generation );
+    RenderedAt ( env . runtime_snapshot () . generation );
   update_from_and_rerender_buffer_with_approvals (
     stream, org_buffer_text, env,
     viewforest_id_from_request_result, views_state, skgrepo_restriction,

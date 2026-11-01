@@ -48,7 +48,7 @@ local content = table.concat({
   '** e',
 }, '\n')
 local buf = buffer.open_org_buffer_from_text(
-  content, 'skg://fold-preservation-test')
+  content, 'skg://fold-preservation-test', nil, T.runtime_generation())
 print('Created buffer with content')
 
 -- Position on line 4 ('** d').

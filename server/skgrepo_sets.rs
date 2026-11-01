@@ -83,6 +83,26 @@ impl SkgrepoRestriction {
         skgrepos           : BTreeSet::new (),
         kept_out           : Vec::new (), }, } }
 
+  /// The same skgrepo restriction under 'config', which a config
+  /// reload may have made differ from the one it was made under: no
+  /// skgrepo restriction stays none, and a restriction stays at its
+  /// most private skgrepo shown. If 'config' no longer names that
+  /// skgrepo, it is the restriction a connection starts with, as if
+  /// the connection were new.
+  pub fn under_config (
+    &self,
+    config : &SkgConfig,
+  ) -> SkgrepoRestriction {
+    if self . is_unrestricted () {
+      return SkgrepoRestriction::unrestricted (config); }
+    SkgrepoRestriction::named (config, self . most_private_shown . clone ())
+      . unwrap_or_else ( |_| {
+        tracing::warn! (
+          skgrepo = %self . most_private_shown,
+          "the reloaded config no longer names the skgrepo restriction's most private skgrepo shown; starting over from its default");
+        SkgrepoRestriction::default_from_config (config)
+          . unwrap_or_else ( |_| SkgrepoRestriction::unrestricted (config) ) } ) }
+
   /// The skgrepo restriction over the privacy order 'order' (most
   /// public first) whose most private skgrepo shown is
   /// 'most_private_shown', for a test without a config.

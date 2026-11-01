@@ -10,6 +10,7 @@ pub mod investigate_unknown_node;
 pub mod rebuild_session_lifetime_stores;
 pub mod repos;
 pub mod rerender_all_views;
+pub mod runtime_generation;
 pub mod save_buffer;
 pub mod server_warnings;
 pub mod integrate_unshown_changes;

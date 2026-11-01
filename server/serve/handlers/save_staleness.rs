@@ -10,9 +10,9 @@
 //! has it is not written, so it saves silently however old the
 //! buffer. The writes a save derives from the current graph (delete
 //! propagation, strandeds resets, Hoist repairs, fork clones, restore
-//! requests) undo nothing, and are not checked. A buffer no server
-//! response drew ('RenderedAt::Never') shows nothing the server sent,
-//! so it can be stale about nothing.
+//! requests) undo nothing, and are not checked. A buffer no view
+//! response drew, such as a client's new empty view, is dated by the
+//! 'runtime generation' request its client sent on opening it.
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::errors::{BufferValidationError, HeadlineName};
@@ -24,19 +24,15 @@ use crate::serve::util::value_from_request_sexp;
 
 use std::collections::BTreeSet;
 
-/// When the saved buffer's text was rendered, as its save request says.
+/// When the saved buffer's text was rendered, as its save request
+/// says: '(rendered-at . "N")', runtime generation N, as the response
+/// that last drew the buffer said.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum RenderedAt {
-  /// '(rendered-at . "N")': at runtime generation N, as the response
-  /// that last drew the buffer said.
-  Generation (u64),
-  /// '(rendered-at . "never")': no server response drew the buffer,
-  /// as for a client's new empty view; its text is the user's own.
-  Never,
-}
+pub struct RenderedAt (pub u64);
 
-/// The request's '(rendered-at . ...)'. A request without it is
-/// refused: omitting it must not bypass the staleness check.
+/// The request's '(rendered-at . "N")'. A request without it, or with
+/// anything but a number, is refused: omitting it must not bypass the
+/// staleness check.
 pub fn rendered_at_from_request (
   request : &str,
 ) -> Result<RenderedAt, String> {
@@ -45,13 +41,12 @@ pub fn rendered_at_from_request (
     . map_err ( |_| concat! (
       "The save request lacks the field '(rendered-at . \"N\")': ",
       "the runtime generation its buffer was rendered at, which every view ",
-      "response carries, or \"never\" for a buffer no response drew. ",
-      "Nothing was saved.") . to_string () ) ?;
-  if value == "never" { return Ok (RenderedAt::Never); }
+      "response carries, and the 'runtime generation' request answers for ",
+      "a new empty view. Nothing was saved.") . to_string () ) ?;
   value . parse::<u64> ()
-    . map ( RenderedAt::Generation )
+    . map ( RenderedAt )
     . map_err ( |_| format! (
-      "The save request's 'rendered-at' is {:?}, neither a runtime generation number nor \"never\". Nothing was saved.",
+      "The save request's 'rendered-at' is {:?}, not a runtime generation number. Nothing was saved.",
       value )) }
 
 /// One error per node the buffer would write that changed after
@@ -63,8 +58,7 @@ pub fn stale_write_errors (
   nodeInstructions : &[NodeInstruction],
   nodeMerges       : &[NodeMerge],
 ) -> Vec<BufferValidationError> {
-  let RenderedAt::Generation (rendered_at) = rendered_at
-    else { return Vec::new (); };
+  let rendered_at : u64 = rendered_at . 0;
   let written_pids : BTreeSet<ID> =
     // BTreeSet, so the errors come in a stable order.
     nodeInstructions . iter ()

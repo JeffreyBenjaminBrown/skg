@@ -23,6 +23,7 @@
     (insert "* (skg node (gnid 1) (skgRepos (nodeRepo main))) 1\n** (skg node (gnid 1)) 1")
     (org-mode)
     (setq skg-view-id (org-id-uuid))
+    (setq skg-rendered-at (skg-test-runtime-generation))
     (goto-char (point-min))
     (message "✓ Created *skg-content-view* buffer with invalid content"))
 

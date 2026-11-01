@@ -7,6 +7,7 @@
 
 use skg::serve::ViewsState;
 use skg::serve::handlers::rebuild_session_lifetime_stores::rebuild_session_lifetime_stores_in_place;
+use skg::serve::handlers::runtime_generation::handle_runtime_generation_request;
 use skg::serve::handlers::save_buffer::handle_save_buffer_request;
 use skg::serve::handlers::single_root_view::handle_single_root_view_request;
 use skg::skgrepo_sets::SkgrepoRestriction;
@@ -176,25 +177,65 @@ fn a_buffer_rendered_before_a_node_changed_cannot_write_it
     assert! ( file_text (&f, "c") . contains ("c by second") ); }
   Ok (()) }
 
+/// The 'runtime generation' request's answer, as a client dating a
+/// new empty view receives it.
+fn runtime_generation_answer (
+  f : &Fixture,
+) -> String {
+  let (mut stream, read_end) : (TcpStream, TcpStream) = mk_test_tcp_stream_pair ();
+  handle_runtime_generation_request (&mut stream, &f . env);
+  drop (stream);
+  let messages : Vec<String> = read_all_lp_messages (&mut BufReader::new (read_end));
+  assert! ( messages [0] . starts_with ("((response-type runtime-generation)"),
+            "{}", messages [0] );
+  extract_string_field_from_sexp (&messages [0], "content") . expect ("content") }
+
 #[test]
-fn a_buffer_no_response_drew_is_never_stale
+fn a_new_empty_view_is_dated_by_the_runtime_generation_request
   () -> Result<(), Box<dyn Error>> {
   // A buffer the client built itself, like a new empty view the user
-  // typed an existing node's headline into, saves as rendered 'never'.
+  // typed an existing node's headline into, saves as rendered at the
+  // generation the client asked for when it opened the view.
   let mut f : Fixture = fixture () ?;
   let mut connection : ViewsState = new_connection ();
+  let opened_at : String = runtime_generation_answer (&f);
   let (c_view, rendered_at) : (String, u64) =
     open_view (&mut f, &mut connection, "c", "c-view");
+  assert_eq! (opened_at, rendered_at . to_string ());
   let first : String = save (
     &mut f, &mut connection, "c-view",
     &c_view . replace ("c as first written", "c once"), Some (rendered_at . to_string ()) );
   assert! ( errors_of (&first) . starts_with (" ())"), "{}", first );
-  let typed : String = save (
+  { // Typed into a view opened before c changed: saving it would undo that change.
+    let typed : String = save (
+      &mut f, &mut connection, "typed-view",
+      "* (skg node (gnid c) (skgRepos (nodeRepo main))) c typed\n",
+      Some (opened_at) );
+    assert! ( errors_of (&typed) . contains ("changed after the buffer was rendered"),
+              "{}", typed );
+    assert! ( file_text (&f, "c") . contains ("c once") ); }
+  { // An empty view opened after the change saves.
+    let opened_later_at : String = runtime_generation_answer (&f);
+    let typed : String = save (
+      &mut f, &mut connection, "typed-later-view",
+      "* (skg node (gnid c) (skgRepos (nodeRepo main))) c typed\n",
+      Some (opened_later_at) );
+    assert! ( errors_of (&typed) . starts_with (" ())"), "{}", typed );
+    assert! ( file_text (&f, "c") . contains ("c typed") ); }
+  Ok (()) }
+
+#[test]
+fn a_save_whose_rendered_at_is_not_a_number_is_refused
+  () -> Result<(), Box<dyn Error>> {
+  let mut f : Fixture = fixture () ?;
+  let mut connection : ViewsState = new_connection ();
+  let result : String = save (
     &mut f, &mut connection, "typed-view",
     "* (skg node (gnid c) (skgRepos (nodeRepo main))) c typed\n",
     Some ("never" . to_string ()) );
-  assert! ( errors_of (&typed) . starts_with (" ())"), "{}", typed );
-  assert! ( file_text (&f, "c") . contains ("c typed") );
+  assert! ( errors_of (&result) . contains ("not a runtime generation number"),
+            "{}", result );
+  assert! ( file_text (&f, "c") . contains ("c as first written") );
   Ok (()) }
 
 #[test]

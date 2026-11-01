@@ -243,8 +243,8 @@ end
 ---@param strandeds_review table|nil
 ---@param delete_from string|nil 'visible' or 'all'
 ---@param rendered_at string|nil the generation the buffer was rendered at
----  ('vim.b.skg_rendered_at'); nil, in a buffer no server response
----  drew, rides out as "never"
+---  ('vim.b.skg_rendered_at'); nil, in a buffer no response dated,
+---  sends no such field, and the server refuses the save
 ---@return string
 function M.save_request_sexp (view_id, position, approved_forks,
                                 fork_skgrepos, approved_hoist_pids,
@@ -252,14 +252,18 @@ function M.save_request_sexp (view_id, position, approved_forks,
                                 delete_from, rendered_at)
   local request = {
     sexpr.pair(sexpr.symbol('request'), 'save buffer'),
-    sexpr.pair(sexpr.symbol('view-id'), view_id),
-    sexpr.pair(sexpr.symbol('rendered-at'), rendered_at or 'never'),
+    sexpr.pair(sexpr.symbol('view-id'), view_id) }
+  if rendered_at then
+    table.insert(request,
+      sexpr.pair(sexpr.symbol('rendered-at'), rendered_at)) end
+  table.insert(request,
     sexpr.pair(sexpr.symbol('point-lines-below-focused-headline'),
-               tostring(position.lines_below_focused_headline)),
-    sexpr.pair(sexpr.symbol('point-column'),
-               tostring(position.column)),
+               tostring(position.lines_below_focused_headline)))
+  table.insert(request,
+    sexpr.pair(sexpr.symbol('point-column'), tostring(position.column)))
+  table.insert(request,
     sexpr.pair(sexpr.symbol('point-screen-lines-below-window-start'),
-               tostring(position.screen_lines_below_window_start)) }
+               tostring(position.screen_lines_below_window_start)))
   if approved_forks then
     table.insert(request,
       sexpr.pair(sexpr.symbol('approved-forks'), 'true')) end

@@ -10,9 +10,12 @@ print('Starting integration test...')
 
 print('open-empty-buffer')
 require('skg.view_new_empty').view_new_empty()
-local content_buffer = vim.api.nvim_get_current_buf()
+local content_buffer = T.wait_for_buffer('skg://empty')
 if not content_buffer or not vim.api.nvim_buf_is_valid(content_buffer) then
   T.fail('skg content buffer was not created')
+end
+if not vim.b[content_buffer].skg_rendered_at then
+  T.fail('the empty view has no rendered-at')
 end
 
 vim.api.nvim_set_current_buf(content_buffer)

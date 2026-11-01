@@ -8,6 +8,11 @@
 #     or by editing SKG_CONFIG in ./bash/start-servers.sh
 #   To build and run the release profile instead of the debug one:
 #       SKG_RELEASE=1 ./bash/start-servers.sh
+# - WHAT RUNS
+#   cargo-watch rebuilds and restarts the server on every edit under
+#   server/. Between edits, bash/run-skg-rerunning-on-exit.sh runs the
+#   server again whenever it exits, so killing the server (by its PID,
+#   or with the 'shutdown' request) restarts it, rereading the config.
 # - TO SHUTDOWN
 #   - If foregrounded at command line, use
 #     Ctrl-C
@@ -22,8 +27,10 @@ SKG_CONFIG="${SKG_CONFIG:-data/skgconfig.toml}"
 DATA_ROOT="$(dirname "$SKG_CONFIG")"
 if [ "${SKG_RELEASE:-}" = "1" ]; then
   CARGO_PROFILE_FLAG="--release"
+  PROFILE_DIR="target/release"
 else
   CARGO_PROFILE_FLAG=""
+  PROFILE_DIR="target/debug"
 fi
 
 preflight_check_config() {
@@ -84,15 +91,16 @@ kill_stale_skg() {
   # logs/cargo-watch.log. Match both spellings, and match the server
   # binary itself ('target/debug/skg <config>'), which neither old
   # pattern caught -- cargo-watch does not always take its child down
-  # with it. Kill cargo-watch first so it cannot respawn skg.
+  # with it. Kill cargo-watch first so it cannot respawn the rerunning
+  # loop, then the loop so it cannot rerun skg, then skg.
   # Every pattern is scoped to this config, so skg instances serving
   # other configs (other ports, other data) are left alone. Each matches
   # the debug and the release (SKG_RELEASE=1) form of its command.
   # bash/stop-servers.sh signals this script's process group, whose
   # 'cleanup' trap runs this function, so it kills by these patterns too.
-  pkill -f "cargo[- ]watch .*--bin skg -- $SKG_CONFIG"         2>/dev/null || true
-  pkill -f "cargo run (--release )?--bin skg -- $SKG_CONFIG"   2>/dev/null || true
-  pkill -f "target/(debug|release)/skg $SKG_CONFIG"            2>/dev/null || true
+  pkill -f "cargo[- ]watch .*--bin skg .*$SKG_CONFIG"                2>/dev/null || true
+  pkill -f "run-skg-rerunning-on-exit.sh [^ ]+ $SKG_CONFIG"          2>/dev/null || true
+  pkill -f "target/(debug|release)/skg $SKG_CONFIG"                  2>/dev/null || true
 }
 
 wait_for_free_api_port() {
@@ -119,14 +127,18 @@ wait_for_free_api_port() {
 
 start_skg_with_restart() {
   echo ""
-  echo "Starting skg server with auto-restart on code changes..."
+  echo "Starting skg server with auto-restart on code changes and on exit..."
   kill_stale_skg
   wait_for_free_api_port
   echo "cargo-watch starting..."
   echo "Server logs go to $DATA_ROOT/logs/server-to-user.log and $DATA_ROOT/logs/server.jsonl"
   echo "cargo-watch/stdout-stderr go to $DATA_ROOT/logs/cargo-watch.log"
-  cargo watch -w server/ -x "run ${CARGO_PROFILE_FLAG:+$CARGO_PROFILE_FLAG }--bin skg -- $SKG_CONFIG" \
-    >> "$DATA_ROOT/logs/cargo-watch.log" 2>&1 # "-w server/" says "only watch server/"
+  # "-w server/" says "only watch server/". cargo-watch runs the -s
+  # command only if the -x build succeeds.
+  cargo watch -w server/ \
+    -x "build ${CARGO_PROFILE_FLAG:+$CARGO_PROFILE_FLAG }--bin skg" \
+    -s "bash/run-skg-rerunning-on-exit.sh $PROFILE_DIR $SKG_CONFIG" \
+    >> "$DATA_ROOT/logs/cargo-watch.log" 2>&1
 }
 
 cleanup() { # trap handler for graceful shutdown

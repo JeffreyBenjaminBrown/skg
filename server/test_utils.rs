@@ -511,7 +511,7 @@ pub async fn update_from_and_rerender_buffer_with_snapshots_test (
   let mut env : SkgEnv =
     skg_env_from_parts (config, tantivy_index, graph);
   let rendered_at : RenderedAt = // as if the buffer were rendered now
-    RenderedAt::Generation ( env . runtime_snapshot () . generation );
+    RenderedAt ( env . runtime_snapshot () . generation );
   update_from_and_rerender_buffer_with_approvals (
     stream, org_buffer_text, &mut env,
     viewforest_id_from_request_result, views_state,

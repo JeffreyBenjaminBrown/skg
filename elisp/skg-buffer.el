@@ -135,10 +135,9 @@ an edit command typed via M-x keeps the approval."
   "The runtime generation, a string, at which the server rendered this
 buffer's text: the `rendered-at' of the response that last installed
 it. A save sends it back as (rendered-at . N), and the server refuses
-the save if a node it would write changed after that generation. Nil
-in a buffer no server response drew, such as an empty view; such a
-buffer saves as rendered \"never\", and its text, the user's own, is
-never stale.")
+the save if a node it would write changed after that generation. A
+new empty view, which no view response drew, holds the generation the
+server answered when the view was opened (`skg-view-new-empty').")
 (put 'skg-rendered-at 'permanent-local t)
 
 (defun skg--rendered-at-in (response)
@@ -274,10 +273,11 @@ and truncates to a reasonable length."
         (concat (substring trimmed 0 (- max-len 3)) "...")
       trimmed)))
 
-(defun skg-open-empty-content-view ()
-  "Open a new, empty skg content view buffer."
+(defun skg-open-empty-content-view (rendered-at)
+  "Open a new, empty skg content view buffer, rendered at RENDERED-AT,
+the runtime generation the server answered (`skg-rendered-at')."
   (skg-open-org-buffer-from-text
-   nil "" "*skg-empty*"))
+   nil "" "*skg-empty*" nil rendered-at))
 
 (defun skg-open-org-buffer-from-text (_tcp-proc org-text buffer-name &optional view-id rendered-at)
   "Open a new buffer and insert ORG-TEXT, enabling org-mode.

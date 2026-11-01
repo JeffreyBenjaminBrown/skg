@@ -84,6 +84,20 @@ function M.wait_for_response (timeout_secs)
   end, timeout_secs)
 end
 
+---The server's current runtime generation, a string, waited for. A
+---test that builds a view buffer by hand keeps it as the buffer's
+---'skg_rendered_at', as 'view_new_empty' does for an empty view.
+---@param timeout_secs number|nil
+---@return string
+function M.runtime_generation (timeout_secs)
+  local generation = nil
+  require('skg.view_new_empty').request_runtime_generation(
+    function (answer) generation = answer end)
+  if not M.wait_for(function () return generation end, timeout_secs) then
+    M.fail('the server answered no runtime generation') end
+  return generation
+end
+
 ---@param buf integer
 ---@return string BUF's full text
 function M.buffer_text (buf)

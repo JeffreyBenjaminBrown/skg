@@ -331,9 +331,10 @@ def command_new (arguments):
       creating_view_id,
       "* (skg node (skgRepos (nodeRepo " + arguments . repo + "))) " +
       title + "\n",
-      # No server response drew this buffer, as none draws a client's
-      # new empty view: its text is the tool's own.
-      "never" )
+      # No view response drew this buffer, as none draws a client's
+      # new empty view; like one, it is dated by the generation the
+      # server answers when it is opened.
+      fetch_runtime_generation (connection) )
     rerendered = rerendered_view_of_save (
       messages [-1], { "view_id" : creating_view_id, "command" : "new",
                        "request" : {} } )
@@ -832,6 +833,17 @@ def fetch_repo_ownership (connection):
     owned = sexp_to_text ( metadata_form (entry, "owned") [1] )
     ownership [name] = owned == "true"
   return ownership
+
+# ============================================================
+# The runtime generation, which dates a buffer no view response drew
+# ============================================================
+
+def fetch_runtime_generation (connection):
+  """The server's current runtime generation, as the text N: what a
+  buffer no view response drew is rendered at."""
+  response = connection . request ( request_line ("runtime generation") )
+  require_response_type (response, "runtime-generation")
+  return sexp_to_text ( response_field (response, "content") )
 
 # ============================================================
 # The compact view

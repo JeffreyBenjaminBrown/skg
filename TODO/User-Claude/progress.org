@@ -603,3 +603,109 @@ over one data tree still do not see each other's writes until a
 rebuild; the check only covers writes through this server. The
 'AWAITS' marker in '3_review.org' that the design section mentions is
 left for User.
+* No more 'rendered-at "never"'; a killed server comes back; rebuild reloads the config: DONE, uncommitted
+** What changed
+*** A new empty view asks the server how old it is
+A new request, '((request . "runtime generation"))', answers
+'((response-type runtime-generation) (content "N"))', the current
+runtime generation ('server/serve/handlers/runtime_generation.rs'). The
+name says "runtime generation" rather than "generation", which
+'coding-advice/names.org' forbids bare. Emacs's 'skg-view-new-empty'
+and Neovim's 'view_new_empty' send it and open the empty view when the
+answer arrives, keeping it as the buffer's rendered-at; the tool's 'new'
+sends it before its save. 'RenderedAt' is now a newtype over the
+number, and a save whose 'rendered-at' is anything but a number, or
+absent, is refused. A client buffer without a rendered-at sends no such
+field, so the server's refusal names it.
+
+The integration tests that build a view buffer by hand (nine in Emacs,
+nine in Neovim) now date it with 'skg-test-runtime-generation'
+('tests/integration/test-wait.el') or 'T.runtime_generation()'
+('tests/integration/test-nvim-lib.lua'); 'empty-content-save' waits
+for the empty view to open.
+*** A killed server comes back
+'bash/start-servers.sh' has cargo-watch build the binary ('-x build')
+and then run 'bash/run-skg-rerunning-on-exit.sh PROFILE_DIR CONFIG',
+which runs the binary again whenever it exits. When cargo-watch
+rebuilds, it signals the script, whose trap stops the binary and exits,
+so exactly one server runs. A run that dies within 30 seconds doubles
+the pause before the next, up to a minute, so a bad config retries
+slowly. 'kill_stale_skg' kills cargo-watch, then the loop, then the
+binary; its cargo-watch pattern matches both the old and new command
+lines, so Jeff's next start replaces his current one cleanly.
+'bash/stop-servers.sh' still works: it signals the script's process
+group, whose trap runs 'kill_stale_skg'.
+
+Tested on a scratch config at port 17393: killing the binary by PID
+brought it back in about two seconds; the generated stop script
+removed every process and freed the port; a scratch cargo-watch
+running the loop, on a touch of its watched folder, left exactly one
+loop and one binary; a missing config retried after 2, 4 and 8
+seconds. Jeff's 'bash/stop-servers.sh' was saved before the run and
+restored right after the scratch run overwrote it; it is unchanged.
+Jeff's server still runs under the old start-servers.sh, as asked.
+*** Rebuild is the config reload
+'rebuild session-lifetime stores' already re-read the config file (the
+server's 'config_path' exists for that), so no 'reload config' request
+was added; see the deviation below. What it lacked was made whole:
+- it writes the owned skgrepos' 'OTHER_SKGREPO_DEPENDENCIES.toml', as
+  a startup does;
+- its answer lists the reload's warnings (unknown config keys,
+  contradicted foreign manifests, and a changed 'port' or
+  'timing_log', which only a restart applies); the startup warnings
+  the 'server warnings' request serves stay as they were;
+- each connection's skgrepo restriction follows the current config at
+  every request ('SkgrepoRestriction::under_config', called in
+  'handle_emacs'): no restriction stays none, a restriction keeps its
+  most private skgrepo shown, and one whose skgrepo the config dropped
+  becomes the config's default. Without this, a connection restricted
+  before a more private skgrepo was added showed that skgrepo's nodes,
+  since a restriction keeps out only the skgrepos it was built with;
+- both clients fetch the herald rules again after a successful
+  rebuild, since the reloaded config may change skgrepo labels.
+An invalid config fails the rebuild with "Rebuild failed: Reloading
+config from PATH: ...", and the old generation keeps serving, as
+before. Docs: 'api-and-formats.org' ("Rebuild session-lifetime
+stores", "Herald rules", the new "Runtime generation", "Save buffer",
+"The rendered-at of a view"), 'COMMANDS.org', 'COMMANDS-nvim.org',
+'setup.org', 'moving-nodes-across-repos.org' (which said a config
+change needs a restart).
+** Tests
+New: 'tests/unit/runtime_generation_request.rs';
+'tests/save_stale_buffers.rs' replaces the "never" case with a new
+empty view dated by the request (refused when the node changed after
+it, saved when not) and a refusal of a non-numeric rendered-at;
+'tests/reload_config.rs' (an added skgrepo, a changed port's warning,
+both kinds of restriction following the new config; an invalid config
+refused through the handler with the old generation, config and graph
+still live); 'tests/elisp/test-skg-rebuild-session-lifetime-stores.el'
+and 'tests/nvim/misc_requests_spec.lua' (the request sent, herald
+rules re-fetched after success only); the empty-view tests in both
+clients now check the request and the stored generation.
+
+Ladder: 'cargo test' 1085 passed; Emacs 428; Neovim 467; the tool's
+test PASS; integration (Emacs) 35 of 36, 'import-md-and-org' failing
+as before; the ten touched integration tests also pass with
+'SKG_TEST_CLIENT=nvim'. A live scratch server answered the request,
+reloaded a config with an added skgrepo, and refused a garbage config
+while still serving the old one. Jeff's server was rebuilt by
+cargo-watch from these edits.
+** Deviations
+*** No 'reload config' request
+The rebuild already re-reads the config, so a second request would
+have done the same thing under a second name. I made the rebuild a
+complete reload instead, and said so in its docstrings and docs. If a
+separate command name is still wanted for discoverability, it is a
+two-line alias in each client; I would rather not, since two names
+for one action is the kind of synonym 'names.org' warns about.
+*** The empty view opens on the server's answer
+Rather than block Emacs while it waits, the view opens when the answer
+arrives, as every other view does. A server that cannot answer means no
+empty view.
+** What's imperfect
+Only the connection that sent the rebuild drops its open views; other
+connections' views go stale and their saves are refused, as before.
+A server killed by the 'shutdown' request also comes back under the new
+start script; only 'bash/stop-servers.sh' or Ctrl-C stops it. Every
+rebuild of Jeff's server will now repeat the known manifest-order
+warning about 'user-claude' in its answer.

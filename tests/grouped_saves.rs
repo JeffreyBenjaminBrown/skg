@@ -39,6 +39,9 @@ mod new;
 #[path = "rebuild.rs"]
 mod rebuild;
 
+#[path = "reload_config.rs"]
+mod reload_config;
+
 #[path = "save.rs"]
 mod save;
 

@@ -27,16 +27,26 @@ function M.connection_verify ()
   client.send_string('((request . "verify connection"))\n')
 end
 
----Rebuild the in-memory graph and Tantivy from authoritative .skg files.
----The .skg files are not changed.
+---Reload the server's config, and rebuild the in-memory graph and
+---Tantivy from authoritative .skg files. The .skg files are not
+---changed. An invalid config fails the rebuild, and the server keeps
+---serving the old one. After a successful rebuild the herald rules are
+---fetched again, since the reloaded config may have changed their
+---skgrepo labels.
 function M.rebuild_session_lifetime_stores ()
   vim.notify('Rebuilding session-lifetime stores (this may take a while) ...')
   state.register_response_handler('rebuild-session-lifetime-stores',
     function (_payload, response)
       local content = payload.field_text(response, 'content')
-      vim.notify((content or 'Rebuild complete.')
-                 .. '\nExisting skg views are now invalid.'
-                 .. ' Run :SkgCloseAllSkgBuffers to close them.')
+      local failed = content ~= nil
+                     and vim.startswith(content, 'Rebuild failed')
+      if failed then
+        vim.notify(content, vim.log.levels.ERROR)
+      else
+        require('skg.herald_rules').request_herald_rules()
+        vim.notify((content or 'Rebuild complete.')
+                   .. '\nExisting skg views are now invalid.'
+                   .. ' Run :SkgCloseAllSkgBuffers to close them.') end
     end, true)
   state.lp_reset()
   client.send_string('((request . "rebuild session-lifetime stores"))\n')

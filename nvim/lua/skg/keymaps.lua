@@ -197,7 +197,7 @@ M.commands = {
   ImportMdAndOrg = { module = 'skg.import_md_and_org', fn = 'import_md_and_org',
                      desc = 'Preview and import Markdown/Org into an owned repo' },
   RebuildSessionLifetimeStores = { module = 'skg.misc_requests', fn = 'rebuild_session_lifetime_stores',
-                 desc = 'Rebuild the graph and Tantivy from the .skg files' },
+                 desc = 'Reload the config; rebuild the graph and Tantivy from the .skg files' },
   StripBodyWhitespace = { module = 'skg.misc_requests',
                           fn = 'strip_trailing_whitespace_from_bodies',
                           desc = 'Strip trailing whitespace from every body on disk' },

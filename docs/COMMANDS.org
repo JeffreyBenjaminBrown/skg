@@ -1409,7 +1409,8 @@ existing data, save and close the open views and stop the server before
 changing the files in its skgrepos, then restart it. If files in an already configured
 skgrepo changed while the server remained running,
 'M-x skg-rebuild-session-lifetime-stores' reloads them; close stale views and
-open fresh ones before editing. Configuration changes require a restart.
+open fresh ones before editing. The same command reloads an edited config,
+a new skgrepo included.
 
 The Cargo command prints a reminder to commit the imported files so Git
 diff views have a baseline; it does not run Git. Reimporting replaces the
@@ -1539,10 +1540,14 @@ Displays the result in the minibuffer.
 *** skg-connection-end
 Closes the TCP connection to the Rust server.
 *** skg-rebuild-session-lifetime-stores
-Re-reads the authoritative =.skg= files, validates and replaces the in-memory
-graph, and rebuilds the derived Tantivy search index. It does not rewrite the
-=.skg= files. Existing views are closed after a successful rebuild, because
-they were rendered before it.
+Re-reads the config file and the authoritative =.skg= files, validates and
+replaces the in-memory graph, and rebuilds the derived Tantivy search index.
+It does not rewrite the =.skg= files. So an edited config (a skgrepo added,
+removed or reordered, say) takes effect without restarting the server, except
+for its 'port' and 'timing_log', which the answer warns about. An invalid
+config fails the rebuild, and the server keeps serving the old one. Existing
+views are closed after a successful rebuild, because they were rendered
+before it.
 *** skg-strip-trailing-whitespace-from-bodies
 Strips trailing whitespace from every line of every body,
 and trailing blank lines from each body's tail,

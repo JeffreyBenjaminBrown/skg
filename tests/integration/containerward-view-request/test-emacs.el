@@ -45,6 +45,7 @@
       (erase-buffer)
       (org-mode)
       (setq skg-view-id (org-id-uuid))
+      (setq skg-rendered-at (skg-test-runtime-generation))
       (insert "* (skg node (gnid 0) (skgRepos (nodeRepo main))) 0\n")
       (insert "** (skg node (gnid 1)) 1\n")
       (insert "*** (skg node (gnid 11)) 11\n")

@@ -109,6 +109,7 @@ which takes priority over subee.skg on disk."
       (erase-buffer)
       (org-mode)
       (setq skg-view-id (org-id-uuid))
+      (setq skg-rendered-at (skg-test-runtime-generation))
       (insert "* (skg node (gnid 11) (skgRepos (nodeRepo main)) writeProtected) 11\n")
       (insert "* (skg node (gnid subee) (skgRepos (nodeRepo main))) subee\n")
       (insert "** (skg node (gnid subee-1) (skgRepos (nodeRepo main))) subee-1")

@@ -110,9 +110,13 @@ rebuild. A wrapper that reruns the binary when it exits would make a
 kill mean a restart, and a 'reload config' request would avoid the kill.
 *** Jeff : great!
 **** User
-Being built: 'bash/start-servers.sh' reruns the binary when it exits, so
-a kill is a restart, and the server gains a 'reload config' request that
-the clients expose as a command.
+Done: 'bash/start-servers.sh' reruns the binary when it exits, so a
+kill is a restart (only 'bash/stop-servers.sh' stops it for good), and
+the existing rebuild command now also reloads the config, rewriting the
+dependency manifests and reporting what only a restart can apply (port,
+timing log). No separate 'reload config' command: it would be a second
+name for the rebuild. Restart your server once with the new
+'start-servers.sh' to get the rerun loop.
 ** DONE One repo, two names
 'first' in User's config, 'user-claude' in Jeff's. Nothing breaks, since
 '.skg' files record no repo names, but labels in views and warnings
@@ -135,6 +139,9 @@ whether it should also consult the full view's metadata, so it can warn
 me beforehand that, say, I am trying to retitle a write-protected node,
 which the server will refuse anyway. Small convenience; I'd do it, but
 it is not urgent. Yes or no?
+***** TODO jeff : let's use the difff view for this
+Reviwing changes is exactly what it's for.
+
 ** DONE 'rendered-at "never"'
 A buffer no server response drew (a new empty view) sends
 '(rendered-at . "never")', and the server checks nothing in it. Text
@@ -145,5 +152,6 @@ holding pasted old nodes is rare. The alternative is for the client to
 ask the server for the current generation when it opens an empty view.
 *** Jeff : that alternative seems easy, safe, and useful, no?
 **** User
-Yes. Being built: opening an empty view asks the server for the current
-generation, and 'never' is gone.
+Done: opening an empty view asks the server ('runtime generation'
+request) and 'never' is gone; a save with a missing or non-numeric
+'rendered-at' is refused.

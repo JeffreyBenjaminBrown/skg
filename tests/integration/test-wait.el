@@ -52,4 +52,14 @@ is idle. Returns t on success, nil on timeout."
                    (= 0 (length skg-lp--buf))))
    timeout-secs))
 
+(defun skg-test-runtime-generation (&optional timeout-secs)
+  "The server's current runtime generation, a string, waited for.
+A test that builds a view buffer by hand keeps it as the buffer's
+`skg-rendered-at', as `skg-view-new-empty' does for an empty view."
+  (let ((generation nil))
+    (skg-request-runtime-generation
+     (lambda (answer) (setq generation answer)))
+    (or (skg-test-wait-for (lambda () generation) timeout-secs)
+        (error "The server answered no runtime generation"))))
+
 (provide 'test-wait)

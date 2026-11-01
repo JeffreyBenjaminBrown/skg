@@ -3,6 +3,7 @@
 ;;; the result should be saved to 'data/owned/skg/1.skg'.
 
 (load-file "../../../elisp/skg-init.el")
+(load-file "../test-wait.el")
 
 (defvar integration-test-phase "starting")
 
@@ -19,9 +20,11 @@
   (setq integration-test-phase "open-empty-buffer")
   (skg-view-new-empty)
 
-  (let ((content-buffer (get-buffer "*skg-empty*")))
+  (let ((content-buffer (skg-test-wait-for-buffer "*skg-empty*")))
     (unless content-buffer
-      (fail-test "skg content buffer was not created")))
+      (fail-test "skg content buffer was not created"))
+    (unless (buffer-local-value 'skg-rendered-at content-buffer)
+      (fail-test "the empty view has no rendered-at")))
 
   (with-current-buffer "*skg-empty*"
     (erase-buffer)

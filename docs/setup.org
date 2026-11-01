@@ -54,7 +54,8 @@ two never share a search index. 'data/skgconfig-user-claude.toml',
 beside 'data/skgconfig-jeff.toml', is such a config. A server reads a
 skgrepo's files only when it starts or rebuilds its stores
 ('skg-rebuild-session-lifetime-stores' in Emacs), so it shows another
-server's saves only after one of those.
+server's saves only after one of those. The rebuild re-reads the config
+too, so a skgrepo added to it needs no restart.
 ** start the client
 #+begin_src elisp
   (progn (load-file "../elisp/skg-reload.el")

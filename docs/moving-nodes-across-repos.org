@@ -50,7 +50,9 @@ Do them in two separate saves.
 The move uses the skgrepo name to look up the directory. If the new
 skgrepo name isn't in =[[repos]]=, you'll get a "Skg repo not found"
 error, not a "move failed" error, and no =.skg= file will be moved.
-Add the skgrepo first and restart the server before doing the move.
+Add the skgrepo first, and restart the server or rebuild its stores
+('skg-rebuild-session-lifetime-stores', which re-reads the config)
+before doing the move.
 
 *** Containment, subscriptions, links: all unaffected
 All graph relationships are by ID, not =(ID, repo)=. The set of

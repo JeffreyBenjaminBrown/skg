@@ -276,7 +276,7 @@ pub fn save_under (
   let (mut stream, _read_end) : (TcpStream, TcpStream) = mk_test_tcp_stream_pair ();
   let mut env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
   let rendered_at : RenderedAt = // as if the buffer were rendered now
-    RenderedAt::Generation ( env . runtime_snapshot () . generation );
+    RenderedAt ( env . runtime_snapshot () . generation );
   Ok ( block_on (
     update_from_and_rerender_buffer_with_approvals (
       &mut stream, text, &mut env,
