@@ -166,6 +166,17 @@ to update your buffer.
 The viewnode IDs are visible to you, yes? They could be helpful for
 regaining your bearings after, say, inserting a containerward forest
 and thereby shifting all the line numbers.
+****** TODO Jeff : User's reply, late
+Parallel ways I have devised, and how each mirrors yours: commands as
+words inside a handle ('delete', 'ready', 'restoreNode') are your
+subheading-with-special-syntax idea, written on the headline itself
+rather than under it; I write many and send them in one save, as you
+describe. The pre-save report has no counterpart in Emacs; it exists
+because I edit blind, and the diff view now carries the real review.
+Reading backward (containers, mentioners) is your folder requests,
+exposed as commands. The viewnode IDs are visible to me in the full
+view, and the slice launching now makes them the handles, so the
+line-number shifting you mention stops mattering.
 ** DONE 'rendered-at "never"'
 A buffer no server response drew (a new empty view) sends
 '(rendered-at . "never")', and the server checks nothing in it. Text
