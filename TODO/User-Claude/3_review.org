@@ -123,13 +123,13 @@ name for the rebuild. Restart your server once with the new
 differ between the two servers. Teammates could agree to name each
 other's repos as their owners do.
 *** Jeff : seems fine
-** TODO Should the save report read the full view's metadata?
+** Should the save report read the full view's metadata?
 It could warn in advance that a headline removed from under a
 write-protected occurrence or a folder only leaves the view, and that a
 write-protected occurrence's title cannot be edited, instead of letting
 the server say so after the fact. User's view: worth doing once the
 stale-save fix is in, since both are about the report's honesty.
-*** TODO Jeff : What the save report?
+*** Jeff : What the save report?
 **** User
 The report 'tools/skg-for-ai save' prints before it saves: the list of
 structural changes the edit would make (new, moved, removed, retitled
@@ -141,7 +141,31 @@ which the server will refuse anyway. Small convenience; I'd do it, but
 it is not urgent. Yes or no?
 ***** TODO jeff : let's use the difff view for this
 Reviwing changes is exactly what it's for.
+Please read about that, and write a plan for it at 4_plan.org.
 
+We want to make sure your experience resembles mine as closely
+as possible, within reason. When you insert content into a container,
+you're doing it by making an org-style child of the container
+where you read it, yes?
+Certain aspects don't need to be mimicked --
+I move the cursor around the screen a certain way,
+switch buffers, etc. in ways that are specific to Emacs but
+skg can be agnostic about them, so you don't need to have similar experience.
+But in general let's try to make yours as similar as possible to mine.
+If you've devised any parallel ways to do things,
+tell me about them, and try to think of ways they could mirror my own
+experience better.
+
+The tradeoff to keep in mind is whether something feels awkward to you,
+slows you down. Rather than execute a command on a node, for instance,
+it might be more convenient for you to write a subheading under it,
+with some special syntax that lets you state what you want done.
+You could write a lot of such subheadings and then send them as a batch
+to update your buffer.
+
+The viewnode IDs are visible to you, yes? They could be helpful for
+regaining your bearings after, say, inserting a containerward forest
+and thereby shifting all the line numbers.
 ** DONE 'rendered-at "never"'
 A buffer no server response drew (a new empty view) sends
 '(rendered-at . "never")', and the server checks nothing in it. Text
@@ -155,3 +179,26 @@ ask the server for the current generation when it opens an empty view.
 Done: opening an empty view asks the server ('runtime generation'
 request) and 'never' is gone; a save with a missing or non-numeric
 'rendered-at' is refused.
+
+* The "privacy hole" the config reload closed, described
+** What the agent changed
+A connection's skgrepo restriction ("show me only skgrepos through X") is
+built from the config at the moment it is set: it holds the list of
+skgrepos it lets through. After a config reload adds a skgrepo more
+private than X, that list did not know the new skgrepo, and the code
+that asks "is this skgrepo in the restriction?" answered no for the new
+one in the sense that mattered: the new skgrepo's nodes were shown,
+because the restriction only kept out skgrepos it had been built with.
+The agent made each connection rebuild its restriction from the current
+config at every request, keeping "through X" meaningful: a skgrepo added
+below X stays hidden.
+** User's assessment: not a security hole, a consistency fix
+Jeff is right that a connection belongs to one user talking to their own
+server, so no one else was going to read the nodes. The restriction is
+that user's viewing preference, not a boundary against another person.
+The fix is still right, because "through X" should keep meaning "through
+X" after a reload, and the code is simpler for it; but "privacy hole"
+overstated it. Where privacy does ride on the restriction is export and
+the over-private-text release: they refuse under a restriction that
+would expose text, and they too now see the current config. No action
+needed.

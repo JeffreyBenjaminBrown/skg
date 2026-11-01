@@ -1,0 +1,81 @@
+#+title: User Claude reviews changes the way Jeff does: through the diff view
+
+* Why
+Jeff reviews his edits with the diff view before committing: C-c v d
+opens buffers showing every change since the last commit, with context;
+he marks each change commit-ready and commits all at once. User instead
+reviews a change before saving it, through the report 'tools/skg-for-ai
+save' prints. Jeff wants User's experience to resemble his, so review
+moves to where his is: after the save, over the whole worktree, in the
+diff view, with the same marks and the same commit. 'docs/diff-view.org'
+is the reference; this plan says only what the tool must add.
+
+* How User works after this
+User edits a compact view and saves. Saving writes '.skg' files in
+User's repo and nothing else; the server already refuses a stale save.
+When a piece of work is done, User opens the diff view, reads the
+changes as compact views, marks the ones meant, fixes the others by
+editing further, and commits with one message. Jeff's answer to the
+question in '3_review.org': yes, when User inserts content into a
+container, it is by adding an org-style child under the container in the
+compact view of the place where User read it, exactly as Jeff would in
+Emacs. What need not match: cursor movement, buffer switching, keys.
+
+* What the tool adds
+** 'diff': the diff view's buffers as compact views
+One command sends the "diff view" request once per buffer kind, as the
+clients do, and renders each non-empty answer the way 'view' does: a
+full file, a compact file and a sidecar. Change facts matter here, so
+the handle carries them as the diff heralds would show them ('docs/
+heralds.org', "Diff heralds"): the kind of change (new, modified,
+removed, deleted, moved), and whether it is ready. The summary block
+opens with the readiness summary the server sends: how many leaves,
+how many ready, how many not shown in this buffer.
+** Marking
+Marking is a save: a gesture writes '(ready ...)' or '(unready ...)'
+into a headline's edit requests and saves the buffer. The tool exposes
+it as a token in the handle, 'ready' or 'unready', exactly as 'delete'
+is today: User edits the compact view of a diff buffer, adds 'ready' to
+the handles meant, and runs 'save', which turns the tokens into the
+requests and saves. The server's rules then apply unchanged: toggling,
+the typed "yes" when a gesture would unmark more than one leaf (the
+tool asks on the command line), the refusal of contradictory requests.
+'ready all' on a headline marks what the server's 'all' names there.
+** 'commit MESSAGE'
+Sends "stage and commit" with the message; on '(needs-confirmation . t)'
+prints the readiness summary (and any already-staged paths) and asks
+for a typed "yes" before resending confirmed. It commits only owned
+skgrepos, so on User's server that is 'first' alone: the diff view's
+"foreign skgrepos never produce a change" rule means Jeff's repos are
+invisible to it there, which is what we want.
+** Restoring
+The two restore requests ('restoreNode', 'restoreRel') become handle
+tokens too, so a change User regrets is undone the way Jeff undoes it.
+** What the pre-save report becomes
+It stays, shortened: it still refuses a bad handle and still shows what
+a save will do, since a compact view is edited blind. But it no longer
+tries to predict the server's refusals, and its stale check is gone
+already. The question from '3_review.org' (should the report consult
+the full view's metadata?) is answered by this plan: no, the diff view
+is the review.
+
+* What has to be true first
+The diff view refuses a connection that is restricted. User's server
+starts unrestricted (no 'default_repo_set' in User's config), so this
+holds; the tool should say so plainly if a diff is refused for that
+reason. User's repo must be a gitrepo with a HEAD commit, which it is.
+
+* Order
+'diff' first, used on User's own uncommitted work as the first test.
+Then marking and 'commit', then restoring. Then shorten the report.
+Fixture tests for each, as the reading and writing halves have, on a
+scratch server whose owned repo is a gitrepo with a commit. One real
+use: User commits his next notes through the tool instead of 'git
+commit'.
+
+* Questions for Jeff
+** Should the tool also offer the readiness-navigation commands?
+Jeff has six commands to jump between changes, ready or unready. In a
+compact file User reads the whole buffer, so jumping means little;
+the summary and the handle tokens seem enough. Skip them?
+*** Jeff
