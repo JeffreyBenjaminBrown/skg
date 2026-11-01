@@ -10,11 +10,12 @@
 //!   overrider's source has 'user_owns_it = true', regardless of the
 //!   active source-set.
 //! - VISIBILITY: when an 'ActiveSourceSet' is supplied, an edge is
-//!   followed only if its overrider's source is active. An inactive
-//!   overrider cannot be drawn, so it must not substitute; the walk
-//!   stops and the last visible node is the effective one. Callers
-//!   that ask "what marker would the server have written, ever?"
-//!   (the tamper check) pass None, i.e. visibility-ungated.
+//!   followed only if both its relSource and its overrider's home source
+//!   are active. An inactive relationship cannot affect visible topology,
+//!   and an inactive overrider cannot be drawn; either one stops the walk
+//!   at the last visible node. Callers that ask "what marker would the
+//!   server have written, ever?" (the tamper check) pass None, i.e.
+//!   visibility-ungated.
 //!
 //! A path of any length is normal: a user-owned override chain
 //! (D overrides C overrides N, all owned) resolves to the end of the
@@ -28,6 +29,7 @@
 //! choose a branch.
 
 use crate::dbs::in_rust_graph::InRustGraph;
+use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::source_sets::ActiveSourceSet;
 use crate::types::misc::{ID, SkgConfig};
 
@@ -124,11 +126,13 @@ pub fn carrier_on_user_owned_chain (
   resolve_override (config, graph, None, original)
     . path . contains (carrier) }
 
-/// The overriders of 'pid' that substitution may follow: user-owned
-/// (per the config; an unknown source counts as not followable) and,
-/// when 'active' is supplied, from an active source. Modeled on
-/// 'user_owned_overriders_of' in [[./override_invariants.rs]], which
-/// serves validation and so applies no visibility filter.
+/// The overriders of 'pid' that substitution may follow: the edge's
+/// relSource is active, and the overrider is both user-owned and at an
+/// active home source. Relationship visibility comes from the same
+/// directional gated accessor used by folders, paths, and counts.
+/// Ownership is modeled on 'user_owned_overriders_of' in
+/// [[./override_invariants.rs]], which serves validation and so applies no
+/// visibility filter.
 fn followable_overriders_of (
   config : &SkgConfig,
   graph  : &InRustGraph,
@@ -136,18 +140,18 @@ fn followable_overriders_of (
   pid    : &ID,
 ) -> Vec<ID> {
   let mut result : Vec<ID> = Vec::new ();
-  if let Some (overriders) = graph . overriders_of . get (pid) {
-    for overrider in overriders {
-      if let Some (overrider_node) = graph . nodes . get (overrider) {
-        let user_owned : bool =
-          config . sources . get (&overrider_node . source)
-          . map ( |sc| sc . user_owns_it )
-          . unwrap_or (false);
-        let visible : bool =
-          active
-          . map ( |a| a . is_all ()
-                  || a . contains_source (&overrider_node . source) )
-          . unwrap_or (true);
-        if user_owned && visible {
-          result . push ( overrider . clone () ); }}}}
+  for overrider in graph . other_member_pids_gated (
+    pid, RelationRole::OVERRIDDEN, active ) {
+    if let Some (overrider_node) = graph . nodes . get (&overrider) {
+      let user_owned : bool =
+        config . sources . get (&overrider_node . source)
+        . map ( |sc| sc . user_owns_it )
+        . unwrap_or (false);
+      let home_visible : bool =
+        active
+        . map ( |a| a . is_all ()
+                || a . contains_source (&overrider_node . source) )
+        . unwrap_or (true);
+      if user_owned && home_visible {
+        result . push (overrider); }} }
   result }

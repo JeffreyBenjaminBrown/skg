@@ -4,7 +4,9 @@ use skg::dbs::in_rust_graph::override_resolution::{
   resolve_override,
 };
 use skg::source_sets::{ActiveSourceSet, SourceSetName};
-use skg::types::misc::{ID, MSV, SkgConfig, SkgfileSource, SourceName, rel_partners_at_relSource};
+use skg::types::misc::{
+  ID, MSV, RelPartner, SkgConfig, SkgfileSource, SourceName,
+  rel_partners_at_relSource};
 use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
 
 use std::collections::HashMap;
@@ -155,6 +157,25 @@ fn an_active_owned_overrider_substitutes_under_a_restricted_set () {
       cycle          : vec![], } ); }
 
 #[test]
+fn an_inactive_override_edge_between_active_nodes_does_not_substitute () {
+  let active : ActiveSourceSet =
+    restricted_to ( &["owned", "foreign"] );
+  let mut overrider : NodeComplete =
+    node ("overrider", "owned", &[]);
+  overrider . overrides_view_of = MSV::Specified (vec![
+    RelPartner::at_relSource (
+      SourceName::from ("owned2"), ID::from ("target")) ]);
+  assert_eq! (
+    resolve (
+      vec![ node ("target", "owned", &[]), overrider ],
+      Some (&active), "target" ),
+    OverrideResolution {
+      effective      : ID::from ("target"),
+      path           : vec![],
+      cycle_detected : false,
+      cycle          : vec![], } ); }
+
+#[test]
 fn a_chain_of_two_resolves_transitively_with_path () {
   // A user-owned chain X overrides Y overrides Z; resolves to the end
   // of the chain, carrying the full path. Linear chains are legal.
@@ -173,7 +194,7 @@ fn a_chain_of_two_resolves_transitively_with_path () {
       cycle          : vec![], } ); }
 
 #[test]
-fn per_edge_visibility_stops_a_chain_at_an_inactive_middle () {
+fn inactive_overrider_home_stops_a_chain_at_that_edge () {
   let active : ActiveSourceSet =
     // y's source 'owned2' is inactive; x's source 'owned' is active.
     restricted_to ( &["owned", "foreign"] );
