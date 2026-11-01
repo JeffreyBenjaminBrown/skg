@@ -24,9 +24,18 @@ order the manifest and the config disagree about, naming the node and
 both repos. A bare disagreement of orderings is not warned about; the
 docs ('api-and-formats', the manifest section; 'telescopes') say why.
 Being built; nothing for you to do.
-** TODO Jeff : is there a deeper problem here?
+** DONE [Jeff] Does the server now scan every telescope at startup
+looking for misorderings? Is that costly?
+*** TODO Jeff : User's answer: no, and no
+It reads nothing it did not already read. Only when a foreign manifest
+contradicts the config does it list each repo's directory once
+('read_dir', filenames only, no file contents) and intersect the ID
+sets of the two repos in question. Thousands of files cost
+milliseconds, once, at startup and at rebuild. With no contradiction,
+nothing runs.
+** Jeff : is there a deeper problem here?
 Privacy as a concept really shouldn't encompass foreign nodes.
-*** TODO Jeff : User's answer: yes, there is a more natural structure
+*** Jeff : User's answer: yes, there is a more natural structure
 **** Your reversal is right, but the private fact lives in your file
 Subscribing to a shady writer is a private fact about you; it is recorded
 in your '.skg' file, in whichever of your repos you choose, and it is
@@ -61,3 +70,95 @@ urgent: the rule works. I would do it before the next teammate joins,
 since each new config under the current rule adds another inverted
 ordering and another chance for the manifest to confuse someone.
 Yes or no, and if yes, now or later?
+**** DONE [jeff] : Let's make it part of the next plan.
+But don't write that plan yet.
+Let's first ideate.
+***** User : noted; no plan written. Ideas below.
+** TODO [jeff] : What other preparation might the team need,
+with respect to reading and writing our graphs?
+We should all be able to edit the nodes we own simultaneously.
+We'll either want to be notified, or to simply update automatically,
+when (esp. foreign) part of our graphs change.
+
+What should their experience of reading and writing the graph be like?
+If it takes a lot of context for you to learn to process it like me,
+I don't want them to need that; the cognitive burden on them
+should be minimal, so they can focus on other things.
+
+And yet their edits have to be legible to you and me.
+For instance, if someone -- Tracy, say -- reverses the order of two statements
+that you made in a document, the two statements should carry their original IDs,
+rather than be assigned fresh IDs because Tracy was editing a view without IDs.
+
+I suspect the following would be sufficient, but tell me if I'm wrong:
+Each AI reads a compact view with short viewnode IDs (but in a new,
+skg-for-ai sense of viewnode -- a vainode?) that refers to a verbose view.
+The vainode ID is very short, like a viewnode ID.
+The compact view shows the same heralds you see.
+They also have tools to request
+roleward or roleward-plus-containerward forests from any node.
+
+They process their views like normal org text.
+They usually only write via the content view.
+The experience is strange only in that they have to preserve the graphnode IDs
+associated with the things they are editing.
+Each move should bring the vianode metadata with it;
+they can't delete a headline and then retype its title without its metadata.
+*** TODO Jeff : User's answer: your sketch is right, and mostly built; three upgrades and one open design
+**** What already exists
+'tools/skg-for-ai' is your sketch with one difference. A compact view is
+the full view with each headline's metadata replaced by a short handle;
+the handle points into a saved verbose view; moving a headline moves its
+handle, so its graphnode ID travels with it; a headline retyped without
+its handle is a new node, and the pre-save report says so before the
+save. Teammates would need to read the tool's README, not my history.
+**** Upgrade: the handle should be the server's viewnode ID
+Your "vainode" already exists: every headline carries a viewnode ID in
+its metadata, assigned per view and kept across that view's saves
+('ViewnodeIdRecord'). My handles are line numbers in the saved view
+instead, which renumber at every save. Using the viewnode ID makes the
+handle stable, equal to what you see in the metadata, and needs no new
+concept. The saved verbose view stays, for the metadata lookup.
+**** Upgrade: the same heralds you see
+The compact view renders only the relationship heralds. The server
+serves the whole herald rule table, so the tool can render every herald
+as the clients do (☮, B, folders, requests, change facts), styles
+dropped. Then a teammate's view says what yours says.
+**** Upgrade: catch the retyped headline
+The likeliest mistake: delete a headline, retype its title, lose the ID.
+The report already lists a removal and a new node side by side; the
+tool should notice a new headline whose title equals a removed one's and
+refuse until the writer confirms or restores the handle. Cheap, and it
+is the one rule a newcomer has to learn.
+**** Roleward forests
+'contains' and 'links-here' exist. The folder requests the clients send
+(the roleward forests: containers, mentioners, subscribers, overriders,
+hiders) can all be exposed the same way, from any node; a small
+addition.
+**** The open design: learning that a foreign part changed
+Each of us owns our repo, so simultaneous editing never conflicts
+across people; within one repo the stale-save refusal covers it. What
+is missing is noticing: my server holds your repo in memory as it was
+when it started, and yours mine. Two shapes, not exclusive:
+***** Watch the files
+Each server watches its foreign repos' directories and integrates a
+changed file when it appears, re-rendering the open views that show
+it, as a save's collateral rerender does today. Cheapest to use; no
+protocol; but a half-written file, or a 'git pull' landing hundreds of
+files, must be handled as one batch, not a storm.
+***** Say so through the graph
+Your 'to Jeff' / 'to User' notes already carry the human-level signal
+via subscription. A teammate who finished something adds a child; the
+subscriber's view shows it as unintegrated content. This needs nothing
+new, but it only reaches someone who opens the view, which is where the
+file watch helps: it makes that view current.
+***** What I would build first
+File watching for foreign repos, batched, with the subscription notes as
+the social protocol on top. The sleep/wake/trigger methodology the plan
+node asks of Facilitator may be nothing more than "a change in a repo I
+subscribe to wakes me", which the watcher could emit as an event.
+**** Minimal cognitive burden
+A newcomer needs: the tool's README, the rule "never retype a handled
+headline", and the 'to <name>' convention. My own notes in 'first'
+('who I am', 'what has happened') are what I would hand them, not this
+conversation.
