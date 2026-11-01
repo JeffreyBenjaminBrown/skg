@@ -6,6 +6,9 @@ It needs a built server, 'target/debug/skg' ('cargo build --bin skg'),
 or the binary SKG_BINARY names.
 
 In order, it:
+- checks the title normalizer and the fuzzy match of a new headline's
+  title with a removed one's on pairs that must match, pairs that must
+  not, and pairs at the thresholds;
 - renders every rendering case both clients' tests share
   ('tests/shared/herald-rendering-cases.txt') as they render it, with
   the rule table and label table pinned beside it and each case's
@@ -22,8 +25,11 @@ In order, it:
 - on a second scratch server, edits compact views and saves them:
   a title, a body, a new child, a move, a removal, a deletion, bad
   handles, an edit the server refuses, a stale view the server
-  refuses, 'new', and one view over several saves, whose handles
-  stay, checking each report exactly and the graph after each save;
+  refuses, 'new', one view over several saves, whose handles stay,
+  and retyped headlines (an exact retype refused, then saved marked
+  '⟨new⟩'; a reworded one asked about, then answered '--keep-ids',
+  which keeps its node, or '--all-new', which makes a new one),
+  checking each report exactly and the graph after each save;
 - on a third scratch server, whose owned skgrepo is a gitrepo with the
   fixture committed: saves a retitle, a new child and a deletion,
   checks the diff view's compact buffer exactly, marks the new child
@@ -91,6 +97,7 @@ TOOL_RUNS = [
 def main (argv):
   update_expected = "--update-expected" in argv
   failures = []
+  failures += failures_of_title_matching ()
   failures += failures_of_shared_herald_cases ()
   failures += failures_against_scratch_servers (update_expected)
   for failure in failures:
@@ -98,6 +105,102 @@ def main (argv):
   if failures:
     sys . exit (1)
   print ( "PASS" + ( " (expected files rewritten)" if update_expected else "" ))
+
+# ============================================================
+# Retyped headlines: the title normalizer and the fuzzy match
+# ============================================================
+
+# (TITLE, its normalized words)
+NORMALIZED_TITLES = [
+  ( "A save writes the skg files", [ "sav", "writ", "skg", "fil" ] ),
+  ( "Saving: it's what the server does!", [ "sav", "server" ] ),
+  ( "Fixing the stale-save check", [ "fix", "stal", "sav", "check" ] ),
+  ( "Boxes, classes and the class", [ "box", "class", "class" ] ),
+  ( "Really quickly used", [ "real", "quick", "used" ] ),
+  ( "Is it a thing of theirs?", [ "thing" ] ),
+  ( "", [] ) ]
+
+# (NEW TITLE, REMOVED TITLE, whether the fuzzy match asks about them)
+TITLE_MATCH_CASES = [
+  # Reworded: the same statement
+  ( "A save writes the skg files", "Saving writes skg files", True ),
+  ( "Foreign repos are removed from the privacy ladder",
+    "Foreign repos leave the privacy ladder", True ),
+  ( "Fixing the stale save check", "Fix the stale-save check", True ),
+  ( "Retyping a headline loses the node ID",
+    "A retyped headline loses its ID", True ),
+  ( "The handle is the viewnode ID", "Handles are viewnode IDs", True ),
+  ( "Watching each repo directory for changes",
+    "Watch every repo directory for changes", True ),
+  ( "The background worker commits Tantivy",
+    "Tantivy commits in the background", True ),
+  ( "Ask Jeff about the port", "Ask Jeff about ports", True ),
+  # Unrelated
+  ( "The diff view shows every change",
+    "Foreign repos leave the privacy ladder", False ),
+  ( "Sell the car", "Buy milk", False ),
+  ( "Tests must not share fixture directories", "Tests run in parallel", False ),
+  ( "Tantivy updates after a save", "Tantivy commits in the background", False ),
+  ( "Annual budget audit", "Quarterly budget review", False ),
+  # Equal titles are the exact case, not the fuzzy one
+  ( "Fred likes apples", "Fred likes apples", False ),
+  # At the thresholds: Dice 0.6 (ratio 0.70) asks, Dice 0.57 (ratio
+  # 0.69) does not; ratio 0.75 (Dice 0) asks, ratio 0.625 does not;
+  # Dice 0.5 with ratio 0.61 does not
+  ( "one two three six seven", "one two three four five", True ),
+  ( "red green yellow purple", "red green blue", False ),
+  ( "abcdefxy", "abcdefgh", True ),
+  ( "abcdexyz", "abcdefgh", False ),
+  ( "Second child", "First child", False ) ]
+
+def failures_of_title_matching ():
+  failures = []
+  for title, words in NORMALIZED_TITLES:
+    if skg_for_ai . normalized_title_words (title) != words:
+      failures . append (
+        f"{title!r} normalizes to "
+        f"{skg_for_ai . normalized_title_words (title)}, not {words}" )
+  for new_title, removed_title, asks in TITLE_MATCH_CASES:
+    if skg_for_ai . titles_probably_reworded (new_title, removed_title) != asks:
+      failures . append (
+        f"{new_title!r} / {removed_title!r}: the fuzzy match "
+        + ( "does not ask" if asks else "asks" ) + ", with (Dice, ratio) "
+        f"{skg_for_ai . title_similarity (new_title, removed_title)}" )
+  dice, ratio = skg_for_ai . title_similarity (
+    "one two three six seven", "one two three four five" )
+  if dice != 0.6 or ratio >= skg_for_ai . REWORDED_RATIO_THRESHOLD:
+    failures . append ( f"the Dice threshold case gives {( dice, ratio )}" )
+  dice, ratio = skg_for_ai . title_similarity ( "abcdefxy", "abcdefgh" )
+  if dice != 0 or ratio != 0.75:
+    failures . append ( f"the ratio threshold case gives {( dice, ratio )}" )
+  return failures + failures_of_reworded_pairing ()
+
+def failures_of_reworded_pairing ():
+  """Pairs are one to one, best first: each new headline gets its best
+  removed one still unpaired, and names the others it resembles. A
+  headline marked '⟨new⟩' is never paired, and carries no other word."""
+  original = [ skg_for_ai . OutlineHeadline ( handle, 1, title, [], None )
+               for handle, title in [ ( "0a", "Fred likes apples and pears" ),
+                                      ( "0b", "Fred likes apples" ),
+                                      ( "0c", "Unrelated" ) ] ]
+  edited = skg_for_ai . parse_edited_compact_view (
+    "* Unrelated ⟨0c⟩\n"
+    "* Fred likes apples and plums\n"
+    "* Fred likes apples, pears\n"
+    "* Fred likes pears and apples ⟨new⟩\n"
+    "* Fred likes plums ⟨new delete⟩\n" )
+  failures = []
+  pairs = [ ( pair . new_index, pair . removed_handle,
+              pair . other_removed_handles )
+            for pair in skg_for_ai . reworded_headline_pairs (edited, original) ]
+  if pairs != [ ( 1, "0b", [ "0a" ] ), ( 2, "0a", [ "0b" ] ) ]:
+    failures . append ( f"the reworded pairs are {pairs}" )
+  errors = skg_for_ai . handle_error_lines (
+    edited [ 1 : ], { "0c" : original [2] } )
+  if errors != [ "Error: ⟨new⟩ on line 5 of the compact view carries "
+                 "'delete'; it takes no other word." ]:
+    failures . append ( f"the '⟨new⟩' errors are {errors}" )
+  return failures
 
 # ============================================================
 # Heralds: every rendering case both clients' tests share, rendered
@@ -288,7 +391,9 @@ def failures_of_writing (scratch, data_root):
   for case in [ check_title_edit, check_body_edit, check_new_child,
                 check_move, check_removal, check_deletion,
                 check_bad_handles, check_server_refusal, check_stale_view,
-                check_new_root, check_handles_across_saves ]:
+                check_new_root, check_handles_across_saves,
+                check_exact_retype, check_reworded_retype_asked,
+                check_reworded_retype_kept, check_reworded_retype_all_new ]:
     try:
       case (context)
     except CaseFailure as failure:
@@ -591,6 +696,143 @@ def check_handles_across_saves (context):
                          handles_and_titles (folder),
                          { "Added at the top" : "Added at the top, retitled" },
                          [ "Added after a removal" ] )
+
+def check_exact_retype (context):
+  """A headline removed and retyped elsewhere without its handle is
+  refused, with or without '--yes'; marked '⟨new⟩', it saves as a new
+  node, and the removed one keeps its own."""
+  folder = fresh_root_view (context, "retype-exact")
+  removed_id = id_of_compact_headline (folder, "** Added after a removal")
+  first_child_body = "A body line that stays unnumbered.\n"
+  edit_compact ( folder, [
+    ( "** Added after a removal ⟨0e⟩\n", "" ),
+    ( first_child_body, first_child_body + "*** Added after a removal\n" ) ])
+  graph_before = skg_files (context)
+  refusal = (
+    REPORT_HEAD +
+    "Error: the new headline 'Added after a removal' on line 11 of the "
+    "compact view has the title of the removed ⟨0e⟩ 'Added after a "
+    "removal'. If it is that node, moved or reworded, end it with ⟨0e⟩; "
+    "if it is another node, end it with '⟨new⟩'.\n" )
+  for flags in [ [], [ "--yes" ] ]:
+    completed = run_save (folder, *flags)
+    require_output ( completed, refusal, expected_returncode = 1 )
+    if "Nothing was saved: some handles are in error" not in completed . stderr:
+      raise CaseFailure ( f"stderr was {completed . stderr!r}" )
+  require_equal ( "the graph after a refused retype",
+                  skg_files (context), graph_before )
+  edit_compact ( folder, [ ( "*** Added after a removal\n",
+                             "*** Added after a removal ⟨new⟩\n" ) ])
+  require_output (
+    run_save (folder, "--yes"),
+    REPORT_HEAD +
+    "Removed: ⟨0e⟩ 'Added after a removal', from under ⟨0a⟩ 'The fixture "
+    "root'.\n"
+    "New: 'Added after a removal', under ⟨0f⟩ 'First child, renamed in A'.\n"
+    + saved_line (1) + DANGLING_LINK_WARNING + written_paths (folder) )
+  new_id = id_of_compact_headline (folder, "*** Added after a removal")
+  require_equal ( "whether the '⟨new⟩' headline is a new node",
+                  new_id != removed_id, True )
+  require_equal ( "the new node's container",
+                  skg_list (context, "child-a-id", "contains"), [ new_id ] )
+  require_equal ( "the removed node's title",
+                  skg_title (context, removed_id), "Added after a removal" )
+  if removed_id in skg_list (context, "root-id", "contains"):
+    raise CaseFailure ( "the root still contains the removed node" )
+
+REWORDED_TITLE = "The headline added at the top, retitled again"
+REWORDED_QUESTION = (
+  "Question: removed ⟨0d⟩ 'Added at the top, retitled' / new '" +
+  REWORDED_TITLE + "' (line 10): probably the same statement reworded; "
+  "keep its ID?\n" )
+REWORDED_NOT_SAVED = (
+  "Not saved. Answer the questions with '--keep-ids' or '--all-new', or on "
+  "each new headline (its removed handle, or '⟨new⟩'), and run again with "
+  "'--yes' to save.\n" )
+
+def check_reworded_retype_asked (context):
+  """A headline removed and retyped elsewhere, reworded, is asked
+  about, and '--yes' alone does not answer: nothing is saved."""
+  folder = fresh_root_view (context, "retype-reworded")
+  context [ "reworded_folder" ] = folder
+  context [ "reworded_id" ] = id_of_compact_headline (
+    folder, "** Added at the top, retitled" )
+  edit_compact ( folder, [
+    ( "** Added at the top, retitled ⟨0d⟩\n", "" ),
+    ( "*** Added after a removal ⟨",
+      "*** " + REWORDED_TITLE + "\n*** Added after a removal ⟨" ) ])
+  report = (
+    REPORT_HEAD +
+    "Removed: ⟨0d⟩ 'Added at the top, retitled', from under ⟨0a⟩ 'The "
+    "fixture root'.\n"
+    "New: '" + REWORDED_TITLE + "', under ⟨0e⟩ 'First child, renamed in "
+    "A'.\n" + REWORDED_QUESTION + REWORDED_NOT_SAVED )
+  graph_before = skg_files (context)
+  require_output ( run_save (folder), report )
+  completed = run_save (folder, "--yes")
+  require_output ( completed, report, expected_returncode = 1 )
+  if "'--yes' does not answer that" not in completed . stderr:
+    raise CaseFailure ( f"stderr was {completed . stderr!r}" )
+  require_equal ( "the graph after an unanswered question",
+                  skg_files (context), graph_before )
+
+def check_reworded_retype_kept (context):
+  """Answered '--keep-ids', the reworded headline takes the removed
+  one's handle: the report shows a move and a retitle, and the save
+  keeps the node, its ID and its file, under the new title."""
+  folder = context [ "reworded_folder" ]
+  node_id = context [ "reworded_id" ]
+  report = (
+    REPORT_HEAD +
+    "Moved: ⟨0d⟩ 'Added at the top, retitled', from under ⟨0a⟩ 'The fixture "
+    "root' to under ⟨0e⟩ 'First child, renamed in A'.\n"
+    "Title: ⟨0d⟩ 'Added at the top, retitled' → '" + REWORDED_TITLE + "'.\n" )
+  require_output ( run_save (folder, "--keep-ids"), report + NOT_SAVED )
+  files_before = set ( skg_files (context) )
+  require_output ( run_save (folder, "--keep-ids", "--yes"),
+                   report + saved_line (1) + DANGLING_LINK_WARNING
+                   + written_paths (folder) )
+  require_equal ( "the owned files after '--keep-ids'",
+                  set ( skg_files (context) ), files_before )
+  require_equal ( "the kept node's title",
+                  skg_title (context, node_id), REWORDED_TITLE )
+  require_equal ( "the kept node's new container",
+                  skg_list (context, "child-a-id", "contains") [0], node_id )
+  require_equal ( "the kept node in the re-rendered view",
+                  id_of_compact_headline (folder, "*** " + REWORDED_TITLE),
+                  node_id )
+
+def check_reworded_retype_all_new (context):
+  """Answered '--all-new', the reworded headline is a new node, and
+  the removed one keeps its ID and title."""
+  folder = fresh_root_view (context, "retype-all-new")
+  node_id = context [ "reworded_id" ]
+  new_title = "The headline added at the top and retitled again"
+  edit_compact ( folder, [
+    ( compact_line_starting ( folder, "*** " + REWORDED_TITLE ) + "\n", "" ),
+    ( "** Second child, retitled ⟨",
+      "** " + new_title + "\n** Second child, retitled ⟨" ) ])
+  question = (
+    "Question: removed ⟨0e⟩ '" + REWORDED_TITLE + "' / new '" + new_title +
+    "' (line 11): probably the same statement reworded; keep its ID?\n" )
+  if question not in run_save (folder) . stdout:
+    raise CaseFailure ( f"no question {question!r}" )
+  files_before = set ( skg_files (context) )
+  require_output (
+    run_save (folder, "--all-new", "--yes"),
+    REPORT_HEAD +
+    "Removed: ⟨0e⟩ '" + REWORDED_TITLE + "', from under ⟨0d⟩ 'First "
+    "child, renamed in A'.\n"
+    "New: '" + new_title + "', under ⟨0a⟩ 'The fixture root'.\n"
+    + saved_line (1) + DANGLING_LINK_WARNING + written_paths (folder) )
+  new_id = id_of_compact_headline (folder, "** " + new_title)
+  require_equal ( "the files '--all-new' added",
+                  set ( skg_files (context) ) - files_before,
+                  { new_id + ".skg" } )
+  require_equal ( "the removed node's title",
+                  skg_title (context, node_id), REWORDED_TITLE )
+  if node_id in skg_list (context, "child-a-id", "contains"):
+    raise CaseFailure ( "the first child still contains the removed node" )
 
 def handles_and_titles (folder):
   """{HANDLE: TITLE} of the root view's compact headlines."""

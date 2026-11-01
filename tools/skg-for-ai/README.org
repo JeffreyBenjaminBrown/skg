@@ -116,7 +116,8 @@ as 'raw' does.
 
 Options, after the command: '--port N' for every command ('save' and
 'integrate' require the sidecar's); '--yes' for
-'save' and 'commit'; for the view commands also '--out-dir DIR', '--name BASE' to name the files
+'save' and 'commit'; '--keep-ids' or '--all-new' for 'save' (see
+"Retyped headlines"); for the view commands also '--out-dir DIR', '--name BASE' to name the files
 'BASE.full.org' and so on instead of 'COMMAND_ARGUMENT', and
 '--no-summary' to leave the summary out of the compact view.
 Every command that writes a view fetches the server's herald rule
@@ -337,7 +338,10 @@ Wait for "Server ready." in 'server.log', then run the tool with
 * Tests
 'python3 tools/skg-for-ai/test_skg_for_ai.py' runs them, given a built
 server ('cargo build --bin skg'; 'SKG_BINARY' names another binary).
-First it renders every case of the rendering cases both clients'
+First it checks the title normalizer of "Retyped headlines" on a few
+titles, and the fuzzy match on pairs that must match, pairs that must
+not, and pairs at each threshold, and that pairing is one to one,
+best first. Then it renders every case of the rendering cases both clients'
 tests share, 'tests/shared/herald-rendering-cases.txt', as their tests
 do: with the rule table and the skgrepo label table pinned beside it
 ('herald-rules.sexp', which a Rust test keeps equal to the served
@@ -364,8 +368,13 @@ container), a deletion through 'delete' in a handle, two bad handles
 (refused by the server, the files left as they were), a stale view
 (refused by the server),
 'new' (refused in the foreign skgrepo; in the owned one a root
-whose view then saves a body and a child), and one view saved again
-and again.
+whose view then saves a body and a child), one view saved again
+and again, and retyped headlines: a headline removed and retyped
+under another parent (refused, with and without '--yes'; then saved
+marked '⟨new⟩', a new node beside the old one), and one removed and
+retyped reworded (asked about, and not saved with '--yes' alone; with
+'--keep-ids' the node keeps its ID and file under the new title; with
+'--all-new', in a later view, a new node is made).
 It compares each report with the text expected and reads the '.skg'
 files after each save. The stale case renders a view, changes a node
 it shows through a second view's save, and saves the first view's
@@ -440,8 +449,9 @@ rendered is one of these words, since a save consumes every request;
 so each such word in a handle was written there. The rebuild writes
 them into the headline's '(editRequest ...)', which holds one edit
 request ('delete', 'restoreNode' or 'restoreRel') and one readiness
-request after it. A headline without a handle is written bare, and
-the save makes it a new node, with a new ID.
+request after it. A headline without a handle, or with the handle
+'⟨new⟩', is written bare, and the save makes it a new node, with a
+new ID (see "Retyped headlines").
 
 Body lines are taken as edited, and belong to the headline above them.
 The link annotations the tool added ('⟦→ ... ⟧' or '⟦✗ ... ⟧' right
@@ -490,7 +500,9 @@ Bodies changed: 1 (⟨0a⟩).
 Not saved. Run again with '--yes' to save.
 #+end_example
 An 'Error:' line names a handle that names no headline of the full
-view, or whose request words make no one '(editRequest ...)' (two edit requests, both 'ready' and 'unready', 'all' alone);
+view, or whose request words make no one '(editRequest ...)' (two edit requests, both 'ready' and 'unready', 'all' alone),
+or a '⟨new⟩' carrying another word, or a new headline retyped with a
+removed one's title (see "Retyped headlines");
 any error stops the save, and the report then lists only the errors.
 The report does not guess what the server will refuse: the server's
 answer says that.
@@ -512,7 +524,66 @@ different parent, or at a different depth below the same one.
 'Repeated:' is a handle used twice, which shows the same node twice.
 'Title:' gives a changed title, old and new, and 'Bodies changed:'
 counts the changed bodies and names their handles. An edit with none
-of these prints 'No changes.' and saves nothing.
+of these prints 'No changes.' and saves nothing. Last, a 'Question:'
+line asks whether a new headline is a removed one reworded (see
+"Retyped headlines").
+** Retyped headlines
+A headline's handle is what ties it to its node. Retyping a headline
+instead of moving its line loses that tie: the typed headline becomes
+a new node with a new ID, and the old node leaves its parent but stays
+in the graph, so links to it, its other relationships and its history
+stay with a node the view no longer shows. So the rule is: to move or
+reword a headline, keep its handle. Cut and paste the whole line, or
+copy the handle onto the headline typed in its place; a handle with
+only its ID, '⟨0e⟩', is enough, since the rest of a handle is display.
+
+The tool catches the mistake before saving, by comparing the title of
+each new headline (one with no handle) with the title of each headline
+the edit removed (a handle of the full view the edited compact view no
+longer has).
+
+When the titles are equal, the save is refused. An 'Error:' line names
+the new headline and the removed one, and says how to go on: if the
+new headline is the removed node, moved or reworded, end it with the
+removed one's handle; if it is a different node that happens to share
+the title, end it with '⟨new⟩'. That handle has no ID, only the word,
+and says "this headline is new on purpose": the tool saves it as a
+new node and never compares its title again. It takes no other word.
+
+When the titles differ but probably say the same thing, the report
+asks:
+#+begin_example
+Question: removed ⟨0d⟩ 'Added at the top, retitled' / new 'The headline added at the top, retitled again' (line 10): probably the same statement reworded; keep its ID?
+#+end_example
+and nothing is saved until it is answered. '--yes' alone does not
+answer it: '--yes' says "save", not which of two things to save. The
+answers:
+- '--keep-ids' answers yes to every question: each new headline takes
+  its removed headline's handle, and so its node, its ID and its
+  metadata, with the new title. The report then shows the move and
+  the retitle instead of a removal and a new headline.
+- '--all-new' answers no to every question: each new headline is a
+  new node, and each removed one leaves its parent.
+- Or answer on each headline: write the removed handle on it (the
+  same node), or '⟨new⟩' (a new one). Then that headline asks nothing.
+Run the save with the answer and '--yes' to save; without '--yes' the
+report shows what the answer would save.
+
+A title "probably says the same thing" by a deliberately loose test.
+Each title is lowercased; apostrophes are dropped and other
+punctuation splits words; common words are dropped (articles,
+prepositions, conjunctions, pronouns and verbs like 'is', 'are',
+'was', 'be', 'has', 'have', 'do'); and each word loses one suffix
+('-ing', '-ed', '-es', '-ly' or '-s') and then a final 'e', so that
+'save', 'saves', 'saved' and 'saving' are one word. Two titles match
+when their sets of words share enough, by the Dice coefficient
+(twice the shared words over the sum of the two counts) of at least
+0.6, or when the remaining texts are alike letter by letter, by
+'difflib''s ratio, at least 0.75. The test errs toward asking: a
+needless question costs one flag, a missed one costs an ID. When a
+new headline resembles several removed ones it is paired with the
+closest, and the question names the others; each removed headline is
+paired with one new headline at most, closest pairs first.
 ** Handles across saves
 The server keeps a view per connection, and the tool's connection ends
 with each command, so a save names a view the server does not hold.

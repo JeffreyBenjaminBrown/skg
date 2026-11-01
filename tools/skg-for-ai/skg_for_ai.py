@@ -30,7 +30,10 @@ a new empty view does, and writes its view as 'view' would.
 prints the changes it would make, and with '--yes' saves it and
 writes the server's re-rendered view over the three files. Words in a
 handle ask for edit requests: 'delete', 'ready', 'unready', 'all',
-'restoreNode', 'restoreRel'.
+'restoreNode', 'restoreRel'. A new headline whose title equals a
+removed one's stops the save until its handle is restored or it is
+marked '⟨new⟩'; one whose title resembles a removed one's is a
+question, answered by '--keep-ids' or '--all-new' or on the headline.
 'integrate SIDECAR' makes every change a buffer of the diff view does
 not make editable editable there, as the clients' 'C-c r u' does, and
 writes the buffer again.
@@ -46,6 +49,7 @@ formats; the protocol is in 'docs/api-and-formats.org'.
 """
 
 import argparse
+import difflib
 import json
 import os
 import re
@@ -241,8 +245,19 @@ def parse_command_line (argv):
     help = "the server's port; it must be the one the sidecar records" )
   save_parser . add_argument (
     "--yes", action = "store_true",
-    help = ( "save, unless the report finds an error; this also answers "
-             "yes to the question asked before unmarking several changes" ))
+    help = ( "save, unless the report finds an error or asks whether a new "
+             "headline rewords a removed one; this also answers yes to the "
+             "question asked before unmarking several changes" ))
+  reworded_answers = save_parser . add_mutually_exclusive_group ()
+  reworded_answers . add_argument (
+    "--keep-ids", action = "store_true",
+    help = ( "answer each 'probably the same statement reworded' question "
+             "yes: the new headline takes the removed one's handle, and so "
+             "its node, with the new title" ))
+  reworded_answers . add_argument (
+    "--all-new", action = "store_true",
+    help = ( "answer each 'probably the same statement reworded' question "
+             "no: every new headline is a new node" ))
   import_parser = commands . add_parser (
     "import", help = "preview and apply a Markdown and Org import",
     parents = [ port_option ] )
@@ -333,7 +348,9 @@ def command_import (arguments):
 def command_save (arguments):
   """Rebuild the full buffer from the edited compact view and print the
   changes it makes. With '--yes', and when the report finds no bad
-  handle, send the save (for a buffer of the diff view, after opening
+  handle, no retyped headline and no unanswered question whether a new
+  headline rewords a removed one (see "Retyped headlines" in the
+  README), send the save (for a buffer of the diff view, after opening
   it again on the save's connection), print the server's answer and
   write its re-rendered view over the three files. The save carries the generation the view was
   rendered at, so the server refuses it if a node it would write
@@ -344,11 +361,25 @@ def command_save (arguments):
     raise SkgToolError (
       f"The view came from the server on port {saved_view . sidecar [ 'port' ]}, "
       f"not {arguments . port}." )
+  if NEW_NODE_HANDLE_WORD in saved_view . headline_of_handle:
+    raise SkgToolError (
+      f"The full view has a headline whose viewnode ID is "
+      f"'{NEW_NODE_HANDLE_WORD}', which the compact view reads as the mark "
+      "of a new node; view a smaller part of the graph." )
   edited = parse_edited_compact_view (saved_view . compact_text)
   original = outline_of_full_view (saved_view . parsed_view)
-  errors = handle_error_lines (edited, saved_view . headline_of_handle)
+  errors = ( handle_error_lines (edited, saved_view . headline_of_handle)
+             or retyped_headline_error_lines (
+                  edited, original, saved_view . headline_of_handle ))
+  reworded_pairs = [] if errors else reworded_headline_pairs (edited, original)
+  if arguments . keep_ids:
+    give_new_headlines_their_removed_handles (edited, reworded_pairs)
+  questions = (
+    [] if arguments . keep_ids or arguments . all_new
+    else reworded_question_lines (
+           edited, reworded_pairs, saved_view . headline_of_handle ))
   changes = [] if errors else change_report_lines (
-    edited, original, saved_view . headline_of_handle )
+    edited, original, saved_view . headline_of_handle ) + questions
   connection = SkgConnection ( saved_view . sidecar [ "port" ] )
   try:
     print ( "Changes in " + os . path . basename (saved_view . compact_path) +
@@ -362,6 +393,15 @@ def command_save (arguments):
         "Nothing was saved: some handles are in error; see above." )
     if not changes:
       print ( "Nothing to save." )
+      return
+    if questions:
+      print ( "Not saved. Answer the questions with '--keep-ids' or "
+              "'--all-new', or on each new headline (its removed handle, or "
+              "'⟨new⟩'), and run again with '--yes' to save." )
+      if arguments . yes:
+        raise SkgToolError (
+          "Nothing was saved: the report asks whether new headlines reword "
+          "removed ones; '--yes' does not answer that." )
       return
     if not arguments . yes:
       print ( "Not saved. Run again with '--yes' to save." )
@@ -1859,11 +1899,15 @@ def load_saved_view (path):
 class OutlineHeadline:
   """A headline of the full view or of the edited compact view.
   'handle' is its viewnode ID (None for a new headline),
+  'marked_new' whether a new headline says it is new on purpose, with
+  the handle '⟨new⟩',
   'parent' the index of its parent in the same outline (None at the
   top level), 'tokens' the display tokens of its handle, 'body' its
   body lines, link annotations stripped."""
-  def __init__ (self, handle, level, title, tokens, compact_line_number):
+  def __init__ (self, handle, level, title, tokens, compact_line_number,
+                marked_new = False):
     self . handle = handle
+    self . marked_new = marked_new
     self . level = level
     self . title = title
     self . tokens = tokens
@@ -1911,10 +1955,11 @@ def edited_headline (compact_line_number, level, text_after_stars):
     return OutlineHeadline (
       None, level, strip_link_annotations (text_after_stars) . rstrip (),
       [], compact_line_number )
+  marked_new = match . group (2) == NEW_NODE_HANDLE_WORD
   return OutlineHeadline (
-    match . group (2), level,
+    None if marked_new else match . group (2), level,
     strip_link_annotations ( match . group (1) ),
-    match . group (3) . split (), compact_line_number )
+    match . group (3) . split (), compact_line_number, marked_new )
 
 def strip_link_annotations (text):
   return ANNOTATED_LINK_PATTERN . sub ( r'\1', text )
@@ -1939,12 +1984,18 @@ def assign_parents (headlines):
 
 def handle_error_lines (edited, headline_of_handle):
   """A line per handle that names no headline of the full view, and
-  per handle whose request tokens make no one '(editRequest ...)'.
-  HEADLINE_OF_HANDLE maps each viewnode ID of the full view to its
-  headline. Whether the server accepts a request is the server's to
-  say."""
+  per handle whose request tokens make no one '(editRequest ...)',
+  and per '⟨new⟩' carrying another word. HEADLINE_OF_HANDLE maps each
+  viewnode ID of the full view to its headline. Whether the server
+  accepts a request is the server's to say."""
   errors = []
   for headline in edited:
+    if headline . marked_new and headline . tokens:
+      errors . append (
+        f"Error: ⟨{NEW_NODE_HANDLE_WORD}⟩ on line "
+        f"{headline . compact_line_number} of the compact view carries "
+        + ", " . join ( "'" + token + "'" for token in headline . tokens )
+        + "; it takes no other word." )
     if headline . handle is None:
       continue
     where = ( f"⟨{headline . handle}⟩ on line {headline . compact_line_number} "
@@ -2207,6 +2258,194 @@ def descendant_indices (outline, index):
       break
     descendants . append (later)
   return descendants
+
+# ------------------------------------------------------------
+# Retyped headlines: a new headline whose title is, or resembles, a
+# removed one's
+# ------------------------------------------------------------
+
+# The handle '⟨new⟩' marks a headline without a handle as a new node on
+# purpose, whatever removed headline its title equals or resembles.
+NEW_NODE_HANDLE_WORD = "new"
+# Words too common to say what a title is about: articles,
+# prepositions, conjunctions, pronouns and the commonest verbs. The
+# fuzzy match ignores them.
+TITLE_STOPWORDS = frozenset ( """
+  a an the
+  of in on at to for from by with about into onto over under up down
+  out off as than via per after before between through during without
+  within against among around behind below above across along toward
+  towards upon
+  and or but nor so if then
+  i me my mine we us our ours you your yours he him his she her hers
+  it its they them their theirs this that these those who whom whose
+  which what
+  is are was were be been being am has have had having do does did
+  done will would can could shall should may might must
+  """ . split () )
+# The suffixes the crude stemmer strips, tried in this order; the
+# first one a word ends in that leaves a stem this long is stripped.
+STEMMED_SUFFIXES = [ "ing", "ed", "es", "ly", "s" ]
+MINIMUM_STEM_LENGTH = 3
+# A new headline and a removed one probably state the same thing
+# reworded when either signal reaches its threshold.
+REWORDED_DICE_THRESHOLD = 0.6
+REWORDED_RATIO_THRESHOLD = 0.75
+
+def retyped_headline_error_lines (edited, original, headline_of_handle):
+  """An error per new headline, not marked '⟨new⟩', whose title equals
+  the title of a headline the edit removed: retyping a headline
+  instead of keeping its handle would lose its node's ID."""
+  removed = removed_titled_headlines (edited, original)
+  errors = []
+  for index in unmarked_new_titled_indices (edited):
+    headline = edited [index]
+    handles = [ handle for handle, title in removed
+                if title == headline . title ]
+    if not handles:
+      continue
+    restored = ( f"end it with ⟨{handles [0]}⟩" if len (handles) == 1
+                 else "end it with one of those handles" )
+    errors . append (
+      f"Error: the new headline '{headline . title}' on line "
+      f"{headline . compact_line_number} of the compact view has the title "
+      "of the removed " + ", " . join (
+        described_handle (handle, headline_of_handle) for handle in handles )
+      + f". If it is that node, moved or reworded, {restored}; if it is "
+      f"another node, end it with '⟨{NEW_NODE_HANDLE_WORD}⟩'." )
+  return errors
+
+class RewordedHeadlinePair:
+  """A new headline, by its index in the edited outline, and the
+  removed headline, by handle, whose title it probably rewords; and
+  the other removed headlines its title resembles, best first."""
+  def __init__ (self, new_index, removed_handle, other_removed_handles):
+    self . new_index = new_index
+    self . removed_handle = removed_handle
+    self . other_removed_handles = other_removed_handles
+
+def reworded_headline_pairs (edited, original):
+  """Each new headline not marked '⟨new⟩' paired with the removed
+  headline whose title it probably rewords, one to one, in the edited
+  outline's order. Candidate pairs are taken best first, by the larger
+  of their two signals, and a pair either of whose headlines is
+  already paired is skipped."""
+  removed = removed_titled_headlines (edited, original)
+  candidates_of_new_index = {}
+  for index in unmarked_new_titled_indices (edited):
+    for removed_order, ( handle, title ) in enumerate (removed):
+      if titles_probably_reworded ( edited [index] . title, title ):
+        candidates_of_new_index . setdefault ( index, [] ) . append (
+          ( - max ( title_similarity ( edited [index] . title, title )),
+            removed_order, handle ))
+  ranked = sorted (
+    ( candidate + ( index, )
+      for index, candidates in candidates_of_new_index . items ()
+      for candidate in candidates ),
+    key = lambda candidate : ( candidate [0], candidate [3], candidate [1] ))
+  pairs = []
+  paired_indices, paired_handles = set (), set ()
+  for _, _, handle, index in ranked:
+    if index in paired_indices or handle in paired_handles:
+      continue
+    paired_indices . add (index)
+    paired_handles . add (handle)
+    pairs . append ( RewordedHeadlinePair (
+      index, handle,
+      [ other for _, _, other in sorted ( candidates_of_new_index [index] )
+        if other != handle ] ))
+  return sorted ( pairs, key = lambda pair : pair . new_index )
+
+def reworded_question_lines (edited, pairs, headline_of_handle):
+  """A question per pair: is the new headline the removed one, reworded?"""
+  lines = []
+  for pair in pairs:
+    headline = edited [ pair . new_index ]
+    lines . append (
+      "Question: removed " +
+      described_handle ( pair . removed_handle, headline_of_handle ) +
+      f" / new '{headline . title}' (line {headline . compact_line_number}): "
+      "probably the same statement reworded; keep its ID?" +
+      ( " Its title also resembles " + ", " . join (
+          described_handle (handle, headline_of_handle)
+          for handle in pair . other_removed_handles ) + "."
+        if pair . other_removed_handles else "" ))
+  return lines
+
+def give_new_headlines_their_removed_handles (edited, pairs):
+  """The answer '--keep-ids': each pair's new headline takes the removed
+  headline's handle, and so its metadata and node, with its new title."""
+  for pair in pairs:
+    edited [ pair . new_index ] . handle = pair . removed_handle
+
+def removed_titled_headlines (edited, original):
+  """[(HANDLE, TITLE)] of each titled headline of the full view whose
+  handle the edited compact view no longer has, in the full view's
+  order."""
+  kept_handles = { headline . handle for headline in edited
+                   if headline . handle is not None }
+  return [ ( headline . handle, headline . title ) for headline in original
+           if headline . handle not in kept_handles and headline . title ]
+
+def unmarked_new_titled_indices (edited):
+  return [ index for index, headline in enumerate (edited)
+           if headline . handle is None and not headline . marked_new
+           and headline . title ]
+
+def titles_probably_reworded (left_title, right_title):
+  """Whether two different titles probably state the same thing
+  reworded: their normalized words' Dice coefficient, or difflib's
+  ratio of their normalized texts, reaches its threshold."""
+  if left_title == right_title:
+    return False
+  dice, ratio = title_similarity (left_title, right_title)
+  return dice >= REWORDED_DICE_THRESHOLD or ratio >= REWORDED_RATIO_THRESHOLD
+
+def title_similarity (left_title, right_title):
+  """(DICE, RATIO): the Dice coefficient of the two titles' sets of
+  normalized words, 2 |A ∩ B| / (|A| + |B|), and
+  'difflib.SequenceMatcher''s ratio of their normalized words joined
+  by spaces. Both are 0 when either title has no word left."""
+  left_words = normalized_title_words (left_title)
+  right_words = normalized_title_words (right_title)
+  if not left_words or not right_words:
+    return ( 0.0, 0.0 )
+  left_set, right_set = set (left_words), set (right_words)
+  return ( 2 * len ( left_set & right_set ) / ( len (left_set) + len (right_set) ),
+           difflib . SequenceMatcher (
+             None, " " . join (left_words), " " . join (right_words)
+           ) . ratio () )
+
+def normalized_title_words (title):
+  """TITLE's words as the fuzzy match compares them: lowercased,
+  apostrophes dropped ("it's" is 'its'), every other run of
+  punctuation a word break, stopwords dropped, each word crudely
+  stemmed."""
+  words = re . sub ( r'[\W_]+', " ",
+                     re . sub ( "['’]", "", title . lower () )) . split ()
+  return [ crude_stem (word) for word in words
+           if word not in TITLE_STOPWORDS ]
+
+def crude_stem (word):
+  """WORD without the first of STEMMED_SUFFIXES it ends in that leaves
+  a stem of MINIMUM_STEM_LENGTH letters, and then without a final 'e'
+  (on a stem longer than that), so that 'save', 'saves', 'saved' and
+  'saving' are all 'sav'. '-es' is stripped only after s, x, z, ch
+  or sh ('boxes', not 'makes'), and '-s' never after another s
+  ('class')."""
+  for suffix in STEMMED_SUFFIXES:
+    stem = word [ : - len (suffix) ]
+    if ( not word . endswith (suffix)
+         or len (stem) < MINIMUM_STEM_LENGTH
+         or ( suffix == "es"
+              and not stem . endswith (( "s", "x", "z", "ch", "sh" )) )
+         or ( suffix == "s" and stem . endswith ("s") )):
+      continue
+    word = stem
+    break
+  return ( word [ : -1 ]
+           if word . endswith ("e") and len (word) > MINIMUM_STEM_LENGTH
+           else word )
 
 # ------------------------------------------------------------
 # The server's answer

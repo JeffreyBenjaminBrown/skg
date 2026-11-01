@@ -1434,3 +1434,117 @@ overflow. A held view drops such an ID; this is only for unheld ones.
 Unchanged by this slice; a fix would let the reopened diff buffer's
 record adopt the saved buffer's IDs, which a held view deliberately
 does not do.
+* The tool catches a retyped headline: DONE, uncommitted
+** What was done
+*** Exact
+Before 'save' builds its report, 'retyped_headline_error_lines' (in
+'skg_for_ai.py', section "Retyped headlines") compares the title of
+each new headline (no handle, not marked '⟨new⟩') with the title of
+each removed headline: a titled headline of the full view whose
+viewnode ID the edited compact view no longer has, descendants of a
+removed headline included. An equal title is an 'Error:' line naming
+both ("the new headline 'X' on line N of the compact view has the
+title of the removed ⟨ID⟩ 'X'. If it is that node, moved or reworded,
+end it with ⟨ID⟩; if it is another node, end it with '⟨new⟩'."), and
+like every error it stops the save, '--yes' or not. It runs only when
+no handle is in error, so the report lists one kind of error at a
+time.
+*** The mark '⟨new⟩'
+A handle whose ID is the word 'new' is no handle: the headline is
+read as new ('OutlineHeadline.marked_new'), rebuilt bare, and never
+compared. It takes no other word ('⟨new delete⟩' is an error).
+Viewnode IDs are base-36 counters, so a view of some 30,000 headlines
+could hold a real viewnode ID 'new'; 'save' refuses such a view with
+a message rather than guess.
+*** Fuzzy
+'titles_probably_reworded' and 'title_similarity', over
+'normalized_title_words' and 'crude_stem'. A new headline and a
+removed one with different titles are probably the same statement when
+the Dice coefficient of their normalized word sets is at least 0.6, or
+'difflib.SequenceMatcher(None, A, B).ratio()' of the normalized words
+joined by spaces is at least 0.75; both are 0 when either title has no
+word left. 'reworded_headline_pairs' pairs them one to one: candidate
+pairs are taken best first by the larger of the two signals, skipping a
+pair either of whose headlines is already paired; each pair keeps the
+other removed headlines its new headline resembles, which the question
+names. Each pair is a 'Question:' line after the change lines:
+"Question: removed ⟨ID⟩ 'X' / new 'Y' (line N): probably the same
+statement reworded; keep its ID?", plus "Its title also resembles ..."
+when there are others.
+*** The answers
+'--keep-ids' (each pair's new headline takes the removed handle, so
+the report shows a move and a retitle, and the save keeps the node)
+and '--all-new' (each is a new node), mutually exclusive, both needing
+'--yes' to save. Without an answer, the report ends "Not saved. Answer
+the questions with ..."; with '--yes' alone the tool also exits 1,
+"Nothing was saved: ... '--yes' does not answer that." On one
+headline, the removed handle or '⟨new⟩' answers it. The flags answer
+only the fuzzy question; an exact retype is refused whatever the
+flags.
+*** README
+A section "Retyped headlines" under "Writing" (the rule, the error,
+the question, the answers, the test in prose), and mentions in "The
+report", "How the compact view becomes a buffer", the options and
+"Tests".
+** Thresholds and normalizer, as implemented
+Lowercase; delete apostrophes (so "it's" is the stopword 'its'); every
+other run of non-alphanumerics a word break; drop the stopwords
+('TITLE_STOPWORDS': articles, prepositions, conjunctions, pronouns,
+forms of be, have, do and the modal verbs; 'not' is kept, since it
+changes a statement); stem each word. Dice >= 0.6 or ratio >= 0.75
+('REWORDED_DICE_THRESHOLD', 'REWORDED_RATIO_THRESHOLD'), inclusive.
+** Tests
+'python3 tools/skg-for-ai/test_skg_for_ai.py': PASS. New unit checks
+('failures_of_title_matching', first in 'main'): seven normalizer
+cases, nineteen pairs (eight reworded, five unrelated, an equal pair,
+and five at the thresholds: Dice exactly 0.6 asks, 0.57 does not;
+ratio exactly 0.75 asks, 0.625 does not; Dice 0.5 with ratio 0.61 does
+not), the exact values at the two threshold cases, and the one-to-one
+pairing with its "others" and the '⟨new delete⟩' error. Raising either
+threshold by 0.01 fails the matching threshold case. New save cases on
+the writing server: 'check_exact_retype' (refused with and without
+'--yes', graph unchanged; then '⟨new⟩' saves a new node, the old one
+keeping its title), 'check_reworded_retype_asked' (asked; '--yes'
+alone exits 1 and writes nothing), 'check_reworded_retype_kept'
+('--keep-ids' reports a move and a retitle; saved, the same '.skg'
+files, the node's file has the new title, its new container lists it,
+and the re-rendered view's handle names the same graphnode ID) and
+'check_reworded_retype_all_new' ('--all-new' adds exactly one file,
+the new node's; the old node keeps its title and leaves its
+container). 'cargo check --all-targets' clean; nothing under
+'server/', 'elisp/' or 'nvim/' changed.
+** Deviations
+*** The stemmer is a little less crude than asked
+'-es' is stripped only after s, x, z, ch or sh ('boxes' is 'box';
+'makes' loses only its '-s'), '-s' never after another s ('class'), a suffix
+only when the stem keeps three letters, and after the suffix a final
+'e' is dropped from a stem longer than three letters, so 'save',
+'saves', 'saved' and 'saving' all become 'sav'. Without the last rule
+'save' and 'saved' never shared a word.
+*** More prepositions
+The stopword list has the longer prepositions too ('after', 'before',
+'between', 'through', 'without', ...); a title rarely turns on them.
+*** '--yes' with an unanswered question exits 1
+The plan says the save waits; the tool exits 1 so that a script that
+passed '--yes' cannot mistake the unsaved run for a save. Without
+'--yes' it exits 0, as an unconfirmed save always has.
+** What's imperfect
+*** The ratio is loose on short titles
+On two-word titles one shared word often brings the ratio past 0.75:
+'budget meeting' / 'budget notes' (0.76), 'Map the moon' / 'Map the
+noon' (0.88), 'Store the handle' / 'Restore the handle' (0.91). Each
+is only a question, and the brief chose to err toward asking; but a
+writer who removes a short headline and adds an unrelated short one
+will meet them. 'Fred likes apples' / 'Fred hates apples' asks too, by
+design.
+*** A new headline can lose its pair to a better one
+Pairing is one to one, so when two new headlines resemble one removed
+headline best, the weaker gets its next-best still-unpaired candidate,
+or no question at all. With '--keep-ids' the alternative would have
+put one handle on two headlines, a repeated node.
+** Open questions
+*** Should '--keep-ids' also settle an exact retype?
+An exact retype is refused whatever the flags, as the plan says; the
+writer then restores the handle or writes '⟨new⟩' by hand. Letting
+'--keep-ids' and '--all-new' answer it too would be one rule instead
+of two, at the cost of the exact case no longer forcing a look.
