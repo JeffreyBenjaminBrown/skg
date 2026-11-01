@@ -218,10 +218,17 @@ a save's; small and obviously right.
 ** DONE 'integrate unshown changes' in the tool
 Added (Jeff's C-c r u), since the diff view can refuse to make a change
 editable until it is integrated.
-** TODO Should a commit include 'OTHER_SKGREPO_DEPENDENCIES.toml'?
+** DONE Should a commit include 'OTHER_SKGREPO_DEPENDENCIES.toml'?
 "Stage and commit" stages only '.skg' files, so the manifest the server
 rewrites at every start stays uncommitted in every repo; Jeff's repos
 track it, so he commits it by hand. Either the server stages it too, or
 git ignores it. User leans to staging it: it is generated, but it is
 what a receiver of the repo needs, and the docs present it as published.
 *** Jeff
+I think we should exclude it. The diff view doesn't cover it,
+and I want users to have to think about it before changing that file.
+**** User
+Agreed and left as is: 'stage and commit' stages only '.skg' files, and
+the manifest is committed by hand, deliberately. The docs will say so
+in one sentence (after the running agent finishes with
+'api-and-formats', to avoid an edit collision).
