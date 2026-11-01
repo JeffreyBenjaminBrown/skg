@@ -1,0 +1,6 @@
+* Contained twice ⟨0a 2C ⌂:main⟩
+** ⟨0b ☮ These contain it.⟩
+*** First child ⟨0c ☮B 1Cb⟩
+**** The fixture root ⟨0d ☮B 1C2a L2⟩
+***** Above the root ⟨0e ☮ Ca⟩
+*** A second container, outside the view ⟨0f ☮ Cb⟩

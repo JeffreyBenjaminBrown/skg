@@ -1,0 +1,7 @@
+* Fred's note ⟨0a C1 1/L 1S ⌂:fred⟩
+** ⟨0c It subscribes to these.⟩
+** ⟨0d ☮ These subscribe to it.⟩
+*** Second child, a subscriber ⟨0e ☮ 1C 1/L Sb H2 ⌂:main⟩
+**** The fixture root ⟨0f ☮B 1C2a L2a⟩
+***** Above the root ⟨0g ☮ Ca⟩
+** A detail of Fred's ⟨0b 1H⟩

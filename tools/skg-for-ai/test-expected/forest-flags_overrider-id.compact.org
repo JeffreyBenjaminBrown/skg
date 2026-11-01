@@ -1,0 +1,3 @@
+* An overrider, outside the view ⟨0a O1 F1 ⌂:main⟩
+** ⟨0b ☮ flags⟩
+*** ⟨0c ☮ had ID before import⟩

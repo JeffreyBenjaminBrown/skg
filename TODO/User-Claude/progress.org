@@ -1235,3 +1235,144 @@ so it still holds the old ladder-with-Jeff's-repos content until
 User's server next starts.
 *** A disputed pair whose both own manifests list each other
 Each claims to be the more private; config order decides.
+* The tool: viewnode handles, every herald, roleward forests: DONE, uncommitted
+** What was done
+*** A handle is the headline's viewnode ID
+A compact headline ends in '⟨ID HERALDS folded⟩', ID the '(vnid ID)'
+of its metadata in the full view. The saved full view stays the
+metadata source: 'SavedView' indexes its headlines by viewnode ID
+('headlines_by_viewnode_id'), and the report, the error check and the
+rebuild look a handle up there. A handle the full view lacks is an
+error ("names no headline of the full view"); a headline the server
+rendered without a viewnode ID stops the tool. The request words
+('delete', 'ready', 'unready', 'all', 'restoreNode', 'restoreRel')
+and 'folded' work as before. The compact file's header comment says
+what a handle is. README, expected files and every test that named a
+line number now use viewnode IDs.
+
+Before it saves, 'save' opens the view again on its own connection,
+under the sidecar's view ID, as the command that wrote it did
+('reopen_view_for_save': a fresh content view, the folder request's
+save for 'forest', the search, or the buffer of the diff view, the
+last of which the tool already did). The server keeps a view per
+connection and the tool's connection ends with each command, so
+without this every save renumbered the whole view in buffer order;
+with it, the server keeps every viewnode ID of the saved buffer that
+its re-opened view holds. See the deviation below for where that
+stops.
+*** Every herald, from the served rule table
+'herald_text' applies the served rule table to the metadata with a
+port of the clients' lens ('lens_tokens' and its helpers, mirroring
+'nvim/lua/skg/sexpr/lens.lua'), joins tokens as the clients do (a
+space, none before an ABUT token, structural colons stripped), and
+puts the relationship heralds where the table's sentinel stands. It
+supplies what the clients supply: the skgrepo label of a
+'repoBoundary', 'pendingDetachment' (read from the parent and
+grandparent), and a changed folder's label (read from its members),
+from 'shared/herald-styles.json'. The rule table and label table are
+fetched once per command and cached on the connection. The tool's
+own diff-herald and skgrepo-boundary code is gone. The bare 'aC' is
+still left out.
+*** Roleward forests
+'forest KIND ID' for every folder the clients' 'C-c l' commands
+request: containers, mentioners, subscribesTo, overrides,
+hidesFromSubs, aliases, flags ('FOREST_VIEW_REQUESTS'). 'contains ID'
+and 'links-here ID' are its aliases for containers and mentioners,
+and keep their file names. The README has a table of the kinds.
+** Tests
+'python3 tools/skg-for-ai/test_skg_for_ai.py': PASS. The herald check
+now renders all 89 cases of 'tests/shared/herald-rendering-cases.txt'
+as the clients' tests do (pinned 'herald-rules.sexp' and
+'herald-skgrepo-labels.sexp', each case's context), comparing text;
+no case needs anything the tool lacks. A 'raw' check pins the served
+rule table to the pinned file. Each forest kind has an expected file;
+the fixture gained two owned nodes outside every existing view
+('overrider-id', with a true flag, overrides 'overridden-id', which
+has an alias), so overrides, aliases and flags show something.
+'check_handles_across_saves' adds and retitles across two saves and
+checks every handle still names its headline and each new one is new,
+then removes a headline and checks the next save names the handle it
+may change. 'cargo check --all-targets' clean; nothing under
+'server/', 'elisp/' or 'nvim/' changed.
+** The live read
+Jeff's server was not running (nothing on 1731), so I copied his
+config's eight repos (without '.git') into the scratchpad and started
+a server there on port 1795; 'data/' is unchanged. 'view
+703f5a82-d948-431f-985c-4db8132bc504' wrote 42 headlines, all
+editable, all in 'public', so the heralds are mostly relationship
+counts:
+#+begin_example
+  * AI team for Skg ⟨0a C6 2/3L ⌂:public⟩
+  ** the team ⟨0b aC10⟩
+  *** Taste Claude ⟨0c L1⟩
+  *** Facilitator Claude ⟨0i aC6⟩
+  *** Don't waste anyone's time. ⟨1a⟩
+  ** intermediate goals to triage ⟨1j 1/L⟩
+#+end_example
+The handles run '0a' to '1p' ('0z' is followed by '1a'). 'forest
+containers' on it drew no folder (nothing contains it) and sent no
+save. 'forest mentioners', on the copy only, showed what the other
+heralds add:
+#+begin_example
+  ** ⟨1q ☮ These link to it.⟩
+  *** who I am ⟨1r ☮B Lb ~user-claude ⌂:user-claude⟩
+  *** Taste Claude ⟨1s ☮B 1C Lb⟩
+  **** the team ⟨1t ☮ 1C10a⟩
+  ***** AI team for Skg ⟨1u ☮ C6a 2/3L ⟳⟩
+#+end_example
+The folder's sentence reads well; '☮B' says at a glance which
+occurrences are copies with their bodies hidden, and '⟳' marks the
+chain's return to the root. The folder drawn by the save gets handles
+after the fresh view's ('1q' on), so it sits low-numbered last.
+** Deviations
+*** Handles stay across saves only while the re-opened view is as large
+The plan assumed the server keeps a view's viewnode IDs across its
+saves. It does, for a view it holds, and a view is held per
+connection; a save of a view the connection does not hold drops every
+viewnode ID ('drop_unknown_viewnode_ids_in_parsed_viewforest' with an
+empty record, 'server/rerender_pass.rs'). Re-opening the view first
+fixes that up to a limit: a view opened afresh numbers its N headlines
+'0a' onward, so it holds the saved buffer's IDs exactly when none is
+past the Nth. Adds, moves and retitles keep every handle. After a
+removal the saved view has fewer headlines than its highest ID, and
+the next save may renumber the highest ones; 'save' then prints
+"Handles the save may change: ⟨ID⟩ 'TITLE' ..." before it saves. A
+real fix needs the server (see the open question), which this slice
+was not to touch.
+*** The handle no longer names the kind
+'⟨5 containerFolder⟩' is now '⟨0b ☮ These contain it.⟩': every kind
+but a node has a herald label, so the kind atom would repeat it. The
+report still names a titleless headline by its kind ('⟨0b⟩
+(containerFolder)'), and the summary still counts kinds.
+*** The heralds' order is the rule table's
+The brief listed node heralds before relationship heralds; the rule
+table puts the relationship heralds after '☮B' and before '⟳',
+'~NAME', '⌂:LABEL' and the change facts, and the tool follows it.
+*** 'forest containers' sends no save
+A fresh content view already draws the root's containers folder, so
+that kind is 'view' under another name, as 'contains' was.
+*** The live read was on a copy
+Nothing listened on 1731, and starting Jeff's server on his data
+would write its index and manifests there.
+** What's imperfect
+*** A request word inside a herald
+Request words are found by membership in the handle's tokens. No
+herald of a server-rendered view is one of them, since a save
+consumes every request, but a herald text that someday contains
+'all' or 'ready' as a word would be read as a request.
+*** Unicode beside a colon
+The structural-colon rule keeps a colon beside an alphanumeric
+character. The tool reads that as Emacs does, Unicode-wide; Neovim's
+'[[:alnum:]]' is ASCII only, so the two clients could differ on, say,
+'merge:é...'. No served herald puts a non-ASCII letter there today.
+** Open questions
+*** Should a save keep the viewnode IDs of a view the server does not hold?
+In 'save_buffer''s rerender pass, when 'viewnode_id_record_of' finds no
+open view, the record could be 'ViewnodeIdRecord::of_viewforest' of
+the parsed buffer instead of the empty one: the buffer's own IDs,
+duplicates still renumbered. Every tool handle would then be stable
+across saves with no re-opening, and so would an editor buffer saved
+after a server restart. The cost: the rule that an ID "brought back by
+an old copy of the buffer's text" gets a fresh one would hold only for
+views the server holds. If yes, 'reopen_view_for_save' could shrink to
+the diff view's case.

@@ -1,0 +1,4 @@
+* An overridden node, outside the view ⟨0a 1O A1 ⌂:main⟩
+** ⟨0b It overrides the view of these.⟩
+** ⟨0c ☮ These override the view of it.⟩
+*** An overrider, outside the view ⟨0d ☮ Ob F1⟩

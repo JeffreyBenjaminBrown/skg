@@ -166,7 +166,7 @@ to update your buffer.
 The viewnode IDs are visible to you, yes? They could be helpful for
 regaining your bearings after, say, inserting a containerward forest
 and thereby shifting all the line numbers.
-****** TODO Jeff : User's reply, late
+****** Jeff : User's reply, late
 Parallel ways I have devised, and how each mirrors yours: commands as
 words inside a handle ('delete', 'ready', 'restoreNode') are your
 subheading-with-special-syntax idea, written on the headline itself

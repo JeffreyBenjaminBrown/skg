@@ -8,8 +8,9 @@ same view as text, such as an AI agent, sees all of that metadata,
 which outweighs the words. 'skg_for_ai.py' asks a running skg server
 for a view and writes it twice: once exactly as the server rendered it,
 and once compactly, with the words, the nesting and a short handle per
-headline. Nothing is lost, because each handle points at the line of
-the full view that holds the headline's metadata. An edited compact
+headline, which carries the heralds a client shows. Nothing is lost,
+because each handle is the viewnode ID of the full view's headline,
+whose metadata it stands for. An edited compact
 view can be saved back: the tool rebuilds the full buffer from it and
 saves that through the server (see "Writing"). The diff view, which
 shows every change since the last git-commit, is written the same way,
@@ -26,9 +27,9 @@ itself; only the server does.
 
 * Running it
 ** Commands
-Each view command ('view', 'search', 'links-here', 'contains', 'diff')
-writes three files per view into '--out-dir' (default: the current
-directory) and prints their paths, one per line.
+Each view command ('view', 'search', 'forest', 'contains',
+'links-here', 'diff') writes three files per view into '--out-dir'
+(default: the current directory) and prints their paths, one per line.
 
 'python3 tools/skg-for-ai/skg_for_ai.py view ID' writes the recursive
 content view of the node ID, as a client opens it.
@@ -36,16 +37,30 @@ content view of the node ID, as a client opens it.
 'search TERMS...' writes the search buffer for the terms: each hit at
 the top level, with the containers of each hit beneath it.
 
-'links-here ID' writes the node's view with its mentioners folder: the
-nodes that link to it, each with its containerward chain (its
-containers, theirs, and so on up to the roots). It gets that view by
-saving, as 'C-c l m' does in Emacs; see "How 'links-here' looks
-backward".
+'forest KIND ID' writes the node's view with the folder KIND under it,
+as the clients' 'C-c l' commands draw it ('docs/COMMANDS.org', "C-c
+l"), named 'forest-KIND_ID'. Under each member of a partner folder
+hangs its containerward chain: its containers, theirs, and so on up
+to the roots. The kinds:
+| KIND          | Emacs   | what it draws                                                                    |
+|---------------+---------+----------------------------------------------------------------------------------|
+| containers    | C-c l c | the containers folder: what contains the node                                    |
+| mentioners    | C-c l m | the mentioners folder: what links to it                                          |
+| subscribesTo  | C-c l s | the subscribees folder (what it subscribes to) and the subscribers folder        |
+| overrides     | C-c l o | the overridden folder (what it overrides) and the overriders folder              |
+| hidesFromSubs | C-c l h | the hidden folder (what it hides from its subscriptions) and the hiders folder   |
+| aliases       | C-c l a | the aliases folder                                                               |
+| flags         | C-c l p | the flags folder: its true flags                                                 |
+A write-protected folder (☮) is one whose membership cannot be
+changed from there; an empty one is left out, an empty editable one
+shown as a place to add members. A fresh content view already carries
+the root's containers folder, so 'forest containers' is 'view' under
+another name; every other kind is drawn by a save, as the clients do;
+see "How 'forest' draws a folder".
 
-'contains ID' writes the node's view, which already shows what contains
-it: a fresh content view carries the root's containers folder, with
-each container's containerward chain beneath it. The folder is absent
-when nothing contains the node.
+'contains ID' is 'forest containers ID', and 'links-here ID' is
+'forest mentioners ID', each named after itself ('contains_ID',
+'links-here_ID').
 
 'close SIDECAR' sends 'close view' for the view ID a sidecar records and
 marks the sidecar closed. See "Views and connections" for why it is
@@ -104,6 +119,8 @@ Options, after the command: '--port N' for every command ('save' and
 'save' and 'commit'; for the view commands also '--out-dir DIR', '--name BASE' to name the files
 'BASE.full.org' and so on instead of 'COMMAND_ARGUMENT', and
 '--no-summary' to leave the summary out of the compact view.
+Every command that writes a view fetches the server's herald rule
+table once, with the 'herald rules' request.
 ** The port
 The tool connects to 127.0.0.1 on the port 'SKG_PORT' names, or 1730
 when it is unset; '--port' overrides both. The port of a server is the
@@ -121,78 +138,110 @@ the metadata.
 A body line is copied unchanged, except that its links are annotated.
 A headline keeps its stars and its title; its '(skg ...)' metadata is
 removed, and a handle is added at the end of the line.
-*** The handle, and why it is a line number
-A handle has the fixed form '⟨N ...⟩'. N is the 1-based number of the
-headline's line in the full view, so line N of 'BASE.full.org' holds
-the headline's metadata: 'sed -n Np BASE.full.org' shows it, and the
-pattern '⟨[0-9]+' finds every handle. A line number needs no table
-beside it and stays meaningful when the compact view is edited: a
-headline that is moved keeps its number, so a tool can tell a move
-from a deletion, and a headline without a handle is a new one. Body
-lines are not numbered: a body line belongs to the nearest headline
-above it.
-
-After N, a headline that is not a node occurrence names its kind: '⟨5
-containerFolder⟩', '⟨12 alias⟩'. Folders have no title, so in a
-compact view such a headline is its stars and its handle.
-*** The relationship heralds in the handle
-After N come the headline's relationship heralds, rendered as the
-clients render them, without their styles; 'docs/heralds.org',
-"Relationship heralds", explains them. In display order: 'C' contains,
-'L' links to, 'S' subscribes to, 'O' overrides, 'H' hides from its
-subscriptions. A count before a letter counts the nodes on the
-relation's in-side ("two nodes contain this"), a count after it the
-out-side ("this contains three"). A lowercase letter is an ancestor in
-this view: 'a' the viewparent, 'b' the grandparent, and so on; it
-replaces the count when ancestors make up the whole side. A fraction
-marks a subset: '1/5L', five nodes link here and one of them is
-substantive; 'C2/8', eight contents, two not yet integrated by the
+*** The handle: the headline's viewnode ID
+A handle has the fixed form '⟨ID ...⟩'. ID is the headline's viewnode
+ID, the '(vnid ID)' that opens its metadata in the full view: the
+server gives one to every headline of a view, and keeps it across that
+view's saves ('docs/api-and-formats.org', "The metadata headers").
+'grep -n "(vnid ID)" BASE.full.org' finds the headline's metadata, and
+the pattern '⟨[0-9a-z]+' finds every handle. A headline that is moved
+keeps its handle, so a tool can tell a move from a deletion, and a
+headline without a handle is a new one. Body lines have no handle: a
+body line belongs to the nearest headline above it.
+*** The heralds in the handle
+After ID come the headline's heralds: every herald a client shows,
+in the order it shows them, as plain text, without their styles. A
+client renders them from the server's herald rule table, which the
+tool fetches too ('docs/heralds.org' explains each). So a node reads
+'⟨0d ☮B 1Cb ⟳ M ~+⟩': write-protected (☮), its body omitted (B), its
+relationship heralds, a cycle (⟳), then its change facts. A headline
+that is not a node occurrence shows its label: a folder its sentence,
+'⟨0b ☮ These contain it.⟩'; an alias 'alias', a flag row '☮ had ID
+before import', a tombstone 'something stood here', an unknown
+viewnode 'Reference to unknown node.'; a folder has no title, so in a
+compact view it is its stars and its handle. An illegal edit to a
+foreign node, a section of it in one of your skgrepos, is a folder
+labelled '☮ ILLEGAL EDIT TO FOREIGN NODE'. On a node, in the order a
+client shows them, the heralds are:
+- the position glyphs: 'ᗣ' a ghost, or what HEAD alone warrants;
+  '⊥' an unwarranted position; '☮' write-protected, and 'B' riding it
+  when the node's body is omitted from the view;
+- the relationship heralds (see below), then '⟳', a cycle;
+- '~NAME', its relationship to its parent recorded in a skgrepo more
+  private than the default, then '⌂:LABEL', the home skgrepo boundary
+  (see below);
+- the change facts, in the diff view (see below);
+- pending requests, which a view the server rendered never shows,
+  since a save consumes every request: 'delete', 'detach' (a
+  'noClaim' child that leaves an editable parent at the next save),
+  'req:...' view requests, 'request:...'.
+*** The relationship heralds
+The relationship heralds are rendered as the clients render them;
+'docs/heralds.org', "Relationship heralds", explains them. In display
+order: 'C' contains, 'L' links to, 'S' subscribes to, 'O' overrides,
+'H' hides from its subscriptions. A count before a letter counts the
+nodes on the relation's in-side ("two nodes contain this"), a count
+after it the out-side ("this contains three"). A lowercase letter is
+an ancestor in this view: 'a' the viewparent, 'b' the grandparent, and
+so on; it replaces the count when ancestors make up the whole side. A
+fraction marks a subset: '1/5L', five nodes link here and one of them
+is substantive; 'C2/8', eight contents, two not yet integrated by the
 subscriber above. 'ĥ' after 'O' says this occurrence stands in for a
 node it overrides. The property counts 'A' (aliases), 'I' (extra IDs)
-and 'F' (true flags) follow. So '⟨17 2aC3⟩' is line 17: two
-containers, one of them the viewparent, and three contents.
+and 'F' (true flags) follow. So '⟨0h 2aC3⟩' has two containers, one
+of them the viewparent, and three contents.
 
 One token is left out: a bare 'aC', which says only that the
 viewparent contains the node and nothing else does. That is the
 ordinary case in a content tree, so most handles would carry it;
-'⟨3 aC L1⟩' is written '⟨3 L1⟩', and '⟨5 aC⟩' just '⟨5⟩'. Every other
-form, 'aC10' or '2aC' among them, stays.
+'⟨0c aC L1⟩' is written '⟨0c L1⟩', and '⟨0e aC⟩' just '⟨0e⟩'. Every
+other form, 'aC10' or '2aC' among them, stays.
 *** The skgrepo boundary
 A headline whose home skgrepo differs from its nearest node
 occurrence above it, or a root, carries '⌂:LABEL' after its
-relationship heralds, LABEL the skgrepo's label, as the clients show
-it: '⟨14 C1 1/L bS ⌂:fred⟩' is a note of the 'fred' skgrepo under a
-node of another. Every other headline shares its skgrepo with the
-nearest node above it.
+relationship heralds, LABEL the skgrepo's label from the table the
+server sends beside its herald rules: '⟨0h ☮ C1 1/L bS ⌂:fred⟩' is a
+note of the 'fred' skgrepo under a node of another. Every other
+headline shares its skgrepo with the nearest node above it.
 *** Change facts, in the diff view
 A headline of the diff view that shows a change carries, after the
-skgrepo boundary, the diff heralds the clients show
-('docs/heralds.org', "Diff heralds"), without their styles. On a node
-or a ghost (a deleted node, shown as HEAD has it): '∃+' a new node,
-'∃-' a deleted one, 'M' a modified one (its title, body, properties or
-lists changed), then '~+' a new membership in its parent (in a
-partner folder, its relationship of the folder's kind to the folder's
-parent), '~-' a removed one. On an alias, ID or flag in its folder,
-'+' or '-'; on an unknown viewnode, '~+' or '~-'. A '✓' right after a
-change says it is marked ready: '∃+✓ ~+' is a new node, approved, in a
-membership that is not. The headlines the diff view adds to explain a
-change name their kind: 'oldText title' (the old title; 'oldText
-body', 'oldText titleAndBody'), 'bodyDiff', 'changesetMarker content'
-(its content changed), 'homeSkgrepoMove' and 'relRepoMove' (moves to
-another skgrepo); each takes a '✓' when ready. In the
+skgrepo boundary, the change facts the clients show ('docs/heralds.org',
+"Diff heralds"). On a node or a ghost (a deleted node, shown as HEAD
+has it, 'ᗣ☮'): '∃+' a new node, '∃-' a deleted one, 'M' a modified one
+(its title, body, properties or lists changed), then '~+' a new
+membership in its parent (in a partner folder, its relationship of
+the folder's kind to the folder's parent), '~-' a removed one. On an
+alias, ID or flag in its folder, '+' or '-'; on an unknown viewnode,
+'~+' or '~-'. A '✓' right after a change says it is marked ready:
+'∃+✓ ~+' is a new node, approved, in a membership that is not. The
+headlines the diff view adds to explain a change show their labels:
+'old title' (or 'old body', 'old title and body') and 'body diff',
+'its content changed' (a changeset marker), '⌂ -OLD +NEW' (a move to
+another skgrepo) and 'relationship moved from OLD to NEW'; each takes
+a '✓' when ready. A folder shown because a member's relationship to
+the folder's parent changed reads 'its containers changed (other
+files)' and so on, with '✓' when every such change is ready. In the
 skgrepo-changes buffer a moved node adds '-OLD +NEW', and 'Δ⌂=a' when
 its nearest moved ancestor (here the parent) moved the same way.
 *** Folded headlines
 A headline the server marks 'folded', one a client shows collapsed,
-ends its handle with the token 'folded': '⟨17 C3 folded⟩'. The lines
-under it are still in both files; the token tells where a person
-reading in a client would see less.
-
-The tool computes these from each headline's '(view (rels ...) (props
-...) (birth ...))' facts, mirroring 'render_rel_facts' in
-'nvim/lua/skg/heralds.lua' and reading 'shared/relations.json' for the
-letters and their order. The other heralds (☮, ⊥, ⌂ and so on) are not
-in the handle; the full view's metadata says what they would say.
+ends its handle with the word 'folded': '⟨0j ☮ cH ⌂:fred folded⟩'.
+The lines under it are still in both files; the word tells where a
+person reading in a client would see less. It is the tool's; a client
+shows no herald for it.
+*** How the tool renders them
+The tool applies the rule table the server serves ('herald rules',
+fetched once per command) to each headline's metadata, as the clients'
+lens does ('nvim/lua/skg/sexpr/lens.lua', the port of
+'elisp/skg-sexpr/skg-lens.el'), and renders the relationship heralds
+from the '(view (rels ...) (props ...) (birth ...))' facts, as
+'render_rel_facts' in 'nvim/lua/skg/heralds.lua' does, reading
+'shared/relations.json' for the letters and their order. What one
+headline's metadata cannot say it reads from the headlines around it,
+as a client reads its buffer: a pending detachment from the parent
+and grandparent, a changed folder from its members
+('shared/herald-styles.json' gives the folder labels and which
+folders are write-protected).
 *** Link annotations
 Every '[[id:ID][label]]' link, in a title or a body, is followed by an
 annotation in a fixed form. A link whose target resolves gets '⟦→ TITLE
@@ -245,18 +294,21 @@ The server keeps a view's state per TCP connection, and forgets every
 view of a connection when it ends. Each command opens one connection,
 and sends 'close view' for its view before disconnecting, as a client
 does when its buffer is killed. A view is therefore never left open
-by the tool. A save does not need the view to be open: the server
-reads the saved buffer against the graph, so the view ID in the
-sidecar is enough. The 'close' command matters only for a view that a
-longer-lived connection holds.
+by the tool. A save reads the saved buffer against the graph, but it
+keeps the handles only of a view the server holds, so 'save' opens the
+view again, under the sidecar's view ID, on its own connection first
+(see "Handles across saves"). The 'close' command matters only for a
+view that a longer-lived connection holds.
 
-* How 'links-here' looks backward
-The server has no request that answers "what links here". The clients
-ask for it by saving the view with a '(viewRequests (folder
-mentioners))' on the node's headline ('C-c l m' in Emacs), and the
-re-rendered buffer the save returns shows the mentioners folder. The
-tool does the same: it opens the view, adds that request to the root's
-metadata, and saves the otherwise unchanged buffer. The tool may save,
+* How 'forest' draws a folder
+The server has no request that answers "what links here" or "what
+subscribes to this". The clients ask for a folder by saving the view
+with a view request on the node's headline, '(viewRequests (folder
+mentioners))' for 'C-c l m' in Emacs, or '(viewRequests flags)' for
+'C-c l p', and the re-rendered buffer the save returns shows the
+folder. The tool does the same: it opens the view, adds the kind's
+request to the root's metadata, and saves the otherwise unchanged
+buffer; 'forest containers' alone needs no save. The tool may save,
 as any client may. Since nothing in
 the buffer differs from the graph, the save writes no file, but it is
 a save, sent through the server's whole save path, so a node that the
@@ -282,16 +334,24 @@ Wait for "Server ready." in 'server.log', then run the tool with
 * Tests
 'python3 tools/skg-for-ai/test_skg_for_ai.py' runs them, given a built
 server ('cargo build --bin skg'; 'SKG_BINARY' names another binary).
-First it checks the relationship heralds against the rendering cases
-both clients' tests share, 'tests/shared/herald-rendering-cases.txt',
-taking those whose text is only relationship and property tokens. Then
-it copies 'test-fixture/' to a temporary data root, starts a server
-there on port 1793 ('SKG_FOR_AI_TEST_PORT' changes it), runs 'view',
-'search', 'links-here' and 'contains', and compares each compact view
-with its file in 'test-expected/'. It also checks that every handle names its own line and that line is a headline of the full view. Then
-it sends a 'repos' request through 'raw' and imports a Markdown file
-through 'import', and checks that the runs, the 'links-here' save
-among them, left every '.skg' file of the fixture as it was.
+First it renders every case of the rendering cases both clients'
+tests share, 'tests/shared/herald-rendering-cases.txt', as their tests
+do: with the rule table and the skgrepo label table pinned beside it
+('herald-rules.sexp', which a Rust test keeps equal to the served
+table, and 'herald-skgrepo-labels.sexp'), and with each case's
+context (a changed folder, ready or not, or a pending detachment) as
+a client reads it from the headlines around. It compares the text;
+the styles the tool drops. Then it copies 'test-fixture/' to a
+temporary data root, starts a server there on port 1793
+('SKG_FOR_AI_TEST_PORT' changes it), runs 'view', 'search',
+'links-here', 'contains' and 'forest' with every kind, and compares
+each compact view with its file in 'test-expected/'. It also checks
+that each handle is the viewnode ID of the full view's headline on
+the same line. Then it sends a 'repos' and a 'herald rules' request
+through 'raw' (the served rule table must be the pinned one), imports
+a Markdown file through 'import', and checks that the runs, the
+saves of 'links-here' and 'forest' among them, left every '.skg'
+file of the fixture as it was.
 
 Then, on a second server over a fresh copy of the fixture, it edits
 compact views and saves them, in order: a title, a body, a new child,
@@ -300,14 +360,20 @@ container), a deletion through 'delete' in a handle, two bad handles
 (refused before any save), a retitled write-protected occurrence
 (refused by the server, the files left as they were), a stale view
 (refused by the server),
-and 'new' (refused in the foreign skgrepo; in the owned one a root
-whose view then saves a body and a child).
+'new' (refused in the foreign skgrepo; in the owned one a root
+whose view then saves a body and a child), and one view saved again
+and again.
 It compares each report with the text expected and reads the '.skg'
 files after each save. The stale case renders a view, changes a node
 it shows through a second view's save, and saves the first view's
 edit of another node: the server refuses, naming the changed node, and
 nothing is written; a fresh view then saves the same edit, and the
-second save's change stays.
+second save's change stays. The last case adds a headline and
+retitles another, saves, does the same again, saves, and checks that
+every handle names the headline it named, and each new headline has
+a new handle; then it removes a headline, saves, and checks that the
+next save names, before it saves, the handle it may change (see
+"Handles across saves").
 
 Then, on a third server over a fresh copy of the fixture whose owned
 skgrepo is first made a gitrepo with one commit, it saves a retitle, a
@@ -334,6 +400,8 @@ also contains; the other subscribes to a foreign node and hides two
 foreign nodes from its subscriptions, one of which the view shows
 folded in a hidden-outside-of-subscribee folder. The root's body links
 to a node in the view, to a foreign node, and to an ID nobody wrote.
+Outside the view, an owned node with a true flag overrides another,
+which has an alias.
 
 * Writing
 ** The loop
@@ -348,9 +416,10 @@ python3 tools/skg-for-ai/skg_for_ai.py save DIR/view_ID.view.json --yes
 'save' takes the sidecar, or a directory holding only one. Without
 '--yes' it prints the report and stops; with it, it prints the report,
 sends the save, prints the server's answer, and writes the server's
-re-rendered view over the three files, so the handles are fresh and the
-next edit starts from them. A save needs the server the view came from;
-'--port', if given, must match the sidecar's.
+re-rendered view over the three files, so the next edit starts from
+them. A headline the edit kept keeps its handle (see "Handles across
+saves"), and a new one has a handle now. A save needs the server the
+view came from; '--port', if given, must match the sidecar's.
 
 The tool writes nothing to '.skg' files itself. The server's save does,
 with every check an editor client's save gets, and it writes only to
@@ -358,16 +427,19 @@ skgrepos the server's config owns.
 ** How the compact view becomes a buffer
 The tool rebuilds the buffer an editor client would send, from the
 edited compact view and the full view it was written beside. A
-headline with a handle '⟨N ...⟩' gets back the metadata of line N of
-the full view; its level, title and position come from the edited
-compact view. The rest of the handle (the heralds, the kind, 'folded')
-is display only, and editing it changes nothing, except for the
-request words: 'delete' (see "A deleted node"), and 'ready',
-'unready', 'all', 'restoreNode' and 'restoreRel' (see "Reviewing and
-committing"). The rebuild writes them into the headline's
-'(editRequest ...)', which holds one edit request ('delete',
-'restoreNode' or 'restoreRel') and one readiness request after it. A headline without a handle is
-written bare, and the save makes it a new node, with a new ID.
+headline with a handle '⟨ID ...⟩' gets back the metadata of the full
+view's headline whose viewnode ID is ID; its level, title and
+position come from the edited compact view. The rest of the handle
+(the heralds, 'folded') is display only, and editing it changes
+nothing, except for the request words: 'delete' (see "A deleted
+node"), and 'ready', 'unready', 'all', 'restoreNode' and 'restoreRel'
+(see "Reviewing and committing"). No herald of a view the server
+rendered is one of these words, since a save consumes every request;
+so each such word in a handle was written there. The rebuild writes
+them into the headline's '(editRequest ...)', which holds one edit
+request ('delete', 'restoreNode' or 'restoreRel') and one readiness
+request after it. A headline without a handle is written bare, and
+the save makes it a new node, with a new ID.
 
 Body lines are taken as edited, and belong to the headline above them.
 The link annotations the tool added ('⟦→ ... ⟧' or '⟦✗ ... ⟧' right
@@ -398,7 +470,7 @@ a write-protected folder nothing claims, so removing a headline there
 only removes it from the view.
 *** A deleted node
 To delete a node from the graph, write the word 'delete' inside its
-handle: '⟨7 delete⟩', or '⟨7 aC1 delete⟩'. The tool writes it into the
+handle: '⟨0d delete⟩', or '⟨0d aC1 delete⟩'. The tool writes it into the
 headline's metadata as '(editRequest delete)', the request the clients'
 'skg-delete' ('C-c <backspace>') writes, and the save deletes the node.
 Only an editable node occurrence can carry it; the server refuses it
@@ -409,15 +481,14 @@ view and prints a line per change, each naming headlines by handle and
 title, as in
 #+begin_example
 Changes in view_root-id.compact.org, against view_root-id.full.org (view ID content-view:root-id):
-Moved: ⟨9⟩ 'Contained twice', from under ⟨7⟩ 'First child' to under ⟨10⟩ 'Second child, a subscriber'.
-New: 'A new grandchild', under ⟨7⟩ 'First child'.
-Title: ⟨7⟩ 'First child' → 'First child, renamed'.
-Bodies changed: 1 (⟨1⟩).
+Moved: ⟨0e⟩ 'Contained twice', from under ⟨0d⟩ 'First child' to under ⟨0f⟩ 'Second child, a subscriber'.
+New: 'A new grandchild', under ⟨0d⟩ 'First child'.
+Title: ⟨0d⟩ 'First child' → 'First child, renamed'.
+Bodies changed: 1 (⟨0a⟩).
 Not saved. Run again with '--yes' to save.
 #+end_example
-An 'Error:' line names a handle that names no line of the full view,
-or a body line, or whose request words make no one '(editRequest
-...)' (two edit requests, both 'ready' and 'unready', 'all' alone);
+An 'Error:' line names a handle that names no headline of the full
+view, or whose request words make no one '(editRequest ...)' (two edit requests, both 'ready' and 'unready', 'all' alone);
 any error stops the save, and the report then lists only the errors.
 The report does not guess what the server will refuse: the server's
 answer says that.
@@ -425,7 +496,7 @@ answer says that.
 The changes follow, in this order. 'Delete:', 'Restore node:',
 'Restore membership:', 'Ready:' and 'Unready:' are the requests the
 handles' words ask for, a readiness request with the form the save
-sends ('Ready: ⟨14⟩ 'A new grandchild', as '(ready node rel)'.').
+sends ('Ready: ⟨0j⟩ 'A new grandchild', as '(ready node rel)'.').
 When the 'unready' requests would unmark more than one change, a
 'Question:' line asks what a client asks before such a gesture, and
 '--yes' answers it. 'Removed:' is a handle the edit no longer has,
@@ -440,6 +511,28 @@ different parent, or at a different depth below the same one.
 'Title:' gives a changed title, old and new, and 'Bodies changed:'
 counts the changed bodies and names their handles. An edit with none
 of these prints 'No changes.' and saves nothing.
+** Handles across saves
+The server keeps a view per connection, and the tool's connection ends
+with each command. So before it saves, 'save' opens the view again on
+its connection, under the sidecar's view ID, as the command that wrote
+it did: 'view' renders the node's content view afresh, 'forest' draws
+its folder again by a save that writes nothing, 'search' searches
+again, and 'diff' requests its buffer again. The server keeps, across
+the save, every viewnode ID of the saved buffer that the view it now
+holds has, and gives a new one to every other headline: to a new
+headline, and to one whose viewnode ID the view opened again lacks.
+
+A view opened afresh numbers its headlines from '0a' in buffer order,
+and the save gives a new headline the next viewnode ID after the
+highest. So while the view the tool opens again has as many headlines
+as the saved one, it holds every viewnode ID the saved one does, and
+every handle stays. After a removal it has fewer: then the highest
+handles may change in the next save. 'save' names them, before it
+saves, in a line 'Handles the save may change: ⟨ID⟩ 'TITLE', ...'; the
+re-rendered compact view gives each its handle after the save. A view
+the server held across all its saves, as an editor client's open
+buffer is held, would keep every viewnode ID; the tool cannot hold
+one.
 ** Stale views
 The save carries the runtime generation the view was rendered at, from the
 sidecar. If a node the save would write changed since (by Jeff in
@@ -571,4 +664,4 @@ readiness summary the server's answer carries. A later 'save' or
 'integrate' of a diff buffer first requests that buffer again under
 the sidecar's view ID on its own connection, so that the server
 re-renders it as a buffer of the diff view, with the readiness
-summary.
+summary, and keeps its handles (see "Handles across saves").

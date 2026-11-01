@@ -1,24 +1,25 @@
 # skg-for-ai compact view of view_root-id.full.org (view ID content-view:root-id)
-# Each headline ends in ⟨N ...⟩, N its line number in the full view;
-# a bare 'aC' (only the parent contains it) is left out, and 'folded'
-# marks a headline a client shows collapsed.
+# Each headline ends in its handle ⟨ID HERALDS⟩: ID its viewnode ID,
+# the '(vnid ID)' of its metadata in the full view, and HERALDS what a
+# client shows for it, but a bare 'aC' (only the parent contains it);
+# 'folded' marks a headline a client shows collapsed.
 # Headlines 10, node occurrences 7, distinct nodes 7, folders 3.
 # Skgrepos: fred (foreign) 2, main (owned) 5.
 # Foreign 2, write-protected 3, folded 1.
 # Contained elsewhere too 2, subscribed to 1, subscribing 1.
 # Links 3, distinct targets 3, resolved 2, unresolved 1 (missing 1).
 # Server errors 0, warnings 0.
-* The fixture root ⟨1 1C2 L2 ⌂:main⟩
+* The fixture root ⟨0a 1C2 L2 ⌂:main⟩
 The root links to [[id:child-b-id][its second child]]⟦→ Second child, a subscriber ⌂:main⟧,
 to [[id:fred-note-id][Fred's note]]⟦→ Fred's note ⌂:fred⟧ in the foreign repo,
 and to [[id:missing-id][a node nobody wrote]]⟦✗ missing⟧.
-** ⟨5 containerFolder⟩
-*** Above the root ⟨6 Cb⟩
-** First child ⟨7 aC1⟩
+** ⟨0b ☮ These contain it.⟩
+*** Above the root ⟨0c ☮ Cb⟩
+** First child ⟨0d aC1⟩
 A body line that stays unnumbered.
-*** Contained twice ⟨9 2aC⟩
-** Second child, a subscriber ⟨10 a/L S1 H2⟩
-*** ⟨11 subscribeeFolder⟩
-**** Fred's note ⟨12 C1 1/L bS ⌂:fred⟩
-**** ⟨13 hiddenOutsideOfSubscribeeFolder⟩
-***** An aside of Fred's ⟨14 cH ⌂:fred folded⟩
+*** Contained twice ⟨0e 2aC⟩
+** Second child, a subscriber ⟨0f a/L S1 H2⟩
+*** ⟨0g It subscribes to these.⟩
+**** Fred's note ⟨0h ☮ C1 1/L bS ⌂:fred⟩
+**** ⟨0i The subscriber ancestor hides these, but subscribes to nothing that contains them.⟩
+***** An aside of Fred's ⟨0j ☮ cH ⌂:fred folded⟩

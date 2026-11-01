@@ -7,19 +7,23 @@ directly for anything else.
 For a requested view it writes, into a directory the caller names:
 - NAME.full.org: the view exactly as the server rendered it.
 - NAME.compact.org: the same lines, each headline's '(skg ...)'
-  metadata replaced by a handle '⟨N HERALDS⟩' at the end of the
-  headline, N being the headline's 1-based line number in the full
-  view, and every '[[id:...]]' link followed by its target's title.
+  metadata replaced by a handle '⟨ID HERALDS⟩' at the end of the
+  headline, ID being the headline's viewnode ID, as its metadata in
+  the full view gives it, and HERALDS every herald a client shows
+  for it, as text; and every '[[id:...]]' link followed by its
+  target's title.
   A summary of the view's facts precedes the tree unless
   '--no-summary' is given.
 - NAME.view.json: the server's view ID, the request, the generation
   the server rendered the view at, and the server's errors and
   warnings.
 
-View commands: 'view ID', 'search TERMS...', 'links-here ID',
-'contains ID', 'diff'. Each prints the paths it wrote. 'links-here'
-saves, as the clients' 'C-c l m' does. 'diff' writes each nonempty
-buffer of the diff view, its handles carrying the change facts.
+View commands: 'view ID', 'search TERMS...', 'forest KIND ID'
+('contains ID' and 'links-here ID' name two kinds), 'diff'. Each
+prints the paths it wrote. 'forest' draws the folder KIND under the
+node, as the clients' 'C-c l' commands do, saving as they do. 'diff'
+writes each nonempty buffer of the diff view, its handles carrying
+the change facts.
 'new TITLE REPO' creates a root node in an owned skgrepo, as a save of
 a new empty view does, and writes its view as 'view' would.
 'save SIDECAR' rebuilds the full buffer from an edited compact view,
@@ -70,6 +74,22 @@ DIFF_VIEW_BUFFERS = [ "all changes", "merges", "skgrepo changes",
 WIDE_UNMARK_QUESTION = (
   "Unmarking this node commit-ready will unmark every contributing "
   "decision. You might discard a lot of hard-won information. Continue?" )
+# The folders a client can request from a node ('C-c l' in Emacs; the
+# 'skg-show-folderOf-*' commands in 'elisp/skg-request-views.el'), each
+# by its '(viewRequests ...)' request: 'forest KIND ID'. None for the
+# containers folder, which a fresh content view already draws under
+# its root.
+FOREST_VIEW_REQUESTS = {
+  "containers"    : None,
+  "mentioners"    : "(folder mentioners)",
+  "subscribesTo"  : "(folder subscribesTo)",
+  "overrides"     : "(folder overrides)",
+  "hidesFromSubs" : "(folder hidesFromSubs)",
+  "aliases"       : "(folder aliases)",
+  "flags"         : "flags" }
+# Commands that name one forest kind.
+FOREST_COMMAND_ALIASES = { "contains" : "containers",
+                           "links-here" : "mentioners" }
 SAVE_TERMINAL_RESPONSE_TYPES = {
   "save-result", "delete-from-confirmation", "strandeds-confirmation",
   "telescope-hoist-confirmation", "fork-confirmation",
@@ -109,13 +129,12 @@ def main (argv):
   try:
     if arguments . command == "view":
       view = fetch_single_root_view (connection, arguments . id)
-    elif arguments . command == "contains":
-      # A fresh content view already carries the root's containers
-      # folder, with each container's containerward chain.
-      view = fetch_single_root_view (connection, arguments . id)
-    elif arguments . command == "links-here":
-      view = fetch_view_with_root_folder_request (
-        connection, arguments . id, "mentioners")
+    elif arguments . command in FOREST_COMMAND_ALIASES:
+      view = fetch_forest_view (
+        connection, FOREST_COMMAND_ALIASES [ arguments . command ],
+        arguments . id )
+    elif arguments . command == "forest":
+      view = fetch_forest_view (connection, arguments . kind, arguments . id)
     elif arguments . command == "search":
       view = fetch_search_view (connection, " " . join (arguments . terms))
     require_view_has_headlines (view)
@@ -154,11 +173,17 @@ def parse_command_line (argv):
   commands = parser . add_subparsers ( dest = "command", required = True )
   for command, help_text in [
       ( "view", "the recursive content view of a node" ),
-      ( "contains", "a node's view, which shows what contains it" ),
-      ( "links-here", "a node's view with its mentioners folder" ) ]:
+      ( "contains", "'forest containers ID'" ),
+      ( "links-here", "'forest mentioners ID'" ) ]:
     commands . add_parser (
       command, help = help_text, parents = [ common_options ]
     ) . add_argument ("id")
+  forest_parser = commands . add_parser (
+    "forest", help = ( "a node's view with the folder KIND under its "
+                       "root, as the clients' 'C-c l' commands draw it" ),
+    parents = [ common_options ] )
+  forest_parser . add_argument ( "kind", choices = list (FOREST_VIEW_REQUESTS) )
+  forest_parser . add_argument ("id")
   commands . add_parser (
     "search", help = "the search buffer for TERMS",
     parents = [ common_options ] ) . add_argument ( "terms", nargs = "+" )
@@ -230,10 +255,11 @@ def parse_command_line (argv):
   return parser . parse_args (argv)
 
 def default_base_name (arguments):
-  argument = ( " " . join (arguments . terms)
-               if arguments . command == "search"
-               else arguments . id )
-  return base_name_for ( arguments . command, argument )
+  if arguments . command == "search":
+    return base_name_for ( "search", " " . join (arguments . terms) )
+  if arguments . command == "forest":
+    return base_name_for ( "forest-" + arguments . kind, arguments . id )
+  return base_name_for ( arguments . command, arguments . id )
 
 def base_name_for (command, argument):
   return ( command + "_" +
@@ -307,11 +333,11 @@ def command_import (arguments):
 def command_save (arguments):
   """Rebuild the full buffer from the edited compact view and print the
   changes it makes. With '--yes', and when the report finds no bad
-  handle, send the save, print the server's answer and write its
-  re-rendered view over the three files. The save carries the
-  generation the view was rendered at, so the server refuses it if a
-  node it would write changed since. A refused save leaves the files
-  as they were."""
+  handle, open the view again on the save's connection, send the
+  save, print the server's answer and write its re-rendered view over
+  the three files. The save carries the generation the view was
+  rendered at, so the server refuses it if a node it would write
+  changed since. A refused save leaves the files as they were."""
   saved_view = load_saved_view (arguments . view_files)
   if ( arguments . port is not None
        and arguments . port != saved_view . sidecar [ "port" ] ):
@@ -320,9 +346,9 @@ def command_save (arguments):
       f"not {arguments . port}." )
   edited = parse_edited_compact_view (saved_view . compact_text)
   original = outline_of_full_view (saved_view . parsed_view)
-  errors = handle_error_lines (edited, saved_view . parsed_view)
+  errors = handle_error_lines (edited, saved_view . headline_of_handle)
   changes = [] if errors else change_report_lines (
-    edited, original, saved_view . parsed_view )
+    edited, original, saved_view . headline_of_handle )
   connection = SkgConnection ( saved_view . sidecar [ "port" ] )
   try:
     print ( "Changes in " + os . path . basename (saved_view . compact_path) +
@@ -341,9 +367,18 @@ def command_save (arguments):
       print ( "Not saved. Run again with '--yes' to save." )
       return
     buffer_text = rebuilt_full_buffer (
-      edited, saved_view . parsed_view, saved_view . full_text )
-    if saved_view . sidecar [ "command" ] == "diff":
-      register_diff_view_buffer (connection, saved_view . sidecar)
+      edited, saved_view . headline_of_handle, saved_view . full_text )
+    held_viewnode_ids = reopen_view_for_save (connection, saved_view . sidecar)
+    renumbered = [ handle for handle in dict . fromkeys (
+                     headline . handle for headline in edited
+                     if headline . handle is not None )
+                   if handle not in held_viewnode_ids ]
+    if renumbered:
+      print ( "Handles the save may change: " + ", " . join (
+                described_handle ( handle, saved_view . headline_of_handle )
+                for handle in renumbered ) +
+              ". The view the server opened again does not hold these "
+              "viewnode IDs, so it gives each headline a new one." )
     messages = connection . save_buffer (
       saved_view . sidecar [ "view_id" ], buffer_text,
       saved_view . sidecar [ "rendered_at" ] )
@@ -357,20 +392,39 @@ def command_save (arguments):
   for path in written_paths:
     print (path)
 
-def register_diff_view_buffer (connection, sidecar, outcome = "Nothing was saved"):
-  """Open the sidecar's buffer of the diff view on CONNECTION, under
-  its view ID, as a client's buffer stays open on its connection. The
-  server keeps a view's buffer kind per connection, and a save
-  re-renders as a buffer of the diff view, with the readiness summary,
-  only a view registered as one. The save itself is read from the
-  saved text, against the generation the sidecar records. OUTCOME
-  opens the refusal when the buffer is now empty."""
-  buffer_name = sidecar [ "request" ] [ "buffer" ]
-  if fetch_diff_view_buffer (
-      connection, buffer_name, sidecar [ "view_id" ] ) is None:
+def reopen_view_for_save (connection, sidecar, outcome = "Nothing was saved"):
+  """Open the sidecar's view again on CONNECTION, under its view ID,
+  as the command that wrote it opened it, so that the server holds it
+  as it holds a client's open buffer; return the viewnode IDs of the
+  view it now holds. The server keeps a view per connection, and the
+  tool's connection ends with each command. A save keeps every
+  viewnode ID of the saved buffer that the server's view of it holds,
+  and gives a fresh one to every other headline; and it re-renders as
+  a buffer of the diff view, with the readiness summary, only a view
+  the server holds as one. The save itself is read from the saved
+  text, against the generation the sidecar records. OUTCOME opens the
+  refusal when a buffer of the diff view is now empty."""
+  request = sidecar [ "request" ]
+  if "buffer" in request:
+    view = fetch_diff_view_buffer (
+      connection, request [ "buffer" ], sidecar [ "view_id" ] )
+    if view is None:
+      raise SkgToolError (
+        f"{outcome}: the diff view's '{request [ 'buffer' ]}' buffer is "
+        "empty now (its changes were committed or undone); run 'diff' again." )
+  elif "terms" in request:
+    view = fetch_search_view ( connection, request [ "terms" ] )
+  elif "view_request" in request:
+    view = fetch_view_with_root_folder_request (
+      connection, request [ "id" ], request [ "view_request" ] )
+  else:
+    view = fetch_single_root_view ( connection, request [ "id" ] )
+  if view [ "view_id" ] != sidecar [ "view_id" ]:
     raise SkgToolError (
-      f"{outcome}: the diff view's '{buffer_name}' buffer is empty "
-      "now (its changes were committed or undone); run 'diff' again." )
+      f"{outcome}: opening the view again gave the view ID "
+      f"{view [ 'view_id' ]}, not the sidecar's {sidecar [ 'view_id' ]}." )
+  return set ( headlines_by_viewnode_id (
+    parse_full_view ( view [ "content" ] )) )
 
 def command_integrate (arguments):
   """Send "integrate unshown changes" for a buffer of the diff view,
@@ -397,16 +451,16 @@ def command_integrate (arguments):
       f"The view came from the server on port {sidecar [ 'port' ]}, "
       f"not {arguments . port}." )
   edited = parse_edited_compact_view (saved_view . compact_text)
-  if ( handle_error_lines (edited, saved_view . parsed_view)
+  if ( handle_error_lines (edited, saved_view . headline_of_handle)
        or change_report_lines (
          edited, outline_of_full_view (saved_view . parsed_view),
-         saved_view . parsed_view )):
+         saved_view . headline_of_handle )):
     raise SkgToolError (
       "Nothing was integrated: the compact view has edits; save them "
       "first, or write the buffer again with 'diff'." )
   connection = SkgConnection ( sidecar [ "port" ] )
   try:
-    register_diff_view_buffer (connection, sidecar, "Nothing was integrated")
+    reopen_view_for_save (connection, sidecar, "Nothing was integrated")
     terminal = connection . save_buffer (
       sidecar [ "view_id" ], saved_view . full_text,
       sidecar [ "rendered_at" ] ) [-1]
@@ -659,15 +713,24 @@ def fetch_diff_view_buffer (connection, buffer_name, view_id = None):
            "readiness_summary" : response_field (
              response, "readiness-summary" ) }
 
-def fetch_view_with_root_folder_request (connection, node_id, relation_name):
+def fetch_forest_view (connection, kind, node_id):
+  """The node's view with the folder KIND under its root, as the
+  clients' 'C-c l' command for KIND draws it. A fresh content view
+  already holds the root's containers folder, so for 'containers' it
+  is that view, and no save is sent."""
+  view_request = FOREST_VIEW_REQUESTS [kind]
+  if view_request is None:
+    return fetch_single_root_view (connection, node_id)
+  return fetch_view_with_root_folder_request (connection, node_id, view_request)
+
+def fetch_view_with_root_folder_request (connection, node_id, view_request):
   """Open the node's view, then save it unchanged but for a
-  '(viewRequests (folder RELATION))' on its root, as the clients'
-  'C-c l' commands do. The save's re-rendered buffer is the view.
-  Nothing in the buffer differs from the graph, so the save writes no
-  file."""
+  '(viewRequests VIEW_REQUEST)' on its root, as the clients' 'C-c l'
+  commands do. The save's re-rendered buffer is the view. Nothing in
+  the buffer differs from the graph, so the save writes no file."""
   fresh_view = fetch_single_root_view (connection, node_id)
   requesting_buffer = buffer_with_view_request_on_first_headline (
-    fresh_view [ "content" ], "(folder " + relation_name + ")" )
+    fresh_view [ "content" ], view_request )
   messages = connection . save_buffer (
     fresh_view [ "view_id" ], requesting_buffer, fresh_view [ "rendered_at" ] )
   terminal = messages [-1]
@@ -678,8 +741,7 @@ def fetch_view_with_root_folder_request (connection, node_id, relation_name):
     raise SkgToolError ( "The save that requests the folder failed:\n" +
                          "\n" . join (errors) )
   return { "view_id"     : fresh_view [ "view_id" ],
-           "request"     : { "id" : node_id,
-                             "view_request" : "(folder " + relation_name + ")" },
+           "request"     : { "id" : node_id, "view_request" : view_request },
            "content"     : content,
            "rendered_at" : rendered_at_of (terminal),
            "errors"      : errors,
@@ -733,14 +795,14 @@ def write_view_files (connection, view, out_dir, base_name, show_summary):
   parsed_view = parse_full_view (full_text)
   link_statuses = fetch_link_statuses (connection, parsed_view)
   repo_ownership = fetch_repo_ownership (connection)
-  skgrepo_labels = fetch_skgrepo_labels (connection)
+  herald_tables = fetch_herald_tables (connection)
   compact_lines = []
   if show_summary:
     compact_lines += summary_lines (
       parsed_view, link_statuses, repo_ownership, view,
       os . path . basename (full_path) )
   compact_lines += compact_tree_lines (
-    parsed_view, link_statuses, skgrepo_labels )
+    parsed_view, link_statuses, herald_tables )
   write_text_file (full_path, full_text)
   write_text_file (compact_path, "\n" . join (compact_lines) + "\n")
   write_text_file (
@@ -819,13 +881,14 @@ def metadata_span_of_headline (headline_text):
 # Facts from one headline's metadata
 # ============================================================
 
-def kind_atoms ():
+def metadata_kinds ():
   with open ( os . path . join (SHARED_FOLDER, "metadata-fields.json"),
               encoding = "utf-8" ) as table_file:
-    table = json . load (table_file)
-  return { atom for kind in table [ "kinds" ] for atom in kind [ "atoms" ] }
+    return json . load (table_file) [ "kinds" ]
 
-KIND_ATOMS = kind_atoms ()
+KIND_ATOMS = { atom for kind in metadata_kinds () for atom in kind [ "atoms" ] }
+FOLDER_ATOMS = { atom for kind in metadata_kinds () if kind [ "kind" ] == "folder"
+                 for atom in kind [ "atoms" ] }
 
 def headline_kind (metadata):
   """The kind atom's text, with any parameter ('flag hadId'), or
@@ -841,6 +904,12 @@ def headline_kind (metadata):
 def is_folder_kind (kind):
   return kind . endswith ("Folder")
 
+def folder_atom (metadata):
+  """The folder atom of a folder headline's metadata, or None."""
+  return next ( ( str (element) for element in metadata [ 1 : ]
+                  if isinstance (element, Symbol) and element in FOLDER_ATOMS ),
+                None )
+
 def metadata_has_atom (metadata, atom_name):
   return any ( isinstance (element, Symbol) and element == atom_name
                for element in metadata [ 1 : ] )
@@ -855,6 +924,12 @@ def metadata_form (sexp, head_name):
          and isinstance (element [0], Symbol) and element [0] == head_name ):
       return element
   return None
+
+def headline_viewnode_id (metadata):
+  """The viewnode ID of '(vnid X)', the first part of every headline's
+  metadata the server renders, or None."""
+  form = metadata_form (metadata, "vnid") if metadata is not None else None
+  return sexp_to_text ( form [1] ) if form and len (form) > 1 else None
 
 def headline_gnid (metadata):
   form = metadata_form (metadata, "gnid")
@@ -1087,15 +1162,6 @@ def fetch_repo_ownership (connection):
     ownership [name] = owned == "true"
   return ownership
 
-def fetch_skgrepo_labels (connection):
-  """{REPO: LABEL}, each configured skgrepo's herald label, from the
-  table the server sends beside its herald rules."""
-  response = connection . request ( request_line ("herald rules") )
-  require_response_type (response, "herald-rules")
-  labels = metadata_form ( [ None ] + response, "skgrepoLabels" ) or [ None ]
-  return { sexp_to_text ( entry [0] ) : sexp_to_text ( entry [1] )
-           for entry in labels [ 1 : ] }
-
 # ============================================================
 # The runtime generation, which dates a buffer no view response drew
 # ============================================================
@@ -1111,111 +1177,480 @@ def fetch_runtime_generation (connection):
 # The compact view
 # ============================================================
 
-def compact_tree_lines (parsed_view, link_statuses, skgrepo_labels):
-  return [ compact_line (view_line, link_statuses, skgrepo_labels)
+def compact_tree_lines (parsed_view, link_statuses, herald_tables):
+  contexts = herald_contexts (parsed_view)
+  return [ compact_line ( view_line, link_statuses, herald_tables,
+                          contexts . get ( view_line . line_number ))
            for view_line in parsed_view ]
 
-def compact_line (view_line, link_statuses, skgrepo_labels):
+def compact_line (view_line, link_statuses, herald_tables, context):
   if not view_line . is_headline:
     return annotate_links (view_line . text, link_statuses)
   title = annotate_links (view_line . title, link_statuses)
-  handle = handle_text (view_line, skgrepo_labels)
+  handle = handle_text (view_line, herald_tables, context)
   return ( view_line . stars + " " + title +
            ( " " if title else "" ) + handle )
 
-def handle_text (view_line, skgrepo_labels):
-  """'⟨N KIND HERALDS ⌂:LABEL CHANGES folded⟩': N the line number in
-  the full view, KIND only for a headline that is not a node
-  occurrence (a folder, an alias, an unknown viewnode ...), HERALDS
-  its relationship heralds but for a bare 'aC', '⌂:LABEL' its home
-  skgrepo's label where that differs from its nearest occurrence
-  ancestor's (or it is a root), CHANGES its diff heralds (in the diff
-  view), and 'folded' when a client shows it collapsed."""
-  parts = [ str (view_line . line_number) ]
-  if view_line . metadata is not None:
-    metadata = view_line . metadata
-    kind = headline_kind (metadata)
-    if kind != "node":
-      parts . append (kind)
-    parts += [ token for token in
-               relationship_heralds_text (metadata) . split ()
-               if token != BARE_PARENT_CONTAINS_TOKEN ]
-    if metadata_has_atom ( metadata_form (metadata, "view") or [],
-                           "repoBoundary" ):
-      parts . append ( skgrepo_boundary_token (metadata, skgrepo_labels) )
-    parts += diff_heralds_tokens (metadata)
-    if metadata_has_atom (metadata, "folded"):
-      parts . append ("folded")
+def handle_text (view_line, herald_tables, context):
+  """'⟨ID HERALDS folded⟩': ID the headline's viewnode ID, HERALDS
+  every herald a client shows for it but a bare 'aC', and 'folded'
+  when a client shows it collapsed."""
+  viewnode_id = headline_viewnode_id (view_line . metadata)
+  if viewnode_id is None:
+    raise SkgToolError (
+      f"Line {view_line . line_number} of the view is a headline without "
+      "a viewnode ID, so it can have no handle: " + view_line . text )
+  parts = [ viewnode_id ]
+  heralds = herald_text (
+    view_line . metadata, herald_tables, context,
+    omitted_relationship_tokens = ( BARE_PARENT_CONTAINS_TOKEN, ))
+  if heralds:
+    parts . append (heralds)
+  if metadata_has_atom (view_line . metadata, "folded"):
+    parts . append ("folded")
   return "⟨" + " " . join (parts) + "⟩"
 
-def skgrepo_boundary_token (metadata, skgrepo_labels):
-  """'⌂:LABEL', LABEL the herald label of the headline's home
-  skgrepo, as the clients render 'repoBoundary'; a bare '⌂' when the
-  headline names no home skgrepo."""
+# ============================================================
+# Every herald, as the clients render a headline's metadata, styles
+# dropped. The server serves the rule table ('herald rules'), which
+# the lens below applies to the metadata; it mirrors
+# 'nvim/lua/skg/sexpr/lens.lua', the port of
+# 'elisp/skg-sexpr/skg-lens.el', whose docstrings give the rule
+# grammar. The rule table only positions the relationship heralds,
+# with a sentinel that 'relationship_heralds_text' fills. Three
+# heralds need what one headline's metadata cannot say, which a
+# client supplies from the headlines around it and the label table
+# ('docs/heralds.org', "What the server serves, and what the clients
+# add"): a 'repoBoundary' gets its skgrepo's label, a pending
+# detachment the atom 'pendingDetachment', and a changed folder its
+# changed label in place of the lens's. 'chunks_from_metadata' in
+# 'nvim/lua/skg/heralds.lua' and 'heralds-from-metadata' in
+# 'elisp/heralds-minor-mode.el' do the same.
+# ============================================================
+
+def herald_styles ():
+  with open ( os . path . join (SHARED_FOLDER, "herald-styles.json"),
+              encoding = "utf-8" ) as styles_file:
+    return json . load (styles_file)
+
+HERALD_STYLES = herald_styles ()
+# The style keywords a rule may open with: each style's name in
+# capitals, as the served rule table spells it.
+STYLE_KEYWORDS = { name . upper () for name in HERALD_STYLES [ "styles" ] }
+FOLDER_HERALDS = HERALD_STYLES [ "folder_heralds" ]
+# What the rule table emits where the relationship heralds go
+# ('RELS_SPANS_SENTINEL' in 'server/heralds.rs').
+RELATIONSHIP_HERALDS_SENTINEL = "__RELS_SPANS__"
+
+class HeraldTables:
+  """The two tables the server serves over 'herald rules': the rule
+  table, parsed, and {REPO: LABEL}, each configured skgrepo's herald
+  label."""
+  def __init__ (self, rules, skgrepo_labels):
+    self . rules = rules
+    self . skgrepo_labels = skgrepo_labels
+
+def fetch_herald_tables (connection):
+  """The connection's HeraldTables, fetched on its first use, so once
+  per command."""
+  if connection . herald_tables is None:
+    response = connection . request ( request_line ("herald rules") )
+    require_response_type (response, "herald-rules")
+    connection . herald_tables = herald_tables_of_response (response)
+  return connection . herald_tables
+
+def herald_tables_of_response (response):
+  """The HeraldTables of a 'herald rules' response: its
+  '(content "RULES")' and '(skgrepoLabels ("REPO" "LABEL")...)'."""
+  labels = metadata_form ( [ None ] + response, "skgrepoLabels" ) or [ None ]
+  return HeraldTables (
+    parse_sexp ( response_field (response, "content") ),
+    { sexp_to_text ( entry [0] ) : sexp_to_text ( entry [1] )
+      for entry in labels [ 1 : ] } )
+
+class HeraldContext:
+  """What a headline's heralds need from the headlines around it.
+  'folder_change' is None, or, for a folder a member of which carries
+  a change of its relationship to the folder's viewparent, whether
+  every such change is ready; 'pending_detachment' whether the
+  headline is a pending detachment."""
+  def __init__ (self, folder_change = None, pending_detachment = False):
+    self . folder_change = folder_change
+    self . pending_detachment = pending_detachment
+
+def herald_text (metadata, herald_tables, context = HeraldContext (),
+                 omitted_relationship_tokens = ()):
+  """The heralds a client shows for METADATA, the parsed '(skg ...)',
+  as text: tokens separated by a space, but those the rule table
+  marks ABUT, which join the one before. OMITTED_RELATIONSHIP_TOKENS
+  are relationship tokens left out."""
+  folder = folder_atom (metadata)
+  if ( context . folder_change is not None and folder is not None
+       and folder in FOLDER_HERALDS [ "changed_labels" ] ):
+    return changed_folder_herald_text (folder, context . folder_change)
+  lensed = metadata_with_repoBoundary_label (
+    metadata, herald_tables . skgrepo_labels )
+  if context . pending_detachment:
+    lensed = lensed + [ Symbol ("pendingDetachment") ]
+  relationship_text = " " . join (
+    token for token in relationship_heralds_text (metadata) . split ()
+    if token not in omitted_relationship_tokens )
+  return lens_tokens_as_text (
+    lens_tokens (lensed, herald_tables . rules), relationship_text )
+
+def changed_folder_herald_text (folder, ready):
+  """A changed folder's herald: its ☮ when it is write-protected, its
+  changed label, then ✓ when READY."""
+  return ( ( "☮ " if folder in FOLDER_HERALDS [ "write_protected" ] else "" )
+           + FOLDER_HERALDS [ "changed_labels" ] [folder]
+           + ( "✓" if ready else "" ))
+
+def metadata_with_repoBoundary_label (metadata, skgrepo_labels):
+  """METADATA with the atom 'repoBoundary' in its '(view ...)'
+  replaced by '(repoBoundary LABEL)', LABEL the label SKGREPO_LABELS
+  gives its nodeRepo, or that nodeRepo when the table lacks it. A
+  headline naming no nodeRepo keeps the bare atom, which renders "⌂"."""
   repo = headline_node_repo (metadata)
   if repo is None:
-    return "⌂"
-  return "⌂:" + skgrepo_labels . get (repo, repo)
+    return metadata
+  label = skgrepo_labels . get (repo, repo)
+  return [ [ [ Symbol ("repoBoundary"), label ]
+             if is_symbol_named (fact, "repoBoundary") else fact
+             for fact in part ]
+           if is_list_headed_by (part, "view") else part
+           for part in metadata ]
 
-# ============================================================
-# Diff heralds, as the clients render a headline's '(diff ...)' change
-# facts ('docs/heralds.org', "Diff heralds"; the rules are
-# 'change_fact_rules_for_two_objects' and
-# 'change_fact_rules_for_one_object' in 'server/heralds.rs'), styles
-# dropped. A node or a ghost has two diff objects, its node (∃+ new,
-# ∃- deleted, M modified) and its relationship to its viewparent (~+,
-# ~-); every other headline that names leaves has one. A ✓ follows
-# each object whose changes are all marked ready.
-# ============================================================
+def lens_tokens_as_text (tokens, relationship_text):
+  """TOKENS joined as a client shows them: separated by a space, but a
+  token marked abut, which joins the one before; structural colons
+  stripped. The first sentinel token becomes RELATIONSHIP_TEXT, and
+  any later one is dropped (the rule table emits one for '(rels ...)'
+  and one for '(props ...)')."""
+  pieces = []
+  relationship_text_placed = False
+  for text, abut in tokens:
+    if text == RELATIONSHIP_HERALDS_SENTINEL:
+      if not relationship_text or relationship_text_placed:
+        continue
+      text = relationship_text
+      relationship_text_placed = True
+    else:
+      text = without_structural_colons (text)
+      if not text:
+        continue
+    if pieces and not abut:
+      pieces . append (" ")
+    pieces . append (text)
+  return "" . join (pieces)
 
-TWO_OBJECT_KINDS = { "node", "ghost" }
-RELATIONSHIP_ONLY_KINDS = { "unknown", "restricted" }
+def without_structural_colons (text):
+  """TEXT without the colons the lens joins atoms with where they
+  mean nothing: a colon is structural when the character before or
+  after it is not alphanumeric, '+', '-' or a space, except a colon
+  after '⌂' ("⌂:LABEL") or before '~' ("request:~NAME").
+  ('strip_structural_colons' in 'nvim/lua/skg/heralds.lua'.)"""
+  def keeps_adjacent_colon (character):
+    return character in "+ -" or character . isalnum ()
+  kept = []
+  index = 0
+  while index < len (text):
+    previous = text [ index - 1 ] if index > 0 else None
+    this = text [index]
+    following = text [ index + 1 ] if index + 1 < len (text) else None
+    if ( following == ":" and this not in ":⌂"
+         and not keeps_adjacent_colon (this) ):
+      kept . append (this)
+      index += 2
+    elif ( this == ":" and following is not None and previous != "⌂"
+           and following != "~" and not keeps_adjacent_colon (following) ):
+      kept . append (following)
+      index += 2
+    else:
+      kept . append (this)
+      index += 1
+  return "" . join (kept)
 
-def diff_heralds_tokens (metadata):
-  diff = metadata_form (metadata, "diff")
-  if diff is None:
+# ------------------------------------------------------------
+# The lens: a rule table applied to a sexp. A token is ( TEXT, ABUT ).
+# ------------------------------------------------------------
+
+def lens_tokens (sexp, rules):
+  """RULES applied to SEXP, when RULES' label is SEXP's head."""
+  if not isinstance (sexp, list) or not isinstance (rules, list):
     return []
-  ready = metadata_form (diff, "ready")
-  ready_objects = ( None if ready is None
-                    else { str (element) for element in ready [ 1 : ] } )
-  def existence_sign (object_name):
-    form = metadata_form (diff, object_name)
-    if form is None or len (form) < 2:
-      return None
-    return { "added" : "+", "removed" : "-" } . get ( str ( form [1] ))
-  kind = headline_kind (metadata)
-  tokens = []
-  if kind in TWO_OBJECT_KINDS:
-    node_sign = existence_sign ("node")
-    node_token = ( "∃" + node_sign if node_sign
-                   else "M" if metadata_form (diff, "properties") is not None
-                   else None )
-    if node_token:
-      tokens . append (
-        node_token + ( "✓" if ready_objects
-                       and ready_objects & { "node", "all" } else "" ))
-    rel_sign = existence_sign ("rel")
-    if rel_sign:
-      tokens . append (
-        "~" + rel_sign + ( "✓" if ready_objects
-                           and "rel" in ready_objects else "" ))
-  else:
-    sign = existence_sign ("node") or existence_sign ("rel")
-    readiness_mark = "✓" if ready_objects is not None else ""
-    if sign:
-      tokens . append (
-        ( "~" if kind in RELATIONSHIP_ONLY_KINDS else "" ) + sign +
-        readiness_mark )
-    elif readiness_mark:
-      tokens . append (readiness_mark)
-  home_move = metadata_form (diff, "homeSkgrepoMove")
-  if home_move is not None:
-    tokens += [ "-" + sexp_to_text ( metadata_form (home_move, "old") [1] ),
-                "+" + sexp_to_text ( metadata_form (home_move, "new") [1] ) ]
-  moved_like = metadata_form (diff, "movedLikeAncestor")
-  if moved_like is not None:
-    tokens . append ( "Δ⌂=" + sexp_to_text ( moved_like [1] ))
-  return tokens
+  header = lens_rule_header (rules)
+  if not sexp or not sexp_values_equal ( sexp [0], header [ "label" ] ):
+    return []
+  return lens_transform_from (sexp, header)
+
+def lens_rule_header (rule):
+  """RULE parsed:
+    RULE        ::= WHEN-BODY | [STYLE] (INTERC-BODY | SIMPLE-BODY)
+    WHEN-BODY   ::= WHEN LABEL... CHILDREN...
+    INTERC-BODY ::= INTERC SEP [LABEL] CHILDREN...
+    SIMPLE-BODY ::= LABEL [ABUT] CHILDREN...
+  A simple body is 'non_leaf' when a child is a list, else 'any_leaf'
+  when its label is ANY, else 'atomic_leaf'."""
+  index = 0
+  if is_symbol_named ( rule [index], "WHEN" ):
+    index += 1
+    labels = []
+    while index < len (rule) and isinstance ( rule [index], Symbol ):
+      labels . append ( rule [index] )
+      index += 1
+    return { "kind" : "when", "labels" : labels, "label" : None,
+             "abut" : False, "children" : rule [ index : ] }
+  if isinstance ( rule [index], Symbol ) and rule [index] in STYLE_KEYWORDS:
+    index += 1
+  if is_symbol_named ( rule [index], "INTERC" ):
+    separator = rule [ index + 1 ]
+    index += 2
+    label = None
+    if ( index < len (rule) and isinstance ( rule [index], Symbol )
+         and rule [index] not in STYLE_KEYWORDS ):
+      label = rule [index]
+      index += 1
+    return { "kind" : "interc", "separator" : separator, "label" : label,
+             "abut" : False, "children" : rule [ index : ] }
+  label = rule [index]
+  index += 1
+  abut = index < len (rule) and is_symbol_named ( rule [index], "ABUT" )
+  if abut:
+    index += 1
+  children = rule [ index : ]
+  kind = ( "non_leaf" if any ( isinstance (child, list) for child in children )
+           else "any_leaf" if is_symbol_named (label, "ANY")
+           else "atomic_leaf" )
+  return { "kind" : kind, "label" : label, "abut" : abut,
+           "children" : children }
+
+def lens_transform_from (sexp, header):
+  """The tokens of HEADER's list children applied to SEXP, each after
+  the concatenated string children; the string children alone when
+  no list child gives a token."""
+  prefix = lens_string_children (header [ "children" ])
+  results = [ token for child in header [ "children" ]
+              if isinstance (child, list)
+              for token in lens_dispatch (sexp, child) ]
+  if not prefix:
+    return results
+  if not results:
+    return [ ( prefix, False ) ]
+  return [ ( prefix + text, False ) for text, abut in results ]
+
+def lens_dispatch (sexp, rule_child):
+  header = lens_rule_header (rule_child)
+  kind = header [ "kind" ]
+  if kind == "when":
+    # The children apply to SEXP itself when an element of SEXP is
+    # one of the labels, or a list headed by one.
+    return ( lens_transform_from (sexp, header)
+             if any ( lens_atomic_matches (sexp, label)
+                      or lens_children_with_label (sexp, label)
+                      for label in header [ "labels" ] )
+             else [] )
+  if kind == "interc":
+    return lens_interc_tokens (sexp, header)
+  if kind == "any_leaf":
+    return lens_any_leaf_tokens (sexp, header)
+  if kind == "atomic_leaf":
+    if not header [ "children" ]:
+      return []
+    return [ ( lens_joined_text ( header [ "children" ] ), header [ "abut" ] )
+             for _ in lens_atomic_matches ( sexp, header [ "label" ] ) ]
+  return [ token
+           for match in lens_children_with_label ( sexp, header [ "label" ] )
+           for token in lens_transform_from (match, header) ]
+
+def lens_interc_tokens (sexp, header):
+  """With a label, a token per child of SEXP headed by it; without, at
+  most one, of SEXP itself. A token joins with the separator the
+  nonempty outputs of the list sub-rules, after the string children;
+  it is left out when every output is empty."""
+  prefix = lens_string_children (header [ "children" ])
+  separator = lens_display_text ( header [ "separator" ] )
+  targets = ( lens_children_with_label ( sexp, header [ "label" ] )
+              if header [ "label" ] is not None else [ sexp ] )
+  results = []
+  for target in targets:
+    slots = [ "" . join ( text for text, abut in lens_dispatch (target, child) )
+              for child in header [ "children" ] if isinstance (child, list) ]
+    if any (slots):
+      results . append (
+        ( prefix + separator . join ( slot for slot in slots if slot ),
+          False ) )
+  return results
+
+def lens_any_leaf_tokens (sexp, header):
+  """'(ANY CHILD...)': one token of the children, or, when a child is
+  IT, a token per element of SEXP after its head, that element in
+  IT's place."""
+  children = header [ "children" ]
+  if not children:
+    return []
+  if not any ( is_symbol_named (child, "IT") for child in children ):
+    return [ ( lens_joined_text (children), header [ "abut" ] ) ]
+  return [ ( lens_joined_text (
+               [ element if is_symbol_named (child, "IT") else child
+                 for child in children ] ),
+             header [ "abut" ] )
+           for element in sexp [ 1 : ] ]
+
+def lens_joined_text (values):
+  return ":" . join ( lens_display_text (value) for value in values )
+
+def lens_display_text (value):
+  return render_sexp (value) if isinstance (value, list) else str (value)
+
+def lens_string_children (children):
+  return "" . join ( child for child in children
+                     if isinstance (child, str)
+                     and not isinstance (child, Symbol) )
+
+def lens_children_with_label (sexp, label):
+  return [ element for element in sexp [ 1 : ]
+           if isinstance (element, list) and element
+           and sexp_values_equal ( element [0], label ) ]
+
+def lens_atomic_matches (sexp, label):
+  return [ element for element in sexp [ 1 : ]
+           if not isinstance (element, list)
+           and sexp_values_equal (element, label) ]
+
+def sexp_values_equal (left, right):
+  """Equality of parsed sexps, a symbol never equal to a string."""
+  if isinstance (left, list) or isinstance (right, list):
+    return ( isinstance (left, list) and isinstance (right, list)
+             and len (left) == len (right)
+             and all ( sexp_values_equal (l, r)
+                       for l, r in zip (left, right) ))
+  return type (left) is type (right) and left == right
+
+def is_symbol_named (value, name):
+  return isinstance (value, Symbol) and value == name
+
+def is_list_headed_by (value, name):
+  return isinstance (value, list) and bool (value) and is_symbol_named (
+    value [0], name )
+
+# ------------------------------------------------------------
+# What a headline's heralds need from the headlines around it, read
+# from the full view as a client reads it from its buffer
+# ('folder_change_readiness_in_lines' and
+# 'pending_detachment_in_lines' in 'nvim/lua/skg/metadata.lua').
+# ------------------------------------------------------------
+
+def herald_contexts (parsed_view):
+  """{LINE_NUMBER: HeraldContext} for each headline of the full view
+  that has metadata."""
+  headlines = [ line for line in parsed_view if line . is_headline ]
+  parents = parent_indices_by_level (
+    [ len ( line . stars ) for line in headlines ] )
+  def metadata_at (index):
+    return None if index is None else headlines [index] . metadata
+  contexts = {}
+  for index, line in enumerate (headlines):
+    if line . metadata is None:
+      continue
+    parent = parents [index]
+    contexts [ line . line_number ] = HeraldContext (
+      folder_change_readiness (headlines, index),
+      is_pending_detachment (
+        line . metadata, metadata_at (parent),
+        metadata_at ( None if parent is None else parents [parent] )))
+  return contexts
+
+def parent_indices_by_level (levels):
+  """The index of each headline's parent, by the outline LEVELS, or
+  None for a top-level one."""
+  parents = []
+  open_ancestors = [] # indices, outermost first
+  for index, level in enumerate (levels):
+    while open_ancestors and levels [ open_ancestors [-1] ] >= level:
+      open_ancestors . pop ()
+    parents . append ( open_ancestors [-1] if open_ancestors else None )
+    open_ancestors . append (index)
+  return parents
+
+def folder_change_readiness (headlines, index):
+  """For a folder headline, None when none of its members (its child
+  headlines) carries a change of its relationship to the folder's
+  viewparent, else whether every such change is ready; None for any
+  other headline."""
+  if ( headlines [index] . metadata is None
+       or folder_atom ( headlines [index] . metadata ) is None ):
+    return None
+  level = len ( headlines [index] . stars )
+  members = [] # each ( METADATA, [CHILD METADATA] )
+  for later in headlines [ index + 1 : ]:
+    later_level = len ( later . stars )
+    if later_level <= level:
+      break
+    if later_level == level + 1:
+      members . append ( ( later . metadata, [] ) )
+    elif ( later_level == level + 2 and members
+           and later . metadata is not None ):
+      members [-1] [1] . append ( later . metadata )
+  readinesses = [ membership_change_readiness (member, children)
+                  for member, children in members if member is not None ]
+  readinesses = [ ready for ready in readinesses if ready is not None ]
+  return all (readinesses) if readinesses else None
+
+def membership_change_readiness (member, children):
+  """None when the folder member MEMBER carries no change of its
+  relationship to the folder's viewparent (a '(rel ...)' in its
+  '(diff ...)', or a 'relRepoMove' child), else whether it is ready."""
+  changed, ready = False, True
+  diff = metadata_form (member, "diff")
+  if metadata_form (diff, "rel") is not None:
+    changed = True
+    leaves = leaves_fact (member)
+    ready = objects_ready (
+      member, [ "rel" ] if leaves and "rel" in leaves [1] else [] )
+  for child in children:
+    if metadata_form (child, "relRepoMove") is not None:
+      changed = True
+      ready = ready and metadata_form (
+        metadata_form (child, "diff"), "ready" ) is not None
+  return ready if changed else None
+
+def objects_ready (metadata, objects):
+  """Whether the headline's '(ready ...)' names every one of OBJECTS;
+  with none listed, whether it has a '(ready ...)'."""
+  ready = metadata_form ( metadata_form (metadata, "diff"), "ready" )
+  if ready is None:
+    return False
+  return set (objects) <= { str (element) for element in ready [ 1 : ] }
+
+def is_pending_detachment (metadata, parent, grandparent):
+  """Whether a headline with METADATA, under a parent with PARENT
+  whose own parent has GRANDPARENT, carries 'noClaim', is warranted by
+  the graph (no 'noWarrant' or 'ghostWarrant', no '(rel removed)'),
+  and stands under a parent that reads its children's claims: a node
+  that is not write-protected, or a folder that is not write-protected
+  whose viewparent is such a node."""
+  view = metadata_form (metadata, "view") or []
+  rel = metadata_form ( metadata_form (metadata, "diff"), "rel" )
+  if ( not metadata_has_atom (metadata, "noClaim")
+       or metadata_has_atom (view, "noWarrant")
+       or metadata_has_atom (view, "ghostWarrant")
+       or ( rel is not None and len (rel) == 2
+            and is_symbol_named ( rel [1], "removed" ))):
+    return False
+  def is_editable_node (sexp):
+    return ( sexp is not None and metadata_has_atom (sexp, "node")
+             and not metadata_has_atom (sexp, "writeProtected") )
+  if parent is not None and folder_atom (parent) is not None:
+    return ( folder_atom (parent) not in FOLDER_HERALDS [ "write_protected" ]
+             and is_editable_node (grandparent) )
+  return is_editable_node (parent)
+
+# ============================================================
+# Change facts: a headline's '(diff (leaves ...) (ready ...))', which
+# the summary of a buffer of the diff view counts and a readiness
+# request names ('docs/api-and-formats.org', "Metadata of the diff
+# view").
+# ============================================================
 
 def leaves_fact (metadata):
   """( N, OBJECTS ) of the headline's '(diff (leaves N OBJECT...))',
@@ -1275,9 +1710,10 @@ def summary_lines (parsed_view, link_statuses, repo_ownership, view,
            if view [ "command" ] == "diff" else [] ) + [
     "# skg-for-ai compact view of " + full_file_name +
       " (view ID " + view [ "view_id" ] + ")",
-    "# Each headline ends in ⟨N ...⟩, N its line number in the full view;",
-    "# a bare 'aC' (only the parent contains it) is left out, and 'folded'",
-    "# marks a headline a client shows collapsed.",
+    "# Each headline ends in its handle ⟨ID HERALDS⟩: ID its viewnode ID,",
+    "# the '(vnid ID)' of its metadata in the full view, and HERALDS what a",
+    "# client shows for it, but a bare 'aC' (only the parent contains it);",
+    "# 'folded' marks a headline a client shows collapsed.",
     facts ( ( "Headlines", len (headlines) ),
             ( "node occurrences", len (occurrences) ),
             ( "distinct nodes",
@@ -1370,10 +1806,10 @@ def side_count (metadata, relation_name, side_name):
 # Saving an edited compact view
 # ============================================================
 
-# A compact headline's handle, at the end of the line: its number,
-# then any display tokens.
+# A compact headline's handle, at the end of the line: its viewnode
+# ID, then any display tokens.
 COMPACT_HANDLE_PATTERN = re . compile (
-  r'^(.*?) ?⟨([0-9]+)((?: [^⟨⟩]*)?)⟩\s*$' )
+  r'^(.*?) ?⟨([0-9a-z]+)((?: [^⟨⟩]*)?)⟩\s*$' )
 # The handle tokens that ask for edit requests. The rebuild writes
 # them into the headline's '(editRequest ...)': one of the first three,
 # the request of that name, and after it one readiness request,
@@ -1402,6 +1838,14 @@ class SavedView:
     with open (self . compact_path, encoding = "utf-8") as compact_file:
       self . compact_text = compact_file . read ()
     self . parsed_view = parse_full_view (self . full_text)
+    self . headline_of_handle = headlines_by_viewnode_id (self . parsed_view)
+
+def headlines_by_viewnode_id (parsed_view):
+  """{VIEWNODE ID: VIEWLINE} for each headline of the full view."""
+  return { headline_viewnode_id ( line . metadata ) : line
+           for line in parsed_view
+           if line . is_headline
+           and headline_viewnode_id ( line . metadata ) is not None }
 
 def load_saved_view (path):
   """PATH is a sidecar, or a directory holding exactly one."""
@@ -1418,7 +1862,7 @@ def load_saved_view (path):
 
 class OutlineHeadline:
   """A headline of the full view or of the edited compact view.
-  'handle' is its full-view line number (None for a new headline),
+  'handle' is its viewnode ID (None for a new headline),
   'parent' the index of its parent in the same outline (None at the
   top level), 'tokens' the display tokens of its handle, 'body' its
   body lines, link annotations stripped."""
@@ -1472,7 +1916,7 @@ def edited_headline (compact_line_number, level, text_after_stars):
       None, level, strip_link_annotations (text_after_stars) . rstrip (),
       [], compact_line_number )
   return OutlineHeadline (
-    int ( match . group (2) ), level,
+    match . group (2), level,
     strip_link_annotations ( match . group (1) ),
     match . group (3) . split (), compact_line_number )
 
@@ -1484,42 +1928,35 @@ def outline_of_full_view (parsed_view):
   for view_line in parsed_view:
     if view_line . is_headline:
       headlines . append ( OutlineHeadline (
-        view_line . line_number, len (view_line . stars), view_line . title,
-        [], None ))
+        headline_viewnode_id ( view_line . metadata ),
+        len (view_line . stars), view_line . title, [], None ))
     elif headlines:
       headlines [-1] . body . append (view_line . text)
   assign_parents (headlines)
   return headlines
 
 def assign_parents (headlines):
-  open_ancestors = [] # indices, outermost first
-  for index, headline in enumerate (headlines):
-    while ( open_ancestors and
-            headlines [ open_ancestors [-1] ] . level >= headline . level ):
-      open_ancestors . pop ()
-    headline . parent = open_ancestors [-1] if open_ancestors else None
-    open_ancestors . append (index)
+  for headline, parent in zip (
+      headlines, parent_indices_by_level (
+        [ headline . level for headline in headlines ] )):
+    headline . parent = parent
 
-def handle_error_lines (edited, parsed_view):
+def handle_error_lines (edited, headline_of_handle):
   """A line per handle that names no headline of the full view, and
   per handle whose request tokens make no one '(editRequest ...)'.
-  Whether the server accepts a request is the server's to say."""
+  HEADLINE_OF_HANDLE maps each viewnode ID of the full view to its
+  headline. Whether the server accepts a request is the server's to
+  say."""
   errors = []
   for headline in edited:
     if headline . handle is None:
       continue
     where = ( f"⟨{headline . handle}⟩ on line {headline . compact_line_number} "
               "of the compact view" )
-    if not 1 <= headline . handle <= len (parsed_view):
+    view_line = headline_of_handle . get ( headline . handle )
+    if view_line is None:
       errors . append (
-        f"Error: {where} names no line; the full view has "
-        f"{len (parsed_view)} lines." )
-      continue
-    view_line = parsed_view [ headline . handle - 1 ]
-    if not view_line . is_headline:
-      errors . append (
-        f"Error: {where} names line {headline . handle} of the full view, "
-        "a body line, not a headline." )
+        f"Error: {where} names no headline of the full view." )
     elif headline . has_requests ():
       errors += [ f"Error: {where} {problem}"
                   for problem in request_token_problems (headline, view_line) ]
@@ -1579,27 +2016,27 @@ def unmarked_leaf_count (headline, view_line):
 # Rebuilding the full buffer
 # ------------------------------------------------------------
 
-def rebuilt_full_buffer (edited, parsed_view, full_text):
+def rebuilt_full_buffer (edited, headline_of_handle, full_text):
   """Each headline at its edited level and title, with the metadata of
-  the full-view line its handle names, plus the '(editRequest ...)'
+  the full-view headline its handle names, plus the '(editRequest ...)'
   its handle's tokens ask for; a headline without a handle bare, which
   the save reads as a new node; bodies as edited."""
   lines = []
   for headline in edited:
-    lines . append ( rebuilt_headline_line (headline, parsed_view) )
+    lines . append ( rebuilt_headline_line (headline, headline_of_handle) )
     lines += headline . body
   text = "\n" . join (lines)
   return text + "\n" if full_text . endswith ("\n") else text
 
-def rebuilt_headline_line (headline, parsed_view):
+def rebuilt_headline_line (headline, headline_of_handle):
   stars = "*" * headline . level
   metadata_text = (
     None if headline . handle is None
-    else parsed_view [ headline . handle - 1 ] . metadata_text )
+    else headline_of_handle [ headline . handle ] . metadata_text )
   if metadata_text is None:
     return stars + " " + headline . title
   request = edit_request_text (
-    headline, parsed_view [ headline . handle - 1 ] )
+    headline, headline_of_handle [ headline . handle ] )
   if request:
     metadata_text = metadata_text_with_part (
       metadata_text, request, ( "viewRequests", "view", "diff" ))
@@ -1610,7 +2047,7 @@ def rebuilt_headline_line (headline, parsed_view):
 # The report of changes
 # ------------------------------------------------------------
 
-def change_report_lines (edited, original, parsed_view):
+def change_report_lines (edited, original, headline_of_handle):
   """One line per change, by kind: deletions, removals, moves,
   reorderings, new headlines, repeated handles, titles, then a count
   of changed bodies."""
@@ -1626,13 +2063,7 @@ def change_report_lines (edited, original, parsed_view):
     else:
       first_edited_index_of_handle [ headline . handle ] = index
   def described (handle):
-    """'⟨N⟩ TITLE', from the full view."""
-    view_line = parsed_view [ handle - 1 ]
-    if view_line . title:
-      return f"⟨{handle}⟩ '{view_line . title}'"
-    kind = ( headline_kind (view_line . metadata)
-             if view_line . metadata is not None else "headline" )
-    return f"⟨{handle}⟩ ({kind})"
+    return described_handle (handle, headline_of_handle)
   def edited_parent_key (index):
     """The parent's handle; ('new', INDEX) for a new parent; None at
     the top level."""
@@ -1658,7 +2089,7 @@ def change_report_lines (edited, original, parsed_view):
                       if headline . handle not in first_edited_index_of_handle }
   lines = request_report_lines (
     [ headline for headline in edited if headline . handle is not None ],
-    parsed_view, described )
+    headline_of_handle, described )
   removal_lines = []
   for index, headline in enumerate (original):
     if ( headline . handle not in removed_handles
@@ -1736,7 +2167,15 @@ def change_report_lines (edited, original, parsed_view):
       ", " . join ( f"⟨{handle}⟩" for handle in changed_bodies ) + ")." )
   return lines
 
-def request_report_lines (handled_headlines, parsed_view, described):
+def described_handle (handle, headline_of_handle):
+  """'⟨ID⟩ 'TITLE'', or for a headline without a title '⟨ID⟩ (KIND)',
+  from the full view."""
+  view_line = headline_of_handle [handle]
+  if view_line . title:
+    return f"⟨{handle}⟩ '{view_line . title}'"
+  return f"⟨{handle}⟩ ({headline_kind (view_line . metadata)})"
+
+def request_report_lines (handled_headlines, headline_of_handle, described):
   """The edit requests the handles' tokens ask for, by kind, each
   naming its headline through DESCRIBED; then, when the 'unready'
   requests unmark more than one leaf, the question a client asks
@@ -1752,11 +2191,11 @@ def request_report_lines (handled_headlines, parsed_view, described):
   for word, label in [ ( "ready", "Ready" ), ( "unready", "Unready" ) ]:
     lines += [ label + ": " + described (headline . handle) + ", as '" +
                readiness_request_text (
-                 headline, parsed_view [ headline . handle - 1 ] ) + "'."
+                 headline, headline_of_handle [ headline . handle ] ) + "'."
                for headline in handled_headlines
                if headline . readiness_words () == [ word ] ]
   unmarked = sum ( unmarked_leaf_count (
-                     headline, parsed_view [ headline . handle - 1 ] )
+                     headline, headline_of_handle [ headline . handle ] )
                    for headline in handled_headlines )
   if unmarked > 1:
     lines . append (
@@ -1846,6 +2285,7 @@ class SkgConnection:
       raise SkgToolError (
         f"No skg server answers on port {port}: {error}" )
     self . buffered = b""
+    self . herald_tables = None # 'fetch_herald_tables' fills it
 
   def close (self):
     self . socket . close ()

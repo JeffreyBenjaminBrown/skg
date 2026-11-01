@@ -1,0 +1,3 @@
+* An overridden node, outside the view ⟨0a 1O A1 ⌂:main⟩
+** ⟨0b aliases⟩
+*** Another name for it ⟨0c alias⟩

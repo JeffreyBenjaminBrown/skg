@@ -1,0 +1,11 @@
+* Second child, a subscriber ⟨0a 1C 1/L S1 H2 ⌂:main⟩
+** ⟨0i ☮ These link to it.⟩
+*** The fixture root ⟨0j ☮B 1C2b L2b⟩
+**** Above the root ⟨0k ☮ Ca⟩
+** ⟨0b ☮ These contain it.⟩
+*** The fixture root ⟨0c ☮B 1C2b L2b⟩
+**** Above the root ⟨0d ☮ Ca⟩
+** ⟨0e It subscribes to these.⟩
+*** Fred's note ⟨0f ☮ C1 1/L bS ⌂:fred⟩
+*** ⟨0g The subscriber ancestor hides these, but subscribes to nothing that contains them.⟩
+**** An aside of Fred's ⟨0h ☮ cH ⌂:fred folded⟩

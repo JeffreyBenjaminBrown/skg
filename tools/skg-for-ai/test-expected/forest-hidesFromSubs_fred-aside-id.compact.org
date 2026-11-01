@@ -1,0 +1,5 @@
+* An aside of Fred's ⟨0a 1H ⌂:fred⟩
+** ⟨0b ☮ These hide it from their subscriptions.⟩
+*** Second child, a subscriber ⟨0c ☮ 1C 1/L S1 H2b ⌂:main⟩
+**** The fixture root ⟨0d ☮B 1C2a L2a⟩
+***** Above the root ⟨0e ☮ Ca⟩

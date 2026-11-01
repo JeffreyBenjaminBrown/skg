@@ -1,15 +1,16 @@
 # skg-for-ai compact view of search_Fred.full.org (view ID search:Fred)
-# Each headline ends in ⟨N ...⟩, N its line number in the full view;
-# a bare 'aC' (only the parent contains it) is left out, and 'folded'
-# marks a headline a client shows collapsed.
+# Each headline ends in its handle ⟨ID HERALDS⟩: ID its viewnode ID,
+# the '(vnid ID)' of its metadata in the full view, and HERALDS what a
+# client shows for it, but a bare 'aC' (only the parent contains it);
+# 'folded' marks a headline a client shows collapsed.
 # Headlines 5, node occurrences 4, distinct nodes 3, folders 1.
 # Skgrepos: fred (foreign) 4.
 # Foreign 4, write-protected 4, folded 1.
 # Contained elsewhere too 1, subscribed to 2, subscribing 0.
 # Links 0, distinct targets 0, resolved 0, unresolved 0.
 # Server errors 0, warnings 0.
-* Fred's note ⟨1 C1 1/L 1S ⌂:fred⟩
-* An aside of Fred's ⟨2 1H ⌂:fred⟩
-* A detail of Fred's ⟨3 1C 1H ⌂:fred⟩
-** ⟨4 containerFolder folded⟩
-*** Fred's note ⟨5 Cb 1/L 1S⟩
+* Fred's note ⟨0a ☮ C1 1/L 1S ⌂:fred⟩
+* An aside of Fred's ⟨0b ☮ 1H ⌂:fred⟩
+* A detail of Fred's ⟨0c ☮ 1C 1H ⌂:fred⟩
+** ⟨0d ☮ These contain it. folded⟩
+*** Fred's note ⟨0e ☮ Cb 1/L 1S⟩

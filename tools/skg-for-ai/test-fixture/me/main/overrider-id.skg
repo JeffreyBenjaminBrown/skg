@@ -1,0 +1,6 @@
+pid: overrider-id
+title: An overrider, outside the view
+overrides:
+- overridden-id
+flags:
+- Had_ID_Before_Import
