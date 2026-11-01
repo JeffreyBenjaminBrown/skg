@@ -37,7 +37,15 @@ In order, it:
   then confirmed with '--yes'), checking 'git log' and that the diff
   view is then empty; then integrates a change a diff buffer does not
   make editable, and saves an edit of it; a blank commit message is
-  refused unsent.
+  refused unsent;
+- on a fourth scratch server, runs a daemon: commands through it write
+  what they write on their own connections; it rewrites a held view
+  after a save through it changes a node the view shows, and after a
+  second server over the same data root saves one (the first server's
+  watcher integrates the file), logging each, but keeps a view with
+  unsaved edits; it logs the warning of a file the watcher cannot
+  read; 'close' and 'daemon --stop' release its views; a socket a
+  killed daemon left is replaced, and SIGTERM stops a daemon.
 '--update-expected' rewrites the expected files instead of comparing.
 """
 
@@ -259,7 +267,8 @@ def shared_herald_cases ():
 def failures_against_scratch_servers (update_expected):
   """The reading checks on one scratch server, then the writing
   checks on another, then the reviewing checks on a third, whose owned
-  skgrepo is a gitrepo; each on its own copy of the fixture."""
+  skgrepo is a gitrepo, then the daemon's on a fourth; each on its own
+  copy of the fixture."""
   if not os . path . exists (SERVER_BINARY):
     return [ f"no server binary at {SERVER_BINARY}; run 'cargo build --bin skg'" ]
   return ( failures_on_a_scratch_server (
@@ -267,7 +276,8 @@ def failures_against_scratch_servers (update_expected):
                failures_of_reading (scratch, data_root, update_expected) )
            + failures_on_a_scratch_server (failures_of_writing)
            + failures_on_a_scratch_server (
-               failures_of_reviewing, owned_skgrepo_in_git = True ))
+               failures_of_reviewing, owned_skgrepo_in_git = True )
+           + failures_on_a_scratch_server (failures_of_daemon) )
 
 def failures_on_a_scratch_server (check, owned_skgrepo_in_git = False):
   """CHECK (SCRATCH, DATA_ROOT)'s failures, run against a server on a
@@ -1136,6 +1146,325 @@ EXPECTED_DIFF_COMPACT = (
   "******** Above the root ⟨0n ☮ Ca ⟳⟩\n"
   "*** Second child, a subscriber ⟨0o ☮ a/L S1 H2⟩\n" )
 
+# ============================================================
+# The daemon: each case runs on the graph and the daemon the earlier
+# ones left. A second server, on the same data root with its own port
+# and search index, stands for a teammate's: its saves reach the
+# daemon's server only through the files on disk.
+# ============================================================
+
+DAEMON_READY_TIMEOUT_SECONDS = 30
+# How long a case waits for the watcher to integrate a change on disk
+# and the daemon to log it.
+DAEMON_LOG_TIMEOUT_SECONDS = 20
+SECOND_SERVER_PORT = PORT + 1
+# What a daemon prints once its socket answers.
+DAEMON_READY_LINE = "The daemon listens on"
+INTEGRATED_ONE_MAIN_FILE = (
+  "warning: Integrated 1 file that changed on disk in skgrepo 'main'." )
+
+def failures_of_daemon (scratch, data_root):
+  context = { "scratch"       : scratch,
+              "data_root"     : data_root,
+              "main_repo"     : os . path . join (data_root, "me", "main"),
+              "daemon_folder" : os . path . join (scratch, "daemon"),
+              "processes"     : [] }
+  try:
+    for case in [ check_daemon_starts, check_daemon_writes_what_a_command_writes,
+                  check_daemon_rewrites_a_collateral_rerender,
+                  check_daemon_rewrites_after_a_change_on_disk,
+                  check_daemon_keeps_unsaved_edits,
+                  check_daemon_logs_an_integration_warning,
+                  check_daemon_closes_a_view, check_daemon_stops,
+                  check_daemon_replaces_a_stale_socket ]:
+      try:
+        case (context)
+      except CaseFailure as failure:
+        return [ case . __name__ + ": " + str (failure) +
+                 "\nThe daemon's log:\n" + daemon_log (context) ]
+    return []
+  finally:
+    for process in context [ "processes" ]:
+      if process . poll () is None:
+        process . kill ()
+        process . wait (timeout = 30)
+
+def check_daemon_starts (context):
+  start_daemon (context)
+  require_log_line (context, "started: process ")
+
+def check_daemon_writes_what_a_command_writes (context):
+  """Each command, run once through the daemon (with no '--port': it
+  talks to the daemon's server) and once on its own connection, writes
+  the same full and compact views; the sidecars differ only in
+  whether the view is still open, which the daemon's is, and in the
+  generation it was rendered at, which the save of 'links-here'
+  advances."""
+  plain_folder = os . path . join ( context [ "scratch" ], "daemon-plain" )
+  for tool_arguments, base_name in [
+      ( [ "view", "root-id" ], "view_root-id" ),
+      ( [ "links-here", "child-b-id" ], "links-here_child-b-id" ),
+      ( [ "search", "Fred" ], "search_Fred" ) ]:
+    require_routed_run ( context, tool_arguments )
+    require_tool_run ( tool_arguments + [ "--out-dir", plain_folder ] )
+    for suffix in ( ".full.org", ".compact.org" ):
+      require_equal (
+        base_name + suffix + " through the daemon",
+        read_file ( os . path . join ( context [ "daemon_folder" ], base_name + suffix )),
+        read_file ( os . path . join ( plain_folder, base_name + suffix )) )
+    daemon_sidecar = read_sidecar ( context [ "daemon_folder" ], base_name )
+    plain_sidecar = read_sidecar (plain_folder, base_name)
+    require_equal ( base_name + "'s sidecars, open or not",
+                    ( daemon_sidecar . pop ("closed"), plain_sidecar . pop ("closed") ),
+                    ( False, True ) )
+    for sidecar in ( daemon_sidecar, plain_sidecar ):
+      int ( sidecar . pop ("rendered_at") )
+    require_equal ( base_name + "'s sidecar through the daemon",
+                    daemon_sidecar, plain_sidecar )
+  require_log_line ( context, "holding view_root-id (view ID content-view:root-id)" )
+
+def check_daemon_rewrites_a_collateral_rerender (context):
+  """A save through the daemon of one view retitles a node another
+  held view shows: the server rerenders that view as collateral, and
+  the daemon rewrites its files, before the save returns, and logs
+  why."""
+  folder = context [ "daemon_folder" ]
+  require_routed_run ( context, [ "view", "child-a-id" ] )
+  edit_compact ( folder, [ ( "* First child ⟨0a ",
+                             "* First child, renamed through the daemon ⟨0a " ) ],
+                 "view_child-a-id" )
+  completed = run_tool ( [ "save", os . path . join (folder, "view_child-a-id.view.json"),
+                           "--yes" ], port = None )
+  if completed . returncode != 0 or "Server: saved," not in completed . stdout:
+    raise CaseFailure ( f"the save printed {completed . stdout!r}, {completed . stderr!r}" )
+  require_in_file ( folder, "view_root-id",
+                    "** First child, renamed through the daemon ⟨0d aC1⟩\n" )
+  require_log_line ( context, "saved view_child-a-id" )
+  require_log_line (
+    context,
+    "re-rendered view_root-id because of 'save view_child-a-id.view.json --yes' "
+    "on the daemon's connection; 'First child, renamed through the daemon' "
+    "changed: title, was 'First child'" )
+
+def check_daemon_rewrites_after_a_change_on_disk (context):
+  """A save on the second server writes a file the daemon's server did
+  not write; its watcher integrates it and tells the daemon's
+  connection, naming the views that show the node; the daemon asks
+  for their rerender, rewrites their files and logs why."""
+  start_second_server (context)
+  second_folder = save_through_second_server (
+    context, "view_root-id",
+    ( "** Second child, a subscriber ⟨0f ",
+      "** Second child, renamed on the second server ⟨0f " ))
+  require_log_line ( context, INTEGRATED_ONE_MAIN_FILE )
+  require_log_line (
+    context,
+    "re-rendered view_root-id because files changed on disk (Integrated 1 "
+    "file that changed on disk in skgrepo 'main'.); 'Second child, renamed "
+    "on the second server' changed: title, was 'Second child, a subscriber'" )
+  require_log_line ( context, "re-rendered links-here_child-b-id because files changed on disk" )
+  require_in_file ( context [ "daemon_folder" ], "view_root-id",
+                    "** Second child, renamed on the second server ⟨0f " )
+  require_in_file ( context [ "daemon_folder" ], "links-here_child-b-id",
+                    "* Second child, renamed on the second server ⟨0a " )
+  context [ "second_folder" ] = second_folder
+
+def check_daemon_keeps_unsaved_edits (context):
+  """A held view whose compact view has unsaved edits is not
+  rerendered when a change on disk touches it: its edits stay, and
+  the log says so."""
+  folder = context [ "daemon_folder" ]
+  edit_compact ( folder, [ ( "** First child, renamed through the daemon ⟨0d ",
+                             "** First child, my unsaved edit ⟨0d " ) ])
+  save_through_second_server (
+    context, "view_child-a-id",
+    ( "* First child, renamed through the daemon ⟨0a ",
+      "* First child, renamed on the second server ⟨0a " ))
+  require_log_line ( context, "kept view_root-id: files changed on disk change "
+                              "a node it shows, but its compact view has unsaved edits" )
+  require_log_line ( context, "re-rendered view_child-a-id because files changed on disk" )
+  require_in_file ( folder, "view_root-id", "** First child, my unsaved edit ⟨0d " )
+
+def check_daemon_logs_an_integration_warning (context):
+  """A file the watcher cannot read is a warning in the log."""
+  bad_path = os . path . join ( context [ "main_repo" ], "bad-id.skg" )
+  with open (bad_path, "w", encoding = "utf-8") as bad_file:
+    bad_file . write ( "title: [unclosed\n" )
+  require_log_line ( context, "warning: Node bad-id changed on disk but could "
+                              "not be read, so the server keeps serving its "
+                              "previous version" )
+  os . remove (bad_path)
+
+def check_daemon_closes_a_view (context):
+  folder = context [ "daemon_folder" ]
+  sidecar_path = os . path . join (folder, "view_child-a-id.view.json")
+  require_output ( run_tool ( [ "close", sidecar_path ], port = None ),
+                   sidecar_path + "\n" )
+  require_equal ( "the closed sidecar's 'closed'",
+                  read_sidecar (folder, "view_child-a-id") [ "closed" ], True )
+  require_log_line ( context, "closed view_child-a-id" )
+
+def check_daemon_stops (context):
+  """'daemon --stop' releases every view (each sidecar says closed),
+  removes the socket and ends the daemon. A command then runs on its
+  own connection: a save of a view the daemon held is an ordinary
+  unheld save, which keeps its handles."""
+  folder = context [ "daemon_folder" ]
+  require_output (
+    run_tool ( [ "daemon", "--stop", "--out-dir", folder ], port = None ),
+    f"Stopped the daemon in {os . path . realpath (folder)}.\n" )
+  require_equal ( "the daemon's exit code",
+                  context [ "daemon" ] . wait (timeout = 30), 0 )
+  require_equal ( "whether the socket remains",
+                  os . path . lexists ( os . path . join (folder, "skg-for-ai.sock") ),
+                  False )
+  for name in os . listdir (folder):
+    if name . endswith (".view.json"):
+      require_equal ( name + "'s 'closed'",
+                      read_sidecar ( folder, name [ : - len (".view.json") ] ) [ "closed" ],
+                      True )
+  require_log_line ( context, "stopped: released 3 views" )
+  edit_compact ( folder, [ ( "* Second child, renamed on the second server ⟨0a ",
+                             "* Second child, saved after the daemon stopped ⟨0a " ) ],
+                 "links-here_child-b-id" )
+  completed = run_tool ([ "save", os . path . join (folder, "links-here_child-b-id.view.json"),
+                          "--yes" ])
+  if completed . returncode != 0 or "Server: saved," not in completed . stdout:
+    raise CaseFailure ( f"the save printed {completed . stdout!r}, {completed . stderr!r}" )
+  require_in_file ( folder, "links-here_child-b-id",
+                    "* Second child, saved after the daemon stopped ⟨0a " )
+  require_equal ( "child-b's title", skg_title (context, "child-b-id"),
+                  "Second child, saved after the daemon stopped" )
+
+def check_daemon_replaces_a_stale_socket (context):
+  """A daemon killed outright leaves its socket. A command then runs
+  on its own connection, and a new daemon replaces the socket; a
+  signal stops it as '--stop' does."""
+  folder = context [ "daemon_folder" ]
+  start_daemon (context) . kill ()
+  context [ "daemon" ] . wait (timeout = 30)
+  socket_path = os . path . join (folder, "skg-for-ai.sock")
+  require_equal ( "whether the dead daemon's socket remains",
+                  os . path . lexists (socket_path), True )
+  require_tool_run ([ "view", "shared-id", "--out-dir", folder ])
+  require_equal ( "the sidecar written beside a dead daemon's socket, 'closed'",
+                  read_sidecar (folder, "view_shared-id") [ "closed" ], True )
+  start_daemon (context)
+  require_log_line ( context, "replaced the socket a dead daemon left" )
+  require_routed_run ( context, [ "view", "shared-id" ] )
+  require_equal ( "the sidecar written through the new daemon, 'closed'",
+                  read_sidecar (folder, "view_shared-id") [ "closed" ], False )
+  context [ "daemon" ] . terminate ()
+  require_equal ( "the exit code after SIGTERM",
+                  context [ "daemon" ] . wait (timeout = 30), 0 )
+  require_equal ( "whether the socket remains after SIGTERM",
+                  os . path . lexists (socket_path), False )
+  require_log_line ( context, "stopped: released 1 view" )
+
+# ------------------------------------------------------------
+# Helpers of the daemon cases
+# ------------------------------------------------------------
+
+def start_daemon (context):
+  """Start a daemon for the daemon folder, on the scratch server, and
+  wait until its socket answers; return its process."""
+  folder = context [ "daemon_folder" ]
+  output_path = os . path . join ( context [ "scratch" ], "daemon-output.txt" )
+  ready_lines_before = ( read_file (output_path) . count (DAEMON_READY_LINE)
+                         if os . path . exists (output_path) else 0 )
+  with open (output_path, "a") as output:
+    process = subprocess . Popen (
+      [ sys . executable, os . path . join (TOOL_FOLDER, "skg_for_ai.py"),
+        "daemon", "--out-dir", folder, "--port", str (PORT) ],
+      stdout = output, stderr = subprocess . STDOUT )
+  context [ "processes" ] . append (process)
+  context [ "daemon" ] = process
+  deadline = time . time () + DAEMON_READY_TIMEOUT_SECONDS
+  while time . time () < deadline:
+    if process . poll () is not None:
+      raise CaseFailure ( f"the daemon exited: {read_file (output_path)}" )
+    if read_file (output_path) . count (DAEMON_READY_LINE) > ready_lines_before:
+      return process
+    time . sleep (0.1)
+  raise CaseFailure ( f"the daemon did not start: {read_file (output_path)}" )
+
+def start_second_server (context):
+  """A second server over the scratch data root, with its own port and
+  search index, as a teammate's server reads the same skgrepos."""
+  if port_is_listening (SECOND_SERVER_PORT):
+    raise CaseFailure ( f"port {SECOND_SERVER_PORT} is taken" )
+  config_name = "skgconfig-second.toml"
+  config_text = read_file ( os . path . join ( context [ "data_root" ], "skgconfig.toml" ))
+  with open ( os . path . join ( context [ "data_root" ], config_name ), "w",
+              encoding = "utf-8" ) as config_file:
+    config_file . write (
+      re . sub ( r'(?m)^tantivy_folder = .*$',
+                 'tantivy_folder = ".index-second.tantivy"',
+                 re . sub ( r'(?m)^port = [0-9]+', f"port = {SECOND_SERVER_PORT}",
+                            config_text )))
+  log_path = os . path . join ( context [ "scratch" ], "second-server.log" )
+  with open (log_path, "w") as server_log:
+    server = subprocess . Popen (
+      [ SERVER_BINARY, config_name ], cwd = context [ "data_root" ],
+      stdout = server_log, stderr = subprocess . STDOUT )
+  context [ "processes" ] . append (server)
+  if not wait_for_server_ready (log_path, server):
+    raise CaseFailure ( f"the second server did not become ready; see {log_path}" )
+
+def save_through_second_server (context, base_name, replacement):
+  """View the node BASE_NAME names afresh on the second server, make
+  the one REPLACEMENT in its compact view, and save it there; return
+  the folder."""
+  folder = os . path . join ( context [ "scratch" ], "second-server", base_name )
+  node_id = base_name . split ("_", 1) [1]
+  require_tool_run_on ( [ "view", node_id, "--out-dir", folder ], SECOND_SERVER_PORT )
+  edit_compact ( folder, [ replacement ], "view_" + node_id )
+  completed = run_tool ( [ "save", os . path . join ( folder, "view_" + node_id + ".view.json" ),
+                           "--yes" ], port = SECOND_SERVER_PORT )
+  if completed . returncode != 0 or "Server: saved," not in completed . stdout:
+    raise CaseFailure ( f"the second server's save printed {completed . stdout!r}, "
+                        f"{completed . stderr!r}" )
+  return folder
+
+def require_routed_run (context, tool_arguments):
+  """Run the command with the daemon folder as its '--out-dir' and no
+  '--port', so that it runs through the daemon."""
+  completed = run_tool (
+    tool_arguments + [ "--out-dir", context [ "daemon_folder" ] ], port = None )
+  if completed . returncode != 0:
+    raise CaseFailure (
+      f"'{' ' . join (tool_arguments)}' through the daemon failed: "
+      f"{completed . stdout}{completed . stderr}" )
+  return completed
+
+def require_tool_run_on (tool_arguments, port):
+  completed = run_tool (tool_arguments, port = port)
+  if completed . returncode != 0:
+    raise CaseFailure (
+      f"'{' ' . join (tool_arguments)}' failed: {completed . stderr}" )
+  return completed
+
+def require_log_line (context, text):
+  """Wait until a line of the daemon's log contains TEXT."""
+  deadline = time . time () + DAEMON_LOG_TIMEOUT_SECONDS
+  while time . time () < deadline:
+    if text in daemon_log (context):
+      return
+    time . sleep (0.1)
+  raise CaseFailure ( f"the daemon's log has no line with {text!r}" )
+
+def daemon_log (context):
+  path = os . path . join ( context [ "daemon_folder" ], "skg-for-ai.log" )
+  return read_file (path) if os . path . exists (path) else ""
+
+def require_in_file (folder, base_name, text):
+  compact = read_file ( os . path . join (folder, base_name + ".compact.org") )
+  if text not in compact:
+    raise CaseFailure ( f"{base_name}.compact.org lacks {text!r}:\n{compact}" )
+
+def read_sidecar (folder, base_name):
+  return json . loads ( read_file ( os . path . join (folder, base_name + ".view.json") ))
+
 # ------------------------------------------------------------
 # Helpers of the writing cases
 # ------------------------------------------------------------
@@ -1270,9 +1599,10 @@ def skg_files (context):
            if name . endswith (".skg") }
 
 def run_tool (tool_arguments, standard_input = "", port = PORT):
+  """Run the tool; with PORT None, without '--port'."""
   return subprocess . run (
     [ sys . executable, os . path . join (TOOL_FOLDER, "skg_for_ai.py") ]
-    + tool_arguments + [ "--port", str (port) ],
+    + tool_arguments + ( [ "--port", str (port) ] if port is not None else [] ),
     input = standard_input, capture_output = True, text = True )
 
 def commit_fixture_in_new_gitrepo (folder):

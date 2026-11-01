@@ -44,17 +44,34 @@ request line and prints every response; 'import INPUT_DIR REPO',
 which previews and applies a Markdown and Org import.
 The port is SKG_PORT (default 1730), or '--port'.
 
+'daemon --out-dir DIR' keeps one connection open and holds there
+every view whose files are in DIR: when the server rerenders one
+(after a save on that connection, or when files changed on disk), it
+rewrites the view's three files, and it appends each event to
+'DIR/skg-for-ai.log'. While it runs, every command whose '--out-dir'
+(or whose sidecar's folder) is DIR is sent to it over the Unix socket
+'DIR/skg-for-ai.sock' and runs there; without one, each command opens
+its own connection. 'daemon --stop --out-dir DIR' stops it.
+
 Standard library only. The README beside this file explains the
 formats; the protocol is in 'docs/api-and-formats.org'.
 """
 
 import argparse
+import collections
+import contextlib
 import difflib
+import io
 import json
 import os
 import re
+import select
+import signal
 import socket
+import stat
 import sys
+import time
+import traceback
 import uuid
 
 REPO_ROOT = os . path . dirname ( os . path . dirname (
@@ -98,13 +115,36 @@ SAVE_TERMINAL_RESPONSE_TYPES = {
   "save-result", "delete-from-confirmation", "strandeds-confirmation",
   "telescope-hoist-confirmation", "fork-confirmation",
   "overPrivateText-telescope-confirmation", "error" }
+# The daemon's files, in the folder whose views it holds.
+DAEMON_SOCKET_NAME = "skg-for-ai.sock"
+DAEMON_LOG_NAME = "skg-for-ai.log"
+# How often the daemon's idle wait looks up from its sockets, to
+# notice a stop signal.
+DAEMON_IDLE_POLL_SECONDS = 0.5
+# How long the daemon waits for a command's request to arrive whole.
+DAEMON_CLIENT_TIMEOUT_SECONDS = 10
+# How many changed nodes a log line names before it counts the rest.
+LOGGED_CHANGED_NODES_LIMIT = 6
 
 # ============================================================
 # Commands
 # ============================================================
 
 def main (argv):
+  """Run the command ARGV names; return its exit code. A command whose
+  folder has a daemon listening is sent to it and runs there."""
   arguments = parse_command_line (argv)
+  if arguments . command == "daemon":
+    command_daemon (arguments)
+    return 0
+  daemon_exit_code = exit_code_of_command_sent_to_daemon (arguments, argv)
+  if daemon_exit_code is not None:
+    return daemon_exit_code
+  run_command (arguments)
+  return 0
+
+def run_command (arguments):
+  """Run the command ARGUMENTS names, in this process."""
   if arguments . command == "close":
     command_close (arguments)
     return
@@ -129,7 +169,7 @@ def main (argv):
   if arguments . command == "integrate":
     command_integrate (arguments)
     return
-  connection = SkgConnection (arguments . port)
+  connection = connect_to_server (arguments . port)
   try:
     if arguments . command == "view":
       view = fetch_single_root_view (connection, arguments . id)
@@ -147,7 +187,7 @@ def main (argv):
     written_paths = write_view_files (
       connection, view, arguments . out_dir, base_name,
       not arguments . no_summary )
-    close_view_on_server (connection, view [ "view_id" ])
+    release_view (connection, view [ "view_id" ])
   finally:
     connection . close ()
   for path in written_paths:
@@ -267,6 +307,18 @@ def parse_command_line (argv):
   import_parser . add_argument (
     "--preview-only", action = "store_true",
     help = "cancel after the preview instead of applying it" )
+  daemon_parser = commands . add_parser (
+    "daemon", help = ( "keep one connection open, holding every view "
+                       "written into DIR, and rewrite a view's files when "
+                       "the server rerenders it; commands with that "
+                       "'--out-dir' run through it" ),
+    parents = [ port_option ] )
+  daemon_parser . add_argument (
+    "--out-dir", default = ".",
+    help = "the folder whose views it holds (default: the current one)" )
+  daemon_parser . add_argument (
+    "--stop", action = "store_true",
+    help = "stop the daemon running in '--out-dir'" )
   return parser . parse_args (argv)
 
 def default_base_name (arguments):
@@ -285,19 +337,31 @@ def command_close (arguments):
   sidecar closed. Every other command already closes its own view
   before it disconnects, and the server forgets a connection's views
   when it ends, so this matters only for a view some longer-lived
-  connection holds."""
+  connection holds: a daemon's (see "The daemon" in the README), which
+  then no longer rewrites the view's files. A view ID the daemon holds
+  for other files stays open."""
   with open (arguments . sidecar, encoding = "utf-8") as sidecar_file:
     sidecar = json . load (sidecar_file)
-  connection = SkgConnection (arguments . port)
+  directory = os . path . dirname ( os . path . abspath (arguments . sidecar) )
+  base_name = os . path . basename (arguments . sidecar) [ : - len (".view.json") ]
+  connection = connect_to_server (arguments . port)
   try:
-    close_view_on_server (connection, sidecar [ "view_id" ])
+    if not connection . holds_view_for_other_files (
+        sidecar [ "view_id" ], directory, base_name ):
+      close_view_on_server (connection, sidecar [ "view_id" ])
+      connection . forget_view ( sidecar [ "view_id" ] )
   finally:
     connection . close ()
+  mark_sidecar_closed (arguments . sidecar)
+  print (arguments . sidecar)
+
+def mark_sidecar_closed (sidecar_path):
+  with open (sidecar_path, encoding = "utf-8") as sidecar_file:
+    sidecar = json . load (sidecar_file)
   sidecar [ "closed" ] = True
-  write_text_file ( arguments . sidecar,
+  write_text_file ( sidecar_path,
                     json . dumps (sidecar, indent = 2, ensure_ascii = False)
                     + "\n" )
-  print (arguments . sidecar)
 
 def command_raw (arguments):
   """Send ARGUMENTS.request, and with '--saved-buffer' its save body;
@@ -380,7 +444,7 @@ def command_save (arguments):
            edited, reworded_pairs, saved_view . headline_of_handle ))
   changes = [] if errors else change_report_lines (
     edited, original, saved_view . headline_of_handle ) + questions
-  connection = SkgConnection ( saved_view . sidecar [ "port" ] )
+  connection = connection_for_saved_view (saved_view)
   try:
     print ( "Changes in " + os . path . basename (saved_view . compact_path) +
             ", against " + os . path . basename (saved_view . full_path) +
@@ -413,10 +477,11 @@ def command_save (arguments):
       saved_view . sidecar [ "rendered_at" ],
       saved_view . sidecar [ "request" ] . get ("buffer") )
     rerendered = rerendered_view_of_save ( messages [-1], saved_view . sidecar )
+    connection . log_event ( "saved " + saved_view . base_name )
     written_paths = write_view_files (
       connection, rerendered, saved_view . directory, saved_view . base_name,
       saved_view . sidecar [ "summary" ] )
-    close_view_on_server (connection, rerendered [ "view_id" ])
+    release_view (connection, rerendered [ "view_id" ])
   finally:
     connection . close ()
   for path in written_paths:
@@ -446,15 +511,11 @@ def command_integrate (arguments):
     raise SkgToolError (
       f"The view came from the server on port {sidecar [ 'port' ]}, "
       f"not {arguments . port}." )
-  edited = parse_edited_compact_view (saved_view . compact_text)
-  if ( handle_error_lines (edited, saved_view . headline_of_handle)
-       or change_report_lines (
-         edited, outline_of_full_view (saved_view . parsed_view),
-         saved_view . headline_of_handle )):
+  if compact_view_has_edits (saved_view):
     raise SkgToolError (
       "Nothing was integrated: the compact view has edits; save them "
       "first, or write the buffer again with 'diff'." )
-  connection = SkgConnection ( sidecar [ "port" ] )
+  connection = connection_for_saved_view (saved_view)
   try:
     terminal = connection . save_buffer (
       sidecar [ "view_id" ], saved_view . full_text,
@@ -479,6 +540,7 @@ def command_integrate (arguments):
         "Nothing was integrated; the files are as they were." )
     readiness_summary = response_field (response, "readiness-summary")
     print ( "Integrated: " + readiness_summary_text (readiness_summary) )
+    connection . log_event ( "integrated " + saved_view . base_name )
     view = { "view_id"     : sidecar [ "view_id" ],
              "command"     : sidecar [ "command" ],
              "request"     : sidecar [ "request" ],
@@ -490,11 +552,35 @@ def command_integrate (arguments):
     written_paths = write_view_files (
       connection, view, saved_view . directory, saved_view . base_name,
       sidecar [ "summary" ] )
-    close_view_on_server (connection, view [ "view_id" ])
+    release_view (connection, view [ "view_id" ])
   finally:
     connection . close ()
   for path in written_paths:
     print (path)
+
+def compact_view_has_edits (saved_view):
+  """Whether the compact view differs from its full view in anything a
+  save would send: a bad handle, a change, a request word."""
+  edited = parse_edited_compact_view (saved_view . compact_text)
+  return bool (
+    handle_error_lines (edited, saved_view . headline_of_handle)
+    or change_report_lines (
+         edited, outline_of_full_view (saved_view . parsed_view),
+         saved_view . headline_of_handle ))
+
+def connection_for_saved_view (saved_view):
+  """The connection on which to save or integrate SAVED_VIEW: the
+  daemon's, when one runs this command and talks to the sidecar's
+  server, unless it holds the sidecar's view ID for other files (a
+  later view under the same view ID), in which case a connection of
+  the command's own, as without a daemon."""
+  port = saved_view . sidecar [ "port" ]
+  connection = connect_to_server (port)
+  if connection . holds_view_for_other_files (
+      saved_view . sidecar [ "view_id" ], saved_view . directory,
+      saved_view . base_name ):
+    return SkgConnection (port)
+  return connection
 
 def command_new (arguments):
   """Create a root node titled ARGUMENTS.title whose home is the
@@ -509,7 +595,7 @@ def command_new (arguments):
     raise SkgToolError (
       f"'{arguments . repo}' is not a skgrepo name this command can "
       "write into metadata." )
-  connection = SkgConnection (arguments . port)
+  connection = connect_to_server (arguments . port)
   try:
     ownership = fetch_repo_ownership (connection)
     if ownership . get (arguments . repo) is not True:
@@ -531,6 +617,7 @@ def command_new (arguments):
       messages [-1], { "view_id" : creating_view_id, "command" : "new",
                        "request" : {} } )
     close_view_on_server (connection, creating_view_id)
+    connection . log_event ( "saved new root " + title )
     new_root = next ( ( line for line in
                         parse_full_view ( rerendered [ "content" ] )
                         if line . is_headline ), None )
@@ -547,7 +634,7 @@ def command_new (arguments):
       connection, view, arguments . out_dir,
       arguments . name or base_name_for ( "view", node_id ),
       not arguments . no_summary )
-    close_view_on_server (connection, view [ "view_id" ])
+    release_view (connection, view [ "view_id" ])
   finally:
     connection . close ()
   print ( "New node: " + node_id )
@@ -559,8 +646,9 @@ def command_diff (arguments):
   one connection, and write each nonempty one as 'view' writes a view,
   named BASE_BUFFER ('diff_all-changes' and so on), its compact
   summary opening with the readiness summary the server's answer
-  carries. Each buffer is closed before the next is requested."""
-  connection = SkgConnection (arguments . port)
+  carries. Each buffer is closed before the next is requested, unless
+  a daemon holds it."""
+  connection = connect_to_server (arguments . port)
   written_paths = []
   try:
     for buffer_name in DIFF_VIEW_BUFFERS:
@@ -572,7 +660,7 @@ def command_diff (arguments):
         ( arguments . name or "diff" ) + "_" +
         buffer_name . replace (" ", "-"),
         not arguments . no_summary )
-      close_view_on_server (connection, view [ "view_id" ])
+      release_view (connection, view [ "view_id" ])
   finally:
     connection . close ()
   if not written_paths:
@@ -657,6 +745,10 @@ def require_view_has_headlines (view):
 
 def fetch_single_root_view (connection, node_id):
   view_id = "content-view:" + node_id
+  if connection . holds_view (view_id):
+    # A connection asking for a view ID it holds is answered by name,
+    # '(switch-to-view ID)', not drawn afresh.
+    connection . release_view_to_reopen (view_id)
   response = connection . request (
     request_line ( "single root content view",
                    ( "id", node_id ), ( "view-id", view_id ) ))
@@ -776,11 +868,23 @@ def close_view_on_server (connection, view_id):
   connection . request (
     request_line ( "close view", ( "view-id", view_id ) ))
 
+def release_view (connection, view_id):
+  """Close the view a command wrote, as a client closes a killed
+  buffer's, unless the connection holds it: a daemon's connection
+  keeps every view written into its folder."""
+  if not connection . holds_view (view_id):
+    close_view_on_server (connection, view_id)
+
 # ============================================================
 # Writing the files
 # ============================================================
 
-def write_view_files (connection, view, out_dir, base_name, show_summary):
+def write_view_files (connection, view, out_dir, base_name, show_summary,
+                      unless_compact_differs_from = None):
+  """Write the view's three files; return their paths. Given
+  UNLESS_COMPACT_DIFFERS_FROM, write nothing, and return None, when
+  the compact view on disk is no longer that text: it was edited
+  since it was read."""
   os . makedirs (out_dir, exist_ok = True)
   full_path    = os . path . join (out_dir, base_name + ".full.org")
   compact_path = os . path . join (out_dir, base_name + ".compact.org")
@@ -797,6 +901,10 @@ def write_view_files (connection, view, out_dir, base_name, show_summary):
       os . path . basename (full_path) )
   compact_lines += compact_tree_lines (
     parsed_view, link_statuses, herald_tables )
+  held = connection . holds_views_written_to (out_dir)
+  if ( unless_compact_differs_from is not None
+       and read_text_file (compact_path) != unless_compact_differs_from ):
+    return None
   write_text_file (full_path, full_text)
   write_text_file (compact_path, "\n" . join (compact_lines) + "\n")
   write_text_file (
@@ -812,13 +920,18 @@ def write_view_files (connection, view, out_dir, base_name, show_summary):
         "errors"       : view [ "errors" ],
         "warnings"     : view [ "warnings" ],
         "summary"      : show_summary,
-        "closed"       : True },
+        "closed"       : not held },
       indent = 2, ensure_ascii = False ) + "\n" )
+  connection . note_view_written ( view [ "view_id" ], out_dir, base_name )
   return [ full_path, compact_path, sidecar_path ]
 
 def write_text_file (path, text):
   with open (path, "w", encoding = "utf-8") as output_file:
     output_file . write (text)
+
+def read_text_file (path):
+  with open (path, encoding = "utf-8") as input_file:
+    return input_file . read ()
 
 # ============================================================
 # The full view, parsed
@@ -2454,6 +2567,546 @@ def rerendered_view_of_save (terminal, sidecar):
            "readiness_summary" : readiness_summary }
 
 # ============================================================
+# The daemon: one long-lived connection, holding the views written
+# into one folder
+# ============================================================
+
+# The daemon this process runs, while it runs. The commands it runs
+# talk to its server on its connection ('connect_to_server').
+RUNNING_DAEMON = None
+# The messages that carry a view the server rerendered.
+RERENDER_MESSAGE_TYPES = { "collateral-view", "rerender-view" }
+RESPONSE_TYPE_PATTERN = re . compile ( r'^\(\(response-type ([^\s()]+)\)' )
+
+def command_daemon (arguments):
+  """Run a daemon for the folder '--out-dir' until it is stopped, or
+  with '--stop' stop the one running there."""
+  folder = os . path . realpath (arguments . out_dir)
+  if arguments . stop:
+    stop_daemon (folder)
+    return
+  os . makedirs (folder, exist_ok = True)
+  SkgForAiDaemon (folder, arguments . port) . run ()
+
+def stop_daemon (folder):
+  """Ask the daemon in FOLDER to stop, and print its answer, which it
+  sends once it has released its views and removed its socket."""
+  if not os . path . lexists ( os . path . join (folder, DAEMON_SOCKET_NAME) ):
+    raise SkgToolError ( f"No daemon runs in {folder}." )
+  try:
+    reply = daemon_reply (folder, { "stop" : True })
+  except ConnectionRefusedError:
+    os . remove ( os . path . join (folder, DAEMON_SOCKET_NAME) )
+    raise SkgToolError (
+      f"No daemon runs in {folder}; removed the socket a stopped one left." )
+  print_daemon_reply (reply)
+
+def exit_code_of_command_sent_to_daemon (arguments, argv):
+  """When a daemon listens in the folder of the command ARGUMENTS
+  (parsed from ARGV), send ARGV to it, print what it printed, and
+  return its exit code. Otherwise None: the command runs here. A
+  socket nobody answers on is one a daemon left when it died."""
+  folder = daemon_folder_of_command (arguments)
+  if ( folder is None
+       or not os . path . lexists ( os . path . join (folder, DAEMON_SOCKET_NAME) )):
+    return None
+  try:
+    reply = daemon_reply (folder, { "argv" : argv, "cwd" : os . getcwd () })
+  except ( ConnectionRefusedError, FileNotFoundError ):
+    return None
+  print_daemon_reply (reply)
+  return reply [ "exit_code" ]
+
+def daemon_folder_of_command (arguments):
+  """The folder whose daemon a command runs through: its '--out-dir',
+  or for 'save', 'integrate' and 'close' its sidecar's folder. None
+  for the commands that write no view ('raw', 'import', 'commit')."""
+  if arguments . command in ( "save", "integrate" ):
+    path = arguments . view_files
+  elif arguments . command == "close":
+    path = arguments . sidecar
+  else:
+    return getattr (arguments, "out_dir", None)
+  return ( path if os . path . isdir (path)
+           else os . path . dirname (path) or "." )
+
+class SkgForAiDaemon:
+  """One connection to the server on PORT, kept until the daemon
+  stops, holding every view written into FOLDER, and a Unix socket in
+  FOLDER on which commands arrive. It runs them one at a time, on that
+  connection. Between them it reads what the server sends unprompted,
+  and handles what the commands' responses carried and the unprompted
+  messages that arrived meanwhile: it rewrites the files of each view
+  the server rerendered, asking for the rerender of the views a
+  'repo-files-integrated' message names, as the clients do, and logs
+  each event to FOLDER's log."""
+
+  def __init__ (self, folder, port):
+    self . folder = folder
+    self . port = port
+    self . socket_path = os . path . join (folder, DAEMON_SOCKET_NAME)
+    self . log_path = os . path . join (folder, DAEMON_LOG_NAME)
+    self . connection = None
+    self . listener = None
+    self . stopping = False
+    self . stopped = False
+
+  def run (self):
+    global RUNNING_DAEMON
+    replaced_stale_socket = remove_stale_daemon_socket (self . folder)
+    self . connection = DaemonConnection (self . port, self . folder, self . log)
+    RUNNING_DAEMON = self
+    try:
+      self . log ( f"started: process {os . getpid ()}, server port {self . port}"
+                   + ( "; replaced the socket a dead daemon left"
+                       if replaced_stale_socket else "" ))
+      self . log_startup_warnings ()
+      self . listener = listening_unix_socket (self . folder)
+      for signal_number in ( signal . SIGTERM, signal . SIGINT ):
+        signal . signal (signal_number, self . stop_at_next_pause)
+      print ( f"The daemon listens on {self . socket_path} and holds the views "
+              f"written there; it logs to {self . log_path}.", flush = True )
+      self . serve_until_stopped ()
+    finally:
+      self . shut_down ()
+      RUNNING_DAEMON = None
+
+  def stop_at_next_pause (self, signal_number, frame):
+    self . stopping = True
+
+  def log (self, text):
+    """Append TEXT to the log as one timestamped line."""
+    with open (self . log_path, "a", encoding = "utf-8") as log_file:
+      log_file . write ( time . strftime ("%Y-%m-%d %H:%M:%S") + " " +
+                         " | " . join ( text . splitlines () ) + "\n" )
+
+  def log_startup_warnings (self):
+    """The warnings the server raised as it started, which a client
+    asks for once per connection."""
+    response = self . connection . request ( request_line ("server warnings") )
+    require_response_type (response, "server-warnings")
+    for warning in response_field (response, "warnings") or []:
+      self . log ( "warning: " + sexp_to_text (warning) )
+
+  def serve_until_stopped (self):
+    while not self . stopping and not self . connection . broken:
+      try:
+        self . handle_waiting_messages ()
+        if self . stopping or self . connection . broken:
+          break
+        if self . connection . buffered:
+          self . read_unrequested_message ()
+          continue
+        readable, _, _ = select . select (
+          [ self . connection . socket, self . listener ], [], [],
+          DAEMON_IDLE_POLL_SECONDS )
+        if self . connection . socket in readable:
+          self . read_unrequested_message ()
+        elif self . listener in readable:
+          self . serve_one_command ()
+      except SkgToolError as error:
+        self . log ( "error: " + str (error) )
+    if self . connection . broken:
+      self . log ( "error: the connection to the server is lost; the daemon stops" )
+
+  def read_unrequested_message (self):
+    """Read a message the server sent between commands: an unprompted
+    one, queued with the rest."""
+    payload = self . connection . read_one_message (FIRST_MESSAGE_TIMEOUT_SECONDS)
+    if payload . startswith (UNPROMPTED_REPO_CHANGE_MESSAGE_START):
+      self . connection . handle_unprompted_message (payload)
+      return
+    self . connection . observe_message (payload)
+    if payload_response_type (payload) not in RERENDER_MESSAGE_TYPES:
+      self . log ( "error: the server sent, unasked: " + payload [ : 300 ] )
+
+  def serve_one_command (self):
+    """Read one command from the socket, run it, and answer with what
+    it printed and its exit code. A stop request stops the daemon
+    before it is answered. A connection that sends nothing is another
+    daemon asking whether this one runs."""
+    client, _ = self . listener . accept ()
+    with client:
+      try:
+        client . settimeout (DAEMON_CLIENT_TIMEOUT_SECONDS)
+        request_bytes = received_until_closed (client)
+        if not request_bytes:
+          return
+        request = json . loads ( request_bytes . decode ("utf-8") )
+        client . settimeout (None)
+      except ( OSError, ValueError ) as error:
+        self . log ( f"error: a command arrived unreadable: {error}" )
+        return
+      if request . get ("stop"):
+        self . shut_down ()
+        reply = { "stdout" : f"Stopped the daemon in {self . folder}.\n",
+                  "stderr" : "", "exit_code" : 0 }
+      else:
+        reply = self . reply_to_command ( request [ "argv" ], request [ "cwd" ] )
+        # Before the answer, so that the files a command's save
+        # rerendered are rewritten by the time it returns, and not
+        # while its caller edits them.
+        self . handle_waiting_messages ()
+      try:
+        client . sendall ( json . dumps (reply) . encode ("utf-8") )
+      except OSError as error:
+        self . log ( f"error: could not answer a command: {error}" )
+
+  def reply_to_command (self, argv, cwd):
+    """Run ARGV in the folder CWD, the sender's current one; return
+    what it printed and its exit code."""
+    standard_output = io . StringIO ()
+    standard_error = io . StringIO ()
+    description = described_command (argv)
+    daemon_cwd = os . getcwd ()
+    self . connection . begin_command (description)
+    try:
+      os . chdir (cwd)
+      with contextlib . redirect_stdout (standard_output), \
+           contextlib . redirect_stderr (standard_error):
+        exit_code = self . exit_code_of_command (argv, description)
+    except OSError as error:
+      standard_error . write ( f"skg_for_ai: the daemon cannot run in {cwd}: {error}\n" )
+      exit_code = 1
+    finally:
+      os . chdir (daemon_cwd)
+      self . connection . end_command ()
+    return { "stdout" : standard_output . getvalue (),
+             "stderr" : standard_error . getvalue (),
+             "exit_code" : exit_code }
+
+  def exit_code_of_command (self, argv, description):
+    """Run ARGV as a command run here would run, but on the daemon's
+    connection; print as it prints."""
+    try:
+      arguments = parse_command_line (argv)
+      if arguments . command == "daemon":
+        raise SkgToolError ( f"A daemon already runs in {self . folder}." )
+      self . use_own_port_unless_named (arguments, argv)
+      run_command (arguments)
+      return 0
+    except SkgToolError as error:
+      print ( "skg_for_ai: " + str (error), file = sys . stderr )
+      self . log ( f"error: '{description}' failed: {error}" )
+      return 1
+    except SystemExit as exit_request:
+      # argparse's, for '--help' or a bad command line
+      return ( exit_request . code if isinstance (exit_request . code, int)
+               else 0 if exit_request . code is None else 1 )
+    except Exception as error:
+      traceback . print_exc ()
+      self . log ( f"error: '{description}' failed: {error!r}" )
+      return 1
+
+  def use_own_port_unless_named (self, arguments, argv):
+    """A command the daemon runs talks to the daemon's server unless
+    its command line names '--port'; 'save' and 'integrate' talk to
+    their sidecar's."""
+    if any ( token == "--port" or token . startswith ("--port=")
+             for token in argv ):
+      return
+    if arguments . command not in ( "save", "integrate" ):
+      arguments . port = self . port
+
+  def handle_waiting_messages (self):
+    if self . connection . waiting_messages:
+      # fetched afresh for each batch, as for each command
+      self . connection . herald_tables = None
+    while self . connection . waiting_messages and not self . connection . broken:
+      payload, cause = self . connection . waiting_messages . popleft ()
+      try:
+        if payload . startswith (UNPROMPTED_REPO_CHANGE_MESSAGE_START):
+          self . handle_repo_files_integrated ( parse_sexp (payload) )
+        else:
+          self . rewrite_rerendered_view ( parse_sexp (payload), cause )
+      except SkgToolError as error:
+        self . log ( "error: " + str (error) )
+
+  def handle_repo_files_integrated (self, message):
+    """Log the warnings, and ask for the rerender of each view named
+    that the daemon holds and whose compact view has no unsaved edits,
+    as the clients do ('Repo files integrated' in
+    'docs/api-and-formats.org')."""
+    warnings = [ sexp_to_text (warning)
+                 for warning in response_field (message, "warnings") or [] ]
+    for warning in warnings:
+      self . log ( "warning: " + warning )
+    clean_view_ids = []
+    for view_id in response_field (message, "view-ids") or []:
+      view_id = sexp_to_text (view_id)
+      base_name = self . connection . base_name_of_held_view . get (view_id)
+      saved_view = ( self . held_saved_view (view_id, base_name)
+                     if base_name is not None else None )
+      if saved_view is None:
+        continue
+      if compact_view_has_edits (saved_view):
+        self . log ( f"kept {base_name}: files changed on disk change a node it "
+                     "shows, but its compact view has unsaved edits; its save is "
+                     "refused if it would write a node that changed" )
+        continue
+      clean_view_ids . append (view_id)
+    if clean_view_ids:
+      self . request_rerender (
+        clean_view_ids,
+        "files changed on disk" + ( " (" + " " . join (warnings) + ")"
+                                    if warnings else "" ))
+
+  def request_rerender (self, view_ids, cause):
+    """Send "rerender all views" excluding every held view but
+    VIEW_IDS, and read its stream; the rerendered views wait, with
+    CAUSE, among the connection's messages."""
+    excluded = [ view_id for view_id in self . connection . base_name_of_held_view
+                 if view_id not in view_ids ]
+    self . connection . cause = cause
+    try:
+      self . connection . send_line (
+        "((request . \"rerender all views\")" +
+        ( " (exclude-view-ids" + "" . join ( " " + quote_string (view_id)
+                                             for view_id in excluded ) + ")"
+          if excluded else "" ) + ")" )
+      while True:
+        message = parse_sexp (
+          self . connection . read_message (FIRST_MESSAGE_TIMEOUT_SECONDS) )
+        kind = response_type (message)
+        if kind == "rerender-done":
+          return
+        if kind == "overPrivateText-telescope-confirmation":
+          self . log ( "error: the server withholds a rerender until over-private "
+                       "text is approved, which the daemon does not do: " +
+                       sexp_to_text ( response_field (message, "prompt") or "" ))
+    finally:
+      self . connection . cause = None
+
+  def rewrite_rerendered_view (self, message, cause):
+    """Write the view MESSAGE carries over its files, unless its compact
+    view has unsaved edits, and log it with CAUSE and what changed."""
+    view_id = sexp_to_text ( response_field (message, "view-id") )
+    base_name = self . connection . base_name_of_held_view . get (view_id)
+    if base_name is None:
+      return
+    saved_view = self . held_saved_view (view_id, base_name)
+    if saved_view is None:
+      return
+    if compact_view_has_edits (saved_view):
+      self . log ( f"kept {base_name}: the server rerendered it because {cause}, "
+                   "but its compact view has unsaved edits; its save is refused "
+                   "if it would write a node that changed" )
+      return
+    content = sexp_to_text ( response_field (message, "content") )
+    sidecar = saved_view . sidecar
+    written_paths = write_view_files (
+      self . connection,
+      { "view_id"     : view_id,
+        "command"     : sidecar [ "command" ],
+        "request"     : sidecar [ "request" ],
+        "content"     : content,
+        "rendered_at" : rendered_at_of (message),
+        "errors"      : [],
+        "warnings"    : [] },
+      self . folder, base_name, sidecar [ "summary" ],
+      unless_compact_differs_from = saved_view . compact_text )
+    if written_paths is None:
+      self . log ( f"kept {base_name}: the server rerendered it because {cause}, "
+                   "but its compact view was edited meanwhile; its save is "
+                   "refused if it would write a node that changed" )
+      return
+    self . log ( f"re-rendered {base_name} because {cause}; " +
+                 changed_nodes_text (saved_view . full_text, content) )
+
+  def held_saved_view (self, view_id, base_name):
+    """The files of the held view VIEW_ID, read back; None, and the
+    view closed, when they cannot be read."""
+    try:
+      return SavedView ( os . path . join ( self . folder, base_name + ".view.json" ))
+    except ( OSError, ValueError ) as error:
+      self . log ( f"error: the files of {base_name} cannot be read ({error}); "
+                   "the daemon closes its view" )
+      close_view_on_server (self . connection, view_id)
+      self . connection . forget_view (view_id)
+      return None
+
+  def shut_down (self):
+    """Close every held view, marking its sidecar closed, then the
+    connection and the socket."""
+    if self . stopped:
+      return
+    self . stopped = True
+    self . stopping = True
+    released_count = 0
+    if self . connection is not None:
+      for view_id, base_name in list (
+          self . connection . base_name_of_held_view . items () ):
+        try:
+          if not self . connection . broken:
+            close_view_on_server (self . connection, view_id)
+          mark_sidecar_closed (
+            os . path . join ( self . folder, base_name + ".view.json" ))
+        except ( SkgToolError, OSError, ValueError ) as error:
+          self . log ( f"error: releasing {base_name}: {error}" )
+        released_count += 1
+      self . connection . base_name_of_held_view . clear ()
+      self . connection . disconnect ()
+    if self . listener is not None:
+      self . listener . close ()
+      if os . path . lexists (self . socket_path):
+        os . remove (self . socket_path)
+    self . log ( f"stopped: released {released_count} "
+                 f"view{'' if released_count == 1 else 's'}" )
+
+def daemon_reply (folder, request):
+  """Send REQUEST, a JSON object, to the daemon in FOLDER; return its
+  answer: '{"stdout", "stderr", "exit_code"}'."""
+  with unix_socket_connected_in (folder) as client:
+    client . sendall ( json . dumps (request) . encode ("utf-8") )
+    client . shutdown (socket . SHUT_WR)
+    reply = received_until_closed (client)
+  if not reply:
+    raise SkgToolError ( f"The daemon in {folder} stopped before answering." )
+  return json . loads ( reply . decode ("utf-8") )
+
+def print_daemon_reply (reply):
+  sys . stdout . write ( reply [ "stdout" ] )
+  sys . stdout . flush ()
+  sys . stderr . write ( reply [ "stderr" ] )
+
+def unix_socket_connected_in (folder):
+  """A socket connected to the daemon socket in FOLDER. It connects by
+  the socket's name from inside FOLDER, since the path of a Unix
+  socket is limited to about a hundred bytes."""
+  client = socket . socket ( socket . AF_UNIX, socket . SOCK_STREAM )
+  try:
+    in_folder ( folder, lambda : client . connect (DAEMON_SOCKET_NAME) )
+  except BaseException:
+    client . close ()
+    raise
+  return client
+
+def listening_unix_socket (folder):
+  """A socket listening at FOLDER's daemon socket. It is bound under a
+  temporary name and then renamed, so the socket's name exists only
+  once it listens."""
+  temporary_name = "." + DAEMON_SOCKET_NAME + "." + str ( os . getpid () )
+  temporary_path = os . path . join (folder, temporary_name)
+  listener = socket . socket ( socket . AF_UNIX, socket . SOCK_STREAM )
+  try:
+    if os . path . lexists (temporary_path):
+      os . remove (temporary_path)
+    in_folder ( folder, lambda : listener . bind (temporary_name) )
+    listener . listen (16)
+    os . rename ( temporary_path, os . path . join (folder, DAEMON_SOCKET_NAME) )
+  except BaseException:
+    listener . close ()
+    raise
+  return listener
+
+def remove_stale_daemon_socket (folder):
+  """Remove the daemon socket a dead daemon left in FOLDER, and say
+  whether there was one. A socket a daemon answers on is refused: one
+  daemon holds a folder's views."""
+  socket_path = os . path . join (folder, DAEMON_SOCKET_NAME)
+  try:
+    mode = os . lstat (socket_path) . st_mode
+  except FileNotFoundError:
+    return False
+  if not stat . S_ISSOCK (mode):
+    raise SkgToolError ( f"{socket_path} exists and is not a socket." )
+  try:
+    unix_socket_connected_in (folder) . close ()
+  except ConnectionRefusedError:
+    os . remove (socket_path)
+    return True
+  raise SkgToolError (
+    f"A daemon already runs in {folder}; stop it with "
+    f"'daemon --stop --out-dir {folder}'." )
+
+def in_folder (folder, action):
+  """ACTION's value, called with FOLDER the current directory."""
+  previous_folder = os . getcwd ()
+  os . chdir (folder)
+  try:
+    return action ()
+  finally:
+    os . chdir (previous_folder)
+
+def received_until_closed (connected_socket):
+  received = b""
+  while True:
+    chunk = connected_socket . recv (65536)
+    if not chunk:
+      return received
+    received += chunk
+
+def payload_response_type (payload):
+  match = RESPONSE_TYPE_PATTERN . match (payload)
+  return match . group (1) if match else None
+
+def described_command (argv):
+  """ARGV as the log names a command: each path by its last part."""
+  return " " . join ( os . path . basename (token) if os . sep in token else token
+                      for token in argv )
+
+def changed_nodes_text (old_full_text, new_full_text):
+  """What a rerender changed, node by node, for the log: each node new
+  to the view, gone from it, or changed in its title, body or
+  metadata (its relationships, among others), by title."""
+  old = node_renderings_by_gnid (old_full_text)
+  new = node_renderings_by_gnid (new_full_text)
+  descriptions = (
+    [ "new " + quoted_title ( new [gnid] . title )
+      for gnid in new if gnid not in old ] +
+    [ "gone " + quoted_title ( old [gnid] . title )
+      for gnid in old if gnid not in new ] +
+    [ quoted_title ( new [gnid] . title ) + " changed: " +
+      ", " . join ( changed_parts_of_rendering ( old [gnid], new [gnid] ))
+      for gnid in new
+      if gnid in old and changed_parts_of_rendering ( old [gnid], new [gnid] ) ])
+  if not descriptions:
+    return "no node changed"
+  shown = descriptions [ : LOGGED_CHANGED_NODES_LIMIT ]
+  hidden_count = len (descriptions) - len (shown)
+  return "; " . join (shown) + (
+    f"; and {hidden_count} more" if hidden_count else "" )
+
+NodeRendering = collections . namedtuple (
+  "NodeRendering", [ "title", "body", "metadata_text" ] )
+
+def node_renderings_by_gnid (full_text):
+  """{GNID: NodeRendering} of the first occurrence of each node in a
+  full view, its metadata without the viewnode ID."""
+  renderings = {}
+  current_gnid = None
+  body_lines = []
+  def finish ():
+    if current_gnid is not None:
+      renderings [current_gnid] = renderings [current_gnid] . _replace (
+        body = "\n" . join (body_lines) )
+  for line in parse_full_view (full_text):
+    if not line . is_headline:
+      body_lines . append ( line . text )
+      continue
+    finish ()
+    body_lines = []
+    gnid = ( headline_gnid ( line . metadata )
+             if line . metadata is not None
+             and headline_kind ( line . metadata ) == "node" else None )
+    current_gnid = gnid if gnid is not None and gnid not in renderings else None
+    if current_gnid is not None:
+      renderings [current_gnid] = NodeRendering (
+        line . title, "",
+        re . sub ( r'\(vnid [0-9a-z]+\) ?', "", line . metadata_text ))
+  finish ()
+  return renderings
+
+def changed_parts_of_rendering (old, new):
+  return ( ( [ "title, was " + quoted_title ( old . title ) ]
+             if old . title != new . title else [] ) +
+           ( [ "body" ] if old . body != new . body else [] ) +
+           ( [ "metadata" ] if old . metadata_text != new . metadata_text else [] ))
+
+def quoted_title (title):
+  return "'" + title + "'"
+
+# ============================================================
 # The connection
 # ============================================================
 
@@ -2468,9 +3121,18 @@ class SkgServerQuietError (SkgToolError):
 class SkgConnectionClosedError (SkgToolError):
   pass
 
+def connect_to_server (port):
+  """The connection a command talks to the server on: the daemon's,
+  when this process is a daemon running the command and PORT is its
+  server's; otherwise a new one, which the command closes."""
+  if RUNNING_DAEMON is not None and RUNNING_DAEMON . port == port:
+    return RUNNING_DAEMON . connection
+  return SkgConnection (port)
+
 class SkgConnection:
   """One TCP connection to the server. The server keeps a
-  connection's views until it ends."""
+  connection's views until it ends. This one is a command's own: it
+  holds none of the views the command writes."""
 
   def __init__ (self, port):
     self . port = port
@@ -2484,6 +3146,35 @@ class SkgConnection:
 
   def close (self):
     self . socket . close ()
+
+  def holds_views_written_to (self, out_dir):
+    return False
+
+  def holds_view (self, view_id):
+    return False
+
+  def holds_view_for_other_files (self, view_id, directory, base_name):
+    return False
+
+  def note_view_written (self, view_id, out_dir, base_name):
+    pass
+
+  def forget_view (self, view_id):
+    pass
+
+  def log_event (self, text):
+    pass
+
+  def handle_unprompted_message (self, payload):
+    """A message the server sent unprompted, that it integrated files
+    changed on disk, is no answer: its warnings go to stderr."""
+    for warning in ( response_field (
+        parse_sexp (payload), "warnings" ) or [] ):
+      print ( "skg server: " + sexp_to_text (warning), file = sys . stderr )
+
+  def observe_message (self, payload):
+    """Every message read as part of a response passes here."""
+    pass
 
   def request (self, line):
     """Send one request line; return its one response, parsed."""
@@ -2587,15 +3278,15 @@ class SkgConnection:
     A server still initializing answers with a bare
     '((busy-initializing . ...))' line instead. A message the server
     sends unprompted, between responses, that it integrated files
-    changed on disk is no answer: its warnings go to stderr, and the
-    next message is read."""
+    changed on disk is no answer: 'handle_unprompted_message' takes
+    it, and the next message is read."""
     while True:
       payload = self . read_one_message (timeout_seconds)
-      if not payload . startswith (UNPROMPTED_REPO_CHANGE_MESSAGE_START):
-        return payload
-      for warning in ( response_field (
-          parse_sexp (payload), "warnings" ) or [] ):
-        print ( "skg server: " + sexp_to_text (warning), file = sys . stderr )
+      if payload . startswith (UNPROMPTED_REPO_CHANGE_MESSAGE_START):
+        self . handle_unprompted_message (payload)
+        continue
+      self . observe_message (payload)
+      return payload
 
   def read_one_message (self, timeout_seconds):
     """The payload of the next message, whatever it is."""
@@ -2621,6 +3312,127 @@ class SkgConnection:
     if not chunk:
       raise SkgConnectionClosedError ( "The server closed the connection." )
     self . buffered += chunk
+
+class DaemonConnection (SkgConnection):
+  """The daemon's connection, kept until the daemon stops. It holds
+  every view written into the daemon's folder, each view ID for one
+  base name. The messages that carry a rerendered view, and the
+  unprompted ones, wait among 'waiting_messages' for the daemon to
+  handle between commands; the warnings of save results and rerender
+  streams are logged as they are read."""
+
+  def __init__ (self, port, folder, log):
+    super () . __init__ (port)
+    self . folder = folder
+    self . log = log
+    self . base_name_of_held_view = {}
+    self . views_written_by_command = set ()
+    self . waiting_messages = collections . deque () # (PAYLOAD, CAUSE)
+    self . cause = None # why the server rerenders what it sends now
+    self . broken = False # whether a response was cut off or the server left
+
+  def close (self):
+    """A command's close leaves the daemon's connection open."""
+    pass
+
+  def disconnect (self):
+    self . socket . close ()
+
+  def receive_more (self):
+    try:
+      super () . receive_more ()
+    except ( SkgServerQuietError, SkgConnectionClosedError ):
+      self . broken = True
+      raise
+
+  def holds_views_written_to (self, out_dir):
+    return os . path . realpath (out_dir) == self . folder
+
+  def holds_view (self, view_id):
+    return view_id in self . base_name_of_held_view
+
+  def holds_view_for_other_files (self, view_id, directory, base_name):
+    held_base_name = self . base_name_of_held_view . get (view_id)
+    return ( held_base_name is not None
+             and ( held_base_name != base_name
+                   or os . path . realpath (directory) != self . folder ))
+
+  def note_view_written (self, view_id, out_dir, base_name):
+    """Hold VIEW_ID for the files BASE_NAME, written into OUT_DIR, when
+    that is the daemon's folder. A view ID shows one set of files, and
+    a set of files one view: a later view under the same view ID
+    releases the earlier files (their sidecar is marked closed), and a
+    later view written over the same files closes the earlier view."""
+    if not self . holds_views_written_to (out_dir):
+      return
+    self . views_written_by_command . add (view_id)
+    previous_base_name = self . base_name_of_held_view . get (view_id)
+    if previous_base_name == base_name:
+      return
+    if previous_base_name is not None:
+      self . mark_released (previous_base_name)
+      self . log ( f"released {previous_base_name}: its view ID now shows "
+                   f"{base_name}" )
+    for other_view_id, other_base_name in list (
+        self . base_name_of_held_view . items () ):
+      if other_base_name == base_name and other_view_id != view_id:
+        close_view_on_server (self, other_view_id)
+        del self . base_name_of_held_view [other_view_id]
+    self . base_name_of_held_view [view_id] = base_name
+    self . log ( f"holding {base_name} (view ID {view_id})" )
+
+  def forget_view (self, view_id):
+    base_name = self . base_name_of_held_view . pop (view_id, None)
+    if base_name is not None:
+      self . log ( "closed " + base_name )
+
+  def release_view_to_reopen (self, view_id):
+    """Close the held view VIEW_ID, which a command is about to open
+    again; its files are no longer held until the command writes the
+    new view."""
+    close_view_on_server (self, view_id)
+    self . mark_released ( self . base_name_of_held_view . pop (view_id) )
+
+  def mark_released (self, base_name):
+    """Mark the sidecar of BASE_NAME closed, if it is still there."""
+    try:
+      mark_sidecar_closed (
+        os . path . join ( self . folder, base_name + ".view.json" ))
+    except ( OSError, ValueError ):
+      pass
+
+  def log_event (self, text):
+    self . log (text)
+
+  def handle_unprompted_message (self, payload):
+    self . waiting_messages . append (( payload, None ))
+
+  def observe_message (self, payload):
+    kind = payload_response_type (payload)
+    if kind in RERENDER_MESSAGE_TYPES:
+      self . waiting_messages . append ((
+        payload, self . cause or "the server rerendered it unasked" ))
+    elif kind in ( "save-result", "rerender-done" ):
+      for warning in response_field (
+          parse_sexp (payload), "warnings" ) or []:
+        self . log ( "warning: " + sexp_to_text (warning) )
+
+  def begin_command (self, description):
+    self . views_written_by_command . clear ()
+    self . herald_tables = None # fetched afresh, once per command, as on a command's own connection
+    self . cause = f"of '{description}' on the daemon's connection"
+
+  def end_command (self):
+    """Drop the waiting rerenders of the views the command itself
+    wrote: it wrote them from what it read."""
+    self . waiting_messages = collections . deque (
+      ( payload, cause ) for payload, cause in self . waiting_messages
+      if not ( payload_response_type (payload) in RERENDER_MESSAGE_TYPES
+               and sexp_to_text ( response_field (
+                     parse_sexp (payload), "view-id" ))
+                   in self . views_written_by_command ))
+    self . views_written_by_command . clear ()
+    self . cause = None
 
 def request_line (request_name, *fields):
   return ( "((request . " + quote_string (request_name) + ")" +
@@ -2749,7 +3561,7 @@ def quote_string (text):
 
 if __name__ == "__main__":
   try:
-    main ( sys . argv [ 1 : ] )
+    sys . exit ( main ( sys . argv [ 1 : ] ))
   except SkgToolError as error:
     print ( "skg_for_ai: " + str (error), file = sys . stderr )
     sys . exit (1)

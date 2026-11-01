@@ -220,8 +220,8 @@ So far there are these endpoints:
       "Diff view" request (="all changes"=, ="merges"=, ="skgrepo
       changes"=, ="order-only changes"=). It matters only for a view
       the connection does not hold (a connection that ends with each
-      command, as skg-for-ai's does, or one opened after a server
-      restart): the save then re-renders the buffer as that buffer of
+      command, as skg-for-ai's does without its daemon, or one opened
+      after a server restart): the save then re-renders the buffer as that buffer of
       the diff view, with its readiness summary, keeps every viewnode
       ID it carries (see =(vnid X)= under "The metadata headers"), and
       leaves the connection holding it as that buffer, so that an
@@ -559,7 +559,8 @@ buffer's =rendered-at=.
     response. Both clients handle it whatever request they have in
     flight (Emacs's 'skg-unprompted-response-handler-map', Neovim's
     'state.unprompted_response_handler_map'); skg-for-ai prints its
-    warnings on standard error and reads on.
+    warnings on standard error and reads on, and its daemon logs them
+    and asks for the rerender as the clients do.
   - Message: LP =((response-type repo-files-integrated) (warnings ("WARNING" ...)) (view-ids (VIEW_ID ...)))=.
     The warnings are one per skgrepo with files integrated,
     "Integrated N files that changed on disk in skgrepo 'NAME'.", and

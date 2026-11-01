@@ -1690,3 +1690,158 @@ As startup warnings do. With two people saving often, this may be loud.
 *** Should integration notices be quieter?
 A message in the echo area instead of displaying the warnings buffer,
 keeping the buffer for problems only.
+* The daemon: DONE, uncommitted
+** What was done
+*** The command
+'skg_for_ai.py daemon --out-dir DIR [--port P]' ('SkgForAiDaemon' in
+'tools/skg-for-ai/skg_for_ai.py') opens one connection
+('DaemonConnection', a subclass of 'SkgConnection'), logs the
+server's startup warnings, and listens on 'DIR/skg-for-ai.sock'. The
+socket is bound under a temporary name from inside DIR and renamed, so
+it exists only once it listens, and a long DIR path does not hit the
+Unix-socket path limit (clients connect from inside DIR too). It runs
+in the foreground until 'daemon --stop --out-dir DIR', SIGTERM or
+SIGINT, then closes every held view (marking each sidecar closed), its
+connection and its socket. A socket that refuses connection is a dead
+daemon's: commands then run on their own, and the next daemon removes
+it and logs so; a socket that answers refuses a second daemon. A lost
+server connection (closed, or a response cut off) stops the daemon,
+since the server forgot its views.
+*** Routing
+'main' parses the command line, then 'exit_code_of_command_sent_to_daemon'
+looks for a socket in the command's folder: '--out-dir' for the view
+commands and 'new', the sidecar's folder for 'save', 'integrate' and
+'close'. It sends '{argv, cwd}' as JSON, half-closes, and prints the
+daemon's '{stdout, stderr, exit_code}'. The daemon runs the same
+'run_command' in the sender's cwd with stdout and stderr captured, one
+command at a time. 'connect_to_server' hands a command the daemon's
+connection when its port is the daemon's; a routed command takes the
+daemon's port unless its argv names '--port'. 'raw', 'import' and
+'commit' have no folder and never route.
+*** Held views
+'write_view_files' asks the connection whether it holds what it
+writes; the daemon's holds everything written into DIR, so the
+sidecar says '"closed": false', and 'release_view' skips the 'close
+view' a one-shot command sends. A view ID maps to one base name: a
+later view under the same ID releases the earlier files (sidecar
+closed, a save of them then runs on its own connection,
+'connection_for_saved_view'), and a later view written over the same
+files closes the earlier view ID (a second 'diff'). Asking a held
+view ID again gets '(switch-to-view ID)' from the server, so
+'fetch_single_root_view' first closes a held one. Saves through the
+daemon are ordinary held-view saves; the diff-view buffer kind is
+still sent, and the server keeps the registered kind. An unheld save
+on the daemon's connection (after 'close') registers the view again,
+and the daemon holds it again.
+*** Rerenders and the log
+'read_message' hands unprompted messages to
+'handle_unprompted_message' and every other message to
+'observe_message'. On the daemon's connection both queue
+('waiting_messages'): 'repo-files-integrated', and every
+'collateral-view' and 'rerender-view' with the cause in force when it
+was read. Between commands the daemon selects on the server socket
+and its listener, and drains the queue: for 'repo-files-integrated'
+it logs each warning and sends "rerender all views" excluding every
+held view but the clean ones named (as the clients do); each
+rerendered view is written over its three files and logged with what
+changed, node by node (new, gone, title/body/metadata), compared with
+the old full view. The rerenders a command's own save brought are
+written before the command's answer is sent, and those of views the
+command wrote itself are dropped. A compact view with unsaved edits
+is never overwritten ('kept BASE'), and the compact file is read
+again just before writing, so an edit made meanwhile is kept too.
+'save-result' and 'rerender-done' warnings are logged as read. Log
+events: started, holding, released, closed, saved, saved new root,
+integrated, re-rendered, kept, warning, error, stopped.
+*** Documentation
+README: "The daemon" (why, starting and stopping, commands run
+through it, what happens to the views, what it does not see, the
+log), and the places that said each command opens its own
+connection; the Tests section. 'docs/api-and-formats.org': two
+mentions of skg-for-ai's connection.
+** Tests
+A fourth scratch server in 'test_skg_for_ai.py' ('failures_of_daemon'),
+nine cases in order: the daemon starts; 'view', 'links-here' and
+'search' through it (no '--port') write the same full and compact
+files as on their own connection, sidecars equal but for 'closed' and
+'rendered_at' (the 'links-here' save advances the generation); a save
+through it retitles a node another held view shows, whose files are
+rewritten before the save returns, logged with the save's name; a
+second server over the same data root (own port and search index)
+saves a retitle, and the daemon logs "Integrated 1 file ..." and
+rewrites both views showing the node; a view with unsaved edits is
+kept; a bad '.skg' file is logged as a warning; 'close'; 'daemon
+--stop' (exit 0, socket gone, every sidecar closed, then a one-shot
+save of a held view keeps its handles); a SIGKILLed daemon's socket,
+a command beside it running on its own, a new daemon replacing it,
+SIGTERM. Suite: PASS (33 s, was 26 s), four runs in a row.
+'cargo check --all-targets' clean (no Rust changed).
+** The live run on 1732
+User's server started as PID 58055 ('target/debug/skg
+data/skgconfig-user-claude.toml'), stopped by PID; Jeff's 1731 server
+untouched. Daemon PID 58131, out-dir in the scratchpad. In order: the
+daemon viewed 'what has happened'; a one-shot command with another
+out-dir on 1732 added 'The daemon holds my views now.' under it and
+saved; the daemon heard nothing (as expected; see Deviations); the
+daemon then viewed the node again and the new child, and a body line
+was saved on the child through the daemon, which rewrote 'what has
+happened' as collateral. The log, whole (the first error is a
+mistyped ID of mine):
+#+begin_example
+2026-11-01 21:44:33 started: process 58131, server port 1732
+2026-11-01 21:44:34 error: 'view b75b8f22-f726-4b3e-bfbf-c18bc8308009 --out-dir daemon' failed: The server returned an empty view; the graph may lack that ID.
+2026-11-01 21:44:34 holding view_b75b22a8-f726-4b3e-bfbf-c18bc8308009 (view ID content-view:b75b22a8-f726-4b3e-bfbf-c18bc8308009)
+2026-11-01 21:44:54 holding view_b75b22a8-f726-4b3e-bfbf-c18bc8308009 (view ID content-view:b75b22a8-f726-4b3e-bfbf-c18bc8308009)
+2026-11-01 21:44:55 holding view_f7985bd5-8547-43dc-bff4-4338f3c23810 (view ID content-view:f7985bd5-8547-43dc-bff4-4338f3c23810)
+2026-11-01 21:44:55 saved view_f7985bd5-8547-43dc-bff4-4338f3c23810
+2026-11-01 21:44:55 re-rendered view_b75b22a8-f726-4b3e-bfbf-c18bc8308009 because of 'save view_f7985bd5-8547-43dc-bff4-4338f3c23810.view.json --yes' on the daemon's connection; 'The daemon holds my views now.' changed: body
+2026-11-01 21:45:00 stopped: released 2 views
+#+end_example
+'data/user-claude/first' now holds, uncommitted, the parent's new
+content entry and the child 'f7985bd5-8547-43dc-bff4-4338f3c23810',
+whose body reads "Saved through my daemon, whose view of 'what has
+happened' then followed on its own."
+** Deviations
+*** A save on another connection of the same server does not reach the daemon
+The brief's check (save through an independent connection on the same
+server; the daemon rewrites) contradicts the known limit in
+'9_review.org': the saving server's watcher drops its own writes, and
+only the saving connection's views rerender. Confirmed on the fixture
+and live: no message reached the daemon. The fixture test therefore
+saves through a second server over the same data root, the
+teammate's case, which the watcher does carry; the live run added a
+body line through the daemon to show its collateral path.
+*** 'raw', 'import' and 'commit' do not route
+They have no '--out-dir' and write no view. 'commit' through the
+daemon would refresh its held diff buffers (the rerender stream after
+a git-commit), but its typed "yes" cannot cross the socket; left out.
+*** Rerenders written before the answer
+Not asked for: without it, a caller editing a file right after a
+save raced the daemon's rewrite and lost the edit (seen once
+manually). Unprompted rerenders still race an edit in the moment
+between the reread and the write.
+*** Sidecars differ in 'closed'
+'closed' is false for a held view, so "identical files" holds for the
+full and compact files, and for the sidecar but 'closed'.
+** What's imperfect
+*** A rewritten diff buffer has no readiness summary
+A rerender message carries none, so its summary line says "the server
+sent no readiness summary."
+*** Dirty views are not declared to the server
+The save envelope's 'other-views' stays empty, as before. A held view
+with unsaved edits is protected by the stale check at its own save,
+not by the server's dirty-view conflict check at another save.
+*** A stop signal waits for a running command
+Up to a command's longest read (120 s).
+*** No reconnect
+A restarted server stops the daemon; it does not reconnect and reopen
+its views.
+** Open questions
+*** Should a save tell the server's other connections?
+With the daemon, a one-shot command on the same server without the
+daemon's '--out-dir' leaves the daemon's views stale. Routing every
+command of a port through one daemon, or a server-side collateral
+rerender across connections, would close it.
+*** Should 'commit' route through the daemon?
+With '--yes' only, say; it would keep held diff buffers current after
+a git-commit.
