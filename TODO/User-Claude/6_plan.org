@@ -108,9 +108,11 @@ Unit tests of the normalizer and the match on a dozen pairs (reworded,
 unrelated, near-miss), and a save test for each path: exact refused,
 fuzzy asked, fuzzy confirmed keeps the ID.
 
-* A server learns when a foreign repo changes
+* A server learns when a repo changes on disk
 ** Watching
-The server watches each foreign repo's directory with the platform's
+The server watches every repo's directory, owned and foreign (Jeff:
+then a repo may have several writers, and a pull no longer needs a
+rebuild), with the platform's
 file-change notification (the 'notify' crate, which falls back to
 polling only where no kernel can tell). Events are debounced: the batch
 is integrated after the directory has been quiet for a short interval,
@@ -124,16 +126,23 @@ the stale-save protection then refuses an older buffer, as it should.
 Each affected connection receives a server warning naming the repo and
 the count, shown as startup warnings are. A file that fails to parse is
 a warning, not a stop; the previous generation keeps serving.
-** Owned repos
-Not watched: the server is their only writer. (A hand edit behind a
-running server still needs a rebuild.)
+** The server's own writes
+A save writes files into owned repos, and the watcher sees them. Those
+events must be recognized as the server's own and dropped, or the save
+would be integrated twice: the server records what it writes (path and
+content hash) and the watcher skips a changed file whose content matches
+the record. A file another writer changes while a buffer here is open
+is integrated like a foreign change; the stale-save refusal then covers
+it, which is what lets two servers write one repo safely.
 ** Verification
-A test that writes a '.skg' file into a foreign fixture repo while the
-server runs and sees the node appear in a fresh view and an open view
-re-rendered; a test that a burst of files integrates once; a test that a
+A test that writes a '.skg' file into a fixture repo (one foreign, one
+owned) while the server runs and sees the node appear in a fresh view
+and an open view re-rendered; a test that the server's own save
+produces no second integration; a test that a burst of files integrates once; a test that a
 bad file warns and the old generation serves. Then the real case: User's
 server running, Jeff's server running, User saves into 'first', Jeff's
-server shows the new node without a rebuild.
+server shows the new node without a rebuild; and a 'git pull' into an
+owned repo appears without a rebuild.
 
 * Order and stopping points
 The ladder first; stop for Jeff only if a client picker's shape needs

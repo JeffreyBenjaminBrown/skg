@@ -200,10 +200,17 @@ a hundred times. The usual answer is to debounce, gathering events until
 the directory has been quiet for, say, half a second, then integrating
 the whole batch once. A file still being written shows up as a size
 change; the quiet period handles that too.
-****** TODO Jeff : love it. Do it. But also
+****** DONE Jeff : love it. Do it. But also
 I think we should do this not just for foreign repos but for all of them.
 That way we might share writes to a repo (even if only one of us commits).
 And it solves the trap I've fallen into of pulling and forgetting to rebuild.
+******* TODO Jeff : User: sorry, missed this; now in 6_plan
+All repos are watched. One consequence worth naming: the server's own
+saves also raise events, so it must recognize and drop them (record what
+it wrote, skip a changed file whose content matches), or every save
+would be integrated twice. Another writer's change to an owned repo is
+then integrated like a foreign one, and the stale-save refusal covers the
+buffer that was open, which is what makes shared writes safe.
 *** Minimal cognitive burden
 A newcomer needs: the tool's README, the rule "never retype a handled
 headline", and the 'to <name>' convention. My own notes in 'first'
