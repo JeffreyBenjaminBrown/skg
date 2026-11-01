@@ -1,11 +1,13 @@
 //! PURPOSE: Tell a client, unprompted, what the repo watcher
 //! integrated ('server/repo_watch/'): one "repo-files-integrated"
-//! message, '((warnings ("..." ...)) (view-ids ("..." ...)))', naming
-//! each skgrepo and how many of its files were integrated, what could
-//! not be, and the open views of the connection that show a changed
-//! node. The client shows the warnings as it shows the startup
-//! warnings, and asks for a rerender of those views it holds no
-//! unsaved edits in ("rerender all views", excluding the others).
+//! message, '((integrated ((SKGREPO N) ...)) (warnings ("..." ...))
+//! (view-ids ("..." ...)))', naming each skgrepo and how many of its
+//! files were integrated, what could not be, and the open views of the
+//! connection that show a changed node. The client reports the counts
+//! briefly when there are no warnings, shows the warnings as it shows
+//! the startup warnings, and asks for a rerender of those views it
+//! holds no unsaved edits in ("rerender all views", excluding the
+//! others).
 //!
 //! The connection's loop sends it only between requests, when no
 //! request has arrived for its read timeout, so it never falls inside
@@ -18,6 +20,7 @@ use crate::serve::ViewsState;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{send_response_with_length_prefix, sexp_to_client_string, tag_sexp_response};
 use crate::skgrepo_sets::SkgrepoRestriction;
+use crate::types::misc::SkgrepoName;
 use crate::types::views_state::{OpenViews, ViewforestId};
 
 use sexp::{Atom, Sexp};
@@ -42,6 +45,8 @@ pub fn deliver_repo_change_notices (
     || notices . iter () . any ( |notice| notice . foreign_files_integrated ) {
     // The diff view reads foreign skgrepos from their worktree.
     views_state . graph_straddle = None; }
+  let integrated : Vec<(SkgrepoName, usize)> =
+    files_integrated_per_skgrepo (&notices, restriction);
   let warnings : Vec<String> = {
     let mut warnings : Vec<String> = notices . iter ()
       . flat_map ( |notice| warnings_of_notice (notice, restriction) )
@@ -51,9 +56,11 @@ pub fn deliver_repo_change_notices (
     warnings };
   let view_ids : Vec<ViewforestId> =
     views_to_rerender (&notices, missed_some, views_state);
-  if warnings . is_empty () && view_ids . is_empty () { return; }
+  if integrated . is_empty () && warnings . is_empty () && view_ids . is_empty () {
+    return; }
   send_response_with_length_prefix (
-    stream, & repo_files_integrated_response (&warnings, &view_ids) ); }
+    stream, & repo_files_integrated_response (
+      &integrated, &warnings, &view_ids )); }
 
 /// The notices waiting, and whether some were missed because the
 /// connection fell too far behind.
@@ -69,25 +76,32 @@ fn received_notices (
       Err (TryRecvError::Empty) | Err (TryRecvError::Closed) => break, }}
   (notices, missed_some) }
 
-/// What 'notice' tells a connection under 'restriction': a line per
-/// skgrepo it shows that had files integrated, and each problem
-/// whose skgrepos it all shows.
+/// How many files each skgrepo 'restriction' shows had integrated,
+/// summed over 'notices', in the order the notices first name them.
+pub fn files_integrated_per_skgrepo (
+  notices     : &[Arc<RepoChangeNotice>],
+  restriction : &SkgrepoRestriction,
+) -> Vec<(SkgrepoName, usize)> {
+  let mut integrated : Vec<(SkgrepoName, usize)> = Vec::new ();
+  for (skgrepo, count) in notices . iter ()
+    . flat_map ( |notice| notice . files_integrated . iter () )
+    . filter ( |(skgrepo, _)| restriction . contains_skgrepo (skgrepo) )
+  { match integrated . iter_mut () . find ( |(seen, _)| seen == skgrepo ) {
+      Some ((_, total)) => *total += count,
+      None => integrated . push (( skgrepo . clone (), *count )), }}
+  integrated }
+
+/// The warnings 'notice' tells a connection under 'restriction': each
+/// problem whose skgrepos it all shows.
 pub fn warnings_of_notice (
   notice      : &RepoChangeNotice,
   restriction : &SkgrepoRestriction,
 ) -> Vec<String> {
-  let integrated = notice . files_integrated . iter ()
-    . filter ( |(skgrepo, _)| restriction . contains_skgrepo (skgrepo) )
-    . map ( |(skgrepo, count)| format! (
-      "Integrated {} that changed on disk in skgrepo '{}'.",
-      if *count == 1 { "1 file" . to_string () }
-      else { format! ("{} files", count) },
-      skgrepo . 0 ));
-  let problems = notice . problems . iter ()
+  notice . problems . iter ()
     . filter ( |problem| problem . skgrepos . iter ()
                . all ( |skgrepo| restriction . contains_skgrepo (skgrepo) ))
-    . map ( |problem| problem . message . clone () );
-  integrated . chain (problems) . collect () }
+    . map ( |problem| problem . message . clone () )
+    . collect () }
 
 /// The connection's open views a rerender should bring up to date:
 /// those that show a changed node, and every buffer of the diff view
@@ -112,13 +126,21 @@ fn views_to_rerender (
     . collect ();
   selected . into_iter () . map (ViewforestId::from_client_string) . collect () }
 
-/// '((response-type repo-files-integrated) (warnings ("..." ...))
-/// (view-ids (ID ...)))'.
+/// '((response-type repo-files-integrated) (integrated ((SKGREPO N)
+/// ...)) (warnings ("..." ...)) (view-ids (ID ...)))'.
 pub fn repo_files_integrated_response (
-  warnings : &[String],
-  view_ids : &[ViewforestId],
+  integrated : &[(SkgrepoName, usize)],
+  warnings   : &[String],
+  view_ids   : &[ViewforestId],
 ) -> String {
   let payload : Sexp = Sexp::List ( vec! [
+    Sexp::List ( vec! [
+      Sexp::Atom ( Atom::S ( "integrated" . to_string () )),
+      Sexp::List ( integrated . iter ()
+                   . map ( |(skgrepo, count)| Sexp::List ( vec! [
+                     Sexp::Atom ( Atom::S ( skgrepo . 0 . clone () )),
+                     Sexp::Atom ( Atom::I ( *count as i64 )), ] ))
+                   . collect () ), ] ),
     Sexp::List ( vec! [
       Sexp::Atom ( Atom::S ( "warnings" . to_string () )),
       Sexp::List ( warnings . iter ()

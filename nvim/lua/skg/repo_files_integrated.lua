@@ -1,14 +1,14 @@
 -- PURPOSE: Handle the message the server sends unprompted when it has
 -- integrated '.skg' files that changed on disk (another writer, a
--- 'git pull'): 'repo-files-integrated', with (warnings (...)) and
--- (view-ids (...)).
+-- 'git pull'): 'repo-files-integrated', with (integrated ((SKGREPO
+-- N) ...)), (warnings (...)) and (view-ids (...)).
 --
--- A message whose warnings only count the files integrated per
--- skgrepo is a notification ('skg: repo first: 2 files integrated').
--- One that carries any other warning (a file that could not be read,
--- a batch that failed validation, a leak) is appended, whole, to the
--- server-warnings buffer under a headline 'Repo changes', as the
--- startup warnings are, and that buffer is shown. The views it
+-- A message with no warnings is a notification of its counts ('skg:
+-- repo first: 2 files integrated'). One that carries a warning (a
+-- file that could not be read, a batch that failed validation, a
+-- leak) is appended, counts and warnings, to the server-warnings
+-- buffer under a headline 'Repo changes', as the startup warnings
+-- are, and that buffer is shown. The views it
 -- names show a changed node; each one whose buffer holds no unsaved
 -- edits is rerendered, through a 'rerender all views' request that
 -- excludes every other view. A buffer with unsaved edits keeps them;
@@ -23,6 +23,7 @@ local lock = require('skg.lock')
 local messages = require('skg.messages')
 local payload = require('skg.payload')
 local server_warnings = require('skg.server_warnings')
+local sexpr = require('skg.sexpr.parse')
 local state = require('skg.state')
 
 local M = {}
@@ -34,26 +35,21 @@ M.retry_milliseconds = 500
 ---How many times to ask again before giving up on a blocked rerender.
 M.retry_limit = 120
 
----A warning of a repo-files-integrated message that only counts the
----files integrated in one skgrepo, as 'warnings_of_notice' in
----'server/serve/handlers/repo_files_integrated.rs' words it. The
----captures are the count and the skgrepo.
-M.count_pattern =
-  "^Integrated (%d+) files? that changed on disk in skgrepo '(.*)'%.$"
-
 ---Register the handler as the unprompted one for its response type.
 function M.register ()
   state.unprompted_response_handler_map['repo-files-integrated'] =
     function (_payload_text, response) M.handler(response) end
 end
 
----Show the warnings of a parsed repo-files-integrated RESPONSE and
----rerender the views it names that have no unsaved edits.
+---Show the counts and warnings of a parsed repo-files-integrated
+---RESPONSE and rerender the views it names that have no unsaved edits.
 ---@param response any
 function M.handler (response)
+  local count_clauses =
+    M.count_clauses(payload.field(response, 'integrated'))
   local warnings =
     payload.string_list(payload.field(response, 'warnings'))
-  if #warnings > 0 then M.show_warnings(warnings) end
+  M.show(count_clauses, warnings)
   local view_ids =
     payload.string_list(payload.field(response, 'view-ids'))
   if #view_ids > 0 then
@@ -62,29 +58,43 @@ function M.handler (response)
   end
 end
 
----Notify WARNINGS when each only counts the files integrated in a
----skgrepo; otherwise append them all to the server-warnings buffer
----and show it.
----@param warnings string[]
-function M.show_warnings (warnings)
+---'repo NAME: N files integrated' for each (NAME N) of the parsed
+---INTEGRATED list.
+---@param integrated any
+---@return string[]
+function M.count_clauses (integrated)
   local clauses = {}
-  for _, warning in ipairs(warnings) do
-    local count, skgrepo = warning:match(M.count_pattern)
-    if not count then
-      local headlines = { '* Repo changes' }
-      for _, each in ipairs(warnings) do
-        table.insert(headlines, '** ' .. each) end
-      messages.big_nonfatal_message_appended(
-        server_warnings.buffer_name,
-        'skg: files changed on disk were integrated - see '
-          .. server_warnings.buffer_name,
-        table.concat(headlines, '\n'))
-      return
+  if integrated ~= nil and sexpr.is_list(integrated) then
+    for _, skgrepo_and_count in ipairs(integrated) do
+      local skgrepo = sexpr.atom_text(skgrepo_and_count[1])
+      local count = sexpr.atom_text(skgrepo_and_count[2])
+      table.insert(clauses, 'repo ' .. skgrepo .. ': ' .. count
+                   .. (count == '1' and ' file' or ' files') .. ' integrated')
     end
-    table.insert(clauses, 'repo ' .. skgrepo .. ': ' .. count
-                 .. (count == '1' and ' file' or ' files') .. ' integrated')
   end
-  vim.notify('skg: ' .. table.concat(clauses, '; '))
+  return clauses
+end
+
+---Notify COUNT_CLAUSES when there are no WARNINGS; otherwise append
+---the clauses and the warnings to the server-warnings buffer and show
+---it.
+---@param count_clauses string[]
+---@param warnings string[]
+function M.show (count_clauses, warnings)
+  if #warnings > 0 then
+    local headlines = { '* Repo changes' }
+    for _, line in ipairs(count_clauses) do
+      table.insert(headlines, '** ' .. line) end
+    for _, warning in ipairs(warnings) do
+      table.insert(headlines, '** ' .. warning) end
+    messages.big_nonfatal_message_appended(
+      server_warnings.buffer_name,
+      'skg: files changed on disk were integrated - see '
+        .. server_warnings.buffer_name,
+      table.concat(headlines, '\n'))
+  elseif #count_clauses > 0 then
+    vim.notify('skg: ' .. table.concat(count_clauses, '; '))
+  end
 end
 
 ---Each open skg view buffer, as { view_id = ..., buf = ... }.

@@ -381,11 +381,12 @@ daemon's.
 
 Between its answers, the server may tell a connection that it
 integrated '.skg' files that changed on disk (a teammate's save, a
-'git pull'). A command on its own connection prints each such warning
-on standard error, as 'skg server: Integrated N files that changed on
-disk in skgrepo 'NAME'.', and reads on; a view written before it may
-be refused on save if it would write a node that changed. A daemon
-instead rewrites the views it names and logs the warnings.
+'git pull'). A command on its own connection prints, on standard
+error, a line per skgrepo, as 'skg server: repo NAME: N files
+integrated', and each warning (a file that could not be read, say), as
+'skg server: WARNING', and reads on; a view written before it may be
+refused on save if it would write a node that changed. A daemon
+instead rewrites the views it names and logs the counts and warnings.
 
 * The daemon
 ** Why
@@ -529,15 +530,16 @@ lines is joined into one with ' | '. The events:
   view's files. CAUSE is "of 'COMMAND' on the daemon's connection" for
   a collateral rerender or one after 'commit --yes', "of a git-commit
   on another connection" after a 'commit' without '--yes', or "files
-  changed on disk (WARNINGS)" with the server's notice. CHANGES compares the old full view with the new,
+  changed on disk (COUNTS; WARNINGS)" with the server's notice. CHANGES compares the old full view with the new,
   node by node, by title: "new 'T'", "gone 'T'", "'T' changed: title,
   was 'OLD', body, metadata" (the metadata holds its relationships,
   among other facts), the first six and a count of the rest, or "no
   node changed".
 - 'kept BASE: ...', a rerender not written over unsaved edits.
+- 'changed on disk: repo NAME: N files integrated; ...' when the
+  server integrated files that changed on disk.
 - 'warning: TEXT' for every warning the server sends the connection:
-  its startup warnings, each integration's ("Integrated 1 file that
-  changed on disk in skgrepo 'first'.", a file that could not be read,
+  its startup warnings, each integration's (a file that could not be read,
   a batch that failed validation, a telescope that leaks text), and
   those of every save and rerender on the connection.
 - 'error: ...': a command that failed, with its message; a message the
@@ -547,8 +549,8 @@ For instance:
 #+begin_example
 2026-11-01 21:34:13 saved view_child-a-id
 2026-11-01 21:34:13 re-rendered view_root-id because of 'save view_child-a-id.view.json --yes' on the daemon's connection; 'First child, renamed via daemon' changed: title, was 'First child'
-2026-11-01 21:34:32 warning: Integrated 1 file that changed on disk in skgrepo 'main'.
-2026-11-01 21:34:33 re-rendered view_child-a-id because files changed on disk (Integrated 1 file that changed on disk in skgrepo 'main'.); 'First child, renamed on the other server' changed: title, was 'First child, renamed via daemon'
+2026-11-01 21:34:32 changed on disk: repo main: 1 file integrated
+2026-11-01 21:34:33 re-rendered view_child-a-id because files changed on disk (repo main: 1 file integrated); 'First child, renamed on the other server' changed: title, was 'First child, renamed via daemon'
 #+end_example
 The log is how a reader who was elsewhere learns that the graph moved:
 anything that wants waking when it does can follow the file

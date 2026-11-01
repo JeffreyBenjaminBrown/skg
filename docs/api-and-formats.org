@@ -561,27 +561,27 @@ buffer's =rendered-at=.
     response. Both clients handle it whatever request they have in
     flight (Emacs's 'skg-unprompted-response-handler-map', Neovim's
     'state.unprompted_response_handler_map'); skg-for-ai prints its
-    warnings on standard error and reads on, and its daemon logs them
-    and asks for the rerender as the clients do.
-  - Message: LP =((response-type repo-files-integrated) (warnings ("WARNING" ...)) (view-ids (VIEW_ID ...)))=.
-    The warnings are one per skgrepo with files integrated,
-    "Integrated N files that changed on disk in skgrepo 'NAME'.", and
-    one per node or batch that could not be integrated, saying why
-    and that the server keeps serving the previous version. A
-    connection is not told of a skgrepo its skgrepo restriction keeps
-    out, nor of a problem concerning one. The view IDs are the
+    counts and warnings on standard error and reads on, and its daemon
+    logs them and asks for the rerender as the clients do.
+  - Message: LP =((response-type repo-files-integrated) (integrated ((SKGREPO N) ...)) (warnings ("WARNING" ...)) (view-ids (VIEW_ID ...)))=.
+    =integrated= names each skgrepo with files integrated and how
+    many, in config order. The warnings are one per node or batch
+    that could not be integrated, saying why and that the server keeps
+    serving the previous version. A connection is not told of a
+    skgrepo its skgrepo restriction keeps out, nor of a problem
+    concerning one. The view IDs are the
     connection's open views that show a node the batch changed, and
     every buffer of the diff view it holds; every open view, with a
     warning saying so, when the connection fell too far behind to
     hear every batch. No message is sent when there is nothing to
     tell.
-  - When every warning only counts the files integrated in a
-    skgrepo, each client echoes them in one line ("skg: repo first: 2
-    files integrated; repo main: 1 file integrated"), in the echo area
-    in Emacs, as a notification in Neovim. When any other warning is
-    among them, it appends them all to its server-warnings buffer
-    under a level-1 headline "Repo changes", as it does the startup
-    warnings ("Server warnings"), and shows the buffer. Either way it
+  - When there are no warnings, each client echoes the counts in one
+    line ("skg: repo first: 2 files integrated; repo main: 1 file
+    integrated"), in the echo area in Emacs, as a notification in
+    Neovim. When there is a warning, it appends a line per count and
+    per warning to its server-warnings buffer under a level-1 headline
+    "Repo changes", as it does the startup warnings ("Server
+    warnings"), and shows the buffer. Either way it
     asks for a rerender of each
     named view whose buffer has no unsaved edits: a "Rerender all
     views" request whose =exclude-view-ids= name every other open

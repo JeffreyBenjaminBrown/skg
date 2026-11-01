@@ -1185,8 +1185,7 @@ DAEMON_LOG_TIMEOUT_SECONDS = 20
 SECOND_SERVER_PORT = PORT + 1
 # What a daemon prints once its socket answers.
 DAEMON_READY_LINE = "The daemon listens on"
-INTEGRATED_ONE_MAIN_FILE = (
-  "warning: Integrated 1 file that changed on disk in skgrepo 'main'." )
+INTEGRATED_ONE_MAIN_FILE = "changed on disk: repo main: 1 file integrated"
 
 def failures_of_daemon (scratch, data_root):
   context = { "scratch"       : scratch,
@@ -1290,8 +1289,8 @@ def check_daemon_rewrites_after_a_change_on_disk (context):
   require_log_line ( context, INTEGRATED_ONE_MAIN_FILE )
   require_log_line (
     context,
-    "re-rendered view_root-id because files changed on disk (Integrated 1 "
-    "file that changed on disk in skgrepo 'main'.); 'Second child, renamed "
+    "re-rendered view_root-id because files changed on disk (repo main: 1 "
+    "file integrated); 'Second child, renamed "
     "on the second server' changed: title, was 'Second child, a subscriber'" )
   require_log_line ( context, "re-rendered links-here_child-b-id because files changed on disk" )
   require_in_file ( context [ "daemon_folder" ], "view_root-id",

@@ -75,7 +75,7 @@ describe('skg.repo_files_integrated', function ()
       function (payload_text) handled = payload_text end
     state.response_handler_map = {}
     length_prefix.dispatch_by_type(
-      '((response-type repo-files-integrated) (warnings ()) (view-ids ()))')
+      '((response-type repo-files-integrated) (integrated ()) (warnings ()) (view-ids ()))')
     state.unprompted_response_handler_map['repo-files-integrated'] = saved
     assert.is_truthy(handled and handled:find('repo-files-integrated', 1, true))
     assert.are.equal(0, state.lp_pending_count)
@@ -87,28 +87,27 @@ describe('skg.repo_files_integrated', function ()
       state.unprompted_response_handler_map['repo-files-integrated'])
   end)
 
-  it('notifies, without the warnings buffer, when it only counts files', function ()
+  it('notifies its counts, without the warnings buffer, when it has no warnings', function ()
     local notified = nil
     vim.notify = function (text) notified = text end
     repo_files_integrated.handler(sexpr.read(
       '((response-type repo-files-integrated) '
-      .. '(warnings ("Integrated 2 files that changed on disk in skgrepo \'first\'." '
-      .. '"Integrated 1 file that changed on disk in skgrepo \'main\'.")) '
+      .. '(integrated ((first 2) ("my main" 1))) (warnings ()) '
       .. '(view-ids ()))'))
     assert.are.equal(
-      'skg: repo first: 2 files integrated; repo main: 1 file integrated',
+      'skg: repo first: 2 files integrated; repo my main: 1 file integrated',
       notified)
     assert.is_nil(warnings_text())
   end)
 
-  it('appends real warnings, whole, to the server-warnings buffer', function ()
+  it('appends counts and warnings to the server-warnings buffer', function ()
     repo_files_integrated.handler(sexpr.read(
       '((response-type repo-files-integrated) '
-      .. '(warnings ("Integrated 2 files that changed on disk in skgrepo \'first\'." '
-      .. '"Node bad-id changed on disk but could not be read.")) '
+      .. '(integrated ((first 2))) '
+      .. '(warnings ("Node bad-id changed on disk but could not be read.")) '
       .. '(view-ids ()))'))
     assert.are.equal(
-      "* Repo changes\n** Integrated 2 files that changed on disk in skgrepo 'first'.\n"
+      "* Repo changes\n** repo first: 2 files integrated\n"
       .. '** Node bad-id changed on disk but could not be read.',
       warnings_text())
   end)

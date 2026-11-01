@@ -1977,3 +1977,14 @@ fail on permission rather than run locally.
 *** A structured count in the integration message?
 '(integrated (("first" . 2)))' beside '(warnings ...)' would let the
 clients stop matching text. A Rust change; not done.
+Done: the message now carries '(integrated ((SKGREPO N) ...))',
+summed per skgrepo over the notices delivered together
+('files_integrated_per_skgrepo'), and '(warnings ...)' holds only
+problems (and the "more often than this connection could follow"
+line). Both clients echo/notify the counts when 'warnings' is empty
+and otherwise write the count lines and the warnings under "Repo
+changes"; no text matching remains. Each pair is a two-element list,
+not a dotted pair, so that the three readers parse it alike. The
+tool prints 'skg server: repo NAME: N files integrated' on its own
+connection, and its daemon logs 'changed on disk: repo NAME: N files
+integrated'; a rerender's cause lists counts then warnings.

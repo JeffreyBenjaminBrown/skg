@@ -2951,12 +2951,15 @@ class SkgForAiDaemon:
         self . log ( "error: " + str (error) )
 
   def handle_repo_files_integrated (self, message):
-    """Log the warnings, and ask for the rerender of each view named
-    that the daemon holds and whose compact view has no unsaved edits,
-    as the clients do ('Repo files integrated' in
+    """Log the counts and the warnings, and ask for the rerender of
+    each view named that the daemon holds and whose compact view has
+    no unsaved edits, as the clients do ('Repo files integrated' in
     'docs/api-and-formats.org')."""
+    count_clauses = repo_files_integrated_count_clauses (message)
     warnings = [ sexp_to_text (warning)
                  for warning in response_field (message, "warnings") or [] ]
+    if count_clauses:
+      self . log ( "changed on disk: " + "; " . join (count_clauses) )
     for warning in warnings:
       self . log ( "warning: " + warning )
     clean_view_ids = []
@@ -2977,8 +2980,9 @@ class SkgForAiDaemon:
     if clean_view_ids:
       self . request_rerender (
         clean_view_ids,
-        "files changed on disk" + ( " (" + " " . join (warnings) + ")"
-                                    if warnings else "" ))
+        "files changed on disk" + (
+          " (" + "; " . join (count_clauses + warnings) + ")"
+          if count_clauses or warnings else "" ))
 
   def rerender_held_diffView_buffers (self, cause):
     """Ask for the rerender of every held buffer of the diff view,
@@ -3270,6 +3274,15 @@ def quoted_title (title):
 
 UNPROMPTED_REPO_CHANGE_MESSAGE_START = "((response-type repo-files-integrated)"
 
+def repo_files_integrated_count_clauses (message):
+  """'repo NAME: N files integrated' for each '(NAME N)' of a
+  repo-files-integrated MESSAGE's '(integrated ...)'."""
+  clauses = []
+  for skgrepo, count in response_field (message, "integrated") or []:
+    clauses . append ( f"repo {sexp_to_text (skgrepo)}: {count} "
+                       f"{'file' if count == 1 else 'files'} integrated" )
+  return clauses
+
 class SkgToolError (Exception):
   pass
 
@@ -3328,10 +3341,13 @@ class SkgConnection:
 
   def handle_unprompted_message (self, payload):
     """A message the server sent unprompted, that it integrated files
-    changed on disk, is no answer: its warnings go to stderr."""
-    for warning in ( response_field (
-        parse_sexp (payload), "warnings" ) or [] ):
-      print ( "skg server: " + sexp_to_text (warning), file = sys . stderr )
+    changed on disk, is no answer: its counts and warnings go to
+    stderr."""
+    message = parse_sexp (payload)
+    for line in ( repo_files_integrated_count_clauses (message) +
+                  [ sexp_to_text (warning)
+                    for warning in response_field (message, "warnings") or [] ] ):
+      print ( "skg server: " + line, file = sys . stderr )
 
   def observe_message (self, payload):
     """Every message read as part of a response passes here."""

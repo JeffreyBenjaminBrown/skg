@@ -40,7 +40,7 @@ though no request registered one."
           `((repo-files-integrated
              . ,(lambda (_proc payload) (setq handled payload))))))
     (skg-lp--dispatch-by-type
-     nil "((response-type repo-files-integrated) (warnings ()) (view-ids ()))")
+     nil "((response-type repo-files-integrated) (integrated ()) (warnings ()) (view-ids ()))")
     (should (string-match-p "repo-files-integrated" handled))
     (should (= 0 skg-lp--pending-count))))
 
@@ -48,17 +48,18 @@ though no request registered one."
   (should (eq (alist-get 'repo-files-integrated skg-unprompted-response-handler-map)
               #'skg--repo-files-integrated-handler)))
 
-;; '(warnings ...)' and '(view-ids ())' of a repo-files-integrated
-;; message, printed.
-(defun test-skg-repo-files-integrated--payload (warnings)
+;; A repo-files-integrated message with INTEGRATED, WARNINGS and
+;; '(view-ids ())', printed.
+(defun test-skg-repo-files-integrated--payload (integrated warnings)
   (prin1-to-string
    `((response-type repo-files-integrated)
+     (integrated ,integrated)
      (warnings ,warnings)
      (view-ids ()))))
 
 (ert-deftest test-skg-repo-files-integrated-counts-alone-are-an-echo ()
-  "A message whose warnings only count the files integrated is echoed,
-one clause per skgrepo; the warnings buffer is neither made nor shown."
+  "A message with no warnings echoes its counts, one clause per
+skgrepo; the warnings buffer is neither made nor shown."
   (test-skg-repo-files-integrated--kill-warnings-buffer)
   (let ((echoed nil))
     (cl-letf (((symbol-function 'display-buffer)
@@ -69,15 +70,14 @@ one clause per skgrepo; the warnings buffer is neither made nor shown."
       (skg--repo-files-integrated-handler
        nil
        (test-skg-repo-files-integrated--payload
-        '("Integrated 2 files that changed on disk in skgrepo 'first'."
-          "Integrated 1 file that changed on disk in skgrepo 'main'."))))
+        '((first 2) ("my main" 1)) '())))
     (should (equal echoed
-                   "skg: repo first: 2 files integrated; repo main: 1 file integrated"))
+                   "skg: repo first: 2 files integrated; repo my main: 1 file integrated"))
     (should-not (get-buffer skg-server-warnings-buffer-name))))
 
 (ert-deftest test-skg-repo-files-integrated-real-warnings-go-to-the-warnings-buffer ()
-  "A message carrying any other warning goes whole to the warnings
-buffer, which is shown."
+  "A message carrying a warning goes, counts and warnings, to the
+warnings buffer, which is shown."
   (test-skg-repo-files-integrated--kill-warnings-buffer)
   (unwind-protect
       (let ((shown nil))
@@ -86,13 +86,13 @@ buffer, which is shown."
           (skg--repo-files-integrated-handler
            nil
            (test-skg-repo-files-integrated--payload
-            '("Integrated 2 files that changed on disk in skgrepo 'first'."
-              "Node bad-id changed on disk but could not be read."))))
+            '((first 2))
+            '("Node bad-id changed on disk but could not be read."))))
         (should (equal (buffer-name shown) skg-server-warnings-buffer-name))
         (with-current-buffer skg-server-warnings-buffer-name
           (should (equal (buffer-string)
                          (concat "* Repo changes\n"
-                                 "** Integrated 2 files that changed on disk in skgrepo 'first'.\n"
+                                 "** repo first: 2 files integrated\n"
                                  "** Node bad-id changed on disk but could not be read.\n")))))
     (test-skg-repo-files-integrated--kill-warnings-buffer)))
 
@@ -119,6 +119,7 @@ excludes every other open view."
          nil
          (prin1-to-string
           '((response-type repo-files-integrated)
+            (integrated ((mine 1)))
             (warnings ())
             (view-ids (named-clean named-dirty))))))
       (should (string-match-p (regexp-quote "(request . \"rerender all views\")") sent))

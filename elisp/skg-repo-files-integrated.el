@@ -2,17 +2,15 @@
 ;;;
 ;;; PURPOSE: Handle the message the server sends unprompted when it
 ;;; has integrated '.skg' files that changed on disk (another writer,
-;;; a 'git pull'): "repo-files-integrated", with (warnings (...)) and
-;;; (view-ids (...)).
+;;; a 'git pull'): "repo-files-integrated", with (integrated ((SKGREPO
+;;; N) ...)), (warnings (...)) and (view-ids (...)).
 ;;;
-;;; A message whose warnings only count the files integrated per
-;;; skgrepo is an echo-area message ("skg: repo first: 2 files
-;;; integrated"). One that carries any other warning (a file that
-;;; could not be read, a batch that failed validation, a leak) goes,
-;;; whole, to `skg-server-warnings-buffer-name' under a headline "Repo
-;;; changes", as the startup warnings do, and shows that buffer. The
-;;; views it
-;;; names show a changed node; each one whose buffer holds no unsaved
+;;; A message with no warnings is an echo-area message of its counts
+;;; ("skg: repo first: 2 files integrated"). One that carries a warning
+;;; (a file that could not be read, a batch that failed validation, a
+;;; leak) goes, counts and warnings, to `skg-server-warnings-buffer-name'
+;;; under a headline "Repo changes", as the startup warnings do, and
+;;; shows that buffer. The views it names show a changed node; each one whose buffer holds no unsaved
 ;;; edits is rerendered, through a "rerender all views" request that
 ;;; excludes every other view. A buffer with unsaved edits keeps them;
 ;;; the server refuses its save if it would write a node changed on
@@ -35,57 +33,45 @@ streaming request in flight blocked.")
 (defconst skg--repo-files-integrated-retry-limit 120
   "How many times to ask again before giving up on a blocked rerender.")
 
-(defconst skg--repo-files-integrated-count-regexp
-  "\\`Integrated \\([0-9]+\\) files? that changed on disk in skgrepo '\\(.*\\)'\\.\\'"
-  "A warning of a repo-files-integrated message that only counts the
-files integrated in one skgrepo, as 'warnings_of_notice' in
-'server/serve/handlers/repo_files_integrated.rs' words it. Group 1 is
-the count, group 2 the skgrepo.")
-
 (defun skg--repo-files-integrated-handler (_tcp-proc payload)
-  "Show the warnings of a repo-files-integrated PAYLOAD and rerender
-the views it names that have no unsaved edits."
+  "Show the counts and warnings of a repo-files-integrated PAYLOAD and
+rerender the views it names that have no unsaved edits."
   (condition-case err
       (let* ((response (read payload))
+             (count-clauses (skg--repo-files-integrated-count-clauses
+                             (cadr (assoc 'integrated response))))
              (warnings (cadr (assoc 'warnings response)))
              (view-ids (mapcar (lambda (view-id) (format "%s" view-id))
                                (cadr (assoc 'view-ids response)))))
-        (when (skg--message-list-nonempty-p warnings)
-          (skg--show-repo-files-integrated-warnings warnings))
+        (skg--show-repo-files-integrated count-clauses warnings)
         (when view-ids
           ;; Not from inside the process filter: the rerender sends a request.
           (run-at-time 0 nil #'skg--rerender-views-changed-on-disk view-ids 0)))
     (error
      (message "skg: repo-files-integrated handler error: %S" err))))
 
-(defun skg--show-repo-files-integrated-warnings (warnings)
-  "Echo WARNINGS when each only counts the files integrated in a
-skgrepo; otherwise append them all to the warnings buffer and show it."
-  (if (cl-every (lambda (warning)
-                  (string-match-p skg--repo-files-integrated-count-regexp
-                                  warning))
-                warnings)
-      (message "%s" (skg--repo-files-integrated-echo-text warnings))
+(defun skg--show-repo-files-integrated (count-clauses warnings)
+  "Echo COUNT-CLAUSES when there are no WARNINGS; otherwise append the
+clauses and the warnings to the warnings buffer and show it."
+  (cond
+   ((skg--message-list-nonempty-p warnings)
     (skg--append-to-server-warnings
      (concat "* Repo changes\n"
-             (mapconcat (lambda (warning)
-                          (concat "** " warning "\n"))
-                        warnings ""))
+             (mapconcat (lambda (line) (concat "** " line "\n"))
+                        (append count-clauses warnings) ""))
      (format "skg: files changed on disk were integrated - see %s"
-             skg-server-warnings-buffer-name))))
+             skg-server-warnings-buffer-name)))
+   (count-clauses
+    (message "skg: %s" (mapconcat #'identity count-clauses "; ")))))
 
-(defun skg--repo-files-integrated-echo-text (count-warnings)
-  "\"skg: repo NAME: N files integrated\", one clause per warning of
-COUNT-WARNINGS, each matching `skg--repo-files-integrated-count-regexp'."
-  (concat "skg: "
-          (mapconcat
-           (lambda (warning)
-             (string-match skg--repo-files-integrated-count-regexp warning)
-             (let ((count (match-string 1 warning)))
-               (format "repo %s: %s %s integrated"
-                       (match-string 2 warning) count
-                       (if (equal count "1") "file" "files"))))
-           count-warnings "; ")))
+(defun skg--repo-files-integrated-count-clauses (integrated)
+  "\"repo NAME: N files integrated\" for each (NAME N) of INTEGRATED."
+  (mapcar (lambda (skgrepo-and-count)
+            (let ((count (cadr skgrepo-and-count)))
+              (format "repo %s: %s %s integrated"
+                      (car skgrepo-and-count) count
+                      (if (equal count 1) "file" "files"))))
+          integrated))
 
 (defun skg--rerender-views-changed-on-disk (view-ids attempt)
   "Rerender each open buffer among VIEW-IDS that holds no unsaved

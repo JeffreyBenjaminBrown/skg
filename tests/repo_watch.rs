@@ -12,7 +12,7 @@ use skg::repo_watch::own_writes::own_write_awaits_its_event;
 use skg::repo_watch::watcher::{RepoWatcherHandle, start_repo_watcher};
 use skg::serve::ViewsState;
 use skg::serve::handlers::repo_files_integrated::{
-  deliver_repo_change_notices, warnings_of_notice};
+  deliver_repo_change_notices, files_integrated_per_skgrepo, warnings_of_notice};
 use skg::serve::handlers::rerender_all_views::handle_rerender_all_views_request;
 use skg::serve::handlers::save_buffer::handle_save_buffer_request;
 use skg::serve::handlers::single_root_view::handle_single_root_view_request;
@@ -253,9 +253,8 @@ fn a_connection_is_told_and_its_open_view_rerenders
   assert_eq! ( messages . len (), 1, "{:?}", messages );
   assert! ( messages [0] . starts_with ("((response-type repo-files-integrated)"),
             "{}", messages [0] );
-  assert! ( messages [0] . contains (
-              "Integrated 1 file that changed on disk in skgrepo 'mine'."),
-            "{}", messages [0] );
+  assert! ( messages [0] . contains ("(integrated ((mine 1)))"), "{}", messages [0] );
+  assert! ( messages [0] . contains ("(warnings ())"), "{}", messages [0] );
   assert! ( messages [0] . contains ("(view-ids (a-view))"), "{}", messages [0] );
   { // Nothing is told twice.
     assert! ( delivered_messages (&f, &mut receiver_of_connection, &mut connection)
@@ -299,14 +298,22 @@ fn a_bad_file_warns_and_the_old_generation_serves
             "{}", notice . problems [0] . message );
   assert_eq! ( f . env . runtime_snapshot () . generation, generation_before );
   assert_eq! ( title_in_graph (&f, "b") . as_deref (), Some ("b as first written") );
-  { // Each connection is told, as a warning.
-    let warnings : Vec<String> = warnings_of_notice (
-      &notice, &SkgrepoRestriction::unrestricted (&f . config) );
-    assert_eq! ( warnings . len (), 1, "{:?}", warnings ); }
+  { // Each connection is told, as a warning, and of no file integrated.
+    let restriction : SkgrepoRestriction = SkgrepoRestriction::unrestricted (&f . config);
+    let warnings : Vec<String> = warnings_of_notice (&notice, &restriction);
+    assert_eq! ( warnings . len (), 1, "{:?}", warnings );
+    assert! ( files_integrated_per_skgrepo (
+                & [ notice . clone () ], &restriction ) . is_empty () ); }
   { // Fixed, it is integrated.
     write_skg_file_as_another_writer (&f, "mine", "b", "pid: b\ntitle: b fixed\n");
     let fixed : Arc<RepoChangeNotice> = next_notice (&mut receiver);
     assert_eq! ( fixed . files_integrated, vec! [ (SkgrepoName::from ("mine"), 1) ] );
+    { // The count is no warning; two notices' counts add up per skgrepo.
+      let restriction : SkgrepoRestriction = SkgrepoRestriction::unrestricted (&f . config);
+      assert! ( warnings_of_notice (&fixed, &restriction) . is_empty () );
+      assert_eq! ( files_integrated_per_skgrepo (
+                     & [ fixed . clone (), fixed . clone () ], &restriction ),
+                   vec! [ (SkgrepoName::from ("mine"), 2) ] ); }
     assert_eq! ( title_in_graph (&f, "b") . as_deref (), Some ("b fixed") ); }
   Ok (()) }
 
