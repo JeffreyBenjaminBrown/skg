@@ -48,5 +48,8 @@ mod save_request_envelope;
 #[path = "save_dirty_conflicts.rs"]
 mod save_dirty_conflicts;
 
+#[path = "save_stale_buffers.rs"]
+mod save_stale_buffers;
+
 #[path = "strandeds.rs"]
 mod strandeds;

@@ -74,10 +74,10 @@ fn an_empty_title_serializes_quoted () {
 fn an_empty_view_content_serializes_quoted () {
   let response : String =
     format_single_view_sexp (
-      &ViewforestId::from_client_string ( "v1" . to_string () ), "" );
+      &ViewforestId::from_client_string ( "v1" . to_string () ), "", 7 );
   assert_eq!(
     response,
-    "((view-id v1) (content \"\"))" );
+    "((view-id v1) (content \"\") (rendered-at \"7\"))" );
 }
 
 #[test]

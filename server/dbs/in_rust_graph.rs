@@ -12,6 +12,7 @@ pub mod containerward_role_tree;
 pub mod query;
 pub mod stats;
 pub mod internal_index_validation;
+pub mod last_change_generations;
 pub mod override_invariants;
 pub mod override_resolution;
 pub(crate) mod prepared_update;
@@ -21,6 +22,7 @@ use arc_swap::ArcSwap;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
+use crate::dbs::in_rust_graph::last_change_generations::LastChangeGenerations;
 use crate::types::misc::{ID, SkgrepoName, members_of};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::nodes::rust::GraphnodeInRust;
@@ -60,6 +62,9 @@ pub struct InRustGraph {
   /// Maps any of a node's extra_ids to that node's pid. Invariant:
   /// an extra_id is on at most one node at any visible graph snapshot.
   pub extra_id_to_pid  : im::HashMap<ID, ID>,
+  /// When each node last changed, as runtime generation numbers.
+  /// Not part of any node, so never written to a '.skg' file.
+  pub last_changes     : LastChangeGenerations,
 }
 
 impl InRustGraph {
@@ -71,7 +76,8 @@ impl InRustGraph {
       hiders_of        : im::HashMap::new (),
       overriders_of    : im::HashMap::new (),
       mentioners_of     : im::HashMap::new (),
-      extra_id_to_pid  : im::HashMap::new (), } }
+      extra_id_to_pid  : im::HashMap::new (),
+      last_changes     : LastChangeGenerations::default (), } }
 
   /// Build from a slice of Graphnodes. Typically called at
   /// startup after reading all .skg files from disk.
@@ -103,6 +109,25 @@ impl InRustGraph {
 
   pub fn len (&self) -> usize {
     self . nodes . len () }
+
+  /// The runtime generation at which the node 'pid' last changed;
+  /// None for an ID no node of this graph has had.
+  pub fn last_change_of (
+    &self,
+    pid : &ID,
+  ) -> Option<u64> {
+    self . last_changes . of ( pid, self . nodes . contains_key (pid) ) }
+
+  /// This graph as swapped in as runtime generation 'generation': the
+  /// nodes written since the last swap-in, and every node of a graph
+  /// read whole from disk, last changed at 'generation'.
+  pub fn stamped_at_generation (
+    &self,
+    generation : u64,
+  ) -> InRustGraph {
+    let mut stamped : InRustGraph = self . clone ();
+    stamped . last_changes . stamp (generation);
+    stamped }
 
   /// Resolve an ID (primary or extra) to the node's primary ID.
   /// Returns None if the ID is unknown.
@@ -278,7 +303,8 @@ pub fn apply_nodeInstructions_to_inRustGraph (
       for extra in &old . extra_ids {
         if candidate . extra_id_to_pid . get (extra) == Some (pid) {
           candidate . extra_id_to_pid . remove (extra); }} }
-    candidate . nodes . remove (pid); }
+    candidate . nodes . remove (pid);
+    candidate . last_changes . note_written (pid); }
   for nodeInstruction in &nodeInstructions {
     if let NodeInstruction::Save (SaveNode (node)) = nodeInstruction {
       let rust : GraphnodeInRust = GraphnodeInRust::from (node);

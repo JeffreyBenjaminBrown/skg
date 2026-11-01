@@ -23,6 +23,17 @@ prepared save can affect. A conflict is a hard refusal before any write;
 the error names the views and IDs. Missing or malformed baseline data is
 also refused conservatively. There is no "save anyway" choice.
 
+Each view also remembers when the server drew it. A save is refused,
+before any write, if a node it would write has changed since: by a save
+from another client or from 'tools/skg-for-ai', which this client's
+views do not follow, or by a rebuild of the session-lifetime stores,
+after which every older view is stale. The error names each such node
+and the view's headlines for it. A node the view shows as the graph
+has it is not written, so an untouched node never refuses a save,
+however old the view; and a new empty view, which the server did not
+draw, is never stale. Your edits stay in the view: archive them if
+needed (:SkgShowUnsavedChanges), open a fresh view, and reapply them.
+
 ':w' is the BufWriteCmd on every skg view buffer, so plain saving
 works as expected; ':SkgSave' does the same thing as an explicit
 Ex command.

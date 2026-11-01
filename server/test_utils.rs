@@ -21,6 +21,7 @@ use crate::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
 use crate::from_text::buffer_to_viewnodes::uninterpreted::{headline_to_triple, HeadlineInfo, org_to_viewforest};
 use crate::org_to_text::viewforest_to_string;
 use crate::serve::ViewsState;
+use crate::serve::handlers::save_staleness::RenderedAt;
 use crate::serve::handlers::save_buffer::{
   ClientViewSnapshot, SaveResponse,
   update_from_and_rerender_buffer,
@@ -509,13 +510,15 @@ pub async fn update_from_and_rerender_buffer_with_snapshots_test (
 ) -> Result<SaveResponse, Box<dyn Error>> {
   let mut env : SkgEnv =
     skg_env_from_parts (config, tantivy_index, graph);
+  let rendered_at : RenderedAt = // as if the buffer were rendered now
+    RenderedAt::Generation ( env . runtime_snapshot () . generation );
   update_from_and_rerender_buffer_with_approvals (
     stream, org_buffer_text, &mut env,
     viewforest_id_from_request_result, views_state,
     &SkgrepoRestriction::unrestricted (config),
     true, &HashMap::new (), &std::collections::HashSet::new (),
     &std::collections::HashSet::new (), &StrandedsReview::NotReviewed,
-    DeleteFrom::NotChosen, other_views ) . await
+    DeleteFrom::NotChosen, other_views, rendered_at ) . await
 }
 
 /// As 'update_from_and_rerender_buffer_test', but lets the test choose

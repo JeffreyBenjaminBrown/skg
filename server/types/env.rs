@@ -8,6 +8,7 @@ use crate::diff_view::readiness_store::ReadinessStore;
 use crate::types::misc::{SkgConfig, TantivyIndex};
 
 use std::sync::{Arc, OnceLock};
+use std::time::{SystemTime, UNIX_EPOCH};
 use std::sync::Mutex as SyncMutex;
 use std::sync::MutexGuard as SyncMutexGuard;
 use arc_swap::ArcSwap;
@@ -62,12 +63,21 @@ impl SharedRuntime {
     legacy_graph : InRustGraphHandle,
     tantivy_index : TantivyIndex,
   ) -> Self {
-    let graph = legacy_graph . load_full ();
+    let (graph, generation) : (Arc<InRustGraph>, u64) = {
+      // A graph just read from disk starts at 'startup_generation'. A
+      // graph an earlier runtime already stamped (in tests) starts at its
+      // newest change, so generations never run behind a node's last change.
+      let loaded : Arc<InRustGraph> = legacy_graph . load_full ();
+      let generation : u64 = loaded . last_changes . newest ()
+        . unwrap_or_else (startup_generation);
+      ( Arc::new ( loaded . stamped_at_generation (generation) ),
+        generation ) };
+    legacy_graph . store (graph . clone ());
     let readiness_store : ReadinessStore =
       ReadinessStore::load (&config . data_root);
     SharedRuntime {
       current : ArcSwap::from_pointee (RuntimeGeneration {
-        config : Arc::new (config), graph, tantivy_index, generation : 0,
+        config : Arc::new (config), graph, tantivy_index, generation,
       }),
       mutation_gate : new_mutation_gate (),
       legacy_graph,
@@ -105,13 +115,19 @@ impl SharedRuntime {
     self . readiness_store . lock ()
       . unwrap_or_else ( |poisoned| poisoned . into_inner () ) }
 
+  /// Swap in the next generation. The graph swapped in is 'graph'
+  /// stamped with that generation's number
+  /// ('InRustGraph::stamped_at_generation'), so callers read it from
+  /// the returned generation, not from 'graph'.
   pub fn swap_in (
     &self,
     config : Arc<SkgConfig>,
     graph : Arc<InRustGraph>,
     tantivy_index : TantivyIndex,
   ) -> Arc<RuntimeGeneration> {
-    let generation = self . graph_snapshot () . generation + 1;
+    let generation : u64 = self . graph_snapshot () . generation + 1;
+    let graph : Arc<InRustGraph> =
+      Arc::new ( graph . stamped_at_generation (generation) );
     let swapped_in = Arc::new (RuntimeGeneration {
       config, graph : graph . clone (), tantivy_index, generation,
     });
@@ -128,6 +144,18 @@ impl SharedRuntime {
     self . legacy_graph . clone ()
   }
 }
+
+/// The generation a runtime whose graph was just read from disk
+/// starts at: the microseconds since the Unix epoch. So a buffer an
+/// earlier server process rendered counts as older than every node
+/// this one read, and a restart cannot make it look fresh to the
+/// save's staleness check. Each swap-in adds one, far fewer than the
+/// microseconds that pass before the next process starts.
+fn startup_generation (
+) -> u64 {
+  SystemTime::now () . duration_since (UNIX_EPOCH)
+    . map ( |since_epoch| since_epoch . as_micros () as u64 )
+    . unwrap_or (0) }
 
 #[derive(Clone)]
 pub struct SkgEnv {

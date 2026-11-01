@@ -72,6 +72,12 @@ pub enum BufferValidationError {
   ForkRequestOnUnknownNode       (ID, HeadlineName),  // An explicit 'skg-fork-node' request on a node whose id is not in the graph (an unsaved headline): nothing exists to override.
   ForkRequestMultiple            (ID, Vec<HeadlineName>),  // Two headlines for the same id both carry an explicit fork request; at most one is allowed.
   OverrideInvariantViolation     (String),
+  ChangedSinceRendered {
+    gnid        : ID,  // the node's pid
+    rendered_at : u64, // the runtime generation the buffer was rendered at
+    last_change : u64, // the runtime generation the node last changed at, later than 'rendered_at'
+    headlines   : Vec<HeadlineName>, // the buffer's occurrences of the node
+  }, // The save would write a node that changed after its buffer was rendered: writing the buffer's text would silently undo that change.
   MultipleEditableViewRequestsForSameId    (ID, Vec<HeadlineName>), // Multiple editable view requests for the same ID
   WriteProtectAndEditableViewRequestsOnOneOccurrence (ID, HeadlineName), // One occurrence asks to become both write-protected and the editable one. (On different occurrences of a node, the two requests move editability, and are allowed.)
   EmptyTitle                             (ID),
@@ -297,6 +303,10 @@ impl std::fmt::Display for BufferValidationError {
         write! (f, "Cannot change flags of unsaved or unknown graphnode {:?}; save the node first.", gnid),
       BufferValidationError::OverridesHere_Mismatch(carrier, original, effective, headline) =>
         write!(f, "Node {:?} ({}) carries the fact (overridesHere {:?}), but it is not on the override chain of that original (which resolves to {:?}). The fact looks hand-edited or stale; saving it would rewrite a contains list. Re-render the view and retry.", carrier, headline, original, effective),
+      BufferValidationError::ChangedSinceRendered {
+        gnid, rendered_at, last_change, headlines } =>
+        write!(f, "Node {:?} ({}) changed at runtime generation {}, after this buffer was rendered at runtime generation {}. Nothing was saved; reopen a fresh view and reapply the edit.",
+               gnid, name_headlines (headlines), last_change, rendered_at),
       BufferValidationError::Other (msg) =>
         write!(f, "{}", msg), }} }
 
@@ -321,7 +331,8 @@ impl BufferValidationError {
         | BufferValidationError::AmbiguousDeletion (_, headlines)
         | BufferValidationError::ContradictoryReadinessRequests (_, headlines)
         | BufferValidationError::ForkRequestMultiple (_, headlines)
-        | BufferValidationError::MultipleEditableViewRequestsForSameId (_, headlines) =>
+        | BufferValidationError::MultipleEditableViewRequestsForSameId (_, headlines)
+        | BufferValidationError::ChangedSinceRendered { headlines, .. } =>
         headlines . iter () . collect (),
       BufferValidationError::DuplicatedContent (_)
         | BufferValidationError::ModifiedForeignNode (..)

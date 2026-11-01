@@ -68,6 +68,8 @@ until the server has been quiet for three seconds. With
 '--saved-buffer FILE' the request is a 'save buffer', and the tool
 sends FILE's text as the saved buffer in the length-prefixed body
 after it, then prints every response up to the save's terminal one.
+A 'save buffer' request needs its '(rendered-at . "N")'; without it
+the server refuses the save.
 
 'import INPUT_DIR REPO' imports the Markdown and Org files under
 INPUT_DIR (a path the server can read) into the owned skgrepo REPO: it
@@ -172,10 +174,11 @@ Whether a skgrepo is owned or foreign comes from the server's 'repos'
 request, which lists every configured skgrepo.
 ** The sidecar
 'BASE.view.json' records the view ID, the command and its request, the
-port, the two files' names, the server's errors and warnings, whether
+port, the two files' names, the runtime generation the server rendered the
+view at ('rendered_at'), the server's errors and warnings, whether
 the compact view has a summary, and whether the view is closed. 'save'
-sends the edited view against this view ID, to this port, and renders
-the summary again when there was one.
+sends the edited view against this view ID and generation, to this
+port, and renders the summary again when there was one.
 
 * Views and connections
 The server keeps a view's state per TCP connection, and forgets every
@@ -236,15 +239,16 @@ compact views and saves them, in order: a title, a body, a new child,
 a move to another parent, a removal (the node then still has its other
 container), a deletion through 'delete' in a handle, two bad handles
 (refused before any save), a retitled write-protected occurrence
-(refused by the server, the files left as they were), a stale view,
+(refused by the server, the files left as they were), a stale view
+(refused by the server),
 and 'new' (refused in the foreign skgrepo; in the owned one a root
 whose view then saves a body and a child).
 It compares each report with the text expected and reads the '.skg'
 files after each save. The stale case renders a view, changes a node
 it shows through a second view's save, and saves the first view's
-edit of another node: the tool refuses, and with '--overwrite-stale'
-saves and prints what the server answered, after which the second
-save's change is gone, written over with the first view's text.
+edit of another node: the server refuses, naming the changed node, and
+nothing is written; a fresh view then saves the same edit, and the
+second save's change stays.
 
 It prints PASS or each failure, and keeps the scratch files when
 something fails. '--update-expected' rewrites the expected
@@ -336,10 +340,7 @@ Not saved. Run again with '--yes' to save.
 An 'Error:' line names a handle that names no line of the full view,
 or a body line, or a 'delete' on something that is not an editable
 node occurrence; any error stops the save, and the report then lists
-only the errors. A 'Stale:' line names a node the save would write
-that the server's graph has changed since the view was rendered (see
-"Stale views"); a stale node stops the save unless '--overwrite-stale'
-is given.
+only the errors.
 
 The changes follow, in this order. 'Delete:' is a handle carrying
 'delete'. 'Removed:' is a handle the edit no longer has, with how many
@@ -353,16 +354,13 @@ different parent, or at a different depth below the same one.
 counts the changed bodies and names their handles. An edit with none
 of these prints 'No changes.' and saves nothing.
 ** Stale views
-The server writes each node the saved buffer shows with the buffer's
-text of it. It has no record of when the tool's view was rendered, so
-a node changed by another save since then (by Jeff in Emacs, say)
-would be written back as the tool's view had it, even if the edit did
-not touch it. So before reporting, the tool renders the view again and
-compares, for each node the view shows editable, its title, body and
-content with the fresh render. A node that differs is reported
-'Stale:', and the save stops. Viewing again and redoing the edit is the
-safe answer; '--overwrite-stale' saves anyway, writing the view's text
-over those changes.
+The save carries the runtime generation the view was rendered at, from the
+sidecar. If a node the save would write changed since (by Jeff in
+Emacs, say), the server refuses the whole save, naming the node, and
+writes nothing; the tool prints that refusal as it prints any other,
+and leaves the files. A node the view shows as the graph now has it is
+not written, so it does not stop the save. View again and redo the
+edit.
 ** The server's answer
 After the save the tool prints 'Server: saved' or 'Server: nothing was
 saved', with the counts of errors and warnings, then each error and

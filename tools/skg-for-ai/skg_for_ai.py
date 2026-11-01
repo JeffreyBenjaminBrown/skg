@@ -12,8 +12,9 @@ For a requested view it writes, into a directory the caller names:
   view, and every '[[id:...]]' link followed by its target's title.
   A summary of the view's facts precedes the tree unless
   '--no-summary' is given.
-- NAME.view.json: the server's view ID, the request and the
-  server's errors and warnings.
+- NAME.view.json: the server's view ID, the request, the generation
+  the server rendered the view at, and the server's errors and
+  warnings.
 
 View commands: 'view ID', 'search TERMS...', 'links-here ID',
 'contains ID'. Each prints the paths it wrote. 'links-here' saves,
@@ -165,11 +166,7 @@ def parse_command_line (argv):
     help = "the server's port; it must be the one the sidecar records" )
   save_parser . add_argument (
     "--yes", action = "store_true",
-    help = "save, unless the report finds an error or a stale node" )
-  save_parser . add_argument (
-    "--overwrite-stale", action = "store_true",
-    help = ( "with '--yes', save even over nodes the server's graph "
-             "changed since the view was rendered" ))
+    help = "save, unless the report finds an error" )
   import_parser = commands . add_parser (
     "import", help = "preview and apply a Markdown and Org import",
     parents = [ port_option ] )
@@ -258,10 +255,12 @@ def command_import (arguments):
 
 def command_save (arguments):
   """Rebuild the full buffer from the edited compact view and print the
-  changes it makes. With '--yes', and when the report finds neither a
-  bad handle nor (without '--overwrite-stale') a stale node, send the
-  save, print the server's answer and write its re-rendered view over
-  the three files. A refused save leaves them as they were."""
+  changes it makes. With '--yes', and when the report finds no bad
+  handle, send the save, print the server's answer and write its
+  re-rendered view over the three files. The save carries the
+  generation the view was rendered at, so the server refuses it if a
+  node it would write changed since. A refused save leaves the files
+  as they were."""
   saved_view = load_saved_view (arguments . view_files)
   if ( arguments . port is not None
        and arguments . port != saved_view . sidecar [ "port" ] ):
@@ -275,22 +274,15 @@ def command_save (arguments):
     edited, original, saved_view . parsed_view )
   connection = SkgConnection ( saved_view . sidecar [ "port" ] )
   try:
-    stale = [] if errors else stale_node_lines (
-      connection, saved_view . sidecar, saved_view . parsed_view, original )
     print ( "Changes in " + os . path . basename (saved_view . compact_path) +
             ", against " + os . path . basename (saved_view . full_path) +
             " (view ID " + saved_view . sidecar [ "view_id" ] + "):" )
-    for line in errors + stale + (
+    for line in errors + (
         changes or ( [] if errors else [ "No changes." ] )):
       print (line)
     if errors:
       raise SkgToolError (
         "Nothing was saved: a handle names no headline of the full view." )
-    if stale and not arguments . overwrite_stale:
-      raise SkgToolError (
-        "Nothing was saved: the server's graph changed under the view "
-        "since it was rendered. View it again and redo the edit, or add "
-        "'--overwrite-stale' to write this view's text over those changes." )
     if not changes:
       print ( "Nothing to save." )
       return
@@ -300,7 +292,8 @@ def command_save (arguments):
     buffer_text = rebuilt_full_buffer (
       edited, saved_view . parsed_view, saved_view . full_text )
     messages = connection . save_buffer (
-      saved_view . sidecar [ "view_id" ], buffer_text )
+      saved_view . sidecar [ "view_id" ], buffer_text,
+      saved_view . sidecar [ "rendered_at" ] )
     rerendered = rerendered_view_of_save ( messages [-1], saved_view . sidecar )
     written_paths = write_view_files (
       connection, rerendered, saved_view . directory, saved_view . base_name,
@@ -337,7 +330,10 @@ def command_new (arguments):
     messages = connection . save_buffer (
       creating_view_id,
       "* (skg node (skgRepos (nodeRepo " + arguments . repo + "))) " +
-      title + "\n" )
+      title + "\n",
+      # No server response drew this buffer, as none draws a client's
+      # new empty view: its text is the tool's own.
+      "never" )
     rerendered = rerendered_view_of_save (
       messages [-1], { "view_id" : creating_view_id, "command" : "new",
                        "request" : {} } )
@@ -393,21 +389,23 @@ def fetch_single_root_view (connection, node_id):
     request_line ( "single root content view",
                    ( "id", node_id ), ( "view-id", view_id ) ))
   require_response_type (response, "content-view")
-  return { "view_id"  : view_id,
-           "request"  : { "id" : node_id },
-           "content"  : response_field (response, "content"),
-           "errors"   : response_field (response, "errors") or [],
-           "warnings" : response_field (response, "warnings") or [] }
+  return { "view_id"     : view_id,
+           "request"     : { "id" : node_id },
+           "content"     : response_field (response, "content"),
+           "rendered_at" : rendered_at_of (response),
+           "errors"      : response_field (response, "errors") or [],
+           "warnings"    : response_field (response, "warnings") or [] }
 
 def fetch_search_view (connection, terms):
   response = connection . request (
     request_line ( "text search", ( "terms", terms ) ))
   require_response_type (response, "search-results")
-  return { "view_id"  : "search:" + terms,
-           "request"  : { "terms" : terms },
-           "content"  : response_field (response, "content") or "",
-           "errors"   : [],
-           "warnings" : response_field (response, "warnings") or [] }
+  return { "view_id"     : "search:" + terms,
+           "request"     : { "terms" : terms },
+           "content"     : response_field (response, "content") or "",
+           "rendered_at" : rendered_at_of (response),
+           "errors"      : [],
+           "warnings"    : response_field (response, "warnings") or [] }
 
 def fetch_view_with_root_folder_request (connection, node_id, relation_name):
   """Open the node's view, then save it unchanged but for a
@@ -419,7 +417,7 @@ def fetch_view_with_root_folder_request (connection, node_id, relation_name):
   requesting_buffer = buffer_with_view_request_on_first_headline (
     fresh_view [ "content" ], "(folder " + relation_name + ")" )
   messages = connection . save_buffer (
-    fresh_view [ "view_id" ], requesting_buffer )
+    fresh_view [ "view_id" ], requesting_buffer, fresh_view [ "rendered_at" ] )
   terminal = messages [-1]
   require_response_type (terminal, "save-result")
   content = response_field (terminal, "content")
@@ -427,12 +425,13 @@ def fetch_view_with_root_folder_request (connection, node_id, relation_name):
   if not content:
     raise SkgToolError ( "The save that requests the folder failed:\n" +
                          "\n" . join (errors) )
-  return { "view_id"  : fresh_view [ "view_id" ],
-           "request"  : { "id" : node_id,
-                          "view_request" : "(folder " + relation_name + ")" },
-           "content"  : content,
-           "errors"   : errors,
-           "warnings" : response_field (terminal, "warnings") or [] }
+  return { "view_id"     : fresh_view [ "view_id" ],
+           "request"     : { "id" : node_id,
+                             "view_request" : "(folder " + relation_name + ")" },
+           "content"     : content,
+           "rendered_at" : rendered_at_of (terminal),
+           "errors"      : errors,
+           "warnings"    : response_field (terminal, "warnings") or [] }
 
 def buffer_with_view_request_on_first_headline (buffer_text, view_request):
   """BUFFER_TEXT with '(viewRequests VIEW_REQUEST)' in the metadata of
@@ -499,6 +498,7 @@ def write_view_files (connection, view, out_dir, base_name, show_summary):
         "port"         : connection . port,
         "full_view"    : os . path . basename (full_path),
         "compact_view" : os . path . basename (compact_path),
+        "rendered_at"  : view [ "rendered_at" ],
         "errors"       : view [ "errors" ],
         "warnings"     : view [ "warnings" ],
         "summary"      : show_summary,
@@ -1289,73 +1289,6 @@ def descendant_indices (outline, index):
   return descendants
 
 # ------------------------------------------------------------
-# Stale nodes: the server overwrites a node with whatever the saved
-# buffer says of it, so before saving the tool renders the view again
-# and compares.
-# ------------------------------------------------------------
-
-def stale_node_lines (connection, sidecar, parsed_view, original):
-  """A line per node the save would write (one with an editable
-  occurrence in the view) whose title, body or content a fresh render
-  of the same view shows otherwise."""
-  fresh_parsed_view = parse_full_view (
-    fetch_fresh_view (connection, sidecar) [ "content" ] or "" )
-  fresh_states = editable_node_states (
-    fresh_parsed_view, outline_of_full_view (fresh_parsed_view) )
-  lines = []
-  for gnid, ( handle, state ) in editable_node_states (
-      parsed_view, original ) . items ():
-    title = parsed_view [ handle - 1 ] . title
-    if gnid not in fresh_states:
-      lines . append (
-        f"Stale: ⟨{handle}⟩ '{title}': a fresh render of the view no "
-        "longer shows it editable." )
-      continue
-    fresh_state = fresh_states [gnid] [1]
-    aspects = [ aspect for aspect, old, new in
-                zip ( ( "title", "body", "content" ), state, fresh_state )
-                if old != new ]
-    if aspects:
-      lines . append (
-        f"Stale: ⟨{handle}⟩ '{title}': its " + " and " . join (aspects) +
-        " changed on the server since the view was rendered." )
-  return lines
-
-def fetch_fresh_view (connection, sidecar):
-  """The view the sidecar's command rendered, rendered again. A
-  'links-here' view is rendered without its mentioners folder, whose
-  write-protected chain the save does not write."""
-  if sidecar [ "command" ] == "search":
-    view = fetch_search_view ( connection, sidecar [ "request" ] [ "terms" ] )
-  else:
-    view = fetch_single_root_view ( connection, sidecar [ "request" ] [ "id" ] )
-  close_view_on_server (connection, view [ "view_id" ])
-  return view
-
-def editable_node_states (parsed_view, outline):
-  """{GNID: (HANDLE, (TITLE, BODY, CONTENT))} for the first editable
-  occurrence of each node, CONTENT the IDs of the occurrences under it."""
-  states = {}
-  for index, headline in enumerate (outline):
-    metadata = parsed_view [ headline . handle - 1 ] . metadata
-    if ( metadata is None or headline_kind (metadata) != "node"
-         or metadata_has_atom (metadata, "writeProtected") ):
-      continue
-    gnid = headline_gnid (metadata)
-    if gnid is None or gnid in states:
-      continue
-    content = tuple (
-      headline_gnid ( parsed_view [ outline [child] . handle - 1 ] . metadata )
-      for child in range ( index + 1, len (outline) )
-      if outline [child] . parent == index
-      and parsed_view [ outline [child] . handle - 1 ] . metadata is not None
-      and headline_kind (
-        parsed_view [ outline [child] . handle - 1 ] . metadata ) == "node" )
-    states [gnid] = ( headline . handle,
-                      ( headline . title, tuple (headline . body), content ))
-  return states
-
-# ------------------------------------------------------------
 # The server's answer
 # ------------------------------------------------------------
 
@@ -1391,12 +1324,13 @@ def rerendered_view_of_save (terminal, sidecar):
   if not saved:
     raise SkgToolError (
       "The server refused the save; the files are as they were." )
-  return { "view_id"  : sidecar [ "view_id" ],
-           "command"  : sidecar [ "command" ],
-           "request"  : sidecar [ "request" ],
-           "content"  : content,
-           "errors"   : errors,
-           "warnings" : warnings }
+  return { "view_id"     : sidecar [ "view_id" ],
+           "command"     : sidecar [ "command" ],
+           "request"     : sidecar [ "request" ],
+           "content"     : content,
+           "rendered_at" : rendered_at_of (terminal),
+           "errors"      : errors,
+           "warnings"    : warnings }
 
 # ============================================================
 # The connection
@@ -1453,11 +1387,13 @@ class SkgConnection:
       except SkgConnectionClosedError:
         return messages
 
-  def save_buffer (self, view_id, buffer_text):
-    """Send a save of BUFFER_TEXT; return every response up to and
-    including the terminal one, parsed."""
+  def save_buffer (self, view_id, buffer_text, rendered_at):
+    """Send a save of BUFFER_TEXT, rendered at the generation
+    RENDERED_AT; return every response up to and including the
+    terminal one, parsed."""
     return [ parse_sexp (message) for message in self . raw_save (
       request_line ( "save buffer", ( "view-id", view_id ),
+                     ( "rendered-at", rendered_at ),
                      ( "point-lines-below-focused-headline", "0" ),
                      ( "point-column", "0" ),
                      ( "point-screen-lines-below-window-start", "0" )),
@@ -1530,6 +1466,14 @@ def response_field (response, field_name):
   if len (values) == 1:
     return values [0]
   return values
+
+def rendered_at_of (response):
+  """The generation a response's view was rendered at, '(rendered-at
+  "N")', as the text N. Every response that carries a view has one."""
+  value = response_field (response, "rendered-at")
+  if value is None:
+    raise SkgToolError ( "The server's view carries no 'rendered-at'." )
+  return sexp_to_text (value)
 
 def require_response_type (response, expected):
   actual = response_type (response)

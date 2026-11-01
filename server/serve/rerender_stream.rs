@@ -23,7 +23,6 @@ use crate::serve::util::{ format_lock_views_sexp, format_rerender_done_sexp, for
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::types::views_state::{ViewforestId, ViewState};
-use crate::dbs::in_rust_graph::InRustGraph;
 use crate::rerender_pass::{
   DiffViewBufferRerender, RerenderPassContext, RerenderedView, release_candidates,
   rerender_open_views};
@@ -148,7 +147,7 @@ pub(crate) fn stream_prepared_rerenders (
       & format_lock_views_sexp (&prepared . viewforest_ids) ));
   write_graph_straddle_back (views_state, prepared . graph_straddle);
   register_and_send_rerendered_views (
-    stream, views_state, &prepared . runtime . graph, prepared . views,
+    stream, views_state, &prepared . runtime, prepared . views,
     TcpToClient::RerenderView );
   send_response_with_length_prefix (
     stream,
@@ -159,21 +158,23 @@ pub(crate) fn stream_prepared_rerenders (
         &prepared . warnings ) )); }
 
 /// Register each of 'views' in place of the open view it rerenders,
-/// and send it to the client under 'tag'.
+/// and send it to the client under 'tag', as rendered at 'runtime''s
+/// generation.
 pub(crate) fn register_and_send_rerendered_views (
   stream      : &mut TcpStream,
   views_state : &mut ViewsState,
-  graph       : &InRustGraph,
+  runtime     : &RuntimeGeneration,
   views       : Vec<RerenderedView>,
   tag         : TcpToClient,
 ) {
   for view in views {
     views_state . open_views . update_view (
-      graph, &view . viewforest_id, view . viewforest, view . viewnode_id_record );
+      &runtime . graph, &view . viewforest_id, view . viewforest, view . viewnode_id_record );
     send_response_with_length_prefix (
       stream,
       & tag_sexp_response (
-        tag, & format_single_view_sexp (&view . viewforest_id, &view . text) )); }}
+        tag, & format_single_view_sexp (
+          &view . viewforest_id, &view . text, runtime . generation ) )); }}
 
 /// Keep the graph straddle a rerender brought up to date as the
 /// connection's. A rerender that rendered no buffer of the diff view

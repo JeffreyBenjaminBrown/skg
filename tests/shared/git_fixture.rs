@@ -16,6 +16,7 @@ use skg::from_text::strandeds::StrandedsReview;
 use skg::save::DeleteFrom;
 use skg::serve::handlers::save_buffer::{
   SaveResponse, update_from_and_rerender_buffer_with_approvals};
+use skg::serve::handlers::save_staleness::RenderedAt;
 use skg::serve::handlers::skgrepo_sets::handle_skgrepo_set_request;
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::test_utils::{
@@ -274,13 +275,15 @@ pub fn save_under (
 ) -> Result<SaveResponse, Box<dyn Error>> {
   let (mut stream, _read_end) : (TcpStream, TcpStream) = mk_test_tcp_stream_pair ();
   let mut env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
+  let rendered_at : RenderedAt = // as if the buffer were rendered now
+    RenderedAt::Generation ( env . runtime_snapshot () . generation );
   Ok ( block_on (
     update_from_and_rerender_buffer_with_approvals (
       &mut stream, text, &mut env,
       &Ok ( ViewforestId::ContentView (view . into ()) ),
       &mut f . views_state, restriction,
       approved_forks, &HashMap::new (), &HashSet::new (), &HashSet::new (),
-      &StrandedsReview::NotReviewed, delete_from, &[] )) ? ) }
+      &StrandedsReview::NotReviewed, delete_from, &[], rendered_at )) ? ) }
 
 /// The members 'field' lists in the file 'file' ("SKGREPO/PID.skg"),
 /// as written: the "- " lines that follow the line "FIELD:". Empty

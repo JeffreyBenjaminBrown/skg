@@ -30,6 +30,7 @@ describe('skg.save request strings', function ()
       screen_lines_below_window_start = 3 }, nil, nil)
     assert.are.equal(
       '((request . "save buffer") (view-id . "view_id-1")'
+      .. ' (rendered-at . "never")'
       .. ' (point-lines-below-focused-headline . "2")'
       .. ' (point-column . "5")'
       .. ' (point-screen-lines-below-window-start . "3"))\n',
@@ -591,6 +592,93 @@ describe('skg.save pipeline', function ()
     local ok, err = pcall(save.request_save_buffer)
     assert.is_false(ok)
     assert.is_truthy(tostring(err):find('view ID is nil'))
+  end)
+end)
+
+describe('skg.save rendered-at', function ()
+  local server
+  local position = { lines_below_focused_headline = 0, column = 0,
+                     screen_lines_below_window_start = 0 }
+
+  before_each(function ()
+    helpers.install_fixture_herald_rules()
+    helpers.wipe_skg_buffers()
+    lock.end_stream()
+  end)
+
+  after_each(function ()
+    if server then server.close() server = nil end
+    helpers.reset_client_state()
+    helpers.wipe_skg_buffers()
+    lock.end_stream()
+  end)
+
+  it('carries the generation the buffer was rendered at, "never" if none',
+     function ()
+    assert.is_truthy(save.save_request_sexp('view_id-1', position,
+      nil, nil, nil, nil, nil, nil, '7')
+      :find('(rendered-at . "7")', 1, true))
+    assert.is_truthy(save.save_request_sexp('view_id-1', position)
+      :find('(rendered-at . "never")', 1, true))
+  end)
+
+  it('sends the view\'s rendered-at, and keeps each response\'s',
+     function ()
+    local requests = {}
+    server = helpers.connect_to_fake_server(function (line, respond)
+      if line:find('save buffer', 1, true) then
+        table.insert(requests, line)
+        respond(helpers.framed(
+          '((response-type save-lock) (lock-views ()))'))
+        if #requests == 1 then
+          respond(helpers.framed(
+            '((response-type collateral-view) (view-id "view_id-other")'
+            .. ' (content "* (skg node (gnid b)) b2") (rendered-at "5"))'))
+          respond(helpers.framed(
+            '((response-type save-result)'
+            .. ' (content "* (skg node (gnid a)) a2")'
+            .. ' (errors ()) (warnings ()) (rendered-at "5"))'))
+        else
+          respond(helpers.framed(
+            '((response-type save-result) (content nil)'
+            .. ' (errors ("NOTHING WAS SAVED\\n\\n** Error 1\\nA node this'
+            .. ' save would write changed after the buffer was rendered:"))'
+            .. ' (warnings ()))'))
+        end
+      end
+    end)
+    local other = buffer.open_org_buffer_from_text(
+      '* (skg node (gnid b)) b', 'skg://other', 'view_id-other', '4')
+    local buf = buffer.open_org_buffer_from_text(
+      '* (skg node (gnid a)) a', 'skg://rendered-at', 'view_id-rendered-at',
+      '4')
+    folds.set_up_window()
+    save.request_save_buffer()
+    vim.wait(3000, function ()
+      return lock.stream_in_progress == nil and #requests == 1 end, 10)
+    assert.is_truthy(requests[1]:find('(rendered-at . "4")', 1, true))
+    assert.are.equal('5', vim.b[buf].skg_rendered_at)
+    assert.are.equal('5', vim.b[other].skg_rendered_at)
+    do -- A refused save keeps the edit, the generation, and shows why.
+      vim.api.nvim_buf_set_lines(buf, 0, -1, false,
+                                 { '* (skg node (gnid a)) a edited' })
+      save.request_save_buffer()
+      vim.wait(3000, function ()
+        return lock.stream_in_progress == nil and #requests == 2 end, 10)
+      assert.is_truthy(requests[2]:find('(rendered-at . "5")', 1, true))
+      assert.are.equal('* (skg node (gnid a)) a edited',
+        table.concat(vim.api.nvim_buf_get_lines(buf, 0, -1, false), '\n'))
+      assert.are.equal('5', vim.b[buf].skg_rendered_at)
+      local found = nil
+      for _, candidate in ipairs(vim.api.nvim_list_bufs()) do
+        if vim.api.nvim_buf_get_name(candidate)
+           == 'skg://messages/save-errors' then found = candidate end
+      end
+      assert.is_truthy(found)
+      assert.is_truthy(table.concat(
+        vim.api.nvim_buf_get_lines(found, 0, -1, false), '\n')
+        :find('changed after the buffer was rendered', 1, true))
+      vim.api.nvim_buf_delete(found, { force = true }) end
   end)
 end)
 

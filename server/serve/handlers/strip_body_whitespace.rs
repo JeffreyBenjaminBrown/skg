@@ -59,7 +59,13 @@ fn strip_body_whitespace_and_refresh_caches (
     return Ok ( format! (
       "No body has trailing whitespace ({} files checked, in owned repos).",
       owned_checked )); }
-  let new_graph = Arc::new (InRustGraph::from_graphnodes (&all_nodes));
+  let new_graph : Arc<InRustGraph> = Arc::new ({
+    let mut new_graph : InRustGraph = InRustGraph::from_graphnodes (&all_nodes);
+    { // Only the stripped nodes changed; the rest keep their last-change generations.
+      new_graph . last_changes = runtime . graph . last_changes . clone ();
+      for node in &changed {
+        new_graph . last_changes . note_written (&node . pid); }}
+    new_graph });
   { let tantivy_nodes : Vec<GraphnodeInTantivy> =
       changed . iter () . map (GraphnodeInTantivy::from) . collect ();
     update_index_with_nodes (&tantivy_nodes, &runtime . tantivy_index)

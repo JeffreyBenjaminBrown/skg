@@ -89,7 +89,8 @@ function M.send_save_buffer (save_buf, saved_view_id, approved_forks, fork_skgre
                           approved_hoist_pids,
                           text_approved_pids,
                           strandeds_review,
-                          delete_from)
+                          delete_from,
+                          vim.b[save_buf].skg_rendered_at)
   state.register_response_handler('save-lock',
     function (_payload_text, response)
       M.broad_save_lock_handler(response)
@@ -241,14 +242,18 @@ end
 ---@param text_approved_pids string[]|nil
 ---@param strandeds_review table|nil
 ---@param delete_from string|nil 'visible' or 'all'
+---@param rendered_at string|nil the generation the buffer was rendered at
+---  ('vim.b.skg_rendered_at'); nil, in a buffer no server response
+---  drew, rides out as "never"
 ---@return string
 function M.save_request_sexp (view_id, position, approved_forks,
                                 fork_skgrepos, approved_hoist_pids,
                                 text_approved_pids, strandeds_review,
-                                delete_from)
+                                delete_from, rendered_at)
   local request = {
     sexpr.pair(sexpr.symbol('request'), 'save buffer'),
     sexpr.pair(sexpr.symbol('view-id'), view_id),
+    sexpr.pair(sexpr.symbol('rendered-at'), rendered_at or 'never'),
     sexpr.pair(sexpr.symbol('point-lines-below-focused-headline'),
                tostring(position.lines_below_focused_headline)),
     sexpr.pair(sexpr.symbol('point-column'),
@@ -368,6 +373,7 @@ function M.apply_streamed_view_update (_payload_text, response,
       lock.unlock_after_save(buf)
       M.replace_buffer_with_new_content(
         buf, sexpr.atom_text(content), nil)
+      buffer.store_rendered_at(buf, response)
     end
   end)
   if not ok then
@@ -413,6 +419,7 @@ function M.handle_save_sexp (save_buf, response)
     M.replace_buffer_with_new_content(
       save_buf, content_text,
       M.save_point_position_from_response(response))
+    buffer.store_rendered_at(save_buf, response)
   end
   if #errors > 0 or #warnings > 0 then
     M.show_save_errors_and_warnings(errors, warnings,

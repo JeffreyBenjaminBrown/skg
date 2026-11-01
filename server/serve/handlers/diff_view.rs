@@ -13,7 +13,7 @@ use crate::diff_view::readiness_store::ReadinessStore;
 use crate::serve::ViewsState;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{
-  format_buffer_response_sexp, send_response_with_length_prefix,
+  format_buffer_response_sexp, format_view_response_sexp, send_response_with_length_prefix,
   sexp_to_client_string, tag_sexp_response, true_entry_sexp,
   value_from_request_sexp, viewforest_id_from_request};
 use crate::skgrepo_sets::{SkgrepoRestriction, require_unrestricted};
@@ -65,7 +65,7 @@ pub fn handle_diffView_request (
           diffView_buffer_kind, viewforest_id )) => {
       views_state . open_views . register_diffView_view (
         &runtime . graph, viewforest_id, viewforest, &pids, diffView_buffer_kind );
-      format_buffer_response_sexp ( &text, &[], &[] ) }, };
+      format_view_response_sexp ( &text, &[], &[], runtime . generation ) }, };
   send_response_with_length_prefix (
     stream, &tag_sexp_response (TcpToClient::DiffView, &sexp) ); }
 

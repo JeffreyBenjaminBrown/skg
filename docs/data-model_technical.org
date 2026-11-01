@@ -151,6 +151,26 @@ vector.  A live rebuild swaps in only after the complete candidate succeeds;
 failure leaves the prior generation visible.  The operation never rewrites
 authoritative =.skg= files.
 
+The generation number starts, when the graph is read at startup, at the
+microseconds since the Unix epoch, and each swap-in adds one.  So numbers grow
+across server processes too: a buffer an earlier process rendered is older
+than anything a later one read.
+
+The in-Rust graph records, beside its nodes, the runtime generation at which each
+node last changed (=LastChangeGenerations= in
+=server/dbs/in_rust_graph/last_change_generations.rs=; the graph's
+=last_change_of=).  It is in neither =.skg= files nor any =Graphnode=.  A
+graph read whole from disk, at startup or by a rebuild, dates every node to
+the generation it is swapped in as.  Every later mutation of the graph
+(=apply_nodeInstructions_to_inRustGraph=, and the strip-body-whitespace
+rewrite) notes which nodes it wrote, saved or deleted; the swap-in stamps them
+with its generation (=InRustGraph::stamped_at_generation=, called by
+=SharedRuntime::swap_in=), since a writer cannot know the number before the
+swap-in assigns it.  A deleted node keeps its stamp.  Every view response
+carries the generation it was drawn at, and a save refuses a buffer that would
+write a node stamped later than that (=docs/api-and-formats.org=, "Save
+buffer" and "The rendered-at of a view").
+
 ** The refresh: how a view follows the graph
 
 Every buffer the server sends is drawn by one operation, the

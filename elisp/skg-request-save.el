@@ -278,10 +278,13 @@ with the owned repo the user chose for its clone; it rides out as the
 field (fork-repos ((N . REPO) ...)). STRANDEDS-REVIEW, when non-nil,
 rides out as (strandeds-reviewed . \"true\") and, unless it chose
 none, (reset-strandeds (RELATION RECORDER MEMBER) ...). DELETE-FROM,
-when non-nil, rides out as (delete-from . DELETE-FROM)."
+when non-nil, rides out as (delete-from . DELETE-FROM). The current
+buffer's `skg-rendered-at' rides out as (rendered-at . N), or as
+\"never\" in a buffer no server response drew."
   (append
    `((request . "save buffer")
      (view-id . ,view-id)
+     (rendered-at . ,(or skg-rendered-at "never"))
      (point-lines-below-focused-headline
       . ,(number-to-string
           (plist-get save-point-position
@@ -384,7 +387,8 @@ streams; LOG-CATEGORY and HANDLER-NAME label any error."
         (when buf
           (with-current-buffer buf
             (skg--unlock-after-save)
-            (skg-replace-buffer-with-new-content nil content))))
+            (skg-replace-buffer-with-new-content nil content)
+            (skg--store-rendered-at response))))
     (error (skg-log 'error log-category
                     "%s handler error: %S" handler-name err))))
 
@@ -1074,7 +1078,8 @@ Expected shape: ((content ...) (errors (...)) (warnings (...)))."
               (skg--save-point-position-from-response response)))
         (when content-value
           (skg-replace-buffer-with-new-content
-           nil content-value save-point-position))
+           nil content-value save-point-position)
+          (skg--store-rendered-at response))
         (when (or (skg--message-list-nonempty-p errors-list)
                   (skg--message-list-nonempty-p warnings-list))
           (skg-show-save-errors-and-warnings

@@ -131,6 +131,27 @@ an edit command typed via M-x keeps the approval."
      'permanent-local ; to survive major-mode changes
      t)
 
+(defvar-local skg-rendered-at nil
+  "The runtime generation, a string, at which the server rendered this
+buffer's text: the `rendered-at' of the response that last installed
+it. A save sends it back as (rendered-at . N), and the server refuses
+the save if a node it would write changed after that generation. Nil
+in a buffer no server response drew, such as an empty view; such a
+buffer saves as rendered \"never\", and its text, the user's own, is
+never stale.")
+(put 'skg-rendered-at 'permanent-local t)
+
+(defun skg--rendered-at-in (response)
+  "RESPONSE's (rendered-at \"N\") as the string N, or nil if it has none."
+  (let ((entry (assoc 'rendered-at response)))
+    (when entry (format "%s" (cadr entry)))))
+
+(defun skg--store-rendered-at (response)
+  "Set `skg-rendered-at' from RESPONSE's (rendered-at \"N\"), if it has one."
+  (let ((rendered-at (skg--rendered-at-in response)))
+    (when rendered-at
+      (setq skg-rendered-at rendered-at))))
+
 (defvar-local skg-clean-baseline nil
   "Exact normalized text received at the last clean view replacement.")
 (put 'skg-clean-baseline 'permanent-local t)
@@ -258,10 +279,11 @@ and truncates to a reasonable length."
   (skg-open-org-buffer-from-text
    nil "" "*skg-empty*"))
 
-(defun skg-open-org-buffer-from-text (_tcp-proc org-text buffer-name &optional view-id)
+(defun skg-open-org-buffer-from-text (_tcp-proc org-text buffer-name &optional view-id rendered-at)
   "Open a new buffer and insert ORG-TEXT, enabling org-mode.
 If VIEW-ID is provided, set it as the buffer's skg-view-id;
-otherwise generate a new UUID."
+otherwise generate a new UUID. RENDERED-AT, when provided, is the
+generation the server rendered ORG-TEXT at (`skg-rendered-at')."
   (let* ((skgrepo (skg-content-view-repo-name org-text))
          (buffer (skg--generate-contentView-buffer buffer-name skgrepo))
         (view-id (or view-id (org-id-uuid))))
@@ -274,6 +296,7 @@ otherwise generate a new UUID."
         (heralds-minor-mode)
         (skg-link-annotations-mode 1))
       (setq skg-view-id view-id)
+      (setq skg-rendered-at rendered-at)
       (setq skg-contentView-initialRoot-repo skgrepo)
       (add-hook 'kill-buffer-hook #'skg-send-close-view nil t)
       (set-buffer-modified-p nil)

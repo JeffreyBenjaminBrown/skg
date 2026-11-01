@@ -413,17 +413,7 @@ about it, but only when the linking node is among those written; an
 edit elsewhere saves without the warning. The warnings therefore say
 little about the edit at hand.
 ** Open questions
-*** Should the server refuse a stale buffer?
-The tool's check is a second render and a comparison, which a race
-between the check and the save can defeat and which flags a node
-whose change would not conflict. A save request carrying the text it
-was rendered from (or a per-node fingerprint in the metadata) would
-let the server refuse or merge per node, for every client.
-*** Should the report know what a parent claims?
-The report could say, from the full view's metadata, that a headline
-removed from under a write-protected occurrence or folder only leaves
-the view, and that a write-protected occurrence's title cannot be
-edited, before the server says so.
+Moved to '3_review.org'.
 * User's skgrepo: DONE, uncommitted
 ** What exists
 'data/user-claude/first/' is a git repo with no remote and no commits;
@@ -523,13 +513,93 @@ The 'what has happened' items are one-line headlines, as asked, and
 some run to two hundred characters; a handle at the end of each is
 then far from its start.
 ** Open questions
-*** Should the manifest warning skip teammates' skgrepos?
-Or should a manifest list only the skgrepos its nodes reference, which
-would also keep Jeff's private names out of User's manifest?
-*** Should User's server start restricted?
-A 'default_repo_set' of 'public' (or of 'first' with Jeff's private
-skgrepos left out of User's config entirely) would keep User's reads
-to what Jeff publishes. Which does Jeff want User to read?
-*** Should cargo-watch restart a cleanly stopped server?
-A wrapper that reruns on exit would make "kill it to reload the
-config" work; for now a reload needs a touch under 'server/'.
+Moved to '3_review.org'.
+* The server refuses stale buffers: DONE, uncommitted
+** What was done
+Each node of the in-Rust graph has a last-change runtime generation
+('LastChangeGenerations' in
+'server/dbs/in_rust_graph/last_change_generations.rs', read through
+'InRustGraph::last_change_of'). It lives in a side field of
+'InRustGraph', so it reaches neither '.skg' files nor 'Graphnode'. A
+graph mutation ('apply_nodeInstructions_to_inRustGraph') only notes
+the pids it wrote or deleted; 'SharedRuntime::swap_in' stamps them
+with the generation it assigns ('stamped_at_generation'), and dates
+every node of a graph read whole (startup, rebuild) to that
+generation. A deleted node keeps its stamp. The strip-body-whitespace
+rewrite, which rebuilds the graph from all nodes, carries the old
+stamps over and notes only the stripped nodes.
+
+Every response that installs a buffer carries '(rendered-at "N")':
+'content-view', 'search-results', 'diff-view', 'save-result',
+'collateral-view' and 'rerender-view' (the last also serves stage and
+commit, integrate unshown changes and the absent-reference cleanup).
+'save buffer' requires '(rendered-at . "N")'; without it, or with a
+value neither a number nor "never", the handler reads the envelope
+and answers one error naming the field. Otherwise, right after the
+save plan is built and before any confirmation,
+'stale_write_errors' ('server/serve/handlers/save_staleness.rs')
+checks the plan's nonmerge nodeInstructions (already past the noop
+filter and the restricted-write suppression) and both nodes of each
+nodeMerge; any node stamped later than N refuses the whole save with
+one 'ChangedSinceRendered' error per node: its ID, both generations,
+and the buffer's occurrences of it as subheadlines.
+
+Emacs keeps 'skg-rendered-at' (permanent-local) and Neovim
+'vim.b.skg_rendered_at', set on opening a content view, search
+buffer or diff-view buffer, on a successful save-result, and on each
+streamed view; the save request sends it. A refused save carries no
+content, so the buffer keeps its text and its generation, and the
+error goes to the usual save-errors buffer. The tool records
+'rendered_at' in the sidecar, sends it, and no longer renders the
+view again before saving: 'stale_node_lines', 'fetch_fresh_view',
+'editable_node_states' and '--overwrite-stale' are gone.
+
+Tests: 'tests/save_stale_buffers.rs' (four, in 'grouped_saves',
+through the real handlers over two connections sharing one runtime:
+the refusal and the untouched-node save, "never", the missing field,
+and a rebuild), a startup-generation case in
+'tests/runtime_generation.rs', 'tests/elisp/test-skg-rendered-at.el'
+(five), two cases in 'tests/nvim/save_spec.lua', and the tool's
+stale case now expects the server's refusal and then saves the edit
+from a fresh view. Ladder: 'cargo test' 1081 passed; Emacs 426;
+Neovim 465; the tool's test PASS; integration 35 of 36, the failing
+one 'import-md-and-org', as before.
+** Deviations
+*** "never" for a buffer no response drew
+The integration tests build buffers locally and save them, as a user
+does who types into a new empty view; with a default of "0" every
+write to an existing node from such a buffer was refused. So a
+buffer without a stored generation sends '(rendered-at . "never")',
+and the server checks nothing in it: its text is the user's own. It
+is explicit, so omitting the field still cannot bypass the check.
+The tool's 'new' sends it too.
+*** Generations start at the clock
+A runtime whose graph was just read starts at the microseconds since
+the Unix epoch instead of 0, and a swap-in still adds one. Without
+this, a buffer kept open across a server restart (cargo-watch
+restarts Jeff's server on every 'server/' edit) would carry a number
+from the old process larger than the new process's stamps, and pass
+the check. A runtime built around a graph an earlier runtime already
+stamped (tests re-wrap one handle in a fresh 'SkgEnv' per save)
+starts at the graph's newest stamp instead, so numbers never run
+backwards.
+*** The error names nodes by the buffer's headlines
+The design said "naming the node and both texts' ages". The error
+gives the ID and both generations, and the title only through the
+buffer's own headlines (the subheadline convention), not the graph's
+current title, which under a skgrepo restriction could be text the
+connection should not see.
+*** Entry points other than the handler save "as rendered now"
+'update_from_and_rerender_buffer' and its hoist-approval variant,
+used only by tests, and the test shims in 'server/test_utils.rs',
+'tests/shared/git_fixture.rs' and 'tests/strandeds.rs', pass the
+current generation; only 'handle_save_buffer_request' reads the
+client's.
+** What's imperfect
+Text pasted from an old buffer into a new empty view is not checked,
+since that buffer is "never" rendered. The per-node map grows with
+every node written in a session (a rebuild clears it). Two servers
+over one data tree still do not see each other's writes until a
+rebuild; the check only covers writes through this server. The
+'AWAITS' marker in '3_review.org' that the design section mentions is
+left for User.

@@ -25,7 +25,7 @@ Returns (REQUESTED-BUFFERS OPENED-BUFFER-NAMES)."
                (lambda (_time _repeat function &rest args)
                  (apply function args)))
               ((symbol-function 'skg-open-org-buffer-from-text)
-               (lambda (_proc _text buffer-name _view-id)
+               (lambda (_proc _text buffer-name _view-id &optional _rendered-at)
                  (push buffer-name opened)))
               ((symbol-function 'skg-big-nonfatal-message)
                (lambda (&rest _) nil))

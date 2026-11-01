@@ -18,6 +18,7 @@ use skg::diff_view::readiness_store::readiness_marks_path;
 use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::{
   SaveResponse, update_from_and_rerender_buffer_with_approvals};
+use skg::serve::handlers::save_staleness::RenderedAt;
 use skg::test_utils::{
   cleanup_test_tantivy, copy_dir_all, extract_string_field_from_sexp,
   read_all_lp_messages, skg_env_from_parts};
@@ -97,11 +98,13 @@ fn save (
     mk_test_tcp_stream_pair ();
   let mut env : SkgEnv =
     skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
+  let rendered_at : RenderedAt = // as if the buffer were rendered now
+    RenderedAt::Generation ( env . runtime_snapshot () . generation );
   let response : SaveResponse = block_on (
     update_from_and_rerender_buffer_with_approvals (
       &mut stream, buffer, &mut env,  &Ok (viewforest_id . clone ()),
       &mut f . views_state, &SkgrepoRestriction::unrestricted (&f . config), true, &HashMap::new (),
-      &HashSet::new (), &HashSet::new (), review, DeleteFrom::NotChosen, &[] )) ?;
+      &HashSet::new (), &HashSet::new (), review, DeleteFrom::NotChosen, &[], rendered_at )) ?;
   // The test helper's env holds its own graph handle: carry the
   // swapped-in graph back to the fixture.
   f . graph . store ( env . runtime_snapshot () . graph . clone () );

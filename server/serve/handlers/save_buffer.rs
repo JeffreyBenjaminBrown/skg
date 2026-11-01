@@ -40,9 +40,12 @@ use crate::serve::handlers::text_release::{
 use crate::serve::handlers::save_dependencies::{
   SaveAffectedIds, dirty_view_conflicts, format_conflict_error,
 };
+use crate::serve::handlers::save_staleness::{
+  RenderedAt, rendered_at_from_request, stale_write_errors};
 use crate::serve::util::{
   viewforest_id_from_request,
   buffer_response_entries,
+  rendered_at_entry,
   format_fork_confirmation_response_sexp,
   format_lock_views_sexp,
   read_length_prefixed_content,
@@ -52,7 +55,7 @@ use crate::serve::util::{
   value_from_request_sexp };
 use crate::from_text::fork::build_fork_confirmation_buffer;
 use crate::types::env::SkgEnv;
-use crate::types::errors::SaveError;
+use crate::types::errors::{BufferValidationError, SaveError};
 use crate::types::git::SkgrepoDiff;
 use crate::types::misc::{ID, SkgrepoName, SkgConfig};
 use crate::types::save::{
@@ -106,6 +109,9 @@ pub struct SaveResponse {
   /// Some when the saved buffer is one of the diff view's: the
   /// readiness summary the client shows after the save.
   pub readiness_summary   : Option<BufferReadinessSummary>,
+  /// Some for a save that skgsave-committed and rerendered: the runtime
+  /// generation 'saved_view' was rendered at.
+  pub rendered_at         : Option<u64>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -135,8 +141,10 @@ impl SaveResponse {
     errors             : Vec<String>,
     warnings           : Vec<String>,
     readiness_summary  : Option<BufferReadinessSummary>,
+    rendered_at        : u64,
   ) -> SaveResponse {
     SaveResponse { saved_view, errors, warnings, readiness_summary,
+                   rendered_at : Some (rendered_at),
                    .. SaveResponse::empty () } }
 
   /// A save that skgsave-committed nothing, asking to review the
@@ -201,15 +209,18 @@ impl SaveResponse {
       text_release_confirmation : None,
       strandeds_confirmation    : None,
       delete_from_confirmation  : None,
-      readiness_summary         : None, } }
+      readiness_summary         : None,
+      rendered_at               : None, } }
 
   /// Format: ((content "...") (errors (...)) (warnings (...))
-  /// POINT... (readiness-summary ...)), where the
-  /// point entries and the readiness summary are there when the save
-  /// has them.
+  /// (rendered-at "N") POINT... (readiness-summary ...)), where the
+  /// rendered-at, the point entries and the readiness summary are
+  /// there when the save has them.
   fn to_sexp_string (&self) -> String {
     let mut items : Vec<Sexp> = buffer_response_entries (
       & self . saved_view, & self . errors, & self . warnings );
+    if let Some (rendered_at) = self . rendered_at {
+      items . push (rendered_at_entry (rendered_at)); }
     if let Some (point_position) = &self . save_point_position {
       push_save_point_position_to_sexp_items (&mut items, point_position); }
     if let Some (readiness_summary) = &self . readiness_summary {
@@ -252,6 +263,8 @@ pub fn handle_save_buffer_request (
     strandeds_review_from_request (request);
   let delete_from : DeleteFrom =
     delete_from_from_request (request);
+  let rendered_at_result : Result<RenderedAt, String> =
+    rendered_at_from_request (request);
   { // Send the early broad lock before reading the buffer, so the client's
     // one-shot save-lock handler always fires exactly once and balances its
     // pending-count -- even when the read below fails (otherwise only
@@ -266,11 +279,20 @@ pub fn handle_save_buffer_request (
     send_response_with_length_prefix (
       stream,
       & tag_sexp_response ( TcpToClient::SaveLock, &lock_sexp )); }
-  match read_length_prefixed_content (reader)
-    .and_then (|content| parse_save_request_envelope (
-      &content, viewforest_id_from_request_result . as_ref () . ok ()))
+  match ( read_length_prefixed_content (reader)
+            .and_then (|content| parse_save_request_envelope (
+              &content, viewforest_id_from_request_result . as_ref () . ok ())),
+          rendered_at_result )
   {
-    Ok (envelope) => {
+    (Ok (_envelope), Err (error_msg)) => {
+      // The envelope was read, so the stream stays in step; the save is refused.
+      send_response_with_length_prefix (
+        stream,
+        & tag_sexp_response (
+          TcpToClient::SaveResult,
+          & sexp_to_client_string ( &empty_response_sexp (
+            &error_msg, &[], &save_point_position )) )); }
+    (Ok (envelope), Ok (rendered_at)) => {
       { let _span : tracing::span::EnteredSpan = tracing::info_span!(
           "update_from_and_rerender_buffer" ). entered();
         match block_on(
@@ -287,7 +309,8 @@ pub fn handle_save_buffer_request (
             &text_approved_pids,
             &strandeds_review,
             delete_from,
-            &envelope . other_views ))
+            &envelope . other_views,
+            rendered_at ))
         { Ok (mut save_response) => {
             save_response . save_point_position =
               save_point_position . clone ();
@@ -363,7 +386,7 @@ pub fn handle_save_buffer_request (
                 stream,
                 & tag_sexp_response (
                   TcpToClient::SaveResult, &response_sexp )); }} }}; }
-    Err (err) => {
+    (Err (err), _) => {
       let error_msg : String =
         format! ("Error reading save payload: {}", err );
       tracing::error! ( "{}", error_msg );
@@ -789,12 +812,14 @@ pub async fn update_from_and_rerender_buffer_with_hoist_approval (
   fork_skgrepos               : &HashMap<ID, SkgrepoName>,
   approved_hoist_pids         : &HashSet<ID>,
 ) -> Result<SaveResponse, Box<dyn Error>> {
+  let current_generation : RenderedAt = // This entry point saves a buffer as if rendered now: only the handler knows a client's rendering.
+    RenderedAt::Generation ( env . runtime_snapshot () . generation );
   update_from_and_rerender_buffer_with_approvals (
     stream, org_buffer_text, env,
     viewforest_id_from_request_result, views_state, skgrepo_restriction,
     approved_forks, fork_skgrepos, approved_hoist_pids,
     &HashSet::new (), &StrandedsReview::NotReviewed, DeleteFrom::NotChosen,
-    &[] ) . await
+    &[], current_generation ) . await
 }
 
 pub async fn update_from_and_rerender_buffer_with_approvals (
@@ -811,6 +836,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
   strandeds_review          : &StrandedsReview,
   delete_from               : DeleteFrom,
   other_views               : &[ClientViewSnapshot],
+  rendered_at               : RenderedAt, // when the buffer's text was rendered
 ) -> Result<SaveResponse, Box<dyn Error>> {
   // Save-plan construction reads the current files and graph.  Hold the sole
   // writer gate from before those reads through the graph swap-in, or two requests
@@ -841,6 +867,15 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
     fork_specs,
     post_skgsave_commit_notice_candidates }
     = save_plan;
+  { // A node the buffer would write that changed after the buffer was
+    // rendered refuses the whole save, before any confirmation is asked.
+    let stale_errors : Vec<BufferValidationError> =
+      stale_write_errors (
+        &runtime . graph, rendered_at, &viewforest,
+        &nonmerge_nodeInstructions, &nodeMerges );
+    if ! stale_errors . is_empty () {
+      return Err (Box::new (SaveError::BufferValidationErrors {
+        errors : stale_errors, warnings : parse_warnings, })); }}
   { // Restore and readiness requests write or approve what a skgrepo
     // restriction may hide: refused unless the connection is
     // unrestricted.

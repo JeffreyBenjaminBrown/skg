@@ -81,7 +81,8 @@ errors)."
                           (not (string= content "")))))
         (when opened
           (skg-open-org-buffer-from-text
-           tcp-proc content (concat "diff-view: " buffer) view-id))
+           tcp-proc content (concat "diff-view: " buffer) view-id
+           (skg--rendered-at-in response)))
         (when (or (skg--message-list-nonempty-p errors-list)
                   (skg--message-list-nonempty-p warnings-list))
           (skg-big-nonfatal-message

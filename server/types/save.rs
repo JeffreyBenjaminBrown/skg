@@ -278,6 +278,10 @@ fn buffer_validation_error_text (
     BufferValidationError::FlagEditOnUnknownNode (gnid) => {
       format!("Cannot change a flag on an unsaved or unknown graphnode:\n- ID: {}\n- Save the node first, then run the flag setter.\n",
               gnid . 0) },
+    BufferValidationError::ChangedSinceRendered {
+      gnid, rendered_at, last_change, .. } => {
+      format!("A node this save would write changed after the buffer was rendered:\n- ID: {}\n- The buffer was rendered at runtime generation {}; the node last changed at runtime generation {}.\n- Saving would overwrite that change with this buffer's older text. Archive your edits if you need them (M-x skg-show-unsaved-changes in Emacs, :SkgShowUnsavedChanges in Neovim), reopen a fresh view, and reapply them there.\n",
+              gnid . 0, rendered_at, last_change) },
     BufferValidationError::Other (msg) => {
       format!("{}\n", msg) }, }}
 

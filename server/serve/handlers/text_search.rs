@@ -28,7 +28,7 @@ use crate::serve::handlers::text_release::{
   search_challenge_response,
   search_choice_from_request};
 use crate::serve::protocol::TcpToClient;
-use crate::serve::util::{ send_response_with_length_prefix, tag_text_response};
+use crate::serve::util::{ rendered_at_entry, send_response_with_length_prefix, tag_text_response};
 use crate::types::views_state::{ViewforestId, ViewnodeIdRecord, pids_from_viewforest};
 use crate::types::misc::{TantivyIndex, SkgConfig, ID, SkgrepoName};
 use crate::skgrepo_sets::SkgrepoRestriction;
@@ -232,7 +232,8 @@ pub fn handle_text_search_request (
             &runtime . graph, viewforest_id, viewforest, &drawn_pids );
           send_response_with_length_prefix (
             stream,
-            & mk_search_results_sexp (&rendered, &warnings) ); },
+            & mk_search_results_sexp (
+              &rendered, &warnings, runtime . generation ) ); },
         Err (e) => {
           send_search_results_text (
             stream,
@@ -389,8 +390,9 @@ fn fold_what_was_drawn_under_hit (
     viewforest . get_mut (treeid) . unwrap () . value () . foldAndFocus . folded = true; }}
 
 fn mk_search_results_sexp (
-  content  : &str,
-  warnings : &[String],
+  content     : &str,
+  warnings    : &[String],
+  rendered_at : u64,
 ) -> String {
   Sexp::List ( vec! [
     Sexp::List ( vec! [
@@ -410,6 +412,7 @@ fn mk_search_results_sexp (
           Sexp::Atom ( Atom::S (warning . clone ()) ) )
         . collect () ),
     ] ),
+    rendered_at_entry (rendered_at),
   ] ) . to_string ()
 }
 

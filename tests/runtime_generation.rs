@@ -39,14 +39,13 @@ fn cloned_runtime_observes_atomic_generations_while_old_snapshot_stays_stable ()
     Arc::new (new_config), Arc::new (graph_with ("new-node")),
     new_index . clone ());
 
-  assert_eq! (swapped_in . generation, 1);
+  assert_eq! (swapped_in . generation, captured_old . generation + 1);
   let observed = other_connection . graph_snapshot ();
-  assert_eq! (observed . generation, 1);
+  assert_eq! (observed . generation, captured_old . generation + 1);
   assert_eq! (observed . config . tantivy_folder, PathBuf::from ("new-config"));
   assert! (observed . graph . nodes . contains_key (&ID::from ("new-node")));
   assert! (Arc::ptr_eq (&observed . tantivy_index . index, &new_index . index));
 
-  assert_eq! (captured_old . generation, 0);
   assert_eq! (captured_old . config . tantivy_folder, PathBuf::from ("old-config"));
   assert! (captured_old . graph . nodes . contains_key (&ID::from ("old-node")));
   assert! (Arc::ptr_eq (
@@ -62,8 +61,25 @@ fn a_candidate_not_swapped_in_cannot_change_the_visible_generation () {
   let _failed_candidate = graph_with ("never-swapped-in");
   let after = runtime . graph_snapshot ();
   assert! (Arc::ptr_eq (&before, &after));
-  assert_eq! (after . generation, 0);
+  assert_eq! (after . generation, before . generation);
   assert! (! after . graph . nodes . contains_key (&ID::from ("never-swapped-in")));
+}
+
+#[test]
+fn a_runtime_starts_after_every_earlier_process_and_stamps_what_it_read () {
+  // A buffer an earlier server process rendered must count as older
+  // than every node a later one read: startup generations follow the clock.
+  let earlier = SharedRuntime::new (
+    config (), Arc::new (graph_with ("read")),
+    empty_in_ram_tantivy_index () . unwrap ()) . graph_snapshot ();
+  std::thread::sleep (std::time::Duration::from_millis (1));
+  let later = SharedRuntime::new (
+    config (), Arc::new (graph_with ("read")),
+    empty_in_ram_tantivy_index () . unwrap ()) . graph_snapshot ();
+  assert! (later . generation > earlier . generation);
+  assert_eq! (later . graph . last_change_of (&ID::from ("read")),
+              Some (later . generation));
+  assert_eq! (later . graph . last_change_of (&ID::from ("never-read")), None);
 }
 
 #[test]

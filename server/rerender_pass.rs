@@ -184,11 +184,11 @@ pub fn update_views_after_save (
     views_state . open_views . update_view (
       &context . runtime . graph, viewforest_id, saved_view_mut, saved_viewnode_id_record );
     register_and_send_rerendered_views (
-      stream, views_state, &context . runtime . graph, collateral_views,
+      stream, views_state, &context . runtime, collateral_views,
       TcpToClient::CollateralView ); }
   Ok ( SaveResponse::saved (
     saved_text, context . errors, context . warnings,
-    readiness_summary )) }
+    readiness_summary, context . runtime . generation )) }
 
 /// A root is intentionally rendered raw when the user ordinarily opens an
 /// overridden node.  The buffer which *created* a fork is the exception: once

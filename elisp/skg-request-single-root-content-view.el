@@ -137,7 +137,8 @@ retry."
               (let ((buf-name (skg-content-view-buffer-name
                                content-value)))
                 (skg-open-org-buffer-from-text
-                 tcp-proc content-value buf-name view-id)))
+                 tcp-proc content-value buf-name view-id
+                 (skg--rendered-at-in response))))
             (when (or has-errors has-warnings)
               (skg-big-nonfatal-message
                "*SKG Content View Messages*"

@@ -14,6 +14,7 @@ pub mod save_buffer;
 pub mod server_warnings;
 pub mod integrate_unshown_changes;
 pub(crate) mod save_dependencies;
+pub mod save_staleness;
 pub mod text_release;
 pub mod single_root_view;
 pub mod skgrepo_sets;

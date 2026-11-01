@@ -80,7 +80,8 @@ function M.handle_diffView_response (response, buffer_name, view_id)
     local opened = not empty and content ~= nil and content ~= ''
     if opened then
       buffer.open_org_buffer_from_text(
-        content, 'skg://diff-view: ' .. buffer_name, view_id) end
+        content, 'skg://diff-view: ' .. buffer_name, view_id,
+        payload.field_text(response, 'rendered-at')) end
     if #errors > 0 or #warnings > 0 then
       messages.big_nonfatal_message(
         'skg://messages/diff-view',
