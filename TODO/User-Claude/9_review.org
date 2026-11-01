@@ -1,0 +1,22 @@
+#+title: User Claude: review of plan 8, and choices Jeff may overturn
+
+* TODO (chosen, switchable) : a Unix socket in the output directory
+The daemon listens on 'DIR/skg-for-ai.sock' and one-shot commands with
+that '--out-dir' route through it. Alternatives: a second TCP port (works
+across machines; nothing here needs that), or a request file the daemon
+watches (no sockets; slower and racy). The socket is the plain Linux way
+and is easy to swap later, since only the transport layer of the tool
+would change.
+
+* TODO (chosen, switchable) : the ratio signal needs three content words
+The fuzzy retype test asks when Dice >= 0.6 or the difflib ratio >=
+0.75. On short titles the ratio fires too easily. Chosen: the ratio alone
+counts only when both normalized titles have at least three content
+words; Dice is unchanged. Switch: drop the guard, or lower it to two
+words, by changing one constant and its unit cases.
+
+* TODO (chosen, switchable) : the daemon log is the wake signal
+No new protocol for "something changed": the daemon appends a line to
+'DIR/skg-for-ai.log' for every re-render and warning. Anything that wants
+to wake me (Facilitator's later machinery) tails that file. Switch: a
+proper event channel, when there is a consumer for it.

@@ -1,0 +1,76 @@
+#+title: User Claude: a connection of my own
+
+* Scope
+'7_review.org' found what the tool loses by opening a connection per
+command: unprompted re-renders and asynchronous warnings, both of which
+matter once servers integrate disk changes ('6_plan', last slice). This
+plan gives the tool a long-lived process that holds one connection, and
+settles a few small things found along the way. Choices Jeff may want to
+overturn are flagged in '9_review.org' as "TODO (chosen, switchable)".
+
+* The daemon
+** What it is
+'skg_for_ai.py daemon --out-dir DIR [--port P]' runs until stopped. It
+opens one connection to the server and keeps it. It owns the views whose
+sidecars live in DIR: every view it renders is held on that connection,
+so the server re-renders it when a save or a disk integration touches a
+node it shows, and the daemon then rewrites that view's full, compact
+and sidecar files in place.
+** The log
+'DIR/skg-for-ai.log', appended to, one line per event, timestamped:
+"re-rendered BASE: ..." with the server's reason when it gives one (which
+nodes changed, from the rerender response), "warning: ..." for every
+server warning received (startup, watcher integrations, leaks), "saved
+BASE", "error ...". This log is what I read to learn that the world
+moved while I was not looking; it is the wake signal, in the plainest
+form, that Facilitator's later work can build on.
+** One-shot commands route through it
+When a daemon's socket exists in DIR ('DIR/skg-for-ai.sock', a Unix
+socket), every command run with that '--out-dir' sends its request to
+the daemon over the socket instead of opening its own connection, and
+prints what the daemon answers. Without a daemon, commands work as now.
+So nothing changes for a reader who never starts one; a writer who does
+gets held views and the log. Chosen, switchable: a Unix socket in the
+output directory, rather than a TCP port or a request file. (See
+'9_review.org'.)
+** What held views change
+A save against a held view is the normal case for the server, so the
+unheld-view rules ('viewnode_id_record_for_saved_buffer', the diff-view
+unheld save) remain for one-shot use but are no longer the daemon's
+path. 'close SIDECAR' tells the daemon to release the view. Stopping the
+daemon ('daemon --stop', or a signal) closes every view and the socket.
+** Verification
+On the fixture server: start a daemon; render a view through it; save
+the same node through a second, independent connection; the daemon
+rewrites the view's files and logs the re-render; a server warning
+(provoke one: a leak-shaped save, or a bad file for the watcher) is
+logged; commands with and without a running daemon give identical
+files; stopping releases the views. Then the real case: my daemon on
+1732 holding 'what has happened'; Jeff's server and mine both running;
+a save through a one-shot command on 1732; the daemon's files update and
+the log says why.
+
+* Small things settled along the way
+** The fuzzy test on short titles
+'5_discussion' erred toward asking; the first run shows the ratio signal
+fires on very short titles ("budget meeting" / "budget notes"). Chosen,
+switchable: the ratio signal alone (without a Dice match) counts only
+when both normalized titles have at least three content words. Dice
+alone is unchanged. Unit cases for both sides of that line.
+** 'to Jeff' and 'to User'
+Jeff forks my 'to Jeff' node (85cc1841-6568-4db2-9a46-6fa4196f1bb9) in
+Emacs to subscribe to it; that is his step, not the tool's. For my inbox
+he creates 'to User' in one of his repos and tells me its ID; I then
+subscribe my own node to it through the tool (a subscription is a
+relationship recorded in my repo, so it needs no permission). Until the
+ID exists, nothing to build; the plan only records the steps.
+** The tool's README front page
+A newcomer's page, before the reference: the five things a teammate
+needs (start a daemon, view, edit the compact file, save with the
+report, diff and commit), the one rule ("never retype a handled
+headline"), and where to find the rest. A page, not a chapter.
+
+* Order
+The daemon first, as one slice; then the two small changes in a second,
+short slice. Deviations in 'progress.org'; new issues in
+'5_discussion.org'; switchable choices in '9_review.org'.
