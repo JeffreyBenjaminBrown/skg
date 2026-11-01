@@ -24,12 +24,15 @@
 //! receiver keeps the publisher's skgrepos in need not match the
 //! publisher's own author folder).
 //! When the receiver's privacy order contradicts the manifest's
-//! relative order, warn and suggest the fix; never reorder
+//! relative order of two skgrepos and some telescope this server
+//! composes spans both, warn and suggest the fix; never reorder
 //! automatically.
 
+use crate::dbs::filesystem::one_node::graphnode_from_pid_and_skgrepo;
 use crate::git_ops::read_gitrepo::skgrepo_git_remote;
-use crate::types::misc::{SkgConfig, SkgrepoName};
+use crate::types::misc::{ID, SkgConfig, SkgrepoName};
 
+use std::collections::{HashMap, HashSet};
 use std::io;
 use std::path::PathBuf;
 
@@ -134,13 +137,51 @@ fn dependency_entry_path (e : &toml::Value) -> Option<String> {
                 . and_then ( |p| p . as_str () )
                 . map ( str::to_string )) }
 
+/// Two of the receiver's skgrepos that a foreign manifest orders
+/// opposite to the receiver's config.
+struct ContradictedPair {
+  manifest_skgrepo         : SkgrepoName, // the foreign skgrepo shipping the manifest
+  more_public_per_manifest : SkgrepoName,
+  more_public_per_config   : SkgrepoName,
+}
+
 /// The receiver half: warnings (never errors, never reordering) for
-/// each foreign manifest whose relative order the receiver's config
-/// contradicts. Returned as strings so 'main' can log them and
-/// record them as startup warnings, and tests can pin them.
+/// each pair of skgrepos that a foreign manifest orders opposite to
+/// the receiver's config AND that some telescope of this server
+/// spans, so that node folds in opposite orders on the two servers.
+/// A bare contradiction is not warned about: under the rule that
+/// every foreign skgrepo is more public than every owned one, two
+/// teammates' configs always order their shared skgrepos oppositely.
+/// Returned as strings so 'main' can log them and record them as
+/// startup warnings, and tests can pin them.
 pub fn foreign_manifest_order_warnings (
   config : &SkgConfig,
 ) -> Vec<String> {
+  let contradicted_pairs : Vec<ContradictedPair> =
+    contradicted_pairs_in_foreign_manifests (config);
+  if contradicted_pairs . is_empty () {
+    return Vec::new (); }
+  let section_pids_by_skgrepo : HashMap<SkgrepoName, HashSet<ID>> =
+    section_pids_by_skgrepo (config);
+  contradicted_pairs . iter ()
+    . filter_map ( |pair| {
+        let spanning_pids : Vec<ID> =
+          pids_whose_telescope_spans_both (
+            config, &section_pids_by_skgrepo,
+            &pair . more_public_per_manifest,
+            &pair . more_public_per_config );
+        if spanning_pids . is_empty () { None }
+        else { Some ( spanning_telescope_warning (
+                        config, pair, &spanning_pids )) }} )
+    . collect () }
+
+/// Every pair of the receiver's skgrepos, both named by some foreign
+/// manifest, whose relative order there contradicts the receiver's
+/// config. Manifest entries match receiver skgrepos by final path
+/// component (the skgrepo name).
+fn contradicted_pairs_in_foreign_manifests (
+  config : &SkgConfig,
+) -> Vec<ContradictedPair> {
   let ordered : Vec<SkgrepoName> = config . ordered_skgrepos ();
   let final_component = |p : &std::path::Path| -> Option<String> {
     p . components () . next_back ()
@@ -154,7 +195,7 @@ pub fn foreign_manifest_order_warnings (
       config . skgrepos . get (n)
       . and_then ( |s| final_component ( &s . path ))
       . as_deref () == Some (gitrepo) ) };
-  let mut warnings : Vec<String> = Vec::new ();
+  let mut pairs : Vec<ContradictedPair> = Vec::new ();
   for name in &ordered {
     if config . skgrepo_is_owned (name) { continue; }
     let Some (skgrepo) = config . skgrepos . get (name) else {
@@ -172,22 +213,101 @@ pub fn foreign_manifest_order_warnings (
               . filter_map ( dependency_entry_path )
               . collect () )
       . unwrap_or_default ();
-    // The manifest's entries, restricted to skgrepos the receiver also
-    // has, must appear in the receiver's order.
-    let mut last : Option<(String, usize)> = None;
-    for entry in &entries {
-      let gitrepo : Option<String> =
-        final_component ( std::path::Path::new (entry) );
-      let Some (gitrepo) = gitrepo else { continue; };
-      let Some (position) = receiver_position_of (&gitrepo) else {
-        continue; };
-      if let Some ((prev_gitrepo, prev_position)) = &last {
-        if position < *prev_position {
-          warnings . push ( format! (
-            "Repo '{}' ships a OTHER_SKGREPO_DEPENDENCIES.toml placing '{}' more public than '{}', but this config orders them the other way. Telescopes spanning them will fold in the publisher-unintended order; consider reordering [[repos]].",
-            name, prev_gitrepo, gitrepo )); }}
-      last = Some ((gitrepo, position)); }}
-  warnings }
+    let receiver_positions_in_manifest_order : Vec<usize> =
+      // The manifest's entries, restricted to skgrepos the receiver
+      // also has.
+      entries . iter ()
+      . filter_map ( |entry|
+          final_component ( std::path::Path::new (entry) ) )
+      . filter_map ( |gitrepo| receiver_position_of (&gitrepo) )
+      . collect ();
+    for (i, earlier) in
+      receiver_positions_in_manifest_order . iter () . enumerate () {
+      for later in &receiver_positions_in_manifest_order [i + 1 ..] {
+        if later < earlier {
+          pairs . push ( ContradictedPair {
+            manifest_skgrepo         : name . clone (),
+            more_public_per_manifest : ordered [*earlier] . clone (),
+            more_public_per_config   : ordered [*later] . clone (), } ); }}}}
+  pairs }
+
+/// For each configured skgrepo, the PIDs of its '.skg' files (their
+/// file stems). An unreadable folder contributes none.
+fn section_pids_by_skgrepo (
+  config : &SkgConfig,
+) -> HashMap<SkgrepoName, HashSet<ID>> {
+  config . skgrepos . iter ()
+    . map ( |(name, skgrepo)| {
+        let pids : HashSet<ID> =
+          std::fs::read_dir (&skgrepo . path) . into_iter ()
+          . flatten () . flatten ()
+          . map ( |entry| entry . path () )
+          . filter ( |path| path . extension ()
+                     . map_or ( false, |ext| ext == "skg" ))
+          . filter_map ( |path| path . file_stem ()
+                         . map ( |stem| ID::from (
+                           stem . to_string_lossy () . into_owned () )) )
+          . collect ();
+        ( name . clone (), pids ) } )
+    . collect () }
+
+/// The PIDs, sorted, of the telescopes this server composes from a
+/// section in each of skgrepos A and B. A PID with an owned section
+/// keeps only its owned sections ('retain_owned_sections_when_pid_folderlides'),
+/// so an owned and a foreign skgrepo never share a composed
+/// telescope, and two foreign ones share one only when no owned
+/// skgrepo has a section of that PID.
+fn pids_whose_telescope_spans_both (
+  config                  : &SkgConfig,
+  section_pids_by_skgrepo : &HashMap<SkgrepoName, HashSet<ID>>,
+  a                       : &SkgrepoName,
+  b                       : &SkgrepoName,
+) -> Vec<ID> {
+  let a_owned : bool = config . skgrepo_is_owned (a);
+  if a_owned != config . skgrepo_is_owned (b) {
+    return Vec::new (); }
+  let (Some (a_pids), Some (b_pids)) =
+    ( section_pids_by_skgrepo . get (a),
+      section_pids_by_skgrepo . get (b) )
+    else { return Vec::new (); };
+  let some_owned_skgrepo_has = |pid : &ID| -> bool {
+    section_pids_by_skgrepo . iter ()
+    . any ( |(name, pids)| config . skgrepo_is_owned (name)
+                           && pids . contains (pid) ) };
+  let mut spanning : Vec<ID> =
+    a_pids . intersection (b_pids)
+    . filter ( |pid| a_owned || ! some_owned_skgrepo_has (pid) )
+    . cloned ()
+    . collect ();
+  spanning . sort ();
+  spanning }
+
+/// The warning for one contradicted pair, naming the first spanning
+/// node (with its title when its telescope composes) and how many
+/// more there are.
+fn spanning_telescope_warning (
+  config        : &SkgConfig,
+  pair          : &ContradictedPair,
+  spanning_pids : &[ID],
+) -> String {
+  let example_pid : &ID = &spanning_pids [0];
+  let example_node : String =
+    match graphnode_from_pid_and_skgrepo (
+      config, example_pid . clone (),
+      &pair . more_public_per_config ) {
+      Ok (node) => format! ("'{}' ('{}')", example_pid, node . title),
+      Err (_)   => format! ("'{}'", example_pid), };
+  let more_nodes : String =
+    match spanning_pids . len () - 1 {
+      0 => String::new (),
+      1 => " (and 1 more node)" . to_string (),
+      n => format! (" (and {} more nodes)", n), };
+  format! (
+    "Node {}{} has sections in both '{}' and '{}'. This config orders '{}' more public than '{}', but the OTHER_SKGREPO_DEPENDENCIES.toml of foreign repo '{}' orders them the other way, so that node folds its sections in opposite orders on this server and on that repo's publisher's. For them to agree, one of the two configs must reorder its [[repos]].",
+    example_node, more_nodes,
+    pair . more_public_per_config, pair . more_public_per_manifest,
+    pair . more_public_per_config, pair . more_public_per_manifest,
+    pair . manifest_skgrepo ) }
 
 #[cfg(test)]
 #[path = "../../tests/unit/dependencies_manifest.rs"]

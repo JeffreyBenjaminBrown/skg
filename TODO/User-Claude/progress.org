@@ -1065,3 +1065,38 @@ child and which shows the same chains as nested headlines. Its code,
 the 'failures_of_ancestry_cases' check and the 'view_child-a-id' and
 'view_shared-id' runs went with it; the README's "The ancestry" now
 points to the folder and to 'contains'.
+* The foreign-manifest order warning, narrowed to spanning telescopes: DONE, uncommitted
+** What changed
+'foreign_manifest_order_warnings' ('server/telescope/dependencies_manifest.rs')
+still finds the pairs of skgrepos a foreign manifest orders opposite to
+the config, but warns about a pair only when some telescope this server
+composes has a section in each. The warning names the first such node
+(ID and title), how many more there are, both skgrepos, both orders,
+and the foreign repo whose manifest disagrees. The reasoning is in
+'5_discussion.org'; the docs ('api-and-formats.org', the manifest
+section and "Server warnings"; 'telescopes.org', "Ownership and
+folders") say why a bare disagreement is not warned about.
+** Deviations
+*** Every pair, not only adjacent ones
+The comparison used to check only consecutive manifest entries. With
+the narrowed condition that misses a spanned pair whose contradiction
+shows only between non-adjacent entries, so it now checks every pair
+(test 'receiver_checks_every_manifest_pair_not_only_adjacent_ones').
+*** "Spans" means "this server composes both sections"
+A PID with an owned section keeps only its owned sections, so an
+owned and a foreign skgrepo never share a composed telescope, and two
+foreign ones share one only when no owned skgrepo has that PID. Such
+same-ID files are not warned about here (the owned-wins collision
+already has its own warning). Jeff's case, 'first' (foreign) against
+'personal-deprecated' (owned), is that mixed kind; the two folders
+also share no IDs today.
+*** One warning per pair, not per node
+A pair spanned by many nodes would otherwise flood the startup
+warnings; the warning names one and counts the rest.
+** Verification
+Unit and 'server_warnings' tests adapted; full 'cargo test' green.
+A scratch server on a copy of 'data/skgconfig-jeff.toml' (port 17391,
+tantivy in the scratchpad) started with no manifest warning;
+'check-config' does not compute these warnings, so it could not
+serve. The scratch server's own log lines went to
+'data/logs/server-to-user.log', beside the live server's.

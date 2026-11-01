@@ -1,7 +1,7 @@
 //! OTHER_SKGREPO_DEPENDENCIES.toml: publisher generation (byte-stable, owned
 //! Skgrepos only, prefix-in-order) and receiver order warnings
-//! (matched by skgrepo name, contradiction detected, no false alarm
-//! on agreement).
+//! (matched by skgrepo name, a contradiction warned about only when a
+//! telescope spans the pair, no false alarm on agreement).
 
 use super::{foreign_manifest_order_warnings, write_dependencies_manifests};
 use crate::types::misc::{SkgConfig, Skgrepo, SkgrepoName};
@@ -152,42 +152,92 @@ fn dependency_pair_omits_git_remote_when_repo_is_not_a_gitrepo (
 }
 
 #[test]
-fn receiver_warns_on_contradicted_order_and_not_on_agreement (
+fn receiver_warns_on_contradicted_order_only_when_a_telescope_spans_the_pair (
 ) {
   let tmp : tempfile::TempDir = tempfile::tempdir () . unwrap ();
   let config : SkgConfig = config_at (
     tmp . path (),
-    & [ ("mine",       "owned/mine",       true),
-        ("her-work",   "colleague/work",   false),
-        ("her-extra",  "colleague/extra",  false) ] );
-  { // The colleague's manifest says extra is more public than work;
-    // this config orders them the other way.
-    std::fs::write (
-      tmp . path () . join ("colleague/work/OTHER_SKGREPO_DEPENDENCIES.toml"),
-      "dependencies = [\n  \
-       { path = \"owned/extra\" },\n  \
-       { path = \"owned/work\" },\n]\n"
-    ) . unwrap ();
+    & [ ("her-work",   "colleague/work",   false),
+        ("her-extra",  "colleague/extra",  false),
+        ("mine",       "owned/mine",       true) ] );
+  let manifest_path : PathBuf =
+    tmp . path () . join ("colleague/work/OTHER_SKGREPO_DEPENDENCIES.toml");
+  let contradicting_manifest : &str =
+    // extra more public than work; this config orders them the other way
+    "dependencies = [\n  \
+     { path = \"owned/extra\" },\n  \
+     { path = \"owned/work\" },\n]\n";
+  std::fs::write (&manifest_path, contradicting_manifest) . unwrap ();
+  { // A contradiction no telescope spans: silent.
+    std::fs::write ( tmp . path () . join ("colleague/work/W.skg"),
+                     "title: only in work\npid: W\n" ) . unwrap ();
+    std::fs::write ( tmp . path () . join ("colleague/extra/E.skg"),
+                     "title: only in extra\npid: E\n" ) . unwrap ();
+    assert! ( foreign_manifest_order_warnings (&config) . is_empty () ); }
+  { // Node S has a section in each: the warning names the node and
+    // both skgrepos.
+    std::fs::write ( tmp . path () . join ("colleague/work/S.skg"),
+                     "title: spanning node\npid: S\n" ) . unwrap ();
+    std::fs::write ( tmp . path () . join ("colleague/extra/S.skg"),
+                     "pid: S\n" ) . unwrap ();
     let warnings : Vec<String> =
       foreign_manifest_order_warnings (&config);
     assert_eq! ( warnings . len (), 1, "{:?}", warnings );
-    assert! ( warnings [0] . contains ("her-work") ); }
-  { // Agreement: no warning.
+    assert! ( warnings [0] . starts_with (
+                "Node 'S' ('spanning node') has sections in both 'her-work' and 'her-extra'. This config orders 'her-work' more public than 'her-extra'" ),
+              "{}", warnings [0] ); }
+  { // Agreement: no warning, though S spans the pair.
     std::fs::write (
-      tmp . path () . join ("colleague/work/OTHER_SKGREPO_DEPENDENCIES.toml"),
+      &manifest_path,
       "dependencies = [\n  \
        { path = \"owned/work\" },\n  \
        { path = \"owned/extra\" },\n]\n"
     ) . unwrap ();
     assert! ( foreign_manifest_order_warnings (&config)
               . is_empty () ); }
-  { // Back-compat: a foreign manifest still in the old bare-string
-    // shape is parsed too, so its order is still checked.
+  { // The bare-string manifest shape is read too.
     std::fs::write (
-      tmp . path () . join ("colleague/work/OTHER_SKGREPO_DEPENDENCIES.toml"),
+      &manifest_path,
       "dependencies = [\n  \"owned/extra\",\n  \"owned/work\",\n]\n"
     ) . unwrap ();
     let warnings : Vec<String> =
       foreign_manifest_order_warnings (&config);
     assert_eq! ( warnings . len (), 1, "{:?}", warnings ); }
+  { // An owned section of S makes this server ignore its foreign
+    // sections, so no telescope spans the pair: silent.
+    std::fs::write ( tmp . path () . join ("owned/mine/S.skg"),
+                     "title: spanning node\npid: S\n" ) . unwrap ();
+    assert! ( foreign_manifest_order_warnings (&config)
+              . is_empty () ); }
+}
+
+#[test]
+fn receiver_checks_every_manifest_pair_not_only_adjacent_ones (
+) {
+  // The manifest orders a, b, c; this config orders b, c, a. Only the
+  // non-adjacent pair (a, c) is spanned, by node T.
+  let tmp : tempfile::TempDir = tempfile::tempdir () . unwrap ();
+  let config : SkgConfig = config_at (
+    tmp . path (),
+    & [ ("b", "them/b", false),
+        ("c", "them/c", false),
+        ("a", "them/a", false),
+        ("mine", "owned/mine", true) ] );
+  std::fs::write (
+    tmp . path () . join ("them/c/OTHER_SKGREPO_DEPENDENCIES.toml"),
+    "dependencies = [\n  \
+     { path = \"them/a\" },\n  \
+     { path = \"them/b\" },\n  \
+     { path = \"them/c\" },\n]\n"
+  ) . unwrap ();
+  std::fs::write ( tmp . path () . join ("them/c/T.skg"),
+                   "title: t\npid: T\n" ) . unwrap ();
+  std::fs::write ( tmp . path () . join ("them/a/T.skg"),
+                   "pid: T\n" ) . unwrap ();
+  let warnings : Vec<String> =
+    foreign_manifest_order_warnings (&config);
+  assert_eq! ( warnings . len (), 1, "{:?}", warnings );
+  assert! ( warnings [0] . contains (
+              "has sections in both 'c' and 'a'" ),
+            "{}", warnings [0] );
 }

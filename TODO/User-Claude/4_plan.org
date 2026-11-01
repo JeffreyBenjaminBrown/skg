@@ -106,13 +106,13 @@ the summary and the handle tokens seem enough. Skip them?
 **** User
 Skipped.
 * jeff
-** TODO Let's add skgrepo indicators to your compact view.
+** Let's add skgrepo indicators to your compact view.
 I think it would also help if your heralds included skgrepo indicators.
 The server only attaches them to nodes whose nearest vognode ancestor
 has a different source, so most nodes don't have them.
 They don't clutter the view, and they are very helpful
 for knowing what (whose voice) you're looking at.
-*** TODO User : done, as '⌂:LABEL' in the handle
+*** User : done, as '⌂:LABEL' in the handle
 Where the server writes 'repoBoundary' (a root, or a node whose home
 skgrepo differs from its nearest occurrence ancestor's), the handle
 now carries '⌂:LABEL' after the relationship heralds, LABEL from the
@@ -132,10 +132,10 @@ ancestry, one line per containerward step (the chain 'skg-view-ancestry'
 shows, as the server computes it for the containers folder), so I see
 where a root sits before reading it. Added to the tool's backlog, after
 the fixes now running.
-**** TODO jeff says : why not just use a foldered containerward forest?
+**** jeff says : why not just use a foldered containerward forest?
 My experience is to see one of those in any view whose root
 is not a graph-root. I like it. I imagine you would too.
-***** TODO Jeff : User agrees; the header goes
+***** Jeff : User agrees; the header goes
 The header was built from exactly that folder, which every fresh view
 already carries as the root's first child, with the full chain as
 nested headlines. Since I read a compact view whole, the folder a few

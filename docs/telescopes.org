@@ -167,3 +167,15 @@ section deletes the file, and re-privatizing later recreates it.
 Each owned skgrepo also receives a generated =OTHER_SKGREPO_DEPENDENCIES.toml=
 naming the skgrepos it may reference (everything at least as public),
 so a skgrepo you share carries its own dependency claim.
+
+A receiver's config can order those skgrepos differently than the
+publisher's did. That matters only for a node with sections in two
+of them: reading composes sections most public first, so the two
+servers would fold that node in opposite orders. The server warns
+at startup exactly then, naming the node and both skgrepos. It does
+not warn about the disagreement alone, which is the normal case:
+each teammate's foreign skgrepos are more public than their owned
+ones, so any two teammates order their shared skgrepos oppositely.
+A node with an owned and a foreign section is not warned about
+either, since the owned telescope wins and the foreign sections are
+ignored. See =api-and-formats.org=, "OTHER_SKGREPO_DEPENDENCIES.toml".

@@ -515,9 +515,9 @@ buffer's =rendered-at=.
     or =(warnings ())= when there are none. The warnings are the ones
     the server raised as it started: one per top-level key of
     skgconfig.toml it does not know (see "skgconfig.toml", below), and
-    one per foreign skgrepo whose dependencies manifest orders two
-    skgrepos differently than the config does (see
-    "OTHER_SKGREPO_DEPENDENCIES.toml", below).
+    one per pair of skgrepos that a foreign skgrepo's dependencies
+    manifest orders differently than the config does while some
+    telescope spans both (see "OTHER_SKGREPO_DEPENDENCIES.toml", below).
     A reload of the config ("Rebuild session-lifetime stores") does
     not change them.
   - Each client sends this once per connection, as soon as the
@@ -1589,10 +1589,22 @@ dependencies = [
 
 It is generated output — hand edits are clobbered — and lets someone
 who receives one of your skgrepos see what it depends on and where to get
-it. When a foreign skgrepo's manifest orders two skgrepos differently
-than this config does, the server warns at init, in its log and in
-the startup warnings each client shows on connect (see "Server
-warnings", above). (The receiver also
+it.
+
+The server warns when a foreign skgrepo's manifest orders two skgrepos
+differently than this config does /and/ some node has a section in
+each of them that this server composes into one telescope (see
+=telescopes.org=). Such a node folds its sections in opposite orders on
+this server and on the publisher's. The warning names the node (its ID
+and title, and how many more nodes span the pair), both skgrepos and
+the two orders; it appears at init, in the log and in the startup
+warnings each client shows on connect (see "Server warnings", above).
+A bare disagreement of orders is not warned about: every foreign
+skgrepo is more public than every owned one, so two teammates' configs
+necessarily order their shared skgrepos oppositely, and no reordering
+could satisfy both. Nor is a node whose sections sit in an owned and a
+foreign skgrepo: the owned telescope wins and the foreign sections are
+ignored, so no telescope spans the pair. (The receiver also
 still reads the older bare-string =dependencies= shape, so manifests
 published before this change keep working.)
 

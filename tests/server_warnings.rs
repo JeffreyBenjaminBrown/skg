@@ -1,6 +1,7 @@
 // The startup warnings: 'load_config' warns about the top-level keys
 // of skgconfig.toml it does not know, 'foreign_manifest_order_warnings'
-// about a foreign manifest whose order the config contradicts, and the
+// about a foreign manifest whose order the config contradicts for two
+// skgrepos some telescope spans, and the
 // "server warnings" request serves what the server recorded.
 // Fixture: 'tests/server_warnings/fixtures/skgconfig.toml', a config
 // with no skgrepos that sets an old spelling and an unknown key.
@@ -52,9 +53,9 @@ fn the_server_warnings_request_answers_with_each_recorded_warning (
   Ok (( )) }
 
 /// A foreign skgrepo whose manifest calls 'extra' more public than
-/// 'work', under a config that orders them the other way, yields a
-/// warning that the request serves beside the config's own, as 'main'
-/// records them.
+/// 'work', under a config that orders them the other way, with node S
+/// having a section in each, yields a warning that the request serves
+/// beside the config's own, as 'main' records them.
 #[test]
 fn a_foreign_manifest_the_config_contradicts_is_served_as_a_warning (
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -72,6 +73,10 @@ fn a_foreign_manifest_the_config_contradicts_is_served_as_a_warning (
     "dependencies = [\n  \
      { path = \"owned/extra\" },\n  \
      { path = \"owned/work\" },\n]\n" ) ?;
+  std::fs::write ( tmp . path () . join ("colleague/work/S.skg"),
+                   "title: spanning node\npid: S\n" ) ?;
+  std::fs::write ( tmp . path () . join ("colleague/extra/S.skg"),
+                   "pid: S\n" ) ?;
   let (config, config_warnings) : (SkgConfig, Vec<String>) =
     load_config ( &tmp . path () . join ("skgconfig.toml")
                   . display () . to_string () ) ?;
@@ -83,9 +88,9 @@ fn a_foreign_manifest_the_config_contradicts_is_served_as_a_warning (
   assert_eq! (startup_warnings . len (), 1, "{:?}", startup_warnings);
   let response : String = served_warnings_response (&startup_warnings) ?;
   assert! (response . starts_with (
-             "((response-type server-warnings) (warnings (\"Repo 'her-work' ships" ),
+             "((response-type server-warnings) (warnings (\"Node 'S' ('spanning node') has sections in both 'her-work' and 'her-extra'." ),
            "{}", response);
-  assert! (response . contains ("placing 'extra' more public than 'work'"),
+  assert! (response . contains ("OTHER_SKGREPO_DEPENDENCIES.toml of foreign repo 'her-work'"),
            "{}", response);
   Ok (( )) }
 
