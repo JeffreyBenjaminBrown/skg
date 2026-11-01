@@ -3,9 +3,23 @@
 ** to set the model
 * migrate .skg format
 python3 tools/migrate-skg-keys-2026-10/migrate.py data/owned
-* TODO TODO/diff-mode_complete/1_discussion.org
+* folders need better labels
+<b> hides these, which <a> contains.
+It hides these, yet nothing it subscribes to contains them, and they do not link to it.
+These link to it. Each one's descendents are a containerward forest.
+These contain it. Each one's descendents are a containerward forest.
+* trees should nest without bothering the outside
+like markdown trees inside asterisk trees
+* TODO TODO/diff-mode_complete/
+* AWAITS TODO/total-diff-view/
+Put on hold to simplify reconciliation.
 * next
 ** TODO/skg-for-ai/1_discussion.org
+** TODO CRITICAL: subscription heralds must count historical changes contentward
+If R subscribes to E, and E contains C,
+and C has changed,
+the herald on E as a subscribee of R's
+should count that change among the changes it is reporting.
 ** for docs : the org exporter
 *** ONGOING bug : flattening example links
   - Example links inside verbatim text got flattened. The exporter treats a link
@@ -35,6 +49,18 @@ A config option, for recording videos.
 Could put a second minibuffer line,
 that reads if anything (key sequence -> command),
 leaving a trail for five seconds or until interrupted.
+** JF's nix rec's
+moonpiedumplings/home-manager
+- make apt available for agents
+- install claude via nix, preferably numtide/llm-agents.nix
+- rather than shell, template and then copy in
+- make nix available in container; will share packages from host
+- replace container runtime with a microvm or gvisor
+** pos-tip : mouse over symbol, popup explains
+a package for emacs
+** eldoc : for documenting elisp
+** TODO CRITICAL : M-. doesn't work
+** TODO CRITICAL : don't let target/ exceed 10 gb
 ** TODO CRITICAL : don't force that we keep owned files under 'owned/'
 Let the user do that,
 but have them write out an explicit path for each owned repo,
@@ -55,7 +81,7 @@ because they were being hidden from the subscribee-as-such view.
 
 This requires no additional signaling to the user --
 a subscribee-as-such is already visually obvious to the user.
-** TODO CRITICAL : language changes
+** TODO ? CRITICAL ? language changes
 *** "mentioner mentions mentioned"
 *** hides-from-subscriptions -> hides
 Should apply not just to subscribee content,
@@ -298,11 +324,19 @@ minimizing redundancy, maximizing informativity
 **** Granular links work? Even with weird headline anchors?
 e.g. weird b/c it has a link
 *** ingest into skg
-** embarrasssments
-*** the org-export and docs nodes should be in another skgrepo
+** TODO embarrasssments
+*** TODO the org-export and docs nodes should be in another skgrepo
 *** tests should share fixtures across clients
-** bugs
-*** heralds temporarily lose the overlay
+*** should be able to follow links to paths
+e.g. [[file:/home/jeff/org-roam/personal-proc/memory_used_in_home_folder.org][memory used in home folder]]
+*** uniformity in keymap
+C-c s S -> C-u C-c s s
+** TODO bugs
+*** TODO the disappearing headline upon cycling todo/done
+might only happen in the first headline.
+Right now it's happening in 'taxes, my',
+which has no body.
+*** TODO heralds temporarily lose the overlay
 If I save a big buffer, and then quickly move a node
 while the buffer is still saving.
 *** TODO bugs in make-link / make-content
@@ -321,32 +355,33 @@ while the buffer is still saving.
 Change a link relationship into an ordinary content relationship. This orphans the linking node. Visit the linking node. If it is an island (ignoring its out-link), delete it. The save works, but a (warning?) buffer complains that some collateral buffer does not exist.
 ***** a test case
 Try it on either child of [[id:31b4c38c-5885-4895-ae33-85cb4fb93b86][immaturity]].
-*** org import of aliases with quotation marks
+*** TODO org import of aliases with quotation marks
   * AWS AMI ("Amazon Machine Image")
   **
   *** AMI (\
   *** Amazon
   *** Machine
   *** Image\")"
-*** skg-goto should not change both buffers if the window is split
-*** changing editRequest from delete to none in metadata buffer
+*** TODO skg-goto should not change both buffers if the window is split
+*** TODO changing editRequest from delete to none in metadata buffer
 works, but leaves a red DELETE herald in the metadata buffer.
 *** bug : nested links
 See, e.g.,
 [[id:3c5b0fad-1559-42a4-bcaf-eb7c466cc4f8][[[id:758119b6-2b1e-428b-9664-d7b8a4b63ca1][Markets can aim [[id:2208f9f5-43be-49d4-99c0-d803f8c3e44e][selfishness]] toward social efficiency.]]]]
-*** bug : not warning me when I make changes under an indeefinitive node
+*** TODO bug : not warning me when I make changes under an indeefinitive node
 Maybe that's in the spec but it's definitely bad.
 Should prevent save.
 Otherwise I save things under an write-protected,
 think it worked, and lose them.
-*** bug : C-c G on an alias kills the buffer
+*** TODO bug : C-c G on an alias kills the buffer
 intending to replace it, but can't replace it.
 There are likely other viewnode kinds for which this happens.
 ** behavior changes
+*** Warn, offer to cancel before creating a cycle.
 *** TODO/help.org
 *** Telescope sections are confusing from magit.
 Would like to be able to see them all at a glance for a given ID.
-*** text search across containment paths
+*** TODO text search across containment paths
 *** making a link into content
 **** should rewrite relationships, including text links, that pointed to the node with the link
 That is, suppose node C (container)
@@ -379,18 +414,20 @@ Yes—these rules are user-facing documented in docs/COMMANDS.org:51.
   The Neovim-facing equivalent is docs/COMMANDS-nvim.org:63. The API-level synopsis is docs/api-and-formats.org.
 
   For implementation authority, see server/context.rs:1 (how graph-origin types are assigned) and server/serve/handlers/text_search.rs:448 (the combined ranking calculation).
-*** matching all words should be much more highly valued
+*** TODO matching all words should be much more highly valued
 In fact maybe they should all require presence,
 barring an OR statement.
 *** staging should refresh views
 be it via magit, or via C-c t (a|A)
-*** sort role trees most-public first
+*** TODO sort role trees most-public first
 *** BUG cycling TODO | DONE etc. hides text
 e.g. go to c02b9d3d-8857-4cf0-84b2-244b127160fc
 and try toggling that for one of its intermediate children.
 **** bug in export to org-roam
 The 'exporter' node, the one that defines where to write the org file
 derived from its parent, might have multiple parents.
+** vocab changes
+*** rename restructed -> 'unsayable'
 ** infra
 *** set the default Codex model
 ■ Failed to save default model: config/batchWrite failed in TUI: config/batchWrite failed: failed to
