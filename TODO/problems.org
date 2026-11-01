@@ -721,3 +721,25 @@
    accessors during traversal.  Retain insertion-time edge gating as
    defence-in-depth, and add hidden-sibling-fork and mixed-visibility
    diamond regressions.
+* Source-set relationship-gating gaps found in the override audit (2026-09-20)
+** Automatic override substitution ignores the override edge's relSource
+   'followable_overriders_of' in
+   server/dbs/in_rust_graph/override_resolution.rs gates on ownership and the
+   overrider node's home source, but reads 'overriders_of' directly and never
+   gates the relationship's relSource.  A public overrider connected to a
+   public original only in a private section can therefore substitute in a
+   public-only view even though folders, paths, herald counts, and search
+   ancestry omit that edge.  Use the relSource-gated inverse accessor for
+   source-set-aware resolution.  The existing
+   'per_edge_visibility_stops_a_chain_at_an_inactive_middle' test covers an
+   inactive overrider node, not an inactive edge between active nodes.
+** A private subscription can cause an empty default subscribee folder
+   'maybe_add_subscribeeFolder_branch' initially reads raw 'subscribes_to'
+   members through 'pids_for_subscriber_and_its_subscribees' and filters only
+   the partner nodes' home sources.  The subsequent folder reconciliation
+   correctly removes subscriptions whose relSource is inactive, but it
+   deliberately preserves the now-empty subscribee folder.  Thus a private
+   subscription between public nodes can change a public-only initial view
+   from no folder to an empty folder.  Gate the initial membership/existence
+   test by relSource; add a restricted-source regression with both endpoints
+   public and only the subscription edge private.
