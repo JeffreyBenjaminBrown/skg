@@ -1,4 +1,4 @@
-#+title: skg-for-ai: reading the skg graph as plain files
+#+title: skg-for-ai: reading and writing the skg graph as plain files
 
 * What it is for
 A client such as Emacs shows a skg view as a tree of headlines, each
@@ -9,7 +9,9 @@ which outweighs the words. 'skg_for_ai.py' asks a running skg server
 for a view and writes it twice: once exactly as the server rendered it,
 and once compactly, with the words, the nesting and a short handle per
 headline. Nothing is lost, because each handle points at the line of
-the full view that holds the headline's metadata.
+the full view that holds the headline's metadata. An edited compact
+view can be saved back: the tool rebuilds the full buffer from it and
+saves that through the server (see "Writing").
 
 The tool is written for anyone, human or agent, who wants to use the
 graph without an editor client. It is a client like any other: it
@@ -47,6 +49,8 @@ marks the sidecar closed. See "Views and connections" for why it is
 rarely needed.
 
 Following a link is just 'view' on the link's ID.
+
+'save SIDECAR' saves an edited compact view; see "Writing".
 
 'raw REQUEST' sends REQUEST, one sexp, as a request line, and prints
 every response, each after a line '--- message N (CHARS chars) ---',
@@ -158,9 +162,10 @@ Whether a skgrepo is owned or foreign comes from the server's 'repos'
 request, which lists every configured skgrepo.
 ** The sidecar
 'BASE.view.json' records the view ID, the command and its request, the
-port, the two files' names, the server's errors and warnings, and
-whether the view is closed. A save of an edited view will be sent
-against this view ID.
+port, the two files' names, the server's errors and warnings, whether
+the compact view has a summary, and whether the view is closed. 'save'
+sends the edited view against this view ID, to this port, and renders
+the summary again when there was one.
 
 * Views and connections
 The server keeps a view's state per TCP connection, and forgets every
@@ -214,8 +219,23 @@ with its file in 'test-expected/'. It also checks that every handle
 names its own line and that line is a headline of the full view. Then
 it sends a 'repos' request through 'raw' and imports a Markdown file
 through 'import', and checks that the runs, the 'links-here' save
-among them, left every '.skg' file of the fixture as it was. It prints PASS or each failure, and keeps the scratch
-files when something fails. '--update-expected' rewrites the expected
+among them, left every '.skg' file of the fixture as it was.
+
+Then, on a second server over a fresh copy of the fixture, it edits
+compact views and saves them, in order: a title, a body, a new child,
+a move to another parent, a removal (the node then still has its other
+container), a deletion through 'delete' in a handle, two bad handles
+(refused before any save), a retitled write-protected occurrence
+(refused by the server, the files left as they were) and a stale view.
+It compares each report with the text expected and reads the '.skg'
+files after each save. The stale case renders a view, changes a node
+it shows through a second view's save, and saves the first view's
+edit of another node: the tool refuses, and with '--overwrite-stale'
+saves and prints what the server answered, after which the second
+save's change is gone, written over with the first view's text.
+
+It prints PASS or each failure, and keeps the scratch files when
+something fails. '--update-expected' rewrites the expected
 files instead of comparing; read the difference before keeping it.
 
 The fixture has two skgrepos, a foreign 'fred' listed first and an
@@ -226,15 +246,122 @@ foreign nodes from its subscriptions, one of which the view shows
 folded in a hidden-outside-of-subscribee folder. The root's body links
 to a node in the view, to a foreign node, and to an ID nobody wrote.
 
-* What the writing half will add
-Not built yet ('TODO/User-Claude/2_plan.org', "tools/skg-for-ai,
-writing"). The reader will edit the compact view in place: change
-titles and bodies, add headlines without handles, move or delete
-lines. The tool will rebuild the full buffer from it, giving each
-handled headline its metadata back from the full view and treating an
-unhandled one as a new node, and drop the summary and the link
-annotations. Before saving it will print the structural changes it is
-about to make (headlines removed from their container, moved, added,
-and any handle it cannot find), and save only when told to. The
-server's save then applies every check a client's save gets, and its
-re-rendered view replaces both files, so the handles are fresh.
+* Writing
+** The loop
+To change the graph, edit the compact view in place and save it:
+#+begin_example
+python3 tools/skg-for-ai/skg_for_ai.py view ID --out-dir DIR
+# edit DIR/view_ID.compact.org
+python3 tools/skg-for-ai/skg_for_ai.py save DIR/view_ID.view.json
+# read the report
+python3 tools/skg-for-ai/skg_for_ai.py save DIR/view_ID.view.json --yes
+#+end_example
+'save' takes the sidecar, or a directory holding only one. Without
+'--yes' it prints the report and stops; with it, it prints the report,
+sends the save, prints the server's answer, and writes the server's
+re-rendered view over the three files, so the handles are fresh and the
+next edit starts from them. A save needs the server the view came from;
+'--port', if given, must match the sidecar's.
+
+The tool writes nothing to '.skg' files itself. The server's save does,
+with every check an editor client's save gets, and it writes only to
+skgrepos the server's config owns.
+** How the compact view becomes a buffer
+The tool rebuilds the buffer an editor client would send, from the
+edited compact view and the full view it was written beside. A
+headline with a handle '⟨N ...⟩' gets back the metadata of line N of
+the full view; its level, title and position come from the edited
+compact view. The rest of the handle (the heralds, the kind, 'folded')
+is display only, and editing it changes nothing, except for the word
+'delete' (see "A deleted node"). A headline without a handle is
+written bare, and the save makes it a new node, with a new ID.
+
+Body lines are taken as edited, and belong to the headline above them.
+The link annotations the tool added ('⟦→ ... ⟧' or '⟦✗ ... ⟧' right
+after a link) are removed and the links kept, so a link typed anew
+needs no annotation. The summary's comment lines before the first
+headline are dropped.
+** What each change does in skg
+*** A changed title or body
+The node's title or body changes, wherever else it appears. A
+write-protected occurrence (one the full view marks 'writeProtected',
+such as each container in a 'containerFolder') saves nothing of its own,
+so the server refuses a save that changes its title.
+*** A new headline
+A headline typed without a handle becomes a new node, contained by its
+parent headline, at the position typed. Its home skgrepo is chosen by
+the server as for any new headline. The re-rendered view shows it with
+a handle, and the full view gives its new ID.
+*** A moved headline
+A handled headline under a different parent leaves the old parent's
+content and joins the new one's, at the position typed. Reordering
+headlines under one parent reorders its content.
+*** A removed headline
+Deleting a headline's line, and the lines under it, takes the node out
+of its parent's list (where the parent reads claims: an editable node's
+content, an editable folder's members). The node itself stays in the
+graph, with its other containers. Under a write-protected occurrence or
+a write-protected folder nothing claims, so removing a headline there
+only removes it from the view.
+*** A deleted node
+To delete a node from the graph, write the word 'delete' inside its
+handle: '⟨7 delete⟩', or '⟨7 aC1 delete⟩'. The tool writes it into the
+headline's metadata as '(editRequest delete)', the request the clients'
+'skg-delete' ('C-c <backspace>') writes, and the save deletes the node.
+Only an editable node occurrence can carry it.
+** The report
+Before saving, the tool compares the edited compact view with the full
+view and prints a line per change, each naming headlines by handle and
+title, as in
+#+begin_example
+Changes in view_root-id.compact.org, against view_root-id.full.org (view ID content-view:root-id):
+Moved: ⟨9⟩ 'Contained twice', from under ⟨7⟩ 'First child' to under ⟨10⟩ 'Second child, a subscriber'.
+New: 'A new grandchild', under ⟨7⟩ 'First child'.
+Title: ⟨7⟩ 'First child' → 'First child, renamed'.
+Bodies changed: 1 (⟨1⟩).
+Not saved. Run again with '--yes' to save.
+#+end_example
+An 'Error:' line names a handle that names no line of the full view,
+or a body line, or a 'delete' on something that is not an editable
+node occurrence; any error stops the save, and the report then lists
+only the errors. A 'Stale:' line names a node the save would write
+that the server's graph has changed since the view was rendered (see
+"Stale views"); a stale node stops the save unless '--overwrite-stale'
+is given.
+
+The changes follow, in this order. 'Delete:' is a handle carrying
+'delete'. 'Removed:' is a handle the edit no longer has, with how many
+headlines below it went with it; a child of a removed headline that
+was moved elsewhere is reported as moved. 'Moved:' is a handle under a
+different parent, or at a different depth below the same one.
+'Reordered:' is a parent whose kept children stand in another order.
+'New:' is a headline without a handle, and where it stands.
+'Repeated:' is a handle used twice, which shows the same node twice.
+'Title:' gives a changed title, old and new, and 'Bodies changed:'
+counts the changed bodies and names their handles. An edit with none
+of these prints 'No changes.' and saves nothing.
+** Stale views
+The server writes each node the saved buffer shows with the buffer's
+text of it. It has no record of when the tool's view was rendered, so
+a node changed by another save since then (by Jeff in Emacs, say)
+would be written back as the tool's view had it, even if the edit did
+not touch it. So before reporting, the tool renders the view again and
+compares, for each node the view shows editable, its title, body and
+content with the fresh render. A node that differs is reported
+'Stale:', and the save stops. Viewing again and redoing the edit is the
+safe answer; '--overwrite-stale' saves anyway, writing the view's text
+over those changes.
+** The server's answer
+After the save the tool prints 'Server: saved' or 'Server: nothing was
+saved', with the counts of errors and warnings, then each error and
+warning as the server wrote it. When the server refuses, the three
+files stay as they were, so the edit can be fixed and saved again.
+When the server answers with a question instead (to fork an edited
+foreign node, to delete records the skgrepo restriction hides, to
+review stranded relationships, to hoist telescope text), the tool
+prints the question and stops: it answers none of them, and nothing is
+saved. A client can answer them. One question comes after the save:
+under a restricted skgrepo-set the server may withhold the re-rendered
+view until over-private text is approved. The save has then happened,
+the tool says so, and the files are out of date until the node is
+viewed again.

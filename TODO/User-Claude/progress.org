@@ -307,3 +307,120 @@ host root if asked; '--preview-only' cancels instead). Its test now
 also runs 'raw' on 'repos' and an 'import' against the scratch server.
 The README says plainly that the tool may save and import, as any
 client may.
+* tools/skg-for-ai, writing: DONE, uncommitted
+** What was done
+'save SIDECAR' (or a directory holding one sidecar) rebuilds the full
+buffer from the edited compact view and the full view beside it: a
+handled headline gets back the metadata of the full-view line its
+handle names, at the edited level and title; a headline without a
+handle is written bare; bodies are taken as edited; the link
+annotations and the summary's comment lines are dropped. It prints a
+report and stops; with '--yes' it sends the save, prints the server's
+answer ('Server: saved' or 'Server: nothing was saved', the counts,
+then each error and warning verbatim), and writes the re-rendered view
+over the three files. A refused save, or a question the server asks
+in place of 'save-result', leaves the files as they were. The sidecar
+now records whether the compact view has a summary, so the rewrite
+keeps it or leaves it out.
+
+'buffer_with_view_request_on_first_headline' now shares the insertion
+of a metadata part, 'metadata_text_with_part', with the delete
+request; a parsed full-view line keeps its metadata text.
+
+The test now runs the reading checks on one scratch server and the
+writing cases on a second one over a fresh copy of the fixture: a
+title, a body, a new child (its ID read from the re-rendered full
+view, its '.skg' file and its container's list checked), a move, a
+removal (the node keeps its other container, checked by a fresh
+view), a deletion, two bad handles (refused, graph and files
+unchanged), a retitled write-protected occurrence (refused by the
+server, files unchanged) and a stale view. Each report is asserted
+exactly. 'python3 tools/skg-for-ai/test_skg_for_ai.py' passes;
+'cargo check --all-targets' is clean. The README has a "Writing"
+section.
+** The live save
+On 1731, 'view 703f5a82-d948-431f-985c-4db8132bc504', then a line
+'**** User Claude read this on 2026-11-01 through tools/skg-for-ai.'
+inserted after the body of '*** User Claude ⟨25⟩', just before '***
+Test Claude ⟨55⟩'. 'save' printed:
+#+begin_example
+Changes in view_703f5a82-d948-431f-985c-4db8132bc504.compact.org, against view_703f5a82-d948-431f-985c-4db8132bc504.full.org (view ID content-view:703f5a82-d948-431f-985c-4db8132bc504):
+New: 'User Claude read this on 2026-11-01 through tools/skg-for-ai.', under ⟨25⟩ 'User Claude'.
+Not saved. Run again with '--yes' to save.
+#+end_example
+and 'save --yes':
+#+begin_example
+Changes in view_703f5a82-d948-431f-985c-4db8132bc504.compact.org, against view_703f5a82-d948-431f-985c-4db8132bc504.full.org (view ID content-view:703f5a82-d948-431f-985c-4db8132bc504):
+New: 'User Claude read this on 2026-11-01 through tools/skg-for-ai.', under ⟨25⟩ 'User Claude'.
+Server: saved, 0 errors, 0 warnings.
+#+end_example
+followed by the three paths. In 'data/jeff/public' the save changed
+'d0b1fd26-7453-4768-8465-b452f228ae2b.skg' (User Claude), which gained
+'contains: [f738941c-8481-4220-b002-da22d659298a]', and added
+'f738941c-8481-4220-b002-da22d659298a.skg' with only its title and ID.
+Nothing else changed: the 'OTHER_SKGREPO_DEPENDENCIES.toml' that each
+of Jeff's skgrepos shows modified predates the save. The rewritten
+compact view shows '**** User Claude read this on 2026-11-01 through
+tools/skg-for-ai. ⟨55⟩', and a second 'save' reports 'No changes.'.
+None of it is committed.
+** Deviations from the plan
+*** The server does not refuse a stale view; the tool does
+The plan expected the server to refuse a deliberately stale view. It
+does not: a save writes each node its buffer shows with the buffer's
+text, so saving a view rendered before another save writes the old
+text of every node it shows back over that save, the untouched ones
+included, with no error or warning ('TODO/problems.org' has the
+details; the earlier discussion's claim of per-node protection was
+wrong). So before each report 'save' renders the view again (for a
+'links-here' view, the plain view; for a search, the search) and
+compares, for each node the view shows editable, its title, body and
+the IDs of the occurrences under it. A node that differs is reported
+'Stale:' and the save stops; '--overwrite-stale' sends it anyway and
+prints what the server answered. The test pins the server's present
+behavior: after the overwrite, the other save's change is gone.
+*** The deletion marker is a word in the handle
+The grammar's deletion marker is '(editRequest delete)', which the
+compact view has no metadata to carry. Writing 'delete' inside the
+handle ('⟨7 delete⟩') asks for it; the rebuild inserts the request
+where the server writes it (before '(viewRequests ...)', '(view ...)'
+and '(diff ...)'). The tool refuses it, before saving, on a headline
+that is not an editable node occurrence or already carries an edit
+request.
+*** The report has more kinds of line
+Beside what the plan names, the report says 'Reordered:' for a parent
+whose kept children changed order, 'Repeated:' for a handle used
+twice, and 'Delete:'. A removal is reported once, at the topmost
+removed headline, with how many headlines below it went too. With a
+bad handle the report lists only the errors.
+*** A refusal before saving exits nonzero
+Bad handles and stale nodes print the report and then exit 1 with
+the reason on stderr, as a server refusal does, so a script can tell
+"saved" from "not saved". A report without '--yes' exits 0.
+** What was awkward in the writing loop
+Handles are line numbers of the full view, so every save renumbers
+them: an edit planned against one rendering has to be redone with the
+new numbers after any save, even an unrelated one. The test's
+expected handles shift case by case for this reason.
+
+The report says what the buffer changes, not what the server will
+do with it: a retitled write-protected occurrence reads as an ordinary
+'Title:' line until the server refuses it, and a removal under a
+parent that reads no claims reads as a removal though it only leaves
+the view.
+
+Every save of a view that shows the fixture's dangling link warns
+about it, but only when the linking node is among those written; an
+edit elsewhere saves without the warning. The warnings therefore say
+little about the edit at hand.
+** Open questions
+*** Should the server refuse a stale buffer?
+The tool's check is a second render and a comparison, which a race
+between the check and the save can defeat and which flags a node
+whose change would not conflict. A save request carrying the text it
+was rendered from (or a per-node fingerprint in the metadata) would
+let the server refuse or merge per node, for every client.
+*** Should the report know what a parent claims?
+The report could say, from the full view's metadata, that a headline
+removed from under a write-protected occurrence or folder only leaves
+the view, and that a write-protected occurrence's title cannot be
+edited, before the server says so.

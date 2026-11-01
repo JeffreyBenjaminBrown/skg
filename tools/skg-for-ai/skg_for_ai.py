@@ -18,6 +18,9 @@ For a requested view it writes, into a directory the caller names:
 View commands: 'view ID', 'search TERMS...', 'links-here ID',
 'contains ID'. Each prints the paths it wrote. 'links-here' saves,
 as the clients' 'C-c l m' does.
+'save SIDECAR' rebuilds the full buffer from an edited compact view,
+prints the changes it would make, and with '--yes' saves it and
+writes the server's re-rendered view over the three files.
 Other commands: 'close SIDECAR'; 'raw REQUEST', which sends one
 request line and prints every response; 'import INPUT_DIR REPO',
 which previews and applies a Markdown and Org import.
@@ -65,6 +68,9 @@ def main (argv):
     return
   if arguments . command == "import":
     command_import (arguments)
+    return
+  if arguments . command == "save":
+    command_save (arguments)
     return
   connection = SkgConnection (arguments . port)
   try:
@@ -135,6 +141,23 @@ def parse_command_line (argv):
     help = ( "send FILE's text as the length-prefixed body a "
              "'save buffer' request carries, and read up to the "
              "save's terminal response" ))
+  save_parser = commands . add_parser (
+    "save", help = ( "save an edited compact view: print the changes, "
+                     "and with '--yes' send them" ))
+  save_parser . add_argument (
+    "view_files",
+    help = ( "the BASE.view.json of the view, or a directory holding "
+             "only one" ))
+  save_parser . add_argument (
+    "--port", type = int, default = None,
+    help = "the server's port; it must be the one the sidecar records" )
+  save_parser . add_argument (
+    "--yes", action = "store_true",
+    help = "save, unless the report finds an error or a stale node" )
+  save_parser . add_argument (
+    "--overwrite-stale", action = "store_true",
+    help = ( "with '--yes', save even over nodes the server's graph "
+             "changed since the view was rendered" ))
   import_parser = commands . add_parser (
     "import", help = "preview and apply a Markdown and Org import",
     parents = [ port_option ] )
@@ -218,6 +241,61 @@ def command_import (arguments):
     connection . close ()
   print_messages (messages)
 
+def command_save (arguments):
+  """Rebuild the full buffer from the edited compact view and print the
+  changes it makes. With '--yes', and when the report finds neither a
+  bad handle nor (without '--overwrite-stale') a stale node, send the
+  save, print the server's answer and write its re-rendered view over
+  the three files. A refused save leaves them as they were."""
+  saved_view = load_saved_view (arguments . view_files)
+  if ( arguments . port is not None
+       and arguments . port != saved_view . sidecar [ "port" ] ):
+    raise SkgToolError (
+      f"The view came from the server on port {saved_view . sidecar [ 'port' ]}, "
+      f"not {arguments . port}." )
+  edited = parse_edited_compact_view (saved_view . compact_text)
+  original = outline_of_full_view (saved_view . parsed_view)
+  errors = handle_error_lines (edited, saved_view . parsed_view)
+  changes = [] if errors else change_report_lines (
+    edited, original, saved_view . parsed_view )
+  connection = SkgConnection ( saved_view . sidecar [ "port" ] )
+  try:
+    stale = [] if errors else stale_node_lines (
+      connection, saved_view . sidecar, saved_view . parsed_view, original )
+    print ( "Changes in " + os . path . basename (saved_view . compact_path) +
+            ", against " + os . path . basename (saved_view . full_path) +
+            " (view ID " + saved_view . sidecar [ "view_id" ] + "):" )
+    for line in errors + stale + (
+        changes or ( [] if errors else [ "No changes." ] )):
+      print (line)
+    if errors:
+      raise SkgToolError (
+        "Nothing was saved: a handle names no headline of the full view." )
+    if stale and not arguments . overwrite_stale:
+      raise SkgToolError (
+        "Nothing was saved: the server's graph changed under the view "
+        "since it was rendered. View it again and redo the edit, or add "
+        "'--overwrite-stale' to write this view's text over those changes." )
+    if not changes:
+      print ( "Nothing to save." )
+      return
+    if not arguments . yes:
+      print ( "Not saved. Run again with '--yes' to save." )
+      return
+    buffer_text = rebuilt_full_buffer (
+      edited, saved_view . parsed_view, saved_view . full_text )
+    messages = connection . save_buffer (
+      saved_view . sidecar [ "view_id" ], buffer_text )
+    rerendered = rerendered_view_of_save ( messages [-1], saved_view . sidecar )
+    written_paths = write_view_files (
+      connection, rerendered, saved_view . directory, saved_view . base_name,
+      saved_view . sidecar [ "summary" ] )
+    close_view_on_server (connection, rerendered [ "view_id" ])
+  finally:
+    connection . close ()
+  for path in written_paths:
+    print (path)
+
 def print_messages (messages):
   for index, message in enumerate (messages):
     print ( f"--- message {index} ({len (message)} chars) ---" )
@@ -298,21 +376,25 @@ def buffer_with_view_request_on_first_headline (buffer_text, view_request):
   if span is None:
     raise SkgToolError ( "The view's first headline has no metadata." )
   start, end = span
-  metadata_text = lines [index] [ start : end ]
-  insertion_point = end - 1  # before the closing paren
+  line = lines [index]
+  lines [index] = (
+    line [ : start ] +
+    metadata_text_with_part (
+      line [ start : end ], "(viewRequests " + view_request + ")",
+      ( "view", "diff" )) +
+    line [ end : ] )
+  return "\n" . join (lines)
+
+def metadata_text_with_part (metadata_text, part_text, following_part_heads):
+  """METADATA_TEXT, a '(skg ...)', with PART_TEXT inserted where the
+  server writes it: before the first part headed by one of
+  FOLLOWING_PART_HEADS, or else last."""
   for element_start, element in top_level_elements_with_offsets (metadata_text):
     if ( isinstance (element, list) and element
-         and element [0] in ( "view", "diff" )):
-      insertion_point = start + element_start
-      break
-  addition = "(viewRequests " + view_request + ")"
-  line = lines [index]
-  if insertion_point == end - 1:
-    line = line [ : insertion_point ] + " " + addition + line [ insertion_point : ]
-  else:
-    line = line [ : insertion_point ] + addition + " " + line [ insertion_point : ]
-  lines [index] = line
-  return "\n" . join (lines)
+         and element [0] in following_part_heads ):
+      return ( metadata_text [ : element_start ] + part_text + " " +
+               metadata_text [ element_start : ] )
+  return metadata_text [ : -1 ] + " " + part_text + ")"
 
 def close_view_on_server (connection, view_id):
   connection . request (
@@ -350,6 +432,7 @@ def write_view_files (connection, view, out_dir, base_name, show_summary):
         "compact_view" : os . path . basename (compact_path),
         "errors"       : view [ "errors" ],
         "warnings"     : view [ "warnings" ],
+        "summary"      : show_summary,
         "closed"       : True },
       indent = 2, ensure_ascii = False ) + "\n" )
   return [ full_path, compact_path, sidecar_path ]
@@ -364,8 +447,8 @@ def write_text_file (path, text):
 
 class ViewLine:
   """One line of the full view. A headline has 'stars', 'title' (the
-  text after its metadata) and 'metadata' (the parsed '(skg ...)', or
-  None); a body line has only 'text'."""
+  text after its metadata), 'metadata' (the parsed '(skg ...)', or
+  None) and 'metadata_text' (its text); a body line has only 'text'."""
   def __init__ (self, line_number, text):
     self . line_number = line_number
     self . text = text
@@ -373,6 +456,7 @@ class ViewLine:
     self . stars = None
     self . title = None
     self . metadata = None
+    self . metadata_text = None
 
 def parse_full_view (full_text):
   lines = full_text . split ("\n")
@@ -389,7 +473,8 @@ def parse_full_view (full_text):
       if span is None:
         view_line . title = match . group (2)
       else:
-        view_line . metadata = parse_sexp ( text [ span [0] : span [1] ])
+        view_line . metadata_text = text [ span [0] : span [1] ]
+        view_line . metadata = parse_sexp (view_line . metadata_text)
         view_line . title = text [ span [1] : ] . lstrip (" ")
     parsed . append (view_line)
   return parsed
@@ -804,6 +889,445 @@ def contained_by_a_node_outside_its_ancestry (metadata):
 def side_count (metadata, relation_name, side_name):
   side = relation_side (metadata, relation_name, side_name)
   return side [0] if side else 0
+
+# ============================================================
+# Saving an edited compact view
+# ============================================================
+
+# A compact headline's handle, at the end of the line: its number,
+# then any display tokens.
+COMPACT_HANDLE_PATTERN = re . compile (
+  r'^(.*?) ?⟨([0-9]+)((?: [^⟨⟩]*)?)⟩\s*$' )
+# The handle token that asks the save to delete the node; the rebuild
+# writes it as the grammar's '(editRequest delete)'.
+DELETE_TOKEN = "delete"
+DELETE_REQUEST = "(editRequest delete)"
+# A link followed by the annotation 'annotate_links' appended to it.
+ANNOTATED_LINK_PATTERN = re . compile (
+  r'(\[\[id:[^\]\[]+\](?:\[[^\]]*\])?\])⟦[→✗][^⟧]*⟧' )
+REMOVAL_NOTE = (
+  "  (A removed headline leaves its parent's list, where the parent "
+  "reads claims; the node itself is not deleted. To delete a node, "
+  "add 'delete' to its handle.)" )
+
+class SavedView:
+  """The three files a view command wrote, read back."""
+  def __init__ (self, sidecar_path):
+    with open (sidecar_path, encoding = "utf-8") as sidecar_file:
+      self . sidecar = json . load (sidecar_file)
+    self . directory = os . path . dirname ( os . path . abspath (sidecar_path) )
+    self . base_name = os . path . basename (sidecar_path) [ : - len (".view.json") ]
+    self . full_path = os . path . join (
+      self . directory, self . sidecar [ "full_view" ] )
+    self . compact_path = os . path . join (
+      self . directory, self . sidecar [ "compact_view" ] )
+    with open (self . full_path, encoding = "utf-8") as full_file:
+      self . full_text = full_file . read ()
+    with open (self . compact_path, encoding = "utf-8") as compact_file:
+      self . compact_text = compact_file . read ()
+    self . parsed_view = parse_full_view (self . full_text)
+
+def load_saved_view (path):
+  """PATH is a sidecar, or a directory holding exactly one."""
+  if not os . path . isdir (path):
+    return SavedView (path)
+  sidecars = sorted ( name for name in os . listdir (path)
+                      if name . endswith (".view.json") )
+  if len (sidecars) != 1:
+    raise SkgToolError (
+      f"{path} holds {len (sidecars)} '.view.json' files"
+      + ( ": " + ", " . join (sidecars) if sidecars else "" )
+      + "; name the one to save." )
+  return SavedView ( os . path . join ( path, sidecars [0] ))
+
+class OutlineHeadline:
+  """A headline of the full view or of the edited compact view.
+  'handle' is its full-view line number (None for a new headline),
+  'parent' the index of its parent in the same outline (None at the
+  top level), 'tokens' the display tokens of its handle, 'body' its
+  body lines, link annotations stripped."""
+  def __init__ (self, handle, level, title, tokens, compact_line_number):
+    self . handle = handle
+    self . level = level
+    self . title = title
+    self . tokens = tokens
+    self . compact_line_number = compact_line_number
+    self . body = []
+    self . parent = None
+
+  def deletes (self):
+    return DELETE_TOKEN in self . tokens
+
+def parse_edited_compact_view (compact_text):
+  """The edited compact view's headlines, in order. The summary's
+  comment lines before the first headline are dropped."""
+  lines = compact_text . split ("\n")
+  if lines and lines [-1] == "":
+    lines = lines [ : -1 ]
+  headlines = []
+  for index, text in enumerate (lines):
+    match = HEADLINE_PATTERN . match (text)
+    if match:
+      headlines . append ( edited_headline (
+        index + 1, len ( match . group (1) ), match . group (2) ))
+    elif headlines:
+      headlines [-1] . body . append ( strip_link_annotations (text) )
+    elif text . strip () and not text . startswith ("#"):
+      raise SkgToolError (
+        f"Line {index + 1} of the compact view is text before its first "
+        f"headline: {text!r}" )
+  assign_parents (headlines)
+  return headlines
+
+def edited_headline (compact_line_number, level, text_after_stars):
+  match = COMPACT_HANDLE_PATTERN . match (text_after_stars)
+  if not match:
+    return OutlineHeadline (
+      None, level, strip_link_annotations (text_after_stars) . rstrip (),
+      [], compact_line_number )
+  return OutlineHeadline (
+    int ( match . group (2) ), level,
+    strip_link_annotations ( match . group (1) ),
+    match . group (3) . split (), compact_line_number )
+
+def strip_link_annotations (text):
+  return ANNOTATED_LINK_PATTERN . sub ( r'\1', text )
+
+def outline_of_full_view (parsed_view):
+  headlines = []
+  for view_line in parsed_view:
+    if view_line . is_headline:
+      headlines . append ( OutlineHeadline (
+        view_line . line_number, len (view_line . stars), view_line . title,
+        [], None ))
+    elif headlines:
+      headlines [-1] . body . append (view_line . text)
+  assign_parents (headlines)
+  return headlines
+
+def assign_parents (headlines):
+  open_ancestors = [] # indices, outermost first
+  for index, headline in enumerate (headlines):
+    while ( open_ancestors and
+            headlines [ open_ancestors [-1] ] . level >= headline . level ):
+      open_ancestors . pop ()
+    headline . parent = open_ancestors [-1] if open_ancestors else None
+    open_ancestors . append (index)
+
+def handle_error_lines (edited, parsed_view):
+  """A line per handle that names no headline of the full view, and
+  per 'delete' where the save could not honor one."""
+  errors = []
+  for headline in edited:
+    if headline . handle is None:
+      continue
+    where = ( f"⟨{headline . handle}⟩ on line {headline . compact_line_number} "
+              "of the compact view" )
+    if not 1 <= headline . handle <= len (parsed_view):
+      errors . append (
+        f"Error: {where} names no line; the full view has "
+        f"{len (parsed_view)} lines." )
+      continue
+    view_line = parsed_view [ headline . handle - 1 ]
+    if not view_line . is_headline:
+      errors . append (
+        f"Error: {where} names line {headline . handle} of the full view, "
+        "a body line, not a headline." )
+    elif headline . deletes ():
+      metadata = view_line . metadata
+      if metadata is None or headline_kind (metadata) != "node":
+        errors . append (
+          f"Error: {where} carries 'delete', but it is no node occurrence." )
+      elif metadata_has_atom (metadata, "writeProtected"):
+        errors . append (
+          f"Error: {where} carries 'delete', but the occurrence is "
+          "write-protected; only an editable occurrence can be deleted." )
+      elif metadata_form (metadata, "editRequest") is not None:
+        errors . append (
+          f"Error: {where} carries 'delete', but it already carries an "
+          "edit request." )
+  return errors
+
+# ------------------------------------------------------------
+# Rebuilding the full buffer
+# ------------------------------------------------------------
+
+def rebuilt_full_buffer (edited, parsed_view, full_text):
+  """Each headline at its edited level and title, with the metadata of
+  the full-view line its handle names, plus '(editRequest delete)'
+  when it asks; a headline without a handle bare, which the save reads
+  as a new node; bodies as edited."""
+  lines = []
+  for headline in edited:
+    lines . append ( rebuilt_headline_line (headline, parsed_view) )
+    lines += headline . body
+  text = "\n" . join (lines)
+  return text + "\n" if full_text . endswith ("\n") else text
+
+def rebuilt_headline_line (headline, parsed_view):
+  stars = "*" * headline . level
+  metadata_text = (
+    None if headline . handle is None
+    else parsed_view [ headline . handle - 1 ] . metadata_text )
+  if metadata_text is None:
+    return stars + " " + headline . title
+  if headline . deletes ():
+    metadata_text = metadata_text_with_part (
+      metadata_text, DELETE_REQUEST, ( "viewRequests", "view", "diff" ))
+  return ( stars + " " + metadata_text +
+           ( " " + headline . title if headline . title else "" ))
+
+# ------------------------------------------------------------
+# The report of changes
+# ------------------------------------------------------------
+
+def change_report_lines (edited, original, parsed_view):
+  """One line per change, by kind: deletions, removals, moves,
+  reorderings, new headlines, repeated handles, titles, then a count
+  of changed bodies."""
+  original_index_of_handle = { headline . handle : index
+                               for index, headline in enumerate (original) }
+  first_edited_index_of_handle = {}
+  repeated_indices = []
+  for index, headline in enumerate (edited):
+    if headline . handle is None:
+      continue
+    if headline . handle in first_edited_index_of_handle:
+      repeated_indices . append (index)
+    else:
+      first_edited_index_of_handle [ headline . handle ] = index
+  def described (handle):
+    """'⟨N⟩ TITLE', from the full view."""
+    view_line = parsed_view [ handle - 1 ]
+    if view_line . title:
+      return f"⟨{handle}⟩ '{view_line . title}'"
+    kind = ( headline_kind (view_line . metadata)
+             if view_line . metadata is not None else "headline" )
+    return f"⟨{handle}⟩ ({kind})"
+  def edited_parent_key (index):
+    """The parent's handle; ('new', INDEX) for a new parent; None at
+    the top level."""
+    parent = edited [index] . parent
+    if parent is None:
+      return None
+    return ( edited [parent] . handle if edited [parent] . handle is not None
+             else ( "new", parent ))
+  def original_parent_key (index):
+    parent = original [index] . parent
+    return None if parent is None else original [parent] . handle
+  def place (key):
+    if key is None:
+      return "the top level"
+    if isinstance (key, tuple):
+      return "under the new headline '" + edited [ key [1] ] . title + "'"
+    return "under " + described (key)
+  def depth_below_parent (outline, index):
+    parent = outline [index] . parent
+    return outline [index] . level - (
+      0 if parent is None else outline [parent] . level )
+  removed_handles = { headline . handle for headline in original
+                      if headline . handle not in first_edited_index_of_handle }
+  lines = []
+  for headline in edited:
+    if headline . handle is not None and headline . deletes ():
+      lines . append ( "Delete: " + described (headline . handle) +
+                       ", from the graph." )
+  removal_lines = []
+  for index, headline in enumerate (original):
+    if ( headline . handle not in removed_handles
+         or original_parent_key (index) in removed_handles ):
+      continue
+    removed_below = sum (
+      1 for descendant in descendant_indices (original, index)
+      if original [descendant] . handle in removed_handles )
+    removal_lines . append (
+      "Removed: " + described (headline . handle) + ", from " +
+      place ( original_parent_key (index) ) +
+      ( f" (and {removed_below} headline"
+        f"{'' if removed_below == 1 else 's'} below it)"
+        if removed_below else "" ) + "." )
+  if removal_lines:
+    lines += removal_lines + [ REMOVAL_NOTE ]
+  for handle, index in first_edited_index_of_handle . items ():
+    original_index = original_index_of_handle [handle]
+    old_key = original_parent_key (original_index)
+    new_key = edited_parent_key (index)
+    if new_key != old_key:
+      lines . append ( "Moved: " + described (handle) + ", from " +
+                       place (old_key) + " to " + place (new_key) + "." )
+    elif ( depth_below_parent (edited, index)
+           != depth_below_parent (original, original_index) ):
+      lines . append (
+        "Moved: " + described (handle) +
+        f", from level {original [original_index] . level} to level "
+        f"{edited [index] . level}, still " + place (new_key) + "." )
+  for parent_key in [ None ] + [ headline . handle for headline in original ]:
+    if parent_key is not None and parent_key not in first_edited_index_of_handle:
+      continue
+    old_order = [ original [index] . handle
+                  for index in range ( len (original) )
+                  if original_parent_key (index) == parent_key
+                  and original [index] . handle in first_edited_index_of_handle
+                  and edited_parent_key ( first_edited_index_of_handle [
+                        original [index] . handle ] ) == parent_key ]
+    new_order = [ edited [index] . handle
+                  for index in first_edited_index_of_handle . values ()
+                  if edited_parent_key (index) == parent_key
+                  and original_parent_key ( original_index_of_handle [
+                        edited [index] . handle ] ) == parent_key ]
+    if old_order != new_order:
+      lines . append (
+        "Reordered: " + ( "the top-level headlines" if parent_key is None
+                          else "the children of " + described (parent_key) )
+        + "." )
+  for index, headline in enumerate (edited):
+    if headline . handle is not None:
+      continue
+    body_lines = len (headline . body)
+    lines . append (
+      "New: " + ( "'" + headline . title + "'" if headline . title
+                  else "an untitled headline" ) +
+      ", " + ( "at the top level" if edited_parent_key (index) is None
+               else place ( edited_parent_key (index) )) +
+      ( f" (with a {body_lines}-line body)" if body_lines else "" ) + "." )
+  for index in repeated_indices:
+    lines . append (
+      "Repeated: " + described ( edited [index] . handle ) + ", again " +
+      ( "at the top level" if edited_parent_key (index) is None
+        else place ( edited_parent_key (index) )) +
+      ": a second occurrence of the same node." )
+  changed_bodies = []
+  for handle, index in first_edited_index_of_handle . items ():
+    old = original [ original_index_of_handle [handle] ]
+    if edited [index] . title != old . title:
+      lines . append ( f"Title: ⟨{handle}⟩ '{old . title}' → "
+                       f"'{edited [index] . title}'." )
+    if edited [index] . body != old . body:
+      changed_bodies . append (handle)
+  if changed_bodies:
+    lines . append (
+      f"Bodies changed: {len (changed_bodies)} (" +
+      ", " . join ( f"⟨{handle}⟩" for handle in changed_bodies ) + ")." )
+  return lines
+
+def descendant_indices (outline, index):
+  level = outline [index] . level
+  descendants = []
+  for later in range ( index + 1, len (outline) ):
+    if outline [later] . level <= level:
+      break
+    descendants . append (later)
+  return descendants
+
+# ------------------------------------------------------------
+# Stale nodes: the server overwrites a node with whatever the saved
+# buffer says of it, so before saving the tool renders the view again
+# and compares.
+# ------------------------------------------------------------
+
+def stale_node_lines (connection, sidecar, parsed_view, original):
+  """A line per node the save would write (one with an editable
+  occurrence in the view) whose title, body or content a fresh render
+  of the same view shows otherwise."""
+  fresh_parsed_view = parse_full_view (
+    fetch_fresh_view (connection, sidecar) [ "content" ] or "" )
+  fresh_states = editable_node_states (
+    fresh_parsed_view, outline_of_full_view (fresh_parsed_view) )
+  lines = []
+  for gnid, ( handle, state ) in editable_node_states (
+      parsed_view, original ) . items ():
+    title = parsed_view [ handle - 1 ] . title
+    if gnid not in fresh_states:
+      lines . append (
+        f"Stale: ⟨{handle}⟩ '{title}': a fresh render of the view no "
+        "longer shows it editable." )
+      continue
+    fresh_state = fresh_states [gnid] [1]
+    aspects = [ aspect for aspect, old, new in
+                zip ( ( "title", "body", "content" ), state, fresh_state )
+                if old != new ]
+    if aspects:
+      lines . append (
+        f"Stale: ⟨{handle}⟩ '{title}': its " + " and " . join (aspects) +
+        " changed on the server since the view was rendered." )
+  return lines
+
+def fetch_fresh_view (connection, sidecar):
+  """The view the sidecar's command rendered, rendered again. A
+  'links-here' view is rendered without its mentioners folder, whose
+  write-protected chain the save does not write."""
+  if sidecar [ "command" ] == "search":
+    view = fetch_search_view ( connection, sidecar [ "request" ] [ "terms" ] )
+  else:
+    view = fetch_single_root_view ( connection, sidecar [ "request" ] [ "id" ] )
+  close_view_on_server (connection, view [ "view_id" ])
+  return view
+
+def editable_node_states (parsed_view, outline):
+  """{GNID: (HANDLE, (TITLE, BODY, CONTENT))} for the first editable
+  occurrence of each node, CONTENT the IDs of the occurrences under it."""
+  states = {}
+  for index, headline in enumerate (outline):
+    metadata = parsed_view [ headline . handle - 1 ] . metadata
+    if ( metadata is None or headline_kind (metadata) != "node"
+         or metadata_has_atom (metadata, "writeProtected") ):
+      continue
+    gnid = headline_gnid (metadata)
+    if gnid is None or gnid in states:
+      continue
+    content = tuple (
+      headline_gnid ( parsed_view [ outline [child] . handle - 1 ] . metadata )
+      for child in range ( index + 1, len (outline) )
+      if outline [child] . parent == index
+      and parsed_view [ outline [child] . handle - 1 ] . metadata is not None
+      and headline_kind (
+        parsed_view [ outline [child] . handle - 1 ] . metadata ) == "node" )
+    states [gnid] = ( headline . handle,
+                      ( headline . title, tuple (headline . body), content ))
+  return states
+
+# ------------------------------------------------------------
+# The server's answer
+# ------------------------------------------------------------
+
+def rerendered_view_of_save (terminal, sidecar):
+  """Print the server's answer to the save. Return its re-rendered
+  view, as the view commands describe one; raise if there is none."""
+  kind = response_type (terminal)
+  if kind != "save-result":
+    print ( f"Server: {kind}." )
+    for field_name in ( "prompt", "to-minibuffer" ):
+      text = response_field (terminal, field_name)
+      if text:
+        print ( sexp_to_text (text) )
+    if kind == "overPrivateText-telescope-confirmation":
+      raise SkgToolError (
+        "The save succeeded, but the server withholds its re-rendered "
+        "view until the release is approved, which this tool does not "
+        "do. The files are out of date; view the node again." )
+    raise SkgToolError (
+      "Nothing was saved: the server asks a question this tool does not "
+      "answer. A client can answer it." )
+  content = response_field (terminal, "content")
+  errors = response_field (terminal, "errors") or []
+  warnings = response_field (terminal, "warnings") or []
+  saved = isinstance (content, str) and not isinstance (content, Symbol)
+  print ( "Server: " + ( "saved" if saved else "nothing was saved" ) +
+          f", {len (errors)} error{'' if len (errors) == 1 else 's'}, "
+          f"{len (warnings)} warning{'' if len (warnings) == 1 else 's'}." )
+  for error in errors:
+    print ( "Server error: " + error )
+  for warning in warnings:
+    print ( "Server warning: " + warning )
+  if not saved:
+    raise SkgToolError (
+      "The server refused the save; the files are as they were." )
+  return { "view_id"  : sidecar [ "view_id" ],
+           "command"  : sidecar [ "command" ],
+           "request"  : sidecar [ "request" ],
+           "content"  : content,
+           "errors"   : errors,
+           "warnings" : warnings }
 
 # ============================================================
 # The connection

@@ -6,6 +6,28 @@
   When a plan or a settled discussion decides how an entry will be
   fixed, prefix its headline with 'FIX PLANNED: ' and leave it here
   until the fix lands; then move it as above.
+* Problems noticed while writing tools/skg-for-ai's 'save' (2026-11-01)
+** A save writes every node its buffer shows, stale text included
+  On a scratch server: two connections render the same view; the
+  second saves a new title for node P; the first then saves its
+  buffer, which edits only node Q. Both saves answer 'save-result'
+  with no error or warning, and P's '.skg' file then holds its old
+  title again: the first buffer's untouched, stale text of P was
+  written over the second save's change. The same happens when the
+  first view is registered on a connection that stays open, and when
+  one connection renders and another saves. Nothing compares a
+  buffer's nodes with the graph they were rendered from; the per-node
+  protection 'TODO/User-Claude/2_1_discussion.org' describes ("it
+  compares each node in the buffer with the graph") does not exist.
+  An editor client avoids it only by staying the one connection that
+  saves, so that the server re-renders its other views as collateral,
+  and by declaring its dirty views in 'other-views'. A client that
+  keeps a buffer as a file, as 'tools/skg-for-ai' does, gets no
+  protection; the tool now renders the view again before saving and
+  refuses when a node it would write differs. "An untouched stale
+  node saves silently" (api-and-formats, restricted nodes) holds only
+  in the sense that it is written without a word.
+
 * Problems noticed while executing plan 10, slice 5 (2026-10-31)
 ** The server reads a title that starts "(skg" as metadata
   'headline_to_triple' ('server/from_text/buffer_to_viewnodes/
