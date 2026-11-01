@@ -61,7 +61,7 @@ use crate::types::misc::{ID, SkgrepoName, SkgConfig};
 use crate::types::save::{
   NodeInstruction, PostSkgsaveCommitNoticeCandidate, SavePlan, format_save_error_as_org };
 use crate::types::tree::forest::ViewForest;
-use crate::types::views_state::ViewforestId;
+use crate::types::views_state::{DiffViewBufferKind, ViewforestId, ViewnodeIdRecord};
 use crate::rerender_pass::update_views_after_save;
 
 use futures::executor::block_on;
@@ -263,8 +263,10 @@ pub fn handle_save_buffer_request (
     strandeds_review_from_request (request);
   let delete_from : DeleteFrom =
     delete_from_from_request (request);
-  let rendered_at_result : Result<RenderedAt, String> =
-    rendered_at_from_request (request);
+  let rendered_at_result : Result<(RenderedAt, Option<DiffViewBufferKind>), String> =
+    rendered_at_from_request (request)
+    . and_then ( |rendered_at| named_diffView_buffer_kind_from_request (request)
+                 . map ( |kind| (rendered_at, kind) ));
   { // Send the early broad lock before reading the buffer, so the client's
     // one-shot save-lock handler always fires exactly once and balances its
     // pending-count -- even when the read below fails (otherwise only
@@ -292,7 +294,7 @@ pub fn handle_save_buffer_request (
           TcpToClient::SaveResult,
           & sexp_to_client_string ( &empty_response_sexp (
             &error_msg, &[], &save_point_position )) )); }
-    (Ok (envelope), Ok (rendered_at)) => {
+    (Ok (envelope), Ok ((rendered_at, named_diffView_buffer_kind))) => {
       { let _span : tracing::span::EnteredSpan = tracing::info_span!(
           "update_from_and_rerender_buffer" ). entered();
         match block_on(
@@ -310,7 +312,8 @@ pub fn handle_save_buffer_request (
             &strandeds_review,
             delete_from,
             &envelope . other_views,
-            rendered_at ))
+            rendered_at,
+            named_diffView_buffer_kind ))
         { Ok (mut save_response) => {
             save_response . save_point_position =
               save_point_position . clone ();
@@ -600,6 +603,20 @@ fn push_save_point_position_to_sexp_items (
         point_position . point_screen_lines_below_window_start
         as i64 )), ] )); }
 
+/// The request's '(diff-view-buffer . "NAME")', naming the buffer of
+/// the diff view the save is of ('DiffViewBufferKind::wire_name'); None
+/// without one. A name no buffer has refuses the save.
+fn named_diffView_buffer_kind_from_request (
+  request : &str,
+) -> Result<Option<DiffViewBufferKind>, String> {
+  match value_from_request_sexp ("diff-view-buffer", request) {
+    Err (_) => Ok (None),
+    Ok (name) => DiffViewBufferKind::from_wire_name (&name)
+      . map (Some)
+      . ok_or_else ( || format! (
+        "The save request names the diff view buffer {:?}, which the diff view does not have. Nothing was saved.",
+        name )), }}
+
 fn save_point_position_from_request (
   request : &str,
 ) -> Option<SavePointPosition> {
@@ -819,7 +836,7 @@ pub async fn update_from_and_rerender_buffer_with_hoist_approval (
     viewforest_id_from_request_result, views_state, skgrepo_restriction,
     approved_forks, fork_skgrepos, approved_hoist_pids,
     &HashSet::new (), &StrandedsReview::NotReviewed, DeleteFrom::NotChosen,
-    &[], current_generation ) . await
+    &[], current_generation, None ) . await
 }
 
 pub async fn update_from_and_rerender_buffer_with_approvals (
@@ -837,6 +854,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
   delete_from               : DeleteFrom,
   other_views               : &[ClientViewSnapshot],
   rendered_at               : RenderedAt, // when the buffer's text was rendered
+  named_diffView_buffer_kind : Option<DiffViewBufferKind>, // the request's '(diff-view-buffer . "...")': the buffer of the diff view it saves, for a view the connection does not hold
 ) -> Result<SaveResponse, Box<dyn Error>> {
   // Save-plan construction reads the current files and graph.  Hold the sole
   // writer gate from before those reads through the graph swap-in, or two requests
@@ -860,6 +878,15 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
   if viewforest . is_empty ()
     { return Err ( "Nothing to save found in org_buffer_text"
                    . into() ); }
+  { // A buffer the connection does not hold keeps the viewnode IDs it
+    // carries, and fresh ones are counted from past them.
+    let held : bool = viewforest_id_from_request_result . as_ref () . ok ()
+      . is_some_and ( |viewforest_id| views_state . open_views . views . contains_key (viewforest_id) );
+    if ! held {
+      ViewnodeIdRecord::error_unless_carried_viewnode_ids_leave_room (&viewforest)
+        . map_err ( |e| Box::new ( SaveError::BufferValidationErrors {
+            errors : vec! [ BufferValidationError::Other (e) ],
+            warnings : parse_warnings . clone (), } ) as Box<dyn Error> ) ?; }}
   let SavePlan {
     node_instructions      : mut nonmerge_nodeInstructions,
     nodeMerge_instructions : nodeMerges,
@@ -1098,7 +1125,8 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
         views_state,
         skgrepo_restriction,
         text_approved_pids,
-        &fork_specs ) ?;
+        &fork_specs,
+        named_diffView_buffer_kind ) ?;
     { // Nonfatal parse warnings (e.g. discarded folder headline text)
       // precede the rerender's warnings.
       let mut warnings : Vec<String> = parse_warnings;

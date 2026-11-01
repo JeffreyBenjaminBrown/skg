@@ -18,6 +18,7 @@ use skg::telescope::dependencies_manifest::foreign_section_warnings;
 use skg::dbs::init::{InitContextHandoff, initialize_dbs};
 use skg::types::env::SkgEnv;
 use skg::import_org_roam::{ImportStats, import_org_roam_directory};
+use skg::repo_watch::watcher::{RepoWatcherHandle, start_repo_watcher};
 use skg::serve::serve;
 use skg::types::misc::{ID, SkgConfig, SkgrepoName, TantivyIndex};
 use skg::types::nodes::complete::Graphnode;
@@ -155,13 +156,22 @@ fn main() -> Result<(), Box<dyn Error>> {
     foreign_section_warnings (&config);
   for warning in &manifest_warnings {
     tracing::warn! ("{}", warning); }
-  env . runtime . record_startup_warnings (
-    config_warnings . into_iter () . chain (manifest_warnings) . collect () );
-
   let runtime = env . runtime_snapshot ();
   compute_context_rankings (
     &runtime . tantivy_index, had_id_set, all_node_gnids,
     mentioned_gnids, map_to_content, map_to_containers );
+  let (_repo_watcher, watcher_warnings) : (Option<RepoWatcherHandle>, Vec<String>) =
+    // Files changed on disk are integrated as they change, while the server serves.
+    match start_repo_watcher ( env . clone () ) {
+      Ok (handle) => (Some (handle), Vec::new ()),
+      Err (e) => (None, vec! [ format! (
+        "The server cannot watch the skgrepo directories, so files changed on disk are not integrated until a rebuild: {}",
+        e ) ] ), };
+  for warning in &watcher_warnings {
+    tracing::warn! ("{}", warning); }
+  env . runtime . record_startup_warnings (
+    config_warnings . into_iter () . chain (manifest_warnings)
+      . chain (watcher_warnings) . collect () );
 
   init_done . store (true, Ordering::Release);
   busysignal_handle . join ()

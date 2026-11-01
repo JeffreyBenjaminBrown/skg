@@ -115,14 +115,18 @@ pub fn update_views_after_save (
   skgrepo_restriction         : &SkgrepoRestriction,
   text_approved_pids        : &HashSet<ID>,
   fork_specs                  : &[ForkSpec],
+  named_diffView_buffer_kind  : Option<DiffViewBufferKind>, // what the request says the saved buffer is, for a view the connection does not hold
 ) -> Result<SaveResponse, Box<dyn Error>> {
   let mut context : RerenderPassContext = RerenderPassContext::new (
     env, runtime, skgrepo_restriction,
     views_state . graph_straddle . clone (),
     DiffViewBufferRerender::RefreshOnly );
   let saved_diffView_buffer_kind : Option<DiffViewBufferKind> =
-    viewforest_id_from_request_result . as_ref () . ok ()
-    . and_then ( |viewforest_id| views_state . open_views . diffView_buffer_kind_of_view (viewforest_id) );
+    // A held view is what the connection registered; an unheld one, what the request names.
+    match viewforest_id_from_request_result . as_ref () . ok ()
+      . and_then ( |viewforest_id| views_state . open_views . views . get (viewforest_id) )
+    { Some (held) => held . diffView_buffer_kind,
+      None => named_diffView_buffer_kind, };
   let mut saved_view_mut : ViewForest = saved_view;
   let mut saved_viewnode_id_record : ViewnodeIdRecord =
     // The parsed buffer carries viewnode IDs; the record says which
@@ -183,6 +187,8 @@ pub fn update_views_after_save (
   if let Ok (viewforest_id) = viewforest_id_from_request_result {
     views_state . open_views . update_view (
       &context . runtime . graph, viewforest_id, saved_view_mut, saved_viewnode_id_record );
+    if let Some (buffer_kind) = saved_diffView_buffer_kind {
+      views_state . open_views . mark_as_diffView_buffer (viewforest_id, buffer_kind); }
     register_and_send_rerendered_views (
       stream, views_state, &context . runtime, collateral_views,
       TcpToClient::CollateralView ); }

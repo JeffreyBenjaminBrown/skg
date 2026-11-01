@@ -26,6 +26,7 @@
 (require 'skg-request-rerender-all-views)
 (require 'skg-recovery)
 (require 'skg-request-save)
+(require 'skg-repo-files-integrated)
 (require 'skg-request-server-warnings)
 (require 'skg-request-repo-sets)
 (require 'skg-request-integrate-unshown-changes)

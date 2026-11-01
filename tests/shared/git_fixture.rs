@@ -283,7 +283,7 @@ pub fn save_under (
       &Ok ( ViewforestId::ContentView (view . into ()) ),
       &mut f . views_state, restriction,
       approved_forks, &HashMap::new (), &HashSet::new (), &HashSet::new (),
-      &StrandedsReview::NotReviewed, delete_from, &[], rendered_at )) ? ) }
+      &StrandedsReview::NotReviewed, delete_from, &[], rendered_at, None )) ? ) }
 
 /// The members 'field' lists in the file 'file' ("SKGREPO/PID.skg"),
 /// as written: the "- " lines that follow the line "FIELD:". Empty

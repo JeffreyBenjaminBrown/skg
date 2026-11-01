@@ -17,6 +17,7 @@ pub mod metadata_canon;
 pub mod nodeMerge;
 pub mod org_to_text;
 pub mod refresh;
+pub mod repo_watch;
 pub mod rerender_pass;
 pub mod save;
 pub mod serve;

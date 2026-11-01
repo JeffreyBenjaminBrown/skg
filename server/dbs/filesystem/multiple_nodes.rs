@@ -7,6 +7,7 @@ use crate::dbs::filesystem::one_node::{
   PreparedTelescopeWrite, prepare_graphnode_telescope,
   read_graphnode, validate_pid_matches_filename,
 };
+use crate::repo_watch::own_writes::record_own_removal;
 use crate::types::misc::{SkgConfig, Skgrepo, ID, SkgrepoName};
 use crate::types::nodes::fs::GraphnodeOnDisk;
 use crate::types::nodes::complete::Graphnode;
@@ -440,6 +441,8 @@ pub fn delete_all_nodes_from_fs (
           & config, & skgrepo_name, pid . clone () ) {
           Ok (p) => p,
           Err (_) => continue, };
+      if Path::new (&path) . exists () {
+        record_own_removal ( Path::new (&path) ); }
       match fs::remove_file ( &path )
       {
         Ok ( () ) => {

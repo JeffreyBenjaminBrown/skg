@@ -5,6 +5,7 @@
 
 use crate::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle};
 use crate::diff_view::readiness_store::ReadinessStore;
+use crate::repo_watch::integrate::RepoChangeNotice;
 use crate::types::misc::{SkgConfig, TantivyIndex};
 
 use std::sync::{Arc, OnceLock};
@@ -13,6 +14,7 @@ use std::sync::Mutex as SyncMutex;
 use std::sync::MutexGuard as SyncMutexGuard;
 use arc_swap::ArcSwap;
 use tokio::sync::Mutex;
+use tokio::sync::broadcast;
 
 /// Serializes authoritative mutations for one running Skg environment.
 ///
@@ -24,6 +26,11 @@ pub type MutationGate = Arc<Mutex<()>>;
 
 pub fn new_mutation_gate () -> MutationGate {
   Arc::new ( Mutex::new (()) ) }
+
+/// How many notices of repo changes a connection may fall behind by
+/// before it misses some; one that does rerenders every open view
+/// ('server/serve/handlers/repo_files_integrated.rs').
+const REPO_CHANGE_NOTICE_CAPACITY : usize = 64;
 
 #[derive(Clone)]
 pub struct RuntimeGeneration {
@@ -46,6 +53,9 @@ pub struct SharedRuntime {
   /// recorded once by 'main' and served by the "server warnings"
   /// request.
   startup_warnings : OnceLock<Vec<String>>,
+  /// What each batch of files changed on disk did
+  /// ('server/repo_watch/'), for every connection to tell its client.
+  repo_change_notices : broadcast::Sender<Arc<RepoChangeNotice>>,
 }
 
 impl SharedRuntime {
@@ -83,8 +93,26 @@ impl SharedRuntime {
       legacy_graph,
       readiness_store : SyncMutex::new (readiness_store),
       startup_warnings : OnceLock::new (),
+      repo_change_notices : broadcast::channel (REPO_CHANGE_NOTICE_CAPACITY) . 0,
     }
   }
+
+  /// Tell every connection what a batch of files changed on disk
+  /// did. A notice with nothing in it is not sent.
+  pub fn publish_repo_change_notice (
+    &self,
+    notice : RepoChangeNotice,
+  ) {
+    if notice . is_empty () { return; }
+    // No connection listening is no error.
+    let _receivers : Result<usize, _> =
+      self . repo_change_notices . send ( Arc::new (notice) ); }
+
+  /// The notices published from now on, for one connection.
+  pub fn subscribe_to_repo_change_notices (
+    &self,
+  ) -> broadcast::Receiver<Arc<RepoChangeNotice>> {
+    self . repo_change_notices . subscribe () }
 
   /// Record the startup warnings. Only the first call has an effect.
   pub fn record_startup_warnings (

@@ -17,13 +17,24 @@ also refused conservatively. There is no "save anyway" choice.
 Each view also remembers when the server drew it. A save is refused,
 before any write, if a node it would write has changed since: by a save
 from another client or from 'tools/skg-for-ai', which this client's
-views do not follow, or by a rebuild of the session-lifetime stores,
-after which every older view is stale. The error names each such node
+views do not follow; by another writer of the '.skg' files (a second
+server over the same data, a 'git pull', an editor), which the server
+integrates as the files change; or by a rebuild of the session-lifetime
+stores, after which every older view is stale.
+The error names each such node
 and the view's headlines for it. A node the view shows as the graph
 has it is not written, so an untouched node never refuses a save,
 however old the view; and a new empty view, which the server did not
 draw, is never stale. Your edits stay in the view: archive them if
 needed (M-x skg-show-unsaved-changes), open a fresh view, and reapply them.
+
+When the server integrates files changed on disk, it says so in the
+server-warnings buffer (=*SKG Server Warnings*=), under "Repo changes", naming each
+skgrepo and how many of its files it integrated, or what it could not
+read, and rerenders every open view showing a changed node that holds
+no unsaved edits. A view with unsaved edits keeps them, and its save
+is refused if it would write a changed node. No rebuild is needed after
+a 'git pull'. A changed config still needs one ('M-x skg-rebuild-session-lifetime-stores').
 
 If the current files for anything being saved select a title or body
 from below that node's home, Skg stops before every write and offers
@@ -1422,10 +1433,10 @@ before loading: the importer itself does not check them.
 For a first setup, configure the skgrepo before starting Skg. When replacing
 existing data, save and close the open views and stop the server before
 changing the files in its skgrepos, then restart it. If files in an already configured
-skgrepo changed while the server remained running,
-'M-x skg-rebuild-session-lifetime-stores' reloads them; close stale views and
-open fresh ones before editing. The same command reloads an edited config,
-a new skgrepo included.
+skgrepo change while the server runs, the server integrates them as they
+change, and rerenders the clean views that show them.
+'M-x skg-rebuild-session-lifetime-stores' reloads an edited config, a new
+skgrepo included.
 
 The Cargo command prints a reminder to commit the imported files so Git
 diff views have a baseline; it does not run Git. Reimporting replaces the
@@ -1563,7 +1574,8 @@ removed or reordered, say) takes effect without restarting the server, except
 for its 'port' and 'timing_log', which the answer warns about. An invalid
 config fails the rebuild, and the server keeps serving the old one. Existing
 views are closed after a successful rebuild, because they were rendered
-before it.
+before it. Files that change on disk need no rebuild: the server integrates
+them as they change (see the start of this document).
 *** skg-strip-trailing-whitespace-from-bodies
 Strips trailing whitespace from every line of every body,
 and trailing blank lines from each body's tail,

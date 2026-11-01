@@ -350,9 +350,9 @@ def command_save (arguments):
   changes it makes. With '--yes', and when the report finds no bad
   handle, no retyped headline and no unanswered question whether a new
   headline rewords a removed one (see "Retyped headlines" in the
-  README), send the save (for a buffer of the diff view, after opening
-  it again on the save's connection), print the server's answer and
-  write its re-rendered view over the three files. The save carries the generation the view was
+  README), send the save (naming the buffer of the diff view, for
+  one), print the server's answer and write its re-rendered view over
+  the three files. The save carries the generation the view was
   rendered at, so the server refuses it if a node it would write
   changed since. A refused save leaves the files as they were."""
   saved_view = load_saved_view (arguments . view_files)
@@ -408,22 +408,10 @@ def command_save (arguments):
       return
     buffer_text = rebuilt_full_buffer (
       edited, saved_view . headline_of_handle, saved_view . full_text )
-    if "buffer" in saved_view . sidecar [ "request" ]:
-      held_viewnode_ids = reopen_diffView_buffer_for_save (
-        connection, saved_view . sidecar )
-      renumbered = [ handle for handle in dict . fromkeys (
-                       headline . handle for headline in edited
-                       if headline . handle is not None )
-                     if handle not in held_viewnode_ids ]
-      if renumbered:
-        print ( "Handles the save may change: " + ", " . join (
-                  described_handle ( handle, saved_view . headline_of_handle )
-                  for handle in renumbered ) +
-                ". The diff view's buffer the server opened again does not "
-                "hold these viewnode IDs, so it gives each headline a new one." )
     messages = connection . save_buffer (
       saved_view . sidecar [ "view_id" ], buffer_text,
-      saved_view . sidecar [ "rendered_at" ] )
+      saved_view . sidecar [ "rendered_at" ],
+      saved_view . sidecar [ "request" ] . get ("buffer") )
     rerendered = rerendered_view_of_save ( messages [-1], saved_view . sidecar )
     written_paths = write_view_files (
       connection, rerendered, saved_view . directory, saved_view . base_name,
@@ -434,45 +422,17 @@ def command_save (arguments):
   for path in written_paths:
     print (path)
 
-def reopen_diffView_buffer_for_save (
-    connection, sidecar, outcome = "Nothing was saved"):
-  """Open the sidecar's buffer of the diff view again on CONNECTION,
-  under its view ID, so that the server holds it as one; return the
-  viewnode IDs of the buffer it now holds. The server keeps a view per
-  connection, and the tool's connection ends with each command; it
-  re-renders a save as a buffer of the diff view, with the readiness
-  summary, only for a view it holds as one. A save of a view it holds
-  keeps every viewnode ID of the saved buffer that the held view
-  knows, and gives a fresh one to every other headline. (A save of a
-  view it does not hold keeps every viewnode ID the buffer carries, so
-  a content or search view needs no re-opening.) The save itself is
-  read from the saved text, against the generation the sidecar
-  records. OUTCOME opens the refusal when the buffer is now empty."""
-  buffer_name = sidecar [ "request" ] [ "buffer" ]
-  view = fetch_diff_view_buffer (
-    connection, buffer_name, sidecar [ "view_id" ] )
-  if view is None:
-    raise SkgToolError (
-      f"{outcome}: the diff view's '{buffer_name}' buffer is "
-      "empty now (its changes were committed or undone); run 'diff' again." )
-  if view [ "view_id" ] != sidecar [ "view_id" ]:
-    raise SkgToolError (
-      f"{outcome}: opening the view again gave the view ID "
-      f"{view [ 'view_id' ]}, not the sidecar's {sidecar [ 'view_id' ]}." )
-  return set ( headlines_by_viewnode_id (
-    parse_full_view ( view [ "content" ] )) )
-
 def command_integrate (arguments):
   """Send "integrate unshown changes" for a buffer of the diff view,
   as the clients' 'C-c r u' does, and write the buffer the server
   rerenders over the three files. A client sends it only for a buffer
   with no unsaved changes, so this refuses an edited compact view. The
   server works on the buffer it registered under the view ID, so the
-  full view is first registered there: the buffer is opened again
-  under that ID and the full view saved back unchanged, which writes
-  nothing and leaves the server holding this buffer, its roots and
-  what it makes editable; its readiness summary is printed as the one
-  before integrating. The server refuses that save if a node the
+  full view is first registered there: it is saved back unchanged,
+  naming its buffer of the diff view, which writes nothing and leaves
+  the server holding this buffer, its roots and what it makes
+  editable; its readiness summary is printed as the one before
+  integrating. The server refuses that save if a node the
   buffer shows changed since it was rendered; 'diff' then writes a
   fresh buffer, which makes every change editable."""
   saved_view = load_saved_view (arguments . view_files)
@@ -496,10 +456,9 @@ def command_integrate (arguments):
       "first, or write the buffer again with 'diff'." )
   connection = SkgConnection ( sidecar [ "port" ] )
   try:
-    reopen_diffView_buffer_for_save (connection, sidecar, "Nothing was integrated")
     terminal = connection . save_buffer (
       sidecar [ "view_id" ], saved_view . full_text,
-      sidecar [ "rendered_at" ] ) [-1]
+      sidecar [ "rendered_at" ], sidecar [ "request" ] [ "buffer" ] ) [-1]
     if ( response_type (terminal) != "save-result"
          or not isinstance ( response_field (terminal, "content"), str )
          or isinstance ( response_field (terminal, "content"), Symbol )):
@@ -720,12 +679,11 @@ def fetch_search_view (connection, terms):
            "errors"      : [],
            "warnings"    : response_field (response, "warnings") or [] }
 
-def fetch_diff_view_buffer (connection, buffer_name, view_id = None):
+def fetch_diff_view_buffer (connection, buffer_name):
   """The diff view's buffer BUFFER_NAME, registered on CONNECTION under
-  VIEW_ID (a fresh one when None), or None when the server answers
-  that it would be empty. A refusal raises: it applies to every
-  buffer."""
-  view_id = view_id or "diff-view:" + str ( uuid . uuid4 () )
+  a fresh view ID, or None when the server answers that it would be
+  empty. A refusal raises: it applies to every buffer."""
+  view_id = "diff-view:" + str ( uuid . uuid4 () )
   response = connection . request (
     request_line ( "diff view", ( "buffer", buffer_name ),
                    ( "view-id", view_id ) ))
@@ -2499,6 +2457,8 @@ def rerendered_view_of_save (terminal, sidecar):
 # The connection
 # ============================================================
 
+UNPROMPTED_REPO_CHANGE_MESSAGE_START = "((response-type repo-files-integrated)"
+
 class SkgToolError (Exception):
   pass
 
@@ -2551,13 +2511,19 @@ class SkgConnection:
       except SkgConnectionClosedError:
         return messages
 
-  def save_buffer (self, view_id, buffer_text, rendered_at):
+  def save_buffer (self, view_id, buffer_text, rendered_at,
+                   diffView_buffer = None):
     """Send a save of BUFFER_TEXT, rendered at the generation
     RENDERED_AT; return every response up to and including the
-    terminal one, parsed."""
+    terminal one, parsed. DIFFVIEW_BUFFER names the buffer of the diff
+    view it is ('all changes', say), if it is one: the server holds no
+    view of this connection's, and re-renders the save as that buffer,
+    with its readiness summary, only when the request names it."""
     return [ parse_sexp (message) for message in self . raw_save (
       request_line ( "save buffer", ( "view-id", view_id ),
                      ( "rendered-at", rendered_at ),
+                     * ( [ ( "diff-view-buffer", diffView_buffer ) ]
+                         if diffView_buffer is not None else [] ),
                      ( "point-lines-below-focused-headline", "0" ),
                      ( "point-column", "0" ),
                      ( "point-screen-lines-below-window-start", "0" )),
@@ -2619,7 +2585,20 @@ class SkgConnection:
   def read_message (self, timeout_seconds):
     """One 'Content-Length: N\\r\\n\\r\\nPAYLOAD' message's payload.
     A server still initializing answers with a bare
-    '((busy-initializing . ...))' line instead."""
+    '((busy-initializing . ...))' line instead. A message the server
+    sends unprompted, between responses, that it integrated files
+    changed on disk is no answer: its warnings go to stderr, and the
+    next message is read."""
+    while True:
+      payload = self . read_one_message (timeout_seconds)
+      if not payload . startswith (UNPROMPTED_REPO_CHANGE_MESSAGE_START):
+        return payload
+      for warning in ( response_field (
+          parse_sexp (payload), "warnings" ) or [] ):
+        print ( "skg server: " + sexp_to_text (warning), file = sys . stderr )
+
+  def read_one_message (self, timeout_seconds):
+    """The payload of the next message, whatever it is."""
     self . socket . settimeout (timeout_seconds)
     while b"\r\n\r\n" not in self . buffered:
       if self . buffered . startswith (b"((busy-initializing") and b"\n" in self . buffered:

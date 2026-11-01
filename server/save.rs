@@ -15,6 +15,7 @@ use crate::dbs::in_rust_graph::{
 };
 use crate::dbs::tantivy::background_writer::{enqueue_tantivy_write, lock_tantivy_writes, TantivyWriteTask};
 use crate::dbs::tantivy::write::{add_documents_to_tantivy_writer, tantivy_commit_with_status, delete_nodes_by_gnid_from_index};
+use crate::repo_watch::own_writes::remove_skg_file;
 use crate::types::env::MutationGate;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::{ID, MSV, RelPartner, SkgConfig, TantivyIndex};
@@ -616,10 +617,7 @@ impl PreparedFilesystemUpdate {
     // Mutation starts only after the whole batch has passed ownership and
     // serialization preflight.
     for path in self . deletions {
-      match std::fs::remove_file (&path) {
-        Ok (( ))                                          => {},
-        Err (e) if e . kind () == io::ErrorKind::NotFound => {},
-        Err (e)                                           => return Err (e), } }
+      remove_skg_file ( std::path::Path::new (&path) ) ?; }
     for telescope in &self . writes {
       telescope . apply (config) ?; }
     for telescope in &self . writes {

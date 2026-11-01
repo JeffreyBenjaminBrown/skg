@@ -6,6 +6,7 @@ use crate::dbs::filesystem::one_node::prepare_graphnode_telescope;
 use crate::dbs::in_rust_graph::prepared_update::{
   PreparedGraphUpdate, prepare_graph_update,
 };
+use crate::repo_watch::own_writes::{record_own_removal, record_own_write};
 use crate::save::enqueue_tantivy_delta;
 use crate::types::env::SkgEnv;
 use crate::types::misc::{ID, SkgConfig};
@@ -143,6 +144,7 @@ fn write_creation_files (
   let mut created : Vec<CreatedFile> = Vec::new ();
   for (index, (path, yaml)) in files . iter () . enumerate () {
     let result : io::Result<()> = (|| {
+      record_own_write (path, yaml . as_bytes ());
       let handle : File = OpenOptions::new () . write (true)
         . create_new (true) . open (path)?;
       created . push (CreatedFile { path : path . clone (), handle });
@@ -171,6 +173,7 @@ fn rollback_created_files (
     match (original, current) {
       (_, Err (error)) if error . kind () == io::ErrorKind::NotFound => (),
       (Ok (original), Ok (current)) if same_file (&original, &current) => {
+        record_own_removal (path);
         if let Err (error) = fs::remove_file (path) {
           errors . push (format! ("{}: {}", path . display (), error)); } }
       (Ok (_), Ok (_)) => errors . push (format! (

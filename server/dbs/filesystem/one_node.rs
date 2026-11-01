@@ -10,6 +10,7 @@ use crate::types::nodes::fs::GraphnodeOnDisk;
 use crate::types::nodes::complete::Graphnode;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
+use crate::repo_watch::own_writes::{remove_skg_file, write_skg_file};
 use crate::util::path_from_pid_and_skgrepo;
 use std::error::Error;
 use std::io;
@@ -61,16 +62,8 @@ pub(crate) fn telescope_from_disk (
   config : &SkgConfig,
   pid    : &ID,
 ) -> io::Result<Option<Telescope>> {
-  let mut sections : Vec<(SkgrepoName, GraphnodeOnDisk)> = Vec::new ();
-  for skgrepo_name in config . ordered_skgrepos () {
-    let path : String =
-      match path_from_pid_and_skgrepo (
-        config, &skgrepo_name, pid . clone () ) {
-        Ok (p) => p,
-        Err (_) => continue, };
-    if ! Path::new (&path) . is_file () { continue; }
-    let node_fs : GraphnodeOnDisk = read_graphnode (&path) ?;
-    sections . push (( skgrepo_name, node_fs )); }
+  let sections : Vec<(SkgrepoName, GraphnodeOnDisk)> =
+    sections_of_pid_on_disk (config, pid) ?;
   if sections . is_empty () {
     return Ok (None); }
   let (sections, _illegal) = // reported at load ('IllegalEditToForeignNode')
@@ -79,6 +72,30 @@ pub(crate) fn telescope_from_disk (
     . map (Some)
     . map_err ( |e| io::Error::new (
       io::ErrorKind::InvalidData, e ) ) }
+
+/// Every section of PID on disk, in fold order: for each configured
+/// skgrepo (in 'ordered_skgrepos' order), its pid.skg if present,
+/// read and checked against its filename. Illegal sections are not
+/// separated out.
+pub(crate) fn sections_of_pid_on_disk (
+  config : &SkgConfig,
+  pid    : &ID,
+) -> io::Result<Vec<(SkgrepoName, GraphnodeOnDisk)>> {
+  let mut sections : Vec<(SkgrepoName, GraphnodeOnDisk)> = Vec::new ();
+  for skgrepo_name in config . ordered_skgrepos () {
+    let path : String =
+      match path_from_pid_and_skgrepo (
+        config, &skgrepo_name, pid . clone () ) {
+        Ok (p) => p,
+        Err (_) => continue, };
+    if ! Path::new (&path) . is_file () { continue; }
+    let node_fs : GraphnodeOnDisk =
+      read_graphnode (&path)
+      . map_err ( |e| io::Error::new (
+        e . kind (), format! ("{}: {}", path, e) )) ?;
+    validate_pid_matches_filename (&node_fs, Path::new (&path)) ?;
+    sections . push (( skgrepo_name, node_fs )); }
+  Ok (sections) }
 
 /// Reads a node from disk, returning None if not found
 /// (either in DB or on filesystem).
@@ -174,13 +191,10 @@ impl PreparedTelescopeWrite {
         . map ( |old| old == *yaml )
         . unwrap_or (false);
       if ! unchanged {
-        fs::write (path, yaml) ?; }
+        write_skg_file (Path::new (path), yaml) ?; }
     }
     for path in &self . deletions {
-      match fs::remove_file (path) {
-        Ok (( ))                                          => {},
-        Err (e) if e . kind () == io::ErrorKind::NotFound => {},
-        Err (e)                                           => return Err (e), } }
+      remove_skg_file (Path::new (path)) ?; }
     Ok (( ))
   }
 

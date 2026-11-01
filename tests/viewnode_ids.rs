@@ -24,7 +24,8 @@ use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 use skg::types::viewnode::{
   Folder, ViewnodeId, Viewnode, viewforest_root_viewnode,
   viewnode_of, ViewnodeKind};
-use skg::types::views_state::{OpenViews, ViewforestId, ViewnodeIdRecord};
+use skg::types::views_state::{
+  LARGEST_CARRIED_VIEWNODE_ID_COUNTER, OpenViews, ViewforestId, ViewnodeIdRecord};
 
 use ego_tree::{NodeId, Tree};
 use std::collections::HashSet;
@@ -49,6 +50,8 @@ fn viewnode_ids_in_content_views (
       a_moved_headline_keeps_its_viewnode_id (config, tantivy) . await ?;
       a_typed_headline_gets_a_viewnode_id (config, tantivy) . await ?;
       a_save_against_a_view_not_held_keeps_the_buffers_viewnode_ids (
+        config, tantivy ) . await ?;
+      a_view_not_held_carrying_a_huge_viewnode_id_is_refused (
         config, tantivy ) . await ?;
       // last, since it cuts b from a's content
       an_unknown_viewnode_id_is_dropped (config, tantivy) . await ?;
@@ -329,6 +332,38 @@ async fn a_save_against_a_view_not_held_keeps_the_buffers_viewnode_ids (
             "the view the save registered counts past them all" );
   Ok (( )) }
 
+/// Saved against a view the connection does not hold, a buffer
+/// carrying a viewnode ID near the counter's top (one typed by hand)
+/// is refused before anything is written, naming the ID: the counter
+/// would have no room past it.
+async fn a_view_not_held_carrying_a_huge_viewnode_id_is_refused (
+  config  : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
+  let buffer : String = open_view (
+    config, tantivy, &graph, &mut fresh_views_state (), VIEW_OF_A, "a" ) ?;
+  let b_line : &str = buffer . lines ()
+    . find ( |line| line . contains ("node (gnid b) ") )
+    . expect ("b is shown");
+  let huge : String = ViewnodeId::from_counter (u64::MAX) . 0;
+  let edited : String = buffer . replacen (
+    b_line,
+    & b_line . replacen ( viewnode_id_atom_of (b_line) . unwrap (),
+                          &format! ("(vnid {})", huge), 1 ),
+    1 );
+  let (mut stream, _read_end) : (TcpStream, TcpStream) = mk_test_tcp_stream_pair ();
+  let refused = update_from_and_rerender_buffer (
+    &mut stream, &edited, config, tantivy, &graph,
+    &Ok ( ViewforestId::ContentView (VIEW_OF_A . to_string ()) ),
+    &mut fresh_views_state () ) . await;
+  let message : String = match refused {
+    Err (e) => format! ("{:?}", e),
+    Ok (response) => format! ("{:?}", response . errors), };
+  assert! ( message . contains ("too large") && message . contains (&huge),
+            "refused, naming the ID: {}", message );
+  Ok (( )) }
+
 /// A viewnode ID the view's record does not know is dropped at the
 /// parse, so its headline gets a fresh one: one brought back from a
 /// headline cut at an earlier save, and one typed by hand past the
@@ -374,6 +409,27 @@ async fn an_unknown_viewnode_id_is_dropped (
             "the counter moved only past the two fresh viewnode IDs: {} -> {}",
             counter_before, counter_after );
   Ok (( )) }
+
+/// A buffer the connection does not hold may carry viewnode IDs up to
+/// 'LARGEST_CARRIED_VIEWNODE_ID_COUNTER', and no further.
+#[test]
+fn carried_viewnode_ids_must_leave_the_counter_room (
+) {
+  let tree_carrying = |counter : u64| -> Tree<Viewnode> {
+    let mut tree : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
+    let root : NodeId = tree . root () . id ();
+    let mut tombstone : Viewnode = viewnode_of (ViewnodeKind::Tombstone);
+    tombstone . viewnode_id = Some ( ViewnodeId::from_counter (counter) );
+    tree . get_mut (root) . unwrap () . append (tombstone);
+    tree };
+  assert! ( ViewnodeIdRecord::error_unless_carried_viewnode_ids_leave_room (
+              &tree_carrying (LARGEST_CARRIED_VIEWNODE_ID_COUNTER) ) . is_ok () );
+  let refusal : String = ViewnodeIdRecord::error_unless_carried_viewnode_ids_leave_room (
+    &tree_carrying (LARGEST_CARRIED_VIEWNODE_ID_COUNTER + 1) ) . unwrap_err ();
+  assert! ( refusal . contains ("too large")
+            && refusal . contains (
+              & ViewnodeId::from_counter (LARGEST_CARRIED_VIEWNODE_ID_COUNTER + 1) . 0 ),
+            "{}", refusal ); }
 
 /// The record's pass at the refresh's tail gives a viewnode ID to each viewnode
 /// without one, in buffer order, never one the counter has passed

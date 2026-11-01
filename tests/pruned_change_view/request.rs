@@ -10,6 +10,11 @@ use crate::git_fixture::{Fixture, everything_written, save_view};
 use crate::pruned_change_view::common::{open_all_changes_buffer, with_fixture};
 
 use skg::graph_straddle::types::GraphStraddle;
+use skg::metadata_canon::viewnode_id_atom_of;
+use skg::serve::ViewsState;
+use skg::serve::handlers::save_buffer::handle_save_buffer_request;
+use skg::test_utils::read_all_lp_messages;
+use skg::types::views_state::OpenViews;
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::serve::util::sexp_to_client_string;
 use skg::test_utils::extract_string_field_from_sexp;
@@ -24,6 +29,7 @@ use skg::types::views_state::{DiffViewBufferKind, ViewforestId};
 use git2::{Commit, Oid, Repository, Signature};
 use std::error::Error;
 use std::fs;
+use std::io::{BufReader, Write};
 use std::net::TcpStream;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -97,6 +103,89 @@ fn a_buffers_answer_carries_the_readiness_summary_of_its_save (
               "the answer:\n{}\nthe save's summary:\n{}",
               payload, summary_of_the_save );
     Ok (( )) }) }
+
+/// A save naming a buffer of the diff view its connection does not
+/// hold (a tool's connection ends with each command) re-renders it as
+/// that buffer, with its readiness summary, when the request names the
+/// buffer; each headline keeps the viewnode ID it carries, even one no
+/// rendering gave it. Without the name it re-renders as a content view.
+#[test]
+fn a_save_of_a_diffView_buffer_not_held_keeps_its_viewnode_ids (
+) -> Result<(), Box<dyn Error>> {
+  with_fixture ("sets", &["main"], |f| {
+    let (response, _registered) : (String, bool) = request_all_changes (f) ?;
+    let payload : &str = &response [ response . find ("((") . unwrap () .. ];
+    let content : String = extract_string_field_from_sexp (payload, "content")
+      . expect ("the buffer's answer has content");
+    let rendered_at : String = extract_string_field_from_sexp (payload, "rendered-at")
+      . expect ("the buffer's answer has rendered-at");
+    let first_headline : &str = content . lines ()
+      . find ( |line| viewnode_id_atom_of (line) . is_some () )
+      . expect ("a headline with a viewnode ID");
+    let renumbered : String = content . replacen (
+      first_headline,
+      & first_headline . replacen (
+        viewnode_id_atom_of (first_headline) . unwrap (), "(vnid zz)", 1 ),
+      1 );
+    let saved_on_a_new_connection = |f : &mut Fixture, fields : &str| -> String {
+      let mut views_state : ViewsState = ViewsState {
+        open_views : OpenViews::new (), graph_straddle : None };
+      save_through_the_handler (
+        f, &mut views_state,
+        &format! ( "((request . \"save buffer\") (view-id . \"diff-view-1\") (rendered-at . \"{}\"){})",
+                   rendered_at, fields ),
+        &renumbered ) };
+    { let named : String = saved_on_a_new_connection (
+        f, " (diff-view-buffer . \"all changes\")" );
+      let saved : String = extract_string_field_from_sexp (&named, "content")
+        . expect ("a save-result with content");
+      assert! ( named . contains ("(readiness-summary"), "{}", named );
+      assert_eq! ( viewnode_id_atoms (&saved), viewnode_id_atoms (&renumbered),
+                   "every viewnode ID kept:\n{}", saved );
+      assert! ( saved . contains ("(vnid zz)"), "{}", saved ); }
+    { let unnamed : String = saved_on_a_new_connection (f, "");
+      assert! ( ! unnamed . contains ("(readiness-summary"),
+                "without the name, a content view:\n{}", unnamed ); }
+    { let refused : String = saved_on_a_new_connection (
+        f, " (diff-view-buffer . \"no such buffer\")" );
+      assert! ( refused . contains ("which the diff view does not have"), "{}", refused ); }
+    Ok (( )) }) }
+
+/// The viewnode ID atoms of 'text', in order.
+fn viewnode_id_atoms (
+  text : &str,
+) -> Vec<String> {
+  text . lines ()
+    . filter_map ( |line| viewnode_id_atom_of (line) . map ( str::to_string ) )
+    . collect () }
+
+/// Send 'request' with 'buffer' as its saved buffer through the save
+/// handler, on the connection 'views_state'; return the terminal
+/// save-result message.
+fn save_through_the_handler (
+  f           : &mut Fixture,
+  views_state : &mut ViewsState,
+  request     : &str,
+  buffer      : &str,
+) -> String {
+  let envelope : String = format! (
+    "((saved-buffer \"{}\") (other-views ()))",
+    buffer . replace ('\\', "\\\\") . replace ('"', "\\\"") );
+  let (mut client_writes, server_reads) : (TcpStream, TcpStream) =
+    mk_test_tcp_stream_pair ();
+  write! ( client_writes, "Content-Length: {}\r\n\r\n{}",
+           envelope . len (), envelope ) . unwrap ();
+  let (mut server_writes, client_reads) : (TcpStream, TcpStream) =
+    mk_test_tcp_stream_pair ();
+  let mut env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
+  handle_save_buffer_request (
+    &mut BufReader::new (server_reads), &mut server_writes, request,
+    &mut env, views_state, &SkgrepoRestriction::unrestricted (&f . config) );
+  drop (server_writes);
+  read_all_lp_messages (&mut BufReader::new (client_reads))
+    . into_iter ()
+    . find ( |message| message . contains ("save-result") )
+    . expect ("a save-result") }
 
 #[test]
 fn a_request_is_refused_under_a_skgrepo_restriction (

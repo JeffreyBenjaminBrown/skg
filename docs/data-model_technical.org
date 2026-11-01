@@ -171,6 +171,38 @@ carries the generation it was drawn at, and a save refuses a buffer that would
 write a node stamped later than that (=docs/api-and-formats.org=, "Save
 buffer" and "The rendered-at of a view").
 
+*** A batch of files changed on disk becomes a generation
+
+The server also learns of =.skg= files that change on disk without it
+(another writer, a =git pull=): the repo watcher (=server/repo_watch/=)
+watches every skgrepo directory and gathers the changed paths of a
+burst into one batch, once the directories have been quiet for
+=repo_watch_quiet_ms=.  The batch is integrated as a save's
+nodeInstructions are, under the mutation gate, but nothing is
+written (=integrate_changed_skg_files= in
+=server/repo_watch/integrate.rs=):
+- each path names a skgrepo (its directory) and a pid (its file name);
+  a path whose file is as the server itself last left it is dropped
+  (=server/repo_watch/own_writes.rs=), since every server write of a
+  =.skg= file records the path and a hash of its content;
+- each pid's telescope is read again from every skgrepo, as a load
+  reads it: illegal sections set apart, the rest composed, extra IDs
+  resolved through the current graph.  A node the graph has, and disk
+  no longer, becomes a Delete; one that differs from the graph's, a
+  Save; one that agrees, nothing.  A file that cannot be read leaves
+  its node as the graph has it;
+- the nodeInstructions go through =prepare_graph_update=, the save's
+  incremental validation over the current graph, so a batch costs what
+  a save of its nodes costs, not a rebuild.  A batch that fails leaves
+  the graph as it was, and its paths are tried again with the next;
+- the candidate, with its illegal edits brought up to date, is swapped
+  in as the next generation, which stamps every node of the batch, so a
+  buffer that showed one before is refused if its save would write it.
+  The search index is updated in the background, as after a save.
+A notice of what the batch did reaches every connection, which tells
+its client between requests and names the views to rerender
+(=docs/api-and-formats.org=, "Repo files integrated").
+
 ** The refresh: how a view follows the graph
 
 Every buffer the server sends is drawn by one operation, the

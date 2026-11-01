@@ -31,6 +31,21 @@ streaming protocol: rerender-lock, rerender-view*, rerender-done."
    nil nil nil
    (lambda (pids) (skg-request-rerender-all-views pids))))
 
+(defun skg--request-rerender-views-excluding (label excluded &optional approved-pids)
+  "Ask the server to rerender every open view but EXCLUDED, a list of
+view IDs. LABEL names the stream. APPROVED-PIDS approve the text a
+privacy challenge asked about; a challenge accepted asks again with
+them."
+  (skg--send-streaming-request
+   label nil
+   (append `((request . "rerender all views")
+             (exclude-view-ids ,@excluded))
+           (when approved-pids
+             `((approved-overPrivateText-pids ,@approved-pids))))
+   nil nil nil
+   (lambda (pids)
+     (skg--request-rerender-views-excluding label excluded pids))))
+
 (defun skg--send-streaming-request
     (label response-type request handler
            &optional other-handlers retry-after-empty-stream

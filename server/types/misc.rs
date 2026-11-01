@@ -264,6 +264,9 @@ pub struct SkgConfig {
 
   #[serde (default)]
   pub readiness_marks_file : Option<PathBuf>, // The readiness store's file, as the config states it; see 'readiness_marks_path'.
+
+  #[serde(default = "default_repo_watch_quiet_ms")]
+  pub repo_watch_quiet_ms : u64, // How long the skgrepo directories must be quiet before the files changed in them are integrated; see 'server/repo_watch/watcher.rs'.
 }
 
 /// The foreign skgrepos of this config that one foreign skgrepo's
@@ -413,6 +416,9 @@ fn default_beep_when_server_becomes_available() -> bool {
 fn default_max_roleTree_depth() -> usize {
   20 }
 
+pub fn default_repo_watch_quiet_ms () -> u64 {
+  500 }
+
 
 //
 // Implementations
@@ -544,7 +550,8 @@ impl SkgConfig {
       timing_log         : false,
       beep_when_server_becomes_available : false,
       max_roleTree_depth : default_max_roleTree_depth(),
-      readiness_marks_file : None, }}
+      readiness_marks_file : None,
+      repo_watch_quiet_ms : default_repo_watch_quiet_ms (), }}
 
   /// Creates a SkgConfig with a test-specific Tantivy folder.
   pub fn fromSkgreposAndTantivyFolder (
@@ -566,7 +573,8 @@ impl SkgConfig {
       timing_log         : false,
       beep_when_server_becomes_available : false,
       max_roleTree_depth : default_max_roleTree_depth(),
-      readiness_marks_file : None, }}
+      readiness_marks_file : None,
+      repo_watch_quiet_ms : default_repo_watch_quiet_ms (), }}
 
   pub fn skgrepo_is_owned (
     &self,

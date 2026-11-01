@@ -297,12 +297,18 @@ and sends 'close view' for its view before disconnecting, as a client
 does when its buffer is killed. A view is therefore never left open
 by the tool. A save reads the saved buffer against the graph; the
 server does not hold its view, and keeps every handle the buffer
-carries (see "Handles across saves"). A buffer of the diff view is the
-exception: the server re-renders a saved buffer of the diff view as
-one, with its readiness summary, only when it holds it as one, so
-'save' first opens that buffer again, under the sidecar's view ID, on
-its own connection. The 'close' command matters
-only for a view that a longer-lived connection holds.
+carries (see "Handles across saves"). A save of a buffer of the diff
+view names its buffer ('(diff-view-buffer . "all changes")', say),
+so the server re-renders it as that buffer, with its readiness
+summary. The 'close' command matters only for a view that a
+longer-lived connection holds.
+
+Between its answers, the server may tell a connection that it
+integrated '.skg' files that changed on disk (a teammate's save, a
+'git pull'). The tool prints each such warning on standard error, as
+'skg server: Integrated N files that changed on disk in skgrepo
+'NAME'.', and reads on; a view written before it may be refused on
+save if it would write a node that changed.
 
 * How 'forest' draws a folder
 The server has no request that answers "what links here" or "what
@@ -592,15 +598,7 @@ For such a view the saved buffer's own viewnode IDs are the view's
 one it carries, and a new headline gets one past the highest the
 buffer carries. So every handle stays across a save, through adds,
 moves, retitles and removals, and a new headline gets a new handle.
-
-A buffer of the diff view is saved against the view the tool opens
-again on the save's connection (see "Views and connections"), and for
-a view it holds the server gives a new viewnode ID to a headline
-carrying one that view lacks. That buffer opened afresh numbers its
-headlines from '0a' in buffer order, so after a removal it may lack
-the highest handles. 'save' names them, before it saves, in a line
-'Handles the save may change: ⟨ID⟩ 'TITLE', ...'; the re-rendered
-compact view gives each its handle after the save.
+A buffer of the diff view keeps its handles the same way.
 ** Stale views
 The save carries the runtime generation the view was rendered at, from the
 sidecar. If a node the save would write changed since (by Jeff in
@@ -700,8 +698,9 @@ after, and writes the server's rerendered buffer over the three files.
 python3 tools/skg-for-ai/skg_for_ai.py integrate DIR/diff_all-changes.view.json
 #+end_example
 The server integrates the buffer it holds under the view ID, so the
-tool first opens the buffer again under that ID and saves the full
-view back unchanged (which writes nothing). The server refuses that
+tool first saves the full view back unchanged under that ID, naming
+its buffer of the diff view (which writes nothing, and leaves the
+server holding it as that buffer). The server refuses that
 save when a node the buffer shows has changed since it was written;
 'diff' then gives a fresh buffer, in which every change is editable.
 ** Committing
@@ -729,8 +728,8 @@ The server keeps the diff view's buffers, and the comparison behind
 them, per connection. 'diff' opens one connection, requests the
 buffers in the clients' order, and writes each nonempty one, with the
 readiness summary the server's answer carries. A later 'save' or
-'integrate' of a diff buffer first requests that buffer again under
-the sidecar's view ID on its own connection, so that the server
-re-renders it as a buffer of the diff view, with the readiness
-summary; the save keeps the handles the buffer requested again holds
-(see "Handles across saves").
+'integrate' of a diff buffer names its buffer of the diff view in the
+save request, so that the server re-renders it as one, with the
+readiness summary, on a connection that never opened it; the save
+keeps every handle the buffer carries (see "Handles across
+saves").

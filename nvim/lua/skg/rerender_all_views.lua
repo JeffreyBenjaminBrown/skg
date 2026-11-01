@@ -25,6 +25,12 @@ function M.request_rerender_all_views ()
   return M.request_rerender_all_views_with_approval(nil, nil)
 end
 
+---Ask the server to rerender every open view but EXCLUDED_VIEW_IDS.
+---@param excluded_view_ids string[]
+function M.request_rerender_views_excluding (excluded_view_ids)
+  return M.request_rerender_all_views_with_approval(nil, excluded_view_ids)
+end
+
 function M.request_rerender_clean_views_after_import ()
   local dirty_view_ids = {}
   for _, buf in ipairs(vim.api.nvim_list_bufs()) do

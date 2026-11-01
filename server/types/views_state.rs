@@ -11,6 +11,11 @@ use std::collections::{HashMap, HashSet};
 // Type declarations
 //
 
+/// The largest viewnode ID counter a buffer the connection does not
+/// hold may carry: half the counter's range, leaving the other half
+/// for the fresh viewnode IDs counted past it.
+pub const LARGEST_CARRIED_VIEWNODE_ID_COUNTER : u64 = u64::MAX / 2;
+
 /// Identifies a buffer in the client.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum ViewforestId {
@@ -177,6 +182,16 @@ impl OpenViews {
       if let Some (state) = self . views . get_mut (&viewforest_id) {
         state . diffView_buffer_kind = Some (diffView_buffer_kind); }}
 
+  /// Record that the open view 'viewforest_id' is a buffer of the
+  /// diff view of kind 'diffView_buffer_kind'.
+  pub fn mark_as_diffView_buffer (
+    &mut self,
+    viewforest_id        : &ViewforestId,
+    diffView_buffer_kind : DiffViewBufferKind,
+  ) {
+    if let Some (state) = self . views . get_mut (viewforest_id) {
+      state . diffView_buffer_kind = Some (diffView_buffer_kind); }}
+
   /// Whether any open view is a buffer of the diff view.
   pub fn has_diffView_views (
     &self,
@@ -273,6 +288,27 @@ impl ViewnodeIdRecord {
     record . record_known_viewnode_ids_in (viewforest);
     record }
 
+  /// A buffer the connection does not hold keeps the viewnode IDs it
+  /// carries, and its record counts fresh ones from past the highest
+  /// ('viewnode_id_record_for_saved_buffer'). Refuses a buffer
+  /// carrying one past 'LARGEST_CARRIED_VIEWNODE_ID_COUNTER' (one typed
+  /// by hand, say), which would leave the counter too little room.
+  pub fn error_unless_carried_viewnode_ids_leave_room (
+    viewforest : &Tree<Viewnode>,
+  ) -> Result<(), String> {
+    let too_large : Vec<String> = viewforest . root () . descendants ()
+      . filter_map ( |node| node . value () . viewnode_id . as_ref () )
+      . filter ( |viewnode_id| viewnode_id . counter_value ()
+                 . is_some_and ( |counter| counter > LARGEST_CARRIED_VIEWNODE_ID_COUNTER ))
+      . map ( |viewnode_id| viewnode_id . 0 . clone () )
+      . collect ();
+    if too_large . is_empty () { return Ok (( )); }
+    Err ( format! (
+      "Nothing was saved: the viewnode ID(s) {} are too large. A buffer the server does not hold keeps the viewnode IDs it carries, and each must be at most '{}'. Remove the '(vnid ...)' of each such headline, and the save gives it a fresh one.",
+      too_large . iter () . map ( |id| format! ("'{}'", id) )
+        . collect::<Vec<String>> () . join (", "),
+      ViewnodeId::from_counter (LARGEST_CARRIED_VIEWNODE_ID_COUNTER) )) }
+
   /// After a parse, before the refresh runs: drop every viewnode ID
   /// the record does not know -- one typed by hand, or brought back by
   /// an old copy of the buffer's text -- so that its headline gets a
@@ -325,7 +361,9 @@ impl ViewnodeIdRecord {
   ) -> ViewnodeId {
     loop {
       let viewnode_id : ViewnodeId = ViewnodeId::from_counter (self . next_viewnode_id_counter);
-      self . next_viewnode_id_counter += 1;
+      self . next_viewnode_id_counter =
+        self . next_viewnode_id_counter . checked_add (1)
+        . expect ( "a viewnode ID counter has room: a held view drops the IDs it does not know, and a save refuses an unheld buffer whose IDs leave none ('error_unless_carried_viewnode_ids_leave_room')" );
       if viewnode_id . 0 . parse::<f64> () . is_err () { return viewnode_id; }} }
 
   fn advance_counter_past_viewnode_ids_in (

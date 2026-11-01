@@ -42,6 +42,9 @@ mod rebuild;
 #[path = "reload_config.rs"]
 mod reload_config;
 
+#[path = "repo_watch.rs"]
+mod repo_watch;
+
 #[path = "save.rs"]
 mod save;
 

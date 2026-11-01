@@ -112,14 +112,7 @@ privacy for every imported node.  No input file is changed."
                                (and (boundp 'skg-view-id) skg-view-id))
                    when (and view-id (buffer-modified-p buf))
                    collect view-id)))
-    (skg--send-streaming-request
-     "import rerender" nil
-     (append
-      `((request . "rerender all views")
-        (exclude-view-ids ,@dirty-view-ids))
-      (when approved-pids
-        `((approved-overPrivateText-pids ,@approved-pids))))
-     nil nil nil
-     (lambda (pids) (skg--import-rerender-clean-views pids)))))
+    (skg--request-rerender-views-excluding
+     "import rerender" dirty-view-ids approved-pids)))
 
 (provide 'skg-request-import-md-and-org)

@@ -645,8 +645,7 @@ def check_handles_across_saves (context):
   """A compact view edited and saved again and again keeps its
   handles: the server, which does not hold the view on the save's
   connection, keeps every viewnode ID the saved buffer carries. A new
-  headline gets a new handle. A removal renumbers nothing, and no
-  save warns of a handle it may change."""
+  headline gets a new handle. A removal renumbers nothing."""
   folder = fresh_root_view (context, "handles")
   rendered = handles_and_titles (folder)
   first_child = compact_line_starting (folder, "** First child")
@@ -667,9 +666,7 @@ def check_handles_across_saves (context):
     ( containers_folder, "** Added at the top\n" + containers_folder ),
     ( added, added . replace ( "Added before the first child",
                                "Added before the first child, retitled" )) ])
-  saved = require_save_succeeds (folder)
-  require_equal ( "a renumbering in the second save",
-                  "Handles the save may change" in saved . stdout, False )
+  require_save_succeeds (folder)
   after_second_save = handles_and_titles (folder)
   require_kept_handles ( "the second save", after_first_save,
                          after_second_save,
@@ -689,9 +686,7 @@ def check_handles_across_saves (context):
   edit_compact ( folder, [ ( added_at_top, added_at_top . replace (
     "Added at the top", "Added at the top, retitled" )
     + "\n** Added after a removal" ) ])
-  saved = require_save_succeeds (folder)
-  require_equal ( "a renumbering in the save after a removal",
-                  "Handles the save may change" in saved . stdout, False )
+  require_save_succeeds (folder)
   require_kept_handles ( "the save after a removal", after_removal,
                          handles_and_titles (folder),
                          { "Added at the top" : "Added at the top, retitled" },
@@ -1039,17 +1034,17 @@ def check_integrating_unshown_changes (context):
   require_in_diff_compact (
     folder, "*** First child, renamed ⟨0d aC2⟩\n"
     "A body line that stays unnumbered.\n"
-    "**** Contained twice ⟨0i ☮ 2aC⟩\n"
-    "**** A grandchild, retitled ⟨0j M⟩\n"
-    "***** A new grandchild ⟨0k old title⟩\n" )
+    "**** Contained twice ⟨0f ☮ 2aC⟩\n"
+    "**** A grandchild, retitled ⟨0g M⟩\n"
+    "***** A new grandchild ⟨0h old title⟩\n" )
   for line_number in [ 7, 10 ]:
     require_equal ( f"the write-protection of line {line_number}",
                     "writeProtected" in diff_full_line (folder, line_number),
                     False )
   grandchild_id = UUID_PATTERN . search ( diff_full_line (folder, 10) ) . group (0)
   edit_compact (
-    folder, [ ( "**** A grandchild, retitled ⟨0j M⟩",
-                "**** A grandchild, retitled twice ⟨0j M⟩" ) ],
+    folder, [ ( "**** A grandchild, retitled ⟨0g M⟩",
+                "**** A grandchild, retitled twice ⟨0g M⟩" ) ],
     DIFF_BASE_NAME )
   require_save_succeeds (folder)
   require_equal ( "the grandchild's title",

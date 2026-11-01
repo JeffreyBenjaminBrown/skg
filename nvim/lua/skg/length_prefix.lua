@@ -45,7 +45,8 @@ function M.handle_generic_chunk (chunk)
 end
 
 ---Parse PAYLOAD as a sexp, extract its response-type, and dispatch
----via the handler map. A one-shot handler is removed after a
+---via the handler map, or else, for a message the server sends
+---unprompted, the unprompted handler map. A one-shot handler is removed after a
 ---successful call (an error leaves it registered, mirroring elisp,
 ---where the removal is skipped when the handler signals).
 ---@param payload string
@@ -59,8 +60,13 @@ function M.dispatch_by_type (payload)
       return end
     local entry = state.response_handler_map[response_type]
     if not entry then
-      log.log('warn', 'dispatch', 'no handler for response type: %s',
-              response_type)
+      local unprompted =
+        state.unprompted_response_handler_map[response_type]
+      if unprompted then
+        unprompted(payload, response)
+      else
+        log.log('warn', 'dispatch', 'no handler for response type: %s',
+                response_type) end
       return end
     entry.handler(payload, response)
     if response_type == 'save-result'

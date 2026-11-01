@@ -118,6 +118,7 @@ pub enum TcpToClient {
   Repos, // The configured skgrepos in privacy order, and the connection's skgrepo restriction.
   ServerWarnings, // What the server warned about as it started, '(warnings ("..." ...))'. Each client asks once per connection.
   RuntimeGeneration, // The current runtime generation, '(content "N")'. A client dates a new empty view by it.
+  RepoFilesIntegrated, // Unprompted, between requests: what the repo watcher integrated, '(warnings ("..." ...)) (view-ids (ID ...))', the views naming the connection's open views that show a changed node.
   Error,
 }
 
@@ -170,4 +171,5 @@ impl TcpToClient {
       TcpToClient::ServerWarnings   => "server-warnings",
       TcpToClient::Repos            => "repos",
       TcpToClient::RuntimeGeneration => "runtime-generation",
+      TcpToClient::RepoFilesIntegrated => "repo-files-integrated",
       TcpToClient::Error            => "error", }} }

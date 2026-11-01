@@ -103,7 +103,7 @@ fn save (
     update_from_and_rerender_buffer_with_approvals (
       &mut stream, buffer, &mut env,  &Ok (viewforest_id . clone ()),
       &mut f . views_state, &SkgrepoRestriction::unrestricted (&f . config), true, &HashMap::new (),
-      &HashSet::new (), &HashSet::new (), review, DeleteFrom::NotChosen, &[], rendered_at )) ?;
+      &HashSet::new (), &HashSet::new (), review, DeleteFrom::NotChosen, &[], rendered_at, None )) ?;
   // The test helper's env holds its own graph handle: carry the
   // swapped-in graph back to the fixture.
   f . graph . store ( env . runtime_snapshot () . graph . clone () );

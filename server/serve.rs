@@ -16,6 +16,7 @@ use crate::serve::handlers::import_md_and_org::{
 use crate::serve::handlers::get_file_path::handle_get_file_path_request_with_skgrepo_set;
 use crate::serve::handlers::herald_rules::handle_herald_rules_request;
 use crate::serve::handlers::investigate_unknown_node::handle_investigate_unknown_node_request;
+use crate::serve::handlers::repo_files_integrated::deliver_repo_change_notices;
 use crate::serve::handlers::repos::handle_repos_request;
 use crate::serve::handlers::rebuild_session_lifetime_stores::handle_rebuild_session_lifetime_stores_request;
 use crate::serve::handlers::rerender_all_views::handle_rerender_all_views_request;
@@ -36,6 +37,7 @@ use crate::serve::util::{ request_type_from_request, send_response_with_length_p
 use crate::types::env::SkgEnv;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::views_state::OpenViews;
+use crate::repo_watch::integrate::RepoChangeNotice;
 
 use std::io::{BufRead, BufReader};
 use std::net::SocketAddr;
@@ -44,6 +46,7 @@ use std::net::TcpStream; // handles two-way communication
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
+use tokio::sync::broadcast::Receiver;
 
 /// Per-connection state for the Emacs client. The in-Rust graph
 /// handle is in 'SkgEnv', which is also per-connection (cloned at
@@ -96,6 +99,9 @@ fn handle_emacs (
         SkgrepoRestriction::unrestricted (&runtime . config) });
 
   let mut pending_import : Option<PendingImport> = None;
+  let mut repo_change_notices : Receiver<Arc<RepoChangeNotice>> =
+    // What the repo watcher integrates from now on; told between requests.
+    env . runtime . subscribe_to_repo_change_notices ();
 
   let peer : SocketAddr =
     stream . peer_addr() . unwrap();
@@ -248,7 +254,16 @@ fn handle_emacs (
       Err (ref e)
         if e . kind () == std::io::ErrorKind::WouldBlock
         || e . kind () == std::io::ErrorKind::TimedOut =>
-        {}, // The read timed out; no request has arrived yet.
+        { // The read timed out; no request has arrived yet. If no part
+          // of one has either, the client may hear what the repo
+          // watcher integrated.
+          if request_header . is_empty () && ! repo_change_notices . is_empty () {
+            let runtime = env . runtime_snapshot ();
+            skgrepo_restriction =
+              skgrepo_restriction . under_config (&runtime . config);
+            deliver_repo_change_notices (
+              &mut stream, &mut repo_change_notices,
+              &mut views_state, &skgrepo_restriction ); }},
       Err (_) => break, // real error
     }}
   tracing::info!(peer = %peer, "Emacs disconnected"); }

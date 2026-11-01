@@ -26,13 +26,24 @@ also refused conservatively. There is no "save anyway" choice.
 Each view also remembers when the server drew it. A save is refused,
 before any write, if a node it would write has changed since: by a save
 from another client or from 'tools/skg-for-ai', which this client's
-views do not follow, or by a rebuild of the session-lifetime stores,
-after which every older view is stale. The error names each such node
+views do not follow; by another writer of the '.skg' files (a second
+server over the same data, a 'git pull', an editor), which the server
+integrates as the files change; or by a rebuild of the session-lifetime
+stores, after which every older view is stale.
+The error names each such node
 and the view's headlines for it. A node the view shows as the graph
 has it is not written, so an untouched node never refuses a save,
 however old the view; and a new empty view, which the server did not
 draw, is never stale. Your edits stay in the view: archive them if
 needed (:SkgShowUnsavedChanges), open a fresh view, and reapply them.
+
+When the server integrates files changed on disk, it says so in the
+server-warnings buffer (=skg://messages/server-warnings=), under "Repo changes", naming each
+skgrepo and how many of its files it integrated, or what it could not
+read, and rerenders every open view showing a changed node that holds
+no unsaved edits. A view with unsaved edits keeps them, and its save
+is refused if it would write a changed node. No rebuild is needed after
+a 'git pull'. A changed config still needs one (':SkgRebuildSessionLifetimeStores').
 
 ':w' is the BufWriteCmd on every skg view buffer, so plain saving
 works as expected; ':SkgSave' does the same thing as an explicit
@@ -1321,7 +1332,8 @@ removed or reordered, say) takes effect without restarting the server, except
 for its 'port' and 'timing_log', which the answer warns about. An invalid
 config fails the rebuild, and the server keeps serving the old one.
 Existing skg views are now invalid; run ':SkgCloseAllSkgBuffers'
-to close them.
+to close them. Files that change on disk need no rebuild: the server
+integrates them as they change (see the start of this document).
 *** :SkgStripBodyWhitespace
 Strips trailing whitespace from every line of every body,
 in every skgrepo you own.

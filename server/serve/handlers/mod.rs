@@ -8,6 +8,7 @@ pub mod get_file_path;
 pub mod herald_rules;
 pub mod investigate_unknown_node;
 pub mod rebuild_session_lifetime_stores;
+pub mod repo_files_integrated;
 pub mod repos;
 pub mod rerender_all_views;
 pub mod runtime_generation;

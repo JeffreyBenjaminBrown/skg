@@ -1,0 +1,13 @@
+tantivy_folder = "tantivy"
+port = 1730
+beep_when_server_becomes_available = false
+repo_watch_quiet_ms = 150
+
+[[repos]]
+name = "theirs"
+path = "theirs"
+foreign = true
+
+[[repos]]
+name = "mine"
+path = "mine"

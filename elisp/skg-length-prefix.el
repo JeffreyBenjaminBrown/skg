@@ -50,7 +50,8 @@ If there is buffered data and a handler matched, continues the loop."
 
 (defun skg-lp--dispatch-by-type (tcp-proc payload)
   "Parse PAYLOAD as s-exp, extract response-type, and dispatch
-via `skg-response-handler-map'.
+via `skg-response-handler-map', or else, for a message the server
+sends unprompted, `skg-unprompted-response-handler-map'.
 Keys in the map and response-type values are symbols
 because the sexp crate emits simple strings unquoted."
   (condition-case err
@@ -60,9 +61,15 @@ because the sexp crate emits simple strings unquoted."
         (if (not response-type)
             (skg-log 'warn 'dispatch "response missing response-type: %s"
                      (substring payload 0 (min 80 (length payload))))
-          (let ((handler-entry (assoc response-type skg-response-handler-map)))
-            (if (not handler-entry)
-                (skg-log 'warn 'dispatch "no handler for response type: %s" response-type)
+          (let ((handler-entry (assoc response-type skg-response-handler-map))
+                (unprompted-handler
+                 (cdr (assoc response-type skg-unprompted-response-handler-map))))
+            (cond
+             ((not handler-entry)
+              (if unprompted-handler
+                  (funcall unprompted-handler tcp-proc payload)
+                (skg-log 'warn 'dispatch "no handler for response type: %s" response-type)))
+             (t
               (let ((handler  (cadr handler-entry))
                     (one-shot (cddr handler-entry)))
                 (funcall handler tcp-proc payload)
@@ -78,7 +85,7 @@ because the sexp crate emits simple strings unquoted."
                                          skg-response-handler-map))
                   (setq skg-lp--pending-count
                         (max 0 (1- skg-lp--pending-count))))
-                ) ))))
+                ) ))) ))
     (error
      (skg-log 'error 'dispatch "dispatch error: %S for payload: %s"
               err (substring payload 0 (min 80 (length payload)))) )))

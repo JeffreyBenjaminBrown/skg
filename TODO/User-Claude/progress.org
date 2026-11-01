@@ -473,6 +473,10 @@ see User's saves. The same holds the other way for User's server and
 Jeff's saves. A better policy is deferred; this section and the plan's
 "Two servers, one tree" are where to look for the current one.
 'docs/setup.org' now says how to run such a second server.
+Since the repo watcher (see "A server learns when a repo changes on
+disk", below), the reload is automatic: each server integrates the
+other's saves as the files change, and a rebuild is needed only for a
+changed config.
 ** Restarting Jeff's server
 Killing Jeff's server by PID (53273) did not restart it: the server
 shuts down cleanly on SIGTERM, and cargo-watch reruns only when a
@@ -1548,3 +1552,141 @@ An exact retype is refused whatever the flags, as the plan says; the
 writer then restores the handle or writes '⟨new⟩' by hand. Letting
 '--keep-ids' and '--all-new' answer it too would be one rule instead
 of two, at the cost of the exact case no longer forcing a look.
+* A server learns when a repo changes on disk; unheld diff-view saves; the viewnode ID counter: DONE, uncommitted
+** What was done
+*** Watching
+'notify' 8.2 (the latest stable; 9 is a release candidate) watches
+every configured skgrepo directory, owned and foreign, without
+recursion ('server/repo_watch/watcher.rs'). Events are gathered until
+the directories have been quiet for the new config field
+'repo_watch_quiet_ms' (default 500), then the batch is integrated once.
+An idle watcher checks the config once a second, so a rebuild that
+adds or drops a skgrepo changes what it watches. 'main' starts it after
+the context rankings; if it cannot start, that is a startup warning.
+*** Integrating, partially
+No fallback to a full rebuild was needed. 'integrate_changed_skg_files'
+('server/repo_watch/integrate.rs') reads each changed pid's telescope
+again from every skgrepo (a new 'sections_of_pid_on_disk', which
+'telescope_from_disk' now shares), sets illegal sections apart,
+composes, and compares with the graph: a differing node becomes a
+Save, a vanished one a Delete, an equal one nothing. The
+nodeInstructions go through 'prepare_graph_update', the save's
+incremental validation, and are swapped in with 'SharedRuntime::swap_in',
+which stamps them with the new generation. Tantivy is updated in the
+background as after a save. Nothing is written to disk. All of it holds
+the mutation gate. A file that cannot be read is a problem in the
+notice and its node keeps its old version; a batch failing validation
+leaves the graph as it was and its paths are retried with the next
+batch.
+*** The server's own writes
+'server/repo_watch/own_writes.rs': every writer of '.skg' files
+('PreparedTelescopeWrite::apply', 'PreparedFilesystemUpdate::apply',
+'delete_all_nodes_from_fs', the import's creation files and rollback)
+records the path (directory canonicalized) and a content hash, or
+absence for a removal. The watcher drops a file now matching its
+record and clears the entry.
+*** Telling the connections
+Each batch's 'RepoChangeNotice' goes on a tokio broadcast channel in
+'SharedRuntime'. Each connection subscribes when it opens and, when its
+100 ms read times out with no part of a request read, sends one
+unprompted "repo-files-integrated" message
+('server/serve/handlers/repo_files_integrated.rs'): warnings per
+skgrepo ("Integrated N files that changed on disk in skgrepo 'X'."),
+problems, and the view IDs of its open views showing a changed node
+(plus every diff-view buffer). Skgrepos hidden by the connection's
+restriction are not named. A foreign change also drops the
+connection's graph straddle and the git snapshot cache.
+*** Clients
+Neither client could receive an unprompted message: each registers
+handlers per request, and drops a type with none. Both now consult a
+second map, of unprompted handlers ('skg-unprompted-response-handler-map',
+'state.unprompted_response_handler_map'), which a lost connection does
+not clear. 'elisp/skg-repo-files-integrated.el' and
+'nvim/lua/skg/repo_files_integrated.lua' append the warnings under
+"Repo changes" in the server-warnings buffer, and ask for a rerender of
+the named clean views ("rerender all views" excluding every other open
+view), retrying every half second for a minute while another stream is
+in flight. The Emacs import now shares the excluding request
+('skg--request-rerender-views-excluding'). The tool skips the message,
+printing its warnings on stderr.
+*** Diff-view saves against unheld buffers
+A save request may carry '(diff-view-buffer . "all changes")'. For a
+view the connection does not hold, the save re-renders as that buffer
+of the diff view, with its readiness summary, keeps every viewnode ID
+the buffer carries, and registers it as that buffer. The tool sends it
+and no longer reopens diff buffers before 'save' or 'integrate';
+'reopen_diffView_buffer_for_save' and the "Handles the save may change"
+warning are gone.
+*** The counter
+A save of an unheld buffer carrying a viewnode ID past
+'LARGEST_CARRIED_VIEWNODE_ID_COUNTER' (u64::MAX / 2, '1y2p0ij32e8e7')
+is refused before anything is written, naming it;
+'take_next_viewnode_id' uses 'checked_add' with a message naming that
+guarantee.
+** Tests
+'tests/repo_watch.rs' (six, in 'grouped_saves', each with its own
+watcher, quiet interval 150 ms, over a fixture with a foreign and an
+owned skgrepo): files written into both repos integrated and shown in
+fresh views; a connection told, naming its open view, which then
+rerenders; a burst of 25 files integrated once; a bad file warns and
+the old generation serves, then the fixed file integrates; the server's
+own save is not integrated again (checked through the record: present
+right after the save, cleared by the watcher, no notice; the test
+fails with the record check disabled); a buffer rendered before an
+integration is refused on save. 'viewnode_ids': a refused huge ID, and
+the boundary. 'pruned_change_view::request': an unheld diff-view save
+keeps its IDs (one renumbered 'zz' included) and its summary, and
+without the field is a content view. Emacs: six in
+'test-skg-repo-files-integrated.el'; Neovim: six in
+'repo_files_integrated_spec.lua'.
+
+Ladder: 'cargo test' 1107 passed, 2 ignored; Emacs 438; Neovim 475;
+the tool's test PASS (its integrate case's expected handles changed:
+the headlines 'integrate' adds are now numbered past the buffer's own,
+'0f'..'0h', instead of from a reopened buffer); integration 35 of 36,
+'import-md-and-org' failing as before.
+** The live two-server check
+Jeff's server was not running; 'bash/start-servers.sh' started it (PID
+50176 under cargo-watch, port 1731, watching its 8 skgrepos) and it is
+left running. User's server ran as PID 50259 on 1732 and was stopped by
+PID. The tool saved "Servers now notice repo changes on disk." as a
+child of 'what has happened' on 1732. Jeff's server logged
+"integrated .skg files that changed on disk ... nodes=2" (the parent
+and the new child) within a second, and a read-only view on 1731
+showed the new child, with no rebuild. User's server integrated
+nothing: its own write was dropped. 'data/user-claude/first' holds the
+note uncommitted, and its 'OTHER_SKGREPO_DEPENDENCIES.toml', rewritten
+at User's server's startup as always.
+** Deviations
+*** The client asks for the rerender
+The plan has open views re-render "as a save's collateral rerender
+does". The server does not push views: it sends one short message
+naming the views, and the client requests the rerender. Only the client
+knows which buffers hold unsaved edits, and a pushed view would
+overwrite them; the client's request goes through its existing stream
+machinery (locks, privacy challenge). A short message also avoids a
+race the clients have with a long unprompted one: both reset their
+receive buffer before each request.
+*** Every connection is told
+The plan says each affected connection gets the warning; every
+connection does (under its restriction), since a 'git pull' is worth
+knowing of even with no view showing it.
+*** 'telescope_from_disk' now checks pid against file name
+It shares 'sections_of_pid_on_disk', which does, as the full load does.
+** What's imperfect
+*** Another connection's save on the same server
+Its writes are the server's own, so no notice reaches other
+connections; their views still do not follow it, as before.
+*** A permanently bad file in a failed batch
+A batch failing validation is retried with every later batch, so it
+re-warns each time until fixed.
+*** The clients do not name a diff-view buffer
+After a server restart, an Emacs or Neovim diff buffer saved re-renders
+as a content view, as before; they could send '(diff-view-buffer ...)'
+too, but neither keeps the buffer kind locally.
+*** Every integration opens the warnings buffer
+As startup warnings do. With two people saving often, this may be loud.
+** Open questions
+*** Should integration notices be quieter?
+A message in the echo area instead of displaying the warnings buffer,
+keeping the buffer for problems only.

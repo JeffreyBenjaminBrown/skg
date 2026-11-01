@@ -523,7 +523,7 @@ pub async fn update_from_and_rerender_buffer_with_snapshots_test (
     &SkgrepoRestriction::unrestricted (config),
     true, &HashMap::new (), &std::collections::HashSet::new (),
     &std::collections::HashSet::new (), &StrandedsReview::NotReviewed,
-    DeleteFrom::NotChosen, other_views, rendered_at ) . await
+    DeleteFrom::NotChosen, other_views, rendered_at, None ) . await
 }
 
 /// As 'update_from_and_rerender_buffer_test', but lets the test choose
