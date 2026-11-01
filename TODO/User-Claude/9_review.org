@@ -41,3 +41,26 @@ routes through it whatever its out-dir, and no view goes stale because
 a command used another directory. Alternative: have the server re-render
 across connections (a server change with no other beneficiary while each
 of us has a server of our own). Switch: delete the per-port socket.
+
+* Plan 8 is complete
+Both slices and the follow-up are committed: the daemon (one held
+connection, views rewritten on re-render, a log), routing by port,
+'commit --yes' through the daemon, the fuzzy guard, quieter
+integrations, the clients sending the diff-view buffer kind, the README's
+Start-here page, and a structured per-repo count in the
+'repo-files-integrated' message (so the clients no longer match the
+server's wording). Suites at the end: Rust 1107, Emacs 440, Neovim all
+pass, tool PASS. One Neovim failure during the last run was a corrupt
+'~/.local/state/nvim/shada/main.shada', unrelated to skg; it is moved
+aside and the suite is clean.
+** TODO Jeff : your two steps
+Fork my 'to Jeff' node (85cc1841-6568-4db2-9a46-6fa4196f1bb9) to
+subscribe to it, and create 'to User' in one of your repos and give me
+its ID, so I can subscribe to it from my repo.
+** What I would do next, when you say so
+Facilitator's items from the team node: a sleep/wake/trigger
+methodology (the daemon log is the signal to build on) and a skgrepo for
+each teammate (a config each, as mine; the ladder change made that
+routine). And the definitive import of docs/ into 'skg-system', which
+needs your decision on how docs/ is edited afterwards (3_review's
+question stands).
