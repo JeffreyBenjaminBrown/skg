@@ -218,33 +218,13 @@ sidecar lists.
 Whether a skgrepo is owned or foreign comes from the server's 'repos'
 request, which lists every configured skgrepo.
 *** The ancestry
-A compact view with one root, other than a buffer of the diff view,
-opens its summary with the root's ancestry: the containerward chain
-above the root, a line per container, each its title and ID, the
-root's container first and a root of the graph last:
-#+begin_example
-# Ancestry of the root, its containers upward:
-#   The fixture root (ID root-id)
-#   Above the root (ID top-id)
-#+end_example
-The tool reads it from the root's containers folder, which the server
-draws in a fresh content view (and under each search hit) with each
-container's containerward chain beneath it, so it costs no request. A
-root contained by several nodes, or by a node itself contained by
-several, has several chains, one per path from the folder to a leaf
-of it: the header says how many, writes out the first three in the
-folder's order, each after a line '# chain N', and counts the rest,
-which the containers folder in the view shows. A chain's last line
-can say ', met again: a cycle' (the server draws a container met
-again on the way as a leaf), ', its containers in another chain' (a
-container drawn with its own containers elsewhere in the folder) or
-', its containers not drawn' (the chain stopped at the server's depth
-limit, 'max_roleTree_depth', or at the skgrepo restriction). A root
-with no containers gets '# Ancestry: the root has no containers.'; one
-whose containers folder is missing from the view (a re-rendered view
-whose folder was deleted) gets a line saying how many containers it
-has. A search with several hits has no single root, and gets no
-ancestry. '--no-summary' leaves it out with the rest of the summary.
+A view does not summarize the root's ancestry: the containers folder
+that the server draws as the root's first child in a fresh content
+view (and under each search hit) holds it, each container with its
+own containers nested beneath it, so each chain upward reads as a path
+of nested headlines. 'contains ID' gives the same view of any node,
+to read its ancestry the same way. The folder is absent when nothing
+contains the root.
 
 A buffer of the diff view opens its summary with two more lines: the
 readiness summary the server sends ("1 of 4 changed files are ready",
@@ -304,17 +284,11 @@ Wait for "Server ready." in 'server.log', then run the tool with
 server ('cargo build --bin skg'; 'SKG_BINARY' names another binary).
 First it checks the relationship heralds against the rendering cases
 both clients' tests share, 'tests/shared/herald-rendering-cases.txt',
-taking those whose text is only relationship and property tokens, and
-the ancestry header against small views written in the test, for what
-the fixture does not yield: no containers, a missing containers
-folder, several roots, a cycle, a container drawn in another chain,
-an undrawn one, and more chains than are shown. Then it copies
-'test-fixture/' to a temporary data root, starts a server there on
-port 1793 ('SKG_FOR_AI_TEST_PORT' changes it), runs 'view' (of the
-root, of a child, whose ancestry has two levels, and of a node with
-two containerward chains), 'search', 'links-here' and 'contains', and
-compares each compact view with its file in 'test-expected/'. It also
-checks that every handle names its own line and that line is a headline of the full view. Then
+taking those whose text is only relationship and property tokens. Then
+it copies 'test-fixture/' to a temporary data root, starts a server
+there on port 1793 ('SKG_FOR_AI_TEST_PORT' changes it), runs 'view',
+'search', 'links-here' and 'contains', and compares each compact view
+with its file in 'test-expected/'. It also checks that every handle names its own line and that line is a headline of the full view. Then
 it sends a 'repos' request through 'raw' and imports a Markdown file
 through 'import', and checks that the runs, the 'links-here' save
 among them, left every '.skg' file of the fixture as it was.

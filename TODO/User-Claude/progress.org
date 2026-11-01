@@ -1057,3 +1057,11 @@ the other counts are the same in every buffer.
 Two chains through the same container write that container out in
 both. The tree is in the containers folder below; the header favours
 a chain read top to bottom over compactness.
+
+Later, per Jeff's decision in '4_plan.org' ("You might find
+org-ancestry useful"), the header was removed in favour of the
+containers folder, which every fresh view carries as the root's first
+child and which shows the same chains as nested headlines. Its code,
+the 'failures_of_ancestry_cases' check and the 'view_child-a-id' and
+'view_shared-id' runs went with it; the README's "The ancestry" now
+points to the folder and to 'contains'.

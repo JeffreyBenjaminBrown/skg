@@ -11,8 +11,7 @@ For a requested view it writes, into a directory the caller names:
   headline, N being the headline's 1-based line number in the full
   view, and every '[[id:...]]' link followed by its target's title.
   A summary of the view's facts precedes the tree unless
-  '--no-summary' is given; for a view with one root it opens with the
-  root's containerward chains.
+  '--no-summary' is given.
 - NAME.view.json: the server's view ID, the request, the generation
   the server rendered the view at, and the server's errors and
   warnings.
@@ -1273,8 +1272,7 @@ def summary_lines (parsed_view, link_statuses, repo_ownership, view,
     return "# " + ", " . join (
       name + " " + str (count) for name, count in pairs ) + "."
   return ( diff_summary_lines (parsed_view, view)
-           if view [ "command" ] == "diff"
-           else ancestry_lines (parsed_view) ) + [
+           if view [ "command" ] == "diff" else [] ) + [
     "# skg-for-ai compact view of " + full_file_name +
       " (view ID " + view [ "view_id" ] + ")",
     "# Each headline ends in ⟨N ...⟩, N its line number in the full view;",
@@ -1316,116 +1314,6 @@ def summary_lines (parsed_view, link_statuses, repo_ownership, view,
             ( "warnings", len ( view [ "warnings" ] ))) [ : -1 ] +
       ( " (listed in the .view.json file)."
         if view [ "errors" ] or view [ "warnings" ] else "." ) ]
-
-# ------------------------------------------------------------
-# The root's ancestry, from its containers folder
-# ------------------------------------------------------------
-
-# The chains the ancestry header writes out; it counts the rest.
-ANCESTRY_CHAINS_SHOWN = 3
-
-def ancestry_lines (parsed_view):
-  """Org comment lines giving the containerward chains above the root
-  of a single-root view, read from the root's containers folder (which
-  a fresh content view, and each hit of a search, carries), a line
-  per container: the first chains in the folder's order, then a count
-  of the rest. No lines for a view with several roots."""
-  outline = outline_of_full_view (parsed_view)
-  view_lines_by_number = { view_line . line_number : view_line
-                           for view_line in parsed_view }
-  root_indices = [ index for index, headline in enumerate (outline)
-                   if headline . parent is None ]
-  if len (root_indices) != 1:
-    return []
-  root_index = root_indices [0]
-  root_metadata = view_lines_by_number [
-    outline [root_index] . handle ] . metadata
-  folder_index = next (
-    ( index for index in children_indices (outline, root_index)
-      if headline_kind_in_outline (
-          outline, index, view_lines_by_number ) == "containerFolder" ),
-    None )
-  if folder_index is None:
-    container_count = ( side_count (root_metadata, "contains", "in")
-                        if root_metadata is not None else 0 )
-    return [ "# Ancestry: the root has no containers." if container_count == 0
-             else f"# Ancestry: the root has {container_count} "
-                  f"container{plural_suffix (container_count)}; "
-                  "this view does not show its containers folder." ]
-  chains = containerward_chains (
-    outline, folder_index, view_lines_by_number,
-    [ headline_gnid (root_metadata) ] if root_metadata is not None else [] )
-  shown_chains = chains [ : ANCESTRY_CHAINS_SHOWN ]
-  if len (chains) == 1:
-    lines = [ "# Ancestry of the root, its containers upward:" ]
-  else:
-    lines = [ f"# Ancestry of the root, its containers upward, "
-              f"{len (chains)} chains:" ]
-  for chain_number, chain in enumerate (shown_chains, start = 1):
-    if len (chains) > 1:
-      lines . append ( f"# chain {chain_number}" )
-    lines += [ "#   " + step for step in chain ]
-  unshown_count = len (chains) - len (shown_chains)
-  if unshown_count:
-    lines . append (
-      f"# and {unshown_count} more chain{plural_suffix (unshown_count)}, "
-      "in the root's containers folder." )
-  return lines
-
-def containerward_chains (outline, folder_index, view_lines_by_number,
-                          root_gnids):
-  """Each path from a member of the containers folder at FOLDER_INDEX
-  down its containerward chain to a leaf, as the steps
-  'TITLE (ID GNID)', in the order the view draws them. The server
-  draws a container met again on the way once more, as a leaf; such a
-  leaf says whether it closes a cycle or another chain shows what
-  contains it. Any other leaf with containers says they are not
-  drawn (the chain stopped at its depth limit or a skgrepo
-  restriction)."""
-  def container_indices_of (index):
-    return [ child for child in children_indices (outline, index)
-             if headline_kind_in_outline (
-                 outline, child, view_lines_by_number ) == "node" ]
-  def gnid_at (index):
-    return headline_gnid (
-      view_lines_by_number [ outline [index] . handle ] . metadata )
-  gnids_with_containers_drawn = {
-    gnid_at (index)
-    for index in descendant_indices (outline, folder_index)
-    if headline_kind_in_outline (
-        outline, index, view_lines_by_number ) == "node"
-    and container_indices_of (index) }
-  def chains_from (index, gnids_below):
-    view_line = view_lines_by_number [ outline [index] . handle ]
-    gnid = headline_gnid (view_line . metadata)
-    step = view_line . title + " (ID " + str (gnid) + ")"
-    container_indices = container_indices_of (index)
-    if gnid in gnids_below:
-      return [[ step + ", met again: a cycle" ]]
-    if not container_indices:
-      if side_count (view_line . metadata, "contains", "in") > 0:
-        step += ( ", its containers in another chain"
-                  if gnid in gnids_with_containers_drawn
-                  else ", its containers not drawn" )
-      return [[ step ]]
-    return [ [ step ] + chain
-             for container_index in container_indices
-             for chain in chains_from (
-                 container_index, gnids_below + [ gnid ] ) ]
-  return [ chain
-           for member_index in container_indices_of (folder_index)
-           for chain in chains_from (member_index, root_gnids) ]
-
-def plural_suffix (count):
-  return "" if count == 1 else "s"
-
-def children_indices (outline, index):
-  return [ child for child in descendant_indices (outline, index)
-           if outline [child] . parent == index ]
-
-def headline_kind_in_outline (outline, index, view_lines_by_number):
-  metadata = view_lines_by_number [ outline [index] . handle ] . metadata
-  return headline_kind (metadata) if metadata is not None else None
 
 def diff_summary_lines (parsed_view, view):
   """The readiness summary the server sent with a buffer of the diff

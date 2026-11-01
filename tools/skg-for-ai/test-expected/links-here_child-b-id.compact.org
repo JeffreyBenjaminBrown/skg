@@ -1,6 +1,3 @@
-# Ancestry of the root, its containers upward:
-#   The fixture root (ID root-id)
-#   Above the root (ID top-id)
 # skg-for-ai compact view of links-here_child-b-id.full.org (view ID content-view:child-b-id)
 # Each headline ends in ⟨N ...⟩, N its line number in the full view;
 # a bare 'aC' (only the parent contains it) is left out, and 'folded'
