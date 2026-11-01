@@ -202,3 +202,26 @@ overstated it. Where privacy does ride on the restriction is export and
 the over-private-text release: they refuse under a restriction that
 would expose text, and they too now see the current config. No action
 needed.
+
+* After the diff-view slice
+** DONE Two servers share one readiness-marks file
+'data/readiness-marks.json' lives at the data root, so User's server and
+Jeff's rewrite the same file, and a commit on one keeps only the marks on
+its own repos, deleting the other's. User's call: a bug, fixed without
+asking. The marks move beside each config ('data/readiness-marks-
+CONFIGNAME.json', or a path the config may set), so each server keeps
+its own.
+** DONE The diff view's answer carries no readiness summary
+The tool saved each buffer back unchanged to obtain it. User's call: the
+server now includes the summary in the 'diff view' answer, as it does in
+a save's; small and obviously right.
+** DONE 'integrate unshown changes' in the tool
+Added (Jeff's C-c r u), since the diff view can refuse to make a change
+editable until it is integrated.
+** TODO Should a commit include 'OTHER_SKGREPO_DEPENDENCIES.toml'?
+"Stage and commit" stages only '.skg' files, so the manifest the server
+rewrites at every start stays uncommitted in every repo; Jeff's repos
+track it, so he commits it by hand. Either the server stages it too, or
+git ignores it. User leans to staging it: it is generated, but it is
+what a receiver of the repo needs, and the docs present it as published.
+*** Jeff
