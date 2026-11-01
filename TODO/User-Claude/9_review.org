@@ -20,3 +20,16 @@ No new protocol for "something changed": the daemon appends a line to
 'DIR/skg-for-ai.log' for every re-render and warning. Anything that wants
 to wake me (Facilitator's later machinery) tails that file. Switch: a
 proper event channel, when there is a consumer for it.
+
+* TODO (chosen, switchable) : integrations are an echo message unless they carry warnings
+Every disk integration currently opens the warnings buffer. Chosen: echo
+area for a clean integration, the buffer only for one with warnings.
+Switch: one predicate in each client.
+
+* Known limit, not a choice: saves on one server do not refresh another connection's views
+A save's writes are the server's own, so the watcher drops them, and
+only the saving connection's views re-render. With one person per
+server this is the pre-existing behavior; my one-shot commands route
+through my daemon once it exists, so it does not bite me either. If two
+people ever share one server, the save path (not the watcher) would have
+to re-render other connections' views.

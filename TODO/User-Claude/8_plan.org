@@ -64,6 +64,17 @@ he creates 'to User' in one of his repos and tells me its ID; I then
 subscribe my own node to it through the tool (a subscription is a
 relationship recorded in my repo, so it needs no permission). Until the
 ID exists, nothing to build; the plan only records the steps.
+** Quieter integrations in the clients
+The watching slice opens the warnings buffer at every integration, as
+startup warnings do. Chosen, switchable: an integration with no warnings
+of its own is an echo-area message ("repo X: N files integrated; views
+re-rendered"); the buffer opens only when the integration carries real
+warnings (a bad file, a leak). Both clients.
+** The clients send the buffer kind on a diff-view save
+The server accepts '(diff-view-buffer . "KIND")' so an unheld diff buffer
+re-renders as a diff view; the tool sends it, the clients do not yet, so
+their diff buffers re-render as content views after a server restart.
+Each client keeps the kind buffer-locally and sends it; one test each.
 ** The tool's README front page
 A newcomer's page, before the reference: the five things a teammate
 needs (start a daemon, view, edit the compact file, save with the

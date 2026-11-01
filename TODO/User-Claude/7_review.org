@@ -82,10 +82,10 @@ time it saves, the server has forgotten the view and treats every ID in
 the buffer as unknown, giving each headline a fresh one. The tool worked
 around that by reopening the view before saving, which kept most handles
 but let the highest ones change after a removal.
-*** TODO [jeff] Is it good to open a fresh connection for each command?
+*** [jeff] Is it good to open a fresh connection for each command?
 Do we lose nothing important, in our attempt to make your experience
 match mine as closely as possible?
-**** TODO Jeff : User: we lose two things, and they are about to matter
+**** Jeff : User: we lose two things, and they are about to matter
 A connection is where the server keeps what it knows about a client:
 the views it holds, the repo restriction, and the channel on which it
 sends things the client did not ask for. Emacs keeps one connection for
@@ -116,6 +116,8 @@ one-shot commands keep working against it. That makes my experience
 closer to yours in the way that matters: the buffer updates under me,
 and I am told why. I would build it right after the watching slice,
 since the watcher is what makes it worth having.
+****** DONE [jeff] agreed
+******* User : the daemon is '8_plan.org', launching now.
 ** The fix now being built
 A save against a view the server does not hold takes the buffer's own
 viewnode IDs as the view's record: each headline keeps the ID it carries,
@@ -123,7 +125,7 @@ and new headlines are numbered past the highest. For a view the server
 does hold nothing changes. This makes every handle stable across saves,
 and it also helps you: an Emacs buffer saved after a server restart
 keeps its viewnode IDs instead of being renumbered.
-** TODO Jeff : done, with one remaining case
+** Jeff : done, with one remaining case
 Built and committed. Handles in a content view now survive every save,
 removals included. The one buffer that can still renumber is a diff-view
 buffer: the server re-renders it as a diff view (with its readiness
