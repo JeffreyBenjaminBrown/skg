@@ -72,4 +72,23 @@ Returns (REQUESTED-BUFFERS OPENED-BUFFER-NAMES)."
     (should (equal requested '("all changes")))
     (should (null opened))))
 
+(ert-deftest test-skg-diff-view-shows-the-readiness-summary ()
+  (let ((shown nil))
+    (cl-letf (((symbol-function 'message)
+               (lambda (format-string &rest args)
+                 (setq shown (apply #'format format-string args)))))
+      (test-skg-diff-view--run
+       `(("all changes"
+          . ,(prin1-to-string
+              '((content "* (skg node (gnid a)) a\n")
+                (errors ()) (warnings ()) (rendered-at "7")
+                (readiness-summary (ready 1) (changed 3) (foreign 0)
+                                   (order-only 0) (notEditable 2)))))
+         ("merges" . ,test-skg-diff-view--empty)
+         ("skgrepo changes" . ,test-skg-diff-view--empty)
+         ("order-only changes" . ,test-skg-diff-view--empty))))
+    (should (equal shown
+                   (concat "1 of 3 changed files are ready, 2 changes are "
+                           "not editable in this view; C-c r u integrates them")))))
+
 (provide 'test-skg-diff-view)

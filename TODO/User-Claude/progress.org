@@ -993,3 +993,67 @@ under a write-protected one, instead.
 The answer carries it now; showing it would need one line in each
 client's diff view handler. Today they show it only after a save,
 C-c r u and an unconfirmed commit.
+* The ancestry header in compact views; the diff view's summary on opening: DONE, uncommitted
+** What changed
+*** The ancestry header, in the tool
+A compact view with one root, other than a buffer of the diff view,
+opens its summary with the root's containerward chains, a line per
+container, each its title and ID ('ancestry_lines' and
+'containerward_chains' in 'skg_for_ai.py'). It costs no request: the
+tool reads the root's 'containerFolder', which the server already
+draws in every fresh content view (the 'containers' request a fresh
+view puts on each root) and under each search hit, with the chains
+beneath its members. 'skg-view-ancestry' itself asks the server
+nothing; it reads the org outline above point, so the chain the
+containers folder draws is the server-side equivalent.
+
+Policy, documented in the README under "The ancestry": the header
+says how many chains there are (one per path from the folder to a
+leaf), writes out the first three, each after '# chain N', and counts
+the rest. A chain's last line says ', met again: a cycle', ', its
+containers in another chain' or ', its containers not drawn' when
+the leaf has containers the chain does not show. A root without
+containers gets '# Ancestry: the root has no containers.'; one whose
+folder is missing from a re-rendered view gets a count of its
+containers. A search with several hits gets none; '--no-summary'
+drops it with the rest of the summary.
+
+Tests: two new 'view' runs on the unchanged fixture, 'view_child-a-id'
+(two levels: the fixture root, then the node above it) and
+'view_shared-id' (two chains), with their expected files;
+'view_root-id' and 'links-here_child-b-id' gained the header. A
+fixture-free check, 'failures_of_ancestry_cases', covers no
+containers, a missing folder, several roots, a cycle, a container
+drawn in another chain, an undrawn one, and more chains than shown.
+
+On Jeff's server (read-only 'view', closed), User Claude's header read:
+#+begin_example
+# Ancestry of the root, its containers upward:
+#   the team (ID 63f243e0-59d7-4119-b027-2140eb810a70)
+#   AI team for Skg (ID 703f5a82-d948-431f-985c-4db8132bc504)
+#+end_example
+*** The readiness summary when the diff view opens, in both clients
+'skg--handle-diffView-response' (Emacs) and 'handle_diffView_response'
+(Neovim) show the summary the "diff view" answer carries, through the
+same 'skg--readiness-summary-message' and 'readiness_summary_message'
+a save uses, for each buffer they open. This answers the open
+question in the previous section. One test per client, beside the
+existing diff-view tests. 'docs/COMMANDS.org',
+'docs/COMMANDS-nvim.org' and 'docs/diff-view.org' ("The readiness
+summary") say so.
+** Deviations
+The ancestry is written as one line per container under a heading
+line, not as one line joined by arrows: with full IDs a joined line
+of three or four containers runs past 200 characters. The fixture
+needed no new node: 'child-a-id' already sits two levels below the
+top.
+** What's imperfect
+*** Each opened buffer replaces the previous buffer's message
+The clients show the summary once per buffer they open, so with
+several buffers only the last one's stays visible. That is the
+current buffer's, whose not-editable count is the one that applies;
+the other counts are the same in every buffer.
+*** Chains sharing a prefix repeat it
+Two chains through the same container write that container out in
+both. The tree is in the containers folder below; the header favours
+a chain read top to bottom over compactness.

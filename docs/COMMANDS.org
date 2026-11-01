@@ -967,7 +967,8 @@ the context needed to understand it. It opens up to four buffers,
 changes" and "diff-view: order-only changes", skipping any that would
 be empty. It refuses unless the connection is unrestricted, and
 when an owned skgrepo is not in a git repository or has no HEAD
-commit (the refusal names the skgrepo).
+commit (the refusal names the skgrepo). As each buffer opens, the
+minibuffer shows its readiness summary, as after a save (see C-c r).
 
 Once the diff view's buffers are open, a switch of the
 skgrepo restriction ('skg-restrict-repo-set', C-c v l) rerenders them under

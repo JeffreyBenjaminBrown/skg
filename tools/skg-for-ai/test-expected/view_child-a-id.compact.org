@@ -1,0 +1,19 @@
+# Ancestry of the root, its containers upward:
+#   The fixture root (ID root-id)
+#   Above the root (ID top-id)
+# skg-for-ai compact view of view_child-a-id.full.org (view ID content-view:child-a-id)
+# Each headline ends in ⟨N ...⟩, N its line number in the full view;
+# a bare 'aC' (only the parent contains it) is left out, and 'folded'
+# marks a headline a client shows collapsed.
+# Headlines 5, node occurrences 4, distinct nodes 4, folders 1.
+# Skgrepos: main (owned) 4.
+# Foreign 0, write-protected 2, folded 0.
+# Contained elsewhere too 3, subscribed to 0, subscribing 0.
+# Links 0, distinct targets 0, resolved 0, unresolved 0.
+# Server errors 0, warnings 0.
+* First child ⟨1 1C1 ⌂:main⟩
+A body line that stays unnumbered.
+** ⟨3 containerFolder⟩
+*** The fixture root ⟨4 1C2b L2⟩
+**** Above the root ⟨5 Ca⟩
+** Contained twice ⟨6 2aC⟩

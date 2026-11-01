@@ -60,4 +60,32 @@ describe('skg.diff_view', function ()
     assert.are.same({ 'skg://diff-view: all changes',
                       'skg://diff-view: skgrepo changes' }, opened)
   end)
+
+  it('shows the readiness summary of a buffer it opens', function ()
+    local notices = {}
+    local original_notify = vim.notify
+    vim.notify = function (text) table.insert(notices, text) end
+    local requested = 0
+    server = helpers.connect_to_fake_server(function (line, respond)
+      if line:match('%(buffer %. "all changes"%)') then
+        requested = requested + 1
+        respond(helpers.framed(
+          '((response-type diff-view) (content "* (skg node (gnid a)) a")'
+          .. ' (errors ()) (warnings ()) (rendered-at "7")'
+          .. ' (readiness-summary (ready 1) (changed 3) (foreign 0)'
+          .. ' (order-only 0) (notEditable 2)))'))
+      elseif line:match('%(buffer %. ') then
+        requested = requested + 1
+        respond(helpers.framed(
+          '((response-type diff-view) (empty . t)'
+          .. ' (errors ()) (warnings ()))')) end
+    end)
+    diff_view.diffView_open()
+    vim.wait(3000, function () return requested == 4 end, 10)
+    vim.wait(200, function () return false end, 10)
+    vim.notify = original_notify
+    assert.are.same(
+      { '1 of 3 changed files are ready, 2 changes are not editable'
+        .. ' in this view; <localleader>ru integrates them' }, notices)
+  end)
 end)

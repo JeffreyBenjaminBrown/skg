@@ -556,9 +556,9 @@ earlier change", with "unready" or "ready" for the filtered forms).
 The answer to each "diff view" request for a nonempty buffer, to each
 save of a buffer of the diff view, and to C-c r u carries the
 readiness summary, as does the answer to a stage-and-commit that
-would leave changes behind. After every save of a buffer of the diff
-view, after C-c r u, and before such a stage-and-commit, the client
-shows it: "12 of 14 changed files are ready", or
+would leave changes behind. When a buffer of the diff view opens,
+after every save of one, after C-c r u, and before such a
+stage-and-commit, the client shows it: "12 of 14 changed files are ready", or
 "Commit ready. All 14 of 14 changed files are ready.". A changed file
 is ready when every change it records is marked; order-only files
 count as changed and ready. It is computed over every leaf of the

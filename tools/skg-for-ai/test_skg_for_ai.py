@@ -9,6 +9,7 @@ In order, it:
 - checks the relationship heralds against the rendering cases both
   clients' tests share ('tests/shared/herald-rendering-cases.txt'),
   those whose text is nothing but relationship and property tokens;
+- checks the ancestry header against small views it writes itself;
 - copies 'test-fixture/' to a scratch data root, starts a server
   there on port SKG_FOR_AI_TEST_PORT (default 1793), and runs each
   command of the tool against it;
@@ -61,6 +62,10 @@ HANDLE_PATTERN = re . compile (r'⟨([0-9]+)[ ⟩]')
 # Each run: the files' base name, then the tool's arguments.
 TOOL_RUNS = [
   ( "view_root-id",          [ "view", "root-id" ] ),
+  # Two containers upward: the fixture root, then the node above it.
+  ( "view_child-a-id",       [ "view", "child-a-id" ] ),
+  # Two chains, one of them through the root to the node above it.
+  ( "view_shared-id",        [ "view", "shared-id" ] ),
   ( "search_Fred",           [ "search", "Fred" ] ),
   ( "links-here_child-b-id", [ "links-here", "child-b-id" ] ),
   ( "contains_shared-id",    [ "contains", "shared-id", "--no-summary" ] ) ]
@@ -69,12 +74,73 @@ def main (argv):
   update_expected = "--update-expected" in argv
   failures = []
   failures += failures_of_shared_herald_cases ()
+  failures += failures_of_ancestry_cases ()
   failures += failures_against_scratch_servers (update_expected)
   for failure in failures:
     print ( "FAIL: " + failure )
   if failures:
     sys . exit (1)
   print ( "PASS" + ( " (expected files rewritten)" if update_expected else "" ))
+
+# ============================================================
+# The ancestry header, on views no fixture yields
+# ============================================================
+
+def ancestry_view_text (headlines):
+  """A full view of HEADLINES, each ( STARS, KIND, GNID, CONTAINER_COUNT,
+  TITLE ), KIND 'node' or a folder's kind atom."""
+  return "\n" . join (
+    ( f"{stars} (skg containerFolder)" if kind != "node"
+      else f"{stars} (skg node (gnid {gnid}) "
+           f"(view (rels (contains (in {count}))))) {title}" )
+    for stars, kind, gnid, count, title in headlines ) + "\n"
+
+ANCESTRY_CASES = [
+  ( "no containers",
+    [ ( "*", "node", "r", 0, "R" ) ],
+    [ "# Ancestry: the root has no containers." ] ),
+  ( "containers folder not shown",
+    [ ( "*", "node", "r", 2, "R" ) ],
+    [ "# Ancestry: the root has 2 containers; "
+      "this view does not show its containers folder." ] ),
+  ( "several roots",
+    [ ( "*", "node", "r", 0, "R" ), ( "*", "node", "s", 0, "S" ) ],
+    [] ),
+  ( "a cycle, a container drawn in another chain, an undrawn one",
+    [ ( "*", "node", "r", 2, "R" ),
+      ( "**", "containerFolder", None, None, None ),
+      ( "***", "node", "a", 1, "A" ),
+      ( "****", "node", "x", 2, "X" ),
+      ( "*****", "node", "r", 2, "R" ),
+      ( "*****", "node", "y", 1, "Y" ),
+      ( "***", "node", "b", 2, "B" ),
+      ( "****", "node", "x", 2, "X" ) ],
+    [ "# Ancestry of the root, its containers upward, 3 chains:",
+      "# chain 1", "#   A (ID a)", "#   X (ID x)",
+      "#   R (ID r), met again: a cycle",
+      "# chain 2", "#   A (ID a)", "#   X (ID x)",
+      "#   Y (ID y), its containers not drawn",
+      "# chain 3", "#   B (ID b)",
+      "#   X (ID x), its containers in another chain" ] ),
+  ( "more chains than shown",
+    [ ( "*", "node", "r", 4, "R" ),
+      ( "**", "containerFolder", None, None, None ),
+      ( "***", "node", "a", 0, "A" ), ( "***", "node", "b", 0, "B" ),
+      ( "***", "node", "c", 0, "C" ), ( "***", "node", "d", 0, "D" ) ],
+    [ "# Ancestry of the root, its containers upward, 4 chains:",
+      "# chain 1", "#   A (ID a)", "# chain 2", "#   B (ID b)",
+      "# chain 3", "#   C (ID c)",
+      "# and 1 more chain, in the root's containers folder." ] ) ]
+
+def failures_of_ancestry_cases ():
+  failures = []
+  for name, headlines, expected in ANCESTRY_CASES:
+    lines = skg_for_ai . ancestry_lines ( skg_for_ai . parse_full_view (
+      ancestry_view_text (headlines) ))
+    if lines != expected:
+      failures . append (
+        f"ancestry case '{name}': got {lines}, expected {expected}" )
+  return failures
 
 # ============================================================
 # Relationship heralds
