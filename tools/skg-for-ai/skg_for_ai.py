@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
-"""PURPOSE: read the skg graph through a running server, the way a
-person reads it in a client, but as two plain files per view.
+"""PURPOSE: a client of a running skg server for programs and people
+without an editor. It shows the graph the way a person reads it in a
+client, but as two plain files per view, and it speaks the protocol
+directly for anything else.
 
 For a requested view it writes, into a directory the caller names:
 - NAME.full.org: the view exactly as the server rendered it.
@@ -13,8 +15,12 @@ For a requested view it writes, into a directory the caller names:
 - NAME.view.json: the server's view ID, the request and the
   server's errors and warnings.
 
-Commands: 'view ID', 'search TERMS...', 'links-here ID',
-'contains ID', 'close SIDECAR'. Each prints the paths it wrote.
+View commands: 'view ID', 'search TERMS...', 'links-here ID',
+'contains ID'. Each prints the paths it wrote. 'links-here' saves,
+as the clients' 'C-c l m' does.
+Other commands: 'close SIDECAR'; 'raw REQUEST', which sends one
+request line and prints every response; 'import INPUT_DIR REPO',
+which previews and applies a Markdown and Org import.
 The port is SKG_PORT (default 1730), or '--port'.
 
 Standard library only. The README beside this file explains the
@@ -34,6 +40,9 @@ SHARED_FOLDER = os . path . join (REPO_ROOT, "shared")
 HOST = "127.0.0.1"
 DEFAULT_PORT = 1730
 FIRST_MESSAGE_TIMEOUT_SECONDS = 120
+IMPORT_TIMEOUT_SECONDS = 600
+# How long 'raw' waits after a response for another before it stops.
+RAW_QUIET_SECONDS = 3
 LINK_PATTERN = re . compile (
   r'\[\[id:([^\]\[]+)\](?:\[[^\]]*\])?\]')
 HEADLINE_PATTERN = re . compile (r'^(\*+) (.*)$')
@@ -50,6 +59,12 @@ def main (argv):
   arguments = parse_command_line (argv)
   if arguments . command == "close":
     command_close (arguments)
+    return
+  if arguments . command == "raw":
+    command_raw (arguments)
+    return
+  if arguments . command == "import":
+    command_import (arguments)
     return
   connection = SkgConnection (arguments . port)
   try:
@@ -77,11 +92,13 @@ def main (argv):
     print (path)
 
 def parse_command_line (argv):
-  common_options = argparse . ArgumentParser ( add_help = False )
-  common_options . add_argument (
+  port_option = argparse . ArgumentParser ( add_help = False )
+  port_option . add_argument (
     "--port", type = int,
     default = int ( os . environ . get ( "SKG_PORT", str (DEFAULT_PORT) )),
     help = "the server's port (default: SKG_PORT, else 1730)" )
+  common_options = argparse . ArgumentParser (
+    add_help = False, parents = [ port_option ] )
   common_options . add_argument (
     "--out-dir", default = ".",
     help = "the directory to write into (default: the current one)" )
@@ -93,7 +110,8 @@ def parse_command_line (argv):
     help = "omit the summary block from the compact view" )
   parser = argparse . ArgumentParser (
     prog = "skg_for_ai.py",
-    description = "Write a skg view as a full and a compact Org file." )
+    description = ( "A skg client: write a view as a full and a compact "
+                    "Org file, or send requests directly." ))
   commands = parser . add_subparsers ( dest = "command", required = True )
   for command, help_text in [
       ( "view", "the recursive content view of a node" ),
@@ -108,6 +126,24 @@ def parse_command_line (argv):
   commands . add_parser (
     "close", help = "send 'close view' for a sidecar's view ID",
     parents = [ common_options ] ) . add_argument ( "sidecar" )
+  raw_parser = commands . add_parser (
+    "raw", help = "send one request line; print every response",
+    parents = [ port_option ] )
+  raw_parser . add_argument ( "request", help = "the request, one sexp" )
+  raw_parser . add_argument (
+    "--saved-buffer", metavar = "FILE", default = None,
+    help = ( "send FILE's text as the length-prefixed body a "
+             "'save buffer' request carries, and read up to the "
+             "save's terminal response" ))
+  import_parser = commands . add_parser (
+    "import", help = "preview and apply a Markdown and Org import",
+    parents = [ port_option ] )
+  import_parser . add_argument (
+    "input_dir", help = "the directory to import, as the server sees it" )
+  import_parser . add_argument ( "repo", help = "the owned destination skgrepo" )
+  import_parser . add_argument (
+    "--preview-only", action = "store_true",
+    help = "cancel after the preview instead of applying it" )
   return parser . parse_args (argv)
 
 def default_base_name (arguments):
@@ -135,6 +171,57 @@ def command_close (arguments):
                     json . dumps (sidecar, indent = 2, ensure_ascii = False)
                     + "\n" )
   print (arguments . sidecar)
+
+def command_raw (arguments):
+  """Send ARGUMENTS.request, and with '--saved-buffer' its save body;
+  print each response as the server sent it. Without a body, every
+  response arriving until the server is quiet for RAW_QUIET_SECONDS."""
+  connection = SkgConnection (arguments . port)
+  try:
+    if arguments . saved_buffer is None:
+      messages = connection . raw_request (arguments . request)
+    else:
+      with open (arguments . saved_buffer, encoding = "utf-8") as buffer_file:
+        messages = connection . raw_save (
+          arguments . request, buffer_file . read () )
+  finally:
+    connection . close ()
+  print_messages (messages)
+
+def command_import (arguments):
+  """Preview the import, then apply it, or with '--preview-only'
+  cancel it, on one connection: the server binds the approval token
+  to the connection that previewed. A request for a host root, sent
+  when the input links to files by absolute path, is answered with
+  the empty one, which leaves those links unresolved."""
+  preview_fields = [ ( "action", "preview" ),
+                     ( "input-directory", arguments . input_dir ),
+                     ( "destination-repo", arguments . repo ) ]
+  messages = []
+  connection = SkgConnection (arguments . port)
+  try:
+    def send (fields):
+      message = connection . request_text (
+        request_line ( "import md and org", *fields ),
+        IMPORT_TIMEOUT_SECONDS )
+      messages . append (message)
+      return parse_sexp (message)
+    preview = send (preview_fields)
+    if response_type (preview) == "import-md-and-org-host-mapping-needed":
+      preview = send ( preview_fields + [ ( "host-root", "" ) ] )
+    token = response_field (preview, "approval-token")
+    if token is not None:
+      send ( [ ( "action", "cancel" ) ] if arguments . preview_only
+             else [ ( "action", "apply" ),
+                    ( "approval-token", sexp_to_text (token) ) ] )
+  finally:
+    connection . close ()
+  print_messages (messages)
+
+def print_messages (messages):
+  for index, message in enumerate (messages):
+    print ( f"--- message {index} ({len (message)} chars) ---" )
+    print (message)
 
 # ============================================================
 # Fetching views
@@ -243,7 +330,7 @@ def write_view_files (connection, view, out_dir, base_name, show_summary):
   full_text = view [ "content" ]
   parsed_view = parse_full_view (full_text)
   link_statuses = fetch_link_statuses (connection, parsed_view)
-  repo_ownership = fetch_repo_ownership (connection, parsed_view)
+  repo_ownership = fetch_repo_ownership (connection)
   compact_lines = []
   if show_summary:
     compact_lines += summary_lines (
@@ -575,30 +662,21 @@ def link_annotation (entry):
   return "⟦→ " + title + " ⌂:" + entry [ "label" ] + "⟧"
 
 # ============================================================
-# Repo ownership: whether a view's skgrepos are foreign.
-# No request lists the config's ownership flags, so the tool asks
-# 'flag state' about one node of each skgrepo the view shows.
+# Repo ownership: whether each configured skgrepo is owned or foreign,
+# as the server's 'repos' request reports it.
 # ============================================================
 
-def fetch_repo_ownership (connection, parsed_view):
-  """{REPO: True (owned) | False (foreign) | None (unknown)}."""
-  representative_by_repo = {}
-  for view_line in parsed_view:
-    if view_line . metadata is None:
-      continue
-    repo = headline_node_repo (view_line . metadata)
-    gnid = headline_gnid (view_line . metadata)
-    if ( repo and gnid and repo not in representative_by_repo
-         and headline_kind (view_line . metadata) == "node" ):
-      representative_by_repo [repo] = gnid
+def fetch_repo_ownership (connection):
+  """{REPO: True (owned) | False (foreign)}, for every skgrepo of the
+  config. A skgrepo it lacks is of unknown ownership."""
+  response = connection . request ( request_line ("repos") )
+  require_response_type (response, "repos")
   ownership = {}
-  for repo, gnid in representative_by_repo . items ():
-    response = connection . request (
-      request_line ( "flag state", ( "id", gnid ),
-                     ( "flag", "noSearchMatching" ) ))
-    owned = response_field (response, "owned")
-    ownership [repo] = ( None if owned is None
-                         else sexp_to_text (owned) == "true" )
+  for entry in response_field (response, "repos") or []:
+    entry = [ None ] + entry
+    name = sexp_to_text ( metadata_form (entry, "name") [1] )
+    owned = sexp_to_text ( metadata_form (entry, "owned") [1] )
+    ownership [name] = owned == "true"
   return ownership
 
 # ============================================================
@@ -734,6 +812,12 @@ def side_count (metadata, relation_name, side_name):
 class SkgToolError (Exception):
   pass
 
+class SkgServerQuietError (SkgToolError):
+  pass
+
+class SkgConnectionClosedError (SkgToolError):
+  pass
+
 class SkgConnection:
   """One TCP connection to the server. The server keeps a
   connection's views until it ends."""
@@ -752,29 +836,59 @@ class SkgConnection:
 
   def request (self, line):
     """Send one request line; return its one response, parsed."""
-    self . socket . sendall ( line . encode ("utf-8") + b"\n" )
-    return parse_sexp ( self . read_message (FIRST_MESSAGE_TIMEOUT_SECONDS) )
+    return parse_sexp (
+      self . request_text (line, FIRST_MESSAGE_TIMEOUT_SECONDS) )
+
+  def request_text (self, line, timeout_seconds):
+    """Send one request line; return its one response's text."""
+    self . send_line (line)
+    return self . read_message (timeout_seconds)
+
+  def raw_request (self, line):
+    """Send one request line; return the text of every response that
+    arrives before the server is quiet for RAW_QUIET_SECONDS."""
+    self . send_line (line)
+    messages = [ self . read_message (FIRST_MESSAGE_TIMEOUT_SECONDS) ]
+    while True:
+      try:
+        messages . append ( self . read_message (RAW_QUIET_SECONDS) )
+      except SkgServerQuietError:
+        if self . buffered:
+          raise SkgToolError (
+            "The server stopped partway through a response." )
+        return messages
+      except SkgConnectionClosedError:
+        return messages
 
   def save_buffer (self, view_id, buffer_text):
     """Send a save of BUFFER_TEXT; return every response up to and
     including the terminal one, parsed."""
-    self . socket . sendall (
-      ( request_line ( "save buffer", ( "view-id", view_id ),
-                       ( "point-lines-below-focused-headline", "0" ),
-                       ( "point-column", "0" ),
-                       ( "point-screen-lines-below-window-start", "0" ))
-        + "\n" ) . encode ("utf-8") )
+    return [ parse_sexp (message) for message in self . raw_save (
+      request_line ( "save buffer", ( "view-id", view_id ),
+                     ( "point-lines-below-focused-headline", "0" ),
+                     ( "point-column", "0" ),
+                     ( "point-screen-lines-below-window-start", "0" )),
+      buffer_text ) ]
+
+  def raw_save (self, line, buffer_text):
+    """Send the save request LINE with BUFFER_TEXT as its saved buffer;
+    return the text of every response up to and including the terminal
+    one."""
+    self . send_line (line)
     envelope = ( "((saved-buffer " + quote_string (buffer_text) +
                  ") (other-views ()))" ) . encode ("utf-8")
     self . socket . sendall (
       f"Content-Length: {len (envelope)}\r\n\r\n" . encode () + envelope )
     messages = []
     while True:
-      message = parse_sexp (
-        self . read_message (FIRST_MESSAGE_TIMEOUT_SECONDS) )
+      message = self . read_message (FIRST_MESSAGE_TIMEOUT_SECONDS)
       messages . append (message)
-      if response_type (message) in SAVE_TERMINAL_RESPONSE_TYPES:
+      if ( response_type ( parse_sexp (message) )
+           in SAVE_TERMINAL_RESPONSE_TYPES ):
         return messages
+
+  def send_line (self, line):
+    self . socket . sendall ( line . encode ("utf-8") + b"\n" )
 
   def read_message (self, timeout_seconds):
     """One 'Content-Length: N\\r\\n\\r\\nPAYLOAD' message's payload.
@@ -798,9 +912,9 @@ class SkgConnection:
     try:
       chunk = self . socket . recv (65536)
     except socket . timeout:
-      raise SkgToolError ( "The server did not answer in time." )
+      raise SkgServerQuietError ( "The server did not answer in time." )
     if not chunk:
-      raise SkgToolError ( "The server closed the connection." )
+      raise SkgConnectionClosedError ( "The server closed the connection." )
     self . buffered += chunk
 
 def request_line (request_name, *fields):

@@ -271,3 +271,39 @@ Should 'contains ID' write only the root and its containers folder,
 rather than the whole content view? For a large node the containers
 are lost below its content. The compact-view rule that every line of
 the full view appears would then hold for a narrower full view.
+* A 'repos' request, the unknown-ID view, one protocol client: DONE, uncommitted
+** The 'repos' request
+'((request . "repos"))' answers '((response-type repos) (restriction
+"NAME") (repos ((name "N") (path "P") (abbreviation "A") (owned
+"true")) ...))': every configured skgrepo in privacy order, and the
+connection's skgrepo restriction. The handler is
+'server/serve/handlers/repos.rs', its unit tests 'tests/unit/repos.rs';
+the API doc has a "Repos" section after "Flag state". The tool's
+summary takes ownership from it instead of asking 'flag state' about
+one node per skgrepo.
+
+The config loader makes every skgrepo path absolute and keeps no copy
+of the path as written, so the response gives a path below the data
+root relative to it and any other absolutely. A config that writes an
+absolute path below the data root is therefore reported relative.
+Keeping the written path would mean a new field on 'Skgrepo', which
+some 86 constructors build.
+** Viewing an unknown ID
+The empty view is the intended behavior: an unknown viewnode stands
+for an ID its viewparent's list names, no list names a root, so the ID
+rule makes the root a tombstone and the refresh prunes it. The API
+doc's "Single-root content view from ID" now says so, and that a
+skgrepo restriction refuses such a request instead. The verify
+skill's probe says what to expect. The server is unchanged.
+** One protocol client
+'.claude/skills/verify/skg_client.py' is deleted, and the skill's
+"Speaking the protocol" calls the tool. The tool gained 'raw REQUEST'
+(prints every response until the server is quiet for three seconds),
+'raw REQUEST --saved-buffer FILE' (sends FILE as a save's body and
+reads to the terminal response; the skill's 'save' mode needed a
+home, and the task named only view, search, raw and import), and
+'import INPUT_DIR REPO' (preview and apply on one connection, a blank
+host root if asked; '--preview-only' cancels instead). Its test now
+also runs 'raw' on 'repos' and an 'import' against the scratch server.
+The README says plainly that the tool may save and import, as any
+client may.

@@ -6,18 +6,6 @@
   When a plan or a settled discussion decides how an entry will be
   fixed, prefix its headline with 'FIX PLANNED: ' and leave it here
   until the fix lands; then move it as above.
-* Problems noticed while building tools/skg-for-ai (2026-11-01)
-** The verify skill says an unknown ID renders an unknown viewnode
-  '.claude/skills/verify/SKILL.md' lists, among its good probes, "view
-  a nonexistent id (renders an '(skg (unknown ...))' view, not an
-  error)". On a scratch server today, 'single root content view' of an
-  ID the graph lacks answers '(content "")' with no errors and no
-  warnings: an empty buffer, and nothing saying why.
-** Two hand-rolled clients of the TCP protocol
-  'tools/skg-for-ai/skg_for_ai.py' has its own length-prefixed reader
-  (buffered, and aware of the busy-initializing line) beside
-  '.claude/skills/verify/skg_client.py'. The skill's client could
-  import the tool's 'SkgConnection' instead.
 * Problems noticed while executing plan 10, slice 5 (2026-10-31)
 ** The server reads a title that starts "(skg" as metadata
   'headline_to_triple' ('server/from_text/buffer_to_viewnodes/

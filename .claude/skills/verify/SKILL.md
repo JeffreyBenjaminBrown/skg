@@ -62,14 +62,24 @@ on scratch data instead. Instances share nothing but the binary.
 
 Request: one sexp line + `\n`. Response: one or more
 `Content-Length: N\r\n\r\n<payload>` messages (save returns THREE:
-save-lock, save-relax-lock, save-result). A working Python client sits
-next to this file. Set `SKG_PORT` (default 1750), then:
-- `python3 skg_client.py view 1 "content-view:1"`
-- `python3 skg_client.py save "content-view:1" body.org`
-- `python3 skg_client.py raw '<sexp>'`
-- `python3 skg_client.py import /abs/input/dir main` (previews and
-  applies a Markdown/Org import in one connection, as approval tokens
-  require; a blank host root is sent if one is requested)
+save-lock, save-relax-lock, save-result). The client to use is
+`tools/skg-for-ai/skg_for_ai.py` (its `README.org` documents it). Give
+every command `--port <scratch port>` (or set `SKG_PORT`; the tool's
+own default is 1730), from the repo root:
+- `python3 tools/skg-for-ai/skg_for_ai.py view 1 --port 1750 --out-dir <scratch>/out`
+  writes `view_1.full.org` (the view as the server sent it, metadata
+  and all), `view_1.compact.org` (the same lines, metadata replaced by
+  a handle) and `view_1.view.json` (view ID, errors, warnings).
+  `search TERMS...` does the same for a search.
+- `python3 tools/skg-for-ai/skg_for_ai.py raw '<sexp>' --port 1750`
+  sends one request line and prints every response.
+- `python3 tools/skg-for-ai/skg_for_ai.py raw '<save request sexp>' --saved-buffer body.org --port 1750`
+  saves: it sends the file's text as the saved buffer, wrapped in the
+  body envelope, and prints every response up to the terminal one.
+- `python3 tools/skg-for-ai/skg_for_ai.py import /abs/input/dir main --port 1750`
+  previews and applies a Markdown/Org import on one connection, as
+  approval tokens require, answering a host-root request with the
+  blank one; `--preview-only` cancels instead of applying.
 
 The essentials:
 - View: `((request . "single root content view") (id . "1") (view-id . "content-view:1"))`
@@ -77,19 +87,24 @@ The essentials:
 - Save: `((request . "save buffer") (view-id . "content-view:1")
   (point-lines-below-focused-headline . "0") (point-column . "0")
   (point-screen-lines-below-window-start . "0"))` + newline, then the
-  buffer as an LP body. A new child is just a bare headline
+  buffer as an LP body, `((saved-buffer "BUFFER") (other-views ()))`.
+  Edit the `.full.org` file the `view` command wrote and pass it as
+  `--saved-buffer`. A new child is just a bare headline
   (`** some title`) under the metadata-carrying root line; the
   save-result echoes it back with a fresh UUID, and its `.skg` file
-  appears in `me/main/`.
+  appears in `me/main/`. A save need not come from the connection
+  that opened the view.
+- Repos: `((request . "repos"))` lists every skgrepo, its path and
+  whether it is owned.
 
 Org export needs no server: `./target/debug/skg export-org
 <scratch>/skgconfig.toml <repo-set> <output-dir>` (run it from the
 scratch dir, as the output dir is relative to the working directory).
 
-Good probes: view a nonexistent id (renders an `(skg (unknown ...))`
-view, not an error); send a bogus request type (clean
-`(response-type error)`); re-open the view fresh and check the edit
-persisted.
+Good probes: view a nonexistent id (an empty `content`, with no
+errors; the tool's `view` reports "the graph may lack that ID"); send
+a bogus request type (clean `(response-type error)`); re-open the view
+fresh and check the edit persisted.
 
 ## Cleanup
 

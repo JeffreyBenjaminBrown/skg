@@ -1,3 +1,23 @@
+* Problems noticed while building tools/skg-for-ai (2026-11-01)
+** The verify skill says an unknown ID renders an unknown viewnode
+  '.claude/skills/verify/SKILL.md' lists, among its good probes, "view
+  a nonexistent id (renders an '(skg (unknown ...))' view, not an
+  error)". On a scratch server today, 'single root content view' of an
+  ID the graph lacks answers '(content "")' with no errors and no
+  warnings: an empty buffer, and nothing saying why.
+  Resolved (2026-11-01): the empty view is the intended behavior. An
+  unknown viewnode stands for an ID its viewparent's list names; no
+  list names a root, so the ID rule makes it a tombstone and the
+  refresh prunes it. The skill's probe now says so, and the API doc's
+  "Single-root content view from ID" states it.
+** Two hand-rolled clients of the TCP protocol
+  'tools/skg-for-ai/skg_for_ai.py' has its own length-prefixed reader
+  (buffered, and aware of the busy-initializing line) beside
+  '.claude/skills/verify/skg_client.py'. The skill's client could
+  import the tool's 'SkgConnection' instead.
+  Resolved (2026-11-01): 'skg_client.py' is deleted. The tool gained
+  'raw' (with '--saved-buffer' for a save) and 'import', and the
+  skill's "Speaking the protocol" calls the tool.
 * Problems found by the review of plan 08 (2026-10-30; documented 2026-10-31)
   Found by the throwaway tests of 'TODO/simplify-refresh/
   09_review.org' (Open questions 1 and 2); the tests are in

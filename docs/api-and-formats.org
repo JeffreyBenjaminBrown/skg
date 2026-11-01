@@ -127,6 +127,13 @@ So far there are these endpoints:
   - If =NODE_ID= resolves to a restricted skgrepo, the server refuses the
     request with a human-readable message and does not open a buffer.
     Following a link to a restricted-skgrepo node behaves the same way.
+  - If =NODE_ID= names no node of the graph, the response is an
+    ordinary content-view whose =content= is empty, with no errors and
+    no warnings. An unknown viewnode stands for an ID its viewparent's
+    list names (see "ghost, unknown viewnode" in =docs/glossary.org=);
+    no list names a root, so the ID rule makes it a tombstone, which
+    the refresh prunes. Under a skgrepo restriction the request is
+    refused instead, as for a restricted node.
   - The requested node opens as itself, shown raw. Because the raw root
     is an overridden node shown raw, its immediate children are also shown
     raw (one level); substitution resumes at the grandchildren. See
@@ -646,6 +653,23 @@ since the command searches the current buffer.
   - The endpoint is read-only and may report =hadId=, =wasOverloaded=, or
     =noSearchMatching=. Ownership is advisory; save-time validation remains
     authoritative.
+
+** Repos
+  - Request: ((request . "repos"))
+  - Response: LP =((response-type repos) (restriction "NAME")
+    (repos ((name "NAME") (path "PATH") (abbreviation "ABBR")
+    (owned "true")) ...))=, one entry per configured skgrepo, in
+    privacy order (most public first; see "skgconfig.toml >
+    Skgrepos"). =PATH= is the skgrepo's path as the config writes it:
+    relative to the data root when it lies below it, else absolute.
+    =(abbreviation ...)= appears only when the skgrepo has one,
+    configured or derived (the =abbreviation= field of "Skgrepos").
+    =owned= is "false" for a skgrepo whose entry says
+    =foreign = true=. =(restriction ...)= is the connection's skgrepo
+    restriction, as "skgrepo restriction" reports it.
+  - The endpoint is read-only and ignores the skgrepo restriction: it
+    lists every skgrepo of the config, restricted or not.
+  - Logic: =server/serve/handlers/repos.rs=.
 
 ** Strip body whitespace
   - Request: ((request . "strip body whitespace"))

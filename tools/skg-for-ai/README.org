@@ -11,15 +11,19 @@ and once compactly, with the words, the nesting and a short handle per
 headline. Nothing is lost, because each handle points at the line of
 the full view that holds the headline's metadata.
 
-The tool is written for anyone, human or agent, who wants to read the
-graph without a client. It speaks the server's TCP protocol (see
-'docs/api-and-formats.org') and uses nothing but the Python 3 standard
-library. It never touches '.skg' files; only the server does.
+The tool is written for anyone, human or agent, who wants to use the
+graph without an editor client. It is a client like any other: it
+speaks the server's TCP protocol (see 'docs/api-and-formats.org'),
+and like the editor clients it may save and import, which write
+through the server to the skgrepos the config owns. It uses nothing
+but the Python 3 standard library. It never touches '.skg' files
+itself; only the server does.
 
 * Running it
 ** Commands
-Each command writes three files into '--out-dir' (default: the current
-directory) and prints their paths, one per line.
+Each view command ('view', 'search', 'links-here', 'contains') writes
+three files into '--out-dir' (default: the current directory) and
+prints their paths, one per line.
 
 'python3 tools/skg-for-ai/skg_for_ai.py view ID' writes the recursive
 content view of the node ID, as a client opens it.
@@ -29,7 +33,9 @@ the top level, with the containers of each hit beneath it.
 
 'links-here ID' writes the node's view with its mentioners folder: the
 nodes that link to it, each with its containerward chain (its
-containers, theirs, and so on up to the roots).
+containers, theirs, and so on up to the roots). It gets that view by
+saving, as 'C-c l m' does in Emacs; see "How 'links-here' looks
+backward".
 
 'contains ID' writes the node's view, which already shows what contains
 it: a fresh content view carries the root's containers folder, with
@@ -42,10 +48,26 @@ rarely needed.
 
 Following a link is just 'view' on the link's ID.
 
-Options, after the command: '--out-dir DIR'; '--name BASE' to name the
-files 'BASE.full.org' and so on instead of 'COMMAND_ARGUMENT';
-'--no-summary' to leave the summary out of the compact view; '--port
-N'.
+'raw REQUEST' sends REQUEST, one sexp, as a request line, and prints
+every response, each after a line '--- message N (CHARS chars) ---',
+until the server has been quiet for three seconds. With
+'--saved-buffer FILE' the request is a 'save buffer', and the tool
+sends FILE's text as the saved buffer in the length-prefixed body
+after it, then prints every response up to the save's terminal one.
+
+'import INPUT_DIR REPO' imports the Markdown and Org files under
+INPUT_DIR (a path the server can read) into the owned skgrepo REPO: it
+asks for a preview and then applies it, on one connection, since the
+server binds the preview's approval token to the connection that
+asked. When the server asks for the host root of absolute links, the
+tool answers with the empty one, leaving those links unresolved.
+'--preview-only' cancels instead of applying. It prints the responses
+as 'raw' does.
+
+Options, after the command: '--port N' for every command; for the
+view commands also '--out-dir DIR', '--name BASE' to name the files
+'BASE.full.org' and so on instead of 'COMMAND_ARGUMENT', and
+'--no-summary' to leave the summary out of the compact view.
 ** The port
 The tool connects to 127.0.0.1 on the port 'SKG_PORT' names, or 1730
 when it is unset; '--port' overrides both. The port of a server is the
@@ -132,9 +154,8 @@ and those subscribing; the links, their distinct targets, and how many
 of those resolve; and the server's errors and warnings, which the
 sidecar lists.
 
-No request lists which skgrepos the config marks foreign, so the tool
-asks the server's 'flag state' about one node of each skgrepo the view
-shows; its answer says whether that node is owned.
+Whether a skgrepo is owned or foreign comes from the server's 'repos'
+request, which lists every configured skgrepo.
 ** The sidecar
 'BASE.view.json' records the view ID, the command and its request, the
 port, the two files' names, the server's errors and warnings, and
@@ -157,7 +178,8 @@ ask for it by saving the view with a '(viewRequests (folder
 mentioners))' on the node's headline ('C-c l m' in Emacs), and the
 re-rendered buffer the save returns shows the mentioners folder. The
 tool does the same: it opens the view, adds that request to the root's
-metadata, and saves the otherwise unchanged buffer. Since nothing in
+metadata, and saves the otherwise unchanged buffer. The tool may save,
+as any client may. Since nothing in
 the buffer differs from the graph, the save writes no file, but it is
 a save, sent through the server's whole save path, so a node that the
 server would refuse or ask about on save (a foreign node edited, for
@@ -189,9 +211,10 @@ it copies 'test-fixture/' to a temporary data root, starts a server
 there on port 1793 ('SKG_FOR_AI_TEST_PORT' changes it), runs 'view',
 'search', 'links-here' and 'contains', and compares each compact view
 with its file in 'test-expected/'. It also checks that every handle
-names its own line and that line is a headline of the full view, and
-that the runs, the 'links-here' save among them, left every '.skg'
-file as it was. It prints PASS or each failure, and keeps the scratch
+names its own line and that line is a headline of the full view. Then
+it sends a 'repos' request through 'raw' and imports a Markdown file
+through 'import', and checks that the runs, the 'links-here' save
+among them, left every '.skg' file of the fixture as it was. It prints PASS or each failure, and keeps the scratch
 files when something fails. '--update-expected' rewrites the expected
 files instead of comparing; read the difference before keeping it.
 

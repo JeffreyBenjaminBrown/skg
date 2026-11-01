@@ -13,7 +13,9 @@ In order, it:
   there on port SKG_FOR_AI_TEST_PORT (default 1793), and runs each
   command of the tool against it;
 - compares each compact view with its file in 'test-expected/', and
-  checks that every handle names a headline line of the full view.
+  checks that every handle names a headline line of the full view;
+- sends a 'repos' request through 'raw', and imports a Markdown file
+  through 'import'.
 '--update-expected' rewrites the expected files instead of comparing.
 """
 
@@ -131,6 +133,7 @@ def failures_against_a_scratch_server (update_expected):
     for base_name, tool_arguments in TOOL_RUNS:
       failures += failures_of_one_run (
         base_name, tool_arguments, output_folder, update_expected )
+    failures += failures_of_raw_and_import (scratch)
     failures += failures_of_changed_skg_files (data_root)
   finally:
     server . terminate ()
@@ -143,10 +146,7 @@ def failures_against_a_scratch_server (update_expected):
 
 def failures_of_one_run (base_name, tool_arguments, output_folder,
                          update_expected):
-  completed = subprocess . run (
-    [ sys . executable, os . path . join (TOOL_FOLDER, "skg_for_ai.py") ]
-    + tool_arguments + [ "--port", str (PORT), "--out-dir", output_folder ],
-    capture_output = True, text = True )
+  completed = run_tool ( tool_arguments + [ "--out-dir", output_folder ] )
   if completed . returncode != 0:
     return [ f"'{' ' . join (tool_arguments)}' failed: {completed . stderr}" ]
   written = completed . stdout . split ()
@@ -173,6 +173,33 @@ def failures_of_one_run (base_name, tool_arguments, output_folder,
       f"got {expected_written [1]}" )
   return failures
 
+def failures_of_raw_and_import (scratch):
+  failures = []
+  raw = run_tool ([ "raw", '((request . "repos"))' ])
+  expected_repos = ( '((response-type repos) (restriction "main") (repos ('
+                     '((name "fred") (path "fred/public") (owned "false")) '
+                     '((name "main") (path "me/main") (owned "true")))))' )
+  if raw . returncode != 0 or raw . stdout . split ("\n") [1] != expected_repos:
+    failures . append ( f"'raw' printed {raw . stdout!r}, {raw . stderr!r}" )
+  import_folder = os . path . join (scratch, "import")
+  os . makedirs (import_folder)
+  with open ( os . path . join (import_folder, "imported.md"), "w",
+              encoding = "utf-8" ) as markdown_file:
+    markdown_file . write ( "# An imported heading\n\nIts text.\n" )
+  imported = run_tool ([ "import", import_folder, "main" ])
+  if ( imported . returncode != 0
+       or "(response-type import-md-and-org-result) (content \"Imported "
+          not in imported . stdout ):
+    failures . append (
+      f"'import' printed {imported . stdout!r}, {imported . stderr!r}" )
+  return failures
+
+def run_tool (tool_arguments):
+  return subprocess . run (
+    [ sys . executable, os . path . join (TOOL_FOLDER, "skg_for_ai.py") ]
+    + tool_arguments + [ "--port", str (PORT) ],
+    capture_output = True, text = True )
+
 def failures_of_handles (base_name, full_lines, compact):
   """Each handle names a headline of the full view, every headline is
   named once, and the compact tree has one line per full-view line."""
@@ -193,8 +220,8 @@ def failures_of_handles (base_name, full_lines, compact):
   return failures
 
 def failures_of_changed_skg_files (data_root):
-  """'links-here' sends a save; it must leave every '.skg' file as the
-  fixture has it."""
+  """'links-here' sends a save, and 'import' adds files; neither may
+  change a '.skg' file the fixture has."""
   failures = []
   for folder, _, file_names in os . walk (FIXTURE_FOLDER):
     for file_name in file_names:
