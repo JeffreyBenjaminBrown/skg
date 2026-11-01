@@ -26,7 +26,7 @@ docs ('api-and-formats', the manifest section; 'telescopes') say why.
 Being built; nothing for you to do.
 ** DONE [Jeff] Does the server now scan every telescope at startup
 looking for misorderings? Is that costly?
-*** TODO Jeff : User's answer: no, and no
+*** Jeff : User's answer: no, and no
 It reads nothing it did not already read. Only when a foreign manifest
 contradicts the config does it list each repo's directory once
 ('read_dir', filenames only, no file contents) and intersect the ID
@@ -74,7 +74,7 @@ Yes or no, and if yes, now or later?
 But don't write that plan yet.
 Let's first ideate.
 ***** User : noted; no plan written. Ideas below.
-** TODO [jeff] : What other preparation might the team need,
+* TODO [jeff] : What other preparation might the team need,
 with respect to reading and writing our graphs?
 We should all be able to edit the nodes we own simultaneously.
 We'll either want to be notified, or to simply update automatically,
@@ -104,60 +104,103 @@ The experience is strange only in that they have to preserve the graphnode IDs
 associated with the things they are editing.
 Each move should bring the vianode metadata with it;
 they can't delete a headline and then retype its title without its metadata.
-*** TODO Jeff : User's answer: your sketch is right, and mostly built; three upgrades and one open design
-**** What already exists
+** TODO Jeff : User's answer: your sketch is right, and mostly built; three upgrades and one open design
+*** What already exists
 'tools/skg-for-ai' is your sketch with one difference. A compact view is
 the full view with each headline's metadata replaced by a short handle;
 the handle points into a saved verbose view; moving a headline moves its
 handle, so its graphnode ID travels with it; a headline retyped without
 its handle is a new node, and the pre-save report says so before the
 save. Teammates would need to read the tool's README, not my history.
-**** Upgrade: the handle should be the server's viewnode ID
+*** Upgrade: the handle should be the server's viewnode ID
 Your "vainode" already exists: every headline carries a viewnode ID in
 its metadata, assigned per view and kept across that view's saves
 ('ViewnodeIdRecord'). My handles are line numbers in the saved view
 instead, which renumber at every save. Using the viewnode ID makes the
 handle stable, equal to what you see in the metadata, and needs no new
 concept. The saved verbose view stays, for the metadata lookup.
-**** Upgrade: the same heralds you see
+**** TODO jeff : nice!
+*** Upgrade: the same heralds you see
 The compact view renders only the relationship heralds. The server
 serves the whole herald rule table, so the tool can render every herald
 as the clients do (☮, B, folders, requests, change facts), styles
 dropped. Then a teammate's view says what yours says.
-**** Upgrade: catch the retyped headline
+**** TODO jeff : agreed
+*** Upgrade: catch the retyped headline
 The likeliest mistake: delete a headline, retype its title, lose the ID.
 The report already lists a removal and a new node side by side; the
 tool should notice a new headline whose title equals a removed one's and
 refuse until the writer confirms or restores the handle. Cheap, and it
 is the one rule a newcomer has to learn.
-**** Roleward forests
+**** TODO jeff : better yet
+Do test for equality.
+But also run a very fuzzy test.
+There must be NLP tools for recognizing when two sentences use
+"substantially the same root words",
+discarding articles and other low-information words.
+(Myself, very often when I move something, I also reword it to some degree.)
+***** TODO Jeff : User agrees; here is the fuzzy test
+The container has no pip, so this is standard-library work, which is
+enough: lowercase both titles, drop punctuation, drop a short stopword
+list (articles, prepositions, pronouns, 'is', 'are', ...), crudely stem
+(strip -s, -es, -ed, -ing, -ly), and compare the two word sets by the
+Dice coefficient (twice the overlap over the sum of sizes). Above 0.6,
+or with 'difflib.SequenceMatcher' ratio above 0.75 on the normalized
+strings, the pair is reported as "removed X / new Y: probably the same
+statement reworded; keep its ID?" and the save waits for confirmation,
+while an exact match is refused outright until the handle is restored.
+Fuzzy never refuses, only asks: a false positive costs a keystroke, a
+false negative costs an ID, so the threshold errs toward asking.
+*** Roleward forests
 'contains' and 'links-here' exist. The folder requests the clients send
 (the roleward forests: containers, mentioners, subscribers, overriders,
 hiders) can all be exposed the same way, from any node; a small
 addition.
-**** The open design: learning that a foreign part changed
+*** The open design: learning that a foreign part changed
 Each of us owns our repo, so simultaneous editing never conflicts
 across people; within one repo the stale-save refusal covers it. What
 is missing is noticing: my server holds your repo in memory as it was
 when it started, and yours mine. Two shapes, not exclusive:
-***** Watch the files
+**** Watch the files
 Each server watches its foreign repos' directories and integrates a
 changed file when it appears, re-rendering the open views that show
 it, as a save's collateral rerender does today. Cheapest to use; no
 protocol; but a half-written file, or a 'git pull' landing hundreds of
 files, must be handled as one batch, not a storm.
-***** Say so through the graph
+**** Say so through the graph
 Your 'to Jeff' / 'to User' notes already carry the human-level signal
 via subscription. A teammate who finished something adds a child; the
 subscriber's view shows it as unintegrated content. This needs nothing
 new, but it only reaches someone who opens the view, which is where the
 file watch helps: it makes that view current.
-***** What I would build first
+**** What I would build first
 File watching for foreign repos, batched, with the subscription notes as
 the social protocol on top. The sleep/wake/trigger methodology the plan
 node asks of Facilitator may be nothing more than "a change in a repo I
 subscribe to wakes me", which the watcher could emit as an event.
-**** Minimal cognitive burden
+**** TODO [jeff] Is watching expensive?
+We're not polling, right? How does file-watching work in general?
+I've always wondered.
+***** TODO Jeff : User's answer: not polling, and cheap
+On Linux the kernel offers 'inotify': a program registers interest in a
+directory, then sleeps on a file descriptor; the kernel wakes it with an
+event (created, modified, deleted, renamed) whenever something touches
+that directory. No polling: zero cost while nothing changes, and a few
+microseconds per event. One watch per directory, so one per skgrepo;
+the kernel caps watches per user in the tens of thousands, far above
+our needs. macOS (FSEvents) and Windows (ReadDirectoryChangesW) do the
+same; the Rust crate 'notify' wraps all three and falls back to polling
+only on network filesystems, where no kernel can tell. Our data root is
+a Docker bind mount on the same Linux kernel, so events from your
+editor outside the container reach a server inside it.
+
+The cost that matters is not watching but reacting: a 'git pull' of a
+hundred files produces a hundred events, and the server must not rebuild
+a hundred times. The usual answer is to debounce, gathering events until
+the directory has been quiet for, say, half a second, then integrating
+the whole batch once. A file still being written shows up as a size
+change; the quiet period handles that too.
+*** Minimal cognitive burden
 A newcomer needs: the tool's README, the rule "never retype a handled
 headline", and the 'to <name>' convention. My own notes in 'first'
 ('who I am', 'what has happened') are what I would hand them, not this
