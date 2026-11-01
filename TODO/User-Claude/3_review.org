@@ -229,6 +229,5 @@ I think we should exclude it. The diff view doesn't cover it,
 and I want users to have to think about it before changing that file.
 **** User
 Agreed and left as is: 'stage and commit' stages only '.skg' files, and
-the manifest is committed by hand, deliberately. The docs will say so
-in one sentence (after the running agent finishes with
-'api-and-formats', to avoid an edit collision).
+the manifest is committed by hand, deliberately. 'docs/diff-view.org'
+says so under "Stage and commit".
