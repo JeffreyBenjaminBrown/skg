@@ -396,6 +396,9 @@ def relations_in_display_order ():
                relations, key = lambda r : r [ "display_position" ] ) ]
 
 RELATIONS_IN_DISPLAY_ORDER = relations_in_display_order ()
+# Ordinary content: the parent contains it, and nothing else does. A
+# handle leaves this token out; every other form stays.
+BARE_PARENT_CONTAINS_TOKEN = "aC"
 PROPERTY_COUNT_LETTERS = [ ( "aliases", "A" ), ( "extraIds", "I" ),
                            ( "flags", "F" ) ]
 
@@ -615,17 +618,20 @@ def compact_line (view_line, link_statuses):
            ( " " if title else "" ) + handle )
 
 def handle_text (view_line):
-  """'⟨N KIND HERALDS⟩': N the line number in the full view, KIND only
-  for a headline that is not a node occurrence (a folder, an alias,
-  an unknown viewnode ...), HERALDS its relationship heralds."""
+  """'⟨N KIND HERALDS folded⟩': N the line number in the full view,
+  KIND only for a headline that is not a node occurrence (a folder, an
+  alias, an unknown viewnode ...), HERALDS its relationship heralds
+  but for a bare 'aC', and 'folded' when a client shows it collapsed."""
   parts = [ str (view_line . line_number) ]
   if view_line . metadata is not None:
     kind = headline_kind (view_line . metadata)
     if kind != "node":
       parts . append (kind)
-    heralds = relationship_heralds_text (view_line . metadata)
-    if heralds:
-      parts . append (heralds)
+    parts += [ token for token in
+               relationship_heralds_text (view_line . metadata) . split ()
+               if token != BARE_PARENT_CONTAINS_TOKEN ]
+    if metadata_has_atom (view_line . metadata, "folded"):
+      parts . append ("folded")
   return "⟨" + " " . join (parts) + "⟩"
 
 # ============================================================
@@ -665,7 +671,9 @@ def summary_lines (parsed_view, link_statuses, repo_ownership, view,
   return [
     "# skg-for-ai compact view of " + full_file_name +
       " (view ID " + view [ "view_id" ] + ")",
-    "# Each headline ends in ⟨N ...⟩, N its line number in the full view.",
+    "# Each headline ends in ⟨N ...⟩, N its line number in the full view;",
+    "# a bare 'aC' (only the parent contains it) is left out, and 'folded'",
+    "# marks a headline a client shows collapsed.",
     facts ( ( "Headlines", len (headlines) ),
             ( "node occurrences", len (occurrences) ),
             ( "distinct nodes",

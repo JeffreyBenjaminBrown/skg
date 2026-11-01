@@ -94,6 +94,17 @@ node it overrides. The property counts 'A' (aliases), 'I' (extra IDs)
 and 'F' (true flags) follow. So '⟨17 2aC3⟩' is line 17: two
 containers, one of them the viewparent, and three contents.
 
+One token is left out: a bare 'aC', which says only that the
+viewparent contains the node and nothing else does. That is the
+ordinary case in a content tree, so most handles would carry it;
+'⟨3 aC L1⟩' is written '⟨3 L1⟩', and '⟨5 aC⟩' just '⟨5⟩'. Every other
+form, 'aC10' or '2aC' among them, stays.
+*** Folded headlines
+A headline the server marks 'folded', one a client shows collapsed,
+ends its handle with the token 'folded': '⟨17 C3 folded⟩'. The lines
+under it are still in both files; the token tells where a person
+reading in a client would see less.
+
 The tool computes these from each headline's '(view (rels ...) (props
 ...) (birth ...))' facts, mirroring 'render_rel_facts' in
 'nvim/lua/skg/heralds.lua' and reading 'shared/relations.json' for the

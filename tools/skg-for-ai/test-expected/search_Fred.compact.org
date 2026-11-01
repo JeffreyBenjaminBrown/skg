@@ -1,5 +1,7 @@
 # skg-for-ai compact view of search_Fred.full.org (view ID search:Fred)
-# Each headline ends in ⟨N ...⟩, N its line number in the full view.
+# Each headline ends in ⟨N ...⟩, N its line number in the full view;
+# a bare 'aC' (only the parent contains it) is left out, and 'folded'
+# marks a headline a client shows collapsed.
 # Headlines 5, node occurrences 4, distinct nodes 3, folders 1.
 # Skgrepos: fred (foreign) 4.
 # Foreign 4, write-protected 4, folded 1.
@@ -9,5 +11,5 @@
 * Fred's note ⟨1 C1 1/L 1S⟩
 * An aside of Fred's ⟨2 1H⟩
 * A detail of Fred's ⟨3 1C 1H⟩
-** ⟨4 containerFolder⟩
+** ⟨4 containerFolder folded⟩
 *** Fred's note ⟨5 Cb 1/L 1S⟩
