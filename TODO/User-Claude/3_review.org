@@ -72,15 +72,22 @@ ephemeral agent is building it as outlined above; its report will land
 in 'progress.org'. Replace the 'AWAITS' marker in '3_review.org' with
 DONE once this section is merged back.
 * Decisions needed after the skgrepo slice
-** What User Claude may read
+** DONE What User Claude may read
 User's config lists all seven of Jeff's repos, down to 'personal-most',
 so User's server reads everything of Jeff's. Options: list only through
 'public' in User's config (User cannot read the rest at all), or keep the
 full list but set 'default_repo_set = "public"' (User can widen the
 restriction deliberately). User leans to the first: nothing in User's job
 needs the private notes, and what is not listed cannot leak.
-*** Jeff
-** Jeff's private repo names in User's repo
+*** Jeff : all but personal-most
+That doesn't mean you'll *want* to read them.
+My deciduous and personal-proc notes are tedious.
+personal-ish, on the other hand, is juicy. I'm trusting you with those;
+don't go telling the world, please :)
+**** User
+Done: 'personal-most' is out of 'data/skgconfig-user-claude.toml'. The
+rest stays, and nothing of yours goes anywhere but my own notes.
+** DONE Jeff's private repo names in User's repo
 The server writes 'OTHER_SKGREPO_DEPENDENCIES.toml' into every owned
 repo, listing each repo it may reference: for 'first', every one of
 Jeff's repo paths and GitHub remotes. Pushing 'first' anywhere public
@@ -89,27 +96,46 @@ would fix this, and would also remove the startup warning that User's and
 Jeff's configs order 'first' and 'personal-most' differently. If the
 first question is answered "list only through public", the manifest
 shrinks to public repos anyway.
-*** Jeff
-** Reloading a server's config
+*** Jeff : don't worry about it, I think.
+If I understand correctly, the problem here is that it leaks
+the fact that I have bodies of private notes.
+If so, it's a non-issue -- that's a safe thing to make known.
+**** User
+Right, that is all it reveals: paths and remote names, not contents.
+Nothing to do.
+** DONE Reloading a server's config
 Killing the server does not restart it; cargo-watch reacts only to
 edits under 'server/', so the agent touched 'server/main.rs' to force a
 rebuild. A wrapper that reruns the binary when it exits would make a
 kill mean a restart, and a 'reload config' request would avoid the kill.
-*** Jeff
-** One repo, two names
+*** Jeff : great!
+**** User
+Being built: 'bash/start-servers.sh' reruns the binary when it exits, so
+a kill is a restart, and the server gains a 'reload config' request that
+the clients expose as a command.
+** DONE One repo, two names
 'first' in User's config, 'user-claude' in Jeff's. Nothing breaks, since
 '.skg' files record no repo names, but labels in views and warnings
 differ between the two servers. Teammates could agree to name each
 other's repos as their owners do.
-*** Jeff
-** Should the save report read the full view's metadata?
+*** Jeff : seems fine
+** TODO Should the save report read the full view's metadata?
 It could warn in advance that a headline removed from under a
 write-protected occurrence or a folder only leaves the view, and that a
 write-protected occurrence's title cannot be edited, instead of letting
 the server say so after the fact. User's view: worth doing once the
 stale-save fix is in, since both are about the report's honesty.
-*** Jeff
-** 'rendered-at "never"'
+*** TODO Jeff : What the save report?
+**** User
+The report 'tools/skg-for-ai save' prints before it saves: the list of
+structural changes the edit would make (new, moved, removed, retitled
+headlines), which I read and then confirm with '--yes'. Today it only
+compares my edited compact view with the saved one. The question is
+whether it should also consult the full view's metadata, so it can warn
+me beforehand that, say, I am trying to retitle a write-protected node,
+which the server will refuse anyway. Small convenience; I'd do it, but
+it is not urgent. Yes or no?
+** DONE 'rendered-at "never"'
 A buffer no server response drew (a new empty view) sends
 '(rendered-at . "never")', and the server checks nothing in it. Text
 pasted from an old buffer into a new empty view therefore escapes the
@@ -117,4 +143,7 @@ check. User accepted this to ship the fix: the field is still required,
 so an old client cannot skip the check by omission, and a new empty view
 holding pasted old nodes is rare. The alternative is for the client to
 ask the server for the current generation when it opens an empty view.
-*** Jeff
+*** Jeff : that alternative seems easy, safe, and useful, no?
+**** User
+Yes. Being built: opening an empty view asks the server for the current
+generation, and 'never' is gone.
