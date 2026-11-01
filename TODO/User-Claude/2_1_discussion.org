@@ -1,0 +1,48 @@
+* DONE A save can name a view that another connection opened.
+On the scratch server, a fresh connection saved against a view ID it never opened, and the server accepted it. The writing half would rely on this (each tool command is its own connection), but it also sounds like a hole: does stale-view protection still hold, and is cross-connection saving intended?
+** jeff : Please elaborate.
+I don't understand your terms.
+*** User : what I meant, and what the code says
+A 'view' here is the server's record that some client has a buffer open
+on a root: the server registers it when it renders ('open_views' in
+'server/serve.rs'), uses it to know which buffers to re-render after a
+save, and frees it when the connection closes. That record belongs to
+one TCP connection. The Emacs client keeps one connection open for a
+whole session; the tool opens a fresh connection for every command, so
+the view it rendered in one command is gone by the time a later command
+saves.
+
+The question was whether the server would refuse such a save, or accept
+it unsafely. I read the save path: it accepts the buffer whether or not
+the view is registered, and the protection against saving old text
+('stale' = rendered before the graph changed) does not depend on the
+registration; it compares each node in the buffer with the graph. So the
+tool's one-connection-per-command design is fine. The only effect of the
+missing registration is that no other buffer on that connection gets
+re-rendered, and the tool has none. No decision needed from you; closed.
+* DONE "What links here" requires a save.
+The mentioners folder appears only in response to a save carrying that request, as C-c l m does. Should the view request accept such requests directly, so a read-only tool needn't save? Until then links-here isn't run against your live server.
+** Jeff: Why not save? Why be read-only?
+Assuming your skgconfig is right,
+you can only save to your own data.
+I want your experience to be as close to mine as possible.
+
+Maybe the skg-for-ai tooling was initially intended readonly,
+but if so, it is no longer thus.
+*** User : agreed
+Only the reading slice was read-only, and only so that its first live
+run against your server could not change anything. 'links-here' now runs
+like 'C-c l m' does, and the writing slice follows.
+* DONE No request reports which repos are owned. The tool infers it from flag state on one node per repo. A small "config summary" request would be cleaner.
+** DONE Jeff : Sure!
+* DONE The agent also logged two items in TODO/problems.org
+** the verify skill's claim that an unknown ID renders an unknown-node headline is wrong (the server returns an empty view)
+*** Jeff : please have someone fix that
+** the tool duplicates the skill's protocol reader.
+*** Jeff : what would be natural?
+**** User
+The tool is the real client; the skill is a recipe. So the skill's
+'skg_client.py' goes away and the skill's examples call the tool instead
+('tools/skg-for-ai/skg_for_ai.py raw ...' for a bare request). One
+protocol reader, in the tool.
+***** DONE Jeff : sounds good!
