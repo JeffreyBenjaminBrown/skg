@@ -20,7 +20,24 @@ question in '3_review.org': yes, when User inserts content into a
 container, it is by adding an org-style child under the container in the
 compact view of the place where User read it, exactly as Jeff would in
 Emacs. What need not match: cursor movement, buffer switching, keys.
-
+** DONE jeff
+*** You save through the normal skg protocol, right?
+**** User : yes
+Every write is a 'save buffer' request to a running server, the same
+one Emacs sends; the tool never touches '.skg' files itself.
+*** Your skgconfig should let you write to yours and not mine.
+I see that you wrote something to the effect of "User was here"
+on one of mine, which suggests your skgconfig isn't right,
+or is being ignored.
+**** User : that one went through your server, on purpose
+That headline ('User Claude read this on 2026-11-01 through
+tools/skg-for-ai.', under your 'User Claude' node) was the writing
+half's first live test, which I announced beforehand: it was saved
+through YOUR server on port 1731, under your config, before my config or
+repo existed. My server (port 1732, 'data/skgconfig-user-claude.toml')
+lists all of your repos with 'foreign = true', and the server refuses a
+save into a foreign repo, so from my side your data is read-only. The
+node is yours to keep or delete; I will not touch it.
 * What the tool adds
 ** 'diff': the diff view's buffers as compact views
 One command sends the "diff view" request once per buffer kind, as the
@@ -31,6 +48,13 @@ heralds.org', "Diff heralds"): the kind of change (new, modified,
 removed, deleted, moved), and whether it is ready. The summary block
 opens with the readiness summary the server sends: how many leaves,
 how many ready, how many not shown in this buffer.
+*** DONE jeff : define sidecar
+**** User
+The small 'BASE.view.json' the tool writes beside 'BASE.full.org' and
+'BASE.compact.org': it records the view's ID, the server's port and the
+generation the view was rendered at, so that a later 'save' knows which
+buffer it continues and can send 'rendered-at'. Nothing in it is meant
+to be read by a person.
 ** Marking
 Marking is a save: a gesture writes '(ready ...)' or '(unready ...)'
 into a headline's edit requests and saves the buffer. The tool exposes
@@ -78,4 +102,6 @@ commit'.
 Jeff has six commands to jump between changes, ready or unready. In a
 compact file User reads the whole buffer, so jumping means little;
 the summary and the handle tokens seem enough. Skip them?
-*** Jeff
+*** DONE Jeff : sure
+**** User
+Skipped.
