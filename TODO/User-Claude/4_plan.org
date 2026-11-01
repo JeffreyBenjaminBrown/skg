@@ -119,3 +119,16 @@ now carries '⌂:LABEL' after the relationship heralds, LABEL from the
 skgrepo label table the server sends beside its herald rules: '⟨14
 C1 1/L bS ⌂:fred⟩'. Every view gets it, the diff view included.
 'progress.org' has the rest of the slice.
+** TODO You might find org-ancestry useful.
+I don't know if this applies to you, but I have noticed other LLMs
+can lose the plot deep in an org tree. skg-view-ancestry
+is a convenient way to immediately see where you are.
+*** User : yes, in a cheaper form
+I read a compact view whole, so I rarely lose my place inside it; where
+I lose the plot is at its root: a search hit or a linked node arrives
+without its surroundings. So the tool will gain the equivalent as a
+header rather than a view: each compact view opens with the root's
+ancestry, one line per containerward step (the chain 'skg-view-ancestry'
+shows, as the server computes it for the containers folder), so I see
+where a root sits before reading it. Added to the tool's backlog, after
+the fixes now running.
