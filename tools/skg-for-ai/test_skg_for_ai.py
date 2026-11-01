@@ -240,7 +240,8 @@ def failures_of_writing (scratch, data_root):
   context = { "scratch" : scratch, "main_repo" : main_repo }
   for case in [ check_title_edit, check_body_edit, check_new_child,
                 check_move, check_removal, check_deletion,
-                check_bad_handles, check_server_refusal, check_stale_view ]:
+                check_bad_handles, check_server_refusal, check_stale_view,
+                check_new_root ]:
     try:
       case (context)
     except CaseFailure as failure:
@@ -437,6 +438,45 @@ def check_stale_view (context):
   # What the server did with the stale node: A's text replaced B's.
   require_equal ( "B's title after A overwrote it",
                   skg_title (context, "child-b-id"), "Second child, a subscriber" )
+
+def check_new_root (context):
+  """'new' refuses a foreign skgrepo without saving; in an owned one
+  it creates a root with no container, and its view continues the
+  edit-and-save loop: a body and a child are saved from it."""
+  folder = os . path . join ( context [ "scratch" ], "write", "new-root" )
+  files_before = skg_files (context)
+  refused = run_tool ([ "new", "A new root", "fred", "--out-dir", folder ])
+  if ( refused . returncode != 1 or refused . stdout
+       or "'fred' is not an owned skgrepo" not in refused . stderr ):
+    raise CaseFailure (
+      f"'new' in 'fred' gave exit {refused . returncode}, printed "
+      f"{refused . stdout!r}, stderr {refused . stderr!r}" )
+  require_equal ( "the owned files after the refused 'new'",
+                  skg_files (context), files_before )
+  created = require_tool_run (
+    [ "new", "A new root", "main", "--out-dir", folder, "--no-summary" ])
+  printed = created . stdout . split ("\n")
+  require_equal ( "what 'new' printed first", printed [0], saved_line (0) . strip () )
+  if not printed [1] . startswith ("New node: "):
+    raise CaseFailure ( f"'new' printed {created . stdout!r}" )
+  new_id = printed [1] [ len ("New node: ") : ]
+  base = os . path . join ( folder, "view_" + new_id )
+  require_equal ( "the paths 'new' printed", printed [ 2 : ],
+                  [ base + ".full.org", base + ".compact.org",
+                    base + ".view.json", "" ] )
+  require_equal ( "the new root's title",
+                  skg_title (context, new_id), "A new root" )
+  compact_path = base + ".compact.org"
+  require_equal ( "the new root's compact view",
+                  read_file (compact_path), "* A new root ⟨1⟩\n" )
+  with open (compact_path, "w", encoding = "utf-8") as compact_file:
+    compact_file . write ( "* A new root ⟨1⟩\nIts body.\n** Its child\n" )
+  require_save_succeeds (folder)
+  require_equal ( "the new root's body",
+                  skg_body (context, new_id), [ "Its body." ] )
+  [ child_id ] = skg_list (context, new_id, "contains")
+  require_equal ( "the new root's child's title",
+                  skg_title (context, child_id), "Its child" )
 
 # ------------------------------------------------------------
 # Helpers of the writing cases

@@ -18,6 +18,8 @@ For a requested view it writes, into a directory the caller names:
 View commands: 'view ID', 'search TERMS...', 'links-here ID',
 'contains ID'. Each prints the paths it wrote. 'links-here' saves,
 as the clients' 'C-c l m' does.
+'new TITLE REPO' creates a root node in an owned skgrepo, as a save of
+a new empty view does, and writes its view as 'view' would.
 'save SIDECAR' rebuilds the full buffer from an edited compact view,
 prints the changes it would make, and with '--yes' saves it and
 writes the server's re-rendered view over the three files.
@@ -36,6 +38,7 @@ import os
 import re
 import socket
 import sys
+import uuid
 
 REPO_ROOT = os . path . dirname ( os . path . dirname (
   os . path . dirname ( os . path . abspath (__file__) )))
@@ -71,6 +74,9 @@ def main (argv):
     return
   if arguments . command == "save":
     command_save (arguments)
+    return
+  if arguments . command == "new":
+    command_new (arguments)
     return
   connection = SkgConnection (arguments . port)
   try:
@@ -141,6 +147,12 @@ def parse_command_line (argv):
     help = ( "send FILE's text as the length-prefixed body a "
              "'save buffer' request carries, and read up to the "
              "save's terminal response" ))
+  new_parser = commands . add_parser (
+    "new", help = ( "create a root node TITLE in the owned skgrepo REPO, "
+                    "and write its view" ),
+    parents = [ common_options ] )
+  new_parser . add_argument ( "title" )
+  new_parser . add_argument ( "repo", help = "an owned skgrepo's name" )
   save_parser = commands . add_parser (
     "save", help = ( "save an edited compact view: print the changes, "
                      "and with '--yes' send them" ))
@@ -173,7 +185,10 @@ def default_base_name (arguments):
   argument = ( " " . join (arguments . terms)
                if arguments . command == "search"
                else arguments . id )
-  return ( arguments . command + "_" +
+  return base_name_for ( arguments . command, argument )
+
+def base_name_for (command, argument):
+  return ( command + "_" +
            re . sub ( r'[^A-Za-z0-9_.-]+', "-", argument ) . strip ("-") )
 
 def command_close (arguments):
@@ -293,6 +308,60 @@ def command_save (arguments):
     close_view_on_server (connection, rerendered [ "view_id" ])
   finally:
     connection . close ()
+  for path in written_paths:
+    print (path)
+
+def command_new (arguments):
+  """Create a root node titled ARGUMENTS.title whose home is the
+  owned skgrepo ARGUMENTS.repo, by saving a buffer holding only its
+  headline, as a client saves a new empty view ('C-c v e' in Emacs).
+  Then write the new node's view as 'view' does, named by default
+  'view_ID', so the edit-and-save loop continues from it."""
+  title = arguments . title . strip ()
+  if not title or "\n" in title:
+    raise SkgToolError ( "A title is one nonempty line." )
+  if not re . fullmatch ( r'[^\s()";]+', arguments . repo ):
+    raise SkgToolError (
+      f"'{arguments . repo}' is not a skgrepo name this command can "
+      "write into metadata." )
+  connection = SkgConnection (arguments . port)
+  try:
+    ownership = fetch_repo_ownership (connection)
+    if ownership . get (arguments . repo) is not True:
+      raise SkgToolError (
+        f"'{arguments . repo}' is not an owned skgrepo of this server; "
+        "its owned ones are: " +
+        ", " . join ( name for name, owned in ownership . items ()
+                      if owned ) + "." )
+    creating_view_id = "new-root:" + str ( uuid . uuid4 () )
+    messages = connection . save_buffer (
+      creating_view_id,
+      "* (skg node (skgRepos (nodeRepo " + arguments . repo + "))) " +
+      title + "\n" )
+    rerendered = rerendered_view_of_save (
+      messages [-1], { "view_id" : creating_view_id, "command" : "new",
+                       "request" : {} } )
+    close_view_on_server (connection, creating_view_id)
+    new_root = next ( ( line for line in
+                        parse_full_view ( rerendered [ "content" ] )
+                        if line . is_headline ), None )
+    node_id = ( headline_gnid (new_root . metadata)
+                if new_root is not None and new_root . metadata is not None
+                else None )
+    if node_id is None:
+      raise SkgToolError (
+        "The save succeeded, but its re-rendered view names no new node." )
+    view = fetch_single_root_view (connection, node_id)
+    require_view_has_headlines (view)
+    view [ "command" ] = "view"
+    written_paths = write_view_files (
+      connection, view, arguments . out_dir,
+      arguments . name or base_name_for ( "view", node_id ),
+      not arguments . no_summary )
+    close_view_on_server (connection, view [ "view_id" ])
+  finally:
+    connection . close ()
+  print ( "New node: " + node_id )
   for path in written_paths:
     print (path)
 

@@ -45,6 +45,16 @@ must come first, being more public than all of yours. A config from
 before that rule, which set 'owned_folder' or relied on the 'owned/'
 folder, is converted by 'bash/migrate-to-foreign-flag.sh CONFIG
 [NEW_FOLDER]'; see 'api-and-formats.org', "Skgrepos".
+
+Two people (or a person and an AI teammate) can share one data tree,
+each running a server from a config of their own: both configs list
+the same skgrepos, each marks the other's 'foreign = true', and each
+gives its server its own 'port' and its own 'tantivy_folder', so the
+two never share a search index. 'data/skgconfig-user-claude.toml',
+beside 'data/skgconfig-jeff.toml', is such a config. A server reads a
+skgrepo's files only when it starts or rebuilds its stores
+('skg-rebuild-session-lifetime-stores' in Emacs), so it shows another
+server's saves only after one of those.
 ** start the client
 #+begin_src elisp
   (progn (load-file "../elisp/skg-reload.el")

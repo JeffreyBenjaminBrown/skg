@@ -52,6 +52,16 @@ Following a link is just 'view' on the link's ID.
 
 'save SIDECAR' saves an edited compact view; see "Writing".
 
+'new TITLE REPO' creates a root node titled TITLE whose home is the
+owned skgrepo REPO, and writes its view as 'view' does (named
+'view_ID' unless '--name' says otherwise), after printing the save's
+answer and 'New node: ID'. A view needs a node to start from, so this
+is how an empty skgrepo gets its first one. It saves a buffer holding
+only that headline, as an editor client saves a new empty view
+('skg-view-new-empty', 'C-c v e' in Emacs), and refuses a skgrepo the
+server's 'repos' request does not call owned. The new node's body and
+children are then written through the view's edit-and-save loop.
+
 'raw REQUEST' sends REQUEST, one sexp, as a request line, and prints
 every response, each after a line '--- message N (CHARS chars) ---',
 until the server has been quiet for three seconds. With
@@ -226,7 +236,9 @@ compact views and saves them, in order: a title, a body, a new child,
 a move to another parent, a removal (the node then still has its other
 container), a deletion through 'delete' in a handle, two bad handles
 (refused before any save), a retitled write-protected occurrence
-(refused by the server, the files left as they were) and a stale view.
+(refused by the server, the files left as they were), a stale view,
+and 'new' (refused in the foreign skgrepo; in the owned one a root
+whose view then saves a body and a child).
 It compares each report with the text expected and reads the '.skg'
 files after each save. The stale case renders a view, changes a node
 it shows through a second view's save, and saves the first view's

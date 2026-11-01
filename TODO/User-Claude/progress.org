@@ -424,3 +424,112 @@ The report could say, from the full view's metadata, that a headline
 removed from under a write-protected occurrence or folder only leaves
 the view, and that a write-protected occurrence's title cannot be
 edited, before the server says so.
+* User's skgrepo: DONE, uncommitted
+** What exists
+'data/user-claude/first/' is a git repo with no remote and no commits;
+User Claude commits there. Its 'README.org' says whose it is. It holds
+the first notes and the 'OTHER_SKGREPO_DEPENDENCIES.toml' that User's
+server generates.
+
+'data/skgconfig-user-claude.toml' is User's config: port 1732, its own
+index '.index.tantivy-user-claude' (relative to the data root, so
+beside Jeff's '.index.tantivy'), 'timing_log = false', Jeff's seven
+skgrepos in his order, each 'foreign = true', then the owned 'first'
+('user-claude/first'). It sets no 'default_repo_set', since Jeff's
+has none. Jeff's config ('data/skgconfig-jeff.toml', which
+'data/skgconfig.toml' links to) now lists 'user-claude'
+('user-claude/first', 'foreign = true') first, before 'skg'. Both
+pass 'skg check-config'.
+
+The notes, all home in 'first', written through the tool:
+- 'to Jeff' (85cc1841-6568-4db2-9a46-6fa4196f1bb9): the inbox rule as
+  its body, and one message, "User Claude exists, with a skgrepo at
+  data/user-claude/first, as of 2026-11-01."
+- 'who I am' (07f6e996-975f-44e1-b24b-61fa84d791dc): eight lines in
+  the first person, linking to "AI team for Skg".
+- 'what has happened' (b75b22a8-f726-4b3e-bfbf-c18bc8308009): one
+  child per slice of this plan, with the stale-save finding as a child
+  of the writing slice's item.
+Each was viewed back afresh and read as written.
+** The tool's 'new' command
+An empty skgrepo has no node to view, so 'tools/skg-for-ai' gained
+'new TITLE REPO': it refuses a skgrepo the 'repos' request does not
+call owned, saves a buffer holding only '* (skg node (skgRepos
+(nodeRepo REPO))) TITLE' under a fresh view ID, as an editor client
+saves a new empty view, then writes the new node's view as 'view ID'
+would. Bodies and children come through the ordinary edit-and-save
+loop. The README documents it; the test's last writing case checks the
+refusal in a foreign skgrepo, the new root's '.skg' file and compact
+view, and a body and child saved from its view.
+'python3 tools/skg-for-ai/test_skg_for_ai.py' passes.
+** Running User's server
+From the repository root:
+#+begin_example
+nohup target/debug/skg data/skgconfig-user-claude.toml > data/logs/server-user-claude.log 2>&1 &
+echo $!    # the PID; stop it later with 'kill PID'
+#+end_example
+Wait for "Server ready." in 'data/logs/server-user-claude.log', then
+run the tool with 'SKG_PORT=1732'. It is not running now: its first
+run (PID 65280) was stopped once the notes were verified. Stop it by
+its PID, never by a pattern, which can match Jeff's server
+('target/debug/skg data/skgconfig.toml', under cargo-watch on 1731).
+Startup reads all 55k nodes in about seven seconds.
+** The reload policy
+Agreed with Jeff: each of us runs our own server over the shared tree.
+When User saves into 'user-claude/first', Jeff's server keeps the old
+copy until Jeff restarts it or rebuilds its stores
+('skg-rebuild-session-lifetime-stores'); he does that when he wants to
+see User's saves. The same holds the other way for User's server and
+Jeff's saves. A better policy is deferred; this section and the plan's
+"Two servers, one tree" are where to look for the current one.
+'docs/setup.org' now says how to run such a second server.
+** Restarting Jeff's server
+Killing Jeff's server by PID (53273) did not restart it: the server
+shuts down cleanly on SIGTERM, and cargo-watch reruns only when a
+file under 'server/' changes. Touching 'server/main.rs' (its mtime
+only) made it rebuild and start; it is PID 66064 on 1731, "Server
+ready", with 8 skgrepos. Its Emacs client was disconnected by the
+kill.
+** What was awkward
+*** A manifest-order warning at each of Jeff's startups
+Jeff's server now warns: "Repo 'user-claude' ships a
+OTHER_SKGREPO_DEPENDENCIES.toml placing 'personal-most' more public
+than 'first', but this config orders them the other way." The rule
+that foreign skgrepos come first forces the two configs to disagree
+about Jeff's skgrepos against User's, and User's manifest records
+User's order. Every teammate's skgrepo will raise this warning in
+every other teammate's server, though no telescope spans them. The
+startup's telescope report is unchanged (the two 'pers-dep' leaks it
+had before).
+*** User's manifest names Jeff's private skgrepos
+Because User's config lists all of Jeff's skgrepos as more public than
+'first', the generated manifest in 'user-claude/first' lists every one
+of them, with its GitHub remote, among 'first''s dependencies. If
+User's repo is ever pushed somewhere Jeff's private ones are not, it
+publishes their names and remotes, and claims a dependency that the
+nodes do not have.
+*** One skgrepo, two names
+The repo is 'first' in User's config and 'user-claude' in Jeff's, as
+asked. Names live only in configs ('.skg' files do not record them),
+so nothing breaks, but heralds, warnings and the tool's link
+annotations name it differently on the two servers.
+*** User's server sees everything Jeff owns
+With no 'default_repo_set', User's server has no skgrepo restriction,
+so its views and searches reach 'pers-m'. That matches "both servers
+read every repo", but it means the privacy ladder does nothing between
+Jeff and User.
+*** Long headlines
+The 'what has happened' items are one-line headlines, as asked, and
+some run to two hundred characters; a handle at the end of each is
+then far from its start.
+** Open questions
+*** Should the manifest warning skip teammates' skgrepos?
+Or should a manifest list only the skgrepos its nodes reference, which
+would also keep Jeff's private names out of User's manifest?
+*** Should User's server start restricted?
+A 'default_repo_set' of 'public' (or of 'first' with Jeff's private
+skgrepos left out of User's config entirely) would keep User's reads
+to what Jeff publishes. Which does Jeff want User to read?
+*** Should cargo-watch restart a cleanly stopped server?
+A wrapper that reruns on exit would make "kill it to reload the
+config" work; for now a reload needs a touch under 'server/'.
