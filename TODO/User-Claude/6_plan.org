@@ -1,0 +1,137 @@
+#+title: User Claude: preparing the graph for a team
+
+* Scope
+What '5_discussion.org' settled: foreign repos leave the privacy ladder;
+the tool's handles become the server's viewnode IDs and show every
+herald; a retyped headline is caught, exactly and fuzzily; and a server
+learns when a foreign repo changes. Four slices, in that order. Each
+has its own verification, and the first changes what every config says,
+so it comes before the next teammate's config exists.
+
+* Foreign repos leave the privacy ladder
+** The config
+'[[repos]]' entries keep 'path', 'name', 'abbreviation' and 'foreign =
+true'. The privacy order is the order of the OWNED entries alone; the
+foreign entries form an unordered set, and may appear anywhere in the
+file. The rule that every foreign repo precede every owned one, and its
+check, go. Docs: 'api-and-formats' (Skgrepos, skgrepo-sets, the
+example), 'telescopes', 'glossary', 'setup', 'moving-nodes-across-repos'.
+** The restriction
+'SkgrepoRestriction' names a rung of the owned ladder ('most_private_
+shown', as now) and carries one more thing: whether foreign repos are
+shown, true by default. Its set is the rungs through that one plus, if
+shown, every foreign repo; 'kept_out' is the more private owned rungs
+plus, if hidden, the foreign repos. 'default_repo_set' names an owned
+rung. The clients' restriction picker offers the owned rungs and one
+toggle for foreign repos. Everything that asks "is this repo shown?"
+keeps working through the set; everything that compares privacy ranks
+must only ever compare owned repos, which the leak and telescope code
+already does (a foreign recorder is never a leak; a node with an owned
+section ignores its foreign sections).
+** Two foreign repos sharing a node
+A node with sections in two foreign repos and none owned still folds,
+and the config no longer orders those repos. Rule: fold them in the
+order a manifest that lists both gives; if no foreign manifest lists
+both, or two disagree, warn at startup naming the node and fold in
+config-file order. This replaces the manifest-order warning of the last
+slice, which compared against an order the config no longer has.
+Appended to '5_discussion.org' as a new issue, since it was not raised
+there.
+** Manifests
+An owned repo's manifest lists its owner's ladder through itself, as
+now; foreign repos never appear in it, since an owned repo cannot
+depend on one (a relationship to a foreign node is recorded in the
+owned file and names an ID, which is not a dependency on the repo's
+order). 'migrate-to-foreign-flag.sh' loses its "foreign first" warning.
+** Verification
+Config tests: foreign entries anywhere in the file; a foreign entry
+after an owned one accepted; 'default_repo_set' naming a foreign repo
+refused. Restriction tests: with foreign hidden, a foreign node is
+neither shown nor editable, and a view that showed it re-renders
+without it; with foreign shown, unchanged behavior. Both clients' pickers
+tested as the existing picker tests are. Full suites, integration
+suite, and Jeff's and User's live configs still load (reorder nothing;
+they are valid under both rules).
+
+* The tool: viewnode handles, every herald, roleward forests
+** Handles
+A handle is the headline's viewnode ID as the server assigns it
+('ViewnodeIdRecord'), read from the full view's metadata, not the line
+number. It is stable across saves of that view, so a compact file edited
+over several saves keeps its handles. The full view is still saved and
+is still where a handle's metadata is looked up; the lookup keys on the
+viewnode ID. The README's handle section changes accordingly; the
+rebuild on save matches handles to metadata by viewnode ID.
+** Every herald
+The compact view renders every herald the clients render, from the
+server's herald rule table ('herald rules' request) and the shared
+styles file, as text without styles: write-protected, omitted body,
+cycle, unwarranted, home skgrepo, folders' labels, requests, change
+facts, the relationship heralds already there. The shared case file
+'tests/shared/herald-rendering-cases.txt' has the rendering cases the
+clients use; the tool's test runs all of them, not only the
+relationship-only subset.
+** Roleward forests
+Commands for each folder the clients can request from a node:
+containers (exists), mentioners ('links-here', exists), subscribers,
+overriders, hiders, and whatever else the folder requests offer, each
+rendered like 'view'. One shared implementation parameterized by the
+folder kind.
+** Verification
+The fixture-backed test, with regenerated expected files; a save test
+that edits a compact view across two saves and keeps its handles; a
+live read of the team node on Jeff's server (read-only), recorded in
+'progress.org'.
+
+* The tool catches a retyped headline
+** Exact
+A new headline (no handle) whose title equals a removed headline's title
+is refused before the save: the report names both and asks for the
+handle to be restored, or for the writer to say the two are different
+('--new-node HANDLE' or a token on the new headline, whichever reads
+better).
+** Fuzzy
+Standard library only: lowercase, strip punctuation, drop a short
+stopword list, crude suffix stemming, then the Dice coefficient over
+word sets, with 'difflib.SequenceMatcher' on the normalized strings as a
+second signal. Above the thresholds in '5_discussion.org' the report
+asks "probably the same statement reworded; keep its ID?" and the save
+waits for confirmation, which '--yes' does not give by itself; a
+separate explicit answer does. Fuzzy never refuses.
+** Verification
+Unit tests of the normalizer and the match on a dozen pairs (reworded,
+unrelated, near-miss), and a save test for each path: exact refused,
+fuzzy asked, fuzzy confirmed keeps the ID.
+
+* A server learns when a foreign repo changes
+** Watching
+The server watches each foreign repo's directory with the platform's
+file-change notification (the 'notify' crate, which falls back to
+polling only where no kernel can tell). Events are debounced: the batch
+is integrated after the directory has been quiet for a short interval,
+once. A new Cargo dependency needs network at build; if the build
+cannot fetch it, stop and report rather than vendoring.
+** Integrating
+A batch re-reads the changed files of that repo and swaps in a new
+runtime generation, as a rebuild does but for one repo; open views that
+show a changed node re-render, as a save's collateral rerender does;
+the stale-save protection then refuses an older buffer, as it should.
+Each affected connection receives a server warning naming the repo and
+the count, shown as startup warnings are. A file that fails to parse is
+a warning, not a stop; the previous generation keeps serving.
+** Owned repos
+Not watched: the server is their only writer. (A hand edit behind a
+running server still needs a rebuild.)
+** Verification
+A test that writes a '.skg' file into a foreign fixture repo while the
+server runs and sees the node appear in a fresh view and an open view
+re-rendered; a test that a burst of files integrates once; a test that a
+bad file warns and the old generation serves. Then the real case: User's
+server running, Jeff's server running, User saves into 'first', Jeff's
+server shows the new node without a rebuild.
+
+* Order and stopping points
+The ladder first; stop for Jeff only if a client picker's shape needs
+his taste. Then the tool's two slices, which touch no server code. Then
+watching, which adds a dependency; stop if the build cannot fetch it.
+Deviations go in 'progress.org'; new issues in '5_discussion.org'.
