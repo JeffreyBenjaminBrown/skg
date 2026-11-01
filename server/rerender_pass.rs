@@ -125,11 +125,11 @@ pub fn update_views_after_save (
     . and_then ( |viewforest_id| views_state . open_views . diffView_buffer_kind_of_view (viewforest_id) );
   let mut saved_view_mut : ViewForest = saved_view;
   let mut saved_viewnode_id_record : ViewnodeIdRecord =
-    // The parsed buffer carries viewnode IDs; the view's record says which
+    // The parsed buffer carries viewnode IDs; the record says which
     // it knows, before the refresh runs.
-    viewforest_id_from_request_result . as_ref () . ok ()
-    . map ( |viewforest_id| views_state . open_views . viewnode_id_record_of (viewforest_id) )
-    . unwrap_or_default ();
+    views_state . open_views . viewnode_id_record_for_saved_buffer (
+      viewforest_id_from_request_result . as_ref () . ok (),
+      &saved_view_mut );
   saved_viewnode_id_record . drop_unknown_viewnode_ids_in_parsed_viewforest (&mut saved_view_mut);
   replace_saved_view_fork_roots (&mut saved_view_mut, fork_specs) ?;
   // The skgsave-commit has happened, so every `(editRequest ...)` in the

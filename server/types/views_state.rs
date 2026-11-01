@@ -201,6 +201,22 @@ impl OpenViews {
       . map ( |state| state . viewnode_id_record . clone () )
       . unwrap_or_default () }
 
+  /// The record a save checks its parsed buffer's viewnode IDs
+  /// against: the view's, when 'viewforest_id' names a view this
+  /// connection holds; otherwise the buffer's own
+  /// ('ViewnodeIdRecord::of_viewforest' of 'parsed_viewforest', whose
+  /// parse already dropped every copy's viewnode ID), so each headline
+  /// keeps the one it carries and fresh ones start past them all.
+  pub fn viewnode_id_record_for_saved_buffer (
+    &self,
+    viewforest_id     : Option<&ViewforestId>,
+    parsed_viewforest : &Tree<Viewnode>,
+  ) -> ViewnodeIdRecord {
+    viewforest_id
+      . and_then ( |viewforest_id| self . views . get (viewforest_id) )
+      . map ( |state| state . viewnode_id_record . clone () )
+      . unwrap_or_else ( || ViewnodeIdRecord::of_viewforest (parsed_viewforest) ) }
+
   /// 'viewnode_id_record' is the record the rerender of
   /// 'new_viewforest' assigned its viewnode IDs from.
   pub fn update_view (

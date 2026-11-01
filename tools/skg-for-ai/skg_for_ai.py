@@ -333,9 +333,9 @@ def command_import (arguments):
 def command_save (arguments):
   """Rebuild the full buffer from the edited compact view and print the
   changes it makes. With '--yes', and when the report finds no bad
-  handle, open the view again on the save's connection, send the
-  save, print the server's answer and write its re-rendered view over
-  the three files. The save carries the generation the view was
+  handle, send the save (for a buffer of the diff view, after opening
+  it again on the save's connection), print the server's answer and
+  write its re-rendered view over the three files. The save carries the generation the view was
   rendered at, so the server refuses it if a node it would write
   changed since. A refused save leaves the files as they were."""
   saved_view = load_saved_view (arguments . view_files)
@@ -368,17 +368,19 @@ def command_save (arguments):
       return
     buffer_text = rebuilt_full_buffer (
       edited, saved_view . headline_of_handle, saved_view . full_text )
-    held_viewnode_ids = reopen_view_for_save (connection, saved_view . sidecar)
-    renumbered = [ handle for handle in dict . fromkeys (
-                     headline . handle for headline in edited
-                     if headline . handle is not None )
-                   if handle not in held_viewnode_ids ]
-    if renumbered:
-      print ( "Handles the save may change: " + ", " . join (
-                described_handle ( handle, saved_view . headline_of_handle )
-                for handle in renumbered ) +
-              ". The view the server opened again does not hold these "
-              "viewnode IDs, so it gives each headline a new one." )
+    if "buffer" in saved_view . sidecar [ "request" ]:
+      held_viewnode_ids = reopen_diffView_buffer_for_save (
+        connection, saved_view . sidecar )
+      renumbered = [ handle for handle in dict . fromkeys (
+                       headline . handle for headline in edited
+                       if headline . handle is not None )
+                     if handle not in held_viewnode_ids ]
+      if renumbered:
+        print ( "Handles the save may change: " + ", " . join (
+                  described_handle ( handle, saved_view . headline_of_handle )
+                  for handle in renumbered ) +
+                ". The diff view's buffer the server opened again does not "
+                "hold these viewnode IDs, so it gives each headline a new one." )
     messages = connection . save_buffer (
       saved_view . sidecar [ "view_id" ], buffer_text,
       saved_view . sidecar [ "rendered_at" ] )
@@ -392,33 +394,27 @@ def command_save (arguments):
   for path in written_paths:
     print (path)
 
-def reopen_view_for_save (connection, sidecar, outcome = "Nothing was saved"):
-  """Open the sidecar's view again on CONNECTION, under its view ID,
-  as the command that wrote it opened it, so that the server holds it
-  as it holds a client's open buffer; return the viewnode IDs of the
-  view it now holds. The server keeps a view per connection, and the
-  tool's connection ends with each command. A save keeps every
-  viewnode ID of the saved buffer that the server's view of it holds,
-  and gives a fresh one to every other headline; and it re-renders as
-  a buffer of the diff view, with the readiness summary, only a view
-  the server holds as one. The save itself is read from the saved
-  text, against the generation the sidecar records. OUTCOME opens the
-  refusal when a buffer of the diff view is now empty."""
-  request = sidecar [ "request" ]
-  if "buffer" in request:
-    view = fetch_diff_view_buffer (
-      connection, request [ "buffer" ], sidecar [ "view_id" ] )
-    if view is None:
-      raise SkgToolError (
-        f"{outcome}: the diff view's '{request [ 'buffer' ]}' buffer is "
-        "empty now (its changes were committed or undone); run 'diff' again." )
-  elif "terms" in request:
-    view = fetch_search_view ( connection, request [ "terms" ] )
-  elif "view_request" in request:
-    view = fetch_view_with_root_folder_request (
-      connection, request [ "id" ], request [ "view_request" ] )
-  else:
-    view = fetch_single_root_view ( connection, request [ "id" ] )
+def reopen_diffView_buffer_for_save (
+    connection, sidecar, outcome = "Nothing was saved"):
+  """Open the sidecar's buffer of the diff view again on CONNECTION,
+  under its view ID, so that the server holds it as one; return the
+  viewnode IDs of the buffer it now holds. The server keeps a view per
+  connection, and the tool's connection ends with each command; it
+  re-renders a save as a buffer of the diff view, with the readiness
+  summary, only for a view it holds as one. A save of a view it holds
+  keeps every viewnode ID of the saved buffer that the held view
+  knows, and gives a fresh one to every other headline. (A save of a
+  view it does not hold keeps every viewnode ID the buffer carries, so
+  a content or search view needs no re-opening.) The save itself is
+  read from the saved text, against the generation the sidecar
+  records. OUTCOME opens the refusal when the buffer is now empty."""
+  buffer_name = sidecar [ "request" ] [ "buffer" ]
+  view = fetch_diff_view_buffer (
+    connection, buffer_name, sidecar [ "view_id" ] )
+  if view is None:
+    raise SkgToolError (
+      f"{outcome}: the diff view's '{buffer_name}' buffer is "
+      "empty now (its changes were committed or undone); run 'diff' again." )
   if view [ "view_id" ] != sidecar [ "view_id" ]:
     raise SkgToolError (
       f"{outcome}: opening the view again gave the view ID "
@@ -460,7 +456,7 @@ def command_integrate (arguments):
       "first, or write the buffer again with 'diff'." )
   connection = SkgConnection ( sidecar [ "port" ] )
   try:
-    reopen_view_for_save (connection, sidecar, "Nothing was integrated")
+    reopen_diffView_buffer_for_save (connection, sidecar, "Nothing was integrated")
     terminal = connection . save_buffer (
       sidecar [ "view_id" ], saved_view . full_text,
       sidecar [ "rendered_at" ] ) [-1]

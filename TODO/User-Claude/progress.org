@@ -1376,3 +1376,61 @@ after a server restart. The cost: the rule that an ID "brought back by
 an old copy of the buffer's text" gets a fresh one would hold only for
 views the server holds. If yes, 'reopen_view_for_save' could shrink to
 the diff view's case.
+* A save of a view the server does not hold keeps the buffer's viewnode IDs: DONE, uncommitted
+** What was done
+*** The server
+When a save names a view the connection does not hold, the record its
+parsed buffer is checked against is the buffer's own
+('OpenViews::viewnode_id_record_for_saved_buffer' in
+'server/types/views_state.rs', called from 'update_views_after_save'
+in 'server/rerender_pass.rs'): 'ViewnodeIdRecord::of_viewforest' of
+the parsed viewforest, whose parse already dropped every copy's
+viewnode ID. Each headline keeps the one it carries, and the counter
+starts past the highest. A held view is checked against its own
+record as before. 'docs/api-and-formats.org' (the '(vnid X)'
+paragraph) states both cases; its "never reassigns or reuses one" now
+says "while it holds the view".
+*** The tool
+'reopen_view_for_save' became 'reopen_diffView_buffer_for_save': only
+a buffer of the diff view is opened again before 'save' (and before
+'integrate'), since the server re-renders a save as a buffer of the
+diff view only for one it holds. The warning "Handles the save may
+change" stays, for diff-view saves only, since that held buffer is
+numbered afresh. README's "Views and connections", "Handles across
+saves", the diff view's "How it talks to the server" and the test
+description say so.
+** Tests
+'viewnode_ids::a_save_against_a_view_not_held_keeps_the_buffers_viewnode_ids'
+(in 'viewnode_ids_in_content_views', 'tests/viewnode_ids.rs'): a
+buffer, one headline renumbered '(vnid zz)', a copy of p and a typed
+headline appended, saved against an unheld view; every carried ID
+stays, the copy and the typed headline get IDs past 'zz', and the
+registered record counts past them. It fails with the old empty
+record. The held-view case is the existing
+'an_unknown_viewnode_id_is_dropped'. 'check_handles_across_saves' in
+the tool now checks that the save of a removal and the save after it
+keep every handle, give the new headline a new one, and print no
+warning. 'cargo check --all-targets' clean; 'cargo test' 1099 passed,
+2 ignored; 'python3 tools/skg-for-ai/test_skg_for_ai.py' PASS. No
+client file changed, so the Emacs and Neovim suites were not run.
+** Deviations
+*** A save naming no view also keeps the buffer's IDs
+A save request whose view ID does not parse (an 'Err' from
+'viewforest_id_from_request') is treated as unheld too: the buffer's
+own record. Its re-render is not registered either way.
+** What's imperfect
+*** A fresh ID can be one a removed headline carried
+For an unheld view the counter starts past the highest ID present, not
+past the highest ever used; after a removal of the highest-numbered
+headline, a new headline can get the removed one's ID. Nothing in the
+buffer collides; only a stale reference to the removed handle would
+read it as the new headline.
+*** A hand-typed huge ID moves the counter far
+An unheld save's counter follows any carried base-36 ID, so a
+hand-typed one near u64's top ('3w5e11264sgsf') would push the
+counter there, and its '+= 1' in 'take_next_viewnode_id' would
+overflow. A held view drops such an ID; this is only for unheld ones.
+*** The diff view still renumbers after a removal
+Unchanged by this slice; a fix would let the reopened diff buffer's
+record adopt the saved buffer's IDs, which a held view deliberately
+does not do.

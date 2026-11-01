@@ -1826,15 +1826,23 @@ X is one or more lowercase letters and digits: =(skg (vnid 0a) node
 life of the buffer. The server assigns one, from the view's counter in
 base 36 (two characters at least, skipping any spelled like a number,
 such as =05= or =1e5=), to every viewnode that lacks one at the end of a
-refresh, and never reassigns or reuses one: a headline keeps the
+refresh, and while it holds the view never reassigns or reuses one: a headline keeps the
 viewnode ID it carried through a save and a rerender, through a cut
 and paste, and through a switch of the skgrepo restriction that leaves it standing. A
 headline typed without one gets one; of two headlines carrying one
 viewnode ID, the first in buffer order keeps it and the second (a copy)
-gets a fresh one; a headline carrying one the view does not know
-(typed by hand, or brought back by an old copy of the buffer's text)
-gets a fresh one too, and the counter does not move past it. The
-clients show nothing for it and save it back untouched. The view's
+gets a fresh one. What else a saved headline keeps depends on whether
+the server holds the view the save names (it holds a view per
+connection, from the view's opening or a save of it until the view is
+closed or the connection ends). For a view it holds, a headline carrying one the
+view does not know (typed by hand, or brought back by an old copy of
+the buffer's text) gets a fresh one too, and the counter does not move
+past it. For a view it does not hold (a save on a new connection, or
+after a server restart), the buffer's own viewnode IDs are the view's:
+every headline keeps the one it carries, and the counter starts past
+the highest of them, so a fresh one is never one the buffer carries
+(though it can be one a headline removed before the save carried).
+The clients show nothing for it and save it back untouched. The view's
 record of its viewnode IDs, with the counter and the viewnode IDs of
 the viewforest as last rendered, is 'ViewnodeIdRecord' in
 =server/types/views_state.rs=.

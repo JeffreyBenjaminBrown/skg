@@ -294,11 +294,14 @@ The server keeps a view's state per TCP connection, and forgets every
 view of a connection when it ends. Each command opens one connection,
 and sends 'close view' for its view before disconnecting, as a client
 does when its buffer is killed. A view is therefore never left open
-by the tool. A save reads the saved buffer against the graph, but it
-keeps the handles only of a view the server holds, so 'save' opens the
-view again, under the sidecar's view ID, on its own connection first
-(see "Handles across saves"). The 'close' command matters only for a
-view that a longer-lived connection holds.
+by the tool. A save reads the saved buffer against the graph; the
+server does not hold its view, and keeps every handle the buffer
+carries (see "Handles across saves"). A buffer of the diff view is the
+exception: the server re-renders a saved buffer of the diff view as
+one, with its readiness summary, only when it holds it as one, so
+'save' first opens that buffer again, under the sidecar's view ID, on
+its own connection. The 'close' command matters
+only for a view that a longer-lived connection holds.
 
 * How 'forest' draws a folder
 The server has no request that answers "what links here" or "what
@@ -371,9 +374,8 @@ nothing is written; a fresh view then saves the same edit, and the
 second save's change stays. The last case adds a headline and
 retitles another, saves, does the same again, saves, and checks that
 every handle names the headline it named, and each new headline has
-a new handle; then it removes a headline, saves, and checks that the
-next save names, before it saves, the handle it may change (see
-"Handles across saves").
+a new handle; then it removes a headline, saves, and checks the same
+again across that save and the next (see "Handles across saves").
 
 Then, on a third server over a fresh copy of the fixture whose owned
 skgrepo is first made a gitrepo with one commit, it saves a retitle, a
@@ -513,26 +515,21 @@ counts the changed bodies and names their handles. An edit with none
 of these prints 'No changes.' and saves nothing.
 ** Handles across saves
 The server keeps a view per connection, and the tool's connection ends
-with each command. So before it saves, 'save' opens the view again on
-its connection, under the sidecar's view ID, as the command that wrote
-it did: 'view' renders the node's content view afresh, 'forest' draws
-its folder again by a save that writes nothing, 'search' searches
-again, and 'diff' requests its buffer again. The server keeps, across
-the save, every viewnode ID of the saved buffer that the view it now
-holds has, and gives a new one to every other headline: to a new
-headline, and to one whose viewnode ID the view opened again lacks.
+with each command, so a save names a view the server does not hold.
+For such a view the saved buffer's own viewnode IDs are the view's
+(=docs/api-and-formats.org=, on '(vnid X)'): every headline keeps the
+one it carries, and a new headline gets one past the highest the
+buffer carries. So every handle stays across a save, through adds,
+moves, retitles and removals, and a new headline gets a new handle.
 
-A view opened afresh numbers its headlines from '0a' in buffer order,
-and the save gives a new headline the next viewnode ID after the
-highest. So while the view the tool opens again has as many headlines
-as the saved one, it holds every viewnode ID the saved one does, and
-every handle stays. After a removal it has fewer: then the highest
-handles may change in the next save. 'save' names them, before it
-saves, in a line 'Handles the save may change: ⟨ID⟩ 'TITLE', ...'; the
-re-rendered compact view gives each its handle after the save. A view
-the server held across all its saves, as an editor client's open
-buffer is held, would keep every viewnode ID; the tool cannot hold
-one.
+A buffer of the diff view is saved against the view the tool opens
+again on the save's connection (see "Views and connections"), and for
+a view it holds the server gives a new viewnode ID to a headline
+carrying one that view lacks. That buffer opened afresh numbers its
+headlines from '0a' in buffer order, so after a removal it may lack
+the highest handles. 'save' names them, before it saves, in a line
+'Handles the save may change: ⟨ID⟩ 'TITLE', ...'; the re-rendered
+compact view gives each its handle after the save.
 ** Stale views
 The save carries the runtime generation the view was rendered at, from the
 sidecar. If a node the save would write changed since (by Jeff in
@@ -664,4 +661,5 @@ readiness summary the server's answer carries. A later 'save' or
 'integrate' of a diff buffer first requests that buffer again under
 the sidecar's view ID on its own connection, so that the server
 re-renders it as a buffer of the diff view, with the readiness
-summary, and keeps its handles (see "Handles across saves").
+summary; the save keeps the handles the buffer requested again holds
+(see "Handles across saves").

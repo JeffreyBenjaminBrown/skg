@@ -48,6 +48,8 @@ fn viewnode_ids_in_content_views (
         config, tantivy ) . await ?;
       a_moved_headline_keeps_its_viewnode_id (config, tantivy) . await ?;
       a_typed_headline_gets_a_viewnode_id (config, tantivy) . await ?;
+      a_save_against_a_view_not_held_keeps_the_buffers_viewnode_ids (
+        config, tantivy ) . await ?;
       // last, since it cuts b from a's content
       an_unknown_viewnode_id_is_dropped (config, tantivy) . await ?;
       Ok (( )) } )) }
@@ -273,6 +275,58 @@ async fn a_typed_headline_gets_a_viewnode_id (
     viewnode_id_of_line_containing (&saved . saved_view, "a typed child");
   assert! ( ! viewnode_id_atoms (&buffer) . contains (&typed_viewnode_id),
             "the typed headline's viewnode ID is new:\n{}", saved . saved_view );
+  Ok (( )) }
+
+/// Saved against a view the connection does not hold, the buffer's own
+/// viewnode IDs are the record: each headline keeps the one it carries,
+/// one typed by hand past every other included; a copy still gets a
+/// fresh one; and the fresh ones, the copy's and a typed headline's,
+/// are past the highest the buffer carried.
+async fn a_save_against_a_view_not_held_keeps_the_buffers_viewnode_ids (
+  config  : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
+  let buffer : String = open_view (
+    config, tantivy, &graph, &mut fresh_views_state (), VIEW_OF_A, "a" ) ?;
+  let b_line : &str = buffer . lines ()
+    . find ( |line| line . contains ("node (gnid b) ") )
+    . expect ("b is shown");
+  let p_line : &str = buffer . lines ()
+    . find ( |line| line . contains ("node (gnid p) ") )
+    . expect ("p is shown");
+  let with_b_renumbered_high : String = buffer . replacen (
+    b_line,
+    & b_line . replacen ( viewnode_id_atom_of (b_line) . unwrap (), "(vnid zz)", 1 ),
+    1 );
+  let carried : Vec<String> = viewnode_id_atoms (&with_b_renumbered_high);
+  let edited : String = format! ( // a copy of p and a typed headline, appended
+    "{}* {}\n** a child typed into a view not held\n",
+    with_b_renumbered_high, p_line . trim_start_matches ('*') . trim_start () );
+  let mut views_state : ViewsState = fresh_views_state ();
+  let (saved, _) : (SaveResponse, Vec<String>) = save_view (
+    &edited, config, tantivy, &graph, &mut views_state, VIEW_OF_A ) . await ?;
+  let saved_atoms : Vec<String> = viewnode_id_atoms (&saved . saved_view);
+  for atom in &carried {
+    assert! ( saved_atoms . contains (atom),
+              "{} is kept:\n{}", atom, saved . saved_view ); }
+  assert_eq! ( viewnode_id_of_line_containing (&saved . saved_view, "node (gnid b) "),
+               "(vnid zz)", "b keeps the viewnode ID typed for it:\n{}", saved . saved_view );
+  let p_viewnode_ids : Vec<String> =
+    viewnode_ids_of_lines_containing (&saved . saved_view, "node (gnid p) ");
+  assert_eq! ( p_viewnode_ids . len (), 2, "{}", saved . saved_view );
+  assert_eq! ( p_viewnode_ids [0], viewnode_id_atom_of (p_line) . unwrap (),
+               "the original p keeps its viewnode ID:\n{}", saved . saved_view );
+  let zz_counter : u64 = viewnode_id_of_atom ("(vnid zz)") . counter_value () . unwrap ();
+  for fresh in [ p_viewnode_ids [1] . clone (),
+                 viewnode_id_of_line_containing (
+                   &saved . saved_view, "a child typed into a view not held" ) ] {
+    assert! ( viewnode_id_of_atom (&fresh) . counter_value () . unwrap () > zz_counter,
+              "{} is past every carried viewnode ID:\n{}", fresh, saved . saved_view ); }
+  assert! ( views_state . open_views
+            . viewnode_id_record_of ( &ViewforestId::ContentView (VIEW_OF_A . to_string ()) )
+            . next_viewnode_id_counter > zz_counter + 1,
+            "the view the save registered counts past them all" );
   Ok (( )) }
 
 /// A viewnode ID the view's record does not know is dropped at the
