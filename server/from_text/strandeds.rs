@@ -13,8 +13,11 @@
 //! they need be -- are listed for the user, who chooses which to
 //! reset to their new defaults.
 //!
-//! Mentions are not relationships with a relRepo (links live in their
-//! recorder's text), so they cannot be stranded.
+//! Only relationships recorded in owned skgrepos can be stranded: a
+//! foreign skgrepo's file is not the user's to rewrite, and what it
+//! records is never a leak. Mentions are not relationships with a
+//! relRepo (links live in their recorder's text), so they cannot be
+//! stranded either.
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::{NodeRelation, RelationshipKey};
@@ -119,6 +122,10 @@ pub fn stranded_relationships (
       for partner in relation_list (&recorder, relation) {
         let member : ID = resolve (&partner . member);
         if recorder_pid != *moved && member != *moved { continue; }
+        if ! config . skgrepo_is_owned (&partner . relRepo) {
+          // A foreign skgrepo's relationship is not the user's to reset,
+          // and nothing it records leaks the user's data.
+          continue; }
         let relationship : RelationshipKey = RelationshipKey {
           relation, recorder : recorder_pid . clone (), member : member . clone () };
         if ! seen . insert (relationship . clone ()) { continue; }

@@ -137,8 +137,12 @@ Two things are documented inexpressibles, by design:
 
 ** What leaks, and what repair fixes
 
-A public file naming a private node's ID is a "leak-shaped
-membership". It can arrive from a hand edit or a pull, and it is what
+A leak is data you intend to share revealing data you intend not to
+share, so only your own files can leak: an owned skgrepo naming a node
+whose home is a more private owned skgrepo is a "leak-shaped
+membership", while nothing a foreign skgrepo records is a leak, whatever
+it names, and neither is an owned skgrepo naming a foreign node. A
+leak-shaped membership can arrive from a hand edit or a pull, and it is what
 this model exists to prevent. The server warns about these
 (=telescope-warnings.org= in your data root) rather than erroring: a
 pull must never brick a skgrepo. Repair one with
@@ -154,8 +158,10 @@ starts with telescopes in place.)
 
 ** Ownership and folders
 
-A skgrepo is yours iff its directory sits under the config's
-=owned_folder= (default =owned/=) — see =api-and-formats.org=. Only
+A skgrepo is yours unless its config entry says =foreign = true=;
+no folder name is special. Every foreign skgrepo must be more public
+than every owned one, and the server refuses a config where it is
+not — see =api-and-formats.org=, "Skgrepos". Only
 owned sections are ever written; a save that empties an owned
 section deletes the file, and re-privatizing later recreates it.
 Each owned skgrepo also receives a generated =OTHER_SKGREPO_DEPENDENCIES.toml=

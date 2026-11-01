@@ -90,6 +90,71 @@ fn private_membership_of_a_public_member_is_fine (
     &config, &graph, &ID::new ("container") ) . is_empty () );
 }
 
+/// A foreign "fred" (most public, as the loader requires), then the
+/// owned public < private.
+fn foreign_then_two_owned_skgrepo_config () -> SkgConfig {
+  let mut skgrepos : HashMap<SkgrepoName, Skgrepo> =
+    HashMap::new ();
+  for (name, owned) in [ ("fred", false),
+                         ("public", true),
+                         ("private", true) ] {
+    skgrepos . insert (
+      SkgrepoName::from (name),
+      Skgrepo {
+        name         : SkgrepoName::from (name),
+        abbreviation : None,
+        path         : PathBuf::from (name),
+        owned, } ); }
+  let mut config : SkgConfig =
+    SkgConfig::dummyFromSkgrepos (skgrepos);
+  config . skgrepo_order = vec! [
+    SkgrepoName::from ("fred"),
+    SkgrepoName::from ("public"),
+    SkgrepoName::from ("private") ];
+  config }
+
+#[test]
+fn a_foreign_recorder_never_leaks_but_an_owned_one_still_can (
+) {
+  let config : SkgConfig = foreign_then_two_owned_skgrepo_config ();
+  let at_fred = |member : &str| -> Vec<RelPartner<ID>> {
+    vec! [ RelPartner::at_relRepo ( SkgrepoName::from ("fred"),
+                                    ID::new (member) ) ] };
+  let mut foreign : Graphnode = node_at ("foreign", "fred");
+  foreign . body = Some (
+    "see [[id:secret][a secret]] and [[id:open][an open node]]"
+    . to_string () );
+  foreign . contains = { // an owned private node, and a dangling one
+    let mut members : Vec<RelPartner<ID>> = at_fred ("secret");
+    members . extend ( at_fred ("absent") );
+    members };
+  foreign . subscribesTo  = MSV::Specified ( at_fred ("secret") );
+  foreign . hidesFromSubs = MSV::Specified ( at_fred ("open") );
+  foreign . overrides     = MSV::Specified ( at_fred ("open") );
+  let mut citing_foreign : Graphnode = node_at ("citing-foreign", "public");
+  citing_foreign . overrides = MSV::Specified ( vec! [ // owned names foreign
+    RelPartner::at_relRepo ( SkgrepoName::from ("public"),
+                             ID::new ("foreign") ) ] );
+  let mut leaking : Graphnode = node_at ("leaking", "public");
+  leaking . contains = vec! [ // owned public names owned private
+    RelPartner::at_relRepo ( SkgrepoName::from ("public"),
+                             ID::new ("secret") ) ];
+  let graph : InRustGraph =
+    InRustGraph::from_graphnodes ( & [
+      foreign, citing_foreign, leaking,
+      node_at ("secret", "private"),
+      node_at ("open", "public") ] );
+  let violations : Vec<(ID, TelescopeViolation)> =
+    validate_all_telescopes (&config, &graph);
+  assert_eq! ( violations . len (), 1, "{:?}", violations );
+  assert! ( matches! (
+    & violations [0],
+    (recorder, TelescopeViolation::LeakShapedMembership {
+      relRepo, member, member_home, .. })
+      if recorder . 0 == "leaking" && relRepo . 0 == "public"
+         && member . 0 == "secret" && member_home . 0 == "private" ));
+}
+
 #[test]
 fn leak_check_resolves_extra_ids (
 ) { // a relationship naming a merged-away extra id judges the recorder's home

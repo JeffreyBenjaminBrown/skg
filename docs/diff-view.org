@@ -653,7 +653,8 @@ A relationship touching a node whose home skgrepo moves is stranded
 when it sat at its default relRepo before the move and the sticky rule
 would leave it off its new default. The save finds every stranded
 relationship of every relation, in both directions, shown in some view
-or not ('server/from_text/strandeds.rs'). An inbound stranded
+or not ('server/from_text/strandeds.rs'); only a relationship recorded
+in an owned skgrepo can be stranded. An inbound stranded
 relationship of a privatizing move would leak its member's ID, so the
 save raises it to the new home by itself and says so in its warnings.
 The strandeds of a publicizing move are listed in a

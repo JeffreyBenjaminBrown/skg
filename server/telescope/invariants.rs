@@ -25,10 +25,12 @@ use std::path::Path;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TelescopeViolation {
-  /// The leak shape: a relationship instance whose relRepo is
-  /// more public than its target's home, so the (more public) file
-  /// names an ID whose node is more private -- exactly what the
-  /// telescope exists to prevent. Repair: move the membership's relRepo
+  /// The leak shape: a relationship instance whose relRepo is an owned
+  /// skgrepo more public than its target's home, so the (more public)
+  /// file names an ID whose node is more private -- exactly what the
+  /// telescope exists to prevent. Only owned files can leak: a
+  /// relationship a foreign skgrepo records is never one, whatever it
+  /// names. Repair: move the membership's relRepo
   /// to the target's home or beyond ('skg-set-relRepo',
   /// C-c s r). NOTE the git caveat: the leaking file's
   /// history already contains the ID; repair only stops the
@@ -39,9 +41,9 @@ pub enum TelescopeViolation {
     member      : ID,
     member_home : SkgrepoName,
   },
-  /// A dangling relationship recorded more publicly than its extant recorder.
-  /// With no target home to consult, the recorder's home is the conservative
-  /// privacy ceiling.
+  /// A dangling relationship recorded in an owned skgrepo more public
+  /// than its extant recorder. With no target home to consult, the
+  /// recorder's home is the conservative privacy ceiling.
   AbsentTargetLeakShapedMembership {
     relation      : &'static str,
     relRepo       : SkgrepoName,
@@ -102,7 +104,8 @@ impl fmt::Display for TelescopeViolation {
 
 /// The one primitive both gates call: one node's telescope violations,
 /// judged against the whole graph (targets' homes) and the config
-/// (the privacy order).
+/// (the privacy order and ownership). Leak shapes are judged only for
+/// relationships recorded in owned skgrepos.
 pub fn telescope_violations_of (
   config : &SkgConfig,
   graph  : &InRustGraph,
@@ -119,6 +122,10 @@ pub fn telescope_violations_of (
           relation,
           relRepo : m . relRepo . clone (),
           member : m . member . clone (), } );
+        continue; }
+      if ! config . skgrepo_is_owned ( &m . relRepo ) {
+        // A foreign skgrepo's file is not the user's to share or
+        // withhold, so nothing it records is a leak.
         continue; }
       let target_home : Option<SkgrepoName> =
         graph . pid_of ( &m . member )

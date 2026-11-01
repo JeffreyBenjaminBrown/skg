@@ -129,8 +129,9 @@ most private skgrepo was never shared with a trusted person.  Raw-file editing
 and rebuild remain an escape hatch, but spending effort to remove such tiny
 identity metadata is usually a poor trade.
 
-Telescope warnings use the target's home as the privacy ceiling when the
-target exists.  For a dangling relationship there is no target home, so the
+Leak-shaped telescope warnings judge only relationships recorded in owned
+skgrepos; a foreign skgrepo's file is never a leak.  They use the target's
+home as the privacy ceiling when the target exists.  For a dangling relationship there is no target home, so the
 extant recorder's home is the conservative ceiling.  Saves recompute warnings for
 saved recorders plus untouched inbound recorders affected by identity, existence, or
 home changes; startup and rebuild still audit every recorder.
