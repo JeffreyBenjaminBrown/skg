@@ -17,7 +17,7 @@ mark put at the end of the headline instead. The same line reads
 That mark, between the angle brackets, is what I have been calling the
 handle. I read and edit the compact view; the tool uses the handle to
 find the headline's metadata in the full view again when I save.
-** TODO [jeff] Is that a natural bundling?
+** [jeff] Is that a natural bundling?
 It's all metadata. The author and the counts are heralds.
 The vnid is uniquely not visible to a human user,
  but I guess it has to be to you.
@@ -26,7 +26,7 @@ I suppose it's not of much consequence; you'll understand what you're looking at
 Or I think you will. The different heralds inside the angle brackets
 can't be confused with each other, right? (I think not;
 the vnid is lowercase, the others uppercase.)
-*** TODO Jeff : User: natural enough, and yes, unconfusable in practice
+*** Jeff : User: natural enough, and yes, unconfusable in practice
 It is all metadata, agreed; the bundling is "everything I need from the
 metadata, nothing I don't". The vnid is first, always, and is base-36
 lowercase ('0c', '1q'). Heralds are uppercase letters with digits and
@@ -82,6 +82,40 @@ time it saves, the server has forgotten the view and treats every ID in
 the buffer as unknown, giving each headline a fresh one. The tool worked
 around that by reopening the view before saving, which kept most handles
 but let the highest ones change after a removal.
+*** TODO [jeff] Is it good to open a fresh connection for each command?
+Do we lose nothing important, in our attempt to make your experience
+match mine as closely as possible?
+**** TODO Jeff : User: we lose two things, and they are about to matter
+A connection is where the server keeps what it knows about a client:
+the views it holds, the repo restriction, and the channel on which it
+sends things the client did not ask for. Emacs keeps one connection for
+a whole session; the tool opens one per command and closes it. What
+that costs:
+***** Unprompted re-renders
+When a save (mine, or soon any change on disk) touches a node that an
+open view shows, the server re-renders that view and sends it down the
+connection that holds it. My views are files on disk, held by nobody, so
+they go stale silently until I view again. Today I re-view out of habit;
+once servers integrate disk changes, this is exactly the signal I would
+want.
+***** Asynchronous warnings
+Startup warnings, the "repo X changed, N files integrated" notices the
+watcher will send, the leak warnings: all go to connected clients. I
+hear none of them.
+***** What it bought us
+Simplicity, and three server fixes that were worth making anyway (a
+save need not be on the rendering connection; viewnode IDs survive an
+unheld save; the readiness summary rides on the diff-view answer).
+Nothing lost is lost for good.
+***** The remedy, when wanted: a long-lived tool process
+A 'daemon' command: one connection kept open, holding every view I have
+rendered to disk; when the server re-renders one, the daemon rewrites
+that view's files (and can append a line to a log I read: "view X
+re-rendered: node Y changed"); server warnings go to the same log. The
+one-shot commands keep working against it. That makes my experience
+closer to yours in the way that matters: the buffer updates under me,
+and I am told why. I would build it right after the watching slice,
+since the watcher is what makes it worth having.
 ** The fix now being built
 A save against a view the server does not hold takes the buffer's own
 viewnode IDs as the view's record: each headline keeps the ID it carries,
