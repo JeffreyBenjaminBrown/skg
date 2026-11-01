@@ -33,3 +33,11 @@ server this is the pre-existing behavior; my one-shot commands route
 through my daemon once it exists, so it does not bite me either. If two
 people ever share one server, the save path (not the watcher) would have
 to re-render other connections' views.
+
+* TODO (chosen, switchable) : one daemon per port, found through a per-port socket
+Besides 'DIR/skg-for-ai.sock', the daemon registers '/tmp/skg-for-ai-
+PORT.sock' (XDG_RUNTIME_DIR when set), so every command for that port
+routes through it whatever its out-dir, and no view goes stale because
+a command used another directory. Alternative: have the server re-render
+across connections (a server change with no other beneficiary while each
+of us has a server of our own). Switch: delete the per-port socket.

@@ -75,6 +75,19 @@ The server accepts '(diff-view-buffer . "KIND")' so an unheld diff buffer
 re-renders as a diff view; the tool sends it, the clients do not yet, so
 their diff buffers re-render as content views after a server restart.
 Each client keeps the kind buffer-locally and sends it; one test each.
+** Routing by port, not by output directory
+A one-shot command with a different '--out-dir' on the same port bypasses
+the daemon and leaves its views stale, since the server re-renders only
+the saving connection's views. Chosen, switchable: a daemon also
+registers a per-port socket ('/tmp/skg-for-ai-PORT.sock', or under
+XDG_RUNTIME_DIR when set), and every command for that port routes
+through it whatever its out-dir; the daemon writes the command's files
+where the command asked, and holds those views too. One daemon per port.
+** 'commit --yes' routes through the daemon
+So the daemon's diff views are re-rendered after a git commit. An
+interactive 'commit' (needing a typed "yes") stays local, as the socket
+cannot carry the prompt; it then tells the daemon to re-render its diff
+views when done.
 ** The tool's README front page
 A newcomer's page, before the reference: the five things a teammate
 needs (start a daemon, view, edit the compact file, save with the
