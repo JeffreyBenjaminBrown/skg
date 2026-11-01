@@ -28,15 +28,20 @@ keeps working through the set; everything that compares privacy ranks
 must only ever compare owned repos, which the leak and telescope code
 already does (a foreign recorder is never a leak; a node with an owned
 section ignores its foreign sections).
-** Two foreign repos sharing a node
-A node with sections in two foreign repos and none owned still folds,
-and the config no longer orders those repos. Rule: fold them in the
-order a manifest that lists both gives; if no foreign manifest lists
-both, or two disagree, warn at startup naming the node and fold in
-config-file order. This replaces the manifest-order warning of the last
-slice, which compared against an order the config no longer has.
-Appended to '5_discussion.org' as a new issue, since it was not raised
-there.
+** Sections of one node in repos of different owners
+Jeff's rule ('5_discussion.org'): such sections are not a telescope but
+an illegal edit, possible only through hand-written files, since buffer
+validation refuses writes into another's data. Repos one manifest chains
+together (B's manifest lists A) belong to one owner and fold in the
+manifest's order; this is how Jeff's ladder folds on User's server. When
+no manifest chains the two repos, the home is the other owner's repo
+and the extra section is illegal: on its creator's server (the section
+is owned, the home foreign) the node renders from its home with the
+section's content appended as a child headline carrying a new herald,
+'ILLEGAL EDIT TO FOREIGN NODE', in the 'message' style; on every other
+server the section is ignored. Both report a startup warning naming the
+node and repo. This replaces the manifest-order warning of the last
+slice.
 ** Manifests
 An owned repo's manifest lists its owner's ladder through itself, as
 now; foreign repos never appear in it, since an owned repo cannot
