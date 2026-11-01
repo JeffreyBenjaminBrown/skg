@@ -1,0 +1,206 @@
+#+title: skg-for-ai: reading the skg graph as plain files
+
+* What it is for
+A client such as Emacs shows a skg view as a tree of headlines, each
+with a few short coloured heralds, and hides the long '(skg ...)'
+metadata sexp that every headline carries. A program that reads the
+same view as text, such as an AI agent, sees all of that metadata,
+which outweighs the words. 'skg_for_ai.py' asks a running skg server
+for a view and writes it twice: once exactly as the server rendered it,
+and once compactly, with the words, the nesting and a short handle per
+headline. Nothing is lost, because each handle points at the line of
+the full view that holds the headline's metadata.
+
+The tool is written for anyone, human or agent, who wants to read the
+graph without a client. It speaks the server's TCP protocol (see
+'docs/api-and-formats.org') and uses nothing but the Python 3 standard
+library. It never touches '.skg' files; only the server does.
+
+* Running it
+** Commands
+Each command writes three files into '--out-dir' (default: the current
+directory) and prints their paths, one per line.
+
+'python3 tools/skg-for-ai/skg_for_ai.py view ID' writes the recursive
+content view of the node ID, as a client opens it.
+
+'search TERMS...' writes the search buffer for the terms: each hit at
+the top level, with the containers of each hit beneath it.
+
+'links-here ID' writes the node's view with its mentioners folder: the
+nodes that link to it, each with its containerward chain (its
+containers, theirs, and so on up to the roots).
+
+'contains ID' writes the node's view, which already shows what contains
+it: a fresh content view carries the root's containers folder, with
+each container's containerward chain beneath it. The folder is absent
+when nothing contains the node.
+
+'close SIDECAR' sends 'close view' for the view ID a sidecar records and
+marks the sidecar closed. See "Views and connections" for why it is
+rarely needed.
+
+Following a link is just 'view' on the link's ID.
+
+Options, after the command: '--out-dir DIR'; '--name BASE' to name the
+files 'BASE.full.org' and so on instead of 'COMMAND_ARGUMENT';
+'--no-summary' to leave the summary out of the compact view; '--port
+N'.
+** The port
+The tool connects to 127.0.0.1 on the port 'SKG_PORT' names, or 1730
+when it is unset; '--port' overrides both. The port of a server is the
+'port' of its 'skgconfig.toml'.
+
+* The files it writes
+For a base name such as 'view_ID' the tool writes 'view_ID.full.org',
+'view_ID.compact.org' and 'view_ID.view.json'.
+** The full view
+'BASE.full.org' is the view's text exactly as the server sent it,
+metadata and all. It is what a client receives, before heralds hide
+the metadata.
+** The compact view
+'BASE.compact.org' has every line of the full view, in the same order.
+A body line is copied unchanged, except that its links are annotated.
+A headline keeps its stars and its title; its '(skg ...)' metadata is
+removed, and a handle is added at the end of the line.
+*** The handle, and why it is a line number
+A handle has the fixed form '⟨N ...⟩'. N is the 1-based number of the
+headline's line in the full view, so line N of 'BASE.full.org' holds
+the headline's metadata: 'sed -n Np BASE.full.org' shows it, and the
+pattern '⟨[0-9]+' finds every handle. A line number needs no table
+beside it and stays meaningful when the compact view is edited: a
+headline that is moved keeps its number, so a tool can tell a move
+from a deletion, and a headline without a handle is a new one. Body
+lines are not numbered: a body line belongs to the nearest headline
+above it.
+
+After N, a headline that is not a node occurrence names its kind: '⟨5
+containerFolder⟩', '⟨12 alias⟩'. Folders have no title, so in a
+compact view such a headline is its stars and its handle.
+*** The relationship heralds in the handle
+After N come the headline's relationship heralds, rendered as the
+clients render them, without their styles; 'docs/heralds.org',
+"Relationship heralds", explains them. In display order: 'C' contains,
+'L' links to, 'S' subscribes to, 'O' overrides, 'H' hides from its
+subscriptions. A count before a letter counts the nodes on the
+relation's in-side ("two nodes contain this"), a count after it the
+out-side ("this contains three"). A lowercase letter is an ancestor in
+this view: 'a' the viewparent, 'b' the grandparent, and so on; it
+replaces the count when ancestors make up the whole side. A fraction
+marks a subset: '1/5L', five nodes link here and one of them is
+substantive; 'C2/8', eight contents, two not yet integrated by the
+subscriber above. 'ĥ' after 'O' says this occurrence stands in for a
+node it overrides. The property counts 'A' (aliases), 'I' (extra IDs)
+and 'F' (true flags) follow. So '⟨17 2aC3⟩' is line 17: two
+containers, one of them the viewparent, and three contents.
+
+The tool computes these from each headline's '(view (rels ...) (props
+...) (birth ...))' facts, mirroring 'render_rel_facts' in
+'nvim/lua/skg/heralds.lua' and reading 'shared/relations.json' for the
+letters and their order. The other heralds (☮, ⊥, ⌂ and so on) are not
+in the handle; the full view's metadata says what they would say.
+*** Link annotations
+Every '[[id:ID][label]]' link, in a title or a body, is followed by an
+annotation in a fixed form. A link whose target resolves gets '⟦→ TITLE
+⌂:LABEL⟧', the target's title and its home skgrepo's label. A link
+whose target the graph lacks gets '⟦✗ missing⟧'; one whose target the
+skgrepo restriction hides gets '⟦✗ restricted⟧'. The tool asks the
+server's 'link statuses' request, which the clients' link annotations
+use, and then 'titles by ids' for the titles of the resolved targets.
+The annotation is the tool's; the link itself is unchanged.
+*** The summary
+Unless '--no-summary' is given, the compact view starts with a few Org
+comment lines ('# ...') before the tree. They name the full view and
+the view ID, then count, from the same metadata: the headlines, node
+occurrences, distinct nodes, folders and other kinds; the node
+occurrences in each skgrepo, owned or foreign; the occurrences in
+foreign skgrepos, the write-protected and the folded headlines; those
+contained elsewhere too (a 'contains' in-side larger than its ancestor
+flags, so a container not above it in this view); those subscribed to
+and those subscribing; the links, their distinct targets, and how many
+of those resolve; and the server's errors and warnings, which the
+sidecar lists.
+
+No request lists which skgrepos the config marks foreign, so the tool
+asks the server's 'flag state' about one node of each skgrepo the view
+shows; its answer says whether that node is owned.
+** The sidecar
+'BASE.view.json' records the view ID, the command and its request, the
+port, the two files' names, the server's errors and warnings, and
+whether the view is closed. A save of an edited view will be sent
+against this view ID.
+
+* Views and connections
+The server keeps a view's state per TCP connection, and forgets every
+view of a connection when it ends. Each command opens one connection,
+and sends 'close view' for its view before disconnecting, as a client
+does when its buffer is killed. A view is therefore never left open
+by the tool. A save does not need the view to be open: the server
+reads the saved buffer against the graph, so the view ID in the
+sidecar is enough. The 'close' command matters only for a view that a
+longer-lived connection holds.
+
+* How 'links-here' looks backward
+The server has no request that answers "what links here". The clients
+ask for it by saving the view with a '(viewRequests (folder
+mentioners))' on the node's headline ('C-c l m' in Emacs), and the
+re-rendered buffer the save returns shows the mentioners folder. The
+tool does the same: it opens the view, adds that request to the root's
+metadata, and saves the otherwise unchanged buffer. Since nothing in
+the buffer differs from the graph, the save writes no file, but it is
+a save, sent through the server's whole save path, so a node that the
+server would refuse or ask about on save (a foreign node edited, for
+instance) can make it fail or ask a question the tool does not
+answer. The tool then reports the server's answer and writes nothing.
+
+* Running a scratch server for it
+To try the tool without touching real data, run a second server on a
+scratch data root, as the 'verify' skill ('.claude/skills/verify/')
+describes. In short: copy 'tools/skg-for-ai/test-fixture/' somewhere
+(the server writes its search index and some generated files into the
+data root), set its 'port' in 'skgconfig.toml' to a free port, build
+the server with 'cargo build --bin skg', and start it from the copy:
+#+begin_example
+cd /path/to/copy
+/path/to/repo/target/debug/skg skgconfig.toml > server.log 2>&1 &
+SKG_PID=$!
+#+end_example
+Wait for "Server ready." in 'server.log', then run the tool with
+'SKG_PORT' set to that port. Stop the server with 'kill $SKG_PID'.
+
+* Tests
+'python3 tools/skg-for-ai/test_skg_for_ai.py' runs them, given a built
+server ('cargo build --bin skg'; 'SKG_BINARY' names another binary).
+First it checks the relationship heralds against the rendering cases
+both clients' tests share, 'tests/shared/herald-rendering-cases.txt',
+taking those whose text is only relationship and property tokens. Then
+it copies 'test-fixture/' to a temporary data root, starts a server
+there on port 1793 ('SKG_FOR_AI_TEST_PORT' changes it), runs 'view',
+'search', 'links-here' and 'contains', and compares each compact view
+with its file in 'test-expected/'. It also checks that every handle
+names its own line and that line is a headline of the full view, and
+that the runs, the 'links-here' save among them, left every '.skg'
+file as it was. It prints PASS or each failure, and keeps the scratch
+files when something fails. '--update-expected' rewrites the expected
+files instead of comparing; read the difference before keeping it.
+
+The fixture has two skgrepos, a foreign 'fred' listed first and an
+owned 'main'. Its root contains two children and is contained by a
+node above it; one child contains a node that a node outside the view
+also contains; the other subscribes to a foreign node and hides two
+foreign nodes from its subscriptions, one of which the view shows
+folded in a hidden-outside-of-subscribee folder. The root's body links
+to a node in the view, to a foreign node, and to an ID nobody wrote.
+
+* What the writing half will add
+Not built yet ('TODO/User-Claude/2_plan.org', "tools/skg-for-ai,
+writing"). The reader will edit the compact view in place: change
+titles and bodies, add headlines without handles, move or delete
+lines. The tool will rebuild the full buffer from it, giving each
+handled headline its metadata back from the full view and treating an
+unhandled one as a new node, and drop the summary and the link
+annotations. Before saving it will print the structural changes it is
+about to make (headlines removed from their container, moved, added,
+and any handle it cannot find), and save only when told to. The
+server's save then applies every check a client's save gets, and its
+re-rendered view replaces both files, so the handles are fresh.

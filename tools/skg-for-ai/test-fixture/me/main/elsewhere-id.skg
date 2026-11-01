@@ -1,0 +1,4 @@
+pid: elsewhere-id
+title: A second container, outside the view
+contains:
+- shared-id

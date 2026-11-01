@@ -1,0 +1,7 @@
+pid: child-b-id
+title: Second child, a subscriber
+subscribesTo:
+- fred-note-id
+hidesFromSubs:
+- fred-detail-id
+- fred-aside-id

@@ -1,0 +1,9 @@
+pid: root-id
+title: The fixture root
+body: |-
+  The root links to [[id:child-b-id][its second child]],
+  to [[id:fred-note-id][Fred's note]] in the foreign repo,
+  and to [[id:missing-id][a node nobody wrote]].
+contains:
+- child-a-id
+- child-b-id

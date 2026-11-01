@@ -1,0 +1,4 @@
+pid: fred-note-id
+title: Fred's note
+contains:
+- fred-detail-id

@@ -1,0 +1,16 @@
+# The fixture for 'test_skg_for_ai.py', which copies this folder to a scratch
+# data root before starting a server on it, so the server's index and
+# generated files never land here.
+tantivy_folder = ".index.tantivy"
+port = 1793
+timing_log = false
+beep_when_server_becomes_available = false
+
+[[repos]]
+name = "fred"
+path = "fred/public"
+foreign = true
+
+[[repos]]
+name = "main"
+path = "me/main"

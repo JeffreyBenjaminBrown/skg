@@ -1,0 +1,6 @@
+* Contained twice ⟨1 2C⟩
+** ⟨2 containerFolder⟩
+*** First child ⟨3 1Cb⟩
+**** The fixture root ⟨4 1C2a L2⟩
+***** Above the root ⟨5 Ca⟩
+*** A second container, outside the view ⟨6 Cb⟩

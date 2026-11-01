@@ -132,3 +132,142 @@ is an owned skgrepo whenever the member is owned, and only owned nodes
 move), so no test can exercise it. It keeps 'reset_to_default_relationships'
 from ever adding a save of a foreign recorder should that reasoning
 stop holding.
+* tools/skg-for-ai, reading: DONE, uncommitted
+** What was done
+'tools/skg-for-ai/skg_for_ai.py' (standard library only) talks to a
+running server and, for a view, writes 'BASE.full.org' (the server's
+text, unchanged), 'BASE.compact.org' and the sidecar 'BASE.view.json'
+(view ID, request, port, the server's errors and warnings). The
+compact view keeps every line in order; a headline loses its metadata
+and gains a handle '⟨N KIND HERALDS⟩' at its end, N its line in the
+full view; every '[[id:...]]' link, in titles and bodies, is followed
+by '⟦→ TITLE ⌂:LABEL⟧', '⟦✗ missing⟧' or '⟦✗ restricted⟧'. A summary
+of Org comment lines precedes the tree unless '--no-summary' is given.
+The commands are 'view', 'search', 'links-here', 'contains' and
+'close'; the port is 'SKG_PORT' or '--port'. 'README.org' beside it is
+written for anyone.
+
+The relationship heralds mirror 'render_rel_facts' in
+'nvim/lua/skg/heralds.lua', styles dropped, reading the letters and
+their order from 'shared/relations.json'. The test checks them
+against the 32 cases of 'tests/shared/herald-rendering-cases.txt'
+whose text is only relationship and property tokens, the cases both
+clients' tests read.
+
+'python3 tools/skg-for-ai/test_skg_for_ai.py' passes. It copies
+'tools/skg-for-ai/test-fixture/' (a foreign 'fred' listed first, an
+owned 'main', a folded node, a node with two containers, a
+subscription, a dangling link and a link into the foreign repo) to a
+temporary data root, starts a server on port 1793, runs four commands
+and compares each compact view, summary included, with
+'tools/skg-for-ai/test-expected/'. It also checks each handle's line
+number, and that no '.skg' file changed. 'cargo check --all-targets'
+is clean; no Rust, client or doc outside 'tools/skg-for-ai/' changed.
+
+The live run on 1731 used 'view' on 703f5a82-d948-431f-985c-4db8132bc504,
+'search AI team' and 'close', plus the read-only lookups the tool
+makes ('link statuses', 'titles by ids', 'flag state').
+** Deviations from the plan
+*** A view lives only as long as its connection
+The plan has the view stay open on the server for a later save, and
+the tool close it when asked. The server keeps open views per TCP
+connection ('ViewsState' is local to 'handle_emacs' in
+'server/serve.rs') and forgets them when the connection ends, so a
+command-line tool cannot leave one open. Each command therefore sends
+'close view' itself before disconnecting, and the sidecar records the
+view ID for the writing half. On the scratch server a save sent from
+a new connection, naming a view ID that connection never opened, was
+accepted and re-rendered, so the writing half needs no open view.
+'close SIDECAR' exists as asked, but today it closes nothing that is
+still open.
+*** 'links-here' is a save; 'contains' is 'view'
+The server has no read-only request for either. A fresh content view
+already draws the root's containers folder with each container's
+containerward chain, so 'contains' is 'view' under another file name.
+The mentioners folder appears only through a save carrying
+'(viewRequests (folder mentioners))', as 'C-c l m' sends, so
+'links-here' opens the view, adds that request to the root and saves
+the unchanged buffer. It writes no '.skg' file (the test checks this),
+but it goes through the whole save path, so I did not run it on 1731.
+*** The handle names a headline's kind when it is not a node
+A folder headline has no title, so with the metadata gone it would be
+bare stars. Its handle names the kind atom ('⟨11 subscribeeFolder⟩'),
+as does that of an alias, an unknown viewnode and the other kinds of
+'shared/metadata-fields.json'. A node occurrence's handle has none.
+*** The link annotation carries the skgrepo label too
+The clients' link annotation is the target's home skgrepo label, from
+'link statuses'; that request returns no title, so the tool takes
+titles from 'titles by ids', as 'skg-readable-ids-mode' does, and
+writes both.
+*** Ownership comes from 'flag state'
+No request says which skgrepos are foreign; the clients read the
+config file for it. The tool asks 'flag state' about one node of each
+skgrepo the view shows, whose reply carries '(owned ...)'.
+*** The herald rule table is not fetched
+The rule table only positions a sentinel where the relationship
+heralds go; the clients render them from '(view ...)' alone. Since
+the handle holds only relationship heralds and the kind, the tool
+does not need the table.
+*** The summary has a few more lines
+Beside the counts the plan names, it names the full file and view ID,
+counts the headlines by kind and the node occurrences per skgrepo
+with their ownership, and counts the server's errors and warnings. "Has
+other containers" is computed as a 'contains' in-side larger than its
+ancestor flags, and is written "Contained elsewhere too".
+** Reading the live view
+The compact view of "AI team for Skg" is 277 lines against the full
+view's 269 long ones, and it reads as a document: the words dominate
+and each handle is short. The link annotations helped most: "[[id:
+...][here]]⟦→ AI team for Skg ⌂:public⟧" said at once that a body
+links back to the root, and "each intermediate goal" turned out to be
+the node "intermediate goals to triage", which the view also shows.
+The summary for this view was all zeros but the links, which was
+itself informative: no foreign, folded or shared nodes to watch for.
+*** What was confusing
+Nearly every headline's handle reads 'aC', which says only that its
+parent contains it. In a content tree that is the default, and it
+drowns the few handles that say something ('aC10', '1/2L'). Jeff's
+'2aC3' example is informative precisely because the bare 'aC' is
+not.
+
+Folded headlines are invisible in the compact view except in the
+summary's count. In 'search AI team' (736 headlines, 182 folded) the
+hits are the level-1 headlines and everything under them is collapsed
+chain, which the compact view shows expanded; a reader cannot see
+where the client would stop drawing.
+*** What was missing
+The root's '1/2L' says two nodes link to it, one substantively, but
+which ones only 'links-here' can say, and that requires a save. One
+of them is "Taste Claude", inside this view, which the herald cannot
+tell me either.
+
+Nothing tells me whether a node shows all its content. A 'C6' with six
+children drawn and a 'C6' with two drawn look alike; the summary
+could count the occurrences whose drawn content is fewer than their
+'contains' out-side, which would reveal the initial-node-limit cut and
+nodes repeated elsewhere in the view.
+** Open questions
+*** A read-only request for backward views
+Should the single-root view request accept view requests, such as
+'(folder mentioners)', so that "what links here" needs no save? Then
+'links-here' could run against any server without going through the
+save path, and 'contains' could ask for the containers folder alone.
+*** Ownership over the protocol
+Should 'herald rules' (or another request) report each skgrepo's
+ownership beside its label? Both clients and this tool each find it
+another way.
+*** Saving a view another connection opened
+A save naming a view ID its connection never opened is accepted. Is
+that intended, and does the save's stale-view protection still hold
+for a buffer rendered on another connection? The writing half depends
+on the answer.
+*** Quieter handles
+Should the handle omit a side that the occurrence's birth fully
+explains (the bare 'aC' of ordinary content, which the clients style
+low), or the whole token when nothing else remains? It would be the
+tool's first departure from the clients' text.
+*** What 'contains' should show
+Should 'contains ID' write only the root and its containers folder,
+rather than the whole content view? For a large node the containers
+are lost below its content. The compact-view rule that every line of
+the full view appears would then hold for a narrower full view.

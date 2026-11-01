@@ -1,0 +1,6 @@
+pid: child-a-id
+title: First child
+body: |-
+  A body line that stays unnumbered.
+contains:
+- shared-id
