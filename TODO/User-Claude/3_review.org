@@ -109,3 +109,12 @@ write-protected occurrence's title cannot be edited, instead of letting
 the server say so after the fact. User's view: worth doing once the
 stale-save fix is in, since both are about the report's honesty.
 *** Jeff
+** 'rendered-at "never"'
+A buffer no server response drew (a new empty view) sends
+'(rendered-at . "never")', and the server checks nothing in it. Text
+pasted from an old buffer into a new empty view therefore escapes the
+check. User accepted this to ship the fix: the field is still required,
+so an old client cannot skip the check by omission, and a new empty view
+holding pasted old nodes is rare. The alternative is for the client to
+ask the server for the current generation when it opens an empty view.
+*** Jeff
