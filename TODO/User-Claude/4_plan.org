@@ -105,3 +105,17 @@ the summary and the handle tokens seem enough. Skip them?
 *** DONE Jeff : sure
 **** User
 Skipped.
+* jeff
+** TODO Let's add skgrepo indicators to your compact view.
+I think it would also help if your heralds included skgrepo indicators.
+The server only attaches them to nodes whose nearest vognode ancestor
+has a different source, so most nodes don't have them.
+They don't clutter the view, and they are very helpful
+for knowing what (whose voice) you're looking at.
+*** TODO User : done, as '⌂:LABEL' in the handle
+Where the server writes 'repoBoundary' (a root, or a node whose home
+skgrepo differs from its nearest occurrence ancestor's), the handle
+now carries '⌂:LABEL' after the relationship heralds, LABEL from the
+skgrepo label table the server sends beside its herald rules: '⟨14
+C1 1/L bS ⌂:fred⟩'. Every view gets it, the diff view included.
+'progress.org' has the rest of the slice.

@@ -123,7 +123,7 @@ name for the rebuild. Restart your server once with the new
 differ between the two servers. Teammates could agree to name each
 other's repos as their owners do.
 *** Jeff : seems fine
-** Should the save report read the full view's metadata?
+** DONE Should the save report read the full view's metadata?
 It could warn in advance that a headline removed from under a
 write-protected occurrence or a folder only leaves the view, and that a
 write-protected occurrence's title cannot be edited, instead of letting
@@ -139,7 +139,7 @@ whether it should also consult the full view's metadata, so it can warn
 me beforehand that, say, I am trying to retitle a write-protected node,
 which the server will refuse anyway. Small convenience; I'd do it, but
 it is not urgent. Yes or no?
-***** TODO jeff : let's use the difff view for this
+***** jeff : let's use the difff view for this
 Reviwing changes is exactly what it's for.
 Please read about that, and write a plan for it at 4_plan.org.
 
@@ -180,7 +180,7 @@ Done: opening an empty view asks the server ('runtime generation'
 request) and 'never' is gone; a save with a missing or non-numeric
 'rendered-at' is refused.
 
-* The "privacy hole" the config reload closed, described
+* DONE The "privacy hole" the config reload closed, described
 ** What the agent changed
 A connection's skgrepo restriction ("show me only skgrepos through X") is
 built from the config at the moment it is set: it holds the list of

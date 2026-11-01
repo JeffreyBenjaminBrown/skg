@@ -20,7 +20,13 @@ In order, it:
   a title, a body, a new child, a move, a removal, a deletion, a bad
   handle, an edit the server refuses, and a stale view the server
   refuses, checking
-  each report exactly and the graph after each save.
+  each report exactly and the graph after each save;
+- on a third scratch server, whose owned skgrepo is a gitrepo with the
+  fixture committed: saves a retitle, a new child and a deletion,
+  checks the diff view's compact buffer exactly, marks the new child
+  ready, restores the deleted node, and commits (refused unconfirmed,
+  then confirmed with '--yes'), checking 'git log' and that the diff
+  view is then empty; a blank commit message is refused unsent.
 '--update-expected' rewrites the expected files instead of comparing.
 """
 
@@ -118,23 +124,31 @@ def relationship_tokens_only (metadata_text, text):
 
 def failures_against_scratch_servers (update_expected):
   """The reading checks on one scratch server, then the writing
-  checks on another, each on its own copy of the fixture."""
+  checks on another, then the reviewing checks on a third, whose owned
+  skgrepo is a gitrepo; each on its own copy of the fixture."""
   if not os . path . exists (SERVER_BINARY):
     return [ f"no server binary at {SERVER_BINARY}; run 'cargo build --bin skg'" ]
   return ( failures_on_a_scratch_server (
              lambda scratch, data_root :
                failures_of_reading (scratch, data_root, update_expected) )
-           + failures_on_a_scratch_server (failures_of_writing) )
+           + failures_on_a_scratch_server (failures_of_writing)
+           + failures_on_a_scratch_server (
+               failures_of_reviewing, owned_skgrepo_in_git = True ))
 
-def failures_on_a_scratch_server (check):
+def failures_on_a_scratch_server (check, owned_skgrepo_in_git = False):
   """CHECK (SCRATCH, DATA_ROOT)'s failures, run against a server on a
-  fresh copy of the fixture in the scratch folder SCRATCH."""
+  fresh copy of the fixture in the scratch folder SCRATCH. With
+  OWNED_SKGREPO_IN_GIT, the owned skgrepo is first made a gitrepo
+  whose HEAD commit holds the fixture's files, as the diff view
+  needs."""
   if port_is_listening (PORT):
     return [ f"port {PORT} is taken; set SKG_FOR_AI_TEST_PORT" ]
   scratch = tempfile . mkdtemp ( prefix = "skg-for-ai-test-" )
   data_root = os . path . join (scratch, "data")
   shutil . copytree (FIXTURE_FOLDER, data_root)
   set_port_in_config ( os . path . join (data_root, "skgconfig.toml"), PORT )
+  if owned_skgrepo_in_git:
+    commit_fixture_in_new_gitrepo ( os . path . join (data_root, "me", "main") )
   server_log_path = os . path . join (scratch, "server.log")
   with open (server_log_path, "w") as server_log:
     server = subprocess . Popen (
@@ -229,10 +243,6 @@ NOT_SAVED = "Not saved. Run again with '--yes' to save.\n"
 DANGLING_LINK_WARNING = (
   "Server warning: Dangling link: node root-id links to absent id "
   "missing-id (label \"a node nobody wrote\").\n" )
-REMOVAL_NOTE = (
-  "  (A removed headline leaves its parent's list, where the parent "
-  "reads claims; the node itself is not deleted. To delete a node, "
-  "add 'delete' to its handle.)\n" )
 UUID_PATTERN = re . compile (
   r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' )
 
@@ -300,8 +310,8 @@ def check_move (context):
   folder = fresh_root_view (context, "move")
   edit_compact ( folder, [
     ( "*** Contained twice ⟨10 2aC⟩\n", "" ),
-    ( "***** An aside of Fred's ⟨16 cH folded⟩\n",
-      "***** An aside of Fred's ⟨16 cH folded⟩\n"
+    ( "***** An aside of Fred's ⟨16 cH ⌂:fred folded⟩\n",
+      "***** An aside of Fred's ⟨16 cH ⌂:fred folded⟩\n"
       "*** Contained twice ⟨10 2aC⟩\n" ) ])
   report = ( REPORT_HEAD +
              "Moved: ⟨10⟩ 'Contained twice', from under ⟨8⟩ 'First child, "
@@ -320,7 +330,7 @@ def check_removal (context):
   edit_compact ( folder, [ ( "*** Contained twice ⟨16 2aC⟩\n", "" ) ])
   report = ( REPORT_HEAD +
              "Removed: ⟨16⟩ 'Contained twice', from under ⟨11⟩ 'Second "
-             "child, a subscriber'.\n" + REMOVAL_NOTE )
+             "child, a subscriber'.\n" )
   require_output ( run_save (folder, "--yes"),
                    report + saved_line (0) + written_paths (folder) )
   require_equal ( "the container's content after the removal",
@@ -334,7 +344,7 @@ def check_removal (context):
     "the removed node's fresh view",
     read_file ( os . path . join ( shared_folder,
                                    "view_shared-id.compact.org" )),
-    "* Contained twice ⟨1 1C⟩\n"
+    "* Contained twice ⟨1 1C ⌂:main⟩\n"
     "** ⟨2 containerFolder⟩\n"
     "*** A second container, outside the view ⟨3 Cb⟩\n" )
 
@@ -355,7 +365,9 @@ def check_deletion (context):
 
 def check_bad_handles (context):
   folder = fresh_root_view (context, "bad-handle")
-  edit_compact ( folder, [ ( "** First child, renamed ⟨8⟩",
+  edit_compact ( folder, [ ( "⟨1 1C2 L2 ⌂:main⟩",
+                             "⟨1 1C2 L2 ⌂:main all delete restoreNode⟩" ),
+                           ( "** First child, renamed ⟨8⟩",
                              "** First child, renamed ⟨3⟩" ),
                            ( "⟨7 Cb⟩", "⟨99 Cb⟩" ) ])
   graph_before = skg_files (context)
@@ -364,12 +376,16 @@ def check_bad_handles (context):
   require_output (
     completed,
     REPORT_HEAD +
+    "Error: ⟨1⟩ on line 1 of the compact view carries 'delete' and "
+    "'restoreNode'; a headline takes one edit request.\n"
+    "Error: ⟨1⟩ on line 1 of the compact view carries 'all' without "
+    "'ready' or 'unready'.\n"
     "Error: ⟨99⟩ on line 7 of the compact view names no line; the full "
     "view has 14 lines.\n"
     "Error: ⟨3⟩ on line 8 of the compact view names line 3 of the full "
     "view, a body line, not a headline.\n",
     expected_returncode = 1 )
-  if "Nothing was saved: a handle names no headline" not in completed . stderr:
+  if "Nothing was saved: some handles are in error" not in completed . stderr:
     raise CaseFailure ( f"stderr was {completed . stderr!r}" )
   require_equal ( "the graph after a refused save",
                   skg_files (context), graph_before )
@@ -474,7 +490,7 @@ def check_new_root (context):
                   skg_title (context, new_id), "A new root" )
   compact_path = base + ".compact.org"
   require_equal ( "the new root's compact view",
-                  read_file (compact_path), "* A new root ⟨1⟩\n" )
+                  read_file (compact_path), "* A new root ⟨1 ⌂:main⟩\n" )
   with open (compact_path, "w", encoding = "utf-8") as compact_file:
     compact_file . write ( "* A new root ⟨1⟩\nIts body.\n** Its child\n" )
   require_save_succeeds (folder)
@@ -483,6 +499,223 @@ def check_new_root (context):
   [ child_id ] = skg_list (context, new_id, "contains")
   require_equal ( "the new root's child's title",
                   skg_title (context, child_id), "Its child" )
+
+# ============================================================
+# Reviewing: on a fixture whose owned skgrepo is a gitrepo, edits are
+# saved, the diff view shows them, one is marked ready, a deleted node
+# is restored, and everything is committed. The cases run in order on
+# one server.
+# ============================================================
+
+DIFF_BASE_NAME = "diff_all-changes"
+DIFF_VIEW_ID_PATTERN = re . compile (
+  r'diff-view:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' )
+COMMIT_MESSAGE = "Review the fixture."
+NOT_ALL_READY = (
+  "Not every change is ready to commit: 1 of 4 changed files are ready.\n" )
+EMPTY_DIFF_VIEW = (
+  "The diff view is empty: nothing changed since the last commits.\n" )
+
+def failures_of_reviewing (scratch, data_root):
+  main_repo = os . path . join (data_root, "me", "main")
+  context = { "scratch" : scratch, "main_repo" : main_repo }
+  for case in [ check_edits_to_review, check_diff_shows_the_changes,
+                check_marking_ready, check_unconfirmed_commit,
+                check_restoring_a_deleted_node, check_confirmed_commit,
+                check_blank_commit_message ]:
+    try:
+      case (context)
+    except CaseFailure as failure:
+      return [ case . __name__ + ": " + str (failure) ]
+  return []
+
+def check_edits_to_review (context):
+  """A retitle, a new child and a deletion, saved through a content
+  view."""
+  folder = fresh_root_view (context, "review-edits")
+  edit_compact ( folder, [
+    ( "** First child ⟨7 aC1⟩", "** First child, renamed ⟨7 aC1⟩" ),
+    ( "*** Contained twice ⟨9 2aC⟩\n",
+      "*** Contained twice ⟨9 2aC delete⟩\n*** A new grandchild\n" ) ])
+  require_save_succeeds (folder)
+  require_equal ( "the deleted node's file",
+                  os . path . exists ( skg_path (context, "shared-id") ),
+                  False )
+
+def check_diff_shows_the_changes (context):
+  folder = run_diff (context, "diff-shows")
+  require_equal ( "the diff view's compact buffer",
+                  DIFF_VIEW_ID_PATTERN . sub (
+                    "diff-view:ID", read_diff_compact (folder) ),
+                  EXPECTED_DIFF_COMPACT )
+
+def check_marking_ready (context):
+  """'ready' on the new node marks its existence and its membership;
+  a fresh diff view shows both ready. 'unready' there would unmark two
+  changes, so the report asks first."""
+  folder = run_diff (context, "mark")
+  edit_compact (
+    folder, [ ( "**** A new grandchild ⟨14 ∃+ ~+⟩",
+                "**** A new grandchild ⟨14 ∃+ ~+ ready⟩" ) ],
+    DIFF_BASE_NAME )
+  require_output (
+    run_tool ([ "save", sidecar_of_diff (folder), "--yes" ]),
+    diff_report_head () +
+    "Ready: ⟨14⟩ 'A new grandchild', as '(ready node rel)'.\n" +
+    saved_line (0) +
+    "Readiness: 1 of 4 changed files are ready.\n" +
+    diff_written_paths (folder),
+    ignoring_view_ids = True )
+  fresh = run_diff (context, "marked")
+  compact = read_diff_compact (fresh)
+  for expected in [ "# Readiness: 1 of 4 changed files are ready.\n",
+                    "**** A new grandchild ⟨14 ∃+✓ ~+✓⟩\n" ]:
+    if expected not in compact:
+      raise CaseFailure ( f"the fresh diff view lacks {expected!r}:\n{compact}" )
+  edit_compact (
+    fresh, [ ( "⟨14 ∃+✓ ~+✓⟩", "⟨14 ∃+✓ ~+✓ unready⟩" ) ], DIFF_BASE_NAME )
+  require_output (
+    run_tool ([ "save", sidecar_of_diff (fresh) ]),
+    diff_report_head () +
+    "Unready: ⟨14⟩ 'A new grandchild', as '(unready node rel)'.\n"
+    "Question: this unmarks 2 changes. Unmarking this node commit-ready "
+    "will unmark every contributing decision. You might discard a lot of "
+    "hard-won information. Continue? Saving with '--yes' answers yes.\n" +
+    NOT_SAVED,
+    ignoring_view_ids = True )
+
+def check_unconfirmed_commit (context):
+  """Not every change is ready, so the server asks; an answer other
+  than 'yes' commits nothing."""
+  graph_before = skg_files (context)
+  require_output (
+    run_tool ([ "commit", COMMIT_MESSAGE ], standard_input = "no\n"),
+    NOT_ALL_READY + "Type yes to commit anyway: \nNothing was committed.\n" )
+  require_equal ( "the git log after an unconfirmed commit",
+                  git ( context [ "main_repo" ], [ "log", "--format=%s" ] ),
+                  "The fixture\n" )
+  require_equal ( "the graph after an unconfirmed commit",
+                  skg_files (context), graph_before )
+
+def check_restoring_a_deleted_node (context):
+  """'restoreNode' on a ghost writes the node back from HEAD, in both
+  of its containers."""
+  folder = run_diff (context, "restore")
+  edit_compact (
+    folder, [ ( "**** Contained twice ⟨13 ghost ∃- ~-⟩",
+                "**** Contained twice ⟨13 ghost ∃- ~- restoreNode⟩" ) ],
+    DIFF_BASE_NAME )
+  require_output (
+    run_tool ([ "save", sidecar_of_diff (folder), "--yes" ]),
+    diff_report_head () +
+    "Restore node: ⟨13⟩ 'Contained twice', as HEAD has it.\n" +
+    saved_line (0) +
+    "Readiness: 1 of 2 changed files are ready.\n" +
+    diff_written_paths (folder),
+    ignoring_view_ids = True )
+  require_equal ( "the restored node's title",
+                  skg_title (context, "shared-id"), "Contained twice" )
+  require_equal ( "its first container's content",
+                  skg_list (context, "child-a-id", "contains")
+                    [ : 1 ], [ "shared-id" ] )
+  require_equal ( "its second container's content",
+                  skg_list (context, "elsewhere-id", "contains"),
+                  [ "shared-id" ] )
+
+def check_confirmed_commit (context):
+  """'--yes' answers the server's question; the commit carries the
+  message, and leaves the diff view empty."""
+  completed = run_tool ([ "commit", COMMIT_MESSAGE, "--yes" ])
+  head = git ( context [ "main_repo" ], [ "rev-parse", "HEAD" ] ) . strip ()
+  require_output (
+    completed,
+    "Not every change is ready to commit: 1 of 2 changed files are ready.\n"
+    f"Committed in main ({head}).\n" )
+  require_equal ( "the git log after the commit",
+                  git ( context [ "main_repo" ], [ "log", "--format=%s" ] ),
+                  COMMIT_MESSAGE + "\nThe fixture\n" )
+  require_equal ( "the uncommitted '.skg' files",
+                  [ line for line in git ( context [ "main_repo" ],
+                                           [ "status", "--porcelain" ] )
+                                     . split ("\n")
+                    if line . endswith (".skg") ], [] )
+  require_output (
+    run_tool ([ "diff", "--out-dir",
+                os . path . join ( context [ "scratch" ], "review", "after" ) ]),
+    EMPTY_DIFF_VIEW )
+
+def check_blank_commit_message (context):
+  """A blank message is refused before anything is sent: no server
+  answers on port 1."""
+  completed = run_tool ([ "commit", " " ], port = 1)
+  require_output ( completed, "", expected_returncode = 1 )
+  if "A commit message is required; nothing was sent." not in completed . stderr:
+    raise CaseFailure ( f"stderr was {completed . stderr!r}" )
+
+# ------------------------------------------------------------
+# Helpers of the reviewing cases
+# ------------------------------------------------------------
+
+def run_diff (context, name):
+  """Run 'diff' into a fresh folder; require that it wrote only the
+  all-changes buffer."""
+  folder = os . path . join ( context [ "scratch" ], "review", name )
+  completed = require_tool_run ([ "diff", "--out-dir", folder ])
+  require_equal ( "the files 'diff' wrote", completed . stdout,
+                  diff_written_paths (folder) )
+  return folder
+
+def sidecar_of_diff (folder):
+  return os . path . join (folder, DIFF_BASE_NAME + ".view.json")
+
+def read_diff_compact (folder):
+  return read_file ( os . path . join (folder, DIFF_BASE_NAME + ".compact.org") )
+
+def diff_report_head ():
+  return ( "Changes in " + DIFF_BASE_NAME + ".compact.org, against " +
+           DIFF_BASE_NAME + ".full.org (view ID diff-view:ID):\n" )
+
+def diff_written_paths (folder):
+  return "" . join ( os . path . join (folder, DIFF_BASE_NAME + suffix) + "\n"
+                     for suffix in ( ".full.org", ".compact.org", ".view.json" ))
+
+EXPECTED_DIFF_COMPACT = (
+  "# Readiness: 0 of 4 changed files are ready.\n"
+  "# Headlines with change facts 9, ready 0, not ready 9.\n"
+  "# skg-for-ai compact view of diff_all-changes.full.org (view ID diff-view:ID)\n"
+  "# Each headline ends in ⟨N ...⟩, N its line number in the full view;\n"
+  "# a bare 'aC' (only the parent contains it) is left out, and 'folded'\n"
+  "# marks a headline a client shows collapsed.\n"
+  "# Headlines 15, node occurrences 9, distinct nodes 6, changesetMarker "
+  "content 2, folders 1, ghost 2, oldText title 1.\n"
+  "# Skgrepos: main (owned) 9.\n"
+  "# Foreign 0, write-protected 4, folded 0.\n"
+  "# Contained elsewhere too 2, subscribed to 0, subscribing 1.\n"
+  "# Links 3, distinct targets 3, resolved 2, unresolved 1 (missing 1).\n"
+  "# Server errors 0, warnings 0.\n"
+  # The deleted node's other container, a root of its own
+  "* A second container, outside the view ⟨1 ⌂:main M⟩\n"
+  "** ⟨2 changesetMarker content⟩\n"
+  "** Contained twice ⟨3 ghost ∃- ~-⟩\n"
+  "* Above the root ⟨4 C1 ⌂:main⟩\n"
+  "** The fixture root ⟨5 aC2 L2⟩\n"
+  "The root links to [[id:child-b-id][its second child]]⟦→ Second child, "
+  "a subscriber ⌂:main⟧,\n"
+  "to [[id:fred-note-id][Fred's note]]⟦→ Fred's note ⌂:fred⟧ in the "
+  "foreign repo,\n"
+  "and to [[id:missing-id][a node nobody wrote]]⟦✗ missing⟧.\n"
+  "*** First child, renamed ⟨9 aC1 M⟩\n"
+  "A body line that stays unnumbered.\n"
+  "**** First child ⟨11 oldText title⟩\n"
+  "**** ⟨12 changesetMarker content⟩\n"
+  "**** Contained twice ⟨13 ghost ∃- ~-⟩\n"
+  "**** A new grandchild ⟨14 ∃+ ~+⟩\n"
+  # The new node's containers changed: it had none at HEAD.
+  "***** ⟨15 containerFolder⟩\n"
+  "****** First child, renamed ⟨16 1Cb M ~+⟩\n"
+  "******* The fixture root ⟨17 1C2a L2⟩\n"
+  "******** Above the root ⟨18 Ca⟩\n"
+  "*** Second child, a subscriber ⟨19 a/L S1 H2⟩\n" )
 
 # ------------------------------------------------------------
 # Helpers of the writing cases
@@ -509,8 +742,10 @@ def require_save_succeeds (folder):
     raise CaseFailure (
       f"saving {folder} printed {completed . stdout!r}, {completed . stderr!r}" )
 
-def edit_compact (folder, replacements):
-  path = os . path . join (folder, ROOT_BASE_NAME + ".compact.org")
+def edit_compact (folder, replacements, base_name = ROOT_BASE_NAME):
+  """Replace, in the compact view BASE_NAME in FOLDER, each OLD of
+  REPLACEMENTS by its NEW, requiring that OLD occur once."""
+  path = os . path . join (folder, base_name + ".compact.org")
   text = read_file (path)
   for old, new in replacements:
     if text . count (old) != 1:
@@ -545,8 +780,13 @@ def id_of_compact_headline (folder, headline_start):
   raise CaseFailure (
     f"no headline {headline_start!r} in:\n{read_compact (folder)}" )
 
-def require_output (completed, expected_stdout, expected_returncode = 0):
-  if ( completed . stdout != expected_stdout
+def require_output (completed, expected_stdout, expected_returncode = 0,
+                    ignoring_view_ids = False):
+  """IGNORING_VIEW_IDS: each diff view's view ID, a fresh UUID, is
+  read as 'diff-view:ID'."""
+  stdout = ( DIFF_VIEW_ID_PATTERN . sub ( "diff-view:ID", completed . stdout )
+             if ignoring_view_ids else completed . stdout )
+  if ( stdout != expected_stdout
        or completed . returncode != expected_returncode ):
     raise CaseFailure (
       f"exit {completed . returncode}, printed:\n{completed . stdout}"
@@ -607,11 +847,27 @@ def skg_files (context):
            for name in sorted ( os . listdir ( context [ "main_repo" ] ))
            if name . endswith (".skg") }
 
-def run_tool (tool_arguments):
+def run_tool (tool_arguments, standard_input = "", port = PORT):
   return subprocess . run (
     [ sys . executable, os . path . join (TOOL_FOLDER, "skg_for_ai.py") ]
-    + tool_arguments + [ "--port", str (PORT) ],
-    capture_output = True, text = True )
+    + tool_arguments + [ "--port", str (port) ],
+    input = standard_input, capture_output = True, text = True )
+
+def commit_fixture_in_new_gitrepo (folder):
+  """Make FOLDER a gitrepo, with a local author, whose one commit
+  holds its files."""
+  for git_arguments in [ [ "init", "--quiet" ],
+                         [ "config", "user.name", "Fixture Author" ],
+                         [ "config", "user.email", "fixture@example.com" ],
+                         [ "add", "--all" ],
+                         [ "commit", "--quiet", "--message", "The fixture" ] ]:
+    git (folder, git_arguments)
+
+def git (folder, git_arguments):
+  """Git's standard output, run in FOLDER; raises when git fails."""
+  return subprocess . run (
+    [ "git", "-C", folder ] + git_arguments,
+    capture_output = True, text = True, check = True ) . stdout
 
 def failures_of_handles (base_name, full_lines, compact):
   """Each handle names a headline of the full view, every headline is

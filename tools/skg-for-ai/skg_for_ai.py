@@ -17,13 +17,18 @@ For a requested view it writes, into a directory the caller names:
   warnings.
 
 View commands: 'view ID', 'search TERMS...', 'links-here ID',
-'contains ID'. Each prints the paths it wrote. 'links-here' saves,
-as the clients' 'C-c l m' does.
+'contains ID', 'diff'. Each prints the paths it wrote. 'links-here'
+saves, as the clients' 'C-c l m' does. 'diff' writes each nonempty
+buffer of the diff view, its handles carrying the change facts.
 'new TITLE REPO' creates a root node in an owned skgrepo, as a save of
 a new empty view does, and writes its view as 'view' would.
 'save SIDECAR' rebuilds the full buffer from an edited compact view,
 prints the changes it would make, and with '--yes' saves it and
-writes the server's re-rendered view over the three files.
+writes the server's re-rendered view over the three files. Words in a
+handle ask for edit requests: 'delete', 'ready', 'unready', 'all',
+'restoreNode', 'restoreRel'.
+'commit MESSAGE' stages and git-commits every change in the owned
+skgrepos, asking first when the server says not all is ready.
 Other commands: 'close SIDECAR'; 'raw REQUEST', which sends one
 request line and prints every response; 'import INPUT_DIR REPO',
 which previews and applies a Markdown and Org import.
@@ -53,6 +58,15 @@ RAW_QUIET_SECONDS = 3
 LINK_PATTERN = re . compile (
   r'\[\[id:([^\]\[]+)\](?:\[[^\]]*\])?\]')
 HEADLINE_PATTERN = re . compile (r'^(\*+) (.*)$')
+# The buffers of the diff view, in the order the clients request them.
+DIFF_VIEW_BUFFERS = [ "all changes", "merges", "skgrepo changes",
+                      "order-only changes" ]
+# What a client asks before a readiness gesture that unmarks more
+# than one leaf ('skg--readiness-wide-unmark-question' in
+# 'elisp/skg-readiness.el').
+WIDE_UNMARK_QUESTION = (
+  "Unmarking this node commit-ready will unmark every contributing "
+  "decision. You might discard a lot of hard-won information. Continue?" )
 SAVE_TERMINAL_RESPONSE_TYPES = {
   "save-result", "delete-from-confirmation", "strandeds-confirmation",
   "telescope-hoist-confirmation", "fork-confirmation",
@@ -78,6 +92,12 @@ def main (argv):
     return
   if arguments . command == "new":
     command_new (arguments)
+    return
+  if arguments . command == "diff":
+    command_diff (arguments)
+    return
+  if arguments . command == "commit":
+    command_commit (arguments)
     return
   connection = SkgConnection (arguments . port)
   try:
@@ -137,6 +157,19 @@ def parse_command_line (argv):
     "search", help = "the search buffer for TERMS",
     parents = [ common_options ] ) . add_argument ( "terms", nargs = "+" )
   commands . add_parser (
+    "diff", help = ( "the diff view's nonempty buffers: every change in "
+                     "the owned skgrepos since their last git-commits" ),
+    parents = [ common_options ] )
+  commit_parser = commands . add_parser (
+    "commit", help = ( "stage and git-commit every change in the owned "
+                       "skgrepos, with MESSAGE" ),
+    parents = [ port_option ] )
+  commit_parser . add_argument ( "message" )
+  commit_parser . add_argument (
+    "--yes", action = "store_true",
+    help = ( "answer yes when the server asks to confirm, because not "
+             "every change is ready or something is already staged" ))
+  commands . add_parser (
     "close", help = "send 'close view' for a sidecar's view ID",
     parents = [ common_options ] ) . add_argument ( "sidecar" )
   raw_parser = commands . add_parser (
@@ -166,7 +199,8 @@ def parse_command_line (argv):
     help = "the server's port; it must be the one the sidecar records" )
   save_parser . add_argument (
     "--yes", action = "store_true",
-    help = "save, unless the report finds an error" )
+    help = ( "save, unless the report finds an error; this also answers "
+             "yes to the question asked before unmarking several changes" ))
   import_parser = commands . add_parser (
     "import", help = "preview and apply a Markdown and Org import",
     parents = [ port_option ] )
@@ -282,7 +316,7 @@ def command_save (arguments):
       print (line)
     if errors:
       raise SkgToolError (
-        "Nothing was saved: a handle names no headline of the full view." )
+        "Nothing was saved: some handles are in error; see above." )
     if not changes:
       print ( "Nothing to save." )
       return
@@ -291,6 +325,8 @@ def command_save (arguments):
       return
     buffer_text = rebuilt_full_buffer (
       edited, saved_view . parsed_view, saved_view . full_text )
+    if saved_view . sidecar [ "command" ] == "diff":
+      register_diff_view_buffer_for_save (connection, saved_view . sidecar)
     messages = connection . save_buffer (
       saved_view . sidecar [ "view_id" ], buffer_text,
       saved_view . sidecar [ "rendered_at" ] )
@@ -303,6 +339,20 @@ def command_save (arguments):
     connection . close ()
   for path in written_paths:
     print (path)
+
+def register_diff_view_buffer_for_save (connection, sidecar):
+  """Open the sidecar's buffer of the diff view on CONNECTION, under
+  its view ID, as a client's buffer stays open on its connection. The
+  server keeps a view's buffer kind per connection, and a save
+  re-renders as a buffer of the diff view, with the readiness summary,
+  only a view registered as one. The save itself is read from the
+  saved text, against the generation the sidecar records."""
+  buffer_name = sidecar [ "request" ] [ "buffer" ]
+  if fetch_diff_view_buffer (
+      connection, buffer_name, sidecar [ "view_id" ] ) is None:
+    raise SkgToolError (
+      f"Nothing was saved: the diff view's '{buffer_name}' buffer is empty "
+      "now (its changes were committed or undone); run 'diff' again." )
 
 def command_new (arguments):
   """Create a root node titled ARGUMENTS.title whose home is the
@@ -362,6 +412,88 @@ def command_new (arguments):
   for path in written_paths:
     print (path)
 
+def command_diff (arguments):
+  """Request each buffer of the diff view in the clients' order, on
+  one connection, and write each nonempty one as 'view' writes a view,
+  named BASE_BUFFER ('diff_all-changes' and so on). Each buffer is
+  then saved unchanged, which writes nothing, because the save's answer
+  carries the readiness summary that opens the compact view's summary;
+  the save's re-rendered buffer is the one written. Each buffer is
+  closed before the next is requested."""
+  connection = SkgConnection (arguments . port)
+  written_paths = []
+  try:
+    for buffer_name in DIFF_VIEW_BUFFERS:
+      view = fetch_diff_view_buffer (connection, buffer_name)
+      if view is None:
+        continue
+      view = diff_view_with_readiness_summary (connection, view)
+      written_paths += write_view_files (
+        connection, view, arguments . out_dir,
+        ( arguments . name or "diff" ) + "_" +
+        buffer_name . replace (" ", "-"),
+        not arguments . no_summary )
+      close_view_on_server (connection, view [ "view_id" ])
+  finally:
+    connection . close ()
+  if not written_paths:
+    print ( "The diff view is empty: nothing changed since the last commits." )
+  for path in written_paths:
+    print (path)
+
+def command_commit (arguments):
+  """Send "stage and commit" with the message. When the server asks
+  for confirmation (not every changed file is ready, or some owned
+  gitrepo has entries already staged), print why and ask for a typed
+  "yes", which '--yes' gives; on yes, resend it confirmed. Print what
+  was committed."""
+  if not arguments . message . strip ():
+    raise SkgToolError ( "A commit message is required; nothing was sent." )
+  connection = SkgConnection (arguments . port)
+  try:
+    response = connection . stage_and_commit (arguments . message, False)
+    if response_field (response, "needs-confirmation") is not None:
+      print ( "Not every change is ready to commit: " +
+              readiness_summary_text (
+                response_field (response, "readiness-summary") ))
+      already_staged = response_field (response, "already-staged")
+      for gitrepo_and_paths in already_staged or []:
+        print ( "Already staged in " + sexp_to_text ( gitrepo_and_paths [0] )
+                + ", so committed too: " +
+                ", " . join ( sexp_to_text (path)
+                              for path in gitrepo_and_paths [ 1 : ] ))
+      if not ( arguments . yes or typed_yes ( "Type yes to commit anyway: " )):
+        print ( "Nothing was committed." )
+        return
+      response = connection . stage_and_commit (arguments . message, True)
+  finally:
+    connection . close ()
+  commits = response_field (response, "commits") or []
+  errors = response_field (response, "errors") or []
+  print ( "Committed in " + ", " . join (
+            sexp_to_text ( commit [0] ) + " (" + sexp_to_text ( commit [1] ) + ")"
+            for commit in commits ) + "."
+          if commits else "Nothing was committed." )
+  for error in errors:
+    print ( "Server error: " + error )
+  for warning in response_field (response, "warnings") or []:
+    print ( "Server warning: " + warning )
+  if errors:
+    raise SkgToolError ( "The server reported errors; see above." )
+
+def typed_yes (prompt):
+  """Whether the person at standard input types exactly 'yes'. With no
+  input to read, the answer is no."""
+  print (prompt, end = "", flush = True)
+  try:
+    answer = sys . stdin . readline ()
+  except OSError:
+    answer = ""
+  if not answer . endswith ("\n") or not sys . stdin . isatty ():
+    # The terminal echoed no answer to end the prompt's line.
+    print ()
+  return answer . strip () == "yes"
+
 def print_messages (messages):
   for index, message in enumerate (messages):
     print ( f"--- message {index} ({len (message)} chars) ---" )
@@ -407,6 +539,54 @@ def fetch_search_view (connection, terms):
            "rendered_at" : rendered_at_of (response),
            "errors"      : [],
            "warnings"    : response_field (response, "warnings") or [] }
+
+def fetch_diff_view_buffer (connection, buffer_name, view_id = None):
+  """The diff view's buffer BUFFER_NAME, registered on CONNECTION under
+  VIEW_ID (a fresh one when None), or None when the server answers
+  that it would be empty. A refusal raises: it applies to every
+  buffer."""
+  view_id = view_id or "diff-view:" + str ( uuid . uuid4 () )
+  response = connection . request (
+    request_line ( "diff view", ( "buffer", buffer_name ),
+                   ( "view-id", view_id ) ))
+  require_response_type (response, "diff-view")
+  errors = response_field (response, "errors") or []
+  if response_field (response, "empty") is not None:
+    return None
+  content = response_field (response, "content")
+  if errors or not content:
+    raise SkgToolError (
+      "The server refused the diff view: " + " " . join (errors) +
+      " (The diff view needs a connection with no skgrepo restriction, "
+      "and each owned skgrepo in a gitrepo with a HEAD commit.)" )
+  return { "view_id"     : view_id,
+           "command"     : "diff",
+           "request"     : { "buffer" : buffer_name },
+           "content"     : content,
+           "rendered_at" : rendered_at_of (response),
+           "errors"      : [],
+           "warnings"    : response_field (response, "warnings") or [] }
+
+def diff_view_with_readiness_summary (connection, view):
+  """VIEW, a buffer of the diff view open on CONNECTION, saved
+  unchanged: a buffer of the diff view saves back to itself, and the
+  save's answer carries the readiness summary, which the diff view's
+  own answer lacks. Returns the save's re-rendered buffer with its
+  summary, or VIEW as it was when the save did not succeed."""
+  terminal = connection . save_buffer (
+    view [ "view_id" ], view [ "content" ], view [ "rendered_at" ] ) [-1]
+  content = response_field (terminal, "content")
+  if ( response_type (terminal) != "save-result"
+       or not isinstance (content, str) or isinstance (content, Symbol)
+       or not content ):
+    return dict ( view, readiness_summary = None )
+  return dict ( view,
+                content = content,
+                rendered_at = rendered_at_of (terminal),
+                errors = response_field (terminal, "errors") or [],
+                warnings = response_field (terminal, "warnings") or [],
+                readiness_summary = response_field (
+                  terminal, "readiness-summary" ))
 
 def fetch_view_with_root_folder_request (connection, node_id, relation_name):
   """Open the node's view, then save it unchanged but for a
@@ -482,12 +662,14 @@ def write_view_files (connection, view, out_dir, base_name, show_summary):
   parsed_view = parse_full_view (full_text)
   link_statuses = fetch_link_statuses (connection, parsed_view)
   repo_ownership = fetch_repo_ownership (connection)
+  skgrepo_labels = fetch_skgrepo_labels (connection)
   compact_lines = []
   if show_summary:
     compact_lines += summary_lines (
       parsed_view, link_statuses, repo_ownership, view,
       os . path . basename (full_path) )
-  compact_lines += compact_tree_lines (parsed_view, link_statuses)
+  compact_lines += compact_tree_lines (
+    parsed_view, link_statuses, skgrepo_labels )
   write_text_file (full_path, full_text)
   write_text_file (compact_path, "\n" . join (compact_lines) + "\n")
   write_text_file (
@@ -834,6 +1016,15 @@ def fetch_repo_ownership (connection):
     ownership [name] = owned == "true"
   return ownership
 
+def fetch_skgrepo_labels (connection):
+  """{REPO: LABEL}, each configured skgrepo's herald label, from the
+  table the server sends beside its herald rules."""
+  response = connection . request ( request_line ("herald rules") )
+  require_response_type (response, "herald-rules")
+  labels = metadata_form ( [ None ] + response, "skgrepoLabels" ) or [ None ]
+  return { sexp_to_text ( entry [0] ) : sexp_to_text ( entry [1] )
+           for entry in labels [ 1 : ] }
+
 # ============================================================
 # The runtime generation, which dates a buffer no view response drew
 # ============================================================
@@ -849,34 +1040,131 @@ def fetch_runtime_generation (connection):
 # The compact view
 # ============================================================
 
-def compact_tree_lines (parsed_view, link_statuses):
-  return [ compact_line (view_line, link_statuses)
+def compact_tree_lines (parsed_view, link_statuses, skgrepo_labels):
+  return [ compact_line (view_line, link_statuses, skgrepo_labels)
            for view_line in parsed_view ]
 
-def compact_line (view_line, link_statuses):
+def compact_line (view_line, link_statuses, skgrepo_labels):
   if not view_line . is_headline:
     return annotate_links (view_line . text, link_statuses)
   title = annotate_links (view_line . title, link_statuses)
-  handle = handle_text (view_line)
+  handle = handle_text (view_line, skgrepo_labels)
   return ( view_line . stars + " " + title +
            ( " " if title else "" ) + handle )
 
-def handle_text (view_line):
-  """'⟨N KIND HERALDS folded⟩': N the line number in the full view,
-  KIND only for a headline that is not a node occurrence (a folder, an
-  alias, an unknown viewnode ...), HERALDS its relationship heralds
-  but for a bare 'aC', and 'folded' when a client shows it collapsed."""
+def handle_text (view_line, skgrepo_labels):
+  """'⟨N KIND HERALDS ⌂:LABEL CHANGES folded⟩': N the line number in
+  the full view, KIND only for a headline that is not a node
+  occurrence (a folder, an alias, an unknown viewnode ...), HERALDS
+  its relationship heralds but for a bare 'aC', '⌂:LABEL' its home
+  skgrepo's label where that differs from its nearest occurrence
+  ancestor's (or it is a root), CHANGES its diff heralds (in the diff
+  view), and 'folded' when a client shows it collapsed."""
   parts = [ str (view_line . line_number) ]
   if view_line . metadata is not None:
-    kind = headline_kind (view_line . metadata)
+    metadata = view_line . metadata
+    kind = headline_kind (metadata)
     if kind != "node":
       parts . append (kind)
     parts += [ token for token in
-               relationship_heralds_text (view_line . metadata) . split ()
+               relationship_heralds_text (metadata) . split ()
                if token != BARE_PARENT_CONTAINS_TOKEN ]
-    if metadata_has_atom (view_line . metadata, "folded"):
+    if metadata_has_atom ( metadata_form (metadata, "view") or [],
+                           "repoBoundary" ):
+      parts . append ( skgrepo_boundary_token (metadata, skgrepo_labels) )
+    parts += diff_heralds_tokens (metadata)
+    if metadata_has_atom (metadata, "folded"):
       parts . append ("folded")
   return "⟨" + " " . join (parts) + "⟩"
+
+def skgrepo_boundary_token (metadata, skgrepo_labels):
+  """'⌂:LABEL', LABEL the herald label of the headline's home
+  skgrepo, as the clients render 'repoBoundary'; a bare '⌂' when the
+  headline names no home skgrepo."""
+  repo = headline_node_repo (metadata)
+  if repo is None:
+    return "⌂"
+  return "⌂:" + skgrepo_labels . get (repo, repo)
+
+# ============================================================
+# Diff heralds, as the clients render a headline's '(diff ...)' change
+# facts ('docs/heralds.org', "Diff heralds"; the rules are
+# 'change_fact_rules_for_two_objects' and
+# 'change_fact_rules_for_one_object' in 'server/heralds.rs'), styles
+# dropped. A node or a ghost has two diff objects, its node (∃+ new,
+# ∃- deleted, M modified) and its relationship to its viewparent (~+,
+# ~-); every other headline that names leaves has one. A ✓ follows
+# each object whose changes are all marked ready.
+# ============================================================
+
+TWO_OBJECT_KINDS = { "node", "ghost" }
+RELATIONSHIP_ONLY_KINDS = { "unknown", "restricted" }
+
+def diff_heralds_tokens (metadata):
+  diff = metadata_form (metadata, "diff")
+  if diff is None:
+    return []
+  ready = metadata_form (diff, "ready")
+  ready_objects = ( None if ready is None
+                    else { str (element) for element in ready [ 1 : ] } )
+  def existence_sign (object_name):
+    form = metadata_form (diff, object_name)
+    if form is None or len (form) < 2:
+      return None
+    return { "added" : "+", "removed" : "-" } . get ( str ( form [1] ))
+  kind = headline_kind (metadata)
+  tokens = []
+  if kind in TWO_OBJECT_KINDS:
+    node_sign = existence_sign ("node")
+    node_token = ( "∃" + node_sign if node_sign
+                   else "M" if metadata_form (diff, "properties") is not None
+                   else None )
+    if node_token:
+      tokens . append (
+        node_token + ( "✓" if ready_objects
+                       and ready_objects & { "node", "all" } else "" ))
+    rel_sign = existence_sign ("rel")
+    if rel_sign:
+      tokens . append (
+        "~" + rel_sign + ( "✓" if ready_objects
+                           and "rel" in ready_objects else "" ))
+  else:
+    sign = existence_sign ("node") or existence_sign ("rel")
+    readiness_mark = "✓" if ready_objects is not None else ""
+    if sign:
+      tokens . append (
+        ( "~" if kind in RELATIONSHIP_ONLY_KINDS else "" ) + sign +
+        readiness_mark )
+    elif readiness_mark:
+      tokens . append (readiness_mark)
+  home_move = metadata_form (diff, "homeSkgrepoMove")
+  if home_move is not None:
+    tokens += [ "-" + sexp_to_text ( metadata_form (home_move, "old") [1] ),
+                "+" + sexp_to_text ( metadata_form (home_move, "new") [1] ) ]
+  moved_like = metadata_form (diff, "movedLikeAncestor")
+  if moved_like is not None:
+    tokens . append ( "Δ⌂=" + sexp_to_text ( moved_like [1] ))
+  return tokens
+
+def leaves_fact (metadata):
+  """( N, OBJECTS ) of the headline's '(diff (leaves N OBJECT...))',
+  or None when it names no leaf."""
+  leaves = metadata_form ( metadata_form (metadata, "diff"), "leaves" )
+  if leaves is None:
+    return None
+  return ( first_number (leaves),
+           [ str (element) for element in leaves [ 1 : ]
+             if not isinstance (element, int) ] )
+
+def headline_is_ready (metadata):
+  """Whether a headline that names leaves is ready: its '(ready ...)'
+  names every object its '(leaves ...)' lists, or, listing none, is
+  there."""
+  ready = metadata_form ( metadata_form (metadata, "diff"), "ready" )
+  if ready is None:
+    return False
+  ready_objects = { str (element) for element in ready [ 1 : ] }
+  return set ( leaves_fact (metadata) [1] ) <= ready_objects
 
 # ============================================================
 # The summary
@@ -912,7 +1200,8 @@ def summary_lines (parsed_view, link_statuses, repo_ownership, view,
   def facts (*pairs):
     return "# " + ", " . join (
       name + " " + str (count) for name, count in pairs ) + "."
-  return [
+  return ( diff_summary_lines (parsed_view, view)
+           if view [ "command" ] == "diff" else [] ) + [
     "# skg-for-ai compact view of " + full_file_name +
       " (view ID " + view [ "view_id" ] + ")",
     "# Each headline ends in ⟨N ...⟩, N its line number in the full view;",
@@ -955,6 +1244,41 @@ def summary_lines (parsed_view, link_statuses, repo_ownership, view,
       ( " (listed in the .view.json file)."
         if view [ "errors" ] or view [ "warnings" ] else "." ) ]
 
+def diff_summary_lines (parsed_view, view):
+  """The readiness summary the server sent with a buffer of the diff
+  view, and the count of its headlines with change facts, ready and
+  not."""
+  changed_headlines = [ line . metadata for line in parsed_view
+                        if line . is_headline and line . metadata is not None
+                        and leaves_fact (line . metadata) is not None ]
+  ready_count = sum ( 1 for metadata in changed_headlines
+                      if headline_is_ready (metadata) )
+  summary = view . get ( "readiness_summary" )
+  return [
+    "# Readiness: " + ( readiness_summary_text (summary) if summary
+                        else "the server sent no readiness summary." ),
+    f"# Headlines with change facts {len (changed_headlines)}, ready "
+    f"{ready_count}, not ready {len (changed_headlines) - ready_count}." ]
+
+def readiness_summary_text (summary):
+  """The sentence a client shows for the readiness summary SUMMARY,
+  '((ready N) (changed M) (foreign F) (order-only O) (notEditable K))'
+  ('skg--readiness-summary-message' in 'elisp/skg-readiness.el')."""
+  counts = { str ( entry [0] ) : first_number ( [ None ] + entry [ 1 : ] )
+             for entry in summary or [] }
+  ready = counts . get ("ready", 0)
+  changed = counts . get ("changed", 0)
+  not_editable = counts . get ("notEditable", 0)
+  foreign = counts . get ("foreign", 0)
+  complete = ready == changed
+  return (
+    ( f"Commit ready. All {ready} of {changed} changed files are ready"
+      if complete else f"{ready} of {changed} changed files are ready" ) +
+    ( f", {not_editable} changes are not editable in this buffer"
+      if not_editable else "" ) +
+    ( f", {foreign} files changed in foreign skgrepos" if foreign else "" ) +
+    "." )
+
 def ownership_word (owned):
   return { True : "owned", False : "foreign", None : "ownership unknown" } [owned]
 
@@ -979,17 +1303,17 @@ def side_count (metadata, relation_name, side_name):
 # then any display tokens.
 COMPACT_HANDLE_PATTERN = re . compile (
   r'^(.*?) ?⟨([0-9]+)((?: [^⟨⟩]*)?)⟩\s*$' )
-# The handle token that asks the save to delete the node; the rebuild
-# writes it as the grammar's '(editRequest delete)'.
-DELETE_TOKEN = "delete"
-DELETE_REQUEST = "(editRequest delete)"
+# The handle tokens that ask for edit requests. The rebuild writes
+# them into the headline's '(editRequest ...)': one of the first three,
+# the request of that name, and after it one readiness request,
+# '(ready OBJECT...)' or '(unready OBJECT...)'.
+EDIT_REQUEST_TOKENS = [ "delete", "restoreNode", "restoreRel" ]
+READINESS_TOKENS = [ "ready", "unready" ]
+# With 'ready' or 'unready': name only the object 'all'.
+ALL_TOKEN = "all"
 # A link followed by the annotation 'annotate_links' appended to it.
 ANNOTATED_LINK_PATTERN = re . compile (
   r'(\[\[id:[^\]\[]+\](?:\[[^\]]*\])?\])⟦[→✗][^⟧]*⟧' )
-REMOVAL_NOTE = (
-  "  (A removed headline leaves its parent's list, where the parent "
-  "reads claims; the node itself is not deleted. To delete a node, "
-  "add 'delete' to its handle.)" )
 
 class SavedView:
   """The three files a view command wrote, read back."""
@@ -1036,8 +1360,18 @@ class OutlineHeadline:
     self . body = []
     self . parent = None
 
-  def deletes (self):
-    return DELETE_TOKEN in self . tokens
+  def edit_request_words (self):
+    return [ word for word in EDIT_REQUEST_TOKENS if word in self . tokens ]
+
+  def readiness_words (self):
+    return [ word for word in READINESS_TOKENS if word in self . tokens ]
+
+  def names_only_all (self):
+    return ALL_TOKEN in self . tokens
+
+  def has_requests (self):
+    return bool ( self . edit_request_words () or self . readiness_words ()
+                  or self . names_only_all () )
 
 def parse_edited_compact_view (compact_text):
   """The edited compact view's headlines, in order. The summary's
@@ -1097,7 +1431,8 @@ def assign_parents (headlines):
 
 def handle_error_lines (edited, parsed_view):
   """A line per handle that names no headline of the full view, and
-  per 'delete' where the save could not honor one."""
+  per handle whose request tokens make no one '(editRequest ...)'.
+  Whether the server accepts a request is the server's to say."""
   errors = []
   for headline in edited:
     if headline . handle is None:
@@ -1114,20 +1449,60 @@ def handle_error_lines (edited, parsed_view):
       errors . append (
         f"Error: {where} names line {headline . handle} of the full view, "
         "a body line, not a headline." )
-    elif headline . deletes ():
-      metadata = view_line . metadata
-      if metadata is None or headline_kind (metadata) != "node":
-        errors . append (
-          f"Error: {where} carries 'delete', but it is no node occurrence." )
-      elif metadata_has_atom (metadata, "writeProtected"):
-        errors . append (
-          f"Error: {where} carries 'delete', but the occurrence is "
-          "write-protected; only an editable occurrence can be deleted." )
-      elif metadata_form (metadata, "editRequest") is not None:
-        errors . append (
-          f"Error: {where} carries 'delete', but it already carries an "
-          "edit request." )
+    elif headline . has_requests ():
+      errors += [ f"Error: {where} {problem}"
+                  for problem in request_token_problems (headline, view_line) ]
   return errors
+
+def request_token_problems (headline, view_line):
+  """Why HEADLINE's request tokens make no one '(editRequest ...)'
+  for VIEW_LINE, the headline its handle names."""
+  def quoted (words):
+    return " and " . join ( "'" + word + "'" for word in words )
+  problems = []
+  if view_line . metadata is None:
+    problems . append ( "carries a request, but the headline has no metadata." )
+  if len ( headline . edit_request_words () ) > 1:
+    problems . append (
+      f"carries {quoted ( headline . edit_request_words () )}; a headline "
+      "takes one edit request." )
+  if len ( headline . readiness_words () ) > 1:
+    problems . append ( "carries both 'ready' and 'unready'." )
+  if headline . names_only_all () and not headline . readiness_words ():
+    problems . append ( "carries 'all' without 'ready' or 'unready'." )
+  return problems
+
+def readiness_request_text (headline, view_line):
+  """'(ready OBJECT...)' or '(unready OBJECT...)' for HEADLINE's
+  readiness token, or None. Its objects are 'all' when the handle
+  says 'all', and otherwise every object the headline's '(leaves ...)'
+  lists, as a client's one-level gesture names them; a headline that
+  lists none gets the bare request."""
+  if not headline . readiness_words ():
+    return None
+  leaves = leaves_fact (view_line . metadata)
+  objects = ( [ ALL_TOKEN ] if headline . names_only_all ()
+              else leaves [1] if leaves else [] )
+  return "(" + " " . join ( headline . readiness_words () + objects ) + ")"
+
+def edit_request_text (headline, view_line):
+  """The '(editRequest ...)' HEADLINE's tokens ask for, or None."""
+  parts = headline . edit_request_words ()
+  readiness = readiness_request_text (headline, view_line)
+  if readiness:
+    parts = parts + [ readiness ]
+  return "(editRequest " + " " . join (parts) + ")" if parts else None
+
+def unmarked_leaf_count (headline, view_line):
+  """How many leaves an 'unready' on HEADLINE unmarks, counted as a
+  client counts them: N of '(leaves N ...)' when the request names
+  every object listed, else one per object (one for a bare request)."""
+  if headline . readiness_words () != [ "unready" ]:
+    return 0
+  leaves = leaves_fact (view_line . metadata)
+  if not headline . names_only_all ():
+    return leaves [0] if leaves else 1
+  return ( leaves [0] if leaves and leaves [1] == [ ALL_TOKEN ] else 1 )
 
 # ------------------------------------------------------------
 # Rebuilding the full buffer
@@ -1135,9 +1510,9 @@ def handle_error_lines (edited, parsed_view):
 
 def rebuilt_full_buffer (edited, parsed_view, full_text):
   """Each headline at its edited level and title, with the metadata of
-  the full-view line its handle names, plus '(editRequest delete)'
-  when it asks; a headline without a handle bare, which the save reads
-  as a new node; bodies as edited."""
+  the full-view line its handle names, plus the '(editRequest ...)'
+  its handle's tokens ask for; a headline without a handle bare, which
+  the save reads as a new node; bodies as edited."""
   lines = []
   for headline in edited:
     lines . append ( rebuilt_headline_line (headline, parsed_view) )
@@ -1152,9 +1527,11 @@ def rebuilt_headline_line (headline, parsed_view):
     else parsed_view [ headline . handle - 1 ] . metadata_text )
   if metadata_text is None:
     return stars + " " + headline . title
-  if headline . deletes ():
+  request = edit_request_text (
+    headline, parsed_view [ headline . handle - 1 ] )
+  if request:
     metadata_text = metadata_text_with_part (
-      metadata_text, DELETE_REQUEST, ( "viewRequests", "view", "diff" ))
+      metadata_text, request, ( "viewRequests", "view", "diff" ))
   return ( stars + " " + metadata_text +
            ( " " + headline . title if headline . title else "" ))
 
@@ -1208,11 +1585,9 @@ def change_report_lines (edited, original, parsed_view):
       0 if parent is None else outline [parent] . level )
   removed_handles = { headline . handle for headline in original
                       if headline . handle not in first_edited_index_of_handle }
-  lines = []
-  for headline in edited:
-    if headline . handle is not None and headline . deletes ():
-      lines . append ( "Delete: " + described (headline . handle) +
-                       ", from the graph." )
+  lines = request_report_lines (
+    [ headline for headline in edited if headline . handle is not None ],
+    parsed_view, described )
   removal_lines = []
   for index, headline in enumerate (original):
     if ( headline . handle not in removed_handles
@@ -1227,8 +1602,7 @@ def change_report_lines (edited, original, parsed_view):
       ( f" (and {removed_below} headline"
         f"{'' if removed_below == 1 else 's'} below it)"
         if removed_below else "" ) + "." )
-  if removal_lines:
-    lines += removal_lines + [ REMOVAL_NOTE ]
+  lines += removal_lines
   for handle, index in first_edited_index_of_handle . items ():
     original_index = original_index_of_handle [handle]
     old_key = original_parent_key (original_index)
@@ -1291,6 +1665,34 @@ def change_report_lines (edited, original, parsed_view):
       ", " . join ( f"⟨{handle}⟩" for handle in changed_bodies ) + ")." )
   return lines
 
+def request_report_lines (handled_headlines, parsed_view, described):
+  """The edit requests the handles' tokens ask for, by kind, each
+  naming its headline through DESCRIBED; then, when the 'unready'
+  requests unmark more than one leaf, the question a client asks
+  before such a gesture."""
+  lines = []
+  for word, label, suffix in [
+      ( "delete", "Delete", ", from the graph" ),
+      ( "restoreNode", "Restore node", ", as HEAD has it" ),
+      ( "restoreRel", "Restore membership", ", as HEAD has it" ) ]:
+    lines += [ label + ": " + described (headline . handle) + suffix + "."
+               for headline in handled_headlines
+               if word in headline . edit_request_words () ]
+  for word, label in [ ( "ready", "Ready" ), ( "unready", "Unready" ) ]:
+    lines += [ label + ": " + described (headline . handle) + ", as '" +
+               readiness_request_text (
+                 headline, parsed_view [ headline . handle - 1 ] ) + "'."
+               for headline in handled_headlines
+               if headline . readiness_words () == [ word ] ]
+  unmarked = sum ( unmarked_leaf_count (
+                     headline, parsed_view [ headline . handle - 1 ] )
+                   for headline in handled_headlines )
+  if unmarked > 1:
+    lines . append (
+      f"Question: this unmarks {unmarked} changes. " + WIDE_UNMARK_QUESTION +
+      " Saving with '--yes' answers yes." )
+  return lines
+
 def descendant_indices (outline, index):
   level = outline [index] . level
   descendants = []
@@ -1333,6 +1735,9 @@ def rerendered_view_of_save (terminal, sidecar):
     print ( "Server error: " + error )
   for warning in warnings:
     print ( "Server warning: " + warning )
+  readiness_summary = response_field (terminal, "readiness-summary")
+  if saved and readiness_summary:
+    print ( "Readiness: " + readiness_summary_text (readiness_summary) )
   if not saved:
     raise SkgToolError (
       "The server refused the save; the files are as they were." )
@@ -1342,7 +1747,8 @@ def rerendered_view_of_save (terminal, sidecar):
            "content"     : content,
            "rendered_at" : rendered_at_of (terminal),
            "errors"      : errors,
-           "warnings"    : warnings }
+           "warnings"    : warnings,
+           "readiness_summary" : readiness_summary }
 
 # ============================================================
 # The connection
@@ -1410,6 +1816,20 @@ class SkgConnection:
                      ( "point-column", "0" ),
                      ( "point-screen-lines-below-window-start", "0" )),
       buffer_text ) ]
+
+  def stage_and_commit (self, message, confirmed):
+    """Send "stage and commit" with MESSAGE, confirmed when CONFIRMED;
+    return its response, parsed, after reading the rerender stream
+    that follows it up to its 'rerender-done'."""
+    self . send_line (
+      request_line ( "stage and commit", ( "message", message )) [ : -1 ] +
+      ( " (confirmed . t))" if confirmed else ")" ))
+    response = parse_sexp ( self . read_message (IMPORT_TIMEOUT_SECONDS) )
+    require_response_type (response, "stage-and-commit")
+    while response_type ( parse_sexp (
+        self . read_message (FIRST_MESSAGE_TIMEOUT_SECONDS) )) != "rerender-done":
+      pass
+    return response
 
   def raw_save (self, line, buffer_text):
     """Send the save request LINE with BUFFER_TEXT as its saved buffer;

@@ -8,7 +8,7 @@
 # Contained elsewhere too 2, subscribed to 1, subscribing 1.
 # Links 3, distinct targets 3, resolved 2, unresolved 1 (missing 1).
 # Server errors 0, warnings 0.
-* The fixture root ⟨1 1C2 L2⟩
+* The fixture root ⟨1 1C2 L2 ⌂:main⟩
 The root links to [[id:child-b-id][its second child]]⟦→ Second child, a subscriber ⌂:main⟧,
 to [[id:fred-note-id][Fred's note]]⟦→ Fred's note ⌂:fred⟧ in the foreign repo,
 and to [[id:missing-id][a node nobody wrote]]⟦✗ missing⟧.
@@ -19,6 +19,6 @@ A body line that stays unnumbered.
 *** Contained twice ⟨9 2aC⟩
 ** Second child, a subscriber ⟨10 a/L S1 H2⟩
 *** ⟨11 subscribeeFolder⟩
-**** Fred's note ⟨12 C1 1/L bS⟩
+**** Fred's note ⟨12 C1 1/L bS ⌂:fred⟩
 **** ⟨13 hiddenOutsideOfSubscribeeFolder⟩
-***** An aside of Fred's ⟨14 cH folded⟩
+***** An aside of Fred's ⟨14 cH ⌂:fred folded⟩

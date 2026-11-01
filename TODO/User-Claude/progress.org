@@ -709,3 +709,190 @@ A server killed by the 'shutdown' request also comes back under the new
 start script; only 'bash/stop-servers.sh' or Ctrl-C stops it. Every
 rebuild of Jeff's server will now repeat the known manifest-order
 warning about 'user-claude' in its answer.
+* tools/skg-for-ai, reviewing through the diff view: DONE, uncommitted
+** What was done
+'diff' sends the "diff view" request once per buffer kind, in the
+clients' order ('all changes', 'merges', 'skgrepo changes',
+'order-only changes'), on one connection, skips each '(empty . t)'
+answer, and writes each other buffer as a view:
+'diff_all-changes.full.org', '.compact.org', '.view.json' and so on.
+It refuses with the server's message, and a sentence naming the
+preconditions (no skgrepo restriction, owned skgrepos in gitrepos
+with a HEAD commit). With nothing to show it says "The diff view is
+empty".
+
+The handle gains the diff heralds after the relationship heralds,
+styles dropped: '∃+', '∃-', 'M', '~+', '~-' on a node or ghost, '+'
+and '-' on a property member, '~+' and '~-' on an unknown viewnode,
+each followed by '✓' when its object is ready, and '-OLD +NEW', 'Δ⌂=a'
+for a home skgrepo move ('diff_heralds_tokens', after
+'change_fact_rules_for_two_objects' and '..._for_one_object' in
+'server/heralds.rs'). The change viewnodes already name their kind
+('oldText title', 'changesetMarker content', 'ghost'). A diff buffer's
+summary opens with "# Readiness: ..." (the server's sentence, as
+'skg--readiness-summary-message' words it) and "# Headlines with
+change facts N, ready R, not ready U.".
+
+'save' turns the handle words 'ready', 'unready', 'all',
+'restoreNode' and 'restoreRel', beside 'delete', into one
+'(editRequest [EDIT] [READINESS])'. 'ready' writes '(ready OBJECT...)'
+naming every object the headline's '(leaves ...)' lists, as 'C-c r r'
+does on that headline; with 'all' it names only 'all'. The report
+lists each request ("Ready: ⟨14⟩ 'A new grandchild', as '(ready node
+rel)'."), and a "Question:" line when the 'unready' requests unmark
+more than one leaf. A save of a diff buffer prints the readiness
+summary after the server's line.
+
+'commit MESSAGE' refuses a blank message before connecting, sends
+"stage and commit", reads the rerender stream to its 'rerender-done',
+and on '(needs-confirmation . t)' prints the summary and any
+already-staged paths and reads a typed "yes" from standard input
+('--yes' answers it), then resends with '(confirmed . t)', the field
+both clients send. It prints 'Committed in SKGREPO (COMMIT ID).' or
+'Nothing was committed.'.
+
+Jeff's TODO added to '4_plan.org' during the run (skgrepo indicators)
+is done too: a 'repoBoundary' headline's handle carries '⌂:LABEL',
+LABEL from the '(skgrepoLabels ...)' table the "herald rules" answer
+carries. That changed the four expected compact views and three
+handles in the writing cases.
+
+The README has a "Reviewing and committing" section (the loop,
+marking, restoring, committing, where it works, how it talks to the
+server) and the handle's new parts.
+
+'python3 tools/skg-for-ai/test_skg_for_ai.py' passes (15 s). A third
+scratch server runs over a fixture copy whose owned skgrepo is first
+'git init'ed with a local author and committed: a retitle, a new
+child and a deletion saved through a content view; the whole compact
+diff buffer compared exactly; 'ready' on the new child, its exact
+report, and '∃+✓ ~+✓' plus "1 of 4" in a fresh 'diff'; the
+"Question:" line for an 'unready' of two leaves; an unconfirmed
+commit (stdin "no") that leaves 'git log' and the files alone;
+'restoreNode' on the ghost, with the node's file and both containers'
+lists back; a '--yes' commit whose message 'git log' shows, after
+which the porcelain status has no '.skg' line and 'diff' is empty;
+and a blank message refused with nothing printed, against port 1 so
+any connection attempt would fail. The bad-handle case also checks
+two token errors. 'cargo check --all-targets' is clean; no Rust,
+client or doc outside 'tools/skg-for-ai/' changed.
+** The live review
+User's server on 1732 (PID 135755, stopped by PID afterward). 'view
+b75b22a8-f726-4b3e-bfbf-c18bc8308009', one child appended, saved
+('New: ..., under ⟨1⟩ 'what has happened'.'). 'diff' took 5 s and
+wrote one buffer, whose compact tree was:
+#+begin_example
+  * what has happened ⟨1 C7 ⌂:first M⟩
+  ** ⟨2 changesetMarker content⟩
+  ** Ownership became a per-repo flag: ... ⟨3⟩
+  ... (the four other old children, unchanged, ⟨4⟩ to ⟨8⟩)
+  ** Review moved into the diff view: the tool renders it, marks changes, and commits. ⟨9 ∃+ ~+⟩
+  *** ⟨10 containerFolder⟩
+  **** what has happened ⟨11 C7b M ~+⟩
+#+end_example
+under "# Readiness: 0 of 2 changed files are ready, 2 files changed in
+foreign skgrepos." Writing 'ready' into ⟨9⟩ and saving printed "Ready:
+⟨9⟩ ..., as '(ready node rel)'." and "Readiness: Commit ready. All 2
+of 2 changed files are ready, ...": the membership leaf is the root's
+file's only change, so ⟨1⟩ became 'M✓' and the marker '✓' too.
+'commit' with 'Note the diff-view slice.' needed no confirmation and
+printed "Committed in first (c1eb71a...)."; 'git -C
+data/user-claude/first log --oneline -3' shows 'c1eb71a Note the
+diff-view slice.' over '3b24644 First notes...', authored by User
+Claude. A second 'diff' was empty. 'OTHER_SKGREPO_DEPENDENCIES.toml'
+stays modified in that repo: the commit stages only '.skg' files.
+
+The server created 'data/readiness-marks.json' (see the open
+question); it held no marks after the commit, and I removed it, so
+'data/' is as before.
+*** What was confusing in the compact diff buffers
+The new node's containers folder repeats the root it sits under:
+'what has happened ⟨11 C7b M ~+⟩' is the same node as ⟨1⟩, drawn
+again because a new node's set of containers changed (it had none).
+In the fixture the chain under it runs four levels, back to the top.
+It carries the change facts too, so one mark shows '✓' in three
+places.
+
+A node of U shows its whole content list, so the six unchanged
+earlier items appear in full beside the one new item; 'what has
+happened' will grow by one per slice, and every review of it will
+carry all of them.
+
+A deleted node is a ghost under each former container, and the
+container outside the edited view becomes a root of its own, first
+in the buffer, above the view's real top. Reading it compactly, it
+is not obvious that the two ghosts are one node; their handles differ.
+
+'M' says only that the file changed; what changed is in the
+headlines under it ('oldText title', 'changesetMarker content'), so
+reading a modified node means reading its subtree.
+
+"N files changed in foreign skgrepos" in User's summary counts
+Jeff's uncommitted files, which User can neither see in the buffer nor
+commit.
+** Deviations from the plan
+*** The readiness summary comes from an unchanged save
+The "diff view" answer carries no readiness summary; only a save,
+"integrate unshown changes" (which changes the buffer) and an
+unconfirmed stage-and-commit (which commits when all is ready) do.
+So 'diff' saves each nonempty buffer back unchanged on its own
+connection (a diff buffer is a fixpoint of its save, and nothing is
+written) and writes the save's rendering with its summary. Each
+buffer is closed before the next is requested, so no save rerenders
+another buffer onto the connection.
+*** A save of a diff buffer opens that buffer again first
+The server keeps a view's buffer kind per connection, and the tool's
+connection ends with each command. A 'save' of a diff sidecar
+therefore first requests the same buffer under the sidecar's view ID
+on its connection; without that the save would re-render as a
+content view, without change facts or summary. If that buffer is now
+empty the save is refused, saying to run 'diff' again.
+*** The summary counts files, not leaves
+The plan's summary has leaves, ready and not shown here. The server
+counts changed files, ready files, foreign files and changes not
+editable in the buffer; the tool shows those, and adds its own count
+of headlines with change facts, ready and not. No leaf count is on the
+wire.
+*** The "yes" before an unmark is the client's, not the server's
+The server never asks before a readiness request; the clients ask
+before writing one ('skg--readiness-unmarks-several-leaves-p'). The
+tool counts leaves as they do, prints their question as a
+'Question:' line in the report, and takes '--yes', the save's gate,
+as the answer. A save never prompts on standard input; only 'commit'
+does.
+*** 'ready' names what the headline lists; 'ready all' only 'all'
+On a modified node a bare '(ready)' names its existence and
+membership, neither of which may be a change, so 'ready' names the
+objects in '(leaves ...)' (on a modified node 'all', and 'rel' when
+the membership changed), as 'C-c r r' does. 'ready all' writes
+'(ready all)'. 'unready all' exists for symmetry.
+*** The report no longer predicts refusals
+Gone: the removal note, and the checks that 'delete' sits on an
+editable, write-protection-free node occurrence without another edit
+request. Kept: handles naming no headline or a body line, and request
+words that make no single '(editRequest ...)' (two edit requests,
+'ready' with 'unready', 'all' alone). The bad-handle exit message now
+says "some handles are in error".
+** Open questions
+*** Both servers write 'data/readiness-marks.json'
+User's and Jeff's servers share the data root 'data/', so they share
+the readiness store's file. Each reads it at startup and rewrites its
+whole store after every change, and after a git-commit keeps only the
+marks whose leaves its own straddle has. User's server never sees
+leaves in Jeff's skgrepos (they are foreign to it), so a commit by
+User would drop every mark Jeff made, and a mark by either would
+overwrite the other's since startup. Jeff had no file when the live
+run began. Should the store's file live per config (beside the
+config, or named in it), or under each server's index folder?
+*** Should the diff view's answer carry the readiness summary?
+That would replace the unchanged save. The server computes it
+cheaply once the straddle exists.
+*** No 'integrate unshown changes'
+A summary can report changes not editable in this buffer; Jeff
+integrates them with C-c r u. The tool has no command for it; 'diff'
+again shows a fresh buffer, which makes every node of U editable
+anyway. Is a command wanted?
+*** 'OTHER_SKGREPO_DEPENDENCIES.toml' is never committed
+The server rewrites it, the stage-and-commit stages only '.skg'
+files, so it stays modified in 'first' after every commit. Should
+stage-and-commit include it, or git ignore it?

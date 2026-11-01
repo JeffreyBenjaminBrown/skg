@@ -1,4 +1,4 @@
-* Contained twice ⟨1 2C⟩
+* Contained twice ⟨1 2C ⌂:main⟩
 ** ⟨2 containerFolder⟩
 *** First child ⟨3 1Cb⟩
 **** The fixture root ⟨4 1C2a L2⟩

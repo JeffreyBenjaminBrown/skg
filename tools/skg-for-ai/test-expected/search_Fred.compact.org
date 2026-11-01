@@ -8,8 +8,8 @@
 # Contained elsewhere too 1, subscribed to 2, subscribing 0.
 # Links 0, distinct targets 0, resolved 0, unresolved 0.
 # Server errors 0, warnings 0.
-* Fred's note ⟨1 C1 1/L 1S⟩
-* An aside of Fred's ⟨2 1H⟩
-* A detail of Fred's ⟨3 1C 1H⟩
+* Fred's note ⟨1 C1 1/L 1S ⌂:fred⟩
+* An aside of Fred's ⟨2 1H ⌂:fred⟩
+* A detail of Fred's ⟨3 1C 1H ⌂:fred⟩
 ** ⟨4 containerFolder folded⟩
 *** Fred's note ⟨5 Cb 1/L 1S⟩

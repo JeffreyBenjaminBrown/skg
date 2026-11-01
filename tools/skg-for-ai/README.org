@@ -11,7 +11,10 @@ and once compactly, with the words, the nesting and a short handle per
 headline. Nothing is lost, because each handle points at the line of
 the full view that holds the headline's metadata. An edited compact
 view can be saved back: the tool rebuilds the full buffer from it and
-saves that through the server (see "Writing").
+saves that through the server (see "Writing"). The diff view, which
+shows every change since the last git-commit, is written the same way,
+and changes are marked ready and committed through it (see "Reviewing
+and committing").
 
 The tool is written for anyone, human or agent, who wants to use the
 graph without an editor client. It is a client like any other: it
@@ -23,9 +26,9 @@ itself; only the server does.
 
 * Running it
 ** Commands
-Each view command ('view', 'search', 'links-here', 'contains') writes
-three files into '--out-dir' (default: the current directory) and
-prints their paths, one per line.
+Each view command ('view', 'search', 'links-here', 'contains', 'diff')
+writes three files per view into '--out-dir' (default: the current
+directory) and prints their paths, one per line.
 
 'python3 tools/skg-for-ai/skg_for_ai.py view ID' writes the recursive
 content view of the node ID, as a client opens it.
@@ -50,7 +53,17 @@ rarely needed.
 
 Following a link is just 'view' on the link's ID.
 
+'diff' writes the diff view: each of its buffers that is not empty, as
+a view, named 'diff_all-changes', 'diff_merges', 'diff_skgrepo-changes'
+and 'diff_order-only-changes' ('--name BASE' replaces 'diff'). When
+nothing changed it writes nothing and says so. See "Reviewing and
+committing".
+
 'save SIDECAR' saves an edited compact view; see "Writing".
+
+'commit MESSAGE' stages and git-commits every change in the owned
+skgrepos with MESSAGE, asking first when not everything is marked
+ready; see "Reviewing and committing".
 
 'new TITLE REPO' creates a root node titled TITLE whose home is the
 owned skgrepo REPO, and writes its view as 'view' does (named
@@ -82,8 +95,8 @@ tool answers with the empty one, leaving those links unresolved.
 '--preview-only' cancels instead of applying. It prints the responses
 as 'raw' does.
 
-Options, after the command: '--port N' for every command; for the
-view commands also '--out-dir DIR', '--name BASE' to name the files
+Options, after the command: '--port N' for every command; '--yes' for
+'save' and 'commit'; for the view commands also '--out-dir DIR', '--name BASE' to name the files
 'BASE.full.org' and so on instead of 'COMMAND_ARGUMENT', and
 '--no-summary' to leave the summary out of the compact view.
 ** The port
@@ -139,6 +152,31 @@ viewparent contains the node and nothing else does. That is the
 ordinary case in a content tree, so most handles would carry it;
 '⟨3 aC L1⟩' is written '⟨3 L1⟩', and '⟨5 aC⟩' just '⟨5⟩'. Every other
 form, 'aC10' or '2aC' among them, stays.
+*** The skgrepo boundary
+A headline whose home skgrepo differs from its nearest node
+occurrence above it, or a root, carries '⌂:LABEL' after its
+relationship heralds, LABEL the skgrepo's label, as the clients show
+it: '⟨14 C1 1/L bS ⌂:fred⟩' is a note of the 'fred' skgrepo under a
+node of another. Every other headline shares its skgrepo with the
+nearest node above it.
+*** Change facts, in the diff view
+A headline of the diff view that shows a change carries, after the
+skgrepo boundary, the diff heralds the clients show
+('docs/heralds.org', "Diff heralds"), without their styles. On a node
+or a ghost (a deleted node, shown as HEAD has it): '∃+' a new node,
+'∃-' a deleted one, 'M' a modified one (its title, body, properties or
+lists changed), then '~+' a new membership in its parent (in a
+partner folder, its relationship of the folder's kind to the folder's
+parent), '~-' a removed one. On an alias, ID or flag in its folder,
+'+' or '-'; on an unknown viewnode, '~+' or '~-'. A '✓' right after a
+change says it is marked ready: '∃+✓ ~+' is a new node, approved, in a
+membership that is not. The headlines the diff view adds to explain a
+change name their kind: 'oldText title' (the old title; 'oldText
+body', 'oldText titleAndBody'), 'bodyDiff', 'changesetMarker content'
+(its content changed), 'homeSkgrepoMove' and 'relRepoMove' (moves to
+another skgrepo); each takes a '✓' when ready. In the
+skgrepo-changes buffer a moved node adds '-OLD +NEW', and 'Δ⌂=a' when
+its nearest moved ancestor (here the parent) moved the same way.
 *** Folded headlines
 A headline the server marks 'folded', one a client shows collapsed,
 ends its handle with the token 'folded': '⟨17 C3 folded⟩'. The lines
@@ -174,8 +212,15 @@ sidecar lists.
 
 Whether a skgrepo is owned or foreign comes from the server's 'repos'
 request, which lists every configured skgrepo.
+
+A buffer of the diff view opens its summary with two more lines: the
+readiness summary the server sends ("1 of 4 changed files are ready",
+with how many changes this buffer cannot edit and how many files
+changed in foreign skgrepos), and how many headlines show a change,
+ready and not.
 ** The sidecar
-'BASE.view.json' records the view ID, the command and its request, the
+'BASE.view.json' records the view ID, the command and its request (for
+a buffer of the diff view, the buffer's name), the
 port, the two files' names, the runtime generation the server rendered the
 view at ('rendered_at'), the server's errors and warnings, whether
 the compact view has a summary, and whether the view is closed. 'save'
@@ -252,6 +297,15 @@ edit of another node: the server refuses, naming the changed node, and
 nothing is written; a fresh view then saves the same edit, and the
 second save's change stays.
 
+Then, on a third server over a fresh copy of the fixture whose owned
+skgrepo is first made a gitrepo with one commit, it saves a retitle, a
+new child and a deletion, compares the diff view's compact buffer
+with the text expected, marks the new child 'ready' and sees it ready
+in a fresh 'diff', checks the question before an 'unready' of two
+changes, commits unconfirmed (nothing happens), restores the deleted
+node with 'restoreNode', commits with '--yes' and reads 'git log' and
+an empty diff view, and checks that a blank message is refused.
+
 It prints PASS or each failure, and keeps the scratch files when
 something fails. '--update-expected' rewrites the expected
 files instead of comparing; read the difference before keeping it.
@@ -290,8 +344,12 @@ edited compact view and the full view it was written beside. A
 headline with a handle '⟨N ...⟩' gets back the metadata of line N of
 the full view; its level, title and position come from the edited
 compact view. The rest of the handle (the heralds, the kind, 'folded')
-is display only, and editing it changes nothing, except for the word
-'delete' (see "A deleted node"). A headline without a handle is
+is display only, and editing it changes nothing, except for the
+request words: 'delete' (see "A deleted node"), and 'ready',
+'unready', 'all', 'restoreNode' and 'restoreRel' (see "Reviewing and
+committing"). The rebuild writes them into the headline's
+'(editRequest ...)', which holds one edit request ('delete',
+'restoreNode' or 'restoreRel') and one readiness request after it. A headline without a handle is
 written bare, and the save makes it a new node, with a new ID.
 
 Body lines are taken as edited, and belong to the headline above them.
@@ -326,7 +384,8 @@ To delete a node from the graph, write the word 'delete' inside its
 handle: '⟨7 delete⟩', or '⟨7 aC1 delete⟩'. The tool writes it into the
 headline's metadata as '(editRequest delete)', the request the clients'
 'skg-delete' ('C-c <backspace>') writes, and the save deletes the node.
-Only an editable node occurrence can carry it.
+Only an editable node occurrence can carry it; the server refuses it
+elsewhere.
 ** The report
 Before saving, the tool compares the edited compact view with the full
 view and prints a line per change, each naming headlines by handle and
@@ -340,14 +399,23 @@ Bodies changed: 1 (⟨1⟩).
 Not saved. Run again with '--yes' to save.
 #+end_example
 An 'Error:' line names a handle that names no line of the full view,
-or a body line, or a 'delete' on something that is not an editable
-node occurrence; any error stops the save, and the report then lists
-only the errors.
+or a body line, or whose request words make no one '(editRequest
+...)' (two edit requests, both 'ready' and 'unready', 'all' alone);
+any error stops the save, and the report then lists only the errors.
+The report does not guess what the server will refuse: the server's
+answer says that.
 
-The changes follow, in this order. 'Delete:' is a handle carrying
-'delete'. 'Removed:' is a handle the edit no longer has, with how many
-headlines below it went with it; a child of a removed headline that
-was moved elsewhere is reported as moved. 'Moved:' is a handle under a
+The changes follow, in this order. 'Delete:', 'Restore node:',
+'Restore membership:', 'Ready:' and 'Unready:' are the requests the
+handles' words ask for, a readiness request with the form the save
+sends ('Ready: ⟨14⟩ 'A new grandchild', as '(ready node rel)'.').
+When the 'unready' requests would unmark more than one change, a
+'Question:' line asks what a client asks before such a gesture, and
+'--yes' answers it. 'Removed:' is a handle the edit no longer has,
+with how many headlines below it went with it; a child of a removed
+headline that was moved elsewhere is reported as moved. A removed
+headline leaves its parent's list, where the parent reads claims; the
+node itself stays in the graph. 'Moved:' is a handle under a
 different parent, or at a different depth below the same one.
 'Reordered:' is a parent whose kept children stand in another order.
 'New:' is a headline without a handle, and where it stands.
@@ -377,3 +445,90 @@ under a restricted skgrepo-set the server may withhold the re-rendered
 view until over-private text is approved. The save has then happened,
 the tool says so, and the files are out of date until the node is
 viewed again.
+
+* Reviewing and committing
+** The loop
+Saving writes '.skg' files and nothing else. When a piece of work is
+done, review it in the diff view, mark the changes meant, and commit
+them all with one message:
+#+begin_example
+python3 tools/skg-for-ai/skg_for_ai.py diff --out-dir DIR
+# read DIR/diff_all-changes.compact.org, and any other DIR/diff_*.compact.org
+# fix a change by editing any view (this one too) and saving it
+# add 'ready' to the handles of the changes meant:
+python3 tools/skg-for-ai/skg_for_ai.py save DIR/diff_all-changes.view.json --yes
+python3 tools/skg-for-ai/skg_for_ai.py commit "MESSAGE"
+#+end_example
+The diff view ('docs/diff-view.org') shows how each owned skgrepo's
+worktree differs from its HEAD commit, with the context that explains
+each change: the changed nodes, the nodes above them up to a root,
+and what each change replaced. A deleted node stands as its ghost,
+with HEAD's title and body; a changed title or body has its old text
+under it ('oldText ...'), a changed body its line diff ('bodyDiff');
+a changed content list a 'changesetMarker content', and a removed
+member stands where it stood, marked '~-'. The handles carry the
+change facts (see "Change facts, in the diff view"). There are up to
+four buffers, written in this order when not empty: all changes, the
+nodeMerges, the moves between skgrepos, and the nodes whose only
+change is the order of a list. Each is a view like any other: it can
+be edited and saved, and its save answers with the readiness summary.
+After any save, 'diff' again for a fresh rendering; a save of a diff
+buffer rewrites that buffer's files.
+** Marking changes ready
+A mark says that one change is approved as it is now; editing a marked
+change unmarks it. Marking is a save: write a word in a handle, and
+'save' turns it into a readiness request in the headline's
+'(editRequest ...)', as the clients' 'C-c r r' does.
+
+'ready' marks every change the headline names, as the request '(ready
+OBJECT...)' naming each object its change facts list: on a new node
+its existence and its membership, on a modified node ('M') every
+change its file records and its membership if that changed, on an old
+text or a move the one change, on a changeset marker every change
+under it. 'unready' unmarks the same. 'ready all' and 'unready all'
+name only the object 'all': every change a modified node's file
+records, or every change of a changeset marker.
+
+A save that unmarks more than one change prints the question a client
+asks first, and '--yes' answers it. The server applies the requests
+after the save's edits succeed; it drops a request that names no
+current change, with a warning, and refuses a save in which two
+headlines mark and unmark one change. The save's answer ends with the
+readiness summary, "N of M changed files are ready", which counts
+every change of the owned skgrepos, whatever the buffer shows.
+** Restoring what a change removed
+Two more words undo a removal, the way the clients' 'C-c s n' and 'C-c
+s l' do. 'restoreNode' on a ghost writes the deleted node back as
+HEAD has it, and back into each list that named it at HEAD. 'restoreRel' on a
+removed membership (a '~-' member) puts it back in its list, where
+HEAD had it. The server refuses either anywhere else.
+** Committing
+'commit MESSAGE' sends "stage and commit". The server stages every
+changed '.skg' file of every owned skgrepo, deletions included, and
+git-commits each gitrepo that has changes, with MESSAGE, by that
+gitrepo's configured user. It commits everything, marked or not: the
+marks are a review, not a selection. When not every changed file is
+ready, or some owned gitrepo already has staged entries (which the
+git-commit would include), the server asks first: the tool prints the
+readiness summary and the staged paths, and asks for a typed "yes" on
+standard input; '--yes' answers yes. Any other answer, or no input,
+commits nothing. Then it prints 'Committed in SKGREPO (COMMIT ID)'
+per git-commit, or 'Nothing was committed.', and any error. A blank
+message is refused before anything is sent.
+** Where it works
+The diff view and the commit need a connection with no skgrepo
+restriction, and each owned skgrepo in a gitrepo with a HEAD commit;
+the server refuses them otherwise, and the tool prints its refusal.
+Foreign skgrepos never show a change, and are never committed. So on
+User Claude's server ('data/skgconfig-user-claude.toml'), only the
+owned repo 'first' can show changes or be committed.
+** How it talks to the server
+The server keeps the diff view's buffers, and the comparison behind
+them, per connection, and its answer to "diff view" carries no
+readiness summary. So 'diff' opens one connection, requests the
+buffers in the clients' order, saves each nonempty buffer unchanged
+(it saves back to itself and writes nothing) to get the summary, and
+writes the save's rendering. A later 'save' of a diff buffer first
+requests that buffer again under the sidecar's view ID on its own
+connection, so that the server re-renders the save as a buffer of the
+diff view, with the readiness summary.
