@@ -74,23 +74,30 @@ moves HEAD too, so it shows nothing, which is right. Changes in foreign
 repos never enter the diff view, as before. A diff buffer the daemon
 holds is re-rendered on integration only if it shows a changed node;
 otherwise it waits for the next 'diff'.
-* AWAITS jeff is processing these in sidechannel
-** Known limit, not a choice: saves on one server do not refresh another connection's views
+* Known limit, not a choice: saves on one server do not refresh another connection's views
 A save's writes are the server's own, so the watcher drops them, and
 only the saving connection's views re-render. With one person per
 server this is the pre-existing behavior; my one-shot commands route
 through my daemon once it exists, so it does not bite me either. If two
 people ever share one server, the save path (not the watcher) would have
 to re-render other connections' views.
-
-** TODO (chosen, switchable) : one daemon per port, found through a per-port socket
+** DONE [jeff] Is this potential TODO documented in the code?
+It probably should be.
+*** Ed : being added, as a comment where the save decides whom to re-render
+* (chosen, switchable) : one daemon per port, found through a per-port socket
 Besides 'DIR/skg-for-ai.sock', the daemon registers '/tmp/skg-for-ai-
 PORT.sock' (XDG_RUNTIME_DIR when set), so every command for that port
 routes through it whatever its out-dir, and no view goes stale because
 a command used another directory. Alternative: have the server re-render
 across connections (a server change with no other beneficiary while each
 of us has a server of our own). Switch: delete the per-port socket.
-
+* DONE [jeff] Please have a Sonnet medium
+go through to change any refereces to the old naming scheme (User, Facilitator,
+maybe more) to match the latest team design.
+** Ed : launched (Sonnet). Paths and config names stay ('TODO/User-Claude/',
+'data/user-claude'), since those are the switchable rename above; prose
+changes.
+* AWAITS jeff is processing these in sidechannel
 ** Plan 8 is complete
 Both slices and the follow-up are committed: the daemon (one held
 connection, views rewritten on re-render, a log), routing by port,
