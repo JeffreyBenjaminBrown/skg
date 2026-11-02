@@ -104,7 +104,7 @@ The experience is strange only in that they have to preserve the graphnode IDs
 associated with the things they are editing.
 Each move should bring the vianode metadata with it;
 they can't delete a headline and then retype its title without its metadata.
-** TODO Jeff : Ed's answer: your sketch is right, and mostly built; three upgrades and one open design
+** Jeff : Ed's answer: your sketch is right, and mostly built; three upgrades and one open design
 *** What already exists
 'tools/skg-for-ai' is your sketch with one difference. A compact view is
 the full view with each headline's metadata replaced by a short handle;
@@ -204,7 +204,7 @@ change; the quiet period handles that too.
 I think we should do this not just for foreign repos but for all of them.
 That way we might share writes to a repo (even if only one of us commits).
 And it solves the trap I've fallen into of pulling and forgetting to rebuild.
-******* TODO Jeff : Ed: sorry, missed this; now in 6_plan
+******* DONE Jeff : Ed: sorry, missed this; now in 6_plan
 All repos are watched. One consequence worth naming: the server's own
 saves also raise events, so it must recognize and drop them (record what
 it wrote, skip a changed file whose content matches), or every save
@@ -245,7 +245,7 @@ and you would see this:
 That "ILLEGAL EDIT" herald would be something new,
 rendered in what I've been calling the system font (black text on white background),
 although I think the true name is something else.
-*** TODO Jeff : Ed: taken, with one refinement
+*** DONE Jeff : Ed: taken, with one refinement
 Built into the running slice, and '6_plan.org' says it. The refinement:
 your own ladder, all foreign on my server, is many repos sharing nodes
 legitimately, so "foreign section" is read as "section in a repo that no
@@ -285,28 +285,29 @@ mine, marked "Ed:"; they are not in the graph.
 
 **** Before (what you saw on 2026-11-02, after my fork)
 #+begin_example
-* inboxes ⟨0a ☮ C1 ⌂:ed⟩
-Each child is a fork of a teammate's 'to Ed' node...
-Ed: write-protected (☮), since 'ed' is foreign to you; home 'ed'.
-** to Ed ⟨0b 1S1 1O1 ~ed ⌂:public⟩
-Ed: your node, owned, home 'public'. '1S1 1O1': my clone subscribes
-Ed: to it and overrides it, which is correct. '~ed' says "this
-Ed: relationship is recorded somewhere more private than its default",
-Ed: because the default was computed as 'public' (the owned member's
-Ed: home) and the record is in 'ed'. But 'ed' has no rank on your
-Ed: server, so "more private" meant nothing; and the record could only
-Ed: ever be in 'ed', the recorder's own file.
-*** Hi Ed! ⟨0c⟩
-#+end_example
+  * inboxes ⟨0a ☮ C1 ⌂:ed⟩
+  Each child is a fork of a teammate's 'to Ed' node...
+  Ed: write-protected (☮), since 'ed' is foreign to you; home 'ed'.
+  ** to Ed ⟨0b 1S1 1O1 ~ed ⌂:public⟩
+  Ed: your node, owned, home 'public'. '1S1 1O1': my clone subscribes
+  Ed: to it and overrides it, which is correct. '~ed' says "this
+  Ed: relationship is recorded somewhere more private than its default",
+  Ed: because the default was computed as 'public' (the owned member's
+  Ed: home) and the record is in 'ed'. But 'ed' has no rank on your
+  Ed: server, so "more private" meant nothing; and the record could only
+  Ed: ever be in 'ed', the recorder's own file.
+  *** Hi Ed! ⟨0c⟩
+  #+end_example
 
 **** Now (after the herald fix of 2026-11-02, commit 3b3878b9)
-#+begin_example
-* inboxes ⟨0a ☮ C1 ⌂:ed⟩
-** to Ed ⟨0b 1S1 1O1 ⌂:public⟩
-Ed: the '~ed' is gone: the herald skips any relationship a foreign
-Ed: node records. Nothing else changed.
-*** Hi Ed! ⟨0c⟩
-#+end_example
+  #+begin_example
+  * inboxes ⟨0a ☮ C1 ⌂:ed⟩
+  ** to Ed ⟨0b 1S1 1O1 ⌂:public⟩
+  Ed: the '~ed' is gone: the herald skips any relationship a foreign
+  Ed: node records. Nothing else changed.
+  *** Hi Ed! ⟨0c⟩
+  #+end_example
+
 What is still wrong is not in the picture: 'C-c s r' on 'to Ed' here
 ('relRepo info', the request behind it) answers
 : relRepo: ed.  default: public.
@@ -314,6 +315,24 @@ which calls a relationship that can only live in 'ed' "stored away from
 its default". A reader would try to repair it, and the save would
 refuse, since you cannot write into 'ed'.
 
+***** TODO [jeff] What do you mean that C-c  s r "answers"?
+I just think of it as setting a value.
+Who asked what to who, and who is answering?
+****** TODO Jeff : Ed: sloppy wording; the server answers the client
+C-c s r sets a value, as you say, but before it lets you set anything
+it asks the server a question on your behalf: the 'relRepo info'
+request ("for this relationship, what is its current relRepo and what
+would its default be?"). The server's reply is what fills the prompt:
+the minibuffer starts pre-filled with the current or default repo, and
+the completion list offers the repos at least as private as the
+default. "C-c s r answers X" should have read "the prompt C-c s r
+shows is built from the server's reply, which says X". The misleading
+part is that reply: for this relationship it names 'public' as the
+default, so the prompt presents the record in 'ed' as a departure from
+the default, and offers you repos to "repair" it with, though the save
+would refuse every one of them (you cannot write into 'ed'). With the
+rule change the reply names 'ed' as the default, the prompt pre-fills
+'ed', and nothing looks like it needs repair.
 **** After the rule change I recommend
 No change to the view: identical to "Now". 'C-c s r' answers
 : relRepo: ed.  default: ed.
@@ -321,9 +340,9 @@ because the default relRepo of a relationship whose recorder is foreign
 is the recorder's own repo, the only place it can be. The herald then
 needs no special case: it compares record against default and finds
 them equal. On MY server the same view reads
-#+begin_example
-* inboxes ⟨0a C1 ⌂:first⟩
-** to Ed ⟨0b ☮ 1S1 1O1 ⌂:public⟩
+  #+begin_example
+  * inboxes ⟨0a C1 ⌂:first⟩
+  ** to Ed ⟨0b ☮ 1S1 1O1 ⌂:public⟩
 #+end_example
 before and after alike: there 'first' is owned and ranked, 'public' is
 foreign, and the default for a relationship from my node to your node
