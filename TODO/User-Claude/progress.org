@@ -1989,3 +1989,229 @@ not a dotted pair, so that the three readers parse it alike. The
 tool prints 'skg server: repo NAME: N files integrated' on its own
 connection, and its daemon logs 'changed on disk: repo NAME: N files
 integrated'; a rerender's cause lists counts then warnings.
+* Plan 10, first slices: the audit, placing an existing node, forking: DONE, uncommitted
+** What was done
+*** The audit
+'tools/skg-for-ai/README.org' ends in a new section, "What the tool
+covers of COMMANDS.org": one row per command or command family of
+'docs/COMMANDS.org', saying how the tool does it, "Emacs-only by
+nature", "needs nothing" (the compact files already do it), "'raw'
+only" (the request has no confirmation round, so 'raw' suffices), or
+"gap". The gap list is below, under "The audit's gaps".
+*** Placing an existing node
+A compact headline ending in '⟨node:ID⟩' ('PLACED_NODE_HANDLE_PATTERN',
+'OutlineHeadline.placed_node_id') places the node ID there. Before the
+report, 'resolve_placed_nodes' asks 'link statuses' and 'titles by
+ids' (the link annotations' requests, now shared through
+'fetch_link_statuses_of_ids') for the node's ID and title; the server
+needs the title, since it refuses a write-protected occurrence whose
+title differs from the graph's (verified: "Write-protected occurrence
+differs from the graph"). 'assign_placed_view_requests' mirrors
+'skg--buffer-has-editable-occurrence-p': a placement asks for
+'editableView' unless the rebuilt buffer holds an editable occurrence
+of the node, or one asking to become editable (an earlier placement
+included). The rebuild writes '(skg node (gnid ID) writeProtected
+(viewRequests editableView))', or without the request, then the
+server's title. The report line is "Placed: ⟨node:ID⟩ 'TITLE', under
+...", with ", write-protected, since the view already holds an
+editable occurrence of it." when the request is left out. Errors: an
+ID the graph lacks or the skgrepo restriction hides, a title the
+server does not give, another word in the handle, a body or children
+under the placement (they would be lost under a write-protected
+occurrence in that save).
+*** Forking
+'predicted_forks' reads the edit as the server's
+'apply_foreign_policy' does: an editable occurrence of a foreign node
+(ownership from 'repos'), in content position, whose title, body or
+claiming children (in order) changed, forks; so does a node whose
+handle carries 'fork', written as '(viewRequests fork)'. The report
+adds a 'Fork:' line per fork and a 'Fork into:' line naming the
+clone's skgrepo: '--fork-into REPO' (validated as owned), else the
+server's one owned skgrepo, else an error asking for the flag. An
+edit of a write-protected foreign occurrence in content is an error
+(see Deviations), and 'fork' beside any other edit is an error, as
+'skg-fork-node' refuses a modified buffer.
+
+With '--yes' the save is sent as before; on 'fork-confirmation',
+'approved_fork_skgrepos_of_confirmation' reads the confirmation
+buffer as 'skg--fork-repos-from-confirmation-buffer' does (each
+top-level headline with metadata a clone-to-be, each headline with a
+gnid under it an original), prints each clone-to-be, its skgrepo and
+the server's suggestion, and the original it forks, replaces
+'PICK-A-REPO' with the chosen skgrepo, and re-sends the same buffer
+on the same connection, with the same 'rendered-at', adding
+'(approved-forks . "true") (fork-repos (("ID" . "REPO") ...))', as
+'skg--save-request-sexp' does ('SkgConnection.save_buffer' takes
+'approved_fork_skgrepos'). The decline is the clients' too: they send
+nothing, and neither does a save without '--yes'. If the confirmation
+names an original the report did not predict, nothing is approved.
+
+The word 'editable' writes '(viewRequests editableView)', the
+clients' 'C-c s d', reported as "Editable: ...". It is the way to fork
+a write-protected foreign occurrence, and a gesture of its own.
+*** Documentation
+README: the front page names both gestures; "Running it" lists
+'--fork-into'; "How the compact view becomes a buffer" lists 'editable',
+'fork' and '⟨node:ID⟩'; "The report" lists the new lines and errors;
+"The server's answer" says the fork confirmation is answered; new
+sections "Placing an existing node" (including subscribing,
+overriding and hiding through 'forest' folders) and "Forking"
+(editing a foreign node, the confirmation, forking a node you own);
+"Tests"; the audit. The tool's and the test's docstrings.
+** Tests
+A new scratch server in 'test_skg_for_ai.py'
+('failures_of_placing_and_forking', ten cases in order, between the
+writing and the reviewing servers): an owned and a foreign node
+placed under the first child with made-up titles, then editable with
+their real titles and content; a node placed beside its editable
+occurrence, placed write-protected; a foreign node placed twice in one
+save, the second write-protected; four refused placements (an absent
+ID, a body, a child, another word); a refused edit of the
+write-protected occurrence of that foreign node, and 'editable' on it
+(nothing written, editability moved); a child added under the placed
+foreign node, declined (no '--yes'; also '--fork-into fred' refused)
+and then approved, the '.skg' files showing the clone in 'main' with
+the new child, subscribing to and overriding 'fred-aside-id', which is
+unchanged; 'fork' refused beside a retitle, then approved, a clone
+subscribing to and overriding 'shared-id'; and subscribing and hiding
+in 'forest subscribesTo' (a placement in the subscribee folder, then a
+removal under the subscribee as such; neither reports a fork). Each
+report is compared exactly. Suite: PASS (about 45 s). 'cargo check
+--all-targets' clean; no Rust, elisp or Lua changed.
+** The live fork on 1732
+Ed's server started as PID 83362 ('target/debug/skg
+data/skgconfig-ed.toml'), stopped by PID; Jeff's 1731 server only
+read. Through the tool on 1732: 'view 50dcefe7-...' ('inboxes', no
+children); a headline "** Jeff's outbox to me
+⟨node:883e7f64-c377-4894-a75b-64c52d1668c4⟩" appended; the report said
+"Placed: ⟨node:883e7f64-c377-4894-a75b-64c52d1668c4⟩ 'to Ed', under
+⟨0a⟩ 'inboxes'."; '--yes' saved it, and the re-rendered view showed
+"** to Ed ⟨0b 2aC1 ⌂:public⟩" editable, with "*** Hi Ed! ⟨0c⟩" under
+it. Then the body line "Ed's fork of Jeff's outbox to him; messages
+arrive as unintegrated content." under 'to Ed', and:
+#+begin_example
+Changes in view_50dcefe7-563d-4bee-8eaa-7bad193f57ae.compact.org, against view_50dcefe7-563d-4bee-8eaa-7bad193f57ae.full.org (view ID content-view:50dcefe7-563d-4bee-8eaa-7bad193f57ae):
+Bodies changed: 1 (⟨0b⟩).
+Fork: ⟨0b⟩ 'to Ed', of the foreign skgrepo 'public', whose body changed: the edit goes to a new clone of it, which subscribes to it and overrides it; the original stays as it is.
+Fork into: 'first', the one skgrepo this server owns, unless the edit settles another. The server asks before forking; '--yes' approves.
+Server: fork confirmation: the save forks 1 node, and writes nothing until that is approved.
+Clone-to-be: 'to Ed', in 'first' (the server suggests 'first').
+  It forks 'to Ed' (883e7f64-c377-4894-a75b-64c52d1668c4), of the skgrepo 'public'.
+Approved: the save is sent again with the forks approved.
+Server: saved, 0 errors, 0 warnings.
+#+end_example
+'data/ed/first' now holds, uncommitted, the clone
+'965a2e6e-c380-4a4c-bc7f-a10afd999ba8.skg' (title 'to Ed', the body
+line, 'contains' 15e05de1 ('Hi Ed!'), 'subscribesTo' and 'overrides'
+883e7f64) and 'inboxes' with 'contains: 883e7f64' (the original's ID,
+which override substitution shows as the clone). A fresh 'view' of
+'inboxes' on 1732 shows "** to Ed ⟨0b C1 S1 Oĥ1⟩" with the body line,
+its subscribee folder holding Jeff's 'to Ed' (☮, ⌂:public), and 'Hi
+Ed!'.
+
+On 1731, 'view 50dcefe7-...' (read-only) shows 'inboxes' (⌂:ed) with
+"** to Ed ⟨0b 2aC1 1S 1O ~ed ⌂:public⟩", Jeff's original, now
+subscribed to and overridden once: Jeff's server substitutes only an
+overrider Jeff owns, so it does not show Ed's clone in its place. 'view
+965a2e6e-...' on 1731 shows the clone, "* to Ed ⟨0a C1 S1 O1 ⌂:ed⟩",
+with its body: the watcher had integrated Ed's new files. Nothing was
+saved against 1731.
+** Deviations
+*** An edit of a write-protected foreign node does not fork it
+The brief has an edit of a write-protected (☮) foreign occurrence
+trigger the fork confirmation. The server refuses it ("Write-protected
+occurrence differs from the graph ... request this one editable (C-c s
+d)"), as 'docs/forks.org' says: step one is making the node editable.
+So the tool stops at such an edit in content with an error saying how
+to go on, and gained the word 'editable' (C-c s d, one of "the rest")
+for it. A foreign node in an owned node's content is editable in a
+fresh view, and a placed one after its placing save, so the common
+case (the live one) needs no extra step. Doing the two saves
+automatically was rejected: when the occurrence becomes editable the
+server draws its content (and an omitted body), which the edit made
+against the write-protected rendering lacks, so re-applying the edit
+would remove children and empty bodies.
+*** The confirmation is printed on '--yes', and approved at once
+A save without '--yes' sends nothing, so it cannot show the server's
+confirmation: sending a save to see whether it forks would write when
+it does not. The report predicts the fork instead ('Fork:', 'Fork
+into:'), and '--yes' prints the server's confirmation and approves
+it. The guard: an original the report did not predict stops the
+approval, and nothing is written.
+*** The live forking edit is a body line
+Not the suggested child headline: a body line is a real change (the
+server compares title, body and contents) that adds no node, and puts
+no non-message among the messages the inbox will collect.
+*** The 1731 view does not show the clone under 'inboxes'
+It shows Jeff's 'to Ed', heralded '1S 1O'. Override substitution
+applies to owned overriders only ('substitute_overriders'), and 'ed'
+is foreign to Jeff, so this is the server's rule, not a delay. The
+clone itself is in Jeff's graph.
+*** Subscribing, overriding and hiding are not gaps
+The plan expected them as gaps. 'forest subscribesTo ID' and 'forest
+overrides ID' draw editable folders, and a '⟨node:ID⟩' placed there
+joins the relation (checked on the fixture; the override case was
+first refused by the server's monogamy rule for 'overridden-id', and
+then succeeded on 'fred-aside-id'); removing an unintegrated child
+under a subscribee as such hides it. The test covers subscribing and
+hiding; the README says all three.
+*** Fork prediction stays in content position
+A first version predicted a fork for a child removed under an
+editable subscribee as such, which the server saves as a hide; the
+prediction (and the write-protected error) now covers only roots and
+the children of node occurrences.
+** What's imperfect
+*** The prediction is local
+It mirrors the server's comparison from the two files; a fork it
+misses stops the approval, and one it predicts that the server does
+not make (an edit that equals the graph) just saves.
+*** The placed title comes from the search index
+'titles by ids' reads Tantivy, which lags a save by a moment; a node
+created a moment before is refused with "try again".
+*** '--fork-into' applies to placeholders only
+A clone whose skgrepo the edit settled keeps it, as the clients ask
+only for placeholders; the report's 'Fork into:' line says "unless the
+edit settles another". The tool's new headlines are bare, so this
+does not arise from the tool itself.
+*** The approval through a daemon is untested
+The approving save runs on whichever connection sent the first one,
+the daemon's included; only the one-shot path is tested.
+** Open questions
+*** With several owned skgrepos, default to the server's suggestion?
+The brief says require '--fork-into'; the clients default to the
+suggested skgrepo ("Suggested repo for the clone below"). The tool
+prints the suggestion either way.
+*** Jeff's server marks inboxes' 'to Ed' '~ed'
+"Recorded more private than the default" for a relationship recorded
+in Ed's foreign 'ed' to a node in 'public'; Ed's server shows no such
+mark. Possibly how the default relRepo is computed when the recorder
+is foreign; not investigated.
+** The audit's gaps
+In the README's table order:
+- a save's Hoist or Abort question, its overPrivateText rerender
+  approval, and its delete-from question (printed, never answered);
+- the save declares no other view's unsaved edits ('other-views');
+- 'skg-delete-recursive' (C-u C-c <backspace>);
+- 'skg-delete-references-to-absent-node' (C-c d a), whose
+  confirmation round is not carried;
+- 'skg-search-interactive' (C-c f i): regex, body and Tantivy-syntax
+  options;
+- 'skg-request-write-protected' and its recursive form (C-c s w, W);
+- 'skg-detach' keeping the headline in view, and 'skg-attach' (C-c s
+  t, a);
+- 'skg-set-repo' and its recursive form (C-c s s, S), with the
+  strandeds question: moving a node to another skgrepo;
+- 'skg-set-flag-search-matching' (C-c s x);
+- 'skg-set-merge-request' (C-c s m);
+- 'skg-set-relRepo' and its recursive form (C-c s r, R);
+- the subtree forms of 'skg-cycle-commit-ready' and of
+  'skg-toggle-homeSkgrepo-move-commitReady' (C-u C-c r r, C-u C-c r h);
+- 'skg-restrict-repo-set' (C-c v l) and its overPrivateText questions;
+- the linkstack: push, view, paste and pop of an ID or a link, pop of
+  a node (C-c u, C-c v s, C-c o i/l, C-c O i/l/n);
+- the import's host root for absolute links;
+and reachable through 'raw' only: 'skg-investigate-unknown-node',
+'skg-list-repo-sets', 'skg-show-skgrepo-restriction',
+'skg-export-some-to-org', 'skg-connection-verify',
+'skg-rebuild-session-lifetime-stores' (which closes a daemon's views),
+'skg-strip-trailing-whitespace-from-bodies'.

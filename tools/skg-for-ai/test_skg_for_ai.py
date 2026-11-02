@@ -30,7 +30,17 @@ In order, it:
   '⟨new⟩'; a reworded one asked about, then answered '--keep-ids',
   which keeps its node, or '--all-new', which makes a new one),
   checking each report exactly and the graph after each save;
-- on a third scratch server, whose owned skgrepo is a gitrepo with the
+- on a third scratch server, places existing nodes with '⟨node:ID⟩'
+  (an owned and a foreign one, each then editable with its real title;
+  one beside an editable occurrence, and one placed twice, the later
+  placed write-protected; refused placements), refuses an edit of a
+  write-protected foreign node, makes it editable with 'editable',
+  forks a placed foreign node by adding a child to it (declined
+  without '--yes', approved with it: the clone subscribes to and
+  overrides it), forks an owned node with 'fork' (refused beside
+  another edit, then approved), and subscribes and hides by editing a
+  subscribee folder;
+- on a fourth scratch server, whose owned skgrepo is a gitrepo with the
   fixture committed: saves a retitle, a new child and a deletion,
   checks the diff view's compact buffer exactly, marks the new child
   ready, restores the deleted node, and commits (refused unconfirmed,
@@ -38,7 +48,7 @@ In order, it:
   view is then empty; then integrates a change a diff buffer does not
   make editable, and saves an edit of it; a blank commit message is
   refused unsent;
-- on a fourth scratch server, also over a gitrepo, runs a daemon:
+- on a fifth scratch server, also over a gitrepo, runs a daemon:
   commands through it write what they write on their own connections;
   it rewrites a held view after a save through it changes a node the
   view shows, and after a second server over the same data root saves
@@ -290,15 +300,17 @@ def shared_herald_cases ():
 
 def failures_against_scratch_servers (update_expected):
   """The reading checks on one scratch server, then the writing
-  checks on another, then the reviewing checks on a third, then the
-  daemon's on a fourth, the last two with their owned skgrepo a
-  gitrepo; each on its own copy of the fixture."""
+  checks on another, then the placing and forking checks on a third,
+  then the reviewing checks on a fourth, then the daemon's on a fifth,
+  the last two with their owned skgrepo a gitrepo; each on its own
+  copy of the fixture."""
   if not os . path . exists (SERVER_BINARY):
     return [ f"no server binary at {SERVER_BINARY}; run 'cargo build --bin skg'" ]
   return ( failures_on_a_scratch_server (
              lambda scratch, data_root :
                failures_of_reading (scratch, data_root, update_expected) )
            + failures_on_a_scratch_server (failures_of_writing)
+           + failures_on_a_scratch_server (failures_of_placing_and_forking)
            + failures_on_a_scratch_server (
                failures_of_reviewing, owned_skgrepo_in_git = True )
            + failures_on_a_scratch_server (
@@ -544,7 +556,7 @@ def check_bad_handles (context):
   edit_compact ( folder, [ ( "⟨0a 1C2 L2 ⌂:main⟩",
                              "⟨0a 1C2 L2 ⌂:main all delete restoreNode⟩" ),
                            ( "** First child, renamed ⟨0d⟩",
-                             "** First child, renamed ⟨0z⟩" ),
+                             "** First child, renamed ⟨0s⟩" ),
                            ( "⟨0c ☮ Cb⟩", "⟨zz ☮ Cb⟩" ) ])
   graph_before = skg_files (context)
   full_before = read_file ( os . path . join (folder, ROOT_BASE_NAME + ".full.org") )
@@ -558,7 +570,7 @@ def check_bad_handles (context):
     "'ready' or 'unready'.\n"
     "Error: ⟨zz⟩ on line 7 of the compact view names no headline of the "
     "full view.\n"
-    "Error: ⟨0z⟩ on line 8 of the compact view names no headline of the "
+    "Error: ⟨0s⟩ on line 8 of the compact view names no headline of the "
     "full view.\n",
     expected_returncode = 1 )
   if "Nothing was saved: some handles are in error" not in completed . stderr:
@@ -896,6 +908,358 @@ def compact_line_starting (folder, start):
     raise CaseFailure (
       f"{len (lines)} lines start {start!r}:\n{read_compact (folder)}" )
   return lines [0]
+
+# ============================================================
+# Placing and forking: on a fresh fixture, existing nodes are placed
+# under others with '⟨node:ID⟩', a placed foreign node is forked by an
+# edit (declined, then approved), a write-protected foreign node is
+# made editable with 'editable', and an owned node is forked with
+# 'fork'. The cases run in order on one server.
+# ============================================================
+
+FORK_INTO_MAIN = (
+  "Fork into: 'main', the one skgrepo this server owns, unless the edit "
+  "settles another. The server asks before forking; '--yes' approves.\n" )
+
+def failures_of_placing_and_forking (scratch, data_root):
+  context = { "scratch"   : scratch,
+              "main_repo" : os . path . join (data_root, "me", "main"),
+              "fred_repo" : os . path . join (data_root, "fred", "public") }
+  for case in [ check_placing_nodes, check_placing_beside_an_editable_occurrence,
+                check_placing_a_node_twice, check_placement_errors,
+                check_write_protected_foreign_edit_refused,
+                check_making_a_foreign_node_editable, check_implicit_fork_declined,
+                check_implicit_fork_approved, check_explicit_fork,
+                check_subscribing_and_hiding_by_placing ]:
+    try:
+      case (context)
+    except CaseFailure as failure:
+      return [ case . __name__ + ": " + str (failure) ]
+  return []
+
+def check_placing_nodes (context):
+  """Two existing nodes, one owned and one foreign, placed under the
+  first child with titles the server replaces: each is saved as a
+  pasted occurrence that asks for an editable view, so the re-rendered
+  view shows each editable, with its real title and its content."""
+  folder = fresh_root_view (context, "place")
+  edit_compact ( folder, [ (
+    "A body line that stays unnumbered.\n",
+    "A body line that stays unnumbered.\n"
+    "*** any words at all ⟨node:elsewhere-id⟩\n"
+    "*** Fred's ⟨node:fred-aside-id⟩\n" ) ])
+  report = (
+    REPORT_HEAD +
+    "Placed: ⟨node:elsewhere-id⟩ 'A second container, outside the view', "
+    "under ⟨0d⟩ 'First child'.\n"
+    "Placed: ⟨node:fred-aside-id⟩ 'An aside of Fred's', under ⟨0d⟩ 'First "
+    "child'.\n" )
+  require_output ( run_save (folder), report + NOT_SAVED )
+  require_equal ( "the container's content before '--yes'",
+                  skg_list (context, "child-a-id", "contains"), [ "shared-id" ] )
+  require_output ( run_save (folder, "--yes"),
+                   report + saved_line (0) + written_paths (folder) )
+  require_equal ( "the container's content",
+                  skg_list (context, "child-a-id", "contains"),
+                  [ "elsewhere-id", "fred-aside-id", "shared-id" ] )
+  require_in_compact (
+    folder,
+    "** First child ⟨0d aC3⟩\n"
+    "A body line that stays unnumbered.\n"
+    "*** A second container, outside the view ⟨0k aC1⟩\n"
+    "**** Contained twice ⟨0l ☮ 2aC⟩\n"
+    "*** An aside of Fred's ⟨0m 1H ⌂:fred⟩\n"
+    "*** Contained twice ⟨0e 2aC⟩\n" )
+  if "writeProtected (viewRequests" in read_file (
+      os . path . join (folder, ROOT_BASE_NAME + ".full.org") ):
+    raise CaseFailure ( "the re-rendered view still carries a paste's request" )
+
+def check_placing_beside_an_editable_occurrence (context):
+  """A node placed where the view already holds an editable
+  occurrence of it is placed write-protected, without the view
+  request, and the report says so."""
+  folder = fresh_root_view (context, "place-again")
+  with open ( os . path . join ( folder, ROOT_BASE_NAME + ".compact.org" ),
+              "a", encoding = "utf-8" ) as compact_file:
+    compact_file . write ( "*** Contained twice ⟨node:shared-id⟩\n" )
+  require_output (
+    run_save (folder, "--yes"),
+    REPORT_HEAD +
+    "Placed: ⟨node:shared-id⟩ 'Contained twice', under ⟨0i⟩ 'Second child, "
+    "a subscriber', write-protected, since the view already holds an "
+    "editable occurrence of it.\n" + saved_line (0) + written_paths (folder) )
+  require_equal ( "the second container's content",
+                  skg_list (context, "child-b-id", "contains"), [ "shared-id" ] )
+  if not read_compact (folder) . endswith ( "*** Contained twice ⟨0q ☮ 3aC⟩\n" ):
+    raise CaseFailure (
+      f"the placed occurrence is not last and write-protected:\n{read_compact (folder)}" )
+
+def check_placing_a_node_twice (context):
+  """A foreign node placed twice in one save: the first placement asks
+  for the editable view, the second, finding it, is placed
+  write-protected."""
+  folder = fresh_root_view (context, "place-twice")
+  edit_compact ( folder, [ (
+    "A body line that stays unnumbered.\n",
+    "A body line that stays unnumbered.\n"
+    "*** Fred's detail ⟨node:fred-detail-id⟩\n" ) ])
+  with open ( os . path . join ( folder, ROOT_BASE_NAME + ".compact.org" ),
+              "a", encoding = "utf-8" ) as compact_file:
+    compact_file . write ( "*** Fred's detail again ⟨node:fred-detail-id⟩\n" )
+  require_output (
+    run_save (folder, "--yes"),
+    REPORT_HEAD +
+    "Placed: ⟨node:fred-detail-id⟩ 'A detail of Fred's', under ⟨0d⟩ 'First "
+    "child'.\n"
+    "Placed: ⟨node:fred-detail-id⟩ 'A detail of Fred's', under ⟨0i⟩ 'Second "
+    "child, a subscriber', write-protected, since the view already holds an "
+    "editable occurrence of it.\n" + saved_line (0) + written_paths (folder) )
+  require_equal ( "the first child's content after placing twice",
+                  skg_list (context, "child-a-id", "contains"),
+                  [ "fred-detail-id", "elsewhere-id", "fred-aside-id", "shared-id" ] )
+  require_equal ( "the second child's content after placing twice",
+                  skg_list (context, "child-b-id", "contains"),
+                  [ "shared-id", "fred-detail-id" ] )
+
+def check_placement_errors (context):
+  """A placement of an ID the graph lacks, one with a body, one with a
+  child and one carrying another word are refused before any save."""
+  folder = fresh_root_view (context, "place-errors")
+  edit_compact ( folder, [ (
+    "A body line that stays unnumbered.\n",
+    "A body line that stays unnumbered.\n"
+    "*** Nobody ⟨node:nobody-id⟩\n"
+    "*** With a body ⟨node:top-id⟩\n"
+    "Its body line.\n"
+    "*** With a child ⟨node:overridden-id⟩\n"
+    "**** Its child\n"
+    "*** With a word ⟨node:overrider-id fork⟩\n" ) ])
+  graph_before = skg_files (context)
+  completed = run_save (folder, "--yes")
+  require_output (
+    completed,
+    REPORT_HEAD +
+    "Error: ⟨node:top-id⟩ on line 10 of the compact view has a body; a placed "
+    "node is saved write-protected, which saves no body. Save the placement "
+    "first, then edit its body.\n"
+    "Error: ⟨node:overridden-id⟩ on line 12 of the compact view has children; "
+    "a placed node is saved write-protected, under which nothing claims "
+    "membership. Save the placement first, then add them.\n"
+    "Error: ⟨node:overrider-id⟩ on line 14 of the compact view carries "
+    "'fork'; it takes no other word.\n",
+    expected_returncode = 1 )
+  edit_compact ( folder, [ ( "Its body line.\n", "" ), ( "**** Its child\n", "" ),
+                           ( "⟨node:overrider-id fork⟩", "⟨node:overrider-id⟩" ) ])
+  require_output (
+    run_save (folder, "--yes"),
+    REPORT_HEAD +
+    "Error: ⟨node:nobody-id⟩ on line 9 of the compact view names no node of "
+    "the graph.\n",
+    expected_returncode = 1 )
+  require_equal ( "the graph after refused placements",
+                  skg_files (context), graph_before )
+
+def check_write_protected_foreign_edit_refused (context):
+  """An edit of a write-protected occurrence of a foreign node, in
+  content, forks nothing, so it is refused before any save, saying how
+  to fork it."""
+  folder = fresh_root_view (context, "fork-write-protected")
+  detail = compact_line_starting (folder, "*** A detail of Fred's ⟨0s ")
+  edit_compact ( folder, [ ( detail, detail . replace (
+    "A detail of Fred's ⟨", "A detail of Fred's, mine ⟨" )) ])
+  graph_before = skg_files (context)
+  require_output (
+    run_save (folder, "--yes"),
+    REPORT_HEAD +
+    "Error: ⟨0s⟩ 'A detail of Fred's', of the foreign skgrepo 'fred', is "
+    "write-protected, and its title changed. A write-protected occurrence "
+    "saves nothing of its own, so this would fork nothing. To fork it, undo "
+    "the edit, write 'editable' in its handle and save; then edit it and "
+    "save again.\n",
+    expected_returncode = 1 )
+  require_equal ( "the graph after a refused edit",
+                  skg_files (context), graph_before )
+
+def check_making_a_foreign_node_editable (context):
+  """'editable' in the handle of that write-protected occurrence asks
+  for an editable view, as the clients' 'C-c s d' does: the save
+  writes nothing, and the re-rendered view shows it editable, and the
+  occurrence that was editable write-protected."""
+  folder = fresh_root_view (context, "editable")
+  detail = compact_line_starting (folder, "*** A detail of Fred's ⟨0s ")
+  edit_compact ( folder, [ ( detail, detail [ : -1 ] + " editable⟩" ) ])
+  graph_before = skg_files (context)
+  fred_before = fred_files (context)
+  require_output (
+    run_save (folder, "--yes"),
+    REPORT_HEAD +
+    "Editable: ⟨0s⟩ 'A detail of Fred's', as '(viewRequests editableView)': "
+    "the save makes it this view's editable occurrence of its node.\n"
+    + saved_line (0) + written_paths (folder) )
+  require_equal ( "the owned files after 'editable'", skg_files (context), graph_before )
+  require_equal ( "the foreign files after 'editable'", fred_files (context), fred_before )
+  if "☮" in compact_line_starting (folder, "*** A detail of Fred's ⟨0s "):
+    raise CaseFailure ( f"the occurrence is still write-protected:\n{read_compact (folder)}" )
+  if "☮" not in compact_line_starting (folder, "*** A detail of Fred's ⟨0e "):
+    raise CaseFailure ( f"the other occurrence is still editable:\n{read_compact (folder)}" )
+
+def check_implicit_fork_declined (context):
+  """A child added under the editable occurrence of a foreign node
+  forks it: the report says so, and names the clone's skgrepo. Without
+  '--yes' nothing is sent; a '--fork-into' naming no owned skgrepo is
+  refused."""
+  folder = fresh_root_view (context, "fork")
+  context [ "fork_folder" ] = folder
+  aside = compact_line_starting (folder, "*** An aside of Fred's ⟨")
+  edit_compact ( folder, [ ( aside + "\n", aside + "\n**** My note on it\n" ) ])
+  graph_before = skg_files (context)
+  fred_before = fred_files (context)
+  require_output (
+    run_save (folder),
+    REPORT_HEAD +
+    "New: 'My note on it', under ⟨0h⟩ 'An aside of Fred's'.\n"
+    "Fork: ⟨0h⟩ 'An aside of Fred's', of the foreign skgrepo 'fred', whose "
+    "children changed: the edit goes to a new clone of it, which subscribes "
+    "to it and overrides it; the original stays as it is.\n"
+    + FORK_INTO_MAIN + NOT_SAVED )
+  require_output (
+    run_save (folder, "--yes", "--fork-into", "fred"),
+    REPORT_HEAD +
+    "Error: '--fork-into fred' names no owned skgrepo of this server; its "
+    "owned ones are: main.\n",
+    expected_returncode = 1 )
+  require_equal ( "the owned files after a declined fork",
+                  skg_files (context), graph_before )
+  require_equal ( "the foreign files after a declined fork",
+                  fred_files (context), fred_before )
+
+def check_implicit_fork_approved (context):
+  """With '--yes' the server's fork confirmation is printed and
+  approved: a clone in 'main' holds the edit and subscribes to and
+  overrides the original, which is unchanged, and the re-rendered view
+  shows the clone in the original's place."""
+  folder = context [ "fork_folder" ]
+  fred_before = fred_files (context)
+  files_before = set ( skg_files (context) )
+  completed = run_save (folder, "--yes")
+  require_output (
+    completed,
+    REPORT_HEAD +
+    "New: 'My note on it', under ⟨0h⟩ 'An aside of Fred's'.\n"
+    "Fork: ⟨0h⟩ 'An aside of Fred's', of the foreign skgrepo 'fred', whose "
+    "children changed: the edit goes to a new clone of it, which subscribes "
+    "to it and overrides it; the original stays as it is.\n"
+    + FORK_INTO_MAIN +
+    "Server: fork confirmation: the save forks 1 node, and writes nothing "
+    "until that is approved.\n"
+    "Clone-to-be: 'An aside of Fred's', in 'main' (the server suggests "
+    "'main').\n"
+    "  It forks 'An aside of Fred's' (fred-aside-id), of the skgrepo 'fred'.\n"
+    "Approved: the save is sent again with the forks approved.\n"
+    + saved_line (0) + written_paths (folder) )
+  new_files = set ( skg_files (context) ) - files_before
+  clone_id = id_of_compact_headline (folder, "*** An aside of Fred's")
+  child_id = id_of_compact_headline (folder, "**** My note on it")
+  require_equal ( "the files the fork added", new_files,
+                  { clone_id + ".skg", child_id + ".skg" } )
+  require_equal ( "the clone's title", skg_title (context, clone_id),
+                  "An aside of Fred's" )
+  require_equal ( "the clone's content", skg_list (context, clone_id, "contains"),
+                  [ child_id ] )
+  require_equal ( "what the clone subscribes to",
+                  skg_list (context, clone_id, "subscribesTo"), [ "fred-aside-id" ] )
+  require_equal ( "what the clone overrides",
+                  skg_list (context, clone_id, "overrides"), [ "fred-aside-id" ] )
+  require_equal ( "the foreign files after the fork",
+                  fred_files (context), fred_before )
+  require_equal ( "the container's content after the fork",
+                  skg_list (context, "child-a-id", "contains"),
+                  [ "fred-detail-id", "elsewhere-id", "fred-aside-id", "shared-id" ] )
+  require_in_compact ( folder, "*** An aside of Fred's ⟨0h C1 S1 Oĥ1⟩\n"
+                               "**** My note on it ⟨0t⟩\n" )
+
+def check_explicit_fork (context):
+  """'fork' on an owned node, as the clients' 'skg-fork-node' marks
+  it: refused beside other edits, then approved with '--yes', making a
+  clone in 'main' that subscribes to and overrides it."""
+  folder = fresh_root_view (context, "fork-explicit")
+  shared = compact_line_starting (folder, "*** Contained twice ⟨0o ")
+  edit_compact ( folder, [ ( shared, shared [ : -1 ] + " fork⟩" ) ])
+  first_child = compact_line_starting (folder, "** First child ⟨")
+  edit_compact ( folder, [ ( first_child, first_child . replace (
+    "First child", "First child, renamed" )) ])
+  graph_before = skg_files (context)
+  require_output (
+    run_save (folder, "--yes"),
+    REPORT_HEAD +
+    "Error: ⟨0o⟩ 'Contained twice' carries 'fork', but the compact view has "
+    "other edits; save them first, as a client forks only from a saved "
+    "buffer, so that the clone is the node as it is saved.\n",
+    expected_returncode = 1 )
+  require_equal ( "the graph after a refused fork",
+                  skg_files (context), graph_before )
+  first_child = compact_line_starting (folder, "** First child, renamed ⟨")
+  edit_compact ( folder, [ ( first_child, first_child . replace (
+    "First child, renamed", "First child" )) ])
+  files_before = set ( skg_files (context) )
+  require_output (
+    run_save (folder, "--yes"),
+    REPORT_HEAD +
+    "Fork: ⟨0o⟩ 'Contained twice', by request: a new clone of it subscribes "
+    "to it and overrides it.\n" + FORK_INTO_MAIN +
+    "Server: fork confirmation: the save forks 1 node, and writes nothing "
+    "until that is approved.\n"
+    "Clone-to-be: 'Contained twice', in 'main' (the server suggests "
+    "'main').\n"
+    "  It forks 'Contained twice' (shared-id), of the skgrepo 'main'.\n"
+    "Approved: the save is sent again with the forks approved.\n"
+    + saved_line (0) + written_paths (folder) )
+  [ clone_file ] = set ( skg_files (context) ) - files_before
+  clone_id = clone_file [ : - len (".skg") ]
+  require_equal ( "the explicit clone's title", skg_title (context, clone_id),
+                  "Contained twice" )
+  require_equal ( "what the explicit clone subscribes to",
+                  skg_list (context, clone_id, "subscribesTo"), [ "shared-id" ] )
+  require_equal ( "what the explicit clone overrides",
+                  skg_list (context, clone_id, "overrides"), [ "shared-id" ] )
+  require_equal ( "the forked node's title", skg_title (context, "shared-id"),
+                  "Contained twice" )
+
+def check_subscribing_and_hiding_by_placing (context):
+  """In the editable subscribee folder 'forest subscribesTo' draws, a
+  placed foreign node is subscribed to; its unintegrated child, then
+  removed from under it, is hidden from the subscription. Neither
+  forks."""
+  folder = os . path . join ( context [ "scratch" ], "write", "subscribe" )
+  require_tool_run ([ "forest", "subscribesTo", "elsewhere-id", "--out-dir",
+                      folder, "--no-summary" ])
+  base_name = "forest-subscribesTo_elsewhere-id"
+  compact_path = os . path . join ( folder, base_name + ".compact.org" )
+  compact = read_file (compact_path)
+  folder_line = next ( line for line in compact . split ("\n")
+                       if "It subscribes to these." in line )
+  edit_compact ( folder, [ ( folder_line + "\n", folder_line +
+                             "\n*** Fred's ⟨node:fred-note-id⟩\n" ) ], base_name )
+  if "Server: saved," not in run_save (folder, "--yes") . stdout:
+    raise CaseFailure ( "the subscribing save failed" )
+  require_equal ( "what the node subscribes to",
+                  skg_list (context, "elsewhere-id", "subscribesTo"),
+                  [ "fred-note-id" ] )
+  detail = next ( line for line in read_file (compact_path) . split ("\n")
+                  if line . startswith ("**** A detail of Fred's ⟨") )
+  edit_compact ( folder, [ ( detail + "\n", "" ) ], base_name )
+  completed = run_save (folder, "--yes")
+  if "Fork:" in completed . stdout or "Server: saved," not in completed . stdout:
+    raise CaseFailure ( f"the hiding save printed {completed . stdout!r}" )
+  require_equal ( "what the node hides from its subscriptions",
+                  skg_list (context, "elsewhere-id", "hidesFromSubs"),
+                  [ "fred-detail-id" ] )
+
+def fred_files (context):
+  """{FILE NAME: TEXT} of the foreign skgrepo."""
+  return { name : read_file ( os . path . join ( context [ "fred_repo" ], name ))
+           for name in sorted ( os . listdir ( context [ "fred_repo" ] ))
+           if name . endswith (".skg") }
 
 # ============================================================
 # Reviewing: on a fixture whose owned skgrepo is a gitrepo, edits are

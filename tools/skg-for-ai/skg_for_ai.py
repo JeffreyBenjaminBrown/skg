@@ -30,7 +30,11 @@ a new empty view does, and writes its view as 'view' would.
 prints the changes it would make, and with '--yes' saves it and
 writes the server's re-rendered view over the three files. Words in a
 handle ask for edit requests: 'delete', 'ready', 'unready', 'all',
-'restoreNode', 'restoreRel'. A new headline whose title equals a
+'restoreNode', 'restoreRel'; and for view requests: 'editable',
+'fork'. A headline ending in '⟨node:ID⟩' places that existing node
+there, as the clients' paste does. A save that forks a node (an edited
+foreign node, or 'fork') is approved by '--yes', the clone going to
+'--fork-into REPO' or the one owned skgrepo. A new headline whose title equals a
 removed one's stops the save until its handle is restored or it is
 marked '⟨new⟩'; one whose title resembles a removed one's is a
 question, answered by '--keep-ids' or '--all-new' or on the headline.
@@ -294,7 +298,12 @@ def parse_command_line (argv):
     "--yes", action = "store_true",
     help = ( "save, unless the report finds an error or asks whether a new "
              "headline rewords a removed one; this also answers yes to the "
-             "question asked before unmarking several changes" ))
+             "question asked before unmarking several changes, and approves "
+             "the forks the report lists" ))
+  save_parser . add_argument (
+    "--fork-into", metavar = "REPO", default = None,
+    help = ( "the owned skgrepo of a fork's clone (default: the server's "
+             "one owned skgrepo, when it owns exactly one)" ))
   reworded_answers = save_parser . add_mutually_exclusive_group ()
   reworded_answers . add_argument (
     "--keep-ids", action = "store_true",
@@ -428,7 +437,11 @@ def command_save (arguments):
   one), print the server's answer and write its re-rendered view over
   the three files. The save carries the generation the view was
   rendered at, so the server refuses it if a node it would write
-  changed since. A refused save leaves the files as they were."""
+  changed since. A refused save leaves the files as they were.
+  A placed node ('⟨node:ID⟩') takes its title from the server. When
+  the save forks, the report says so; the server then answers with a
+  fork confirmation, which the save prints and approves, as the
+  clients' approval does, if it forks only what the report said."""
   saved_view = load_saved_view (arguments . view_files)
   require_port_of_sidecar (arguments . port, saved_view . sidecar)
   if NEW_NODE_HANDLE_WORD in saved_view . headline_of_handle:
@@ -438,20 +451,28 @@ def command_save (arguments):
       "of a new node; view a smaller part of the graph." )
   edited = parse_edited_compact_view (saved_view . compact_text)
   original = outline_of_full_view (saved_view . parsed_view)
-  errors = ( handle_error_lines (edited, saved_view . headline_of_handle)
-             or retyped_headline_error_lines (
-                  edited, original, saved_view . headline_of_handle ))
-  reworded_pairs = [] if errors else reworded_headline_pairs (edited, original)
-  if arguments . keep_ids:
-    give_new_headlines_their_removed_handles (edited, reworded_pairs)
-  questions = (
-    [] if arguments . keep_ids or arguments . all_new
-    else reworded_question_lines (
-           edited, reworded_pairs, saved_view . headline_of_handle ))
-  changes = [] if errors else change_report_lines (
-    edited, original, saved_view . headline_of_handle ) + questions
   connection = connection_for_saved_view (saved_view)
   try:
+    errors = ( handle_error_lines (edited, saved_view . headline_of_handle)
+               or resolve_placed_nodes (connection, edited)
+               or retyped_headline_error_lines (
+                    edited, original, saved_view . headline_of_handle ))
+    assign_placed_view_requests (edited, saved_view . headline_of_handle)
+    reworded_pairs = [] if errors else reworded_headline_pairs (edited, original)
+    if arguments . keep_ids:
+      give_new_headlines_their_removed_handles (edited, reworded_pairs)
+    questions = (
+      [] if arguments . keep_ids or arguments . all_new
+      else reworded_question_lines (
+             edited, reworded_pairs, saved_view . headline_of_handle ))
+    changes = [] if errors else change_report_lines (
+      edited, original, saved_view . headline_of_handle )
+    forks = PredictedForks () if errors else predicted_forks (
+      edited, original, saved_view . headline_of_handle,
+      fetch_repo_ownership (connection), arguments . fork_into,
+      bool (changes) )
+    errors = errors + forks . error_lines
+    changes = [] if errors else changes + forks . lines + questions
     print ( "Changes in " + os . path . basename (saved_view . compact_path) +
             ", against " + os . path . basename (saved_view . full_path) +
             " (view ID " + saved_view . sidecar [ "view_id" ] + "):" )
@@ -478,10 +499,16 @@ def command_save (arguments):
       return
     buffer_text = rebuilt_full_buffer (
       edited, saved_view . headline_of_handle, saved_view . full_text )
-    messages = connection . save_buffer (
-      saved_view . sidecar [ "view_id" ], buffer_text,
-      saved_view . sidecar [ "rendered_at" ],
-      saved_view . sidecar [ "request" ] . get ("buffer") )
+    def send_save (approved_fork_skgrepos = None):
+      return connection . save_buffer (
+        saved_view . sidecar [ "view_id" ], buffer_text,
+        saved_view . sidecar [ "rendered_at" ],
+        saved_view . sidecar [ "request" ] . get ("buffer"),
+        approved_fork_skgrepos )
+    messages = send_save ()
+    if response_type ( messages [-1] ) == "fork-confirmation":
+      messages = send_save ( approved_fork_skgrepos_of_confirmation (
+        messages [-1], forks ))
     rerendered = rerendered_view_of_save ( messages [-1], saved_view . sidecar )
     connection . log_view_event (
       "saved", saved_view . directory, saved_view . base_name )
@@ -1215,10 +1242,16 @@ def visible_text_of_line (view_line):
   return view_line . title if view_line . is_headline else view_line . text
 
 def fetch_link_statuses (connection, parsed_view):
+  """The statuses of the view's link targets: see
+  'fetch_link_statuses_of_ids'."""
+  return fetch_link_statuses_of_ids (
+    connection, link_target_ids_in_order (parsed_view) )
+
+def fetch_link_statuses_of_ids (connection, ids):
   """{ID: {'status': 'resolved'|'restricted'|'missing', 'pid', 'label',
-  'title'}}: the 'link statuses' request the clients' link annotations
-  send, then 'titles by ids' for the resolved targets' titles."""
-  ids = link_target_ids_in_order (parsed_view)
+  'title'}} for each of IDS: the 'link statuses' request the clients'
+  link annotations send, then 'titles by ids' for the resolved
+  targets' titles."""
   if not ids:
     return {}
   response = connection . request (
@@ -1943,6 +1976,16 @@ EDIT_REQUEST_TOKENS = [ "delete", "restoreNode", "restoreRel" ]
 READINESS_TOKENS = [ "ready", "unready" ]
 # With 'ready' or 'unready': name only the object 'all'.
 ALL_TOKEN = "all"
+# The handle tokens that ask for view requests, each with the request
+# the rebuild writes into the headline's '(viewRequests ...)':
+# 'editable' the clients' 'skg-set-editable' ('C-c s d'), 'fork' their
+# 'skg-fork-node' ('C-c m f').
+VIEW_REQUEST_TOKENS = [ ( "editable", "editableView" ), ( "fork", "fork" ) ]
+# A headline ending in '⟨node:ID⟩' places the existing node ID there,
+# as the clients' 'skg-paste-node' ('C-c o n') does.
+PLACED_NODE_HANDLE_WORD = "node"
+PLACED_NODE_HANDLE_PATTERN = re . compile (
+  r'^(.*?) ?⟨' + PLACED_NODE_HANDLE_WORD + r':([^\s⟨⟩]+)((?: [^⟨⟩]*)?)⟩\s*$' )
 # A link followed by the annotation 'annotate_links' appended to it.
 ANNOTATED_LINK_PATTERN = re . compile (
   r'(\[\[id:[^\]\[]+\](?:\[[^\]]*\])?\])⟦[→✗][^⟧]*⟧' )
@@ -1996,11 +2039,20 @@ class OutlineHeadline:
   the handle '⟨new⟩',
   'parent' the index of its parent in the same outline (None at the
   top level), 'tokens' the display tokens of its handle, 'body' its
-  body lines, link annotations stripped."""
+  body lines, link annotations stripped. A headline ending in
+  '⟨node:ID⟩' has no handle and 'placed_node_id' ID: it places that
+  existing node there. 'resolve_placed_nodes' then sets 'placed_pid'
+  and 'placed_title', what the server calls the node, and
+  'assign_placed_view_requests' 'placed_requests_editable', whether
+  its metadata asks for an editable view."""
   def __init__ (self, handle, level, title, tokens, compact_line_number,
-                marked_new = False):
+                marked_new = False, placed_node_id = None):
     self . handle = handle
     self . marked_new = marked_new
+    self . placed_node_id = placed_node_id
+    self . placed_pid = None
+    self . placed_title = None
+    self . placed_requests_editable = False
     self . level = level
     self . title = title
     self . tokens = tokens
@@ -2017,9 +2069,20 @@ class OutlineHeadline:
   def names_only_all (self):
     return ALL_TOKEN in self . tokens
 
+  def view_request_words (self):
+    return [ word for word, _ in VIEW_REQUEST_TOKENS if word in self . tokens ]
+
   def has_requests (self):
     return bool ( self . edit_request_words () or self . readiness_words ()
-                  or self . names_only_all () )
+                  or self . names_only_all () or self . view_request_words () )
+
+  def is_placed (self):
+    return self . placed_node_id is not None
+
+  def report_title (self):
+    """The title the report gives the headline: for a placed node, the
+    one the server has, once resolved."""
+    return self . placed_title if self . placed_title is not None else self . title
 
 def parse_edited_compact_view (compact_text):
   """The edited compact view's headlines, in order. The summary's
@@ -2043,6 +2106,12 @@ def parse_edited_compact_view (compact_text):
   return headlines
 
 def edited_headline (compact_line_number, level, text_after_stars):
+  placed = PLACED_NODE_HANDLE_PATTERN . match (text_after_stars)
+  if placed:
+    return OutlineHeadline (
+      None, level, strip_link_annotations ( placed . group (1) ),
+      placed . group (3) . split (), compact_line_number,
+      placed_node_id = placed . group (2) )
   match = COMPACT_HANDLE_PATTERN . match (text_after_stars)
   if not match:
     return OutlineHeadline (
@@ -2078,17 +2147,20 @@ def assign_parents (headlines):
 def handle_error_lines (edited, headline_of_handle):
   """A line per handle that names no headline of the full view, and
   per handle whose request tokens make no one '(editRequest ...)',
-  and per '⟨new⟩' carrying another word. HEADLINE_OF_HANDLE maps each
+  and per '⟨new⟩' or '⟨node:ID⟩' carrying another word, and per
+  placed node with a body or children. HEADLINE_OF_HANDLE maps each
   viewnode ID of the full view to its headline. Whether the server
   accepts a request is the server's to say."""
   errors = []
-  for headline in edited:
-    if headline . marked_new and headline . tokens:
+  for index, headline in enumerate (edited):
+    if ( headline . marked_new or headline . is_placed () ) and headline . tokens:
       errors . append (
-        f"Error: ⟨{NEW_NODE_HANDLE_WORD}⟩ on line "
+        "Error: " + compact_handle_text (headline) + " on line "
         f"{headline . compact_line_number} of the compact view carries "
         + ", " . join ( "'" + token + "'" for token in headline . tokens )
         + "; it takes no other word." )
+    if headline . is_placed ():
+      errors += placed_node_shape_error_lines (edited, index)
     if headline . handle is None:
       continue
     where = ( f"⟨{headline . handle}⟩ on line {headline . compact_line_number} "
@@ -2100,6 +2172,36 @@ def handle_error_lines (edited, headline_of_handle):
     elif headline . has_requests ():
       errors += [ f"Error: {where} {problem}"
                   for problem in request_token_problems (headline, view_line) ]
+  return errors
+
+def compact_handle_text (headline):
+  """The handle a headline without a viewnode ID was written with:
+  '⟨new⟩' or '⟨node:ID⟩'."""
+  if headline . is_placed ():
+    return "⟨" + PLACED_NODE_HANDLE_WORD + ":" + headline . placed_node_id + "⟩"
+  return "⟨" + NEW_NODE_HANDLE_WORD + "⟩"
+
+def placed_node_shape_error_lines (edited, index):
+  """Errors for the placed node at INDEX of the edited outline that has
+  body lines or children. The headline is saved write-protected, as the
+  clients' paste writes it, and a write-protected occurrence saves
+  nothing of its own: its body would not be written, and no child of
+  it claims membership, so a new child would be an orphan graphnode
+  and a moved one would leave its parent for nowhere. Both wait for
+  the save that places it, after which it is editable."""
+  headline = edited [index]
+  where = ( compact_handle_text (headline) + " on line " +
+            f"{headline . compact_line_number} of the compact view" )
+  errors = []
+  if any ( line . strip () for line in headline . body ):
+    errors . append (
+      f"Error: {where} has a body; a placed node is saved write-protected, "
+      "which saves no body. Save the placement first, then edit its body." )
+  if any ( other . parent == index for other in edited ):
+    errors . append (
+      f"Error: {where} has children; a placed node is saved write-protected, "
+      "under which nothing claims membership. Save the placement first, "
+      "then add them." )
   return errors
 
 def request_token_problems (headline, view_line):
@@ -2118,6 +2220,11 @@ def request_token_problems (headline, view_line):
     problems . append ( "carries both 'ready' and 'unready'." )
   if headline . names_only_all () and not headline . readiness_words ():
     problems . append ( "carries 'all' without 'ready' or 'unready'." )
+  if ( headline . view_request_words () and view_line . metadata is not None
+       and headline_kind (view_line . metadata) != "node" ):
+    problems . append (
+      f"carries {quoted ( headline . view_request_words () )}, but is not a "
+      "node occurrence; only a node takes a view request." )
   return problems
 
 def readiness_request_text (headline, view_line):
@@ -2170,11 +2277,18 @@ def rebuilt_full_buffer (edited, headline_of_handle, full_text):
 
 def rebuilt_headline_line (headline, headline_of_handle):
   stars = "*" * headline . level
+  if headline . is_placed ():
+    return stars + " " + placed_node_metadata_text (headline) + " " + (
+      headline . placed_title )
   metadata_text = (
     None if headline . handle is None
     else headline_of_handle [ headline . handle ] . metadata_text )
   if metadata_text is None:
     return stars + " " + headline . title
+  view_requests = view_requests_text (headline)
+  if view_requests:
+    metadata_text = metadata_text_with_part (
+      metadata_text, view_requests, ( "view", "diff" ))
   request = edit_request_text (
     headline, headline_of_handle [ headline . handle ] )
   if request:
@@ -2182,6 +2296,21 @@ def rebuilt_headline_line (headline, headline_of_handle):
       metadata_text, request, ( "viewRequests", "view", "diff" ))
   return ( stars + " " + metadata_text +
            ( " " + headline . title if headline . title else "" ))
+
+def placed_node_metadata_text (headline):
+  """The metadata the clients' 'skg-paste-node' writes
+  ('skg--insert-node-from-entry' in 'elisp/skg-id-search.el'): the ID,
+  'writeProtected', and an editable-view request unless the buffer
+  already holds an editable occurrence of the node."""
+  return ( "(skg node (gnid " + headline . placed_pid + ") writeProtected" +
+           ( " (viewRequests editableView)"
+             if headline . placed_requests_editable else "" ) + ")" )
+
+def view_requests_text (headline):
+  """The '(viewRequests ...)' HEADLINE's tokens ask for, or None."""
+  requests = [ request for word, request in VIEW_REQUEST_TOKENS
+               if word in headline . view_request_words () ]
+  return "(viewRequests " + " " . join (requests) + ")" if requests else None
 
 # ------------------------------------------------------------
 # The report of changes
@@ -2278,7 +2407,7 @@ def change_report_lines (edited, original, headline_of_handle):
                           else "the children of " + described (parent_key) )
         + "." )
   for index, headline in enumerate (edited):
-    if headline . handle is not None:
+    if headline . handle is not None or headline . is_placed ():
       continue
     body_lines = len (headline . body)
     lines . append (
@@ -2287,6 +2416,18 @@ def change_report_lines (edited, original, headline_of_handle):
       ", " + ( "at the top level" if edited_parent_key (index) is None
                else place ( edited_parent_key (index) )) +
       ( f" (with a {body_lines}-line body)" if body_lines else "" ) + "." )
+  for index, headline in enumerate (edited):
+    if not headline . is_placed ():
+      continue
+    lines . append (
+      "Placed: " + compact_handle_text (headline) + " '" +
+      headline . report_title () + "', " +
+      ( "at the top level" if edited_parent_key (index) is None
+        else place ( edited_parent_key (index) )) +
+      ( ", write-protected, since the view already holds an editable "
+        "occurrence of it"
+        if headline . placed_pid is not None
+        and not headline . placed_requests_editable else "" ) + "." )
   for index in repeated_indices:
     lines . append (
       "Repeated: " + described ( edited [index] . handle ) + ", again " +
@@ -2328,6 +2469,11 @@ def request_report_lines (handled_headlines, headline_of_handle, described):
     lines += [ label + ": " + described (headline . handle) + suffix + "."
                for headline in handled_headlines
                if word in headline . edit_request_words () ]
+  lines += [ "Editable: " + described (headline . handle) +
+             ", as '(viewRequests editableView)': the save makes it this "
+             "view's editable occurrence of its node."
+             for headline in handled_headlines
+             if "editable" in headline . view_request_words () ]
   for word, label in [ ( "ready", "Ready" ), ( "unready", "Unready" ) ]:
     lines += [ label + ": " + described (headline . handle) + ", as '" +
                readiness_request_text (
@@ -2351,6 +2497,239 @@ def descendant_indices (outline, index):
       break
     descendants . append (later)
   return descendants
+
+# ------------------------------------------------------------
+# Placing an existing node: a headline ending in '⟨node:ID⟩'
+# ------------------------------------------------------------
+
+def resolve_placed_nodes (connection, edited):
+  """Give each placed node of the edited outline the ID and the title
+  the server has for it, as the link annotations ask: 'link statuses',
+  then 'titles by ids'. The save needs the title: a write-protected
+  occurrence whose title differs from the graph's refuses the save.
+  Return an error line per placed node the graph lacks, the skgrepo
+  restriction hides, or whose title the server does not give."""
+  placed = [ headline for headline in edited if headline . is_placed () ]
+  if not placed:
+    return []
+  statuses = fetch_link_statuses_of_ids (
+    connection, list ( dict . fromkeys (
+      headline . placed_node_id for headline in placed )) )
+  errors = []
+  for headline in placed:
+    where = ( compact_handle_text (headline) + " on line " +
+              f"{headline . compact_line_number} of the compact view" )
+    entry = statuses . get ( headline . placed_node_id )
+    if entry is None or entry [ "status" ] == "missing":
+      errors . append ( f"Error: {where} names no node of the graph." )
+    elif entry [ "status" ] != "resolved":
+      errors . append (
+        f"Error: {where} names a node the skgrepo restriction hides." )
+    elif entry . get ("title") is None:
+      errors . append (
+        f"Error: {where} names a node whose title the server does not "
+        "give yet (its search index may lag a save by a moment); try again." )
+    else:
+      headline . placed_pid = entry [ "pid" ]
+      headline . placed_title = entry [ "title" ]
+  return errors
+
+def assign_placed_view_requests (edited, headline_of_handle):
+  """Each resolved placed node asks for an editable view unless the
+  rebuilt buffer already holds an editable occurrence of its node, or
+  one that asks to be made editable: a buffer holds at most one, as
+  'skg--buffer-has-editable-occurrence-p' in 'elisp/skg-id-search.el'
+  checks before a paste. Placed nodes are taken in order, so of two
+  placements of one node the first asks."""
+  for index, headline in enumerate (edited):
+    if headline . is_placed () and headline . placed_pid is not None:
+      headline . placed_requests_editable = not buffer_holds_editable_occurrence (
+        edited, headline_of_handle, headline . placed_pid, index )
+
+def buffer_holds_editable_occurrence (edited, headline_of_handle, pid,
+                                      except_index):
+  """Whether a headline of the edited outline but EXCEPT_INDEX is, or
+  asks to become, an editable occurrence of the node PID."""
+  for index, headline in enumerate (edited):
+    if index == except_index:
+      continue
+    if headline . is_placed ():
+      if headline . placed_pid == pid and headline . placed_requests_editable:
+        return True
+      continue
+    view_line = ( headline_of_handle . get ( headline . handle )
+                  if headline . handle is not None else None )
+    if ( view_line is None or view_line . metadata is None
+         or headline_kind ( view_line . metadata ) != "node"
+         or headline_gnid ( view_line . metadata ) != pid ):
+      continue
+    if ( not metadata_has_atom ( view_line . metadata, "writeProtected" )
+         or "editable" in headline . view_request_words () ):
+      return True
+  return False
+
+# ------------------------------------------------------------
+# Forking: an edit of a foreign node, or the word 'fork'
+# ------------------------------------------------------------
+
+class PredictedForks:
+  """What the report says a save forks: 'error_lines' that stop it,
+  'lines' a 'Fork:' line per fork, 'gnids' the ID of each node it
+  forks, and 'clone_skgrepo', the owned skgrepo a clone goes to when
+  the server leaves the choice to the client (None when no choice
+  can be made: no skgrepo is owned, or several are and
+  '--fork-into' names none)."""
+  def __init__ (self):
+    self . error_lines = []
+    self . lines = []
+    self . gnids = []
+    self . clone_skgrepo = None
+
+def predicted_forks (edited, original, headline_of_handle, ownership,
+                     fork_into, other_changes):
+  """The forks the edited compact view asks for, as the server detects
+  them ('apply_foreign_policy' in 'server/from_text/validate.rs'): an
+  editable occurrence of a foreign node whose title, body or content
+  differs from the full view's, and a node whose handle carries
+  'fork', as the clients' 'skg-fork-node' marks one. OWNERSHIP is
+  {SKGREPO: OWNED}; FORK_INTO the '--fork-into' skgrepo or None;
+  OTHER_CHANGES whether the report lists changes besides forks, which
+  a 'fork' refuses, as the clients refuse to fork from a buffer with
+  unsaved changes. An edit of a write-protected occurrence of a
+  foreign node is an error: the server refuses a changed title,
+  ignores a body, and claims nothing for a child there, so it forks
+  nothing; making it editable first ('editable', then a save) is the
+  gesture, as 'docs/forks.org' says. Only an occurrence in content
+  position (a root, or a node's child) forks: a member of a folder
+  does not, and a subscribee as such, whose removed children become
+  hides, takes no edit of its title or body."""
+  forks = PredictedForks ()
+  owned = [ name for name, is_owned in ownership . items () if is_owned ]
+  original_index_of_handle = { headline . handle : index
+                               for index, headline in enumerate (original) }
+  seen_handles = set ()
+  for index, headline in enumerate (edited):
+    if headline . handle is None or headline . handle in seen_handles:
+      continue
+    seen_handles . add ( headline . handle )
+    view_line = headline_of_handle . get ( headline . handle )
+    if ( view_line is None or view_line . metadata is None
+         or headline_kind ( view_line . metadata ) != "node" ):
+      continue
+    described = described_handle ( headline . handle, headline_of_handle )
+    gnid = headline_gnid ( view_line . metadata )
+    if "fork" in headline . view_request_words ():
+      if other_changes:
+        forks . error_lines . append (
+          f"Error: {described} carries 'fork', but the compact view has "
+          "other edits; save them first, as a client forks only from a "
+          "saved buffer, so that the clone is the node as it is saved." )
+      forks . lines . append (
+        f"Fork: {described}, by request: a new clone of it subscribes to "
+        "it and overrides it." )
+      forks . gnids . append (gnid)
+      continue
+    skgrepo = headline_node_repo ( view_line . metadata )
+    if ( ownership . get (skgrepo) is not False
+         or not in_content_position (edited, index, headline_of_handle) ):
+      continue
+    write_protected = metadata_has_atom ( view_line . metadata, "writeProtected" )
+    changed = changed_parts_of_node_occurrence (
+      edited, index, original, original_index_of_handle [ headline . handle ],
+      headline_of_handle, write_protected )
+    if not changed:
+      continue
+    if write_protected:
+      forks . error_lines . append (
+        f"Error: {described}, of the foreign skgrepo '{skgrepo}', is "
+        f"write-protected, and its {' and ' . join (changed)} changed. A "
+        "write-protected occurrence saves nothing of its own, so this would "
+        "fork nothing. To fork it, undo the edit, write 'editable' in its "
+        "handle and save; then edit it and save again." )
+      continue
+    forks . lines . append (
+      f"Fork: {described}, of the foreign skgrepo '{skgrepo}', whose "
+      f"{' and ' . join (changed)} changed: the edit goes to a new clone of "
+      "it, which subscribes to it and overrides it; the original stays as "
+      "it is." )
+    forks . gnids . append (gnid)
+  if not forks . lines:
+    return forks
+  if fork_into is not None:
+    if fork_into in owned:
+      forks . clone_skgrepo = fork_into
+    else:
+      forks . error_lines . append (
+        f"Error: '--fork-into {fork_into}' names no owned skgrepo of this "
+        "server; its owned ones are: " + ( ", " . join (owned) or "none" ) + "." )
+  elif len (owned) == 1:
+    forks . clone_skgrepo = owned [0]
+  else:
+    forks . error_lines . append (
+      "Error: this save forks, and the clone needs an owned skgrepo: " +
+      ( "this server owns none." if not owned else
+        "this server owns several (" + ", " . join (owned) +
+        "); name one with '--fork-into REPO'." ))
+  if forks . clone_skgrepo is not None:
+    forks . lines . append (
+      f"Fork into: '{forks . clone_skgrepo}'" +
+      ( ", as '--fork-into' says" if fork_into is not None
+        else ", the one skgrepo this server owns" ) +
+      ", unless the edit settles another. The server asks before forking; "
+      "'--yes' approves." )
+  return forks
+
+def in_content_position (edited, index, headline_of_handle):
+  """Whether the headline at INDEX of the edited outline stands where
+  content does: at the top level, or under a node occurrence (one
+  with a handle naming a node, a new headline, or a placed node)."""
+  parent = edited [index] . parent
+  if parent is None or edited [parent] . handle is None:
+    return True
+  view_line = headline_of_handle . get ( edited [parent] . handle )
+  return ( view_line is not None and view_line . metadata is not None
+           and headline_kind ( view_line . metadata ) == "node" )
+
+def changed_parts_of_node_occurrence (edited, edited_index, original,
+                                      original_index, headline_of_handle,
+                                      write_protected):
+  """Which of 'title', 'body' and 'children' of a node occurrence the
+  edit changed: its children as the save reads them, the node
+  occurrences under it that claim membership, in order. Under a
+  write-protected occurrence, where nothing claims, removing or
+  reordering children changes nothing, so only an added one counts."""
+  changed = []
+  if edited [edited_index] . title != original [original_index] . title:
+    changed . append ("title")
+  if edited [edited_index] . body != original [original_index] . body:
+    changed . append ("body")
+  edited_children = claiming_children_keys ( edited, edited_index, headline_of_handle )
+  original_children = claiming_children_keys ( original, original_index, headline_of_handle )
+  if ( set (edited_children) - set (original_children) if write_protected
+       else edited_children != original_children ):
+    changed . append ("children")
+  return changed
+
+def claiming_children_keys (outline, index, headline_of_handle):
+  """The children of OUTLINE's headline INDEX that are node
+  occurrences claiming membership in it, in order: each by its handle,
+  a placed node by ('node', ID), a new headline by ('new', INDEX)."""
+  keys = []
+  for child_index, child in enumerate (outline):
+    if child . parent != index:
+      continue
+    if child . is_placed ():
+      keys . append (( "node", child . placed_node_id ))
+      continue
+    if child . handle is None:
+      keys . append (( "new", child_index ))
+      continue
+    view_line = headline_of_handle . get ( child . handle )
+    if ( view_line is not None and view_line . metadata is not None
+         and headline_kind ( view_line . metadata ) == "node"
+         and not metadata_has_atom ( view_line . metadata, "noClaim" )):
+      keys . append ( child . handle )
+  return keys
 
 # ------------------------------------------------------------
 # Retyped headlines: a new headline whose title is, or resembles, a
@@ -2487,7 +2866,7 @@ def removed_titled_headlines (edited, original):
 def unmarked_new_titled_indices (edited):
   return [ index for index, headline in enumerate (edited)
            if headline . handle is None and not headline . marked_new
-           and headline . title ]
+           and not headline . is_placed () and headline . title ]
 
 def titles_probably_reworded (left_title, right_title):
   """Whether two different titles probably state the same thing
@@ -2549,6 +2928,99 @@ def crude_stem (word):
   return ( word [ : -1 ]
            if word . endswith ("e") and len (word) > MINIMUM_STEM_LENGTH
            else word )
+
+# ------------------------------------------------------------
+# The fork confirmation
+# ------------------------------------------------------------
+
+# What the server's fork confirmation shows as the skgrepo of a clone
+# whose skgrepo the edit did not settle, which the client must replace
+# ('FORK_SKGREPO_PLACEHOLDER' in 'server/from_text/fork.rs').
+FORK_SKGREPO_PLACEHOLDER = "PICK-A-REPO"
+# The comment the server writes above such a clone.
+SUGGESTED_FORK_SKGREPO_PATTERN = re . compile (
+  r'^# Suggested repo for the clone below: (.+)$' )
+
+class ForkConfirmationClone:
+  """A clone-to-be of the fork confirmation: its title, the skgrepo
+  shown for it (perhaps the placeholder), the server's suggestion
+  above it (or None), and 'originals', [(ID, SKGREPO, TITLE)], the
+  nodes it forks."""
+  def __init__ (self, title, skgrepo, suggested_skgrepo):
+    self . title = title
+    self . skgrepo = skgrepo
+    self . suggested_skgrepo = suggested_skgrepo
+    self . originals = []
+
+def fork_confirmation_clones (content):
+  """The clones-to-be of the fork confirmation's buffer CONTENT, read
+  as the clients read it ('skg--fork-repos-from-confirmation-buffer'
+  in 'elisp/skg-request-save.el'): each top-level headline with
+  metadata is a clone-to-be, and each headline with an ID under one
+  that names its skgrepo is an original it forks. The instructions
+  headline has no metadata."""
+  clones = []
+  clone = None
+  previous_text = ""
+  for view_line in parse_full_view (content):
+    if view_line . is_headline and len (view_line . stars) == 1:
+      clone = None
+      if view_line . metadata is not None:
+        suggestion = SUGGESTED_FORK_SKGREPO_PATTERN . match (previous_text)
+        clone = ForkConfirmationClone (
+          view_line . title, headline_node_repo (view_line . metadata),
+          suggestion . group (1) . strip () if suggestion else None )
+        clones . append (clone)
+    elif ( view_line . is_headline and len (view_line . stars) == 2
+           and clone is not None and clone . skgrepo is not None
+           and view_line . metadata is not None
+           and headline_gnid (view_line . metadata) is not None ):
+      clone . originals . append ((
+        headline_gnid (view_line . metadata),
+        headline_node_repo (view_line . metadata), view_line . title ))
+    previous_text = view_line . text
+  return clones
+
+def approved_fork_skgrepos_of_confirmation (confirmation, forks):
+  """Print the fork confirmation, as the clients' confirmation buffer
+  shows it: each clone-to-be, its skgrepo, and the original it forks.
+  Return [(ID, SKGREPO)], each original's ID with its clone's skgrepo,
+  which approves it: a placeholder is replaced by FORKS'
+  'clone_skgrepo', as a client's prompt replaces it. Raise, saving
+  nothing, when the server forks a node the report did not list
+  (FORKS' 'gnids'): '--yes' approved only what the report showed."""
+  clones = fork_confirmation_clones (
+    sexp_to_text ( response_field (confirmation, "content") or "" ))
+  originals = [ original for clone in clones for original in clone . originals ]
+  print ( f"Server: fork confirmation: the save forks {len (originals)} "
+          f"node{'' if len (originals) == 1 else 's'}, and writes nothing "
+          "until that is approved." )
+  approved = []
+  for clone in clones:
+    placeholder = clone . skgrepo == FORK_SKGREPO_PLACEHOLDER
+    skgrepo = forks . clone_skgrepo if placeholder else clone . skgrepo
+    print ( f"Clone-to-be: '{clone . title}', in " +
+            ( f"'{skgrepo}'" if skgrepo is not None else "no skgrepo yet" ) +
+            ( "" if placeholder else ", as the edit settles it" ) +
+            ( f" (the server suggests '{clone . suggested_skgrepo}')"
+              if clone . suggested_skgrepo else "" ) + "." )
+    for gnid, original_skgrepo, title in clone . originals:
+      print ( f"  It forks '{title}' ({gnid}), of the skgrepo "
+              f"'{original_skgrepo}'." )
+      approved . append (( gnid, skgrepo ))
+  unlisted = [ gnid for gnid, _, _ in originals if gnid not in forks . gnids ]
+  if unlisted or not approved:
+    raise SkgToolError (
+      "Nothing was saved: the server asks to fork " +
+      ( ", " . join (unlisted) if unlisted else "nothing it names" ) +
+      ", which the report did not list as a fork; '--yes' approves only "
+      "what the report showed. A client can review it." )
+  if any ( skgrepo is None for _, skgrepo in approved ):
+    raise SkgToolError (
+      "Nothing was saved: a clone needs an owned skgrepo; name one with "
+      "'--fork-into REPO'." )
+  print ( "Approved: the save is sent again with the forks approved." )
+  return approved
 
 # ------------------------------------------------------------
 # The server's answer
@@ -3380,22 +3852,33 @@ class SkgConnection:
         return messages
 
   def save_buffer (self, view_id, buffer_text, rendered_at,
-                   diffView_buffer = None):
+                   diffView_buffer = None, approved_fork_skgrepos = None):
     """Send a save of BUFFER_TEXT, rendered at the generation
     RENDERED_AT; return every response up to and including the
     terminal one, parsed. DIFFVIEW_BUFFER names the buffer of the diff
     view it is ('all changes', say), if it is one: the server holds no
     view of this connection's, and re-renders the save as that buffer,
-    with its readiness summary, only when the request names it."""
-    return [ parse_sexp (message) for message in self . raw_save (
-      request_line ( "save buffer", ( "view-id", view_id ),
-                     ( "rendered-at", rendered_at ),
-                     * ( [ ( "diff-view-buffer", diffView_buffer ) ]
-                         if diffView_buffer is not None else [] ),
-                     ( "point-lines-below-focused-headline", "0" ),
-                     ( "point-column", "0" ),
-                     ( "point-screen-lines-below-window-start", "0" )),
-      buffer_text ) ]
+    with its readiness summary, only when the request names it.
+    APPROVED_FORK_SKGREPOS, [(ID, SKGREPO)], approves the forks a
+    'fork-confirmation' listed, each original ID with its clone's
+    skgrepo, as the clients' approval re-saves the buffer:
+    '(approved-forks . "true") (fork-repos (("ID" . "SKGREPO") ...))'
+    ('skg--save-request-sexp' in 'elisp/skg-request-save.el')."""
+    line = request_line (
+      "save buffer", ( "view-id", view_id ), ( "rendered-at", rendered_at ),
+      * ( [ ( "diff-view-buffer", diffView_buffer ) ]
+          if diffView_buffer is not None else [] ),
+      ( "point-lines-below-focused-headline", "0" ),
+      ( "point-column", "0" ),
+      ( "point-screen-lines-below-window-start", "0" ),
+      * ( [ ( "approved-forks", "true" ) ]
+          if approved_fork_skgrepos is not None else [] ))
+    if approved_fork_skgrepos is not None:
+      line = line [ : -1 ] + " (fork-repos (" + " " . join (
+        "(" + quote_string (gnid) + " . " + quote_string (skgrepo) + ")"
+        for gnid, skgrepo in approved_fork_skgrepos ) + ")))"
+    return [ parse_sexp (message)
+             for message in self . raw_save (line, buffer_text) ]
 
   def stage_and_commit (self, message, confirmed):
     """Send "stage and commit" with MESSAGE, confirmed when CONFIRMED;

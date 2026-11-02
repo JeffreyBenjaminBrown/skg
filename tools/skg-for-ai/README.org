@@ -26,7 +26,11 @@ or a body by editing its text. Add a node by writing a new headline,
 with no handle, where it belongs. Move a node by moving its line,
 handle and all, and its subtree with it. Remove a headline to take
 the node out of its parent; write 'delete' in its handle,
-'⟨0d aC1 delete⟩', to delete the node itself.
+'⟨0d aC1 delete⟩', to delete the node itself. To put a node that
+already exists here too, write a headline ending in '⟨node:ID⟩', ID
+its ID; to fork a teammate's node, edit it where it is editable, and
+the save asks before it forks ("Placing an existing node" and
+"Forking").
 
 Then save with the report: 'save DIR/view_ID.view.json' prints, line
 by line, what the save would do, and changes nothing. Read it. If it
@@ -56,8 +60,10 @@ The rest of this file is reference. "Running it" lists every command
 and option; "The files it writes" explains the compact view, its
 handles and heralds, and its summary; "The daemon" says what the
 daemon does and what its log means; "Writing" covers saving in
-detail, the report, and "Retyped headlines"; "Reviewing and
-committing" covers the diff view, readiness and the commit. The
+detail, the report, "Retyped headlines", placing an existing node
+and forking; "Reviewing and committing" covers the diff view,
+readiness and the commit; "What the tool covers of COMMANDS.org"
+says, command by command, what the tool does of what Emacs does. The
 protocol is in 'docs/api-and-formats.org', and the diff view in
 'docs/diff-view.org'.
 
@@ -191,7 +197,8 @@ Options, after the command: '--port N' for every command ('save',
 a daemon's folder talks to the daemon's server unless it names one);
 '--yes' for
 'save' and 'commit'; '--keep-ids' or '--all-new' for 'save' (see
-"Retyped headlines"); for the view commands also '--out-dir DIR', '--name BASE' to name the files
+"Retyped headlines"); '--fork-into REPO' for 'save' (see "Forking");
+for the view commands also '--out-dir DIR', '--name BASE' to name the files
 'BASE.full.org' and so on instead of 'COMMAND_ARGUMENT', and
 '--no-summary' to leave the summary out of the compact view.
 Every command that writes a view fetches the server's herald rule
@@ -638,7 +645,29 @@ every handle names the headline it named, and each new headline has
 a new handle; then it removes a headline, saves, and checks the same
 again across that save and the next (see "Handles across saves").
 
-Then, on a third server over a fresh copy of the fixture whose owned
+Then, on a third server over a fresh copy of the fixture, it places
+and forks. It places an owned node and a foreign one under the first
+child with '⟨node:ID⟩' and titles of its own, and sees each in the
+re-rendered view editable, with its real title and content; places a
+node beside its editable occurrence, and a foreign node twice in one
+save, and sees each later one placed write-protected, as the report
+says; and refuses, before any save, a placement of an ID the graph
+lacks, one with a body, one with a child and one with another word.
+It refuses an edit of the write-protected occurrence of that foreign
+node, saying how to fork it, and makes it editable with 'editable',
+which writes nothing. It adds a child under the placed foreign node:
+without '--yes' the report shows the fork and nothing is sent, and a
+'--fork-into' naming a foreign skgrepo is refused; with '--yes' the
+server's confirmation is printed and approved, and the '.skg' files
+show a clone in the owned skgrepo that contains the new child and
+subscribes to and overrides the original, which is unchanged. Then
+'fork' on an owned node is refused beside another edit, and alone is
+approved, making a clone that subscribes to and overrides it. Last, a
+foreign node placed in the subscribee folder 'forest subscribesTo'
+draws is subscribed to, and its unintegrated child, removed, is
+hidden, neither save forking.
+
+Then, on a fourth server over a fresh copy of the fixture whose owned
 skgrepo is first made a gitrepo with one commit, it saves a retitle, a
 new child and a deletion, compares the diff view's compact buffer
 with the text expected, marks the new child 'ready' and sees it ready
@@ -652,7 +681,7 @@ and checks its output, that the child and the grandchild are now
 editable there, and that a save of the buffer retitles the grandchild
 again. Last, it checks that a blank commit message is refused.
 
-Then, on a fourth server over a fresh copy of the fixture whose owned
+Then, on a fifth server over a fresh copy of the fixture whose owned
 skgrepo is a gitrepo, it starts a daemon in a scratch folder and runs
 commands through it (with no '--port'). It runs every command with
 'XDG_RUNTIME_DIR' its own scratch folder, and without 'SKG_PORT', so
@@ -728,15 +757,19 @@ view's headline whose viewnode ID is ID; its level, title and
 position come from the edited compact view. The rest of the handle
 (the heralds, 'folded') is display only, and editing it changes
 nothing, except for the request words: 'delete' (see "A deleted
-node"), and 'ready', 'unready', 'all', 'restoreNode' and 'restoreRel'
-(see "Reviewing and committing"). No herald of a view the server
-rendered is one of these words, since a save consumes every request;
-so each such word in a handle was written there. The rebuild writes
-them into the headline's '(editRequest ...)', which holds one edit
-request ('delete', 'restoreNode' or 'restoreRel') and one readiness
-request after it. A headline without a handle, or with the handle
-'⟨new⟩', is written bare, and the save makes it a new node, with a
-new ID (see "Retyped headlines").
+node"), 'ready', 'unready', 'all', 'restoreNode' and 'restoreRel'
+(see "Reviewing and committing"), and 'editable' and 'fork' (see
+"Forking"). No herald of a view the server rendered is one of these
+words, since a save consumes every request; so each such word in a
+handle was written there. The rebuild writes the first six into the
+headline's '(editRequest ...)', which holds one edit request
+('delete', 'restoreNode' or 'restoreRel') and one readiness request
+after it, and the last two into its '(viewRequests ...)', as
+'editableView' and 'fork'. A headline without a handle, or with the
+handle '⟨new⟩', is written bare, and the save makes it a new node,
+with a new ID (see "Retyped headlines"). A headline ending in
+'⟨node:ID⟩' is written as the clients paste a node (see "Placing an
+existing node").
 
 Body lines are taken as edited, and belong to the headline above them.
 The link annotations the tool added ('⟦→ ... ⟧' or '⟦✗ ... ⟧' right
@@ -786,16 +819,21 @@ Not saved. Run again with '--yes' to save.
 #+end_example
 An 'Error:' line names a handle that names no headline of the full
 view, or whose request words make no one '(editRequest ...)' (two edit requests, both 'ready' and 'unready', 'all' alone),
-or a '⟨new⟩' carrying another word, or a new headline retyped with a
-removed one's title (see "Retyped headlines");
+or that carries 'editable' or 'fork' but is no node;
+or a '⟨new⟩' or '⟨node:ID⟩' carrying another word, a placed node the
+graph lacks, or one with a body or children (see "Placing an existing
+node"); or a new headline retyped with a removed one's title (see
+"Retyped headlines"); or an edit of a write-protected foreign node, a
+'fork' beside other edits, or a fork with no owned skgrepo to go to
+(see "Forking");
 any error stops the save, and the report then lists only the errors.
 The report does not guess what the server will refuse: the server's
 answer says that.
 
 The changes follow, in this order. 'Delete:', 'Restore node:',
-'Restore membership:', 'Ready:' and 'Unready:' are the requests the
-handles' words ask for, a readiness request with the form the save
-sends ('Ready: ⟨0j⟩ 'A new grandchild', as '(ready node rel)'.').
+'Restore membership:', 'Editable:', 'Ready:' and 'Unready:' are the
+requests the handles' words ask for, a readiness request with the form
+the save sends ('Ready: ⟨0j⟩ 'A new grandchild', as '(ready node rel)'.').
 When the 'unready' requests would unmark more than one change, a
 'Question:' line asks what a client asks before such a gesture, and
 '--yes' answers it. 'Removed:' is a handle the edit no longer has,
@@ -806,12 +844,16 @@ node itself stays in the graph. 'Moved:' is a handle under a
 different parent, or at a different depth below the same one.
 'Reordered:' is a parent whose kept children stand in another order.
 'New:' is a headline without a handle, and where it stands.
+'Placed:' is a headline ending in '⟨node:ID⟩', with the title the
+server gives the node, where it stands, and whether it is placed
+write-protected.
 'Repeated:' is a handle used twice, which shows the same node twice.
 'Title:' gives a changed title, old and new, and 'Bodies changed:'
-counts the changed bodies and names their handles. An edit with none
-of these prints 'No changes.' and saves nothing. Last, a 'Question:'
-line asks whether a new headline is a removed one reworded (see
-"Retyped headlines").
+counts the changed bodies and names their handles. 'Fork:' is a node
+the save forks, and 'Fork into:' the skgrepo its clone goes to (see
+"Forking"). An edit with none of these prints 'No changes.' and saves
+nothing. Last, a 'Question:' line asks whether a new headline is a
+removed one reworded (see "Retyped headlines").
 ** Retyped headlines
 A headline's handle is what ties it to its node. Retyping a headline
 instead of moving its line loses that tie: the typed headline becomes
@@ -873,6 +915,124 @@ needless question costs one flag, a missed one costs an ID. When a
 new headline resembles several removed ones it is paired with the
 closest, and the question names the others; each removed headline is
 paired with one new headline at most, closest pairs first.
+** Placing an existing node
+A headline that ends in '⟨node:ID⟩', ID a node's ID, puts that
+existing node there: under an editable parent it joins the parent's
+content, so the node gains a container and keeps the ones it had.
+This is the clients' 'skg-paste-node' ('C-c o n' in Emacs), which
+pastes the top of the linkstack; the tool has no linkstack, and the
+ID is written instead. Find an ID in the full view, where each
+headline's metadata carries its '(gnid ID)', or in a link.
+#+begin_example
+** inboxes ⟨0a C1 ⌂:first⟩
+*** anything ⟨node:883e7f64-c377-4894-a75b-64c52d1668c4⟩
+#+end_example
+The title may be anything: the tool asks the server for the node's
+title ('link statuses', then 'titles by ids', as the link annotations
+do), the report shows it, and the save sends it, since the server
+refuses a write-protected occurrence whose title differs from the
+graph's. The report reads
+#+begin_example
+Placed: ⟨node:883e7f64-c377-4894-a75b-64c52d1668c4⟩ 'to Ed', under ⟨0a⟩ 'inboxes'.
+#+end_example
+The headline is sent as the clients paste it: '(skg node (gnid ID)
+writeProtected (viewRequests editableView))', a write-protected
+occurrence asking to be made editable. The save fulfils the request,
+so the re-rendered view shows the node editable, with its real title,
+body and content, and a handle. When the view already holds an
+editable occurrence of the node, or a headline asking to become one
+(an earlier placement of it, say), the request is left out, since a
+view holds at most one editable occurrence of a node; the node is
+then placed write-protected, and the report says so: "Placed: ...,
+write-protected, since the view already holds an editable occurrence
+of it."
+
+Placed in an editable folder of a 'forest' view, a node joins that
+folder's relation instead: in the subscribee folder ('forest
+subscribesTo ID') the folder's node subscribes to it, and in the
+overridden folder ('forest overrides ID') overrides it. Under a
+subscribee as such, the subscribed node in that folder, stand its
+children the subscriber has not integrated; removing one there hides
+it from the subscription, as in the clients.
+
+A placed node takes no other word in its handle, no body and no
+children in the save that places it: it is saved write-protected,
+which saves no body, and under which no child claims membership. Edit
+it in the view the save writes, where it is editable. The report
+stops at a placed ID the graph lacks or the skgrepo restriction
+hides.
+** Forking
+A fork ('docs/forks.org') makes an editable clone, in a skgrepo you
+own, of a node: the clone subscribes to the original and overrides
+it, so it stands in the original's place in your views, while the
+original's later content reaches you as unintegrated content in the
+clone's subscribee folder. It is how a teammate's node becomes yours
+to edit, without changing theirs.
+*** Editing a foreign node forks it
+A node of a foreign skgrepo forks when you edit it: change its title
+or its body, or add, remove or reorder its children, at an editable
+occurrence of it. A foreign node in your own node's content is
+editable in a fresh view; one placed with '⟨node:ID⟩' is editable
+after the save that places it. A write-protected occurrence ('☮')
+saves nothing of its own, so editing one forks nothing: the report
+stops with an error, and says how to go on. Write 'editable' in its
+handle and save, which makes it the view's editable occurrence of the
+node, as the clients' 'C-c s d' does; then edit it and save again.
+Only an occurrence in content forks, a root of the view or a node's
+child: a member of a folder does not, and a subscribee as such, in a
+subscribee folder, takes no edit of its title or body, and a child
+removed from under it is hidden instead (see "Placing an existing
+node").
+
+The report says what forks, and where the clone goes:
+#+begin_example
+Bodies changed: 1 (⟨0b⟩).
+Fork: ⟨0b⟩ 'to Ed', of the foreign skgrepo 'public', whose body changed: the edit goes to a new clone of it, which subscribes to it and overrides it; the original stays as it is.
+Fork into: 'first', the one skgrepo this server owns, unless the edit settles another. The server asks before forking; '--yes' approves.
+Not saved. Run again with '--yes' to save.
+#+end_example
+The clone needs an owned skgrepo. '--fork-into REPO' names it; without
+it, the clone goes to the server's one owned skgrepo, from the 'repos'
+request, and when the server owns several the report stops and asks
+for '--fork-into'.
+*** The fork confirmation
+A save that forks writes nothing at first: the server answers with a
+fork confirmation, which lists each clone-to-be (the edited title,
+its skgrepo, or 'PICK-A-REPO' with a suggestion when the edit did not
+settle one) over the original it forks. Without '--yes' the tool sends
+nothing, so nothing is forked: that is the decline, as a client's
+decline sends nothing either. With '--yes' the tool prints the
+confirmation, as the clients show it in their confirmation buffer,
+#+begin_example
+Server: fork confirmation: the save forks 1 node, and writes nothing until that is approved.
+Clone-to-be: 'to Ed', in 'first' (the server suggests 'first').
+  It forks 'to Ed' (883e7f64-c377-4894-a75b-64c52d1668c4), of the skgrepo 'public'.
+Approved: the save is sent again with the forks approved.
+#+end_example
+then approves it, as a client's approval does: it sends the same save
+again, on the same connection, with '(approved-forks . "true")' and
+'(fork-repos (("ID" . "REPO") ...))', each original's ID with its
+clone's skgrepo, the placeholder replaced by the '--fork-into' or
+default skgrepo. The answer to that save is the ordinary one, and its
+re-rendered view, written over the files, shows the clone in the
+original's place, marked 'Oĥ'. '--yes' approves only the forks the
+report listed: if the server lists another, nothing is saved, and the
+tool says which.
+
+The clone copies the original's title, body and content list (the
+IDs, not the subtree) with the edit applied, subscribes to it and
+overrides it; a child the edit removed becomes one the clone hides
+from its subscription. The original is not written. A node may have
+one clone you own; forking it again is refused, naming the clone.
+*** Forking a node you own
+'fork' in the handle of a node you own forks it, as the clients'
+'skg-fork-node' ('C-c m f') does: '⟨0d aC1 fork⟩'. Its clone
+subscribes to it and overrides it, and the original keeps its own
+content; a chain of overrides deepens this way. As the clients refuse
+to fork from a buffer with unsaved changes, so that the clone is the
+node as saved, a 'fork' beside any other edit of the compact view is
+an error: save the other edits first. The confirmation and its
+approval are those of an implicit fork.
 ** Handles across saves
 The server keeps a view per connection, and without a daemon the
 tool's connection ends with each command, so a save names a view the
@@ -898,8 +1058,9 @@ After the save the tool prints 'Server: saved' or 'Server: nothing was
 saved', with the counts of errors and warnings, then each error and
 warning as the server wrote it. When the server refuses, the three
 files stay as they were, so the edit can be fixed and saved again.
-When the server answers with a question instead (to fork an edited
-foreign node, to delete records the skgrepo restriction hides, to
+When the server answers with a fork confirmation, the tool prints it
+and approves it, as "Forking" says. When it answers with another
+question instead (to delete records the skgrepo restriction hides, to
 review stranded relationships, to hoist telescope text), the tool
 prints the question and stops: it answers none of them, and nothing is
 saved. A client can answer them. One question comes after the save:
@@ -1022,3 +1183,79 @@ with the readiness summary, on a connection that never opened it; the
 save keeps every handle the buffer carries (see "Handles across
 saves"). Through a daemon the connection holds the buffer already, and
 naming it changes nothing.
+
+* What the tool covers of COMMANDS.org
+Each command of 'docs/COMMANDS.org', or family of commands, and what
+the tool does of it: how it does it; "Emacs-only by nature" for what
+concerns only the editor (point, windows, folding, keys, buffers),
+which needs nothing; or "gap", what the tool cannot do yet. Commands
+reached only through 'raw' say so: 'raw' sends a request and prints
+its answers, and suffices where the request has no confirmation
+round and its answer reads as it is.
+| Emacs                      | command                                          | in the tool                                                                                                                                                   |
+|----------------------------+--------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| C-x C-s                    | skg-save                                         | 'save SIDECAR', with the report, then '--yes'                                                                                                                 |
+|                            | its fork confirmation                            | 'save --yes' approves the forks the report lists; '--fork-into REPO' (see "Forking")                                                                          |
+|                            | its Hoist or Abort                               | gap: printed, never answered; nothing is saved                                                                                                                |
+|                            | its overPrivateText rerender approval            | gap: printed; the save happened, the files go stale                                                                                                           |
+|                            | other views' unsaved edits                       | gap: the save declares no other view; a stale view is refused at its own save                                                                                 |
+|                            | files changed on disk                            | the daemon rewrites its views and logs it; a lone command prints the counts on stderr                                                                         |
+|                            | where a save's warnings go                       | printed after the save, 'Server warning: ...'                                                                                                                 |
+| C-a                        | skg-beginning-of-line                            | Emacs-only by nature                                                                                                                                          |
+| M-x                        | skg-show-unsaved-changes                         | needs nothing: a refused save leaves the edited compact file as it is                                                                                         |
+| C-c <backspace>            | skg-delete                                       | 'delete' in the handle                                                                                                                                        |
+|                            | its delete-from question                         | gap: printed, never answered; asked only under the config's 'default_repo_set'                                                                                |
+| C-u C-c <backspace>        | skg-delete-recursive                             | gap: 'delete' must be written on each headline                                                                                                                |
+| C-c d a                    | skg-delete-references-to-absent-node             | gap: its confirmation round is not carried                                                                                                                    |
+| C-c f RET                  | skg-search                                       | 'search TERMS'                                                                                                                                                |
+| C-c f i                    | skg-search-interactive                           | gap: no regex, body or Tantivy-syntax option                                                                                                                  |
+| C-c f l                    | skg-search-make-link                             | 'search', then type '[[id:ID][label]]', the ID from the full view                                                                                             |
+| C-c g RET, C-c g i, M-x    | skg-goto, skg-goto-by-id, ...-from-id            | 'view ID'                                                                                                                                                     |
+| C-c G RET, C-c G i         | the same, closing this buffer                    | Emacs-only by nature; a daemon's view is released with 'close SIDECAR'                                                                                        |
+| C-c g b                    | skg-goto-biggest-branch                          | Emacs-only by nature                                                                                                                                          |
+| C-c g m, M; C-c G m, M     | skg-goto-in-magit, ...-parent                    | Emacs-only by nature (magit); git reads the node's file directly                                                                                              |
+| C-c g v                    | skg-goto-viewnode-id                             | needs nothing: the handle is the viewnode ID; 'grep' finds it                                                                                                 |
+| C-c t r                    | skg-investigate-unknown-node                     | 'raw' only: "investigate unknown node"                                                                                                                        |
+| C-c l a, o, h, s, p, c, m  | skg-show-folderOf-*                              | 'forest KIND ID'; 'contains ID', 'links-here ID'; in its editable folders '⟨node:ID⟩' subscribes or overrides, and a removal under a subscribee as such hides |
+| C-c s d                    | skg-set-editable                                 | 'editable' in the handle                                                                                                                                      |
+| C-c s w, C-c s W           | skg-request-write-protected(-recursive)          | gap                                                                                                                                                           |
+| C-c s t                    | skg-detach                                       | removing the headline takes it out of its parent; gap: no word keeps it in the view                                                                           |
+| C-c s a                    | skg-attach                                       | gap: a '⊥' headline cannot be put in its parent's list                                                                                                        |
+| C-c s s, C-c s S           | skg-set-repo(-recursive)                         | gap: a node cannot move to another skgrepo; nor is the strandeds question carried                                                                             |
+| C-c s x                    | skg-set-flag-search-matching                     | gap                                                                                                                                                           |
+| C-c s m                    | skg-set-merge-request                            | gap                                                                                                                                                           |
+| C-c s n                    | skg-restore-deleted-node                         | 'restoreNode' in the handle                                                                                                                                   |
+| C-c s l                    | skg-restore-removed-membership                   | 'restoreRel' in the handle                                                                                                                                    |
+| C-c s r, C-c s R           | skg-set-relRepo(-recursive)                      | gap                                                                                                                                                           |
+| C-c r r                    | skg-cycle-commit-ready                           | 'ready', 'unready', 'all' in the handle; gap: no subtree form (C-u)                                                                                           |
+| C-c r h                    | skg-toggle-homeSkgrepo-move-commitReady          | 'ready' or 'unready' on the move's headline; gap: no form for every like move (C-u)                                                                           |
+| C-c r u                    | skg-diffView-integrate-unshown-changes           | 'integrate SIDECAR'                                                                                                                                           |
+| C-c r c                    | skg-stage-and-commit                             | 'commit MESSAGE'                                                                                                                                              |
+| C-c r n, p (c, u, r)       | skg-diffView-goto-next/previous-*                | Emacs-only by nature; the change facts are in the handles                                                                                                     |
+| C-c m c                    | skg-replace-link-with-content                    | remove the leaf, write '⟨node:ID⟩' in its place                                                                                                               |
+| C-c m f                    | skg-fork-node                                    | 'fork' in the handle (see "Forking")                                                                                                                          |
+| C-c m l                    | skg-replace-content-with-link                    | remove the branch, type a headline titled '[[id:ID][title]]'                                                                                                  |
+| C-c v b                    | skg-org-body-toggle                              | Emacs-only by nature                                                                                                                                          |
+| C-c v m                    | skg-view-metadata                                | Emacs-only by nature: the full view shows the metadata; its requests are handle words                                                                         |
+| C-c v o                    | skg-view-ancestry                                | Emacs-only by nature: the compact view's nesting                                                                                                              |
+| C-c v d                    | skg-diffView-open                                | 'diff'                                                                                                                                                        |
+| C-c v e                    | skg-view-new-empty                               | 'new TITLE REPO'                                                                                                                                              |
+| C-c v h                    | skg-view-heralds-mode                            | needs nothing: the compact view shows heralds, the full view metadata                                                                                         |
+| C-c v L                    | skg-toggle-repo-overlay-on-links                 | needs nothing: every link annotation carries '⌂:LABEL'                                                                                                        |
+| C-c v l                    | skg-restrict-repo-set                            | gap: a connection keeps the config's 'default_repo_set'; nor its overPrivateText questions                                                                    |
+| M-x                        | skg-list-repo-sets, skg-show-skgrepo-restriction | 'raw' only: "skgrepo-sets"                                                                                                                                    |
+| C-c v r, C-c v R           | skg-readable-ids-mode, -refresh                  | Emacs-only by nature                                                                                                                                          |
+| C-c u, C-c v s             | skg-id-push, skg-view-linkstack                  | gap: no linkstack; IDs are read from the full view                                                                                                            |
+| C-c o i, O i; C-c o l, O l | skg-paste-id, skg-pop-id, -link                  | gap: no linkstack; an ID or a link is typed                                                                                                                   |
+| C-c o n, C-c O n           | skg-paste-node, skg-pop-node                     | '⟨node:ID⟩' (see "Placing an existing node"); gap: no stack to pop                                                                                            |
+| C-c v w                    | skg-view-without-metadata                        | needs nothing: the compact view, but for its handles                                                                                                          |
+| C-c i n, C-c i p           | skg-id-next, skg-id-prev                         | Emacs-only by nature                                                                                                                                          |
+| (keys outside views)       | the global, magit and minibuffer keys            | Emacs-only by nature                                                                                                                                          |
+| M-x                        | skg-import-md-and-org                            | 'import INPUT_DIR REPO'; gap: a host root for absolute links is never given                                                                                   |
+| (Cargo)                    | import-org-roam                                  | needs nothing: a Cargo subcommand, no client's                                                                                                                |
+| M-x                        | skg-export-some-to-org                           | 'raw' only: "export to org"                                                                                                                                   |
+| M-x                        | skg-connection-verify                            | 'raw' only: "verify connection"                                                                                                                               |
+| M-x                        | skg-connection-end                               | Emacs-only by nature; 'daemon --stop' ends the daemon's                                                                                                       |
+| M-x                        | skg-rebuild-session-lifetime-stores              | 'raw' only; it closes every view, so a running daemon must be restarted                                                                                       |
+| M-x                        | skg-strip-trailing-whitespace-from-bodies        | 'raw' only: "strip body whitespace"                                                                                                                           |
+| M-x                        | skg-close-all-skg-buffers, skg-reload            | Emacs-only by nature                                                                                                                                          |
