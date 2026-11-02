@@ -10,13 +10,13 @@ restriction. 'reload' and 'extend' replaced the two senses of
 into Ed's 'inboxes'. Suites at the end: Rust 1108, Emacs 441, Neovim
 478, tool PASS.
 
-* (chosen, switchable) : '--yes' alone cancels the delete-from question
+* DONE (chosen, switchable) : '--yes' alone cancels the delete-from question
 Emacs asks "delete from the visible containers, or all?"; the tool's
 '--yes' takes the answer that writes nothing more, so a deletion that
 raises the question is cancelled unless '--delete-from visible|all' is
 given. Switch: let '--yes' mean "visible", the client's first choice.
 ** DONE jeff: When does that happen? i.e. under what condiitions?
-*** TODO Jeff : Ed's answer
+*** DONE Jeff : Ed's answer
 Only under a skgrepo restriction, and only when you delete a node that
 is also named by relationships recorded in repos the restriction keeps
 out (say, one of your private sections contains it). The server then
@@ -30,11 +30,11 @@ which is why I let '--yes' pick the cautious answer.
 **** DONE jeff : explain this de novo
 You keep saying things like "the command" as if I know what's in your head.
 Who's experience are you even talking about, yours or mine?
-***** TODO Jeff : Ed, from the top
+***** DONE Jeff : Ed, from the top
 Whose experience: mine, writing through 'tools/skg-for-ai'. Nothing
 here changes Emacs.
 
-What you do in Emacs. You put the cursor on a headline and press C-c
+What you do in Emacs: You put the cursor on a headline and press C-c
 <backspace> ('skg-delete'); the node is marked for deletion; you save.
 Usually it is just deleted. In one situation the server stops and asks
 you a question instead: you are working under a skgrepo restriction
@@ -59,12 +59,12 @@ while deleting from hidden private records I never saw could cost you
 data. The alternative is "visible", the first answer Emacs offers.
 Since my servers run with no restriction, I expect never to meet the
 question in practice; the choice is about safety when I do.
-* (chosen, switchable) : 'relRepo:NAME subtree' infers the kind from its headline
+* DONE (chosen, switchable) : 'relRepo:NAME subtree' infers the kind from its headline
 Emacs offers a menu (node, subscribee folder, overridden folder); the
 tool reads the kind from the headline the word is written on. Switch:
 an explicit kind word.
 ** DONE jeff : When, where does emacs offer that menu?
-*** TODO Jeff : Ed's answer
+*** DONE Jeff : Ed's answer
 In 'skg-set-relRepo-recursive' (C-c s R, or C-u C-c s r), before it
 asks for the repo: an org-menu of the five node-node relations, whose
 level-2 headlines are the roles a view-child can play toward its
@@ -79,7 +79,7 @@ cannot express is "content AND subscribee at once" in one word; that
 would be two saves, or a kind word. I expect one kind at a time to be
 the common case.
 **** DONE jeff : explain this one de novo, too, please
-***** TODO Jeff : Ed, from the top
+***** DONE Jeff : Ed, from the top
 Whose experience: again mine, in the tool, mirroring your Emacs
 commands.
 
@@ -116,12 +116,13 @@ E.g. 'repo:NAME' on a write-protected occurrence. The tool refuses
 before saving where Emacs saves and warns, because a compact view is
 edited blind and a refused save costs less than a surprise. Switch:
 downgrade any of them to a report line.
-* FIX PLANNED : approving a withheld re-render after a save that created a node
+* DONE approving a withheld re-render after a save that created a node
 When a restricted save's re-rendered view is withheld (overPrivateText),
 the only approval is to send the same save again; if the save created a
 node, the re-send is refused as stale, so the files stay old. The
 clients have the same problem. The tool says so. In 'TODO/problems.org';
-an agent is making the approval a separate request carrying no buffer.
+fixed: the approval is the new 'rerender views' request, carrying no
+buffer (commit above). Both clients and the tool use it.
 * Pointers
 The default relRepo for a relationship a foreign node records: TODO for
 Jeff in '5_discussion.org'.
