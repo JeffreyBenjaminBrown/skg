@@ -231,7 +231,7 @@ and see it where you put it.
 
 Buffer validation already refuses writes in someone else's data.
 So the only way this could happen is with hand-written .skg files.
-If the server finds a node with a foreign section, 
+If the server finds a node with a foreign section,
 I think it should report the problem,
 and only show the weird data to its creator, with a stark label.
 
@@ -242,7 +242,7 @@ and you would see this:
   * <my note>
   ** ILLEGAL EDIT TO FOREIGN NODE <your note>
 ```
-That "ILLEGAL EDIT" herald would be something new, 
+That "ILLEGAL EDIT" herald would be something new,
 rendered in what I've been calling the system font (black text on white background),
 although I think the true name is something else.
 *** TODO Jeff : Ed: taken, with one refinement
@@ -254,7 +254,7 @@ are one owner's telescope and fold in the manifest's order; unchained
 ones are the illegal case you describe, shown only to the creator under
 the 'ILLEGAL EDIT TO FOREIGN NODE' herald (the 'message' style, which is
 the black-on-white one), ignored and warned about everywhere else.
-* TODO Jeff : a foreign recorder's default relRepo
+* Jeff : a foreign recorder's default relRepo
 'SkgConfig::default_relRepo' gives, for a relationship a foreign node
 records to an owned one, the owned member's home: a foreign skgrepo
 has no rung, so 'more_private_of' returns the owned side. But such a
@@ -275,3 +275,58 @@ Two ways out:
   checking, though for a foreign recorder they write nothing.
 - Leave the rule, and keep the herald's special case.
 I recommend the first. Say which you want.
+** TODO [jeff] I need before and after pictures.
+Please draw them like you would see in your compact view,
+and put comments in the bodies of nodes where they would help.
+*** TODO Jeff : Ed's pictures
+All three are the view of Ed's 'inboxes' as seen on YOUR server, where
+'ed/first' is foreign and 'public' is owned. Comments in bodies are
+mine, marked "Ed:"; they are not in the graph.
+
+**** Before (what you saw on 2026-11-02, after my fork)
+#+begin_example
+* inboxes ⟨0a ☮ C1 ⌂:ed⟩
+Each child is a fork of a teammate's 'to Ed' node...
+Ed: write-protected (☮), since 'ed' is foreign to you; home 'ed'.
+** to Ed ⟨0b 1S1 1O1 ~ed ⌂:public⟩
+Ed: your node, owned, home 'public'. '1S1 1O1': my clone subscribes
+Ed: to it and overrides it, which is correct. '~ed' says "this
+Ed: relationship is recorded somewhere more private than its default",
+Ed: because the default was computed as 'public' (the owned member's
+Ed: home) and the record is in 'ed'. But 'ed' has no rank on your
+Ed: server, so "more private" meant nothing; and the record could only
+Ed: ever be in 'ed', the recorder's own file.
+*** Hi Ed! ⟨0c⟩
+#+end_example
+
+**** Now (after the herald fix of 2026-11-02, commit 3b3878b9)
+#+begin_example
+* inboxes ⟨0a ☮ C1 ⌂:ed⟩
+** to Ed ⟨0b 1S1 1O1 ⌂:public⟩
+Ed: the '~ed' is gone: the herald skips any relationship a foreign
+Ed: node records. Nothing else changed.
+*** Hi Ed! ⟨0c⟩
+#+end_example
+What is still wrong is not in the picture: 'C-c s r' on 'to Ed' here
+('relRepo info', the request behind it) answers
+: relRepo: ed.  default: public.
+which calls a relationship that can only live in 'ed' "stored away from
+its default". A reader would try to repair it, and the save would
+refuse, since you cannot write into 'ed'.
+
+**** After the rule change I recommend
+No change to the view: identical to "Now". 'C-c s r' answers
+: relRepo: ed.  default: ed.
+because the default relRepo of a relationship whose recorder is foreign
+is the recorder's own repo, the only place it can be. The herald then
+needs no special case: it compares record against default and finds
+them equal. On MY server the same view reads
+#+begin_example
+* inboxes ⟨0a C1 ⌂:first⟩
+** to Ed ⟨0b ☮ 1S1 1O1 ⌂:public⟩
+#+end_example
+before and after alike: there 'first' is owned and ranked, 'public' is
+foreign, and the default for a relationship from my node to your node
+is my node's home, 'first', which is where it is recorded. The rule
+change only affects how a foreign recorder's relationships are described
+on servers that do not own it.
