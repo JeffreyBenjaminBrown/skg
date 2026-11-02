@@ -89,7 +89,7 @@ Returns (REQUESTED-BUFFERS OPENED-BUFFER-NAMES)."
          ("order-only changes" . ,test-skg-diff-view--empty))))
     (should (equal shown
                    (concat "1 of 3 changed files are ready, 2 changes are "
-                           "not editable in this view; C-c r u integrates them")))))
+                           "not editable in this view; C-c r u extends the diff view to them")))))
 
 (ert-deftest test-skg-diff-view-a-buffer-names-itself-on-save ()
   "A buffer of the diff view keeps its buffer's name and sends it on

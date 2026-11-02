@@ -1,6 +1,7 @@
 // A buffer of the diff view is rendered from its sets recomputed after
-// the save wherever a save renders something new, but only the "integrate
-// unshown changes" request makes occurrences editable or appends roots
+// the save wherever a save renders something new, but only extending it
+// (the "extend diff view" request, or the rerender after a reload) makes
+// occurrences editable or appends roots
 // ('docs/diff-view.org', "A save makes nothing editable and appends no
 // root"). The 'fresh' fixture (one skgrepo, main): r
 // contains a, whose body changed, and w, unchanged; w contains w1
@@ -12,9 +13,10 @@
 use skg::metadata_canon::without_viewnode_ids;
 use crate::git_fixture::{graph_straddle, save_cleanly};
 use crate::pruned_change_view::common::{
-  all_changes_view, integrate_unshown_changes, node_lines,
+  all_changes_view, extend_diff_view, node_lines,
   open_all_changes_buffer, requesting_editable_at, rerendered_view_content,
-  retitle_in_a_content_view, send_integrate_unshown_changes_request,
+  retitle_in_a_content_view, send_extend_diff_view_request,
+  rerender_all_views_for_the_all_changes_buffer, write_and_reload_as_another_writer,
   send_stage_and_commit_request, with_fixture};
 
 use skg::graph_straddle::types::GraphStraddle;
@@ -90,7 +92,7 @@ fn a_write_protected_leaf_that_changes_becomes_editable_by_the_command (
               "w must stay a write-protected member without its content:\n{}", saved );
     assert! ( node_lines (saved, "w1") . is_empty (), "{}", saved );
     assert_eq! ( response . readiness_summary . unwrap () . changes_not_editable_here, 1 );
-    let (shown, not_editable) : (String, usize) = integrate_unshown_changes (f) ?;
+    let (shown, not_editable) : (String, usize) = extend_diff_view (f) ?;
     assert! ( shown_editable (&shown, "w"), "w must be editable:\n{}", shown );
     assert! ( without_viewnode_ids (&shown) . contains ("*** (skg (oldText title) (diff (leaves 1))) w"),
               "w's old title must be shown:\n{}", shown );
@@ -117,7 +119,7 @@ fn a_change_two_levels_under_a_write_protected_leaf_is_shown_by_the_command (
     assert! ( node_lines (&response . saved_view, "w1a") . is_empty (),
               "{}", response . saved_view );
     assert_eq! ( response . readiness_summary . unwrap () . changes_not_editable_here, 1 );
-    let (shown, not_editable) : (String, usize) = integrate_unshown_changes (f) ?;
+    let (shown, not_editable) : (String, usize) = extend_diff_view (f) ?;
     for node in [ "w", "w1", "w1a" ] {
       assert! ( shown_editable (&shown, node),
                 "{} must be editable:\n{}", node, shown ); }
@@ -142,7 +144,7 @@ fn a_change_under_a_new_origin_is_appended_as_a_root_by_the_command (
     assert_eq! ( root_ids (&response . saved_view), vec! [ "q", "r" ],
                  "{}", response . saved_view );
     assert_eq! ( response . readiness_summary . unwrap () . changes_not_editable_here, 1 );
-    let (shown, not_editable) : (String, usize) = integrate_unshown_changes (f) ?;
+    let (shown, not_editable) : (String, usize) = extend_diff_view (f) ?;
     assert_eq! ( root_ids (&shown), vec! [ "q", "r", "s" ], "{}", shown );
     let s_subtree : Vec<&str> = subtree_starting (&shown, "* (skg bodyFolded node (gnid s) ");
     assert! ( s_subtree . iter () . any ( |line|
@@ -153,7 +155,7 @@ fn a_change_under_a_new_origin_is_appended_as_a_root_by_the_command (
     assert_eq! ( not_editable, 0 );
     let again : SaveResponse = save_cleanly (f, &all_changes_view (), &shown) ?;
     assert_eq! ( again . saved_view, shown, "a further save adds nothing" );
-    assert_eq! ( integrate_unshown_changes (f) ? . 0, shown,
+    assert_eq! ( extend_diff_view (f) ? . 0, shown,
                  "a further command adds nothing" );
     Ok (( )) }) }
 
@@ -170,7 +172,7 @@ fn the_command_makes_a_member_editable_then_appends_an_origin_not_shown (
     let buffer : String = retitle_in_a_content_view (f, "w1a", "w1a retitled", &buffer) ?;
     save_cleanly (f, &all_changes_view (), &buffer) ?;
     let response : String =
-      send_integrate_unshown_changes_request (f, DiffViewBufferKind::AllChanges) ?;
+      send_extend_diff_view_request (f, DiffViewBufferKind::AllChanges) ?;
     let shown : String = rerendered_view_content (&response);
     assert! ( shown_editable (&shown, "w") && shown_editable (&shown, "w1a"),
               "the command drew w's content:\n{}", shown );
@@ -178,10 +180,53 @@ fn the_command_makes_a_member_editable_then_appends_an_origin_not_shown (
     let buffer : String = retitle_in_a_content_view (f, "s1", "s1 retitled", &shown) ?;
     save_cleanly (f, &all_changes_view (), &buffer) ?;
     let response : String =
-      send_integrate_unshown_changes_request (f, DiffViewBufferKind::AllChanges) ?;
+      send_extend_diff_view_request (f, DiffViewBufferKind::AllChanges) ?;
     let shown : String = rerendered_view_content (&response);
     assert_eq! ( root_ids (&shown), vec! [ "q", "r", "s" ],
                  "the command appended s:\n{}", shown );
+    Ok (( )) }) }
+
+/// Another writer retitles s1 on disk; s1 is under s, an origin the
+/// buffer does not show. The reload names the clean buffer, and the
+/// "rerender all views" its client then sends extends it, as the
+/// command would: s is appended, with s1's change. A further rerender
+/// changes nothing.
+#[test]
+fn the_rerender_after_a_reload_extends_the_buffer_to_a_change_it_did_not_show (
+) -> Result<(), Box<dyn Error>> {
+  with_fixture ("fresh", &["main"], |f| {
+    let buffer : String = open_all_changes_buffer (f) ?;
+    assert_eq! ( root_ids (&buffer), vec! [ "q", "r" ], "{}", buffer );
+    let delivered : String = write_and_reload_as_another_writer (
+      f, "main", "s1", "pid: s1\ntitle: s1 retitled on disk\n" ) ?;
+    assert! ( delivered . contains ("(response-type repo-files-reloaded)")
+              && delivered . contains ("(reloaded ((main 1)))")
+              && delivered . contains ( &all_changes_view () . repr_in_client () ),
+              "the reload names the buffer:\n{}", delivered );
+    let shown : String = rerender_all_views_for_the_all_changes_buffer (f) ?;
+    assert_eq! ( root_ids (&shown), vec! [ "q", "r", "s" ],
+                 "the rerender appended s:\n{}", shown );
+    assert! ( shown . lines () . any ( |line|
+                line . ends_with (" s1 retitled on disk")
+                && ! line . contains ("writeProtected") ),
+              "s1's change must be shown editable:\n{}", shown );
+    assert_eq! ( rerender_all_views_for_the_all_changes_buffer (f) ?,
+                 shown, "a further rerender changes nothing" );
+    Ok (( )) }) }
+
+/// s1 is retitled by a save of a content view, not on disk: no reload
+/// names the buffer, so "rerender all views" only refreshes it, and s
+/// is not appended until the command.
+#[test]
+fn a_rerender_with_no_reload_does_not_extend_the_buffer (
+) -> Result<(), Box<dyn Error>> {
+  with_fixture ("fresh", &["main"], |f| {
+    let buffer : String = open_all_changes_buffer (f) ?;
+    retitle_in_a_content_view (f, "s1", "s1 retitled", &buffer) ?;
+    let shown : String = rerender_all_views_for_the_all_changes_buffer (f) ?;
+    assert_eq! ( root_ids (&shown), vec! [ "q", "r" ], "{}", shown );
+    let (extended, _) : (String, usize) = extend_diff_view (f) ?;
+    assert_eq! ( root_ids (&extended), vec! [ "q", "r", "s" ], "{}", extended );
     Ok (( )) }) }
 
 /// The new cycle of p and q gains a member: q now contains z, which
@@ -215,7 +260,7 @@ fn a_changed_cycle_membership_appends_no_second_root (
                 without_viewnode_ids (line) . starts_with ("** (skg node (gnid ") && line . ends_with (") z") ),
               "z must be shown under q:\n{}", saved );
     assert_eq! ( root_ids (&saved), vec! [ "q", "r" ], "{}", saved );
-    let (shown, _) : (String, usize) = integrate_unshown_changes (f) ?;
+    let (shown, _) : (String, usize) = extend_diff_view (f) ?;
     assert_eq! ( root_ids (&shown), vec! [ "q", "r" ], "{}", shown );
     Ok (( )) }) }
 
@@ -240,7 +285,7 @@ fn a_node_the_user_write_protected_stays_so_until_the_command (
                 "a must stay write-protected:\n{}", response . saved_view );
       assert! ( response . readiness_summary . as_ref () . unwrap ()
                 . changes_not_editable_here > 0 ); }
-    let (shown, not_editable) : (String, usize) = integrate_unshown_changes (f) ?;
+    let (shown, not_editable) : (String, usize) = extend_diff_view (f) ?;
     assert! ( shown_editable (&shown, "a")
               && without_viewnode_ids (&shown) . contains ("*** (skg (oldText body) (diff (leaves 1)))"),
               "a must be editable, its change shown:\n{}", shown );
@@ -253,7 +298,7 @@ fn the_command_on_a_buffer_with_every_change_editable_changes_nothing (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("fresh", &["main"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
-    let (shown, not_editable) : (String, usize) = integrate_unshown_changes (f) ?;
+    let (shown, not_editable) : (String, usize) = extend_diff_view (f) ?;
     assert_eq! ( shown, buffer );
     assert_eq! ( not_editable, 0 );
     Ok (( )) }) }
@@ -475,7 +520,7 @@ fn a_change_shown_only_in_a_container_folder_is_appended_as_a_root_by_the_comman
     assert! ( ! shown_editable (&response . saved_view, "c1"),
               "{}", response . saved_view );
     assert_eq! ( response . readiness_summary . unwrap () . changes_not_editable_here, 1 );
-    let (shown, not_editable) : (String, usize) = integrate_unshown_changes (f) ?;
+    let (shown, not_editable) : (String, usize) = extend_diff_view (f) ?;
     let c1_in_the_folder : &str = subtree_starting (&shown, "*** (skg node (gnid c1) ") [0];
     assert! ( c1_in_the_folder . contains ("writeProtected"),
               "c1 stays write-protected in the container folder:\n{}", shown );
@@ -503,7 +548,7 @@ fn a_root_the_command_appended_stays_once_outside_u (
     let buffer : String = open_all_changes_buffer (f) ?;
     let buffer : String = retitle_in_a_content_view (f, "c1", "c1 retitled", &buffer) ?;
     save_cleanly (f, &all_changes_view (), &buffer) ?;
-    let (shown, _) : (String, usize) = integrate_unshown_changes (f) ?;
+    let (shown, _) : (String, usize) = extend_diff_view (f) ?;
     let root_line : &str = subtree_starting (&shown, "* (skg node (gnid c1) ") [0];
     let reverted : String = // at the root; the folder's member follows the graph
       shown . replacen ( root_line, &root_line . replacen ("c1 retitled", "c1", 1), 1 );
@@ -576,7 +621,7 @@ fn the_command_makes_a_member_under_a_ghost_editable (
     let protected : String =
       save_cleanly (f, &all_changes_view (), &requested) ? . saved_view;
     assert! ( ! shown_editable (&protected, "m"), "{}", protected );
-    let (shown, not_editable) : (String, usize) = integrate_unshown_changes (f) ?;
+    let (shown, not_editable) : (String, usize) = extend_diff_view (f) ?;
     assert_eq! ( not_editable, 0, "{}", shown );
     assert! ( without_viewnode_ids (&shown) . contains (m_line), "{}", shown );
     let response : SaveResponse = save_cleanly (f, &all_changes_view (), &shown) ?;
@@ -602,7 +647,7 @@ fn the_command_makes_a_removed_member_under_a_live_vognode_editable (
     let protected : String =
       save_cleanly (f, &all_changes_view (), &requested) ? . saved_view;
     assert! ( ! shown_editable (&protected, "x"), "{}", protected );
-    let (shown, not_editable) : (String, usize) = integrate_unshown_changes (f) ?;
+    let (shown, not_editable) : (String, usize) = extend_diff_view (f) ?;
     assert_eq! ( not_editable, 0, "{}", shown );
     assert! ( without_viewnode_ids (&shown) . contains (x_under_b), "{}", shown );
     assert_eq! ( node_lines (&shown, "x") . iter ()

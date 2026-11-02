@@ -45,14 +45,14 @@ In order, it:
   checks the diff view's compact buffer exactly, marks the new child
   ready, restores the deleted node, and commits (refused unconfirmed,
   then confirmed with '--yes'), checking 'git log' and that the diff
-  view is then empty; then integrates a change a diff buffer does not
+  view is then empty; then extends a diff buffer to a change it does not
   make editable, and saves an edit of it; a blank commit message is
   refused unsent;
 - on a fifth scratch server, also over a gitrepo, runs a daemon:
   commands through it write what they write on their own connections;
   it rewrites a held view after a save through it changes a node the
   view shows, and after a second server over the same data root saves
-  one (the first server's watcher integrates the file), logging each,
+  one (the first server's watcher reloads the file), logging each,
   but keeps a view with unsaved edits; it logs the warning of a file
   the watcher cannot read; a command for its port writing into another
   folder runs through it, and that view is rewritten after a save; a
@@ -1283,7 +1283,7 @@ def failures_of_reviewing (scratch, data_root):
   for case in [ check_edits_to_review, check_diff_shows_the_changes,
                 check_marking_ready, check_unconfirmed_commit,
                 check_restoring_a_deleted_node, check_confirmed_commit,
-                check_integrating_unshown_changes,
+                check_extending_the_diff_view,
                 check_blank_commit_message ]:
     try:
       case (context)
@@ -1406,29 +1406,29 @@ def check_confirmed_commit (context):
                 os . path . join ( context [ "scratch" ], "review", "after" ) ]),
     EMPTY_DIFF_VIEW )
 
-def check_integrating_unshown_changes (context):
+def check_extending_the_diff_view (context):
   """A buffer of the diff view shows a retitled root and, write-protected
   beneath it, a child whose own child another view then retitles. The
-  buffer, as it stands, does not make that change editable; 'integrate'
+  buffer, as it stands, does not make that change editable; 'extend'
   makes the child editable, which draws the retitled grandchild,
   editable too, and a save of the buffer then retitles it again."""
-  root_view = fresh_root_view (context, "integrate-root")
+  root_view = fresh_root_view (context, "extend-root")
   edit_compact ( root_view, [ ( "* The fixture root ⟨0a ",
                                 "* The fixture root, retitled ⟨0a " ) ])
   require_save_succeeds (root_view)
-  folder = run_diff (context, "integrate")
+  folder = run_diff (context, "extend")
   require_in_diff_compact (folder, "*** First child, renamed ⟨0d ☮B aC2⟩\n")
   require_equal ( "the write-protection of the first child's headline",
                   "writeProtected" in diff_full_line (folder, 7), True )
-  grandchild_view = fresh_root_view (context, "integrate-grandchild")
+  grandchild_view = fresh_root_view (context, "extend-grandchild")
   edit_compact ( grandchild_view, [ ( "*** A new grandchild ⟨",
                                       "*** A grandchild, retitled ⟨" ) ])
   require_save_succeeds (grandchild_view)
   require_output (
-    run_tool ([ "integrate", sidecar_of_diff (folder) ]),
-    "Before integrating: 0 of 2 changed files are ready, 1 changes are "
+    run_tool ([ "extend", sidecar_of_diff (folder) ]),
+    "Before extending: 0 of 2 changed files are ready, 1 changes are "
     "not editable in this buffer.\n"
-    "Integrated: 0 of 2 changed files are ready.\n" +
+    "Extended: 0 of 2 changed files are ready.\n" +
     diff_written_paths (folder) )
   require_in_diff_compact (
     folder, "*** First child, renamed ⟨0d aC2⟩\n"
@@ -1543,13 +1543,13 @@ EXPECTED_DIFF_COMPACT = (
 # ============================================================
 
 DAEMON_READY_TIMEOUT_SECONDS = 30
-# How long a case waits for the watcher to integrate a change on disk
+# How long a case waits for the watcher to reload a change on disk
 # and the daemon to log it.
 DAEMON_LOG_TIMEOUT_SECONDS = 20
 SECOND_SERVER_PORT = PORT + 1
 # What a daemon prints once its socket answers.
 DAEMON_READY_LINE = "The daemon listens on"
-INTEGRATED_ONE_MAIN_FILE = "changed on disk: repo main: 1 file integrated"
+RELOADED_ONE_MAIN_FILE = "changed on disk: reloaded 1 file from repo main"
 
 def failures_of_daemon (scratch, data_root):
   context = { "scratch"       : scratch,
@@ -1562,7 +1562,7 @@ def failures_of_daemon (scratch, data_root):
                   check_daemon_rewrites_a_collateral_rerender,
                   check_daemon_rewrites_after_a_change_on_disk,
                   check_daemon_keeps_unsaved_edits,
-                  check_daemon_logs_an_integration_warning,
+                  check_daemon_logs_a_reload_warning,
                   check_daemon_takes_a_command_for_its_port,
                   check_second_daemon_on_the_port_refused,
                   check_daemon_commits_and_rewrites_a_diffView_buffer,
@@ -1642,7 +1642,7 @@ def check_daemon_rewrites_a_collateral_rerender (context):
 
 def check_daemon_rewrites_after_a_change_on_disk (context):
   """A save on the second server writes a file the daemon's server did
-  not write; its watcher integrates it and tells the daemon's
+  not write; its watcher reloads it and tells the daemon's
   connection, naming the views that show the node; the daemon asks
   for their rerender, rewrites their files and logs why."""
   start_second_server (context)
@@ -1650,11 +1650,11 @@ def check_daemon_rewrites_after_a_change_on_disk (context):
     context, "view_root-id",
     ( "** Second child, a subscriber ⟨0f ",
       "** Second child, renamed on the second server ⟨0f " ))
-  require_log_line ( context, INTEGRATED_ONE_MAIN_FILE )
+  require_log_line ( context, RELOADED_ONE_MAIN_FILE )
   require_log_line (
     context,
-    "re-rendered view_root-id because files changed on disk (repo main: 1 "
-    "file integrated); 'Second child, renamed "
+    "re-rendered view_root-id because files changed on disk (reloaded 1 "
+    "file from repo main); 'Second child, renamed "
     "on the second server' changed: title, was 'Second child, a subscriber'" )
   require_log_line ( context, "re-rendered links-here_child-b-id because files changed on disk" )
   require_in_file ( context [ "daemon_folder" ], "view_root-id",
@@ -1679,7 +1679,7 @@ def check_daemon_keeps_unsaved_edits (context):
   require_log_line ( context, "re-rendered view_child-a-id because files changed on disk" )
   require_in_file ( folder, "view_root-id", "** First child, my unsaved edit ⟨0d " )
 
-def check_daemon_logs_an_integration_warning (context):
+def check_daemon_logs_a_reload_warning (context):
   """A file the watcher cannot read is a warning in the log."""
   bad_path = os . path . join ( context [ "main_repo" ], "bad-id.skg" )
   with open (bad_path, "w", encoding = "utf-8") as bad_file:

@@ -29,7 +29,7 @@
 ;;; by the headlines under it, or are not shown there.
 ;;;
 ;;; It also formats the readiness summary, which the save, stage-and-
-;;; commit and integrate-unshown-changes show.
+;;; commit and extend-diff-view show.
 ;;;
 ;;; DATA USED/ASSUMED: See docs/api-and-formats.org.
 
@@ -368,7 +368,7 @@ from SUMMARY, the save response's
                  ready changed)
        (format "%d of %d changed files are ready" ready changed))
      (if (> not-editable 0)
-         (format ", %d changes are not editable in this view; C-c r u integrates them"
+         (format ", %d changes are not editable in this view; C-c r u extends the diff view to them"
                  not-editable)
        "")
      (if (> foreign 0)

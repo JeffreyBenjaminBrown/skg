@@ -28,7 +28,7 @@ pub enum RequestType {
   DeleteReferencesToAbsentNode,
   DiffView,
   StageAndCommit,
-  IntegrateUnshownChanges,
+  ExtendDiffView,
   InvestigateUnknownNode,
   ServerWarnings,
   Repos,
@@ -63,7 +63,7 @@ impl RequestType {
       "delete references to absent node" => Ok (RequestType::DeleteReferencesToAbsentNode),
       "diff view"                => Ok (RequestType::DiffView),
       "stage and commit"         => Ok (RequestType::StageAndCommit),
-      "integrate unshown changes"     => Ok (RequestType::IntegrateUnshownChanges),
+      "extend diff view"         => Ok (RequestType::ExtendDiffView),
       "investigate unknown node" => Ok (RequestType::InvestigateUnknownNode),
       "server warnings"          => Ok (RequestType::ServerWarnings),
       "repos"                    => Ok (RequestType::Repos),
@@ -113,12 +113,12 @@ pub enum TcpToClient {
   DeleteReferencesResult,
   DiffView, // One buffer of the diff view, or '(empty . t)' when that buffer would show nothing.
   StageAndCommit, // The per-skgrepo git-commits, or the readiness summary with '(needs-confirmation . t)'. A rerender stream follows.
-  IntegrateUnshownChanges, // The readiness summary of the buffer of the diff view rerendered with every change editable, or a refusal. A rerender stream follows.
+  ExtendDiffView, // The readiness summary of the buffer of the diff view rerendered with every change editable, or a refusal. A rerender stream follows.
   InvestigateUnknownNode, // What git history says an unknown node used to be, or the node an ID resolves to, as Org text.
   Repos, // The configured skgrepos in privacy order, and the connection's skgrepo restriction.
   ServerWarnings, // What the server warned about as it started, '(warnings ("..." ...))'. Each client asks once per connection.
   RuntimeGeneration, // The current runtime generation, '(content "N")'. A client dates a new empty view by it.
-  RepoFilesIntegrated, // Unprompted, between requests: what the repo watcher integrated, '(warnings ("..." ...)) (view-ids (ID ...))', the views naming the connection's open views that show a changed node.
+  RepoFilesReloaded, // Unprompted, between requests: what the repo watcher reloaded, '(reloaded ((SKGREPO N) ...)) (warnings ("..." ...)) (view-ids (ID ...))', the views naming the connection's open views that show a changed node.
   Error,
 }
 
@@ -166,10 +166,10 @@ impl TcpToClient {
       TcpToClient::DeleteReferencesResult => "delete-references-result",
       TcpToClient::DiffView         => "diff-view",
       TcpToClient::StageAndCommit   => "stage-and-commit",
-      TcpToClient::IntegrateUnshownChanges => "integrate-unshown-changes",
+      TcpToClient::ExtendDiffView => "extend-diff-view",
       TcpToClient::InvestigateUnknownNode => "investigate-unknown-node",
       TcpToClient::ServerWarnings   => "server-warnings",
       TcpToClient::Repos            => "repos",
       TcpToClient::RuntimeGeneration => "runtime-generation",
-      TcpToClient::RepoFilesIntegrated => "repo-files-integrated",
+      TcpToClient::RepoFilesReloaded => "repo-files-reloaded",
       TcpToClient::Error            => "error", }} }

@@ -26,7 +26,7 @@ per-request token or a queue.")
 
 (defvar skg-unprompted-response-handler-map nil
   "Alist from response-type symbols to handlers for the messages the
-server sends unprompted, between responses (\='repo-files-integrated\=').
+server sends unprompted, between responses (\='repo-files-reloaded\=').
 Consulted when `skg-response-handler-map' has no handler for a type.
 Each handler is called as (funcall HANDLER tcp-proc payload). Set as
 each file defining one loads; a lost connection does not clear it.")

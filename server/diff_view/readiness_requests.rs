@@ -22,8 +22,8 @@
 //! headline may name, from the same rule
 //! ('set_ready_facts_in_viewforest').
 //!
-//! A save of a buffer of the diff view, and the "integrate unshown
-//! changes" request, answer with the readiness summary of the buffer
+//! A save of a buffer of the diff view, and the "extend diff view"
+//! request, answer with the readiness summary of the buffer
 //! they rerendered ('buffer_readiness_summary_for').
 
 use crate::types::tree::forest::stands_in_containerward_chain;

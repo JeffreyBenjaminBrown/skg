@@ -489,7 +489,9 @@ pub struct ViewnodeStats {
   /// the suppression is deliberate (see 'docs/telescopes.org',
   /// "What leaks, and what repair fixes") -- the herald marks
   /// exactly the deliberately privatized relationships. Also None: without a
-  /// graph handle; for a node that is not genuinely a member here
+  /// graph handle; for a relationship recorded in a foreign skgrepo,
+  /// which has no privacy rank, and which only that skgrepo's own node
+  /// records; for a node that is not genuinely a member here
   /// (one claiming nothing); and for the two
   /// compound partner folders (HiddenInSubscribee /
   /// HiddenOutsideOfSubscribee), which have no single

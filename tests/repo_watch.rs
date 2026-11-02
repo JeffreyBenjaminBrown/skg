@@ -1,18 +1,18 @@
 // cargo nextest run --test grouped_saves -E 'test(repo_watch::)'
 //
-// The repo watcher (server/repo_watch/) integrates '.skg' files that
+// The repo watcher (server/repo_watch/) reloads '.skg' files that
 // change on disk while the server runs: into the graph as a new
-// runtime generation, to each connection as one "repo-files-integrated"
+// runtime generation, to each connection as one "repo-files-reloaded"
 // message naming the views to rerender. The server's own writes are
-// not integrated again. Each test runs its own watcher over its own
+// not reloaded again. Each test runs its own watcher over its own
 // copy of the fixture, with a short quiet interval.
 
-use skg::repo_watch::integrate::RepoChangeNotice;
+use skg::repo_watch::reload::RepoChangeNotice;
 use skg::repo_watch::own_writes::own_write_awaits_its_event;
 use skg::repo_watch::watcher::{RepoWatcherHandle, start_repo_watcher};
 use skg::serve::ViewsState;
-use skg::serve::handlers::repo_files_integrated::{
-  deliver_repo_change_notices, files_integrated_per_skgrepo, warnings_of_notice};
+use skg::serve::handlers::repo_files_reloaded::{
+  deliver_repo_change_notices, files_reloaded_per_skgrepo, warnings_of_notice};
 use skg::serve::handlers::rerender_all_views::handle_rerender_all_views_request;
 use skg::serve::handlers::save_buffer::handle_save_buffer_request;
 use skg::serve::handlers::single_root_view::handle_single_root_view_request;
@@ -181,7 +181,7 @@ fn delivered_messages (
   drop (stream);
   read_all_lp_messages (&mut BufReader::new (read_end)) }
 
-/// The client's answer to a "repo-files-integrated" message: a
+/// The client's answer to a "repo-files-reloaded" message: a
 /// rerender of every open view it does not exclude. The rerendered
 /// views' texts.
 fn rerender_views (
@@ -208,7 +208,7 @@ fn title_in_graph (
     . map ( |node| node . title . clone () ) }
 
 #[test]
-fn files_written_into_a_foreign_and_an_owned_repo_are_integrated
+fn files_written_into_a_foreign_and_an_owned_repo_are_reloaded
   () -> Result<(), Box<dyn Error>> {
   let f : Fixture = fixture () ?;
   let mut connection : ViewsState = new_connection ();
@@ -220,11 +220,11 @@ fn files_written_into_a_foreign_and_an_owned_repo_are_integrated
   write_skg_file_as_another_writer (&f, "mine", "n", "pid: n\ntitle: n from another writer\n");
   write_skg_file_as_another_writer (&f, "mine", "b", "pid: b\ntitle: b rewritten on disk\n");
   let notice : Arc<RepoChangeNotice> = next_notice (&mut receiver);
-  assert_eq! ( notice . files_integrated,
+  assert_eq! ( notice . files_reloaded,
                vec! [ (SkgrepoName::from ("theirs"), 1),
                       (SkgrepoName::from ("mine"), 2) ] );
   assert! ( notice . problems . is_empty (), "{:?}", notice . problems );
-  assert! ( notice . foreign_files_integrated );
+  assert! ( notice . foreign_files_reloaded );
   assert_eq! ( notice . generation, Some (generation_before + 1) );
   assert_eq! ( f . env . runtime_snapshot () . generation, generation_before + 1 );
   assert_eq! ( title_in_graph (&f, "b") . as_deref (), Some ("b rewritten on disk") );
@@ -251,9 +251,9 @@ fn a_connection_is_told_and_its_open_view_rerenders
   let messages : Vec<String> =
     delivered_messages (&f, &mut receiver_of_connection, &mut connection);
   assert_eq! ( messages . len (), 1, "{:?}", messages );
-  assert! ( messages [0] . starts_with ("((response-type repo-files-integrated)"),
+  assert! ( messages [0] . starts_with ("((response-type repo-files-reloaded)"),
             "{}", messages [0] );
-  assert! ( messages [0] . contains ("(integrated ((mine 1)))"), "{}", messages [0] );
+  assert! ( messages [0] . contains ("(reloaded ((mine 1)))"), "{}", messages [0] );
   assert! ( messages [0] . contains ("(warnings ())"), "{}", messages [0] );
   assert! ( messages [0] . contains ("(view-ids (a-view))"), "{}", messages [0] );
   { // Nothing is told twice.
@@ -268,7 +268,7 @@ fn a_connection_is_told_and_its_open_view_rerenders
   Ok (()) }
 
 #[test]
-fn a_burst_of_files_is_integrated_once
+fn a_burst_of_files_is_reloaded_once
   () -> Result<(), Box<dyn Error>> {
   let f : Fixture = fixture () ?;
   let mut receiver : Receiver<Arc<RepoChangeNotice>> = f . env . runtime . subscribe_to_repo_change_notices ();
@@ -277,7 +277,7 @@ fn a_burst_of_files_is_integrated_once
       &f, "mine", &format! ("burst{}", index),
       &format! ("pid: burst{}\ntitle: burst {}\n", index, index) ); }
   let notice : Arc<RepoChangeNotice> = next_notice (&mut receiver);
-  assert_eq! ( notice . files_integrated,
+  assert_eq! ( notice . files_reloaded,
                vec! [ (SkgrepoName::from ("mine"), 25) ] );
   assert_no_notice_comes (&mut receiver);
   assert_eq! ( title_in_graph (&f, "burst24") . as_deref (), Some ("burst 24") );
@@ -292,33 +292,33 @@ fn a_bad_file_warns_and_the_old_generation_serves
   write_skg_file_as_another_writer (&f, "mine", "b", "pid: b\ntitle: [never closed\n");
   let notice : Arc<RepoChangeNotice> = next_notice (&mut receiver);
   assert_eq! ( notice . generation, None );
-  assert! ( notice . files_integrated . is_empty () );
+  assert! ( notice . files_reloaded . is_empty () );
   assert_eq! ( notice . problems . len (), 1, "{:?}", notice . problems );
   assert! ( notice . problems [0] . message . contains ("Node b changed on disk but could not be read"),
             "{}", notice . problems [0] . message );
   assert_eq! ( f . env . runtime_snapshot () . generation, generation_before );
   assert_eq! ( title_in_graph (&f, "b") . as_deref (), Some ("b as first written") );
-  { // Each connection is told, as a warning, and of no file integrated.
+  { // Each connection is told, as a warning, and of no file reloaded.
     let restriction : SkgrepoRestriction = SkgrepoRestriction::unrestricted (&f . config);
     let warnings : Vec<String> = warnings_of_notice (&notice, &restriction);
     assert_eq! ( warnings . len (), 1, "{:?}", warnings );
-    assert! ( files_integrated_per_skgrepo (
+    assert! ( files_reloaded_per_skgrepo (
                 & [ notice . clone () ], &restriction ) . is_empty () ); }
-  { // Fixed, it is integrated.
+  { // Fixed, it is reloaded.
     write_skg_file_as_another_writer (&f, "mine", "b", "pid: b\ntitle: b fixed\n");
     let fixed : Arc<RepoChangeNotice> = next_notice (&mut receiver);
-    assert_eq! ( fixed . files_integrated, vec! [ (SkgrepoName::from ("mine"), 1) ] );
+    assert_eq! ( fixed . files_reloaded, vec! [ (SkgrepoName::from ("mine"), 1) ] );
     { // The count is no warning; two notices' counts add up per skgrepo.
       let restriction : SkgrepoRestriction = SkgrepoRestriction::unrestricted (&f . config);
       assert! ( warnings_of_notice (&fixed, &restriction) . is_empty () );
-      assert_eq! ( files_integrated_per_skgrepo (
+      assert_eq! ( files_reloaded_per_skgrepo (
                      & [ fixed . clone (), fixed . clone () ], &restriction ),
                    vec! [ (SkgrepoName::from ("mine"), 2) ] ); }
     assert_eq! ( title_in_graph (&f, "b") . as_deref (), Some ("b fixed") ); }
   Ok (()) }
 
 #[test]
-fn the_servers_own_save_is_not_integrated_again
+fn the_servers_own_save_is_not_reloaded_again
   () -> Result<(), Box<dyn Error>> {
   let mut f : Fixture = fixture () ?;
   let mut connection : ViewsState = new_connection ();
@@ -339,14 +339,17 @@ fn the_servers_own_save_is_not_integrated_again
   assert_eq! ( f . env . runtime_snapshot () . generation, generation_after_save );
   for pid in ["a", "b"] { // the watcher saw each write, recognized it, and dropped it
     assert! ( ! own_write_awaits_its_event ( &skg_path (&f, "mine", pid) ), "{}", pid ); }
-  { // Another writer's change to the same file afterwards is integrated.
+  { // Another writer's change to the same file afterwards is reloaded.
     write_skg_file_as_another_writer (&f, "mine", "a", "pid: a\ntitle: a by another writer\ncontains:\n- b\n");
     let notice : Arc<RepoChangeNotice> = next_notice (&mut receiver);
-    assert_eq! ( notice . files_integrated, vec! [ (SkgrepoName::from ("mine"), 1) ] ); }
+    assert_eq! ( notice . files_reloaded, vec! [ (SkgrepoName::from ("mine"), 1) ] ); }
   Ok (()) }
 
+/// A buffer with unsaved edits, rendered before a reload changed b,
+/// is saved with an edit of b and an edit of a. The save is refused
+/// whole: it names b, and writes neither b nor a.
 #[test]
-fn a_buffer_rendered_before_an_integration_cannot_write_an_integrated_node
+fn a_buffer_rendered_before_a_reload_cannot_write_a_reloaded_node
   () -> Result<(), Box<dyn Error>> {
   let mut f : Fixture = fixture () ?;
   let mut connection : ViewsState = new_connection ();
@@ -356,11 +359,17 @@ fn a_buffer_rendered_before_an_integration_cannot_write_an_integrated_node
   let _notice : Arc<RepoChangeNotice> = next_notice (&mut receiver);
   let result : String = save (
     &mut f, &mut connection, "a-view",
-    &a_view . replace ("b as first written", "b from the old buffer"),
+    &a_view . replace ("b as first written", "b from the old buffer")
+            . replace ("a as first written", "a from the old buffer"),
     rendered_at );
   assert! ( result . contains ("changed after the buffer was rendered")
-            && result . contains ("- ID: b"),
+            && result . contains ("- ID: b")
+            && ! result . contains ("- ID: a"),
             "{}", result );
   assert! ( fs::read_to_string ( skg_path (&f, "mine", "b") ) ?
             . contains ("b from another writer") );
+  assert! ( fs::read_to_string ( skg_path (&f, "mine", "a") ) ?
+            . contains ("a as first written"),
+            "the refused save writes no node, not even a fresh one" );
+  assert_eq! ( title_in_graph (&f, "a") . as_deref (), Some ("a as first written") );
   Ok (()) }

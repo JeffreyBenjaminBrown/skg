@@ -195,7 +195,8 @@ it reads any claim.
 its =abbreviation= in the config or else its name, from the label
 table the server sends beside the herald rules. A =~NAME= immediately
 before it reports a relationship stored at a more private relRepo than
-its default; =request:~NAME= is an explicit pending request to change
+its default (never one stored in a foreign skgrepo, which has no
+privacy rank); =request:~NAME= is an explicit pending request to change
 that relationship's skgrepo on save. The home skgrepo belongs to the
 node; relRepo belongs to a relationship.
 

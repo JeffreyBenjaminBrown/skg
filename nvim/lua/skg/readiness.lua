@@ -9,7 +9,7 @@
 -- which leaves a headline names. Neovim has no prefix argument, so each recursive form is its
 -- own command.
 -- It also formats the readiness summary, which the save,
--- stage-and-commit and integrate-unshown-changes show. What a
+-- stage-and-commit and extend-diff-view show. What a
 -- headline's change facts say, whether a folder's change is ready, and
 -- how a request is placed in '(editRequest ...)' are read in
 -- skg.metadata, as in Emacs.
@@ -440,7 +440,7 @@ function M.readiness_summary_message (summary)
       summary.ready, summary.changed)) end
   if summary.not_editable > 0 then
     table.insert(parts, string.format(
-      ', %d changes are not editable in this view; <localleader>ru integrates them',
+      ', %d changes are not editable in this view; <localleader>ru extends the diff view to them',
       summary.not_editable)) end
   if summary.foreign > 0 then
     table.insert(parts, string.format(

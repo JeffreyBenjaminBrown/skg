@@ -154,9 +154,9 @@ committing".
 
 'save SIDECAR' saves an edited compact view; see "Writing".
 
-'integrate SIDECAR' makes editable, in a buffer of the diff view, the
-changes it does not make editable, as the clients' 'C-c r u' does,
-and writes the buffer again; see "Reviewing and committing".
+'extend SIDECAR' extends a buffer of the diff view to the changes it
+does not make editable, as the clients' 'C-c r u' does, and writes
+the buffer again; see "Reviewing and committing".
 
 'commit MESSAGE' stages and git-commits every change in the owned
 skgrepos with MESSAGE, asking first when not everything is marked
@@ -193,7 +193,7 @@ tool answers with the empty one, leaving those links unresolved.
 as 'raw' does.
 
 Options, after the command: '--port N' for every command ('save',
-'integrate' and 'close' require the sidecar's; a command run through
+'extend' and 'close' require the sidecar's; a command run through
 a daemon's folder talks to the daemon's server unless it names one);
 '--yes' for
 'save' and 'commit'; '--keep-ids' or '--all-new' for 'save' (see
@@ -387,10 +387,10 @@ matters only for a view that a longer-lived connection holds: a
 daemon's.
 
 Between its answers, the server may tell a connection that it
-integrated '.skg' files that changed on disk (a teammate's save, a
+reloaded '.skg' files that changed on disk (a teammate's save, a
 'git pull'). A command on its own connection prints, on standard
-error, a line per skgrepo, as 'skg server: repo NAME: N files
-integrated', and each warning (a file that could not be read, say), as
+error, a line per skgrepo, as 'skg server: reloaded N files from repo
+NAME', and each warning (a file that could not be read, say), as
 'skg server: WARNING', and reads on; a view written before it may be
 refused on save if it would write a node that changed. A daemon
 instead rewrites the views it names and logs the counts and warnings.
@@ -401,7 +401,7 @@ A command's connection ends with the command, and with it everything
 the server would have said to it later. The server rerenders a view
 only on the connection that holds it: after a save on that
 connection, of any view that shows a node the save changed, and when
-it integrates '.skg' files that changed on disk (a teammate's save on
+it reloads '.skg' files that changed on disk (a teammate's save on
 their own server, a 'git pull'), of the views showing a changed node.
 It tells only connected clients its warnings. Files written by a
 command therefore go stale silently, and nobody hears the warnings.
@@ -439,7 +439,7 @@ rebuilt) logs it and stops, since the server has forgotten its views.
 While a daemon runs for a port, every command for that port runs
 through it, whatever folder it writes into: a view command ('view',
 'search', 'forest', 'contains', 'links-here', 'diff', 'new'), and
-'save', 'integrate' and 'close', whose port is their sidecar's, and
+'save', 'extend' and 'close', whose port is their sidecar's, and
 'commit --yes'. A command's port is the one its '--port' or
 'SKG_PORT' names, or the sidecar's. A command that names no port and
 has no sidecar runs through the daemon of its '--out-dir', if one
@@ -474,8 +474,8 @@ taken from the buffer, the diff-view buffer named in the request; see
 "Handles across saves") are not needed. The tool still names the
 buffer of the diff view in a save; the server keeps the kind a held
 view was registered with, so this changes nothing, and a command
-behaves the same with or without a daemon. 'integrate' still saves the
-full view back unchanged before it integrates, which writes nothing.
+behaves the same with or without a daemon. 'extend' still saves the
+full view back unchanged before it extends, which writes nothing.
 
 When the server rerenders a held view, the daemon writes the
 rerendered view over its three files, as 'save' does, and logs it.
@@ -487,11 +487,13 @@ The server rerenders a held view
 - after a git-commit on the daemon's connection ('commit --yes'), and
   of the buffers of the diff view after one on another ('commit'
   without '--yes', which then asks the daemon);
-- after it integrates files that changed on disk, of which it tells
-  the connection with a 'repo-files-integrated' message naming the
+- after it reloads files that changed on disk, of which it tells
+  the connection with a 'repo-files-reloaded' message naming the
   views that show a changed node (and every buffer of the diff view):
   the daemon then asks for their rerender, as the clients do ('Repo
-  files integrated' in 'docs/api-and-formats.org').
+  files reloaded' in 'docs/api-and-formats.org'), and the server
+  extends each buffer of the diff view so rerendered to the changes
+  it did not show, as 'extend' would.
 A rewritten buffer of the diff view has no readiness summary, since a
 rerender carries none; its next save, or 'diff', gives one.
 
@@ -531,7 +533,7 @@ lines is joined into one with ' | '. The events:
   'released BASE: its view ID now shows OTHER'; 'closed BASE'. BASE
   is the files' base name in the daemon's folder, and their folder's
   real path joined to it elsewhere ('/home/me/notes/view_ID').
-- 'saved BASE', 'saved new root TITLE', 'integrated BASE', for the
+- 'saved BASE', 'saved new root TITLE', 'extended BASE', for the
   commands that write to the graph.
 - 're-rendered BASE because CAUSE; CHANGES': the daemon rewrote a
   view's files. CAUSE is "of 'COMMAND' on the daemon's connection" for
@@ -543,10 +545,10 @@ lines is joined into one with ' | '. The events:
   among other facts), the first six and a count of the rest, or "no
   node changed".
 - 'kept BASE: ...', a rerender not written over unsaved edits.
-- 'changed on disk: repo NAME: N files integrated; ...' when the
-  server integrated files that changed on disk.
+- 'changed on disk: reloaded N files from repo NAME; ...' when the
+  server reloaded files that changed on disk.
 - 'warning: TEXT' for every warning the server sends the connection:
-  its startup warnings, each integration's (a file that could not be read,
+  its startup warnings, each reload's (a file that could not be read,
   a batch that failed validation, a telescope that leaks text), and
   those of every save and rerender on the connection.
 - 'error: ...': a command that failed, with its message; a message the
@@ -556,8 +558,8 @@ For instance:
 #+begin_example
 2026-11-01 21:34:13 saved view_child-a-id
 2026-11-01 21:34:13 re-rendered view_root-id because of 'save view_child-a-id.view.json --yes' on the daemon's connection; 'First child, renamed via daemon' changed: title, was 'First child'
-2026-11-01 21:34:32 changed on disk: repo main: 1 file integrated
-2026-11-01 21:34:33 re-rendered view_child-a-id because files changed on disk (repo main: 1 file integrated); 'First child, renamed on the other server' changed: title, was 'First child, renamed via daemon'
+2026-11-01 21:34:32 changed on disk: reloaded 1 file from repo main
+2026-11-01 21:34:33 re-rendered view_child-a-id because files changed on disk (reloaded 1 file from repo main); 'First child, renamed on the other server' changed: title, was 'First child, renamed via daemon'
 #+end_example
 The log is how a reader who was elsewhere learns that the graph moved:
 anything that wants waking when it does can follow the file
@@ -676,7 +678,7 @@ changes, commits unconfirmed (nothing happens), restores the deleted
 node with 'restoreNode', commits with '--yes' and reads 'git log' and
 an empty diff view. Then it retitles the root, writes the diff view
 (the root's first child write-protected in it), retitles that child's
-new child through a content view, runs 'integrate' on the diff buffer
+new child through a content view, runs 'extend' on the diff buffer
 and checks its output, that the child and the grandchild are now
 editable there, and that a save of the buffer retitles the grandchild
 again. Last, it checks that a blank commit message is refused.
@@ -693,8 +695,8 @@ differ only in 'closed' (and the generation, which the save of
 another held view shows; the daemon rewrites that view and logs the
 save and the rerender. Then a second server starts over the same data
 root, with its own port and search index, as a teammate's would, and
-saves a retitle there: the first server's watcher integrates the file,
-and the daemon logs the integration warning, rewrites the views that
+saves a retitle there: the first server's watcher reloads the file,
+and the daemon logs the reload, rewrites the views that
 show the node and logs why. A view whose compact view has unsaved
 edits is kept as it is when another such change touches it. A file
 written into the owned skgrepo that the watcher cannot read is a
@@ -1125,7 +1127,7 @@ s l' do. 'restoreNode' on a ghost writes the deleted node back as
 HEAD has it, and back into each list that named it at HEAD. 'restoreRel' on a
 removed membership (a '~-' member) puts it back in its list, where
 HEAD had it. The server refuses either anywhere else.
-** Integrating changes the buffer does not make editable
+** Extending a buffer to the changes it does not make editable
 A buffer of the diff view makes a change editable where it holds an
 editable occurrence of the node that records it. A fresh buffer
 ('diff') makes every change editable, but a save makes nothing
@@ -1134,7 +1136,7 @@ save, or by this save itself) may not be editable in the buffer the
 save writes. The readiness summary then says "N changes are not
 editable in this buffer".
 
-'integrate SIDECAR' makes them editable, as the clients' 'C-c r u'
+'extend SIDECAR' extends the buffer to them, as the clients' 'C-c r u'
 does: the server makes each changed node editable at its first
 occurrence in the buffer (drawing its body and content), and appends
 as roots the origins of changes the buffer shows nowhere. It refuses
@@ -1142,9 +1144,9 @@ a compact view with edits (save them first, as a client refuses a
 buffer with unsaved changes), prints the readiness summary before and
 after, and writes the server's rerendered buffer over the three files.
 #+begin_example
-python3 tools/skg-for-ai/skg_for_ai.py integrate DIR/diff_all-changes.view.json
+python3 tools/skg-for-ai/skg_for_ai.py extend DIR/diff_all-changes.view.json
 #+end_example
-The server integrates the buffer it holds under the view ID, so the
+The server extends the buffer it holds under the view ID, so the
 tool first saves the full view back unchanged under that ID, naming
 its buffer of the diff view (which writes nothing, and leaves the
 server holding it as that buffer). The server refuses that
@@ -1177,7 +1179,7 @@ The server keeps the diff view's buffers, and the comparison behind
 them, per connection. 'diff' opens one connection (or runs through a daemon),
 requests the buffers in the clients' order, and writes each nonempty
 one, with the readiness summary the server's answer carries. A later
-'save' or 'integrate' of a diff buffer names its buffer of the diff
+'save' or 'extend' of a diff buffer names its buffer of the diff
 view in the save request, so that the server re-renders it as one,
 with the readiness summary, on a connection that never opened it; the
 save keeps every handle the buffer carries (see "Handles across
@@ -1203,6 +1205,7 @@ round and its answer reads as it is.
 |                            | where a save's warnings go                       | printed after the save, 'Server warning: ...'                                                                                                                 |
 | C-a                        | skg-beginning-of-line                            | Emacs-only by nature                                                                                                                                          |
 | M-x                        | skg-show-unsaved-changes                         | needs nothing: a refused save leaves the edited compact file as it is                                                                                         |
+| M-x                        | skg-request-rerender-all-views                   | needs nothing: a held view is rewritten when the server rerenders it; a lone command's files are rewritten by viewing again                                   |
 | C-c <backspace>            | skg-delete                                       | 'delete' in the handle                                                                                                                                        |
 |                            | its delete-from question                         | gap: printed, never answered; asked only under the config's 'default_repo_set'                                                                                |
 | C-u C-c <backspace>        | skg-delete-recursive                             | gap: 'delete' must be written on each headline                                                                                                                |
@@ -1229,7 +1232,7 @@ round and its answer reads as it is.
 | C-c s r, C-c s R           | skg-set-relRepo(-recursive)                      | gap                                                                                                                                                           |
 | C-c r r                    | skg-cycle-commit-ready                           | 'ready', 'unready', 'all' in the handle; gap: no subtree form (C-u)                                                                                           |
 | C-c r h                    | skg-toggle-homeSkgrepo-move-commitReady          | 'ready' or 'unready' on the move's headline; gap: no form for every like move (C-u)                                                                           |
-| C-c r u                    | skg-diffView-integrate-unshown-changes           | 'integrate SIDECAR'                                                                                                                                           |
+| C-c r u                    | skg-diffView-extend                              | 'extend SIDECAR'                                                                                                                                              |
 | C-c r c                    | skg-stage-and-commit                             | 'commit MESSAGE'                                                                                                                                              |
 | C-c r n, p (c, u, r)       | skg-diffView-goto-next/previous-*                | Emacs-only by nature; the change facts are in the handles                                                                                                     |
 | C-c m c                    | skg-replace-link-with-content                    | remove the leaf, write '⟨node:ID⟩' in its place                                                                                                               |

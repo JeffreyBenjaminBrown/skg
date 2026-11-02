@@ -62,7 +62,7 @@ function M.connect ()
   end)
   -- Once per connection, before any view is requested.
   require('skg.server_warnings').request_server_warnings(tcp)
-  require('skg.repo_files_integrated').register()
+  require('skg.repo_files_reloaded').register()
   local annotations = package.loaded['skg.link_annotations']
   if annotations then annotations.connection_changed() end
   return state.tcp

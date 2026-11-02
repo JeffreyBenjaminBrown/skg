@@ -145,7 +145,7 @@ and hide INTERNAL from M-x completion."
   (progn;; commit readiness, in the diff view (prefix arg => recursive)
     (define-key map (kbd "C-c r r") #'skg-cycle-commit-ready)
     (define-key map (kbd "C-c r h") #'skg-toggle-homeSkgrepo-move-commitReady)
-    (define-key map (kbd "C-c r u") #'skg-diffView-integrate-unshown-changes)
+    (define-key map (kbd "C-c r u") #'skg-diffView-extend)
     (define-key map (kbd "C-c r c") #'skg-stage-and-commit)
     (define-key map (kbd "C-c r n c") #'skg-diffView-goto-next-change)
     (define-key map (kbd "C-c r n u") #'skg-diffView-goto-next-unready-change)

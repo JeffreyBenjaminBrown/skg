@@ -5,7 +5,7 @@
 
 use crate::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle};
 use crate::diff_view::readiness_store::ReadinessStore;
-use crate::repo_watch::integrate::RepoChangeNotice;
+use crate::repo_watch::reload::RepoChangeNotice;
 use crate::types::misc::{SkgConfig, TantivyIndex};
 
 use std::sync::{Arc, OnceLock};
@@ -29,7 +29,7 @@ pub fn new_mutation_gate () -> MutationGate {
 
 /// How many notices of repo changes a connection may fall behind by
 /// before it misses some; one that does rerenders every open view
-/// ('server/serve/handlers/repo_files_integrated.rs').
+/// ('server/serve/handlers/repo_files_reloaded.rs').
 const REPO_CHANGE_NOTICE_CAPACITY : usize = 64;
 
 #[derive(Clone)]

@@ -279,6 +279,42 @@ describe('skg stream consumers', function ()
       :find('stale herald', 1, true))
   end)
 
+  it('skips every view with unsaved edits when rerendering all views',
+     function ()
+    local seen = nil
+    server = helpers.connect_to_fake_server(function (line, respond)
+      if line:find('rerender all views', 1, true) then
+        seen = line
+        respond(helpers.framed(
+          '((response-type rerender-lock) (lock-views (view_id-a)))'))
+        respond(helpers.framed(
+          '((response-type rerender-done) (errors ()) (warnings ()))'))
+      end
+    end)
+    local notices = {}
+    local original_notify = vim.notify
+    vim.notify = function (message) table.insert(notices, message) end
+    local ok, err = pcall(function ()
+      buffer.open_org_buffer_from_text(
+        '* (skg node (gnid a)) a', 'skg://a', 'view_id-a')
+      local b = buffer.open_org_buffer_from_text(
+        '* (skg node (gnid b)) b', 'skg://b', 'view_id-b')
+      vim.api.nvim_buf_set_lines(b, 0, 1, false, { '* (skg node (gnid b)) b edited' })
+      assert.is_true(vim.bo[b].modified)
+      rerender.request_rerender_all_views()
+      vim.wait(3000, function ()
+        return lock.stream_in_progress == nil end, 10)
+      assert.is_truthy(seen and seen:find('(exclude-view-ids "view_id-b")', 1, true))
+      assert.is_falsy(seen:find('view_id-a', 1, true))
+      assert.are.equal('* (skg node (gnid b)) b edited',
+        vim.api.nvim_buf_get_lines(b, 0, 1, false)[1])
+      assert.is_truthy(table.concat(notices, '\n')
+        :find('not rerendered, having unsaved edits: skg://b', 1, true))
+    end)
+    vim.notify = original_notify
+    assert(ok, err)
+  end)
+
   it('switches the repo-set and rides the rerender stream',
      function ()
     local seen = nil

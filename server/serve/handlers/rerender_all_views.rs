@@ -1,6 +1,10 @@
 //! The "rerender all views" request: rerender every open view, or
 //! every one the request does not exclude, through the shared
-//! rerender pipeline ('server/serve/rerender_stream.rs').
+//! rerender pipeline ('server/serve/rerender_stream.rs'). A buffer of
+//! the diff view that a reload named ('repo_files_reloaded.rs') is
+//! also extended to the changes it does not show, as the "extend diff
+//! view" request would ('DiffViewBufferRerender::ExtendingWhereAReloadAsked');
+//! the clients exclude every buffer that holds unsaved edits.
 
 use crate::rerender_pass::DiffViewBufferRerender;
 use crate::serve::ViewsState;
@@ -86,12 +90,15 @@ fn stream_rerender_views_excluding (
     RerenderRequest {
       restriction : skgrepo_restriction,
       selector    : RerenderSelector::All,
-      diffView_buffer_rerender : DiffViewBufferRerender::RefreshOnly, } );
+      diffView_buffer_rerender : DiffViewBufferRerender::ExtendingWhereAReloadAsked, } );
   prepared . viewforest_ids . retain (|viewforest_id| ! excluded . contains (viewforest_id));
   prepared . views . retain (|view| ! excluded . contains (&view . viewforest_id));
   if ! authorize_prepared_rerenders (
     stream, &mut prepared, skgrepo_restriction,
     "rerender-all-views", approved_pids) {
     return; }
+  for view in &prepared . views {
+    views_state . open_views . set_extend_at_next_rerender_all (
+      &view . viewforest_id, false ); }
   stream_prepared_rerenders (stream, views_state, prepared);
 }

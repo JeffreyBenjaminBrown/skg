@@ -6,14 +6,14 @@
 //!
 //! Events are debounced: once one arrives, the watcher gathers more
 //! until the directories have been quiet for the config's
-//! 'repo_watch_quiet_ms', then integrates the batch once
-//! ('integrate_changed_skg_files') and publishes its notice to every
+//! 'repo_watch_quiet_ms', then reloads the batch once
+//! ('reload_changed_skg_files') and publishes its notice to every
 //! connection. A 'git pull' of a hundred files, or a file written in
 //! several steps, is then one batch. While nothing happens, the
 //! watcher wakes once a second to watch the directories the current
 //! config names, which a rebuild may have changed.
 
-use crate::repo_watch::integrate::integrate_changed_skg_files;
+use crate::repo_watch::reload::reload_changed_skg_files;
 use crate::types::env::SkgEnv;
 
 use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
@@ -56,14 +56,14 @@ pub fn start_repo_watcher (
   let stop_seen_by_thread : Arc<AtomicBool> = stop . clone ();
   thread::Builder::new ()
     . name ( "repo watcher" . to_string () )
-    . spawn ( move || watch_and_integrate (
+    . spawn ( move || watch_and_reload (
       env, watcher, receiver, stop_seen_by_thread ))
     . map_err ( |e| notify::Error::io (e) ) ?;
   Ok ( RepoWatcherHandle { stop } ) }
 
-/// The watcher's loop: wait for an event, gather the batch, integrate
+/// The watcher's loop: wait for an event, gather the batch, reload
 /// it, publish its notice.
-fn watch_and_integrate (
+fn watch_and_reload (
   env      : SkgEnv,
   mut watcher : RecommendedWatcher,
   receiver : Receiver<notify::Result<Event>>,
@@ -89,13 +89,13 @@ fn watch_and_integrate (
         Err (RecvTimeoutError::Disconnected) => return, }}
     if stop . load (Ordering::Acquire) { return; }
     match catch_unwind ( AssertUnwindSafe (
-      || integrate_changed_skg_files (&env, &pending) ))
+      || reload_changed_skg_files (&env, &pending) ))
     { Ok ((notice, retry)) => {
         pending = retry;
         env . runtime . publish_repo_change_notice (notice); },
       Err (_panic) => {
         // Logged by the panic hook; the watcher keeps watching.
-        tracing::error! ( "integrating files changed on disk panicked" );
+        tracing::error! ( "reloading files changed on disk panicked" );
         pending . clear (); }, }
     watch_the_configured_skgrepos (&env, &mut watcher, &mut watched); }}
 

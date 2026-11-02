@@ -12,7 +12,7 @@ use skg::metadata_canon::without_viewnode_ids;
 use crate::git_fixture::save_cleanly;
 use crate::pruned_change_view::common::{
   all_changes_buffer, all_changes_view, assert_lines_in_order,
-  assert_saves_back_unchanged, integrate_unshown_changes,
+  assert_saves_back_unchanged, extend_diff_view,
   open_all_changes_buffer, with_fixture};
 use skg::types::views_state::DiffViewBufferKind;
 
@@ -26,7 +26,7 @@ const D_UNDER_C : &str =
   "***** (skg node (gnid d) (skgRepos (nodeRepo main)) writeProtected";
 
 /// The branches b and d stand in ID order, and the buffer saves back
-/// unchanged, as it stands and as "integrate unshown changes"
+/// unchanged, as it stands and as "extend diff view"
 /// rerenders it, each several times (an unordered walk would put the
 /// branches in either order at each rerender).
 #[test]
@@ -38,8 +38,8 @@ fn a_two_container_role_tree_saves_back_unchanged (
     for _ in 0 .. 5 {
       assert_saves_back_unchanged (f, DiffViewBufferKind::AllChanges, &buffer) ?; }
     for _ in 0 .. 5 {
-      let (shown, _) : (String, usize) = integrate_unshown_changes (f) ?;
-      assert_eq! ( shown, buffer, "integrating changes nothing here" );
+      let (shown, _) : (String, usize) = extend_diff_view (f) ?;
+      assert_eq! ( shown, buffer, "extending changes nothing here" );
       assert_saves_back_unchanged (f, DiffViewBufferKind::AllChanges, &shown) ?; }
     Ok (( )) }) }
 

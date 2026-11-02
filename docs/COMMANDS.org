@@ -19,7 +19,7 @@ before any write, if a node it would write has changed since: by a save
 from another client or from 'tools/skg-for-ai', which this client's
 views do not follow; by another writer of the '.skg' files (a second
 server over the same data, a 'git pull', an editor), which the server
-integrates as the files change; or by a rebuild of the session-lifetime
+reloads as the files change; or by a rebuild of the session-lifetime
 stores, after which every older view is stale.
 The error names each such node
 and the view's headlines for it. A node the view shows as the graph
@@ -28,11 +28,27 @@ however old the view; and a new empty view, which the server did not
 draw, is never stale. Your edits stay in the view: archive them if
 needed (M-x skg-show-unsaved-changes), open a fresh view, and reapply them.
 
-When the server integrates files changed on disk, it says so in the
-echo area, naming each skgrepo and how many of its files it integrated
-("skg: repo first: 2 files integrated"), and rerenders every open view
-showing a changed node that holds no unsaved edits. When something
-could not be integrated (a file it could not read, say), the whole
+The refusal is whole: nothing the buffer asks is written, not even
+its edits of nodes nobody else changed. To recover a view whose save
+was refused because files changed on disk (or another save), keeping
+all of its roots:
+- Copy the buffer's text aside: M-x skg-show-unsaved-changes writes
+  it, with a diff against the text the server last drew, to a file.
+- Discard the buffer's edits and redraw it: mark it unmodified (M-~,
+  'not-modified'), then M-x skg-request-rerender-all-views, which
+  redraws every open view without unsaved edits from the graph as it
+  now is, with all of its roots. It never redraws a buffer that still
+  has unsaved edits: it leaves that buffer as it is and names it in
+  the echo area, so marking the buffer unmodified is what lets it go.
+- Redo the edits by hand over the new text, comparing against the copy.
+
+When the server reloads files changed on disk, it says so in the
+echo area, naming each skgrepo and how many of its files it reloaded
+("skg: reloaded 2 files from repo first"), and rerenders every open view
+showing a changed node that holds no unsaved edits. A buffer of the
+diff view so rerendered is also extended to the changes it did not
+show, as C-c r u would extend it. When something
+could not be reloaded (a file it could not read, say), the whole
 notice goes instead to the server-warnings buffer
 (=*SKG Server Warnings*=), under "Repo changes", which is shown. A view with unsaved edits keeps them, and its save
 is refused if it would write a changed node. No rebuild is needed after
@@ -78,10 +94,16 @@ not warned of.
 
 A rerender that follows a command (C-c v l, 'skg-restrict-repo-set';
 a commit; an import; the
-cleanup of references to an absent node, the integration of unshown
-changes, or a call of the function 'skg-request-rerender-all-views',
-which is no M-x command) has errors and
+cleanup of references to an absent node, the extension of the diff
+view, or M-x skg-request-rerender-all-views) has errors and
 warnings of its own, which go to =*skg rerender messages*=.
+** M-x skg-request-rerender-all-views : redraw every clean view
+Redraws every open view that has no unsaved edits from the graph as it
+now is, each with all of its roots; a buffer of the diff view is
+refreshed. A view with unsaved edits is left as it is, since the server
+draws a view from what it last rendered or saved, and the redraw would
+discard the edits; the echo area names each one skipped. See "C-x
+C-s" for its use after a refused save.
 ** C-a : skg-beginning-of-line
 On a headline, moves point to the start of its title, after the stars
 and the metadata; pressed again, to the true start of the line. On
@@ -787,7 +809,7 @@ changed file counts as ready when every change it records is marked;
 a file whose only change is the order of a list counts as ready
 without marks. The summary
 adds how many changes are not editable in this view (C-c r u
-integrates them)
+extends the diff view to them)
 and how many files changed in foreign skgrepos.
 
 A gesture that would unmark more than one change (a recursive one, one
@@ -818,14 +840,16 @@ point (or of the move at point), then saves: it unmarks the move if
 it is ready, else marks it. With a prefix argument (C-u C-c r h), it
 does the same to every descendant whose home skgrepo moved between the same
 two skgrepos. Works on write-protected headlines too.
-*** C-c r u : skg-diffView-integrate-unshown-changes
-Integrates every change not editable in the buffer of the diff view.
+*** C-c r u : skg-diffView-extend
+Extends the buffer of the diff view to every change not editable in it.
 Each changed node with no editable occurrence becomes editable where
 the buffer first shows it, in content or else in a partner folder,
 with its change and its content shown under it; when a change is
 under a root the buffer lacks, that root is appended at the end. The
 minibuffer then shows the readiness summary, as after a save. Refuses
 with "Save the buffer first." while the buffer has unsaved changes.
+A clean buffer the server rerenders after reloading files changed on
+disk is extended the same way, with no key pressed.
 *** C-c r c : skg-stage-and-commit
 Prompts once for a commit message, then stages every change and
 git-commits it, in every owned skgrepo that has changes, with that
@@ -1000,7 +1024,7 @@ member is a write-protected member shown without its content. But a
 save makes nothing editable that the buffer already shows, and
 appends no root: the readiness summary counts a change since the
 buffer opened that it holds nowhere editable as not editable in this
-view. C-c r u integrates such changes. Nothing the
+view. C-c r u extends the buffer to such changes. Nothing the
 buffer holds editable is write-protected again by the server. An
 editable-view request (C-c s d) works as in any view, except that
 'initial_node_limit' refuses only the extension of a node outside U
@@ -1435,7 +1459,7 @@ before loading: the importer itself does not check them.
 For a first setup, configure the skgrepo before starting Skg. When replacing
 existing data, save and close the open views and stop the server before
 changing the files in its skgrepos, then restart it. If files in an already configured
-skgrepo change while the server runs, the server integrates them as they
+skgrepo change while the server runs, the server reloads them as they
 change, and rerenders the clean views that show them.
 'M-x skg-rebuild-session-lifetime-stores' reloads an edited config, a new
 skgrepo included.
@@ -1576,7 +1600,7 @@ removed or reordered, say) takes effect without restarting the server, except
 for its 'port' and 'timing_log', which the answer warns about. An invalid
 config fails the rebuild, and the server keeps serving the old one. Existing
 views are closed after a successful rebuild, because they were rendered
-before it. Files that change on disk need no rebuild: the server integrates
+before it. Files that change on disk need no rebuild: the server reloads
 them as they change (see the start of this document).
 *** skg-strip-trailing-whitespace-from-bodies
 Strips trailing whitespace from every line of every body,

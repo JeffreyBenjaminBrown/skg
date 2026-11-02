@@ -17,7 +17,7 @@ membership among its "Terms a user meets". A buffer of the diff view
 is drawn by the refresh every view uses, whose model is
 'docs/data-model_technical.org', "The refresh: how a view follows the
 graph"; this document says what its diff-view mode adds. The wire forms are the
-API doc's "Diff view", "Stage and commit", "Integrate unshown changes" and
+API doc's "Diff view", "Stage and commit", "Extend diff view" and
 "Metadata of the diff view" ('docs/api-and-formats.org'). The
 heralds are 'docs/heralds.org', "Diff heralds". The commands are
 both COMMANDS files, under C-c v d and C-c r, and the two restore
@@ -128,7 +128,7 @@ D, the buffer's first roots, is R deduplicated: R is processed in ID
 order, and a content origin is discarded when its containerward walk
 within U reaches another content origin still kept. Of two origins on
 a shared cycle, exactly one is kept. When D is recomputed for a buffer
-that already stands (see "Integrating unshown changes"), the buffer's
+that already stands (see "Extending the diff view"), the buffer's
 standing roots are pinned as kept first, so a change to a cycle's
 membership never adds a second root for it.
 
@@ -397,11 +397,13 @@ by the recomputed U wherever it draws something new. Nothing the buffer
 holds editable is write-protected again by the server. But the server
 makes no occurrence editable and appends no root on its own: a change
 recorded by a node the buffer holds no editable occurrence of is not
-editable in this view, and the readiness summary counts it.
-** Integrating unshown changes
-C-c r u ('skg-diffView-integrate-unshown-changes'; Neovim
-'<localleader>ru'), on a buffer with no unsaved changes, sends
-"integrate unshown changes". The server brings the straddle up to
+editable in this view, and the readiness summary counts it, until the
+buffer is extended (below).
+** Extending the diff view
+C-c r u ('skg-diffView-extend'; Neovim '<localleader>ru',
+':SkgDiffViewExtend'), on a buffer with no unsaved changes, sends
+"extend diff view", which extends the buffer to the changes it does
+not show. The server brings the straddle up to
 date and recomputes the buffer's sets. Every node of U without an
 editable occurrence becomes editable at its first content occurrence
 in level order, its children claiming as a buffer read back would
@@ -421,6 +423,20 @@ The answer
 is the readiness summary, and the rerender stream carries the buffer.
 It does not matter who write-protected an occurrence: the user asked
 for every change.
+*** After a reload
+When the server reloads '.skg' files that changed on disk (another
+writer's save, a 'git pull'), its "repo-files-reloaded" message names
+every open buffer of the diff view, and the client asks for the
+rerender of each that holds no unsaved edits. That rerender extends
+the buffer as C-c r u would, so a change made elsewhere appears in it
+even where the buffer did not show its node. The server marks each
+buffer the message names ('ViewState::extend_at_next_rerender_all')
+and the next "rerender all views" that includes the buffer extends it
+and clears the mark; any other rerender is a refresh alone. A buffer
+with unsaved edits is not rerendered, so it keeps its edits and is not
+extended; its save is refused if it would write a node the reload
+changed (COMMANDS.org, "Save buffer"). Under a skgrepo restriction,
+where C-c r u is refused, no buffer is marked.
 ** What counts as editable here
 A buffer makes a node's changes editable when it holds an editable
 occurrence of the node, wherever that sits, or the node's ghost in
@@ -565,8 +581,8 @@ count as changed and ready. It is computed over every leaf of the
 change-forest, whatever buffer is open. It adds the changed files of
 the foreign skgrepos, and the changes not editable in this view:
 the leaves whose recorder the buffer does not make editable (see
-"What counts as editable here"), with the command that integrates
-them. The diff view's answer, a save and C-c r u compute it alike
+"What counts as editable here"), with the command that extends the
+buffer to them. The diff view's answer, a save and C-c r u compute it alike
 ('buffer_readiness_summary_for', 'server/diff_view/readiness_requests.rs').
 
 * Restoring what a change removed

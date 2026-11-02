@@ -46,6 +46,7 @@ pub struct ViewState {
                             // pids_from_viewforest)
   pub diffView_buffer_kind : Option<DiffViewBufferKind>, // Some for a buffer of the diff view
   pub viewnode_id_record : ViewnodeIdRecord,
+  pub extend_at_next_rerender_all : bool, // for a buffer of the diff view a reload named: the next "rerender all views" that rerenders it extends it ('DiffViewBufferRerender::ExtendingWhereAReloadAsked')
 }
 
 /// The viewnode IDs of one buffer: the counter they are assigned from,
@@ -167,7 +168,8 @@ impl OpenViews {
         ViewnodeIdRecord::of_viewforest (&viewforest);
       let state : ViewState =
         ViewState { viewforest, pids, diffView_buffer_kind : None,
-                    viewnode_id_record };
+                    viewnode_id_record,
+                    extend_at_next_rerender_all : false };
       self . views . insert ( viewforest_id, state ); }
 
   /// 'register_view' for a buffer of the diff view.
@@ -191,6 +193,18 @@ impl OpenViews {
   ) {
     if let Some (state) = self . views . get_mut (viewforest_id) {
       state . diffView_buffer_kind = Some (diffView_buffer_kind); }}
+
+  /// Set whether the next "rerender all views" that rerenders the
+  /// open view 'viewforest_id' extends it, if it is a buffer of the
+  /// diff view ('ViewState::extend_at_next_rerender_all').
+  pub fn set_extend_at_next_rerender_all (
+    &mut self,
+    viewforest_id : &ViewforestId,
+    extend        : bool,
+  ) {
+    if let Some (state) = self . views . get_mut (viewforest_id) {
+      state . extend_at_next_rerender_all =
+        extend && state . diffView_buffer_kind . is_some (); }}
 
   /// Whether any open view is a buffer of the diff view.
   pub fn has_diffView_views (
@@ -259,7 +273,8 @@ impl OpenViews {
                viewforest_id . clone (),
                ViewState { viewforest : new_viewforest,
                            pids, diffView_buffer_kind : None,
-                           viewnode_id_record } ); }}
+                           viewnode_id_record,
+                           extend_at_next_rerender_all : false } ); }}
 
   pub fn unregister_view (
     &mut self,

@@ -1,23 +1,24 @@
 ;;; -*- lexical-binding: t; -*-
 ;;;
 ;;; PURPOSE: Handle the message the server sends unprompted when it
-;;; has integrated '.skg' files that changed on disk (another writer,
-;;; a 'git pull'): "repo-files-integrated", with (integrated ((SKGREPO
+;;; has reloaded '.skg' files that changed on disk (another writer,
+;;; a 'git pull'): "repo-files-reloaded", with (reloaded ((SKGREPO
 ;;; N) ...)), (warnings (...)) and (view-ids (...)).
 ;;;
 ;;; A message with no warnings is an echo-area message of its counts
-;;; ("skg: repo first: 2 files integrated"). One that carries a warning
+;;; ("skg: reloaded 2 files from repo first"). One that carries a warning
 ;;; (a file that could not be read, a batch that failed validation, a
 ;;; leak) goes, counts and warnings, to `skg-server-warnings-buffer-name'
 ;;; under a headline "Repo changes", as the startup warnings do, and
 ;;; shows that buffer. The views it names show a changed node; each one whose buffer holds no unsaved
 ;;; edits is rerendered, through a "rerender all views" request that
-;;; excludes every other view. A buffer with unsaved edits keeps them;
-;;; the server refuses its save if it would write a node changed on
-;;; disk since it was rendered.
+;;; excludes every other view; the server also extends each buffer of
+;;; the diff view among them to the changes it does not show. A buffer
+;;; with unsaved edits keeps them; the server refuses its save if it
+;;; would write a node changed on disk since it was rendered.
 ;;;
 ;;; DATA USED/ASSUMED: See docs/api-and-formats.org, "Repo files
-;;; integrated".
+;;; reloaded".
 
 (require 'cl-lib)
 (require 'skg-request-rerender-all-views)
@@ -26,31 +27,31 @@
 (require 'skg-lock-buffers)            ; for skg--stream-in-progress
 (require 'skg-state)
 
-(defconst skg--repo-files-integrated-retry-seconds 0.5
+(defconst skg--repo-files-reloaded-retry-seconds 0.5
   "How long to wait before asking again for a rerender that another
 streaming request in flight blocked.")
 
-(defconst skg--repo-files-integrated-retry-limit 120
+(defconst skg--repo-files-reloaded-retry-limit 120
   "How many times to ask again before giving up on a blocked rerender.")
 
-(defun skg--repo-files-integrated-handler (_tcp-proc payload)
-  "Show the counts and warnings of a repo-files-integrated PAYLOAD and
+(defun skg--repo-files-reloaded-handler (_tcp-proc payload)
+  "Show the counts and warnings of a repo-files-reloaded PAYLOAD and
 rerender the views it names that have no unsaved edits."
   (condition-case err
       (let* ((response (read payload))
-             (count-clauses (skg--repo-files-integrated-count-clauses
-                             (cadr (assoc 'integrated response))))
+             (count-clauses (skg--repo-files-reloaded-count-clauses
+                             (cadr (assoc 'reloaded response))))
              (warnings (cadr (assoc 'warnings response)))
              (view-ids (mapcar (lambda (view-id) (format "%s" view-id))
                                (cadr (assoc 'view-ids response)))))
-        (skg--show-repo-files-integrated count-clauses warnings)
+        (skg--show-repo-files-reloaded count-clauses warnings)
         (when view-ids
           ;; Not from inside the process filter: the rerender sends a request.
           (run-at-time 0 nil #'skg--rerender-views-changed-on-disk view-ids 0)))
     (error
-     (message "skg: repo-files-integrated handler error: %S" err))))
+     (message "skg: repo-files-reloaded handler error: %S" err))))
 
-(defun skg--show-repo-files-integrated (count-clauses warnings)
+(defun skg--show-repo-files-reloaded (count-clauses warnings)
   "Echo COUNT-CLAUSES when there are no WARNINGS; otherwise append the
 clauses and the warnings to the warnings buffer and show it."
   (cond
@@ -59,19 +60,19 @@ clauses and the warnings to the warnings buffer and show it."
      (concat "* Repo changes\n"
              (mapconcat (lambda (line) (concat "** " line "\n"))
                         (append count-clauses warnings) ""))
-     (format "skg: files changed on disk were integrated - see %s"
+     (format "skg: files changed on disk were reloaded - see %s"
              skg-server-warnings-buffer-name)))
    (count-clauses
     (message "skg: %s" (mapconcat #'identity count-clauses "; ")))))
 
-(defun skg--repo-files-integrated-count-clauses (integrated)
-  "\"repo NAME: N files integrated\" for each (NAME N) of INTEGRATED."
+(defun skg--repo-files-reloaded-count-clauses (reloaded)
+  "\"reloaded N files from repo NAME\" for each (NAME N) of RELOADED."
   (mapcar (lambda (skgrepo-and-count)
             (let ((count (cadr skgrepo-and-count)))
-              (format "repo %s: %s %s integrated"
-                      (car skgrepo-and-count) count
-                      (if (equal count 1) "file" "files"))))
-          integrated))
+              (format "reloaded %s %s from repo %s"
+                      count (if (equal count 1) "file" "files")
+                      (car skgrepo-and-count))))
+          reloaded))
 
 (defun skg--rerender-views-changed-on-disk (view-ids attempt)
   "Rerender each open buffer among VIEW-IDS that holds no unsaved
@@ -90,8 +91,8 @@ in flight, ask again later; ATTEMPT counts the tries."
     (cond
      ((null to-rerender) nil)
      (skg--stream-in-progress
-      (if (< attempt skg--repo-files-integrated-retry-limit)
-          (run-at-time skg--repo-files-integrated-retry-seconds nil
+      (if (< attempt skg--repo-files-reloaded-retry-limit)
+          (run-at-time skg--repo-files-reloaded-retry-seconds nil
                        #'skg--rerender-views-changed-on-disk
                        view-ids (1+ attempt))
         (message "skg: views showing files changed on disk were not rerendered; %s"
@@ -107,7 +108,7 @@ in flight, ask again later; ATTEMPT counts the tries."
            when view-id
            collect (cons view-id buffer)))
 
-(setf (alist-get 'repo-files-integrated skg-unprompted-response-handler-map)
-      #'skg--repo-files-integrated-handler)
+(setf (alist-get 'repo-files-reloaded skg-unprompted-response-handler-map)
+      #'skg--repo-files-reloaded-handler)
 
-(provide 'skg-repo-files-integrated)
+(provide 'skg-repo-files-reloaded)

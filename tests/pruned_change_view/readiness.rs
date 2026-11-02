@@ -9,7 +9,7 @@ use crate::git_fixture::{
   Fixture, OwnedSkgrepos, edit_line, save_cleanly, with_git_fixture};
 use crate::git_fixture_helpers::without_lines_containing;
 use crate::pruned_change_view::common::{
-  all_changes_view, insert_after_line_starting, integrate_unshown_changes,
+  all_changes_view, insert_after_line_starting, extend_diff_view,
   open_all_changes_buffer, open_buffer, save_buffer, with_fixture,
   with_fixture_and_foreign};
 
@@ -216,7 +216,7 @@ fn editing_a_node_lapses_its_mark (
 /// deletions, and the relationships ln-lo, r-del and del-delc. Roots
 /// the user drops from the buffer are origins it no longer shows: the
 /// save leaves them out and counts their changes as not editable, and the
-/// "integrate unshown changes" request appends them again.
+/// "extend diff view" request appends them again.
 #[test]
 fn the_save_reports_the_readiness_summary (
 ) -> Result<(), Box<dyn Error>> {
@@ -240,7 +240,7 @@ fn the_save_reports_the_readiness_summary (
                    . filter ( |line| line . starts_with ("* ") ) . count (), 1,
                  "the dropped roots stay dropped:\n{}", response . saved_view );
     assert_eq! ( summary_of (&response), summary (1, 6, 3) );
-    let (shown, not_editable) : (String, usize) = integrate_unshown_changes (f) ?;
+    let (shown, not_editable) : (String, usize) = extend_diff_view (f) ?;
     let roots : Vec<&str> = shown . lines ()
       . filter ( |line| line . starts_with ("* ") ) . collect ();
     assert! ( roots . len () == 4 && without_viewnode_ids (roots [0]) . starts_with ("* (skg node (gnid r)")

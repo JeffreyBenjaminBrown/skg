@@ -30,7 +30,7 @@ use crate::types::save::ForkSpec;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{Editability, ViewRequest, ViewnodeKind, Vognode};
 use crate::types::views_state::{
-  DiffViewBufferKind, ViewforestId, ViewnodeIdRecord, pids_from_viewforest};
+  DiffViewBufferKind, ViewState, ViewforestId, ViewnodeIdRecord, pids_from_viewforest};
 use crate::update_buffer::refresh_content_view;
 
 use ego_tree::NodeId;
@@ -80,10 +80,29 @@ impl<'a> RerenderPassContext<'a> {
 pub enum DiffViewBufferRerender {
   /// Nothing: the refresh alone.
   RefreshOnly,
-  /// The "integrate unshown changes" request's: before the refresh,
-  /// occurrences made editable and the content origins the buffer
-  /// lacks appended ('refresh_diffView_buffer_over_current_straddle').
-  IntegratingUnshownChanges,
+  /// The "extend diff view" request's: the buffer is extended to the
+  /// changes it does not show. Before the refresh, occurrences are
+  /// made editable and the content origins the buffer lacks appended
+  /// ('refresh_diffView_buffer_over_current_straddle').
+  Extending,
+  /// The "rerender all views" request's: 'Extending' for each buffer
+  /// a reload named ('ViewState::extend_at_next_rerender_all'), the
+  /// refresh alone for the others.
+  ExtendingWhereAReloadAsked,
+}
+
+impl DiffViewBufferRerender {
+  /// Whether the rerender of the buffer of the diff view 'state'
+  /// extends it.
+  pub fn extends (
+    &self,
+    state : &ViewState,
+  ) -> bool {
+    match self {
+      DiffViewBufferRerender::RefreshOnly => false,
+      DiffViewBufferRerender::Extending => true,
+      DiffViewBufferRerender::ExtendingWhereAReloadAsked =>
+        state . extend_at_next_rerender_all, } }
 }
 
 /// An open view, rerendered in memory: its new text, and the
@@ -160,7 +179,7 @@ pub fn update_views_after_save (
         &mut saved_view_mut,
         &mut saved_viewnode_id_record,
         &mut context,
-        RerenderMode::of_buffer (saved_diffView_buffer_kind) ) ?; }
+        RerenderMode::of_buffer (saved_diffView_buffer_kind, false) ) ?; }
   let saved_text : String = viewforest_to_string (&saved_view_mut) ?;
   let readiness_summary : Option<BufferReadinessSummary> =
     saved_diffView_buffer_kind . and ( context . graph_straddle . as_ref () )
@@ -266,7 +285,9 @@ pub(crate) fn rerender_open_view (
   let mut viewnode_id_record : ViewnodeIdRecord =
     views_state . open_views . viewnode_id_record_of (viewforest_id);
   let mode : RerenderMode = RerenderMode::of_buffer (
-    views_state . open_views . diffView_buffer_kind_of_view (viewforest_id) );
+    views_state . open_views . diffView_buffer_kind_of_view (viewforest_id),
+    views_state . open_views . views . get (viewforest_id)
+      . is_some_and ( |state| context . diffView_buffer_rerender . extends (state) ));
   let in_the_view : &dyn Fn (Box<dyn Error>) -> String = &|e : Box<dyn Error>| -> String {
     format! ( "View {}: {}", viewforest_id . repr_in_client (), e ) };
   refresh_view (
@@ -290,22 +311,25 @@ pub(crate) fn release_candidates<'v> (
     . collect () }
 
 /// The situation a rerender refreshes a view in, from the view
-/// itself: a content view, or a buffer of the diff view of this kind.
+/// itself: a content view, or a buffer of the diff view of this kind,
+/// extended to the changes it does not show or not.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum RerenderMode {
   ContentView,
-  DiffView (DiffViewBufferKind),
+  DiffView { buffer_kind : DiffViewBufferKind,
+             extend      : bool },
 }
 
 impl RerenderMode {
   /// The mode of a view whose buffer kind in the diff view, if it is
-  /// one, is 'diffView_buffer'.
+  /// one, is 'diffView_buffer'; such a buffer is extended if 'extend'.
   pub fn of_buffer (
     diffView_buffer : Option<DiffViewBufferKind>,
+    extend          : bool,
   ) -> RerenderMode {
     match diffView_buffer {
       None => RerenderMode::ContentView,
-      Some (buffer_kind) => RerenderMode::DiffView (buffer_kind), } }
+      Some (buffer_kind) => RerenderMode::DiffView { buffer_kind, extend }, } }
 }
 
 /// Bring an open view up to date with the graph; it renders nothing,
@@ -314,7 +338,7 @@ impl RerenderMode {
 /// content-view mode ('refresh_content_view'); a buffer of the diff
 /// view in diff-view mode, over the graph straddle, brought up to date
 /// in 'context' ('refresh_diffView_buffer_over_current_straddle',
-/// which says what the "integrate unshown changes" request adds).
+/// which says what extending the buffer adds).
 pub fn refresh_view (
   viewforest         : &mut ViewForest,
   viewnode_id_record : &mut ViewnodeIdRecord, // the view's, which assigns the viewnode IDs its new viewnodes get
@@ -327,8 +351,8 @@ pub fn refresh_view (
   match mode {
     RerenderMode::ContentView => refresh_content_view (
       viewforest, viewnode_id_record, context ) ?,
-    RerenderMode::DiffView (buffer_kind) => refresh_diffView_buffer_over_current_straddle (
-      context, buffer_kind, viewforest, viewnode_id_record ) ?, };
+    RerenderMode::DiffView { buffer_kind, extend } => refresh_diffView_buffer_over_current_straddle (
+      context, buffer_kind, extend, viewforest, viewnode_id_record ) ?, };
   tracing::debug!("refresh_view: done ({:.3}s)",
             t_rerender . elapsed () . as_secs_f64 ());
   Ok (( )) }

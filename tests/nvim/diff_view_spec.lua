@@ -86,6 +86,6 @@ describe('skg.diff_view', function ()
     vim.notify = original_notify
     assert.are.same(
       { '1 of 3 changed files are ready, 2 changes are not editable'
-        .. ' in this view; <localleader>ru integrates them' }, notices)
+        .. ' in this view; <localleader>ru extends the diff view to them' }, notices)
   end)
 end)

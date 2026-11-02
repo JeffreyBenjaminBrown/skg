@@ -177,10 +177,10 @@ The server also learns of =.skg= files that change on disk without it
 (another writer, a =git pull=): the repo watcher (=server/repo_watch/=)
 watches every skgrepo directory and gathers the changed paths of a
 burst into one batch, once the directories have been quiet for
-=repo_watch_quiet_ms=.  The batch is integrated as a save's
+=repo_watch_quiet_ms=.  The batch is reloaded as a save's
 nodeInstructions are, under the mutation gate, but nothing is
-written (=integrate_changed_skg_files= in
-=server/repo_watch/integrate.rs=):
+written (=reload_changed_skg_files= in
+=server/repo_watch/reload.rs=):
 - each path names a skgrepo (its directory) and a pid (its file name);
   a path whose file is as the server itself last left it is dropped
   (=server/repo_watch/own_writes.rs=), since every server write of a
@@ -201,7 +201,9 @@ written (=integrate_changed_skg_files= in
   The search index is updated in the background, as after a save.
 A notice of what the batch did reaches every connection, which tells
 its client between requests and names the views to rerender
-(=docs/api-and-formats.org=, "Repo files integrated").
+(=docs/api-and-formats.org=, "Repo files reloaded"); the rerender of
+a buffer of the diff view it names also extends it
+(=docs/diff-view.org=, "After a reload").
 
 ** The refresh: how a view follows the graph
 

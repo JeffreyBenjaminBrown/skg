@@ -1,23 +1,24 @@
 -- PURPOSE: Handle the message the server sends unprompted when it has
--- integrated '.skg' files that changed on disk (another writer, a
--- 'git pull'): 'repo-files-integrated', with (integrated ((SKGREPO
+-- reloaded '.skg' files that changed on disk (another writer, a
+-- 'git pull'): 'repo-files-reloaded', with (reloaded ((SKGREPO
 -- N) ...)), (warnings (...)) and (view-ids (...)).
 --
 -- A message with no warnings is a notification of its counts ('skg:
--- repo first: 2 files integrated'). One that carries a warning (a
+-- reloaded 2 files from repo first'). One that carries a warning (a
 -- file that could not be read, a batch that failed validation, a
 -- leak) is appended, counts and warnings, to the server-warnings
 -- buffer under a headline 'Repo changes', as the startup warnings
 -- are, and that buffer is shown. The views it
 -- names show a changed node; each one whose buffer holds no unsaved
 -- edits is rerendered, through a 'rerender all views' request that
--- excludes every other view. A buffer with unsaved edits keeps them;
--- the server refuses its save if it would write a node changed on
--- disk since it was rendered. The Lua port of
--- elisp/skg-repo-files-integrated.el.
+-- excludes every other view; the server also extends each buffer of
+-- the diff view among them to the changes it does not show. A buffer
+-- with unsaved edits keeps them; the server refuses its save if it
+-- would write a node changed on disk since it was rendered. The Lua
+-- port of elisp/skg-repo-files-reloaded.el.
 --
 -- DATA USED/ASSUMED: See docs/api-and-formats.org, "Repo files
--- integrated".
+-- reloaded".
 
 local lock = require('skg.lock')
 local messages = require('skg.messages')
@@ -37,16 +38,16 @@ M.retry_limit = 120
 
 ---Register the handler as the unprompted one for its response type.
 function M.register ()
-  state.unprompted_response_handler_map['repo-files-integrated'] =
+  state.unprompted_response_handler_map['repo-files-reloaded'] =
     function (_payload_text, response) M.handler(response) end
 end
 
----Show the counts and warnings of a parsed repo-files-integrated
+---Show the counts and warnings of a parsed repo-files-reloaded
 ---RESPONSE and rerender the views it names that have no unsaved edits.
 ---@param response any
 function M.handler (response)
   local count_clauses =
-    M.count_clauses(payload.field(response, 'integrated'))
+    M.count_clauses(payload.field(response, 'reloaded'))
   local warnings =
     payload.string_list(payload.field(response, 'warnings'))
   M.show(count_clauses, warnings)
@@ -58,18 +59,19 @@ function M.handler (response)
   end
 end
 
----'repo NAME: N files integrated' for each (NAME N) of the parsed
----INTEGRATED list.
----@param integrated any
+---'reloaded N files from repo NAME' for each (NAME N) of the parsed
+---RELOADED list.
+---@param reloaded any
 ---@return string[]
-function M.count_clauses (integrated)
+function M.count_clauses (reloaded)
   local clauses = {}
-  if integrated ~= nil and sexpr.is_list(integrated) then
-    for _, skgrepo_and_count in ipairs(integrated) do
+  if reloaded ~= nil and sexpr.is_list(reloaded) then
+    for _, skgrepo_and_count in ipairs(reloaded) do
       local skgrepo = sexpr.atom_text(skgrepo_and_count[1])
       local count = sexpr.atom_text(skgrepo_and_count[2])
-      table.insert(clauses, 'repo ' .. skgrepo .. ': ' .. count
-                   .. (count == '1' and ' file' or ' files') .. ' integrated')
+      table.insert(clauses, 'reloaded ' .. count
+                   .. (count == '1' and ' file' or ' files')
+                   .. ' from repo ' .. skgrepo)
     end
   end
   return clauses
@@ -89,7 +91,7 @@ function M.show (count_clauses, warnings)
       table.insert(headlines, '** ' .. warning) end
     messages.big_nonfatal_message_appended(
       server_warnings.buffer_name,
-      'skg: files changed on disk were integrated - see '
+      'skg: files changed on disk were reloaded - see '
         .. server_warnings.buffer_name,
       table.concat(headlines, '\n'))
   elseif #count_clauses > 0 then

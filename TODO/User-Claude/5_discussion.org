@@ -254,3 +254,24 @@ are one owner's telescope and fold in the manifest's order; unchained
 ones are the illegal case you describe, shown only to the creator under
 the 'ILLEGAL EDIT TO FOREIGN NODE' herald (the 'message' style, which is
 the black-on-white one), ignored and warned about everywhere else.
+* TODO Jeff : a foreign recorder's default relRepo
+'SkgConfig::default_relRepo' gives, for a relationship a foreign node
+records to an owned one, the owned member's home: a foreign skgrepo
+has no rung, so 'more_private_of' returns the owned side. But such a
+relationship can only be recorded in the foreign node's own file, in
+its foreign skgrepo. That is why Jeff's server showed '~ed' between
+Ed's 'inboxes' and Jeff's 'to Ed'. The herald now ignores any
+relationship recorded in a foreign skgrepo ('set_relRepo'), which
+fixes what you saw. The rule itself is unchanged, and the 'relRepo
+info' request ('server/serve/handlers/relRepo_info.rs') still reports
+that relationship's default as the owned home, which is misleading.
+The save never writes such a relationship, so nothing is written
+wrong.
+Two ways out:
+- Make 'default_relRepo' return the recorder's home when the recorder
+  is foreign, which is where the relationship necessarily lives. Then
+  the herald's special case is redundant and could go. The save paths
+  that call it ('strandeds.rs', 'supplement_from_disk.rs') would need
+  checking, though for a foreign recorder they write nothing.
+- Leave the rule, and keep the herald's special case.
+I recommend the first. Say which you want.

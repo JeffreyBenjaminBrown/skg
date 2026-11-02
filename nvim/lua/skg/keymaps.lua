@@ -165,10 +165,10 @@ M.commands = {
     module = 'skg.readiness',
     fn = 'toggle_homeSkgrepo_move_commitReady_recursive',
     desc = 'Toggle the commit-readiness of every home skgrepo move in the subtree like this one, and save' },
-  DiffViewIntegrateUnshownChanges = {
-    module = 'skg.integrate_unshown_changes',
-    fn = 'diffView_integrate_unshown_changes',
-    desc = 'Make every change of this diff-view buffer editable, appending roots as needed' },
+  DiffViewExtend = {
+    module = 'skg.extend_diff_view',
+    fn = 'diffView_extend',
+    desc = 'Extend this diff-view buffer to the changes it does not show, appending roots as needed' },
   StageAndCommit = { module = 'skg.stage_and_commit', fn = 'stage_and_commit',
                      desc = 'Stage and git-commit every owned skgrepo with changes, with one message' },
   DiffViewGotoNextChange = { module = 'skg.readiness',
@@ -196,6 +196,8 @@ M.commands = {
                   desc = 'Export to plain .org files under a chosen skgrepo restriction' },
   ImportMdAndOrg = { module = 'skg.import_md_and_org', fn = 'import_md_and_org',
                      desc = 'Preview and import Markdown/Org into an owned repo' },
+  RerenderAllViews = { module = 'skg.rerender_all_views', fn = 'request_rerender_all_views',
+                       desc = 'Rerender every open view that holds no unsaved edits' },
   RebuildSessionLifetimeStores = { module = 'skg.misc_requests', fn = 'rebuild_session_lifetime_stores',
                  desc = 'Reload the config; rebuild the graph and Tantivy from the .skg files' },
   StripBodyWhitespace = { module = 'skg.misc_requests',
@@ -313,7 +315,7 @@ M.content_view_bindings = {
   { 'rR', 'CycleCommitReadyRecursive' }, -- C-u C-c r r
   { 'rh', 'ToggleHomeSkgrepoMoveCommitReady' }, -- C-c r h
   { 'rH', 'ToggleHomeSkgrepoMoveCommitReadyRecursive' }, -- C-u C-c r h
-  { 'ru', 'DiffViewIntegrateUnshownChanges' }, -- C-c r u
+  { 'ru', 'DiffViewExtend' },            -- C-c r u
   { 'rc', 'StageAndCommit' },            -- C-c r c
   { 'rnc', 'DiffViewGotoNextChange' },            -- C-c r n c
   { 'rnu', 'DiffViewGotoNextUnreadyChange' },     -- C-c r n u

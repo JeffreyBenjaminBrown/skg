@@ -22,7 +22,7 @@ M.response_handler_map = {}
 
 ---Map from response-type names to the handlers, fn(payload_text,
 ---parsed_response), of the messages the server sends unprompted,
----between responses ('repo-files-integrated'). Consulted when
+---between responses ('repo-files-reloaded'). Consulted when
 ---response_handler_map has no handler for a type; a lost connection
 ---does not clear it.
 M.unprompted_response_handler_map = {}

@@ -16,7 +16,7 @@ use crate::serve::handlers::import_md_and_org::{
 use crate::serve::handlers::get_file_path::handle_get_file_path_request_with_skgrepo_set;
 use crate::serve::handlers::herald_rules::handle_herald_rules_request;
 use crate::serve::handlers::investigate_unknown_node::handle_investigate_unknown_node_request;
-use crate::serve::handlers::repo_files_integrated::deliver_repo_change_notices;
+use crate::serve::handlers::repo_files_reloaded::deliver_repo_change_notices;
 use crate::serve::handlers::repos::handle_repos_request;
 use crate::serve::handlers::rebuild_session_lifetime_stores::handle_rebuild_session_lifetime_stores_request;
 use crate::serve::handlers::rerender_all_views::handle_rerender_all_views_request;
@@ -25,7 +25,7 @@ use crate::serve::handlers::save_buffer::handle_save_buffer_request;
 use crate::serve::handlers::server_warnings::handle_server_warnings_request;
 use crate::serve::handlers::single_root_view::handle_single_root_view_request;
 use crate::serve::handlers::skgrepo_sets::handle_skgrepo_set_request;
-use crate::serve::handlers::integrate_unshown_changes::handle_integrate_unshown_changes_request;
+use crate::serve::handlers::extend_diff_view::handle_extend_diff_view_request;
 use crate::serve::handlers::stage_and_commit::handle_stage_and_commit_request;
 use crate::serve::handlers::strip_body_whitespace::handle_strip_body_whitespace_request;
 use crate::serve::handlers::text_search::handle_text_search_request;
@@ -37,7 +37,7 @@ use crate::serve::util::{ request_type_from_request, send_response_with_length_p
 use crate::types::env::SkgEnv;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::views_state::OpenViews;
-use crate::repo_watch::integrate::RepoChangeNotice;
+use crate::repo_watch::reload::RepoChangeNotice;
 
 use std::io::{BufRead, BufReader};
 use std::net::SocketAddr;
@@ -100,7 +100,7 @@ fn handle_emacs (
 
   let mut pending_import : Option<PendingImport> = None;
   let mut repo_change_notices : Receiver<Arc<RepoChangeNotice>> =
-    // What the repo watcher integrates from now on; told between requests.
+    // What the repo watcher reloads from now on; told between requests.
     env . runtime . subscribe_to_repo_change_notices ();
 
   let peer : SocketAddr =
@@ -205,8 +205,8 @@ fn handle_emacs (
             handle_stage_and_commit_request (
               &mut stream, &request_header, &env, &mut views_state,
               &skgrepo_restriction ),
-          Ok (RequestType::IntegrateUnshownChanges) =>
-            handle_integrate_unshown_changes_request (
+          Ok (RequestType::ExtendDiffView) =>
+            handle_extend_diff_view_request (
               &mut stream, &request_header, &env, &mut views_state,
               &skgrepo_restriction ),
           Ok (RequestType::HeraldRules) =>
@@ -256,7 +256,7 @@ fn handle_emacs (
         || e . kind () == std::io::ErrorKind::TimedOut =>
         { // The read timed out; no request has arrived yet. If no part
           // of one has either, the client may hear what the repo
-          // watcher integrated.
+          // watcher reloaded.
           if request_header . is_empty () && ! repo_change_notices . is_empty () {
             let runtime = env . runtime_snapshot ();
             skgrepo_restriction =

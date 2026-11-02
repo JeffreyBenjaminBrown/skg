@@ -225,7 +225,7 @@ So far there are these endpoints:
       the diff view, with its readiness summary, keeps every viewnode
       ID it carries (see =(vnid X)= under "The metadata headers"), and
       leaves the connection holding it as that buffer, so that an
-      "Integrate unshown changes" request can follow. A view the
+      "Extend diff view" request can follow. A view the
       connection holds keeps the kind it was registered with. A name
       no buffer has refuses the save, and nothing is written. Both
       clients keep the name in each buffer of the diff view they open
@@ -280,8 +280,9 @@ So far there are these endpoints:
        change view sets recomputed after the save: a new member in U is editable,
        with its content list, and any other new member is a
        write-protected member shown without its content. It
-       makes no occurrence editable and appends no root; the "integrate
-       unshown changes" request below does. An editable-view request
+       makes no occurrence editable and appends no root; the "extend
+       diff view" request below does, and so does the rerender that
+       follows a "Repo files reloaded" message. An editable-view request
        cascades as in any view. Every extension spends
        =initial_node_limit=, but the budget refuses only the extension
        of a node outside U; nothing else in the buffer is bounded by
@@ -540,7 +541,7 @@ buffer's =rendered-at=.
     disagree about their order, naming the node, the disagreeing
     manifests and which skgrepo this server folds first (see
     "OTHER_SKGREPO_DEPENDENCIES.toml", below); and one if the server
-    cannot watch the skgrepo directories (see "Repo files integrated",
+    cannot watch the skgrepo directories (see "Repo files reloaded",
     below), saying that files changed on disk then need a rebuild.
     A reload of the config ("Rebuild session-lifetime stores") does
     not change them.
@@ -552,9 +553,9 @@ buffer's =rendered-at=.
     =*SKG Server Warnings*= in Emacs, =skg://messages/server-warnings=
     in Neovim. An empty answer opens nothing.
 
-** Repo files integrated
+** Repo files reloaded
   - Unprompted: the server sends this message without a request, when
-    its repo watcher has integrated =.skg= files that changed on disk
+    its repo watcher has reloaded =.skg= files that changed on disk
     ('server/repo_watch/'). It comes only between responses: a
     connection's loop sends it when no request, nor any part of one,
     has arrived for its read timeout, so it never falls inside another
@@ -563,10 +564,10 @@ buffer's =rendered-at=.
     'state.unprompted_response_handler_map'); skg-for-ai prints its
     counts and warnings on standard error and reads on, and its daemon
     logs them and asks for the rerender as the clients do.
-  - Message: LP =((response-type repo-files-integrated) (integrated ((SKGREPO N) ...)) (warnings ("WARNING" ...)) (view-ids (VIEW_ID ...)))=.
-    =integrated= names each skgrepo with files integrated and how
+  - Message: LP =((response-type repo-files-reloaded) (reloaded ((SKGREPO N) ...)) (warnings ("WARNING" ...)) (view-ids (VIEW_ID ...)))=.
+    =reloaded= names each skgrepo with files reloaded and how
     many, in config order. The warnings are one per node or batch
-    that could not be integrated, saying why and that the server keeps
+    that could not be reloaded, saying why and that the server keeps
     serving the previous version. A connection is not told of a
     skgrepo its skgrepo restriction keeps out, nor of a problem
     concerning one. The view IDs are the
@@ -574,10 +575,13 @@ buffer's =rendered-at=.
     every buffer of the diff view it holds; every open view, with a
     warning saying so, when the connection fell too far behind to
     hear every batch. No message is sent when there is nothing to
-    tell.
+    tell. Each buffer of the diff view among the view IDs is marked,
+    when the connection has no skgrepo restriction, so that the next
+    "Rerender all views" that includes it extends it as "Extend diff
+    view" would ('docs/diff-view.org', "After a reload").
   - When there are no warnings, each client echoes the counts in one
-    line ("skg: repo first: 2 files integrated; repo main: 1 file
-    integrated"), in the echo area in Emacs, as a notification in
+    line ("skg: reloaded 2 files from repo first; reloaded 1 file from
+    repo main"), in the echo area in Emacs, as a notification in
     Neovim. When there is a warning, it appends a line per count and
     per warning to its server-warnings buffer under a level-1 headline
     "Repo changes", as it does the startup warnings ("Server
@@ -594,7 +598,7 @@ buffer's =rendered-at=.
     notification (inotify on Linux), not recursively, since a
     skgrepo's =.skg= files sit directly in it. Once an event arrives it
     gathers events until the directories have been quiet for
-    =repo_watch_quiet_ms= (see "skgconfig.toml"), then integrates the
+    =repo_watch_quiet_ms= (see "skgconfig.toml"), then reloads the
     batch once, under the mutation gate, so never in the middle of a
     save: each changed node's telescope is read again from every
     skgrepo, validated as a save's nodeInstructions are, and swapped
@@ -709,12 +713,12 @@ buffer's =rendered-at=.
   - Logic: =server/serve/handlers/stage_and_commit.rs=,
     =server/git_ops/stage_and_commit.rs=.
 
-** Integrate unshown changes
-  - Request: =((request . "integrate unshown changes") (view-id . "VIEW_ID"))=,
+** Extend diff view
+  - Request: =((request . "extend diff view") (view-id . "VIEW_ID"))=,
     where VIEW_ID names a buffer of the diff view. The client
     sends it only for a buffer with no unsaved changes, since the
     server works on the viewforest it registered at the last rerender.
-  - Response: LP response-type "integrate-unshown-changes", then a rerender
+  - Response: LP response-type "extend-diff-view", then a rerender
     stream (rerender-lock, rerender-view*, rerender-done). The
     response is one of:
     - =((readiness-summary ...) (errors ()) (warnings ()))=, the save
@@ -735,7 +739,7 @@ buffer's =rendered-at=.
     second one. Last, the buffer is refreshed once, as after a save,
     which gives each node made editable its body and draws its content
     list and the content of each appended root.
-    =server/serve/handlers/integrate_unshown_changes.rs=, =server/diff_view/buffer_rerender.rs=
+    =server/serve/handlers/extend_diff_view.rs=, =server/diff_view/buffer_rerender.rs=
     ('ensure_editableOccurrences_exist',
     'contentOrigins_missing_from_buffer'), and 'refresh_view' in
     =server/rerender_pass.rs=.
@@ -787,8 +791,8 @@ buffer's =rendered-at=.
     re-render after a rebuild, but tell the user to close the old
     views, and fetch the herald rules again ("Herald rules"), whose
     skgrepo labels the reloaded config may have changed. Files that
-    change on disk need no rebuild: the server integrates them as they
-    change ("Repo files integrated"). A rebuild is what applies a
+    change on disk need no rebuild: the server reloads them as they
+    change ("Repo files reloaded"). A rebuild is what applies a
     changed config.
 
 ** relRepo info
@@ -1027,12 +1031,17 @@ one automatically.
        Every rerender stream ends with this message.
   - Behavior: Re-renders every open view from server memory, each a
     refresh of what it holds; a buffer of the diff view is refreshed
-    over the graph straddle.
+    over the graph straddle, and one a "Repo files reloaded" message
+    named is also extended, as "Extend diff view" would extend it.
+    The server draws each view from what it last rendered or saved, so
+    a client excludes every view with unsaved edits, whose text the
+    rerender would replace.
     Does not save or modify the graph. Refreshes all views without
     requiring a save. The optional =(exclude-view-ids "VIEW_ID" ...)=
     leaves the views it names as they are: the clients name their
-    dirty views after an import, and, after a "Repo files integrated"
-    message, every view but the clean ones it names.
+    dirty views after an import and on the explicit command, and,
+    after a "Repo files reloaded" message, every view but the clean
+    ones it names.
   - All view text is prepared in memory before the release decision.
     Under a restricted set, overPrivateText content without exact approval returns
     LP =overPrivateText-telescope-confirmation= with
@@ -1496,7 +1505,9 @@ facts. The skgrepo recording it, when its privacy was deliberately
 raised above the relationship's default, is the =(relRepo NAME)= of
 the headline's =(skgRepos ...)= (the =contains= relationship to a
 content child, or the folder's relation for a partner folder member);
-ugly herald "~NAME", shown immediately before the ⌂. It is recomputed
+ugly herald "~NAME", shown immediately before the ⌂. A relationship
+recorded in a foreign skgrepo never carries it: a foreign skgrepo has
+no privacy rank, and only its own node records the relationship. It is recomputed
 at every rendering, and the save never reads it as a request, which
 is =(editRequest (relRepo NAME))=. And =(overridesHere N)=, crucial
 =ĥ= immediately after the =O= token, is a load-bearing declared part,
@@ -1587,7 +1598,7 @@ Pass its path as a command-line argument (default: =data/skgconfig.toml=) when s
 | =default_repo_set= | no | the most private owned skgrepo | The skgrepo restriction when a client connects: the most private owned skgrepo to show, foreign skgrepos shown. It must name an owned skgrepo; a foreign one is refused. The default is no skgrepo restriction. Runtime changes are per connection and are not written back. |
 | =max_roleTree_depth= | no | 20 | Max breadth-first depth of a containerward chain. |
 | =readiness_marks_file= | no | =readiness-marks-STEM.json= | The diff view's readiness marks file (see "Readiness marks file"). Relative to data root. |
-| =repo_watch_quiet_ms= | no | 500 | How long, in milliseconds, the skgrepo directories must be quiet after a =.skg= file changes on disk before the server integrates the changes (see "Repo files integrated"). A rebuild applies a changed value. |
+| =repo_watch_quiet_ms= | no | 500 | How long, in milliseconds, the skgrepo directories must be quiet after a =.skg= file changes on disk before the server reloads the changes (see "Repo files reloaded"). A rebuild applies a changed value. |
 
 The retired keys =db_name=, =delete_on_quit=, and =auto_audit_daily= are
 rejected with a migration error; remove them from older configurations.

@@ -440,7 +440,8 @@ fn set_omitted_body (
 /// relationship default. None on any of: the viewnode does not
 /// stand as a member here ('stands_as_member'); a compound partner folder
 /// (HiddenInSubscribee / HiddenOutsideOfSubscribee: no single
-/// 'relation_member_role'); no recorded relationship; unresolvable homes;
+/// 'relation_member_role'); no recorded relationship; a relationship
+/// recorded in a foreign skgrepo; unresolvable homes;
 /// or the skgrepo equalling the default.
 fn set_relRepo (
   tree   : &mut Tree<Viewnode>,
@@ -487,6 +488,12 @@ fn set_relRepo (
     let skgrepo : SkgrepoName =
       match relRepos . relRepo_memoized (&recorder_pid, relation, &target_pid) {
         Some (l) => l, None => break 'compute None, };
+    if ! config . skgrepo_is_owned (&skgrepo) {
+      // A foreign skgrepo has no rung on the privacy ladder, so a
+      // relationship recorded there is more private than nothing; and
+      // only a foreign node's own file records it, so no user of this
+      // server privatized it.
+      break 'compute None; }
     let default : SkgrepoName = {
       let recorder_home : Option<SkgrepoName> =
         graph . pid_and_skgrepo (&recorder_pid) . map ( |(_, s)| s );
@@ -560,6 +567,69 @@ mod relationship_default_tests {
     else { panic! ("member should be unrestricted"); };
     assert_eq! ( rendered_member . viewStats . relRepo, None,
       "the recorder-home default must not render a fake relRepo override" );
+  }
+
+  /// A foreign node contains an owned one: the relationship is recorded
+  /// in the foreign node's skgrepo, which has no privacy rank, so no
+  /// relRepo is marked, though the default (the owned member's home)
+  /// differs from it. The same for a foreign node containing a node of
+  /// another foreign skgrepo.
+  #[test]
+  fn a_relationship_recorded_in_a_foreign_skgrepo_has_no_override_herald () {
+    let config : SkgConfig = {
+      let mut skgrepos : HashMap<SkgrepoName, Skgrepo> =
+        HashMap::new ();
+      for (name, owned) in [ ("public", true), ("ed", false),
+                             ("private", true), ("other", false) ] {
+        skgrepos . insert (
+          SkgrepoName::from (name),
+          Skgrepo {
+            name         : SkgrepoName::from (name),
+            abbreviation : None,
+            path         : PathBuf::from (name),
+            owned        : owned, } ); }
+      let mut config : SkgConfig = SkgConfig::dummyFromSkgrepos (skgrepos);
+      config . skgrepo_order = ["public", "private", "ed", "other"]
+        . into_iter () . map (SkgrepoName::from) . collect ();
+      config };
+    let node = |pid : &str, home : &str, contains : &[&str]| -> Graphnode {
+      let mut node : Graphnode = empty_graphnode ();
+      node . pid = ID::new (pid);
+      node . title = pid . to_string ();
+      node . home_skgrepo = SkgrepoName::from (home);
+      node . contains = contains . iter ()
+        . map ( |member| RelPartner::at_relRepo (
+          SkgrepoName::from (home), ID::new (*member) ))
+        . collect ();
+      node };
+    let graph : InRustGraph = InRustGraph::from_graphnodes (&[
+      node ("inboxes", "ed", &["to-ed", "elsewhere"]),
+      node ("to-ed", "private", &[]),
+      node ("elsewhere", "other", &[]) ]);
+    let mut tree : Tree<Viewnode> =
+      Tree::new (viewforest_root_viewnode ());
+    let recorder_treeid : NodeId = tree . root_mut () . append (
+      mk_editable_viewnode (
+        ID::new ("inboxes"), SkgrepoName::from ("ed"),
+        "inboxes" . to_string (), None ) ) . id ();
+    for (member, home) in [ ("to-ed", "private"), ("elsewhere", "other") ] {
+      let member_treeid : NodeId = tree . get_mut (recorder_treeid)
+        . unwrap () . append ( mk_editable_viewnode (
+          ID::new (member), SkgrepoName::from (home),
+          member . to_string (), None ) ) . id ();
+      assert_ne! ( config . default_relRepo (
+                     &SkgrepoName::from ("ed"), &SkgrepoName::from (home) ),
+                   SkgrepoName::from ("ed"),
+                   "the default differs from the relRepo, so only the foreign rule suppresses the herald" );
+      set_relRepo (
+        &mut tree, member_treeid, true, &graph,
+        &mut RelRepoLookup::over (&graph), &config );
+      let ViewnodeKind::Vognode (Vognode::Occurrence (rendered_member)) =
+        & tree . get (member_treeid) . unwrap () . value () . kind
+      else { panic! ("member should be an occurrence"); };
+      assert_eq! ( rendered_member . viewStats . relRepo, None,
+        "a relationship recorded in the foreign skgrepo ed must not be marked ~ed ({})",
+        member ); }
   }
 }
 

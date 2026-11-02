@@ -13,8 +13,11 @@ use skg::graph_straddle::build::current_graph_straddle_in_slot;
 use skg::graph_straddle::types::GraphStraddle;
 use skg::diff_view::readiness_store::ReadinessStore;
 use skg::serve::handlers::save_buffer::SaveResponse;
-use skg::serve::handlers::integrate_unshown_changes::handle_integrate_unshown_changes_request;
+use skg::serve::handlers::extend_diff_view::handle_extend_diff_view_request;
 use skg::serve::handlers::stage_and_commit::handle_stage_and_commit_request;
+use skg::serve::handlers::repo_files_reloaded::deliver_repo_change_notices;
+use skg::serve::handlers::rerender_all_views::handle_rerender_all_views_request;
+use skg::repo_watch::reload::{RepoChangeNotice, reload_changed_skg_files};
 use skg::diff_view::buffer_rerender::RenderedDiffViewBuffer;
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::serve::handlers::diff_view::diffView_buffer;
@@ -30,11 +33,13 @@ use skg::types::viewnode::Viewnode;
 use ego_tree::Tree;
 
 use futures::executor::block_on;
+use tokio::sync::broadcast::Receiver;
 use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
+use std::fs;
 use std::io::Read;
 use std::net::TcpStream;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, MutexGuard};
 
 const FIXTURES : &str = "tests/pruned_change_view/fixtures";
@@ -197,10 +202,10 @@ pub fn send_stage_and_commit_request (
   read_end . read_to_string (&mut response) ?;
   Ok (response) }
 
-/// Send a "integrate unshown changes" request for the buffer 'diffView_buffer_kind'
+/// Send an "extend diff view" request for the buffer 'diffView_buffer_kind'
 /// to its handler, with no skgrepo restriction; return everything it
 /// wrote.
-pub fn send_integrate_unshown_changes_request (
+pub fn send_extend_diff_view_request (
   f                    : &mut Fixture,
   diffView_buffer_kind : DiffViewBufferKind,
 ) -> Result<String, Box<dyn Error>> {
@@ -209,9 +214,9 @@ pub fn send_integrate_unshown_changes_request (
     SkgrepoRestriction::unrestricted (&f . config);
   let (mut stream, mut read_end) : (TcpStream, TcpStream) =
     mk_test_tcp_stream_pair ();
-  handle_integrate_unshown_changes_request (
+  handle_extend_diff_view_request (
     &mut stream,
-    &format! ( "((request . \"integrate unshown changes\") (view-id . \"{}\"))\n",
+    &format! ( "((request . \"extend diff view\") (view-id . \"{}\"))\n",
                viewforest_id_of (diffView_buffer_kind) . repr_in_client () ),
     &env, &mut f . views_state, &all_skgrepos );
   drop (stream);
@@ -219,13 +224,69 @@ pub fn send_integrate_unshown_changes_request (
   read_end . read_to_string (&mut response) ?;
   Ok (response) }
 
-/// The "all changes" buffer as the "integrate unshown changes" request
+/// Write 'text' as the file of 'pid' in the owned skgrepo 'skgrepo',
+/// as another writer would, and reload it as the repo watcher does
+/// ('reload_changed_skg_files'); then tell the connection, as its
+/// loop does between requests ('deliver_repo_change_notices'). Return
+/// what the connection was sent.
+pub fn write_and_reload_as_another_writer (
+  f       : &mut Fixture,
+  skgrepo : &str,
+  pid     : &str,
+  text    : &str,
+) -> Result<String, Box<dyn Error>> {
+  let env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
+  let mut receiver : Receiver<Arc<RepoChangeNotice>> =
+    env . runtime . subscribe_to_repo_change_notices ();
+  let path : PathBuf = f . root . path () . join (skgrepo) . join ( format! ("{}.skg", pid) );
+  fs::write (&path, text) ?;
+  let (notice, retry) : (RepoChangeNotice, BTreeSet<PathBuf>) =
+    reload_changed_skg_files ( &env, &BTreeSet::from ([ path ]) );
+  assert! ( retry . is_empty () && notice . problems . is_empty (),
+            "the reload must succeed: {:?}", notice . problems );
+  env . runtime . publish_repo_change_notice (notice);
+  let (mut stream, mut read_end) : (TcpStream, TcpStream) =
+    mk_test_tcp_stream_pair ();
+  deliver_repo_change_notices (
+    &mut stream, &mut receiver, &mut f . views_state,
+    &SkgrepoRestriction::unrestricted (&f . config) );
+  drop (stream);
+  let mut delivered : String = String::new ();
+  read_end . read_to_string (&mut delivered) ?;
+  Ok (delivered) }
+
+/// Send a "rerender all views" request, with no skgrepo restriction,
+/// as a client does after a reload ('write_and_reload_as_another_writer');
+/// return the "all changes" buffer it rerendered.
+pub fn rerender_all_views_for_the_all_changes_buffer (
+  f : &mut Fixture,
+) -> Result<String, Box<dyn Error>> {
+  let env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
+  let (mut stream, mut read_end) : (TcpStream, TcpStream) =
+    mk_test_tcp_stream_pair ();
+  handle_rerender_all_views_request (
+    &mut stream, "((request . \"rerender all views\"))",
+    &env, &mut f . views_state,
+    &SkgrepoRestriction::unrestricted (&f . config) );
+  drop (stream);
+  let mut response : String = String::new ();
+  read_end . read_to_string (&mut response) ?;
+  let view_id : String = format! ( "\"{}\"", all_changes_view () . repr_in_client () );
+  let message : &str = response . split ("Content-Length")
+    . find ( |message| message . contains ("rerender-view")
+                       && message . contains (&view_id) )
+    . ok_or_else ( || format! ( "the buffer is not rerendered:\n{}", response )) ?;
+  Ok ( extract_string_field_from_sexp (
+         &message [ message . find ('(') . unwrap () .. ], "content" )
+       . expect ("the streamed view has content") ) }
+
+/// The "all changes" buffer as the "extend diff view" request
 /// rerenders it, and the not-editable count of its readiness summary.
-pub fn integrate_unshown_changes (
+pub fn extend_diff_view (
   f : &mut Fixture,
 ) -> Result<(String, usize), Box<dyn Error>> {
   let response : String =
-    send_integrate_unshown_changes_request (f, DiffViewBufferKind::AllChanges) ?;
+    send_extend_diff_view_request (f, DiffViewBufferKind::AllChanges) ?;
   let not_editable : usize = response . split ("(notEditable ") . nth (1)
     . and_then ( |rest| rest . split (')') . next () )
     . and_then ( |count| count . parse () . ok () )

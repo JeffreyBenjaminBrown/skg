@@ -3,7 +3,7 @@
 //! again from every skgrepo, and the nodes that differ from the graph
 //! are written to it (or deleted from it) as nodeInstructions, through
 //! the save's incremental validation ('prepare_graph_update'). The
-//! nodes so integrated take the new generation as their last change,
+//! nodes so reloaded take the new generation as their last change,
 //! so the stale-save check refuses a buffer that showed them before.
 //!
 //! Nothing is written to disk: the files are already what the graph
@@ -37,27 +37,27 @@ use std::sync::Arc;
 use tokio::sync::MutexGuard;
 
 /// What one batch did, for every connection to report
-/// ('server/serve/handlers/repo_files_integrated.rs').
+/// ('server/serve/handlers/repo_files_reloaded.rs').
 #[derive(Clone, Debug, Default)]
 pub struct RepoChangeNotice {
   /// The generation the batch was swapped in as; None when nothing
-  /// was integrated.
+  /// was reloaded.
   pub generation : Option<u64>,
   /// The nodes the batch wrote to or deleted from the graph, or whose
   /// illegal edits it changed.
   pub changed_pids : HashSet<ID>,
   /// For each skgrepo, in config order, how many of its files the
-  /// batch integrated.
-  pub files_integrated : Vec<(SkgrepoName, usize)>,
-  /// What could not be integrated.
+  /// batch reloaded.
+  pub files_reloaded : Vec<(SkgrepoName, usize)>,
+  /// What could not be reloaded.
   pub problems : Vec<RepoChangeProblem>,
-  /// Whether a foreign skgrepo's file was integrated. The diff view
+  /// Whether a foreign skgrepo's file was reloaded. The diff view
   /// reads foreign skgrepos from their worktree, so its graph
   /// straddle is then stale.
-  pub foreign_files_integrated : bool,
+  pub foreign_files_reloaded : bool,
 }
 
-/// One thing a batch could not integrate, and the skgrepos it
+/// One thing a batch could not reload, and the skgrepos it
 /// concerns, so that a connection whose skgrepo restriction hides one
 /// of them is not told of it.
 #[derive(Clone, Debug)]
@@ -71,7 +71,7 @@ impl RepoChangeNotice {
   pub fn is_empty (
     &self,
   ) -> bool {
-    self . files_integrated . is_empty () && self . problems . is_empty () }
+    self . files_reloaded . is_empty () && self . problems . is_empty () }
 }
 
 /// A changed '.skg' file of a configured skgrepo.
@@ -92,13 +92,13 @@ enum ReadChange {
   Nothing,
 }
 
-/// Integrate the changed 'paths' (any paths; those that are not a
+/// Reload the changed 'paths' (any paths; those that are not a
 /// '.skg' file directly inside a configured skgrepo are ignored, and
 /// so are those whose file is as the server itself last wrote it).
 /// Holds the mutation gate throughout, so a batch never interleaves
 /// with a save. Returns the notice and the paths to try again with
 /// the next batch: those of a batch that failed validation.
-pub fn integrate_changed_skg_files (
+pub fn reload_changed_skg_files (
   env   : &SkgEnv,
   paths : &BTreeSet<PathBuf>,
 ) -> (RepoChangeNotice, BTreeSet<PathBuf>) {
@@ -122,7 +122,7 @@ pub fn integrate_changed_skg_files (
     by_pid };
   let mut nodeInstructions : Vec<NodeInstruction> = Vec::new ();
   let mut illegal_edits : HashMap<ID, Vec<IllegalEdit>> = HashMap::new ();
-  let mut integrated_pids : BTreeSet<ID> = BTreeSet::new ();
+  let mut reloaded_pids : BTreeSet<ID> = BTreeSet::new ();
   for (pid, files) in &files_by_pid {
     match read_change_of_pid (config, &base, pid) {
       Err (message) =>
@@ -145,21 +145,21 @@ pub fn integrate_changed_skg_files (
           ReadChange::Nothing => false, };
         if wrote || illegal_edits_changed {
           illegal_edits . insert ( pid . clone (), illegal );
-          integrated_pids . insert ( pid . clone () ); }}, }}
-  if integrated_pids . is_empty () {
+          reloaded_pids . insert ( pid . clone () ); }}, }}
+  if reloaded_pids . is_empty () {
     return (notice, BTreeSet::new ()); }
   let prepared : PreparedGraphUpdate =
     match prepare_graph_update (config, base . clone (), nodeInstructions) {
       Ok (prepared) => prepared,
       Err (error) => {
-        let retry : BTreeSet<PathBuf> = integrated_pids . iter ()
+        let retry : BTreeSet<PathBuf> = reloaded_pids . iter ()
           . flat_map ( |pid| files_by_pid [pid] . iter () . map ( |file| file . path . clone () ))
           . collect ();
         notice . problems . push ( RepoChangeProblem {
-          skgrepos : skgrepos_of ( integrated_pids . iter ()
+          skgrepos : skgrepos_of ( reloaded_pids . iter ()
                                    . flat_map ( |pid| files_by_pid [pid] . iter () )),
           message  : format! (
-            "Files that changed on disk could not be integrated, so the server keeps serving its previous graph; they are tried again with the next change on disk:\n{}",
+            "Files that changed on disk could not be reloaded, so the server keeps serving its previous graph; they are tried again with the next change on disk:\n{}",
             error ), } );
         return (notice, retry); }, };
   let telescope_warnings : Vec<(ID, TelescopeViolation)> =
@@ -179,26 +179,26 @@ pub fn integrate_changed_skg_files (
     &swapped_in . graph, &runtime . tantivy_index,
     prepared . nodeInstructions () . to_vec () );
   emit_telescope_warnings (&telescope_warnings);
-  let integrated_files : Vec<&ChangedSkgFile> = integrated_pids . iter ()
+  let reloaded_files : Vec<&ChangedSkgFile> = reloaded_pids . iter ()
     . flat_map ( |pid| files_by_pid [pid] . iter () )
     . collect ();
-  notice . foreign_files_integrated = integrated_files . iter ()
+  notice . foreign_files_reloaded = reloaded_files . iter ()
     . any ( |file| ! config . skgrepo_is_owned (&file . skgrepo) );
-  if notice . foreign_files_integrated {
+  if notice . foreign_files_reloaded {
     if let Err (e) = forget_cached_git_snapshots () {
       tracing::warn! ( error = %e, "could not forget the cached git snapshots" ); }}
-  notice . files_integrated = config . ordered_skgrepos () . into_iter ()
+  notice . files_reloaded = config . ordered_skgrepos () . into_iter ()
     . filter_map ( |skgrepo| {
-      let count : usize = integrated_files . iter ()
+      let count : usize = reloaded_files . iter ()
         . filter ( |file| file . skgrepo == skgrepo ) . count ();
       (count > 0) . then_some ((skgrepo, count)) } )
     . collect ();
-  notice . changed_pids = integrated_pids . into_iter () . collect ();
+  notice . changed_pids = reloaded_pids . into_iter () . collect ();
   notice . generation = Some (swapped_in . generation);
   tracing::info! (
     generation = swapped_in . generation,
     nodes = notice . changed_pids . len (),
-    "integrated .skg files that changed on disk" );
+    "reloaded .skg files that changed on disk" );
   (notice, BTreeSet::new ()) }
 
 /// The '.skg' files among 'paths' that sit directly in a configured

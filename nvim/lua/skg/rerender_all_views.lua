@@ -1,6 +1,7 @@
 -- PURPOSE: The rerender stream (rerender-lock -> rerender-view* ->
 -- rerender-done), shared by the switch of the skgrepo restriction, the explicit
--- rerender-all request, and the requests a rerender stream follows,
+-- rerender-all command (which skips every buffer with unsaved edits),
+-- and the requests a rerender stream follows,
 -- with the prologue those requests share (send_streaming_request).
 -- The Lua port of elisp/skg-request-rerender-all-views.el.
 
@@ -19,10 +20,36 @@ M.overPrivateText_retry = nil
 M.overPrivateText_challenged = false
 M.after_empty_stream = nil
 
----Ask the server to re-render every open view: lock everything, then
----drive the streaming protocol.
+---Ask the server to re-render every open view that holds no unsaved
+---edits: lock everything, then drive the streaming protocol. The
+---server draws a view from what it last rendered or saved for it,
+---which would discard unsaved edits; so each buffer that has them is
+---left as it is, and named in a notification.
 function M.request_rerender_all_views ()
-  return M.request_rerender_all_views_with_approval(nil, nil)
+  local dirty_view_ids, dirty_bufs = M.dirty_view_buffers()
+  if #dirty_bufs > 0 then
+    local names = {}
+    for _, buf in ipairs(dirty_bufs) do
+      table.insert(names, vim.api.nvim_buf_get_name(buf)) end
+    vim.notify('skg: not rerendered, having unsaved edits: '
+               .. table.concat(names, ', '))
+  end
+  return M.request_rerender_all_views_with_approval(nil, dirty_view_ids)
+end
+
+---The view IDs of the skg view buffers with unsaved edits, and the
+---buffers, in the same order.
+---@return string[], integer[]
+function M.dirty_view_buffers ()
+  local dirty_view_ids, dirty_bufs = {}, {}
+  for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+    local view_id = vim.api.nvim_buf_is_valid(buf) and vim.b[buf].skg_view_id
+    if view_id and vim.bo[buf].modified then
+      table.insert(dirty_view_ids, view_id)
+      table.insert(dirty_bufs, buf)
+    end
+  end
+  return dirty_view_ids, dirty_bufs
 end
 
 ---Ask the server to rerender every open view but EXCLUDED_VIEW_IDS.
@@ -32,13 +59,7 @@ function M.request_rerender_views_excluding (excluded_view_ids)
 end
 
 function M.request_rerender_clean_views_after_import ()
-  local dirty_view_ids = {}
-  for _, buf in ipairs(vim.api.nvim_list_bufs()) do
-    if vim.api.nvim_buf_is_valid(buf) and vim.bo[buf].modified then
-      local view_id = vim.b[buf].skg_view_id
-      if view_id then table.insert(dirty_view_ids, view_id) end
-    end
-  end
+  local dirty_view_ids = M.dirty_view_buffers()
   return M.request_rerender_all_views_with_approval(nil, dirty_view_ids)
 end
 

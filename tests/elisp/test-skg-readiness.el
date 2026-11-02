@@ -307,7 +307,7 @@ siblings, or a child without metadata."
                  " (readiness-summary (ready 12) (changed 14) (foreign 2)"
                  " (order-only 1) (notEditable 3)))")))
       (should (equal (car shown)
-                     "12 of 14 changed files are ready, 3 changes are not editable in this view; C-c r u integrates them, 2 files changed in foreign skgrepos"))
+                     "12 of 14 changed files are ready, 3 changes are not editable in this view; C-c r u extends the diff view to them, 2 files changed in foreign skgrepos"))
       (with-temp-buffer
         (skg-handle-save-sexp
          (concat "((content \"* (skg node (gnid a)) a\n\") (errors ()) (warnings ())"

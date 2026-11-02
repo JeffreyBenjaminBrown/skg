@@ -38,9 +38,9 @@ foreign node, or 'fork') is approved by '--yes', the clone going to
 removed one's stops the save until its handle is restored or it is
 marked '⟨new⟩'; one whose title resembles a removed one's is a
 question, answered by '--keep-ids' or '--all-new' or on the headline.
-'integrate SIDECAR' makes every change a buffer of the diff view does
-not make editable editable there, as the clients' 'C-c r u' does, and
-writes the buffer again.
+'extend SIDECAR' extends a buffer of the diff view to every change it
+does not make editable, as the clients' 'C-c r u' does, and writes the
+buffer again.
 'commit MESSAGE' stages and git-commits every change in the owned
 skgrepos, asking first when the server says not all is ready.
 Other commands: 'close SIDECAR'; 'raw REQUEST', which sends one
@@ -174,8 +174,8 @@ def run_command (arguments):
   if arguments . command == "commit":
     command_commit (arguments)
     return
-  if arguments . command == "integrate":
-    command_integrate (arguments)
+  if arguments . command == "extend":
+    command_extend (arguments)
     return
   connection = connect_to_server (arguments . port)
   try:
@@ -243,15 +243,14 @@ def parse_command_line (argv):
     "diff", help = ( "the diff view's nonempty buffers: every change in "
                      "the owned skgrepos since their last git-commits" ),
     parents = [ common_options ] )
-  integrate_parser = commands . add_parser (
-    "integrate", help = ( "make the changes a buffer of the diff view does "
-                          "not make editable editable there, and write it "
-                          "again" ))
-  integrate_parser . add_argument (
+  extend_parser = commands . add_parser (
+    "extend", help = ( "extend a buffer of the diff view to the changes it "
+                       "does not make editable, and write it again" ))
+  extend_parser . add_argument (
     "view_files",
     help = ( "the BASE.view.json of a buffer of the diff view, or a "
              "directory holding only one" ))
-  integrate_parser . add_argument (
+  extend_parser . add_argument (
     "--port", type = int, default = None,
     help = "the server's port; it must be the one the sidecar records" )
   commit_parser = commands . add_parser (
@@ -521,8 +520,8 @@ def command_save (arguments):
   for path in written_paths:
     print (path)
 
-def command_integrate (arguments):
-  """Send "integrate unshown changes" for a buffer of the diff view,
+def command_extend (arguments):
+  """Send "extend diff view" for a buffer of the diff view,
   as the clients' 'C-c r u' does, and write the buffer the server
   rerenders over the three files. A client sends it only for a buffer
   with no unsaved changes, so this refuses an edited compact view. The
@@ -531,19 +530,19 @@ def command_integrate (arguments):
   naming its buffer of the diff view, which writes nothing and leaves
   the server holding this buffer, its roots and what it makes
   editable; its readiness summary is printed as the one before
-  integrating. The server refuses that save if a node the
+  extending. The server refuses that save if a node the
   buffer shows changed since it was rendered; 'diff' then writes a
   fresh buffer, which makes every change editable."""
   saved_view = load_saved_view (arguments . view_files)
   sidecar = saved_view . sidecar
   if sidecar [ "command" ] != "diff":
     raise SkgToolError (
-      "Nothing was integrated: " + os . path . basename (saved_view . full_path) +
+      "Nothing was extended: " + os . path . basename (saved_view . full_path) +
       " is not a buffer of the diff view." )
   require_port_of_sidecar (arguments . port, sidecar)
   if compact_view_has_edits (saved_view):
     raise SkgToolError (
-      "Nothing was integrated: the compact view has edits; save them "
+      "Nothing was extended: the compact view has edits; save them "
       "first, or write the buffer again with 'diff'." )
   connection = connection_for_saved_view (saved_view)
   try:
@@ -554,24 +553,24 @@ def command_integrate (arguments):
          or not isinstance ( response_field (terminal, "content"), str )
          or isinstance ( response_field (terminal, "content"), Symbol )):
       raise SkgToolError (
-        "Nothing was integrated: the server refused this buffer as it "
+        "Nothing was extended: the server refused this buffer as it "
         "stands; run 'diff' for a fresh one, which makes every change "
         "editable. The server said: " + " " . join (
           response_field (terminal, "errors") or [ render_sexp (terminal) ] ))
-    print ( "Before integrating: " + readiness_summary_text (
+    print ( "Before extending: " + readiness_summary_text (
       response_field (terminal, "readiness-summary") ))
-    response, rerendered = connection . integrate_unshown_changes (
+    response, rerendered = connection . extend_diff_view (
       sidecar [ "view_id" ] )
     errors = response_field (response, "errors") or []
     for error in errors:
       print ( "Server error: " + error )
     if errors or rerendered is None:
       raise SkgToolError (
-        "Nothing was integrated; the files are as they were." )
+        "Nothing was extended; the files are as they were." )
     readiness_summary = response_field (response, "readiness-summary")
-    print ( "Integrated: " + readiness_summary_text (readiness_summary) )
+    print ( "Extended: " + readiness_summary_text (readiness_summary) )
     connection . log_view_event (
-      "integrated", saved_view . directory, saved_view . base_name )
+      "extended", saved_view . directory, saved_view . base_name )
     view = { "view_id"     : sidecar [ "view_id" ],
              "command"     : sidecar [ "command" ],
              "request"     : sidecar [ "request" ],
@@ -608,7 +607,7 @@ def compact_view_has_edits (saved_view):
          saved_view . headline_of_handle ))
 
 def connection_for_saved_view (saved_view):
-  """The connection on which to save or integrate SAVED_VIEW: the
+  """The connection on which to save or extend SAVED_VIEW: the
   daemon's, when one runs this command and talks to the sidecar's
   server, unless it holds the sidecar's view ID for other files (a
   later view under the same view ID), in which case a connection of
@@ -3082,7 +3081,7 @@ RUNNING_DAEMON = None
 RERENDER_MESSAGE_TYPES = { "collateral-view", "rerender-view" }
 RESPONSE_TYPE_PATTERN = re . compile ( r'^\(\(response-type ([^\s()]+)\)' )
 # The commands that name a sidecar, whose port is the sidecar's.
-SIDECAR_COMMANDS = ( "save", "integrate", "close" )
+SIDECAR_COMMANDS = ( "save", "extend", "close" )
 # The commands that always run in their own process: 'raw' speaks the
 # protocol directly, and 'import' binds its approval to a connection
 # of its own. ('commit' runs here too unless '--yes' answers for it.)
@@ -3163,7 +3162,7 @@ def port_named_by_command (arguments, argv):
   return None
 
 def port_of_sidecar_of_command (arguments):
-  """The port the sidecar of a 'save', 'integrate' or 'close' records;
+  """The port the sidecar of a 'save', 'extend' or 'close' records;
   None for other commands, or when the sidecar cannot be read (the
   command then says why, where it runs)."""
   if arguments . command not in SIDECAR_COMMANDS:
@@ -3181,7 +3180,7 @@ def daemon_sidecar_argument (arguments):
 
 def daemon_folder_of_command (arguments):
   """The folder whose daemon a command runs through: its '--out-dir',
-  or for 'save', 'integrate' and 'close' its sidecar's folder. None
+  or for 'save', 'extend' and 'close' its sidecar's folder. None
   for the commands that write no view."""
   if arguments . command in SIDECAR_COMMANDS:
     path = daemon_sidecar_argument (arguments)
@@ -3211,7 +3210,7 @@ class SkgForAiDaemon:
   commands' responses carried and the unprompted messages that
   arrived meanwhile: it rewrites the files of each view the server
   rerendered, asking for the rerender of the views a
-  'repo-files-integrated' message names, as the clients do, and logs
+  'repo-files-reloaded' message names, as the clients do, and logs
   each event to FOLDER's log."""
 
   def __init__ (self, folder, port):
@@ -3402,7 +3401,7 @@ class SkgForAiDaemon:
   def use_own_port_unless_named (self, arguments, named_port):
     """A command the daemon runs talks to the port its sender named
     (NAMED_PORT, by '--port' or SKG_PORT), else to the daemon's
-    server; 'save', 'integrate' and 'close' talk to their sidecar's."""
+    server; 'save', 'extend' and 'close' talk to their sidecar's."""
     if named_port is not None:
       arguments . port = named_port
     elif arguments . command not in SIDECAR_COMMANDS:
@@ -3416,18 +3415,18 @@ class SkgForAiDaemon:
       payload, cause = self . connection . waiting_messages . popleft ()
       try:
         if payload . startswith (UNPROMPTED_REPO_CHANGE_MESSAGE_START):
-          self . handle_repo_files_integrated ( parse_sexp (payload) )
+          self . handle_repo_files_reloaded ( parse_sexp (payload) )
         else:
           self . rewrite_rerendered_view ( parse_sexp (payload), cause )
       except SkgToolError as error:
         self . log ( "error: " + str (error) )
 
-  def handle_repo_files_integrated (self, message):
+  def handle_repo_files_reloaded (self, message):
     """Log the counts and the warnings, and ask for the rerender of
     each view named that the daemon holds and whose compact view has
-    no unsaved edits, as the clients do ('Repo files integrated' in
+    no unsaved edits, as the clients do ('Repo files reloaded' in
     'docs/api-and-formats.org')."""
-    count_clauses = repo_files_integrated_count_clauses (message)
+    count_clauses = repo_files_reloaded_count_clauses (message)
     warnings = [ sexp_to_text (warning)
                  for warning in response_field (message, "warnings") or [] ]
     if count_clauses:
@@ -3744,15 +3743,16 @@ def quoted_title (title):
 # The connection
 # ============================================================
 
-UNPROMPTED_REPO_CHANGE_MESSAGE_START = "((response-type repo-files-integrated)"
+UNPROMPTED_REPO_CHANGE_MESSAGE_START = "((response-type repo-files-reloaded)"
 
-def repo_files_integrated_count_clauses (message):
-  """'repo NAME: N files integrated' for each '(NAME N)' of a
-  repo-files-integrated MESSAGE's '(integrated ...)'."""
+def repo_files_reloaded_count_clauses (message):
+  """'reloaded N files from repo NAME' for each '(NAME N)' of a
+  repo-files-reloaded MESSAGE's '(reloaded ...)'."""
   clauses = []
-  for skgrepo, count in response_field (message, "integrated") or []:
-    clauses . append ( f"repo {sexp_to_text (skgrepo)}: {count} "
-                       f"{'file' if count == 1 else 'files'} integrated" )
+  for skgrepo, count in response_field (message, "reloaded") or []:
+    clauses . append ( f"reloaded {count} "
+                       f"{'file' if count == 1 else 'files'} "
+                       f"from repo {sexp_to_text (skgrepo)}" )
   return clauses
 
 class SkgToolError (Exception):
@@ -3812,11 +3812,11 @@ class SkgConnection:
     pass
 
   def handle_unprompted_message (self, payload):
-    """A message the server sent unprompted, that it integrated files
+    """A message the server sent unprompted, that it reloaded files
     changed on disk, is no answer: its counts and warnings go to
     stderr."""
     message = parse_sexp (payload)
-    for line in ( repo_files_integrated_count_clauses (message) +
+    for line in ( repo_files_reloaded_count_clauses (message) +
                   [ sexp_to_text (warning)
                     for warning in response_field (message, "warnings") or [] ] ):
       print ( "skg server: " + line, file = sys . stderr )
@@ -3894,15 +3894,15 @@ class SkgConnection:
       pass
     return response
 
-  def integrate_unshown_changes (self, view_id):
-    """Send "integrate unshown changes" for VIEW_ID; return its
+  def extend_diff_view (self, view_id):
+    """Send "extend diff view" for VIEW_ID; return its
     response, parsed, and the 'rerender-view' message for VIEW_ID in
     the rerender stream that follows it (None when there is none),
     after reading that stream up to its 'rerender-done'."""
     self . send_line (
-      request_line ( "integrate unshown changes", ( "view-id", view_id )))
+      request_line ( "extend diff view", ( "view-id", view_id )))
     response = parse_sexp ( self . read_message (IMPORT_TIMEOUT_SECONDS) )
-    require_response_type (response, "integrate-unshown-changes")
+    require_response_type (response, "extend-diff-view")
     rerendered = None
     while True:
       message = parse_sexp ( self . read_message (FIRST_MESSAGE_TIMEOUT_SECONDS) )
@@ -3937,7 +3937,7 @@ class SkgConnection:
     """One 'Content-Length: N\\r\\n\\r\\nPAYLOAD' message's payload.
     A server still initializing answers with a bare
     '((busy-initializing . ...))' line instead. A message the server
-    sends unprompted, between responses, that it integrated files
+    sends unprompted, between responses, that it reloaded files
     changed on disk is no answer: 'handle_unprompted_message' takes
     it, and the next message is read."""
     while True:

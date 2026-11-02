@@ -1,6 +1,8 @@
 ;;; -*- lexical-binding: t; -*-
 ;;;
-;;; Handler for the "rerender all views" request/response,
+;;; The "rerender all views" command, which skips every buffer with
+;;; unsaved edits ('skg-request-rerender-all-views'),
+;;; the handler for its request/response,
 ;;; and the rerender stream that follows several other requests,
 ;;; with the prologue those requests share
 ;;; ('skg--send-streaming-request').
@@ -10,7 +12,7 @@
 
 (require 'skg-length-prefix)
 (require 'skg-request-save) ; for skg-replace-buffer-with-new-content, skg-big-nonfatal-message
-(require 'skg-buffer)       ; for skg-find-buffer-by-view-id
+(require 'skg-buffer)       ; for skg-find-buffer-by-view-id, skg--unsaved-view-buffers
 (require 'skg-lock-buffers)
 
 (defvar skg--rerender-overPrivateText-retry nil
@@ -20,16 +22,23 @@
   "Non-nil while consuming the empty unwind after a privacy challenge.")
 
 (defun skg-request-rerender-all-views (&optional approved-pids)
-  "Ask the server to re-render every open view.
+  "Ask the server to re-render every open view that holds no unsaved
+edits. The server draws a view from what it last rendered or saved for
+it, which would discard unsaved edits; so each buffer that has them is
+left as it is, and named in the echo area.
+APPROVED-PIDS approve the text a privacy challenge asked about.
 Locks all skg buffers, then registers handlers for the
 streaming protocol: rerender-lock, rerender-view*, rerender-done."
-  (skg--send-streaming-request
-   "rerender" nil
-   (append '((request . "rerender all views"))
-           (when approved-pids
-             `((approved-overPrivateText-pids ,@approved-pids))))
-   nil nil nil
-   (lambda (pids) (skg-request-rerender-all-views pids))))
+  (interactive)
+  (let ((dirty (skg--unsaved-view-buffers)))
+    (when dirty
+      (message "skg: not rerendered, having unsaved edits: %s"
+               (mapconcat #'buffer-name dirty ", ")))
+    (skg--request-rerender-views-excluding
+     "rerender"
+     (mapcar (lambda (buffer) (buffer-local-value 'skg-view-id buffer))
+             dirty)
+     approved-pids)))
 
 (defun skg--request-rerender-views-excluding (label excluded &optional approved-pids)
   "Ask the server to rerender every open view but EXCLUDED, a list of

@@ -1,7 +1,7 @@
 //! What the server itself last wrote to each '.skg' path: the content
 //! hash of a write, or absence for a removal. A save writes files into
 //! owned skgrepos, and the repo watcher sees those writes as it sees
-//! anyone's; without this record every save would be integrated a
+//! anyone's; without this record every save would be reloaded a
 //! second time. The watcher drops an event whose file now matches the
 //! record ('is_own_write_then_forget'), which also forgets the entry.
 //!

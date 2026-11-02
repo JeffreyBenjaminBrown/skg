@@ -1457,7 +1457,7 @@ the node. Marking it marks the leaf of the removed alias or ID.
 **** readiness summary
 
 The line a client shows after every save of a diff-view buffer, after the
-"integrate unshown changes" command (C-c r u), and before a
+"extend the diff view" command (C-c r u), and before a
 stage-and-commit that would leave changes behind: "12 of 14 changed
 files are ready", or "Commit ready. All 14 of 14 changed files are
 ready." A changed file is ready when every change it records is
@@ -1486,7 +1486,8 @@ The change-forest leaves recorded by the nodes whose changes a
 buffer does not
 [[*editable in the diff view][make editable]] are the *changes
 not editable in the view*, which the readiness summary counts. A
-save never makes them editable; C-c r u integrates them.
+save never makes them editable; C-c r u extends the buffer to them,
+as does the rerender of a clean buffer after a reload.
 
 **** readiness request, readiness gesture
 

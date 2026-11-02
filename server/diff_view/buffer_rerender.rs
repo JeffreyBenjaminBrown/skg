@@ -1,7 +1,8 @@
 //! Buffers of the diff view ('docs/diff-view.org', "Rendering a
 //! buffer"): the stub of a fresh one, its first rendering, and the
-//! refresh of an open one, with what the "integrate unshown changes"
-//! request adds to it. Each is a refresh in diff-view mode
+//! refresh of an open one, with what extending it to the changes it
+//! does not show adds ('docs/diff-view.org', "Extending the diff
+//! view"). Each is a refresh in diff-view mode
 //! ('refresh_viewforest', 'server/refresh/'), over the graph straddle,
 //! with the '(ready ...)' change facts read from the store: the first
 //! rendering refreshes a stub of the buffer's roots
@@ -29,7 +30,7 @@ use crate::types::viewnode::{
   Editability, Existence, FoldAndFocus, Folder, Viewnode, ViewnodeKind, Vognode,
   mk_editable_viewnode, viewnode_of};
 use crate::types::views_state::{DiffViewBufferKind, ViewnodeIdRecord, pids_from_viewforest};
-use crate::rerender_pass::{DiffViewBufferRerender, RerenderPassContext};
+use crate::rerender_pass::RerenderPassContext;
 use crate::refresh::mode::RefreshMode;
 
 use ego_tree::{NodeId, NodeRef};
@@ -63,9 +64,9 @@ pub fn refresh_diffView_viewforest (
 
 /// Bring an open buffer of the diff view up to date: bring the
 /// straddle in the context's slot up to date, and refresh the buffer
-/// over it; it renders nothing. Only for the "integrate unshown
-/// changes" request ('DiffViewBufferRerender::IntegratingUnshownChanges')
-/// does it make
+/// over it; it renders nothing. Only if 'extend' (the "extend diff
+/// view" request, and the "rerender all views" after a reload;
+/// 'DiffViewBufferRerender') does it make
 /// occurrences editable or append roots, both before the one refresh:
 /// each node of the recomputed U without an editable occurrence
 /// becomes editable at its first content occurrence, and the content
@@ -75,6 +76,7 @@ pub fn refresh_diffView_viewforest (
 pub fn refresh_diffView_buffer_over_current_straddle (
   context              : &mut RerenderPassContext<'_>,
   diffView_buffer_kind : DiffViewBufferKind,
+  extend               : bool,
   viewforest           : &mut ViewForest,
   viewnode_id_record   : &mut ViewnodeIdRecord,
 ) -> Result<(), Box<dyn Error>> {
@@ -85,7 +87,7 @@ pub fn refresh_diffView_buffer_over_current_straddle (
       &mut context . graph_straddle, &runtime . config, runtime . graph . clone () )
     . map_err ( |e| format! (
       "Cannot rerender the diff view buffer: {}", e )) ?;
-  if context . diffView_buffer_rerender == DiffViewBufferRerender::IntegratingUnshownChanges {
+  if extend {
     let standing_roots : BTreeSet<ID> = root_gnids_of_buffer (viewforest);
     ensure_editableOccurrences_exist (&straddle, diffView_buffer_kind, viewforest);
     let new_roots : Vec<ID> = contentOrigins_missing_from_buffer (
@@ -235,8 +237,8 @@ pub fn root_gnids_of_buffer (
       _ => None, } )
     . collect () }
 
-/// Before the refresh of a rerender that integrates the changes not
-/// editable in the view ('refresh_diffView_buffer_over_current_straddle'): each node of the
+/// Before the refresh of a rerender that extends the buffer to the
+/// changes not editable in it ('refresh_diffView_buffer_over_current_straddle'): each node of the
 /// buffer's recomputed U that has no editable occurrence becomes
 /// editable where it stands, at its level-order first content
 /// occurrence (a root, a member of a vognode's content, or a removed

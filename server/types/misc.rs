@@ -266,7 +266,7 @@ pub struct SkgConfig {
   pub readiness_marks_file : Option<PathBuf>, // The readiness store's file, as the config states it; see 'readiness_marks_path'.
 
   #[serde(default = "default_repo_watch_quiet_ms")]
-  pub repo_watch_quiet_ms : u64, // How long the skgrepo directories must be quiet before the files changed in them are integrated; see 'server/repo_watch/watcher.rs'.
+  pub repo_watch_quiet_ms : u64, // How long the skgrepo directories must be quiet before the files changed in them are reloaded; see 'server/repo_watch/watcher.rs'.
 }
 
 /// The foreign skgrepos of this config that one foreign skgrepo's

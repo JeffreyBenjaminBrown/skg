@@ -1,13 +1,13 @@
--- Coverage for skg.repo_files_integrated: the message the server sends
--- unprompted when it integrated files changed on disk. Mirrors
--- tests/elisp/test-skg-repo-files-integrated.el.
+-- Coverage for skg.repo_files_reloaded: the message the server sends
+-- unprompted when it reloaded files changed on disk. Mirrors
+-- tests/elisp/test-skg-repo-files-reloaded.el.
 
 local helpers = dofile(
   debug.getinfo(1, 'S').source:sub(2):match('^(.*)/') .. '/helpers.lua')
 
 local length_prefix = require('skg.length_prefix')
 local lock = require('skg.lock')
-local repo_files_integrated = require('skg.repo_files_integrated')
+local repo_files_reloaded = require('skg.repo_files_reloaded')
 local rerender = require('skg.rerender_all_views')
 local server_warnings = require('skg.server_warnings')
 local sexpr = require('skg.sexpr.parse')
@@ -39,7 +39,7 @@ local function view_buffer (view_id, dirty)
   return buf
 end
 
-describe('skg.repo_files_integrated', function ()
+describe('skg.repo_files_reloaded', function ()
   local buffers
   local real_notify
   local real_request
@@ -70,44 +70,44 @@ describe('skg.repo_files_integrated', function ()
 
   it('is dispatched though no request registered a handler', function ()
     local handled = nil
-    local saved = state.unprompted_response_handler_map['repo-files-integrated']
-    state.unprompted_response_handler_map['repo-files-integrated'] =
+    local saved = state.unprompted_response_handler_map['repo-files-reloaded']
+    state.unprompted_response_handler_map['repo-files-reloaded'] =
       function (payload_text) handled = payload_text end
     state.response_handler_map = {}
     length_prefix.dispatch_by_type(
-      '((response-type repo-files-integrated) (integrated ()) (warnings ()) (view-ids ()))')
-    state.unprompted_response_handler_map['repo-files-integrated'] = saved
-    assert.is_truthy(handled and handled:find('repo-files-integrated', 1, true))
+      '((response-type repo-files-reloaded) (reloaded ()) (warnings ()) (view-ids ()))')
+    state.unprompted_response_handler_map['repo-files-reloaded'] = saved
+    assert.is_truthy(handled and handled:find('repo-files-reloaded', 1, true))
     assert.are.equal(0, state.lp_pending_count)
   end)
 
   it('is registered as unprompted', function ()
-    repo_files_integrated.register()
+    repo_files_reloaded.register()
     assert.is_function(
-      state.unprompted_response_handler_map['repo-files-integrated'])
+      state.unprompted_response_handler_map['repo-files-reloaded'])
   end)
 
   it('notifies its counts, without the warnings buffer, when it has no warnings', function ()
     local notified = nil
     vim.notify = function (text) notified = text end
-    repo_files_integrated.handler(sexpr.read(
-      '((response-type repo-files-integrated) '
-      .. '(integrated ((first 2) ("my main" 1))) (warnings ()) '
+    repo_files_reloaded.handler(sexpr.read(
+      '((response-type repo-files-reloaded) '
+      .. '(reloaded ((first 2) ("my main" 1))) (warnings ()) '
       .. '(view-ids ()))'))
     assert.are.equal(
-      'skg: repo first: 2 files integrated; repo my main: 1 file integrated',
+      'skg: reloaded 2 files from repo first; reloaded 1 file from repo my main',
       notified)
     assert.is_nil(warnings_text())
   end)
 
   it('appends counts and warnings to the server-warnings buffer', function ()
-    repo_files_integrated.handler(sexpr.read(
-      '((response-type repo-files-integrated) '
-      .. '(integrated ((first 2))) '
+    repo_files_reloaded.handler(sexpr.read(
+      '((response-type repo-files-reloaded) '
+      .. '(reloaded ((first 2))) '
       .. '(warnings ("Node bad-id changed on disk but could not be read.")) '
       .. '(view-ids ()))'))
     assert.are.equal(
-      "* Repo changes\n** repo first: 2 files integrated\n"
+      "* Repo changes\n** reloaded 2 files from repo first\n"
       .. '** Node bad-id changed on disk but could not be read.',
       warnings_text())
   end)
@@ -116,7 +116,7 @@ describe('skg.repo_files_integrated', function ()
     table.insert(buffers, view_buffer('named-clean', false))
     table.insert(buffers, view_buffer('named-dirty', true))
     table.insert(buffers, view_buffer('unnamed', false))
-    repo_files_integrated.rerender_views_changed_on_disk(
+    repo_files_reloaded.rerender_views_changed_on_disk(
       { 'named-clean', 'named-dirty' }, 0)
     table.sort(requested)
     assert.are.same({ 'named-dirty', 'unnamed' }, requested)
@@ -124,7 +124,7 @@ describe('skg.repo_files_integrated', function ()
 
   it('asks for nothing when no named view is clean', function ()
     table.insert(buffers, view_buffer('named-dirty', true))
-    repo_files_integrated.rerender_views_changed_on_disk(
+    repo_files_reloaded.rerender_views_changed_on_disk(
       { 'named-dirty', 'not-open' }, 0)
     assert.is_nil(requested)
   end)
@@ -135,10 +135,10 @@ describe('skg.repo_files_integrated', function ()
     local deferred = nil
     vim.defer_fn = function (fn, ms) deferred = { fn = fn, ms = ms } end
     lock.begin_stream('save')
-    repo_files_integrated.rerender_views_changed_on_disk({ 'named-clean' }, 0)
+    repo_files_reloaded.rerender_views_changed_on_disk({ 'named-clean' }, 0)
     vim.defer_fn = real_defer
     assert.is_nil(requested)
-    assert.are.equal(repo_files_integrated.retry_milliseconds, deferred.ms)
+    assert.are.equal(repo_files_reloaded.retry_milliseconds, deferred.ms)
     lock.end_stream()
     deferred.fn()
     assert.are.same({}, requested)

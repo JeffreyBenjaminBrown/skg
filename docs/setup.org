@@ -53,7 +53,7 @@ the same skgrepos, each marks the other's 'foreign = true', and each
 gives its server its own 'port' and its own 'tantivy_folder', so the
 two never share a search index. 'data/skgconfig-ed.toml',
 beside 'data/skgconfig-jeff.toml', is such a config. Each server
-watches every skgrepo directory and integrates the '.skg' files that
+watches every skgrepo directory and reloads the '.skg' files that
 change on disk, so it shows another server's saves, or a 'git pull',
 within about a second ('repo_watch_quiet_ms'), and rerenders the open
 views that show them. A changed config is the one thing that needs a

@@ -2215,3 +2215,122 @@ and reachable through 'raw' only: 'skg-investigate-unknown-node',
 'skg-export-some-to-org', 'skg-connection-verify',
 'skg-rebuild-session-lifetime-stores' (which closes a daemon's views),
 'skg-strip-trailing-whitespace-from-bodies'.
+* Plan 10, server and clients slice: reload and extend, the stale save's recovery, the foreign '~NAME': DONE, uncommitted
+** What was done
+*** The watcher reloads
+The protocol message is 'repo-files-reloaded', its count field
+'reloaded'; the clients say "skg: reloaded 2 files from repo first"
+(echo or notification without warnings; the warnings buffer under
+"Repo changes" with them). Server: 'server/repo_watch/reload.rs'
+('reload_changed_skg_files', 'RepoChangeNotice::files_reloaded',
+'foreign_files_reloaded'), 'server/serve/handlers/repo_files_reloaded.rs'
+('files_reloaded_per_skgrepo', 'repo_files_reloaded_response',
+'TcpToClient::RepoFilesReloaded'). Emacs
+'elisp/skg-repo-files-reloaded.el', Neovim
+'nvim/lua/skg/repo_files_reloaded.lua', their tests renamed to match.
+The tool's log lines read "changed on disk: reloaded 1 file from repo
+main" (the "changed on disk" prefix stays). Docs: api-and-formats
+"Repo files reloaded", COMMANDS (both), data-model_technical, setup,
+the config field's row, the tool README.
+*** The diff view extends
+Request 'extend diff view', response 'extend-diff-view'
+('server/serve/handlers/extend_diff_view.rs',
+'RequestType::ExtendDiffView', 'DiffViewBufferRerender::Extending').
+Emacs 'skg-diffView-extend' in 'elisp/skg-request-extend-diff-view.el'
+(C-c r u kept); Neovim ':SkgDiffViewExtend' in
+'nvim/lua/skg/extend_diff_view.lua' (<localleader>ru kept); the tool's
+command 'extend' ("Before extending" / "Extended", log verb
+'extended'). The readiness summary says "C-c r u extends the diff view
+to them". Docs: diff-view.org "Extending the diff view", api "Extend
+diff view", glossary, both COMMANDS, the tool README.
+*** A clean diff buffer extends itself after a reload
+'ViewState::extend_at_next_rerender_all', set by
+'deliver_repo_change_notices' for each buffer of the diff view the
+message names (only under no skgrepo restriction, since the extend
+request refuses a restricted connection), and read through the new
+'DiffViewBufferRerender::ExtendingWhereAReloadAsked', which the
+"rerender all views" handler now passes. 'RerenderMode::DiffView'
+carries 'extend', decided per view in 'rerender_open_view';
+'refresh_diffView_buffer_over_current_straddle' takes it as an
+argument instead of reading the pass's mode. The rerender-all handler
+and the extend handler clear the mark of each view they rerender. The
+clients need no change: their post-reload rerender is that request.
+Tests ('tests/pruned_change_view/recomputed_sets.rs'):
+'the_rerender_after_a_reload_extends_the_buffer_to_a_change_it_did_not_show'
+(s1 retitled on disk; after the reload and rerender, s is appended
+with s1's change; a second rerender changes nothing; mutation-checked)
+and 'a_rerender_with_no_reload_does_not_extend_the_buffer'. Helpers in
+'common.rs': 'write_and_reload_as_another_writer',
+'rerender_all_views_for_the_all_changes_buffer'.
+*** The stale-save refusal, confirmed whole
+'a_buffer_rendered_before_a_reload_cannot_write_a_reloaded_node'
+('tests/repo_watch.rs') now also edits a, which nobody else changed:
+the refusal names b only, and neither file nor the graph changes.
+*** "rerender all views" no longer overwrites a dirty buffer
+It did: the server draws each view from what it last rendered, and
+'skg-request-rerender-all-views' excluded nothing, so the client
+replaced unsaved text. Now it is an M-x command that excludes every
+view with unsaved edits ('skg--unsaved-view-buffers') and names the
+skipped buffers in the echo area; Neovim gains ':SkgRerenderAllViews'
+('request_rerender_all_views', same behavior, sharing
+'dirty_view_buffers' with the import's rerender). Tests: an ERT test
+in 'test-skg-repo-files-reloaded.el' and a spec in
+'stream_consumers_spec.lua'. COMMANDS.org and COMMANDS-nvim.org
+document the recovery under the save section (copy aside with
+skg-show-unsaved-changes; mark unmodified, M-~ or ':set nomodified';
+rerender; redo by hand) and give the command an entry; the tool
+README's coverage table gains a row.
+*** The '~NAME' herald on a foreign relRepo
+The fact is computed in 'set_relRepo' ('server/refresh/viewnodestats.rs'):
+"the relationship's relRepo differs from 'default_relRepo'". For
+Ed's 'inboxes' (home 'ed', foreign) containing Jeff's 'to Ed' (home
+owned), 'default_relRepo' gives the owned member's home, since a
+foreign skgrepo never raises a floor ('more_private_of'), while the
+relationship necessarily lives in 'ed', Ed's file. So it always
+"differed". 'set_relRepo' now marks nothing whose relRepo is not
+owned. The herald is meant to say "more private than the default"
+(its docs, and the 'ViewnodeStats::relRepo' comment, "deliberately
+privatized"), not "recorded in a repo you don't own", so the code
+was wrong, not the docs. Test:
+'a_relationship_recorded_in_a_foreign_skgrepo_has_no_override_herald'
+(foreign recorder to an owned member, and to a member of another
+foreign skgrepo; mutation-checked). heralds.org and api-and-formats
+say a foreign relRepo never carries it. The underlying rule is a
+question for Jeff ('5_discussion.org', "a foreign recorder's default
+relRepo").
+** Suites
+cargo check clean; cargo nextest 1108/1108; Emacs 441/441; Neovim 478
+pass, 0 fail; tool PASS; integration suite all pass but
+'import-md-and-org' (already failing). The live server on 1731 was
+rebuilt by cargo-watch and reports "Server ready".
+** What's imperfect
+- A dirty buffer of the diff view that the reload named keeps its mark
+  until the next "rerender all views" that includes it, which then
+  extends it, even if that comes long after (say after its save and an
+  explicit M-x skg-request-rerender-all-views). Harmless (an extension
+  only adds), but it is not strictly "the rerender after the reload".
+- The extension's rerender sends no readiness summary (the rerender
+  stream has none), so the echo area's last summary may be stale until
+  the next save or C-c r u.
+- The rerender-all handler computes the extension of excluded views
+  too, then drops them (it prepares every view, then filters), as it
+  already rendered excluded views before.
+- "integrate" remains in ordinary prose (docs/this-is-awesome.org,
+  skg-enables-deep-sharing.org, data-model_friendly.org,
+  data-model-skg-extensions.org: people integrating knowledge) and in
+  the subscription sense ("unintegrated content", forks.org, heralds,
+  the '(unintegrated N)' wire fact, 'less_what_the_subscriber_integrates').
+  Neither is the watcher's or the diff view's sense, so I left them.
+- 'skg-reload.el' and the elisp "reloaded modules" message use
+  "reload" in Emacs's sense (reloading code); a different thing, but
+  named by context.
+- Quasi-duplicate: elisp 'skg--import-rerender-clean-views' collects
+  dirty view IDs by hand where 'skg--unsaved-view-buffers' now serves
+  the rerender command; left as it was.
+** Deviations
+- Ed's answer said 'skg-request-rerender-all-views' was on C-c v; it
+  was bound to nothing and not interactive, so it became an M-x
+  command (no key added) and gained its Neovim command.
+- The recovery's "discard and redraw" step needs the buffer marked
+  unmodified first, since the rerender now skips a dirty buffer; the
+  docs say so.
