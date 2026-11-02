@@ -27,6 +27,38 @@ question never comes and the deletion just happens. So the switch
 matters only to a restricted session deleting a node with hidden
 containers; my servers run unrestricted, so I expect to meet it rarely,
 which is why I let '--yes' pick the cautious answer.
+**** DONE jeff : explain this de novo
+You keep saying things like "the command" as if I know what's in your head.
+Who's experience are you even talking about, yours or mine?
+***** TODO Jeff : Ed, from the top
+Whose experience: mine, writing through 'tools/skg-for-ai'. Nothing
+here changes Emacs.
+
+What you do in Emacs. You put the cursor on a headline and press C-c
+<backspace> ('skg-delete'); the node is marked for deletion; you save.
+Usually it is just deleted. In one situation the server stops and asks
+you a question instead: you are working under a skgrepo restriction
+(say, "show me only through public"), and the node you are deleting is
+also named by relationships recorded in repos your restriction hides
+(one of your private notes contains it). The server writes nothing and
+asks "Delete from: (c)ancel, (v)isible records only, (a)ll owned
+records"; you press c, v or a; the save then proceeds that way.
+
+What I do with the tool. I write the word 'delete' into the node's
+handle in my compact view and run 'save --yes'. The tool sends the save.
+If the server asks that same question, there is no one at a keyboard
+to press c, v or a, so the tool has to have been told the answer in
+advance, as a flag: '--delete-from visible' or '--delete-from all'. If
+I gave neither, the tool answers as if I had pressed c, cancel: nothing
+is deleted, and it prints the question so I can run again with a flag.
+
+The choice you may overturn: what 'save --yes' with no flag should mean
+when that question comes. I chose cancel, the answer that changes
+nothing, because I edit blind and a cancelled save costs me one rerun,
+while deleting from hidden private records I never saw could cost you
+data. The alternative is "visible", the first answer Emacs offers.
+Since my servers run with no restriction, I expect never to meet the
+question in practice; the choice is about safety when I do.
 * (chosen, switchable) : 'relRepo:NAME subtree' infers the kind from its headline
 Emacs offers a menu (node, subscribee folder, overridden folder); the
 tool reads the kind from the headline the word is written on. Switch:
@@ -46,6 +78,39 @@ folder to subscriptions, on an overridden folder to overrides. What it
 cannot express is "content AND subscribee at once" in one word; that
 would be two saves, or a kind word. I expect one kind at a time to be
 the common case.
+**** DONE jeff : explain this one de novo, too, please
+***** TODO Jeff : Ed, from the top
+Whose experience: again mine, in the tool, mirroring your Emacs
+commands.
+
+What you do in Emacs. Every relationship (this node contains that one;
+this node subscribes to that one) is recorded in some skgrepo, its
+"relRepo"; usually the default one, chosen by privacy. C-c s r
+('skg-set-relRepo') changes the relRepo of ONE relationship, the one
+between the headline at point and its parent in the view; it prompts
+you for the repo and you save. C-c s R ('skg-set-relRepo-recursive')
+does it for a whole subtree at once, and because a subtree holds
+relationships of several kinds, it first shows a menu asking which
+kinds you mean: the relation of a plain child to its parent (contains),
+of a node listed in a "subscribes to" folder (subscribes), of a node
+listed in an "overrides" folder (overrides). You tick the kinds, then
+choose the repo, then save.
+
+What I do with the tool. For one relationship I write 'relRepo:NAME'
+into the headline's handle. For a subtree I add the word 'subtree':
+'relRepo:NAME subtree'. The tool has no menu, so it has to decide which
+kinds I mean. It decides from where I wrote the words: on a plain
+headline, the contains relationships of that subtree; on a "subscribes
+to" folder, the subscriptions under it; on an "overrides" folder, the
+overrides under it.
+
+The choice you may overturn: letting the headline's position stand in
+for your menu. It cannot express "contains and subscribes at once", as
+one ticking of your menu can; for that I would write the word on two
+headlines, which is two saves. The alternative is an explicit kind
+word, e.g. 'relRepo:NAME subtree:contains,subscribes'. I chose the
+inference because one kind at a time seems the common case and the
+inferred kind is the one a reader of the compact view would expect.
 * DONE (chosen, switchable) : some client warnings are tool errors
 E.g. 'repo:NAME' on a write-protected occurrence. The tool refuses
 before saving where Emacs saves and warns, because a compact view is
