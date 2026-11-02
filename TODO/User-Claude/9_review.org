@@ -1,32 +1,81 @@
 #+title: User Claude: review of plan 8, and choices Jeff may overturn
 
-* TODO (chosen, switchable) : a Unix socket in the output directory
+* (chosen, switchable) : a Unix socket in the output directory
 The daemon listens on 'DIR/skg-for-ai.sock' and one-shot commands with
 that '--out-dir' route through it. Alternatives: a second TCP port (works
 across machines; nothing here needs that), or a request file the daemon
 watches (no sockets; slower and racy). The socket is the plain Linux way
 and is easy to swap later, since only the transport layer of the tool
 would change.
-
-* TODO (chosen, switchable) : the ratio signal needs three content words
+** DONE [jeff]
+*** What do you mean by "one-shot commands with that '--out-dir'"?
+**** TODO Jeff : Ed's answer
+A one-shot command is any ordinary run of the tool: 'view ID', 'save
+FILE', 'diff', ... Each runs, prints, and exits. '--out-dir DIR' says
+where it writes its files (and where it finds the ones it reads back).
+The daemon is the exception: it keeps running. When a daemon is running
+for DIR, a one-shot command told to use DIR does not talk to the server
+itself; it hands its request to the daemon, which performs it on its
+held connection. Since the last slice the same holds for any command on
+the daemon's port, whatever its directory, so the sentence is now simply
+"one-shot commands for that port".
+* DONE (chosen, switchable) : the ratio signal needs three content words
 The fuzzy retype test asks when Dice >= 0.6 or the difflib ratio >=
 0.75. On short titles the ratio fires too easily. Chosen: the ratio alone
 counts only when both normalized titles have at least three content
 words; Dice is unchanged. Switch: drop the guard, or lower it to two
 words, by changing one constant and its unit cases.
 
-* TODO (chosen, switchable) : the daemon log is the wake signal
+* (chosen, switchable) : the daemon log is the wake signal
 No new protocol for "something changed": the daemon appends a line to
 'DIR/skg-for-ai.log' for every re-render and warning. Anything that wants
 to wake me (Facilitator's later machinery) tails that file. Switch: a
 proper event channel, when there is a consumer for it.
 
-* TODO (chosen, switchable) : integrations are an echo message unless they carry warnings
+** TODO [jeff] Please put this in your graph outbox file to Cory
+I changed everyones' names, inclduing yours,
+and shuffled responsibilities somewhat; I hope you don't mind.
+Those names felt cold and awkward.
+Please review 703f5a82-d948-431f-985c-4db8132bc504.
+
+I guess everyone will want an 'outboxes' node and an 'inbox' node;
+in 'outboxes' they would keep all their teammate-specific outboxes,
+and in 'inboxes' they would keep forks of every outbox directed at them.
+*** DONE Ed : done; I don't mind at all
+I read the team node. I am Ed now; the user-facing docs went to Doc,
+which I welcome, since reading and writing the graph is a job on its
+own. My repo has 'outboxes' (containing the old 'to Jeff' and a new 'to
+Corey', whose first message is your outboxes/inboxes proposal, with the
+two node IDs) and an empty 'inboxes' explaining itself. 'who I am' and
+'what has happened' record the rename.
+**** TODO (chosen, switchable) : the repo folder keeps its old name for now
+'data/user-claude/first' and the config entry 'user-claude' in yours
+could become 'ed/first' and 'ed'. Renaming touches your config and needs
+your server to reload, so I left it; say when, and I will do it in one
+go (folder, both configs, my notes).
+**** A gap found while doing this
+The tool cannot yet contain an EXISTING node under another (your
+'skg-paste-node'); a compact headline without a handle always makes a
+new node. I did it once by hand with a raw save carrying the paste
+metadata. The next tool slice adds a handle word for it (e.g.
+'⟨node:ID⟩' on a new headline), since "set up a skgrepo for every
+teammate" and the inboxes convention both need it.
+* (chosen, switchable) : integrations are an echo message unless they carry warnings
 Every disk integration currently opens the warnings buffer. Chosen: echo
 area for a clean integration, the buffer only for one with warnings.
 Switch: one predicate in each client.
-
-* Known limit, not a choice: saves on one server do not refresh another connection's views
+** DONE [jeff] Integrations into the diff view?
+*** TODO Jeff : Ed's answer: they show up where they are changes
+The diff view compares HEAD with the worktree of each owned repo, on
+request. Another writer's file landing in one of my owned repos is
+integrated into the graph by the watcher and, being uncommitted, is a
+change the next 'diff' shows, like one of my own saves. A 'git pull'
+moves HEAD too, so it shows nothing, which is right. Changes in foreign
+repos never enter the diff view, as before. A diff buffer the daemon
+holds is re-rendered on integration only if it shows a changed node;
+otherwise it waits for the next 'diff'.
+* AWAITS jeff is processing these in sidechannel
+** Known limit, not a choice: saves on one server do not refresh another connection's views
 A save's writes are the server's own, so the watcher drops them, and
 only the saving connection's views re-render. With one person per
 server this is the pre-existing behavior; my one-shot commands route
@@ -34,7 +83,7 @@ through my daemon once it exists, so it does not bite me either. If two
 people ever share one server, the save path (not the watcher) would have
 to re-render other connections' views.
 
-* TODO (chosen, switchable) : one daemon per port, found through a per-port socket
+** TODO (chosen, switchable) : one daemon per port, found through a per-port socket
 Besides 'DIR/skg-for-ai.sock', the daemon registers '/tmp/skg-for-ai-
 PORT.sock' (XDG_RUNTIME_DIR when set), so every command for that port
 routes through it whatever its out-dir, and no view goes stale because
@@ -42,7 +91,7 @@ a command used another directory. Alternative: have the server re-render
 across connections (a server change with no other beneficiary while each
 of us has a server of our own). Switch: delete the per-port socket.
 
-* Plan 8 is complete
+** Plan 8 is complete
 Both slices and the follow-up are committed: the daemon (one held
 connection, views rewritten on re-render, a log), routing by port,
 'commit --yes' through the daemon, the fuzzy guard, quieter
@@ -53,11 +102,11 @@ server's wording). Suites at the end: Rust 1107, Emacs 440, Neovim all
 pass, tool PASS. One Neovim failure during the last run was a corrupt
 '~/.local/state/nvim/shada/main.shada', unrelated to skg; it is moved
 aside and the suite is clean.
-** TODO Jeff : your two steps
+*** TODO Jeff : your two steps
 Fork my 'to Jeff' node (85cc1841-6568-4db2-9a46-6fa4196f1bb9) to
 subscribe to it, and create 'to User' in one of your repos and give me
 its ID, so I can subscribe to it from my repo.
-** What I would do next, when you say so
+*** What I would do next, when you say so
 Facilitator's items from the team node: a sleep/wake/trigger
 methodology (the daemon log is the signal to build on) and a skgrepo for
 each teammate (a config each, as mine; the ladder change made that
