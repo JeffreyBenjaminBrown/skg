@@ -243,7 +243,7 @@ Agreed and left as is: 'stage and commit' stages only '.skg' files, and
 the manifest is committed by hand, deliberately. 'docs/diff-view.org'
 says so under "Stage and commit".
 
-* TODO Jeff : how docs/ is edited once it lives in the graph
+* DONE Jeff : how docs/ is edited once it lives in the graph
 Not yet decided, and it gates the definitive import of docs/ into
 'skg-system'. Once Skg is the source of truth, 'docs/' is export output,
 and a direct edit there is overwritten by the next export; yet agents in
@@ -257,3 +257,7 @@ the exporter never deletes a file, so a document removed from Skg
 leaves its '.org' in 'docs/' until deleted by hand. Whichever you
 choose, 'ORIENTATION.org' should then say which files under 'docs/'
 are generated.
+
+** TODO jeff : deferring
+We don't even need to write an issue for this;
+it'll be impossible to ignore soon enough.

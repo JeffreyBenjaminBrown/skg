@@ -1,0 +1,14 @@
+* introduction
+Please read coding-advice/ORIENTATION.org.
+It's too much, though;
+you don't need to chase down all those avenues in too much detail for now.
+
+Then, please use the tools at tools/skg-for-ai/ to read [[id:703f5a82-d948-431f-985c-4db8132bc504][AI team for Skg]].
+The aim is eventually for all our comms to be in the graph,
+but for now we'll plan that in this .org document.
+* vision
+I need to be able to keep the team "running", but not actually active,
+all the time. I think that means we need tools for passing control
+from one to another. Is this even possible? God I hope so.
+
+Please respond in this org-document, per coding-advice/org-discussions.org

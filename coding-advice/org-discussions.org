@@ -71,3 +71,11 @@ says where it was settled, so Jeff is not asked twice.
 ** Clarity
 Every sentence should have a subject and a verb.
 Every new term should be introduced/defined before it is used.
+* DRY in the CLI
+Do not tell me in brief in the CLI what you have already written
+for me at length in a .org document. Just point me to it.
+Often, literally "goto <doc>"
+is all I want to read in your CLI response.
+
+(But do, of course, tell me there what I won't find
+in the docs you're pointing me at.)
