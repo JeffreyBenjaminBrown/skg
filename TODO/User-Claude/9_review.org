@@ -151,8 +151,15 @@ v, "re-render all") redraws every open buffer with all its roots; I will
 have the slice confirm it refuses to redraw a dirty buffer and document
 the recovery in COMMANDS.org, so the rare case has a written path.
 ******** DONE [jeff] : yes please
-********* Ed : the slice is running; it also files the '~ed' oddity in 'TODO/problems.org'.
-* TODO [jeff] In your writing, please use ordinary skg links.
+********* Ed : done (commit 3b3878b9). One correction to my answer above:
+'rerender all views' was bound to nothing and DID overwrite dirty
+buffers; it is now an M-x command (and ':SkgRerenderAllViews') that
+skips buffers with unsaved edits and names them, and COMMANDS.org
+documents the recovery. The '~ed' oddity is fixed and moved to
+'TODO/DONE/problems.org'; a design question it raised (the default
+relRepo for a relationship a foreign node records) is a TODO for you in
+'5_discussion.org'.
+* DONE [jeff] In your writing, please use ordinary skg links.
 In something you wrote to Corey, you wrote IDs and titles next to each other,
 but not as a link. I imagine it's costless to you, and I know it helps me,
 to see those as actual links.

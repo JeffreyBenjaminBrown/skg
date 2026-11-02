@@ -1,3 +1,15 @@
+* Problems noticed by Ed while forking a foreign node (2026-11-02)
+** DONE the '~NAME' herald ranks a foreign relRepo
+  On Jeff's server, where repo 'ed' is foreign and so has no privacy
+  rank, the relationship from Ed's 'inboxes' (in 'ed/first') to Jeff's
+  'to Ed' (883e7f64-c377-4894-a75b-64c52d1668c4, in 'public') rendered
+  with '~ed', the herald for "relRepo more private than the default".
+  Ed's own server shows no such mark. Since the ladder change, a
+  comparison of privacy ranks must involve owned repos only; this one
+  still ranks a foreign repo, or compares against a default computed
+  as if it had a rank. Fix planned in TODO/User-Claude/10_plan.org,
+  "Server and clients: words, and the diff view's self-extension",
+  task 4 of the running slice.
 * Problems noticed while writing tools/skg-for-ai's 'save' (2026-11-01; fixed 2026-11-01)
 ** A save writes every node its buffer shows, stale text included
   On a scratch server: two connections render the same view; the
