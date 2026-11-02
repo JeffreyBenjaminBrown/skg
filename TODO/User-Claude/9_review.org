@@ -60,12 +60,14 @@ new node. I did it once by hand with a raw save carrying the paste
 metadata. The next tool slice adds a handle word for it (e.g.
 '⟨node:ID⟩' on a new headline), since "set up a skgrepo for every
 teammate" and the inboxes convention both need it.
+***** DONE jeff : yes, let's include this in the next plan
+****** Ed : it is '10_plan.org', launching now.
 * (chosen, switchable) : integrations are an echo message unless they carry warnings
 Every disk integration currently opens the warnings buffer. Chosen: echo
 area for a clean integration, the buffer only for one with warnings.
 Switch: one predicate in each client.
-** DONE [jeff] Integrations into the diff view?
-*** TODO Jeff : Ed's answer: they show up where they are changes
+** [jeff] Integrations into the diff view?
+*** Jeff : Ed's answer: they show up where they are changes
 The diff view compares HEAD with the worktree of each owned repo, on
 request. Another writer's file landing in one of my owned repos is
 integrated into the graph by the watcher and, being uncommitted, is a
@@ -74,6 +76,32 @@ moves HEAD too, so it shows nothing, which is right. Changes in foreign
 repos never enter the diff view, as before. A diff buffer the daemon
 holds is re-rendered on integration only if it shows a changed node;
 otherwise it waits for the next 'diff'.
+**** DONE [jeff]
+I'm still not clear on what you mean by integrations.
+Is it a diffView-specific thing, or general to any view?
+
+Suppose we both own the same skgrepo -- e.g. (probably) skg-system.
+If you change it while I'm editing the diff view,
+I'll want the diff view updated to integrate those changes.
+Does this happen automatically?
+***** TODO Jeff : Ed's answer: general, and mostly automatic
+"Integration" is the watcher's word: when a '.skg' file changes on
+disk, the server reads it and folds the node into the graph as a new
+generation. That is general; it has nothing to do with the diff view.
+Afterwards the server tells each connected client which of its open
+views show a changed node, and the client re-renders those (only the
+clean ones: a buffer with unsaved edits is left alone and told).
+
+Your scenario: we both own 'skg-system'; I save into it while your diff
+view is open. Your server integrates my files at once, since they are
+not its own writes. If your diff buffer shows one of the nodes I
+changed, it re-renders, and the change appears with its change facts.
+What does not happen by itself: a node I changed that your diff buffer
+does not yet show is not added as a new root, because a re-render keeps
+a diff buffer's roots; for that you press C-c r u ('integrate unshown
+changes', the diff view's own word, which is where the overlap of terms
+comes from) or reopen the diff view. Making the re-render also add new
+roots is a small server change; say if you want it in '10_plan.org'.
 * Known limit, not a choice: saves on one server do not refresh another connection's views
 A save's writes are the server's own, so the watcher drops them, and
 only the saving connection's views re-render. With one person per
@@ -105,8 +133,7 @@ index. Your server restarted on its own (the rerun loop) with no warning
 about 'ed'; both configs pass 'check-config'. No other teammate has a
 repo yet, so nothing else applied. Old names remain only in the dated
 record of earlier plans.
-* AWAITS jeff is processing these in sidechannel
-** Plan 8 is complete
+* Plan 8 is complete
 Both slices and the follow-up are committed: the daemon (one held
 connection, views rewritten on re-render, a log), routing by port,
 'commit --yes' through the daemon, the fuzzy guard, quieter
@@ -117,11 +144,15 @@ server's wording). Suites at the end: Rust 1107, Emacs 440, Neovim all
 pass, tool PASS. One Neovim failure during the last run was a corrupt
 '~/.local/state/nvim/shada/main.shada', unrelated to skg; it is moved
 aside and the suite is clean.
-*** TODO Jeff : your two steps
+** DONE Jeff : your two steps
 Fork my 'to Jeff' node (85cc1841-6568-4db2-9a46-6fa4196f1bb9) to
 subscribe to it, and create 'to User' in one of your repos and give me
 its ID, so I can subscribe to it from my repo.
-*** What I would do next, when you say so
+*** DONE [jeff] It's 883e7f64-c377-4894-a75b-64c52d1668c4
+**** Ed : seen ('to Ed', with 'Hi Ed!' in it). Forking it into my
+'inboxes' is the first job of '10_plan.org', since the tool cannot yet
+fork; it will be done as that plan's live test.
+** What I would do next, when you say so
 Corey's items from the team node: a sleep/wake/trigger
 methodology (the daemon log is the signal to build on) and a skgrepo for
 each teammate (a config each, as mine; the ladder change made that

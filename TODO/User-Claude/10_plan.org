@@ -1,0 +1,60 @@
+#+title: Ed can do anything Jeff can: the tool's missing gestures
+
+* Why
+The team node's plan for Ed says "Be able to do anything Jeff can" and
+"Set up a skgrepo for every teammate". Two gaps appeared at once when
+Jeff's and Ed's mail nodes were made: the tool cannot place an existing
+node under another ('skg-paste-node'), and it cannot fork a foreign node
+('docs/forks.org'), which is how one subscribes to a teammate's outbox.
+Rather than patch those two, this plan audits every command in
+'docs/COMMANDS.org' against the tool and closes the gaps that a user of
+skg, as opposed to a user of Emacs, needs.
+
+* The audit
+For each command in 'docs/COMMANDS.org', one of: already covered by the
+tool (and how); Emacs-only by nature (cursor, windows, folding display,
+keys), needing nothing; or a gap. The audit is written to the tool's
+README as a table, so a teammate can see what the tool can do, and the
+gaps become this plan's work list. Expected gaps, at least: paste an
+existing node; fork (implicit, by editing a foreign node, with the
+fork-confirmation protocol; explicit, 'skg-fork-node'); subscribe,
+override and hide as explicit edits; the merge request; node deletion
+with recursive scope; moving a node to another skgrepo; the linkstack as
+a stack (push, pop, paste ID/link); text search options (regex, body,
+operators); the alias and ID folders' edits; export to org.
+
+* How gestures are written
+Everything is a word in a handle or a headline with a special shape,
+sent in a save, as the existing words are ('delete', 'ready', ...):
+** Placing an existing node
+A new headline ending in '⟨node:ID⟩' is that node placed here: the tool
+writes the paste metadata ('(skg node (gnid ID) writeProtected
+(viewRequests editableView))', or without the view request when the
+buffer already holds an editable occurrence), the title is taken from
+the server. The first use is Ed's 'inboxes'.
+** Forking
+Editing a foreign node's title, body or children in a compact view is
+the implicit gesture; the server answers with the fork-confirmation
+protocol (read it in 'api-and-formats' and the clients), which the tool
+carries: the report shows the clone-to-be and its source, the repo is
+chosen with '--fork-into REPO' (default: the tool's one owned repo if
+there is exactly one), and '--yes' approves. An explicit fork of an
+owned node is the word 'fork'. The first use: fork Jeff's 'to Ed'
+(883e7f64-c377-4894-a75b-64c52d1668c4) into Ed's 'inboxes', so the
+clone subscribes to it and new messages surface as unintegrated content.
+** The rest
+Each remaining gap gets the smallest word or shape that mirrors the
+Emacs command; the audit decides, and 'progress.org' records each.
+
+* Verification
+Fixture tests for every new gesture on the scratch servers the tool's
+test already runs (the fixture has a foreign repo, which forking needs).
+Live: the fork above, on Ed's server, then a read-only view on Jeff's
+server (1731) showing the clone under 'inboxes' in 'ed/first'. Suites:
+tool PASS, cargo check clean; the clients untouched unless the audit
+finds a protocol detail only they know.
+
+* Order
+Audit first, written into the README; then paste and fork, with the live
+fork; then the remaining gaps in the audit's order. Switchable choices go
+to '11_review.org'; new issues to '5_discussion.org'.
