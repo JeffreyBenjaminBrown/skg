@@ -197,6 +197,20 @@ pub(crate) fn write_graph_straddle_back (
 pub fn stream_empty_rerender (
   stream : &mut TcpStream,
 ) {
+  stream_empty_rerender_with_errors (stream, &[]); }
+
+/// As 'stream_empty_rerender', with 'error' in the "rerender-done":
+/// the answer to a rerender request the server could not read.
+pub(crate) fn stream_empty_rerender_with_error (
+  stream : &mut TcpStream,
+  error  : String,
+) {
+  stream_empty_rerender_with_errors (stream, &[error]); }
+
+fn stream_empty_rerender_with_errors (
+  stream : &mut TcpStream,
+  errors : &[String],
+) {
   send_response_with_length_prefix (
     stream,
     & tag_sexp_response (
@@ -206,4 +220,4 @@ pub fn stream_empty_rerender (
     stream,
     & tag_sexp_response (
       TcpToClient::RerenderDone,
-      & format_rerender_done_sexp ( &[], &[] ) )); }
+      & format_rerender_done_sexp ( errors, &[] ) )); }

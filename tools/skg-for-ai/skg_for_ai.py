@@ -553,7 +553,12 @@ def command_save (arguments):
   clients' approval does, if it forks only what the report said. The
   server's other questions are printed, and answered as the command
   line says ('answer_save_question'): each answer sends the same save
-  again, carrying it and the earlier ones."""
+  again, carrying it and the earlier ones. A save whose rerender the
+  server withholds, as it does under a skgrepo restriction when that
+  would show text from overPrivateText telescopes, has been written:
+  '--show-overPrivateText' releases the rerender by asking for it, as
+  the clients do ('release_withheld_save_rerender'), and never sends
+  the save again."""
   saved_view = load_saved_view (arguments . view_files)
   require_port_of_sidecar (arguments . port, saved_view . sidecar)
   if NEW_NODE_HANDLE_WORD in saved_view . headline_of_handle:
@@ -625,18 +630,16 @@ def command_save (arguments):
       if response_type ( messages [-1] ) not in SAVE_QUESTION_TYPES:
         break
       answer_save_question ( messages [-1], answers, arguments, forks )
-    try:
-      rerendered = rerendered_view_of_save ( messages [-1], saved_view . sidecar )
-    except SkgToolError:
-      if answers . overPrivateText_pids is None:
-        raise
-      # The save that asked had been written; only the re-send that
-      # approves its rerender was refused, as a stale one is when the
-      # save made a new node.
-      raise SkgToolError (
-        "The save succeeded, but the server refused to send it again to "
-        "release its re-rendered view (see above); the files are out of "
-        "date. View the node again with '--show-overPrivateText'." )
+    terminal = messages [-1]
+    if response_type (terminal) == "overPrivateText-telescope-confirmation":
+      overPrivateText_answer (
+        terminal, arguments . show_overPrivateText, "the save succeeded, but ",
+        "The save succeeded, but its re-rendered view is withheld; the files "
+        "are out of date. View the node again with '--show-overPrivateText'.",
+        approval = "the withheld rerender is asked for" )
+      terminal = release_withheld_save_rerender (
+        connection, terminal, saved_view . sidecar [ "view_id" ] )
+    rerendered = rerendered_view_of_save ( terminal, saved_view . sidecar )
     connection . log_view_event (
       "saved", saved_view . directory, saved_view . base_name )
     written_paths = write_view_files (
@@ -1268,20 +1271,19 @@ def fetch_view_with_root_folder_request (connection, node_id, view_request,
   fresh_view = fetch_single_root_view (connection, node_id, show_overPrivateText)
   requesting_buffer = buffer_with_view_request_on_first_headline (
     fresh_view [ "content" ], view_request )
-  def send_save (answers = None):
+  def send_save ():
     return connection . save_buffer (
-      fresh_view [ "view_id" ], requesting_buffer, fresh_view [ "rendered_at" ],
-      answers = answers )
-  messages = send_save ()
-  if response_type ( messages [-1] ) == "overPrivateText-telescope-confirmation":
-    answers = SaveAnswers ()
-    answers . overPrivateText_pids = overPrivateText_answer (
-      messages [-1], show_overPrivateText, "",
+      fresh_view [ "view_id" ], requesting_buffer, fresh_view [ "rendered_at" ] )
+  terminal = send_save () [-1]
+  if response_type (terminal) == "overPrivateText-telescope-confirmation":
+    overPrivateText_answer (
+      terminal, show_overPrivateText, "",
       "Nothing was viewed: the server withholds the folder's text from "
       "overPrivateText telescopes under the skgrepo restriction; run again "
-      "with '--show-overPrivateText' to release it.", to_stderr = True )
-    messages = send_save (answers)
-  terminal = messages [-1]
+      "with '--show-overPrivateText' to release it.", to_stderr = True,
+      approval = "the withheld rerender is asked for" )
+    terminal = release_withheld_save_rerender (
+      connection, terminal, fresh_view [ "view_id" ] )
   require_response_type (terminal, "save-result")
   content = response_field (terminal, "content")
   errors = response_field (terminal, "errors") or []
@@ -4211,8 +4213,7 @@ def approved_fork_skgrepos_of_confirmation (confirmation, forks):
 # a retry of the same save that carries the answer.
 SAVE_QUESTION_TYPES = (
   "delete-from-confirmation", "strandeds-confirmation",
-  "telescope-hoist-confirmation", "fork-confirmation",
-  "overPrivateText-telescope-confirmation" )
+  "telescope-hoist-confirmation", "fork-confirmation" )
 # How many times one save may be sent: once, and once per question
 # (the Hoist question can come again when a telescope became dirty
 # meanwhile).
@@ -4223,14 +4224,12 @@ class SaveAnswers:
   every earlier one, as the clients' do ('skg--save-request-sexp' in
   'elisp/skg-request-save.el'): 'fork_skgrepos', [(ID, SKGREPO)], the
   approved forks; 'hoist_pids', the telescopes approved for Hoist;
-  'overPrivateText_pids', those whose text the rerender may release;
   'strandeds_reset', None until the strandeds are reviewed, then the
   [(RELATION, RECORDER, MEMBER)] to reset to default; 'delete_from',
   'visible' or 'all'."""
   def __init__ (self):
     self . fork_skgrepos = None
     self . hoist_pids = None
-    self . overPrivateText_pids = None
     self . strandeds_reset = None
     self . delete_from = None
 
@@ -4246,10 +4245,6 @@ class SaveAnswers:
     if self . hoist_pids:
       fields . append ( "(approved-hoist-pids " +
                         " " . join ( map ( quote_string, self . hoist_pids )) + ")" )
-    if self . overPrivateText_pids:
-      fields . append ( "(approved-overPrivateText-pids " +
-                        " " . join ( map ( quote_string, self . overPrivateText_pids ))
-                        + ")" )
     if self . strandeds_reset is not None:
       fields . append ( '(strandeds-reviewed . "true")' )
       if self . strandeds_reset:
@@ -4275,12 +4270,6 @@ def answer_save_question (question, answers, arguments, forks):
     answers . strandeds_reset = strandeds_answer (question, arguments . strandeds)
   elif kind == "telescope-hoist-confirmation":
     answers . hoist_pids = hoist_answer (question, arguments . hoist)
-  elif kind == "overPrivateText-telescope-confirmation":
-    answers . overPrivateText_pids = overPrivateText_answer (
-      question, arguments . show_overPrivateText, "the save succeeded, but ",
-      "The save succeeded, but its re-rendered view is withheld; the files "
-      "are out of date. Save again with '--show-overPrivateText' to release "
-      "it, or view the node again." )
 
 def response_text_field (response, field_name):
   value = response_field (response, field_name)
@@ -4353,11 +4342,13 @@ def hoist_answer (question, hoist):
   return [ pid for pid, _ in telescopes ]
 
 def overPrivateText_answer (question, show, situation, refusal,
-                            to_stderr = False):
+                            to_stderr = False,
+                            approval = "the request is sent again"):
   """The PIDs an overPrivateText confirmation lists, approved when SHOW
   ('--show-overPrivateText'); else raise REFUSAL. SITUATION opens what
-  the confirmation says happened. TO_STDERR: printed on standard error,
-  for a command whose standard output is the paths it wrote."""
+  the confirmation says happened, APPROVAL what approving it does.
+  TO_STDERR: printed on standard error, for a command whose standard
+  output is the paths it wrote."""
   output = sys . stderr if to_stderr else sys . stdout
   pids = [ sexp_to_text (pid) for pid in ( response_field (question, "pids") or [] ) ]
   print ( "Server: overPrivateText confirmation: " + situation +
@@ -4367,7 +4358,7 @@ def overPrivateText_answer (question, show, situation, refusal,
           file = output )
   if not show:
     raise SkgToolError (refusal)
-  print ( "Approved: the request is sent again, releasing that text.",
+  print ( "Approved: " + approval + ", releasing that text.",
           file = output )
   return pids
 
@@ -4396,6 +4387,39 @@ def request_releasing_overPrivateText (connection, line, show, what):
 # The server's answer
 # ------------------------------------------------------------
 
+def release_withheld_save_rerender (connection, confirmation, view_id):
+  """Release the rerender a save withheld: the server's CONFIRMATION
+  names the views withheld, and lists the PIDs whose text they would
+  show. Send "rerender views" for them, approving those PIDs, as the
+  clients' approval does ('skg--request-rerender-views' in
+  'elisp/skg-request-rerender-all-views.el'), and return a save-result
+  of the rerender: the content and rendered-at of its view of VIEW_ID,
+  the errors and warnings of its 'rerender-done'. Raise when the
+  server asks again, or sends no view of VIEW_ID."""
+  view_ids = [ sexp_to_text (withheld)
+               for withheld in response_field (confirmation, "view-ids") or [] ]
+  pids = [ sexp_to_text (pid)
+           for pid in response_field (confirmation, "pids") or [] ]
+  messages = connection . rerender_views (view_ids, pids)
+  done = messages [-1]
+  rerendered = [ message for message in messages
+                 if response_type (message) == "rerender-view"
+                 and sexp_to_text ( response_field (message, "view-id") ) == view_id ]
+  if ( response_type ( messages [0] ) == "overPrivateText-telescope-confirmation"
+       or not rerendered ):
+    print ( "Server: " + "; " . join (
+      [ response_text_field ( messages [0], "prompt" ) ] +
+      [ sexp_to_text (error) for error in response_field (done, "errors") or [] ] ))
+    raise SkgToolError (
+      "The save succeeded, but the server did not release its re-rendered "
+      "view (see above); the files are out of date. View the node again "
+      "with '--show-overPrivateText'." )
+  return [ [ Symbol ("response-type"), Symbol ("save-result") ],
+           [ Symbol ("content"), response_field ( rerendered [0], "content" ) ],
+           [ Symbol ("errors"), response_field (done, "errors") or [] ],
+           [ Symbol ("warnings"), response_field (done, "warnings") or [] ],
+           [ Symbol ("rendered-at"), response_field ( rerendered [0], "rendered-at" ) ] ]
+
 def rerendered_view_of_save (terminal, sidecar):
   """Print the server's answer to the save. Return its re-rendered
   view, as the view commands describe one; raise if there is none."""
@@ -4406,11 +4430,6 @@ def rerendered_view_of_save (terminal, sidecar):
       text = response_field (terminal, field_name)
       if text:
         print ( sexp_to_text (text) )
-    if kind == "overPrivateText-telescope-confirmation":
-      raise SkgToolError (
-        "The save succeeded, but the server withholds its re-rendered "
-        "view until the release is approved, which this tool does not "
-        "do. The files are out of date; view the node again." )
     raise SkgToolError (
       "Nothing was saved: the server asks a question this tool does not "
       "answer. A client can answer it." )
@@ -5260,6 +5279,22 @@ class SkgConnection:
         self . read_message (FIRST_MESSAGE_TIMEOUT_SECONDS) )) != "rerender-done":
       pass
     return response
+
+  def rerender_views (self, view_ids, approved_pids):
+    """Send "rerender views" for VIEW_IDS, approving the text of
+    APPROVED_PIDS; return every message of its answer, parsed, up to
+    and including the 'rerender-done' that ends it: a rerender stream,
+    perhaps after an overPrivateText confirmation. A daemon's
+    connection keeps the rerendered views for the daemon to write."""
+    self . send_line (
+      "((request . \"rerender views\") (view-ids " +
+      " " . join ( map ( quote_string, view_ids )) + ")" +
+      approved_overPrivateText_field (approved_pids) + ")" )
+    messages = []
+    while not messages or response_type ( messages [-1] ) != "rerender-done":
+      messages . append ( parse_sexp (
+        self . read_message (FIRST_MESSAGE_TIMEOUT_SECONDS) ))
+    return messages
 
   def request_then_rerender_stream (self, line):
     """Send the request LINE, whose response a rerender stream follows

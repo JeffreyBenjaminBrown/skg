@@ -1,7 +1,9 @@
 ;;; -*- lexical-binding: t; -*-
 ;;;
 ;;; The "rerender all views" command, which skips every buffer with
-;;; unsaved edits ('skg-request-rerender-all-views'),
+;;; unsaved edits ('skg-request-rerender-all-views'), the "rerender
+;;; views" request that releases a save's withheld rerender
+;;; ('skg--request-rerender-views'),
 ;;; the handler for its request/response,
 ;;; and the rerender stream that follows several other requests,
 ;;; with the prologue those requests share
@@ -54,6 +56,20 @@ them."
    nil nil nil
    (lambda (pids)
      (skg--request-rerender-views-excluding label excluded pids))))
+
+(defun skg--request-rerender-views (view-ids approved-pids)
+  "Ask the server to rerender the open views VIEW-IDS, approving the
+text of APPROVED-PIDS. This releases a save's withheld rerender
+(`skg--save-text-release-confirmation-handler'); it writes nothing. A
+challenge accepted asks again with the PIDs it lists."
+  (skg--send-streaming-request
+   "rerender" nil
+   `((request . "rerender views")
+     (view-ids ,@view-ids)
+     (approved-overPrivateText-pids ,@approved-pids))
+   nil nil nil
+   (lambda (pids)
+     (skg--request-rerender-views view-ids pids))))
 
 (defun skg--send-streaming-request
     (label response-type request handler

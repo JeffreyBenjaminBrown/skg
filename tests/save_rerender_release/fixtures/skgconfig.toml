@@ -1,0 +1,11 @@
+tantivy_folder = "tantivy"
+port = 1730
+beep_when_server_becomes_available = false
+
+[[repos]]
+name = "main"
+path = "main"
+
+[[repos]]
+name = "private"
+path = "private"

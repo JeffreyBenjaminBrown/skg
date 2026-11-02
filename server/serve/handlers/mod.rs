@@ -11,6 +11,7 @@ pub mod rebuild_session_lifetime_stores;
 pub mod repo_files_reloaded;
 pub mod repos;
 pub mod rerender_all_views;
+pub mod rerender_views;
 pub mod runtime_generation;
 pub mod save_buffer;
 pub mod server_warnings;

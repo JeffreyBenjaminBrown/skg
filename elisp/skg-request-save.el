@@ -9,10 +9,11 @@
 (require 'skg-buffer)
 (require 'skg-lock-buffers)
 (require 'skg-readiness) ; for skg--readiness-summary-message
+(declare-function skg--request-rerender-views "skg-request-rerender-all-views"
+                  (view-ids approved-pids))
 
 (defun skg-request-save-buffer (&optional approved-forks fork-skgrepos
                                           approved-hoist-pids
-                                          text-approved-pids
                                           strandeds-review
                                           delete-from)
   "Send the current buffer contents to Rust for processing.
@@ -50,7 +51,7 @@ It rides this save and its retries only, never cached."
   (skg--lock-all-skg-buffers)
   (condition-case err
       (skg--send-save-buffer
-       approved-forks fork-skgrepos approved-hoist-pids text-approved-pids
+       approved-forks fork-skgrepos approved-hoist-pids
        strandeds-review delete-from)
     (error
      (skg--cancel-locally-failed-save)
@@ -58,7 +59,6 @@ It rides this save and its retries only, never cached."
 
 (defun skg--send-save-buffer (approved-forks fork-skgrepos
                                             approved-hoist-pids
-                                            text-approved-pids
                                             strandeds-review
                                             delete-from)
   "Serialize and send a save once `skg--stream-in-progress' is set and
@@ -90,7 +90,6 @@ the buffers are locked."
                                     approved-forks
                                     fork-skgrepos
                                     approved-hoist-pids
-                                    text-approved-pids
                                     strandeds-review
                                     delete-from))
                                   "\n"))
@@ -147,7 +146,7 @@ the buffers are locked."
        (lambda (_tcp-proc payload)
          (skg--delete-from-confirmation-handler
           save-buffer payload approved-forks fork-skgrepos
-          approved-hoist-pids text-approved-pids strandeds-review))
+          approved-hoist-pids strandeds-review))
        nil)
       ;; Another alternative terminal: a home skgrepo move would strand
       ;; relationships. Retry this same save with the user's review.
@@ -156,7 +155,7 @@ the buffers are locked."
        (lambda (_tcp-proc payload)
          (skg--strandeds-confirmation-handler
           save-buffer payload approved-forks fork-skgrepos
-          approved-hoist-pids text-approved-pids delete-from))
+          approved-hoist-pids delete-from))
        nil)
       ;; The other alternative terminal. It carries no title/body text; after
       ;; approval, retry this same save with the exact listed PIDs.
@@ -165,14 +164,15 @@ the buffers are locked."
        (lambda (_tcp-proc payload)
          (skg--telescope-hoist-confirmation-handler
           save-buffer payload approved-forks fork-skgrepos
-          text-approved-pids strandeds-review delete-from))
+          strandeds-review delete-from))
        nil)
+      ;; The terminal message of a save whose rerender is withheld. The
+      ;; save was written; approval asks for a rerender of the views it
+      ;; names, not for the save again.
       (skg-register-response-handler
        'overPrivateText-telescope-confirmation
        (lambda (_tcp-proc payload)
-         (skg--save-text-release-confirmation-handler
-          save-buffer payload approved-forks fork-skgrepos
-          approved-hoist-pids strandeds-review delete-from))
+         (skg--save-text-release-confirmation-handler payload))
        nil)
 
       (skg-lp-reset)
@@ -267,7 +267,6 @@ internal edit; it is restored before any request is sent."
 (defun skg--save-request-sexp (view-id save-point-position
                                         &optional approved-forks fork-skgrepos
                                         approved-hoist-pids
-                                        text-approved-pids
                                         strandeds-review
                                         delete-from)
   "Build the save-buffer request sexp. When FORK-APPROVED is non-nil,
@@ -308,8 +307,6 @@ as (diff-view-buffer . NAME)."
      (list (list 'fork-repos fork-skgrepos)))
    (when approved-hoist-pids
      `((approved-hoist-pids ,@approved-hoist-pids)))
-   (when text-approved-pids
-     `((approved-overPrivateText-pids ,@text-approved-pids)))
    (when strandeds-review
      '((strandeds-reviewed . "true")))
    (when (cdr strandeds-review)
@@ -627,7 +624,7 @@ re-save carries again."
 
 (defun skg--delete-from-confirmation-handler
     (save-buffer payload approved-forks fork-skgrepos
-                 approved-hoist-pids text-approved-pids strandeds-review)
+                 approved-hoist-pids strandeds-review)
   "Handle a `delete-from-confirmation' message for SAVE-BUFFER: records the
 skgrepo restriction keeps out name a graphnode the save deletes, and
 nothing was skgsave-committed. Ask \"Delete from: (c)ancel, (v)isible
@@ -665,7 +662,7 @@ choice, carrying the other approvals along. Cancel saves nothing."
               (with-current-buffer save-buffer
                 (skg-request-save-buffer
                  approved-forks fork-skgrepos approved-hoist-pids
-                 text-approved-pids strandeds-review delete-from))))))
+                 strandeds-review delete-from))))))
     (error
      (skg-log 'error 'save "delete-from-confirmation handler error: %S" err))))
 
@@ -683,8 +680,7 @@ prompt: \"visible\" for ?v, \"all\" for ?a, nil (cancel) otherwise."
 
 (defun skg--strandeds-confirmation-handler
     (save-buffer payload approved-forks fork-skgrepos
-                 approved-hoist-pids text-approved-pids
-                 &optional delete-from)
+                 approved-hoist-pids &optional delete-from)
   "Handle a `strandeds-confirmation' message for SAVE-BUFFER: the save's home
 skgrepo moves would strand the relationships it lists, and nothing was
 skgsave-committed. Show them, ask which to reset to default, and re-issue the
@@ -725,7 +721,7 @@ same save with that review, carrying the other approvals along."
               (with-current-buffer save-buffer
                 (skg-request-save-buffer
                  approved-forks fork-skgrepos approved-hoist-pids
-                 text-approved-pids review delete-from))))))
+                 review delete-from))))))
     (error
      (skg-log 'error 'save "strandeds-confirmation handler error: %S" err))))
 
@@ -786,7 +782,7 @@ called with a prompt per relationship, and resets to default those it accepts."
 
 (defun skg--telescope-hoist-confirmation-handler
     (save-buffer payload approved-forks fork-skgrepos
-                 &optional text-approved-pids strandeds-review delete-from)
+                 &optional strandeds-review delete-from)
   "Handle the text-free terminal Hoist challenge for SAVE-BUFFER.
 The server has skgsave-committed nothing.  On approval, reissue the same save with
 the exact candidate PIDs; on Abort, leave the buffer and every .skg file
@@ -831,21 +827,23 @@ if it had already been reviewed, and DELETE-FROM if it had been chosen."
               (with-current-buffer save-buffer
                 (skg-request-save-buffer
                  approved-forks fork-skgrepos approved-pids
-                 text-approved-pids strandeds-review delete-from))
+                 strandeds-review delete-from))
             (message
              "Hoist aborted; nothing was saved. Repair the .skg sections manually."))))
     (error
      (skg-log 'error 'save
               "telescope-hoist-confirmation handler error: %S" err))))
 
-(defun skg--save-text-release-confirmation-handler
-    (save-buffer payload approved-forks fork-skgrepos approved-hoist-pids
-                 &optional strandeds-review delete-from)
-  "Handle a save-rerender text release challenge.
-The filesystem save has succeeded, but the server has not released the
-staged saved/collateral text or changed its open-view registry.  Approval
-reissues the save with the exact PIDs; declining leaves the current buffers
-unchanged."
+(defun skg--save-text-release-confirmation-handler (payload)
+  "Handle a save-rerender text release challenge, the terminal message
+of a save whose rerender would show text from overPrivateText
+telescopes under the skgrepo restriction. The save has been written,
+but the server has sent none of the rerendered text; its challenge
+names the views withheld, the saved one first. Approval asks the
+server to rerender those views, approving the PIDs the challenge
+lists (`skg--request-rerender-views'); the save is not sent again,
+since the graph it changed would make it stale. Declining leaves the
+buffers as they are."
   (dolist (response-type
            '(collateral-view save-relax-lock fork-confirmation
              strandeds-confirmation delete-from-confirmation
@@ -863,16 +861,16 @@ unchanged."
              (approved-pids
               (mapcar (lambda (pid) (format "%s" pid))
                       (cadr (assoc 'pids response))))
+             (withheld-view-ids
+              (mapcar (lambda (view-id) (format "%s" view-id))
+                      (cadr (assoc 'view-ids response))))
              (prompt (or (cadr (assoc 'prompt response))
                          "Display staged text from overPrivateText telescopes? ")))
         (if noninteractive
             (message "Saved, but protected rerender text was withheld for %s"
                      (mapconcat #'identity approved-pids ", "))
           (if (yes-or-no-p prompt)
-              (with-current-buffer save-buffer
-                (skg-request-save-buffer
-                 approved-forks fork-skgrepos approved-hoist-pids
-                 approved-pids strandeds-review delete-from))
+              (skg--request-rerender-views withheld-view-ids approved-pids)
             (message
              "Save succeeded; protected rerender text remains withheld and buffers are unchanged."))))
     (error
@@ -1031,7 +1029,7 @@ hand (C-c s s)."
     (skg--replace-fork-confirmation-with-result
      (current-buffer) source (length fork-skgrepos))
     (with-current-buffer source
-      (skg-request-save-buffer t fork-skgrepos nil nil strandeds-review
+      (skg-request-save-buffer t fork-skgrepos nil strandeds-review
                                delete-from))))
 
 (defun skg-decline-fork ()

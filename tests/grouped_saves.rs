@@ -57,5 +57,8 @@ mod save_dirty_conflicts;
 #[path = "save_stale_buffers.rs"]
 mod save_stale_buffers;
 
+#[path = "save_rerender_release.rs"]
+mod save_rerender_release;
+
 #[path = "strandeds.rs"]
 mod strandeds;

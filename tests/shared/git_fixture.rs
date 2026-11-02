@@ -282,7 +282,7 @@ pub fn save_under (
       &mut stream, text, &mut env,
       &Ok ( ViewforestId::ContentView (view . into ()) ),
       &mut f . views_state, restriction,
-      approved_forks, &HashMap::new (), &HashSet::new (), &HashSet::new (),
+      approved_forks, &HashMap::new (), &HashSet::new (),
       &StrandedsReview::NotReviewed, delete_from, &[], rendered_at, None )) ? ) }
 
 /// The members 'field' lists in the file 'file' ("SKGREPO/PID.skg"),

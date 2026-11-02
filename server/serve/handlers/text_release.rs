@@ -11,6 +11,7 @@ use crate::serve::util::sexp_to_client_string;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::ID;
 use crate::types::sexp::extract_string_list_from_sexp;
+use crate::types::views_state::ViewforestId;
 use crate::types::viewnode::{
   Viewnode, ViewnodeKind, Vognode};
 
@@ -131,10 +132,35 @@ pub fn decide_for_overPrivateText_pids (
 pub fn challenge_response (
   decision : &TextReleaseDecision,
 ) -> Option<String> {
+  challenge_entries (decision)
+    . map ( |entries| sexp_to_client_string ( &Sexp::List (entries) ))
+}
+
+/// The challenge a save sends when it withholds its rerender: the
+/// text-free challenge response, and '(view-ids ("V" ...))', the views
+/// whose rerender it withheld, which the "rerender views" request
+/// releases once the user approves.
+pub fn save_rerender_challenge_response (
+  decision               : &TextReleaseDecision,
+  withheld_viewforest_ids : &[ViewforestId],
+) -> Option<String> {
+  challenge_entries (decision) . map ( |mut entries| {
+    entries . push ( Sexp::List ( vec! [
+      atom ("view-ids"),
+      Sexp::List (
+        withheld_viewforest_ids . iter ()
+        . map ( |viewforest_id| atom (&viewforest_id . repr_in_client ()) )
+        . collect () ) ] ));
+    sexp_to_client_string ( &Sexp::List (entries) ) } )
+}
+
+fn challenge_entries (
+  decision : &TextReleaseDecision,
+) -> Option<Vec<Sexp>> {
   let TextReleaseDecision::Challenge {
     operation, pids, prompt,
   } = decision else { return None; };
-  Some ( sexp_to_client_string ( &Sexp::List ( vec! [
+  Some ( vec! [
     pair (
       "response-type",
       TcpToClient::OverPrivateTextTelescopeConfirmation . repr_in_client () ),
@@ -146,7 +172,7 @@ pub fn challenge_response (
         . map ( |pid| atom (pid . as_str ()) )
         . collect () ) ] ),
     pair ("prompt", prompt),
-  ] )) )
+  ] )
 }
 
 /// Entombstone the occurrences of overPrivateText nodes. Search

@@ -34,9 +34,7 @@ use crate::diff_view::restore_requests::{
 use crate::graph_straddle::build::current_graph_straddle_in_slot;
 use crate::graph_straddle::types::GraphStraddle;
 use crate::serve::handlers::text_release::{
-  TextReleaseDecision, challenge_response,
-  approved_pids_from_request as text_approved_pids_from_request,
-};
+  TextReleaseDecision, save_rerender_challenge_response};
 use crate::serve::handlers::save_dependencies::{
   SaveAffectedIds, dirty_view_conflicts, format_conflict_error,
 };
@@ -93,7 +91,9 @@ pub struct SaveResponse {
   /// nothing was skgsave-committed and the response contains no title/body text.
   pub hoist_confirmation  : Option<Vec<HoistCandidate>>,
   /// Fully tagged overPrivateText-telescope-confirmation response produced after the
-  /// save's rerenders have been staged but before text or view-state release.
+  /// save's rerenders have been staged but before any text is released.
+  /// It names the views whose rerender was withheld, which a "rerender
+  /// views" request releases ('rerender_views.rs').
   pub text_release_confirmation : Option<String>,
   /// Some when a home skgrepo move would strand relationships and the request
   /// carried no review of them: nothing was skgsave-committed, and the
@@ -190,11 +190,15 @@ impl SaveResponse {
                    .. SaveResponse::empty () } }
 
   /// A save whose rerender holds text the skgrepo restriction may not
-  /// release without approval: the challenge, and no text.
+  /// release without approval: the challenge, naming the views whose
+  /// rerender is withheld, and no text.
   pub fn text_release_challenge (
-    decision : &TextReleaseDecision,
+    decision                : &TextReleaseDecision,
+    withheld_viewforest_ids : &[ViewforestId],
   ) -> SaveResponse {
-    SaveResponse { text_release_confirmation : challenge_response (decision),
+    SaveResponse { text_release_confirmation :
+                     save_rerender_challenge_response (
+                       decision, withheld_viewforest_ids ),
                    .. SaveResponse::empty () } }
 
   fn empty (
@@ -257,8 +261,6 @@ pub fn handle_save_buffer_request (
     fork_skgrepos_from_request (request);
   let approved_hoist_pids : HashSet<ID> =
     hoist_approved_pids_from_request (request);
-  let text_approved_pids : HashSet<ID> =
-    text_approved_pids_from_request (request);
   let strandeds_review : StrandedsReview =
     strandeds_review_from_request (request);
   let delete_from : DeleteFrom =
@@ -308,7 +310,6 @@ pub fn handle_save_buffer_request (
             approved_forks,
             &fork_skgrepos,
             &approved_hoist_pids,
-            &text_approved_pids,
             &strandeds_review,
             delete_from,
             &envelope . other_views,
@@ -835,7 +836,7 @@ pub async fn update_from_and_rerender_buffer_with_hoist_approval (
     stream, org_buffer_text, env,
     viewforest_id_from_request_result, views_state, skgrepo_restriction,
     approved_forks, fork_skgrepos, approved_hoist_pids,
-    &HashSet::new (), &StrandedsReview::NotReviewed, DeleteFrom::NotChosen,
+    &StrandedsReview::NotReviewed, DeleteFrom::NotChosen,
     &[], current_generation, None ) . await
 }
 
@@ -849,7 +850,6 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
   approved_forks              : bool,
   fork_skgrepos               : &HashMap<ID, SkgrepoName>,
   approved_hoist_pids         : &HashSet<ID>,
-  text_approved_pids        : &HashSet<ID>,
   strandeds_review          : &StrandedsReview,
   delete_from               : DeleteFrom,
   other_views               : &[ClientViewSnapshot],
@@ -1130,7 +1130,6 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
         viewforest_id_from_request_result,
         views_state,
         skgrepo_restriction,
-        text_approved_pids,
         &fork_specs,
         named_diffView_buffer_kind ) ?;
     { // Nonfatal parse warnings (e.g. discarded folder headline text)

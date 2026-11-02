@@ -522,7 +522,7 @@ pub async fn update_from_and_rerender_buffer_with_snapshots_test (
     viewforest_id_from_request_result, views_state,
     &SkgrepoRestriction::unrestricted (config),
     true, &HashMap::new (), &std::collections::HashSet::new (),
-    &std::collections::HashSet::new (), &StrandedsReview::NotReviewed,
+    &StrandedsReview::NotReviewed,
     DeleteFrom::NotChosen, other_views, rendered_at, None ) . await
 }
 

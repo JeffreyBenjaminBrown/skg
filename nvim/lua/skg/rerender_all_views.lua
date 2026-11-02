@@ -1,6 +1,7 @@
 -- PURPOSE: The rerender stream (rerender-lock -> rerender-view* ->
 -- rerender-done), shared by the switch of the skgrepo restriction, the explicit
 -- rerender-all command (which skips every buffer with unsaved edits),
+-- the "rerender views" request that releases a save's withheld rerender,
 -- and the requests a rerender stream follows,
 -- with the prologue those requests share (send_streaming_request).
 -- The Lua port of elisp/skg-request-rerender-all-views.el.
@@ -83,6 +84,24 @@ function M.request_rerender_all_views_with_approval (approved_pids,
     function (pids)
       M.request_rerender_all_views_with_approval(pids, excluded_view_ids)
     end)
+end
+
+---Ask the server to rerender the open views VIEW_IDS, approving the
+---text of APPROVED_PIDS. This releases a save's withheld rerender
+---('save.save_text_release_confirmation_handler'); it writes nothing.
+---A challenge accepted asks again with the PIDs it lists.
+---@param view_ids string[]
+---@param approved_pids string[]
+function M.request_rerender_views (view_ids, approved_pids)
+  local named = { sexpr.symbol('view-ids') }
+  for _, view_id in ipairs(view_ids) do table.insert(named, view_id) end
+  local approval = { sexpr.symbol('approved-overPrivateText-pids') }
+  for _, pid in ipairs(approved_pids) do table.insert(approval, pid) end
+  M.send_streaming_request('rerender', nil,
+    { sexpr.pair(sexpr.symbol('request'), 'rerender views'),
+      named, approval },
+    nil, nil,
+    function (pids) M.request_rerender_views(view_ids, pids) end)
 end
 
 ---Send REQUEST, a list of sexpr pairs, for a command whose answer a

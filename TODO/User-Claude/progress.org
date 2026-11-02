@@ -2500,15 +2500,81 @@ view, a 'forest' save and a search under a restriction ask too, so
 - 'linkstack push' asks the server for a title on a connection of its
   own, not through a daemon (it never routes to one).
 ** Open questions
-*** Releasing a withheld rerender without re-sending the save
+*** RESOLVED Releasing a withheld rerender without re-sending the save
 A save-rerender 'overPrivateText-telescope-confirmation' comes after
 the save has been written, and the protocol's only approval is the
 same save again, which the stale check refuses whenever the save made
 a node (and would make it twice if it did not). A request that
 releases the withheld rerender, or a retry the server recognizes as
 the same save, needs a server change. Also in 'TODO/problems.org'.
+Resolved 2026-11-02 by the "rerender views" request; see "The
+withheld save rerender is released by 'rerender views'" below.
 *** Should '--yes' alone answer delete-from with "visible"?
 It writes, but keeps the hidden records as they are.
 *** Should 'relRepo:NAME subtree' take a kind word?
 E.g. 'relRepo:NAME subtree subscribee' on a node, as the client's menu
 allows.
+
+* The withheld save rerender is released by 'rerender views': DONE, uncommitted
+** What was done
+A save whose rerender would show text from overPrivateText telescopes
+under a skgrepo restriction is written, then answered by its
+'overPrivateText-telescope-confirmation' (operation save-rerender),
+which now also carries '(view-ids ("SAVED" "COLLATERAL" ...))'.
+Before answering, the server registers the saved view as the save
+left it, new nodes with their IDs ('withhold_save_rerender',
+'server/rerender_pass.rs'); it sends none of it. The approval is a new
+request, '((request . "rerender views") (view-ids "V" ...)
+(approved-overPrivateText-pids "P" ...))'
+('server/serve/handlers/rerender_views.rs'): it writes nothing and
+answers with a rerender stream of the named views, or, unapproved,
+the challenge (operation rerender-views) and an empty stream. Both
+clients ('skg--request-rerender-views', 'request_rerender_views') and
+skg-for-ai ('release_withheld_save_rerender', also for the forest
+views drawn by a save) approve by it. The save no longer carries
+'approved-overPrivateText-pids': the server does not read it, the
+clients' and the tool's save requests do not send it, and the
+parameter is gone from their save functions. The stale-save check is
+untouched. 'docs/api-and-formats.org' ("Save buffer", new "Rerender
+views"), both COMMANDS files, and the tool's README say so. The
+problem entry moved to 'TODO/DONE/problems.org'.
+** Tests
+- 'cargo check --all-targets' clean; 'cargo nextest run' 1110 passed;
+  'cargo test' all ok. New: 'tests/save_rerender_release.rs' (in
+  'grouped_saves'): under restriction "main", a save adding a node
+  under an overPrivateText root is written and withheld, naming the
+  view; the same save sent again is refused as stale; "rerender views"
+  unapproved asks again and sends no text; approved, it sends the view
+  with the new node's ID; that view then saves (not stale). And a
+  unit test of the request's 'view-ids' parsing.
+- 'bash/emacs-tests.sh' 442 passed (the save-text-release test now
+  checks the rerender request; a test of 'skg--request-rerender-views'
+  and its challenge retry; positional-argument updates).
+- 'bash/nvim-tests.sh' 479 passed (a fake-server test of the release;
+  positional-argument updates).
+- 'python3 tools/skg-for-ai/test_skg_for_ai.py' PASS:
+  'check_releasing_a_save_s_rerender' now adds a node under the
+  telescope's child and releases it. Two fixture adaptations follow in
+  'check_marking_like_moves_ready' (17 changed files, not 16; the
+  move headline's viewnode ID '1c', not '0r').
+- Integration suite: all but import-md-and-org (failing already).
+  cargo-watch: "Server ready" after the last server edit.
+** Deviations
+- The brief's field 'allow-overPrivateText-telescopes' is the protocol's
+  existing 'approved-overPrivateText-pids'; the request is "rerender
+  views" with a list, not "rerender view", because the collateral
+  views are withheld too and the challenge names them all.
+- The registry changes at a withheld save (the saved view is
+  registered as saved), where the doc used to say it did not: without
+  that, a rerender would draw the view from before the save, without
+  the new node. A declined release leaves the client's buffer with the
+  saved text, which a new save refuses as stale if the save changed a
+  node it writes; the COMMANDS files say to reopen the view.
+** What's imperfect
+- The released view comes as a 'rerender-view', not a 'save-result':
+  a buffer of the diff view gets no readiness summary, and point and
+  scroll are kept as any rerender keeps them, not restored from the
+  save's point fields.
+- skg-for-ai stops, writing nothing, if "rerender views" is challenged
+  again (the graph changed between); the clients ask and retry.
+

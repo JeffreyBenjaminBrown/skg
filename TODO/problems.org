@@ -6,22 +6,6 @@
   When a plan or a settled discussion decides how an entry will be
   fixed, prefix its headline with 'FIX PLANNED: ' and leave it here
   until the fix lands; then move it as above.
-* Problems noticed while closing skg-for-ai's audit gaps (2026-11-02)
-** Approving a withheld save rerender re-sends the save, which a new node makes stale
-  Under a skgrepo restriction, a save whose rerender would show
-  overPrivateText text is written, and then answered with
-  'overPrivateText-telescope-confirmation' (operation save-rerender).
-  The only approval the protocol has is the same save again with
-  'approved-overPrivateText-pids' ('skg--save-text-release-confirmation-handler'
-  re-issues 'skg-request-save-buffer'; skg-for-ai does the same). When
-  the save made a new node, the re-sent buffer still holds it bare, so
-  the server reads a changed parent last written after the buffer's
-  'rendered-at' and refuses the whole save as stale; without the stale
-  check it would make the node twice. Reproduced on a scratch server
-  through skg-for-ai: view 'tele-id' under restriction 'main', add a
-  headline under its child, 'save --yes --show-overPrivateText'. A fix
-  needs the server: a request that releases the withheld rerender of
-  the save just made, or a retry it recognizes as that save.
 * Problems noticed while executing plan 10, slice 5 (2026-10-31)
 ** The server reads a title that starts "(skg" as metadata
   'headline_to_triple' ('server/from_text/buffer_to_viewnodes/

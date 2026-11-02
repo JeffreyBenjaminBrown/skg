@@ -60,14 +60,14 @@ describe('skg.save request strings', function ()
     assert.is_falsy(line:find('hoist-approved . "true"', 1, true))
   end)
 
-  it('adds exact text-release pids when given', function ()
+  it('carries no text-release pids, even with every other approval',
+     function ()
     local line = save.save_request_sexp('view_id-1', {
       lines_below_focused_headline = 0,
       column = 0,
       screen_lines_below_window_start = 0 },
-      nil, nil, nil, { 'overPrivateText-a', 'overPrivateText-b' })
-    assert.is_truthy(line:find(
-      '(approved-overPrivateText-pids "overPrivateText-a" "overPrivateText-b")', 1, true))
+      true, { { 'id-a', 'src-1' } }, { 'pid-a' }, {}, 'visible')
+    assert.is_falsy(line:find('approved-overPrivateText-pids', 1, true))
   end)
 end)
 
@@ -78,7 +78,7 @@ describe('skg.save strandeds review requests', function ()
   it('carries a strandeds review and the relationships it resets to default',
      function ()
     local line = save.save_request_sexp('view_id-1', position,
-      nil, nil, nil, nil, { { 'contains', 'q', 'n' } })
+      nil, nil, nil, { { 'contains', 'q', 'n' } })
     assert.is_truthy(line:find('(strandeds-reviewed . "true")', 1, true))
     assert.is_truthy(line:find(
       '(reset-strandeds ("contains" "q" "n"))', 1, true))
@@ -87,7 +87,7 @@ describe('skg.save strandeds review requests', function ()
   it('a review that resets nothing still says it was reviewed',
      function ()
     local line = save.save_request_sexp('view_id-1', position,
-      nil, nil, nil, nil, {})
+      nil, nil, nil, {})
     assert.is_truthy(line:find('(strandeds-reviewed . "true")', 1, true))
     assert.is_falsy(line:find('reset-strandeds', 1, true))
     assert.is_falsy(save.save_request_sexp('view_id-1', position)
@@ -168,6 +168,75 @@ describe('skg.save strandeds confirmation', function ()
   end)
 end)
 
+describe('skg.save withheld rerender', function ()
+  local server
+  local real_list_uis = vim.api.nvim_list_uis
+  local real_confirm = vim.fn.confirm
+
+  before_each(function ()
+    helpers.install_fixture_herald_rules()
+    helpers.wipe_skg_buffers()
+    lock.end_stream()
+  end)
+
+  after_each(function ()
+    vim.api.nvim_list_uis = real_list_uis
+    vim.fn.confirm = real_confirm
+    if server then server.close() server = nil end
+    helpers.reset_client_state()
+    helpers.wipe_skg_buffers()
+    lock.end_stream()
+  end)
+
+  it('releases it by rerendering the views it names, not by saving again',
+     function ()
+    -- Mirrors test-save-text-release-balances-and-rerenders-the-withheld-views.
+    local saves, rerenders = {}, {}
+    server = helpers.connect_to_fake_server(function (line, respond)
+      if line:find('save buffer', 1, true) then
+        table.insert(saves, line)
+        respond(helpers.framed(
+          '((response-type save-lock) (lock-views ()))'))
+        respond(helpers.framed(
+          '((response-type overPrivateText-telescope-confirmation)'
+          .. ' (operation save-rerender) (pids (tele))'
+          .. ' (prompt "Include that text?") (view-ids (view_id-withheld)))'))
+      elseif line:find('rerender views', 1, true) then
+        table.insert(rerenders, line)
+        respond(helpers.framed(
+          '((response-type rerender-lock) (lock-views (view_id-withheld)))'))
+        respond(helpers.framed(
+          '((response-type rerender-view) (view-id view_id-withheld)'
+          .. ' (content "* (skg node (gnid tele) (skgRepos (nodeRepo main)))'
+          .. ' A title kept private\n** (skg node (gnid new) (skgRepos'
+          .. ' (nodeRepo main))) a new node\n") (rendered-at "9"))'))
+        respond(helpers.framed(
+          '((response-type rerender-done) (errors ()) (warnings ()))'))
+      end
+    end)
+    vim.api.nvim_list_uis = function () return { {} } end
+    vim.fn.confirm = function () return 1 end -- Include
+    local buf = open_view(
+      '* (skg node (gnid tele) (skgRepos (nodeRepo main))) A title kept private\n'
+      .. '** a new node',
+      'skg://withheld', 'view_id-withheld')
+    save.request_save_buffer()
+    vim.wait(3000, function ()
+      return #rerenders >= 1 and lock.stream_in_progress == nil end, 10)
+    assert.are.equal(1, #saves)
+    -- The fake server reads lines, and the saved buffer's envelope
+    -- ends without one, so the request follows its last line.
+    assert.is_truthy(rerenders[1]:find(
+      '((request . "rerender views") (view-ids "view_id-withheld")'
+      .. ' (approved-overPrivateText-pids "tele"))', 1, true))
+    assert.is_truthy(table.concat(
+      vim.api.nvim_buf_get_lines(buf, 0, -1, false), '\n')
+      :find('(gnid new)', 1, true))
+    assert.are.equal('9', vim.b[buf].skg_rendered_at)
+    assert.are.equal(0, state.lp_pending_count)
+  end)
+end)
+
 describe('skg.save delete-from confirmation', function ()
   local server
   local real_list_uis = vim.api.nvim_list_uis
@@ -192,7 +261,7 @@ describe('skg.save delete-from confirmation', function ()
 
   it('carries the choice only when one was made', function ()
     assert.is_truthy(save.save_request_sexp('view_id-1', position,
-      nil, nil, nil, nil, nil, 'visible')
+      nil, nil, nil, nil, 'visible')
       :find('(delete-from . "visible")', 1, true))
     assert.is_falsy(save.save_request_sexp('view_id-1', position)
                       :find('delete-from', 1, true))
@@ -615,7 +684,7 @@ describe('skg.save rendered-at', function ()
   it('carries the generation the buffer was rendered at, none if none',
      function ()
     assert.is_truthy(save.save_request_sexp('view_id-1', position,
-      nil, nil, nil, nil, nil, nil, '7')
+      nil, nil, nil, nil, nil, '7')
       :find('(rendered-at . "7")', 1, true))
     assert.is_falsy(save.save_request_sexp('view_id-1', position)
       :find('rendered-at', 1, true))

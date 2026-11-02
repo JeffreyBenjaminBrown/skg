@@ -275,10 +275,10 @@ Two ways out:
   checking, though for a foreign recorder they write nothing.
 - Leave the rule, and keep the herald's special case.
 I recommend the first. Say which you want.
-** TODO [jeff] I need before and after pictures.
+** DONE [jeff] I need before and after pictures.
 Please draw them like you would see in your compact view,
 and put comments in the bodies of nodes where they would help.
-*** TODO Jeff : Ed's pictures
+*** Jeff : Ed's pictures
 All three are the view of Ed's 'inboxes' as seen on YOUR server, where
 'ed/first' is foreign and 'public' is owned. Comments in bodies are
 mine, marked "Ed:"; they are not in the graph.
@@ -315,10 +315,10 @@ which calls a relationship that can only live in 'ed' "stored away from
 its default". A reader would try to repair it, and the save would
 refuse, since you cannot write into 'ed'.
 
-***** TODO [jeff] What do you mean that C-c  s r "answers"?
+***** [jeff] What do you mean that C-c  s r "answers"?
 I just think of it as setting a value.
 Who asked what to who, and who is answering?
-****** TODO Jeff : Ed: sloppy wording; the server answers the client
+****** Jeff : Ed: sloppy wording; the server answers the client
 C-c s r sets a value, as you say, but before it lets you set anything
 it asks the server a question on your behalf: the 'relRepo info'
 request ("for this relationship, what is its current relRepo and what

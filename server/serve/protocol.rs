@@ -15,6 +15,7 @@ pub enum RequestType {
   HeraldRules,
   RebuildSessionLifetimeStores,
   RerenderAllViews,
+  RerenderViews,
   StripBodyWhitespace,
   TitlesByIds,
   LinkStatuses,
@@ -50,6 +51,7 @@ impl RequestType {
       "herald rules"             => Ok (RequestType::HeraldRules),
       "rebuild session-lifetime stores"              => Ok (RequestType::RebuildSessionLifetimeStores),
       "rerender all views"       => Ok (RequestType::RerenderAllViews),
+      "rerender views"           => Ok (RequestType::RerenderViews),
       "strip body whitespace"    => Ok (RequestType::StripBodyWhitespace),
       "titles by ids"            => Ok (RequestType::TitlesByIds),
       "link statuses"            => Ok (RequestType::LinkStatuses),
@@ -86,7 +88,7 @@ pub enum TcpToClient {
   StrandedsConfirmation, // Terminal message of a save whose home skgrepo moves would strand relationships at their old, more private skgrepos, when the request carried no review of them. Lists each one; the client re-saves with (strandeds-reviewed . "true") and the chosen (reset-strandeds (RELATION RECORDER MEMBER) ...). Nothing is committed.
   DeleteFromConfirmation, // Terminal message of a save under a skgrepo restriction whose deletes would strip records the skgrepo restriction keeps out, when the request carried no (delete-from ...). Carries their count and a prompt; the client re-saves with (delete-from . "visible") or (delete-from . "all"). Nothing is committed.
   TelescopeHoistConfirmation, // Terminal message of a save whose current disk inputs select title/body below home. Carries only pid/home pairs and a publication warning; an approved retry carries the exact pids. Nothing is committed.
-  OverPrivateTextTelescopeConfirmation, // A textual response would expose title/body selected below home under a skgrepo restriction. Carries only the operation, affected pids, and a prompt; the client may retry with an explicit per-pid approval.
+  OverPrivateTextTelescopeConfirmation, // A textual response would expose title/body selected below home under a skgrepo restriction. Carries only the operation, affected pids, and a prompt; the client may retry with an explicit per-pid approval. A save's (operation save-rerender) also names the views whose rerender it withheld, which the client releases by a "rerender views" request carrying the approval.
   CollateralView, // One streamed collateral-view update during save. Sent per-view between SaveLock and SaveResult.
   CloseView,
   SearchResults, // The search buffer: the hits, each with what the enrichment draws under it. Or a message to the user, when there are no hits or the search failed.

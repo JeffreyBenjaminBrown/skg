@@ -139,6 +139,51 @@ the approved PIDs."
                        '("p1" "p2"))))
       (should (assq 'skgrepo-restriction skg-response-handler-map)))))
 
+(ert-deftest test-skg-request-rerender-views-names-the-views-and-retries-a-challenge ()
+  "The release of a save's withheld rerender asks for a rerender of the
+views named, approving the PIDs; a challenge to that rerender, once its
+empty stream is done, asks again with the PIDs it lists."
+  (let ((skg-response-handler-map nil)
+        (skg-lp--pending-count 0)
+        (skg--stream-in-progress nil)
+        (skg--rerender-overPrivateText-retry nil)
+        (skg--rerender-overPrivateText-challenged nil)
+        (sent nil)
+        (scheduled nil))
+    (cl-letf (((symbol-function 'skg-tcp-connect-to-rust) (lambda () 'fake-proc))
+              ((symbol-function 'skg--lock-all-skg-buffers) #'ignore)
+              ((symbol-function 'skg--unlock-all-save-locked) #'ignore)
+              ((symbol-function 'skg--unlock-buffers-not-in-view-id-list) #'ignore)
+              ((symbol-function 'y-or-n-p) (lambda (&rest _) t))
+              ((symbol-function 'run-at-time)
+               (lambda (_delay _repeat fn &rest args)
+                 (push (cons fn args) scheduled)))
+              ((symbol-function 'process-send-string)
+               (lambda (_proc text) (push text sent))))
+      (skg--request-rerender-views '("saved-view" "other-view") '("p1"))
+      (should (equal (read (car sent))
+                     '((request . "rerender views")
+                       (view-ids "saved-view" "other-view")
+                       (approved-overPrivateText-pids "p1"))))
+      (skg-lp--dispatch-by-type
+       nil
+       "((response-type overPrivateText-telescope-confirmation) \
+         (operation rerender-views) (pids (p1 p2)) (prompt \"Include?\"))")
+      (skg-lp--dispatch-by-type
+       nil "((response-type rerender-lock) (lock-views ()))")
+      (skg-lp--dispatch-by-type
+       nil "((response-type rerender-done) (errors ()) (warnings ()))")
+      (should (= 0 skg-lp--pending-count))
+      (should (null skg--stream-in-progress))
+      (should (= 1 (length scheduled)))
+      (let ((retry (pop scheduled)))
+        (apply (car retry) (cdr retry)))
+      (should (= 2 (length sent)))
+      (should (equal (read (car sent))
+                     '((request . "rerender views")
+                       (view-ids "saved-view" "other-view")
+                       (approved-overPrivateText-pids "p1" "p2")))))))
+
 (ert-deftest test-skg-restrict-repo-set-sends-a-foreign-choice-without-a-name ()
   "A foreign choice asks the server to show or hide the foreign repos,
 naming no repo, so the rung stays as it is."

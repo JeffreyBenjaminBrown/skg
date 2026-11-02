@@ -79,9 +79,13 @@ and maintenance writers have no prompt and refuse this repair.
 
 That disk-publication choice is separate from displaying the result. If
 a successful save under a skgrepo restriction would rerender text from
-an overPrivateText telescope, Skg asks for a second, request-scoped approval. Decline
-leaves the save skgsave-committed but sends no new view text and changes no
-open-view registry entry.
+an overPrivateText telescope, Skg asks for a second, request-scoped approval. Approve
+and Skg asks the server for the rerender it withheld, of the saved view
+and the other views the save changed; the save is not sent again. Decline
+leaves the save skgsave-committed and the buffers as they were: the saved
+buffer still holds what was saved, unrendered, and saving it again is
+refused as stale when the save changed a node it writes. Reopen the view
+to go on.
 *** what a save does to other views
 A save rerenders every other open view that shows what it changed,
 and brings it up to date with the graph, saying nothing of what it

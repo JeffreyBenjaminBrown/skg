@@ -1,3 +1,33 @@
+* Problems noticed while closing skg-for-ai's audit gaps (2026-11-02; fixed 2026-11-02)
+** DONE Approving a withheld save rerender re-sends the save, which a new node makes stale
+  Under a skgrepo restriction, a save whose rerender would show
+  overPrivateText text is written, and then answered with
+  'overPrivateText-telescope-confirmation' (operation save-rerender).
+  The only approval the protocol has is the same save again with
+  'approved-overPrivateText-pids' ('skg--save-text-release-confirmation-handler'
+  re-issues 'skg-request-save-buffer'; skg-for-ai does the same). When
+  the save made a new node, the re-sent buffer still holds it bare, so
+  the server reads a changed parent last written after the buffer's
+  'rendered-at' and refuses the whole save as stale; without the stale
+  check it would make the node twice. Reproduced on a scratch server
+  through skg-for-ai: view 'tele-id' under restriction 'main', add a
+  headline under its child, 'save --yes --show-overPrivateText'. A fix
+  needs the server: a request that releases the withheld rerender of
+  the save just made, or a retry it recognizes as that save.
+  Fixed: the approval is a request of its own, "rerender views"
+  ('server/serve/handlers/rerender_views.rs'), which names views,
+  carries the approved PIDs, writes nothing and answers with a
+  rerender stream. A withheld save registers its saved view as the
+  save left it (new nodes with their IDs), and its challenge names
+  the views withheld, '(view-ids ("SAVED" "COLLATERAL" ...))'
+  ('withhold_save_rerender', 'server/rerender_pass.rs'). Both clients
+  and skg-for-ai approve by that request; a save no longer carries
+  '(approved-overPrivateText-pids ...)', nor does the server read it.
+  The stale-save check is unchanged. Tested by
+  'tests/save_rerender_release.rs' (a save that makes a node under
+  the restriction, its challenge, the stale re-send, the release, a
+  save of the released view) and the tool's
+  'check_releasing_a_save_s_rerender'.
 * Problems noticed by Ed while forking a foreign node (2026-11-02)
 ** DONE the '~NAME' herald ranks a foreign relRepo
   On Jeff's server, where repo 'ed' is foreign and so has no privacy

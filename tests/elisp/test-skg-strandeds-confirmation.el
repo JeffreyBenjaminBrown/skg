@@ -26,13 +26,13 @@
 
 (ert-deftest test-save-request-sexp-carries-a-strandeds-review ()
   (let ((sexp (skg--save-request-sexp
-               "v" test--strandeds-point-position nil nil nil nil
+               "v" test--strandeds-point-position nil nil nil
                '(reviewed ("contains" "q" "n")))))
     (should (equal (cdr (assoc 'strandeds-reviewed sexp)) "true"))
     (should (equal (cdr (assoc 'reset-strandeds sexp))
                    '(("contains" "q" "n")))))
   (let ((sexp (skg--save-request-sexp
-               "v" test--strandeds-point-position nil nil nil nil
+               "v" test--strandeds-point-position nil nil nil
                '(reviewed))))
     (should (equal (cdr (assoc 'strandeds-reviewed sexp)) "true"))
     (should-not (assoc 'reset-strandeds sexp))))
@@ -77,13 +77,13 @@ with the review, carrying the attempt's other approvals."
                    (lambda (&rest args) (setq resave-args args))))
           (skg--strandeds-confirmation-handler
            save-buffer test--strandeds-payload
-           t '(("n" . "public")) '("h") '("t"))
+           t '(("n" . "public")) '("h"))
           (should-not (assoc 'save-result skg-response-handler-map))
           (should-not (assoc 'telescope-hoist-confirmation
                              skg-response-handler-map))
           (should (= skg-lp--pending-count 0))
           (should (equal resave-args
-                         '(t (("n" . "public")) ("h") ("t")
+                         '(t (("n" . "public")) ("h")
                              (reviewed ("contains" "q" "n")
                                        ("contains" "r" "n"))
                              nil))))

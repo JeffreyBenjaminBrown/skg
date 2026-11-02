@@ -200,12 +200,12 @@ So far there are these endpoints:
       user approved for text publication; it is not a boolean and
       does not authorize any other PID or bypass ordinary save
       validation.
-    - =(approved-overPrivateText-pids "PID" ...)= is the shared text-release
-      approval field. On save it appears only when retrying a
-      =save-rerender= =overPrivateText-telescope-confirmation=, and authorizes
-      those exact PIDs for that response attempt. It is independent of
-      Hoist authority: viewing text and publishing it on disk are
-      different decisions.
+    - A save carries no =(approved-overPrivateText-pids ...)=: the
+      text-release approval of a save's rerender rides the "Rerender
+      views" request that follows the save's
+      =overPrivateText-telescope-confirmation= (below), not the save.
+      It is independent of Hoist authority: viewing text and publishing
+      it on disk are different decisions.
     - =rendered-at= is mandatory: the runtime generation the saved
       buffer's text was rendered at, as the last response that drew
       it said, or, for a buffer no view response drew (a client's new
@@ -413,16 +413,22 @@ So far there are these endpoints:
     collateral rerenders. After a valid save has updated disk and the
     session-lifetime stores, the server renders the saved view and every collateral view in memory.
     Under a restricted skgrepo-set, if the staged forests contain overPrivateText
-    telescopes without exact text-release approval, it changes no
-    open-view registry entry, streams no content, and sends
+    telescopes, it streams no content, and sends
     =((response-type overPrivateText-telescope-confirmation)
-    (operation save-rerender) (pids ("P" ...)) (prompt "..."))=.
+    (operation save-rerender) (pids ("P" ...)) (prompt "...")
+    (view-ids ("SAVED_VIEW_ID" "COLLATERAL_VIEW_ID" ...)))=:
+    the views whose rerender is withheld, the saved view first.
     The save itself has succeeded; only its updated text is withheld.
-    The client may retry the same save with
-    =(approved-overPrivateText-pids "P" ...)=. On an unrestricted connection,
-    or on an approved retry, the ordinary save-result carries the shared overPrivateText-
-    telescope warning. Declining leaves current client buffers and the
-    server's open-view registry unchanged.
+    The server registers the saved view as the save left it (with the
+    IDs the save gave its new nodes), sending none of it; the
+    collateral views keep their registrations. To approve, the client
+    sends "Rerender views" (below) naming those views, with
+    =(approved-overPrivateText-pids "P" ...)=: it answers with their
+    rerenders, and writes nothing. The save is never sent again for
+    this: once written, a save that changed a node it writes is stale
+    ("The rendered-at of a view"). On an unrestricted connection the
+    ordinary save-result carries the shared overPrivateText-telescope
+    warning. Declining leaves the client's buffers as they are.
   - Exactly one of =save-result=, =delete-from-confirmation=,
     =strandeds-confirmation=,
     =telescope-hoist-confirmation=, =fork-confirmation=, and the save-rerender
@@ -1054,6 +1060,30 @@ one automatically.
   - =server/serve/rerender_stream.rs= prepares, authorizes and streams
     the rerenders; every request answered by a rerender stream shares
     it.
+
+** Rerender views
+  - Request: =((request . "rerender views") (view-ids "VIEW_ID" ...)
+    (approved-overPrivateText-pids "PID" ...))=. =view-ids= is
+    required; the approval is optional.
+  - Response: a rerender stream (see "Rerender all views") of the
+    open views named: each is refreshed from what the connection
+    holds for it, a buffer of the diff view over the graph straddle,
+    and not extended. A named view the connection does not hold adds
+    an error to =rerender-done=; a request without =view-ids= gets an
+    empty rerender stream whose =rerender-done= carries the error.
+  - Writes nothing. Its use is to release a save's withheld rerender:
+    the save's =overPrivateText-telescope-confirmation= names the views
+    (see "Save buffer"), and the client sends this request for them,
+    approving the PIDs that confirmation listed. Both clients and
+    skg-for-ai do.
+  - Under a restricted set, overPrivateText content without exact
+    approval returns LP =overPrivateText-telescope-confirmation= with
+    =(operation rerender-views)= and the exact PIDs, followed by an
+    empty rerender stream; no view text is sent and no open-view
+    registry entry changes. A retry with those PIDs is released; the
+    release, or an unrestricted connection, adds the shared warning to
+    =rerender-done=.
+  - =server/serve/handlers/rerender_views.rs=.
 
 ** skgrepo-sets
   - Skgrepo-sets are the prefixes of the config's privacy ladder, the

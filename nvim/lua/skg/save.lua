@@ -36,7 +36,6 @@ M.fork_repo_placeholder = 'PICK-A-REPO'
 ---@param approved_forks boolean|nil
 ---@param fork_repos table[]|nil {{id, repo}, ...}
 ---@param approved_hoist_pids string[]|nil
----@param text_approved_pids string[]|nil
 ---@param strandeds_review table|nil the relationships, each
 ---  {relation, recorder, member}, the user chose to reset to default after a
 ---  strandeds-confirmation (possibly none); nil when not reviewed
@@ -46,7 +45,6 @@ M.fork_repo_placeholder = 'PICK-A-REPO'
 ---  never cached
 function M.request_save_buffer (approved_forks, fork_skgrepos,
                                 approved_hoist_pids,
-                                text_approved_pids,
                                 strandeds_review,
                                 delete_from)
   local save_buf = vim.api.nvim_get_current_buf()
@@ -61,7 +59,7 @@ function M.request_save_buffer (approved_forks, fork_skgrepos,
   lock.lock_all_skg_buffers()
   local ok, err = pcall(
     M.send_save_buffer, save_buf, saved_view_id, approved_forks, fork_skgrepos,
-    approved_hoist_pids, text_approved_pids, strandeds_review, delete_from)
+    approved_hoist_pids, strandeds_review, delete_from)
   if not ok then
     M.cancel_locally_failed_save()
     error(err) end
@@ -70,7 +68,7 @@ end
 ---Serialize and send a save once 'lock.stream_in_progress' is set and
 ---the buffers are locked.
 function M.send_save_buffer (save_buf, saved_view_id, approved_forks, fork_skgrepos,
-                             approved_hoist_pids, text_approved_pids,
+                             approved_hoist_pids,
                              strandeds_review, delete_from)
   local focused_line = focus.owning_headline_line()
   local focused_had_metadata = focused_line ~= nil
@@ -87,7 +85,6 @@ function M.send_save_buffer (save_buf, saved_view_id, approved_forks, fork_skgre
     M.save_request_sexp(saved_view_id, save_point_position,
                           approved_forks, fork_skgrepos,
                           approved_hoist_pids,
-                          text_approved_pids,
                           strandeds_review,
                           delete_from,
                           vim.b[save_buf].skg_rendered_at,
@@ -130,7 +127,7 @@ function M.send_save_buffer (save_buf, saved_view_id, approved_forks, fork_skgre
     function (_payload_text, response)
       M.delete_from_confirmation_handler(
         save_buf, response, approved_forks, fork_skgrepos,
-        approved_hoist_pids, text_approved_pids, strandeds_review)
+        approved_hoist_pids, strandeds_review)
     end, false)
   -- Another alternative terminal: a home skgrepo move would strand
   -- relationships. Retry this same save with the user's review.
@@ -138,19 +135,20 @@ function M.send_save_buffer (save_buf, saved_view_id, approved_forks, fork_skgre
     function (_payload_text, response)
       M.strandeds_confirmation_handler(
         save_buf, response, approved_forks, fork_skgrepos,
-        approved_hoist_pids, text_approved_pids, delete_from)
+        approved_hoist_pids, delete_from)
     end, false)
   state.register_response_handler('telescope-hoist-confirmation',
     function (_payload_text, response)
       M.telescope_hoist_confirmation_handler(
         save_buf, response, approved_forks, fork_skgrepos,
-        text_approved_pids, strandeds_review, delete_from)
+        strandeds_review, delete_from)
     end, false)
+  -- The terminal message of a save whose rerender is withheld. The
+  -- save was written; approval asks for a rerender of the views it
+  -- names, not for the save again.
   state.register_response_handler('overPrivateText-telescope-confirmation',
     function (_payload_text, response)
-      M.save_text_release_confirmation_handler(
-        save_buf, response, approved_forks, fork_skgrepos,
-        approved_hoist_pids, strandeds_review, delete_from)
+      M.save_text_release_confirmation_handler(response)
     end, false)
   state.lp_reset()
   client.send_string(request_line)
@@ -240,7 +238,6 @@ end
 ---@param approved_forks boolean|nil
 ---@param fork_repos table[]|nil
 ---@param approved_hoist_pids string[]|nil
----@param text_approved_pids string[]|nil
 ---@param strandeds_review table|nil
 ---@param delete_from string|nil 'visible' or 'all'
 ---@param rendered_at string|nil the generation the buffer was rendered at
@@ -253,7 +250,7 @@ end
 ---@return string
 function M.save_request_sexp (view_id, position, approved_forks,
                                 fork_skgrepos, approved_hoist_pids,
-                                text_approved_pids, strandeds_review,
+                                strandeds_review,
                                 delete_from, rendered_at,
                                 diffView_buffer_kind)
   local request = {
@@ -285,11 +282,6 @@ function M.save_request_sexp (view_id, position, approved_forks,
   if approved_hoist_pids then
     local field = { sexpr.symbol('approved-hoist-pids') }
     for _, pid in ipairs(approved_hoist_pids) do
-      table.insert(field, pid) end
-    table.insert(request, field) end
-  if text_approved_pids then
-    local field = { sexpr.symbol('approved-overPrivateText-pids') }
-    for _, pid in ipairs(text_approved_pids) do
       table.insert(field, pid) end
     table.insert(request, field) end
   if strandeds_review then
@@ -646,7 +638,7 @@ end
 ---@param fork_repos table[]|nil
 function M.telescope_hoist_confirmation_handler (
     save_buf, response, approved_forks, fork_skgrepos,
-    text_approved_pids, strandeds_review, delete_from)
+    strandeds_review, delete_from)
   state.response_handler_map['collateral-view'] = nil
   state.response_handler_map['save-relax-lock'] = nil
   state.response_handler_map['fork-confirmation'] = nil
@@ -680,7 +672,7 @@ function M.telescope_hoist_confirmation_handler (
       vim.api.nvim_set_current_buf(save_buf)
       M.request_save_buffer(
         approved_forks, fork_skgrepos, approved_pids,
-        text_approved_pids, strandeds_review, delete_from)
+        strandeds_review, delete_from)
     else
       vim.notify('Hoist aborted; nothing was saved. Repair the .skg'
                  .. ' sections manually.')
@@ -702,7 +694,7 @@ end
 ---@param response any
 function M.delete_from_confirmation_handler (
     save_buf, response, approved_forks, fork_skgrepos,
-    approved_hoist_pids, text_approved_pids, strandeds_review)
+    approved_hoist_pids, strandeds_review)
   for _, response_type in ipairs({
       'collateral-view', 'save-relax-lock', 'fork-confirmation',
       'strandeds-confirmation', 'delete-from-confirmation',
@@ -734,7 +726,7 @@ function M.delete_from_confirmation_handler (
     vim.api.nvim_set_current_buf(save_buf)
     M.request_save_buffer(
       approved_forks, fork_skgrepos, approved_hoist_pids,
-      text_approved_pids, strandeds_review, delete_from)
+      strandeds_review, delete_from)
   end)
   if not ok then
     log.log('error', 'save', 'delete-from-confirmation handler error: %s',
@@ -759,7 +751,7 @@ end
 ---@param response any
 function M.strandeds_confirmation_handler (
     save_buf, response, approved_forks, fork_skgrepos,
-    approved_hoist_pids, text_approved_pids, delete_from)
+    approved_hoist_pids, delete_from)
   for _, response_type in ipairs({
       'collateral-view', 'save-relax-lock', 'fork-confirmation',
       'strandeds-confirmation', 'delete-from-confirmation',
@@ -797,7 +789,7 @@ function M.strandeds_confirmation_handler (
     vim.api.nvim_set_current_buf(save_buf)
     M.request_save_buffer(
       approved_forks, fork_skgrepos, approved_hoist_pids,
-      text_approved_pids, review, delete_from)
+      review, delete_from)
   end)
   if not ok then
     log.log('error', 'save', 'strandeds-confirmation handler error: %s',
@@ -858,17 +850,17 @@ function M.strandeds_review_from_choice (strandeds, choice, ask)
   return review
 end
 
----Handle a save-rerender release challenge. The save itself has been skgsave-committed,
----but staged text and the open-view registry remain untouched. Approval
----reissues with exact PIDs; Abort keeps current buffers as they are.
----@param save_buf integer
+---Handle a save-rerender release challenge, the terminal message of a
+---save whose rerender would show text from overPrivateText telescopes
+---under the skgrepo restriction. The save has been written, but the
+---server has sent none of the rerendered text; its challenge names the
+---views withheld, the saved one first. Approval asks the server to
+---rerender those views, approving the PIDs the challenge lists
+---('rerender_all_views.request_rerender_views'); the save is not sent
+---again, since the graph it changed would make it stale. Declining
+---keeps the buffers as they are.
 ---@param response any
----@param approved_forks boolean|nil
----@param fork_repos table[]|nil
----@param approved_hoist_pids string[]|nil
-function M.save_text_release_confirmation_handler (
-    save_buf, response, approved_forks, fork_skgrepos,
-    approved_hoist_pids, strandeds_review, delete_from)
+function M.save_text_release_confirmation_handler (response)
   for _, response_type in ipairs({
       'collateral-view', 'save-relax-lock', 'fork-confirmation',
       'strandeds-confirmation', 'delete-from-confirmation',
@@ -883,6 +875,8 @@ function M.save_text_release_confirmation_handler (
   lock.unlock_all_save_locked()
   local approved_pids =
     payload.string_list(payload.field(response, 'pids'))
+  local withheld_view_ids =
+    payload.string_list(payload.field(response, 'view-ids'))
   local prompt = payload.field_text(response, 'prompt')
     or 'Display staged text from overPrivateText telescopes?'
   if #vim.api.nvim_list_uis() == 0 then
@@ -891,10 +885,8 @@ function M.save_text_release_confirmation_handler (
     return
   end
   if vim.fn.confirm(prompt, '&Include\n&Keep withheld', 2) == 1 then
-    vim.api.nvim_set_current_buf(save_buf)
-    M.request_save_buffer(
-      approved_forks, fork_skgrepos, approved_hoist_pids,
-      approved_pids, strandeds_review, delete_from)
+    require('skg.rerender_all_views').request_rerender_views(
+      withheld_view_ids, approved_pids)
   else
     vim.notify('Save succeeded; protected rerender text remains withheld'
                .. ' and buffers are unchanged.')
@@ -1068,7 +1060,7 @@ function M.approve_fork ()
   vim.b[buf].skg_fork_suppress_strip = true
   vim.api.nvim_buf_delete(buf, { force = true })
   vim.api.nvim_set_current_buf(source)
-  M.request_save_buffer(true, fork_skgrepos, nil, nil, strandeds_review,
+  M.request_save_buffer(true, fork_skgrepos, nil, strandeds_review,
                         delete_from)
 end
 

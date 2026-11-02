@@ -9,11 +9,10 @@
 use crate::rerender_pass::DiffViewBufferRerender;
 use crate::serve::ViewsState;
 use crate::serve::handlers::text_release::approved_pids_from_request;
-use crate::serve::protocol::TcpToClient;
 use crate::serve::rerender_stream::{
   PreparedRerenders, authorize_prepared_rerenders,
-  RerenderRequest, RerenderSelector, prepare_rerender_views, stream_prepared_rerenders};
-use crate::serve::util::{ format_lock_views_sexp, format_rerender_done_sexp, send_response_with_length_prefix, tag_sexp_response};
+  RerenderRequest, RerenderSelector, prepare_rerender_views,
+  stream_empty_rerender_with_error, stream_prepared_rerenders};
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::env::SkgEnv;
 use crate::types::views_state::ViewforestId;
@@ -32,12 +31,7 @@ pub fn handle_rerender_all_views_request (
     match excluded_viewforest_ids_from_request (request) {
       Ok (excluded) => excluded,
       Err (error) => {
-        send_response_with_length_prefix (
-          stream, &tag_sexp_response (TcpToClient::RerenderLock,
-            &format_lock_views_sexp (&[])));
-        send_response_with_length_prefix (
-          stream, &tag_sexp_response (TcpToClient::RerenderDone,
-            &format_rerender_done_sexp (&[error], &[])));
+        stream_empty_rerender_with_error (stream, error);
         return; } };
   stream_rerender_views_excluding (
     stream, env, views_state, skgrepo_restriction,

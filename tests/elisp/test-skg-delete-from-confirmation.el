@@ -28,7 +28,7 @@
 
 (ert-deftest test-save-request-sexp-carries-delete-from ()
   (let ((sexp (skg--save-request-sexp
-               "v" test--delete-from-point-position nil nil nil nil nil
+               "v" test--delete-from-point-position nil nil nil nil
                "visible")))
     (should (equal (cdr (assoc 'delete-from sexp)) "visible"))))
 
@@ -59,7 +59,7 @@ the prompt it asked."
                    (lambda (&rest args) (setq resave-args args))))
           (skg--delete-from-confirmation-handler
            save-buffer test--delete-from-payload
-           t '(("n" . "public")) '("h") '("t") '(reviewed))
+           t '(("n" . "public")) '("h") '(reviewed))
           (should-not (assoc 'save-result skg-response-handler-map))
           (should-not (assoc 'strandeds-confirmation skg-response-handler-map))
           (should (= skg-lp--pending-count 0))
@@ -74,7 +74,7 @@ other approvals."
     (should (string-match-p
              "Delete from: (c)ancel, (v)isible records only, (a)ll owned records"
              asked))
-    (should (equal args '(t (("n" . "public")) ("h") ("t") (reviewed) "visible"))))
+    (should (equal args '(t (("n" . "public")) ("h") (reviewed) "visible"))))
   (pcase-let ((`(,args ,_) (test--delete-from-handler-resaves-with ?a)))
     (should (equal (car (last args)) "all"))))
 
@@ -104,8 +104,8 @@ choice re-issues the save with that choice still on it."
                    " (strandeds (((relation \"contains\") (recorder \"q\") (member \"n\")"
                    " (relRepo \"private\") (default \"public\"))))"
                    " (prompt \"Reset? \"))")
-           nil nil nil nil "visible")
-          (should (equal resave-args '(nil nil nil nil (reviewed) "visible"))))
+           nil nil nil "visible")
+          (should (equal resave-args '(nil nil nil (reviewed) "visible"))))
       (kill-buffer save-buffer))))
 
 (provide 'test-skg-delete-from-confirmation)

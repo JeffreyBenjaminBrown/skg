@@ -87,47 +87,49 @@
              t '(("N" . "owned")))))
       (kill-buffer source))
     (should (equal called
-                   '(t (("N" . "owned")) ("A" "B") nil nil nil)))
+                   '(t (("N" . "owned")) ("A" "B") nil nil)))
     (should (= skg-lp--pending-count 0))
     (should-not (assoc 'save-result skg-response-handler-map))))
 
-(ert-deftest test-save-request-sexp-carries-text-release-pids ()
-  "Saved/collateral rerender authority uses the shared release field."
-  (let* ((sexp (skg--save-request-sexp
-                "view-id-1"
-                '(:point-lines-below-focused-headline 0
-                  :point-column 0
-                  :point-screen-lines-below-window-start 0)
-                nil nil nil '("U1" "U2")))
-         (entry (assoc 'approved-overPrivateText-pids sexp)))
-    (should (equal entry '(approved-overPrivateText-pids "U1" "U2")))))
+(ert-deftest test-save-request-sexp-carries-no-text-release-pids ()
+  "A save carries no text-release approval: a withheld rerender is
+released by a rerender of its views, not by the save again."
+  (let ((sexp (skg--save-request-sexp
+               "view-id-1"
+               '(:point-lines-below-focused-headline 0
+                 :point-column 0
+                 :point-screen-lines-below-window-start 0)
+               t '(("N" . "owned")) '("H") '(reviewed) "visible")))
+    (should-not (assoc 'approved-overPrivateText-pids sexp))))
 
-(ert-deftest test-save-text-release-balances-and-retries-exact-pids ()
-  "The save is skgsave-committed, but no staged text is adopted before approval."
-  (let ((source (generate-new-buffer "*save-release-origin*"))
-        (skg-response-handler-map
+(ert-deftest test-save-text-release-balances-and-rerenders-the-withheld-views ()
+  "The save was written, but its rerender withheld. Approval asks for
+a rerender of the views the challenge names, with its exact PIDs; it
+does not save again."
+  (let ((skg-response-handler-map
          '((save-result ignore . t)
            (collateral-view ignore)
            (save-relax-lock ignore)
            (overPrivateText-telescope-confirmation ignore)))
         (skg-lp--pending-count 1)
-        called)
-    (unwind-protect
-        (cl-letf (((symbol-function 'skg--end-stream) #'ignore)
-                  ((symbol-function 'skg--unlock-all-save-locked) #'ignore)
-                  ((symbol-function 'yes-or-no-p) (lambda (_) t))
-                  ((symbol-function 'skg-request-save-buffer)
-                   (lambda (&rest args) (setq called args))))
-          (let ((noninteractive nil))
-            (skg--save-text-release-confirmation-handler
-             source
-             "((response-type overPrivateText-telescope-confirmation) (operation save-rerender) (pids (U1 U2)) (prompt \"Include?\"))"
-             t '(("N" . "owned")) '("H"))))
-      (kill-buffer source))
-    (should (equal called
-                   '(t (("N" . "owned")) ("H") ("U1" "U2") nil nil)))
+        rerendered saved)
+    (cl-letf (((symbol-function 'skg--end-stream) #'ignore)
+              ((symbol-function 'skg--unlock-all-save-locked) #'ignore)
+              ((symbol-function 'yes-or-no-p) (lambda (_) t))
+              ((symbol-function 'skg-request-save-buffer)
+               (lambda (&rest args) (setq saved args)))
+              ((symbol-function 'skg--request-rerender-views)
+               (lambda (&rest args) (setq rerendered args))))
+      (let ((noninteractive nil))
+        (skg--save-text-release-confirmation-handler
+         "((response-type overPrivateText-telescope-confirmation) (operation save-rerender) (pids (U1 U2)) (prompt \"Include?\") (view-ids (saved-view other-view)))")))
+    (should (equal rerendered
+                   '(("saved-view" "other-view") ("U1" "U2"))))
+    (should-not saved)
     (should (= skg-lp--pending-count 0))
-    (should-not (assoc 'save-result skg-response-handler-map))))
+    (should-not (assoc 'save-result skg-response-handler-map))
+    (should-not (assoc 'overPrivateText-telescope-confirmation
+                       skg-response-handler-map))))
 
 (ert-deftest test-fork-repos-from-confirmation-buffer-walks-two-levels ()
   "skg--fork-repos-from-confirmation-buffer pairs each clone-to-be
@@ -206,7 +208,7 @@ ordinary-save refusal on C-x C-s."
               (should (string-match-p
                        "Fork confirmed; saving\\.\\.\\."
                        (buffer-string))))
-            (should (equal called '(t (("N" . "owned")) nil nil nil nil)))
+            (should (equal called '(t (("N" . "owned")) nil nil nil)))
             (skg--finish-pending-fork-result
              source "((content \"saved\") (errors ()) (warnings ()))")
             (with-current-buffer result

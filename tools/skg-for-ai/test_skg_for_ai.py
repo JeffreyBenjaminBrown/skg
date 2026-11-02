@@ -2399,9 +2399,10 @@ def check_searching_under_a_restriction (context):
 def check_releasing_a_save_s_rerender (context):
   """Under the restriction, a save whose re-rendered view shows an
   overPrivateText telescope's text happens, but the view is withheld:
-  '--yes' alone leaves the files stale; with '--show-overPrivateText'
-  the same save is sent again, approving it, and the files are
-  rewritten."""
+  '--yes' alone leaves the files stale. With '--show-overPrivateText'
+  the tool asks for the withheld rerender, approving it, rather than
+  sending the save again, which the server would refuse as stale once
+  the save had made a node; the files then show the new node."""
   folder = context [ "daemon_folder" ]
   edit_compact ( folder, [ ( "** Contained twice ⟨0b 3aC⟩",
                              "** Contained twice, retitled ⟨0b 3aC⟩" ) ],
@@ -2416,21 +2417,34 @@ def check_releasing_a_save_s_rerender (context):
   require_failure (
     run_tool ([ "save", sidecar, "--yes" ]), release_lines,
     "skg_for_ai: The save succeeded, but its re-rendered view is withheld; "
-    "the files are out of date. Save again with '--show-overPrivateText' to "
-    "release it, or view the node again.\n" )
+    "the files are out of date. View the node again with "
+    "'--show-overPrivateText'.\n" )
   require_equal ( "the title saved before the release",
                   skg_title (context, "shared-id"), "Contained twice, retitled" )
+  require_tool_run ([ "view", "tele-id", "--out-dir", folder,
+                      "--show-overPrivateText", "--no-summary" ])
+  edit_compact ( folder, [ ( "** Contained twice, retitled ⟨0b 3aC⟩\n",
+                             "** Contained twice, retitled ⟨0b 3aC⟩\n"
+                             "*** Added under the telescope\n" ) ],
+                 "view_tele-id" )
   completed = require_tool_run ([ "save", sidecar, "--yes",
                                   "--show-overPrivateText" ])
   if not completed . stdout . endswith (
-      "Approved: the request is sent again, releasing that text.\n"
+      release_lines [0] + "\n"
+      "Approved: the withheld rerender is asked for, releasing that text.\n"
       "Server: saved, 0 errors, 1 warning.\n"
-      "Server warning: save rerender includes title or body text selected "
+      "Server warning: rerender views includes title or body text selected "
       "below its node's home repo for PID tele-id.\n" +
       "" . join ( os . path . join (folder, "view_tele-id" + suffix) + "\n"
                   for suffix in ( ".full.org", ".compact.org", ".view.json" ))):
     raise CaseFailure ( f"the approving save printed {completed . stdout!r}" )
-  require_in_file ( folder, "view_tele-id", "** Contained twice, retitled ⟨0b 3aC⟩\n" )
+  new_id = id_of_compact_headline (
+    folder, "*** Added under the telescope", "view_tele-id" )
+  require_equal ( "the telescope's child's content after the release",
+                  skg_list (context, "shared-id", "contains"), [ new_id ] )
+  require_in_file ( folder, "view_tele-id",
+                    "** Contained twice, retitled ⟨0b 3aC1⟩\n"
+                    "*** Added under the telescope ⟨0c⟩\n" )
 
 def check_deleting_under_a_restriction (context):
   """Under the restriction, deleting a node a record of 'private' names
@@ -2649,13 +2663,13 @@ def check_marking_like_moves_ready (context):
     diff_report_head () +
     "Ready: ⟨0b⟩ (homeSkgrepoMove (old private) (new main)), as '(ready)'.\n"
     "Ready: ⟨0e⟩ (homeSkgrepoMove (old private) (new main)), as '(ready)'.\n"
-    + saved_line (0) + "Readiness: 2 of 16 changed files are ready.\n" +
+    + saved_line (0) + "Readiness: 2 of 17 changed files are ready.\n" +
     diff_written_paths (folder),
     ignoring_view_ids = True )
   require_in_diff_compact ( folder, "** ⟨0b ⌂ -private +main✓⟩\n" )
   require_in_diff_compact ( folder, "** Its private leaf ⟨0d M✓⟩\n"
                                     "*** ⟨0e ⌂ -private +main✓⟩\n" )
-  require_in_diff_compact ( folder, "***** ⟨0r ⌂ -private +main⟩\n" )
+  require_in_diff_compact ( folder, "***** ⟨1c ⌂ -private +main⟩\n" )
 
 def check_deleting_references (context):
   """'delete-references ID' sends nothing without '--yes'; with it the
@@ -2843,22 +2857,23 @@ def edit_compact (folder, replacements, base_name = ROOT_BASE_NAME):
   with open (path, "w", encoding = "utf-8") as compact_file:
     compact_file . write (text)
 
-def read_compact (folder):
-  return read_file ( os . path . join (folder, ROOT_BASE_NAME + ".compact.org") )
+def read_compact (folder, base_name = ROOT_BASE_NAME):
+  return read_file ( os . path . join (folder, base_name + ".compact.org") )
 
 def require_in_compact (folder, text):
   if text not in read_compact (folder):
     raise CaseFailure (
       f"the re-rendered compact view lacks {text!r}:\n{read_compact (folder)}" )
 
-def id_of_compact_headline (folder, headline_start):
+def id_of_compact_headline (folder, headline_start, base_name = ROOT_BASE_NAME):
   """The ID in the metadata of the full-view headline that the handle
-  of the compact headline starting HEADLINE_START names."""
-  for line in read_compact (folder) . split ("\n"):
+  of the compact headline starting HEADLINE_START names, in the view
+  BASE_NAME."""
+  for line in read_compact (folder, base_name) . split ("\n"):
     if line . startswith (headline_start + " ⟨"):
       handle = HANDLE_PATTERN . search (line) . group (1)
       for full_line in read_file (
-          os . path . join (folder, ROOT_BASE_NAME + ".full.org") ) . split ("\n"):
+          os . path . join (folder, base_name + ".full.org") ) . split ("\n"):
         viewnode_id = VIEWNODE_ID_PATTERN . match (full_line)
         if viewnode_id and viewnode_id . group (1) == handle:
           match = UUID_PATTERN . search (full_line)
@@ -2868,7 +2883,7 @@ def id_of_compact_headline (folder, headline_start):
           return match . group (0)
       raise CaseFailure ( f"the full view has no headline ⟨{handle}⟩" )
   raise CaseFailure (
-    f"no headline {headline_start!r} in:\n{read_compact (folder)}" )
+    f"no headline {headline_start!r} in:\n{read_compact (folder, base_name)}" )
 
 def require_output (completed, expected_stdout, expected_returncode = 0,
                     ignoring_view_ids = False):

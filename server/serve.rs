@@ -20,6 +20,7 @@ use crate::serve::handlers::repo_files_reloaded::deliver_repo_change_notices;
 use crate::serve::handlers::repos::handle_repos_request;
 use crate::serve::handlers::rebuild_session_lifetime_stores::handle_rebuild_session_lifetime_stores_request;
 use crate::serve::handlers::rerender_all_views::handle_rerender_all_views_request;
+use crate::serve::handlers::rerender_views::handle_rerender_views_request;
 use crate::serve::handlers::runtime_generation::handle_runtime_generation_request;
 use crate::serve::handlers::save_buffer::handle_save_buffer_request;
 use crate::serve::handlers::server_warnings::handle_server_warnings_request;
@@ -236,6 +237,13 @@ fn handle_emacs (
                                                    &mut env ),
           Ok (RequestType::RerenderAllViews) =>
             handle_rerender_all_views_request (
+              &mut stream,
+              &request_header,
+              &env,
+              &mut views_state,
+              &skgrepo_restriction ),
+          Ok (RequestType::RerenderViews) =>
+            handle_rerender_views_request (
               &mut stream,
               &request_header,
               &env,

@@ -476,7 +476,8 @@ asks before it releases such text: before a view ('view', 'forest'
 and the others), a save's re-rendered view, or the rerender of the
 held views a new restriction asks for, it names the telescopes and
 withholds the text. '--show-overPrivateText' approves, and the tool
-sends the request again with their IDs; without it, the tool prints
+sends the request again with their IDs (for a save, it asks for the
+withheld rerender instead; see "The server's answer"); without it, the tool prints
 the question on standard error and writes nothing (a save has then
 happened; see "The server's answer"). A search asks whether to
 include such telescopes: without the option it excludes them, saying
@@ -862,8 +863,9 @@ by membership and by a link), each owned skgrepo a gitrepo, and a
 daemon runs. 'restrict main' restricts its connection; viewing the
 telescope is refused, then released with '--show-overPrivateText'; a
 search excludes it, then includes it; a save whose re-rendered view
-shows it happens but leaves the files stale, and is released by
-'--show-overPrivateText'. Deleting a node a private record names
+shows it happens but leaves the files stale, and a save that adds a
+node under it is released by '--show-overPrivateText', which writes
+the new node's view. Deleting a node a private record names
 asks delete-from: cancelled by '--yes' alone, then '--delete-from
 visible' (the private record still names it). 'restrict --foreign
 hidden' is refused beside a held view with unsaved edits, then asks
@@ -1352,13 +1354,13 @@ The questions, in the order the server asks them:
 One question comes after the save: under a skgrepo restriction the
 server may withhold the re-rendered view while it shows text from
 overPrivateText telescopes. The save has then happened. With
-'--show-overPrivateText' the tool approves the release, sending the
-save again, which writes nothing more, and writes the view; without
-it, it says so, and the files are out of date until the node is
-viewed again. When the save made a new node, the server refuses the
-re-send as stale, since the first attempt wrote the parent; the tool
-then says the save happened and the files are out of date. (The
-clients' approval re-sends the save the same way.)
+'--show-overPrivateText' the tool approves the release as the
+clients do: it asks the server to rerender the views the question
+names (the "rerender views" request), approving those telescopes,
+and writes the view; the save is not sent again, which the server
+would refuse as stale once the save had changed a node. Without the
+option it says so, and the files are out of date until the node is
+viewed again.
 
 * Reviewing and committing
 ** The loop
