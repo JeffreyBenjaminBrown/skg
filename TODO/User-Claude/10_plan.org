@@ -46,6 +46,21 @@ clone subscribes to it and new messages surface as unintegrated content.
 Each remaining gap gets the smallest word or shape that mirrors the
 Emacs command; the audit decides, and 'progress.org' records each.
 
+* Server and clients: words, and the diff view's self-extension
+Jeff's requests in '9_review.org'. "Integrate" meant two things; now:
+the watcher RELOADS changed files ('repo-files-reloaded' message,
+"reloaded N files from repo X", the config field and docs following);
+the diff view EXTENDS to unshown changes ('extend diff view' request,
+C-c r u "extend the diff view"); 'forks.org' keeps "unintegrated
+content" for its own sense. A clean diff buffer re-rendered after a
+reload extends itself to the new changes. The stale-save refusal is
+confirmed to cover a dirty save that would clobber a reload, and
+COMMANDS.org documents the recovery (copy the text aside, re-render with
+'skg-request-rerender-all-views', which must refuse a dirty buffer, redo
+by hand). Also from the live fork: Jeff's server marks the 'inboxes' to
+'to Ed' relationship '~ed' (stored more privately than the default),
+though 'ed' is foreign and has no rank there; find the comparison that
+still ranks a foreign repo and make it not apply.
 * Verification
 Fixture tests for every new gesture on the scratch servers the tool's
 test already runs (the fixture has a foreign repo, which forking needs).

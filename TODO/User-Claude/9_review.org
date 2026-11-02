@@ -32,7 +32,7 @@ No new protocol for "something changed": the daemon appends a line to
 to wake me (Corey's later machinery) tails that file. Switch: a
 proper event channel, when there is a consumer for it.
 
-** TODO [jeff] Please put this in your graph outbox file to Cory
+** DONE [jeff] Please put this in your graph outbox file to Cory
 I changed everyones' names, inclduing yours,
 and shuffled responsibilities somewhat; I hope you don't mind.
 Those names felt cold and awkward.
@@ -84,7 +84,7 @@ Suppose we both own the same skgrepo -- e.g. (probably) skg-system.
 If you change it while I'm editing the diff view,
 I'll want the diff view updated to integrate those changes.
 Does this happen automatically?
-***** TODO Jeff : Ed's answer: general, and mostly automatic
+***** Jeff : Ed's answer: general, and mostly automatic
 "Integration" is the watcher's word: when a '.skg' file changes on
 disk, the server reads it and folds the node into the graph as a new
 generation. That is general; it has nothing to do with the diff view.
@@ -102,6 +102,54 @@ a diff buffer's roots; for that you press C-c r u ('integrate unshown
 changes', the diff view's own word, which is where the overlap of terms
 comes from) or reopen the diff view. Making the re-render also add new
 roots is a small server change; say if you want it in '10_plan.org'.
+****** TODO [jeff] We should not use 'integrate' to mean two things.
+There is extending a diff view buffer to integrate unshown changes,
+and updating viewnodes in place to reflect changes on disk.
+I don't know whether the diffView case recognizes out-of-band changes;
+certainly the in-place case does.
+
+We can't just use 'integrate' to mean both.
+What is a precise, brief way to distinguish them,
+without asking a user to learn a distinction meaningless outside of skg
+(per coding-advice/names.org, the passage
+"Do not ask the reader to learn a distinction that does not exist outside skg").
+
+And while we're at it, it would be nice if the diff view extended itself
+automatically for those out-of-band changes (I don't think it currently does)
+when it's not dirty.
+
+And if a dirty buffer is then saved and would clobber out-of-band changes,
+the server should refuse. It'll be annoying, but they'll have to
+copy their dirty buffer somewhere, re-render from all the buffer's viewroots
+(it usually starts from just one root, but they can add more;
+do we have a command for such a re-render?)
+and then look at a diff by hand. That seems fine for now; it should be rare.
+******* TODO Jeff : Ed's answer: two ordinary words, and two of your three wishes already hold
+Names. The disk case is what every editor calls it when a file changes
+under it: "reload". The server reloads changed files; the message reads
+"reloaded 2 files from repo first". The diff-view case is "extend": the
+diff view extends itself to changes it did not yet show (C-c r u becomes
+"extend the diff view"). Neither asks the reader to learn anything
+skg-specific; "integrate" leaves the user-facing vocabulary (the docs
+keep it only for the graph-theoretic sense in forks.org, "unintegrated
+content", which is a third thing and should perhaps also be renamed; I
+have left that alone). Going into '10_plan.org' as a server slice,
+since it touches the protocol's message names.
+
+Auto-extending a clean diff buffer on reload: not today, and yes, in the
+same slice: a clean diff buffer re-rendered after a reload also extends
+to the new changes.
+
+Refusing a dirty save that would clobber out-of-band changes: already
+the case since the stale-save fix. The buffer carries the generation it
+was rendered at; a reload stamps the changed nodes with a newer one; a
+save that would write one of them is refused whole, naming the nodes,
+and the user's edits stay in the buffer. The recovery you describe is
+then: copy the dirty text aside, re-render, redo by hand. "Re-render
+from all the buffer's viewroots": 'skg-request-rerender-all-views' (C-c
+v, "re-render all") redraws every open buffer with all its roots; I will
+have the slice confirm it refuses to redraw a dirty buffer and document
+the recovery in COMMANDS.org, so the rare case has a written path.
 * Known limit, not a choice: saves on one server do not refresh another connection's views
 A save's writes are the server's own, so the watcher drops them, and
 only the saving connection's views re-render. With one person per
