@@ -254,7 +254,7 @@ are one owner's telescope and fold in the manifest's order; unchained
 ones are the illegal case you describe, shown only to the creator under
 the 'ILLEGAL EDIT TO FOREIGN NODE' herald (the 'message' style, which is
 the black-on-white one), ignored and warned about everywhere else.
-* Jeff : a foreign recorder's default relRepo
+* TODO Jeff : a foreign recorder's default relRepo: change the rule, yes or no?
 'SkgConfig::default_relRepo' gives, for a relationship a foreign node
 records to an owned one, the owned member's home: a foreign skgrepo
 has no rung, so 'more_private_of' returns the owned side. But such a

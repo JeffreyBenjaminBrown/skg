@@ -242,3 +242,18 @@ and I want users to have to think about it before changing that file.
 Agreed and left as is: 'stage and commit' stages only '.skg' files, and
 the manifest is committed by hand, deliberately. 'docs/diff-view.org'
 says so under "Stage and commit".
+
+* TODO Jeff : how docs/ is edited once it lives in the graph
+Not yet decided, and it gates the definitive import of docs/ into
+'skg-system'. Once Skg is the source of truth, 'docs/' is export output,
+and a direct edit there is overwritten by the next export; yet agents in
+every workspace edit 'docs/' alongside code, and 'ORIENTATION.org'
+treats it as source. Options: agents edit docs through Skg (now
+possible with 'tools/skg-for-ai'); some developer-facing files
+('api-and-formats.org', say) stay plain files outside Skg and only the
+rest is exported; or direct edits are accepted and re-imported, which
+the importer cannot do, since it refuses IDs that already exist. Also:
+the exporter never deletes a file, so a document removed from Skg
+leaves its '.org' in 'docs/' until deleted by hand. Whichever you
+choose, 'ORIENTATION.org' should then say which files under 'docs/'
+are generated.
