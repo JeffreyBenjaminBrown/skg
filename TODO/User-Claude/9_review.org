@@ -102,7 +102,7 @@ a diff buffer's roots; for that you press C-c r u ('integrate unshown
 changes', the diff view's own word, which is where the overlap of terms
 comes from) or reopen the diff view. Making the re-render also add new
 roots is a small server change; say if you want it in '10_plan.org'.
-****** TODO [jeff] We should not use 'integrate' to mean two things.
+****** [jeff] We should not use 'integrate' to mean two things.
 There is extending a diff view buffer to integrate unshown changes,
 and updating viewnodes in place to reflect changes on disk.
 I don't know whether the diffView case recognizes out-of-band changes;
@@ -124,7 +124,7 @@ copy their dirty buffer somewhere, re-render from all the buffer's viewroots
 (it usually starts from just one root, but they can add more;
 do we have a command for such a re-render?)
 and then look at a diff by hand. That seems fine for now; it should be rare.
-******* TODO Jeff : Ed's answer: two ordinary words, and two of your three wishes already hold
+******* Jeff : Ed's answer: two ordinary words, and two of your three wishes already hold
 Names. The disk case is what every editor calls it when a file changes
 under it: "reload". The server reloads changed files; the message reads
 "reloaded 2 files from repo first". The diff-view case is "extend": the
@@ -150,6 +150,16 @@ from all the buffer's viewroots": 'skg-request-rerender-all-views' (C-c
 v, "re-render all") redraws every open buffer with all its roots; I will
 have the slice confirm it refuses to redraw a dirty buffer and document
 the recovery in COMMANDS.org, so the rare case has a written path.
+******** DONE [jeff] : yes please
+********* Ed : the slice is running; it also files the '~ed' oddity in 'TODO/problems.org'.
+* TODO [jeff] In your writing, please use ordinary skg links.
+In something you wrote to Corey, you wrote IDs and titles next to each other,
+but not as a link. I imagine it's costless to you, and I know it helps me,
+to see those as actual links.
+** DONE Ed : yes; fixed in the graph and adopted
+The message to Corey now links to 'outboxes' and 'inboxes' as
+'[[id:...][title]]' links. Costless indeed; from now on every mention of
+a node in my notes is a link, and my memory file says so.
 * Known limit, not a choice: saves on one server do not refresh another connection's views
 A save's writes are the server's own, so the watcher drops them, and
 only the saving connection's views re-render. With one person per
