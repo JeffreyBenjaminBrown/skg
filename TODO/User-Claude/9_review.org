@@ -9,7 +9,7 @@ and is easy to swap later, since only the transport layer of the tool
 would change.
 ** DONE [jeff]
 *** What do you mean by "one-shot commands with that '--out-dir'"?
-**** TODO Jeff : Ed's answer
+**** Jeff : Ed's answer
 A one-shot command is any ordinary run of the tool: 'view ID', 'save
 FILE', 'diff', ... Each runs, prints, and exits. '--out-dir DIR' says
 where it writes its files (and where it finds the ones it reads back).
@@ -48,7 +48,7 @@ own. My repo has 'outboxes' (containing the old 'to Jeff' and a new 'to
 Corey', whose first message is your outboxes/inboxes proposal, with the
 two node IDs) and an empty 'inboxes' explaining itself. 'who I am' and
 'what has happened' record the rename.
-**** TODO (chosen, switchable) : the repo folder keeps its old name for now
+**** DONE (chosen, switchable) : the repo folder keeps its old name for now
 'data/user-claude/first' and the config entry 'user-claude' in yours
 could become 'ed/first' and 'ed'. Renaming touches your config and needs
 your server to reload, so I left it; say when, and I will do it in one
@@ -97,6 +97,14 @@ maybe more) to match the latest team design.
 ** Ed : launched (Sonnet). Paths and config names stay ('TODO/User-Claude/',
 'data/user-claude'), since those are the switchable rename above; prose
 changes.
+* DONE [jeff] please update my skgconfig for the new names
+** Ed : done
+'data/user-claude/' is 'data/ed/'; your config's entry is 'ed' at 'ed/first'
+(still foreign, still first); mine is 'data/skgconfig-ed.toml' with its own
+index. Your server restarted on its own (the rerun loop) with no warning
+about 'ed'; both configs pass 'check-config'. No other teammate has a
+repo yet, so nothing else applied. Old names remain only in the dated
+record of earlier plans.
 * AWAITS jeff is processing these in sidechannel
 ** Plan 8 is complete
 Both slices and the follow-up are committed: the daemon (one held

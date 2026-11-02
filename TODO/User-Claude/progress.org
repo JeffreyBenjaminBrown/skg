@@ -416,19 +416,20 @@ little about the edit at hand.
 Moved to '3_review.org'.
 * Ed's skgrepo: DONE, uncommitted
 ** What exists
-'data/user-claude/first/' is a git repo with no remote and no commits;
-Ed commits there. Its 'README.org' says whose it is. It holds
-the first notes and the 'OTHER_SKGREPO_DEPENDENCIES.toml' that Ed's
-server generates.
+'data/ed/first/' (until 2026-11-02 'data/user-claude/first/') is a
+git repo with no remote and no commits; Ed commits there. Its
+'README.org' says whose it is. It holds the first notes and the
+'OTHER_SKGREPO_DEPENDENCIES.toml' that Ed's server generates.
 
-'data/skgconfig-user-claude.toml' is Ed's config: port 1732, its own
-index '.index.tantivy-user-claude' (relative to the data root, so
+'data/skgconfig-ed.toml' (until 2026-11-02
+'skgconfig-user-claude.toml') is Ed's config: port 1732, its own
+index '.index.tantivy-ed' (relative to the data root, so
 beside Jeff's '.index.tantivy'), 'timing_log = false', Jeff's seven
 skgrepos in his order, each 'foreign = true', then the owned 'first'
-('user-claude/first'). It sets no 'default_repo_set', since Jeff's
+('ed/first'). It sets no 'default_repo_set', since Jeff's
 has none. Jeff's config ('data/skgconfig-jeff.toml', which
-'data/skgconfig.toml' links to) now lists 'user-claude'
-('user-claude/first', 'foreign = true') first, before 'skg'. Both
+'data/skgconfig.toml' links to) now lists 'ed'
+('ed/first', 'foreign = true') first, before 'skg'. Both
 pass 'skg check-config'.
 
 The notes, all home in 'first', written through the tool:
@@ -455,10 +456,10 @@ view, and a body and child saved from its view.
 ** Running Ed's server
 From the repository root:
 #+begin_example
-nohup target/debug/skg data/skgconfig-user-claude.toml > data/logs/server-user-claude.log 2>&1 &
+nohup target/debug/skg data/skgconfig-ed.toml > data/logs/server-ed.log 2>&1 &
 echo $!    # the PID; stop it later with 'kill PID'
 #+end_example
-Wait for "Server ready." in 'data/logs/server-user-claude.log', then
+Wait for "Server ready." in 'data/logs/server-ed.log', then
 run the tool with 'SKG_PORT=1732'. It is not running now: its first
 run (PID 65280) was stopped once the notes were verified. Stop it by
 its PID, never by a pattern, which can match Jeff's server
@@ -466,7 +467,7 @@ its PID, never by a pattern, which can match Jeff's server
 Startup reads all 55k nodes in about seven seconds.
 ** The reload policy
 Agreed with Jeff: each of us runs our own server over the shared tree.
-When Ed saves into 'user-claude/first', Jeff's server keeps the old
+When Ed saves into 'ed/first', Jeff's server keeps the old
 copy until Jeff restarts it or rebuilds its stores
 ('skg-rebuild-session-lifetime-stores'); he does that when he wants to
 see Ed's saves. The same holds the other way for Ed's server and
@@ -497,13 +498,13 @@ startup's telescope report is unchanged (the two 'pers-dep' leaks it
 had before).
 *** Ed's manifest names Jeff's private skgrepos
 Because Ed's config lists all of Jeff's skgrepos as more public than
-'first', the generated manifest in 'user-claude/first' lists every one
+'first', the generated manifest in 'ed/first' lists every one
 of them, with its GitHub remote, among 'first''s dependencies. If
 Ed's repo is ever pushed somewhere Jeff's private ones are not, it
 publishes their names and remotes, and claims a dependency that the
 nodes do not have.
 *** One skgrepo, two names
-The repo is 'first' in Ed's config and 'user-claude' in Jeff's, as
+The repo is 'first' in Ed's config and 'ed' in Jeff's, as
 asked. Names live only in configs ('.skg' files do not record them),
 so nothing breaks, but heralds, warnings and the tool's link
 annotations name it differently on the two servers.
@@ -712,7 +713,7 @@ connections' views go stale and their saves are refused, as before.
 A server killed by the 'shutdown' request also comes back under the new
 start script; only 'bash/stop-servers.sh' or Ctrl-C stops it. Every
 rebuild of Jeff's server will now repeat the known manifest-order
-warning about 'user-claude' in its answer.
+warning about 'ed' in its answer.
 * tools/skg-for-ai, reviewing through the diff view: DONE, uncommitted
 ** What was done
 'diff' sends the "diff view" request once per buffer kind, in the
@@ -909,7 +910,7 @@ resolved against the data root, or else
 canonical 'config_path'. So Jeff's server (started with the symlink
 'data/skgconfig.toml' or with 'data/skgconfig-jeff.toml') uses
 'data/readiness-marks-skgconfig-jeff.json', and Ed's
-'data/readiness-marks-skgconfig-user-claude.json'. 'ReadinessStore'
+'data/readiness-marks-skgconfig-ed.json'. 'ReadinessStore'
 'load' and 'save' now take the file, not the data root;
 'READINESS_MARKS_FILE' and the free 'readiness_marks_path' are gone.
 The unit test 'each_config_keeps_its_own_marks_file'
