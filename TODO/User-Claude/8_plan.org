@@ -1,4 +1,4 @@
-#+title: User Claude: a connection of my own
+#+title: Ed: a connection of my own
 
 * Scope
 '7_review.org' found what the tool loses by opening a connection per
@@ -23,7 +23,7 @@ nodes changed, from the rerender response), "warning: ..." for every
 server warning received (startup, watcher integrations, leaks), "saved
 BASE", "error ...". This log is what I read to learn that the world
 moved while I was not looking; it is the wake signal, in the plainest
-form, that Facilitator's later work can build on.
+form, that Corey's later work can build on.
 ** One-shot commands route through it
 When a daemon's socket exists in DIR ('DIR/skg-for-ai.sock', a Unix
 socket), every command run with that '--out-dir' sends its request to

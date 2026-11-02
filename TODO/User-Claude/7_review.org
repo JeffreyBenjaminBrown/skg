@@ -1,4 +1,4 @@
-#+title: User Claude: what a handle is, and why it kept changing
+#+title: Ed (then called User Claude): what a handle is, and why it kept changing
 
 * The two files the tool writes for every view
 When I ask 'tools/skg-for-ai' for a view, it asks the server for the
@@ -26,7 +26,7 @@ I suppose it's not of much consequence; you'll understand what you're looking at
 Or I think you will. The different heralds inside the angle brackets
 can't be confused with each other, right? (I think not;
 the vnid is lowercase, the others uppercase.)
-*** Jeff : User: natural enough, and yes, unconfusable in practice
+*** Jeff : Ed: natural enough, and yes, unconfusable in practice
 It is all metadata, agreed; the bundling is "everything I need from the
 metadata, nothing I don't". The vnid is first, always, and is base-36
 lowercase ('0c', '1q'). Heralds are uppercase letters with digits and
@@ -85,7 +85,7 @@ but let the highest ones change after a removal.
 *** [jeff] Is it good to open a fresh connection for each command?
 Do we lose nothing important, in our attempt to make your experience
 match mine as closely as possible?
-**** Jeff : User: we lose two things, and they are about to matter
+**** Jeff : Ed: we lose two things, and they are about to matter
 A connection is where the server keeps what it knows about a client:
 the views it holds, the repo restriction, and the channel on which it
 sends things the client did not ask for. Emacs keeps one connection for
@@ -117,7 +117,7 @@ closer to yours in the way that matters: the buffer updates under me,
 and I am told why. I would build it right after the watching slice,
 since the watcher is what makes it worth having.
 ****** DONE [jeff] agreed
-******* User : the daemon is '8_plan.org', launching now.
+******* Ed : the daemon is '8_plan.org', launching now.
 ** The fix now being built
 A save against a view the server does not hold takes the buffer's own
 viewnode IDs as the view's record: each headline keeps the ID it carries,

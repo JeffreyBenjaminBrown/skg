@@ -1,4 +1,4 @@
-#+title: User Claude: progress
+#+title: Ed: progress
 
 * Ownership becomes a per-repo flag: DONE, uncommitted
 ** What was done
@@ -66,7 +66,7 @@ foreign repo records to one of your nodes is a "leak-shaped
 membership" warning. This showed up in the 'overridden-direct-visit'
 fixture, where the foreign 'Cheese' overrides an owned node. The test
 passes, but the server now writes a 'telescope-warnings.org' there.
-The same thing will happen when User's repo, foreign to Jeff, links
+The same thing will happen when Ed's repo, foreign to Jeff, links
 to Jeff's public nodes.
 *** Generated files in tracked fixtures changed
 Running the integration suite regenerated the
@@ -341,7 +341,7 @@ section.
 ** The live save
 On 1731, 'view 703f5a82-d948-431f-985c-4db8132bc504', then a line
 '**** User Claude read this on 2026-11-01 through tools/skg-for-ai.'
-inserted after the body of '*** User Claude ⟨25⟩', just before '***
+inserted after the body of '*** Ed ⟨25⟩', just before '***
 Test Claude ⟨55⟩'. 'save' printed:
 #+begin_example
 Changes in view_703f5a82-d948-431f-985c-4db8132bc504.compact.org, against view_703f5a82-d948-431f-985c-4db8132bc504.full.org (view ID content-view:703f5a82-d948-431f-985c-4db8132bc504):
@@ -355,7 +355,7 @@ New: 'User Claude read this on 2026-11-01 through tools/skg-for-ai.', under ⟨2
 Server: saved, 0 errors, 0 warnings.
 #+end_example
 followed by the three paths. In 'data/jeff/public' the save changed
-'d0b1fd26-7453-4768-8465-b452f228ae2b.skg' (User Claude), which gained
+'d0b1fd26-7453-4768-8465-b452f228ae2b.skg' (Ed), which gained
 'contains: [f738941c-8481-4220-b002-da22d659298a]', and added
 'f738941c-8481-4220-b002-da22d659298a.skg' with only its title and ID.
 Nothing else changed: the 'OTHER_SKGREPO_DEPENDENCIES.toml' that each
@@ -414,14 +414,14 @@ edit elsewhere saves without the warning. The warnings therefore say
 little about the edit at hand.
 ** Open questions
 Moved to '3_review.org'.
-* User's skgrepo: DONE, uncommitted
+* Ed's skgrepo: DONE, uncommitted
 ** What exists
 'data/user-claude/first/' is a git repo with no remote and no commits;
-User Claude commits there. Its 'README.org' says whose it is. It holds
-the first notes and the 'OTHER_SKGREPO_DEPENDENCIES.toml' that User's
+Ed commits there. Its 'README.org' says whose it is. It holds
+the first notes and the 'OTHER_SKGREPO_DEPENDENCIES.toml' that Ed's
 server generates.
 
-'data/skgconfig-user-claude.toml' is User's config: port 1732, its own
+'data/skgconfig-user-claude.toml' is Ed's config: port 1732, its own
 index '.index.tantivy-user-claude' (relative to the data root, so
 beside Jeff's '.index.tantivy'), 'timing_log = false', Jeff's seven
 skgrepos in his order, each 'foreign = true', then the owned 'first'
@@ -452,7 +452,7 @@ loop. The README documents it; the test's last writing case checks the
 refusal in a foreign skgrepo, the new root's '.skg' file and compact
 view, and a body and child saved from its view.
 'python3 tools/skg-for-ai/test_skg_for_ai.py' passes.
-** Running User's server
+** Running Ed's server
 From the repository root:
 #+begin_example
 nohup target/debug/skg data/skgconfig-user-claude.toml > data/logs/server-user-claude.log 2>&1 &
@@ -466,10 +466,10 @@ its PID, never by a pattern, which can match Jeff's server
 Startup reads all 55k nodes in about seven seconds.
 ** The reload policy
 Agreed with Jeff: each of us runs our own server over the shared tree.
-When User saves into 'user-claude/first', Jeff's server keeps the old
+When Ed saves into 'user-claude/first', Jeff's server keeps the old
 copy until Jeff restarts it or rebuilds its stores
 ('skg-rebuild-session-lifetime-stores'); he does that when he wants to
-see User's saves. The same holds the other way for User's server and
+see Ed's saves. The same holds the other way for Ed's server and
 Jeff's saves. A better policy is deferred; this section and the plan's
 "Two servers, one tree" are where to look for the current one.
 'docs/setup.org' now says how to run such a second server.
@@ -490,28 +490,28 @@ Jeff's server now warns: "Repo 'user-claude' ships a
 OTHER_SKGREPO_DEPENDENCIES.toml placing 'personal-most' more public
 than 'first', but this config orders them the other way." The rule
 that foreign skgrepos come first forces the two configs to disagree
-about Jeff's skgrepos against User's, and User's manifest records
-User's order. Every teammate's skgrepo will raise this warning in
+about Jeff's skgrepos against Ed's, and Ed's manifest records
+Ed's order. Every teammate's skgrepo will raise this warning in
 every other teammate's server, though no telescope spans them. The
 startup's telescope report is unchanged (the two 'pers-dep' leaks it
 had before).
-*** User's manifest names Jeff's private skgrepos
-Because User's config lists all of Jeff's skgrepos as more public than
+*** Ed's manifest names Jeff's private skgrepos
+Because Ed's config lists all of Jeff's skgrepos as more public than
 'first', the generated manifest in 'user-claude/first' lists every one
 of them, with its GitHub remote, among 'first''s dependencies. If
-User's repo is ever pushed somewhere Jeff's private ones are not, it
+Ed's repo is ever pushed somewhere Jeff's private ones are not, it
 publishes their names and remotes, and claims a dependency that the
 nodes do not have.
 *** One skgrepo, two names
-The repo is 'first' in User's config and 'user-claude' in Jeff's, as
+The repo is 'first' in Ed's config and 'user-claude' in Jeff's, as
 asked. Names live only in configs ('.skg' files do not record them),
 so nothing breaks, but heralds, warnings and the tool's link
 annotations name it differently on the two servers.
-*** User's server sees everything Jeff owns
-With no 'default_repo_set', User's server has no skgrepo restriction,
+*** Ed's server sees everything Jeff owns
+With no 'default_repo_set', Ed's server has no skgrepo restriction,
 so its views and searches reach 'pers-m'. That matches "both servers
 read every repo", but it means the privacy ladder does nothing between
-Jeff and User.
+Jeff and Ed.
 *** Long headlines
 The 'what has happened' items are one-line headlines, as asked, and
 some run to two hundred characters; a handle at the end of each is
@@ -606,7 +606,7 @@ every node written in a session (a rebuild clears it). Two servers
 over one data tree still do not see each other's writes until a
 rebuild; the check only covers writes through this server. The
 'AWAITS' marker in '3_review.org' that the design section mentions is
-left for User.
+left for Ed.
 * No more 'rendered-at "never"'; a killed server comes back; rebuild reloads the config: DONE, uncommitted
 ** What changed
 *** A new empty view asks the server how old it is
@@ -781,7 +781,7 @@ any connection attempt would fail. The bad-handle case also checks
 two token errors. 'cargo check --all-targets' is clean; no Rust,
 client or doc outside 'tools/skg-for-ai/' changed.
 ** The live review
-User's server on 1732 (PID 135755, stopped by PID afterward). 'view
+Ed's server on 1732 (PID 135755, stopped by PID afterward). 'view
 b75b22a8-f726-4b3e-bfbf-c18bc8308009', one child appended, saved
 ('New: ..., under ⟨1⟩ 'what has happened'.'). 'diff' took 5 s and
 wrote one buffer, whose compact tree was:
@@ -831,8 +831,8 @@ is not obvious that the two ghosts are one node; their handles differ.
 headlines under it ('oldText title', 'changesetMarker content'), so
 reading a modified node means reading its subtree.
 
-"N files changed in foreign skgrepos" in User's summary counts
-Jeff's uncommitted files, which User can neither see in the buffer nor
+"N files changed in foreign skgrepos" in Ed's summary counts
+Jeff's uncommitted files, which Ed can neither see in the buffer nor
 commit.
 ** Deviations from the plan
 *** The readiness summary comes from an unchanged save
@@ -879,12 +879,12 @@ words that make no single '(editRequest ...)' (two edit requests,
 says "some handles are in error".
 ** Open questions
 *** Both servers write 'data/readiness-marks.json'
-User's and Jeff's servers share the data root 'data/', so they share
+Ed's and Jeff's servers share the data root 'data/', so they share
 the readiness store's file. Each reads it at startup and rewrites its
 whole store after every change, and after a git-commit keeps only the
-marks whose leaves its own straddle has. User's server never sees
+marks whose leaves its own straddle has. Ed's server never sees
 leaves in Jeff's skgrepos (they are foreign to it), so a commit by
-User would drop every mark Jeff made, and a mark by either would
+Ed would drop every mark Jeff made, and a mark by either would
 overwrite the other's since startup. Jeff had no file when the live
 run began. Should the store's file live per config (beside the
 config, or named in it), or under each server's index folder?
@@ -908,7 +908,7 @@ resolved against the data root, or else
 '<data_root>/readiness-marks-STEM.json', STEM the stem of the
 canonical 'config_path'. So Jeff's server (started with the symlink
 'data/skgconfig.toml' or with 'data/skgconfig-jeff.toml') uses
-'data/readiness-marks-skgconfig-jeff.json', and User's
+'data/readiness-marks-skgconfig-jeff.json', and Ed's
 'data/readiness-marks-skgconfig-user-claude.json'. 'ReadinessStore'
 'load' and 'save' now take the file, not the data root;
 'READINESS_MARKS_FILE' and the free 'readiness_marks_path' are gone.
@@ -1030,7 +1030,7 @@ fixture-free check, 'failures_of_ancestry_cases', covers no
 containers, a missing folder, several roots, a cycle, a container
 drawn in another chain, an undrawn one, and more chains than shown.
 
-On Jeff's server (read-only 'view', closed), User Claude's header read:
+On Jeff's server (read-only 'view', closed), Ed's header read:
 #+begin_example
 # Ancestry of the root, its containers upward:
 #   the team (ID 63f243e0-59d7-4119-b027-2140eb810a70)
@@ -1111,7 +1111,7 @@ The privacy ladder is the owned '[[repos]]' entries in declaration
 order ('SkgConfig::privacy_ladder'); foreign entries may sit anywhere.
 'validate_foreign_skgrepos_more_public_than_owned' is gone, and so is
 the migration script's "foreign first" warning. 'default_repo_set'
-naming a foreign repo is refused. Jeff's and User's live configs pass
+naming a foreign repo is refused. Jeff's and Ed's live configs pass
 'check-config' unchanged.
 
 The comparison chokepoint in 'server/types/misc.rs' now separates two
@@ -1171,7 +1171,7 @@ mid-slice, by Jeff's rule from '5_discussion.org'. What was built:
   manifests disagree about folds as the manifest of the more private
   one says (the one whose own manifest lists the other; failing that,
   config order), with a startup warning naming the node. This is how
-  Jeff's ladder, all foreign on User's server, folds; User's server,
+  Jeff's ladder, all foreign on Ed's server, folds; Ed's server,
   run once on a scratch copy of its config, started with no warnings.
 - Sections of one PID in different owners' repos are not one
   telescope ('separate_illegal_sections' in
@@ -1233,10 +1233,10 @@ foreign repos hidden, picking it still leaves them hidden. The
 confirmation message says so.
 *** Live data touched
 Jeff's live server regenerated his repos' manifests (owned-only). My
-scratch run of User's config rewrote 'data/user-claude/first''s
+scratch run of Ed's config rewrote 'data/user-claude/first''s
 manifest with an absolute path; I restored it from that repo's HEAD,
 so it still holds the old ladder-with-Jeff's-repos content until
-User's server next starts.
+Ed's server next starts.
 *** A disputed pair whose both own manifests list each other
 Each claims to be the more private; config order decides.
 * The tool: viewnode handles, every herald, roleward forests: DONE, uncommitted
@@ -1648,15 +1648,15 @@ the headlines 'integrate' adds are now numbered past the buffer's own,
 ** The live two-server check
 Jeff's server was not running; 'bash/start-servers.sh' started it (PID
 50176 under cargo-watch, port 1731, watching its 8 skgrepos) and it is
-left running. User's server ran as PID 50259 on 1732 and was stopped by
+left running. Ed's server ran as PID 50259 on 1732 and was stopped by
 PID. The tool saved "Servers now notice repo changes on disk." as a
 child of 'what has happened' on 1732. Jeff's server logged
 "integrated .skg files that changed on disk ... nodes=2" (the parent
 and the new child) within a second, and a read-only view on 1731
-showed the new child, with no rebuild. User's server integrated
+showed the new child, with no rebuild. Ed's server integrated
 nothing: its own write was dropped. 'data/user-claude/first' holds the
 note uncommitted, and its 'OTHER_SKGREPO_DEPENDENCIES.toml', rewritten
-at User's server's startup as always.
+at Ed's server's startup as always.
 ** Deviations
 *** The client asks for the rerender
 The plan has open views re-render "as a save's collateral rerender
@@ -1777,7 +1777,7 @@ a command beside it running on its own, a new daemon replacing it,
 SIGTERM. Suite: PASS (33 s, was 26 s), four runs in a row.
 'cargo check --all-targets' clean (no Rust changed).
 ** The live run on 1732
-User's server started as PID 58055 ('target/debug/skg
+Ed's server started as PID 58055 ('target/debug/skg
 data/skgconfig-user-claude.toml'), stopped by PID; Jeff's 1731 server
 untouched. Daemon PID 58131, out-dir in the scratchpad. In order: the
 daemon viewed 'what has happened'; a one-shot command with another
@@ -1925,7 +1925,7 @@ warnings fill the buffer, replacing one; the diff buffer names
 itself on save); Neovim: 477 (likewise). 'cargo check --all-targets'
 clean; no Rust changed.
 ** The live check on 1732
-User's server started as PID 61859 and was stopped by PID; Jeff's
+Ed's server started as PID 61859 and was stopped by PID; Jeff's
 1731 server untouched. A daemon (PID 61929) with its out-dir in the
 scratchpad; 'view' of 'what has happened' into the daemon's folder,
 the same view with '--port 1732' into a second folder, and 'search'

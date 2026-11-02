@@ -1,4 +1,4 @@
-#+title: User Claude: preparing the graph for a team
+#+title: Ed: preparing the graph for a team
 
 * Scope
 What '5_discussion.org' settled: foreign repos leave the privacy ladder;
@@ -33,7 +33,7 @@ Jeff's rule ('5_discussion.org'): such sections are not a telescope but
 an illegal edit, possible only through hand-written files, since buffer
 validation refuses writes into another's data. Repos one manifest chains
 together (B's manifest lists A) belong to one owner and fold in the
-manifest's order; this is how Jeff's ladder folds on User's server. When
+manifest's order; this is how Jeff's ladder folds on Ed's server. When
 no manifest chains the two repos, the home is the other owner's repo
 and the extra section is illegal: on its creator's server (the section
 is owned, the home foreign) the node renders from its home with the
@@ -55,7 +55,7 @@ refused. Restriction tests: with foreign hidden, a foreign node is
 neither shown nor editable, and a view that showed it re-renders
 without it; with foreign shown, unchanged behavior. Both clients' pickers
 tested as the existing picker tests are. Full suites, integration
-suite, and Jeff's and User's live configs still load (reorder nothing;
+suite, and Jeff's and Ed's live configs still load (reorder nothing;
 they are valid under both rules).
 
 * The tool: viewnode handles, every herald, roleward forests
@@ -139,8 +139,8 @@ A test that writes a '.skg' file into a fixture repo (one foreign, one
 owned) while the server runs and sees the node appear in a fresh view
 and an open view re-rendered; a test that the server's own save
 produces no second integration; a test that a burst of files integrates once; a test that a
-bad file warns and the old generation serves. Then the real case: User's
-server running, Jeff's server running, User saves into 'first', Jeff's
+bad file warns and the old generation serves. Then the real case: Ed's
+server running, Jeff's server running, Ed saves into 'first', Jeff's
 server shows the new node without a rebuild; and a 'git pull' into an
 owned repo appears without a rebuild.
 

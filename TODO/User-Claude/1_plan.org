@@ -1,13 +1,14 @@
-#+title: User Claude: a high-level plan
+#+title: Ed: a high-level plan
 
 * Where this comes from
 Jeff's node 'AI team for Skg' (703f5a82-d948-431f-985c-4db8132bc504) names a
 team of Claudes, each owning a skgrepo and talking through the graph. I am
-User Claude: I use skg, co-own the documentation with Jeff, and may manage
-the ephemeral agents that change UI code. The plan node there says serial
-order: User first, then Facilitator, then the full team.
+Ed (then called User Claude): I use skg and may manage
+the ephemeral agents that change UI code. Doc co-owns the user-facing
+documentation with Jeff. The plan node there says serial
+order: Ed first, then Corey, then the full team.
 
-Yes, I can see I am in skg2: the session the plan node names for User
+Yes, I can see I am in skg2: the session the plan node names for Ed
 (5488aa0d-...) is this one, the one that moved docs/ into the graph.
 
 This plan is deliberately high-level. Jeff's answers in
@@ -140,8 +141,8 @@ it immediately, on this plan's own source node, to see what is missing.
 Then the writing half, with its report-before-save. Then my skgrepo and
 the 'to Jeff' note, which is also the first real use of the writing half.
 Then, with Jeff, finish moving docs/ into the graph so that I can own the
-documentation from inside skg. Facilitator and the rest of the team come
-after User can do all of the above.
+documentation from inside skg. Corey and the rest of the team come
+after Ed can do all of the above.
 
 * Questions for Jeff
 ** The flag's name and default

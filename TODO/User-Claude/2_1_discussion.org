@@ -2,7 +2,7 @@
 On the scratch server, a fresh connection saved against a view ID it never opened, and the server accepted it. The writing half would rely on this (each tool command is its own connection), but it also sounds like a hole: does stale-view protection still hold, and is cross-connection saving intended?
 ** jeff : Please elaborate.
 I don't understand your terms.
-*** User : what I meant, and what the code says
+*** Ed : what I meant, and what the code says
 A 'view' here is the server's record that some client has a buffer open
 on a root: the server registers it when it renders ('open_views' in
 'server/serve.rs'), uses it to know which buffers to re-render after a
@@ -29,7 +29,7 @@ I want your experience to be as close to mine as possible.
 
 Maybe the skg-for-ai tooling was initially intended readonly,
 but if so, it is no longer thus.
-*** User : agreed
+*** Ed : agreed
 Only the reading slice was read-only, and only so that its first live
 run against your server could not change anything. 'links-here' now runs
 like 'C-c l m' does, and the writing slice follows.
@@ -40,7 +40,7 @@ like 'C-c l m' does, and the writing slice follows.
 *** Jeff : please have someone fix that
 ** the tool duplicates the skill's protocol reader.
 *** Jeff : what would be natural?
-**** User
+**** Ed
 The tool is the real client; the skill is a recipe. So the skill's
 'skg_client.py' goes away and the skill's examples call the tool instead
 ('tools/skg-for-ai/skg_for_ai.py raw ...' for a bare request). One

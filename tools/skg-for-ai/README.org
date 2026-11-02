@@ -1009,7 +1009,7 @@ The diff view and the commit need a connection with no skgrepo
 restriction, and each owned skgrepo in a gitrepo with a HEAD commit;
 the server refuses them otherwise, and the tool prints its refusal.
 Foreign skgrepos never show a change, and are never committed. So on
-User Claude's server ('data/skgconfig-user-claude.toml'), only the
+Ed's server ('data/skgconfig-user-claude.toml'), only the
 owned repo 'first' can show changes or be committed.
 ** How it talks to the server
 The server keeps the diff view's buffers, and the comparison behind

@@ -1,4 +1,4 @@
-#+title: User Claude: review of the work so far
+#+title: Ed (then called User Claude): review of the work so far
 
 Only the first item is written now; the rest waits until '2_plan.org' is
 finished.
@@ -16,7 +16,7 @@ on is simply overwritten.
 
 Today this bites only when two things write the same node: two clients,
 a client and this tool, or a client and an external edit followed by a
-rebuild. With two servers over one tree (Jeff's and User's), and more
+rebuild. With two servers over one tree (Jeff's and Ed's), and more
 teammates to come, it will bite. The tool guards itself by re-rendering
 before each save and refusing nodes that changed; Emacs and Neovim have
 no guard, and the tool's guard has a window between its check and its
@@ -61,38 +61,38 @@ anyway, so refusing only ever rejects a real conflict. I propose refuse.
 **** Jeff
 Refuse the whole save.
 *** Whose job
-This is Save Claude's system. If Save does not exist yet when we get to
-it, User plans it and an ephemeral agent builds it; otherwise it is
+This is Jesus's system. If Jesus does not exist yet when we get to
+it, Ed plans it and an ephemeral agent builds it; otherwise it is
 handed over.
-**** Jeff : You can do it, User!
+**** Jeff : You can do it, Ed!
 You are our first astronaut, paving the way ...
-** User : proceeding
-Both answers taken: the whole save is refused, and User does it. An
+** Ed : proceeding
+Both answers taken: the whole save is refused, and Ed does it. An
 ephemeral agent is building it as outlined above; its report will land
 in 'progress.org'. Replace the 'AWAITS' marker in '3_review.org' with
 DONE once this section is merged back.
 * Decisions needed after the skgrepo slice
-** DONE What User Claude may read
-User's config lists all seven of Jeff's repos, down to 'personal-most',
-so User's server reads everything of Jeff's. Options: list only through
-'public' in User's config (User cannot read the rest at all), or keep the
-full list but set 'default_repo_set = "public"' (User can widen the
-restriction deliberately). User leans to the first: nothing in User's job
+** DONE What Ed may read
+Ed's config lists all seven of Jeff's repos, down to 'personal-most',
+so Ed's server reads everything of Jeff's. Options: list only through
+'public' in Ed's config (Ed cannot read the rest at all), or keep the
+full list but set 'default_repo_set = "public"' (Ed can widen the
+restriction deliberately). Ed leans to the first: nothing in Ed's job
 needs the private notes, and what is not listed cannot leak.
 *** Jeff : all but personal-most
 That doesn't mean you'll *want* to read them.
 My deciduous and personal-proc notes are tedious.
 personal-ish, on the other hand, is juicy. I'm trusting you with those;
 don't go telling the world, please :)
-**** User
+**** Ed
 Done: 'personal-most' is out of 'data/skgconfig-user-claude.toml'. The
 rest stays, and nothing of yours goes anywhere but my own notes.
-** DONE Jeff's private repo names in User's repo
+** DONE Jeff's private repo names in Ed's repo
 The server writes 'OTHER_SKGREPO_DEPENDENCIES.toml' into every owned
 repo, listing each repo it may reference: for 'first', every one of
 Jeff's repo paths and GitHub remotes. Pushing 'first' anywhere public
 would publish them. Listing only the repos that 'first' actually cites
-would fix this, and would also remove the startup warning that User's and
+would fix this, and would also remove the startup warning that Ed's and
 Jeff's configs order 'first' and 'personal-most' differently. If the
 first question is answered "list only through public", the manifest
 shrinks to public repos anyway.
@@ -100,7 +100,7 @@ shrinks to public repos anyway.
 If I understand correctly, the problem here is that it leaks
 the fact that I have bodies of private notes.
 If so, it's a non-issue -- that's a safe thing to make known.
-**** User
+**** Ed
 Right, that is all it reveals: paths and remote names, not contents.
 Nothing to do.
 ** DONE Reloading a server's config
@@ -109,7 +109,7 @@ edits under 'server/', so the agent touched 'server/main.rs' to force a
 rebuild. A wrapper that reruns the binary when it exits would make a
 kill mean a restart, and a 'reload config' request would avoid the kill.
 *** Jeff : great!
-**** User
+**** Ed
 Done: 'bash/start-servers.sh' reruns the binary when it exits, so a
 kill is a restart (only 'bash/stop-servers.sh' stops it for good), and
 the existing rebuild command now also reloads the config, rewriting the
@@ -118,7 +118,7 @@ timing log). No separate 'reload config' command: it would be a second
 name for the rebuild. Restart your server once with the new
 'start-servers.sh' to get the rerun loop.
 ** DONE One repo, two names
-'first' in User's config, 'user-claude' in Jeff's. Nothing breaks, since
+'first' in Ed's config, 'user-claude' in Jeff's. Nothing breaks, since
 '.skg' files record no repo names, but labels in views and warnings
 differ between the two servers. Teammates could agree to name each
 other's repos as their owners do.
@@ -127,10 +127,10 @@ other's repos as their owners do.
 It could warn in advance that a headline removed from under a
 write-protected occurrence or a folder only leaves the view, and that a
 write-protected occurrence's title cannot be edited, instead of letting
-the server say so after the fact. User's view: worth doing once the
+the server say so after the fact. Ed's view: worth doing once the
 stale-save fix is in, since both are about the report's honesty.
 *** Jeff : What the save report?
-**** User
+**** Ed
 The report 'tools/skg-for-ai save' prints before it saves: the list of
 structural changes the edit would make (new, moved, removed, retitled
 headlines), which I read and then confirm with '--yes'. Today it only
@@ -166,7 +166,7 @@ to update your buffer.
 The viewnode IDs are visible to you, yes? They could be helpful for
 regaining your bearings after, say, inserting a containerward forest
 and thereby shifting all the line numbers.
-****** Jeff : User's reply, late
+****** Jeff : Ed's reply, late
 Parallel ways I have devised, and how each mirrors yours: commands as
 words inside a handle ('delete', 'ready', 'restoreNode') are your
 subheading-with-special-syntax idea, written on the headline itself
@@ -181,12 +181,12 @@ line-number shifting you mention stops mattering.
 A buffer no server response drew (a new empty view) sends
 '(rendered-at . "never")', and the server checks nothing in it. Text
 pasted from an old buffer into a new empty view therefore escapes the
-check. User accepted this to ship the fix: the field is still required,
+check. Ed accepted this to ship the fix: the field is still required,
 so an old client cannot skip the check by omission, and a new empty view
 holding pasted old nodes is rare. The alternative is for the client to
 ask the server for the current generation when it opens an empty view.
 *** Jeff : that alternative seems easy, safe, and useful, no?
-**** User
+**** Ed
 Done: opening an empty view asks the server ('runtime generation'
 request) and 'never' is gone; a save with a missing or non-numeric
 'rendered-at' is refused.
@@ -203,7 +203,7 @@ because the restriction only kept out skgrepos it had been built with.
 The agent made each connection rebuild its restriction from the current
 config at every request, keeping "through X" meaningful: a skgrepo added
 below X stays hidden.
-** User's assessment: not a security hole, a consistency fix
+** Ed's assessment: not a security hole, a consistency fix
 Jeff is right that a connection belongs to one user talking to their own
 server, so no one else was going to read the nodes. The restriction is
 that user's viewing preference, not a boundary against another person.
@@ -216,14 +216,14 @@ needed.
 
 * After the diff-view slice
 ** DONE Two servers share one readiness-marks file
-'data/readiness-marks.json' lives at the data root, so User's server and
+'data/readiness-marks.json' lives at the data root, so Ed's server and
 Jeff's rewrite the same file, and a commit on one keeps only the marks on
-its own repos, deleting the other's. User's call: a bug, fixed without
+its own repos, deleting the other's. Ed's call: a bug, fixed without
 asking. The marks move beside each config ('data/readiness-marks-
 CONFIGNAME.json', or a path the config may set), so each server keeps
 its own.
 ** DONE The diff view's answer carries no readiness summary
-The tool saved each buffer back unchanged to obtain it. User's call: the
+The tool saved each buffer back unchanged to obtain it. Ed's call: the
 server now includes the summary in the 'diff view' answer, as it does in
 a save's; small and obviously right.
 ** DONE 'integrate unshown changes' in the tool
@@ -233,12 +233,12 @@ editable until it is integrated.
 "Stage and commit" stages only '.skg' files, so the manifest the server
 rewrites at every start stays uncommitted in every repo; Jeff's repos
 track it, so he commits it by hand. Either the server stages it too, or
-git ignores it. User leans to staging it: it is generated, but it is
+git ignores it. Ed leans to staging it: it is generated, but it is
 what a receiver of the repo needs, and the docs present it as published.
 *** Jeff
 I think we should exclude it. The diff view doesn't cover it,
 and I want users to have to think about it before changing that file.
-**** User
+**** Ed
 Agreed and left as is: 'stage and commit' stages only '.skg' files, and
 the manifest is committed by hand, deliberately. 'docs/diff-view.org'
 says so under "Stage and commit".

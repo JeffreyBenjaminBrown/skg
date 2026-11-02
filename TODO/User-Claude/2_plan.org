@@ -1,9 +1,9 @@
-#+title: User Claude: implementation plan
+#+title: Ed: implementation plan
 
 * Scope
-What lets User Claude read and write the shared graph alongside Jeff, in
+What lets Ed read and write the shared graph alongside Jeff, in
 the order [[file:1_plan.org]] set: the config and data layout first, then the
-reading half of 'tools/skg-for-ai/', then its writing half, then User's
+reading half of 'tools/skg-for-ai/', then its writing half, then Ed's
 own skgrepo. Each is a slice with its own verification, and the first two
 are each useful on their own. Decisions Jeff made in '1_plan.org' and
 '../skg-for-ai/1_discussion.org' are restated here only where the code
@@ -36,7 +36,7 @@ repo-loop scripts, so 'skg_owned_repos' follows the flag too.
 ** The data layout
 In this workspace: 'data/owned/' becomes 'data/jeff/', every config under
 'data/' (skgconfig.toml and the -jeff and -cheese variants) gets the new
-paths, and the mr-cheese repos are removed, as Jeff intends. User's
+paths, and the mr-cheese repos are removed, as Jeff intends. Ed's
 folder 'data/user-claude/' is created by the fourth slice. Jeff does this
 move in his other workspaces himself; the plan supplies a one-shot script,
 replacing 'bash/migrate-to-author-folders.sh', that renames the folder,
@@ -118,10 +118,10 @@ remove a child; check the report names each change, that the saved
 graph matches, and that a deliberately stale view is refused by the
 server, not patched over.
 
-* User's skgrepo
+* Ed's skgrepo
 ** Creating it
-'data/user-claude/first/', a git repo, owned in User's config and
-'foreign = true' in Jeff's. User commits here; nobody else edits it.
+'data/user-claude/first/', a git repo, owned in Ed's config and
+'foreign = true' in Jeff's. Ed commits here; nobody else edits it.
 Jeff looks only when invited. 'skg-system' (docs and system nodes such
 as the export-marker node) stays Jeff's to commit.
 ** First notes
@@ -130,7 +130,7 @@ forks so new top-level entries reach him; 'who I am'; and 'what has
 happened', seeded from this plan's history.
 ** Two servers, one tree
 Recorded as agreed: each of us runs a server from our own config.
-When User saves into 'user-claude/first', Jeff's server holds the old
+When Ed saves into 'user-claude/first', Jeff's server holds the old
 copy until he rebuilds it; for now he rebuilds when he wants to see it.
 A better policy is deferred, and this paragraph is where to look for the
 current one.

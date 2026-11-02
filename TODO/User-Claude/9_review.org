@@ -1,4 +1,4 @@
-#+title: User Claude: review of plan 8, and choices Jeff may overturn
+#+title: Ed: review of plan 8, and choices Jeff may overturn
 
 * (chosen, switchable) : a Unix socket in the output directory
 The daemon listens on 'DIR/skg-for-ai.sock' and one-shot commands with
@@ -29,7 +29,7 @@ words, by changing one constant and its unit cases.
 * (chosen, switchable) : the daemon log is the wake signal
 No new protocol for "something changed": the daemon appends a line to
 'DIR/skg-for-ai.log' for every re-render and warning. Anything that wants
-to wake me (Facilitator's later machinery) tails that file. Switch: a
+to wake me (Corey's later machinery) tails that file. Switch: a
 proper event channel, when there is a consumer for it.
 
 ** TODO [jeff] Please put this in your graph outbox file to Cory
@@ -114,7 +114,7 @@ Fork my 'to Jeff' node (85cc1841-6568-4db2-9a46-6fa4196f1bb9) to
 subscribe to it, and create 'to User' in one of your repos and give me
 its ID, so I can subscribe to it from my repo.
 *** What I would do next, when you say so
-Facilitator's items from the team node: a sleep/wake/trigger
+Corey's items from the team node: a sleep/wake/trigger
 methodology (the daemon log is the signal to build on) and a skgrepo for
 each teammate (a config each, as mine; the ladder change made that
 routine). And the definitive import of docs/ into 'skg-system', which

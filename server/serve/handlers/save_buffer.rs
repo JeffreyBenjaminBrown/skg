@@ -1056,6 +1056,12 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
       errors : vec![crate::types::errors::BufferValidationError::Other (
         format_conflict_error (&dirty_conflicts))],
       warnings : parse_warnings, })); }
+  // Known limit: only the saving connection's views are re-rendered.
+  // Other connections to this server are not refreshed, because the
+  // repo watcher drops the server's own writes (server/repo_watch/own_writes.rs).
+  // With one person per server this does not bite; if two people ever
+  // share a server, the save path, not the watcher, should re-render
+  // the other connections' views.
   let collateral_viewforest_ids : Vec<ViewforestId> = viewforest_id_from_request_result . as_ref ()
     .map (|saved_viewforest_id| affected_gnids . collateral_viewforest_ids (
       saved_viewforest_id, views_state,
