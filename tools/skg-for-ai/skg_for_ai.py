@@ -30,11 +30,17 @@ a new empty view does, and writes its view as 'view' would.
 prints the changes it would make, and with '--yes' saves it and
 writes the server's re-rendered view over the three files. Words in a
 handle ask for edit requests: 'delete', 'ready', 'unready', 'all',
-'restoreNode', 'restoreRel'; and for view requests: 'editable',
-'fork'. A headline ending in '⟨node:ID⟩' places that existing node
-there, as the clients' paste does. A save that forks a node (an edited
-foreign node, or 'fork') is approved by '--yes', the clone going to
-'--fork-into REPO' or the one owned skgrepo. A new headline whose title equals a
+'restoreNode', 'restoreRel', 'merge:ID', 'relRepo:NAME',
+'noSearchMatching', 'searchMatching'; for view requests: 'editable',
+'fork', 'write-protect'; 'detach' and 'attach' write or remove
+'noClaim'; 'repo:NAME' moves the node; 'subtree' asks for the
+clients' prefix-argument forms. A headline ending in '⟨node:ID⟩'
+places that existing node there, as the clients' paste does. A save
+that forks a node (an edited foreign node, or 'fork') is approved by
+'--yes', the clone going to '--fork-into REPO' or the one owned
+skgrepo. The server's other questions are answered by '--hoist',
+'--delete-from', '--strandeds' and '--show-overPrivateText'; '--yes'
+alone writes nothing more. A new headline whose title equals a
 removed one's stops the save until its handle is restored or it is
 marked '⟨new⟩'; one whose title resembles a removed one's is a
 question, answered by '--keep-ids' or '--all-new' or on the headline.
@@ -45,7 +51,11 @@ buffer again.
 skgrepos, asking first when the server says not all is ready.
 Other commands: 'close SIDECAR'; 'raw REQUEST', which sends one
 request line and prints every response; 'import INPUT_DIR REPO',
-which previews and applies a Markdown and Org import.
+which previews and applies a Markdown and Org import;
+'delete-references ID', which removes the owned structured references
+to an absent node; 'restrict [NAME]', which prints or (through a
+daemon) sets the skgrepo restriction; 'linkstack ACTION', the clients'
+linkstack kept in a file.
 The port is SKG_PORT (default 1730), or '--port'.
 
 'daemon --out-dir DIR' keeps one connection open and holds there
@@ -177,18 +187,31 @@ def run_command (arguments):
   if arguments . command == "extend":
     command_extend (arguments)
     return
+  if arguments . command == "delete-references":
+    command_delete_references (arguments)
+    return
+  if arguments . command == "restrict":
+    command_restrict (arguments)
+    return
+  if arguments . command == "linkstack":
+    command_linkstack (arguments)
+    return
   connection = connect_to_server (arguments . port)
   try:
+    show = arguments . show_overPrivateText
     if arguments . command == "view":
-      view = fetch_single_root_view (connection, arguments . id)
+      view = fetch_single_root_view (connection, arguments . id, show)
     elif arguments . command in FOREST_COMMAND_ALIASES:
       view = fetch_forest_view (
         connection, FOREST_COMMAND_ALIASES [ arguments . command ],
-        arguments . id )
+        arguments . id, show )
     elif arguments . command == "forest":
-      view = fetch_forest_view (connection, arguments . kind, arguments . id)
+      view = fetch_forest_view (connection, arguments . kind, arguments . id, show)
     elif arguments . command == "search":
-      view = fetch_search_view (connection, " " . join (arguments . terms))
+      view = fetch_search_view (
+        connection, " " . join (arguments . terms),
+        [ option for option in SEARCH_OPTIONS if getattr (arguments, option) ],
+        show )
     require_view_has_headlines (view)
     view [ "command" ] = arguments . command
     base_name = arguments . name or default_base_name (arguments)
@@ -218,6 +241,11 @@ def parse_command_line (argv):
   common_options . add_argument (
     "--no-summary", action = "store_true",
     help = "omit the summary block from the compact view" )
+  common_options . add_argument (
+    "--show-overPrivateText", action = "store_true",
+    help = ( "under a skgrepo restriction, approve releasing text from "
+             "overPrivateText telescopes when the server asks (a search "
+             "then includes them; without it, it excludes them)" ))
   parser = argparse . ArgumentParser (
     prog = "skg_for_ai.py",
     description = ( "A skg client: write a view as a full and a compact "
@@ -236,9 +264,20 @@ def parse_command_line (argv):
     parents = [ common_options ] )
   forest_parser . add_argument ( "kind", choices = list (FOREST_VIEW_REQUESTS) )
   forest_parser . add_argument ("id")
-  commands . add_parser (
+  search_parser = commands . add_parser (
     "search", help = "the search buffer for TERMS",
-    parents = [ common_options ] ) . add_argument ( "terms", nargs = "+" )
+    parents = [ common_options ] )
+  search_parser . add_argument ( "terms", nargs = "+" )
+  search_parser . add_argument (
+    "--regex", action = "store_true",
+    help = "read each term as a regular expression ('C-c f i' option r)" )
+  search_parser . add_argument (
+    "--body", action = "store_true",
+    help = "search the bodies too, not only titles and aliases (option b)" )
+  search_parser . add_argument (
+    "--operators", action = "store_true",
+    help = ( "keep Tantivy's phrase and operator syntax: AND, OR, quotes, "
+             "+word, -word, grouping (option t)" ))
   commands . add_parser (
     "diff", help = ( "the diff view's nonempty buffers: every change in "
                      "the owned skgrepos since their last git-commits" ),
@@ -303,6 +342,26 @@ def parse_command_line (argv):
     "--fork-into", metavar = "REPO", default = None,
     help = ( "the owned skgrepo of a fork's clone (default: the server's "
              "one owned skgrepo, when it owns exactly one)" ))
+  save_parser . add_argument (
+    "--hoist", action = "store_true",
+    help = ( "answer the Hoist question Hoist: move the title and body a "
+             "telescope selects below its home up to its home (without it, "
+             "'--yes' answers Abort)" ))
+  save_parser . add_argument (
+    "--delete-from", choices = [ "visible", "all" ], default = None,
+    help = ( "when records the skgrepo restriction keeps out name a node the "
+             "save deletes, strip the ID from the visible records only, or "
+             "from every owned record (without it, '--yes' cancels)" ))
+  save_parser . add_argument (
+    "--strandeds", choices = [ "reset", "keep" ], default = None,
+    help = ( "when a move to another skgrepo strands relationships in their "
+             "old skgrepos, reset each to its new default, or keep each where "
+             "it is (without it, '--yes' saves nothing)" ))
+  save_parser . add_argument (
+    "--show-overPrivateText", action = "store_true",
+    help = ( "under a skgrepo restriction, approve releasing the re-rendered "
+             "view's text from overPrivateText telescopes (without it, the "
+             "save happens and the files go stale)" ))
   reworded_answers = save_parser . add_mutually_exclusive_group ()
   reworded_answers . add_argument (
     "--keep-ids", action = "store_true",
@@ -322,6 +381,56 @@ def parse_command_line (argv):
   import_parser . add_argument (
     "--preview-only", action = "store_true",
     help = "cancel after the preview instead of applying it" )
+  import_parser . add_argument (
+    "--host-root", metavar = "PATH", default = "",
+    help = ( "the absolute host path of INPUT_DIR, for links to files by "
+             "absolute path (default: none, which leaves them unresolved)" ))
+  delete_references_parser = commands . add_parser (
+    "delete-references",
+    help = ( "remove every owned structured reference (contains, "
+             "subscribesTo, hidesFromSubs, overrides) to the absent node ID" ),
+    parents = [ port_option ] )
+  delete_references_parser . add_argument ( "id" )
+  delete_references_parser . add_argument (
+    "--out-dir", default = None,
+    help = "the folder whose daemon to run through, if one runs there" )
+  delete_references_parser . add_argument (
+    "--yes", action = "store_true", help = "send the request" )
+  delete_references_parser . add_argument (
+    "--leave-links", action = "store_true",
+    help = ( "approve the cleanup when titles or bodies link to the ID: "
+             "those links stay, dangling" ))
+  restrict_parser = commands . add_parser (
+    "restrict",
+    help = ( "show the daemon's skgrepo restriction and the rungs, or set "
+             "it: NAME, the most private owned skgrepo to show, and with "
+             "'--foreign' whether foreign skgrepos are shown" ),
+    parents = [ port_option ] )
+  restrict_parser . add_argument ( "name", nargs = "?", default = None )
+  restrict_parser . add_argument (
+    "--foreign", choices = [ "shown", "hidden" ], default = None,
+    help = "show or hide the foreign skgrepos" )
+  restrict_parser . add_argument (
+    "--out-dir", default = None,
+    help = "the folder whose daemon to run through, if one runs there" )
+  restrict_parser . add_argument (
+    "--show-overPrivateText", action = "store_true",
+    help = ( "approve releasing text from overPrivateText telescopes the "
+             "views would show under the new restriction" ))
+  linkstack_parser = commands . add_parser (
+    "linkstack",
+    help = ( "the linkstack, kept in OUT_DIR: 'push ID-OR-LINK', 'paste "
+             "id|link|node', 'pop id|link|node', 'show'" ),
+    parents = [ port_option ] )
+  linkstack_parser . add_argument (
+    "action", choices = [ "show", "push", "paste", "pop" ] )
+  linkstack_parser . add_argument (
+    "argument", nargs = "?", default = None,
+    help = ( "for 'push', an ID or a link '[[id:ID][LABEL]]'; for 'paste' "
+             "and 'pop', what to print: 'id', 'link' or 'node'" ))
+  linkstack_parser . add_argument (
+    "--out-dir", default = ".",
+    help = "the folder of the linkstack's file (default: the current one)" )
   daemon_parser = commands . add_parser (
     "daemon", help = ( "keep one connection open, holding every view "
                        "its commands write, and rewrite a view's files "
@@ -402,7 +511,8 @@ def command_import (arguments):
   cancel it, on one connection: the server binds the approval token
   to the connection that previewed. A request for a host root, sent
   when the input links to files by absolute path, is answered with
-  the empty one, which leaves those links unresolved."""
+  '--host-root', the input directory's absolute path on the host; by
+  default with the empty one, which leaves those links unresolved."""
   preview_fields = [ ( "action", "preview" ),
                      ( "input-directory", arguments . input_dir ),
                      ( "destination-repo", arguments . repo ) ]
@@ -417,7 +527,7 @@ def command_import (arguments):
       return parse_sexp (message)
     preview = send (preview_fields)
     if response_type (preview) == "import-md-and-org-host-mapping-needed":
-      preview = send ( preview_fields + [ ( "host-root", "" ) ] )
+      preview = send ( preview_fields + [ ( "host-root", arguments . host_root ) ] )
     token = response_field (preview, "approval-token")
     if token is not None:
       send ( [ ( "action", "cancel" ) ] if arguments . preview_only
@@ -440,7 +550,10 @@ def command_save (arguments):
   A placed node ('⟨node:ID⟩') takes its title from the server. When
   the save forks, the report says so; the server then answers with a
   fork confirmation, which the save prints and approves, as the
-  clients' approval does, if it forks only what the report said."""
+  clients' approval does, if it forks only what the report said. The
+  server's other questions are printed, and answered as the command
+  line says ('answer_save_question'): each answer sends the same save
+  again, carrying it and the earlier ones."""
   saved_view = load_saved_view (arguments . view_files)
   require_port_of_sidecar (arguments . port, saved_view . sidecar)
   if NEW_NODE_HANDLE_WORD in saved_view . headline_of_handle:
@@ -452,8 +565,13 @@ def command_save (arguments):
   original = outline_of_full_view (saved_view . parsed_view)
   connection = connection_for_saved_view (saved_view)
   try:
-    errors = ( handle_error_lines (edited, saved_view . headline_of_handle)
+    ownership = fetch_repo_ownership (connection)
+    errors = handle_error_lines (edited, saved_view . headline_of_handle)
+    word_check = ( OutlineWordCheck () if errors else outline_word_check (
+      edited, saved_view . headline_of_handle, ownership ))
+    errors = ( errors or word_check . error_lines
                or resolve_placed_nodes (connection, edited)
+               or resolve_merge_acquirees (connection, edited)
                or retyped_headline_error_lines (
                     edited, original, saved_view . headline_of_handle ))
     assign_placed_view_requests (edited, saved_view . headline_of_handle)
@@ -467,16 +585,16 @@ def command_save (arguments):
     changes = [] if errors else change_report_lines (
       edited, original, saved_view . headline_of_handle )
     forks = PredictedForks () if errors else predicted_forks (
-      edited, original, saved_view . headline_of_handle,
-      fetch_repo_ownership (connection), arguments . fork_into,
-      bool (changes) )
+      edited, original, saved_view . headline_of_handle, ownership,
+      arguments . fork_into, bool (changes) )
     errors = errors + forks . error_lines
     changes = [] if errors else changes + forks . lines + questions
     print ( "Changes in " + os . path . basename (saved_view . compact_path) +
             ", against " + os . path . basename (saved_view . full_path) +
             " (view ID " + saved_view . sidecar [ "view_id" ] + "):" )
     for line in errors + (
-        changes or ( [] if errors else [ "No changes." ] )):
+        changes + word_check . note_lines if changes
+        else [] if errors else word_check . note_lines + [ "No changes." ] ):
       print (line)
     if errors:
       raise SkgToolError (
@@ -498,17 +616,27 @@ def command_save (arguments):
       return
     buffer_text = rebuilt_full_buffer (
       edited, saved_view . headline_of_handle, saved_view . full_text )
-    def send_save (approved_fork_skgrepos = None):
-      return connection . save_buffer (
+    answers = SaveAnswers ()
+    for attempt in range (SAVE_ATTEMPTS_LIMIT):
+      messages = connection . save_buffer (
         saved_view . sidecar [ "view_id" ], buffer_text,
         saved_view . sidecar [ "rendered_at" ],
-        saved_view . sidecar [ "request" ] . get ("buffer"),
-        approved_fork_skgrepos )
-    messages = send_save ()
-    if response_type ( messages [-1] ) == "fork-confirmation":
-      messages = send_save ( approved_fork_skgrepos_of_confirmation (
-        messages [-1], forks ))
-    rerendered = rerendered_view_of_save ( messages [-1], saved_view . sidecar )
+        saved_view . sidecar [ "request" ] . get ("buffer"), answers )
+      if response_type ( messages [-1] ) not in SAVE_QUESTION_TYPES:
+        break
+      answer_save_question ( messages [-1], answers, arguments, forks )
+    try:
+      rerendered = rerendered_view_of_save ( messages [-1], saved_view . sidecar )
+    except SkgToolError:
+      if answers . overPrivateText_pids is None:
+        raise
+      # The save that asked had been written; only the re-send that
+      # approves its rerender was refused, as a stale one is when the
+      # save made a new node.
+      raise SkgToolError (
+        "The save succeeded, but the server refused to send it again to "
+        "release its re-rendered view (see above); the files are out of "
+        "date. View the node again with '--show-overPrivateText'." )
     connection . log_view_event (
       "saved", saved_view . directory, saved_view . base_name )
     written_paths = write_view_files (
@@ -605,6 +733,25 @@ def compact_view_has_edits (saved_view):
     or change_report_lines (
          edited, outline_of_full_view (saved_view . parsed_view),
          saved_view . headline_of_handle ))
+
+def current_buffer_of_edited_view (saved_view):
+  """The buffer a save of SAVED_VIEW's edited compact view would send,
+  as far as the nodes it names go: what a client's dirty buffer holds.
+  A placed node keeps its typed title; the words of 'subtree' are not
+  given below. A compact view whose handles are in error has no such
+  buffer, and is refused, naming it."""
+  edited = parse_edited_compact_view (saved_view . compact_text)
+  if handle_error_lines (edited, saved_view . headline_of_handle):
+    raise SkgToolError (
+      f"The held view {saved_view . compact_path} has edits in error, so the "
+      "save cannot tell the server what it would change; fix them (its "
+      "'save' says how), or 'close' it." )
+  for headline in edited:
+    if headline . is_placed ():
+      headline . placed_pid = headline . placed_node_id
+      headline . placed_title = headline . title
+  return rebuilt_full_buffer (
+    edited, saved_view . headline_of_handle, saved_view . full_text )
 
 def connection_for_saved_view (saved_view):
   """The connection on which to save or extend SAVED_VIEW: the
@@ -752,6 +899,234 @@ def command_commit (arguments):
   if errors:
     raise SkgToolError ( "The server reported errors; see above." )
 
+def command_delete_references (arguments):
+  """Send "delete references to absent node" for an ID the graph lacks,
+  as the clients' 'skg-delete-references-to-absent-node' ('C-c d a')
+  does: the server removes it from every owned 'contains',
+  'subscribesTo', 'hidesFromSubs' and 'overrides' list, and rerenders
+  the views that showed one. Without '--yes' nothing is sent, since the
+  server asks first only when titles or bodies link to the ID; when it
+  asks, its warning is printed, and '--leave-links' approves, sending
+  the request again with the preview it names. Like the clients, it
+  refuses while a view the daemon holds has unsaved edits."""
+  if not arguments . yes:
+    print ( f"Not sent. This removes every owned structured reference to the "
+            f"absent node {arguments . id} (in 'contains', 'subscribesTo', "
+            "'hidesFromSubs' and 'overrides' lists); run again with '--yes'." )
+    return
+  connection = connect_to_server (arguments . port)
+  try:
+    refuse_while_held_views_have_edits (
+      connection, "removing the references to an absent node" )
+    line = request_line ( "delete references to absent node",
+                          ( "id", arguments . id ))
+    response = connection . request_then_rerender_stream (line)
+    if response_type (response) == "delete-references-confirmation":
+      print ( "Server: delete-references confirmation: titles or bodies link "
+              f"to {arguments . id}; the cleanup leaves those links, dangling. "
+              + response_text_field (response, "prompt") )
+      print ( response_text_field (response, "content") . rstrip ("\n") )
+      if not arguments . leave_links:
+        raise SkgToolError (
+          "Nothing was removed: run again with '--yes --leave-links' to "
+          "remove the structured references and leave the links." )
+      print ( "Approved: the request is sent again." )
+      response = connection . request_then_rerender_stream (
+        line [ : -1 ] + " (approved-preview . " + quote_string (
+          response_text_field (response, "approved-preview") ) + "))" )
+    if response_type (response) != "delete-references-result":
+      raise SkgToolError (
+        "The server refused: " + response_text_field (response, "content") )
+    connection . log_event ( "removed the references to " + arguments . id )
+  finally:
+    connection . close ()
+  print ( "Server: removed the references to " + arguments . id + ": " +
+          response_text_field (response, "changed-memberships") +
+          " membership(s) in " + response_text_field (response, "changed-nodes") +
+          " node(s)." )
+  print ( response_text_field (response, "content") . rstrip ("\n") )
+
+def refuse_while_held_views_have_edits (connection, what):
+  """Refuse WHAT while a view CONNECTION holds has unsaved edits, as
+  the clients refuse a request whose rerender would replace an unsaved
+  buffer. A command's own connection holds none."""
+  for view_id, files_stem in connection . held_views ():
+    try:
+      saved_view = SavedView ( files_stem + ".view.json" )
+    except ( OSError, ValueError ):
+      continue
+    if compact_view_has_edits (saved_view):
+      raise SkgToolError (
+        f"Nothing was sent: {saved_view . compact_path} has unsaved edits, "
+        f"which {what} would rerender away; save them, or undo them, first." )
+
+def command_restrict (arguments):
+  """With neither NAME nor '--foreign', print the skgrepo restriction
+  and its rungs, as 'skg-list-repo-sets' does. Otherwise set it, as
+  the clients' 'skg-restrict-repo-set' ('C-c v l') does: NAME is the
+  most private owned skgrepo to show, '--foreign' whether the foreign
+  skgrepos are shown. The restriction belongs to the connection, so
+  setting it needs a daemon, whose connection keeps it for every
+  command run through it; the server rerenders the views it holds,
+  which it rewrites. Refused while a held view has unsaved edits. When
+  the new restriction would release text from overPrivateText
+  telescopes, the server asks first; '--show-overPrivateText'
+  approves."""
+  connection = connect_to_server (arguments . port)
+  try:
+    if arguments . name is None and arguments . foreign is None:
+      response = connection . request ( request_line ("list repo sets") )
+      require_response_type (response, "repo-sets")
+      rungs = [ sexp_to_text (rung) for rung in response_field (response, "sets") or [] ]
+      print ( skgrepo_restriction_text (response, rungs) + "; available: " +
+              ", " . join ( skgrepo_rung_label (rung, rungs) for rung in rungs ) + "." )
+      return
+    if not connection . holds_views_it_writes ():
+      raise SkgToolError (
+        "The skgrepo restriction belongs to a connection, and this command's "
+        "own ends with it; start a daemon ('daemon --out-dir DIR &') and run "
+        "'restrict' through it, so that the commands run through it see the "
+        "restriction." )
+    refuse_while_held_views_have_edits (
+      connection, "switching the skgrepo restriction" )
+    line = request_line (
+      "set skgrepo restriction",
+      * ( [ ( "name", arguments . name ) ] if arguments . name is not None else [] ),
+      * ( [ ( "foreign-repos", arguments . foreign ) ]
+          if arguments . foreign is not None else [] ))
+    response = connection . request_then_rerender_stream (line)
+    if response_type (response) == "overPrivateText-telescope-confirmation":
+      pids = overPrivateText_answer (
+        response, arguments . show_overPrivateText, "",
+        "The skgrepo restriction is as it was: run again with "
+        "'--show-overPrivateText' to release that text." )
+      response = connection . request_then_rerender_stream (
+        line [ : -1 ] + approved_overPrivateText_field (pids) + ")" )
+    require_response_type (response, "skgrepo-restriction")
+    refusal = response_field (response, "content")
+    if refusal is not None:
+      raise SkgToolError ( "The server refused: " + sexp_to_text (refusal) )
+    rungs = [ sexp_to_text (rung) for rung in response_field (
+      connection . request ( request_line ("list repo sets") ), "sets" ) or [] ]
+    described = skgrepo_restriction_text (response, rungs)
+    connection . log_event (described)
+  finally:
+    connection . close ()
+  print (described)
+
+def skgrepo_rung_label (rung, rungs):
+  """How the clients show a rung ('skg--skgrepo-restriction-label'):
+  the most private, which with foreign skgrepos shown is no
+  restriction, says so."""
+  return rung + ( " (no restriction)" if rungs and rung == rungs [-1] else "" )
+
+def skgrepo_restriction_text (response, rungs):
+  """What the clients say of a skgrepo restriction RESPONSE
+  ('skg--skgrepo-restriction-message')."""
+  rung = response_text_field (response, "restriction")
+  if response_text_field (response, "foreign-repos") == "hidden":
+    return f"Skgrepo restriction: {rung}; foreign repos hidden"
+  return "Skgrepo restriction: " + skgrepo_rung_label (rung, rungs)
+
+# The linkstack's file, in the folder '--out-dir' names: the stack as
+# the clients' 'skg-view-linkstack' ('C-c v s') shows it, a headline
+# per entry, its label as the title and its ID as the body, the top
+# first. It may be edited by hand, as that buffer may.
+LINKSTACK_FILE_NAME = "skg-for-ai.linkstack.org"
+LINK_WITH_LABEL_PATTERN = re . compile ( r'\[\[id:([^\]\[]+)\](?:\[([^\]]*)\])?\]' )
+
+def command_linkstack (arguments):
+  """The clients' linkstack, kept in a file: 'push ID' ('C-c u') pushes
+  the node ID with its title from the server, 'push [[id:ID][LABEL]]'
+  the link's ID and label; 'show' ('C-c v s') prints the stack; 'paste
+  id|link|node' ('C-c o i', 'o l', 'o n') prints, from the top entry,
+  its ID, a link '[[id:ID][LABEL]]', or a headline's text 'LABEL
+  ⟨node:ID⟩', which placed in a compact view puts that node there;
+  'pop id|link|node' ('C-c O i', 'O l', 'O n') prints the same and
+  removes the entry."""
+  path = os . path . join (arguments . out_dir, LINKSTACK_FILE_NAME)
+  stack = read_linkstack (path)
+  if arguments . action == "show":
+    if arguments . argument is not None:
+      raise SkgToolError ( "'linkstack show' takes no argument." )
+    print ( linkstack_text (stack) . rstrip ("\n") if stack
+            else "The linkstack is empty." )
+    return
+  if arguments . action == "push":
+    if arguments . argument is None:
+      raise SkgToolError ( "'linkstack push' takes an ID or a link." )
+    entry = linkstack_entry_to_push (arguments . argument, arguments . port)
+    write_linkstack ( path, [ entry ] + stack )
+    print ( f"Pushed: '{entry [1]}' ({entry [0]})." )
+    return
+  if arguments . argument not in ( "id", "link", "node" ):
+    raise SkgToolError (
+      f"'linkstack {arguments . action}' takes 'id', 'link' or 'node'." )
+  if not stack:
+    raise SkgToolError ( "The linkstack is empty." )
+  gnid, label = stack [0]
+  print ( { "id"   : gnid,
+            "link" : f"[[id:{gnid}][{label}]]",
+            "node" : f"{label} ⟨{PLACED_NODE_HANDLE_WORD}:{gnid}⟩" }
+          [ arguments . argument ] )
+  if arguments . action == "pop":
+    write_linkstack ( path, stack [ 1 : ] )
+
+def linkstack_entry_to_push (argument, port):
+  """(ID, LABEL) for ARGUMENT, a link (its label, else the node's title)
+  or an ID (the node's title), the title from the server on PORT, which
+  must know the node."""
+  link = LINK_WITH_LABEL_PATTERN . fullmatch ( argument . strip () )
+  gnid = link . group (1) if link else argument . strip ()
+  if link and link . group (2):
+    return ( gnid, link . group (2) )
+  if not WORD_PARAMETER_PATTERN . fullmatch (gnid):
+    raise SkgToolError ( f"'{argument}' is neither an ID nor a link '[[id:ID][LABEL]]'." )
+  connection = SkgConnection (port)
+  try:
+    entry = fetch_link_statuses_of_ids (connection, [ gnid ]) . get (gnid)
+  finally:
+    connection . close ()
+  if entry is None or entry [ "status" ] != "resolved" or entry . get ("title") is None:
+    raise SkgToolError (
+      f"The server gives no title for {gnid}: " +
+      ( "it names no node of the graph." if entry is None
+        or entry [ "status" ] == "missing"
+        else "the skgrepo restriction hides it." if entry [ "status" ] != "resolved"
+        else "its search index may lag a save by a moment; try again." ))
+  return ( entry [ "pid" ], entry [ "title" ] )
+
+def read_linkstack (path):
+  """[(ID, LABEL)] of the linkstack file at PATH, the top first; [] when
+  there is none."""
+  try:
+    lines = read_text_file (path) . split ("\n")
+  except FileNotFoundError:
+    return []
+  stack = []
+  index = 0
+  while index < len (lines):
+    line = lines [index]
+    if not line . strip ():
+      index += 1
+      continue
+    if ( not line . startswith ("* ") or index + 1 >= len (lines)
+         or not lines [ index + 1 ] . strip ()
+         or lines [ index + 1 ] . startswith ("*") ):
+      raise SkgToolError (
+        f"Line {index + 1} of {path} is not an entry: a headline '* LABEL' "
+        "with the ID on the next line." )
+    stack . append (( lines [ index + 1 ] . strip (), line [ 2 : ] . strip () ))
+    index += 2
+  return stack
+
+def linkstack_text (stack):
+  return "" . join ( f"* {label}\n{gnid}\n" for gnid, label in stack )
+
+def write_linkstack (path, stack):
+  os . makedirs ( os . path . dirname ( os . path . abspath (path) ), exist_ok = True )
+  write_text_file ( path, linkstack_text (stack) )
+
 def typed_yes (prompt):
   """Whether the person at standard input types exactly 'yes'. With no
   input to read, the answer is no."""
@@ -787,15 +1162,17 @@ def require_view_has_headlines (view):
       + ( " Errors: " + json . dumps ( view [ "errors" ], ensure_ascii = False )
           if view [ "errors" ] else "" ))
 
-def fetch_single_root_view (connection, node_id):
+def fetch_single_root_view (connection, node_id, show_overPrivateText = False):
   view_id = "content-view:" + node_id
   if connection . holds_view (view_id):
     # A connection asking for a view ID it holds is answered by name,
     # '(switch-to-view ID)', not drawn afresh.
     connection . release_view_to_reopen (view_id)
-  response = connection . request (
+  response = request_releasing_overPrivateText (
+    connection,
     request_line ( "single root content view",
-                   ( "id", node_id ), ( "view-id", view_id ) ))
+                   ( "id", node_id ), ( "view-id", view_id ) ),
+    show_overPrivateText, "viewed" )
   require_response_type (response, "content-view")
   return { "view_id"     : view_id,
            "request"     : { "id" : node_id },
@@ -804,12 +1181,40 @@ def fetch_single_root_view (connection, node_id):
            "errors"      : response_field (response, "errors") or [],
            "warnings"    : response_field (response, "warnings") or [] }
 
-def fetch_search_view (connection, terms):
-  response = connection . request (
-    request_line ( "text search", ( "terms", terms ) ))
+# The search options of 'C-c f i', each a flag of 'search'.
+SEARCH_OPTIONS = ( "regex", "body", "operators" )
+
+def fetch_search_view (connection, terms, options = (),
+                       show_overPrivateText = False):
+  """The search buffer for TERMS, searched with the OPTIONS named
+  (among SEARCH_OPTIONS), as 'skg-search-interactive' asks. Under a
+  skgrepo restriction the server may first ask whether to include
+  overPrivateText telescopes: SHOW_OVERPRIVATETEXT includes them, and
+  otherwise they are excluded, as a client's "no" does; a line on
+  standard error says which."""
+  line = request_line (
+    "text search", ( "terms", terms ),
+    * [ ( option, "true" if option in options else "false" )
+        for option in SEARCH_OPTIONS ] )
+  response = connection . request (line)
+  if response_type (response) == "overPrivateText-telescope-confirmation":
+    choice = "include" if show_overPrivateText else "exclude"
+    print ( "skg server: " + response_text_field (response, "prompt") + " The "
+            "search " + choice + "s them" + (
+              "." if show_overPrivateText else
+              "; '--show-overPrivateText' includes them." ),
+            file = sys . stderr )
+    response = connection . request (
+      line [ : -1 ] + " (overPrivateText-telescopes . " + quote_string (choice)
+      + "))" )
   require_response_type (response, "search-results")
+  if response_field (response, "rendered-at") is None:
+    # no match, or an error: a message, not a view
+    raise SkgToolError ( "The server returned no view: " +
+                         response_text_field (response, "content") )
   return { "view_id"     : "search:" + terms,
-           "request"     : { "terms" : terms },
+           "request"     : dict ( { "terms" : terms },
+                                  ** { option : True for option in options } ),
            "content"     : response_field (response, "content") or "",
            "rendered_at" : rendered_at_of (response),
            "errors"      : [],
@@ -843,26 +1248,39 @@ def fetch_diff_view_buffer (connection, buffer_name):
            "readiness_summary" : response_field (
              response, "readiness-summary" ) }
 
-def fetch_forest_view (connection, kind, node_id):
+def fetch_forest_view (connection, kind, node_id, show_overPrivateText = False):
   """The node's view with the folder KIND under its root, as the
   clients' 'C-c l' command for KIND draws it. A fresh content view
   already holds the root's containers folder, so for 'containers' it
   is that view, and no save is sent."""
   view_request = FOREST_VIEW_REQUESTS [kind]
   if view_request is None:
-    return fetch_single_root_view (connection, node_id)
-  return fetch_view_with_root_folder_request (connection, node_id, view_request)
+    return fetch_single_root_view (connection, node_id, show_overPrivateText)
+  return fetch_view_with_root_folder_request (
+    connection, node_id, view_request, show_overPrivateText )
 
-def fetch_view_with_root_folder_request (connection, node_id, view_request):
+def fetch_view_with_root_folder_request (connection, node_id, view_request,
+                                         show_overPrivateText = False):
   """Open the node's view, then save it unchanged but for a
   '(viewRequests VIEW_REQUEST)' on its root, as the clients' 'C-c l'
   commands do. The save's re-rendered buffer is the view. Nothing in
   the buffer differs from the graph, so the save writes no file."""
-  fresh_view = fetch_single_root_view (connection, node_id)
+  fresh_view = fetch_single_root_view (connection, node_id, show_overPrivateText)
   requesting_buffer = buffer_with_view_request_on_first_headline (
     fresh_view [ "content" ], view_request )
-  messages = connection . save_buffer (
-    fresh_view [ "view_id" ], requesting_buffer, fresh_view [ "rendered_at" ] )
+  def send_save (answers = None):
+    return connection . save_buffer (
+      fresh_view [ "view_id" ], requesting_buffer, fresh_view [ "rendered_at" ],
+      answers = answers )
+  messages = send_save ()
+  if response_type ( messages [-1] ) == "overPrivateText-telescope-confirmation":
+    answers = SaveAnswers ()
+    answers . overPrivateText_pids = overPrivateText_answer (
+      messages [-1], show_overPrivateText, "",
+      "Nothing was viewed: the server withholds the folder's text from "
+      "overPrivateText telescopes under the skgrepo restriction; run again "
+      "with '--show-overPrivateText' to release it.", to_stderr = True )
+    messages = send_save (answers)
   terminal = messages [-1]
   require_response_type (terminal, "save-result")
   content = response_field (terminal, "content")
@@ -899,11 +1317,13 @@ def buffer_with_view_request_on_first_headline (buffer_text, view_request):
 
 def metadata_text_with_part (metadata_text, part_text, following_part_heads):
   """METADATA_TEXT, a '(skg ...)', with PART_TEXT inserted where the
-  server writes it: before the first part headed by one of
-  FOLLOWING_PART_HEADS, or else last."""
+  server writes it: before the first part headed by, or the first atom
+  named, one of FOLLOWING_PART_HEADS, or else last."""
   for element_start, element in top_level_elements_with_offsets (metadata_text):
-    if ( isinstance (element, list) and element
-         and element [0] in following_part_heads ):
+    if ( ( isinstance (element, list) and element
+           and element [0] in following_part_heads )
+         or ( isinstance (element, Symbol)
+              and element in following_part_heads )):
       return ( metadata_text [ : element_start ] + part_text + " " +
                metadata_text [ element_start : ] )
   return metadata_text [ : -1 ] + " " + part_text + ")"
@@ -1032,12 +1452,17 @@ def metadata_span_of_headline (headline_text):
 # Facts from one headline's metadata
 # ============================================================
 
-def metadata_kinds ():
+def metadata_fields_table ():
   with open ( os . path . join (SHARED_FOLDER, "metadata-fields.json"),
               encoding = "utf-8" ) as table_file:
-    return json . load (table_file) [ "kinds" ]
+    return json . load (table_file)
+
+def metadata_kinds ():
+  return metadata_fields_table () [ "kinds" ]
 
 KIND_ATOMS = { atom for kind in metadata_kinds () for atom in kind [ "atoms" ] }
+# The parts of '(skg ...)' in the order the server writes them.
+METADATA_PARTS = metadata_fields_table () [ "parts" ]
 FOLDER_ATOMS = { atom for kind in metadata_kinds () if kind [ "kind" ] == "folder"
                  for atom in kind [ "atoms" ] }
 
@@ -1794,13 +2219,7 @@ def is_pending_detachment (metadata, parent, grandparent):
        or ( rel is not None and len (rel) == 2
             and is_symbol_named ( rel [1], "removed" ))):
     return False
-  def is_editable_node (sexp):
-    return ( sexp is not None and metadata_has_atom (sexp, "node")
-             and not metadata_has_atom (sexp, "writeProtected") )
-  if parent is not None and folder_atom (parent) is not None:
-    return ( folder_atom (parent) not in FOLDER_HERALDS [ "write_protected" ]
-             and is_editable_node (grandparent) )
-  return is_editable_node (parent)
+  return reads_claims (parent, grandparent)
 
 # ============================================================
 # Change facts: a headline's '(diff (leaves ...) (ready ...))', which
@@ -1975,11 +2394,42 @@ EDIT_REQUEST_TOKENS = [ "delete", "restoreNode", "restoreRel" ]
 READINESS_TOKENS = [ "ready", "unready" ]
 # With 'ready' or 'unready': name only the object 'all'.
 ALL_TOKEN = "all"
+# The handle words that ask for the edit requests with a parameter,
+# each a prefix and its parameter: 'merge:ID', the clients'
+# 'skg-set-merge-request' ('C-c s m'), whose node acquires ID by a
+# nodeMerge; 'relRepo:NAME', their 'skg-set-relRepo' ('C-c s r'), the
+# skgrepo NAME recording the headline's relationship to its parent.
+MERGE_WORD_PREFIX = "merge:"
+RELREPO_WORD_PREFIX = "relRepo:"
+# The handle words that ask for the flag request, the clients'
+# 'skg-set-flag-search-matching' ('C-c s x'), each with the flag's
+# desired value.
+SEARCH_MATCHING_TOKENS = { "noSearchMatching" : "true",
+                           "searchMatching"   : "false" }
 # The handle tokens that ask for view requests, each with the request
 # the rebuild writes into the headline's '(viewRequests ...)':
 # 'editable' the clients' 'skg-set-editable' ('C-c s d'), 'fork' their
-# 'skg-fork-node' ('C-c m f').
-VIEW_REQUEST_TOKENS = [ ( "editable", "editableView" ), ( "fork", "fork" ) ]
+# 'skg-fork-node' ('C-c m f'), 'write-protect' their
+# 'skg-request-write-protected' ('C-c s w'; with 'subtree', 'C-c s W'
+# and its request 'writeProtectedSubtreeView').
+VIEW_REQUEST_TOKENS = [ ( "editable", "editableView" ), ( "fork", "fork" ),
+                        ( "write-protect", "writeProtectedView" ) ]
+WRITE_PROTECT_SUBTREE_REQUEST = "writeProtectedSubtreeView"
+# The handle words that change whether a headline claims membership of
+# its parent's list: 'detach' writes 'noClaim', as the clients'
+# 'skg-detach' ('C-c s t') does, 'attach' removes it, as their
+# 'skg-attach' ('C-c s a') does.
+CLAIM_TOKENS = [ "detach", "attach" ]
+# 'repo:NAME' moves the node to the owned skgrepo NAME, as the clients'
+# 'skg-set-repo' ('C-c s s') does.
+REPO_WORD_PREFIX = "repo:"
+# 'subtree' asks for the subtree form of the other words of its handle,
+# as a prefix argument (C-u) does in the clients: 'delete', 'ready',
+# 'unready', 'write-protect', 'repo:NAME', 'relRepo:NAME',
+# 'noSearchMatching' and 'searchMatching'.
+SUBTREE_TOKEN = "subtree"
+# What a word may name: a skgrepo or an ID, written into metadata bare.
+WORD_PARAMETER_PATTERN = re . compile ( r'[^\s()";⟨⟩]+' )
 # A headline ending in '⟨node:ID⟩' places the existing node ID there,
 # as the clients' 'skg-paste-node' ('C-c o n') does.
 PLACED_NODE_HANDLE_WORD = "node"
@@ -2058,22 +2508,57 @@ class OutlineHeadline:
     self . compact_line_number = compact_line_number
     self . body = []
     self . parent = None
+    # The words a 'subtree' above gives it, each with the handle of
+    # the headline carrying that 'subtree' ('expand_subtree_words').
+    self . subtree_words = []
+    self . subtree_origin = {}
+    # Whether its readiness request names its leaves as a headline
+    # below the gesture's does: without 'all'.
+    self . readiness_below = False
+    # The words of its own handle a 'subtree' on it does not apply to
+    # it: its relationship is not of the kind the gesture sets, say.
+    self . dropped_words = set ()
+    self . merge_title = None # the acquiree's, once resolved
+
+  def words (self):
+    """The words of its handle, but those a 'subtree' on it drops, and
+    those a 'subtree' gives it."""
+    return [ word for word in dict . fromkeys ( self . tokens + self . subtree_words )
+             if word not in self . dropped_words ]
 
   def edit_request_words (self):
-    return [ word for word in EDIT_REQUEST_TOKENS if word in self . tokens ]
+    return [ word for word in self . words () if is_edit_request_word (word) ]
 
   def readiness_words (self):
-    return [ word for word in READINESS_TOKENS if word in self . tokens ]
+    return [ word for word in READINESS_TOKENS if word in self . words () ]
 
   def names_only_all (self):
     return ALL_TOKEN in self . tokens
 
   def view_request_words (self):
-    return [ word for word, _ in VIEW_REQUEST_TOKENS if word in self . tokens ]
+    return [ word for word, _ in VIEW_REQUEST_TOKENS if word in self . words () ]
+
+  def claim_words (self):
+    return [ word for word in CLAIM_TOKENS if word in self . words () ]
+
+  def repo_words (self):
+    return [ word for word in self . words ()
+             if word . startswith (REPO_WORD_PREFIX) ]
+
+  def asks_subtree (self):
+    return SUBTREE_TOKEN in self . tokens
+
+  def merge_acquiree (self):
+    """The ID its 'merge:ID' names, or None."""
+    return next ( ( word [ len (MERGE_WORD_PREFIX) : ]
+                    for word in self . edit_request_words ()
+                    if word . startswith (MERGE_WORD_PREFIX) ), None )
 
   def has_requests (self):
     return bool ( self . edit_request_words () or self . readiness_words ()
-                  or self . names_only_all () or self . view_request_words () )
+                  or self . names_only_all () or self . view_request_words ()
+                  or self . claim_words () or self . repo_words ()
+                  or self . asks_subtree () )
 
   def is_placed (self):
     return self . placed_node_id is not None
@@ -2152,12 +2637,25 @@ def handle_error_lines (edited, headline_of_handle):
   accepts a request is the server's to say."""
   errors = []
   for index, headline in enumerate (edited):
-    if ( headline . marked_new or headline . is_placed () ) and headline . tokens:
+    # '⟨new⟩' takes one 'repo:NAME', its home skgrepo; '⟨node:ID⟩' no word.
+    other_words = (
+      headline . tokens [ 1 : ] if ( headline . marked_new
+                                    and headline . repo_words () == headline . tokens [ : 1 ] )
+      else headline . tokens )
+    if ( headline . marked_new or headline . is_placed () ) and other_words:
       errors . append (
         "Error: " + compact_handle_text (headline) + " on line "
         f"{headline . compact_line_number} of the compact view carries "
-        + ", " . join ( "'" + token + "'" for token in headline . tokens )
-        + "; it takes no other word." )
+        + ", " . join ( "'" + token + "'" for token in other_words )
+        + "; it takes no other word" +
+        ( " but one 'repo:NAME'" if headline . marked_new else "" ) + "." )
+    elif headline . marked_new and headline . repo_words () and not (
+        WORD_PARAMETER_PATTERN . fullmatch (
+          word_parameter ( headline . repo_words () [0] ))):
+      errors . append (
+        "Error: " + compact_handle_text (headline) + " on line "
+        f"{headline . compact_line_number} of the compact view carries "
+        f"'{headline . repo_words () [0]}', which names nothing." )
     if headline . is_placed ():
       errors += placed_node_shape_error_lines (edited, index)
     if headline . handle is None:
@@ -2203,28 +2701,575 @@ def placed_node_shape_error_lines (edited, index):
       "then add them." )
   return errors
 
+def is_edit_request_word (word):
+  """Whether WORD asks for an edit request: 'delete', 'restoreNode',
+  'restoreRel', 'merge:ID', 'relRepo:NAME', 'noSearchMatching',
+  'searchMatching'."""
+  return ( word in EDIT_REQUEST_TOKENS or word in SEARCH_MATCHING_TOKENS
+           or word . startswith (MERGE_WORD_PREFIX)
+           or word . startswith (RELREPO_WORD_PREFIX) )
+
+def edit_request_part_of_word (word):
+  """The part of '(editRequest ...)' an edit-request WORD asks for."""
+  if word in SEARCH_MATCHING_TOKENS:
+    return "(flag noSearchMatching " + SEARCH_MATCHING_TOKENS [word] + ")"
+  if word . startswith (MERGE_WORD_PREFIX):
+    return "(merge " + word [ len (MERGE_WORD_PREFIX) : ] + ")"
+  if word . startswith (RELREPO_WORD_PREFIX):
+    return "(relRepo " + word [ len (RELREPO_WORD_PREFIX) : ] + ")"
+  return word
+
+def word_parameter (word):
+  """The parameter of a word 'PREFIX:PARAMETER' ('repo:', 'relRepo:',
+  'merge:')."""
+  return word . split (":", 1) [1]
+
+def quoted_words (words):
+  return " and " . join ( "'" + word + "'" for word in words )
+
+# The kinds that may carry each kind of word: what the clients'
+# commands accept ('shared/metadata-fields.json' says which kinds take
+# 'noClaim').
+RELREPO_KINDS = ( "node", "unknown", "restricted", "alias" )
+CLAIM_KINDS = ( "node", "ghost", "unknown", "restricted", "alias", "id" )
+
 def request_token_problems (headline, view_line):
   """Why HEADLINE's request tokens make no one '(editRequest ...)'
-  for VIEW_LINE, the headline its handle names."""
-  def quoted (words):
-    return " and " . join ( "'" + word + "'" for word in words )
+  for VIEW_LINE, the headline its handle names, or ask for what its
+  kind does not take."""
   problems = []
   if view_line . metadata is None:
     problems . append ( "carries a request, but the headline has no metadata." )
+    return problems
+  kind = headline_kind (view_line . metadata)
   if len ( headline . edit_request_words () ) > 1:
     problems . append (
-      f"carries {quoted ( headline . edit_request_words () )}; a headline "
-      "takes one edit request." )
+      f"carries {quoted_words ( headline . edit_request_words () )}"
+      + subtree_origin_text (headline, headline . edit_request_words ())
+      + "; a headline takes one edit request." )
   if len ( headline . readiness_words () ) > 1:
-    problems . append ( "carries both 'ready' and 'unready'." )
-  if headline . names_only_all () and not headline . readiness_words ():
+    problems . append ( "carries both 'ready' and 'unready'"
+                        + subtree_origin_text (headline, READINESS_TOKENS) + "." )
+  if headline . names_only_all () and not any (
+      word in headline . tokens for word in READINESS_TOKENS ):
     problems . append ( "carries 'all' without 'ready' or 'unready'." )
-  if ( headline . view_request_words () and view_line . metadata is not None
-       and headline_kind (view_line . metadata) != "node" ):
+  only_on_a_node = (
+    headline . view_request_words () + headline . repo_words () +
+    [ word for word in headline . edit_request_words ()
+      if word . startswith (MERGE_WORD_PREFIX) or word in SEARCH_MATCHING_TOKENS ] )
+  if only_on_a_node and kind != "node":
     problems . append (
-      f"carries {quoted ( headline . view_request_words () )}, but is not a "
-      "node occurrence; only a node takes a view request." )
+      f"carries {quoted_words (only_on_a_node)}, but is not a node "
+      "occurrence; only a node takes it." )
+  relRepo_words = [ word for word in headline . edit_request_words ()
+                    if word . startswith (RELREPO_WORD_PREFIX) ]
+  if relRepo_words and kind not in RELREPO_KINDS and not (
+      # 'relRepo:NAME subtree' on a writable folder sets its members'
+      headline . asks_subtree () and folder_atom (view_line . metadata)
+      in WRITABLE_FOLDER_RELATIONSHIP_KINDS ):
+    problems . append (
+      f"carries {quoted_words (relRepo_words)}, but is no node, alias, "
+      "unknown viewnode or restricted viewnode; only those stand for a "
+      "relationship whose skgrepo can be set." )
+  if headline . claim_words () and kind not in CLAIM_KINDS:
+    problems . append (
+      f"carries {quoted_words ( headline . claim_words () )}, but a headline of "
+      f"this kind ({kind}) claims no membership." )
+  if len ( headline . claim_words () ) > 1:
+    problems . append ( "carries both 'detach' and 'attach'." )
+  if len ( headline . repo_words () ) > 1:
+    problems . append ( f"carries {quoted_words ( headline . repo_words () )}; "
+                        "a node has one home skgrepo." )
+  if ( "write-protect" in headline . view_request_words ()
+       and "editable" in headline . view_request_words () ):
+    problems . append ( "carries both 'write-protect' and 'editable'." )
+  for word in ( headline . edit_request_words () + headline . repo_words () ):
+    if ( ":" in word and
+         not WORD_PARAMETER_PATTERN . fullmatch ( word_parameter (word) )):
+      problems . append ( f"carries '{word}', which names nothing." )
+  if headline . asks_subtree () and not words_with_a_subtree_form (headline):
+    problems . append (
+      "carries 'subtree' with no word it applies to; 'subtree' applies to "
+      "'delete', 'ready', 'unready', 'write-protect', 'repo:NAME', "
+      "'relRepo:NAME', 'noSearchMatching' and 'searchMatching'." )
   return problems
+
+def subtree_origin_text (headline, words):
+  """' (WORD from 'subtree' on ⟨ID⟩, ...)' for those of WORDS a
+  'subtree' above gave HEADLINE; empty when none."""
+  origins = [ f"'{word}' from 'subtree' on ⟨{headline . subtree_origin [word]}⟩"
+              for word in words if word in headline . subtree_origin
+              and word not in headline . tokens ]
+  return " (" + ", " . join (origins) + ")" if origins else ""
+
+def words_with_a_subtree_form (headline):
+  """The words of HEADLINE's own handle that 'subtree' applies to."""
+  return [ word for word in headline . tokens
+           if word in ( "delete", "ready", "unready", "write-protect" )
+           or word in SEARCH_MATCHING_TOKENS
+           or word . startswith (REPO_WORD_PREFIX)
+           or word . startswith (RELREPO_WORD_PREFIX) ]
+
+# ------------------------------------------------------------
+# Words read against the outline: what a 'subtree' gives the
+# headlines below it, and what 'detach', 'attach', 'repo:NAME',
+# 'relRepo:NAME' and the flag words need of where they stand
+# ------------------------------------------------------------
+
+# The writable partner folders, each with the kind of relationship
+# 'relRepo:NAME subtree' sets from it ('skg--writable-folder-relations'
+# in 'elisp/skg-metadata.el').
+WRITABLE_FOLDER_RELATIONSHIP_KINDS = { "subscribeeFolder" : "subscribee",
+                                       "overriddenFolder" : "overridden" }
+# The partner folders whose members' relationships belong to the other
+# end, so that no relRepo can be set from there
+# ('skg--relRepo-unsupported-folder-atoms').
+RELREPO_UNSUPPORTED_FOLDERS = (
+  "subscriberFolder", "overriderFolder", "hiderFolder", "hiddenFolder",
+  "containerFolder", "mentionerFolder", "acquiredByFolder",
+  "acquiredFolder", "illegalEditFolder", "hiddenInSubscribeeFolder",
+  "hiddenOutsideOfSubscribeeFolder" )
+
+class OutlineWordCheck:
+  """What reading the handles' words against the outline found:
+  'error_lines', which stop the save, and 'note_lines', what a
+  'subtree' leaves out and why, which the report prints with the
+  changes."""
+  def __init__ (self):
+    self . error_lines = []
+    self . note_lines = []
+
+def outline_word_check (edited, headline_of_handle, ownership):
+  """Give each headline the words a 'subtree' above it gives it
+  ('expand_subtree_words'); then check what the words ask of where
+  they stand: a headline given words must still make one edit
+  request; 'detach' and 'attach' need a parent that reads claims;
+  'repo:NAME' an owned skgrepo and an editable node; 'relRepo:NAME' an
+  owned skgrepo and a relationship the save writes; a flag word an
+  editable node of an owned skgrepo. OWNERSHIP is {SKGREPO: OWNED}."""
+  check = OutlineWordCheck ()
+  expand_subtree_words (edited, headline_of_handle, ownership, check)
+  for index, headline in enumerate (edited):
+    if headline . marked_new and headline . repo_words ():
+      skgrepo = word_parameter ( headline . repo_words () [0] )
+      if ownership . get (skgrepo) is not True:
+        check . error_lines . append (
+          f"Error: ⟨new⟩ on line {headline . compact_line_number} of the "
+          f"compact view carries '{headline . repo_words () [0]}', but "
+          f"'{skgrepo}' is no owned skgrepo of this server; its owned ones "
+          f"are: {owned_skgrepos_text (ownership)}." )
+    if headline . handle is None or headline . handle not in headline_of_handle:
+      continue
+    view_line = headline_of_handle [ headline . handle ]
+    if view_line . metadata is None:
+      continue
+    where = ( f"⟨{headline . handle}⟩ on line {headline . compact_line_number} "
+              "of the compact view" )
+    problems = (
+      ( request_token_problems (headline, view_line)
+        if headline . subtree_words else [] ) +
+      claim_problems (edited, index, headline_of_handle) +
+      repo_problems (headline, view_line, ownership) +
+      relRepo_problems (edited, index, headline_of_handle, ownership) +
+      search_matching_problems (headline, view_line, ownership) )
+    check . error_lines += [ f"Error: {where} {problem}" for problem in problems ]
+  return check
+
+def outline_metadata (edited, index, headline_of_handle):
+  """The metadata the headline at INDEX of the edited outline is read
+  with by the save, as far as its kind and editability go: its full
+  view headline's; a placed node's, a write-protected occurrence; a
+  new headline's, an editable node. None for no headline, or a handle
+  the full view lacks."""
+  if index is None:
+    return None
+  headline = edited [index]
+  if headline . is_placed ():
+    return [ Symbol ("skg"), Symbol ("node"), Symbol ("writeProtected") ]
+  if headline . handle is None:
+    return [ Symbol ("skg"), Symbol ("node") ]
+  view_line = headline_of_handle . get ( headline . handle )
+  return None if view_line is None else view_line . metadata
+
+def handled_metadata (edited, index, headline_of_handle):
+  """The full view's metadata of the headline at INDEX, which a word can
+  be written into; None for a new or placed headline."""
+  if edited [index] . handle is None:
+    return None
+  return outline_metadata (edited, index, headline_of_handle)
+
+def is_editable_node (metadata):
+  """Whether METADATA is an occurrence's that is not write-protected
+  ('skg--occurrence-sexp-p', 'skg--node-write-protected-p')."""
+  return ( metadata is not None and metadata_has_atom (metadata, "node")
+           and not metadata_has_atom (metadata, "writeProtected") )
+
+def reads_claims (parent, grandparent):
+  """Whether a parent with the metadata PARENT, whose own parent has
+  GRANDPARENT, reads its children's claims: a node that is not
+  write-protected, or a folder that is not write-protected whose
+  viewparent is such a node ('skg--reads-claims-p')."""
+  if parent is not None and folder_atom (parent) is not None:
+    return ( folder_atom (parent) not in FOLDER_HERALDS [ "write_protected" ]
+             and is_editable_node (grandparent) )
+  return is_editable_node (parent)
+
+def parent_reads_claims (edited, index, headline_of_handle):
+  parent = edited [index] . parent
+  return reads_claims (
+    outline_metadata (edited, parent, headline_of_handle),
+    None if parent is None else outline_metadata (
+      edited, edited [parent] . parent, headline_of_handle ))
+
+def claim_problems (edited, index, headline_of_handle):
+  """Why 'detach' or 'attach' cannot stand on the headline at INDEX:
+  its parent reads no claims, or it already claims (or does not) what
+  the word asks."""
+  headline = edited [index]
+  if not headline . claim_words ():
+    return []
+  word = headline . claim_words () [0]
+  if not parent_reads_claims (edited, index, headline_of_handle):
+    return [ f"carries '{word}', but its parent reads no claims (it is "
+             "write-protected, or no editable node), so no child claims "
+             "membership of it." ]
+  claims = not metadata_has_atom (
+    headline_of_handle [ headline . handle ] . metadata, "noClaim" )
+  if word == "detach" and not claims:
+    return [ "carries 'detach', but claims nothing already." ]
+  if word == "attach" and claims:
+    return [ "carries 'attach', but claims membership already." ]
+  return []
+
+def owned_skgrepos_text (ownership):
+  return ", " . join ( name for name, owned in ownership . items () if owned ) or "none"
+
+def repo_problems (headline, view_line, ownership):
+  """Why the 'repo:NAME' of HEADLINE's own handle cannot move its node:
+  NAME is no owned skgrepo, the occurrence is write-protected (the
+  save would refuse its edit, as 'skg-set-repo' warns), or the node is
+  there already. One a 'subtree' left out of the move is no error."""
+  words = [ word for word in headline . repo_words () if word in headline . tokens ]
+  if not words:
+    return []
+  skgrepo = word_parameter ( words [0] )
+  if ownership . get (skgrepo) is not True:
+    return [ f"carries '{words [0]}', but '{skgrepo}' is no owned skgrepo of "
+             f"this server; its owned ones are: {owned_skgrepos_text (ownership)}." ]
+  if metadata_has_atom (view_line . metadata, "writeProtected"):
+    return [ f"carries '{words [0]}', but is write-protected here, so the save "
+             "would refuse its edit; write it on the node's editable "
+             "occurrence." ]
+  if headline_node_repo (view_line . metadata) == skgrepo:
+    return [ f"carries '{words [0]}', but its home skgrepo is '{skgrepo}' already." ]
+  return []
+
+def relRepo_problems (edited, index, headline_of_handle, ownership):
+  """Why the 'relRepo:NAME' of the own handle of the headline at INDEX
+  can set no relationship's skgrepo, as 'skg--rel-at-point' refuses:
+  NAME is no owned skgrepo; the headline is a root; its parent is a
+  folder whose relationships belong to the other end, a writable folder
+  under a write-protected viewparent, a write-protected node, or
+  neither a node nor a writable folder. An alias sets its own
+  relationship to its node."""
+  headline = edited [index]
+  words = [ word for word in headline . edit_request_words ()
+            if word . startswith (RELREPO_WORD_PREFIX) and word in headline . tokens ]
+  if not words:
+    return []
+  skgrepo = word_parameter ( words [0] )
+  if ownership . get (skgrepo) is not True:
+    return [ f"carries '{words [0]}', but '{skgrepo}' is no owned skgrepo of "
+             f"this server; its owned ones are: {owned_skgrepos_text (ownership)}." ]
+  if headline_kind ( headline_of_handle [ headline . handle ] . metadata ) == "alias":
+    return []
+  parent = headline . parent
+  parent_metadata = outline_metadata (edited, parent, headline_of_handle)
+  if parent_metadata is None:
+    return [ f"carries '{words [0]}', but is a root: there is no relationship "
+             "here to set." ]
+  folder = folder_atom (parent_metadata)
+  if folder in RELREPO_UNSUPPORTED_FOLDERS:
+    return [ f"carries '{words [0]}', but stands in a {folder}, whose "
+             "relationships belong to the other end." ]
+  if folder in WRITABLE_FOLDER_RELATIONSHIP_KINDS:
+    if not is_editable_node ( outline_metadata (
+        edited, edited [parent] . parent, headline_of_handle )):
+      return [ f"carries '{words [0]}', but the folder's viewparent is "
+               "write-protected here, so the save would not write this "
+               "relationship." ]
+    return []
+  if headline_kind (parent_metadata) != "node":
+    return [ f"carries '{words [0]}', but its parent is neither a node nor a "
+             "writable folder." ]
+  if not is_editable_node (parent_metadata):
+    return [ f"carries '{words [0]}', but its parent is write-protected here, "
+             "so the save would not write this relationship." ]
+  return []
+
+def search_matching_problems (headline, view_line, ownership):
+  """Why a flag word of HEADLINE's own handle cannot stand there, as
+  'skg-set-flag-search-matching' refuses: a write-protected
+  occurrence, or a node of a foreign skgrepo."""
+  words = [ word for word in headline . edit_request_words ()
+            if word in SEARCH_MATCHING_TOKENS and word in headline . tokens ]
+  if not words:
+    return []
+  if metadata_has_atom (view_line . metadata, "writeProtected"):
+    return [ f"carries '{words [0]}', but is write-protected here; write it on "
+             "the node's editable occurrence." ]
+  if ownership . get ( headline_node_repo (view_line . metadata) ) is not True:
+    return [ f"carries '{words [0]}', but its node is foreign; search "
+             "matching is set on nodes of owned skgrepos only." ]
+  return []
+
+# ------------------------------------------------------------
+# 'subtree': the clients' prefix-argument forms
+# ------------------------------------------------------------
+
+def expand_subtree_words (edited, headline_of_handle, ownership, check):
+  """For each headline whose handle carries 'subtree', give the
+  headlines below it the words it applies to, as the clients'
+  commands with a prefix argument mark them ('give_subtree_word'),
+  dropping from the headline itself those that do not apply to it.
+  What is left out, and why, goes to CHECK's notes, and a word
+  'subtree' cannot apply from where it stands to its errors."""
+  for index, root in enumerate (edited):
+    if ( not root . asks_subtree () or root . handle is None
+         or root . handle not in headline_of_handle
+         or headline_of_handle [ root . handle ] . metadata is None ):
+      continue
+    for word in words_with_a_subtree_form (root):
+      if word in READINESS_TOKENS:
+        expand_readiness_subtree (edited, index, word, headline_of_handle)
+      elif word == "delete":
+        expand_delete_subtree (edited, index, headline_of_handle)
+      elif word . startswith (REPO_WORD_PREFIX):
+        expand_repo_subtree (edited, index, word, headline_of_handle, check)
+      elif word . startswith (RELREPO_WORD_PREFIX):
+        expand_relRepo_subtree (edited, index, word, headline_of_handle, check)
+      elif word in SEARCH_MATCHING_TOKENS:
+        expand_search_matching_subtree (
+          edited, index, word, headline_of_handle, ownership, check )
+      # 'write-protect' asks the server for its subtree form.
+
+def give_subtree_word (edited, target, word, root):
+  """Give the headline at TARGET the WORD the 'subtree' on the headline
+  at ROOT applies to it."""
+  headline = edited [target]
+  if word in headline . tokens or word in headline . subtree_words:
+    return
+  headline . subtree_words . append (word)
+  headline . subtree_origin [word] = edited [root] . handle
+
+def walk_below (outline, index, visit):
+  """Call VISIT (LATER) on each headline below the one at INDEX, in
+  order, skipping those below a headline for which it returns False."""
+  pruned_level = None
+  for later in descendant_indices (outline, index):
+    if pruned_level is not None and outline [later] . level > pruned_level:
+      continue
+    pruned_level = None
+    if not visit (later):
+      pruned_level = outline [later] . level
+
+def expand_delete_subtree (edited, root, headline_of_handle):
+  """'delete subtree', the clients' 'skg-delete-recursive' ('C-u C-c
+  <backspace>'): every node occurrence below is deleted too; the other
+  headlines (folders, ghosts, unknown viewnodes) are skipped."""
+  for later in descendant_indices (edited, root):
+    metadata = handled_metadata (edited, later, headline_of_handle)
+    if metadata is not None and headline_kind (metadata) == "node":
+      give_subtree_word (edited, later, "delete", root)
+
+def home_skgrepo_move (metadata):
+  """( OLD, NEW ) of a home skgrepo move viewnode's
+  '(homeSkgrepoMove (old OLD) (new NEW))', or None."""
+  move = metadata_form (metadata, "homeSkgrepoMove")
+  if move is None:
+    return None
+  return ( sexp_to_text ( ( metadata_form (move, "old") or [ None, "" ] ) [1] ),
+           sexp_to_text ( ( metadata_form (move, "new") or [ None, "" ] ) [1] ))
+
+def expand_readiness_subtree (edited, root, word, headline_of_handle):
+  """'ready subtree' or 'unready subtree'. On a home skgrepo move, the
+  clients' 'C-u C-c r h': every move between the same two skgrepos in
+  the moved node's subtree. Elsewhere their 'C-u C-c r r': every
+  headline in the subtree that names leaves, those below naming them
+  without 'all' ('skg--readiness-leaves-below'), and the headline
+  itself only when it names some."""
+  root_metadata = headline_of_handle [ edited [root] . handle ] . metadata
+  move = home_skgrepo_move (root_metadata)
+  if move is not None:
+    moved_node = edited [root] . parent
+    for target in ( [ root ] if moved_node is None else
+                    [ moved_node ] + descendant_indices (edited, moved_node) ):
+      metadata = handled_metadata (edited, target, headline_of_handle)
+      if metadata is not None and home_skgrepo_move (metadata) == move:
+        give_subtree_word (edited, target, word, root)
+    return
+  if leaves_fact (root_metadata) is None and not edited [root] . names_only_all ():
+    edited [root] . dropped_words . add (word)
+  for later in descendant_indices (edited, root):
+    metadata = handled_metadata (edited, later, headline_of_handle)
+    leaves = None if metadata is None else leaves_fact (metadata)
+    if leaves is None or ( leaves [1] and set ( leaves [1] ) == { ALL_TOKEN } ):
+      continue
+    if word not in edited [later] . tokens:
+      edited [later] . readiness_below = True
+    give_subtree_word (edited, later, word, root)
+
+def expand_repo_subtree (edited, root, word, headline_of_handle, check):
+  """'repo:NAME subtree', the clients' 'skg-set-repo-recursive' ('C-c s
+  S'): the node and every node below it reached through member
+  occurrences whose home skgrepo is the node's move to NAME
+  ('skg--do-at-recursive-repo-move-occurrences'). A write-protected
+  occurrence is not moved (the save would refuse its edit) and is
+  noted, unless the move reaches the node's editable occurrence."""
+  root_metadata = headline_of_handle [ edited [root] . handle ] . metadata
+  old_skgrepo = headline_node_repo (root_metadata)
+  moved_gnids = set ()
+  write_protected = []
+  def consider (target):
+    metadata = handled_metadata (edited, target, headline_of_handle)
+    if metadata_has_atom (metadata, "writeProtected"):
+      write_protected . append (target)
+      if target == root:
+        edited [root] . dropped_words . add (word)
+      return
+    moved_gnids . add ( headline_gnid (metadata) )
+    give_subtree_word (edited, target, word, root)
+  consider (root)
+  def visit (later):
+    metadata = handled_metadata (edited, later, headline_of_handle)
+    if ( metadata is None or headline_kind (metadata) != "node"
+         or metadata_has_atom (metadata, "noClaim") ):
+      return False
+    if headline_node_repo (metadata) == old_skgrepo:
+      consider (later)
+    return True
+  walk_below (edited, root, visit)
+  for target in write_protected:
+    gnid = headline_gnid ( handled_metadata (edited, target, headline_of_handle) )
+    if gnid not in moved_gnids:
+      check . note_lines . append (
+        "Not moved: " + described_handle ( edited [target] . handle, headline_of_handle )
+        + f", write-protected here, which the save would refuse to edit; "
+        f"'{word} subtree' on ⟨{edited [root] . handle}⟩ leaves it." )
+
+def expand_relRepo_subtree (edited, root, word, headline_of_handle, check):
+  """'relRepo:NAME subtree', the clients' 'skg-set-relRepo-recursive'
+  ('C-c s R'), for the kind of relationship its headline names: on a
+  node its content relationships, on a subscribee folder the
+  subscriptions, on an overridden folder the overrides, the walk of
+  'skg--relRepo-recursive-targets'. The headline itself takes it only
+  when its own relationship is of that kind."""
+  root_metadata = headline_of_handle [ edited [root] . handle ] . metadata
+  root_folder = folder_atom (root_metadata)
+  kind = ( "content" if headline_kind (root_metadata) == "node"
+           else WRITABLE_FOLDER_RELATIONSHIP_KINDS . get (root_folder) )
+  if kind is None:
+    check . error_lines . append (
+      f"Error: ⟨{edited [root] . handle}⟩ on line "
+      f"{edited [root] . compact_line_number} of the compact view carries "
+      f"'{word} subtree', which applies on a node (its content "
+      "relationships), a subscribee folder or an overridden folder." )
+    return
+  def metadata_of (index):
+    return outline_metadata (edited, index, headline_of_handle)
+  def subscribee_as_such (index):
+    metadata = metadata_of (index)
+    return ( metadata is not None and headline_kind (metadata) == "node"
+             and not metadata_has_atom (metadata, "noClaim")
+             and folder_atom ( metadata_of ( edited [index] . parent ) or
+                               [ Symbol ("skg") ] ) == "subscribeeFolder" )
+  def prune_below (index):
+    return ( metadata_has_atom ( metadata_of (index), "writeProtected" )
+             or subscribee_as_such (index) )
+  def relationship_matches (index):
+    metadata = metadata_of (index)
+    member_kind = headline_kind (metadata)
+    if not ( ( member_kind == "node" and not metadata_has_atom (metadata, "noClaim") )
+             or member_kind in ( "unknown", "restricted" )):
+      return False
+    parent = edited [index] . parent
+    parent_metadata = metadata_of (parent)
+    if parent_metadata is None:
+      return False
+    if headline_kind (parent_metadata) == "node":
+      return ( kind == "content" and is_editable_node (parent_metadata)
+               and not subscribee_as_such (parent) )
+    return ( WRITABLE_FOLDER_RELATIONSHIP_KINDS . get ( folder_atom (parent_metadata) )
+             == kind
+             and is_editable_node ( metadata_of ( edited [parent] . parent )) )
+  if root_folder is not None or not relationship_matches (root):
+    # a folder stands for no relationship; a node, for its own when
+    # its parent's list holds it
+    edited [root] . dropped_words . add (word)
+  if root_folder is None and prune_below (root):
+    return
+  def visit (later):
+    if edited [later] . handle is None:
+      return False
+    metadata = metadata_of (later)
+    member_kind = headline_kind (metadata)
+    if member_kind == "node":
+      if metadata_has_atom (metadata, "noClaim"):
+        return False
+      if relationship_matches (later):
+        give_subtree_word (edited, later, word, root)
+      return not prune_below (later)
+    if member_kind in ( "unknown", "restricted" ):
+      if relationship_matches (later):
+        give_subtree_word (edited, later, word, root)
+      return True
+    return folder_atom (metadata) in WRITABLE_FOLDER_RELATIONSHIP_KINDS
+  walk_below (edited, root, visit)
+
+def expand_search_matching_subtree (edited, root, word, headline_of_handle,
+                                    ownership, check):
+  """'noSearchMatching subtree' or 'searchMatching subtree', the
+  clients' 'C-u C-c s x': the node and every member occurrence below
+  it, skipping, as 'skg--stage-flag-search-matching-recursive' does, a
+  second occurrence of a node, a write-protected occurrence, one with
+  another edit request, and a foreign node; the skipped ones but the
+  repeated are noted."""
+  targets = [ root ]
+  def visit (later):
+    metadata = handled_metadata (edited, later, headline_of_handle)
+    if ( metadata is None or headline_kind (metadata) != "node"
+         or metadata_has_atom (metadata, "noClaim") ):
+      return False
+    targets . append (later)
+    return True
+  walk_below (edited, root, visit)
+  seen_gnids = set ()
+  skipped = []
+  for target in targets:
+    metadata = handled_metadata (edited, target, headline_of_handle)
+    gnid = headline_gnid (metadata)
+    other_requests = [ other for other in edited [target] . tokens
+                       if is_edit_request_word (other) and other != word ]
+    reason = (
+      "repeated" if gnid in seen_gnids
+      else "write-protected" if metadata_has_atom (metadata, "writeProtected")
+      else "it has another edit request" if other_requests
+      else "foreign" if ownership . get ( headline_node_repo (metadata) ) is not True
+      else None )
+    if reason is None:
+      seen_gnids . add (gnid)
+      give_subtree_word (edited, target, word, root)
+      continue
+    if target == root:
+      edited [root] . dropped_words . add (word)
+    if reason != "repeated":
+      skipped . append ( described_handle ( edited [target] . handle,
+                                            headline_of_handle )
+                         + " (" + reason + ")" )
+  if skipped:
+    check . note_lines . append (
+      f"Skipped: '{word} subtree' on ⟨{edited [root] . handle}⟩ leaves "
+      + ", " . join (skipped) + "." )
 
 def readiness_request_text (headline, view_line):
   """'(ready OBJECT...)' or '(unready OBJECT...)' for HEADLINE's
@@ -2234,14 +3279,26 @@ def readiness_request_text (headline, view_line):
   lists none gets the bare request."""
   if not headline . readiness_words ():
     return None
+  return "(" + " " . join ( headline . readiness_words () +
+                            readiness_objects (headline, view_line) ) + ")"
+
+def readiness_objects (headline, view_line):
+  """The objects HEADLINE's readiness request names: 'all' when its
+  handle says 'all'; else every object its '(leaves ...)' lists, but
+  'all' on a headline below a 'subtree' gesture's, as the clients'
+  recursive gesture names them ('skg--readiness-leaves-below')."""
+  if headline . names_only_all ():
+    return [ ALL_TOKEN ]
   leaves = leaves_fact (view_line . metadata)
-  objects = ( [ ALL_TOKEN ] if headline . names_only_all ()
-              else leaves [1] if leaves else [] )
-  return "(" + " " . join ( headline . readiness_words () + objects ) + ")"
+  objects = leaves [1] if leaves else []
+  if headline . readiness_below:
+    return [ obj for obj in objects if obj != ALL_TOKEN ]
+  return objects
 
 def edit_request_text (headline, view_line):
   """The '(editRequest ...)' HEADLINE's tokens ask for, or None."""
-  parts = headline . edit_request_words ()
+  parts = [ edit_request_part_of_word (word)
+            for word in headline . edit_request_words () ]
   readiness = readiness_request_text (headline, view_line)
   if readiness:
     parts = parts + [ readiness ]
@@ -2254,9 +3311,10 @@ def unmarked_leaf_count (headline, view_line):
   if headline . readiness_words () != [ "unready" ]:
     return 0
   leaves = leaves_fact (view_line . metadata)
-  if not headline . names_only_all ():
-    return leaves [0] if leaves else 1
-  return ( leaves [0] if leaves and leaves [1] == [ ALL_TOKEN ] else 1 )
+  objects = readiness_objects (headline, view_line)
+  if leaves and objects == leaves [1]:
+    return leaves [0]
+  return max ( 1, len (objects) )
 
 # ------------------------------------------------------------
 # Rebuilding the full buffer
@@ -2282,19 +3340,56 @@ def rebuilt_headline_line (headline, headline_of_handle):
   metadata_text = (
     None if headline . handle is None
     else headline_of_handle [ headline . handle ] . metadata_text )
+  if metadata_text is None and headline . repo_words ():
+    # a new headline given its home skgrepo, as 'skg-set-repo' gives
+    # a headline without metadata ('skg--populate-minimal-node-metadata')
+    metadata_text = "(skg node (skgRepos (nodeRepo " + word_parameter (
+      headline . repo_words () [0] ) + ")))"
+    return stars + " " + metadata_text + " " + headline . title
   if metadata_text is None:
     return stars + " " + headline . title
+  if headline . repo_words ():
+    metadata_text = metadata_text_with_nodeRepo (
+      metadata_text, word_parameter ( headline . repo_words () [0] ))
+  if "detach" in headline . claim_words ():
+    metadata_text = metadata_text_with_part (
+      metadata_text, "noClaim", metadata_parts_following ("noClaim") )
+  if "attach" in headline . claim_words ():
+    metadata_text = metadata_text_without_atom (metadata_text, "noClaim")
   view_requests = view_requests_text (headline)
   if view_requests:
     metadata_text = metadata_text_with_part (
-      metadata_text, view_requests, ( "view", "diff" ))
+      metadata_text, view_requests, metadata_parts_following ("viewRequests") )
   request = edit_request_text (
     headline, headline_of_handle [ headline . handle ] )
   if request:
     metadata_text = metadata_text_with_part (
-      metadata_text, request, ( "viewRequests", "view", "diff" ))
+      metadata_text, request, metadata_parts_following ("editRequest") )
   return ( stars + " " + metadata_text +
            ( " " + headline . title if headline . title else "" ))
+
+def metadata_parts_following (part_name):
+  """The names of the parts of '(skg ...)' the server writes after
+  PART_NAME ('parts' in 'shared/metadata-fields.json'), a part
+  written there going before the first of them that is present."""
+  return tuple ( METADATA_PARTS [ METADATA_PARTS . index (part_name) + 1 : ] )
+
+def metadata_text_with_nodeRepo (metadata_text, skgrepo):
+  """METADATA_TEXT with its home skgrepo '(nodeRepo ...)' SKGREPO."""
+  if re . search ( r'\(nodeRepo [^()\s]+\)', metadata_text ):
+    return re . sub ( r'\(nodeRepo [^()\s]+\)', "(nodeRepo " + skgrepo + ")",
+                      metadata_text, count = 1 )
+  return metadata_text_with_part (
+    metadata_text, "(skgRepos (nodeRepo " + skgrepo + "))",
+    metadata_parts_following ("skgRepos") )
+
+def metadata_text_without_atom (metadata_text, atom):
+  """METADATA_TEXT without the bare atom ATOM at its top level."""
+  for element_start, element in top_level_elements_with_offsets (metadata_text):
+    if isinstance (element, Symbol) and element == atom:
+      return ( metadata_text [ : element_start ] +
+               metadata_text [ element_start + len (atom) : ] . lstrip (" ") )
+  return metadata_text
 
 def placed_node_metadata_text (headline):
   """The metadata the clients' 'skg-paste-node' writes
@@ -2307,7 +3402,10 @@ def placed_node_metadata_text (headline):
 
 def view_requests_text (headline):
   """The '(viewRequests ...)' HEADLINE's tokens ask for, or None."""
-  requests = [ request for word, request in VIEW_REQUEST_TOKENS
+  requests = [ ( WRITE_PROTECT_SUBTREE_REQUEST
+                 if word == "write-protect" and headline . asks_subtree ()
+                 else request )
+               for word, request in VIEW_REQUEST_TOKENS
                if word in headline . view_request_words () ]
   return "(viewRequests " + " " . join (requests) + ")" if requests else None
 
@@ -2355,9 +3453,7 @@ def change_report_lines (edited, original, headline_of_handle):
       0 if parent is None else outline [parent] . level )
   removed_handles = { headline . handle for headline in original
                       if headline . handle not in first_edited_index_of_handle }
-  lines = request_report_lines (
-    [ headline for headline in edited if headline . handle is not None ],
-    headline_of_handle, described )
+  lines = request_report_lines (edited, headline_of_handle, described)
   removal_lines = []
   for index, headline in enumerate (original):
     if ( headline . handle not in removed_handles
@@ -2455,24 +3551,78 @@ def described_handle (handle, headline_of_handle):
     return f"⟨{handle}⟩ '{view_line . title}'"
   return f"⟨{handle}⟩ ({headline_kind (view_line . metadata)})"
 
-def request_report_lines (handled_headlines, headline_of_handle, described):
-  """The edit requests the handles' tokens ask for, by kind, each
-  naming its headline through DESCRIBED; then, when the 'unready'
-  requests unmark more than one leaf, the question a client asks
-  before such a gesture."""
+def request_report_lines (edited, headline_of_handle, described):
+  """The requests the handles' words ask for, by kind, each naming its
+  headline through DESCRIBED; then, when the 'unready' requests unmark
+  more than one leaf, the question a client asks before such a
+  gesture."""
+  handled_headlines = [ headline for headline in edited
+                        if headline . handle is not None ]
+  def parent_text (headline):
+    parent = headline . parent
+    if parent is None:
+      return "the top level"
+    if edited [parent] . handle is not None:
+      return described ( edited [parent] . handle )
+    if edited [parent] . is_placed ():
+      return compact_handle_text ( edited [parent] )
+    return "the new headline '" + edited [parent] . title + "'"
+  def with_word (word):
+    return [ headline for headline in handled_headlines
+             if word in headline . words () ]
+  def with_word_prefix (prefix):
+    return [ ( headline, word ) for headline in handled_headlines
+             for word in headline . words () if word . startswith (prefix) ]
   lines = []
   for word, label, suffix in [
       ( "delete", "Delete", ", from the graph" ),
       ( "restoreNode", "Restore node", ", as HEAD has it" ),
       ( "restoreRel", "Restore membership", ", as HEAD has it" ) ]:
     lines += [ label + ": " + described (headline . handle) + suffix + "."
-               for headline in handled_headlines
-               if word in headline . edit_request_words () ]
+               for headline in with_word (word) ]
+  for headline, word in with_word_prefix (MERGE_WORD_PREFIX):
+    acquiree = word_parameter (word)
+    lines . append (
+      "Merge: " + described (headline . handle) + " acquires ⟨node:" + acquiree
+      + "⟩" + ( " '" + headline . merge_title + "'"
+                if headline . merge_title is not None else "" )
+      + ", as '(merge " + acquiree + ")': a nodeMerge makes the two one node, "
+      "this one, with the relationships of both." )
+  for headline, word in with_word_prefix (RELREPO_WORD_PREFIX):
+    lines . append (
+      "relRepo: " + described (headline . handle) + ", as '(relRepo " +
+      word_parameter (word) + ")': its relationship to " +
+      parent_text (headline) + " is recorded in '" + word_parameter (word) + "'." )
+  for word, effect in [ ( "noSearchMatching", "no longer matches searches" ),
+                        ( "searchMatching", "matches searches again" ) ]:
+    lines += [ "Search matching: " + described (headline . handle) + ", as '" +
+               edit_request_part_of_word (word) + "': the node " + effect + "."
+               for headline in with_word (word) ]
+  for headline, word in with_word_prefix (REPO_WORD_PREFIX):
+    lines . append (
+      "Repo: " + described (headline . handle) + ", from '" +
+      str ( headline_node_repo (
+        headline_of_handle [ headline . handle ] . metadata )) +
+      "' to '" + word_parameter (word) + "': the node's home skgrepo moves." )
   lines += [ "Editable: " + described (headline . handle) +
              ", as '(viewRequests editableView)': the save makes it this "
              "view's editable occurrence of its node."
-             for headline in handled_headlines
-             if "editable" in headline . view_request_words () ]
+             for headline in with_word ("editable") ]
+  lines += [ "Write-protect: " + described (headline . handle) +
+             ( ", as '(viewRequests writeProtectedSubtreeView)': after saving "
+               "the edits, the save makes it and every occurrence of its content "
+               "subtree write-protected."
+               if headline . asks_subtree () else
+               ", as '(viewRequests writeProtectedView)': after saving its "
+               "edits, the save makes it write-protected." )
+             for headline in with_word ("write-protect") ]
+  lines += [ "Detach: " + described (headline . handle) + ", from " +
+             parent_text (headline) + ", as 'noClaim': the save takes it out "
+             "of its parent's list, and the view still shows it."
+             for headline in with_word ("detach") ]
+  lines += [ "Attach: " + described (headline . handle) + ", to " +
+             parent_text (headline) + ": the save puts it in its parent's list."
+             for headline in with_word ("attach") ]
   for word, label in [ ( "ready", "Ready" ), ( "unready", "Unready" ) ]:
     lines += [ label + ": " + described (headline . handle) + ", as '" +
                readiness_request_text (
@@ -2531,6 +3681,34 @@ def resolve_placed_nodes (connection, edited):
     else:
       headline . placed_pid = entry [ "pid" ]
       headline . placed_title = entry [ "title" ]
+  return errors
+
+def resolve_merge_acquirees (connection, edited):
+  """Give each headline whose handle carries 'merge:ID' the title the
+  server has for the acquiree ID, as 'resolve_placed_nodes' asks;
+  return an error line per acquiree the graph lacks or the skgrepo
+  restriction hides."""
+  merging = [ headline for headline in edited if headline . merge_acquiree () ]
+  if not merging:
+    return []
+  statuses = fetch_link_statuses_of_ids (
+    connection, list ( dict . fromkeys (
+      headline . merge_acquiree () for headline in merging )) )
+  errors = []
+  for headline in merging:
+    where = ( f"⟨{headline . handle}⟩ on line {headline . compact_line_number} "
+              "of the compact view" )
+    entry = statuses . get ( headline . merge_acquiree () )
+    if entry is None or entry [ "status" ] == "missing":
+      errors . append ( f"Error: {where} carries 'merge:"
+                        f"{headline . merge_acquiree ()}', which names no node "
+                        "of the graph." )
+    elif entry [ "status" ] != "resolved":
+      errors . append ( f"Error: {where} carries 'merge:"
+                        f"{headline . merge_acquiree ()}', which names a node "
+                        "the skgrepo restriction hides." )
+    else:
+      headline . merge_title = entry . get ("title")
   return errors
 
 def assign_placed_view_requests (edited, headline_of_handle):
@@ -2712,7 +3890,9 @@ def changed_parts_of_node_occurrence (edited, edited_index, original,
 def claiming_children_keys (outline, index, headline_of_handle):
   """The children of OUTLINE's headline INDEX that are node
   occurrences claiming membership in it, in order: each by its handle,
-  a placed node by ('node', ID), a new headline by ('new', INDEX)."""
+  a placed node by ('node', ID), a new headline by ('new', INDEX). A
+  child claims unless its metadata carries 'noClaim'; in the edited
+  outline, 'detach' and 'attach' in its handle say otherwise."""
   keys = []
   for child_index, child in enumerate (outline):
     if child . parent != index:
@@ -2726,7 +3906,9 @@ def claiming_children_keys (outline, index, headline_of_handle):
     view_line = headline_of_handle . get ( child . handle )
     if ( view_line is not None and view_line . metadata is not None
          and headline_kind ( view_line . metadata ) == "node"
-         and not metadata_has_atom ( view_line . metadata, "noClaim" )):
+         and ( "attach" in child . claim_words () or
+               ( "detach" not in child . claim_words ()
+                 and not metadata_has_atom ( view_line . metadata, "noClaim" )))):
       keys . append ( child . handle )
   return keys
 
@@ -3022,6 +4204,195 @@ def approved_fork_skgrepos_of_confirmation (confirmation, forks):
   return approved
 
 # ------------------------------------------------------------
+# The save's other questions, and the answers its retries carry
+# ------------------------------------------------------------
+
+# The questions a save may ask in place of its result, each answered by
+# a retry of the same save that carries the answer.
+SAVE_QUESTION_TYPES = (
+  "delete-from-confirmation", "strandeds-confirmation",
+  "telescope-hoist-confirmation", "fork-confirmation",
+  "overPrivateText-telescope-confirmation" )
+# How many times one save may be sent: once, and once per question
+# (the Hoist question can come again when a telescope became dirty
+# meanwhile).
+SAVE_ATTEMPTS_LIMIT = 8
+
+class SaveAnswers:
+  """The answers a save carries on its retries, each retry carrying
+  every earlier one, as the clients' do ('skg--save-request-sexp' in
+  'elisp/skg-request-save.el'): 'fork_skgrepos', [(ID, SKGREPO)], the
+  approved forks; 'hoist_pids', the telescopes approved for Hoist;
+  'overPrivateText_pids', those whose text the rerender may release;
+  'strandeds_reset', None until the strandeds are reviewed, then the
+  [(RELATION, RECORDER, MEMBER)] to reset to default; 'delete_from',
+  'visible' or 'all'."""
+  def __init__ (self):
+    self . fork_skgrepos = None
+    self . hoist_pids = None
+    self . overPrivateText_pids = None
+    self . strandeds_reset = None
+    self . delete_from = None
+
+  def request_fields_text (self):
+    """The fields the save request carries for these answers, each
+    after a space."""
+    fields = []
+    if self . fork_skgrepos is not None:
+      fields += [ '(approved-forks . "true")',
+                  "(fork-repos (" + " " . join (
+                    "(" + quote_string (gnid) + " . " + quote_string (skgrepo) + ")"
+                    for gnid, skgrepo in self . fork_skgrepos ) + "))" ]
+    if self . hoist_pids:
+      fields . append ( "(approved-hoist-pids " +
+                        " " . join ( map ( quote_string, self . hoist_pids )) + ")" )
+    if self . overPrivateText_pids:
+      fields . append ( "(approved-overPrivateText-pids " +
+                        " " . join ( map ( quote_string, self . overPrivateText_pids ))
+                        + ")" )
+    if self . strandeds_reset is not None:
+      fields . append ( '(strandeds-reviewed . "true")' )
+      if self . strandeds_reset:
+        fields . append ( "(reset-strandeds " + " " . join (
+          "(" + " " . join ( map ( quote_string, triple )) + ")"
+          for triple in self . strandeds_reset ) + ")" )
+    if self . delete_from is not None:
+      fields . append ( "(delete-from . " + quote_string (self . delete_from) + ")" )
+    return "" . join ( " " + field for field in fields )
+
+def answer_save_question (question, answers, arguments, forks):
+  """Print the save's QUESTION, and record in ANSWERS the answer the
+  command line gives it, so that the save is sent again with it; raise,
+  sending nothing more, when it gives none. '--yes' alone takes the
+  answer that writes nothing more: Abort, cancel, decline. FORKS are
+  what the report predicted, which approves a fork confirmation."""
+  kind = response_type (question)
+  if kind == "fork-confirmation":
+    answers . fork_skgrepos = approved_fork_skgrepos_of_confirmation (question, forks)
+  elif kind == "delete-from-confirmation":
+    answers . delete_from = delete_from_answer (question, arguments . delete_from)
+  elif kind == "strandeds-confirmation":
+    answers . strandeds_reset = strandeds_answer (question, arguments . strandeds)
+  elif kind == "telescope-hoist-confirmation":
+    answers . hoist_pids = hoist_answer (question, arguments . hoist)
+  elif kind == "overPrivateText-telescope-confirmation":
+    answers . overPrivateText_pids = overPrivateText_answer (
+      question, arguments . show_overPrivateText, "the save succeeded, but ",
+      "The save succeeded, but its re-rendered view is withheld; the files "
+      "are out of date. Save again with '--show-overPrivateText' to release "
+      "it, or view the node again." )
+
+def response_text_field (response, field_name):
+  value = response_field (response, field_name)
+  return "" if value is None else sexp_to_text (value)
+
+def delete_from_answer (question, delete_from):
+  """'visible' or 'all', as DELETE_FROM ('--delete-from') says, for a
+  delete-from confirmation ('skg--delete-from-confirmation-handler'):
+  records the skgrepo restriction keeps out name a node the save
+  deletes."""
+  print ( f"Server: delete-from confirmation: "
+          f"{response_text_field (question, 'count')} record(s) the skgrepo "
+          "restriction keeps out name a node this save deletes; nothing was "
+          "written. " + response_text_field (question, "prompt") )
+  if delete_from is None:
+    raise SkgToolError (
+      "Nothing was saved (cancelled): save again with '--delete-from "
+      "visible' to strip the deleted IDs from the records the restriction "
+      "shows only, or '--delete-from all' to strip them from every owned "
+      "record." )
+  print ( "Delete from: " + ( "the visible records only"
+                              if delete_from == "visible"
+                              else "every owned record" ) +
+          "; the save is sent again." )
+  return delete_from
+
+def strandeds_answer (question, strandeds):
+  """The relationships to reset to default, as STRANDEDS
+  ('--strandeds') says, for a strandeds confirmation
+  ('skg--strandeds-confirmation-handler'): 'reset' every listed one,
+  'keep' none. Each is printed as the clients list it."""
+  listed = [
+    tuple ( response_text_field (entry, field)
+            for field in ( "relation", "recorder", "member", "relRepo", "default" ))
+    for entry in ( response_field (question, "strandeds") or [] ) ]
+  print ( f"Server: strandeds confirmation: the save's home skgrepo moves "
+          f"would leave {len (listed)} relationship"
+          f"{'' if len (listed) == 1 else 's'} in their old skgrepos; nothing "
+          "was written." )
+  for relation, recorder, member, relRepo, default in listed:
+    print ( f"  {recorder} {relation} {member}: stays at {relRepo}; its default "
+            f"is now {default}." )
+  if strandeds is None:
+    raise SkgToolError (
+      "Nothing was saved: save again with '--strandeds reset' to move every "
+      "listed relationship to its new default, or '--strandeds keep' to "
+      "leave them where they are." )
+  print ( "Strandeds: " + ( "each is reset to its default"
+                            if strandeds == "reset" else "each stays where it is" )
+          + "; the save is sent again." )
+  return ( [ ( relation, recorder, member )
+             for relation, recorder, member, _, _ in listed ]
+           if strandeds == "reset" else [] )
+
+def hoist_answer (question, hoist):
+  """The telescopes a Hoist confirmation lists, approved when HOIST
+  ('--hoist'); else Abort, which writes nothing
+  ('skg--telescope-hoist-confirmation-handler')."""
+  telescopes = [ ( response_text_field (entry, "pid"),
+                   response_text_field (entry, "home") )
+                 for entry in ( response_field (question, "telescopes") or [] ) ]
+  print ( "Server: Hoist confirmation: " + response_text_field (question, "prompt") )
+  for pid, home in telescopes:
+    print ( f"  {pid}, whose home is '{home}'." )
+  if not hoist:
+    raise SkgToolError (
+      "Nothing was saved (Abort). Save again with '--hoist' to Hoist, or "
+      "repair the '.skg' files by hand." )
+  print ( "Hoist: approved; the save is sent again." )
+  return [ pid for pid, _ in telescopes ]
+
+def overPrivateText_answer (question, show, situation, refusal,
+                            to_stderr = False):
+  """The PIDs an overPrivateText confirmation lists, approved when SHOW
+  ('--show-overPrivateText'); else raise REFUSAL. SITUATION opens what
+  the confirmation says happened. TO_STDERR: printed on standard error,
+  for a command whose standard output is the paths it wrote."""
+  output = sys . stderr if to_stderr else sys . stdout
+  pids = [ sexp_to_text (pid) for pid in ( response_field (question, "pids") or [] ) ]
+  print ( "Server: overPrivateText confirmation: " + situation +
+          "the skgrepo restriction withholds text from overPrivateText "
+          "telescopes" + ( " (" + ", " . join (pids) + ")" if pids else "" ) +
+          " until approved. " + response_text_field (question, "prompt"),
+          file = output )
+  if not show:
+    raise SkgToolError (refusal)
+  print ( "Approved: the request is sent again, releasing that text.",
+          file = output )
+  return pids
+
+def approved_overPrivateText_field (pids):
+  return ( " (approved-overPrivateText-pids " +
+           " " . join ( map ( quote_string, pids )) + ")" )
+
+def request_releasing_overPrivateText (connection, line, show, what):
+  """Send the request LINE and return its response; when the server
+  instead asks to release text from overPrivateText telescopes (under a
+  skgrepo restriction), print the question on standard error and, when
+  SHOW, send LINE again approving it; else raise, saying nothing was
+  WHAT."""
+  response = connection . request (line)
+  if response_type (response) != "overPrivateText-telescope-confirmation":
+    return response
+  pids = overPrivateText_answer (
+    response, show, "",
+    f"Nothing was {what}: the server withholds text from overPrivateText "
+    "telescopes under the skgrepo restriction; run again with "
+    "'--show-overPrivateText' to release it.", to_stderr = True )
+  return connection . request (
+    line [ : -1 ] + approved_overPrivateText_field (pids) + ")" )
+
+# ------------------------------------------------------------
 # The server's answer
 # ------------------------------------------------------------
 
@@ -3083,9 +4454,10 @@ RESPONSE_TYPE_PATTERN = re . compile ( r'^\(\(response-type ([^\s()]+)\)' )
 # The commands that name a sidecar, whose port is the sidecar's.
 SIDECAR_COMMANDS = ( "save", "extend", "close" )
 # The commands that always run in their own process: 'raw' speaks the
-# protocol directly, and 'import' binds its approval to a connection
-# of its own. ('commit' runs here too unless '--yes' answers for it.)
-COMMANDS_NEVER_SENT_TO_A_DAEMON = ( "raw", "import" )
+# protocol directly, 'import' binds its approval to a connection of
+# its own, and 'linkstack' keeps a file, asking the server at most for
+# a title. ('commit' runs here too unless '--yes' answers for it.)
+COMMANDS_NEVER_SENT_TO_A_DAEMON = ( "raw", "import", "linkstack" )
 
 def command_daemon (arguments):
   """Run a daemon for the folder '--out-dir' until it is stopped, or
@@ -3852,33 +5224,28 @@ class SkgConnection:
         return messages
 
   def save_buffer (self, view_id, buffer_text, rendered_at,
-                   diffView_buffer = None, approved_fork_skgrepos = None):
+                   diffView_buffer = None, answers = None):
     """Send a save of BUFFER_TEXT, rendered at the generation
     RENDERED_AT; return every response up to and including the
     terminal one, parsed. DIFFVIEW_BUFFER names the buffer of the diff
     view it is ('all changes', say), if it is one: the server holds no
     view of this connection's, and re-renders the save as that buffer,
     with its readiness summary, only when the request names it.
-    APPROVED_FORK_SKGREPOS, [(ID, SKGREPO)], approves the forks a
-    'fork-confirmation' listed, each original ID with its clone's
-    skgrepo, as the clients' approval re-saves the buffer:
-    '(approved-forks . "true") (fork-repos (("ID" . "SKGREPO") ...))'
-    ('skg--save-request-sexp' in 'elisp/skg-request-save.el')."""
+    ANSWERS, a SaveAnswers, carries the answers to the questions
+    earlier attempts of the same save asked, as the clients' retries
+    carry them ('skg--save-request-sexp' in
+    'elisp/skg-request-save.el')."""
     line = request_line (
       "save buffer", ( "view-id", view_id ), ( "rendered-at", rendered_at ),
       * ( [ ( "diff-view-buffer", diffView_buffer ) ]
           if diffView_buffer is not None else [] ),
       ( "point-lines-below-focused-headline", "0" ),
       ( "point-column", "0" ),
-      ( "point-screen-lines-below-window-start", "0" ),
-      * ( [ ( "approved-forks", "true" ) ]
-          if approved_fork_skgrepos is not None else [] ))
-    if approved_fork_skgrepos is not None:
-      line = line [ : -1 ] + " (fork-repos (" + " " . join (
-        "(" + quote_string (gnid) + " . " + quote_string (skgrepo) + ")"
-        for gnid, skgrepo in approved_fork_skgrepos ) + ")))"
+      ( "point-screen-lines-below-window-start", "0" ))
+    if answers is not None:
+      line = line [ : -1 ] + answers . request_fields_text () + ")"
     return [ parse_sexp (message)
-             for message in self . raw_save (line, buffer_text) ]
+             for message in self . raw_save (line, buffer_text, view_id) ]
 
   def stage_and_commit (self, message, confirmed):
     """Send "stage and commit" with MESSAGE, confirmed when CONFIRMED;
@@ -3893,6 +5260,22 @@ class SkgConnection:
         self . read_message (FIRST_MESSAGE_TIMEOUT_SECONDS) )) != "rerender-done":
       pass
     return response
+
+  def request_then_rerender_stream (self, line):
+    """Send the request LINE, whose response a rerender stream follows
+    ('rerender-lock', 'rerender-view'..., 'rerender-done'); return the
+    response, parsed, after reading the stream. A daemon's connection
+    keeps the rerendered views for the daemon to write."""
+    self . send_line (line)
+    response = parse_sexp ( self . read_message (IMPORT_TIMEOUT_SECONDS) )
+    while response_type ( parse_sexp (
+        self . read_message (FIRST_MESSAGE_TIMEOUT_SECONDS) )) != "rerender-done":
+      pass
+    return response
+
+  def held_views (self):
+    """[(VIEW ID, FILES STEM)] of the views the connection holds."""
+    return []
 
   def extend_diff_view (self, view_id):
     """Send "extend diff view" for VIEW_ID; return its
@@ -3913,13 +5296,15 @@ class SkgConnection:
            and sexp_to_text ( response_field (message, "view-id") ) == view_id ):
         rerendered = message
 
-  def raw_save (self, line, buffer_text):
+  def raw_save (self, line, buffer_text, saved_view_id = None):
     """Send the save request LINE with BUFFER_TEXT as its saved buffer;
     return the text of every response up to and including the terminal
-    one."""
+    one. The envelope's 'other-views' lists the connection's other
+    views ('other_views_text'), those but SAVED_VIEW_ID."""
+    other_views = self . other_views_text (saved_view_id)
     self . send_line (line)
     envelope = ( "((saved-buffer " + quote_string (buffer_text) +
-                 ") (other-views ()))" ) . encode ("utf-8")
+                 ") (other-views " + other_views + "))" ) . encode ("utf-8")
     self . socket . sendall (
       f"Content-Length: {len (envelope)}\r\n\r\n" . encode () + envelope )
     messages = []
@@ -3929,6 +5314,11 @@ class SkgConnection:
       if ( response_type ( parse_sexp (message) )
            in SAVE_TERMINAL_RESPONSE_TYPES ):
         return messages
+
+  def other_views_text (self, saved_view_id):
+    """The 'other-views' of a save's envelope: every other view the
+    client holds live, a command's own connection none."""
+    return "()"
 
   def send_line (self, line):
     self . socket . sendall ( line . encode ("utf-8") + b"\n" )
@@ -4012,6 +5402,9 @@ class DaemonConnection (SkgConnection):
   def holds_view (self, view_id):
     return view_id in self . files_stem_of_held_view
 
+  def held_views (self):
+    return list ( self . files_stem_of_held_view . items () )
+
   def holds_view_for_other_files (self, view_id, directory, base_name):
     held_files_stem = self . files_stem_of_held_view . get (view_id)
     return ( held_files_stem is not None
@@ -4076,6 +5469,31 @@ class DaemonConnection (SkgConnection):
 
   def handle_unprompted_message (self, payload):
     self . waiting_messages . append (( payload, None ))
+
+  def other_views_text (self, saved_view_id):
+    """Every held view but SAVED_VIEW_ID, as the clients list their
+    other buffers ('skg--other-view-buffer-snapshots'): one whose
+    compact view has unsaved edits is dirty, its baseline the full view
+    and its current text the buffer its save would send; the server
+    refuses a save that would change what a dirty view shows. One
+    whose files cannot be read is left clean: the daemon closes it
+    when it next rewrites it."""
+    entries = []
+    for view_id, files_stem in self . files_stem_of_held_view . items ():
+      if view_id == saved_view_id:
+        continue
+      try:
+        saved_view = SavedView ( files_stem + ".view.json" )
+      except ( OSError, ValueError ):
+        saved_view = None
+      if saved_view is None or not compact_view_has_edits (saved_view):
+        entries . append ( "((view-id " + quote_string (view_id) + ") (dirty false))" )
+        continue
+      entries . append (
+        "((view-id " + quote_string (view_id) + ") (dirty true) (baseline (present "
+        + quote_string (saved_view . full_text) + ")) (current "
+        + quote_string ( current_buffer_of_edited_view (saved_view) ) + "))" )
+    return "(" + " " . join (entries) + ")"
 
   def observe_message (self, payload):
     kind = payload_response_type (payload)

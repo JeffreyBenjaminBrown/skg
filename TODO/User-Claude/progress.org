@@ -2334,3 +2334,181 @@ rebuilt by cargo-watch and reports "Server ready".
 - The recovery's "discard and redraw" step needs the buffer marked
   unmodified first, since the rerender now skips a dirty buffer; the
   docs say so.
+* Plan 10, the rest: the audit's gaps closed in the tool: DONE, uncommitted
+** What was done
+Every gap row of the README's audit table now says how the tool does
+it; no row says "gap". Only 'tools/skg-for-ai/' changed
+('skg_for_ai.py', 'test_skg_for_ai.py', 'README.org'); no Rust, elisp
+or Lua.
+*** The save's questions
+'command_save' now sends the save in a loop: when the terminal message
+is one of 'SAVE_QUESTION_TYPES', 'answer_save_question' prints it and
+records the answer in a 'SaveAnswers', and the same save is sent again
+carrying it and every earlier answer, as 'skg--save-request-sexp'
+does ('SaveAnswers.request_fields_text': 'approved-forks' and
+'fork-repos', 'approved-hoist-pids', 'approved-overPrivateText-pids',
+'strandeds-reviewed' and 'reset-strandeds', 'delete-from'). The
+answers: '--delete-from visible|all'; '--strandeds reset|keep' (each
+stranded relationship is listed as the clients list it); '--hoist';
+'--show-overPrivateText' for the save-rerender release; the fork
+confirmation as before. Without its flag, '--yes' takes the answer
+that writes nothing more (cancel, quit, Abort, decline) and the tool
+stops naming the flag. 'SkgConnection.save_buffer' takes the answers
+in place of 'approved_fork_skgrepos'.
+*** Other views' unsaved edits
+'raw_save' fills the envelope's 'other-views' from
+'other_views_text'. A command's own connection holds no view, so it
+stays '()'; the daemon's ('DaemonConnection.other_views_text') lists
+every other held view, clean, or, when its compact view has edits,
+dirty with the full view as baseline and 'current_buffer_of_edited_view'
+as current, as 'skg--other-view-buffer-snapshots' does. The server
+then refuses a save that touches what a dirty held view shows. A held
+view whose handles are in error makes such a save fail with a message
+naming it.
+*** Words in a handle
+New words, each mirroring a client command, each with report lines
+and errors ('request_report_lines', 'request_token_problems',
+'outline_word_check'):
+- 'detach' / 'attach' (C-c s t / a): write or remove 'noClaim'; refused
+  where the parent reads no claims ('reads_claims', now shared with
+  'is_pending_detachment') or where the headline already claims (or
+  does not). Fork prediction reads them ('claiming_children_keys').
+- 'write-protect' (C-c s w), with 'subtree' 'writeProtectedSubtreeView'
+  (C-c s W).
+- 'merge:ID' (C-c s m): '(merge ID)', the acquiree's title resolved as
+  a placed node's ('resolve_merge_acquirees').
+- 'relRepo:NAME' (C-c s r): '(relRepo NAME)', refused as
+  'skg--rel-at-point' refuses (a root, a write-protected parent, a
+  folder whose relationships belong to the other end).
+- 'noSearchMatching' / 'searchMatching' (C-c s x): '(flag
+  noSearchMatching true|false)'.
+- 'repo:NAME' (C-c s s): rewrites '(nodeRepo ...)'; '⟨new repo:NAME⟩'
+  gives a new headline its skgrepo, as 'skg--populate-minimal-node-metadata'.
+- 'subtree', the C-u forms ('expand_subtree_words'): 'delete subtree'
+  ('skg-delete-recursive'), 'ready|unready subtree' (C-u C-c r r; on a
+  home skgrepo move, C-u C-c r h), 'repo:NAME subtree' (C-c s S),
+  'relRepo:NAME subtree' (C-c s R), 'noSearchMatching subtree' (C-u
+  C-c s x), each walking the edited outline as the client's walk does.
+  What a walk leaves out is a 'Not moved:' or 'Skipped:' line.
+Metadata parts are placed by 'metadata_parts_following', read from
+'parts' in 'shared/metadata-fields.json' ('METADATA_PARTS'), which
+'metadata_text_with_part' now matches on atoms too.
+*** Commands and options
+- 'search --regex --body --operators' (C-c f i).
+- 'delete-references ID' (C-c d a): nothing sent without '--yes'; the
+  links confirmation is printed and approved by '--leave-links'
+  ('request_then_rerender_stream' reads the stream that follows).
+- 'restrict [NAME] [--foreign shown|hidden]' (C-c v l,
+  'skg-list-repo-sets'): prints on any connection, sets only through a
+  daemon; refused while a held view has unsaved edits
+  ('refuse_while_held_views_have_edits', also used by
+  'delete-references').
+- '--show-overPrivateText' on the view commands
+  ('request_releasing_overPrivateText', and the save behind 'forest'),
+  on search (include, else exclude), on 'save' and on 'restrict'.
+- 'linkstack push|show|paste|pop' (C-c u, C-c v s, C-c o, C-c O): the
+  stack is 'skg-for-ai.linkstack.org' in '--out-dir', in the format of
+  the clients' linkstack buffer; paste and pop print what to write.
+- 'import --host-root PATH'.
+- A search with no match now says "No matches found" instead of "The
+  server's view carries no 'rendered-at'" (an older bug).
+*** Documentation
+README: "Start here" points at the words; "Running it" documents the
+three commands and every new option; "How the compact view becomes a
+buffer" lists the words; new "Words in a handle" (a section per word)
+and "The skgrepo restriction and overPrivateText"; "The report", "The
+server's answer" (the questions and their flags), "The daemon"
+(other-views, 'restrict', 'delete-references'), "Marking changes
+ready" ('subtree'), "Tests", and the audit table, realigned. The
+tool's and the test's docstrings.
+** Tests
+'python3 tools/skg-for-ai/test_skg_for_ai.py': PASS (about 64 s, up
+from 43 s). 'cargo check --all-targets' clean. New:
+- reading server: 'check_search_options', 'check_linkstack',
+  'check_restriction_on_a_command_s_own_connection';
+- a new fourth server, 'failures_of_more_words': detach and attach,
+  write-protect (and subtree), the flag words (and subtree, skipping
+  two foreign nodes), merge, delete subtree, misplaced words;
+- reviewing server: 'check_marking_a_subtree_ready';
+- daemon server: 'check_daemon_declares_its_unsaved_views' (a save
+  beside a dirty held view is refused, naming it; then undone, so the
+  next case saves as before);
+- a new seventh server, 'failures_of_two_owned_skgrepos', whose fixture
+  gains an owned 'private' ('add_private_skgrepo',
+  'PRIVATE_SKGREPO_FILES': an overPrivateText telescope, a private note,
+  a private branch and leaf, a node naming an absent ID), both owned
+  skgrepos gitrepos, through a daemon: restrict, overPrivateText view,
+  search and save release, delete-from, foreign hidden and shown,
+  Hoist, relRepo (and subtree), repo with strandeds, '⟨new
+  repo:NAME⟩', repo subtree, like moves ready, delete-references.
+'failures_on_a_scratch_server' takes 'with_private_skgrepo'; the
+shared fixture is unchanged.
+** Live check
+Read-only on 1731, bypassing any daemon: 'search inbox' 5 hits,
+'--body' 174; 'inbo.* --regex' 8; '"to Ed" --operators' 2 (Ed's clone
+and Jeff's original), the same words without it 1000. Nothing was
+saved there; Ed's server was not started.
+** Deviations
+*** '--yes' alone answers with the choice that writes nothing
+For delete-from that is cancel, not "visible"; for strandeds, quit,
+not "none". Both write; the brief's "safe default" read as "writes
+nothing more".
+*** 'relRepo:NAME subtree' takes its kind from where it is written
+The client asks for one of three kinds in a menu. Here the headline
+decides: a node sets its content relationships, a subscribee folder
+its subscriptions, an overridden folder its overrides. So the
+subscriptions of every subscribee folder in a node's content subtree
+take one gesture per folder.
+*** 'ready subtree' on a move headline is C-u C-c r h
+The readiness words stay explicit ('ready' marks, 'unready' unmarks),
+not a toggle; on a '⌂ -OLD +NEW' headline 'subtree' means "every like
+move in the moved node's subtree", elsewhere the subtree of changes.
+*** Some client messages are errors here
+'repo:NAME' on a write-protected occurrence, or naming the node's own
+skgrepo; 'detach' on a headline claiming nothing; 'attach' on one
+claiming: the clients say so in the echo area and do nothing, the
+tool stops the save. A 'subtree' that gives a headline a second edit
+request is an error too, but the flag's subtree skips such a node, as
+its client walk does.
+*** 'delete-references' sends nothing without '--yes'
+The server asks first only when links point at the ID; otherwise the
+first request writes. So a run without '--yes' cannot preview; it
+says what it would do.
+*** 'restrict' sets only through a daemon
+A command's own connection ends with the command, so a restriction
+set on it would govern nothing.
+*** overPrivateText beyond the save
+The brief named the save-rerender approval; once 'restrict' exists, a
+view, a 'forest' save and a search under a restriction ask too, so
+'--show-overPrivateText' answers those as well.
+** What's imperfect
+- The release of a save's withheld rerender sends the save again, as
+  the clients do; when the save made a new node, that re-send is
+  refused as stale (the first attempt wrote the parent), so the files
+  stay out of date. Checked by hand on a scratch server; the tool then
+  says the save happened. See the open question.
+- A dirty held view's current text, in 'other-views', is rebuilt
+  without the 'subtree' expansion, and a placed node's title as typed;
+  the server's dependencies are IDs, so this should not matter.
+- 'relRepo:NAME' does not ask 'relRepo info' for the relationship's
+  default, as 'skg-set-relRepo' does to narrow its menu; the server's
+  floor check refuses a NAME too public.
+- Untested: '--delete-from all'; the 'Not moved:' note; 'relRepo:NAME
+  subtree' on a folder; the overPrivateText question behind 'forest'.
+- Search hits that rank alike come in no fixed order, so the search
+  tests compare sets.
+- 'linkstack push' asks the server for a title on a connection of its
+  own, not through a daemon (it never routes to one).
+** Open questions
+*** Releasing a withheld rerender without re-sending the save
+A save-rerender 'overPrivateText-telescope-confirmation' comes after
+the save has been written, and the protocol's only approval is the
+same save again, which the stale check refuses whenever the save made
+a node (and would make it twice if it did not). A request that
+releases the withheld rerender, or a retry the server recognizes as
+the same save, needs a server change. Also in 'TODO/problems.org'.
+*** Should '--yes' alone answer delete-from with "visible"?
+It writes, but keeps the hidden records as they are.
+*** Should 'relRepo:NAME subtree' take a kind word?
+E.g. 'relRepo:NAME subtree subscribee' on a node, as the client's menu
+allows.

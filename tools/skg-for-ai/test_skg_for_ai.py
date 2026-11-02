@@ -21,7 +21,9 @@ In order, it:
   full view;
 - sends a 'repos' and a 'herald rules' request through 'raw' (the
   served rule table is the pinned one), and imports a Markdown file
-  through 'import';
+  through 'import'; searches with each search option; pushes, pastes
+  and pops the linkstack; prints the restriction, and refuses to set
+  it without a daemon;
 - on a second scratch server, edits compact views and saves them:
   a title, a body, a new child, a move, a removal, a deletion, bad
   handles, an edit the server refuses, a stale view the server
@@ -40,15 +42,21 @@ In order, it:
   overrides it), forks an owned node with 'fork' (refused beside
   another edit, then approved), and subscribes and hides by editing a
   subscribee folder;
-- on a fourth scratch server, whose owned skgrepo is a gitrepo with the
+- on a fourth scratch server, writes the words of a handle:
+  'detach' and 'attach', 'write-protect' (and 'subtree'),
+  'noSearchMatching' and 'searchMatching' (and 'subtree', skipping
+  foreign nodes), 'merge:ID', 'delete subtree', and words refused where
+  they stand;
+- on a fifth scratch server, whose owned skgrepo is a gitrepo with the
   fixture committed: saves a retitle, a new child and a deletion,
   checks the diff view's compact buffer exactly, marks the new child
   ready, restores the deleted node, and commits (refused unconfirmed,
   then confirmed with '--yes'), checking 'git log' and that the diff
   view is then empty; then extends a diff buffer to a change it does not
-  make editable, and saves an edit of it; a blank commit message is
-  refused unsent;
-- on a fifth scratch server, also over a gitrepo, runs a daemon:
+  make editable, and saves an edit of it; marks and unmarks a subtree's
+  changes with 'ready subtree' and 'unready subtree'; a blank commit
+  message is refused unsent;
+- on a sixth scratch server, also over a gitrepo, runs a daemon:
   commands through it write what they write on their own connections;
   it rewrites a held view after a save through it changes a node the
   view shows, and after a second server over the same data root saves
@@ -59,7 +67,16 @@ In order, it:
   second daemon for the port is refused; 'commit --yes' through it, and
   an interactive 'commit' beside it, each rewrite its held buffer of
   the diff view; 'close' and 'daemon --stop' release its views; a
-  socket a killed daemon left is replaced, and SIGTERM stops a daemon.
+  socket a killed daemon left is replaced, and SIGTERM stops a daemon;
+- on a seventh scratch server, whose fixture gains a second owned
+  skgrepo, 'private' ('add_private_skgrepo'), both gitrepos, through a
+  daemon: restricts the connection, and under it views, searches and
+  saves with overPrivateText text withheld and then released, deletes
+  a node a private record names (delete-from), and hides and shows the
+  foreign skgrepos; then Hoists a telescope's title home, sets
+  relRepos, moves nodes between the owned skgrepos (the strandeds
+  question; '⟨new repo:NAME⟩'; 'repo:NAME subtree'), marks like moves
+  ready, and removes the references to an absent node.
 '--update-expected' rewrites the expected files instead of comparing.
 """
 
@@ -240,7 +257,7 @@ def failures_of_reworded_pairing ():
   errors = skg_for_ai . handle_error_lines (
     edited [ 1 : ], { "0c" : original [2] } )
   if errors != [ "Error: ⟨new⟩ on line 5 of the compact view carries "
-                 "'delete'; it takes no other word." ]:
+                 "'delete'; it takes no other word but one 'repo:NAME'." ]:
     failures . append ( f"the '⟨new⟩' errors are {errors}" )
   return failures
 
@@ -301,9 +318,10 @@ def shared_herald_cases ():
 def failures_against_scratch_servers (update_expected):
   """The reading checks on one scratch server, then the writing
   checks on another, then the placing and forking checks on a third,
-  then the reviewing checks on a fourth, then the daemon's on a fifth,
-  the last two with their owned skgrepo a gitrepo; each on its own
-  copy of the fixture."""
+  then the other words' on a fourth, then the reviewing checks on a
+  fifth, then the daemon's on a sixth, then those of two owned
+  skgrepos on a seventh, the last three with their owned skgrepos
+  gitrepos; each on its own copy of the fixture."""
   if not os . path . exists (SERVER_BINARY):
     return [ f"no server binary at {SERVER_BINARY}; run 'cargo build --bin skg'" ]
   return ( failures_on_a_scratch_server (
@@ -311,25 +329,34 @@ def failures_against_scratch_servers (update_expected):
                failures_of_reading (scratch, data_root, update_expected) )
            + failures_on_a_scratch_server (failures_of_writing)
            + failures_on_a_scratch_server (failures_of_placing_and_forking)
+           + failures_on_a_scratch_server (failures_of_more_words)
            + failures_on_a_scratch_server (
                failures_of_reviewing, owned_skgrepo_in_git = True )
            + failures_on_a_scratch_server (
-               failures_of_daemon, owned_skgrepo_in_git = True ) )
+               failures_of_daemon, owned_skgrepo_in_git = True )
+           + failures_on_a_scratch_server (
+               failures_of_two_owned_skgrepos, owned_skgrepo_in_git = True,
+               with_private_skgrepo = True ) )
 
-def failures_on_a_scratch_server (check, owned_skgrepo_in_git = False):
+def failures_on_a_scratch_server (check, owned_skgrepo_in_git = False,
+                                  with_private_skgrepo = False):
   """CHECK (SCRATCH, DATA_ROOT)'s failures, run against a server on a
   fresh copy of the fixture in the scratch folder SCRATCH. With
-  OWNED_SKGREPO_IN_GIT, the owned skgrepo is first made a gitrepo
-  whose HEAD commit holds the fixture's files, as the diff view
-  needs."""
+  WITH_PRIVATE_SKGREPO, the copy gains a second owned skgrepo
+  ('add_private_skgrepo'). With OWNED_SKGREPO_IN_GIT, each owned
+  skgrepo is first made a gitrepo whose HEAD commit holds its files,
+  as the diff view needs."""
   if port_is_listening (PORT):
     return [ f"port {PORT} is taken; set SKG_FOR_AI_TEST_PORT" ]
   scratch = tempfile . mkdtemp ( prefix = "skg-for-ai-test-" )
   data_root = os . path . join (scratch, "data")
   shutil . copytree (FIXTURE_FOLDER, data_root)
   set_port_in_config ( os . path . join (data_root, "skgconfig.toml"), PORT )
+  if with_private_skgrepo:
+    add_private_skgrepo (data_root)
   if owned_skgrepo_in_git:
-    commit_fixture_in_new_gitrepo ( os . path . join (data_root, "me", "main") )
+    for owned in [ "main" ] + ( [ "private" ] if with_private_skgrepo else [] ):
+      commit_fixture_in_new_gitrepo ( os . path . join (data_root, "me", owned) )
   server_log_path = os . path . join (scratch, "server.log")
   with open (server_log_path, "w") as server_log:
     server = subprocess . Popen (
@@ -355,8 +382,88 @@ def failures_of_reading (scratch, data_root, update_expected):
     failures += failures_of_one_run (
       base_name, tool_arguments, view_id, output_folder, update_expected )
   failures += failures_of_raw_and_import (scratch)
+  for check in [ check_search_options, check_linkstack,
+                 check_restriction_on_a_command_s_own_connection ]:
+    try:
+      check (scratch)
+    except CaseFailure as failure:
+      failures . append ( check . __name__ + ": " + str (failure) )
   failures += failures_of_changed_skg_files (data_root)
   return failures
+
+def hit_titles (folder, base_name):
+  """The titles of the top-level headlines of a search buffer's compact
+  view: its hits."""
+  return [ line [ 2 : line . index (" ⟨") ]
+           for line in read_file ( os . path . join (
+             folder, base_name + ".compact.org" )) . split ("\n")
+           if line . startswith ("* ") ]
+
+def check_search_options (scratch):
+  """'--body' finds a word only a body holds, '--regex' reads a term as
+  a regular expression over the lowercased words, and '--operators'
+  keeps Tantivy's syntax, which here narrows what the same words find
+  without it. A search with no match writes nothing and says so."""
+  folder = os . path . join (scratch, "search-options")
+  completed = run_tool ([ "search", "unnumbered", "--out-dir", folder ])
+  require_output ( completed, "", expected_returncode = 1 )
+  require_equal ( "a search with no match, on stderr", completed . stderr,
+                  "skg_for_ai: The server returned no view: No matches found.\n" )
+  for arguments, base_name, titles in [
+      ( [ "unnumbered", "--body" ], "search_unnumbered", [ "First child" ] ),
+      ( [ "fre.*", "--regex" ], "search_fre.",
+        [ "An aside of Fred's", "Fred's note", "A detail of Fred's" ] ),
+      ( [ '"Fred s note" OR aside', "--operators" ],
+        "search_Fred-s-note-OR-aside", [ "Fred's note", "An aside of Fred's" ] ),
+      ( [ '"Fred s note" OR aside' ], "search_Fred-s-note-OR-aside",
+        [ "An aside of Fred's", "Fred's note", "A detail of Fred's" ] ) ]:
+    require_tool_run ([ "search" ] + arguments + [ "--out-dir", folder ])
+    # sorted: hits that rank alike come in no fixed order
+    require_equal ( "the hits of 'search " + " " . join (arguments) + "'",
+                    sorted ( hit_titles (folder, base_name) ), sorted (titles) )
+  require_equal ( "the sidecar's request of a search with options",
+                  read_sidecar (folder, "search_fre.") [ "request" ],
+                  { "terms" : "fre.*", "regex" : True } )
+
+def check_linkstack (scratch):
+  """The linkstack, a file in '--out-dir': pushed IDs take the node's
+  title, a pushed link its label; 'paste' prints from the top entry,
+  'pop' prints and removes it; an ID the graph lacks is refused."""
+  folder = os . path . join (scratch, "linkstack")
+  def linkstack (*arguments):
+    return run_tool ( [ "linkstack" ] + list (arguments) + [ "--out-dir", folder ] )
+  require_output ( linkstack ("show"), "The linkstack is empty.\n" )
+  require_output ( linkstack ("push", "shared-id"),
+                   "Pushed: 'Contained twice' (shared-id).\n" )
+  require_output ( linkstack ("push", "[[id:root-id][the root]]"),
+                   "Pushed: 'the root' (root-id).\n" )
+  require_output ( linkstack ("show"),
+                   "* the root\nroot-id\n* Contained twice\nshared-id\n" )
+  require_output ( linkstack ("paste", "link"), "[[id:root-id][the root]]\n" )
+  require_output ( linkstack ("paste", "id"), "root-id\n" )
+  require_output ( linkstack ("pop", "node"), "the root ⟨node:root-id⟩\n" )
+  require_output ( linkstack ("pop", "link"), "[[id:shared-id][Contained twice]]\n" )
+  completed = linkstack ("pop", "id")
+  require_output ( completed, "", expected_returncode = 1 )
+  require_equal ( "popping an empty linkstack, on stderr", completed . stderr,
+                  "skg_for_ai: The linkstack is empty.\n" )
+  completed = linkstack ("push", "nobody-id")
+  require_output ( completed, "", expected_returncode = 1 )
+  require_equal ( "pushing an ID the graph lacks, on stderr", completed . stderr,
+                  "skg_for_ai: The server gives no title for nobody-id: it "
+                  "names no node of the graph.\n" )
+
+def check_restriction_on_a_command_s_own_connection (scratch):
+  """'restrict' prints the skgrepo restriction a connection starts with
+  and the rungs; setting it needs a daemon, whose connection keeps
+  it."""
+  require_output ( run_tool ([ "restrict" ]),
+                   "Skgrepo restriction: main (no restriction); available: "
+                   "main (no restriction).\n" )
+  completed = run_tool ([ "restrict", "main" ])
+  require_output ( completed, "", expected_returncode = 1 )
+  if "start a daemon" not in completed . stderr:
+    raise CaseFailure ( f"stderr was {completed . stderr!r}" )
 
 def failures_of_one_run (base_name, tool_arguments, expected_view_id,
                          output_folder, update_expected):
@@ -899,14 +1006,13 @@ def require_kept_handles (what, before, after, retitled, new_titles):
       raise CaseFailure (
         f"after {what}, '{title}' has the handles {new_handles}, among {before}" )
 
-def compact_line_starting (folder, start):
-  """The one line of the root view's compact file that starts with
-  START."""
-  lines = [ line for line in read_compact (folder) . split ("\n")
-            if line . startswith (start) ]
+def compact_line_starting (folder, start, base_name = ROOT_BASE_NAME):
+  """The one line of the compact file BASE_NAME (by default the root
+  view's) that starts with START."""
+  compact = read_file ( os . path . join (folder, base_name + ".compact.org") )
+  lines = [ line for line in compact . split ("\n") if line . startswith (start) ]
   if len (lines) != 1:
-    raise CaseFailure (
-      f"{len (lines)} lines start {start!r}:\n{read_compact (folder)}" )
+    raise CaseFailure ( f"{len (lines)} lines start {start!r}:\n{compact}" )
   return lines [0]
 
 # ============================================================
@@ -1255,6 +1361,263 @@ def check_subscribing_and_hiding_by_placing (context):
                   skg_list (context, "elsewhere-id", "hidesFromSubs"),
                   [ "fred-detail-id" ] )
 
+# ============================================================
+# More words: each case views a node afresh, writes words in handles,
+# saves, and checks the report and the graph, on the graph the earlier
+# ones left.
+# ============================================================
+
+def failures_of_more_words (scratch, data_root):
+  context = { "scratch"   : scratch,
+              "main_repo" : os . path . join (data_root, "me", "main") }
+  for case in [ check_detaching_and_attaching, check_write_protecting,
+                check_search_matching, check_merging, check_deleting_a_subtree,
+                check_misplaced_words ]:
+    try:
+      case (context)
+    except CaseFailure as failure:
+      return [ case . __name__ + ": " + str (failure) ]
+  return []
+
+def check_detaching_and_attaching (context):
+  """'detach' takes a child out of its parent's list and keeps it in
+  the view, unwarranted ('⊥'); 'attach' puts it back. Either is
+  refused where the parent reads no claims, and where the headline
+  already claims (or does not) what it asks."""
+  folder = fresh_root_view (context, "detach")
+  edit_compact ( folder, [ ( "*** Contained twice ⟨0e 2aC⟩",
+                             "*** Contained twice ⟨0e 2aC detach⟩" ) ])
+  require_output (
+    run_save (folder, "--yes"),
+    REPORT_HEAD +
+    "Detach: ⟨0e⟩ 'Contained twice', from ⟨0d⟩ 'First child', as 'noClaim': "
+    "the save takes it out of its parent's list, and the view still shows "
+    "it.\n" + saved_line (0) + written_paths (folder) )
+  require_equal ( "the parent's content after 'detach'",
+                  skg_list (context, "child-a-id", "contains"), [] )
+  require_in_compact ( folder, "** First child ⟨0d⟩\n"
+                               "A body line that stays unnumbered.\n"
+                               "*** Contained twice ⟨0e ⊥ 1C⟩\n" )
+  edit_compact ( folder, [ ( "*** Contained twice ⟨0e ⊥ 1C⟩",
+                             "*** Contained twice ⟨0e ⊥ 1C attach⟩" ) ])
+  require_output (
+    run_save (folder, "--yes"),
+    REPORT_HEAD +
+    "Attach: ⟨0e⟩ 'Contained twice', to ⟨0d⟩ 'First child': the save puts it "
+    "in its parent's list.\n" + saved_line (0) + written_paths (folder) )
+  require_equal ( "the parent's content after 'attach'",
+                  skg_list (context, "child-a-id", "contains"), [ "shared-id" ] )
+  edit_compact ( folder, [ ( "*** Contained twice ⟨0e 2aC⟩",
+                             "*** Contained twice ⟨0e 2aC attach⟩" ),
+                           ( "*** Above the root ⟨0c ☮ Cb⟩",
+                             "*** Above the root ⟨0c ☮ Cb detach⟩" ) ])
+  require_output (
+    run_save (folder, "--yes"),
+    REPORT_HEAD +
+    "Error: ⟨0c⟩ on line 6 of the compact view carries 'detach', but its "
+    "parent reads no claims (it is write-protected, or no editable node), so "
+    "no child claims membership of it.\n"
+    "Error: ⟨0e⟩ on line 9 of the compact view carries 'attach', but claims "
+    "membership already.\n",
+    expected_returncode = 1 )
+
+def check_write_protecting (context):
+  """'write-protect' makes an occurrence write-protected, keeping its
+  children's editability; 'write-protect subtree' makes its content
+  subtree write-protected too. Neither writes a file. 'write-protect'
+  beside 'editable', or on a folder, is refused."""
+  folder = fresh_root_view (context, "write-protect")
+  graph_before = skg_files (context)
+  edit_compact ( folder, [ ( "** First child ⟨0d aC1⟩",
+                             "** First child ⟨0d aC1 write-protect⟩" ) ])
+  require_output (
+    run_save (folder, "--yes"),
+    REPORT_HEAD +
+    "Write-protect: ⟨0d⟩ 'First child', as '(viewRequests "
+    "writeProtectedView)': after saving its edits, the save makes it "
+    "write-protected.\n" + saved_line (0) + written_paths (folder) )
+  require_in_compact ( folder, "** First child ⟨0d ☮B aC1⟩\n"
+                               "*** Contained twice ⟨0e 2aC⟩\n" )
+  folder = fresh_root_view (context, "write-protect-subtree")
+  edit_compact ( folder, [ ( "** First child ⟨0d aC1⟩",
+                             "** First child ⟨0d aC1 write-protect subtree⟩" ) ])
+  require_output (
+    run_save (folder, "--yes"),
+    REPORT_HEAD +
+    "Write-protect: ⟨0d⟩ 'First child', as '(viewRequests "
+    "writeProtectedSubtreeView)': after saving the edits, the save makes it "
+    "and every occurrence of its content subtree write-protected.\n"
+    + saved_line (0) + written_paths (folder) )
+  require_in_compact ( folder, "** First child ⟨0d ☮B aC1⟩\n"
+                               "*** Contained twice ⟨0e ☮ 2aC⟩\n" )
+  require_equal ( "the graph after write-protecting", skg_files (context),
+                  graph_before )
+  folder = fresh_root_view (context, "write-protect-refused")
+  edit_compact ( folder, [ ( "** First child ⟨0d aC1⟩",
+                             "** First child ⟨0d aC1 write-protect editable⟩" ),
+                           ( "** ⟨0b ☮ These contain it.⟩",
+                             "** ⟨0b ☮ These contain it. write-protect⟩" ) ])
+  require_output (
+    run_save (folder, "--yes"),
+    REPORT_HEAD +
+    "Error: ⟨0b⟩ on line 5 of the compact view carries 'write-protect', but "
+    "is not a node occurrence; only a node takes it.\n"
+    "Error: ⟨0d⟩ on line 7 of the compact view carries both 'write-protect' "
+    "and 'editable'.\n",
+    expected_returncode = 1 )
+
+def check_search_matching (context):
+  """'noSearchMatching' sets the node's flag, 'searchMatching' clears
+  it. 'noSearchMatching subtree' sets it on the node and every member
+  occurrence below, skipping the foreign ones, which it names."""
+  folder = fresh_root_view (context, "search-matching")
+  edit_compact ( folder, [ ( "** First child ⟨0d aC1⟩",
+                             "** First child ⟨0d aC1 noSearchMatching⟩" ) ])
+  require_output (
+    run_save (folder, "--yes"),
+    REPORT_HEAD +
+    "Search matching: ⟨0d⟩ 'First child', as '(flag noSearchMatching true)': "
+    "the node no longer matches searches.\n"
+    + saved_line (0) + written_paths (folder) )
+  require_equal ( "the flags after 'noSearchMatching'",
+                  skg_list (context, "child-a-id", "flags"), [ "NoSearchMatching" ] )
+  edit_compact ( folder, [ ( "** First child ⟨0d aC1 F1⟩",
+                             "** First child ⟨0d aC1 F1 searchMatching⟩" ) ])
+  require_output (
+    run_save (folder, "--yes"),
+    REPORT_HEAD +
+    "Search matching: ⟨0d⟩ 'First child', as '(flag noSearchMatching false)': "
+    "the node matches searches again.\n"
+    + saved_line (0) + written_paths (folder) )
+  require_equal ( "the flags after 'searchMatching'",
+                  skg_list (context, "child-a-id", "flags"), [] )
+  edit_compact ( folder, [ ( "*** Contained twice ⟨0e 2aC⟩\n",
+                             "*** Contained twice ⟨0e 2aC⟩\n"
+                             "*** Fred's ⟨node:fred-note-id⟩\n" ) ])
+  require_save_succeeds (folder)
+  root = compact_line_starting (folder, "* The fixture root ⟨0a ")
+  edit_compact ( folder, [ ( root, root [ : -1 ] + " noSearchMatching subtree⟩" ) ])
+  completed = run_save (folder, "--yes")
+  require_equal ( "the report of 'noSearchMatching subtree'",
+                  [ line for line in completed . stdout . split ("\n")
+                    if line . startswith ( ( "Search matching:", "Skipped:" ) ) ],
+                  [ "Search matching: ⟨0a⟩ 'The fixture root', as '(flag "
+                    "noSearchMatching true)': the node no longer matches searches.",
+                    "Search matching: ⟨0d⟩ 'First child', as '(flag "
+                    "noSearchMatching true)': the node no longer matches searches.",
+                    "Search matching: ⟨0e⟩ 'Contained twice', as '(flag "
+                    "noSearchMatching true)': the node no longer matches searches.",
+                    "Search matching: ⟨0f⟩ 'Second child, a subscriber', as "
+                    "'(flag noSearchMatching true)': the node no longer matches "
+                    "searches.",
+                    "Skipped: 'noSearchMatching subtree' on ⟨0a⟩ leaves ⟨0k⟩ "
+                    "'Fred's note' (foreign), ⟨0l⟩ 'A detail of Fred's' "
+                    "(foreign)." ] )
+  for node_id in [ "root-id", "child-a-id", "shared-id", "child-b-id" ]:
+    require_equal ( node_id + "'s flags after 'noSearchMatching subtree'",
+                    skg_list (context, node_id, "flags"), [ "NoSearchMatching" ] )
+
+def check_merging (context):
+  """'merge:ID' makes the node acquire the node ID by a nodeMerge: the
+  acquiree's file goes, and its ID becomes one of the acquirer's. An ID
+  the graph lacks is refused before any save."""
+  folder = os . path . join ( context [ "scratch" ], "write", "merge" )
+  require_tool_run ([ "view", "elsewhere-id", "--out-dir", folder, "--no-summary" ])
+  base_name = "view_elsewhere-id"
+  head = ( "Changes in view_elsewhere-id.compact.org, against "
+           "view_elsewhere-id.full.org (view ID content-view:elsewhere-id):\n" )
+  root = compact_line_starting (folder, "* A second container", base_name)
+  edit_compact ( folder, [ ( root, root [ : -1 ] + " merge:nobody-id⟩" ) ], base_name )
+  require_output (
+    run_save (folder, "--yes"),
+    head + "Error: ⟨0a⟩ on line 1 of the compact view carries "
+    "'merge:nobody-id', which names no node of the graph.\n",
+    expected_returncode = 1 )
+  edit_compact ( folder, [ ( "merge:nobody-id", "merge:overridden-id" ) ], base_name )
+  require_output (
+    run_save (folder, "--yes"),
+    head + "Merge: ⟨0a⟩ 'A second container, outside the view' acquires "
+    "⟨node:overridden-id⟩ 'An overridden node, outside the view', as '(merge "
+    "overridden-id)': a nodeMerge makes the two one node, this one, with the "
+    "relationships of both.\n" + saved_line (0) +
+    "" . join ( os . path . join (folder, base_name + suffix) + "\n"
+                for suffix in ( ".full.org", ".compact.org", ".view.json" )))
+  require_equal ( "whether the acquiree's file remains",
+                  os . path . exists ( skg_path (context, "overridden-id") ), False )
+  require_equal ( "the acquirer's extra IDs",
+                  skg_list (context, "elsewhere-id", "extra_ids"),
+                  [ "overridden-id" ] )
+
+def check_deleting_a_subtree (context):
+  """'delete subtree' deletes the node and every node occurrence below
+  it, as 'skg-delete-recursive' marks them."""
+  folder = fresh_root_view (context, "delete-subtree")
+  edit_compact ( folder, [ ( "A body line that stays unnumbered.\n",
+                             "A body line that stays unnumbered.\n"
+                             "*** A branch to delete\n**** Its leaf\n" ) ])
+  require_save_succeeds (folder)
+  branch_id = id_of_compact_headline (folder, "*** A branch to delete")
+  leaf_id = id_of_compact_headline (folder, "**** Its leaf")
+  branch = compact_line_starting (folder, "*** A branch to delete ⟨")
+  leaf = compact_line_starting (folder, "**** Its leaf ⟨")
+  edit_compact ( folder, [ ( branch, branch [ : -1 ] + " delete subtree⟩" ) ])
+  completed = run_save (folder, "--yes")
+  require_equal ( "the report of 'delete subtree'",
+                  [ line for line in completed . stdout . split ("\n")
+                    if line . startswith ("Delete:") ],
+                  [ f"Delete: ⟨{HANDLE_PATTERN . search (branch) . group (1)}⟩ "
+                    "'A branch to delete', from the graph.",
+                    f"Delete: ⟨{HANDLE_PATTERN . search (leaf) . group (1)}⟩ "
+                    "'Its leaf', from the graph." ] )
+  for node_id in [ branch_id, leaf_id ]:
+    require_equal ( "whether a deleted node's file remains",
+                    os . path . exists ( skg_path (context, node_id) ), False )
+  require_equal ( "the first child's content after 'delete subtree'",
+                  skg_list (context, "child-a-id", "contains"),
+                  [ "shared-id", "fred-note-id" ] )
+
+def check_misplaced_words (context):
+  """Words that cannot stand where they are written are refused before
+  any save: 'subtree' alone, 'relRepo:NAME' on a root, 'repo:NAME'
+  naming a foreign skgrepo or the node's own."""
+  folder = fresh_root_view (context, "misplaced")
+  def append_word (start, word):
+    line = compact_line_starting (folder, start)
+    edit_compact ( folder, [ ( line, line [ : -1 ] + " " + word + "⟩" ) ])
+    return ( HANDLE_PATTERN . search (line) . group (1),
+             read_compact (folder) . split ("\n") . index (
+               line [ : -1 ] + " " + word + "⟩" ) + 1 )
+  first_child = append_word ("** First child ⟨", "subtree")
+  require_output (
+    run_save (folder, "--yes"),
+    REPORT_HEAD +
+    f"Error: ⟨{first_child [0]}⟩ on line {first_child [1]} of the compact view "
+    "carries 'subtree' with no word it applies to; 'subtree' applies to "
+    "'delete', 'ready', 'unready', 'write-protect', 'repo:NAME', "
+    "'relRepo:NAME', 'noSearchMatching' and 'searchMatching'.\n",
+    expected_returncode = 1 )
+  edit_compact ( folder, [ ( " subtree⟩", "⟩" ) ])
+  with open ( os . path . join ( folder, ROOT_BASE_NAME + ".compact.org" ),
+              "a", encoding = "utf-8" ) as compact_file:
+    compact_file . write ( "** Made in a foreign skgrepo ⟨new repo:fred⟩\n" )
+  new_line = len ( read_compact (folder) . split ("\n") ) - 1
+  root = append_word ("* The fixture root ⟨", "relRepo:main")
+  contained = append_word ("*** Contained twice ⟨", "repo:fred")
+  second = append_word ("** Second child, a subscriber ⟨", "repo:main")
+  require_output (
+    run_save (folder, "--yes"),
+    REPORT_HEAD +
+    f"Error: ⟨{root [0]}⟩ on line {root [1]} of the compact view carries "
+    "'relRepo:main', but is a root: there is no relationship here to set.\n"
+    f"Error: ⟨{contained [0]}⟩ on line {contained [1]} of the compact view "
+    "carries 'repo:fred', but 'fred' is no owned skgrepo of this server; its "
+    "owned ones are: main.\n"
+    f"Error: ⟨{second [0]}⟩ on line {second [1]} of the compact view carries "
+    "'repo:main', but its home skgrepo is 'main' already.\n"
+    f"Error: ⟨new⟩ on line {new_line} of the compact view carries 'repo:fred', "
+    "but 'fred' is no owned skgrepo of this server; its owned ones are: main.\n",
+    expected_returncode = 1 )
+
 def fred_files (context):
   """{FILE NAME: TEXT} of the foreign skgrepo."""
   return { name : read_file ( os . path . join ( context [ "fred_repo" ], name ))
@@ -1283,7 +1646,7 @@ def failures_of_reviewing (scratch, data_root):
   for case in [ check_edits_to_review, check_diff_shows_the_changes,
                 check_marking_ready, check_unconfirmed_commit,
                 check_restoring_a_deleted_node, check_confirmed_commit,
-                check_extending_the_diff_view,
+                check_extending_the_diff_view, check_marking_a_subtree_ready,
                 check_blank_commit_message ]:
     try:
       case (context)
@@ -1450,6 +1813,39 @@ def check_extending_the_diff_view (context):
                   skg_title (context, grandchild_id),
                   "A grandchild, retitled twice" )
 
+def check_marking_a_subtree_ready (context):
+  """'ready subtree' marks every change in the headline's subtree, as
+  'C-u C-c r r' does, those below it without 'all'; 'unready subtree'
+  unmarks them, asking first."""
+  folder = run_diff (context, "subtree-ready")
+  edit_compact ( folder, [ ( "** The fixture root, retitled ⟨0b aC2 L2 M⟩",
+                             "** The fixture root, retitled ⟨0b aC2 L2 M ready "
+                             "subtree⟩" ) ], DIFF_BASE_NAME )
+  require_output (
+    run_tool ([ "save", sidecar_of_diff (folder), "--yes" ]),
+    diff_report_head () +
+    "Ready: ⟨0b⟩ 'The fixture root, retitled', as '(ready all)'.\n"
+    "Ready: ⟨0c⟩ 'The fixture root', as '(ready)'.\n"
+    "Ready: ⟨0g⟩ 'A new grandchild', as '(ready)'.\n" +
+    saved_line (0) + "Readiness: Commit ready. All 2 of 2 changed files are ready.\n" +
+    diff_written_paths (folder),
+    ignoring_view_ids = True )
+  edit_compact ( folder, [ ( "** The fixture root, retitled ⟨0b aC2 L2 M✓⟩",
+                             "** The fixture root, retitled ⟨0b aC2 L2 M✓ "
+                             "unready subtree⟩" ) ], DIFF_BASE_NAME )
+  require_output (
+    run_tool ([ "save", sidecar_of_diff (folder), "--yes" ]),
+    diff_report_head () +
+    "Unready: ⟨0b⟩ 'The fixture root, retitled', as '(unready all)'.\n"
+    "Unready: ⟨0c⟩ 'The fixture root', as '(unready)'.\n"
+    "Unready: ⟨0g⟩ 'A new grandchild', as '(unready)'.\n"
+    "Question: this unmarks 3 changes. Unmarking this node commit-ready will "
+    "unmark every contributing decision. You might discard a lot of hard-won "
+    "information. Continue? Saving with '--yes' answers yes.\n" +
+    saved_line (0) + "Readiness: 0 of 2 changed files are ready.\n" +
+    diff_written_paths (folder),
+    ignoring_view_ids = True )
+
 def check_blank_commit_message (context):
   """A blank message is refused before anything is sent: no server
   answers on port 1."""
@@ -1563,6 +1959,7 @@ def failures_of_daemon (scratch, data_root):
                   check_daemon_rewrites_after_a_change_on_disk,
                   check_daemon_keeps_unsaved_edits,
                   check_daemon_logs_a_reload_warning,
+                  check_daemon_declares_its_unsaved_views,
                   check_daemon_takes_a_command_for_its_port,
                   check_second_daemon_on_the_port_refused,
                   check_daemon_commits_and_rewrites_a_diffView_buffer,
@@ -1688,6 +2085,30 @@ def check_daemon_logs_a_reload_warning (context):
                               "not be read, so the server keeps serving its "
                               "previous version" )
   os . remove (bad_path)
+
+def check_daemon_declares_its_unsaved_views (context):
+  """A save through the daemon names, in its envelope's 'other-views',
+  every other view the daemon holds, with the edited text of those
+  whose compact views have unsaved edits, as the clients name their
+  other buffers: the server then refuses a save that changes a node
+  such a view shows, naming the view, and writes nothing. Undoing the
+  unsaved edit lets the next case's save through."""
+  folder = context [ "daemon_folder" ]
+  edit_compact ( folder, [ ( "** Contained twice ⟨",
+                             "** Contained twice, retitled through the daemon ⟨" ) ],
+                 "view_child-a-id" )
+  completed = run_tool ( [ "save", os . path . join (folder, "view_child-a-id.view.json"),
+                           "--yes" ], port = None )
+  if ( completed . returncode == 0
+       or "this save conflicts with unsaved dependencies in content-view:root-id"
+          not in completed . stdout ):
+    raise CaseFailure ( f"the save printed {completed . stdout!r}, {completed . stderr!r}" )
+  require_equal ( "shared-id's title after the refused save",
+                  skg_title (context, "shared-id"), "Contained twice" )
+  edit_compact ( folder, [ ( "** Contained twice, retitled through the daemon ⟨",
+                             "** Contained twice ⟨" ) ], "view_child-a-id" )
+  edit_compact ( folder, [ ( "** First child, my unsaved edit ⟨0d ",
+                             "** First child, renamed through the daemon ⟨0d " ) ])
 
 def check_daemon_takes_a_command_for_its_port (context):
   """A command for the daemon's port that writes into another folder
@@ -1866,6 +2287,409 @@ def check_daemon_replaces_a_stale_socket (context):
   require_equal ( "whether the socket remains after SIGTERM",
                   os . path . lexists (socket_path), False )
   require_log_line ( context, "stopped: released 1 view" )
+
+# ============================================================
+# Two owned skgrepos: the fixture gains 'private', more private than
+# 'main' ('add_private_skgrepo'), both gitrepos, and a daemon holds the
+# skgrepo restriction. The cases run in order, on the graph and the
+# restriction the earlier ones left.
+# ============================================================
+
+def failures_of_two_owned_skgrepos (scratch, data_root):
+  context = { "scratch"       : scratch,
+              "data_root"     : data_root,
+              "main_repo"     : os . path . join (data_root, "me", "main"),
+              "private_repo"  : os . path . join (data_root, "me", "private"),
+              "daemon_folder" : os . path . join (scratch, "daemon"),
+              "processes"     : [] }
+  try:
+    for case in [ check_restricting, check_viewing_overPrivateText,
+                  check_searching_under_a_restriction,
+                  check_releasing_a_save_s_rerender,
+                  check_deleting_under_a_restriction,
+                  check_hiding_the_foreign_skgrepos, check_hoisting,
+                  check_setting_relRepos, check_moving_to_another_skgrepo,
+                  check_marking_like_moves_ready, check_deleting_references ]:
+      try:
+        case (context)
+      except CaseFailure as failure:
+        return [ case . __name__ + ": " + str (failure) +
+                 "\nThe daemon's log:\n" + daemon_log (context) ]
+    return []
+  finally:
+    for process in context [ "processes" ]:
+      if process . poll () is None:
+        process . kill ()
+        process . wait (timeout = 30)
+
+def private_lines (context, node_id):
+  """The lines of NODE_ID's section in 'private', or None."""
+  path = os . path . join ( context [ "private_repo" ], node_id + ".skg" )
+  return read_file (path) . split ("\n") if os . path . exists (path) else None
+
+def require_failure (completed, stdout_lines, stderr_text):
+  """COMPLETED exited 1, printing every one of STDOUT_LINES (in order,
+  among others) and STDERR_TEXT on standard error."""
+  lines = completed . stdout . split ("\n")
+  if ( completed . returncode != 1 or stderr_text not in completed . stderr
+       or [ line for line in lines if line in stdout_lines ] != stdout_lines ):
+    raise CaseFailure (
+      f"exit {completed . returncode}, printed:\n{completed . stdout}stderr: "
+      f"{completed . stderr}\nexpected exit 1, the lines {stdout_lines!r} and "
+      f"on stderr {stderr_text!r}" )
+
+def check_restricting (context):
+  """'restrict' through a daemon sets its connection's skgrepo
+  restriction, which every command run through it then has."""
+  start_daemon (context)
+  require_output ( run_tool ([ "restrict" ]),
+                   "Skgrepo restriction: private (no restriction); available: "
+                   "main, private (no restriction).\n" )
+  require_output ( run_tool ([ "restrict", "main" ]),
+                   "Skgrepo restriction: main\n" )
+  require_output ( run_tool ([ "restrict" ]),
+                   "Skgrepo restriction: main; available: main, private (no "
+                   "restriction).\n" )
+  require_log_line ( context, "Skgrepo restriction: main" )
+  require_output ( run_tool ([ "restrict", "fred" ]), "", expected_returncode = 1 )
+
+OVERPRIVATETEXT_PROMPT_OF_A_VIEW = (
+  "Server: overPrivateText confirmation: the skgrepo restriction withholds "
+  "text from overPrivateText telescopes (tele-id) until approved. single "
+  "root view would reveal title or body text selected below its node's home "
+  "repo for PID tele-id. Include that text?\n" )
+
+def check_viewing_overPrivateText (context):
+  """Under the restriction, viewing a telescope whose title sits below
+  its home asks first: refused without '--show-overPrivateText',
+  released with it."""
+  folder = context [ "daemon_folder" ]
+  completed = run_tool ([ "view", "tele-id", "--out-dir", folder ])
+  require_output ( completed, "", expected_returncode = 1 )
+  require_equal (
+    "the refused view's stderr", completed . stderr,
+    OVERPRIVATETEXT_PROMPT_OF_A_VIEW +
+    "skg_for_ai: Nothing was viewed: the server withholds text from "
+    "overPrivateText telescopes under the skgrepo restriction; run again with "
+    "'--show-overPrivateText' to release it.\n" )
+  completed = require_tool_run ([ "view", "tele-id", "--out-dir", folder,
+                                  "--show-overPrivateText" ])
+  require_equal ( "the released view's stderr", completed . stderr,
+                  OVERPRIVATETEXT_PROMPT_OF_A_VIEW +
+                  "Approved: the request is sent again, releasing that text.\n" )
+  require_in_file ( folder, "view_tele-id",
+                    "* A title kept private ⟨0a C1 ⌂:main⟩\n"
+                    "** Contained twice ⟨0b 3aC⟩\n" )
+
+def check_searching_under_a_restriction (context):
+  """Under the restriction a search asks whether to include the
+  overPrivateText telescopes: excluded by default, included with
+  '--show-overPrivateText'."""
+  folder = os . path . join ( context [ "scratch" ], "restricted-search" )
+  completed = run_tool ([ "search", "kept", "--out-dir", folder ])
+  require_output ( completed, "", expected_returncode = 1 )
+  if ( "The search excludes them; '--show-overPrivateText' includes them."
+       not in completed . stderr or "No matches found." not in completed . stderr ):
+    raise CaseFailure ( f"stderr was {completed . stderr!r}" )
+  require_tool_run ([ "search", "kept", "--out-dir", folder,
+                      "--show-overPrivateText" ])
+  require_equal ( "the hits including overPrivateText telescopes",
+                  hit_titles (folder, "search_kept"), [ "A title kept private" ] )
+
+def check_releasing_a_save_s_rerender (context):
+  """Under the restriction, a save whose re-rendered view shows an
+  overPrivateText telescope's text happens, but the view is withheld:
+  '--yes' alone leaves the files stale; with '--show-overPrivateText'
+  the same save is sent again, approving it, and the files are
+  rewritten."""
+  folder = context [ "daemon_folder" ]
+  edit_compact ( folder, [ ( "** Contained twice ⟨0b 3aC⟩",
+                             "** Contained twice, retitled ⟨0b 3aC⟩" ) ],
+                 "view_tele-id" )
+  sidecar = os . path . join (folder, "view_tele-id.view.json")
+  release_lines = [
+    "Server: overPrivateText confirmation: the save succeeded, but the "
+    "skgrepo restriction withholds text from overPrivateText telescopes "
+    "(tele-id) until approved. save rerender would reveal title or body text "
+    "selected below its node's home repo for PID tele-id. Include that "
+    "text?" ]
+  require_failure (
+    run_tool ([ "save", sidecar, "--yes" ]), release_lines,
+    "skg_for_ai: The save succeeded, but its re-rendered view is withheld; "
+    "the files are out of date. Save again with '--show-overPrivateText' to "
+    "release it, or view the node again.\n" )
+  require_equal ( "the title saved before the release",
+                  skg_title (context, "shared-id"), "Contained twice, retitled" )
+  completed = require_tool_run ([ "save", sidecar, "--yes",
+                                  "--show-overPrivateText" ])
+  if not completed . stdout . endswith (
+      "Approved: the request is sent again, releasing that text.\n"
+      "Server: saved, 0 errors, 1 warning.\n"
+      "Server warning: save rerender includes title or body text selected "
+      "below its node's home repo for PID tele-id.\n" +
+      "" . join ( os . path . join (folder, "view_tele-id" + suffix) + "\n"
+                  for suffix in ( ".full.org", ".compact.org", ".view.json" ))):
+    raise CaseFailure ( f"the approving save printed {completed . stdout!r}" )
+  require_in_file ( folder, "view_tele-id", "** Contained twice, retitled ⟨0b 3aC⟩\n" )
+
+def check_deleting_under_a_restriction (context):
+  """Under the restriction, deleting a node a record of 'private' names
+  asks where to strip its ID: '--yes' alone cancels, writing nothing;
+  '--delete-from visible' strips it from the visible records only."""
+  folder = os . path . join ( context [ "scratch" ], "delete-from" )
+  require_tool_run ([ "view", "doomed-id", "--out-dir", folder, "--no-summary" ])
+  edit_compact ( folder, [ ( "* A node to delete ⟨0a",
+                             "* A node to delete ⟨0a delete" ) ],
+                 "view_doomed-id" )
+  question = [
+    "Server: delete-from confirmation: 1 record(s) the skgrepo restriction "
+    "keeps out name a node this save deletes; nothing was written. 1 record "
+    "in skgrepos the skgrepo restriction keeps out names a graphnode this "
+    "save deletes. Nothing was saved." ]
+  require_failure (
+    run_tool ([ "save", folder, "--yes" ]), question,
+    "skg_for_ai: Nothing was saved (cancelled): save again with "
+    "'--delete-from visible' to strip the deleted IDs from the records the "
+    "restriction shows only, or '--delete-from all' to strip them from every "
+    "owned record.\n" )
+  require_equal ( "whether the node's file remains after the cancel",
+                  os . path . exists ( skg_path (context, "doomed-id") ), True )
+  completed = run_tool ([ "save", folder, "--yes", "--delete-from", "visible" ])
+  if ( "Delete from: the visible records only; the save is sent again.\n"
+       "Server: saved, 0 errors, 0 warnings.\n" not in completed . stdout ):
+    raise CaseFailure ( f"the save printed {completed . stdout!r}, {completed . stderr!r}" )
+  require_equal ( "whether the node's file remains after the delete",
+                  os . path . exists ( skg_path (context, "doomed-id") ), False )
+  require_equal ( "the private record that names it",
+                  "- doomed-id" in private_lines (context, "secret-id"), True )
+
+def check_hiding_the_foreign_skgrepos (context):
+  """'restrict --foreign hidden' hides the foreign skgrepos: the held
+  views are rerendered under it, one showing overPrivateText text only
+  with '--show-overPrivateText', and a held view of a foreign node's
+  subscriber no longer shows it. The switch is refused while a held
+  view has unsaved edits. 'restrict private --foreign shown' lifts the
+  restriction."""
+  folder = context [ "daemon_folder" ]
+  require_tool_run ([ "view", "child-b-id", "--out-dir", folder ])
+  require_in_file ( folder, "view_child-b-id", "*** Fred's note ⟨" )
+  edit_compact ( folder, [ ( "* Second child, a subscriber ⟨",
+                             "* Second child, unsaved ⟨" ) ], "view_child-b-id" )
+  completed = run_tool ([ "restrict", "--foreign", "hidden" ])
+  require_output ( completed, "", expected_returncode = 1 )
+  if "view_child-b-id.compact.org has unsaved edits" not in completed . stderr:
+    raise CaseFailure ( f"stderr was {completed . stderr!r}" )
+  edit_compact ( folder, [ ( "* Second child, unsaved ⟨",
+                             "* Second child, a subscriber ⟨" ) ], "view_child-b-id" )
+  require_failure (
+    run_tool ([ "restrict", "--foreign", "hidden" ]), [],
+    "skg_for_ai: The skgrepo restriction is as it was: run again with "
+    "'--show-overPrivateText' to release that text.\n" )
+  require_output (
+    run_tool ([ "restrict", "--foreign", "hidden", "--show-overPrivateText" ]),
+    "Server: overPrivateText confirmation: the skgrepo restriction withholds "
+    "text from overPrivateText telescopes (tele-id) until approved. repo set "
+    "switch rerender would reveal title or body text selected below its node's "
+    "home repo for PID tele-id. Include that text?\n"
+    "Approved: the request is sent again, releasing that text.\n"
+    "Skgrepo restriction: main; foreign repos hidden\n" )
+  require_log_line ( context, "re-rendered view_child-b-id because of 'restrict "
+                              "--foreign hidden --show-overPrivateText" )
+  if "Fred's note" in read_file ( os . path . join ( folder, "view_child-b-id.compact.org" )):
+    raise CaseFailure ( "the held view still shows the foreign node" )
+  require_output ( run_tool ([ "restrict", "private", "--foreign", "shown" ]),
+                   "Skgrepo restriction: private (no restriction)\n" )
+  require_in_file ( folder, "view_child-b-id", "*** Fred's note ⟨" )
+
+def check_hoisting (context):
+  """A save of a telescope whose title sits below its home asks Hoist
+  or Abort: '--yes' alone aborts, writing nothing; '--hoist' moves the
+  title home and saves."""
+  folder = os . path . join ( context [ "scratch" ], "hoist" )
+  require_tool_run ([ "view", "tele-id", "--out-dir", folder, "--no-summary" ])
+  edit_compact ( folder, [ ( "* A title kept private ⟨0a C1 ⌂:main⟩\n",
+                             "* A title kept private ⟨0a C1 ⌂:main⟩\nA body.\n" ) ],
+                 "view_tele-id" )
+  question = [
+    "Server: Hoist confirmation: Saving would publish title or body text "
+    "selected below home for 1 telescope. Hoist writes the selected text at "
+    "home and removes lower title/body copies while preserving lower "
+    "relationships and aliases. Abort writes nothing; manual repair requires "
+    "editing the .skg files. Hoist?",
+    "  tele-id, whose home is 'main'." ]
+  require_failure (
+    run_tool ([ "save", folder, "--yes" ]), question,
+    "skg_for_ai: Nothing was saved (Abort). Save again with '--hoist' to "
+    "Hoist, or repair the '.skg' files by hand.\n" )
+  require_equal ( "the home section's title after Abort",
+                  skg_title (context, "tele-id"), None )
+  completed = run_tool ([ "save", folder, "--yes", "--hoist" ])
+  if ( "Hoist: approved; the save is sent again.\nServer: saved, 0 errors, "
+       not in completed . stdout ):
+    raise CaseFailure ( f"the save printed {completed . stdout!r}, {completed . stderr!r}" )
+  require_equal ( "the home section's title after Hoist",
+                  skg_title (context, "tele-id"), "A title kept private" )
+  require_equal ( "the home section's body after Hoist",
+                  skg_body (context, "tele-id"), [ "A body." ] )
+
+def check_setting_relRepos (context):
+  """'relRepo:private' records a membership in 'private'; 'relRepo:NAME
+  subtree' on a node does so for every content relationship of its
+  subtree, its own too."""
+  folder = fresh_root_view (context, "relRepo")
+  contained = compact_line_starting (folder, "*** Contained twice, retitled ⟨")
+  edit_compact ( folder, [ ( contained, contained [ : -1 ] + " relRepo:private⟩" ) ])
+  completed = require_save_succeeds (folder)
+  require_equal ( "the report of 'relRepo:private'",
+                  [ line for line in completed . stdout . split ("\n")
+                    if line . startswith ("relRepo:") ],
+                  [ f"relRepo: ⟨{HANDLE_PATTERN . search (contained) . group (1)}⟩ "
+                    "'Contained twice, retitled', as '(relRepo private)': its "
+                    "relationship to ⟨0d⟩ 'First child' is recorded in "
+                    "'private'." ] )
+  require_equal ( "the public section's content", skg_list (context, "child-a-id",
+                                                            "contains"), [] )
+  require_equal ( "whether the private section of the first child records it",
+                  "- shared-id" in private_lines (context, "child-a-id"), True )
+  second = compact_line_starting (folder, "** Second child, a subscriber ⟨")
+  edit_compact ( folder, [ ( second + "\n",
+                             second + "\n*** A child kept private\n" ) ])
+  require_save_succeeds (folder)
+  second = compact_line_starting (folder, "** Second child, a subscriber ⟨")
+  child = compact_line_starting (folder, "*** A child kept private ⟨")
+  edit_compact ( folder, [ ( second, second [ : -1 ] + " relRepo:private subtree⟩" ) ])
+  completed = require_save_succeeds (folder)
+  require_equal ( "the report of 'relRepo:private subtree'",
+                  [ line [ : line . index (",") ]
+                    for line in completed . stdout . split ("\n")
+                    if line . startswith ("relRepo:") ],
+                  [ f"relRepo: ⟨{HANDLE_PATTERN . search (second) . group (1)}⟩ "
+                    "'Second child",
+                    f"relRepo: ⟨{HANDLE_PATTERN . search (child) . group (1)}⟩ "
+                    "'A child kept private'" ] )
+  require_equal ( "whether the private section of the second child records its child",
+                  "- " + id_of_compact_headline ( folder, "*** A child kept private" )
+                  in private_lines (context, "child-b-id"), True )
+  require_equal ( "whether the private section of the root records the second child",
+                  "- child-b-id" in private_lines (context, "root-id"), True )
+
+def check_moving_to_another_skgrepo (context):
+  """'repo:main' moves a private node home to 'main'; the relationships
+  left in 'private' are the strandeds question, which '--yes' alone
+  does not answer and '--strandeds keep' answers by leaving them. A
+  new headline written '⟨new repo:private⟩' is made in 'private', and
+  'repo:main subtree' moves it and its child."""
+  folder = os . path . join ( context [ "scratch" ], "move" )
+  require_tool_run ([ "view", "secret-id", "--out-dir", folder, "--no-summary" ])
+  root = compact_line_starting (folder, "* A private note ⟨", "view_secret-id")
+  edit_compact ( folder, [ ( root, root [ : -1 ] + " repo:main⟩" ) ], "view_secret-id" )
+  question = [
+    "Server: strandeds confirmation: the save's home skgrepo moves would "
+    "leave 3 relationships in their old skgrepos; nothing was written.",
+    "  child-a-id contains secret-id: stays at private; its default is now main.",
+    "  secret-id contains doomed-id: stays at private; its default is now main.",
+    "  secret-id contains shared-id: stays at private; its default is now main." ]
+  require_failure (
+    run_tool ([ "save", folder, "--yes" ]), question,
+    "skg_for_ai: Nothing was saved: save again with '--strandeds reset' to move "
+    "every listed relationship to its new default, or '--strandeds keep' to "
+    "leave them where they are.\n" )
+  require_equal ( "the home of the node after the unanswered question",
+                  os . path . exists ( skg_path (context, "secret-id") ), False )
+  completed = run_tool ([ "save", folder, "--yes", "--strandeds", "keep" ])
+  if ( "Strandeds: each stays where it is; the save is sent again.\n"
+       "Server: saved, 0 errors, 0 warnings.\n" not in completed . stdout ):
+    raise CaseFailure ( f"the save printed {completed . stdout!r}, {completed . stderr!r}" )
+  require_equal ( "the moved node's title at home", skg_title (context, "secret-id"),
+                  "A private note" )
+  require_equal ( "the private section it left",
+                  private_lines (context, "secret-id") [ 1 : ],
+                  [ "contains:", "- shared-id", "- doomed-id", "" ] )
+  folder = fresh_root_view (context, "move-new")
+  second = compact_line_starting (folder, "** Second child, a subscriber ⟨")
+  edit_compact ( folder, [ ( second + "\n", second +
+                             "\n*** Made private ⟨new repo:private⟩\n" ) ])
+  completed = require_save_succeeds (folder)
+  require_equal ( "the title of the new headline's private home",
+                  private_lines (context, id_of_compact_headline (
+                    folder, "*** Made private" )) [ 0 ], "title: Made private" )
+  folder = os . path . join ( context [ "scratch" ], "move-subtree" )
+  require_tool_run ([ "view", "branch-id", "--out-dir", folder, "--no-summary" ])
+  root = compact_line_starting (folder, "* A private branch ⟨", "view_branch-id")
+  edit_compact ( folder, [ ( root, root [ : -1 ] + " repo:main subtree⟩" ) ],
+                 "view_branch-id" )
+  completed = run_tool ([ "save", folder, "--yes", "--strandeds", "reset" ])
+  require_equal ( "the report of 'repo:main subtree'",
+                  [ line for line in completed . stdout . split ("\n")
+                    if line . startswith ("Repo:") ],
+                  [ "Repo: ⟨0a⟩ 'A private branch', from 'private' to 'main': "
+                    "the node's home skgrepo moves.",
+                    "Repo: ⟨0b⟩ 'Its private leaf', from 'private' to 'main': "
+                    "the node's home skgrepo moves." ] )
+  if "Server: saved, 0 errors" not in completed . stdout:
+    raise CaseFailure ( f"the save printed {completed . stdout!r}, {completed . stderr!r}" )
+  for node_id, title in [ ( "branch-id", "A private branch" ),
+                          ( "leaf-id", "Its private leaf" ) ]:
+    require_equal ( "a moved node's title at home", skg_title (context, node_id), title )
+
+def check_marking_like_moves_ready (context):
+  """In the diff view, 'ready subtree' on a home skgrepo move marks
+  every move between the same two skgrepos in the moved node's
+  subtree, as 'C-u C-c r h' does: the branch's and its leaf's, and
+  not the move of the node above them."""
+  folder = os . path . join ( context [ "scratch" ], "review", "like-moves" )
+  require_tool_run ([ "diff", "--out-dir", folder ])
+  require_in_diff_compact ( folder, "* A private branch ⟨0a C1 ⌂:main M⟩\n"
+                                    "** ⟨0b ⌂ -private +main⟩\n" )
+  edit_compact ( folder, [ ( "** ⟨0b ⌂ -private +main⟩",
+                             "** ⟨0b ⌂ -private +main ready subtree⟩" ) ],
+                 DIFF_BASE_NAME )
+  require_output (
+    run_tool ([ "save", sidecar_of_diff (folder), "--yes" ]),
+    diff_report_head () +
+    "Ready: ⟨0b⟩ (homeSkgrepoMove (old private) (new main)), as '(ready)'.\n"
+    "Ready: ⟨0e⟩ (homeSkgrepoMove (old private) (new main)), as '(ready)'.\n"
+    + saved_line (0) + "Readiness: 2 of 16 changed files are ready.\n" +
+    diff_written_paths (folder),
+    ignoring_view_ids = True )
+  require_in_diff_compact ( folder, "** ⟨0b ⌂ -private +main✓⟩\n" )
+  require_in_diff_compact ( folder, "** Its private leaf ⟨0d M✓⟩\n"
+                                    "*** ⟨0e ⌂ -private +main✓⟩\n" )
+  require_in_diff_compact ( folder, "***** ⟨0r ⌂ -private +main⟩\n" )
+
+def check_deleting_references (context):
+  """'delete-references ID' sends nothing without '--yes'; with it the
+  server warns that a body links to the ID, and '--leave-links'
+  approves: the membership goes, the link stays, and the daemon
+  rewrites the view of the node that named it."""
+  folder = context [ "daemon_folder" ]
+  require_tool_run ([ "view", "refs-id", "--out-dir", folder ])
+  require_output (
+    run_tool ([ "delete-references", "absent-id" ]),
+    "Not sent. This removes every owned structured reference to the absent "
+    "node absent-id (in 'contains', 'subscribesTo', 'hidesFromSubs' and "
+    "'overrides' lists); run again with '--yes'.\n" )
+  warning = [ "Server: delete-references confirmation: titles or bodies link to "
+              "absent-id; the cleanup leaves those links, dangling. Remove the "
+              "structured references?",
+              "- refs-id / contains / absent-id (repo main)" ]
+  require_failure (
+    run_tool ([ "delete-references", "absent-id", "--yes" ]), warning,
+    "skg_for_ai: Nothing was removed: run again with '--yes --leave-links' to "
+    "remove the structured references and leave the links.\n" )
+  require_equal ( "the membership before the approval",
+                  skg_list (context, "refs-id", "contains"), [ "absent-id" ] )
+  completed = require_tool_run ([ "delete-references", "absent-id", "--yes",
+                                  "--leave-links" ])
+  if ( "Server: removed the references to absent-id: 1 membership(s) in 1 "
+       "node(s).\n" not in completed . stdout ):
+    raise CaseFailure ( f"it printed {completed . stdout!r}" )
+  require_equal ( "the membership after the approval",
+                  skg_list (context, "refs-id", "contains"), [] )
+  require_equal ( "the body after the approval", skg_body (context, "refs-id"),
+                  [ "See [[id:absent-id][the absent one]]." ] )
+  require_log_line ( context, "re-rendered view_refs-id because of "
+                              "'delete-references absent-id --yes --leave-links" )
 
 # ------------------------------------------------------------
 # Helpers of the daemon cases
@@ -2184,6 +3008,40 @@ def failures_of_changed_skg_files (data_root):
       if read_file (fixture_path) != read_file (scratch_path):
         failures . append ( f"the runs changed {scratch_path}" )
   return failures
+
+# The files a second owned skgrepo, 'private', adds to the fixture,
+# and those it adds to 'main' beside it ('add_private_skgrepo').
+PRIVATE_SKGREPO_FILES = {
+  # A telescope whose title sits below its home, 'main': overPrivateText.
+  "me/main/tele-id.skg"      : "pid: tele-id\ncontains:\n- shared-id\n",
+  "me/private/tele-id.skg"   : "pid: tele-id\ntitle: A title kept private\n",
+  # A private node, contained by a private section of a public one, and
+  # naming a public node that a save deletes.
+  "me/private/secret-id.skg" : ( "pid: secret-id\ntitle: A private note\n"
+                                 "contains:\n- shared-id\n- doomed-id\n" ),
+  "me/private/child-a-id.skg" : "pid: child-a-id\ncontains:\n- secret-id\n",
+  "me/main/doomed-id.skg"    : "pid: doomed-id\ntitle: A node to delete\n",
+  # A private branch and its leaf, which move to 'main' together.
+  "me/private/branch-id.skg" : ( "pid: branch-id\ntitle: A private branch\n"
+                                 "contains:\n- leaf-id\n" ),
+  "me/private/leaf-id.skg"   : "pid: leaf-id\ntitle: Its private leaf\n",
+  # A node naming an ID nobody wrote, by membership and by a link.
+  "me/main/refs-id.skg"      : ( "pid: refs-id\ntitle: Names an absent node\n"
+                                 "body: |-\n  See [[id:absent-id][the absent one]].\n"
+                                 "contains:\n- absent-id\n" ) }
+
+def add_private_skgrepo (data_root):
+  """Give the fixture at DATA_ROOT a second owned skgrepo, 'private',
+  more private than 'main', and the files PRIVATE_SKGREPO_FILES
+  lists."""
+  with open ( os . path . join (data_root, "skgconfig.toml"), "a",
+              encoding = "utf-8" ) as config_file:
+    config_file . write ( '\n[[repos]]\nname = "private"\npath = "me/private"\n' )
+  for relative_path, text in PRIVATE_SKGREPO_FILES . items ():
+    path = os . path . join (data_root, relative_path)
+    os . makedirs ( os . path . dirname (path), exist_ok = True )
+    with open (path, "w", encoding = "utf-8") as skg_file:
+      skg_file . write (text)
 
 def set_port_in_config (config_path, port):
   text = read_file (config_path)
