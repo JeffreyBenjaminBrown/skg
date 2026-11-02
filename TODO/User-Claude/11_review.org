@@ -1,0 +1,39 @@
+#+title: Ed: review of plan 10, and choices Jeff may overturn
+
+* Plan 10 is complete
+The tool now covers every command in 'docs/COMMANDS.org' (the audit
+table in its README has no "gap" row), including placing an existing
+node, forking, the save questions, moves, merges, the linkstack and the
+restriction. 'reload' and 'extend' replaced the two senses of
+'integrate'; a clean diff buffer extends itself after a reload; the
+'~NAME' herald no longer ranks a foreign repo. Jeff's 'to Ed' is forked
+into Ed's 'inboxes'. Suites at the end: Rust 1108, Emacs 441, Neovim
+478, tool PASS.
+
+* TODO (chosen, switchable) : '--yes' alone cancels the delete-from question
+Emacs asks "delete from the visible containers, or all?"; the tool's
+'--yes' takes the answer that writes nothing more, so a deletion that
+raises the question is cancelled unless '--delete-from visible|all' is
+given. Switch: let '--yes' mean "visible", the client's first choice.
+
+* TODO (chosen, switchable) : 'relRepo:NAME subtree' infers the kind from its headline
+Emacs offers a menu (node, subscribee folder, overridden folder); the
+tool reads the kind from the headline the word is written on. Switch:
+an explicit kind word.
+
+* TODO (chosen, switchable) : some client warnings are tool errors
+E.g. 'repo:NAME' on a write-protected occurrence. The tool refuses
+before saving where Emacs saves and warns, because a compact view is
+edited blind and a refused save costs less than a surprise. Switch:
+downgrade any of them to a report line.
+
+* FIX PLANNED : approving a withheld re-render after a save that created a node
+When a restricted save's re-rendered view is withheld (overPrivateText),
+the only approval is to send the same save again; if the save created a
+node, the re-send is refused as stale, so the files stay old. The
+clients have the same problem. The tool says so. In 'TODO/problems.org';
+an agent is making the approval a separate request carrying no buffer.
+
+* Pointers
+The default relRepo for a relationship a foreign node records: TODO for
+Jeff in '5_discussion.org'.
