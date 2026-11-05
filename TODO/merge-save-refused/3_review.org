@@ -296,7 +296,7 @@ list and forbids copying it.
 ***** TODO [jeff] Why forbid copying the relation list?
 (This isn't pushback; I just don't get it.)
 What might want to copy it where?
-****** TODO Claude says: my sentence was unclear; the walk, not the list
+****** TODO Claude says: unclear; I meant the walk, not the list
 The plan forbids copying the neighborhood walk, the function
 'update_relevant_neighborhood', which an agent might otherwise
 duplicate as a second function without the link relation. The
