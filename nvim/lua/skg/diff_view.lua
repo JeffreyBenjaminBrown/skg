@@ -81,8 +81,7 @@ function M.handle_diffView_response (response, buffer_name, view_id)
     local opened = not empty and content ~= nil and content ~= ''
     if opened then
       local buf = buffer.open_org_buffer_from_text(
-        content, 'skg://diff-view: ' .. buffer_name, view_id,
-        payload.field_text(response, 'rendered-at'))
+        content, 'skg://diff-view: ' .. buffer_name, view_id)
       -- Its save names it ('save.save_request_sexp').
       vim.b[buf].skg_diffView_buffer_kind = buffer_name
       local summary = readiness.readiness_summary_from_response(response)

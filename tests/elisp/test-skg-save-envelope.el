@@ -21,7 +21,7 @@ other views, and survives quoting."
 it was drawn, not as it was edited."
   (let ((buf (skg-open-org-buffer-from-text
               nil "* (skg node (gnid a)) a\n" "*test-save-envelope*"
-              "view-envelope" "7"))
+              "view-envelope"))
         (sent nil))
     (unwind-protect
         (with-current-buffer buf

@@ -47,34 +47,8 @@ use crate::types::save::{DeleteNode, ForkSpec, NodeInstruction, SaveNode};
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{ViewnodeKind, Vognode};
 use crate::serve::handlers::strip_body_whitespace::strip_trailing_whitespace_from_body;
-use crate::serve::util::value_from_request_sexp;
 
 use std::collections::{BTreeMap, BTreeSet};
-
-/// When the saved buffer's text was rendered, as its save request
-/// says: '(rendered-at . "N")', runtime generation N, as the response
-/// that last drew the buffer said.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct RenderedAt (pub u64);
-
-/// The request's '(rendered-at . "N")'. A request without it, or with
-/// anything but a number, is refused: omitting it must not bypass the
-/// staleness check.
-pub fn rendered_at_from_request (
-  request : &str,
-) -> Result<RenderedAt, String> {
-  let value : String =
-    value_from_request_sexp ("rendered-at", request)
-    . map_err ( |_| concat! (
-      "The save request lacks the field '(rendered-at . \"N\")': ",
-      "the runtime generation its buffer was rendered at, which every view ",
-      "response carries, and the 'runtime generation' request answers for ",
-      "a new empty view. Nothing was saved.") . to_string () ) ?;
-  value . parse::<u64> ()
-    . map ( RenderedAt )
-    . map_err ( |_| format! (
-      "The save request's 'rendered-at' is {:?}, not a runtime generation number. Nothing was saved.",
-      value )) }
 
 /// One error per graphnode the buffer would write or delete whose
 /// copy in 'baseline' no longer matches the graph, naming the buffer's
@@ -204,9 +178,8 @@ fn change_since_rendered (
     ( "extra IDs",
       ! changes . extra_ids_gained . is_empty ()
       || ! changes . extra_ids_lost . is_empty () ),
-    ( "flags",
-      ! changes . flags_gained . is_empty ()
-      || ! changes . flags_lost . is_empty () ),
+    ( "flags", // the noop filter compares them in order
+      then . flags != now . flags ),
     ( "subscriptions",
       relationships_changed (&then . subscribesTo, &now . subscribesTo) ),
     ( "hides",

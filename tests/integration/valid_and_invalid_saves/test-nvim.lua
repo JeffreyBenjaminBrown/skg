@@ -26,8 +26,7 @@ local function test_invalid_save ()
 
   local view_id = buffer.generate_uuid()
   local content_buf = buffer.open_org_buffer_from_text(
-    original_content, content_buffer_name, view_id,
-    T.runtime_generation())
+    original_content, content_buffer_name, view_id)
   vim.b[content_buf].skg_clean_baseline = '' -- the baseline of a new empty view, which a hand-built view stands in for
   print('created ' .. content_buffer_name .. ' buffer with invalid'
        .. ' content')

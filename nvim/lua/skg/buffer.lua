@@ -12,7 +12,6 @@
 -- exist: vim.b survives filetype changes.
 
 local heralds = require('skg.heralds')
-local payload = require('skg.payload')
 local sexpr = require('skg.sexpr.parse')
 local state = require('skg.state')
 
@@ -149,30 +148,17 @@ end
 
 -- ── lifecycle ──────────────────────────────────────────────────────
 
----Set BUF's 'skg_rendered_at' from RESPONSE's (rendered-at "N"), if
----it has one: the runtime generation the server rendered the text
----at, which BUF's save sends back ('save.save_request_sexp'). The
----server refuses the save if a node it would write changed later.
----@param buf integer
----@param response any
-function M.store_rendered_at (buf, response)
-  local rendered_at = payload.field_text(response, 'rendered-at')
-  if rendered_at then vim.b[buf].skg_rendered_at = rendered_at end
-end
-
 ---Find-or-create the buffer named BUFFER_NAME, fill it with ORG_TEXT,
 ---mark it as an skg view (view_id = VIEW_ID or a fresh UUID), enable
 ---heralds, arm the lifecycle autocmds, clear the modified flag, and
----switch to it. RENDERED_AT, when given, is the generation the server
----rendered ORG_TEXT at ('store_rendered_at'). The port of
+---switch to it. ORG_TEXT becomes its baseline
+---('capture_clean_baseline'). The port of
 ---'skg-open-org-buffer-from-text'.
 ---@param org_text string
 ---@param buffer_name string
 ---@param view_id string|nil
----@param rendered_at string|nil
 ---@return integer bufnr
-function M.open_org_buffer_from_text (org_text, buffer_name, view_id,
-                                      rendered_at)
+function M.open_org_buffer_from_text (org_text, buffer_name, view_id)
   local view_id = view_id or M.generate_uuid()
   local buf = nil
   for _, existing in ipairs(vim.api.nvim_list_bufs()) do
@@ -188,7 +174,6 @@ function M.open_org_buffer_from_text (org_text, buffer_name, view_id,
   vim.api.nvim_buf_set_lines(buf, 0, -1, false,
                              vim.split(org_text, '\n'))
   M.configure_view_buffer(buf, view_id)
-  vim.b[buf].skg_rendered_at = rendered_at
   vim.bo[buf].modified = false
   M.capture_clean_baseline(buf)
   vim.api.nvim_set_current_buf(buf)

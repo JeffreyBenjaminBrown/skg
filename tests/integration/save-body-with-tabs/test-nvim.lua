@@ -22,7 +22,7 @@ local org_text = table.concat({
 local buffer = require('skg.buffer')
 local view_id = buffer.generate_uuid()
 buffer.open_org_buffer_from_text(
-  org_text, 'skg://skg-body-with-tabs', view_id, T.runtime_generation())
+  org_text, 'skg://skg-body-with-tabs', view_id)
 vim.b[0].skg_clean_baseline = '' -- the baseline of a new empty view, which a hand-built view stands in for
 vim.api.nvim_win_set_cursor(0, { 1, 0 })
 

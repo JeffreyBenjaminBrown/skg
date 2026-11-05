@@ -61,11 +61,11 @@ fn fixture (
   Ok ( Fixture { dir, env, restriction } ) }
 
 /// Open a content view of 'tele' as "tele-view" under the restriction,
-/// approving its title: its text, and the generation it was rendered at.
+/// approving its title: its text.
 fn open_tele_view (
   f           : &Fixture,
   views_state : &mut ViewsState,
-) -> (String, String) {
+) -> String {
   let (mut stream, read_end) : (TcpStream, TcpStream) = mk_test_tcp_stream_pair ();
   handle_single_root_view_request (
     &mut stream,
@@ -75,23 +75,21 @@ fn open_tele_view (
   drop (stream);
   let messages : Vec<String> = read_all_lp_messages (&mut BufReader::new (read_end));
   let response : &String = messages . last () . expect ("a content-view response");
-  ( extract_string_field_from_sexp (response, "content") . expect ("content"),
-    extract_string_field_from_sexp (response, "rendered-at") . expect ("rendered-at") ) }
+  extract_string_field_from_sexp (response, "content") . expect ("content") }
 
-/// Save 'buffer' as "tele-view", rendered at 'rendered_at' as
-/// 'baseline', under the restriction, with 'extra_fields' in the
-/// request: every message the save sent.
+/// Save 'buffer' as "tele-view", whose baseline is 'baseline', under
+/// the restriction, with 'extra_fields' in the request: every message
+/// the save sent.
 fn save_tele_view (
   f            : &mut Fixture,
   views_state  : &mut ViewsState,
   buffer       : &str,
   baseline     : &str,
-  rendered_at  : &str,
   extra_fields : &str,
 ) -> Vec<String> {
   let request : String = format! (
-    "((request . \"save buffer\") (view-id . \"tele-view\") (rendered-at . \"{}\"){})",
-    rendered_at, extra_fields );
+    "((request . \"save buffer\") (view-id . \"tele-view\"){})",
+    extra_fields );
   let sexp_string_body = |text : &str| -> String {
     text . replace ('\\', "\\\\") . replace ('"', "\\\"") };
   let envelope : String = format! (
@@ -141,13 +139,13 @@ fn a_withheld_save_rerender_is_released_by_rerendering_its_views
   let mut f : Fixture = fixture () ?;
   let mut connection : ViewsState =
     ViewsState { open_views : OpenViews::new (), graph_straddle : None };
-  let (view, rendered_at) : (String, String) =
+  let view : String =
     open_tele_view (&f, &mut connection);
   assert! ( view . contains ("A title kept private"), "{}", view );
   let edited : String = format! ("{}*** a new node\n", view);
   { // The save writes the new node, and withholds its rerender.
     let messages : Vec<String> =
-      save_tele_view (&mut f, &mut connection, &edited, &view, &rendered_at, "");
+      save_tele_view (&mut f, &mut connection, &edited, &view, "");
     let terminal : &String = messages . last () . unwrap ();
     assert! ( terminal . starts_with (
                 "((response-type overPrivateText-telescope-confirmation) \
@@ -160,7 +158,7 @@ fn a_withheld_save_rerender_is_released_by_rerendering_its_views
     assert_eq! ( main_files_titled (&f, "a new node") . len (), 1 ); }
   { // Sent again, the same save is stale: it wrote the child.
     let messages : Vec<String> = save_tele_view (
-      &mut f, &mut connection, &edited, &view, &rendered_at,
+      &mut f, &mut connection, &edited, &view,
       " (approved-overPrivateText-pids \"tele\")" );
     let terminal : &String = messages . last () . unwrap ();
     assert! ( terminal . contains ("NOTHING WAS SAVED")
@@ -176,7 +174,7 @@ fn a_withheld_save_rerender_is_released_by_rerendering_its_views
     assert! ( messages [1] . contains ("(lock-views ())"), "{}", messages [1] );
     assert! ( ! messages . iter () . any ( |message|
                 message . contains ("A title kept private") )); }
-  let (fresh, fresh_rendered_at) : (String, String) =
+  let fresh : String =
   { // Approved, it sends the view as the save left it, the new node with its ID.
     let messages : Vec<String> = rerender_tele_view (
       &f, &mut connection, " (approved-overPrivateText-pids \"tele\")" );
@@ -194,13 +192,11 @@ fn a_withheld_save_rerender_is_released_by_rerendering_its_views
               && fresh . contains ( &format! ("(gnid {})", new_pid) )
               && fresh . contains ("a new node"),
               "{}", fresh );
-    ( fresh,
-      extract_string_field_from_sexp (&messages [1], "rendered-at")
-        . expect ("rendered-at") ) };
+    fresh };
   { // The released view saves: it is not stale.
     let messages : Vec<String> = save_tele_view (
       &mut f, &mut connection,
-      &fresh . replace ("a new node", "a renamed node"), &fresh, &fresh_rendered_at, "" );
+      &fresh . replace ("a new node", "a renamed node"), &fresh, "" );
     let terminal : &String = messages . last () . unwrap ();
     assert! ( terminal . contains ("(operation save-rerender)"), "{}", terminal );
     assert_eq! ( main_files_titled (&f, "a renamed node") . len (), 1 );

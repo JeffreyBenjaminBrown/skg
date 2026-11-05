@@ -221,3 +221,116 @@ plan asked. Four corrections carried into slice 3 (the plan's
 Emacs only; the Neovim hand-built views' baselines; the TODO
 comment citing the plan; the tool's baseline source. Slice 3
 launched 21:14.
+** Slice 3
+*** Commits
+- 6675ea26 A stale save is decided by the baseline, not by the clock:
+  the content-based check, its error with what changed and the body's
+  line diff, and its tests; the request still carried an unused
+  rendered-at.
+- The commit carrying this entry: the generation machinery goes from
+  the server, the three clients, the tests and the docs; the slice's
+  docs; the slice's headline turned DONE.
+*** Suites
+- 'cargo nextest run --test grouped_saves', during the work: after
+  the check's first draft, 5 failures, all expected fixture
+  adaptation (the old generation tests, and 'repo_watch' and
+  'save_rerender_release' saving with the empty baseline where they
+  meant a real one); then 172 of 172.
+- 'bash/all-tests.sh' after the first commit: build, Emacs 445 of
+  445, Neovim 482 of 482, nextest 1121 of 1121, doctests green;
+  integration 70 of 72, the two failures 'import-md-and-org' (Emacs and
+  Neovim), pre-existing.
+- 'python3 tools/skg-for-ai/test_skg_for_ai.py' after each commit: PASS.
+- 'bash/emacs-tests.sh' during the removal: one failure, expected
+  fixture adaptation (a test passed a rendered-at argument that no
+  longer exists); then green.
+- 'bash/nvim-tests.sh' during the removal: one failure, expected
+  fixture adaptation (the new empty view's test asserted that no
+  request is sent, but heralds ask for their rules); then green.
+- 'bash/all-tests.sh' after the removal (both clients' integration
+  passes): build, Emacs 444 of 444, Neovim 481 of 481, nextest 1120 of
+  1120, doctests green; integration 70 of 72, the two failures
+  'import-md-and-org', pre-existing. Counts fell by the tests of the
+  removed machinery ('runtime_generation_request', the startup-clock
+  test, the client tests of a request without rendered-at).
+- The 'verify' skill at the TCP surface, on a scratch server: an old
+  view's body edit of a node retitled since is refused, naming the
+  title's old and new values; an equally old view of another node
+  saves; no view carries rendered-at; "runtime generation" is an
+  unknown request.
+- No new failure, no flake.
+*** Deviations from the plan's how
+**** Two commits
+The check and its error first, with the request still carrying an
+unused rendered-at; then the removal across server, clients, tests and
+docs, which cannot land apart (a client that sends no rendered-at
+needs a server that does not ask for it).
+**** A body with trailing whitespace on disk would make every save stale
+The noop filter compares with the graph as stored, but a view draws
+a body's trailing whitespace and the parser trims it. So the
+baseline's copy of any node whose file has such a body survives the
+filter, and so does the buffer's write of it, even untouched: every
+save of a view showing such a node would have been refused, until a
+strip. The baseline's writes are therefore filtered once more,
+against the graph as drawn: the graph's body put through
+'strip_trailing_whitespace_from_body' ('graphnode_as_drawn' in
+'save_staleness.rs'). The error's comparison uses the same form, so
+it does not report whitespace. A test covers it
+('trailing_whitespace_on_disk_does_not_make_a_buffer_stale'). The
+plan's "the parser trims what the strip trimmed" holds; the plan did
+not anticipate the same asymmetry before any strip.
+**** The title line shows the graph's title
+The plan's example shows the old title on the "Title:" line, but also
+omits that line when the graph lost the node; so it is the graph's
+title, now. The old title appears in the title aspect when it differs.
+**** The baseline's parse errors refuse the save
+'org_to_viewforest' returns, beside the viewforest, a list of parse
+errors; a non-empty list refuses the save with the "could not be
+read" message, as a failure does. A server-drawn baseline has none in
+every suite.
+**** Aspects beyond 'node_changes_between'
+The aspects named are those the noop filter compares, so a stale node
+always names at least one: the aliases are named also when only their
+relRepos changed; the flags when only their order did; the content,
+when its IDs did not change, says "reordered" or "the skgrepos of its
+relationships". Subscriptions, hides and overrides are named when the
+baseline specifies them and they differ.
+**** The startup generation is 0
+'startup_generation' (microseconds since the epoch) existed so a
+restart could not make an old buffer look fresh. With it gone the
+generation starts at 0; it names reload notices, rerender passes and
+rebuilt search-index folders (with the process ID), none of which
+compare across processes.
+**** The foreign test lives in 'save_stale_buffers.rs'
+The fixture gained a foreign repo cheaply ('theirs/n.skg'). Editing n
+asks to fork it; the stale check runs before the fork confirmation and
+names n through the fork spec's original.
+**** The tool's search tells a view from a message by its warnings
+'fetch_search_view' told a no-match message from a view by the
+missing rendered-at; a view response has a 'warnings' field, a
+message does not.
+**** Client tests renamed and trimmed
+'tests/elisp/test-skg-rendered-at.el' became
+'tests/elisp/test-skg-baseline.el' (a view keeps the text each
+response draws as its baseline, and a refused save keeps it); the
+Neovim 'skg.save rendered-at' block became 'skg.save baseline'. Tests
+that only asserted the absence of rendered-at were dropped.
+*** Fixtures changed
+- 'tests/save_stale_buffers/fixtures/': 'main/b.skg' (a body of two
+  lines), 'main/w.skg' (a body with trailing whitespace), and a
+  foreign repo 'theirs' with 'n.skg', for the plan's tests.
+- 'tests/repo_watch.rs' and 'tests/save_rerender_release.rs': their
+  save helpers send the view's own text as the baseline (they sent
+  the empty one, which writes nothing, so their stale tests would
+  have passed vacuously or failed).
+- The Neovim integration scripts that open hand-built views set
+  'skg_clean_baseline' to '' after opening, as the slice-2 correction
+  said; the Emacs and Neovim scripts no longer ask for a runtime
+  generation; 'empty-content-save' checks the empty view's baseline
+  instead of its rendered-at.
+*** Left unfinished
+Nothing of the slice. Slice 4's dependency changes and slice 6's
+rebuild (views still closed, the clients still tell the user to close
+them, and 'docs/COMMANDS.org' says so) are untouched.
+*** Headline
+DONE.

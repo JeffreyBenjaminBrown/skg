@@ -131,15 +131,6 @@ an edit command typed via M-x keeps the approval."
      'permanent-local ; to survive major-mode changes
      t)
 
-(defvar-local skg-rendered-at nil
-  "The runtime generation, a string, at which the server rendered this
-buffer's text: the `rendered-at' of the response that last installed
-it. A save sends it back as (rendered-at . N), and the server refuses
-the save if a node it would write changed after that generation. A
-new empty view, which no view response drew, holds the generation the
-server answered when the view was opened (`skg-view-new-empty').")
-(put 'skg-rendered-at 'permanent-local t)
-
 (defvar-local skg-diffView-buffer-kind nil
   "Which buffer of the diff view this skg buffer is, by the name its
 \"diff view\" request gave (\"all changes\", say); nil for any other
@@ -147,17 +138,6 @@ view. A save sends it as (diff-view-buffer . NAME), so that a server
 that does not hold the view (after a restart) re-renders the save as
 that buffer of the diff view.")
 (put 'skg-diffView-buffer-kind 'permanent-local t)
-
-(defun skg--rendered-at-in (response)
-  "RESPONSE's (rendered-at \"N\") as the string N, or nil if it has none."
-  (let ((entry (assoc 'rendered-at response)))
-    (when entry (format "%s" (cadr entry)))))
-
-(defun skg--store-rendered-at (response)
-  "Set `skg-rendered-at' from RESPONSE's (rendered-at \"N\"), if it has one."
-  (let ((rendered-at (skg--rendered-at-in response)))
-    (when rendered-at
-      (setq skg-rendered-at rendered-at))))
 
 (defvar-local skg-clean-baseline nil
   "Exact normalized text received at the last clean view replacement.")
@@ -281,17 +261,15 @@ and truncates to a reasonable length."
         (concat (substring trimmed 0 (- max-len 3)) "...")
       trimmed)))
 
-(defun skg-open-empty-content-view (rendered-at)
-  "Open a new, empty skg content view buffer, rendered at RENDERED-AT,
-the runtime generation the server answered (`skg-rendered-at')."
+(defun skg-open-empty-content-view ()
+  "Open a new, empty skg content view buffer."
   (skg-open-org-buffer-from-text
-   nil "" "*skg-empty*" nil rendered-at))
+   nil "" "*skg-empty*"))
 
-(defun skg-open-org-buffer-from-text (_tcp-proc org-text buffer-name &optional view-id rendered-at)
+(defun skg-open-org-buffer-from-text (_tcp-proc org-text buffer-name &optional view-id)
   "Open a new buffer and insert ORG-TEXT, enabling org-mode.
 If VIEW-ID is provided, set it as the buffer's skg-view-id;
-otherwise generate a new UUID. RENDERED-AT, when provided, is the
-generation the server rendered ORG-TEXT at (`skg-rendered-at')."
+otherwise generate a new UUID."
   (let* ((skgrepo (skg-content-view-repo-name org-text))
          (buffer (skg--generate-contentView-buffer buffer-name skgrepo))
         (view-id (or view-id (org-id-uuid))))
@@ -304,7 +282,6 @@ generation the server rendered ORG-TEXT at (`skg-rendered-at')."
         (heralds-minor-mode)
         (skg-link-annotations-mode 1))
       (setq skg-view-id view-id)
-      (setq skg-rendered-at rendered-at)
       (setq skg-contentView-initialRoot-repo skgrepo)
       (add-hook 'kill-buffer-hook #'skg-send-close-view nil t)
       (set-buffer-modified-p nil)

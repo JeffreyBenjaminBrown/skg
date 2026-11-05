@@ -178,8 +178,7 @@ answer and 'New node: ID'. A view needs a node to start from, so this
 is how an empty skgrepo gets its first one. It saves a buffer holding
 only that headline, as an editor client saves a new empty view
 ('skg-view-new-empty', 'C-c v e' in Emacs), with the empty baseline
-of one, dated like one by the
-server's answer to a 'runtime generation' request, and refuses a skgrepo the
+of one, and refuses a skgrepo the
 server's 'repos' request does not call owned. The new node's body and
 children are then written through the view's edit-and-save loop.
 
@@ -192,9 +191,6 @@ after it, then prints every response up to the save's terminal one.
 The body also carries the saved buffer's baseline, the text the server
 last drew for it: with '--baseline FILE', FILE's text; without it, the
 empty baseline, a new empty view's.
-A 'save buffer' request needs its '(rendered-at . "N")', a number;
-without it the server refuses the save. 'raw "((request . \"runtime
-generation\"))"' gives a current one.
 
 'import INPUT_DIR REPO' imports the Markdown and Org files under
 INPUT_DIR (a path the server can read) into the owned skgrepo REPO: it
@@ -436,11 +432,11 @@ ready and not.
 ** The sidecar
 'BASE.view.json' records the view ID, the command and its request (for
 a buffer of the diff view, the buffer's name), the
-port, the two files' names, the runtime generation the server rendered the
-view at ('rendered_at'), the server's errors and warnings, whether
+port, the two files' names, the server's errors and warnings, whether
 the compact view has a summary, and whether the view is closed: it
 is closed unless a daemon holds it (see "The daemon"). 'save' sends
-the edited view against this view ID and generation, to this port,
+the edited view against this view ID, with the full view as its
+baseline, to this port,
 and renders the summary again when there was one.
 
 * Views and connections
@@ -833,8 +829,7 @@ commands through it (with no '--port'). It runs every command with
 that no daemon outside the test is reached. 'view', 'links-here' and
 'search' write the same full and compact views through it as on their
 own connection (with no daemon's socket to find), and sidecars that
-differ only in 'closed' (and the generation, which the save of
-'links-here' advances). A save through the daemon retitles a node
+differ only in 'closed'. A save through the daemon retitles a node
 another held view shows; the daemon rewrites that view and logs the
 save and the rerender. Then a second server starts over the same data
 root, with its own port and search index, as a teammate's would, and
@@ -1320,13 +1315,14 @@ A buffer of the diff view keeps its handles the same way. Through a
 daemon the server holds the view, and keeps its viewnode IDs across
 its saves as it does an editor's.
 ** Stale views
-The save carries the runtime generation the view was rendered at, from the
-sidecar. If a node the save would write changed since (by Jeff in
-Emacs, say), the server refuses the whole save, naming the node, and
-writes nothing; the tool prints that refusal as it prints any other,
-and leaves the files. A node the view shows as the graph now has it is
-not written, so it does not stop the save. View again and redo the
-edit.
+The save carries the full view ('BASE.full.org') as its baseline: the
+text the server last drew. If a node the save would write changed
+since (by Jeff in Emacs, say), the server refuses the whole save,
+naming the node and saying what changed in it (a changed body comes
+with its changed lines), and writes nothing; the tool prints that
+refusal as it prints any other, and leaves the files. A node the view
+shows as the graph now has it is not written, so it does not stop the
+save. View again and redo the edit.
 ** The server's answer
 After the save the tool prints 'Server: saved' or 'Server: nothing was
 saved', with the counts of errors and warnings, then each error and

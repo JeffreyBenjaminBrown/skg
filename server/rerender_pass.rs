@@ -224,7 +224,7 @@ pub fn update_views_after_save (
       TcpToClient::CollateralView ); }
   Ok ( SaveResponse::saved (
     saved_text, context . errors, context . warnings,
-    readiness_summary, context . runtime . generation )) }
+    readiness_summary )) }
 
 /// Withhold a save's rerender over the text-release challenge
 /// 'decision'. The saved view is registered as this save left it,

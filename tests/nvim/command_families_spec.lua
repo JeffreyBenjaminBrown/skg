@@ -315,33 +315,17 @@ describe('skg.view_ancestry and view_new_empty', function ()
     assert.are.equal('* a\n** c\n*** e', buffer_text())
   end)
 
-  it('view_new_empty asks the runtime generation, then opens a blank'
-     .. ' skg content view rendered at it', function ()
-    local requests = {}
-    local server = helpers.connect_to_fake_server(function (line, respond)
-      table.insert(requests, line)
-      if line:find('runtime generation', 1, true) then
-        respond(helpers.framed(
-          '((response-type runtime-generation)'
-          .. ' (content "1762000000000042"))'))
-      end
-    end)
+  it('view_new_empty opens a blank skg content view', function ()
+    local server = helpers.connect_to_fake_server(function () end)
     local before = vim.api.nvim_get_current_buf()
     require('skg.view_new_empty').view_new_empty()
-    vim.wait(2000, function ()
-      return vim.b[vim.api.nvim_get_current_buf()].skg_content_view
-             == true
-    end, 10)
     server.close()
     helpers.reset_client_state()
     local buf = vim.api.nvim_get_current_buf()
     assert.are_not.equal(before, buf)
-    assert.is_truthy(vim.tbl_contains(requests,
-                     '((request . "runtime generation"))'))
     assert.are.equal('', buffer_text())
     assert.is_truthy(vim.b[buf].skg_view_id)
     assert.is_true(vim.b[buf].skg_content_view)
-    assert.are.equal('1762000000000042', vim.b[buf].skg_rendered_at)
     -- Its baseline is the text it was created with, which its save
     -- carries.
     assert.are.equal('', vim.b[buf].skg_clean_baseline)

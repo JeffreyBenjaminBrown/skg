@@ -15,7 +15,7 @@ use crate::diff_view::readiness_store::ReadinessStore;
 use crate::serve::ViewsState;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{
-  buffer_response_entries, format_buffer_response_sexp, rendered_at_entry,
+  buffer_response_entries, format_buffer_response_sexp,
   send_response_with_length_prefix, sexp_to_client_string, tag_sexp_response,
   true_entry_sexp, value_from_request_sexp, viewforest_id_from_request};
 use crate::skgrepo_sets::{SkgrepoRestriction, require_unrestricted};
@@ -78,20 +78,18 @@ pub fn handle_diffView_request (
           diffView_buffer_kind, viewforest_id )) => {
       views_state . open_views . register_diffView_view (
         &runtime . graph, viewforest_id, viewforest, &pids, diffView_buffer_kind );
-      diffView_buffer_response_sexp ( &text, runtime . generation, &summary ) }, };
+      diffView_buffer_response_sexp ( &text, &summary ) }, };
   send_response_with_length_prefix (
     stream, &tag_sexp_response (TcpToClient::DiffView, &sexp) ); }
 
-/// ((content "ORG") (errors ()) (warnings ()) (rendered-at "N")
-///  (readiness-summary ...)): a view response, ending as a save's does
+/// ((content "ORG") (errors ()) (warnings ()) (readiness-summary ...)):
+/// a view response, ending as a save's does
 /// when it saves a buffer of the diff view.
 fn diffView_buffer_response_sexp (
   text        : &str,
-  rendered_at : u64,
   summary     : &BufferReadinessSummary,
 ) -> String {
   let mut entries : Vec<Sexp> = buffer_response_entries (text, &[], &[]);
-  entries . push ( rendered_at_entry (rendered_at) );
   entries . push ( summary . to_sexp () );
   sexp_to_client_string ( &Sexp::List (entries) ) }
 

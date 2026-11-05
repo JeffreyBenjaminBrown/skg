@@ -66,10 +66,9 @@ So far there are these endpoints:
       telescopes.
 
   - Response: one LP =((response-type search-results) (content
-    "ORG") (warnings ("..." ...)) (rendered-at "N"))=, whose content is the search
-    buffer: each hit, and what the enrichment draws under it.
-    =rendered-at= is the runtime generation the buffer was drawn at
-    (see "The rendered-at of a view" below). A no-match or error response has the same response type and
+    "ORG") (warnings ("..." ...)))=, whose content is the search
+    buffer: each hit, and what the enrichment draws under it. A
+    no-match or error response has the same response type and
     a single =content= field, a message to the user. (The
     overPrivateText challenge above is sent instead of it.) No other
     message follows; the search buffer is an ordinary view from
@@ -117,11 +116,8 @@ So far there are these endpoints:
     (id . "NODE_ID") (view-id . "VIEW_ID")
     (approved-overPrivateText-pids "PID" ...))=
   - Response: LP =((response-type content-view) (content "...")
-    (errors ("..." ...)) (warnings ("..." ...)) (rendered-at "N"))=. The document
-    structure is detailed below, under =Content view=. =rendered-at=
-    is the runtime generation the view was drawn at (see "The
-    rendered-at of a view" below); an error response, which opens no
-    buffer, carries none.
+    (errors ("..." ...)) (warnings ("..." ...)))=. The document
+    structure is detailed below, under =Content view=.
     Under a restricted skgrepo-set, a response involving an overPrivateText
     telescope instead returns LP =overPrivateText-telescope-confirmation= with
     =(operation single-root-view)=, the exact PIDs, and a text-free
@@ -160,7 +156,7 @@ So far there are these endpoints:
     buffers share; the next diff view builds it anew.
 
 ** Save buffer
-  - Request: First =((request . "save buffer") (view-id . "VIEW_ID") (rendered-at . "G") (point-lines-below-focused-headline . "N") (point-column . "C") (point-screen-lines-below-window-start . "M"))\n=, then one UTF-8 length-prefixed S-expression envelope:
+  - Request: First =((request . "save buffer") (view-id . "VIEW_ID") (point-lines-below-focused-headline . "N") (point-column . "C") (point-screen-lines-below-window-start . "M"))\n=, then one UTF-8 length-prefixed S-expression envelope:
     #+begin_src lisp
     ((saved-buffer "...Org text...")
      (baseline "...the saved buffer's text as the server last drew it...")
@@ -178,8 +174,8 @@ So far there are these endpoints:
     server last drew it, before any edit (Emacs keeps it in
     'skg-clean-baseline', Neovim in 'vim.b.skg_clean_baseline',
     skg-for-ai in the view's '.full.org' file). A new empty view's
-    baseline is the text the client created it with. It has no
-    =unavailable= form. A save whose envelope lacks it is refused,
+    baseline is the text the client created it with (see "The
+    baseline of a view" below). It has no =unavailable= form. A save whose envelope lacks it is refused,
     with an error naming the field, and nothing is written. =other-views=
     is mandatory even when empty and covers every other live client view,
     including views the server has not registered. Clean entries carry no
@@ -214,15 +210,6 @@ So far there are these endpoints:
       =overPrivateText-telescope-confirmation= (below), not the save.
       It is independent of Hoist authority: viewing text and publishing
       it on disk are different decisions.
-    - =rendered-at= is mandatory: the runtime generation the saved
-      buffer's text was rendered at, as the last response that drew
-      it said, or, for a buffer no view response drew (a client's new
-      empty view, a buffer a test builds), as the "Runtime generation"
-      request answered when the buffer was opened (see "The
-      rendered-at of a view" below). A request without the field, or
-      with a value that is not a number, is refused after the envelope
-      is read, with one error naming the field, and nothing is
-      written.
     - =(diff-view-buffer . "NAME")= is optional: it names the buffer
       of the diff view the saved buffer is, by the =buffer= name of the
       "Diff view" request (="all changes"=, ="merges"=, ="skgrepo
@@ -255,15 +242,14 @@ So far there are these endpoints:
        views may unlock at this point. A malformed save-relax-lock message leaves
        all locks held until terminal cleanup.
     3. Zero or more collateral-view messages (one per collateral view, streamed as each finishes):
-       =Content-Length: N\r\n\r\n((response-type collateral-view) (view-id "VIEW_ID") (content "...") (rendered-at "G"))=
+       =Content-Length: N\r\n\r\n((response-type collateral-view) (view-id "VIEW_ID") (content "..."))=
        Emacs unlocks and updates each buffer as it arrives, and keeps
-       its =rendered-at=.
+       its text as the buffer's baseline.
     4. Final save response:
-       =Content-Length: N\r\n\r\n((response-type save-result) (content "...") (errors ("..." ...)) (warnings ("..." ...)) (rendered-at "G") (point-lines-below-focused-headline N) (point-column C) (point-screen-lines-below-window-start M))=
+       =Content-Length: N\r\n\r\n((response-type save-result) (content "...") (errors ("..." ...)) (warnings ("..." ...)) (point-lines-below-focused-headline N) (point-column C) (point-screen-lines-below-window-start M))=
        =content= is the re-rendered saved buffer (nil on failure).
-       =rendered-at= is the runtime generation the save swapped in, at which
-       the saved and collateral views were re-rendered; a failed
-       save carries none, and the buffer keeps its own. =errors= is a list of failure-explaining strings. =warnings= is a list of nonfatal messages. Both lists are present and empty if none.
+       The client keeps the content as the buffer's new baseline; a
+       failed save carries none, and the buffer keeps its own. =errors= is a list of failure-explaining strings. =warnings= is a list of nonfatal messages. Both lists are present and empty if none.
        The refresh of each view the save rerenders says nothing of
        what it changed there ('docs/glossary.org', "what the refresh
        changes silently").
@@ -311,25 +297,51 @@ So far there are these endpoints:
     dropped.=, which names its headline as a subheadline.
   - A stale buffer is refused, before anything is written and before
     any confirmation is asked ('stale_write_errors' in
-    'server/serve/handlers/save_staleness.rs'): if a node the buffer
-    would write last changed at a runtime generation later than its
-    =rendered-at=, writing the buffer's text of it would silently undo
-    that change. What the buffer would write is what its text yields
-    once the identical-to-graph nodeInstructions are dropped as
-    no-ops; the writes the save derives from the current graph
-    (nodeMerges, delete propagation, strandeds resets, Hoist repairs,
-    fork clones, restore requests) are not checked. So a node the buffer shows as the graph
-    has it never refuses a save, however old the buffer, and a node
-    the buffer creates has no last change; but a node deleted after
-    the render counts as changed, so an old buffer cannot recreate
-    it. Each stale node is one =** Error N= of the =NOTHING WAS
-    SAVED= message, giving its ID and both runtime generations, and naming the
-    buffer's occurrences of it as subheadlines. There is no
+    'server/serve/handlers/save_staleness.rs'). A save writes a
+    graphnode either from a copy the buffer took when it was drawn or
+    from the graph as it stands at save time; only a copy can be older
+    than the graph, and only a write from a copy, or a delete, can
+    discard graph state the user never saw. The buffer's copies are in
+    its baseline (see "The baseline of a view" below). So the server
+    parses the baseline as it parses the saved text, up to the filter
+    that drops nodeInstructions identical to the graph as no-ops, under
+    the same skgrepo restriction; what survives are the baseline's
+    writes, the graphnodes whose copy in the baseline no longer
+    matches the graph (or that the graph no longer has). A graphnode
+    the buffer writes or deletes that is among them is stale: writing
+    the buffer's text of it would silently undo a change made since
+    the buffer was drawn. What the buffer writes is what its text
+    yields after that filter, plus the original of each fork clone;
+    the writes the save derives from the current graph (nodeMerges,
+    delete propagation, strandeds resets, Hoist repairs, restore
+    requests) undo nothing and are not checked. So a node the buffer
+    shows as the graph has it never refuses a save, however old the
+    buffer; a node the graph deleted after the buffer was drawn is
+    stale, so an old buffer cannot recreate it; a merge request is
+    never stale; and a restart, a rebuild or a body-whitespace strip
+    makes nothing stale by itself. A graphnode the buffer writes
+    without holding a copy of it in its baseline (pasted in by ID, or
+    typed into a new empty view) has nothing to compare, and is not
+    checked. A baseline that cannot be parsed refuses the save, saying
+    so. Each stale node is one =** Error N= of the =NOTHING WAS SAVED=
+    message, whose first line reads "A node this save would write
+    changed after the buffer was rendered:", naming the buffer's
+    occurrences of it as subheadlines, and saying what changed: the
+    graph's title of it, its ID, and the aspects that differ from the
+    baseline's copy ("the title (then "X", now "Y")", "the body", "the
+    content (gained IDS, lost IDS)", "the home skgrepo (then A, now
+    B)", and by name the aliases, extra IDs, flags, subscriptions,
+    hides and overrides); a changed body is followed by its changed
+    lines, baseline against graph, each lost line prefixed "- " and
+    each gained one "+ ", at most 40 each way. A deleted node's error
+    says instead "It was deleted after this buffer was rendered." The
+    user's own edits are the diff of the buffer against the same
+    baseline, which the recovery command writes. There is no
     save-anyway path: the user reopens a fresh view and reapplies the
     edit; the refused buffer keeps its text. Since each connection
     rerenders only its own views, this is what protects a buffer from
     another connection's save (another client, or 'tools/skg-for-ai'),
-    and from a rebuild, after which every earlier buffer is stale.
+    and from files reloaded after another writer changed them.
   - A write-protected occurrence saves nothing of its own, so a save is
     refused, before anything is written, if one differs from the graph
     ('errors_for_writeProtected_occurrences' in
@@ -445,7 +457,7 @@ So far there are these endpoints:
     =(approved-overPrivateText-pids "P" ...)=: it answers with their
     rerenders, and writes nothing. The save is never sent again for
     this: once written, a save that changed a node it writes is stale
-    ("The rendered-at of a view"). On an unrestricted connection the
+    (the stale-buffer rule above). On an unrestricted connection the
     ordinary save-result carries the shared overPrivateText-telescope
     warning. Declining leaves the client's buffers as they are.
   - Exactly one of =save-result=, =delete-from-confirmation=,
@@ -529,27 +541,23 @@ refused because another view's metadata is invalid lists that view's
 errors on one line, naming each headline by its viewnode ID or title,
 since the command searches the current buffer.
 
-** The rendered-at of a view
-Every response that gives the client a buffer to install as a view
-carries =(rendered-at "N")=, the runtime generation
-('RuntimeGeneration' in 'server/types/env.rs';
-'docs/data-model_technical.org', "Runtime generations and
-rebuilding") the buffer was drawn at: =content-view=,
-=search-results=, =diff-view=, =save-result=, =collateral-view= and
-=rerender-view=, the last two once per view. It is not in any
-headline's metadata. Each client keeps it per buffer (Emacs's
-'skg-rendered-at', Neovim's 'vim.b.skg_rendered_at', the tool's
-sidecar), replaces it whenever a response redraws the buffer, and
-sends it back with the buffer's save as =(rendered-at . "N")=. A
-buffer no view response drew, such as a new empty view, is dated
-instead by the "Runtime generation" request, which its client sends
-as it opens the buffer and whose answer it keeps the same way. The
-numbers grow across server processes as well as within one, so a
-buffer an earlier server process drew counts as older than every
-node a later one read. The fork-confirmation buffer carries none: it
-is not saved, and approving it re-saves the source buffer, with that
-buffer's =rendered-at=.
-
+** The baseline of a view
+A view's baseline is its text as the server last drew it, before any
+edit. Every response that gives the client a buffer to install as a
+view draws one: =content-view=, =search-results=, =diff-view=,
+=save-result=, =collateral-view= and =rerender-view=, the last two
+once per view. Each client keeps the baseline per buffer (Emacs in
+'skg-clean-baseline', Neovim in 'vim.b.skg_clean_baseline', the
+tool in the view's '.full.org' file), recaptures it whenever a
+response redraws the buffer, and sends it with the buffer's save as
+the envelope's =baseline= ("Save buffer"). A buffer no view response
+drew, such as a new empty view, has as its baseline the text the
+client created it with. The server compares the baseline with the
+graph to decide whether the save is stale ("Save buffer", the stale
+buffer); a dirty other view's baseline serves the dirty-view
+conflict check. The fork-confirmation buffer has none: it is not
+saved, and approving it re-saves the source buffer, with that
+buffer's baseline.
 ** Server warnings
   - Request: ((request . "server warnings"))
   - Response: LP =((response-type server-warnings) (warnings ("WARNING" ...)))=,
@@ -617,7 +625,7 @@ buffer's =rendered-at=.
     view. While another streaming request is in flight it asks again
     every half second, for up to a minute. A buffer with unsaved edits
     keeps them; its save is refused if it would write a node the
-    batch changed (see "The rendered-at of a view").
+    batch changed (see "Save buffer", the stale buffer).
   - The watcher: the server watches every configured skgrepo
     directory, owned and foreign, with the platform's file-change
     notification (inotify on Linux), not recursively, since a
@@ -628,8 +636,7 @@ buffer's =rendered-at=.
     save: each changed node's telescope is read again from every
     skgrepo, validated as a save's nodeInstructions are, and swapped
     in as a new runtime generation, with the search index updated in
-    the background; nothing is written to disk. A batch's nodes take
-    that generation as their last change. A file that cannot be read
+    the background; nothing is written to disk. A file that cannot be read
     leaves its node as the graph has it; a batch that fails validation
     leaves the whole graph as it was, and its files are tried again
     with the next change on disk. The server's own writes are
@@ -660,10 +667,9 @@ buffer's =rendered-at=.
     ="order-only changes"=. The client sends one request per buffer, in
     that order, each after the previous answer.
   - Response: LP response-type "diff-view", one of:
-    - =((content "ORG") (errors ()) (warnings ()) (rendered-at "N") (readiness-summary ...))=:
+    - =((content "ORG") (errors ()) (warnings ()) (readiness-summary ...))=:
       the buffer, now registered under VIEW_ID as a buffer of the diff
-      view, the runtime generation it was drawn at (see "The
-      rendered-at of a view"), and its readiness summary, in the form
+      view, and its readiness summary, in the form
       and with the counts a save of the buffer unchanged would report
       (see "Save buffer").
     - =((empty . t) (errors ()) (warnings ()))=: the buffer would show
@@ -809,10 +815,10 @@ buffer's =rendered-at=.
     config no longer names it as owned, becomes the config's default;
     either way foreign skgrepos stay shown or hidden as they were. Success
     closes existing views, drops the graph straddle of the diff
-    view, and recomputes context rankings for search. Every node of
-    the rebuilt graph last changed at the new runtime generation, so a save
-    of any buffer rendered before the rebuild is refused if it would
-    write an existing node (see "Save buffer"); the clients do not
+    view, and recomputes context rankings for search. A rebuild makes
+    no buffer stale by itself: a save is refused only where a buffer's
+    baseline no longer matches the rebuilt graph (see "Save buffer",
+    the stale buffer). The clients do not
     re-render after a rebuild, but tell the user to close the old
     views, and fetch the herald rules again ("Herald rules"), whose
     skgrepo labels the reloaded config may have changed. Files that
@@ -874,18 +880,6 @@ buffer's =rendered-at=.
     restricted or not; =shown= says which the restriction keeps out.
   - Logic: =server/serve/handlers/repos.rs=.
 
-** Runtime generation
-  - Request: ((request . "runtime generation"))
-  - Response: LP =((response-type runtime-generation) (content "N"))=,
-    the current runtime generation.
-  - A client opening a buffer no view response drew (a new empty
-    view: Emacs's 'skg-view-new-empty', Neovim's 'view_new_empty', the
-    tool's 'new') asks this first and keeps the answer as the buffer's
-    =rendered-at= (see "The rendered-at of a view"), so the buffer's
-    save refuses to write a node that changed after the buffer was
-    opened.
-  - Logic: =server/serve/handlers/runtime_generation.rs=.
-
 ** Strip body whitespace
   - Request: ((request . "strip body whitespace"))
   - Response: LP response-type "strip-body-whitespace" with
@@ -899,7 +893,9 @@ buffer's =rendered-at=.
     the bodies of nodes the skgrepo restriction keeps out too. Rewrites exactly the .skg files whose bodies
     changed (a clean file stays byte-identical); a body that strips
     to nothing is dropped from its file. The graph and Tantivy are refreshed
-    to match. The clients suggest
+    to match. Open views stay valid: a view still shows the stripped
+    whitespace until it is redrawn, but the parser trims it, so no
+    save is stale for it ("Save buffer", the stale buffer). The clients suggest
     reviewing the result with =git diff --ignore-all-space=, which
     should show nothing.
 
@@ -1047,9 +1043,9 @@ one automatically.
        =Content-Length: N\r\n\r\n((response-type rerender-lock) (lock-views ("view ID1" "view ID2" ...)))=
        Lists all view IDs that will be re-rendered. Emacs locks those buffers.
     2. Zero or more per-view messages (one per view, streamed as each finishes):
-       =Content-Length: N\r\n\r\n((response-type rerender-view) (view-id "VIEW_ID") (content "...") (rendered-at "G"))=
+       =Content-Length: N\r\n\r\n((response-type rerender-view) (view-id "VIEW_ID") (content "..."))=
        Emacs unlocks and updates each buffer as it arrives, and keeps
-       its =rendered-at=.
+       its text as the buffer's baseline.
     3. Done message:
        =Content-Length: N\r\n\r\n((response-type rerender-done) (errors ("..." ...)) (warnings ("..." ...)))=
        Emacs removes the rerender-view handler and unlocks any remaining buffers.

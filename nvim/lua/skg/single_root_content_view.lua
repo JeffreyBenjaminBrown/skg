@@ -99,8 +99,7 @@ function M.handle_content_view_sexp (payload_text, response, view_id)
       buffer.open_org_buffer_from_text(
         content_text,
         buffer.content_view_buffer_name(content_text),
-        view_id,
-        payload.field_text(response, 'rendered-at')) end
+        view_id) end
     local has_errors = #errors > 0
     local has_warnings = #warnings > 0
     if has_errors or has_warnings then

@@ -158,8 +158,7 @@ pub(crate) fn stream_prepared_rerenders (
         &prepared . warnings ) )); }
 
 /// Register each of 'views' in place of the open view it rerenders,
-/// and send it to the client under 'tag', as rendered at 'runtime''s
-/// generation.
+/// and send it to the client under 'tag'.
 pub(crate) fn register_and_send_rerendered_views (
   stream      : &mut TcpStream,
   views_state : &mut ViewsState,
@@ -174,7 +173,7 @@ pub(crate) fn register_and_send_rerendered_views (
       stream,
       & tag_sexp_response (
         tag, & format_single_view_sexp (
-          &view . viewforest_id, &view . text, runtime . generation ) )); }}
+          &view . viewforest_id, &view . text ) )); }}
 
 /// Keep the graph straddle a rerender brought up to date as the
 /// connection's. A rerender that rendered no buffer of the diff view

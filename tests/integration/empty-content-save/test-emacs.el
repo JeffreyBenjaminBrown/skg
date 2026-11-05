@@ -23,8 +23,8 @@
   (let ((content-buffer (skg-test-wait-for-buffer "*skg-empty*")))
     (unless content-buffer
       (fail-test "skg content buffer was not created"))
-    (unless (buffer-local-value 'skg-rendered-at content-buffer)
-      (fail-test "the empty view has no rendered-at")))
+    (unless (equal (buffer-local-value 'skg-clean-baseline content-buffer) "")
+      (fail-test "the empty view's baseline is not its empty text")))
 
   (with-current-buffer "*skg-empty*"
     (erase-buffer)

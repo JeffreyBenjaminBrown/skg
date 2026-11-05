@@ -2004,9 +2004,7 @@ def check_daemon_writes_what_a_command_writes (context):
   talks to the daemon's server) and once on its own connection (with
   no daemon's socket to find), writes
   the same full and compact views; the sidecars differ only in
-  whether the view is still open, which the daemon's is, and in the
-  generation it was rendered at, which the save of 'links-here'
-  advances."""
+  whether the view is still open, which the daemon's is."""
   plain_folder = os . path . join ( context [ "scratch" ], "daemon-plain" )
   for tool_arguments, base_name in [
       ( [ "view", "root-id" ], "view_root-id" ),
@@ -2025,8 +2023,6 @@ def check_daemon_writes_what_a_command_writes (context):
     require_equal ( base_name + "'s sidecars, open or not",
                     ( daemon_sidecar . pop ("closed"), plain_sidecar . pop ("closed") ),
                     ( False, True ) )
-    for sidecar in ( daemon_sidecar, plain_sidecar ):
-      int ( sidecar . pop ("rendered_at") )
     require_equal ( base_name + "'s sidecar through the daemon",
                     daemon_sidecar, plain_sidecar )
   require_log_line ( context, "holding view_root-id (view ID content-view:root-id)" )

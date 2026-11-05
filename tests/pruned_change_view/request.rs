@@ -117,8 +117,6 @@ fn a_save_of_a_diffView_buffer_not_held_keeps_its_viewnode_ids (
     let payload : &str = &response [ response . find ("((") . unwrap () .. ];
     let content : String = extract_string_field_from_sexp (payload, "content")
       . expect ("the buffer's answer has content");
-    let rendered_at : String = extract_string_field_from_sexp (payload, "rendered-at")
-      . expect ("the buffer's answer has rendered-at");
     let first_headline : &str = content . lines ()
       . find ( |line| viewnode_id_atom_of (line) . is_some () )
       . expect ("a headline with a viewnode ID");
@@ -132,8 +130,8 @@ fn a_save_of_a_diffView_buffer_not_held_keeps_its_viewnode_ids (
         open_views : OpenViews::new (), graph_straddle : None };
       save_through_the_handler (
         f, &mut views_state,
-        &format! ( "((request . \"save buffer\") (view-id . \"diff-view-1\") (rendered-at . \"{}\"){})",
-                   rendered_at, fields ),
+        &format! ( "((request . \"save buffer\") (view-id . \"diff-view-1\"){})",
+                   fields ),
         &renumbered ) };
     { let named : String = saved_on_a_new_connection (
         f, " (diff-view-buffer . \"all changes\")" );

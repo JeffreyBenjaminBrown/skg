@@ -85,7 +85,6 @@ function M.send_save_buffer (save_buf, saved_view_id, approved_forks, fork_skgre
                           approved_hoist_pids,
                           strandeds_review,
                           delete_from,
-                          vim.b[save_buf].skg_rendered_at,
                           vim.b[save_buf].skg_diffView_buffer_kind)
   state.register_response_handler('save-lock',
     function (_payload_text, response)
@@ -266,9 +265,6 @@ end
 ---@param approved_hoist_pids string[]|nil
 ---@param strandeds_review table|nil
 ---@param delete_from string|nil 'visible' or 'all'
----@param rendered_at string|nil the generation the buffer was rendered at
----  ('vim.b.skg_rendered_at'); nil, in a buffer no response dated,
----  sends no such field, and the server refuses the save
 ---@param diffView_buffer_kind string|nil which buffer of the diff view
 ---  the saved buffer is ('vim.b.skg_diffView_buffer_kind', "all
 ---  changes" say), sent as (diff-view-buffer . NAME); nil for any
@@ -277,14 +273,11 @@ end
 function M.save_request_sexp (view_id, position, approved_forks,
                                 fork_skgrepos, approved_hoist_pids,
                                 strandeds_review,
-                                delete_from, rendered_at,
+                                delete_from,
                                 diffView_buffer_kind)
   local request = {
     sexpr.pair(sexpr.symbol('request'), 'save buffer'),
     sexpr.pair(sexpr.symbol('view-id'), view_id) }
-  if rendered_at then
-    table.insert(request,
-      sexpr.pair(sexpr.symbol('rendered-at'), rendered_at)) end
   if diffView_buffer_kind then
     table.insert(request,
       sexpr.pair(sexpr.symbol('diff-view-buffer'), diffView_buffer_kind)) end
@@ -404,7 +397,6 @@ function M.apply_streamed_view_update (_payload_text, response,
       lock.unlock_after_save(buf)
       M.replace_buffer_with_new_content(
         buf, sexpr.atom_text(content), nil)
-      buffer.store_rendered_at(buf, response)
     end
   end)
   if not ok then
@@ -450,7 +442,6 @@ function M.handle_save_sexp (save_buf, response)
     M.replace_buffer_with_new_content(
       save_buf, content_text,
       M.save_point_position_from_response(response))
-    buffer.store_rendered_at(save_buf, response)
   end
   if #errors > 0 or #warnings > 0 then
     M.show_save_errors_and_warnings(errors, warnings,

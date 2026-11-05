@@ -148,8 +148,7 @@ function M.display_search_results (response, search_terms)
   local buf = buffer.open_org_buffer_from_text(
     content and (vim.trim(content) .. '\n') or '',
     buffer.search_buffer_name(search_terms),
-    'search:' .. search_terms,
-    payload.field_text(response, 'rendered-at'))
+    'search:' .. search_terms)
   vim.bo[buf].modified = false
   for _, hook in ipairs(M.search_buffer_setup_hooks) do
     pcall(hook)

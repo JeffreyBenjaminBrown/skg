@@ -31,8 +31,7 @@ local content = table.concat({
   '** (skg node (gnid 6)) 6',
 }, '\n')
 local buf = buffer.open_org_buffer_from_text(
-  content, 'skg://focus-and-folded-metadata-test', nil,
-  T.runtime_generation())
+  content, 'skg://focus-and-folded-metadata-test')
 vim.b[buf].skg_clean_baseline = '' -- the baseline of a new empty view, which a hand-built view stands in for
 print('Created buffer with 6 headlines')
 

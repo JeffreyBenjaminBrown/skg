@@ -48,7 +48,7 @@ local content = table.concat({
   '** e',
 }, '\n')
 local buf = buffer.open_org_buffer_from_text(
-  content, 'skg://fold-preservation-test', nil, T.runtime_generation())
+  content, 'skg://fold-preservation-test')
 vim.b[buf].skg_clean_baseline = '' -- the baseline of a new empty view, which a hand-built view stands in for
 print('Created buffer with content')
 

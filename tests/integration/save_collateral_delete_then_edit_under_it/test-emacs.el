@@ -109,7 +109,6 @@ which takes priority over subee.skg on disk."
       (erase-buffer)
       (org-mode)
       (setq skg-view-id (org-id-uuid))
-      (setq skg-rendered-at (skg-test-runtime-generation))
       (setq skg-clean-baseline "") ; the baseline of a new empty view, which a hand-built view stands in for
       (insert "* (skg node (gnid 11) (skgRepos (nodeRepo main)) writeProtected) 11\n")
       (insert "* (skg node (gnid subee) (skgRepos (nodeRepo main))) subee\n")

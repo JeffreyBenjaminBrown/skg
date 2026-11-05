@@ -2,9 +2,10 @@
 //! generation, as a save's does: each changed node's telescope is read
 //! again from every skgrepo, and the nodes that differ from the graph
 //! are written to it (or deleted from it) as nodeInstructions, through
-//! the save's incremental validation ('prepare_graph_update'). The
-//! nodes so reloaded take the new generation as their last change,
-//! so the stale-save check refuses a buffer that showed them before.
+//! the save's incremental validation ('prepare_graph_update'). A
+//! buffer that showed a node so reloaded, and would write it, is then
+//! stale: its copy no longer matches the graph
+//! ('server/serve/handlers/save_staleness.rs').
 //!
 //! Nothing is written to disk: the files are already what the graph
 //! should say. A file that cannot be read leaves its node as the graph

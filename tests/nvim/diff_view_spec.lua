@@ -71,7 +71,7 @@ describe('skg.diff_view', function ()
         requested = requested + 1
         respond(helpers.framed(
           '((response-type diff-view) (content "* (skg node (gnid a)) a")'
-          .. ' (errors ()) (warnings ()) (rendered-at "7")'
+          .. ' (errors ()) (warnings ())'
           .. ' (readiness-summary (ready 1) (changed 3) (foreign 0)'
           .. ' (order-only 0) (notEditable 2)))'))
       elseif line:match('%(buffer %. ') then

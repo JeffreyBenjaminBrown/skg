@@ -38,12 +38,10 @@ use crate::serve::handlers::text_release::{
 use crate::serve::handlers::save_dependencies::{
   SaveAffectedIds, dirty_view_conflicts, format_conflict_error,
 };
-use crate::serve::handlers::save_staleness::{
-  RenderedAt, rendered_at_from_request, stale_write_errors};
+use crate::serve::handlers::save_staleness::stale_write_errors;
 use crate::serve::util::{
   viewforest_id_from_request,
   buffer_response_entries,
-  rendered_at_entry,
   format_fork_confirmation_response_sexp,
   format_lock_views_sexp,
   read_length_prefixed_content,
@@ -109,9 +107,6 @@ pub struct SaveResponse {
   /// Some when the saved buffer is one of the diff view's: the
   /// readiness summary the client shows after the save.
   pub readiness_summary   : Option<BufferReadinessSummary>,
-  /// Some for a save that skgsave-committed and rerendered: the runtime
-  /// generation 'saved_view' was rendered at.
-  pub rendered_at         : Option<u64>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -145,10 +140,8 @@ impl SaveResponse {
     errors             : Vec<String>,
     warnings           : Vec<String>,
     readiness_summary  : Option<BufferReadinessSummary>,
-    rendered_at        : u64,
   ) -> SaveResponse {
     SaveResponse { saved_view, errors, warnings, readiness_summary,
-                   rendered_at : Some (rendered_at),
                    .. SaveResponse::empty () } }
 
   /// A save that skgsave-committed nothing, asking to review the
@@ -217,18 +210,14 @@ impl SaveResponse {
       text_release_confirmation : None,
       strandeds_confirmation    : None,
       delete_from_confirmation  : None,
-      readiness_summary         : None,
-      rendered_at               : None, } }
+      readiness_summary         : None, } }
 
   /// Format: ((content "...") (errors (...)) (warnings (...))
-  /// (rendered-at "N") POINT... (readiness-summary ...)), where the
-  /// rendered-at, the point entries and the readiness summary are
-  /// there when the save has them.
+  /// POINT... (readiness-summary ...)), where the point entries and
+  /// the readiness summary are there when the save has them.
   fn to_sexp_string (&self) -> String {
     let mut items : Vec<Sexp> = buffer_response_entries (
       & self . saved_view, & self . errors, & self . warnings );
-    if let Some (rendered_at) = self . rendered_at {
-      items . push (rendered_at_entry (rendered_at)); }
     if let Some (point_position) = &self . save_point_position {
       push_save_point_position_to_sexp_items (&mut items, point_position); }
     if let Some (readiness_summary) = &self . readiness_summary {
@@ -269,10 +258,8 @@ pub fn handle_save_buffer_request (
     strandeds_review_from_request (request);
   let delete_from : DeleteFrom =
     delete_from_from_request (request);
-  let rendered_at_result : Result<(RenderedAt, Option<DiffViewBufferKind>), String> =
-    rendered_at_from_request (request)
-    . and_then ( |rendered_at| named_diffView_buffer_kind_from_request (request)
-                 . map ( |kind| (rendered_at, kind) ));
+  let named_diffView_buffer_kind_result : Result<Option<DiffViewBufferKind>, String> =
+    named_diffView_buffer_kind_from_request (request);
   { // Send the early broad lock before reading the buffer, so the client's
     // one-shot save-lock handler always fires exactly once and balances its
     // pending-count -- even when the read below fails (otherwise only
@@ -290,7 +277,7 @@ pub fn handle_save_buffer_request (
   match ( read_length_prefixed_content (reader)
             .and_then (|content| parse_save_request_envelope (
               &content, viewforest_id_from_request_result . as_ref () . ok ())),
-          rendered_at_result )
+          named_diffView_buffer_kind_result )
   {
     (Ok (_envelope), Err (error_msg)) => {
       // The envelope was read, so the stream stays in step; the save is refused.
@@ -300,7 +287,7 @@ pub fn handle_save_buffer_request (
           TcpToClient::SaveResult,
           & sexp_to_client_string ( &empty_response_sexp (
             &error_msg, &[], &save_point_position )) )); }
-    (Ok (envelope), Ok ((rendered_at, named_diffView_buffer_kind))) => {
+    (Ok (envelope), Ok (named_diffView_buffer_kind)) => {
       { let _span : tracing::span::EnteredSpan = tracing::info_span!(
           "update_from_and_rerender_buffer" ). entered();
         match block_on(
@@ -318,7 +305,6 @@ pub fn handle_save_buffer_request (
             &strandeds_review,
             delete_from,
             &envelope . other_views,
-            rendered_at,
             named_diffView_buffer_kind ))
         { Ok (mut save_response) => {
             save_response . save_point_position =
@@ -838,8 +824,6 @@ pub async fn update_from_and_rerender_buffer_with_hoist_approval (
   fork_skgrepos               : &HashMap<ID, SkgrepoName>,
   approved_hoist_pids         : &HashSet<ID>,
 ) -> Result<SaveResponse, Box<dyn Error>> {
-  let current_generation : RenderedAt = // This entry point saves a buffer as if rendered now: only the handler knows a client's rendering.
-    RenderedAt ( env . runtime_snapshot () . generation );
   update_from_and_rerender_buffer_with_approvals (
     stream, org_buffer_text,
     "", // the empty baseline: this entry point's buffers were drawn by no server, and an empty baseline writes nothing
@@ -847,7 +831,7 @@ pub async fn update_from_and_rerender_buffer_with_hoist_approval (
     viewforest_id_from_request_result, views_state, skgrepo_restriction,
     approved_forks, fork_skgrepos, approved_hoist_pids,
     &StrandedsReview::NotReviewed, DeleteFrom::NotChosen,
-    &[], current_generation, None ) . await
+    &[], None ) . await
 }
 
 pub async fn update_from_and_rerender_buffer_with_approvals (
@@ -864,7 +848,6 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
   strandeds_review          : &StrandedsReview,
   delete_from               : DeleteFrom,
   other_views               : &[ClientViewSnapshot],
-  _rendered_at              : RenderedAt,
   named_diffView_buffer_kind : Option<DiffViewBufferKind>, // the request's '(diff-view-buffer . "...")': the buffer of the diff view it saves, for a view the connection does not hold
 ) -> Result<SaveResponse, Box<dyn Error>> {
   // Save-plan construction reads the current files and graph.  Hold the sole

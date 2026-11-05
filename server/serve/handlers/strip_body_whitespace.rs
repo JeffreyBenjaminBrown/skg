@@ -61,12 +61,8 @@ fn strip_body_whitespace_and_refresh_caches (
       owned_checked )); }
   let new_graph : Arc<InRustGraph> = Arc::new ({
     let mut new_graph : InRustGraph = InRustGraph::from_graphnodes (&all_nodes);
-    { // Only the stripped nodes changed; the rest keep their last-change generations.
-      new_graph . last_changes = runtime . graph . last_changes . clone ();
-      // Nor do the illegal edits, which no body strip touches.
-      new_graph . illegal_edits = runtime . graph . illegal_edits . clone ();
-      for node in &changed {
-        new_graph . last_changes . note_written (&node . pid); }}
+    new_graph . illegal_edits = // which no body strip touches
+      runtime . graph . illegal_edits . clone ();
     new_graph });
   { let tantivy_nodes : Vec<GraphnodeInTantivy> =
       changed . iter () . map (GraphnodeInTantivy::from) . collect ();

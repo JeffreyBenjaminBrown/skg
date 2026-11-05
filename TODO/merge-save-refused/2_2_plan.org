@@ -541,7 +541,7 @@ the field; the tool's tests likewise. Run
 
 Docs: the save request's envelope in 'docs/api-and-formats.org'
 ("Save buffer") documents the field; the tool's README too.
-** TODO Slice 3: staleness by content, and the generations go
+** DONE Slice 3: staleness by content, and the generations go
 *** Corrections carried from slice 2
 - 'bash/integration-tests.sh' runs the Emacs client only. The
   Neovim pass is what 'bash/all-tests.sh' adds; run the

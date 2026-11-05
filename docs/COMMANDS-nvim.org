@@ -23,24 +23,33 @@ prepared save can affect. A conflict is a hard refusal before any write;
 the error names the views and IDs. Missing or malformed baseline data is
 also refused conservatively. There is no "save anyway" choice.
 
-Each view also remembers when the server drew it. A save is refused,
-before any write, if a node it would write has changed since: by a save
-from another client or from 'tools/skg-for-ai', which this client's
-views do not follow; by another writer of the '.skg' files (a second
-server over the same data, a 'git pull', an editor), which the server
-reloads as the files change; or by a rebuild of the session-lifetime
-stores, after which every older view is stale.
-The error names each such node
-and the view's headlines for it. A node the view shows as the graph
-has it is not written, so an untouched node never refuses a save,
-however old the view; and a new empty view, which the server did not
-draw, is never stale. Your edits stay in the view: archive them if
+Each view also keeps the text the server last drew for it, its
+baseline, and sends it with every save. A save is refused, before any
+write, if a node it would write has changed since the server drew the
+view: by a save from another client or from 'tools/skg-for-ai', which
+this client's views do not follow, or by another writer of the '.skg'
+files (a second server over the same data, a 'git pull', an editor),
+which the server reloads as the files change. The server compares the
+view's copy of each node it would write with the graph, so only real
+changes count: a node the view shows as the graph has it is not
+written, so an untouched node never refuses a save, however old the
+view; and a restart, a rebuild or a whitespace strip makes no view
+stale by itself. A node the view writes without having been drawn in
+it (pasted in by ID, or typed into a new empty view) is not checked.
+The error names each such node, the view's headlines for it, and what
+changed in it since the view was drawn: the title (old and new), the
+body (with its changed lines, then against now), the content (the IDs
+gained and lost), the home skgrepo (old and new), or by name its
+aliases, extra IDs, flags, subscriptions, hides or overrides; or that
+the node was deleted. Your edits stay in the view: archive them if
 needed (:SkgShowUnsavedChanges), open a fresh view, and reapply them.
 
 The refusal is whole: nothing the buffer asks is written, not even
-its edits of nodes nobody else changed. To recover a view whose save
-was refused because files changed on disk (or another save), keeping
-all of its roots:
+its edits of nodes nobody else changed. Recovering is a three-way
+merge by hand, from one common base, the text the server last drew:
+the recovery document holds your edits as a diff against that text,
+and the error holds the graph's change against the same text. To
+recover a view, keeping all of its roots:
 - Copy the buffer's text aside: ':SkgShowUnsavedChanges' writes it,
   with a diff against the text the server last drew, to a file.
 - Discard the buffer's edits and redraw it: mark it unmodified
@@ -49,7 +58,9 @@ all of its roots:
   with all of its roots. It never redraws a buffer that still has
   unsaved edits: it leaves that buffer as it is and names it in a
   notification, so marking the buffer unmodified is what lets it go.
-- Redo the edits by hand over the new text, comparing against the copy.
+- Reapply your diff by hand over the new text, where it still
+  applies; where the graph changed the same lines (the error shows
+  how), decide what the text should say.
 (Emacs: the same, with M-~ and M-x skg-request-rerender-all-views.)
 
 When the server reloads files changed on disk, it says so in a
@@ -1378,6 +1389,7 @@ It ignores the skgrepo restriction: it rewrites the bodies of nodes
 the skgrepo restriction keeps out too.
 Rewrites exactly the .skg files whose bodies change;
 the derived caches are refreshed to match.
+Open views stay valid: their saves are not refused for it.
 *** :SkgCloseAllSkgBuffers
 This may be warranted after an session-lifetime-store rebuild.
 Kills every skg view buffer (each triggers a close-view notice to

@@ -82,8 +82,7 @@ summary, as a save does, and any errors and warnings. Returns
                           (not (string= content "")))))
         (when opened
           (skg-open-org-buffer-from-text
-           tcp-proc content (concat "diff-view: " buffer) view-id
-           (skg--rendered-at-in response))
+           tcp-proc content (concat "diff-view: " buffer) view-id)
           (let ((opened-buffer (skg-find-buffer-by-view-id view-id)))
             (when opened-buffer
               (with-current-buffer opened-buffer

@@ -601,6 +601,28 @@ of the implementation), which keeps what the user put in it. Org
 folding keeps the words "fold" and "unfold"; drawing more of a view
 is not called unfolding.
 
+*** baseline, stale
+
+A buffer's *baseline* is its text as the server last drew it, before
+any edit. Emacs keeps it in 'skg-clean-baseline', Neovim in
+'vim.b.skg_clean_baseline', 'tools/skg-for-ai' in the view's
+'.full.org' file; each recaptures it whenever a response redraws the
+buffer, and sends it with every save. A new empty view's baseline is
+the text the client created it with. *The baseline's writes* are the
+Save instructions that saving the baseline itself would produce,
+parsed, supplemented and filtered of no-ops as the saved text is:
+a baseline viewnode equal to the graph's graphnode yields none; one
+that differs, or whose graphnode the graph lacks, survives.
+
+A graphnode is *stale* in a save when the buffer writes or deletes it
+(or forks it) and it is among the baseline's writes: the buffer's copy
+of it no longer matches the graph, so writing it would undo a change
+the user never saw. A save with a stale graphnode is refused whole
+('server/serve/handlers/save_staleness.rs'). Staleness is decided by
+content, not by time: a restart, a rebuild or a whitespace strip makes
+nothing stale by itself, and a graphnode changed and changed back is
+not stale.
+
 *** text search, search view, enrichment
 
 A *text search* (=C-c f=) answers with one message, which opens a

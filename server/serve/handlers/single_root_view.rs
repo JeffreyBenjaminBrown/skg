@@ -11,7 +11,6 @@ use crate::serve::util::{
   viewforest_id_from_request,
   send_response_with_length_prefix,
   format_buffer_response_sexp,
-  format_view_response_sexp,
   sexp_to_client_string,
   tag_sexp_response,
   tag_text_response};
@@ -116,11 +115,10 @@ pub fn handle_single_root_view_request (
                     warnings };
                 tag_sexp_response (
                   TcpToClient::ContentView,
-                  & format_view_response_sexp (
+                  & format_buffer_response_sexp (
                     & buffer_content,
                     &[],
-                    & warnings,
-                    runtime . generation ) ) },
+                    & warnings ) ) },
               Err (e) => {
                 let mut errors : Vec<String> = Vec::new ();
                 errors . push ( format! (

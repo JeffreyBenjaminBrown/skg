@@ -66,23 +66,6 @@ fn a_candidate_not_swapped_in_cannot_change_the_visible_generation () {
 }
 
 #[test]
-fn a_runtime_starts_after_every_earlier_process_and_stamps_what_it_read () {
-  // A buffer an earlier server process rendered must count as older
-  // than every node a later one read: startup generations follow the clock.
-  let earlier = SharedRuntime::new (
-    config (), Arc::new (graph_with ("read")),
-    empty_in_ram_tantivy_index () . unwrap ()) . graph_snapshot ();
-  std::thread::sleep (std::time::Duration::from_millis (1));
-  let later = SharedRuntime::new (
-    config (), Arc::new (graph_with ("read")),
-    empty_in_ram_tantivy_index () . unwrap ()) . graph_snapshot ();
-  assert! (later . generation > earlier . generation);
-  assert_eq! (later . graph . last_change_of (&ID::from ("read")),
-              Some (later . generation));
-  assert_eq! (later . graph . last_change_of (&ID::from ("never-read")), None);
-}
-
-#[test]
 fn rebuild_candidate_uses_a_sibling_directory_without_wiping_live_index () {
   let temp = tempfile::tempdir () . unwrap ();
   let live_path = temp . path () . join ("tantivy");

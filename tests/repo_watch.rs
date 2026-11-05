@@ -114,14 +114,13 @@ fn assert_no_notice_comes (
     Err (TryRecvError::Empty) => {},
     other => panic! ("an unexpected repo change notice: {:?}", other), }}
 
-/// Open a content view of 'gnid' as 'view_id': its text, and the
-/// generation it was rendered at.
+/// Open a content view of 'gnid' as 'view_id': its text.
 fn open_view (
   f           : &Fixture,
   views_state : &mut ViewsState,
   gnid        : &str,
   view_id     : &str,
-) -> (String, u64) {
+) -> String {
   let (mut stream, read_end) : (TcpStream, TcpStream) = mk_test_tcp_stream_pair ();
   handle_single_root_view_request (
     &mut stream,
@@ -132,23 +131,19 @@ fn open_view (
   drop (stream);
   let messages : Vec<String> = read_all_lp_messages (&mut BufReader::new (read_end));
   let response : &String = messages . last () . expect ("a content-view response");
-  ( extract_string_field_from_sexp (response, "content") . expect ("content"),
-    extract_string_field_from_sexp (response, "rendered-at") . expect ("rendered-at")
-      . parse () . unwrap () ) }
+  extract_string_field_from_sexp (response, "content") . expect ("content") }
 
-/// Save 'buffer' as 'view_id', rendered at 'rendered_at' as
-/// 'baseline': the terminal save-result message.
+/// Save 'buffer' as 'view_id', whose baseline is 'baseline': the
+/// terminal save-result message.
 fn save (
   f           : &mut Fixture,
   views_state : &mut ViewsState,
   view_id     : &str,
   buffer      : &str,
   baseline    : &str,
-  rendered_at : u64,
 ) -> String {
   let request : String = format! (
-    "((request . \"save buffer\") (view-id . \"{}\") (rendered-at . \"{}\"))",
-    view_id, rendered_at );
+    "((request . \"save buffer\") (view-id . \"{}\"))", view_id );
   let sexp_string_body = |text : &str| -> String {
     text . replace ('\\', "\\\\") . replace ('"', "\\\"") };
   let envelope : String = format! (
@@ -216,7 +211,7 @@ fn files_written_into_a_foreign_and_an_owned_repo_are_reloaded
   let f : Fixture = fixture () ?;
   let mut connection : ViewsState = new_connection ();
   let mut receiver : Receiver<Arc<RepoChangeNotice>> = f . env . runtime . subscribe_to_repo_change_notices ();
-  let (a_view, _) : (String, u64) = open_view (&f, &mut connection, "a", "a-view");
+  let a_view : String = open_view (&f, &mut connection, "a", "a-view");
   assert! ( a_view . contains ("b as first written"), "{}", a_view );
   let generation_before : u64 = f . env . runtime_snapshot () . generation;
   write_skg_file_as_another_writer (&f, "theirs", "u", "pid: u\ntitle: u as they wrote it\n");
@@ -233,9 +228,9 @@ fn files_written_into_a_foreign_and_an_owned_repo_are_reloaded
   assert_eq! ( title_in_graph (&f, "b") . as_deref (), Some ("b rewritten on disk") );
   { // A fresh view shows each new node.
     let mut other : ViewsState = new_connection ();
-    let (u_view, _) : (String, u64) = open_view (&f, &mut other, "u", "u-view");
+    let u_view : String = open_view (&f, &mut other, "u", "u-view");
     assert! ( u_view . contains ("u as they wrote it"), "{}", u_view );
-    let (n_view, _) : (String, u64) = open_view (&f, &mut other, "n", "n-view");
+    let n_view : String = open_view (&f, &mut other, "n", "n-view");
     assert! ( n_view . contains ("n from another writer"), "{}", n_view ); }
   Ok (()) }
 
@@ -245,8 +240,8 @@ fn a_connection_is_told_and_its_open_view_rerenders
   let f : Fixture = fixture () ?;
   let mut connection : ViewsState = new_connection ();
   let mut receiver : Receiver<Arc<RepoChangeNotice>> = f . env . runtime . subscribe_to_repo_change_notices ();
-  let (_a_view, _) : (String, u64) = open_view (&f, &mut connection, "a", "a-view");
-  let (_t_view, _) : (String, u64) = open_view (&f, &mut connection, "t", "t-view");
+  let _a_view : String = open_view (&f, &mut connection, "a", "a-view");
+  let _t_view : String = open_view (&f, &mut connection, "t", "t-view");
   let mut receiver_of_connection : Receiver<Arc<RepoChangeNotice>> =
     f . env . runtime . subscribe_to_repo_change_notices ();
   write_skg_file_as_another_writer (&f, "mine", "b", "pid: b\ntitle: b rewritten again\n");
@@ -326,12 +321,12 @@ fn the_servers_own_save_is_not_reloaded_again
   let mut f : Fixture = fixture () ?;
   let mut connection : ViewsState = new_connection ();
   let mut receiver : Receiver<Arc<RepoChangeNotice>> = f . env . runtime . subscribe_to_repo_change_notices ();
-  let (a_view, rendered_at) : (String, u64) = open_view (&f, &mut connection, "a", "a-view");
+  let a_view : String = open_view (&f, &mut connection, "a", "a-view");
   let result : String = save (
     &mut f, &mut connection, "a-view",
     &a_view . replace ("a as first written", "a saved by the server")
             . replace ("b as first written", "b saved by the server"),
-    &a_view, rendered_at );
+    &a_view );
   assert! ( result . contains ("a saved by the server"), "{}", result );
   assert! ( fs::read_to_string ( skg_path (&f, "mine", "b") ) ?
             . contains ("b saved by the server") );
@@ -357,14 +352,14 @@ fn a_buffer_rendered_before_a_reload_cannot_write_a_reloaded_node
   let mut f : Fixture = fixture () ?;
   let mut connection : ViewsState = new_connection ();
   let mut receiver : Receiver<Arc<RepoChangeNotice>> = f . env . runtime . subscribe_to_repo_change_notices ();
-  let (a_view, rendered_at) : (String, u64) = open_view (&f, &mut connection, "a", "a-view");
+  let a_view : String = open_view (&f, &mut connection, "a", "a-view");
   write_skg_file_as_another_writer (&f, "mine", "b", "pid: b\ntitle: b from another writer\n");
   let _notice : Arc<RepoChangeNotice> = next_notice (&mut receiver);
   let result : String = save (
     &mut f, &mut connection, "a-view",
     &a_view . replace ("b as first written", "b from the old buffer")
             . replace ("a as first written", "a from the old buffer"),
-    &a_view, rendered_at );
+    &a_view );
   assert! ( result . contains ("changed after the buffer was rendered")
             && result . contains ("- ID: b")
             && ! result . contains ("- ID: a"),

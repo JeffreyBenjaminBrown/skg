@@ -33,7 +33,6 @@ pub enum RequestType {
   InvestigateUnknownNode,
   ServerWarnings,
   Repos,
-  RuntimeGeneration,
 }
 
 impl RequestType {
@@ -69,7 +68,6 @@ impl RequestType {
       "investigate unknown node" => Ok (RequestType::InvestigateUnknownNode),
       "server warnings"          => Ok (RequestType::ServerWarnings),
       "repos"                    => Ok (RequestType::Repos),
-      "runtime generation"       => Ok (RequestType::RuntimeGeneration),
       other => Err (format! ("Unsupported request type: {}", other)), }} }
 
 /// IN DETAIL: See docs/api-and-formats.org
@@ -119,7 +117,6 @@ pub enum TcpToClient {
   InvestigateUnknownNode, // What git history says an unknown node used to be, or the node an ID resolves to, as Org text.
   Repos, // The configured skgrepos in privacy order, and the connection's skgrepo restriction.
   ServerWarnings, // What the server warned about as it started, '(warnings ("..." ...))'. Each client asks once per connection.
-  RuntimeGeneration, // The current runtime generation, '(content "N")'. A client dates a new empty view by it.
   RepoFilesReloaded, // Unprompted, between requests: what the repo watcher reloaded, '(reloaded ((SKGREPO N) ...)) (warnings ("..." ...)) (view-ids (ID ...))', the views naming the connection's open views that show a changed node.
   Error,
 }
@@ -172,6 +169,5 @@ impl TcpToClient {
       TcpToClient::InvestigateUnknownNode => "investigate-unknown-node",
       TcpToClient::ServerWarnings   => "server-warnings",
       TcpToClient::Repos            => "repos",
-      TcpToClient::RuntimeGeneration => "runtime-generation",
       TcpToClient::RepoFilesReloaded => "repo-files-reloaded",
       TcpToClient::Error            => "error", }} }

@@ -91,7 +91,7 @@ fn save (
   baseline    : Option<&str>,
 ) -> String {
   let request : String = format! (
-    "((request . \"save buffer\") (view-id . \"{}\") (rendered-at . \"0\"))",
+    "((request . \"save buffer\") (view-id . \"{}\"))",
     view_id );
   let envelope : String = format! (
     "((saved-buffer \"{}\"){} (other-views ()))",

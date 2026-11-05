@@ -52,7 +52,6 @@
       (erase-buffer)
       (org-mode)
       (setq skg-view-id (org-id-uuid))
-      (setq skg-rendered-at (skg-test-runtime-generation))
       (setq skg-clean-baseline "") ; the baseline of a new empty view, which a hand-built view stands in for
 
       ;; Insert the 6 headlines

@@ -25,7 +25,7 @@ Returns (REQUESTED-BUFFERS OPENED-BUFFER-NAMES)."
                (lambda (_time _repeat function &rest args)
                  (apply function args)))
               ((symbol-function 'skg-open-org-buffer-from-text)
-               (lambda (_proc _text buffer-name _view-id &optional _rendered-at)
+               (lambda (_proc _text buffer-name _view-id)
                  (push buffer-name opened)))
               ((symbol-function 'skg-big-nonfatal-message)
                (lambda (&rest _) nil))
@@ -81,7 +81,7 @@ Returns (REQUESTED-BUFFERS OPENED-BUFFER-NAMES)."
        `(("all changes"
           . ,(prin1-to-string
               '((content "* (skg node (gnid a)) a\n")
-                (errors ()) (warnings ()) (rendered-at "7")
+                (errors ()) (warnings ())
                 (readiness-summary (ready 1) (changed 3) (foreign 0)
                                    (order-only 0) (notEditable 2)))))
          ("merges" . ,test-skg-diff-view--empty)
@@ -108,7 +108,7 @@ save as (diff-view-buffer . NAME); a content view sends none."
           (setq diffView-buffer (skg-find-buffer-by-view-id "diff-view-id"))
           (setq content-buffer (skg-open-org-buffer-from-text
                                 nil "* (skg node (gnid b)) b\n"
-                                "*test-skg-content-view*" "content-view-id" "1"))
+                                "*test-skg-content-view*" "content-view-id"))
           (with-current-buffer diffView-buffer
             (should (equal (assoc 'diff-view-buffer
                                   (skg--save-request-sexp

@@ -125,29 +125,6 @@ pub(crate) fn format_buffer_response_sexp (
   sexp_to_client_string ( &Sexp::List ( buffer_response_entries (
     buffer_content, errors, warnings )) ) }
 
-/// As 'format_buffer_response_sexp', for a buffer the client installs
-/// as a view: also '(rendered-at "N")', the runtime generation the view
-/// was rendered at, which the client sends back when it saves the
-/// buffer.
-pub(crate) fn format_view_response_sexp (
-  buffer_content : &str,
-  errors         : &[String],
-  warnings       : &[String],
-  rendered_at    : u64,
-) -> String {
-  let mut entries : Vec<Sexp> =
-    buffer_response_entries (buffer_content, errors, warnings);
-  entries . push (rendered_at_entry (rendered_at));
-  sexp_to_client_string ( &Sexp::List (entries) ) }
-
-/// '(rendered-at "N")': the runtime generation a view was rendered at.
-pub(crate) fn rendered_at_entry (
-  rendered_at : u64,
-) -> Sexp {
-  Sexp::List ( vec! [
-    Sexp::Atom ( Atom::S ( "rendered-at" . to_string () )),
-    Sexp::Atom ( Atom::S ( rendered_at . to_string () )) ] ) }
-
 /// The entries of 'format_buffer_response_sexp', for a caller that
 /// adds more.
 pub(crate) fn buffer_response_entries (
@@ -183,14 +160,13 @@ pub(crate) fn format_fork_confirmation_response_sexp (
     format_string_list_sexp ("warnings", &[]) ] )) }
 
 /// Format a single view update as an s-expression.
-/// Format: ((view-id "VIEW_ID") (content "CONTENT") (rendered-at "N"))
+/// Format: ((view-id "VIEW_ID") (content "CONTENT"))
 /// Used for any streamed per-view message (collateral-view,
 /// rerender-view, etc.). The caller tags it with the appropriate
 /// TcpToClient variant.
 pub(crate) fn format_single_view_sexp (
   viewforest_id : &ViewforestId,
   content       : &str,
-  rendered_at   : u64,
 ) -> String {
   sexp_to_client_string ( &Sexp::List ( vec! [
     Sexp::List ( vec! [
@@ -198,8 +174,7 @@ pub(crate) fn format_single_view_sexp (
       Sexp::Atom ( Atom::S ( viewforest_id . repr_in_client () )) ] ),
     Sexp::List ( vec! [
       Sexp::Atom ( Atom::S ( "content" . to_string () )),
-      Sexp::Atom ( Atom::S ( content . to_string () )) ] ),
-    rendered_at_entry (rendered_at) ] )) }
+      Sexp::Atom ( Atom::S ( content . to_string () )) ] ) ] )) }
 
 /// Format: ((lock-views ("VIEW_ID1" "VIEW_ID2" ...)))
 pub(crate) fn format_lock_views_sexp (

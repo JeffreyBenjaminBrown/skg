@@ -197,7 +197,6 @@ local buf2 = vim.api.nvim_create_buf(true, false)
 vim.api.nvim_buf_set_name(buf2, 'skg://skg-test-buf2')
 vim.bo[buf2].filetype = 'org'
 vim.b[buf2].skg_view_id = require('skg.buffer').generate_uuid()
-vim.b[buf2].skg_rendered_at = T.runtime_generation()
 vim.b[buf2].skg_clean_baseline = '' -- the baseline of a new empty view, which a hand-built view stands in for
 vim.api.nvim_buf_set_lines(buf2, 0, -1, false, {
   '* (skg node (gnid 11) (skgRepos (nodeRepo main)) writeProtected) 11',

@@ -14,9 +14,8 @@ For a requested view it writes, into a directory the caller names:
   target's title.
   A summary of the view's facts precedes the tree unless
   '--no-summary' is given.
-- NAME.view.json: the server's view ID, the request, the generation
-  the server rendered the view at, and the server's errors and
-  warnings.
+- NAME.view.json: the server's view ID, the request, and the
+  server's errors and warnings.
 
 View commands: 'view ID', 'search TERMS...', 'forest KIND ID'
 ('contains ID' and 'links-here ID' name two kinds), 'diff'. Each
@@ -555,9 +554,9 @@ def command_save (arguments):
   headline rewords a removed one (see "Retyped headlines" in the
   README), send the save (naming the buffer of the diff view, for
   one), print the server's answer and write its re-rendered view over
-  the three files. The save carries the generation the view was
-  rendered at, so the server refuses it if a node it would write
-  changed since. A refused save leaves the files as they were.
+  the three files. The save carries the full view as its baseline,
+  so the server refuses it if a node it would write changed since
+  the view was drawn. A refused save leaves the files as they were.
   A placed node ('⟨node:ID⟩') takes its title from the server. When
   the save forks, the report says so; the server then answers with a
   fork confirmation, which the save prints and approves, as the
@@ -637,7 +636,6 @@ def command_save (arguments):
       messages = connection . save_buffer (
         saved_view . sidecar [ "view_id" ], buffer_text,
         saved_view . full_text,
-        saved_view . sidecar [ "rendered_at" ],
         saved_view . sidecar [ "request" ] . get ("buffer"), answers )
       if response_type ( messages [-1] ) not in SAVE_QUESTION_TYPES:
         break
@@ -691,7 +689,7 @@ def command_extend (arguments):
   try:
     terminal = connection . save_buffer (
       sidecar [ "view_id" ], saved_view . full_text, saved_view . full_text,
-      sidecar [ "rendered_at" ], sidecar [ "request" ] [ "buffer" ] ) [-1]
+      sidecar [ "request" ] [ "buffer" ] ) [-1]
     if ( response_type (terminal) != "save-result"
          or not isinstance ( response_field (terminal, "content"), str )
          or isinstance ( response_field (terminal, "content"), Symbol )):
@@ -718,7 +716,6 @@ def command_extend (arguments):
              "command"     : sidecar [ "command" ],
              "request"     : sidecar [ "request" ],
              "content"     : sexp_to_text ( response_field (rerendered, "content") ),
-             "rendered_at" : rendered_at_of (rerendered),
              "errors"      : [],
              "warnings"    : response_field (response, "warnings") or [],
              "readiness_summary" : readiness_summary }
@@ -809,11 +806,7 @@ def command_new (arguments):
       creating_view_id,
       "* (skg node (skgRepos (nodeRepo " + arguments . repo + "))) " +
       title + "\n",
-      "", # the baseline of a client's new empty view, the text it was created with
-      # No view response drew this buffer, as none draws a client's
-      # new empty view; like one, it is dated by the generation the
-      # server answers when it is opened.
-      fetch_runtime_generation (connection) )
+      "" ) # the baseline of a client's new empty view, the text it was created with
     rerendered = rerendered_view_of_save (
       messages [-1], { "view_id" : creating_view_id, "command" : "new",
                        "request" : {} } )
@@ -1193,7 +1186,6 @@ def fetch_single_root_view (connection, node_id, show_overPrivateText = False):
   return { "view_id"     : view_id,
            "request"     : { "id" : node_id },
            "content"     : response_field (response, "content"),
-           "rendered_at" : rendered_at_of (response),
            "errors"      : response_field (response, "errors") or [],
            "warnings"    : response_field (response, "warnings") or [] }
 
@@ -1224,15 +1216,14 @@ def fetch_search_view (connection, terms, options = (),
       line [ : -1 ] + " (overPrivateText-telescopes . " + quote_string (choice)
       + "))" )
   require_response_type (response, "search-results")
-  if response_field (response, "rendered-at") is None:
-    # no match, or an error: a message, not a view
+  if response_field (response, "warnings") is None:
+    # no match, or an error: a message, not a view, which has no warnings
     raise SkgToolError ( "The server returned no view: " +
                          response_text_field (response, "content") )
   return { "view_id"     : "search:" + terms,
            "request"     : dict ( { "terms" : terms },
                                   ** { option : True for option in options } ),
            "content"     : response_field (response, "content") or "",
-           "rendered_at" : rendered_at_of (response),
            "errors"      : [],
            "warnings"    : response_field (response, "warnings") or [] }
 
@@ -1258,7 +1249,6 @@ def fetch_diff_view_buffer (connection, buffer_name):
            "command"     : "diff",
            "request"     : { "buffer" : buffer_name },
            "content"     : content,
-           "rendered_at" : rendered_at_of (response),
            "errors"      : [],
            "warnings"    : response_field (response, "warnings") or [],
            "readiness_summary" : response_field (
@@ -1286,8 +1276,7 @@ def fetch_view_with_root_folder_request (connection, node_id, view_request,
     fresh_view [ "content" ], view_request )
   def send_save ():
     return connection . save_buffer (
-      fresh_view [ "view_id" ], requesting_buffer, fresh_view [ "content" ],
-      fresh_view [ "rendered_at" ] )
+      fresh_view [ "view_id" ], requesting_buffer, fresh_view [ "content" ] )
   terminal = send_save () [-1]
   if response_type (terminal) == "overPrivateText-telescope-confirmation":
     overPrivateText_answer (
@@ -1307,7 +1296,6 @@ def fetch_view_with_root_folder_request (connection, node_id, view_request,
   return { "view_id"     : fresh_view [ "view_id" ],
            "request"     : { "id" : node_id, "view_request" : view_request },
            "content"     : content,
-           "rendered_at" : rendered_at_of (terminal),
            "errors"      : errors,
            "warnings"    : response_field (terminal, "warnings") or [] }
 
@@ -1396,7 +1384,6 @@ def write_view_files (connection, view, out_dir, base_name, show_summary,
         "port"         : connection . port,
         "full_view"    : os . path . basename (full_path),
         "compact_view" : os . path . basename (compact_path),
-        "rendered_at"  : view [ "rendered_at" ],
         "errors"       : view [ "errors" ],
         "warnings"     : view [ "warnings" ],
         "summary"      : show_summary,
@@ -1759,17 +1746,6 @@ def fetch_repo_ownership (connection):
     owned = sexp_to_text ( metadata_form (entry, "owned") [1] )
     ownership [name] = owned == "true"
   return ownership
-
-# ============================================================
-# The runtime generation, which dates a buffer no view response drew
-# ============================================================
-
-def fetch_runtime_generation (connection):
-  """The server's current runtime generation, as the text N: what a
-  buffer no view response drew is rendered at."""
-  response = connection . request ( request_line ("runtime generation") )
-  require_response_type (response, "runtime-generation")
-  return sexp_to_text ( response_field (response, "content") )
 
 # ============================================================
 # The compact view
@@ -4407,7 +4383,7 @@ def release_withheld_save_rerender (connection, confirmation, view_id):
   show. Send "rerender views" for them, approving those PIDs, as the
   clients' approval does ('skg--request-rerender-views' in
   'elisp/skg-request-rerender-all-views.el'), and return a save-result
-  of the rerender: the content and rendered-at of its view of VIEW_ID,
+  of the rerender: the content of its view of VIEW_ID,
   the errors and warnings of its 'rerender-done'. Raise when the
   server asks again, or sends no view of VIEW_ID."""
   view_ids = [ sexp_to_text (withheld)
@@ -4431,8 +4407,7 @@ def release_withheld_save_rerender (connection, confirmation, view_id):
   return [ [ Symbol ("response-type"), Symbol ("save-result") ],
            [ Symbol ("content"), response_field ( rerendered [0], "content" ) ],
            [ Symbol ("errors"), response_field (done, "errors") or [] ],
-           [ Symbol ("warnings"), response_field (done, "warnings") or [] ],
-           [ Symbol ("rendered-at"), response_field ( rerendered [0], "rendered-at" ) ] ]
+           [ Symbol ("warnings"), response_field (done, "warnings") or [] ] ]
 
 def rerendered_view_of_save (terminal, sidecar):
   """Print the server's answer to the save. Return its re-rendered
@@ -4468,7 +4443,6 @@ def rerendered_view_of_save (terminal, sidecar):
            "command"     : sidecar [ "command" ],
            "request"     : sidecar [ "request" ],
            "content"     : content,
-           "rendered_at" : rendered_at_of (terminal),
            "errors"      : errors,
            "warnings"    : warnings,
            "readiness_summary" : readiness_summary }
@@ -4918,7 +4892,6 @@ class SkgForAiDaemon:
         "command"     : sidecar [ "command" ],
         "request"     : sidecar [ "request" ],
         "content"     : content,
-        "rendered_at" : rendered_at_of (message),
         "errors"      : [],
         "warnings"    : [] },
       saved_view . directory, saved_view . base_name, sidecar [ "summary" ],
@@ -5256,11 +5229,10 @@ class SkgConnection:
       except SkgConnectionClosedError:
         return messages
 
-  def save_buffer (self, view_id, buffer_text, baseline, rendered_at,
+  def save_buffer (self, view_id, buffer_text, baseline,
                    diffView_buffer = None, answers = None):
     """Send a save of BUFFER_TEXT, whose baseline (the text the server
-    last drew for it) is BASELINE, rendered at the generation
-    RENDERED_AT; return every response up to and including the
+    last drew for it) is BASELINE; return every response up to and including the
     terminal one, parsed. DIFFVIEW_BUFFER names the buffer of the diff
     view it is ('all changes', say), if it is one: the server holds no
     view of this connection's, and re-renders the save as that buffer,
@@ -5270,7 +5242,7 @@ class SkgConnection:
     carry them ('skg--save-request-sexp' in
     'elisp/skg-request-save.el')."""
     line = request_line (
-      "save buffer", ( "view-id", view_id ), ( "rendered-at", rendered_at ),
+      "save buffer", ( "view-id", view_id ),
       * ( [ ( "diff-view-buffer", diffView_buffer ) ]
           if diffView_buffer is not None else [] ),
       ( "point-lines-below-focused-headline", "0" ),
@@ -5606,14 +5578,6 @@ def save_envelope_text (buffer_text, baseline, other_views_text):
   return ( "((saved-buffer " + quote_string (buffer_text) +
            ") (baseline " + quote_string (baseline) +
            ") (other-views " + other_views_text + "))" )
-
-def rendered_at_of (response):
-  """The generation a response's view was rendered at, '(rendered-at
-  "N")', as the text N. Every response that carries a view has one."""
-  value = response_field (response, "rendered-at")
-  if value is None:
-    raise SkgToolError ( "The server's view carries no 'rendered-at'." )
-  return sexp_to_text (value)
 
 def require_response_type (response, expected):
   actual = response_type (response)
