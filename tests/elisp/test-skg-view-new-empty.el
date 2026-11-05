@@ -41,7 +41,10 @@ It must not invent a node or ask for its repo."
           (should (equal (buffer-string) ""))
           (should (derived-mode-p 'skg-content-view-mode))
           (should (stringp skg-view-id))
-          (should (equal skg-rendered-at "1762000000000042")))
+          (should (equal skg-rendered-at "1762000000000042"))
+          ;; Its baseline is the text it was created with, which its
+          ;; save carries.
+          (should (equal skg-clean-baseline "")))
       (when (buffer-live-p opened)
         (set-buffer-modified-p nil)
         (kill-buffer opened)))))

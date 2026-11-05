@@ -177,7 +177,8 @@ owned skgrepo REPO, and writes its view as 'view' does (named
 answer and 'New node: ID'. A view needs a node to start from, so this
 is how an empty skgrepo gets its first one. It saves a buffer holding
 only that headline, as an editor client saves a new empty view
-('skg-view-new-empty', 'C-c v e' in Emacs), dated like one by the
+('skg-view-new-empty', 'C-c v e' in Emacs), with the empty baseline
+of one, dated like one by the
 server's answer to a 'runtime generation' request, and refuses a skgrepo the
 server's 'repos' request does not call owned. The new node's body and
 children are then written through the view's edit-and-save loop.
@@ -188,6 +189,9 @@ until the server has been quiet for three seconds. With
 '--saved-buffer FILE' the request is a 'save buffer', and the tool
 sends FILE's text as the saved buffer in the length-prefixed body
 after it, then prints every response up to the save's terminal one.
+The body also carries the saved buffer's baseline, the text the server
+last drew for it: with '--baseline FILE', FILE's text; without it, the
+empty baseline, a new empty view's.
 A 'save buffer' request needs its '(rendered-at . "N")', a number;
 without it the server refuses the save. 'raw "((request . \"runtime
 generation\"))"' gives a current one.
@@ -279,7 +283,9 @@ For a base name such as 'view_ID' the tool writes 'view_ID.full.org',
 ** The full view
 'BASE.full.org' is the view's text exactly as the server sent it,
 metadata and all. It is what a client receives, before heralds hide
-the metadata.
+the metadata. It is also the view's baseline, the text the server last
+drew for it, which every save of the view sends beside the edited
+buffer ('docs/api-and-formats.org', "Save buffer").
 ** The compact view
 'BASE.compact.org' has every line of the full view, in the same order.
 A body line is copied unchanged, except that its links are annotated.

@@ -512,7 +512,7 @@ save deleting either is refused. Add one sentence to the C-c s m
 entry in 'docs/COMMANDS.org' (and its Neovim mirror). In
 'docs/api-and-formats.org', say under "Save buffer" that a merge
 is built from the graph as the save's ordinary edits leave it.
-** TODO Slice 2: the baseline rides with every save
+** DONE Slice 2: the baseline rides with every save
 *** Corrections carried from slice 1
 None to the behavior. Names that changed: 'SavePlan' carries
 'nodeMerge_pairs' (two pids), 'PreparedSave::nodeMerges' gives

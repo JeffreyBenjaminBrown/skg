@@ -78,11 +78,12 @@ the buffers are locked."
            (saved-view-id skg-view-id)
            (buffer-contents
             (skg--buffer-snapshot-with-save-metadata focused-had-metadata))
+           (baseline (skg--saved-buffer-baseline))
            (other-view-buffer-snapshots
             (skg--other-view-buffer-snapshots save-buffer))
            (wire-content
             (skg--serialize-save-envelope
-             buffer-contents other-view-buffer-snapshots))
+             buffer-contents baseline other-view-buffer-snapshots))
            (request-s-exp (concat (prin1-to-string
                                    (skg--save-request-sexp
                                     skg-view-id
@@ -184,8 +185,17 @@ the buffers are locked."
       (process-send-string tcp-proc header)
       (process-send-string tcp-proc wire-content))))
 
-(defun skg--serialize-save-envelope (saved-buffer other-view-buffer-snapshots)
-  "Serialize SAVED-BUFFER and OTHER-VIEW-SNAPSHOTS for the Rust server."
+(defun skg--saved-buffer-baseline ()
+  "The current buffer's baseline, `skg-clean-baseline', which every save
+carries.  Every view a client can save has one, so its absence is an
+error, not something to send."
+  (unless (stringp skg-clean-baseline)
+    (error "Cannot save: this view has no baseline (the text the server last drew).  Reopen it"))
+  (substring-no-properties skg-clean-baseline))
+
+(defun skg--serialize-save-envelope (saved-buffer baseline other-view-buffer-snapshots)
+  "Serialize SAVED-BUFFER, its BASELINE and OTHER-VIEW-BUFFER-SNAPSHOTS for
+the Rust server."
   ;; Emacs prints its empty list as the atom `nil', while the Rust protocol
   ;; requires an explicit list for other-views.  Serialize that one empty
   ;; value as `()'.  Ignore user printer limits: truncation would corrupt the
@@ -194,6 +204,7 @@ the buffers are locked."
         (print-level nil))
     (concat
      "((saved-buffer " (prin1-to-string saved-buffer) ") "
+     "(baseline " (prin1-to-string baseline) ") "
      "(other-views "
      (if other-view-buffer-snapshots
          (prin1-to-string other-view-buffer-snapshots)

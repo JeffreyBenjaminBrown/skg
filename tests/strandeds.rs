@@ -101,7 +101,9 @@ fn save (
     RenderedAt ( env . runtime_snapshot () . generation );
   let response : SaveResponse = block_on (
     update_from_and_rerender_buffer_with_approvals (
-      &mut stream, buffer, &mut env,  &Ok (viewforest_id . clone ()),
+      &mut stream, buffer,
+      "", // the empty baseline: a hand-written buffer was drawn by no server
+      &mut env,  &Ok (viewforest_id . clone ()),
       &mut f . views_state, &SkgrepoRestriction::unrestricted (&f . config), true, &HashMap::new (),
       &HashSet::new (), review, DeleteFrom::NotChosen, &[], rendered_at, None )) ?;
   // The test helper's env holds its own graph handle: carry the

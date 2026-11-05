@@ -923,3 +923,48 @@ describe('skg.save fork confirmation', function ()
       vim.api.nvim_buf_get_name(vim.api.nvim_get_current_buf()))
   end)
 end)
+
+describe('skg.save envelope', function ()
+  local client = require('skg.client')
+  local payload = require('skg.payload')
+  local real_send_string = client.send_string
+
+  after_each(function ()
+    client.send_string = real_send_string
+    helpers.reset_client_state()
+    helpers.wipe_skg_buffers()
+    lock.end_stream()
+  end)
+
+  it('carries the baseline between the saved buffer and the other views',
+     function ()
+    assert.are.equal(
+      '((saved-buffer "* edited \\"λ\\"\n")'
+      .. ' (baseline "* drawn \\"λ\\"\n") (other-views ()))',
+      save.serialize_save_envelope(
+        '* edited "λ"\n', '* drawn "λ"\n', {}))
+  end)
+
+  it('sends, as the baseline, the text the server last drew', function ()
+    local sent = {}
+    client.send_string = function (text) table.insert(sent, text) end
+    local buf = open_view('* (skg node (gnid a)) a\n', 'skg://envelope',
+                          'view_id-envelope')
+    vim.api.nvim_buf_set_lines(buf, 1, 1, false, { 'a body line' })
+    vim.api.nvim_win_set_cursor(0, { 1, 0 })
+    save.send_save_buffer(buf, 'view_id-envelope')
+    local envelope = sexpr.read(sent[#sent])
+    assert.are.equal('* (skg node (gnid a)) a\n',
+                     payload.field_text(envelope, 'baseline'))
+    assert.is_truthy(payload.field_text(envelope, 'saved-buffer')
+                       :find('a body line', 1, true))
+  end)
+
+  it('refuses a view without a baseline before sending anything',
+     function ()
+    local buf = open_view('* (skg node (gnid a)) a\n', 'skg://no-baseline',
+                          'view_id-no-baseline')
+    vim.b[buf].skg_clean_baseline = nil
+    assert.has_error(function () save.saved_buffer_baseline(buf) end)
+  end)
+end)

@@ -6,6 +6,7 @@ It needs a built server, 'target/debug/skg' ('cargo build --bin skg'),
 or the binary SKG_BINARY names.
 
 In order, it:
+- checks that a save's envelope carries the saved buffer's baseline;
 - checks the title normalizer and the fuzzy match of a new headline's
   title with a removed one's on pairs that must match, pairs that must
   not, and pairs at the thresholds;
@@ -143,6 +144,7 @@ def main (argv):
   os . environ . pop ( "SKG_PORT", None )
   failures = []
   failures += failures_of_title_matching ()
+  failures += failures_of_save_envelope ()
   failures += failures_of_shared_herald_cases ()
   failures += failures_against_scratch_servers (update_expected)
   shutil . rmtree ( os . environ [ "XDG_RUNTIME_DIR" ], ignore_errors = True )
@@ -151,6 +153,21 @@ def main (argv):
   if failures:
     sys . exit (1)
   print ( "PASS" + ( " (expected files rewritten)" if update_expected else "" ))
+
+# ============================================================
+# The save envelope
+# ============================================================
+
+def failures_of_save_envelope ():
+  """A save's envelope carries the saved buffer, its baseline (the
+  text the server last drew for it), and the other views, each string
+  quoted."""
+  envelope = skg_for_ai . save_envelope_text (
+    '* edited "λ"\n', '* drawn "λ"\n', "()" )
+  expected = ( '((saved-buffer "* edited \\"λ\\"\n") '
+               '(baseline "* drawn \\"λ\\"\n") (other-views ()))' )
+  return ( [] if envelope == expected
+           else [ f"the save envelope is {envelope!r}, not {expected!r}" ] )
 
 # ============================================================
 # Retyped headlines: the title normalizer and the fuzzy match

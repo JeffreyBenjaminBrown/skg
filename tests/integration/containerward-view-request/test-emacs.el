@@ -46,6 +46,7 @@
       (org-mode)
       (setq skg-view-id (org-id-uuid))
       (setq skg-rendered-at (skg-test-runtime-generation))
+      (setq skg-clean-baseline "") ; the baseline of a new empty view, which a hand-built view stands in for
       (insert "* (skg node (gnid 0) (skgRepos (nodeRepo main))) 0\n")
       (insert "** (skg node (gnid 1)) 1\n")
       (insert "*** (skg node (gnid 11)) 11\n")

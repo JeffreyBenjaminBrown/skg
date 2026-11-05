@@ -104,3 +104,110 @@ the agent's edits; it is stopped, and Jeff's server now runs
 from a worktree pinned at 6507e89f ('_burying/skg-stable' for
 the client code; the server binary from a container-side copy).
 Slice 2 launched 20:52.
+** Slice 2
+*** Commits
+- The commit carrying this entry: every save carries the saved
+  buffer's baseline (server, the three clients, tests, docs, and the
+  slice's headline turned DONE).
+*** Suites
+- 'cargo nextest run --test grouped_saves': 166 of 166 pass (1 new:
+  'save_stale_buffers::a_save_without_a_baseline_is_refused').
+- 'cargo check --all-targets': no warnings.
+- 'bash/emacs-tests.sh': 445 of 445 pass (3 new, in
+  'tests/elisp/test-skg-save-envelope.el').
+- 'bash/nvim-tests.sh': 482 of 482 pass (3 new, in
+  'tests/nvim/save_spec.lua').
+- 'python3 tools/skg-for-ai/test_skg_for_ai.py': PASS (one new check,
+  'failures_of_save_envelope').
+- 'bash/nextest.sh': 1116 of 1116 pass.
+- 'bash/integration-tests.sh', first run: 26 of 36 pass. Nine
+  failures were expected fixture adaptation: Emacs scripts that build a
+  view buffer by hand gave it no baseline, so the client refused the
+  save locally ("this view has no baseline"); see "Fixtures changed".
+  The tenth, 'import-md-and-org', is pre-existing (the plan's
+  pitfalls), not investigated.
+- 'bash/integration-tests.sh' after the adaptation: 35 of 36 pass; the
+  one failure is 'import-md-and-org', pre-existing.
+- That script runs only the Emacs client. The Neovim pass (each folder
+  with a 'test-nvim.lua', run by 'SKG_TEST_CLIENT=nvim ./run-test.sh'
+  one at a time, as 'bash/all-tests.sh' does): 35 of 36 pass; the one
+  failure is 'import-md-and-org', pre-existing. So 70 of 72 runs in
+  all, as at the baseline. (Slice 1's "70 of 72" from
+  'bash/integration-tests.sh' alone counted only the Emacs runs.)
+- No new failure and no flake.
+*** Deviations from the plan's how
+**** One commit, not server then clients
+The server refuses an envelope without the field, and refuses an
+unknown field, so a server-only commit, or a clients-only one, leaves
+every client save refused at that revision. One commit keeps each
+revision working.
+**** The tool's baseline is the '.full.org' file
+The sidecar ('.view.json') has no 'content' field. The full view file
+is the response's 'content' as the server sent it, never edited by
+the tool's user, and is already what 'other_views_text' sends as a
+dirty view's baseline; 'save' and 'extend' send it
+('SavedView.full_text'). The forest commands' unchanged save sends the
+fresh view's 'content'; 'new' sends the empty baseline, a new empty
+view's. The README's "The full view" says so.
+**** 'raw' gained '--baseline FILE'
+'raw --saved-buffer FILE' builds the envelope itself, so it needs a
+baseline: FILE's text with '--baseline FILE', else the empty one. The
+envelope is built in one place, 'save_envelope_text'.
+**** A new empty view already captured its baseline
+Both clients open a new empty view through
+'skg-open-org-buffer-from-text' / 'open_org_buffer_from_text', which
+already capture the clean baseline (the empty text). No code change;
+the existing new-empty-view tests now assert it.
+**** A client refuses locally a view without a baseline
+'skg--saved-buffer-baseline' (Emacs) and 'save.saved_buffer_baseline'
+(Neovim) signal an error before anything is sent; the save's existing
+local-failure path unwinds the locks. No client view should lack one.
+**** The Neovim envelope has its own function
+'save.serialize_save_envelope', mirroring Emacs's
+'skg--serialize-save-envelope', so the field can be tested without a
+server.
+**** The unused parameter is allowed until slice 3
+'update_from_and_rerender_buffer_with_approvals' takes 'baseline'
+under '#[allow(unused_variables)]' with a TODO naming slice 3, which
+should remove both.
+**** Not guarded: a bare symbol parses as text
+The 'sexp' crate parses a bare symbol and a quoted string alike, so
+'(baseline unavailable)' reads as the text "unavailable" (an Org text
+with no headlines, which writes nothing). 'saved-buffer' has the same
+property. No client sends it; a list such as '(present "...")' is
+refused.
+*** Fixtures changed
+- Rust tests that build envelopes by hand ('tests/repo_watch.rs',
+  'tests/save_rerender_release.rs', 'tests/pruned_change_view/
+  request.rs') send '(baseline "")'. The harnesses
+  ('server/test_utils.rs', 'tests/strandeds.rs',
+  'tests/shared/git_fixture.rs', and the test-only entry point
+  'update_from_and_rerender_buffer_with_hoist_approval') pass the empty
+  baseline.
+- 'tests/save_stale_buffers.rs': its 'save' helper takes the baseline
+  (None omits the field); its callers pass the text 'open_view'
+  returned, or the empty baseline for the typed views, ready for slice
+  3.
+- 'tests/save_request_envelope.rs': the accepted envelopes carry the
+  field; three new rejected ones (missing, duplicated, wrapped).
+- Nine Emacs integration scripts that build a view buffer by hand
+  ('body-fold-preservation', 'containerward-view-request',
+  'focus-and-folded-metadata', 'fold-preservation',
+  'mentionerward-view-request', 'root-folded-save',
+  'save-body-with-tabs', 'save_collateral_delete_then_edit_under_it',
+  'valid_and_invalid_saves') and the one Neovim script that does so
+  without 'open_org_buffer_from_text'
+  ('save_collateral_delete_then_edit_under_it') give it the empty
+  baseline, a new empty view's, beside its rendered-at.
+*** For slice 3
+The other Neovim integration scripts build their hand-made views with
+'open_org_buffer_from_text', which captures the hand-written text
+itself as the baseline. Where that text differs from the graph, its
+viewnodes survive the noop filter, so under slice 3 such a save could
+be refused as stale. Their Emacs twins now use the empty baseline; if
+slice 3's integration run refuses them, set 'skg_clean_baseline' to ''
+after opening, as 'save_collateral_delete_then_edit_under_it' does.
+*** Left unfinished
+Nothing of the slice.
+*** Headline
+DONE.

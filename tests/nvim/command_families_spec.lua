@@ -342,5 +342,8 @@ describe('skg.view_ancestry and view_new_empty', function ()
     assert.is_truthy(vim.b[buf].skg_view_id)
     assert.is_true(vim.b[buf].skg_content_view)
     assert.are.equal('1762000000000042', vim.b[buf].skg_rendered_at)
+    -- Its baseline is the text it was created with, which its save
+    -- carries.
+    assert.are.equal('', vim.b[buf].skg_clean_baseline)
   end)
 end)

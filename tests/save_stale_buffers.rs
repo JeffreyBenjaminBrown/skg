@@ -80,14 +80,15 @@ fn open_view (
       . parse () . unwrap () ) }
 
 /// Save 'buffer' as 'view_id' through the save handler, with
-/// '(rendered-at . RENDERED_AT)' when given: the terminal save-result
-/// message.
+/// '(rendered-at . RENDERED_AT)' when given, and with the envelope's
+/// '(baseline BASELINE)' when given: the terminal save-result message.
 fn save (
   f           : &mut Fixture,
   views_state : &mut ViewsState,
   view_id     : &str,
   buffer      : &str,
   rendered_at : Option<String>,
+  baseline    : Option<&str>,
 ) -> String {
   let request : String = format! (
     "((request . \"save buffer\") (view-id . \"{}\"){})",
@@ -95,8 +96,10 @@ fn save (
     rendered_at . map ( |n| format! (" (rendered-at . \"{}\")", n) )
       . unwrap_or_default () );
   let envelope : String = format! (
-    "((saved-buffer \"{}\") (other-views ()))",
-    buffer . replace ('\\', "\\\\") . replace ('"', "\\\"") );
+    "((saved-buffer \"{}\"){} (other-views ()))",
+    sexp_string_body (buffer),
+    baseline . map ( |text| format! (" (baseline \"{}\")", sexp_string_body (text)) )
+      . unwrap_or_default () );
   let (mut client_writes, server_reads) : (TcpStream, TcpStream) =
     mk_test_tcp_stream_pair ();
   write! ( client_writes, "Content-Length: {}\r\n\r\n{}",
@@ -112,6 +115,12 @@ fn save (
     . into_iter ()
     . find ( |message| message . contains ("save-result") )
     . expect ("a save-result") }
+
+/// 'text' escaped to sit between the quotes of a sexp string.
+fn sexp_string_body (
+  text : &str,
+) -> String {
+  text . replace ('\\', "\\\\") . replace ('"', "\\\"") }
 
 fn file_text (
   f    : &Fixture,
@@ -142,7 +151,8 @@ fn a_buffer_rendered_before_a_node_changed_cannot_write_it
   { // The first connection's save of a succeeds, and says when its rerender was drawn.
     let result : String = save (
       &mut f, &mut first, "a-first",
-      &a_in_first . replace ("a as first written", "a by first"), Some (rendered_at . to_string ()) );
+      &a_in_first . replace ("a as first written", "a by first"), Some (rendered_at . to_string ()),
+      Some (&a_in_first) );
     assert! ( errors_of (&result) . starts_with (" ())"), "{}", result );
     assert_eq! (
       extract_string_field_from_sexp (&result, "rendered-at"),
@@ -150,7 +160,8 @@ fn a_buffer_rendered_before_a_node_changed_cannot_write_it
   { // The second connection's older view of a would undo that: refused, nothing written.
     let result : String = save (
       &mut f, &mut second, "a-second",
-      &a_in_second . replace ("a as first written", "a by second"), Some (rendered_at . to_string ()) );
+      &a_in_second . replace ("a as first written", "a by second"), Some (rendered_at . to_string ()),
+      Some (&a_in_second) );
     let errors : String = errors_of (&result);
     assert! ( errors . contains ("NOTHING WAS SAVED")
               && errors . contains ("changed after the buffer was rendered")
@@ -166,13 +177,15 @@ fn a_buffer_rendered_before_a_node_changed_cannot_write_it
   { // The same old buffer, a's text untouched, still differs from the graph,
     // so saving it would also undo the change: refused.
     let result : String = save (
-      &mut f, &mut second, "a-second", &a_in_second, Some (rendered_at . to_string ()) );
+      &mut f, &mut second, "a-second", &a_in_second, Some (rendered_at . to_string ()),
+      Some (&a_in_second) );
     assert! ( errors_of (&result) . contains ("NOTHING WAS SAVED"), "{}", result );
     assert! ( file_text (&f, "a") . contains ("a by first") ); }
   { // An equally old buffer that does not write a saves.
     let result : String = save (
       &mut f, &mut second, "c-second",
-      &c_in_second . replace ("c as first written", "c by second"), Some (rendered_at . to_string ()) );
+      &c_in_second . replace ("c as first written", "c by second"), Some (rendered_at . to_string ()),
+      Some (&c_in_second) );
     assert! ( errors_of (&result) . starts_with (" ())"), "{}", result );
     assert! ( file_text (&f, "c") . contains ("c by second") ); }
   Ok (()) }
@@ -204,13 +217,14 @@ fn a_new_empty_view_is_dated_by_the_runtime_generation_request
   assert_eq! (opened_at, rendered_at . to_string ());
   let first : String = save (
     &mut f, &mut connection, "c-view",
-    &c_view . replace ("c as first written", "c once"), Some (rendered_at . to_string ()) );
+    &c_view . replace ("c as first written", "c once"), Some (rendered_at . to_string ()),
+    Some (&c_view) );
   assert! ( errors_of (&first) . starts_with (" ())"), "{}", first );
   { // Typed into a view opened before c changed: saving it would undo that change.
     let typed : String = save (
       &mut f, &mut connection, "typed-view",
       "* (skg node (gnid c) (skgRepos (nodeRepo main))) c typed\n",
-      Some (opened_at) );
+      Some (opened_at), Some ("") );
     assert! ( errors_of (&typed) . contains ("changed after the buffer was rendered"),
               "{}", typed );
     assert! ( file_text (&f, "c") . contains ("c once") ); }
@@ -219,7 +233,7 @@ fn a_new_empty_view_is_dated_by_the_runtime_generation_request
     let typed : String = save (
       &mut f, &mut connection, "typed-later-view",
       "* (skg node (gnid c) (skgRepos (nodeRepo main))) c typed\n",
-      Some (opened_later_at) );
+      Some (opened_later_at), Some ("") );
     assert! ( errors_of (&typed) . starts_with (" ())"), "{}", typed );
     assert! ( file_text (&f, "c") . contains ("c typed") ); }
   Ok (()) }
@@ -232,7 +246,7 @@ fn a_save_whose_rendered_at_is_not_a_number_is_refused
   let result : String = save (
     &mut f, &mut connection, "typed-view",
     "* (skg node (gnid c) (skgRepos (nodeRepo main))) c typed\n",
-    Some ("never" . to_string ()) );
+    Some ("never" . to_string ()), Some ("") );
   assert! ( errors_of (&result) . contains ("not a runtime generation number"),
             "{}", result );
   assert! ( file_text (&f, "c") . contains ("c as first written") );
@@ -247,8 +261,25 @@ fn a_save_without_rendered_at_is_refused
     open_view (&mut f, &mut connection, "c", "c-view");
   let result : String = save (
     &mut f, &mut connection, "c-view",
-    &c_view . replace ("c as first written", "c edited"), None );
+    &c_view . replace ("c as first written", "c edited"), None, Some (&c_view) );
   assert! ( errors_of (&result) . contains ("rendered-at"), "{}", result );
+  assert! ( file_text (&f, "c") . contains ("c as first written") );
+  Ok (()) }
+
+#[test]
+fn a_save_without_a_baseline_is_refused
+  () -> Result<(), Box<dyn Error>> {
+  // The envelope must carry the saved buffer's baseline: without it the
+  // save is refused, naming the field, and nothing is written.
+  let mut f : Fixture = fixture () ?;
+  let mut connection : ViewsState = new_connection ();
+  let (c_view, rendered_at) : (String, u64) =
+    open_view (&mut f, &mut connection, "c", "c-view");
+  let result : String = save (
+    &mut f, &mut connection, "c-view",
+    &c_view . replace ("c as first written", "c edited"),
+    Some (rendered_at . to_string ()), None );
+  assert! ( errors_of (&result) . contains ("missing baseline"), "{}", result );
   assert! ( file_text (&f, "c") . contains ("c as first written") );
   Ok (()) }
 
@@ -262,7 +293,8 @@ fn a_rebuild_makes_every_earlier_buffer_stale
   rebuild_session_lifetime_stores_in_place (&mut f . env, &mut connection) ?;
   { let result : String = save (
       &mut f, &mut connection, "c-view",
-      &c_view . replace ("c as first written", "c edited"), Some (rendered_at . to_string ()) );
+      &c_view . replace ("c as first written", "c edited"), Some (rendered_at . to_string ()),
+      Some (&c_view) );
     assert! ( errors_of (&result) . contains ( &format! (
                 "last changed at runtime generation {}", rendered_at + 1 )),
               "{}", result );
@@ -273,7 +305,8 @@ fn a_rebuild_makes_every_earlier_buffer_stale
     assert_eq! (fresh_rendered_at, rendered_at + 1);
     let result : String = save (
       &mut f, &mut connection, "c-fresh",
-      &fresh . replace ("c as first written", "c edited"), Some (fresh_rendered_at . to_string ()) );
+      &fresh . replace ("c as first written", "c edited"), Some (fresh_rendered_at . to_string ()),
+      Some (&fresh) );
     assert! ( errors_of (&result) . starts_with (" ())"), "{}", result );
     assert! ( file_text (&f, "c") . contains ("c edited") ); }
   Ok (()) }

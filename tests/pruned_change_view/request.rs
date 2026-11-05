@@ -169,7 +169,7 @@ fn save_through_the_handler (
   buffer      : &str,
 ) -> String {
   let envelope : String = format! (
-    "((saved-buffer \"{}\") (other-views ()))",
+    "((saved-buffer \"{}\") (baseline \"\") (other-views ()))", // the empty baseline, which writes nothing
     buffer . replace ('\\', "\\\\") . replace ('"', "\\\"") );
   let (mut client_writes, server_reads) : (TcpStream, TcpStream) =
     mk_test_tcp_stream_pair ();

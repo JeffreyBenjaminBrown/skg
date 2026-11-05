@@ -5,15 +5,17 @@ use skg::types::views_state::ViewforestId;
 fn accepts_exact_dirty_snapshots_and_explicit_empty_views () {
   let saved_viewforest_id : ViewforestId = ViewforestId::ContentView ("saved" . into ());
   let empty = parse_save_request_envelope (
-    "((saved-buffer \"* root\n\") (other-views ()))",
+    "((saved-buffer \"* root\n\") (baseline \"\") (other-views ()))",
     Some (&saved_viewforest_id)) . unwrap ();
   assert_eq! (empty . saved_buffer, "* root\n");
+  assert_eq! (empty . baseline, "");
   assert! (empty . other_views . is_empty ());
 
   let parsed = parse_save_request_envelope (
-    "((saved-buffer \"λ\n\") (other-views (((view-id \"other\") (dirty true) (baseline (present \"before\n\")) (current \"after\tλ\")) ((view-id \"newer\") (dirty true) (baseline unavailable) (current \"new\")) ((view-id \"clean\") (dirty false)))))",
+    "((saved-buffer \"λ\n\") (baseline \"* (skg node (gnid a)) λ\n\") (other-views (((view-id \"other\") (dirty true) (baseline (present \"before\n\")) (current \"after\tλ\")) ((view-id \"newer\") (dirty true) (baseline unavailable) (current \"new\")) ((view-id \"clean\") (dirty false)))))",
     Some (&saved_viewforest_id)) . unwrap ();
   assert_eq! (parsed . saved_buffer, "λ\n");
+  assert_eq! (parsed . baseline, "* (skg node (gnid a)) λ\n");
   assert_eq! (parsed . other_views . len (), 3);
   assert_eq! (parsed . other_views [0] . baseline . as_deref (),
               Some ("before\n"));
@@ -29,14 +31,17 @@ fn rejects_legacy_and_ambiguous_envelopes () {
   for malformed in [
     "* legacy raw Org",
     "((saved-buffer \"text\"))",
-    "((saved-buffer \"text\") (other-views ()) (other-views ()))",
-    "((saved-buffer \"text\") (other-views ()) (surprise true))",
-    "((saved-buffer \"text\") (other-views (((view-id \"saved\") (dirty false)))))",
-    "((saved-buffer \"text\") (other-views (((view-id \"other\") (dirty false)) ((view-id \"other\") (dirty false)))))",
-    "((saved-buffer \"text\") (other-views (((view-id \"other\") (dirty perhaps)))))",
-    "((saved-buffer \"text\") (other-views (((view-id \"other\") (dirty true) (baseline unavailable)))))",
-    "((saved-buffer \"text\") (other-views (((view-id \"other\") (dirty false) (current \"stale\")))))",
-    "((saved-buffer \"text\") (other-views (((view-id \"other\") (dirty true) (baseline (bogus \"old\")) (current \"new\")))))",
+    "((saved-buffer \"text\") (other-views ()))",
+    "((saved-buffer \"text\") (baseline \"\") (baseline \"\") (other-views ()))",
+    "((saved-buffer \"text\") (baseline (present \"old\")) (other-views ()))",
+    "((saved-buffer \"text\") (baseline \"\") (other-views ()) (other-views ()))",
+    "((saved-buffer \"text\") (baseline \"\") (other-views ()) (surprise true))",
+    "((saved-buffer \"text\") (baseline \"\") (other-views (((view-id \"saved\") (dirty false)))))",
+    "((saved-buffer \"text\") (baseline \"\") (other-views (((view-id \"other\") (dirty false)) ((view-id \"other\") (dirty false)))))",
+    "((saved-buffer \"text\") (baseline \"\") (other-views (((view-id \"other\") (dirty perhaps)))))",
+    "((saved-buffer \"text\") (baseline \"\") (other-views (((view-id \"other\") (dirty true) (baseline unavailable)))))",
+    "((saved-buffer \"text\") (baseline \"\") (other-views (((view-id \"other\") (dirty false) (current \"stale\")))))",
+    "((saved-buffer \"text\") (baseline \"\") (other-views (((view-id \"other\") (dirty true) (baseline (bogus \"old\")) (current \"new\")))))",
   ] {
     assert! (parse_save_request_envelope (
       malformed, Some (&saved_viewforest_id)) . is_err (),

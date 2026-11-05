@@ -124,6 +124,10 @@ pub struct ClientViewSnapshot {
 
 pub struct SaveRequestEnvelope {
   pub saved_buffer : String,
+  /// The saved buffer's baseline: its text as the server last drew it,
+  /// before any edit. A new empty view's is the text the client
+  /// created it with.
+  pub baseline     : String,
   pub other_views  : Vec<ClientViewSnapshot>,
 }
 
@@ -303,6 +307,7 @@ pub fn handle_save_buffer_request (
           update_from_and_rerender_buffer_with_approvals (
             stream,
             & envelope . saved_buffer,
+            & envelope . baseline,
             env,
             &viewforest_id_from_request_result,
             views_state,
@@ -415,6 +420,9 @@ pub fn parse_save_request_envelope (
     fields, "saved-buffer", "save envelope") ?;
   let saved_buffer : String = sexp_atom_string (
     saved_buffer_value, "saved-buffer") ?;
+  let baseline : String = sexp_atom_string (
+    unique_field (fields, "baseline", "save envelope") ?,
+    "baseline") ?;
   let other_views_value : &Sexp = unique_field (
     fields, "other-views", "save envelope") ?;
   let other_view_entries : &[Sexp] = sexp_list (
@@ -473,10 +481,10 @@ pub fn parse_save_request_envelope (
       viewforest_id, dirty, baseline, current, }); }
   for field in fields {
     let (key, _) : (&str, &Sexp) = field_pair (field, "save envelope") ?;
-    if ! ["saved-buffer", "other-views"] . contains (&key) {
+    if ! ["saved-buffer", "baseline", "other-views"] . contains (&key) {
       return Err (format! (
         "Malformed save envelope: unknown field {}", key) . into ()); }}
-  Ok (SaveRequestEnvelope { saved_buffer, other_views })
+  Ok (SaveRequestEnvelope { saved_buffer, baseline, other_views })
 }
 
 fn parse_baseline (
@@ -833,7 +841,9 @@ pub async fn update_from_and_rerender_buffer_with_hoist_approval (
   let current_generation : RenderedAt = // This entry point saves a buffer as if rendered now: only the handler knows a client's rendering.
     RenderedAt ( env . runtime_snapshot () . generation );
   update_from_and_rerender_buffer_with_approvals (
-    stream, org_buffer_text, env,
+    stream, org_buffer_text,
+    "", // the empty baseline: this entry point's buffers were drawn by no server, and an empty baseline writes nothing
+    env,
     viewforest_id_from_request_result, views_state, skgrepo_restriction,
     approved_forks, fork_skgrepos, approved_hoist_pids,
     &StrandedsReview::NotReviewed, DeleteFrom::NotChosen,
@@ -843,6 +853,8 @@ pub async fn update_from_and_rerender_buffer_with_hoist_approval (
 pub async fn update_from_and_rerender_buffer_with_approvals (
   stream                      : &mut TcpStream,
   org_buffer_text             : &str,
+  #[allow(unused_variables)] // TODO: the stale check reads it (plan 'TODO/merge-save-refused/2_2_plan.org', slice 3)
+  baseline                    : &str, // the buffer's text as the server last drew it
   env                         : &mut SkgEnv,
   viewforest_id_from_request_result : &Result<ViewforestId, String>,
   views_state                  : &mut ViewsState,

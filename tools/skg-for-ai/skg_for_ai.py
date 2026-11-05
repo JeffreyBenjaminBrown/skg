@@ -316,6 +316,11 @@ def parse_command_line (argv):
     help = ( "send FILE's text as the length-prefixed body a "
              "'save buffer' request carries, and read up to the "
              "save's terminal response" ))
+  raw_parser . add_argument (
+    "--baseline", metavar = "FILE", default = None,
+    help = ( "with '--saved-buffer', send FILE's text as the saved "
+             "buffer's baseline, the text the server last drew for it; "
+             "by default the empty baseline" ))
   new_parser = commands . add_parser (
     "new", help = ( "create a root node TITLE in the owned skgrepo REPO, "
                     "and write its view" ),
@@ -491,7 +496,8 @@ def mark_sidecar_closed (sidecar_path):
                     + "\n" )
 
 def command_raw (arguments):
-  """Send ARGUMENTS.request, and with '--saved-buffer' its save body;
+  """Send ARGUMENTS.request, and with '--saved-buffer' its save body,
+  whose baseline is the text of '--baseline' (by default empty);
   print each response as the server sent it. Without a body, every
   response arriving until the server is quiet for RAW_QUIET_SECONDS."""
   connection = SkgConnection (arguments . port)
@@ -500,8 +506,13 @@ def command_raw (arguments):
       messages = connection . raw_request (arguments . request)
     else:
       with open (arguments . saved_buffer, encoding = "utf-8") as buffer_file:
-        messages = connection . raw_save (
-          arguments . request, buffer_file . read () )
+        buffer_text = buffer_file . read ()
+      baseline = ""
+      if arguments . baseline is not None:
+        with open (arguments . baseline, encoding = "utf-8") as baseline_file:
+          baseline = baseline_file . read ()
+      messages = connection . raw_save (
+        arguments . request, buffer_text, baseline )
   finally:
     connection . close ()
   print_messages (messages)
@@ -625,6 +636,7 @@ def command_save (arguments):
     for attempt in range (SAVE_ATTEMPTS_LIMIT):
       messages = connection . save_buffer (
         saved_view . sidecar [ "view_id" ], buffer_text,
+        saved_view . full_text,
         saved_view . sidecar [ "rendered_at" ],
         saved_view . sidecar [ "request" ] . get ("buffer"), answers )
       if response_type ( messages [-1] ) not in SAVE_QUESTION_TYPES:
@@ -678,7 +690,7 @@ def command_extend (arguments):
   connection = connection_for_saved_view (saved_view)
   try:
     terminal = connection . save_buffer (
-      sidecar [ "view_id" ], saved_view . full_text,
+      sidecar [ "view_id" ], saved_view . full_text, saved_view . full_text,
       sidecar [ "rendered_at" ], sidecar [ "request" ] [ "buffer" ] ) [-1]
     if ( response_type (terminal) != "save-result"
          or not isinstance ( response_field (terminal, "content"), str )
@@ -797,6 +809,7 @@ def command_new (arguments):
       creating_view_id,
       "* (skg node (skgRepos (nodeRepo " + arguments . repo + "))) " +
       title + "\n",
+      "", # the baseline of a client's new empty view, the text it was created with
       # No view response drew this buffer, as none draws a client's
       # new empty view; like one, it is dated by the generation the
       # server answers when it is opened.
@@ -1273,7 +1286,8 @@ def fetch_view_with_root_folder_request (connection, node_id, view_request,
     fresh_view [ "content" ], view_request )
   def send_save ():
     return connection . save_buffer (
-      fresh_view [ "view_id" ], requesting_buffer, fresh_view [ "rendered_at" ] )
+      fresh_view [ "view_id" ], requesting_buffer, fresh_view [ "content" ],
+      fresh_view [ "rendered_at" ] )
   terminal = send_save () [-1]
   if response_type (terminal) == "overPrivateText-telescope-confirmation":
     overPrivateText_answer (
@@ -5242,9 +5256,10 @@ class SkgConnection:
       except SkgConnectionClosedError:
         return messages
 
-  def save_buffer (self, view_id, buffer_text, rendered_at,
+  def save_buffer (self, view_id, buffer_text, baseline, rendered_at,
                    diffView_buffer = None, answers = None):
-    """Send a save of BUFFER_TEXT, rendered at the generation
+    """Send a save of BUFFER_TEXT, whose baseline (the text the server
+    last drew for it) is BASELINE, rendered at the generation
     RENDERED_AT; return every response up to and including the
     terminal one, parsed. DIFFVIEW_BUFFER names the buffer of the diff
     view it is ('all changes', say), if it is one: the server holds no
@@ -5264,7 +5279,7 @@ class SkgConnection:
     if answers is not None:
       line = line [ : -1 ] + answers . request_fields_text () + ")"
     return [ parse_sexp (message)
-             for message in self . raw_save (line, buffer_text, view_id) ]
+             for message in self . raw_save (line, buffer_text, baseline, view_id) ]
 
   def stage_and_commit (self, message, confirmed):
     """Send "stage and commit" with MESSAGE, confirmed when CONFIRMED;
@@ -5331,15 +5346,16 @@ class SkgConnection:
            and sexp_to_text ( response_field (message, "view-id") ) == view_id ):
         rerendered = message
 
-  def raw_save (self, line, buffer_text, saved_view_id = None):
-    """Send the save request LINE with BUFFER_TEXT as its saved buffer;
-    return the text of every response up to and including the terminal
-    one. The envelope's 'other-views' lists the connection's other
-    views ('other_views_text'), those but SAVED_VIEW_ID."""
+  def raw_save (self, line, buffer_text, baseline, saved_view_id = None):
+    """Send the save request LINE with BUFFER_TEXT as its saved buffer
+    and BASELINE as that buffer's baseline; return the text of every
+    response up to and including the terminal one. The envelope's
+    'other-views' lists the connection's other views
+    ('other_views_text'), those but SAVED_VIEW_ID."""
     other_views = self . other_views_text (saved_view_id)
     self . send_line (line)
-    envelope = ( "((saved-buffer " + quote_string (buffer_text) +
-                 ") (other-views " + other_views + "))" ) . encode ("utf-8")
+    envelope = save_envelope_text (
+      buffer_text, baseline, other_views ) . encode ("utf-8")
     self . socket . sendall (
       f"Content-Length: {len (envelope)}\r\n\r\n" . encode () + envelope )
     messages = []
@@ -5582,6 +5598,14 @@ def response_field (response, field_name):
   if len (values) == 1:
     return values [0]
   return values
+
+def save_envelope_text (buffer_text, baseline, other_views_text):
+  """The envelope a 'save buffer' request carries: BUFFER_TEXT as the
+  saved buffer, BASELINE as its baseline, and OTHER_VIEWS_TEXT, already
+  a sexp list, as its 'other-views'."""
+  return ( "((saved-buffer " + quote_string (buffer_text) +
+           ") (baseline " + quote_string (baseline) +
+           ") (other-views " + other_views_text + "))" )
 
 def rendered_at_of (response):
   """The generation a response's view was rendered at, '(rendered-at

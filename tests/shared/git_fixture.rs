@@ -279,7 +279,9 @@ pub fn save_under (
     RenderedAt ( env . runtime_snapshot () . generation );
   Ok ( block_on (
     update_from_and_rerender_buffer_with_approvals (
-      &mut stream, text, &mut env,
+      &mut stream, text,
+      "", // the empty baseline: a hand-written buffer was drawn by no server
+      &mut env,
       &Ok ( ViewforestId::ContentView (view . into ()) ),
       &mut f . views_state, restriction,
       approved_forks, &HashMap::new (), &HashSet::new (),

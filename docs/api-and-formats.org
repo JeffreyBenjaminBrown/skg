@@ -163,6 +163,7 @@ So far there are these endpoints:
   - Request: First =((request . "save buffer") (view-id . "VIEW_ID") (rendered-at . "G") (point-lines-below-focused-headline . "N") (point-column . "C") (point-screen-lines-below-window-start . "M"))\n=, then one UTF-8 length-prefixed S-expression envelope:
     #+begin_src lisp
     ((saved-buffer "...Org text...")
+     (baseline "...the saved buffer's text as the server last drew it...")
      (other-views
        (((view-id "...") (dirty false))
         ((view-id "...") (dirty true)
@@ -172,7 +173,14 @@ So far there are these endpoints:
          (baseline unavailable)
          (current "...edited text...")))))
     #+end_src
-    =Content-Length= is the envelope's UTF-8 byte length. =other-views=
+    =Content-Length= is the envelope's UTF-8 byte length. =baseline= is
+    mandatory: the saved buffer's baseline, its text exactly as the
+    server last drew it, before any edit (Emacs keeps it in
+    'skg-clean-baseline', Neovim in 'vim.b.skg_clean_baseline',
+    skg-for-ai in the view's '.full.org' file). A new empty view's
+    baseline is the text the client created it with. It has no
+    =unavailable= form. A save whose envelope lacks it is refused,
+    with an error naming the field, and nothing is written. =other-views=
     is mandatory even when empty and covers every other live client view,
     including views the server has not registered. Clean entries carry no
     buffer snapshots. Dirty entries carry exact current text and either the exact

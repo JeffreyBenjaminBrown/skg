@@ -518,7 +518,9 @@ pub async fn update_from_and_rerender_buffer_with_snapshots_test (
   let rendered_at : RenderedAt = // as if the buffer were rendered now
     RenderedAt ( env . runtime_snapshot () . generation );
   update_from_and_rerender_buffer_with_approvals (
-    stream, org_buffer_text, &mut env,
+    stream, org_buffer_text,
+    "", // the empty baseline: a hand-written buffer was drawn by no server, and an empty baseline writes nothing
+    &mut env,
     viewforest_id_from_request_result, views_state,
     &SkgrepoRestriction::unrestricted (config),
     true, &HashMap::new (), &std::collections::HashSet::new (),

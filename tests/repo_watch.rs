@@ -149,7 +149,7 @@ fn save (
     "((request . \"save buffer\") (view-id . \"{}\") (rendered-at . \"{}\"))",
     view_id, rendered_at );
   let envelope : String = format! (
-    "((saved-buffer \"{}\") (other-views ()))",
+    "((saved-buffer \"{}\") (baseline \"\") (other-views ()))", // the empty baseline, which writes nothing
     buffer . replace ('\\', "\\\\") . replace ('"', "\\\"") );
   let (mut client_writes, server_reads) : (TcpStream, TcpStream) =
     mk_test_tcp_stream_pair ();

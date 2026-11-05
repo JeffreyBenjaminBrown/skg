@@ -76,11 +76,9 @@ function M.send_save_buffer (save_buf, saved_view_id, approved_forks, fork_skgre
   local save_point_position = M.current_save_point_position()
   local buffer_contents = M.buffer_snapshot_with_save_metadata(
     save_buf, focused_had_metadata)
-  local wire_content = sexpr.to_string({
-    { sexpr.symbol('saved-buffer'), buffer_contents },
-    { sexpr.symbol('other-views'),
-      M.other_view_buffer_snapshots(save_buf) },
-  })
+  local wire_content = M.serialize_save_envelope(
+    buffer_contents, M.saved_buffer_baseline(save_buf),
+    M.other_view_buffer_snapshots(save_buf))
   local request_line =
     M.save_request_sexp(saved_view_id, save_point_position,
                           approved_forks, fork_skgrepos,
@@ -183,6 +181,34 @@ function M.buffer_snapshot_with_save_metadata (save_buf, focused_had_metadata)
   if not was_modified then vim.bo[save_buf].modified = false end
   if not ok then error(result) end
   return result
+end
+
+---The text of a save's envelope: the saved buffer's text, its baseline,
+---and the other views' snapshots ('other_view_buffer_snapshots').
+---@param buffer_contents string
+---@param baseline string
+---@param other_view_buffer_snapshots table
+---@return string
+function M.serialize_save_envelope (buffer_contents, baseline,
+                                    other_view_buffer_snapshots)
+  return sexpr.to_string({
+    { sexpr.symbol('saved-buffer'), buffer_contents },
+    { sexpr.symbol('baseline'), baseline },
+    { sexpr.symbol('other-views'), other_view_buffer_snapshots },
+  })
+end
+
+---SAVE_BUF's baseline, 'vim.b.skg_clean_baseline', which every save
+---carries. Every view a client can save has one, so its absence is an
+---error, not something to send.
+---@param save_buf integer
+---@return string
+function M.saved_buffer_baseline (save_buf)
+  local baseline = vim.b[save_buf].skg_clean_baseline
+  if type(baseline) ~= 'string' then
+    error('Cannot save: this view has no baseline (the text the server'
+          .. ' last drew). Reopen it.') end
+  return baseline
 end
 
 ---@param save_buf integer
