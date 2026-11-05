@@ -9,6 +9,7 @@
 use skg::repo_watch::reload::reload_changed_skg_files;
 use skg::serve::ViewsState;
 use skg::serve::handlers::rebuild_session_lifetime_stores::rebuild_session_lifetime_stores_in_place;
+use skg::serve::handlers::rerender_all_views::handle_rerender_all_views_request;
 use skg::serve::handlers::save_buffer::handle_save_buffer_request;
 use skg::serve::handlers::single_root_view::handle_single_root_view_request;
 use skg::serve::handlers::strip_body_whitespace::handle_strip_body_whitespace_request;
@@ -19,7 +20,7 @@ use skg::test_utils::{
 use skg::dbs::init::create_empty_tantivy_index;
 use skg::types::env::SkgEnv;
 use skg::types::misc::{SkgConfig, TantivyIndex};
-use skg::types::views_state::OpenViews;
+use skg::types::views_state::{OpenViews, ViewforestId};
 
 use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use std::collections::BTreeSet;
@@ -112,6 +113,23 @@ fn save (
   read_all_lp_messages (&mut BufReader::new (client_reads))
     . pop ()
     . expect ("a terminal message") }
+
+/// Rerender every view 'views_state' holds: the "rerender-view"
+/// messages of the stream.
+fn rerender_all_views (
+  f           : &Fixture,
+  views_state : &mut ViewsState,
+) -> Vec<String> {
+  let (mut stream, read_end) : (TcpStream, TcpStream) = mk_test_tcp_stream_pair ();
+  handle_rerender_all_views_request (
+    &mut stream, "((request . \"rerender all views\"))",
+    &f . env, views_state,
+    &SkgrepoRestriction::unrestricted (&f . config) );
+  drop (stream);
+  read_all_lp_messages (&mut BufReader::new (read_end))
+    . into_iter ()
+    . filter ( |message| message . starts_with ("((response-type rerender-view)") )
+    . collect () }
 
 /// Open 'gnid' on a connection of its own, apply 'edit' to the view,
 /// and save it: a change made elsewhere. It must succeed.
@@ -336,6 +354,57 @@ fn a_rebuild_does_not_make_a_buffer_stale
     &c_view . replace ("c as first written", "c edited"), Some (&c_view) );
   assert! ( saved (&result), "{}", result );
   assert! ( file_text (&f, "c") . contains ("c edited") );
+  Ok (()) }
+
+#[test]
+fn views_survive_a_rebuild_and_a_rerender_redraws_them
+  () -> Result<(), Box<dyn Error>> {
+  // c changes on disk and a rebuild reads it. The connection still
+  // holds its view of c; rerendering every view redraws it from the
+  // rebuilt graph, and a save of the redrawn view succeeds.
+  let mut f : Fixture = fixture () ?;
+  let mut connection : ViewsState = new_connection ();
+  open_view (&mut f, &mut connection, "c", "c-view");
+  fs::write ( file_path (&f, "main", "c"),
+              "pid: c\ntitle: c as rewritten on disk\n" ) ?;
+  rebuild_session_lifetime_stores_in_place (&mut f . env, &mut connection) ?;
+  assert! ( connection . open_views
+              . viewforest_id_to_view ( &ViewforestId::from_client_string (
+                "c-view" . to_string () ))
+              . is_some () );
+  let rerendered : Vec<String> = rerender_all_views (&f, &mut connection);
+  let c_rerendered : String = rerendered . iter ()
+    . find ( |message| message . contains ("c-view") )
+    . and_then ( |message| extract_string_field_from_sexp (message, "content") )
+    . expect ("a rerender of c-view");
+  assert! ( c_rerendered . contains ("c as rewritten on disk"), "{}", c_rerendered );
+  let result : String = save (
+    &mut f, &mut connection, "c-view",
+    &c_rerendered . replace ("c as rewritten on disk", "c edited after the rebuild"),
+    Some (&c_rerendered) );
+  assert! ( saved (&result), "{}", result );
+  assert! ( file_text (&f, "c") . contains ("c edited after the rebuild") );
+  Ok (()) }
+
+#[test]
+fn a_view_left_unrerendered_across_a_rebuild_is_compared_at_its_save
+  () -> Result<(), Box<dyn Error>> {
+  // A view with unsaved edits is not rerendered after a rebuild. It
+  // keeps its baseline; c changed on disk before the rebuild, so a
+  // save writing c from that baseline is refused.
+  let mut f : Fixture = fixture () ?;
+  let mut connection : ViewsState = new_connection ();
+  let c_view : String = open_view (&mut f, &mut connection, "c", "c-view");
+  fs::write ( file_path (&f, "main", "c"),
+              "pid: c\ntitle: c as rewritten on disk\n" ) ?;
+  rebuild_session_lifetime_stores_in_place (&mut f . env, &mut connection) ?;
+  let result : String = save (
+    &mut f, &mut connection, "c-view",
+    &c_view . replace ("c as first written", "c edited"), Some (&c_view) );
+  assert! ( errors_of (&result) . contains ("changed after the buffer was rendered")
+            && errors_of (&result) . contains ("- Title: c as rewritten on disk"),
+            "{}", result );
+  assert! ( file_text (&f, "c") . contains ("c as rewritten on disk") );
   Ok (()) }
 
 #[test]

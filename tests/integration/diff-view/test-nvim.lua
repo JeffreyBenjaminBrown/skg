@@ -9,8 +9,9 @@
 -- Phase 3: Stage and commit; every owned skgrepo is committed, the
 --          foreign one is not, and the buffers keep their roots,
 --          which show no change any more.
--- Phase 4: With d referenced again by hand, open a view of r and
---          investigate the unknown node d.
+-- Phase 4: With d referenced again by hand, rebuild, which
+--          rerenders every view; open a view of r and investigate
+--          the unknown node d.
 
 local T = dofile('../test-nvim-lib.lua')
 T.arm_timeout(120)
@@ -147,13 +148,30 @@ T.check(T.wait_for(function ()
 end, 10), 'the buffers of the diff view keep their roots, unchanged')
 
 -- PHASE 4: reference d again, by hand; have the server reread the
--- files; open a view of r; investigate d there.
+-- files, which rerenders every view; open a view of r; investigate d
+-- there.
 print('=== PHASE 4: Investigate the deleted node ===')
 T.write_file(data_dir .. 'owned/alpha/r.skg',
   'pid: r\ntitle: the root\ncontains:\n- t\n- m\n- x\n- d\n')
-require('skg.misc_requests').rebuild_session_lifetime_stores()
-T.check(T.wait_for(function () return newest_notification('views are now invalid') end, 30),
-        'the server reread the files')
+do
+  local rerender = require('skg.rerender_all_views')
+  local request_rerender_all_views = rerender.request_rerender_all_views
+  local rerender_sent = false
+  rerender.request_rerender_all_views = function ()
+    rerender_sent = true
+    return request_rerender_all_views() end
+  require('skg.misc_requests').rebuild_session_lifetime_stores()
+  T.check(T.wait_for(function () return newest_notification('rebuilt successfully') end, 30),
+          'the server reread the files')
+  T.check(T.wait_for(function ()
+    return rerender_sent and not require('skg.lock').stream_in_progress end, 30),
+    'every view was rerendered after the rebuild')
+  rerender.request_rerender_all_views = request_rerender_all_views
+  -- The buffers of the diff view survive the rebuild, and r is a root
+  -- of one; a view request for r would switch to it. Close them.
+  for _, buf in ipairs(diffView_buffers()) do
+    vim.api.nvim_buf_delete(buf, { force = true }) end
+end
 require('skg.single_root_content_view').request_single_root_content_view_from_id('r')
 local view = T.wait_for(function ()
   for _, buf in ipairs(vim.api.nvim_list_bufs()) do

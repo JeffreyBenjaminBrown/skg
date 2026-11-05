@@ -1378,9 +1378,12 @@ It does not rewrite the =.skg= files. So an edited config (a skgrepo added,
 removed or reordered, say) takes effect without restarting the server, except
 for its 'port' and 'timing_log', which the answer warns about. An invalid
 config fails the rebuild, and the server keeps serving the old one.
-Existing skg views are now invalid; run ':SkgCloseAllSkgBuffers'
-to close them. Files that change on disk need no rebuild: the server
-reloads them as they change (see the start of this document).
+After a successful rebuild every view without unsaved edits is
+rerendered from the rebuilt graph, as ':SkgRerenderAllViews' does; the
+views with unsaved edits are named and left as they are, and a save of
+one is checked like any other. Files that change on disk need no
+rebuild: the server reloads them as they change (see the start of this
+document).
 *** :SkgStripBodyWhitespace
 Strips trailing whitespace from every line of every body,
 in every skgrepo you own.
@@ -1391,7 +1394,6 @@ Rewrites exactly the .skg files whose bodies change;
 the derived caches are refreshed to match.
 Open views stay valid: their saves are not refused for it.
 *** :SkgCloseAllSkgBuffers
-This may be warranted after an session-lifetime-store rebuild.
 Kills every skg view buffer (each triggers a close-view notice to
 the server first).
 *** :SkgReload

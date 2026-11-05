@@ -675,7 +675,7 @@ with 'grep -rl SetSkgrepoRestriction tests/'.
 
 Docs: "Save buffer" in 'docs/api-and-formats.org' documents the
 refusal next to the stale-buffer paragraph.
-** TODO Slice 6: views survive a rebuild
+** DONE Slice 6: views survive a rebuild
 *** Corrections carried from slice 5
 - The restriction a view was rendered under is
   'ViewState::skgrepo_restriction_at_last_render'; the refusal is

@@ -1615,9 +1615,11 @@ replaces the in-memory graph, and rebuilds the derived Tantivy search index.
 It does not rewrite the =.skg= files. So an edited config (a skgrepo added,
 removed or reordered, say) takes effect without restarting the server, except
 for its 'port' and 'timing_log', which the answer warns about. An invalid
-config fails the rebuild, and the server keeps serving the old one. Existing
-views are closed after a successful rebuild, because they were rendered
-before it. Files that change on disk need no rebuild: the server reloads
+config fails the rebuild, and the server keeps serving the old one. After a
+successful rebuild every view without unsaved edits is rerendered from the
+rebuilt graph, as 'skg-request-rerender-all-views' does; the views with
+unsaved edits are named and left as they are, and a save of one is checked
+like any other. Files that change on disk need no rebuild: the server reloads
 them as they change (see the start of this document).
 *** skg-strip-trailing-whitespace-from-bodies
 Strips trailing whitespace from every line of every body,
@@ -1632,7 +1634,8 @@ Open views stay valid: their saves are not refused for it.
 Review the result with 'git diff --ignore-all-space',
 which should show nothing.
 *** skg-close-all-skg-buffers
-This may be warranted after an session-lifetime-store rebuild.
+Kills every skg view buffer (each sends the server a close-view
+notice first).
 *** skg-reload
 Unloads all skg elisp modules and reloads them from disk.
 Useful when you've changed elisp code

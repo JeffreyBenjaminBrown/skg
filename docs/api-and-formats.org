@@ -359,8 +359,12 @@ So far there are these endpoints:
     every open view, and the clients refuse to switch while a view has
     unsaved edits; this makes the server independent of that courtesy,
     and covers any change of the connection's restriction that
-    rerenders no view. A buffer the connection does not hold has no
-    record and is not checked.
+    rerenders no view. A rebuild is one ("Rebuild session-lifetime
+    stores"): when the reloaded config changes the set of skgrepos
+    the connection shows, a view with unsaved edits, which the rerender
+    after the rebuild skips, is refused at its save by this rule. A
+    buffer the connection does not hold has no record and is not
+    checked.
   - A write-protected occurrence saves nothing of its own, so a save is
     refused, before anything is written, if one differs from the graph
     ('errors_for_writeProtected_occurrences' in
@@ -839,14 +843,19 @@ buffer's baseline.
     a restriction keeps its most private skgrepo shown, or, if the
     config no longer names it as owned, becomes the config's default;
     either way foreign skgrepos stay shown or hidden as they were. Success
-    closes existing views, drops the graph straddle of the diff
-    view, and recomputes context rankings for search. A rebuild makes
-    no buffer stale by itself: a save is refused only where a buffer's
-    baseline no longer matches the rebuilt graph (see "Save buffer",
-    the stale buffer). The clients do not
-    re-render after a rebuild, but tell the user to close the old
-    views, and fetch the herald rules again ("Herald rules"), whose
-    skgrepo labels the reloaded config may have changed. Files that
+    keeps the connection's open views, drops the graph straddle of the
+    diff view, and recomputes context rankings for search. A rebuild
+    makes no buffer stale by itself: a save is refused only where a
+    buffer's baseline no longer matches the rebuilt graph (see "Save
+    buffer", the stale buffer). After a successful rebuild the clients
+    fetch the herald rules again ("Herald rules"), whose skgrepo labels
+    the reloaded config may have changed, and then send "rerender all
+    views", which redraws every view without unsaved edits from the
+    rebuilt graph, under the reconciled restriction, which each view
+    records; a node of a skgrepo the reloaded config no longer names
+    is drawn as an unknown one. A view with unsaved edits keeps its
+    text and baseline, and is compared at its save like any other.
+    Files that
     change on disk need no rebuild: the server reloads them as they
     change ("Repo files reloaded"). A rebuild is what applies a
     changed config.

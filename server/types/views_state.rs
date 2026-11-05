@@ -120,10 +120,6 @@ impl OpenViews {
       views       : HashMap::new (),
       root_gnids : ManyToMany::new () }}
 
-  pub fn clear (&mut self) {
-    self . views       . clear ();
-    self . root_gnids    = ManyToMany::new (); }
-
   pub fn viewforest_id_to_pids (
     &self,
     viewforest_id : &ViewforestId,

@@ -15,13 +15,18 @@
                (lambda (_proc text) (push text sent)))
               ((symbol-function 'skg-lp-reset) #'ignore)
               ((symbol-function 'ding) #'ignore)
+              ((symbol-function 'run-at-time)
+               (lambda (_time _repeat function &rest args) (apply function args)))
+              ((symbol-function 'skg-request-rerender-all-views)
+               (lambda () (push "rerender all views" sent)))
               ((symbol-function 'skg-register-response-handler)
                (lambda (type handler _one-shot) (puthash type handler handlers))))
       (funcall body (lambda () sent) handlers))))
 
-(ert-deftest test-rebuild-sends-its-request-and-refetches-the-herald-rules ()
+(ert-deftest test-rebuild-refetches-the-herald-rules-then-rerenders-all-views ()
   "A successful rebuild may have reloaded a config with other skgrepo
-labels, so the herald rules are fetched again."
+labels, so the herald rules are fetched again; then every view
+without unsaved edits is rerendered from the rebuilt graph."
   (test--rebuild-run
    (lambda (sent handlers)
      (skg-rebuild-session-lifetime-stores)
@@ -30,8 +35,10 @@ labels, so the herald rules are fetched again."
      (funcall (gethash 'rebuild-session-lifetime-stores handlers)
               'fake-proc
               "((response-type rebuild-session-lifetime-stores) (content \"Config reloaded; rebuilt.\"))")
-     (should (equal (car (funcall sent))
-                    "((request . \"herald rules\"))\n")))))
+     (should (equal (funcall sent)
+                    '("rerender all views"
+                      "((request . \"herald rules\"))\n"
+                      "((request . \"rebuild session-lifetime stores\"))\n"))))))
 
 (ert-deftest test-a-failed-rebuild-fetches-nothing-more ()
   (test--rebuild-run

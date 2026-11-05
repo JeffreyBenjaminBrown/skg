@@ -9,6 +9,8 @@ use skg::serve::ViewsState;
 use skg::serve::handlers::rebuild_session_lifetime_stores::{
   handle_rebuild_session_lifetime_stores_request,
   rebuild_session_lifetime_stores_in_place};
+use skg::serve::handlers::rerender_all_views::handle_rerender_all_views_request;
+use skg::serve::handlers::single_root_view::handle_single_root_view_request;
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::test_utils::{
   copy_dir_all, extract_string_field_from_sexp, graph_handle_from_config,
@@ -134,4 +136,52 @@ fn an_invalid_config_is_refused_and_the_old_one_keeps_serving
   assert! ( graph_has (&after, "a") );
   assert! ( rebuild_session_lifetime_stores_in_place (&mut f . env, &mut connection)
             . is_err () );
+  Ok (()) }
+
+#[test]
+fn a_view_of_a_skgrepo_the_reloaded_config_drops_shows_its_node_as_unknown
+  () -> Result<(), Box<dyn Error>> {
+  // a, in main, contains b, in second. The view of a survives a
+  // rebuild whose config no longer names second; rerendered, it shows
+  // b as an unknown viewnode.
+  let mut f : Fixture = fixture () ?;
+  let mut connection : ViewsState = new_connection ();
+  let root : PathBuf = f . config_path . parent () . unwrap () . to_path_buf ();
+  fs::write ( root . join ("main/a.skg"),
+              "pid: a\ntitle: a in main\ncontains:\n- b\n" ) ?;
+  rebuild_session_lifetime_stores_in_place (&mut f . env, &mut connection) ?;
+  { let (mut stream, read_end) : (TcpStream, TcpStream) = mk_test_tcp_stream_pair ();
+    let runtime : Arc<RuntimeGeneration> = f . env . runtime_snapshot ();
+    handle_single_root_view_request (
+      &mut stream,
+      "((request . \"single root content view\") (id . \"a\") (view-id . \"a-view\"))",
+      &f . env, &mut connection,
+      &SkgrepoRestriction::unrestricted (&runtime . config) );
+    drop (stream);
+    let messages : Vec<String> = read_all_lp_messages (&mut BufReader::new (read_end));
+    let a_view : String = extract_string_field_from_sexp (
+      messages . last () . expect ("a content-view response"), "content" )
+      . expect ("content");
+    assert! ( a_view . contains ("b in second"), "{}", a_view ); }
+  { let old : String = fs::read_to_string (&f . config_path) ?;
+    fs::write ( &f . config_path,
+                old . replace ("[[repos]]\nname = \"second\"\npath = \"second\"\n", "") ) ?; }
+  rebuild_session_lifetime_stores_in_place (&mut f . env, &mut connection) ?;
+  let runtime : Arc<RuntimeGeneration> = f . env . runtime_snapshot ();
+  assert! ( ! graph_has (&runtime, "b") );
+  let (mut stream, read_end) : (TcpStream, TcpStream) = mk_test_tcp_stream_pair ();
+  handle_rerender_all_views_request (
+    &mut stream, "((request . \"rerender all views\"))",
+    &f . env, &mut connection,
+    &SkgrepoRestriction::unrestricted (&runtime . config) );
+  drop (stream);
+  let a_rerendered : String = read_all_lp_messages (&mut BufReader::new (read_end))
+    . iter ()
+    . find ( |message| message . starts_with ("((response-type rerender-view)")
+                       && message . contains ("a-view") )
+    . and_then ( |message| extract_string_field_from_sexp (message, "content") )
+    . expect ("a rerender of a-view");
+  assert! ( a_rerendered . contains ("unknown (gnid b)")
+            && ! a_rerendered . contains ("b in second"),
+            "{}", a_rerendered );
   Ok (()) }

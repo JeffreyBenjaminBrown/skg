@@ -8,8 +8,9 @@
 ;;; Phase 3: Stage and commit; every owned skgrepo is committed, the
 ;;;          foreign one is not, and the buffers keep their roots,
 ;;;          which show no change any more.
-;;; Phase 4: With d referenced again by hand, open a view of r and
-;;;          investigate the unknown node d.
+;;; Phase 4: With d referenced again by hand, rebuild, which
+;;;          rerenders every view; open a view of r and investigate
+;;;          the unknown node d.
 
 (load-file "../../../elisp/skg-init.el")
 (load-file "../test-wait.el")
@@ -158,19 +159,37 @@
                        (diff-view-buffers))))
   (test-pass "Committed alpha and beta, and the buffers keep their roots, unchanged"))
 
+(defvar test-rerender-all-views-sent nil
+  "Whether the rebuild's rerender of every view was asked for.")
+
+(defun test-note-rerender-all-views-sent (&rest _)
+  (setq test-rerender-all-views-sent t))
+
 (defun phase-4-investigate-the-deleted-node ()
   (setq integration-test-phase "phase-4")
   ;; Reference d again, by hand, and have the server reread the files.
   (with-temp-file (expand-file-name "owned/alpha/r.skg" test-data-dir)
     (insert "pid: r\ntitle: the root\ncontains:\n- t\n- m\n- x\n- d\n"))
   (setq test-messages nil)
+  (advice-add 'skg-request-rerender-all-views :after
+              #'test-note-rerender-all-views-sent)
   (skg-rebuild-session-lifetime-stores)
   (unless (skg-test-wait-for
            (lambda ()
-             (cl-some (lambda (m) (string-match-p "views are now invalid" m))
+             (cl-some (lambda (m) (string-match-p "rebuilt successfully" m))
                       test-messages))
            30)
     (test-fail "Timeout waiting for the rebuild"))
+  (unless (skg-test-wait-for
+           (lambda () (and test-rerender-all-views-sent
+                           (not skg--stream-in-progress)))
+           30)
+    (test-fail "Timeout waiting for the rerender of every view after the rebuild"))
+  (advice-remove 'skg-request-rerender-all-views
+                 #'test-note-rerender-all-views-sent)
+  ;; The buffers of the diff view survive the rebuild, and r is a root
+  ;; of one; a view request for r would switch to it. Close them.
+  (mapc #'kill-buffer (diff-view-buffers))
   (skg-request-single-root-content-view-from-id "r")
   (let ((view (skg-test-wait-for
                (lambda ()

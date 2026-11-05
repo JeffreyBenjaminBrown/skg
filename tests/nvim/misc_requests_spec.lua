@@ -36,24 +36,24 @@ describe('skg.misc_requests rebuild_session_lifetime_stores', function ()
     return requests
   end
 
-  it('sends its request, and after success fetches the herald rules',
-     function ()
+  it('sends its request, and after success fetches the herald rules,'
+     .. ' then rerenders every view', function ()
     local requests = serve_rebuild('Config reloaded; rebuilt.')
     misc_requests.rebuild_session_lifetime_stores()
     assert.is_truthy(vim.wait(2000, function ()
-      return vim.tbl_contains(requests, '((request . "herald rules"))')
-    end, 10))
-    assert.is_truthy(vim.tbl_contains(requests,
-      '((request . "rebuild session-lifetime stores"))'))
+      return #requests >= 3 end, 10))
+    assert.are.equal('((request . "rebuild session-lifetime stores"))',
+                     requests[1])
+    assert.are.equal('((request . "herald rules"))', requests[2])
+    assert.is_truthy(requests[3]:find('(request . "rerender all views")',
+                                      1, true))
   end)
 
   it('after a failure fetches nothing more', function ()
     local requests = serve_rebuild('Rebuild failed: Reloading config: bad')
     misc_requests.rebuild_session_lifetime_stores()
     vim.wait(300, function () return false end, 10)
-    assert.is_falsy(vim.tbl_contains(requests,
-                    '((request . "herald rules"))'))
-    assert.is_truthy(vim.tbl_contains(requests,
-      '((request . "rebuild session-lifetime stores"))'))
+    assert.are.same({ '((request . "rebuild session-lifetime stores"))' },
+                    requests)
   end)
 end)

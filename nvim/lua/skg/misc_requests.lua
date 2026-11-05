@@ -32,7 +32,8 @@ end
 ---changed. An invalid config fails the rebuild, and the server keeps
 ---serving the old one. After a successful rebuild the herald rules are
 ---fetched again, since the reloaded config may have changed their
----skgrepo labels.
+---skgrepo labels, and then every view without unsaved edits is
+---rerendered.
 function M.rebuild_session_lifetime_stores ()
   vim.notify('Rebuilding session-lifetime stores (this may take a while) ...')
   state.register_response_handler('rebuild-session-lifetime-stores',
@@ -43,13 +44,23 @@ function M.rebuild_session_lifetime_stores ()
       if failed then
         vim.notify(content, vim.log.levels.ERROR)
       else
-        require('skg.herald_rules').request_herald_rules()
-        vim.notify((content or 'Rebuild complete.')
-                   .. '\nExisting skg views are now invalid.'
-                   .. ' Run :SkgCloseAllSkgBuffers to close them.') end
+        vim.notify(content or 'Rebuild complete.')
+        -- Outside this handler: the rerender resets the receiver,
+        -- which would drop whatever follows the rebuild's answer.
+        vim.schedule(M.refetch_herald_rules_and_rerender_all_views) end
     end, true)
   state.lp_reset()
   client.send_string('((request . "rebuild session-lifetime stores"))\n')
+end
+
+---Fetch the herald rules, then rerender every view without unsaved
+---edits. The server answers in order, so the views are redrawn under
+---the new rules. Nothing between the two sends reads the connection,
+---so the rerender's reset of the receiver cannot drop the herald
+---rules' answer.
+function M.refetch_herald_rules_and_rerender_all_views ()
+  require('skg.herald_rules').request_herald_rules()
+  require('skg.rerender_all_views').request_rerender_all_views()
 end
 
 ---Strip trailing whitespace from every line of every body, in every
