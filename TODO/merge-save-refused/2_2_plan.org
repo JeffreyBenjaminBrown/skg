@@ -630,6 +630,15 @@ that same text; reopen a fresh view and reapply your diff where
 it still applies. Drop "after which every older view is stale"
 and the restart clause; neither is true any more.
 ** TODO Slice 4: neither a merge request nor a link depends
+*** Corrections carried from slice 3
+None to the behavior. 'stale_write_errors' ('save_staleness.rs')
+now takes the graph, config, restriction, baseline text,
+viewforest, nodeInstructions and fork specs; 'rendered-at' and
+the runtime-generation request are gone from server, clients,
+tests and docs. The stale error's variant is
+'ChangedSinceRendered { change, headlines, gnid }' with
+'ChangeSinceRendered' and 'ChangedAspect' in
+'server/types/errors.rs'.
 Drop the merge branch from 'dependencies_from_viewforest' and
 'links_from_text' from 'dependencies_from_text'. Remove the
 PITFALL comment in 'dirty_view_conflicts' that this fixes.

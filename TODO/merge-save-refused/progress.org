@@ -334,3 +334,17 @@ rebuild (views still closed, the clients still tell the user to close
 them, and 'docs/COMMANDS.org' says so) are untouched.
 *** Headline
 DONE.
+** Orchestrator's notes after slice 3 (2026-11-05, 21:50 UTC)
+Slice 3 launched 21:14, reported 21:46 (32 minutes, the plan's
+largest). Two commits, both green under 'bash/all-tests.sh'.
+Read 'save_staleness.rs' whole: the check is the plan's rule,
+and the one unforeseen case the agent met is real and its fix
+right: a body whose file still carries trailing whitespace is
+drawn with it and parsed without it, so the baseline's copy
+would have survived the noop filter forever; the baseline's
+writes are therefore filtered once more against the graph as a
+view draws it ('graphnode_as_drawn'), with a test. The other
+deviations (the Title line shows the graph's current title; the
+generation counter starts at 0; parse errors in the baseline
+refuse the save) are fine. No correction needed for slice 4.
+Slice 4 launched 21:52.
