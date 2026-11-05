@@ -1,0 +1,182 @@
+#+title: 44464f2d..HEAD: vocabulary, citations, stale text
+Read-only review, 2026-11-05. Fix costs: cheap, costly or
+unwise. Glossary lines are of the working tree, which has
+uncommitted edits.
+* Ranked findings
+** 1. A re-sent save is said to be stale; often it is not
+'api-and-formats.org':488-489, 'COMMANDS.org':82-83,
+'COMMANDS-nvim.org':97-98, 'skg-request-save.el':850-851,
+'save.lua':876-877, 'tools/skg-for-ai/README.org':1362-1363.
+After the overPrivateText rerender is withheld, the buffer keeps
+its old baseline. Re-sent, the nodes the save edited now equal
+the graph, so the noop filter drops them: nothing is written for
+them and nothing is stale. Only a graphnode written afresh (a
+container gaining the same new child again) is stale; a new root
+is simply created twice. The reason not to re-send is that the
+save would apply again. Cheap: reword all six.
+** 2. 'graphnode_as_drawn' means the opposite of drawn
+'save_staleness.rs':109-130 and 156;
+'tests/save_stale_buffers.rs':333. The comment at 110-113 says a
+body "is drawn with" its trailing whitespace, yet the function
+strips it: it is the graphnode as the parser reads a drawn copy
+back. The glossary's "the containerward chain, as drawn" (1695)
+uses "as drawn" for what a view shows. Cheap: rename, e.g.
+'graphnode_as_parsed_back'.
+** 3. "Phase one" collides with "Phase 1" in the same file
+'server/save.rs':214, 282-284, 302, 324 name the ordinary
+nodeInstructions "phase one" and the NodeMerges "phase two";
+'server/save.rs':415-429, 481, 586 already call the two passes
+of 'apply_delete_propagation_cleanup' "Phase 1" and "Phase 2",
+and those run inside phase one. 'dbs/in_rust_graph.rs':329-330
+adds "merge phase" and "ordinary phase". Cheap: "the ordinary
+phase" and "the nodeMerge phase" everywhere.
+** 4. "Stale" has five subjects; the glossary defines one
+Glossary 617 defines a stale graphnode. The docs also say stale
+buffer ('save_staleness.rs':1; api 298, 346, 585, 657, 850, 932,
+2357), stale save ('data-model_technical.org':158; api 488),
+stale view ('COMMANDS.org':27-28) and stale write
+('stale_write_errors'). The tool uses it in the ordinary sense,
+files out of date ('skg_for_ai.py':368; its README 499, 867,
+1504), and 'COMMANDS.org':165 has a "stale approval". Cheap: the
+glossary adds "a buffer, view or save is stale when it would
+write a stale graphnode"; the tool says "out of date".
+** 5. Bare "merge", and three names for its members
+'names.org' forbids a bare "merge". New bare uses:
+'save_staleness.rs':19, 'save.rs':285-286, 'types/save.rs':59,
+'from_text/validate.rs':341, 'dbs/in_rust_graph.rs':329,
+'docs/merging.org':55-63. Worst: "a three-way merge by hand"
+('COMMANDS.org':39-40, 'COMMANDS-nvim.org':48-49), a text merge
+in a doc full of nodeMerges. The acquirer and acquiree are "a
+side of a merge pair" ('errors.rs':19, 84), "the deleted merge
+node" ('errors.rs':82; the glossary sanctions "merge nodes" only
+as a verb phrase) and "merge partner"
+('validate_nodeMerge.rs':5, older at :2; "partner" is a folder
+term). Cheap.
+** 6. 'ChangeSinceRendered' beside 'ChangedSinceRendered'
+'types/errors.rs':30 (new type) and 108 (older variant) differ
+by one letter and meet in the same match arms
+('errors.rs':355-360, 'types/save.rs':288-290). Cheap: rename
+only the new type, e.g. 'HowTheGraphnodeChanged'; the old name
+stays.
+** 7. A third meaning of "aspect"
+'ChangedAspect' ('errors.rs':38-44; 'save_staleness.rs':161-193)
+names title, body, content, aliases, extra IDs, flags,
+subscriptions, hides, overrides, home skgrepo. The glossary has
+"diff aspect" (1333: existence, text, home skgrepo, alias, extra
+ID, flag, relRepo; 'NodeAspect', 'change_leaves.rs':44) and the
+change-forest's "changed aspects" (1371). "Body" here is "text"
+there. Not in the glossary. Cheap: a glossary line saying the
+stale error names aspects at its own grain.
+** 8. "Baseline" and "clean baseline" name one thing
+Glossary 604-615 defines "baseline" only. "Clean baseline" stays
+in api 183 and 385, 'COMMANDS.org':129, 'COMMANDS-nvim.org':140,
+'save_dependencies/mod.rs':86, 'skg-recovery.el':56-75, and in
+every client name ('skg-clean-baseline'). 'types/git.rs':23, 38
+use "baseline" for a git stage. Cheap: the glossary names the
+synonym; renaming the variables would be unwise.
+** 9. The baseline is not "exactly" what the server drew
+api 173-174 ("exactly as the server last drew it"); glossary
+606. Both clients capture it after stripping the focus and fold
+metadata ('skg-request-save.el':1146-1157, 'save.lua':498-508);
+'skg-buffer.el':143 calls it "normalized". Harmless to the
+check. Cheap: drop "exactly", or say "as the client installed
+it".
+** 10. Smaller stale statements
+'rebuild_session_lifetime_stores.rs':132: "each keeps its
+baseline": the server holds none; the client does.
+'save_staleness.rs':23-24: "a rebuild changes no graphnode": a
+rebuild under an edited config can drop a skgrepo's graphnodes.
+The glossary's "by itself" is the true form. Both cheap.
+** 11. "Drawn" and "rendered" for one moment
+api 298-345 says "when it was drawn" and "last drawn under", the
+errors say "was rendered" and "rendered under"; the code names
+say render. A synonym pair without a private distinction, so
+'names.org' permits it. The stale error also says "the buffer"
+in its first line and "this buffer" in its third
+('types/save.rs':289, 322). Changing the first line is unwise:
+client tests match it.
+* 1. Vocabulary
+** baseline
+Existed as "clean baseline" (finding 8). One meaning across the
+server, both clients, the tool ('.full.org') and the docs.
+Glossary defines it (604) and the docs use it after. The two
+envelope fields named 'baseline' differ in form: the saved
+buffer's is a bare string, an other view's '(present TEXT)' or
+'unavailable' (api 168-183). Documented; changing the wire would
+be costly.
+** the baseline's writes
+New; one meaning ('baseline_writes', 'save_staleness.rs':88; api
+308-310); defined in the glossary (611). Good.
+** the buffer's writes
+Not used verbatim; the docs say "what the buffer writes" and
+define it inline (api 313-317, 'save_staleness.rs':16-18). Fine.
+** stale
+See finding 4. Confusible with ordinary English ("files go
+stale") and the glossary's "stale member" (1428), an unused
+aside.
+** merge request, merge pair, merge node, merge partner
+"Merge request" is older ('skg-set-merge-request'); elsewhere
+"nodeMerge request" ('nodeMergeInstructionTriple.rs':16). "Merge
+pair" is new, in code only, undefined; one meaning. "Merge node"
+and "merge partner": finding 5. Confusible with a forge's "merge
+request"; older than this work, so leave it.
+** as drawn
+Finding 2.
+** changed aspect
+Finding 7. The phrase itself appears only as 'ChangedAspect'.
+** rendered under
+New; one meaning: the skgrepo restriction a held view was last
+rendered under ('views_state.rs':51, 'save_buffer.rs':1145-1170,
+'errors.rs':113-116, api 345-367). Not in the glossary; the
+restriction entry (898) could say a view records it. Cheap.
+** phase one, phase two
+Finding 3.
+** Tense and wording of new comments and errors
+Doc comments describe the code as it is, in the present; none
+narrates the change ("used to", "since slice N"); their "now"
+and "no longer" compare the graph with the baseline. The plan's
+future tense did not leak. Bare words ('names.org'): "merge"
+(finding 5); "the other views' snapshots" ('save.lua':186) wants
+"buffer snapshots"; "Swap in the next generation" ('env.rs':136)
+and "The generation number" ('data-model_technical.org':154) sit
+where the runtime generation is plain from context; acceptable.
+* 2. Citations
+No code in the range cites 'TODO/', a plan or a slice: none in
+'server/', 'elisp/', 'nvim/', 'tools/' or 'tests/', in source,
+tests, comments or doc comments. Two near-misses mean the
+'SavePlan', not a plan document, and are fine:
+'server/from_text.rs':56 ("The plan carries the merge pairs")
+and 'nodeInstructions_from_the_merges_in_a_viewforest.rs':39 (in
+'tests/merge/') ("The plan should carry the merge"). The second
+also uses a bare "merge"; cheap to say "the merge request".
+* 3. Stale comments and docs
+** Statements no longer true
+Finding 1 (six places), finding 9, and both in finding 10.
+Beyond those, the sampled files read true against the code:
+'save_staleness.rs' (module and every doc comment),
+'save_buffer.rs' (envelope, restriction check, the stale-check
+comment at 893), 'save.rs' ('prepare_save_under_mutation_gate',
+'PreparedSave::nodeMerges'), 'views_state.rs' ('register_view',
+'update_view', the new field), the rebuild handler apart from
+132, 'skg-request-save.el' and 'save.lua' apart from finding 1.
+In 'api-and-formats.org': the stale-buffer bullet (298-345), the
+restriction bullet (345-367), the dependency rule (386-391), the
+nodeMerge bullet (412-423), "The baseline of a view" (573-589),
+the reload (657), the rebuild (846-858) and the strip (930-932)
+match the code. The claim at 2357-2359 that a suppressed write
+to a restricted node never reaches the stale check holds: the
+suppression is in 'extract_nonmergeSavePlan_locally_in_graph',
+which the baseline goes through as well.
+** Surviving mentions of the removed machinery
+'rendered-at' (any spelling): none outside 'TODO/'.
+'LastChangeGenerations', 'last_change': none outside 'TODO/'.
+'runtime generation' survives only for the type that stays, each
+mention true: 'coding-advice/names.org':28;
+'server/types/env.rs':1, 45, 152, 192;
+'server/rerender_pass.rs':2, 47; 'server/refresh/mod.rs':61;
+'server/repo_watch/mod.rs':3; 'tests/repo_watch.rs':5;
+'tests/grouped_unit.rs':58-59 (the test of 'SharedRuntime');
+'docs/glossary.org':2054-2057; 'docs/api-and-formats.org':667,
+833; 'docs/data-model_technical.org':139-162. None dates a
+buffer.
+

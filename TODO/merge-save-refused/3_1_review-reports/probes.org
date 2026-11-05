@@ -1,0 +1,160 @@
+#+title: Probes of plan 2_2 at the TCP surface
+* Setup
+An isolated server ('target/debug/skg' at HEAD, port 1757) on a
+scratch data root: owned skgrepos 'pub' then 'priv', default
+'priv'. Nodes: 'r' (Root) contains 'a' (Alpha, three body
+lines), 'b' (Beta), 'x' (Ex), 'c' (Cee, whose body links to
+'x'); 'p' in 'priv'. A Python driver on 'SkgConnection' from
+'tools/skg-for-ai' held connections open and sent save
+envelopes with '(baseline ...)' and hand-built '(other-views
+...)'. Disk edits waited 3 s for the reload notice. Server log:
+no panics. Scratch data deleted afterwards.
+* Finding: after a sibling merge, the container never saves
+Not one of the twelve probes, but it is the most serious result.
+Reproduced from scratch: 's1' contains 'k1', 'k2'; a view of
+'s1' carries '(editRequest (merge k2))' on 'k1'; the save
+succeeds. 's1.skg' still lists 'k1' and 'k2' (now one node);
+the view draws one child. Then every save of a view holding
+'s1' is refused, the returned text saved unedited included, and
+a freshly opened view too:
+#+begin_example
+A node this save would write changed after the buffer was
+  rendered:
+- Title: Siblings
+- ID: s1
+- Changed since this buffer was rendered: the content
+  (gained k2, lost none).
+#+end_example
+Nothing changed after the render. The baseline's copy of 's1'
+(one child) never equals the graph's (two IDs, one pid), so it
+survives the noop filter. The buffer's copy survives it too, so
+'s1' is "stale" forever. The advised recovery (reopen a fresh
+view) cannot help. Only a hand edit of 's1.skg' clears it.
+Before the plan, such a save rewrote 's1' deduplicated. The
+"gained k2" also misleads, since 's1' gained nothing.
+* 1. Stale by content: as the plan says
+Conn opens view of 'r'; 'a.skg' retitled "Alpha Changed" on
+disk (notice 'repo-files-reloaded ... (view-ids (cv:1))');
+the view edits A's body, saved with the old baseline.
+Response: 'NOTHING WAS SAVED', Error 1 first line exactly "A
+node this save would write changed after the buffer was
+rendered:", '- Title: Alpha Changed', '- Changed since ...: the
+title (then "Alpha", now "Alpha Changed")', then the occurrence
+'*** Alpha' as a subheadline. 'a.skg' untouched.
+* 2. Not stale when unchanged: as the plan says, not as asked
+Variant asked for (view of 'r' holds A and B; A retitled on
+disk; the view edits only B): refused, stale A ("then "Alpha
+Changed", now "Alpha""). That follows the plan: the buffer
+still holds A's old copy, which differs from the graph, so it
+is a write, and writing it would undo the retitle.
+Variant where the view does not hold A (view of 'b'): edit of
+B saved, A untouched. So "unrelated" must mean "not in the
+view"; any view holding an unedited copy of a changed node is
+refused. Users will meet this after every outside change.
+* 3. Changed and changed back: as the plan says
+View of 'r'; A retitled "Alpha Temp" on disk, reloaded, then
+restored, reloaded; the view edits A's body and saves with the
+first baseline. Success; 'a.skg' carries the edit.
+* 4. Deleted after render: as the plan says
+View of 'r'; 'a.skg' removed, reloaded; the view edits A.
+Response: the stale first line, '- ID: a', '- It was deleted
+after this buffer was rendered.', no title line. Nothing
+recreated.
+* 5. Merge keeps edits: as the plan says (acquirer half untested)
+View of 'r': A retitled "Alpha Merged" and given
+'(editRequest (merge b))'; B's body edited in the same buffer.
+Success. 'a.skg': 'title: Alpha Merged', 'extra_ids: [b]',
+'contains:' the new text preserver only (first child). The
+preserver: "MERGED: Beta" with B's body as this buffer edited
+it. ('r.skg' still lists 'a' and 'b': see the finding above.)
+Then 'c' merges 'x' and 'x' carries '(editRequest delete)':
+refused, "A node this save would merge is also deleted by it:"
+'- Title: Ex', '- ID: x', '- It is the acquiree of a merge
+request in this buffer.', '- Remove either ...'. Nothing
+written.
+The acquirer variant could not be produced: one headline holds
+one editRequest ("editRequest may appear only once"), and a
+second occurrence carrying 'delete' is refused first by
+"ambiguous deletion instructions" and "multiple defining
+containers".
+* 6. Merge of a node that changed: as the plan says, not as asked
+View of 'c' with '(editRequest (merge x))'; meanwhile 'x.skg'
+became "Ex Changed" with a body. Success; the preserver is
+"MERGED: Ex Changed" with the new body; 'c' has 'x' among its
+extra IDs.
+The same through a view of 'r', which also holds 'x': refused,
+stale 'x' (its own old copy, not the merge) and stale 'r' (the
+finding above). As in probe 2, the merge itself is never
+stale, but an acquiree the view also shows is.
+* 7. The body's line diff: as the plan says
+View of 'a'; on disk "line two P3" became "line two DISK" plus
+a new line; the view retitles A. Refused, with
+#+begin_example
+- Changed since this buffer was rendered: the body.
+- The body's changed lines, then against now:
+  - line two P3
+  + line two DISK
+  + line two-and-a-half
+#+end_example
+* 8. Missing baseline: as the plan says
+Envelope '((saved-buffer "...") (other-views ()))' with a real
+edit of C. Response: 'save-lock', then 'save-result' with
+'(content nil)' and error "Error reading save payload:
+Malformed save envelope: missing baseline". 'c.skg' byte
+identical. (No "NOTHING WAS SAVED" header, unlike other
+refusals.)
+* 9. Merge request, link: merge as planned; link differs
+One connection holds views of 'm1', 'l1' (body links to 't1'),
+'h1' (contains 't1') and 't1'. Each save edits 't1''s body;
+'other-views' marks one view dirty with baseline and current.
+- Dirty 'm1' whose only mention of 't1' is '(editRequest
+  (merge t1))': success; 'save-relax-lock' kept 'cv:9m'.
+- Dirty 'l1' whose only tie is the link: refused, "this save
+  conflicts with unsaved dependencies in cv:9l. ... Conflicts:
+  cv:9l [l1]".
+- Control, dirty 'h1' holding 't1': refused, '[h1, t1]'.
+The link target is no longer a dependency
+('dependencies_from_viewforest'), but 'dirty_view_conflicts'
+matches the dirty view's own nodes against
+'update_relevant_neighborhood' of the save's writes, which keeps
+inbound links. 'l1' links to 't1', so 'l1' is "affected" and
+the dirty view of 'l1' conflicts anyway. The plan kept the
+links there for redraws of clean views; it also blocks this.
+* 10. Restriction: as the plan says; refusal reachable over TCP
+View of 'r' under 'priv' (shows 'p' as an occurrence). "set
+skgrepo restriction" to 'pub': 'rerender-lock', 'rerender-view'
+('p' now 'restricted'), 'rerender-done'. The pre-switch text,
+retitled, saved with its pre-switch baseline: success; 'r.skg'
+retitled, 'p' kept in its contents. No refusal, since the
+rerender re-recorded the restriction.
+The refusal can be produced over TCP after all, by a rebuild:
+view of 't1' under 'priv', edited; config edited to drop
+'priv' (default 'pub'); "rebuild session-lifetime stores";
+restriction now 'pub'; "rerender all views" excluding the dirty
+view; save. Refused: "This view was rendered under a different
+skgrepo restriction (then: priv, pub; now: pub). Rerender it,
+or archive its edits and reopen it." Nothing written.
+Nit: "then: priv, pub" is not ladder order (config lists 'pub'
+first); the plan's example lists most public first.
+* 11. Rebuild: as the plan says
+Views 'cv:11clean' (of 'c') and 'cv:11dirty' (of 'a', edited).
+'a.skg' body changed on disk, reloaded. Rebuild: "Config
+reloaded; ... rebuilt successfully". "rerender all views"
+excluding the dirty view: 'cv:11clean' redrawn, identical text,
+no errors. Saving that redraw with an edit: success.
+Saving 'cv:11dirty' with its pre-rebuild baseline: refused,
+stale 'a', body diff "- line three" / "+ line three DISK11".
+Also: a dirty view of an unchanged node, saved after a plain
+rebuild, succeeds.
+* 12. No generation anywhere: as the plan says
+Responses seen: 'content-view', 'search-results', 'diff-view'
+(after 'git init' of the scratch repos), 'save-result',
+'collateral-view', 'rerender-view', 'rerender-done',
+'repo-files-reloaded'. None carries 'rendered-at'. A grep of
+'server', 'elisp', 'nvim', 'tools' and 'docs' finds no
+'rendered-at', 'rendered_at' or "runtime generation" request.
+'((request . "runtime generation"))' answers '(response-type
+error)' "Unsupported request type: runtime generation".
+* Aside
+A save rewrites a body as 'body: |2-' and moves 'title:' above
+'pid:'. Probably older than this work; harmless.
