@@ -475,3 +475,93 @@ parse, as the agent chose: it reads only the connection's views,
 and the parse's validators would otherwise judge the buffer under
 the wrong restriction. Good. Names and the rebuild interplay are
 carried into slice 6. Slice 6 launched 22:12.
+** Slice 6
+*** Commits
+- 349a3f91 "Views survive a rebuild; the clients rerender them": the
+  rebuild keeps 'open_views' (still drops the graph straddle); Emacs
+  and Neovim fetch the herald rules and then send "rerender all
+  views" after a successful rebuild; tests, docs, and the slice's
+  headline turned DONE.
+- The commit carrying this entry ("plan 2_2 done: ..."): the three
+  entries under "The stale-save check refuses saves needlessly
+  (2026-11-05)" moved, with their parent headline, from
+  'TODO/problems.org' to the top of 'TODO/DONE/problems.org'.
+*** Suites
+- 'cargo nextest run --test grouped_saves': 177 of 177 (including the
+  three new tests; 'save_stale_buffers::' 14 of 14, 'reload_config::'
+  3 of 3).
+- 'bash/emacs-tests.sh': 444 of 444. 'bash/nvim-tests.sh': all
+  passed (481 successes, 0 failed, 0 errors in the 'all-tests' run).
+- 'bash/nextest.sh': 1126 of 1126. 'cargo check --all-targets': no
+  warnings.
+- The integration tests 'diff-view' and 'link-annotations' for both
+  clients, run alone while working: all pass.
+- 'bash/all-tests.sh' (2026-11-05, about 21:46-21:49 UTC, 182 s),
+  'tests/results/ALL.org': Build PASS; Emacs tests PASS; Neovim tests
+  PASS; Nextest PASS (1126 of 1126); Doctests PASS; Integration FAIL,
+  2 of 72: 'emacs/import-md-and-org' and 'nvim/import-md-and-org',
+  failing again on the retry. Both are the pre-existing failure the
+  plan names ("A failure that predates the plan"); not investigated.
+  No other failure.
+- '/verify' at the TCP surface, on an isolated server, all on one
+  connection: opened a view of a node, rewrote its file on disk,
+  rebuilt, sent "rerender all views" (one rerender-view, carrying the
+  rewritten title; rerender-done with no errors), saved an edit of
+  the redrawn view with it as the baseline: saved, and the file
+  carried the edit.
+- The tool's own tests ('test_skg_for_ai.py') were not run: the
+  tool's code did not change, only one row of its README.
+*** Deviations from the plan's how
+- The clients send the two requests outside the rebuild's handler
+  (Emacs 'run-at-time 0', Neovim 'vim.schedule'), as the import's
+  rerender does: the rerender resets the receiver, which inside the
+  handler would drop whatever follows the rebuild's answer. Both go
+  from one new function ('skg--refetch-herald-rules-and-rerender-all-views',
+  'refetch_herald_rules_and_rerender_all_views'), herald rules first:
+  the server answers in order, so the views are redrawn under the new
+  herald rules, and nothing between the two sends reads the
+  connection, so the rerender's reset cannot drop the herald answer.
+  The rebuild message no longer carries the "close your views" line.
+- 'OpenViews::clear' had no other caller, so it is removed.
+- The reconciliation of the restriction: 'serve.rs' (line 123)
+  applies 'under_config' at the start of every request, before
+  dispatch, so the "rerender all views" that follows a rebuild runs
+  under the reconciled restriction and the rerender stream records it
+  in each view. No code change was needed.
+- Beyond the one test the plan asks for
+  ('views_survive_a_rebuild_and_a_rerender_redraws_them' in
+  'tests/save_stale_buffers.rs'), two more: a view left unrerendered
+  across a rebuild is compared at its save and refused when its node
+  changed on disk ('save_stale_buffers.rs'), and a view showing a
+  node of a skgrepo the reloaded config drops is redrawn with it
+  unknown ('reload_config.rs'), which the rebuild paragraph of the
+  docs now states.
+- Docs beyond those named: the "Save buffer" paragraph names the
+  rebuild as the case slice 5's refusal covers (as the carried
+  correction asked); the 'skg-close-all-skg-buffers' and
+  ':SkgCloseAllSkgBuffers' entries lose "This may be warranted after
+  a rebuild" (the Emacs entry, which had nothing else, now says what
+  it does); the tool README's row for the rebuild no longer says it
+  closes every view and needs a daemon restart.
+*** Fixtures changed
+- 'tests/integration/diff-view/' (both clients), phase 4: it waited
+  for "views are now invalid"; it now waits for "rebuilt
+  successfully" and for the rerender that follows to finish
+  (expected adaptation). It then closes the buffers of the diff view
+  before asking for a view of r: they survive the rebuild now, r is a
+  root of one, and the single-root view request answers
+  'switch-to-view' to an open content view having that root, a buffer
+  of the diff view included ('content_viewforest_id_for_root_gnid'
+  does not exclude them). That was already so before a rebuild; the
+  rebuild used to hide it by forgetting the views. Whether a link to
+  r should land in a diff-view buffer is a question for Jeff, not
+  changed here.
+- Unit tests: 'tests/elisp/test-skg-rebuild-session-lifetime-stores.el'
+  and 'tests/nvim/misc_requests_spec.lua' expect the herald rules and
+  then the rerender after success, and nothing after a failure.
+- Noticed, unchanged: Neovim sends "close view" twice per deleted
+  buffer (seen in the diff-view server log); harmless.
+*** Left unfinished
+Nothing.
+*** Headline
+DONE.
