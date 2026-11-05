@@ -92,12 +92,13 @@ makes nothing stale by itself.
   longer matches the graph.
 - 'merge request', 'acquirer', 'acquiree', 'merge pair', 'merge
   nodes', 'NodeMerge', 'phase one', 'phase two', 'derived
-  writes': as in '2_plan.org''s vocabulary, repeated here. A
+  writes': as the deleted '2_plan.org' defined them, repeated here. A
   merge request is '(editRequest (merge ID))' on a headline; the
   headline's graphnode is the acquirer, the named one the
   acquiree. A merge pair is the acquirer's pid and the acquiree's
-  ID as written ('nodeMerge_pairs' in
-  'server/from_text/local_fieldintent_collection/lower.rs'). A
+  pid: since slice 1, 'from_text.rs' resolves the ID as written
+  (possibly an extra ID) to its pid before the pair enters the
+  'SavePlan' as 'nodeMerge_pairs'. A
   NodeMerge is the triple a pair becomes: text preserver, updated
   acquirer, delete of the acquiree. Phase one applies the
   ordinary nodeInstructions and phase two the NodeMerges, in
@@ -315,7 +316,7 @@ including a merge's acquiree. Keep it before the save is
 prepared. With the triple built from phase one's candidate, the
 text preserver copies the acquiree as the repair left it.
 ** IDs are compared as pids
-A merge pair's acquiree ID may be an extra ID. A 'DeleteNode'
+A merge pair holds two pids (since slice 1). A 'DeleteNode'
 carries a gnid. 'ForkSpec::original_gnid' is a gnid. The
 baseline's and the buffer's Save instructions carry pids after
 supplementation. Resolve every gnid through
@@ -512,6 +513,14 @@ entry in 'docs/COMMANDS.org' (and its Neovim mirror). In
 'docs/api-and-formats.org', say under "Save buffer" that a merge
 is built from the graph as the save's ordinary edits leave it.
 ** TODO Slice 2: the baseline rides with every save
+*** Corrections carried from slice 1
+None to the behavior. Names that changed: 'SavePlan' carries
+'nodeMerge_pairs' (two pids), 'PreparedSave::nodeMerges' gives
+the triples, 'stale_write_errors' is called with an empty
+nodeMerges slice until slice 3 removes the parameter. A new error
+'CannotDeleteAndMergeSimultaneously' with a 'NodeMergeRole' enum
+lives in 'server/types/errors.rs'. 'prepare_save_under_mutation_
+gate' and 'PreparedSave' are public now, for the merge tests.
 Server: the envelope parser requires '(baseline "TEXT")' beside
 'saved-buffer' and refuses its absence; the parsed baseline
 reaches 'update_from_and_rerender_buffer_with_approvals' as a
