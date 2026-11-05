@@ -14,7 +14,7 @@ use skg::test_utils::{
   update_from_and_rerender_buffer_with_snapshots_test,
 };
 use skg::test_utils::single_root_view;
-use skg::types::misc::ID;
+use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 use skg::types::errors::SaveError;
 use skg::types::save::format_save_error_as_org;
 use skg::types::views_state::{OpenViews, ViewforestId};
@@ -56,9 +56,9 @@ fn conflicting_dirty_view_refuses_before_mutation_and_disjoint_view_succeeds
         config, Some (tantivy), &ID::from ("A")) ?;
       let edited_a : String = a_view . replace (
         "A links to [[id:X][X]]", "[[id:X][X]] [[id:A][A]]");
-      let (b_view, _, _) = single_root_view (
-        config, Some (tantivy), &ID::from ("B")) ?;
-      let dirty_b : String = format! ("{}\nlocal edit", b_view);
+      let (x_view, _, _) = single_root_view (
+        config, Some (tantivy), &ID::from ("X")) ?;
+      let dirty_x : String = format! ("{}\nlocal edit", x_view);
       let a_path = config . skgrepos . values () . next () . unwrap ()
         . path . join ("A.skg");
       let a_before : Vec<u8> = fs::read (&a_path) ?;
@@ -67,17 +67,17 @@ fn conflicting_dirty_view_refuses_before_mutation_and_disjoint_view_succeeds
       let result = update_from_and_rerender_buffer_with_snapshots_test (
         &mut stream, &edited_a, config, tantivy, &graph,
         &Ok (saved_viewforest_id . clone ()), &mut views_state,
-        &[dirty_buffer_snapshot ("client-only-b", Some (&b_view), &dirty_b)])
+        &[dirty_buffer_snapshot ("client-only-x", Some (&x_view), &dirty_x)])
         . await;
       drop (stream);
       let messages = read_all_lp_messages (&mut BufReader::new (read_end));
       let error = match result {
         Ok (_) => panic! (
-          "B's shared link target X must conflict with A's neighborhood"),
+          "a dirty view showing A's link target X must conflict with A's neighborhood"),
         Err (error) => error,
       };
       let message : String = error_text (error . as_ref ());
-      assert! (message . contains ("client-only-b")
+      assert! (message . contains ("client-only-x")
                && message . contains ("X"), "{}", message);
       assert_eq! (fs::read (&a_path) ?, a_before,
                   "a refused save must not write its file");
@@ -162,6 +162,130 @@ fn missing_or_unparseable_dirty_baseline_refuses () -> Result<(), Box<dyn Error>
         assert! (message . contains ("recovery command")
                  || message . contains (
                    "skg-show-unsaved-changes"), "{}", message); }
+      Ok (( ))
+    }))
+}
+
+/// Saves 'saved_text' as the view 'saved-view' while one other client
+/// view, 'dirty_view', is dirty: its baseline is 'dirty_baseline' and its
+/// unsaved text 'dirty_current'. No view is registered.
+async fn save_beside_one_dirty_view (
+  config         : &SkgConfig,
+  tantivy        : &TantivyIndex,
+  graph          : &InRustGraphHandle,
+  saved_text     : &str,
+  dirty_view     : &str,
+  dirty_baseline : &str,
+  dirty_current  : &str,
+) -> Result<(), Box<dyn Error>> {
+  let mut views_state : ViewsState = ViewsState {
+    open_views        : OpenViews::new (),
+    graph_straddle    : None,
+  };
+  let (mut stream, _) = mk_test_tcp_stream_pair ();
+  update_from_and_rerender_buffer_with_snapshots_test (
+    &mut stream, saved_text, config, tantivy, graph,
+    &Ok (ViewforestId::ContentView ("saved-view" . into ())),
+    &mut views_state,
+    &[dirty_buffer_snapshot (dirty_view, Some (dirty_baseline), dirty_current)])
+    . await ?;
+  Ok (( ))
+}
+
+/// A dirty view of C whose only mention of B is a merge request on C
+/// does not depend on B, so a save that retitles B succeeds.
+#[test]
+fn a_merge_request_target_is_not_a_dirty_view_dependency
+  () -> Result<(), Box<dyn Error>> {
+  run_with_test_stores (
+    "skg-test-save-dirty-merge-target",
+    "tests/save_dirty_conflicts/fixtures",
+    "/tmp/tantivy-test-save-dirty-merge-target",
+    |config, tantivy| Box::pin (async move {
+      let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
+      let (c_view, _, _) = single_root_view (
+        config, Some (tantivy), &ID::from ("C")) ?;
+      let c_requesting_merge : String = c_view . replacen (
+        "(skg ", "(skg (editRequest (merge B)) ", 1);
+      assert_ne! (c_requesting_merge, c_view);
+      let (b_view, _, _) = single_root_view (
+        config, Some (tantivy), &ID::from ("B")) ?;
+      let retitled_b : String = b_view . replace (
+        "B links to [[id:X][X]]", "B, retitled, links to [[id:X][X]]");
+      save_beside_one_dirty_view (
+        config, tantivy, &graph, &retitled_b,
+        "merge-requesting-c", &c_view, &c_requesting_merge) . await
+        . map_err (|error| error_text (error . as_ref ())) ?;
+      assert_eq! (
+        graphnode_from_graph (&graph . load_full (), &ID::from ("B"))
+          . unwrap () . title,
+        "B, retitled, links to [[id:X][X]]");
+      Ok (( ))
+    }))
+}
+
+/// A dirty view of C whose only mention of X is a link in C's unsaved
+/// body does not depend on X, so a save that retitles X succeeds.
+#[test]
+fn a_link_target_is_not_a_dirty_view_dependency
+  () -> Result<(), Box<dyn Error>> {
+  run_with_test_stores (
+    "skg-test-save-dirty-link-target",
+    "tests/save_dirty_conflicts/fixtures",
+    "/tmp/tantivy-test-save-dirty-link-target",
+    |config, tantivy| Box::pin (async move {
+      let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
+      let (c_view, _, _) = single_root_view (
+        config, Some (tantivy), &ID::from ("C")) ?;
+      let c_linking_x : String = format! (
+        "{}\nsee [[id:X][X]]", c_view . trim_end ());
+      let (x_view, _, _) = single_root_view (
+        config, Some (tantivy), &ID::from ("X")) ?;
+      let retitled_x : String = x_view . replace (
+        "shared X", "shared X, retitled");
+      save_beside_one_dirty_view (
+        config, tantivy, &graph, &retitled_x,
+        "x-linking-c", &c_view, &c_linking_x) . await
+        . map_err (|error| error_text (error . as_ref ())) ?;
+      assert_eq! (
+        graphnode_from_graph (&graph . load_full (), &ID::from ("X"))
+          . unwrap () . title,
+        "shared X, retitled");
+      Ok (( ))
+    }))
+}
+
+/// A dirty view that shows X still depends on X, so a save that
+/// retitles X is refused, naming that view and X, and writes nothing.
+#[test]
+fn a_dirty_view_showing_a_graphnode_refuses_a_save_of_it
+  () -> Result<(), Box<dyn Error>> {
+  run_with_test_stores (
+    "skg-test-save-dirty-shown-target",
+    "tests/save_dirty_conflicts/fixtures",
+    "/tmp/tantivy-test-save-dirty-shown-target",
+    |config, tantivy| Box::pin (async move {
+      let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
+      let (x_view, _, _) = single_root_view (
+        config, Some (tantivy), &ID::from ("X")) ?;
+      let dirty_x : String = format! ("{}\nlocal edit", x_view . trim_end ());
+      let retitled_x : String = x_view . replace (
+        "shared X", "shared X, retitled");
+      let x_path = config . skgrepos . values () . next () . unwrap ()
+        . path . join ("X.skg");
+      let x_before : Vec<u8> = fs::read (&x_path) ?;
+      let message : String = match save_beside_one_dirty_view (
+        config, tantivy, &graph, &retitled_x,
+        "showing-x", &x_view, &dirty_x) . await
+      { Ok (( )) => panic! ("a dirty view showing X must refuse a save of X"),
+        Err (error) => error_text (error . as_ref ()), };
+      assert! (message . contains ("showing-x [X]"), "{}", message);
+      assert_eq! (fs::read (&x_path) ?, x_before,
+                  "a refused save must not write its file");
+      assert_eq! (
+        graphnode_from_graph (&graph . load_full (), &ID::from ("X"))
+          . unwrap () . title,
+        "shared X");
       Ok (( ))
     }))
 }

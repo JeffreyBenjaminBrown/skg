@@ -360,7 +360,13 @@ So far there are these endpoints:
     candidate graphs. Other registered views containing an affected unrestricted ID
     are rerendered. For every dirty client view, the server parses and unions
     dependencies from its clean baseline, current text, and registered viewforest
-    when present. Any intersection refuses the save conservatively; malformed
+    when present. A dependency is a graphnode the view holds a viewnode of: an
+    occurrence, the overrides an occurrence shows, a gnid-only viewnode, a
+    ghost, or an ID property member. A merge request's target and a link's
+    target are not dependencies merely by being named there: the request or
+    the link holds no copy of the target, so a save that changes the target
+    clobbers nothing the view holds.
+    Any intersection refuses the save conservatively; malformed
     or missing dirty dependency data also refuses. A refusal returns
     =save-result= with nil content and actionable errors naming view IDs and
     IDs, and performs no filesystem, graph, search index, registry, or collateral

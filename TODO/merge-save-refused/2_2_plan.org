@@ -629,7 +629,7 @@ the server last drew; the error holds the graph's change against
 that same text; reopen a fresh view and reapply your diff where
 it still applies. Drop "after which every older view is stale"
 and the restart clause; neither is true any more.
-** TODO Slice 4: neither a merge request nor a link depends
+** DONE Slice 4: neither a merge request nor a link depends
 *** Corrections carried from slice 3
 None to the behavior. 'stale_write_errors' ('save_staleness.rs')
 now takes the graph, config, restriction, baseline text,

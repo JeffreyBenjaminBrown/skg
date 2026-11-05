@@ -5,10 +5,9 @@ use crate::save::PreparedSave;
 use crate::serve::ViewsState;
 use crate::serve::handlers::save_buffer::ClientViewSnapshot;
 use crate::types::misc::ID;
-use crate::types::links::links_from_text;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
-  Editability, NodeEditRequest, PropertyMember, ViewnodeKind, Vognode,
+  PropertyMember, ViewnodeKind, Vognode,
 };
 use crate::types::views_state::ViewforestId;
 
@@ -96,10 +95,6 @@ pub(crate) fn dirty_view_conflicts (
     if let Some (registered) = views_state . open_views
         . viewforest_id_to_view (&buffer_snapshot . viewforest_id)
     { dependencies . extend (dependencies_from_viewforest (registered)); }
-    // todo | PITFALL : Matching every reference is more conservative than
-    // necessary, but much more convenient than classifying dependencies.
-    // A save of A and a dirty view of B can conflict merely because both
-    // link to X, even when B does not display X's changing herald.
     let mut matching : Vec<ID> = dependencies . iter ()
       .filter_map (|gnid| affected . matching_identity (gnid, before, after))
       .collect ();
@@ -126,12 +121,14 @@ fn dependencies_from_text (
       viewforest_id . repr_in_client (),
       errors . iter () . map (ToString::to_string)
         .collect::<Vec<String>> () . join ("; "))); }
-  let mut result : HashSet<ID> = dependencies_from_viewforest (&forest);
-  result . extend (links_from_text (text) . into_iter ()
-    .map (|link| link . gnid));
-  Ok (result)
+  Ok (dependencies_from_viewforest (&forest))
 }
 
+/// The graphnodes a dirty view holds viewnodes of: occurrences (and the
+/// overrides each shows), gnid-only viewnodes, ghosts and ID property
+/// members. A merge request or a link does not make its target one: it
+/// holds no copy of the target, so a save that changes the target
+/// clobbers nothing the view holds.
 fn dependencies_from_viewforest (
   forest : &ViewForest,
 ) -> HashSet<ID> {
@@ -140,11 +137,7 @@ fn dependencies_from_viewforest (
     match &node . value () . kind {
       ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) => {
         result . insert (occurrence . gnid . clone ());
-        result . extend (occurrence . overridesHere . iter () . cloned ());
-        if let Editability::Editable {
-          edit_request : Some (NodeEditRequest::NodeMerge (target)), ..
-        } = &occurrence . editability
-        { result . insert (target . clone ()); }}
+        result . extend (occurrence . overridesHere . iter () . cloned ()); }
       ViewnodeKind::Vognode (Vognode::GnidOnly (gnid_only)) => {
         result . insert (gnid_only . gnid . clone ()); }
       ViewnodeKind::Vognode (Vognode::Ghost (ghost)) => {

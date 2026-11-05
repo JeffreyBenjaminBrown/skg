@@ -348,3 +348,43 @@ deviations (the Title line shows the graph's current title; the
 generation counter starts at 0; parse errors in the baseline
 refuse the save) are fine. No correction needed for slice 4.
 Slice 4 launched 21:52.
+** Slice 4
+*** Commits
+- The commit carrying this entry: a dirty view depends only on the
+  graphnodes it holds viewnodes of; neither a merge request's target
+  nor a link's target is a dependency; its three tests, the adapted
+  existing test, the dirty-view paragraph of
+  'docs/api-and-formats.org', and the slice's headline turned DONE.
+*** Suites
+- 'cargo nextest run --test grouped_saves -E test(save_dirty_conflicts::)':
+  5 of 5. With the old 'save_dependencies/mod.rs' restored for one
+  run, the two new "is not a dependency" tests failed and the other
+  three passed, so the new tests discriminate.
+- 'cargo nextest run --test grouped_saves': 175 of 175.
+- 'bash/nextest.sh': 1123 of 1123.
+- No failures. The integration suite was not run: the slice changes
+  no buffer text, no protocol and no client path.
+*** Deviations from the plan's how
+- None in the code: the merge branch of 'dependencies_from_viewforest'
+  and the 'links_from_text' extension of 'dependencies_from_text' are
+  gone, with their now-unused imports, and the PITFALL comment with
+  them. 'dependencies_from_viewforest' gained a doc comment saying what
+  a dependency is.
+- The three tests share a helper, 'save_beside_one_dirty_view', which
+  saves one buffer beside one dirty snapshot with no view registered.
+  The link test puts the link in C's unsaved body rather than in a
+  fixture file, so no fixture changed; the merge test puts
+  '(editRequest (merge B))' on C's headline in C's unsaved text.
+*** Fixtures changed
+- None. The existing test
+  'conflicting_dirty_view_refuses_before_mutation_and_disjoint_view_succeeds'
+  was adapted (expected adaptation, not a fixture change): its refusing
+  half used a dirty view of B whose only tie to the save of A was that
+  both link to X, which is exactly the conflict this slice removes. It
+  now uses a dirty view showing X, which A's save's neighborhood still
+  reaches through A's link, so it still tests a refusal before any
+  write.
+*** Left unfinished
+Nothing.
+*** Headline
+DONE.
