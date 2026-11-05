@@ -542,6 +542,30 @@ the field; the tool's tests likewise. Run
 Docs: the save request's envelope in 'docs/api-and-formats.org'
 ("Save buffer") documents the field; the tool's README too.
 ** TODO Slice 3: staleness by content, and the generations go
+*** Corrections carried from slice 2
+- 'bash/integration-tests.sh' runs the Emacs client only. The
+  Neovim pass is what 'bash/all-tests.sh' adds; run the
+  integration tests for both clients the way it does (read its
+  integration section for the per-client invocation), or run
+  'bash/all-tests.sh' itself, before this slice ends.
+- Several Neovim integration scripts open hand-built views
+  through 'open_org_buffer_from_text', which records the
+  hand-written text as the baseline. Where that text differs
+  from the graph, this slice's check would refuse their saves as
+  stale. Set 'skg_clean_baseline' to the empty text after opening
+  in those scripts, as the Emacs scripts already pass the empty
+  baseline; a hand-built view was drawn by no server.
+- 'update_from_and_rerender_buffer_with_approvals' takes the
+  baseline as '&str' with an '#[allow(unused_variables)]' and a
+  TODO comment naming this plan. This slice uses the parameter;
+  remove the allow and the comment (code does not cite 'TODO/').
+- The tool ('tools/skg-for-ai') sends the view's '.full.org' file
+  as the baseline, 'new' sends the empty baseline, and 'raw' has
+  '--baseline FILE'. The sidecar has no 'content' field; where
+  the plan says the tool's sidecar 'content', read its
+  '.full.org' file.
+- 'tests/save_stale_buffers.rs': the 'save' helper already takes
+  a baseline; callers pass the text the view was opened with.
 Rewrite 'stale_write_errors' around the baseline as "Agreed
 behavior" says, with the fork specs as a parameter and no
 nodeMerges. Give 'ChangedSinceRendered' the fields the new
