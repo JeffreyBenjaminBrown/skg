@@ -27,9 +27,24 @@
   'strip_body_whitespace_and_refresh_caches' notes every stripped
   node as written, so an open view showing one (none is redrawn)
   is refused as stale if it then edits that node, although every
-  save strips trailing whitespace itself and the graph holds no
-  body text. Fix: do not note them. See
+  save strips trailing whitespace itself, so no save can undo a
+  strip. Fix: do not note them. See
   'TODO/merge-save-refused/1_discussion.org'.
+* The save handler's checks depend on their position in it (2026-11-05)
+  In 'update_from_and_rerender_buffer_with_approvals'
+  ('server/serve/handlers/save_buffer.rs') one vector,
+  'nonmerge_nodeInstructions', starts as the buffer's writes and
+  accumulates derived writes (restore requests, delete
+  propagation, strandeds resets, Hoist repairs, fork clones) as
+  the handler proceeds. A NodeInstruction does not record whether
+  the buffer asked for it or the save derived it, so a check that
+  must see only the buffer's writes ('stale_write_errors') is
+  correct only because of where in the handler it runs. A
+  provenance tag on NodeInstruction, or separate vectors until
+  the final concatenation, would make such checks
+  position-independent. Deferred by Jeff (2026-11-05); see
+  'TODO/merge-save-refused/3_principles.org', "The checks are
+  defined by their position in the handler".
 * Problems noticed while executing plan 10, slice 5 (2026-10-31)
 ** The server reads a title that starts "(skg" as metadata
   'headline_to_triple' ('server/from_text/buffer_to_viewnodes/

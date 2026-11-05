@@ -1,0 +1,6 @@
+#+title: Progress of the plans in this folder
+* Plan 2_2: stale saves decided by content, not by clock
+Orchestrated by Ed (Fable 5.1), one Opus 5.5 agent per slice,
+from 2026-11-05. Each slice's report goes under its own
+subheadline, in the shape 'coding-advice/orchestration.org'
+gives.

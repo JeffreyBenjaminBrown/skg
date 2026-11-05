@@ -40,24 +40,25 @@ it never makes a buffer stale. A server restart or a rebuild
 makes nothing stale by itself.
 * Scope
 ** In scope
-- A merge is built from the graph as phase one leaves it, so a
-  save that merges a graphnode and also changes it keeps both. A
-  save that deletes a merge node is refused (slice 1).
-- The saved buffer's baseline rides with every save, from all
+- A merge will be built from the graph as phase one leaves it, so
+  a save that merges a graphnode and also changes it will keep
+  both. A save that deletes a merge node will be refused (slice
+  1).
+- The saved buffer's baseline will ride with every save, from all
   three clients (slice 2).
-- The server decides staleness by comparing the baseline with the
-  graph, and the generation machinery goes: 'rendered-at' in
-  requests and responses, the 'runtime generation' request, and
-  'LastChangeGenerations' (slice 3).
-- The stale error says what changed, using the diff view's
+- The server will decide staleness by comparing the baseline with
+  the graph, and the generation machinery will go: 'rendered-at'
+  in requests and responses, the 'runtime generation' request,
+  and 'LastChangeGenerations' (slice 3).
+- The stale error will say what changed, using the diff view's
   node-comparison functions (slice 3).
-- A merge request is no dirty-view dependency, and neither is a
-  link (slice 4).
-- The server records the skgrepo restriction each view was last
-  rendered under, and refuses a save of a view whose restriction
-  has since changed (slice 5).
-- Open views survive a rebuild; the clients rerender them instead
-  of closing them (slice 6).
+- A merge request will be no dirty-view dependency, and neither
+  will a link (slice 4).
+- The server will record the skgrepo restriction each view was
+  last rendered under, and refuse a save of a view whose
+  restriction has since changed (slice 5).
+- Open views will survive a rebuild; the clients will rerender
+  them instead of closing them (slice 6).
 ** Out of scope
 - A rendered diff-view buffer of a stale save. Slice 3 reuses the
   diff view's comparison functions for text only; a rendered
@@ -107,24 +108,26 @@ makes nothing stale by itself.
   swap-ins ('RuntimeGeneration' in 'server/types/env.rs'). It
   stays; only its use for staleness goes.
 * Agreed behavior
-** A merge is built on the save's own edits
-The NodeMerge triples are built inside
+** A merge will be built on the save's own edits
+The NodeMerge triples will be built inside
 'prepare_save_under_mutation_gate', from phase one's candidate
 graph ('graph_after_save'), and no longer in
 'buffer_to_validated_saveplan_with_fork_skgrepos_in_graph'.
-'SavePlan' carries the merge pairs instead of the triples. So
-the updated acquirer carries the buffer's edits to the acquirer,
-the text preserver carries the buffer's edits to the acquiree,
-and the merged contents reflect the save's deletes.
-** A save that deletes a merge node is refused
+'SavePlan' will carry the merge pairs instead of the triples. So
+the updated acquirer will carry the buffer's edits to the
+acquirer, the text preserver will carry the buffer's edits to
+the acquiree, and the merged contents will reflect the save's
+deletes.
+** A save that deletes a merge node will be refused
 A save whose buffer deletes the acquirer or the acquiree of one
-of its merge pairs is refused before anything is written, with a
-new 'BufferValidationError' variant,
+of its merge pairs will be refused before anything is written,
+with a new 'BufferValidationError' variant,
 'CannotDeleteAndMergeSimultaneously', carrying the graphnode's
 pid and whether it is the acquirer or the acquiree, checked
 beside 'CannotMoveAndMergeSimultaneously' in
 'server/from_text.rs', all IDs as pids. Only the buffer's own
-deletes count. Its org form:
+deletes will count, not delete propagation. Its org form will
+read:
 #+begin_example
   A node this save would merge is also deleted by it:
   - Title: B
@@ -132,34 +135,37 @@ deletes count. Its org form:
   - It is the acquiree of a merge request in this buffer.
   - Remove either the deletion or the merge request, then save.
 #+end_example
-For an acquirer, the third line says "the acquirer".
-** The save envelope carries the baseline
-The envelope's 'saved-buffer' is joined by a mandatory
-'(baseline "TEXT")'. A request without it is refused with a
+For an acquirer, the third line will say "the acquirer".
+** The save envelope will carry the baseline
+The envelope's 'saved-buffer' will be joined by a mandatory
+'(baseline "TEXT")'. A request without it will be refused with a
 message naming the field, as a request without 'rendered-at' is
-today, and nothing is saved. There is no 'unavailable' form for
-the saved buffer: every view a client can save has a baseline,
-and a new empty view's is its initial text.
-** Staleness is decided by content
+today, and nothing will be saved. There will be no 'unavailable'
+form for the saved buffer: every view a client can save has a
+baseline, and a new empty view's will be its initial text.
+** Staleness will be decided by content
 Before any confirmation is asked and before anything is written,
-the server parses the baseline through the same path as the
-saved text up to the noop filter
-('extract_nonmergeSavePlan_locally_in_graph', under the
-connection's current skgrepo restriction) and takes the pids of
-its Save instructions: the baseline's writes. Every graphnode
-the buffer writes or deletes whose pid is among them is stale,
-and the whole save is refused with one error per stale
-graphnode. A baseline that fails to parse refuses the save too,
-with a message that says so and points at the recovery command,
-as a dirty view's unparsable baseline does today.
+the server will parse the baseline through the same path as the
+saved text up to the noop filter ('org_to_viewforest' with
+'IdResolution::ThroughGraph', then
+'extract_nonmergeSavePlan_locally_in_graph', under the
+connection's current skgrepo restriction, skipping the
+validators between them) and take the pids of its Save
+instructions: the baseline's writes. Every graphnode the buffer
+writes or deletes whose pid is among them will be stale, and the
+whole save will be refused with one error per stale graphnode. A
+baseline that fails to parse or to extract will refuse the save
+too, with a message that says so and points at the recovery
+command, as a dirty view's unparsable baseline does today.
 
-So: a merge request is never stale; a graphnode the buffer shows
-unchanged is not written and so never stale; a graphnode deleted
-after the render is stale, because the baseline's copy survives
-the noop filter when the graph lacks the graphnode; a strip is
-invisible, because the parser trims what the strip trimmed; a
-restart or a rebuild makes nothing stale by itself.
-** The generation machinery goes
+So a merge request will never be stale; a graphnode the buffer
+shows unchanged is not written and so will never be stale; a
+graphnode deleted after the render will be stale, because the
+baseline's copy survives the noop filter when the graph lacks
+the graphnode; a strip will be invisible, because the parser
+trims what the strip trimmed; a restart or a rebuild will make
+nothing stale by itself.
+** The generation machinery will go
 Removed: '(rendered-at . "N")' from the save request;
 '(rendered-at "N")' from every view response ('content-view',
 'search-results', 'diff-view', 'save-result', 'collateral-view',
@@ -168,11 +174,12 @@ handler; 'RenderedAt', 'rendered_at_from_request' and
 'rendered_at_entry'; 'LastChangeGenerations', its field on
 'InRustGraph', every 'note_written' and the stamping in
 'SharedRuntime::swap_in'; the clients' storage of rendered-at
-and the new-empty-view's request for a generation; the tool's
-sidecar 'rendered_at'. 'RuntimeGeneration::generation' stays for
-the reload notices, the rerender pass and the Tantivy rebuild.
-** The stale error says what changed
-The error's org form:
+and the new empty view's request for a generation; the tool's
+sidecar 'rendered_at'. 'RuntimeGeneration::generation' will stay
+for the reload notices, the rerender pass and the Tantivy
+rebuild.
+** The stale error will say what changed
+The error's org form will read:
 #+begin_example
   A node this save would write changed after the buffer was rendered:
   - Title: event horizon
@@ -181,65 +188,72 @@ The error's org form:
     horizon", now "event horizons"); the body; the content (gained
     743fd40c-..., lost none); the home skgrepo (then public, now
     personal-ish).
+  - The body's changed lines, then against now:
+    - a line the graph no longer has
+    + a line the graph gained
   - Saving would undo that change. Archive your edits if you need
     them (M-x skg-show-unsaved-changes in Emacs,
     :SkgShowUnsavedChanges in Neovim), reopen a fresh view, and
     reapply them there.
 #+end_example
-- The first line stays exactly as it is now; client tests and
+- The first line will stay exactly as it is now; client tests and
   two Rust tests match on it.
-- The "Changed since" line lists only the aspects that differ,
-  from the diff view's own comparison: 'node_changes_between'
-  ('server/graph_straddle/union_walk.rs') for title, body,
-  aliases, extra IDs, flags and home skgrepo, and
-  'interleaved_diff_without_reorders' ('server/types/list.rs')
-  for the content list. Title and home skgrepo show both values;
-  the body only that it changed; lists what was gained and lost,
-  by ID. Aliases, IDs, flags, subscriptions, hides and overrides
-  are named when they changed.
-- A changed body is followed by its line diff, baseline against
-  graph, by 'interleaved_diff_without_reorders' over lines: each
-  lost line prefixed "- ", each gained line "+ ", unchanged lines
-  omitted, at most 40 lines each way, then "... and N more". So
-  the user holds two diffs from one base: theirs, which
-  'skg-show-unsaved-changes' writes, and the graph's, in the
-  error.
-- If the graph no longer has the graphnode, the title line is
-  omitted and the third line reads "It was deleted after this
-  buffer was rendered."
-- The one-line 'Display' form in 'server/types/errors.rs' carries
-  the title and the names of the changed aspects.
-** Neither a merge request nor a link is a dirty-view dependency
-'dependencies_from_viewforest' stops adding a merge request's
-target, and 'dependencies_from_text' stops adding the links of
-the text. A dirty view depends on the graphnodes it holds
+- The "Changed since" line will list only the aspects that
+  differ, from the diff view's own comparison:
+  'node_changes_between' ('server/graph_straddle/union_walk.rs')
+  for title, body, aliases, extra IDs, flags and home skgrepo,
+  and 'interleaved_diff_without_reorders' ('server/types/
+  list.rs') for the content list. Title and home skgrepo will
+  show both values; lists what was gained and lost, by ID.
+  Aliases, IDs, flags, subscriptions, hides and overrides will be
+  named when they changed.
+- A changed body will be followed by its line diff, baseline
+  against graph, by 'interleaved_diff_without_reorders' over
+  lines: each lost line prefixed "- ", each gained line "+ ",
+  unchanged lines omitted, at most 40 lines each way, then "...
+  and N more". So the user will hold two diffs from one base:
+  theirs, which 'skg-show-unsaved-changes' writes, and the
+  graph's, in the error.
+- The error will not report: aspects that did not change;
+  graphnodes the buffer does not write or delete, however they
+  changed; the user's own edits; any viewnode of the baseline
+  that the noop filter dropped.
+- If the graph no longer has the graphnode, the title line will
+  be omitted and the third line will read "It was deleted after
+  this buffer was rendered."
+- The one-line 'Display' form in 'server/types/errors.rs' will
+  carry the title and the names of the changed aspects.
+** Neither a merge request nor a link will be a dependency
+'dependencies_from_viewforest' will stop adding a merge request's
+target, and 'dependencies_from_text' will stop adding the links
+of the text. A dirty view will depend on the graphnodes it holds
 viewnodes of: occurrences, gnid-only viewnodes, ghosts, ID
 property members, and the overrides an occurrence shows. The
 collateral-redraw neighborhood ('update_relevant_neighborhood')
-keeps its links; a redundant redraw of a clean view costs
+will keep its links; a redundant redraw of a clean view costs
 nothing.
-** A view remembers the restriction it was rendered under
-'ViewState' gains the skgrepo restriction the view was last
+** A view will remember the restriction it was rendered under
+'ViewState' will gain the skgrepo restriction the view was last
 rendered under, set wherever a view is registered or rerendered.
-A save of a view the connection holds is refused, before the
-stale check, when that restriction's set of shown skgrepos
-differs from the connection's current one: "This view was
-rendered under a different skgrepo restriction (then: main,
-private; now: main). Rerender it, or archive its edits and reopen
-it." The clients already refuse to switch the restriction while
-a view has unsaved edits; this makes the server independent of
-that courtesy, and covers a rebuild that reconciles the
+A save of a view the connection holds will be refused, before the
+stale check, when that restriction's 'skgrepos' set differs from
+the connection's current one: "This view was rendered under a
+different skgrepo restriction (then: main, private; now: main).
+Rerender it, or archive its edits and reopen it." The clients
+already refuse to switch the restriction while a view has
+unsaved edits; this will make the server independent of that
+courtesy, and will cover a rebuild that reconciles the
 connection's restriction with a changed config.
-** Views survive a rebuild
-'rebuild_session_lifetime_stores_in_place' stops clearing
-'open_views'. It still drops the graph straddle. On a successful
-rebuild each client, instead of telling the user to close the
-views, sends 'rerender all views', which redraws every view
-without unsaved edits and names the ones it skipped. A dirty
-view keeps its baseline and is compared at its save like any
-other. A view showing a graphnode of a skgrepo the reloaded
-config no longer names is redrawn with that graphnode as the
-refresh shows an unknown one.
+** Views will survive a rebuild
+'rebuild_session_lifetime_stores_in_place' will stop clearing
+'open_views'. It will still drop the graph straddle. On a
+successful rebuild each client, instead of telling the user to
+close the views, will send 'rerender all views', which redraws
+every view without unsaved edits and names the ones it skipped.
+A dirty view will keep its baseline and be compared at its save
+like any other. A view showing a graphnode of a skgrepo the
+reloaded config no longer names will be redrawn with that
+graphnode as the refresh shows an unknown one.
 ** What stays as it is
 - The dirty-view conflict check, apart from slice 4.
 - The move-and-merge refusal.
@@ -249,9 +263,14 @@ refresh shows an unknown one.
   graph and the index; only its dating goes, with
   'LastChangeGenerations'.
 - A clean view is still redrawn after any save that changes a
-  graphnode it shows.
+  graphnode it shows, and after a reload of files changed on
+  disk.
 - The reload notice's 'generation' field and the rerender pass's
   use of the generation.
+- The recovery command and its document ('skg-show-unsaved-
+  changes', ':SkgShowUnsavedChanges').
+- The fork confirmation, the delete-from, strandeds and Hoist
+  confirmations, and the order they are asked in.
 * Pitfalls the slices must respect
 ** Where the merge is computed today, and where it moves
 'nodeMerge_instructions_from_pairs' runs in
@@ -303,16 +322,22 @@ supplementation. Resolve every gnid through
 'graph . pid_else_raw_id' before comparing.
 ** The baseline is parsed as the saved text is, minus the plan
 'extract_nonmergeSavePlan_locally_in_graph' ('server/from_text/
-local_fieldintent_collection/mod.rs') parses, supplements from
-the in-Rust graph ('supplement_from_disk.rs' reads the graph,
-not disk) and noop-filters. Call it on the baseline with the
-same graph, config and restriction as the save, and keep only
-the pids of its 'node_instructions' Saves. Its skgrepo moves,
-flag targets, merge pairs and warnings are ignored. It must not
-be given the saved text's fork or restriction side effects: it
-runs before 'validate_and_filter_foreign_instructions', so the
-baseline's foreign nodes stay in its Saves, which is what makes
-a fork clone's original checkable.
+local_fieldintent_collection/mod.rs', line 60) takes a
+'ViewForest', not text: parse the baseline first with
+'org_to_viewforest (text, IdResolution::ThroughGraph (graph))'
+as 'buffer_to_validated_saveplan_with_fork_skgrepos_in_graph'
+does, skip the validators that follow it there, and call the
+extraction with the same graph, config and restriction as the
+save. It supplements from the in-Rust graph
+('supplement_from_disk.rs' reads the graph, not disk) and
+noop-filters. Keep only the pids of the 'node_instructions'
+Saves of the 'NonmergeSavePlan' it returns; its skgrepo moves,
+flag targets, merge pairs, notice candidates and warnings are
+ignored. It runs before 'validate_and_filter_foreign_
+instructions', so the baseline's foreign graphnodes stay in its
+Saves, which is what makes a fork clone's original checkable.
+'org_to_viewforest' with 'ThroughGraph' supplies IDs to new
+headlines; a baseline has none, and any it got would be unused.
 ** Who emits and reads rendered-at
 Server: 'single_root_view.rs', 'text_search.rs', 'diff_view.rs',
 'rerender_stream.rs', 'rerender_pass.rs' (the response
@@ -349,9 +374,9 @@ empty baseline writes nothing, so nothing is stale. Only
 'ViewState' is constructed in two places, both in
 'server/types/views_state.rs'. The rerender pass and the
 registration after a view request both go through them. Compare
-restrictions by the set of skgrepos they show
-('SkgrepoRestriction' has 'contains_skgrepo' and
-'is_unrestricted'); add an accessor for the set if none exists.
+restrictions by the set of skgrepos they show, the public
+'skgrepos' field of 'SkgrepoRestriction'
+('server/skgrepo_sets.rs', line 34).
 ** The rebuild's reconciliation of the restriction
 After a rebuild, "each connection's skgrepo restriction follows
 the new config at its next request" ('docs/api-and-formats.org',
@@ -371,11 +396,12 @@ on the first line, "changed after the buffer was rendered":
 'tests/nvim/save_spec.lua'. 'tests/save_stale_buffers.rs' matches
 on the generation phrases, which slice 3 replaces.
 ** The diff view's comparison functions
-'node_changes_between' ('server/graph_straddle/union_walk.rs')
-compares two 'GraphnodeInRust' and returns 'NodeChanges'
-('types.rs'). It is private to the straddle today; widen it to
-'pub(crate)'. A baseline viewnode becomes a 'GraphnodeInRust'
-through 'GraphnodeInRust::from' on its supplemented 'Graphnode'.
+'node_changes_between' ('server/graph_straddle/union_walk.rs',
+line 190) compares two 'GraphnodeInRust' and returns
+'NodeChanges' ('types.rs'). It is a private function today;
+widen it to 'pub(crate)'. A baseline viewnode becomes a
+'GraphnodeInRust' through 'GraphnodeInRust::from' on its
+supplemented 'Graphnode'.
 No 'GraphStraddle' is built for an error.
 ** The clients' rebuild handlers
 Emacs: 'skg--rebuild-session-lifetime-stores-handler'
@@ -404,9 +430,14 @@ which it skipped. The herald-rules refetch stays.
   run --test grouped_saves -E 'test(merge::)'', and similarly
   for the other modules). 'Cargo.toml' has 'autotests = false';
   a new test file joins an existing grouped binary.
-- Client tests: 'bash/integration-tests.sh' runs the integration
-  scripts for both clients; the tool has
-  'tools/skg-for-ai/test_skg_for_ai.py'.
+- Client tests: 'bash/emacs-tests.sh' and 'bash/nvim-tests.sh'
+  run the clients' unit tests; 'bash/integration-tests.sh' runs
+  the integration scripts for both clients; the tool's tests
+  run with 'python3 tools/skg-for-ai/test_skg_for_ai.py' and
+  need a built server. 'bash/all-tests.sh' runs everything and
+  writes 'tests/results/ALL.org'. Run full suites one at a time:
+  two at once collide on fixed temp paths and the Tantivy
+  writer.
 * Code map
 - 'server/from_text.rs', 'server/save.rs',
   'server/nodeMerge/nodeMergeInstructionTriple.rs',
@@ -547,6 +578,9 @@ itself. 'docs/data-model_technical.org', "Runtime generations
 and rebuilding": the generation is internal and dates nothing.
 The strip entries say that open views stay valid. The module
 comment of 'save_staleness.rs' states the principle.
+'docs/glossary.org' gains 'baseline' and 'stale', as the
+vocabulary above defines them, and loses what it says of
+staleness by generation.
 'docs/COMMANDS.org' (the stale-save paragraph near line 22 and
 the recovery steps that follow it) and its mirror in
 'docs/COMMANDS-nvim.org' (near line 30): say what the error now
