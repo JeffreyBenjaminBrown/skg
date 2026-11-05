@@ -129,9 +129,9 @@ pub fn rebuild_session_lifetime_stores_in_place (
     Ok (warnings)
   })();
   if result . is_ok () {
-    // The open views stay registered: each keeps its baseline, and a
-    // save compares that with the rebuilt graph like any other. The
-    // client asks to rerender them. The next request of the diff view
+    // The open views stay registered. The client keeps each view's
+    // baseline, and a save compares that with the rebuilt graph like
+    // any other. The client asks to rerender them. The next request of the diff view
     // rebuilds both halves of its straddle from the disk state the
     // rebuilt live graph was read from.
     views_state . graph_straddle = None; }

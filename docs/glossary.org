@@ -603,8 +603,11 @@ is not called unfolding.
 
 *** baseline, stale
 
-A buffer's *baseline* is its text as the server last drew it, before
-any edit. Emacs keeps it in 'skg-clean-baseline', Neovim in
+A buffer's *baseline* is the text the server last drew for it, as
+the client installed it (without the focus and fold metadata the
+client removes), before any edit. The clients' names call it the
+*clean baseline*; the two names mean one thing. Emacs keeps it in
+'skg-clean-baseline', Neovim in
 'vim.b.skg_clean_baseline', 'tools/skg-for-ai' in the view's
 '.full.org' file; each recaptures it whenever a response redraws the
 buffer, and sends it with every save. A new empty view's baseline is
@@ -612,7 +615,10 @@ the text the client created it with. *The baseline's writes* are the
 Save instructions that saving the baseline itself would produce,
 parsed, supplemented and filtered of no-ops as the saved text is:
 a baseline viewnode equal to the graph's graphnode yields none; one
-that differs, or whose graphnode the graph lacks, survives.
+that differs, or whose graphnode the graph lacks, survives. (The
+"baseline" of a git stage in 'server/types/git.rs', HEAD for the staged
+changes and the git index for the unstaged, is a git notion, not a
+buffer's baseline.)
 
 A graphnode is *stale* in a save when the buffer writes or deletes it
 (or forks it) and it is among the baseline's writes: the buffer's copy
@@ -621,7 +627,12 @@ the user never saw. A save with a stale graphnode is refused whole
 ('server/serve/handlers/save_staleness.rs'). Staleness is decided by
 content, not by time: a restart, a rebuild or a whitespace strip makes
 nothing stale by itself, and a graphnode changed and changed back is
-not stale.
+not stale. "Stale" applies to a graphnode; by extension, a buffer or
+view is stale when it holds a stale graphnode's copy, and a save or
+write is stale when it would write one. The stale error names what
+changed at its own grain ('StaleAspect': the title, body, content,
+aliases, extra IDs, flags, subscriptions, hides, overrides or home
+skgrepo), not as diff aspects: it says "body" where they say "text".
 
 *** text search, search view, enrichment
 
@@ -1154,7 +1165,9 @@ request, =(editRequest (merge ID))=, and a save applies it; the diff
 view's merges buffer shows each nodeMerge since HEAD. In prose, say
 "merge nodes" or "nodeMerge", never a bare "merge"; the bare word
 appears only in client-facing wire strings, where only nodes can
-merge. See =docs/merging.org=.
+merge. The acquirer and the acquiree are the nodeMerge's two *merge
+nodes*, and a save carries each merge request as a *merge pair*: the
+acquirer's pid and the acquiree's. See =docs/merging.org=.
 
 *** text preserver
 

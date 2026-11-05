@@ -848,8 +848,9 @@ but the server has sent none of the rerendered text; its challenge
 names the views withheld, the saved one first. Approval asks the
 server to rerender those views, approving the PIDs the challenge
 lists (`skg--request-rerender-views'); the save is not sent again,
-since the graph it changed would make it stale. Declining leaves the
-buffers as they are."
+since it would apply a second time (creating a new root of the view
+again, or refused as stale for a container it gave a new child).
+Declining leaves the buffers as they are."
   (dolist (response-type
            '(collateral-view save-relax-lock fork-confirmation
              strandeds-confirmation delete-from-confirmation

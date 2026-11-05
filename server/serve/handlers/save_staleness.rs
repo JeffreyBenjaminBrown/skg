@@ -16,12 +16,13 @@
 //! What the buffer writes is the nodeInstructions its text yields once
 //! the noop filter has dropped the ones identical to the graph, plus
 //! the originals of its fork clones. So a graphnode the buffer shows
-//! unchanged is never stale. A merge is built from the graph at save
-//! time, and the writes a save derives from the current graph (delete
-//! propagation, strandeds resets, Hoist repairs, restore requests)
-//! undo nothing, so none of those is checked. A strip of whitespace
-//! changes nothing a parsed baseline shows, and a restart or a rebuild
-//! changes no graphnode, so neither makes a buffer stale. A graphnode
+//! unchanged is never stale. A nodeMerge is built from the graph at
+//! save time, and the writes a save derives from the current graph
+//! (delete propagation, strandeds resets, Hoist repairs, restore
+//! requests) undo nothing, so none of those is checked. A strip of
+//! whitespace changes nothing a parsed baseline shows, and a restart
+//! or a rebuild makes nothing stale by itself: only a graphnode whose
+//! copy no longer matches the graph is stale. A graphnode
 //! the buffer writes without a baseline copy of it (pasted in by ID,
 //! or typed into a new empty view, whose baseline is the text the
 //! client created it with) has nothing to compare, and is not checked.
@@ -38,7 +39,7 @@ use crate::graph_straddle::types::NodeChanges;
 use crate::graph_straddle::union_walk::node_changes_between;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::errors::{
-  BufferValidationError, ChangeSinceRendered, ChangedAspect, HeadlineName};
+  BufferValidationError, StaleGraphnodeReport, StaleAspect, HeadlineName};
 use crate::types::list::{Diff_Item, interleaved_diff_without_reorders};
 use crate::types::misc::{ID, MSV, RelPartner, SkgConfig};
 use crate::types::nodes::complete::Graphnode;
@@ -186,22 +187,22 @@ fn change_since_rendered (
   graph : &InRustGraph,
   pid   : &ID,
   then  : &Graphnode,
-) -> ChangeSinceRendered {
+) -> StaleGraphnodeReport {
   let Some (now) : Option<Graphnode> = graphnode_as_read_back_from_a_view (graph, pid)
-    else { return ChangeSinceRendered::Deleted; };
+    else { return StaleGraphnodeReport::Deleted; };
   let (then, now) : (GraphnodeInRust, GraphnodeInRust) =
     ( GraphnodeInRust::from (then), GraphnodeInRust::from (&now) );
   let changes : NodeChanges = node_changes_between (&then, &now);
-  let mut aspects : Vec<ChangedAspect> = Vec::new ();
+  let mut aspects : Vec<StaleAspect> = Vec::new ();
   if changes . title_changed {
-    aspects . push ( ChangedAspect {
+    aspects . push ( StaleAspect {
       name : "title",
       detail : Some ( format! ( "then \"{}\", now \"{}\"",
                                 then . title, now . title )) } ); }
   if changes . body_changed {
-    aspects . push ( ChangedAspect { name : "body", detail : None } ); }
+    aspects . push ( StaleAspect { name : "body", detail : None } ); }
   if then . contains != now . contains {
-    aspects . push ( ChangedAspect {
+    aspects . push ( StaleAspect {
       name : "content",
       detail : Some ( content_change (&then . contains, &now . contains) ) } ); }
   for (name, changed) in [
@@ -220,12 +221,12 @@ fn change_since_rendered (
       relationships_changed (&then . hidesFromSubs, &now . hidesFromSubs) ),
     ( "overrides",
       relationships_changed (&then . overrides, &now . overrides) ), ] {
-    if changed { aspects . push ( ChangedAspect { name, detail : None } ); }}
+    if changed { aspects . push ( StaleAspect { name, detail : None } ); }}
   if let Some (home) = &changes . home {
-    aspects . push ( ChangedAspect {
+    aspects . push ( StaleAspect {
       name : "home skgrepo",
       detail : Some ( format! ( "then {}, now {}", home . old, home . new )) } ); }
-  ChangeSinceRendered::Changed {
+  StaleGraphnodeReport::Changed {
     title      : now . title . clone (),
     aspects,
     body_lines : if changes . body_changed {

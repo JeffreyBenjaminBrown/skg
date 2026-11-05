@@ -1,7 +1,6 @@
 use super::misc::{ID, SkgrepoName};
 use crate::diff_view::readiness_requests::NamedLeafSet;
 use super::viewnode::ViewnodeId;
-use std::collections::BTreeSet;
 use std::error::Error;
 use std::fmt;
 use std::io;
@@ -16,7 +15,7 @@ pub struct HeadlineName {
   pub viewnode_id  : Option<ViewnodeId>, // None for a headline typed, or copied, since the last render
 }
 
-/// Which side of a merge pair a graphnode is.
+/// Which merge node of a merge pair a graphnode is.
 #[derive (Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NodeMergeRole {
   Acquirer,
@@ -27,18 +26,23 @@ pub enum NodeMergeRole {
 /// rendered: what the graph holds now, against the buffer's baseline
 /// copy of it.
 #[derive (Debug, Clone, PartialEq)]
-pub enum ChangeSinceRendered {
+pub enum StaleGraphnodeReport {
   Deleted, // the graph no longer has the graphnode
   Changed {
     title      : String, // the graph's title of it now
-    aspects    : Vec<ChangedAspect>, // only those that differ
+    aspects    : Vec<StaleAspect>, // only those that differ
     body_lines : Vec<String>, // the body's changed lines, baseline against graph, each prefixed "- " or "+ "; empty when the body did not change
   }, }
 
-/// One aspect of a graphnode that differs between a buffer's baseline
-/// and the graph.
+/// One aspect of a stale graphnode that differs between a buffer's
+/// baseline and the graph: title, body, content, aliases, extra IDs,
+/// flags, subscriptions, hides, overrides or home skgrepo. These are
+/// the stale error's own grain, not the diff aspects of change-forest
+/// leaves ('NodeAspect') nor the diff view's 'ChangedAspects': this
+/// says "body" where those say "text", and names a relationship list
+/// whole where those name each relationship.
 #[derive (Debug, Clone, PartialEq)]
-pub struct ChangedAspect {
+pub struct StaleAspect {
   pub name   : &'static str, // as the one-line message names it, e.g. "title"
   pub detail : Option<String>, // what the org message adds in parentheses, e.g. the old and new values
 }
@@ -79,9 +83,9 @@ pub enum BufferValidationError {
                                    SkgrepoName), // buffer skgrepo
   CannotMoveAndMergeSimultaneously (ID),
   CannotDeleteAndMergeSimultaneously {
-    pid   : ID,            // the deleted merge node's pid
+    pid   : ID,            // the pid of the merge node the buffer deletes
     title : String,        // its title in the graph
-    role  : NodeMergeRole, // which side of its merge pair it is
+    role  : NodeMergeRole, // which merge node of its merge pair it is
   }, // The buffer deletes the acquirer or the acquiree of one of its own merge requests.
   SkgrepoNotInConfig              (ID, SkgrepoName),
   // Fork errors. Editing a foreign node N is read as a request to
@@ -107,12 +111,12 @@ pub enum BufferValidationError {
   OverrideInvariantViolation     (String),
   ChangedSinceRendered {
     gnid      : ID, // the node's pid
-    change    : ChangeSinceRendered, // how the graph's graphnode differs from the buffer's baseline copy of it
+    change    : StaleGraphnodeReport, // how the graph's graphnode differs from the buffer's baseline copy of it
     headlines : Vec<HeadlineName>, // the buffer's occurrences of the node
   }, // The save would write a node that changed after its buffer was rendered: writing the buffer's text would silently undo that change.
   RenderedUnderAnotherSkgrepoRestriction {
-    skgrepos_then : BTreeSet<SkgrepoName>, // the skgrepos the restriction the held view was last rendered under shows
-    skgrepos_now  : BTreeSet<SkgrepoName>, // the skgrepos the connection's current restriction shows
+    skgrepos_then : Vec<SkgrepoName>, // the skgrepos the restriction the held view was last rendered under shows, in the config's order
+    skgrepos_now  : Vec<SkgrepoName>, // the skgrepos the connection's current restriction shows, in the config's order
   }, // The save is of a held view rendered under a skgrepo restriction that showed other skgrepos than the connection's current one.
   MultipleEditableViewRequestsForSameId    (ID, Vec<HeadlineName>), // Multiple editable view requests for the same ID
   WriteProtectAndEditableViewRequestsOnOneOccurrence (ID, HeadlineName), // One occurrence asks to become both write-protected and the editable one. (On different occurrences of a node, the two requests move editability, and are allowed.)
@@ -353,11 +357,11 @@ impl std::fmt::Display for BufferValidationError {
       BufferValidationError::OverridesHere_Mismatch(carrier, original, effective, headline) =>
         write!(f, "Node {:?} ({}) carries the fact (overridesHere {:?}), but it is not on the override chain of that original (which resolves to {:?}). The fact looks hand-edited or stale; saving it would rewrite a contains list. Re-render the view and retry.", carrier, headline, original, effective),
       BufferValidationError::ChangedSinceRendered {
-        gnid, change : ChangeSinceRendered::Deleted, headlines } =>
+        gnid, change : StaleGraphnodeReport::Deleted, headlines } =>
         write!(f, "Node {:?} ({}) was deleted after this buffer was rendered. Nothing was saved; reopen a fresh view and reapply the edit.",
                gnid, name_headlines (headlines)),
       BufferValidationError::ChangedSinceRendered {
-        gnid, change : ChangeSinceRendered::Changed { title, aspects, .. }, headlines } =>
+        gnid, change : StaleGraphnodeReport::Changed { title, aspects, .. }, headlines } =>
         write!(f, "Node {:?} \"{}\" ({}) changed after this buffer was rendered: {}. Nothing was saved; reopen a fresh view and reapply the edit.",
                gnid, title, name_headlines (headlines),
                aspects . iter () . map ( |aspect| aspect . name )
@@ -418,10 +422,10 @@ impl BufferValidationError {
 /// The refusal of a save of a view rendered under another skgrepo
 /// restriction, as both of its forms say it.
 pub fn rendered_under_another_skgrepo_restriction_text (
-  skgrepos_then : &BTreeSet<SkgrepoName>,
-  skgrepos_now  : &BTreeSet<SkgrepoName>,
+  skgrepos_then : &[SkgrepoName],
+  skgrepos_now  : &[SkgrepoName],
 ) -> String {
-  let names = |skgrepos : &BTreeSet<SkgrepoName>| -> String {
+  let names = |skgrepos : &[SkgrepoName]| -> String {
     if skgrepos . is_empty () { "no skgrepo" . to_string () }
     else { skgrepos . iter () . map ( |skgrepo| skgrepo . to_string () )
            . collect::<Vec<String>> () . join (", ") }};

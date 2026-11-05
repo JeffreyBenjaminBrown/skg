@@ -1,6 +1,6 @@
 use super::misc::{ID, SkgrepoChange, SkgrepoName};
 use super::nodes::complete::Graphnode;
-use super::errors::{SaveError, BufferValidationError, ChangeSinceRendered, HeadlineName, rendered_under_another_skgrepo_restriction_text, with_org_subheadlines};
+use super::errors::{SaveError, BufferValidationError, StaleGraphnodeReport, HeadlineName, rendered_under_another_skgrepo_restriction_text, with_org_subheadlines};
 
 
 /////////////////
@@ -56,7 +56,7 @@ pub struct SavePlan {
   /// Each merge request as (acquirer pid, acquiree pid). The NodeMerge
   /// triples are built from these only once the save's ordinary
   /// nodeInstructions have been prepared ('prepare_save_under_mutation_gate'),
-  /// so that a merge carries the save's own edits to both graphnodes.
+  /// so that a nodeMerge carries the save's own edits to both graphnodes.
   pub nodeMerge_pairs        : Vec<(ID, ID)>,
   pub skgrepo_moves          : Vec<SkgrepoMove>,
   /// Forks detected this save: editing a foreign node N is read as a
@@ -299,13 +299,13 @@ fn buffer_validation_error_text (
 /// advice: the graphnode, and what changed in it.
 fn change_since_rendered_lines (
   gnid   : &ID,
-  change : &ChangeSinceRendered,
+  change : &StaleGraphnodeReport,
 ) -> String {
   match change {
-    ChangeSinceRendered::Deleted =>
+    StaleGraphnodeReport::Deleted =>
       format! ("- ID: {}\n- It was deleted after this buffer was rendered.\n",
                gnid . 0),
-    ChangeSinceRendered::Changed { title, aspects, body_lines } => {
+    StaleGraphnodeReport::Changed { title, aspects, body_lines } => {
       let aspects_text : String =
         aspects . iter ()
         . map ( |aspect| match &aspect . detail {

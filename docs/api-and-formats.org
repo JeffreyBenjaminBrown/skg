@@ -170,8 +170,9 @@ So far there are these endpoints:
          (current "...edited text...")))))
     #+end_src
     =Content-Length= is the envelope's UTF-8 byte length. =baseline= is
-    mandatory: the saved buffer's baseline, its text exactly as the
-    server last drew it, before any edit (Emacs keeps it in
+    mandatory: the saved buffer's baseline, the text the server last
+    drew for it, as the client installed it (without the focus and
+    fold metadata the client removes) and before any edit (Emacs keeps it in
     'skg-clean-baseline', Neovim in 'vim.b.skg_clean_baseline',
     skg-for-ai in the view's '.full.org' file). A new empty view's
     baseline is the text the client created it with (see "The
@@ -485,8 +486,11 @@ So far there are these endpoints:
     sends "Rerender views" (below) naming those views, with
     =(approved-overPrivateText-pids "P" ...)=: it answers with their
     rerenders, and writes nothing. The save is never sent again for
-    this: once written, a save that changed a node it writes is stale
-    (the stale-buffer rule above). On an unrestricted connection the
+    this, because it would apply a second time: its edits of existing
+    graphnodes now match the graph and are not written again, a new
+    graphnode it put under a container would make that container stale
+    (the stale-buffer rule above) and so refuse it, and a new root of
+    the view would be created a second time. On an unrestricted connection the
     ordinary save-result carries the shared overPrivateText-telescope
     warning. Declining leaves the client's buffers as they are.
   - Exactly one of =save-result=, =delete-from-confirmation=,
@@ -571,8 +575,9 @@ errors on one line, naming each headline by its viewnode ID or title,
 since the command searches the current buffer.
 
 ** The baseline of a view
-A view's baseline is its text as the server last drew it, before any
-edit. Every response that gives the client a buffer to install as a
+A view's baseline is the text the server last drew for it, as the
+client installed it (without the focus and fold metadata the client
+removes), before any edit. Every response that gives the client a buffer to install as a
 view draws one: =content-view=, =search-results=, =diff-view=,
 =save-result=, =collateral-view= and =rerender-view=, the last two
 once per view. Each client keeps the baseline per buffer (Emacs in

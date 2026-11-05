@@ -62,7 +62,7 @@ use crate::rerender_pass::update_views_after_save;
 
 use futures::executor::block_on;
 use sexp::{Sexp, Atom};
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::error::Error;
 use std::io::BufReader;
 use std::net::TcpStream;
@@ -383,7 +383,7 @@ pub fn handle_save_buffer_request (
                   TcpToClient::SaveResult, &response_sexp )); }} }}; }
     (Err (err), _) => {
       let error_msg : String =
-        format! ("Error reading save payload: {}", err );
+        format! ("NOTHING WAS SAVED\n\nError reading save payload: {}", err );
       tracing::error! ( "{}", error_msg );
       let response_sexp : String =
         sexp_to_client_string ( &empty_response_sexp (
@@ -851,7 +851,8 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
   named_diffView_buffer_kind : Option<DiffViewBufferKind>, // the request's '(diff-view-buffer . "...")': the buffer of the diff view it saves, for a view the connection does not hold
 ) -> Result<SaveResponse, Box<dyn Error>> {
   error_unless_view_was_rendered_under_current_restriction (
-    viewforest_id_from_request_result, views_state, skgrepo_restriction ) ?;
+    viewforest_id_from_request_result, views_state, skgrepo_restriction,
+    & env . runtime_snapshot () . config ) ?;
   // Save-plan construction reads the current files and graph.  Hold the sole
   // writer gate from before those reads through the graph swap-in, or two requests
   // can serialize their writes yet still act on the same stale disk state.
@@ -1155,6 +1156,7 @@ fn error_unless_view_was_rendered_under_current_restriction (
   viewforest_id_from_request_result : &Result<ViewforestId, String>,
   views_state                       : &ViewsState,
   skgrepo_restriction               : &SkgrepoRestriction,
+  config                            : &SkgConfig, // orders the skgrepos the refusal names
 ) -> Result<(), Box<dyn Error>> {
   let Some (rendered_under) : Option<&SkgrepoRestriction> =
     viewforest_id_from_request_result . as_ref () . ok ()
@@ -1165,9 +1167,22 @@ fn error_unless_view_was_rendered_under_current_restriction (
     return Ok (( )); }
   Err ( Box::new ( SaveError::BufferValidationErrors {
     errors : vec! [ BufferValidationError::RenderedUnderAnotherSkgrepoRestriction {
-      skgrepos_then : rendered_under . skgrepos . clone (),
-      skgrepos_now  : skgrepo_restriction . skgrepos . clone (), } ],
+      skgrepos_then : skgrepos_in_config_order (config, &rendered_under . skgrepos),
+      skgrepos_now  : skgrepos_in_config_order (config, &skgrepo_restriction . skgrepos), } ],
     warnings : Vec::new (), } )) }
+
+/// 'skgrepos' in the config's order ('ordered_skgrepos': the owned ones
+/// most public first), then any the config does not name, by name.
+fn skgrepos_in_config_order (
+  config   : &SkgConfig,
+  skgrepos : &BTreeSet<SkgrepoName>,
+) -> Vec<SkgrepoName> {
+  let named : Vec<SkgrepoName> = config . ordered_skgrepos ();
+  named . iter ()
+    . filter ( |skgrepo| skgrepos . contains (skgrepo) )
+    . chain ( skgrepos . iter () . filter ( |skgrepo| ! named . contains (skgrepo) ))
+    . cloned ()
+    . collect () }
 
 /// Turn a successfully skgsave-committed HiddenOutside addition into a message only
 /// when the final graph classifies it as hidden *inside* a subscribee.  This is

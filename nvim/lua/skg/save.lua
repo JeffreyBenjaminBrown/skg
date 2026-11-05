@@ -874,8 +874,9 @@ end
 ---views withheld, the saved one first. Approval asks the server to
 ---rerender those views, approving the PIDs the challenge lists
 ---('rerender_all_views.request_rerender_views'); the save is not sent
----again, since the graph it changed would make it stale. Declining
----keeps the buffers as they are.
+---again, since it would apply a second time (creating a new root of the
+---view again, or refused as stale for a container it gave a new child).
+---Declining keeps the buffers as they are.
 ---@param response any
 function M.save_text_release_confirmation_handler (response)
   for _, response_type in ipairs({

@@ -52,7 +52,7 @@ see 'skg-paste-link' and similar commands.
 This causes the server to act on the merge request
 and rebuild the buffer.
 
-The merge is built after the save's other edits, so it keeps them.
+The nodeMerge is built after the save's other edits, so it keeps them.
 If the same save retitles the acquirer, or edits the acquiree's body,
 the merged node carries the new title,
 and the text preserver ("MERGED: ...") carries the edited body.

@@ -1359,8 +1359,9 @@ overPrivateText telescopes. The save has then happened. With
 '--show-overPrivateText' the tool approves the release as the
 clients do: it asks the server to rerender the views the question
 names (the "rerender views" request), approving those telescopes,
-and writes the view; the save is not sent again, which the server
-would refuse as stale once the save had changed a node. Without the
+and writes the view; the save is not sent again, since it would
+apply a second time (creating a new root of the view again, or refused
+as stale for a container it gave a new child). Without the
 option it says so, and the files are out of date until the node is
 viewed again.
 

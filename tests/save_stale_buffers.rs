@@ -505,6 +505,8 @@ fn a_save_without_a_baseline_is_refused
   let result : String = save (
     &mut f, &mut connection, "c-view",
     &c_view . replace ("c as first written", "c edited"), None );
-  assert! ( errors_of (&result) . contains ("missing baseline"), "{}", result );
+  assert! ( errors_of (&result) . contains ("NOTHING WAS SAVED")
+            && errors_of (&result) . contains ("missing baseline"),
+            "{}", result );
   assert! ( file_text (&f, "c") . contains ("c as first written") );
   Ok (()) }

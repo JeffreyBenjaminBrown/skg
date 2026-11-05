@@ -36,7 +36,7 @@ fn test_single_merge() -> Result<(), Box<dyn Error>> {
         assert_eq! (
           save_plan . nodeMerge_pairs,
           vec! [ (ID::from ("1"), ID::from ("2")) ],
-          "The plan should carry the merge as (acquirer pid, acquiree pid)" );
+          "The SavePlan should carry the merge request as (acquirer pid, acquiree pid)" );
         let prepared : PreparedSave = prepare_save_under_mutation_gate (
           save_plan . node_instructions,
           &save_plan . nodeMerge_pairs,

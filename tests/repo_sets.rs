@@ -486,7 +486,7 @@ fn a_save_of_a_view_rendered_under_another_restriction_is_refused (
       read_all_lp_messages (&mut BufReader::new (client_reads))
       . pop () . expect ("a terminal message");
     assert! ( save_result . contains (
-                "This view was rendered under a different skgrepo restriction (then: private, public; now: public). Rerender it, or archive its edits and reopen it." ),
+                "This view was rendered under a different skgrepo restriction (then: public, private; now: public). Rerender it, or archive its edits and reopen it." ),
               "the save is refused, naming both restrictions:\n{}", save_result );
   } ); } );
   let on_disk : Graphnode =

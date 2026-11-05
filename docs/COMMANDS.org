@@ -36,8 +36,8 @@ the node was deleted. Your edits stay in the view: archive them if
 needed (M-x skg-show-unsaved-changes), open a fresh view, and reapply them.
 
 The refusal is whole: nothing the buffer asks is written, not even
-its edits of nodes nobody else changed. Recovering is a three-way
-merge by hand, from one common base, the text the server last drew:
+its edits of nodes nobody else changed. Recovering is a reconciliation
+by hand of two diffs from one common base, the text the server last drew:
 the recovery document holds your edits as a diff against that text,
 and the error holds the graph's change against the same text. To
 recover a view, keeping all of its roots:
@@ -79,9 +79,11 @@ an overPrivateText telescope, Skg asks for a second, request-scoped approval. Ap
 and Skg asks the server for the rerender it withheld, of the saved view
 and the other views the save changed; the save is not sent again. Decline
 leaves the save skgsave-committed and the buffers as they were: the saved
-buffer still holds what was saved, unrendered, and saving it again is
-refused as stale when the save changed a node it writes. Reopen the view
-to go on.
+buffer still holds what was saved, unrendered. Do not save it again:
+the save would apply a second time. Its edits of existing nodes would
+write nothing, but a new node it put under a container would make that
+container stale, refusing the save, and a new root of the view would be
+created twice. Reopen the view to go on.
 *** what a save does to other views
 A save rerenders every other open view that shows what it changed,
 and brings it up to date with the graph, saying nothing of what it

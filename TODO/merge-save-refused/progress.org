@@ -565,3 +565,115 @@ carried into slice 6. Slice 6 launched 22:12.
 Nothing.
 *** Headline
 DONE.
+** Slice 7
+*** Commits
+- 57d82303 "A nodeMerge of two siblings no longer makes their
+  container stale": the stale check compares the baseline's copy and
+  the graph's graphnode with each relationship list mapped to pids
+  and later duplicates dropped; 'graphnode_as_drawn' becomes
+  'graphnode_as_read_back_from_a_view'; two new tests.
+- The commit carrying this entry ("plan 2_2, slice 7: wording and
+  names from the review"): the missing-baseline header, the
+  restriction refusal in config order, the vocabulary report's
+  findings 1 and 3 to 10, and the slice's headline turned DONE.
+*** Suites
+- 'cargo nextest run --test grouped_saves': 180 of 180 (after each
+  commit's changes; 'save_stale_buffers::' 16 of 16). The two new
+  tests fail against the code before the fix, with "the content
+  (gained k2, lost none)", as the probe found.
+- 'cargo nextest run --test grouped_repos -E test(skgrepo_sets::)':
+  10 of 10.
+- 'bash/nextest.sh': 1128 of 1128. 'cargo check --all-targets': no
+  warnings.
+- 'bash/emacs-tests.sh': 444 of 444. 'bash/nvim-tests.sh': 481
+  successes, 0 failed, 0 errors.
+- Integration tests not run: no text a client test or integration
+  script matches changed. A grep under 'tests/' for the changed texts
+  ("Error reading save payload", "Malformed save envelope", "missing
+  baseline", "rendered under a different", "then: ", "three-way")
+  finds only 'tests/save_stale_buffers.rs' and 'tests/repo_sets.rs',
+  both updated here.
+- '/verify' at the TCP surface, on an isolated server (one skgrepo;
+  's' contains 'k1', 'k2'): a view of 's' merged 'k2' into 'k1'
+  (saved; 's.skg' still listed both); a fresh view of 's' on a second
+  connection, saved unedited with itself as the baseline: saved, and
+  's.skg' lost the duplicate. A save envelope without '(baseline ...)':
+  "NOTHING WAS SAVED", then "Error reading save payload: Malformed
+  save envelope: missing baseline"; nothing written. No panic in the
+  server log. The restriction order was not probed there: it needs a
+  config edit and a rebuild, and 'tests/repo_sets.rs' covers it
+  through the same handler.
+- No failure of any kind.
+*** Deviations from the plan's how
+- The duplicate-member canonicalization maps 'contains',
+  'subscribesTo', 'hidesFromSubs' and 'overrides' only. The aliases
+  are text, not IDs. The extra IDs are not compared by the noop
+  filter ('buffernode_differs_from_disknode'), and each would resolve
+  through 'pid_else_raw_id' to the graphnode itself. A duplicate is
+  dropped by pid alone, keeping the first member's relRepo
+  ('with_relationships_by_distinct_pid'). The baseline's copy is
+  stored canonical, so the "Changed since" line compares canonical
+  lists too.
+- The two tests the plan asks for are two tests, not one: whichever
+  save runs first rewrites the container without the duplicate, so
+  the second would no longer exercise it. Both assert that the
+  container's file still lists both IDs before their save.
+- The missing-baseline header: the plan offered the old rendered-at
+  refusal's shape or the other envelope errors'; neither carried the
+  header. Every envelope read failure ("Error reading save payload:
+  ...", which a missing baseline is one of) now starts with "NOTHING
+  WAS SAVED", the header the validation refusals carry. The refusal
+  of an unknown 'diff-view-buffer' name keeps its "Nothing was saved."
+  sentence.
+- Config order: 'RenderedUnderAnotherSkgrepoRestriction' carries two
+  'Vec's, ordered when the refusal is built, by 'ordered_skgrepos',
+  then any skgrepo the config no longer names (a rebuild can drop
+  one), by name. 'tests/repo_sets.rs' now expects "then: public,
+  private".
+- Finding 3 ('save.rs'): the doc comment's "Two-phase cleanup" became
+  "Two-pass cleanup" too. The review's other pair, "merge phase" and
+  "ordinary phase" in 'dbs/in_rust_graph.rs', now says phase two (its
+  NodeMerges) and phase one (its ordinary nodeInstructions).
+- Finding 5: beyond the cited spots, 'validate_nodeMerge.rs''s older
+  "merge partner" and "more than one merge", the variant's "deleted
+  merge node" and "side of a merge pair" ('errors.rs'), and the
+  merge test's message ("The SavePlan should carry the merge
+  request"). The glossary's nodeMerge entry now defines "merge node"
+  (the acquirer or the acquiree) and "merge pair", the names the code
+  comments use.
+- Finding 7: renamed to 'StaleAspect', with a doc comment naming its
+  values and how it differs from 'NodeAspect' and the diff view's
+  'ChangedAspects'; the glossary's stale entry says the same in one
+  sentence. Finding 6: 'StaleGraphnodeReport'. The function
+  'change_since_rendered' that builds one keeps its name.
+- Finding 9 also applies to "The baseline of a view" in
+  'api-and-formats.org' and to the glossary's definition, which said
+  the same.
+- Finding 1: the six passages say the save would apply a second time:
+  its edits of existing graphnodes write nothing, a new graphnode
+  under a container makes that container stale and refuses the save,
+  and a new root is created twice.
+- The glossary edits were staged without Jeff's uncommitted hunk (the
+  "Stranded" entry): the index got HEAD's text with only this slice's
+  edits. While editing I truncated the working 'docs/glossary.org'
+  once (a script that read and wrote one path) and restored it from
+  HEAD plus Jeff's hunk; the restored file's blob (ad3dab39) is the
+  one 'git diff' showed at the start of the slice, so nothing of his
+  was lost unless he edited it in the minutes between.
+*** Fixtures changed
+- 'tests/save_stale_buffers/fixtures/main/': 's.skg' (contains 'k1',
+  'k2'), 'k1.skg', 'k2.skg', for the new tests. No other test there
+  reads the folder's file count.
+- 'tests/repo_sets.rs': the restriction refusal's expected order
+  (expected adaptation).
+- 'tests/save_stale_buffers.rs': the missing-baseline test also
+  expects the header.
+*** Left unfinished
+Nothing. Noticed, not in the slice: the review's "stale" in the tool's
+ordinary sense ('skg_for_ai.py', its README) was left; the slice's
+item 4 asks only for the glossary. 'with_relationships_by_distinct_pid'
+resembles 'dedup_vector' ('types/list.rs') and 'dedup_members_by_gnid'
+('traverse.rs'), but maps each member to its pid first and dedups
+'RelPartner's by member, so neither fits.
+*** Headline
+DONE.

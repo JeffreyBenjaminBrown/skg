@@ -282,8 +282,8 @@ impl PreparedSave {
 /// Prepares, without writing anything, both phases of a save: phase
 /// one applies the ordinary nodeInstructions, and phase two the
 /// NodeMerges, which are built here from phase one's candidate graph.
-/// So a merge keeps whatever the same save did to its acquirer or its
-/// acquiree, and its merged contents reflect the save's deletes.
+/// So a nodeMerge keeps whatever the same save did to its acquirer or
+/// its acquiree, and its merged contents reflect the save's deletes.
 pub fn prepare_save_under_mutation_gate (
   mut nodeInstructions  : Vec<NodeInstruction>,
   nodeMerge_pairs     : &[(ID, ID)], // (acquirer pid, acquiree pid)
@@ -412,21 +412,21 @@ pub enum DeleteFrom {
   AllOwnedRecords, // "all": strip every owned record, restricted ones too
 }
 
-/// Two-phase cleanup so deletes don't leave dangling references on
+/// Two-pass cleanup so deletes don't leave dangling references on
 /// disk:
 ///
 /// Foreign raw references deliberately survive: delete propagation never
 /// manufactures or modifies a foreign telescope write.
 ///
-/// Phase 1 (cleanup-SaveNode generation): for any owned node N still on
+/// First pass (cleanup-SaveNode generation): for any owned node N still on
 /// disk that references a being-deleted pid in any of its out bound
 /// list fields, *maybe* append a verbatim Save(N) to NODE_DEFS
-/// so that phase 2 will rewrite N. But *don't* do that for:
-/// - nodes already in NODE_DEFS as Save. Phase 2 covers them.
+/// so that the second pass will rewrite N. But *don't* do that for:
+/// - nodes already in NODE_DEFS as Save. The second pass covers them.
 /// - nodes also being deleted (because why bother)
 ///
-/// Phase 2 (strip pass): for every Save in NODE_DEFS regardless of
-/// origin (which could be Phase 1 or the save itself),
+/// Second pass (strip pass): for every Save in NODE_DEFS regardless of
+/// origin (which could be the first pass or the save itself),
 /// remove every id in 'deleted_id_set' from the four
 /// outbound list fields (contains, subscribesTo,
 /// hidesFromSubs, overrides).
@@ -478,7 +478,7 @@ pub(crate) fn apply_delete_propagation_cleanup (
           s . insert ( e . clone () ); }}}
     s };
 
-  { // Phase 1: append "save-it-unchanged" SaveNodes for referencers not already covered by the user's nodeInstructions. As-is, these would have no effect, but phase 2 strips some IDs.
+  { // First pass: append "save-it-unchanged" SaveNodes for referencers not already covered by the user's nodeInstructions. As-is, these would have no effect, but the second pass strips some IDs.
     let user_save_pids : HashSet<ID> = node_defs . iter ()
       . filter_map ( |d| match d {
         NodeInstruction::Save (SaveNode (n)) => Some ( n . pid . clone ()),
@@ -582,8 +582,8 @@ fn records_of_graphnodeInRust (
 
 
 /// Project a GraphnodeInRust back into a Graphnode verbatim. Stripping
-/// of deleted ids happens later, in 'apply_delete_propagation_cleanup'
-/// phase 2, and applies uniformly to all Saves.
+/// of deleted ids happens later, in 'apply_delete_propagation_cleanup''s
+/// second pass, and applies uniformly to all Saves.
 pub(crate) fn graphnode_from_graphnodeInRust (
   rust : &GraphnodeInRust,
 ) -> Graphnode {

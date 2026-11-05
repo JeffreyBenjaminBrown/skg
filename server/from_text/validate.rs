@@ -337,8 +337,8 @@ pub(super) fn validate_no_simultaneous_move_and_nodeMerge (
   if errors . is_empty() { Ok (())
   } else { Err (errors) }}
 
-/// Validates that the buffer deletes neither member of any of its own
-/// merge pairs. The merge is built from the graph as the save's other
+/// Validates that the buffer deletes neither merge node of any of its
+/// own merge pairs. The nodeMerge is built from the graph as the save's other
 /// writes leave it, so it could not acquire, or preserve the text of,
 /// a graphnode the same save deletes. Only the buffer's own Deletes
 /// count; delete propagation comes later and never deletes a graphnode.

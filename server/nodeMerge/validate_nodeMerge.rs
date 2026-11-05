@@ -1,13 +1,13 @@
 //! Validation rules:
-//!   - Both merge partners must be Occurrences with IDs.
+//!   - Both merge nodes must be Occurrences with IDs.
 //!     - Those two IDs must represent distinct nodes.
 //!     - Those two IDs must already be in the DB.
-//!   (That the buffer deletes neither merge partner is checked later,
+//!   (That the buffer deletes neither merge node is checked later,
 //!   on the save's Delete instructions, by pid:
 //!   'validate_no_simultaneous_delete_and_nodeMerge'.)
 //!   - Monogamy:
 //!     - No node can be an acquirer and an acquiree.
-//!     - No node can be involved in more than one merge.
+//!     - No node can be involved in more than one nodeMerge.
 
 use crate::types::viewnode::NodeEditRequest;
 use crate::types::viewnode::{Viewnode, ViewnodeKind, Occurrence};

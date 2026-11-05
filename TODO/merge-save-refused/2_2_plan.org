@@ -710,7 +710,7 @@ invalid" (find them with 'grep -rl "now invalid" tests/').
 Docs: the rebuild paragraph of 'docs/api-and-formats.org' and
 the rebuild entries of 'docs/COMMANDS.org' and
 'docs/COMMANDS-nvim.org'.
-** TODO Slice 7: corrections from the review
+** DONE Slice 7: corrections from the review
 The two review reports in '3_1_review-reports/' ('probes.org',
 'vocabulary-and-citations.org') found these. Each is a
 correction, not a design change; nothing here is open.
