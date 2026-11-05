@@ -1,0 +1,166 @@
+#+title: The rendered stale-save buffer: the cans of worms
+* TODO Claude says: what this is
+You said "let's do it" to the rendered stale-save buffer in
+'3_review.org', and expected cans of worms. This document opens
+them. Each top-level question below stands alone, defines its
+terms, and ends with a default I will take if you say nothing.
+Nothing here is implemented; '4_plan.org' is written and waits,
+and this would follow it as plan 5.
+
+A 'stale save' is a save refused because a graphnode the buffer
+edited changed in the graph after the buffer was drawn (after
+plan 4, only an edited one). Today the refusal is an error text
+naming each stale graphnode and what changed about it. The
+'rendered stale-save buffer' would be a view of the same facts:
+a buffer the client opens, drawn by the server, showing each
+stale graphnode as the graph now has it, with what changed under
+you marked the way the diff view marks changes.
+* How the pieces fit
+** The refresh already draws a view over two graphs
+Every buffer of the diff view is drawn by the one refresh in
+'RefreshMode::DiffView' ('server/refresh/mode.rs'), which takes a
+'GraphStraddle' (two graphs, before and after), a buffer kind,
+and a readiness store. The refresh draws each member of either
+graph, tags it added or removed, and puts change viewnodes (old
+title and body, moved home, changed folders) ahead of a changed
+node ('docs/diff-view.org', "The refresh over the straddle").
+** A straddle can stand on any two graphs
+'GraphStraddle::new' ('server/graph_straddle/types.rs') takes two
+graphs. Today the before-graph is always HEAD and the after-graph
+the live graph, and the straddle carries HEAD's identity so it
+knows when to rebuild. For a stale save the before-graph would be
+the live graph with the baseline's copies of the stale graphnodes
+substituted in: the graph as the refused buffer saw it. The
+after-graph is the live graph. Then every change the diff view
+would show between them is exactly what changed under the user.
+** A save response can already carry a buffer
+The fork confirmation returns a write-protected buffer in a save
+response, and both clients open it ('skg--fork-confirmation-
+handler' in 'elisp/skg-request-save.el'). A stale save could
+answer the same way, with the rendered buffer beside the error.
+** What is not there yet
+A straddle whose before-graph is not HEAD (an origin other than
+"HEAD against live", and no HEAD identity to go stale by); a
+straddle held per view rather than one per connection
+('ViewsState::graph_straddle' is one slot); a buffer kind or mode
+variant for this buffer, with no readiness store and no
+commit-readiness facts; the save response's new message and the
+clients' handler for it; and the registration of the buffer as a
+view, so that it can be redrawn, closed and, if you want,
+saved from.
+* TODO Two-way or three-way?
+A stale save has three texts: the baseline (what the server
+drew), the buffer (what you edited), and the graph (what is
+there now). The refresh over a straddle shows two: it would show
+the baseline against the graph, "what changed under you". Your
+own edits stay in the refused buffer, open beside it; you
+reconcile by reading both. A three-way view, with your edits
+marked too, is a different mechanism: two straddles from one
+base, drawn into one buffer, which the refresh does not do.
+
+ANSWER:
+
+I'll default to: two-way now, the refused buffer kept open
+beside it; three-way is a later generalization, and the
+merge-conflict question below is where it would be decided.
+* TODO Read-only, or a place to reconcile?
+The buffers of the diff view are editable: an occurrence of a
+changed node is editable with its whole content list, and a save
+from such a buffer is an ordinary save ('docs/diff-view.org',
+"Editability in the diff view"). The stale-save buffer could be
+the same: you reapply your edits into it, where the current text
+and the marks of what changed sit together, and save it; its
+baseline is its own drawn text, so its save passes the stale
+check; the refused buffer is then discarded. Or it could be
+write-protected, a report to read while you reapply edits into a
+fresh ordinary view, as the recovery steps say today.
+
+ANSWER:
+
+I'll default to: editable, as the diff view's buffers are. The
+refresh already knows how; a read-only buffer would be the same
+drawing with one flag.
+* TODO Which roots?
+The buffer could show only the stale graphnodes, each a root, or
+the refused view's own roots, so that the stale graphnodes appear
+where you saw them, among unchanged neighbors that carry no
+marks. The second is a redraw of the refused view annotated with
+what changed since its baseline. It costs nothing more: the
+straddle tags unchanged nodes with no change.
+
+ANSWER:
+
+I'll default to: the refused view's roots. The stale graphnodes
+are then found by their marks, as changes are found in a diff
+view, and the buffer reads as "your view, as it is now".
+* TODO Opened by the refusal, or on request?
+The fork confirmation opens its buffer at once. The stale-save
+buffer could open at once beside the error, or the error could
+end with "C-c v s shows what changed", and the command open it
+for the refused buffer, from the baseline the client still
+holds. Both need the same server work; the difference is one
+client command and whether the server renders the buffer on
+every refusal.
+
+ANSWER:
+
+I'll default to: both. The refusal opens it; the command opens
+it again later for any buffer with a baseline, and that command
+is the general "what changed since this view was drawn", useful
+without any refusal.
+* TODO What is the merge-conflict scenario?
+You said you would like to use the generalization "in scenarios
+like merge conflicts". I do not know which conflicts you mean,
+and the answer shapes the straddle's origin type. The candidates
+I see: a git merge that leaves conflict markers in '.skg' files
+of an owned skgrepo (two versions of a node from two branches);
+a pull of a foreign skgrepo whose upstream changed a node you had
+edited in your own repo's section of it; or two users' saves to
+one shared graph. In each case there are two versions of some
+graphnodes and perhaps a common base; a two-graph view shows any
+pair, and a three-way view needs the base.
+
+ANSWER:
+
+I'll default to: design the straddle's origin as an enum with
+two variants now, "HEAD against live" and "baseline against
+live", leaving room for a third; and not design the merge
+conflict view until you say which conflicts.
+* TODO A straddle per view
+The diff view's one straddle per connection is rebuilt when HEAD
+moves and re-paired when the live graph changes. A stale-save
+buffer's straddle has a fixed before-graph (the baseline's
+copies) and follows the live graph like the other. Holding it on
+the view's 'ViewState' lets each such buffer have its own, and
+lets the diff view keep its one slot.
+
+ANSWER:
+
+I'll default to: a straddle on the 'ViewState' of a stale-save
+buffer, and the diff view unchanged.
+* TODO The before-graph's copies under a restriction
+The baseline was drawn under the connection's restriction, so its
+copies are supplemented from the live graph (hidden members woven
+in) and are whole graphnodes. The before-graph is the live graph
+with those substituted. The diff view opens only on an
+unrestricted connection, and a restriction switch rerenders its
+buffers under the new restriction. A stale-save buffer would be
+drawn under the connection's current restriction, and the
+restriction refusal of plan 2_2 already refuses a save of a view
+drawn under another.
+
+ANSWER:
+
+I'll default to: allow the buffer under any restriction, drawn
+under the connection's current one, and let plan 2_2's rule
+guard its save.
+* TODO Order against plan 4
+Plan 4 is small (four slices) and its first slice narrows what a
+stale save is, which this buffer depends on. Running plan 4
+first also restarts your live server on every edit while it
+runs, since your server is on cargo-watch again; say when that
+is acceptable, or I pin your server to a worktree as before.
+
+ANSWER:
+
+I'll default to: plan 4 first, then this as plan 5.
