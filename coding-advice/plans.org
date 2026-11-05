@@ -21,6 +21,13 @@ run stopped). The habit: find the function that decides the behavior,
 read it, and cite it in the plan. If you cannot find it, say so in the
 plan as an open question rather than stating the rule.
 
+A rule that two copies of a thing are equal must say in which
+canonical form they are compared. Plan 2_2 said a graphnode the
+buffer shows "as the graph has it" is never stale, and compared
+raw ID lists; a graph's content list can name one graphnode twice
+(an extra ID after a nodeMerge) where a view draws it once, so
+every view of such a container was stale until a probe found it.
+
 * Design the shared model once, before any plan
 When several slices will touch one model (for the TDV: editability,
 write-protection, members and non-members, view requests), write that
@@ -143,7 +150,11 @@ the end: see [[file:orchestration.org]].
 * After each plan, before the next
 Run a short review with two questions, by one agent: what terms did
 this plan's code coin or reuse, and does its code cite anything under
-'TODO/'. Vocabulary drift ("drawn", "fresh", "leaf") and plan
+'TODO/'. Run, by a second agent in parallel, a probe pass: each
+behavior of the plan's "Agreed behavior", driven end to end against
+an isolated server (the verify skill says how), with what was sent
+and received recorded. In plan 04.1 and again in plan 2_2 the one
+regression every suite missed was found by a probe. Vocabulary drift ("drawn", "fresh", "leaf") and plan
 citations in code each entered through one plan and spread through
 the next; both are cheap to catch per plan and expensive to catch at
 the end. The full post-mortem method is in 'code-reviews.org'.

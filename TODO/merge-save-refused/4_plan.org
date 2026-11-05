@@ -1,0 +1,291 @@
+#+title: After plan 2_2: three refinements of the save's checks
+* Assignment and authority
+This plan is a unitary declaration: nothing in it is open for
+discussion. It follows '3_review.org' in this folder, whose
+"Decide" section Jeff answered on 2026-11-05; that review and
+'2_2_plan.org' are background nobody executing this plan needs
+to read. Every term is defined below or in 'docs/glossary.org'.
+
+Execute the slices in order, one agent per slice. The plan
+expects no stop. Otherwise stop only under the conditions in
+'coding-advice/when-to-stop.org'. Record deviations, surprises
+and choices you made alone in 'progress.org' beside this plan,
+under a headline naming this plan and the slice.
+
+Before writing code, read 'coding-advice/names.org',
+'formatting.org', 'ai-agents.org', 'no-legacy-support.org' and
+'common-gotchas.md'.
+* Commits
+One commit per slice. Each message names this plan
+('TODO/merge-save-refused/4_plan.org') and the slice, and follows
+'coding-advice/commit-messages.org'. The slice's commit carries
+its documentation changes and turns the slice's headline from
+TODO to DONE. Never commit anything under 'data/'.
+* Scope
+** In scope
+- A graphnode the buffer shows outdated but did not edit will be
+  left out of the save instead of refusing it (slice 1).
+- The dirty-view conflict check will stop matching through the
+  link relation, while the collateral redraw keeps it (slice 2).
+- A view request for a graphnode that is a root of an open
+  buffer of the diff view will no longer switch to that buffer
+  (slice 3).
+** Out of scope
+- Any change to what the stale error says when it does fire.
+- The rendered stale-save buffer ('3_review.org', "The rendered
+  stale-save buffer").
+- The collateral redraw's choice of views.
+* Vocabulary
+- 'baseline', 'stale', 'the baseline's writes', 'the buffer's
+  writes', 'merge node', 'merge pair', 'dirty view': as
+  'docs/glossary.org' defines them since plan 2_2.
+- 'the buffer's copy' of a graphnode: the supplemented Save
+  instruction the saved text yields for it, after the noop
+  filter ('nonmerge_nodeInstructions' in the save handler).
+- 'the baseline's copy': the supplemented Save instruction the
+  baseline yields for it ('baseline_writes' in
+  'server/serve/handlers/save_staleness.rs').
+- 'untouched': a graphnode is untouched by a buffer when the
+  buffer's copy and the baseline's copy are equal, compared as
+  'baseline_writes' compares a copy with the graph (lists by
+  distinct pid, body as a view reads it back). The user did not
+  edit it; the buffer merely still shows what the server drew.
+- 'outdated': a graphnode whose baseline copy differs from the
+  graph. Stale, as the glossary has it, is outdated and written
+  or deleted by the buffer.
+- 'the collateral neighborhood': the IDs
+  'update_relevant_neighborhood' ('server/dbs/in_rust_graph/
+  relation_accessors.rs') returns for a save's touched IDs: one
+  hop over contains, linksTo, subscribesTo and hidesFromSubs in
+  both directions, plus the override walks.
+- 'a buffer of the diff view': an open view whose 'ViewState'
+  has 'diffView_buffer_kind' set ('server/types/views_state.rs').
+* Agreed behavior
+** An untouched outdated graphnode will be left out of the save
+Today a buffer that still shows A as the server drew it, while A
+changed in the graph, is refused as stale when it saves, even if
+the user edited only B: the noop filter compares A's copy with
+the graph, finds a difference, and counts it as a write. After
+slice 1 the save will drop the Save instruction of every
+graphnode that is outdated and untouched, write the rest, and
+redraw the view, which then shows A as the graph has it. The
+stale refusal will fire only for an outdated graphnode the
+buffer edited or deletes. A delete is never untouched: deleting
+is an edit. A fork clone's original is never untouched: an
+unchanged foreign graphnode makes no fork. The error's text does
+not change. What the save response says: a warning per dropped
+graphnode, "Left as the graph has it: TITLE (ID), which changed
+after this buffer was rendered and which this buffer did not
+edit.", so the user learns why the redraw differs from what they
+saw. The warning does not report graphnodes the buffer edited,
+graphnodes that did not change, or graphnodes the noop filter
+dropped.
+** The dirty-view check will not match through links
+'dirty_view_conflicts' ('server/serve/handlers/
+save_dependencies/mod.rs') matches each dirty view's dependencies
+against the save's touched IDs and their collateral neighborhood
+in the before and after graphs. After slice 2 that match will use
+a neighborhood computed without the link relation, in both
+directions, so a dirty view of L, where L links to the saved A,
+no longer conflicts with A's save, and a dirty view showing A no
+longer conflicts with a save that only adds a link to A. The
+collateral redraw of clean views ('collateral_viewforest_ids')
+keeps the full neighborhood: a clean view showing A's mentioner
+folder is still redrawn when X gains a link to A. A dirty view
+showing that folder is not redrawn, as no dirty view is, and
+writes nothing of it; its folder is refreshed at its next
+redraw.
+** A view request will not switch to a buffer of the diff view
+'handle_single_root_view_request' ('server/serve/handlers/
+single_root_view.rs') answers '((switch-to-view "ID"))' when the
+requested graphnode is a root of an open view, through
+'content_viewforest_id_for_root_gnid' ('views_state.rs'). After
+slice 3 that lookup will skip every open view whose
+'diffView_buffer_kind' is set, so a request for a graphnode that
+is a root only of diff-view buffers renders a content view, and
+a request for one that is also a root of a content view switches
+to that content view, as today.
+** What stays as it is
+- The stale refusal and its text, for an edited or deleted
+  outdated graphnode.
+- The noop filter on the saved text, and what the save writes
+  for every graphnode the user edited.
+- The collateral redraw: which clean views a save redraws.
+- A dirty view's dependencies as slice 4 of plan 2_2 left them:
+  the graphnodes it holds viewnodes of.
+- The switch to an open content view whose root is requested.
+- The diff view's own four buffers, their roots and their
+  registration.
+* Pitfalls the slices must respect
+** Where the buffer's copies and the baseline's copies meet
+'stale_write_errors' ('save_staleness.rs', line 58) computes
+'baseline_writes' (a map from pid to the baseline's supplemented
+copy) and 'buffer_written_pids', and emits one error per pid in
+both. The buffer's copies are the Save instructions in
+'nonmerge_nodeInstructions' at the call site in 'save_buffer.rs'
+(near line 897), supplemented and noop-filtered by
+'extract_nonmergeSavePlan_locally_in_graph' exactly as the
+baseline's are. Compare a buffer copy with a baseline copy by
+'buffernode_differs_from_disknode' after
+'with_relationships_by_distinct_pid' on both
+('save_staleness.rs', line 144), and after trimming both bodies
+as 'graphnode_as_read_back_from_a_view' (line 126) trims the
+graph's; factor that canonicalization into one function the
+three comparisons share.
+** What the handler does with a dropped Save
+'nonmerge_nodeInstructions' is a 'Vec<NodeInstruction>' the
+handler mutates in place through the rest of the pipeline
+(restore requests, delete propagation, strandeds, Hoist, forks).
+Remove the untouched outdated Saves right after the stale check, before
+anything reads the vector again, so that delete propagation and
+the Hoist classification never see them. A 'SkgrepoMove' in
+'skgrepo_moves' for a dropped graphnode cannot exist: a move
+changes the copy's home skgrepo, so the graphnode is not
+untouched. The save's warnings travel in 'parse_warnings' and the
+'SaveResponse'; add the new warnings beside the strandeds
+warnings ('strandeds_warnings'), which reach the response the
+same way.
+** Only the stale check knows the baseline's copies
+'baseline_writes' is private to 'save_staleness.rs'. Give
+'stale_write_errors' a richer result (errors, the untouched
+outdated pids with their titles for the warning) rather than
+exposing the map; keep the function's one call site.
+** The neighborhood has one definition and two readers
+'update_relevant_neighborhood' ('relation_accessors.rs', line
+234) is called twice, both in 'SaveAffectedIds::from_prepared'
+('save_dependencies/mod.rs', lines 29 and 31), for the before and
+after graphs. 'matching_identity' (same file) reads the two sets
+for both the collateral redraw ('collateral_viewforest_ids') and
+the dirty-view check ('dirty_view_conflicts'). Parameterize the
+neighborhood by its list of ordinary relations (the four today;
+the override walks stay in both), keep the existing signature as
+the full version, and give 'SaveAffectedIds' a second pair of
+sets without 'LinksTo' and a second matcher that
+'dirty_view_conflicts' uses. Do not copy the walk.
+** Which views are buffers of the diff view
+'ViewforestId' has two variants, 'ContentView' and 'SearchView'
+('views_state.rs', line 22); a buffer of the diff view is a
+'ContentView' whose 'ViewState::diffView_buffer_kind' is 'Some'
+('register_diffView_view', line 176, sets it after
+'register_view'). 'content_viewforest_id_for_root_gnid' (line
+141) filters by the variant only, which is why it finds
+diff-view buffers. 'root_gnids' maps every root ID, primary and
+extra, to the view IDs; the lookup must consult 'self.views' for
+the kind.
+** The diff-view integration test's workaround
+Slice 6 of plan 2_2 made the integration test 'diff-view' (both
+clients) close its diff-view buffers before asking for a view of
+a root they hold, because the request switched to them. After
+slice 3 that closing is unnecessary; remove it and let the test
+exercise the new behavior (a content view of 'r' opens beside
+the diff-view buffers).
+** A failure that predates the plan
+The integration test 'import-md-and-org' fails in both clients
+before this plan runs. Report it as pre-existing; do not
+investigate it.
+** Test harnesses
+- 'tests/save_stale_buffers.rs' drives several connections,
+  opens views through the server and saves them with the text
+  they were opened with as baseline ('open_view', 'save'); its
+  fixture is 'tests/save_stale_buffers/fixtures/'.
+- 'tests/save_dirty_conflicts.rs' builds dirty snapshots with
+  'dirty_buffer_snapshot' and saves beside them.
+- The switch-to-view behavior is tested where 'grep -rl
+  switch-to-view tests/' points.
+- These run in grouped binaries ('Cargo.toml', 'autotests =
+  false'); a new test joins the module file of its binary.
+- 'bash/integration-tests.sh' runs the Emacs client only;
+  'bash/all-tests.sh' runs each integration folder once per
+  client (SKG_TEST_CLIENT=emacs, then nvim; see near its line
+  205). Run full suites one at a time.
+* Code map
+- 'server/serve/handlers/save_staleness.rs': slice 1's
+  comparison and result.
+- 'server/serve/handlers/save_buffer.rs': the stale check's call
+  site, the dropped Saves, the new warnings.
+- 'server/dbs/in_rust_graph/relation_accessors.rs': the
+  parameterized neighborhood.
+- 'server/serve/handlers/save_dependencies/mod.rs':
+  'SaveAffectedIds', 'dirty_view_conflicts'.
+- 'server/types/views_state.rs': the root lookup.
+- 'server/serve/handlers/single_root_view.rs': the switch.
+- Docs: 'docs/api-and-formats.org' (the stale-buffer paragraph
+  and the dirty-view paragraph under "Save buffer"; the
+  switch-to-view sentence under the single-root view request),
+  'docs/COMMANDS.org' and 'docs/COMMANDS-nvim.org' (the
+  stale-save paragraph and recovery steps near the top),
+  'docs/glossary.org' ('stale'; add 'untouched' and 'outdated').
+* Implementation sequence
+** TODO Slice 1: an untouched outdated graphnode is left out
+Implement "An untouched outdated graphnode will be left out of
+the save" as the pitfalls say.
+
+Tests, in 'tests/save_stale_buffers.rs':
+- connection one opens a view of r showing A and B; connection
+  two retitles A; connection one edits B's body and saves with
+  its original baseline: the save succeeds, B's file has the new
+  body, A's file has connection two's title, the response carries
+  the "Left as the graph has it" warning naming A, and the
+  redrawn view shows A's new title;
+- the same, but connection one also edits A: refused as stale,
+  naming A, nothing written;
+- the same, but connection one deletes A: refused as stale;
+- connection two deletes A (its file goes and is reloaded);
+  connection one edits B and saves: succeeds, A left out, with
+  the warning.
+
+Run the saves binary and 'bash/nextest.sh'. The response gains
+a warning, which the clients already display as they display
+every warning, so the integration suite is not required.
+
+Docs: the stale-buffer paragraph of 'docs/api-and-formats.org'
+says what is left out and warned of, and what is refused; the
+recovery steps in 'docs/COMMANDS.org' and
+'docs/COMMANDS-nvim.org' say that only edited outdated graphnodes
+refuse a save; the glossary gains 'untouched' and 'outdated' and narrows 'stale'.
+** TODO Slice 2: the dirty-view check ignores links
+Implement "The dirty-view check will not match through links" as
+the pitfall "The neighborhood has one definition and two readers"
+says.
+
+Tests, in 'tests/save_dirty_conflicts.rs':
+- a dirty view of L, whose body links to A, no longer refuses a
+  save that edits A;
+- a dirty view showing A no longer refuses a save of X whose only
+  change is a new link to A;
+- a dirty view showing A still refuses a save that edits A, and
+  one that edits A's container's content list.
+And one in the collateral-redraw tests (find them with 'grep -rl
+collateral_viewforest_ids tests/'): a clean view showing A is
+still redrawn when X gains a link to A.
+
+Run the saves binary and 'bash/nextest.sh'.
+
+Docs: the dirty-view paragraph of 'docs/api-and-formats.org' says
+the dirty-view match ignores links and the collateral redraw
+does not.
+** TODO Slice 3: a view request skips buffers of the diff view
+Implement "A view request will not switch to a buffer of the
+diff view": 'content_viewforest_id_for_root_gnid' returns the
+first open view with that root that is not a buffer of the diff
+view.
+
+Tests: beside the existing switch-to-view tests, one where the
+requested graphnode is a root only of a diff-view buffer (the
+request renders a content view) and one where it is a root of
+both (the request switches to the content view). Then restore
+the 'diff-view' integration test of both clients to request the
+view of 'r' without closing the diff-view buffers first, and run
+the integration tests for both clients (as 'bash/all-tests.sh'
+does).
+
+Docs: the switch-to-view sentence under the single-root view
+request in 'docs/api-and-formats.org', and 'docs/diff-view.org'
+where it describes following a link from a diff-view buffer, if
+it does.
+* Verification and completion
+Each slice runs its own tests and the binaries it touched. After
+slice 3, run 'bash/all-tests.sh' and record its summary in
+'progress.org'. Then mark the three settled items of
+'3_review.org''s "Decide" section DONE with a child saying this
+plan did them.

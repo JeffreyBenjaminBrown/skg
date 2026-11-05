@@ -75,7 +75,9 @@ its slice.
 * The cost record
 Record each slice's launch and report times in 'progress.org',
 so that the review can give durations per slice and the next
-plan can be budgeted.
+plan can be budgeted. Take each time from 'date -u' at the
+moment, never from an estimate: in plan 2_2 the orchestrator's
+estimated times drifted twenty minutes from the commits' times.
 
 * The review
 When the last slice is DONE, write the per-plan review as
