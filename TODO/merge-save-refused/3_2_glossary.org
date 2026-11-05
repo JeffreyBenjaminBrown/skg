@@ -289,6 +289,26 @@ last of them in the list counts. The function walks the list from
 its end and skips any ID it has already checked. "Last" means
 last in the order the save applies them, so a phase-two
 instruction beats a phase-one instruction for the same graphnode.
+**** TODO [jeff] what determines their order in the list?
+***** TODO Claude says: the save handler builds it in two parts
+The list the assertion checks is built in
+'update_from_and_rerender_buffer_with_approvals'
+('server/serve/handlers/save_buffer.rs', near line 1034): first
+the phase-one instructions, then the triples of the NodeMerges.
+The phase-one part starts as the buffer's own instructions in
+the order the extraction emits them, which is the order in which
+the viewforest traversal first meets each graphnode's pid
+('CollectedFieldIntents::order', "first-emission order", in
+'server/from_text/local_fieldintent_collection/types.rs'); the
+handler then appends, in the order it runs them, the restore
+instructions, delete propagation's rewrites, the strandeds
+resets, the Hoist repairs and the fork clones. The phase-two
+part lists each NodeMerge's triple in the order
+'NodeMerge::to_vec' gives: the text preserver, the updated
+acquirer, the delete of the acquiree ('server/types/save.rs',
+line 360). So an ID named in both phases has its phase-two
+instruction later in the list, and the delete of an acquiree is
+the last instruction naming it.
 *** why it changed
 A save that edits a merge's acquiree, or Hoist-repairs it, saves
 the acquiree in phase one and deletes it in phase two. Before the
