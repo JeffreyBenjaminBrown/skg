@@ -351,7 +351,10 @@ pub fn apply_nodeInstructions_to_inRustGraph (
 
 /// Check that in-Rust graph reflects the expected post-apply state
 /// for a batch of nodeInstructions: every Save's pid is present in
-/// in_rust_graph, and every Delete's id is absent. Used as a 'debug_assert!'
+/// in_rust_graph, and every Delete's id is absent. When several
+/// instructions name one ID, only the last counts: a save's merge
+/// phase deletes an acquiree that its ordinary phase may have saved.
+/// Used as a 'debug_assert!'
 /// invariant guard at the top of 'update_views_after_save' to catch
 /// pipeline-ordering regressions (someone reshuffles the pipeline so
 /// rerender runs before the prepared graph swap-in). Returns Ok (()) on
@@ -362,14 +365,17 @@ pub fn in_rust_graph_coherent_with_nodeInstructions_in (
   graph : &InRustGraph,
   nodeInstructions : &[NodeInstruction],
 ) -> Result<(), String> {
-  for instr in nodeInstructions {
+  let mut checked : HashSet<&ID> = HashSet::new ();
+  for instr in nodeInstructions . iter () . rev () {
     match instr {
       NodeInstruction::Save (SaveNode (node)) => {
+        if ! checked . insert (&node . pid) { continue; }
         if ! graph . nodes . contains_key (&node . pid) {
           return Err ( format! (
             "Save instruction pid {} absent from the in-Rust graph",
             node . pid )); }}
       NodeInstruction::Delete (DeleteNode { gnid, .. }) => {
+        if ! checked . insert (gnid) { continue; }
         if graph . nodes . contains_key (gnid) {
           return Err ( format! (
             "Delete instruction id {} still present in the in-Rust graph",
