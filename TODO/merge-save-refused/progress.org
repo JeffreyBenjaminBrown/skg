@@ -92,3 +92,15 @@ since a buffer cannot easily carry both a delete and a merge request
 for the acquirer.
 *** Headline
 DONE.
+** Orchestrator's notes after slice 1 (2026-11-05, 20:50 UTC)
+Slice 1 launched 20:26, reported 20:37 (11 minutes). Diff read:
+the two commits are as the plan asked; the coherence-assertion
+fix (last instruction per ID wins) is right, since phase two
+deletes what phase one may save. No correction needed; the
+names that changed are carried into slice 2's brief and the
+plan ("Corrections carried from slice 1"). The cargo file-lock
+wait the agent saw was Jeff's cargo-watch stack rebuilding on
+the agent's edits; it is stopped, and Jeff's server now runs
+from a worktree pinned at 6507e89f ('_burying/skg-stable' for
+the client code; the server binary from a container-side copy).
+Slice 2 launched 20:52.
