@@ -477,7 +477,7 @@ which it skipped. The herald-rules refetch stays.
   org', 'docs/merging.org', 'docs/COMMANDS.org',
   'docs/COMMANDS-nvim.org', 'tools/skg-for-ai/README.org'.
 * Implementation sequence
-** TODO Slice 1: a merge is built on the save's own edits
+** DONE Slice 1: a merge is built on the save's own edits
 Replace the triples in 'SavePlan' with the merge pairs; move the
 triple construction into 'prepare_save_under_mutation_gate',
 after phase one's candidate graph exists; move the consumers to

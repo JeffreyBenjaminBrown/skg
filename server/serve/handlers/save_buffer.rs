@@ -889,7 +889,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
             warnings : parse_warnings . clone (), } ) as Box<dyn Error> ) ?; }}
   let SavePlan {
     node_instructions      : mut nonmerge_nodeInstructions,
-    nodeMerge_instructions : nodeMerges,
+    nodeMerge_pairs,
     skgrepo_moves,
     fork_specs,
     post_skgsave_commit_notice_candidates }
@@ -897,9 +897,11 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
   { // A node the buffer would write that changed after the buffer was
     // rendered refuses the whole save, before any confirmation is asked.
     let stale_errors : Vec<BufferValidationError> =
+      // A merge is built from the graph at save time, so it is never
+      // stale: no NodeMerges are checked.
       stale_write_errors (
         &runtime . graph, rendered_at, &viewforest,
-        &nonmerge_nodeInstructions, &nodeMerges );
+        &nonmerge_nodeInstructions, &[] );
     if ! stale_errors . is_empty () {
       return Err (Box::new (SaveError::BufferValidationErrors {
         errors : stale_errors, warnings : parse_warnings, })); }}
@@ -984,7 +986,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
     raised . into_iter () . map (raised_relationship_warning) . collect () };
   let hoist_candidates : Vec<HoistCandidate> =
     hoist_candidates_from_disk (
-      &nonmerge_nodeInstructions, &nodeMerges, &runtime . config ) ?;
+      &nonmerge_nodeInstructions, &nodeMerge_pairs, &runtime . config ) ?;
   if hoist_needs_confirmation (
       &hoist_candidates, approved_hoist_pids ) {
     return Ok ( SaveResponse::hoist_confirmation (
@@ -1017,20 +1019,13 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
       nodes . push ( NodeInstruction::Save ( spec . clone . clone () )); }
     nodes };
 
-  let node_instructions : Vec<NodeInstruction> = // includes the nodeMerges
-    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-        "node_instructions_build" ). entered();
-      nonmerge_nodeInstructions . iter () . cloned ()
-      . chain ( nodeMerges . iter ()
-                . flat_map ( |nodeMerge| nodeMerge . to_vec () ))
-    . collect () };
   let prepared_save : PreparedSave =
   { // Prepare every graph/filesystem phase while the writer gate is held.
     let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "prepare_save" ). entered();
     prepare_save_under_mutation_gate (
       nonmerge_nodeInstructions . clone(),
-      &nodeMerges,
+      &nodeMerge_pairs,
       &skgrepo_moves,
       &runtime . config,
       &working_graph,
@@ -1040,6 +1035,13 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
     // failure (e.g. the override-invariant check) back-fills the
     // save's parse-time warnings, which the error itself did not see.
     . map_err ( |e| backfill_parse_warnings (e, &parse_warnings) ) ? };
+  let node_instructions : Vec<NodeInstruction> = // includes the nodeMerges
+    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+        "node_instructions_build" ). entered();
+      nonmerge_nodeInstructions . iter () . cloned ()
+      . chain ( prepared_save . nodeMerges () . iter ()
+                . flat_map ( |nodeMerge| nodeMerge . to_vec () ))
+    . collect () };
   let affected_gnids : SaveAffectedIds =
     SaveAffectedIds::from_prepared (&prepared_save);
   let dirty_conflicts = dirty_view_conflicts (

@@ -14,11 +14,10 @@ pub mod supplement_from_disk;
 pub mod weave;
 pub mod validate;
 
-use crate::nodeMerge::nodeMergeInstructionTriple::nodeMerge_instructions_from_pairs;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::errors::{BufferValidationError, SaveError};
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::save::{NodeMerge, NodeInstruction, SavePlan};
+use crate::types::save::{NodeInstruction, SavePlan};
 use crate::types::tree::forest::ViewForest;
 
 use buffer_to_viewnodes::uninterpreted::org_to_viewforest;
@@ -35,6 +34,7 @@ use local_fieldintent_collection::NonmergeSavePlan;
 use validate::{
   refuse_records_landing_restricted,
   validate_and_filter_foreign_instructions,
+  validate_no_simultaneous_delete_and_nodeMerge,
   validate_no_simultaneous_move_and_nodeMerge};
 
 use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
@@ -50,7 +50,12 @@ use crate::types::save::ForkSpec;
 /// - the parsed viewforest, its missing gnids and skgrepos supplied:
 ///   global/local buffer structure, then saved-view role policy;
 /// - disk-supplemented NodeInstructions: foreign write policy;
-/// - non-nodeMerge plus nodeMerge plan: cross-plan repo-move/nodeMerge policy.
+/// - non-nodeMerge plan plus the merge pairs: cross-plan
+///   repo-move/nodeMerge and delete/nodeMerge policy.
+///
+/// The plan carries the merge pairs, not the NodeMerge triples: those
+/// are built in 'prepare_save_under_mutation_gate', from the graph as
+/// the save's ordinary nodeInstructions leave it.
 ///
 /// Returns the saved view, the plan derived from it, and nonfatal
 /// parse warnings (e.g. discarded folder headline text, destined for
@@ -137,16 +142,18 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
     if ! errors . is_empty () {
       return Err (SaveError::BufferValidationErrors {
         errors, warnings : parsing_warnings . clone (), }); }}
-  let nodeMerge_instructions : Vec<NodeMerge> =
-    // NodeMerge extraction only plans mutations; it does not mutate the saved
+  let nodeMerge_pairs : Vec<(ID, ID)> =
+    // A merge request only plans mutations; it does not mutate the saved
     // viewforest. After a successful skgsave-commit, the common edit-request
     // consumption boundary in update_views_after_save clears this request
     // together with every other `(editRequest ...)` carrier.
-    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-        "nodeMerge_instructions_from_pairs" ). entered();
-      nodeMerge_instructions_from_pairs (
-        &nodeMerge_acquisitions, graph, config )
- } . map_err (SaveError::DatabaseError) ?;
+    // The acquiree is resolved from the ID as written (possibly an
+    // extra ID) to its pid, so every later comparison is by pid.
+    nodeMerge_acquisitions . into_iter ()
+    . map ( |(acquirer, acquiree)| (
+      graph . pid_else_raw_id (&acquirer),
+      graph . pid_else_raw_id (&acquiree) ))
+    . collect ();
   // C's repo is inferred from N's nearest owned vognode ancestor in
   // the view. The flat NodeInstructions have lost that ancestry, so resolve
   // it here, where the placed viewforest is live, keyed by foreign pid.
@@ -204,7 +211,7 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
         "validate_and_filter_foreign_instructions" ). entered();
       validate_and_filter_foreign_instructions (
         nonmerge_plan . node_instructions,
-        &nodeMerge_instructions,
+        &nodeMerge_pairs,
         graph,
         &clone_skgrepo_inputs,
         &adopt_clone_skgrepo,
@@ -221,7 +228,11 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
       return Err ( SaveError::BufferValidationErrors {
         errors, warnings : parsing_warnings . clone () } ); }}
   validate_no_simultaneous_move_and_nodeMerge (
-    &nonmerge_plan . skgrepo_moves, &nodeMerge_instructions )
+    &nonmerge_plan . skgrepo_moves, &nodeMerge_pairs )
+    . map_err ( |errors| SaveError::BufferValidationErrors {
+      errors, warnings : parsing_warnings . clone () } ) ?;
+  validate_no_simultaneous_delete_and_nodeMerge (
+    &node_instructions, &nodeMerge_pairs, graph )
     . map_err ( |errors| SaveError::BufferValidationErrors {
       errors, warnings : parsing_warnings . clone () } ) ?;
   let fork_specs : Vec<ForkSpec> = {
@@ -259,7 +270,7 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
   Ok (( viewforest,
         SavePlan {
           node_instructions,
-          nodeMerge_instructions,
+          nodeMerge_pairs,
           skgrepo_moves : nonmerge_plan . skgrepo_moves,
           fork_specs,
           post_skgsave_commit_notice_candidates :

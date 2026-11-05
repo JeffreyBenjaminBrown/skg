@@ -51,3 +51,14 @@ see 'skg-paste-link' and similar commands.
 *** Save the buffer.
 This causes the server to act on the merge request
 and rebuild the buffer.
+
+The merge is built after the save's other edits, so it keeps them.
+If the same save retitles the acquirer, or edits the acquiree's body,
+the merged node carries the new title,
+and the text preserver ("MERGED: ...") carries the edited body.
+If the same save deletes a node the acquirer or the acquiree contains,
+the merged node does not contain it.
+
+A save that deletes the acquirer or the acquiree itself is refused,
+and nothing is written: remove either the deletion or the merge
+request, then save again.

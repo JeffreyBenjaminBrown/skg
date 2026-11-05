@@ -3,10 +3,10 @@ use crate::dbs::in_rust_graph::relation_accessors::GnidPresence;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::dbs::node_lookup::{graphnode_from_graph, opt_graphnode_by_gnid};
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::types::errors::BufferValidationError;
+use crate::types::errors::{BufferValidationError, NodeMergeRole};
 use crate::types::misc::{
   ID, MSV, RelPartner, RelationshipMemberKey, SkgConfig, SkgrepoName};
-use crate::types::save::{NodeInstruction, SaveNode, DeleteNode, ForkSpec, NodeMerge, SkgrepoMove};
+use crate::types::save::{NodeInstruction, SaveNode, DeleteNode, ForkSpec, SkgrepoMove};
 use crate::types::nodes::complete::Graphnode;
 
 use std::collections::{HashMap, HashSet};
@@ -34,7 +34,7 @@ use std::collections::{HashMap, HashSet};
 /// and foreign creates are recognized by checking disk for the pid.
 pub fn validate_and_filter_foreign_instructions(
   instructions       : Vec<NodeInstruction>,
-  nodeMerge_instructions : &[NodeMerge],
+  nodeMerge_pairs    : &[(ID, ID)], // (acquirer pid, acquiree pid)
   graph              : &InRustGraph,
   clone_skgrepo_inputs : &CloneSkgrepoInputs, // everything clone-repo resolution can use, in priority order
   adopt_clone_skgrepo : &HashMap<ID, ID>, // new node -> forked N whose clone's repo it adopts (see 'new_foreign_nodes_adopting_clone_repos')
@@ -44,26 +44,22 @@ pub fn validate_and_filter_foreign_instructions(
             Vec<BufferValidationError>> {
   let mut outcomes : Vec<ForeignPolicyOutcome> =
     Vec::new();
-  let nodeMerge_nodeInstructions : Vec<NodeInstruction> =
-    nodeMerge_instructions . iter ()
-    . flat_map ( |nodeMerge| nodeMerge . to_vec () )
-    . collect ();
-  // Only a direct edit of a foreign node forks it. A foreign node
-  // reached through a nodeMerge (merging into it, or deleting it as an
-  // acquiree) is not a fork -- it stays a ModifiedForeignNode rejection.
   for instruction in instructions . iter () {
     outcomes . push (
       apply_foreign_policy(
         instruction, /* fork_eligible = */ true,
         adopt_clone_skgrepo, graph, config
       )? ); }
-  { let no_adoptions : HashMap<ID, ID> = HashMap::new ();
-    for instruction in nodeMerge_nodeInstructions . iter () {
-      outcomes . push (
-        apply_foreign_policy(
-          instruction, /* fork_eligible = */ false,
-          &no_adoptions, graph, config
-        )? ); }}
+  // Only a direct edit of a foreign node forks it. A foreign node
+  // reached through a nodeMerge (merging into it, or deleting it as an
+  // acquiree) is not a fork -- it stays a ModifiedForeignNode rejection.
+  outcomes . extend (
+    nodeMerge_pairs . iter ()
+    . flat_map ( |(acquirer, acquiree)| [acquirer, acquiree] )
+    . filter_map ( |gnid| graph . pid_and_skgrepo (gnid) )
+    . filter ( |(_pid, skgrepo)| skgrepo_is_foreign (config, skgrepo) )
+    . map ( |(pid, skgrepo)| ForeignPolicyOutcome::Reject (
+      BufferValidationError::ModifiedForeignNode (pid, skgrepo) )) );
   collect_foreign_policy_outcomes (&outcomes)?;
   // Build the clones from the fork candidates. A fork candidate only
   // ever arises from a regular `instructions` Save (a nodeMerge's saves
@@ -321,23 +317,56 @@ pub(crate) fn flatten_ms<T: Clone>(
 /// NodeInstructions, while merge acquiree/acquirer ids come from merge
 /// requests in the parsed viewforest.
 pub(super) fn validate_no_simultaneous_move_and_nodeMerge (
-  skgrepo_moves          : &[SkgrepoMove],
-  nodeMerge_instructions : &[NodeMerge],
+  skgrepo_moves   : &[SkgrepoMove],
+  nodeMerge_pairs : &[(ID, ID)], // (acquirer pid, acquiree pid)
 ) -> Result<(), Vec<BufferValidationError>> {
-  if skgrepo_moves . is_empty() || nodeMerge_instructions . is_empty() {
+  if skgrepo_moves . is_empty() || nodeMerge_pairs . is_empty() {
     return Ok (()); }
   let move_gnids : HashSet<&ID> =
     skgrepo_moves . iter() . map(|sm| &sm . pid) . collect();
   let mut errors : Vec<BufferValidationError> = Vec::new();
-  for nodeMerge in nodeMerge_instructions {
-    if move_gnids . contains (nodeMerge . acquirer_gnid()) {
+  for (acquirer, acquiree) in nodeMerge_pairs {
+    if move_gnids . contains (acquirer) {
       errors . push (
         BufferValidationError::CannotMoveAndMergeSimultaneously(
-          nodeMerge . acquirer_gnid() . clone() )); }
-    if move_gnids . contains (nodeMerge . acquiree_gnid()) {
+          acquirer . clone() )); }
+    if move_gnids . contains (acquiree) {
       errors . push (
         BufferValidationError::CannotMoveAndMergeSimultaneously(
-          nodeMerge . acquiree_gnid() . clone() )); }}
+          acquiree . clone() )); }}
+  if errors . is_empty() { Ok (())
+  } else { Err (errors) }}
+
+/// Validates that the buffer deletes neither member of any of its own
+/// merge pairs. The merge is built from the graph as the save's other
+/// writes leave it, so it could not acquire, or preserve the text of,
+/// a graphnode the same save deletes. Only the buffer's own Deletes
+/// count; delete propagation comes later and never deletes a graphnode.
+pub(super) fn validate_no_simultaneous_delete_and_nodeMerge (
+  node_instructions : &[NodeInstruction],
+  nodeMerge_pairs   : &[(ID, ID)], // (acquirer pid, acquiree pid)
+  graph             : &InRustGraph,
+) -> Result<(), Vec<BufferValidationError>> {
+  if nodeMerge_pairs . is_empty() { return Ok (()); }
+  let deleted_pids : HashSet<ID> =
+    node_instructions . iter ()
+    . filter_map ( |instruction| match instruction {
+      NodeInstruction::Delete (DeleteNode { gnid, .. }) =>
+        Some (graph . pid_else_raw_id (gnid)),
+      NodeInstruction::Save (_) => None, } )
+    . collect ();
+  let mut errors : Vec<BufferValidationError> = Vec::new();
+  for (acquirer, acquiree) in nodeMerge_pairs {
+    for (gnid, role) in [ (acquirer, NodeMergeRole::Acquirer),
+                          (acquiree, NodeMergeRole::Acquiree) ] {
+      let pid : ID = graph . pid_else_raw_id (gnid);
+      if deleted_pids . contains (&pid) {
+        let title : String = graph . get (&pid)
+          . map ( |node| node . title . clone () )
+          . unwrap_or_default ();
+        errors . push (
+          BufferValidationError::CannotDeleteAndMergeSimultaneously {
+            pid, title, role, } ); }}}
   if errors . is_empty() { Ok (())
   } else { Err (errors) }}
 

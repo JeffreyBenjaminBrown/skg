@@ -54,7 +54,11 @@ pub(crate) fn merge_nodes_with_hoist_approval (
   if nodeMerge_instructions . is_empty () {
     return Ok (None); }
   error_unless_nodeMerge_hoist_is_approved (
-    nodeMerge_instructions, &config, approved_hoist_pids ) ?;
+    & nodeMerge_instructions . iter ()
+      . map ( |nodeMerge| ( nodeMerge . acquirer_gnid () . clone (),
+                            nodeMerge . acquiree_gnid () . clone () ))
+      . collect::<Vec<(ID, ID)>> (),
+    &config, approved_hoist_pids ) ?;
   let primary_nodeInstructions : Vec<NodeInstruction> =
     nodeMerge_instructions . iter ()
     . flat_map ( |node_merge| node_merge . to_vec () )
@@ -80,11 +84,11 @@ pub(crate) fn merge_nodes_with_hoist_approval (
 }
 
 pub(crate) fn error_unless_nodeMerge_hoist_is_approved (
-  nodeMerge_instructions : &[NodeMerge],
-  config                 : &SkgConfig,
-  approved_hoist_pids    : &HashSet<ID>,
+  nodeMerge_pairs     : &[(ID, ID)], // (acquirer pid, acquiree pid)
+  config              : &SkgConfig,
+  approved_hoist_pids : &HashSet<ID>,
 ) -> Result<(), Box<dyn Error>> {
-  if nodeMerge_instructions . is_empty () {
+  if nodeMerge_pairs . is_empty () {
     return Ok (()); }
   // A direct/noninteractive merge gets the empty approval set from the public
   // wrapper above. Refuse if it would copy text out of an overPrivateText acquiree. The
@@ -92,7 +96,7 @@ pub(crate) fn error_unless_nodeMerge_hoist_is_approved (
   // so a fresh reread here finds no remaining candidate.
   let candidates =
     crate::serve::handlers::telescope_hoist::candidates_from_disk (
-      &[], nodeMerge_instructions, &config ) ?;
+      &[], nodeMerge_pairs, &config ) ?;
   if crate::serve::handlers::telescope_hoist::needs_confirmation (
       &candidates, approved_hoist_pids ) {
     return Err (format! (

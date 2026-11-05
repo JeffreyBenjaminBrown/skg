@@ -10,3 +10,85 @@ green; integration 70 of 72, the two failures both
 'import-md-and-org' (Emacs and Neovim), pre-existing and listed
 in the plan's pitfalls. Summary kept at
 'tests/results/ALL.org' until the next full run overwrites it.
+** Orchestrator's launches
+Slice 1 launched 2026-11-05 20:26 UTC.
+** Slice 1
+*** Commits
+- 61c6cf73 The save's coherence check counts only the last
+  instruction per ID.
+- The commit carrying this entry: a merge is built on the save's
+  own edits (the slice's code, tests, docs, and its headline turned
+  DONE).
+*** Suites
+- 'cargo nextest run --test grouped_saves -E 'test(merge::)'': 12
+  of 12 pass (5 new).
+- 'cargo nextest run --test grouped_saves': 165 of 165 pass.
+- 'bash/nextest.sh': 1115 of 1115 pass.
+- 'bash/integration-tests.sh': 35 of 36 test folders pass (each
+  folder runs both clients, so 70 of 72 runs); the one failure is
+  'import-md-and-org', pre-existing (listed in the plan's
+  pitfalls), not investigated.
+- No other failure occurred, so none needed classifying.
+*** Deviations from the plan's how
+**** The merge pairs carry two pids
+'from_text.rs' resolves each pair's acquiree, as written (perhaps
+an extra ID), to its pid through 'pid_else_raw_id' before the
+pair enters 'SavePlan', so every consumer compares pids (the
+plan's "IDs are compared as pids"), and 'candidates_from_disk',
+which has no graph, gets a pid it can find a telescope for. For
+the same reason the triple's acquiree delete now carries the
+acquiree's pid ('nodeMerge_from_acquirer_and_acquiree').
+**** The older as-written deletion check is gone
+'validate_nodeMerge_pair' ('server/nodeMerge/validate_nodeMerge.rs')
+refused "Acquirer/Acquiree ... cannot be marked for deletion" as an
+'Other' string, comparing IDs as written, and ran first, so the
+plan's test of the new error could not see it.
+'validate_no_simultaneous_delete_and_nodeMerge'
+('server/from_text/validate.rs') replaces it, by pid.
+**** The new variant also carries the title
+'CannotDeleteAndMergeSimultaneously { pid, title, role }', the role a
+new 'NodeMergeRole' ('server/types/errors.rs'), because the org form
+shows the title and the formatter has no graph. It names no
+headlines.
+**** The coherence assertion counts only the last instruction per ID
+A save that edits the acquiree and merges it saves it in phase one
+and deletes it in phase two; the 'debug_assert!' after the swap-in
+fired. The same was already reachable through a Hoist repair of an
+acquiree. Fixed in its own commit.
+**** The foreign merge refusal, on pairs
+Each foreign member of a pair yields 'ModifiedForeignNode (pid,
+home)', which is what the triples' foreign acquirer and acquiree
+delete yielded. A foreign acquiree no longer also yields a
+'CreatedForeignNode' for the text preserver, whose fresh pid meant
+nothing to the user. 'tests/multi_repo_errors.rs' counts only the
+former, and passes unchanged.
+**** Other entry points take pairs too
+'update_graph_including_nodeMerges' and its under-the-gate form take
+pairs and build the triples through 'prepare_save_under_mutation_gate'.
+'merge_nodes', which applies triples it is given, keeps them; its
+Hoist gate derives the pairs from them. 'prepare_save_under_mutation_gate',
+'PreparedSave' and its new 'nodeMerges ()' are public, so the
+adapted triple test in 'tests/merge/' can reach them.
+**** One more doc paragraph
+The stale-buffer paragraph of 'docs/api-and-formats.org' said the
+check covers "the two nodes of each nodeMerge"; it no longer does,
+so nodeMerges joined its list of derived writes that are not
+checked. Slice 3 rewrites that paragraph anyway.
+*** Fixtures changed
+- New: 'tests/merge/merge_keeps_the_saves_own_edits/fixtures/'.
+- 'tests/save/extra_id_revocation.rs' (second-phase preflight)
+  passes a merge pair instead of a hand-built triple; its fixture is
+  unchanged and it still fails in phase two's preflight, on the
+  foreign acquirer.
+- 'tests/merge/nodeInstructions_from_the_merges_in_a_viewforest.rs'
+  now checks the pair 'buffer_to_validated_saveplan_in_graph' puts in
+  the plan and the triple 'prepare_save_under_mutation_gate' builds
+  from it; its buffer gained node 1's body line, so phase one does
+  not clear it.
+*** Left unfinished
+Nothing of the slice. The plan's tests cover deleting the acquiree;
+deleting the acquirer is checked by the same code but has no test,
+since a buffer cannot easily carry both a delete and a merge request
+for the acquirer.
+*** Headline
+DONE.

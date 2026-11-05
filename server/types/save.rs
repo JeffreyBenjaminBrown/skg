@@ -53,7 +53,11 @@ pub struct DeleteNode {
 #[derive(Debug)]
 pub struct SavePlan {
   pub node_instructions      : Vec<NodeInstruction>,
-  pub nodeMerge_instructions : Vec<NodeMerge>,
+  /// Each merge request as (acquirer pid, acquiree pid). The NodeMerge
+  /// triples are built from these only once the save's ordinary
+  /// nodeInstructions have been prepared ('prepare_save_under_mutation_gate'),
+  /// so that a merge carries the save's own edits to both graphnodes.
+  pub nodeMerge_pairs        : Vec<(ID, ID)>,
   pub skgrepo_moves          : Vec<SkgrepoMove>,
   /// Forks detected this save: editing a foreign node N is read as a
   /// request to clone it. Held separate from 'node_instructions' because a
@@ -220,6 +224,9 @@ fn buffer_validation_error_text (
     BufferValidationError::CannotMoveAndMergeSimultaneously(gnid) => {
       format!("Cannot move and merge a node simultaneously:\n- ID: {}\n- Please save the move and merge in separate operations.\n",
               gnid . 0) },
+    BufferValidationError::CannotDeleteAndMergeSimultaneously { pid, title, role } => {
+      format!("A node this save would merge is also deleted by it:\n- Title: {}\n- ID: {}\n- It is {} of a merge request in this buffer.\n- Remove either the deletion or the merge request, then save.\n",
+              title, pid . 0, role . with_article ()) },
     BufferValidationError::SkgrepoNotInConfig(gnid, skgrepo) => {
       format!("Node references a repo that does not exist in config:\n- ID: {}\n- Repo: {}\n- Please check your config file and ensure this repo is defined.\n",
               gnid . 0, skgrepo) },

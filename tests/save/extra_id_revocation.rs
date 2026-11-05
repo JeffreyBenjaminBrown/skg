@@ -50,23 +50,10 @@ async fn exercise_second_phase_preflight (
   let mut ordinary : Graphnode =
     graphnode_from_gnid (config, &ID::from ("ordinary")) ?;
   ordinary . title = "would have changed" . to_string ();
-  let acquiree : Graphnode =
-    graphnode_from_gnid (config, &ID::from ("acquiree")) ?;
-  let mut foreign_acquirer : Graphnode =
-    graphnode_from_gnid (config, &ID::from ("foreign-acquirer")) ?;
-  foreign_acquirer . extra_ids = vec![ID::from ("acquiree")];
-  let mut preserver : Graphnode = acquiree;
-  preserver . pid = ID::from ("preserver");
-  preserver . extra_ids . clear ();
-  let merge : NodeMerge = NodeMerge {
-    acquiree_text_preserver : SaveNode (preserver),
-    updated_acquirer        : SaveNode (foreign_acquirer),
-    acquiree_to_delete      : DeleteNode {
-      gnid : ID::from ("acquiree"), home_skgrepo : SkgrepoName::from ("main"),
-    },
-  };
+  let merge_pair : (ID, ID) = // the merge's phase would rewrite a foreign acquirer
+    (ID::from ("foreign-acquirer"), ID::from ("acquiree"));
   let result = update_graph_including_nodeMerges (
-    vec![NodeInstruction::Save (SaveNode (ordinary))], &[merge], &[],
+    vec![NodeInstruction::Save (SaveNode (ordinary))], &[merge_pair], &[],
     config . clone (), tantivy, &graph, &new_mutation_gate (),
     &std::collections::HashSet::new ()) . await;
   assert! (result . is_err (), "foreign merge phase must fail preflight");

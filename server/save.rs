@@ -13,6 +13,7 @@ use crate::dbs::in_rust_graph::{
     GraphUpdatePreparationError, PreparedGraphUpdate, prepare_graph_update,
   },
 };
+use crate::nodeMerge::nodeMergeInstructionTriple::nodeMerge_instructions_from_pairs;
 use crate::dbs::tantivy::background_writer::{enqueue_tantivy_write, lock_tantivy_writes, TantivyWriteTask};
 use crate::dbs::tantivy::write::{add_documents_to_tantivy_writer, tantivy_commit_with_status, delete_nodes_by_gnid_from_index};
 use crate::repo_watch::own_writes::remove_skg_file;
@@ -171,10 +172,11 @@ pub(crate) fn enqueue_tantivy_delta (
 /// order, applying any Tantivy rebuild from either step to the
 /// caller's '&mut TantivyIndex'. The sole place the save pipeline
 /// should call when it has both nodeInstructions and
-/// nodeMerge_instructions in hand.
+/// merge pairs in hand. The NodeMerges are built from the graph as
+/// the nodeInstructions leave it ('prepare_save_under_mutation_gate').
 pub async fn update_graph_including_nodeMerges (
   nodeInstructions  : Vec<NodeInstruction>,
-  nodeMerge_instructions : &[NodeMerge],
+  nodeMerge_pairs   : &[(ID, ID)], // (acquirer pid, acquiree pid)
   skgrepo_moves       : &[SkgrepoMove],
   config             : SkgConfig,
   tantivy_index      : &mut TantivyIndex,
@@ -184,7 +186,7 @@ pub async fn update_graph_including_nodeMerges (
 ) -> Result<(), Box<dyn Error>> {
   let _mutation_guard = mutation_gate . lock () . await;
   update_graph_including_nodeMerges_under_mutation_gate (
-    nodeInstructions, nodeMerge_instructions, skgrepo_moves, config,
+    nodeInstructions, nodeMerge_pairs, skgrepo_moves, config,
     tantivy_index, graph, approved_hoist_pids )
 }
 
@@ -193,7 +195,7 @@ pub async fn update_graph_including_nodeMerges (
 /// disk-derived SavePlan cannot become stale before this function swaps in the new graph.
 pub(crate) fn update_graph_including_nodeMerges_under_mutation_gate (
   nodeInstructions  : Vec<NodeInstruction>,
-  nodeMerge_instructions : &[NodeMerge],
+  nodeMerge_pairs   : &[(ID, ID)], // (acquirer pid, acquiree pid)
   skgrepo_moves       : &[SkgrepoMove],
   config             : SkgConfig,
   tantivy_index      : &mut TantivyIndex,
@@ -201,14 +203,15 @@ pub(crate) fn update_graph_including_nodeMerges_under_mutation_gate (
   approved_hoist_pids : &HashSet<ID>,
 ) -> Result<(), Box<dyn Error>> {
   let prepared : PreparedSave = prepare_save_under_mutation_gate (
-    nodeInstructions, nodeMerge_instructions, skgrepo_moves, &config,
+    nodeInstructions, nodeMerge_pairs, skgrepo_moves, &config,
     graph, approved_hoist_pids,
     &SkgrepoRestriction::unrestricted (&config) ) ?;
   prepared . apply (config, tantivy_index, graph)
 }
 
-pub(crate) struct PreparedSave {
+pub struct PreparedSave {
   graph_before_save             : Arc<InRustGraph>,
+  nodeMerges                    : Vec<NodeMerge>, // built from the graph phase one leaves
   final_candidate               : Arc<InRustGraph>,
   prepared_save                 : Option<PreparedGraphUpdate>,
   prepared_nodeMerge            : Option<PreparedGraphUpdate>,
@@ -229,6 +232,14 @@ impl PreparedSave {
     &self,
   ) -> &Arc<InRustGraph> {
     &self . final_candidate
+  }
+
+  /// The NodeMerge triples, as built from the graph that the save's
+  /// ordinary nodeInstructions leave.
+  pub fn nodeMerges (
+    &self,
+  ) -> &[NodeMerge] {
+    &self . nodeMerges
   }
 
   pub(crate) fn final_write_identities (
@@ -268,9 +279,14 @@ impl PreparedSave {
   }
 }
 
-pub(crate) fn prepare_save_under_mutation_gate (
+/// Prepares, without writing anything, both phases of a save: phase
+/// one applies the ordinary nodeInstructions, and phase two the
+/// NodeMerges, which are built here from phase one's candidate graph.
+/// So a merge keeps whatever the same save did to its acquirer or its
+/// acquiree, and its merged contents reflect the save's deletes.
+pub fn prepare_save_under_mutation_gate (
   mut nodeInstructions  : Vec<NodeInstruction>,
-  nodeMerge_instructions : &[NodeMerge],
+  nodeMerge_pairs     : &[(ID, ID)], // (acquirer pid, acquiree pid)
   skgrepo_moves       : &[SkgrepoMove],
   config             : &SkgConfig,
   graph              : &InRustGraphHandle,
@@ -281,14 +297,10 @@ pub(crate) fn prepare_save_under_mutation_gate (
   apply_delete_propagation_cleanup (
     &mut nodeInstructions, &graph_before_save, config,
     restricted_records_left );
-  let all_filesystem_outputs : Vec<NodeInstruction> =
-    nodeInstructions . iter () . cloned ()
-    . chain ( nodeMerge_instructions . iter ()
-             . flat_map ( |node_merge| node_merge . to_vec () ) )
-    . collect ();
   crate::nodeMerge::error_unless_nodeMerge_hoist_is_approved (
-    nodeMerge_instructions, config, approved_hoist_pids ) ?;
-
+    nodeMerge_pairs, config, approved_hoist_pids ) ?;
+  let phase_one_filesystem_outputs : Vec<NodeInstruction> =
+    nodeInstructions . clone ();
   let prepared_save : Option<PreparedGraphUpdate> =
     if nodeInstructions . is_empty () { None }
     else { Some (prepare_graph_update (
@@ -297,9 +309,20 @@ pub(crate) fn prepare_save_under_mutation_gate (
   let graph_after_save : Arc<InRustGraph> = prepared_save . as_ref ()
     . map ( |prepared| prepared . candidate () . clone () )
     . unwrap_or_else ( || graph_before_save . clone () );
+  let nodeMerges : Vec<NodeMerge> =
+    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+        "nodeMerge_instructions_from_pairs" ). entered();
+      nodeMerge_instructions_from_pairs (
+        nodeMerge_pairs, &graph_after_save, config )
+    } . map_err ( |e| -> Box<dyn Error> {
+      Box::new (SaveError::DatabaseError (e)) } ) ?;
   let nodeMerge_nodeInstructions : Vec<NodeInstruction> =
-    nodeMerge_instructions . iter ()
+    nodeMerges . iter ()
     . flat_map ( |node_merge| node_merge . to_vec () )
+    . collect ();
+  let all_filesystem_outputs : Vec<NodeInstruction> =
+    phase_one_filesystem_outputs . into_iter ()
+    . chain ( nodeMerge_nodeInstructions . iter () . cloned () )
     . collect ();
   let prepared_nodeMerge : Option<PreparedGraphUpdate> =
     if nodeMerge_nodeInstructions . is_empty () { None }
@@ -346,6 +369,7 @@ pub(crate) fn prepare_save_under_mutation_gate (
     .collect ();
   Ok (PreparedSave {
     graph_before_save,
+    nodeMerges,
     final_candidate,
     prepared_save,
     prepared_nodeMerge,

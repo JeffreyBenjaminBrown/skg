@@ -710,6 +710,8 @@ and edits the acquirer's metadata to request a nodeMerge.
 
 The command only edits the node's metadata in the current buffer.
 Save the view afterward to apply the nodeMerge.
+Other edits in the same save, to either node or elsewhere, are kept,
+but a save that also deletes the acquirer or the acquiree is refused.
 *** <localleader>sn : :SkgRestoreDeletedNode
 In a buffer of the diff view, on a ghost (a node deleted since HEAD,
 shown =ᗣ☮ ∃-=), requests that the save write the node back

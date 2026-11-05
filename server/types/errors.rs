@@ -15,6 +15,13 @@ pub struct HeadlineName {
   pub viewnode_id  : Option<ViewnodeId>, // None for a headline typed, or copied, since the last render
 }
 
+/// Which side of a merge pair a graphnode is.
+#[derive (Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NodeMergeRole {
+  Acquirer,
+  Acquiree,
+}
+
 #[derive (Debug)]
 pub enum LinkParseError {
   InvalidFormat,
@@ -50,6 +57,11 @@ pub enum BufferValidationError {
                                    SkgrepoName, // disk skgrepo
                                    SkgrepoName), // buffer skgrepo
   CannotMoveAndMergeSimultaneously (ID),
+  CannotDeleteAndMergeSimultaneously {
+    pid   : ID,            // the deleted merge node's pid
+    title : String,        // its title in the graph
+    role  : NodeMergeRole, // which side of its merge pair it is
+  }, // The buffer deletes the acquirer or the acquiree of one of its own merge requests.
   SkgrepoNotInConfig              (ID, SkgrepoName),
   // Fork errors. Editing a foreign node N is read as a request to
   // clone it (the clone C lives in an owned skgrepo, subscribes to and
@@ -112,6 +124,16 @@ pub enum BufferValidationError {
 //
 // Implementations
 //
+
+impl NodeMergeRole {
+  /// "the acquirer" or "the acquiree".
+  pub fn with_article (
+    &self,
+  ) -> &'static str {
+    match self {
+      NodeMergeRole::Acquirer => "the acquirer",
+      NodeMergeRole::Acquiree => "the acquiree", }}
+}
 
 impl HeadlineName {
   pub fn of (
@@ -257,6 +279,9 @@ impl std::fmt::Display for BufferValidationError {
         write!(f, "Cannot move node {:?} between repos '{}' and '{}': one or both are foreign", gnid, disk_skgrepo, buffer_skgrepo),
       BufferValidationError::CannotMoveAndMergeSimultaneously(gnid) =>
         write!(f, "Cannot move and merge node {:?} in the same save", gnid),
+      BufferValidationError::CannotDeleteAndMergeSimultaneously { pid, title, role } =>
+        write!(f, "Cannot delete and merge node {:?} ('{}', {}) in the same save",
+               pid, title, role . with_article ()),
       BufferValidationError::SkgrepoNotInConfig(gnid, skgrepo) =>
         write!(f, "Node {:?} references repo '{}' which does not exist in config", gnid, skgrepo),
       BufferValidationError::ForkSkgrepoUnresolved(gnid) =>
@@ -339,6 +364,7 @@ impl BufferValidationError {
         | BufferValidationError::CreatedForeignNode (..)
         | BufferValidationError::CannotMoveToOrFromForeignSkgrepo (..)
         | BufferValidationError::CannotMoveAndMergeSimultaneously (_)
+        | BufferValidationError::CannotDeleteAndMergeSimultaneously { .. }
         | BufferValidationError::SkgrepoNotInConfig (..)
         | BufferValidationError::ForkSkgrepoUnresolved (_)
         | BufferValidationError::ForkAlreadyExists (..)

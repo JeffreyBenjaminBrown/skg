@@ -2,7 +2,9 @@
 //!   - Both merge partners must be Occurrences with IDs.
 //!     - Those two IDs must represent distinct nodes.
 //!     - Those two IDs must already be in the DB.
-//!   - Neither merge partner can be marked for deletion.
+//!   (That the buffer deletes neither merge partner is checked later,
+//!   on the save's Delete instructions, by pid:
+//!   'validate_no_simultaneous_delete_and_nodeMerge'.)
 //!   - Monogamy:
 //!     - No node can be an acquirer and an acquiree.
 //!     - No node can be involved in more than one merge.
@@ -19,8 +21,7 @@ use std::error::Error;
 struct NodeMergeValidationData<'a> {
   acquirer_viewnodes    : Vec<&'a Viewnode>,
   acquirer_to_acquirees : HashMap<ID, HashSet<ID>>,
-  acquiree_to_acquirers : HashMap<ID, HashSet<ID>>,
-  to_delete_gnids      : HashSet<ID>, }
+  acquiree_to_acquirers : HashMap<ID, HashSet<ID>>, }
 
 /// Validates merge requests in a viewnode viewforest.
 /// Returns a vector of validation error messages,
@@ -42,8 +43,7 @@ pub fn validate_nodeMerge_requests(
     if let Some(NodeEditRequest::NodeMerge (acquiree_gnid))
       = t . edit_request ()
     { let pair_errors : Vec<String> = validate_nodeMerge_pair(
-        graph, acquirer_gnid, acquiree_gnid,
-        &nodeMerge_validation_data . to_delete_gnids)?;
+        graph, acquirer_gnid, acquiree_gnid)?;
       errors . extend (pair_errors); }}
   errors . extend( {
     let monogamy_errors : Vec<String> =
@@ -61,16 +61,12 @@ fn collect_nodeMerge_validation_data<'a>(
   let mut acquirer_viewnodes : Vec<&Viewnode> = Vec::new();
   let mut acquirer_to_acquirees : HashMap<ID, HashSet<ID>> = HashMap::new();
   let mut acquiree_to_acquirers : HashMap<ID, HashSet<ID>> = HashMap::new();
-  let mut to_delete_gnids : HashSet<ID> = HashSet::new();
   for edge in viewforest . root() . traverse() {
     if let ego_tree::iter::Edge::Open (node_ref) = edge {
       let viewnode : &Viewnode = node_ref . value();
       if let ViewnodeKind::Vognode (Vognode::Occurrence (t))
         = &viewnode . kind
       { { let gnid : &ID = &t . gnid;
-          if matches!(t . edit_request (),
-                      Some (NodeEditRequest::Delete)) {
-            to_delete_gnids . insert(gnid . clone()); } // mutate!
           if let Some(NodeEditRequest::NodeMerge (acquiree_gnid))
           = t . edit_request ()
           { acquirer_viewnodes . push (viewnode); // mutate!
@@ -84,8 +80,7 @@ fn collect_nodeMerge_validation_data<'a>(
               . insert(gnid . clone()); }} }} }
   NodeMergeValidationData { acquirer_viewnodes,
                         acquirer_to_acquirees,
-                        acquiree_to_acquirers,
-                        to_delete_gnids, }}
+                        acquiree_to_acquirers, }}
 
 /// Validates a single merge pair (acquirer + acquiree).
 /// Returns a vector of validation errors for this pair.
@@ -94,7 +89,6 @@ fn validate_nodeMerge_pair(
   graph: &InRustGraph,
   acquirer_gnid: &ID,
   acquiree_gnid: &ID,
-  to_delete_gnids: &HashSet<ID>,
 ) -> Result<Vec<String>, Box<dyn Error>> {
   let mut errors: Vec<String> = Vec::new();
   let acquirer_pid : ID = (
@@ -120,15 +114,6 @@ fn validate_nodeMerge_pair(
       acquirer_gnid . as_str(),
       acquiree_gnid . as_str(),
       acquirer_pid . as_str() )); }
-  if to_delete_gnids . contains (acquirer_gnid) {
-    errors . push(format!(
-      "Acquirer '{}' cannot be marked for deletion",
-      acquirer_gnid . as_str() )); }
-  if to_delete_gnids . contains (acquiree_gnid) {
-    errors . push(format!(
-      "Acquiree '{}' (requested by '{}') cannot be marked for deletion",
-      acquiree_gnid . as_str(),
-      acquirer_gnid . as_str() )); }
   Ok (errors) }
 
 /// Validates monogamy rules for all merges.

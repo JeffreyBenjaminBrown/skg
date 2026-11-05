@@ -20,7 +20,8 @@ use std::error::Error;
 /// - acquiree_to_delete: acquiree marked for deletion
 /// It is a convenience wrapper over local fieldIntent collection
 /// plus 'nodeMerge_instructions_from_pairs'; the production save
-/// pipeline collects once and calls the pair form directly.
+/// pipeline collects once, carries the pairs in its SavePlan, and
+/// calls the pair form from 'prepare_save_under_mutation_gate'.
 #[allow(non_snake_case)]
 pub fn nodeMerge_instructions_from_viewforest (
   viewforest : &ViewForest,
@@ -36,6 +37,9 @@ pub fn nodeMerge_instructions_from_viewforest (
 /// This builds the NodeMerge triples for a batch of (acquirer,
 /// acquiree) pairs, as collected from the buffer by local
 /// instruction collection ('nodeMerge_pairs').
+/// Both members are read from 'graph'. The save pipeline passes the
+/// graph as the save's ordinary nodeInstructions leave it, so the
+/// triples carry the save's own edits to either member.
 #[allow(non_snake_case)]
 pub fn nodeMerge_instructions_from_pairs (
   pairs  : &[(ID, ID)],
@@ -89,7 +93,7 @@ fn nodeMerge_from_acquirer_and_acquiree (
       SaveNode (updated_acquirer),
     acquiree_to_delete :
       DeleteNode {
-        gnid           : acquiree_gnid . clone(),
+        gnid           : acquiree_from_disk . pid . clone(), // the pid, even if the merge request named an extra ID
         home_skgrepo : acquiree_from_disk . home_skgrepo . clone() }} ) }
 
 /// Computes the updated acquirer node with all fields properly merged.

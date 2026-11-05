@@ -10,7 +10,7 @@ use crate::dbs::filesystem::one_node::telescope_from_disk;
 use crate::serve::util::sexp_to_client_string;
 use crate::telescope::compose::compose_telescope_collecting_warnings;
 use crate::types::misc::{ID, SkgConfig, SkgrepoName};
-use crate::types::save::{NodeInstruction, NodeMerge, SaveNode};
+use crate::types::save::{NodeInstruction, SaveNode};
 use crate::types::sexp::extract_string_list_from_sexp;
 
 use sexp::{Atom, Sexp};
@@ -48,24 +48,21 @@ pub fn approved_pids_from_request (
 /// New nodes have no disk telescope and therefore cannot be Hoist candidates.
 pub fn candidates_from_disk (
   node_instructions : &[NodeInstruction],
-  node_merges       : &[NodeMerge],
+  nodeMerge_pairs   : &[(ID, ID)], // (acquirer pid, acquiree pid)
   config            : &SkgConfig,
 ) -> io::Result<Vec<HoistCandidate>> {
   let mut touched : HashSet<ID> = HashSet::new ();
-  let mut note_save = |node_instruction : &NodeInstruction| {
-    if let NodeInstruction::Save (SaveNode (node)) = node_instruction {
-      touched . insert ( node . pid . clone () ); }};
   for node_instruction in node_instructions {
-    note_save (node_instruction); }
-  for node_instruction in node_merges . iter ()
-      . flat_map ( |merge| merge . to_vec () ) {
-    note_save (&node_instruction); }
-  // A nodeMerge copies the acquiree's folded title/body into a fresh
-  // preservation node before deleting the acquiree. That textual input is a
-  // touched telescope even though the primary nodeInstruction for its old PID is
-  // Delete, not Save.
-  for node_merge in node_merges {
-    touched . insert ( node_merge . acquiree_gnid () . clone () ); }
+    if let NodeInstruction::Save (SaveNode (node)) = node_instruction {
+      touched . insert ( node . pid . clone () ); }}
+  // A nodeMerge rewrites the acquirer. It also copies the acquiree's
+  // folded title/body into a fresh preservation node before deleting
+  // the acquiree. That textual input is a touched telescope even though
+  // the primary nodeInstruction for its old PID is Delete, not Save.
+  // (The preservation node is new, so it has no telescope.)
+  for (acquirer, acquiree) in nodeMerge_pairs {
+    touched . insert ( acquirer . clone () );
+    touched . insert ( acquiree . clone () ); }
   let mut touched : Vec<ID> = touched . into_iter () . collect ();
   touched . sort_by ( |a, b| a . as_str () . cmp (b . as_str ()) );
 

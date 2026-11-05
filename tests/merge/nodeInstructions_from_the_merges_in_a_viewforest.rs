@@ -1,11 +1,17 @@
+// The save pipeline turns a merge request into a pair in its SavePlan
+// ('buffer_to_validated_saveplan_in_graph'), and the pair into a
+// NodeMerge triple only while preparing the save
+// ('prepare_save_under_mutation_gate'). This tests both steps.
+
 use indoc::indoc;
-use skg::nodeMerge::nodeMergeInstructionTriple::nodeMerge_instructions_from_viewforest;
-use skg::types::tree::forest::ViewForest;
-use skg::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
-use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewnode_tree;
+use skg::dbs::in_rust_graph::InRustGraphHandle;
+use skg::from_text::buffer_to_validated_saveplan_in_graph;
+use skg::save::{PreparedSave, prepare_save_under_mutation_gate};
+use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::test_utils::{run_with_test_stores, graph_handle_from_config};
 use skg::types::misc::{ID, MSV, SkgrepoName, members_msv};
-use skg::types::save::SaveNode;
+use skg::types::save::{NodeMerge, SaveNode, SavePlan};
+use std::collections::HashSet;
 use std::error::Error;
 
 #[test]
@@ -16,17 +22,27 @@ fn test_single_merge() -> Result<(), Box<dyn Error>> {
     "/tmp/tantivy-test-merge-single",
     |config, _tantivy| {
       Box::pin(async move {
-        // Create a viewforest with node 1 requesting to merge node 2
-        let input = indoc! {"
+        // A buffer with node 1 requesting to merge node 2
+        let input : &str = indoc! {"
           * (skg node (gnid 1) (skgRepos (nodeRepo main)) (editRequest (merge 2))) 1
+          1 body
         "};
-
-        let viewforest = org_to_viewnode_tree (input, IdResolution::AsWritten)?. 0;
-        let nodeMerge_instructions =
-        nodeMerge_instructions_from_viewforest(
-         &ViewForest::from_internal_tree (viewforest),
-         &graph_handle_from_config (config)? . load_full (), config)
-?;
+        let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
+        let unrestricted : SkgrepoRestriction =
+          SkgrepoRestriction::unrestricted (config);
+        let save_plan : SavePlan =
+          buffer_to_validated_saveplan_in_graph (
+            input, &graph . load_full (), config, &unrestricted ) ? . 1;
+        assert_eq! (
+          save_plan . nodeMerge_pairs,
+          vec! [ (ID::from ("1"), ID::from ("2")) ],
+          "The plan should carry the merge as (acquirer pid, acquiree pid)" );
+        let prepared : PreparedSave = prepare_save_under_mutation_gate (
+          save_plan . node_instructions,
+          &save_plan . nodeMerge_pairs,
+          &save_plan . skgrepo_moves,
+          config, &graph, &HashSet::new (), &unrestricted ) ?;
+        let nodeMerge_instructions : &[NodeMerge] = prepared . nodeMerges ();
 
         // Should produce exactly 1 MergeInstructionTriple
         assert_eq!(

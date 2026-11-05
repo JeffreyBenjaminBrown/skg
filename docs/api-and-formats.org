@@ -308,10 +308,9 @@ So far there are these endpoints:
     =rendered-at=, writing the buffer's text of it would silently undo
     that change. What the buffer would write is what its text yields
     once the identical-to-graph nodeInstructions are dropped as
-    no-ops, plus the two nodes of each nodeMerge it requests; the
-    writes the save derives from the current graph (delete
-    propagation, strandeds resets, Hoist repairs, fork clones, restore
-    requests) are not checked. So a node the buffer shows as the graph
+    no-ops; the writes the save derives from the current graph
+    (nodeMerges, delete propagation, strandeds resets, Hoist repairs,
+    fork clones, restore requests) are not checked. So a node the buffer shows as the graph
     has it never refuses a save, however old the buffer, and a node
     the buffer creates has no last change; but a node deleted after
     the render counts as changed, so an old buffer cannot recreate
@@ -361,6 +360,18 @@ So far there are these endpoints:
     are, and the dangling ID shows as an unknown viewnode where its
     recorder is shown; under "all" every owned record of the deleted
     IDs goes, as with no skgrepo restriction.
+  - A nodeMerge is built from the graph as the save's ordinary edits
+    leave it: the server prepares the buffer's other writes first, then
+    builds each merge request's three writes (the text preserver, the
+    updated acquirer, the deleted acquiree) from that candidate graph
+    ('prepare_save_under_mutation_gate' in 'server/save.rs'). So an
+    edit the same save makes to the acquirer or to the acquiree is
+    kept, and the merged contents lack what the save deletes. A save
+    whose buffer deletes the acquirer or the acquiree of one of its own
+    merge requests is refused before anything is written, with an
+    error that begins =A node this save would merge is also deleted
+    by it= and gives the node's title and ID and which of the two it
+    is; only the buffer's own deletes count, not delete propagation.
   - Moving a node between skgrepos: for each home skgrepo move the server
     finds every relationship touching the moved node, in either
     direction and whether or not a view shows it, that sat at its
