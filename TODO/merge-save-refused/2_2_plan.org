@@ -710,6 +710,101 @@ invalid" (find them with 'grep -rl "now invalid" tests/').
 Docs: the rebuild paragraph of 'docs/api-and-formats.org' and
 the rebuild entries of 'docs/COMMANDS.org' and
 'docs/COMMANDS-nvim.org'.
+** TODO Slice 7: corrections from the review
+The two review reports in '3_1_review-reports/' ('probes.org',
+'vocabulary-and-citations.org') found these. Each is a
+correction, not a design change; nothing here is open.
+*** A merge's duplicate member must not make its container stale
+After a merge of two siblings k1 and k2 under container c, c's
+file still lists both IDs, which now name one graphnode (k2 is
+an extra ID of k1). A view draws c's content once, by pid, so
+the baseline's copy of c has 'contains' [k1] while the graph's
+has [k1, k2]; 'buffernode_differs_from_disknode' compares the
+raw lists, so the baseline's copy survives the noop filter and
+every save of a view holding c is refused as stale ("gained
+k2"), including a fresh view's. Before this plan such a save
+rewrote c without the duplicate. Fix in 'baseline_writes'
+('save_staleness.rs'): compare the baseline's copy with the
+graph's graphnode as a view draws it, which 'graphnode_as_drawn'
+already begins: there, also map every relationship list
+('contains', 'subscribesTo', 'hidesFromSubs', 'overrides', and
+the aliases' and extra IDs' lists where they carry IDs) through
+'pid_else_raw_id' and drop later duplicates, keeping order. Do
+the same to the baseline's copy before comparing, so both sides
+are canonical. Leave the noop filter on the saved text alone:
+the buffer's write of c still goes through and cleans the
+duplicate, as before the plan. Test, in
+'tests/save_stale_buffers.rs': a container of two siblings, a
+merge of one into the other through a view, then an unedited
+save of a fresh view of the container succeeds, and a save of
+the merged pair's view that edits the container succeeds too.
+Rename 'graphnode_as_drawn' to say what it is: the graphnode as
+a view would read it back after drawing it; the current name
+says the opposite of what the body does (the view draws the
+whitespace; the parser trims it).
+*** The missing-baseline refusal gets the usual header
+A save envelope without '(baseline ...)' is refused with a
+message that lacks the "NOTHING WAS SAVED" header the other
+refusals carry ('probes.org', probe 8). Give it the same shape
+as a refused 'rendered-at' had before this plan, or as the other
+envelope errors have.
+*** The restriction refusal lists skgrepos in config order
+'RenderedUnderAnotherSkgrepoRestriction' lists the two sets
+("then: priv, pub"); list each in the config's privacy order,
+most public first, as the plan's example does.
+*** The vocabulary report's findings 1 to 10
+Read 'vocabulary-and-citations.org' and apply its findings 1 to
+10, each as it says, in brief:
+- 1: the docs and client comments that say a re-sent save is
+  refused as stale ('api-and-formats.org' near line 488,
+  'COMMANDS.org' near 82, 'COMMANDS-nvim.org' near 97,
+  'skg-request-save.el' near 850, 'save.lua' near 876, the
+  tool's README near 1362) are wrong since slice 3: a re-sent
+  save writes nothing for a graphnode the first save already
+  wrote (its copy now matches the graph), and would create any
+  new graphnode a second time. Say that, and keep the rule that
+  a client never re-sends a save.
+- 2: the rename above.
+- 3: in 'save.rs', the delete-propagation cleanup's passes are
+  commented "Phase 1" and "Phase 2", colliding with the save's
+  phase one and phase two; rename those comments to "first
+  pass" and "second pass".
+- 4: 'docs/glossary.org', 'stale': say it applies to a graphnode
+  (its copy in a buffer no longer matches the graph), and by
+  extension to the buffer, view, save or write that holds or
+  makes such a copy.
+- 5: replace the bare "merge" in the new text with the project's
+  words ('names.org'): "nodeMerge" or "merge request" for the
+  operation, and one name for its two graphnodes, "merge node",
+  as the plan's vocabulary has it; "a three-way merge by hand" in
+  'COMMANDS.org' and 'COMMANDS-nvim.org' becomes a reconciliation
+  by hand.
+- 6: rename 'ChangeSinceRendered' ('errors.rs') so that it no
+  longer differs from 'ChangedSinceRendered' by one letter; for
+  instance 'StaleGraphnodeReport'.
+- 7: 'ChangedAspect': define it in the glossary beside "diff
+  aspect", or rename it to 'StaleAspect'; say in its doc comment
+  how it differs from the change-forest's aspects (it says
+  "body" where they say "text").
+- 8: glossary: "clean baseline" is a synonym of "baseline" (the
+  clients' variable names); 'types/git.rs' uses "baseline" for a
+  git stage, which the glossary should distinguish in one
+  sentence.
+- 9: 'api-and-formats.org' near line 173: the baseline is the
+  drawn text with the client's focus and fold metadata removed,
+  not "exactly" the text the server drew.
+- 10: 'rebuild_session_lifetime_stores.rs' near line 132: the
+  client, not the server, keeps each view's baseline;
+  'save_staleness.rs' near line 23: a rebuild under an edited
+  config can drop a skgrepo's graphnodes, so say a rebuild makes
+  nothing stale by itself, not that it changes no graphnode.
+*** Tests and docs
+Run the saves binary, 'bash/nextest.sh', and, since the error
+texts and client comments change, 'bash/emacs-tests.sh' and
+'bash/nvim-tests.sh'; run the integration tests for both clients
+only if a text a client test matches changed. One commit, or two
+(the duplicate-member fix; the wording), naming the plan and
+"slice 7".
 * Verification and completion
 Each slice runs its own tests and the test binaries it touched.
 After slice 6, run 'bash/all-tests.sh' and record its summary
