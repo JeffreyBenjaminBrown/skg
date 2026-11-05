@@ -4,3 +4,9 @@ Orchestrated by Ed (Fable 5.1), one Opus 5.5 agent per slice,
 from 2026-11-05. Each slice's report goes under its own
 subheadline, in the shape 'coding-advice/orchestration.org'
 gives.
+** Baseline before slice 1 (2026-11-05, 20:23 UTC)
+'bash/all-tests.sh': build, Emacs, Neovim, nextest and doctests
+green; integration 70 of 72, the two failures both
+'import-md-and-org' (Emacs and Neovim), pre-existing and listed
+in the plan's pitfalls. Summary kept at
+'tests/results/ALL.org' until the next full run overwrites it.

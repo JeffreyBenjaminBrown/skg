@@ -403,6 +403,11 @@ widen it to 'pub(crate)'. A baseline viewnode becomes a
 'GraphnodeInRust' through 'GraphnodeInRust::from' on its
 supplemented 'Graphnode'.
 No 'GraphStraddle' is built for an error.
+** A failure that predates the plan
+The integration test 'import-md-and-org' fails in both clients
+before this plan runs (baseline 'bash/all-tests.sh' of
+2026-11-05, 20:23 UTC: 70 of 72 integration tests pass, all else
+green). Report it as pre-existing; do not investigate it.
 ** The clients' rebuild handlers
 Emacs: 'skg--rebuild-session-lifetime-stores-handler'
 ('elisp/skg-request-rebuild-session-lifetime-stores.el') says
