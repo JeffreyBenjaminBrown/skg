@@ -39,6 +39,7 @@ pub(crate) struct PreparedRerenders {
   pub(crate) errors   : Vec<String>,
   warnings : Vec<String>,
   pub(crate) graph_straddle : Option<Arc<GraphStraddle>>, // the connection's, as the rerenders brought it up to date
+  restriction : SkgrepoRestriction, // the one the views were rerendered under, which each records
 }
 
 /// What a request that rerenders open views asks of the pass: the
@@ -104,6 +105,7 @@ pub(crate) fn prepare_rerender_views (
     errors   : context . errors,
     warnings : context . warnings,
     graph_straddle : context . graph_straddle,
+    restriction : request . restriction . clone (),
   }
 }
 
@@ -147,8 +149,8 @@ pub(crate) fn stream_prepared_rerenders (
       & format_lock_views_sexp (&prepared . viewforest_ids) ));
   write_graph_straddle_back (views_state, prepared . graph_straddle);
   register_and_send_rerendered_views (
-    stream, views_state, &prepared . runtime, prepared . views,
-    TcpToClient::RerenderView );
+    stream, views_state, &prepared . runtime, &prepared . restriction,
+    prepared . views, TcpToClient::RerenderView );
   send_response_with_length_prefix (
     stream,
     & tag_sexp_response (
@@ -157,18 +159,21 @@ pub(crate) fn stream_prepared_rerenders (
         &prepared . errors,
         &prepared . warnings ) )); }
 
-/// Register each of 'views' in place of the open view it rerenders,
-/// and send it to the client under 'tag'.
+/// Register each of 'views', rerendered under 'rendered_under', in
+/// place of the open view it rerenders, and send it to the client
+/// under 'tag'.
 pub(crate) fn register_and_send_rerendered_views (
   stream      : &mut TcpStream,
   views_state : &mut ViewsState,
   runtime     : &RuntimeGeneration,
+  rendered_under : &SkgrepoRestriction,
   views       : Vec<RerenderedView>,
   tag         : TcpToClient,
 ) {
   for view in views {
     views_state . open_views . update_view (
-      &runtime . graph, &view . viewforest_id, view . viewforest, view . viewnode_id_record );
+      &runtime . graph, &view . viewforest_id, view . viewforest, view . viewnode_id_record,
+      rendered_under );
     send_response_with_length_prefix (
       stream,
       & tag_sexp_response (

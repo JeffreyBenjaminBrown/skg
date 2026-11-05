@@ -419,7 +419,7 @@ fn rerendered_stored_view (
 ) -> Result<String, Box<dyn Error>> {
   let stored_tree : Tree<Viewnode> = org_to_viewnode_tree (stored, IdResolution::AsWritten) ? . 0;
   views_state . open_views . register_view (
-    &graph . load_full (), viewforest_id . clone (), stored_tree, &[ID::from ("d")] );
+    &graph . load_full (), viewforest_id . clone (), stored_tree, &[ID::from ("d")], &SkgrepoRestriction::unrestricted (config) );
   let env : SkgEnv = skg_env_from_parts (config, tantivy, graph);
   let all : SkgrepoRestriction =
     SkgrepoRestriction::unrestricted (config);

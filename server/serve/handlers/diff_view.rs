@@ -77,7 +77,8 @@ pub fn handle_diffView_request (
     Ok (( Some (( RenderedDiffViewBuffer { text, pids, viewforest }, summary )),
           diffView_buffer_kind, viewforest_id )) => {
       views_state . open_views . register_diffView_view (
-        &runtime . graph, viewforest_id, viewforest, &pids, diffView_buffer_kind );
+        &runtime . graph, viewforest_id, viewforest, &pids, diffView_buffer_kind,
+        skgrepo_restriction );
       diffView_buffer_response_sexp ( &text, &summary ) }, };
   send_response_with_length_prefix (
     stream, &tag_sexp_response (TcpToClient::DiffView, &sexp) ); }

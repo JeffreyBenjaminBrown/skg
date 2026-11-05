@@ -9,7 +9,10 @@ use ego_tree::{NodeId, Tree};
 
 use skg::dbs::filesystem::not_nodes::load_config;
 use skg::serve::ViewsState;
+use skg::serve::handlers::save_buffer::handle_save_buffer_request;
+use skg::serve::handlers::single_root_view::handle_single_root_view_request;
 use skg::serve::handlers::skgrepo_sets::handle_skgrepo_set_request;
+use skg::sexp_string::quote_sexp_string;
 use skg::serve::handlers::text_search::TitleOrAlias;
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::test_utils::{
@@ -18,6 +21,9 @@ use skg::test_utils::{
 use skg::dbs::node_lookup::graphnode_from_graph;
 use skg::test_utils::multi_root_view;
 use skg::test_utils::{set_skgrepo_retagging_relRepos, graph_handle_from_config};
+use skg::test_utils::{read_all_lp_messages, skg_env_from_parts};
+use skg::dbs::in_rust_graph::InRustGraphHandle;
+use skg::types::env::SkgEnv;
 use skg::test_utils::run_with_shared_test_stores;
 use skg::from_text::buffer_to_validated_saveplan;
 use skg::org_to_text::viewforest_to_string;
@@ -35,6 +41,7 @@ use skg::types::views_state::{OpenViews, ViewState, ViewforestId, ViewnodeIdReco
 
 use std::collections::{BTreeSet, HashSet};
 use std::error::Error;
+use std::io::{BufReader, Write};
 use std::net::TcpStream;
 use std::path::PathBuf;
 use skg::metadata_canon::without_viewnode_ids;
@@ -76,6 +83,9 @@ fn all_tests
       s . reset ("restricted_save_preserves_invisible_override_targets", fixtures) ?;
       restricted_save_preserves_invisible_override_targets (
         &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("a_save_of_a_view_rendered_under_another_restriction_is_refused", fixtures) ?;
+      a_save_of_a_view_rendered_under_another_restriction_is_refused (
+        &s . config, &mut s . tantivy ) ?;
       Ok (( )) } )) }
 
 /// PIN (the override-substitution-across-switch case,
@@ -140,7 +150,8 @@ fn override_substitute_across_skgrepo_switch_anonymizes_and_keeps_original (
                     pids       : HashSet::new (),
                     diffView_buffer_kind : None,
                     viewnode_id_record : ViewnodeIdRecord::default (),
-                    extend_at_next_rerender_all : false });
+                    extend_at_next_rerender_all : false,
+                    skgrepo_restriction_at_last_render : restriction . clone () });
       let (mut server_stream, _client_stream) : (TcpStream, TcpStream) =
         mk_test_tcp_stream_pair ();
       std::thread::scope ( |scope| {
@@ -381,7 +392,8 @@ async fn skgrepo_set_switch_rerenders_views (
           pids       : HashSet::from ([ID::from ("active-search-hit")]),
           diffView_buffer_kind : None,
           viewnode_id_record : ViewnodeIdRecord::default (),
-          extend_at_next_rerender_all : false, });
+          extend_at_next_rerender_all : false,
+          skgrepo_restriction_at_last_render : restriction . clone (), });
       let (mut server_stream, _client_stream) : (TcpStream, TcpStream) =
         mk_test_tcp_stream_pair ();
       std::thread::scope ( |scope| {
@@ -404,6 +416,85 @@ async fn skgrepo_set_switch_rerenders_views (
         "repo-set switch should KEEP registered views (re-rendered \
          in place), not close them" );
       Ok (( )) }
+
+/// A view records the skgrepo restriction it was last rendered under,
+/// and a save of it is refused while the connection's shows another
+/// set of skgrepos ('docs/api-and-formats.org', "Save buffer").
+/// A switch rerenders every open view, so it records the new
+/// restriction. The connection's restriction then changes back
+/// without a rerender, as a rebuild's reconciliation with a reloaded
+/// config can change it, and the save of the view is refused, naming
+/// both sets; nothing is written.
+fn a_save_of_a_view_rendered_under_another_restriction_is_refused (
+  config  : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
+  let mut env : SkgEnv = skg_env_from_parts (config, tantivy, &graph);
+  let public : SkgrepoRestriction =
+    SkgrepoRestriction::named (config, SkgrepoName::from ("public")) ?;
+  let mut restriction : SkgrepoRestriction = public . clone ();
+  let mut views_state : ViewsState =
+    ViewsState { open_views     : OpenViews::new (),
+                 graph_straddle : None, };
+  let viewforest_id : ViewforestId =
+    ViewforestId::ContentView ("root-view" . to_string ());
+  let recorded_skgrepos = |views_state : &ViewsState| -> BTreeSet<SkgrepoName> {
+    views_state . open_views . views . get (&viewforest_id)
+      . expect ("the view is registered")
+      . skgrepo_restriction_at_last_render . skgrepos . clone () };
+  std::thread::scope ( |scope| { scope . spawn ( || {
+    // The handlers call block_on, so they run off this test's executor.
+    { let (mut stream, _read_end) : (TcpStream, TcpStream) = mk_test_tcp_stream_pair ();
+      handle_single_root_view_request (
+        &mut stream,
+        "((request . \"single root content view\") (id . \"root\") (view-id . \"root-view\"))",
+        &env, &mut views_state, &restriction ); }
+    assert_eq! ( recorded_skgrepos (&views_state), public . skgrepos,
+                 "a view records the restriction it was rendered under" );
+    { let (mut stream, _read_end) : (TcpStream, TcpStream) = mk_test_tcp_stream_pair ();
+      handle_skgrepo_set_request (
+        &mut stream,
+        "((request . \"set skgrepo restriction\") (name . \"private\"))",
+        &env, &mut views_state, &mut restriction ); }
+    assert_eq! ( restriction . most_private_shown, SkgrepoName::from ("private") );
+    assert_eq! ( recorded_skgrepos (&views_state), restriction . skgrepos,
+                 "the switch rerendered the view and recorded the new restriction" );
+    let rendered_under_private : String = viewforest_to_string (
+      views_state . open_views . viewforest_id_to_view (&viewforest_id)
+        . expect ("the view is registered") )
+      . expect ("the view renders");
+    restriction = public . clone (); // as a rebuild's reconciliation might change it: no view is rerendered
+    let edited : String =
+      rendered_under_private . replace (") active-b\n", ") active-b retitled\n");
+    assert_ne! ( edited, rendered_under_private, "the view shows active-b:\n{}", rendered_under_private );
+    let envelope : String = format! (
+      "((saved-buffer {}) (baseline {}) (other-views ()))",
+      quote_sexp_string (&edited), quote_sexp_string (&rendered_under_private) );
+    let (mut client_writes, server_reads) : (TcpStream, TcpStream) =
+      mk_test_tcp_stream_pair ();
+    write! ( client_writes, "Content-Length: {}\r\n\r\n{}",
+             envelope . len (), envelope ) . unwrap ();
+    let (mut server_writes, client_reads) : (TcpStream, TcpStream) =
+      mk_test_tcp_stream_pair ();
+    handle_save_buffer_request (
+      &mut BufReader::new (server_reads), &mut server_writes,
+      "((request . \"save buffer\") (view-id . \"root-view\"))",
+      &mut env, &mut views_state, &restriction );
+    drop (server_writes);
+    let save_result : String =
+      read_all_lp_messages (&mut BufReader::new (client_reads))
+      . pop () . expect ("a terminal message");
+    assert! ( save_result . contains (
+                "This view was rendered under a different skgrepo restriction (then: private, public; now: public). Rerender it, or archive its edits and reopen it." ),
+              "the save is refused, naming both restrictions:\n{}", save_result );
+  } ); } );
+  let on_disk : Graphnode =
+    graphnode_from_graph (
+      & graph_handle_from_config (config) ? . load_full (), &ID::from ("active-b") )
+    . expect ("active-b is on disk");
+  assert_eq! ( on_disk . title, "active-b", "nothing was written" );
+  Ok (( )) }
 
 async fn content_view_omits_restricted_contained_nodes (
   config : &SkgConfig,

@@ -2,6 +2,7 @@
 
 use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use futures::executor::block_on;
+use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use skg::test_utils::load_config_with_overrides;
 use skg::dbs::init::create_empty_tantivy_index;
@@ -74,9 +75,9 @@ fn test_skgrepo_move_updates_collateral_view_metadata (
       let viewforest_id_2 : ViewforestId =
         ViewforestId::ContentView ( "repo-move-buffer-2" . to_string() );
       views_state . open_views . register_view (
-        &graph . load_full (), viewforest_id_1 . clone(), viewforest . clone(), &pids );
+        &graph . load_full (), viewforest_id_1 . clone(), viewforest . clone(), &pids, &SkgrepoRestriction::unrestricted (&config) );
       views_state . open_views . register_view (
-        &graph . load_full (), viewforest_id_2 . clone(), viewforest, &pids );
+        &graph . load_full (), viewforest_id_2 . clone(), viewforest, &pids, &SkgrepoRestriction::unrestricted (&config) );
 
       let save_input : String =
         initial_buffer . replace (

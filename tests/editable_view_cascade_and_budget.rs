@@ -9,6 +9,7 @@ use indoc::indoc;
 use std::error::Error;
 use std::net::TcpStream;
 
+use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::dbs::in_rust_graph::{
   InRustGraphHandle,
   };
@@ -646,7 +647,7 @@ fn open_content_view (
   let (text, pids, tree) : (String, Vec<ID>, Tree<Viewnode>) =
     multi_root_view (config, Some (tantivy), &root_ids) ?;
   views_state . open_views . register_view (
-    &graph . load_full (), viewforest_id . clone (), tree, &pids );
+    &graph . load_full (), viewforest_id . clone (), tree, &pids, &SkgrepoRestriction::unrestricted (config) );
   Ok (( viewforest_id, text )) }
 
 /// 'buffer' with an editable-view request added to its first line
@@ -1152,7 +1153,7 @@ async fn test_retained_content_node_is_shown_once (
         let (text, pids, tree) : (String, Vec<ID>, Tree<Viewnode>) =
           multi_root_view (&config, Some (tantivy), &[ ID::from ("1") ]) ?;
         views_state . open_views . register_view (
-          &graph . load_full (), other_viewforest_id . clone (), tree, &pids );
+          &graph . load_full (), other_viewforest_id . clone (), tree, &pids, &SkgrepoRestriction::unrestricted (&config) );
         text };
       assert! ( ! other . contains ("(gnid 13)"), "1 no longer contains 13:\n{}", other );
       save_view (

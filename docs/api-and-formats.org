@@ -342,6 +342,25 @@ So far there are these endpoints:
     rerenders only its own views, this is what protects a buffer from
     another connection's save (another client, or 'tools/skg-for-ai'),
     and from files reloaded after another writer changed them.
+  - A save of a view the connection holds is refused, before the
+    stale-buffer check and before anything is written, when the view
+    was last drawn under a skgrepo restriction showing another set of
+    skgrepos than the connection's current one
+    ('error_unless_view_was_rendered_under_current_restriction' in
+    'server/serve/handlers/save_buffer.rs'). The server records, for
+    each view it holds, the restriction it was last drawn under: at
+    the view request, at each rerender, and at the save's own redraw.
+    A buffer drawn under another restriction says nothing of what
+    that restriction kept out, or shows what the current one keeps
+    out, so its text means something else under the current one. The
+    refusal reads "This view was rendered under a different skgrepo
+    restriction (then: main, private; now: main). Rerender it, or
+    archive its edits and reopen it." A restriction switch rerenders
+    every open view, and the clients refuse to switch while a view has
+    unsaved edits; this makes the server independent of that courtesy,
+    and covers any change of the connection's restriction that
+    rerenders no view. A buffer the connection does not hold has no
+    record and is not checked.
   - A write-protected occurrence saves nothing of its own, so a save is
     refused, before anything is written, if one differs from the graph
     ('errors_for_writeProtected_occurrences' in

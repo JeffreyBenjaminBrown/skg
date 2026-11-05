@@ -850,6 +850,8 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
   other_views               : &[ClientViewSnapshot],
   named_diffView_buffer_kind : Option<DiffViewBufferKind>, // the request's '(diff-view-buffer . "...")': the buffer of the diff view it saves, for a view the connection does not hold
 ) -> Result<SaveResponse, Box<dyn Error>> {
+  error_unless_view_was_rendered_under_current_restriction (
+    viewforest_id_from_request_result, views_state, skgrepo_restriction ) ?;
   // Save-plan construction reads the current files and graph.  Hold the sole
   // writer gate from before those reads through the graph swap-in, or two requests
   // can serialize their writes yet still act on the same stale disk state.
@@ -1139,6 +1141,33 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
           &swapped_in . graph, &post_skgsave_commit_notice_candidates ) );
       response . warnings = warnings; }
     Ok (response) } }
+
+/// Refuse a save of a view the connection holds that was last
+/// rendered under a skgrepo restriction showing other skgrepos than
+/// 'skgrepo_restriction', the connection's current one. The buffer
+/// shows what that other restriction let it show, so its silence
+/// about a graphnode means something else under this one. The
+/// clients refuse to switch the restriction while a view has unsaved
+/// edits; this makes the server independent of that, and covers any
+/// change of the connection's restriction that rerenders no view. A
+/// view the connection does not hold has no record to compare.
+fn error_unless_view_was_rendered_under_current_restriction (
+  viewforest_id_from_request_result : &Result<ViewforestId, String>,
+  views_state                       : &ViewsState,
+  skgrepo_restriction               : &SkgrepoRestriction,
+) -> Result<(), Box<dyn Error>> {
+  let Some (rendered_under) : Option<&SkgrepoRestriction> =
+    viewforest_id_from_request_result . as_ref () . ok ()
+    . and_then ( |viewforest_id| views_state . open_views . views . get (viewforest_id) )
+    . map ( |state| &state . skgrepo_restriction_at_last_render )
+    else { return Ok (( )); };
+  if rendered_under . skgrepos == skgrepo_restriction . skgrepos {
+    return Ok (( )); }
+  Err ( Box::new ( SaveError::BufferValidationErrors {
+    errors : vec! [ BufferValidationError::RenderedUnderAnotherSkgrepoRestriction {
+      skgrepos_then : rendered_under . skgrepos . clone (),
+      skgrepos_now  : skgrepo_restriction . skgrepos . clone (), } ],
+    warnings : Vec::new (), } )) }
 
 /// Turn a successfully skgsave-committed HiddenOutside addition into a message only
 /// when the final graph classifies it as hidden *inside* a subscribee.  This is

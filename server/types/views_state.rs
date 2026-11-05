@@ -1,4 +1,5 @@
 use crate::dbs::in_rust_graph::InRustGraph;
+use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::many_to_many::ManyToMany;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{ViewnodeId, Viewnode, ViewnodeKind, Vognode};
@@ -47,6 +48,7 @@ pub struct ViewState {
   pub diffView_buffer_kind : Option<DiffViewBufferKind>, // Some for a buffer of the diff view
   pub viewnode_id_record : ViewnodeIdRecord,
   pub extend_at_next_rerender_all : bool, // for a buffer of the diff view a reload named: the next "rerender all views" that rerenders it extends it ('DiffViewBufferRerender::ExtendingWhereAReloadAsked')
+  pub skgrepo_restriction_at_last_render : SkgrepoRestriction, // the skgrepo restriction the view was last rendered (or registered) under. A save of the view is refused while the connection's shows another set of skgrepos ('error_unless_view_was_rendered_under_current_restriction').
 }
 
 /// The viewnode IDs of one buffer: the counter they are assigned from,
@@ -155,6 +157,7 @@ impl OpenViews {
     viewforest_id : ViewforestId,
     viewforest : impl Into<ViewForest>,
     pids   : &[ID],
+    rendered_under : &SkgrepoRestriction,
   ) { let viewforest : ViewForest =
         viewforest . into ();
       let rids : HashSet<ID> =
@@ -169,7 +172,8 @@ impl OpenViews {
       let state : ViewState =
         ViewState { viewforest, pids, diffView_buffer_kind : None,
                     viewnode_id_record,
-                    extend_at_next_rerender_all : false };
+                    extend_at_next_rerender_all : false,
+                    skgrepo_restriction_at_last_render : rendered_under . clone () };
       self . views . insert ( viewforest_id, state ); }
 
   /// 'register_view' for a buffer of the diff view.
@@ -180,7 +184,8 @@ impl OpenViews {
     viewforest           : impl Into<ViewForest>,
     pids                 : &[ID],
     diffView_buffer_kind : DiffViewBufferKind,
-  ) { self . register_view ( graph, viewforest_id . clone (), viewforest, pids );
+    rendered_under       : &SkgrepoRestriction,
+  ) { self . register_view ( graph, viewforest_id . clone (), viewforest, pids, rendered_under );
       if let Some (state) = self . views . get_mut (&viewforest_id) {
         state . diffView_buffer_kind = Some (diffView_buffer_kind); }}
 
@@ -247,13 +252,15 @@ impl OpenViews {
       . unwrap_or_else ( || ViewnodeIdRecord::of_viewforest (parsed_viewforest) ) }
 
   /// 'viewnode_id_record' is the record the rerender of
-  /// 'new_viewforest' assigned its viewnode IDs from.
+  /// 'new_viewforest' assigned its viewnode IDs from, and
+  /// 'rendered_under' the skgrepo restriction it ran under.
   pub fn update_view (
     &mut self,
     graph      : &InRustGraph,
     viewforest_id : &ViewforestId,
     new_viewforest : impl Into<ViewForest>,
     viewnode_id_record : ViewnodeIdRecord,
+    rendered_under : &SkgrepoRestriction,
   ) { let new_viewforest : ViewForest =
         new_viewforest . into ();
       let pids : HashSet<ID> =
@@ -268,13 +275,15 @@ impl OpenViews {
         = self . views . get_mut (viewforest_id)
         { vs . viewforest = new_viewforest;
           vs . pids = pids;
-          vs . viewnode_id_record = viewnode_id_record; }
+          vs . viewnode_id_record = viewnode_id_record;
+          vs . skgrepo_restriction_at_last_render = rendered_under . clone (); }
       else { self . views . insert (
                viewforest_id . clone (),
                ViewState { viewforest : new_viewforest,
                            pids, diffView_buffer_kind : None,
                            viewnode_id_record,
-                           extend_at_next_rerender_all : false } ); }}
+                           extend_at_next_rerender_all : false,
+                           skgrepo_restriction_at_last_render : rendered_under . clone () } ); }}
 
   pub fn unregister_view (
     &mut self,

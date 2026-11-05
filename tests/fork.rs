@@ -848,9 +848,9 @@ async fn fork_collateral_rerender_substitutes_too (
     graph_straddle : None };
   let graph_snap = graph . load_full ();
   views_state . open_views . register_view (
-    &graph_snap, saved_viewforest_id . clone (), p_view . clone (), &pids );
+    &graph_snap, saved_viewforest_id . clone (), p_view . clone (), &pids, &SkgrepoRestriction::unrestricted (config) );
   views_state . open_views . register_view (
-    &graph_snap, collateral_viewforest_id . clone (), p_view, &pids );
+    &graph_snap, collateral_viewforest_id . clone (), p_view, &pids, &SkgrepoRestriction::unrestricted (config) );
 
   let (mut stream, _read_end) : (TcpStream, TcpStream) =
     mk_test_tcp_stream_pair ();

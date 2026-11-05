@@ -11,6 +11,7 @@
 
 use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 
+use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::metadata_canon::{viewnode_id_atom_of, without_viewnode_ids};
 use skg::serve::ViewsState;
@@ -77,7 +78,7 @@ fn open_view (
     multi_root_view (config, Some (tantivy), &[ ID::from (root) ]) ?;
   views_state . open_views . register_view (
     &graph . load_full (), ViewforestId::ContentView (view_name . to_string ()),
-    tree, &pids );
+    tree, &pids, &SkgrepoRestriction::unrestricted (config) );
   Ok (text) }
 
 /// Save 'buffer' as the view 'view_name'. Returns the response and

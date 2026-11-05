@@ -5,6 +5,7 @@
 // 1. Initial view shows subscribees as write-protected with HiddenOutsideOfSubscribeeFolder
 // 2. After saving with editable view requests, HiddenInSubscribeeFolder is shown
 
+use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::metadata_canon::without_viewnode_ids;
 use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use indoc::indoc;
@@ -518,7 +519,7 @@ async fn test_collateral_view_reflects_newly_hidden_subscribee_content (
         &config, None,
         &ID ("r" . to_string()) )?;
     views_state . open_views . register_view (
-      &graph . load_full (), saved_viewforest_id . clone(), viewforest, &pids);
+      &graph . load_full (), saved_viewforest_id . clone(), viewforest, &pids, &SkgrepoRestriction::unrestricted (config));
 
     let (extended, collateral_views) =
       save_buffer_and_read_collateral_views (
@@ -537,7 +538,7 @@ async fn test_collateral_view_reflects_newly_hidden_subscribee_content (
     let extended_pids : Vec<ID> =
       views_state . open_views . viewforest_id_to_pids (&saved_viewforest_id);
     views_state . open_views . register_view (
-      &graph . load_full (), collateral_viewforest_id, extended_viewforest, &extended_pids);
+      &graph . load_full (), collateral_viewforest_id, extended_viewforest, &extended_pids, &SkgrepoRestriction::unrestricted (config));
 
     let edited : String =
       extended_subscribee_edit_view (&extended, "delete");
@@ -961,7 +962,7 @@ async fn test_collateral_view_reflects_newly_unhidden_subscribee_content (
         &config, None,
         &ID ("R" . to_string()) )?;
     views_state . open_views . register_view (
-      &graph . load_full (), saved_viewforest_id . clone(), viewforest, &pids);
+      &graph . load_full (), saved_viewforest_id . clone(), viewforest, &pids, &SkgrepoRestriction::unrestricted (config));
 
     let (extended, collateral_views) =
       save_buffer_and_read_collateral_views (
@@ -980,7 +981,7 @@ async fn test_collateral_view_reflects_newly_unhidden_subscribee_content (
     let extended_pids : Vec<ID> =
       views_state . open_views . viewforest_id_to_pids (&saved_viewforest_id);
     views_state . open_views . register_view (
-      &graph . load_full (), collateral_viewforest_id, extended_viewforest, &extended_pids);
+      &graph . load_full (), collateral_viewforest_id, extended_viewforest, &extended_pids, &SkgrepoRestriction::unrestricted (config));
 
     let edited : String =
       move_h_from_hiddenin_folder_to_visible_subscribee_content (

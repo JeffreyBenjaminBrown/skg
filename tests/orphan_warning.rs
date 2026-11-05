@@ -16,6 +16,7 @@ use crate::parse_helpers::{occurrences_titled, viewnode_tree_as_written};
 use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use std::net::TcpStream;
 
+use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
@@ -182,7 +183,7 @@ async fn save_view_of_four (
     single_root_view ( config, Some (tantivy), &ID::from ("four") ) ?;
   assert_eq! ( rendered, four );
   views_state . open_views . register_view (
-    &graph . load_full (), view_of_four . clone (), viewforest, &pids );
+    &graph . load_full (), view_of_four . clone (), viewforest, &pids, &SkgrepoRestriction::unrestricted (config) );
   let (mut stream, _read_end) : (TcpStream, TcpStream) =
     mk_test_tcp_stream_pair ();
   update_from_and_rerender_buffer (

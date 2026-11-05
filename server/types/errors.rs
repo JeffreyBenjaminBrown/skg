@@ -1,6 +1,7 @@
 use super::misc::{ID, SkgrepoName};
 use crate::diff_view::readiness_requests::NamedLeafSet;
 use super::viewnode::ViewnodeId;
+use std::collections::BTreeSet;
 use std::error::Error;
 use std::fmt;
 use std::io;
@@ -109,6 +110,10 @@ pub enum BufferValidationError {
     change    : ChangeSinceRendered, // how the graph's graphnode differs from the buffer's baseline copy of it
     headlines : Vec<HeadlineName>, // the buffer's occurrences of the node
   }, // The save would write a node that changed after its buffer was rendered: writing the buffer's text would silently undo that change.
+  RenderedUnderAnotherSkgrepoRestriction {
+    skgrepos_then : BTreeSet<SkgrepoName>, // the skgrepos the restriction the held view was last rendered under shows
+    skgrepos_now  : BTreeSet<SkgrepoName>, // the skgrepos the connection's current restriction shows
+  }, // The save is of a held view rendered under a skgrepo restriction that showed other skgrepos than the connection's current one.
   MultipleEditableViewRequestsForSameId    (ID, Vec<HeadlineName>), // Multiple editable view requests for the same ID
   WriteProtectAndEditableViewRequestsOnOneOccurrence (ID, HeadlineName), // One occurrence asks to become both write-protected and the editable one. (On different occurrences of a node, the two requests move editability, and are allowed.)
   EmptyTitle                             (ID),
@@ -357,6 +362,10 @@ impl std::fmt::Display for BufferValidationError {
                gnid, title, name_headlines (headlines),
                aspects . iter () . map ( |aspect| aspect . name )
                . collect::<Vec<&str>> () . join (", ")),
+      BufferValidationError::RenderedUnderAnotherSkgrepoRestriction {
+        skgrepos_then, skgrepos_now } =>
+        write!(f, "{}", rendered_under_another_skgrepo_restriction_text (
+          skgrepos_then, skgrepos_now )),
       BufferValidationError::Other (msg) =>
         write!(f, "{}", msg), }} }
 
@@ -401,8 +410,22 @@ impl BufferValidationError {
         | BufferValidationError::EmptyTitle (_)
         | BufferValidationError::FlagEditOnForeignNode (..)
         | BufferValidationError::FlagEditOnUnknownNode (_)
+        | BufferValidationError::RenderedUnderAnotherSkgrepoRestriction { .. }
         | BufferValidationError::Other (_) =>
         Vec::new (), }}
 }
+
+/// The refusal of a save of a view rendered under another skgrepo
+/// restriction, as both of its forms say it.
+pub fn rendered_under_another_skgrepo_restriction_text (
+  skgrepos_then : &BTreeSet<SkgrepoName>,
+  skgrepos_now  : &BTreeSet<SkgrepoName>,
+) -> String {
+  let names = |skgrepos : &BTreeSet<SkgrepoName>| -> String {
+    if skgrepos . is_empty () { "no skgrepo" . to_string () }
+    else { skgrepos . iter () . map ( |skgrepo| skgrepo . to_string () )
+           . collect::<Vec<String>> () . join (", ") }};
+  format! ( "This view was rendered under a different skgrepo restriction (then: {}; now: {}). Rerender it, or archive its edits and reopen it.",
+            names (skgrepos_then), names (skgrepos_now) ) }
 
 impl Error for BufferValidationError {}

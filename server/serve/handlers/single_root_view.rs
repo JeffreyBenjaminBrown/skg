@@ -105,7 +105,8 @@ pub fn handle_single_root_view_request (
                     &runtime . graph,
                     viewforest_id . clone (),
                     viewforest,
-                    &pids ); }
+                    &pids,
+                    skgrepo_restriction ); }
                 let warnings : Vec<String> =
                   { let mut warnings : Vec<String> = Vec::new ();
                     if let TextReleaseDecision::AllowWithWarning {

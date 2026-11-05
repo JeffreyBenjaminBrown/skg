@@ -123,7 +123,7 @@ pub fn open_buffer (
     Some (RenderedDiffViewBuffer { text, pids, viewforest }) => {
       f . views_state . open_views . register_diffView_view (
         &runtime . graph, viewforest_id_of (diffView_buffer_kind),
-        viewforest, &pids, diffView_buffer_kind );
+        viewforest, &pids, diffView_buffer_kind, &SkgrepoRestriction::unrestricted (&f . config) );
       Some (text) }, } ) }
 
 /// Save the "all changes" buffer; see 'save_buffer'.
@@ -324,7 +324,7 @@ pub fn edit_in_a_content_view (
   let (text, pids, tree) : (String, Vec<ID>, Tree<Viewnode>) =
     multi_root_view ( &f . config, Some (&f . tantivy), &[ ID::from (node) ] ) ?;
   f . views_state . open_views . register_view (
-    &f . graph . load_full (), viewforest_id . clone (), tree, &pids );
+    &f . graph . load_full (), viewforest_id . clone (), tree, &pids, &SkgrepoRestriction::unrestricted (&f . config) );
   let edited : String = edit (&text);
   let (mut stream, mut read_end) : (TcpStream, TcpStream) =
     mk_test_tcp_stream_pair ();

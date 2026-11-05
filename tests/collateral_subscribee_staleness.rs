@@ -13,6 +13,7 @@ use std::error::Error;
 use crate::git_fixture_helpers::{
   save_and_read_collateral, without_lines_containing};
 
+use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::dbs::in_rust_graph::{
   InRustGraphHandle};
 use skg::test_utils::{
@@ -48,7 +49,7 @@ fn collateral_editable_subscriber_subscribeeFolder_refreshes
                 && a_view . contains ("(gnid N)"),
         "view A should show M and N in S's subscribeeFolder:\n{}", a_view );
       views_state . open_views . register_view (
-        &graph . load_full (), a_viewforest_id . clone (), a_vf, &a_pids );
+        &graph . load_full (), a_viewforest_id . clone (), a_vf, &a_pids, &SkgrepoRestriction::unrestricted (config) );
 
       // View B rooted at S too -- the collateral view. S is editable
       // here as well (it is the root).
@@ -59,7 +60,7 @@ fn collateral_editable_subscriber_subscribeeFolder_refreshes
                 && b_view . contains ("(gnid N)"),
         "view B should show M and N in S's subscribeeFolder:\n{}", b_view );
       views_state . open_views . register_view (
-        &graph . load_full (), b_viewforest_id . clone (), b_vf, &b_pids );
+        &graph . load_full (), b_viewforest_id . clone (), b_vf, &b_pids, &SkgrepoRestriction::unrestricted (config) );
 
       // In view A, drop N from S's subscribeeFolder (subscribesTo -> [M])
       // and save A.

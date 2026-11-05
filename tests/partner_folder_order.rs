@@ -15,6 +15,7 @@
 // keeps every child where it stood and shows u after the kept members
 // ('docs/diff-view.org', "What the refresh keeps").
 
+use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::test_utils::save_and_rerender;
 use std::error::Error;
 use std::io::BufReader;
@@ -189,7 +190,7 @@ async fn a_member_added_elsewhere_follows_the_kept_ones_impl (
   let (u_view, u_pids, u_viewforest) =
     single_root_view (config, Some (tantivy), &ID::from ("u")) ?;
   views_state . open_views . register_view (
-    &graph . load_full (), u_viewforest_id . clone (), u_viewforest, &u_pids );
+    &graph . load_full (), u_viewforest_id . clone (), u_viewforest, &u_pids, &SkgrepoRestriction::unrestricted (config) );
   let repo : &str = { // u's skgrepo, which n shares
     let start : usize = u_view . find ("(nodeRepo ") . expect ("u's line names its repo") + 10;
     &u_view [ start .. start + u_view [start ..] . find (')') . unwrap () ] };

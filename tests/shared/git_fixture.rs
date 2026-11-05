@@ -231,7 +231,7 @@ pub fn open_content_view (
       &f . config, Some (&f . tantivy), &roots, restriction ) ?;
   f . views_state . open_views . register_view (
     &f . graph . load_full (), ViewforestId::ContentView (view . into ()),
-    tree, &pids );
+    tree, &pids, restriction );
   Ok (text) }
 
 /// Write 'public' and 'private' as the files of two owned skgrepos,

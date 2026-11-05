@@ -4,6 +4,7 @@ use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use std::fs;
 use std::io::BufReader;
 
+use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::dbs::node_lookup::graphnode_from_graph;
 use skg::serve::ViewsState;
@@ -99,7 +100,7 @@ fn conflicting_dirty_view_refuses_before_mutation_and_disjoint_view_succeeds
       let (_, x_pids, x_forest) = single_root_view (
         config, Some (tantivy), &ID::from ("X")) ?;
       views_state . open_views . register_view (
-        &graph . load_full (), x_viewforest_id, x_forest, &x_pids);
+        &graph . load_full (), x_viewforest_id, x_forest, &x_pids, &SkgrepoRestriction::unrestricted (config));
       let (mut stream, read_end) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer_with_snapshots_test (
         &mut stream, &edited_a, config, tantivy, &graph,

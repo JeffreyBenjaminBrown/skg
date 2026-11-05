@@ -6,6 +6,7 @@
 // contains a, whose body changed, and b, unchanged. So n, a node of
 // U, is shown editable under x and write-protected under y.
 
+use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::metadata_canon::without_viewnode_ids;
 use crate::git_fixture::{Fixture, skg_files};
 use crate::pruned_change_view::common::{
@@ -196,7 +197,7 @@ fn in_a_content_view_write_protecting_an_occurrence_with_content_saves (
     let (text, pids, tree) : (String, Vec<ID>, Tree<Viewnode>) =
       multi_root_view ( &f . config, Some (&f . tantivy), &[ ID::from ("n") ] ) ?;
     f . views_state . open_views . register_view (
-      &f . graph . load_full (), viewforest_id . clone (), tree, &pids );
+      &f . graph . load_full (), viewforest_id . clone (), tree, &pids, &SkgrepoRestriction::unrestricted (&f . config) );
     assert! ( without_viewnode_ids (&text) . starts_with ("* (skg node (gnid n) (skgRepos (nodeRepo main)) ")
               && ! text . lines () . next () . unwrap () . contains ("writeProtected")
               && node_lines (&text, "a") . len () == 1,

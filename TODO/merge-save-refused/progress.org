@@ -393,3 +393,78 @@ Slice 4 launched 21:52, reported 21:56 (4 minutes). One commit,
 as the plan asked; the one adapted test had relied on exactly
 the over-matching the slice removes. No correction needed.
 Slice 5 launched 21:59.
+** Slice 5
+*** Commits
+- The commit carrying this entry: a view records the skgrepo
+  restriction it was last rendered under, and a save of a held view
+  whose recorded set of skgrepos differs from the connection's is
+  refused; its test, the "Save buffer" paragraph of
+  'docs/api-and-formats.org', and the slice's headline turned DONE.
+*** Suites
+- 'cargo nextest run --test grouped_repos -E test(skgrepo_sets::)':
+  10 of 10. With the comparison in the new check forced to pass for
+  one run, the new test failed (the save went through), so it
+  discriminates.
+- 'bash/nextest.sh': 1123 of 1123, run twice (before and after a
+  last cleanup of the test's helper).
+- '/verify' at the TCP surface, on an isolated server with two owned
+  skgrepos: one connection opened a view, saved an edit (succeeded),
+  switched the restriction (the view was rerendered, its private
+  child a restricted viewnode), and saved again (succeeded; the file
+  carried the edit). The refusal itself is not reachable over TCP
+  today, since a rebuild clears the views; the server test covers it.
+- No failures. The integration suite was not run: 'ViewState' is
+  server-internal, no response or request changed shape, and the
+  clients only display the new refusal as they display any other
+  'NOTHING WAS SAVED' error.
+*** Deviations from the plan's how
+- The test cannot switch the restriction through
+  'handle_skgrepo_set_request' and leave the view unrerendered: the
+  switch always rerenders every open view ('RerenderSelector::All';
+  it takes no selector). So the test, in 'tests/repo_sets.rs'
+  (module 'skgrepo_sets' of 'grouped_repos', inside its 'all_tests'),
+  does both halves: it opens a view through the real view handler
+  under "public", switches to "private" through
+  'handle_skgrepo_set_request' and checks that the rerender recorded
+  the new restriction, then sets the connection's restriction back to
+  "public" without a rerender, as a reconciliation would, and saves
+  through 'handle_save_buffer_request': refused with the agreed text
+  naming both sets, and active-b's file unchanged.
+- The refusal runs first in
+  'update_from_and_rerender_buffer_with_approvals', before the
+  mutation gate and the parse, not between the 'SavePlan'
+  destructuring and the stale check. It reads only the connection's
+  views, and a buffer drawn under another restriction would otherwise
+  meet the parse's validators under the wrong restriction first. It
+  is still before the stale check, as agreed. Its function is
+  'error_unless_view_was_rendered_under_current_restriction' in
+  'save_buffer.rs'.
+- Names: the field is 'ViewState::skgrepo_restriction_at_last_render';
+  the variant is 'BufferValidationError::RenderedUnderAnotherSkgrepoRestriction
+  { skgrepos_then, skgrepos_now }', both forms built by
+  'rendered_under_another_skgrepo_restriction_text' in
+  'server/types/errors.rs' (an empty set reads "no skgrepo"). Its
+  one-line form is the same sentence as its org form.
+- 'register_view', 'register_diffView_view' and 'update_view' take
+  the restriction as a parameter. The rerender stream carries it on
+  'PreparedRerenders' and passes it to
+  'register_and_send_rerendered_views'; the save's redraw, including
+  the withheld one ('withhold_save_rerender'), records the save's.
+- The docs paragraph does not say the refusal covers a rebuild's
+  reconciliation: today a rebuild clears 'open_views', so after one no
+  view is held and nothing is checked. It says the refusal covers any
+  change of the connection's restriction that rerenders no view.
+  Slice 6, which keeps views across a rebuild, can name the rebuild
+  there.
+*** Fixtures changed
+- None. Every test that registers a view by hand now passes the
+  restriction its later requests use (expected adaptation): the
+  unrestricted one where the harnesses save unrestricted,
+  'open_content_view''s own restriction in 'tests/shared/git_fixture.rs',
+  and the connection's in
+  'tests/delete_strips_references_from_neighbors.rs'. The two
+  'ViewState' literals in 'tests/repo_sets.rs' gained the field.
+*** Left unfinished
+Nothing.
+*** Headline
+DONE.

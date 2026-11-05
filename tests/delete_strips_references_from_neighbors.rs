@@ -112,7 +112,7 @@ async fn absent_reference_cleanup_handler_confirms_then_rewrites (
       config, Some (tantivy), &ID::from (root) ) ?;
     views_state . open_views . register_view (
       &graph . load_full (),
-      ViewforestId::ContentView (viewforest_id . to_string ()), tree, &pids ); }
+      ViewforestId::ContentView (viewforest_id . to_string ()), tree, &pids, &restriction ); }
 
   let request = |approval : Option<&str>| {
     let mut request = "((request . \"delete references to absent node\") (id . \"gone\"))" . to_string ();

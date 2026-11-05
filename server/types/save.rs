@@ -1,6 +1,6 @@
 use super::misc::{ID, SkgrepoChange, SkgrepoName};
 use super::nodes::complete::Graphnode;
-use super::errors::{SaveError, BufferValidationError, ChangeSinceRendered, HeadlineName, with_org_subheadlines};
+use super::errors::{SaveError, BufferValidationError, ChangeSinceRendered, HeadlineName, rendered_under_another_skgrepo_restriction_text, with_org_subheadlines};
 
 
 /////////////////
@@ -288,6 +288,10 @@ fn buffer_validation_error_text (
     BufferValidationError::ChangedSinceRendered { gnid, change, .. } => {
       format!("A node this save would write changed after the buffer was rendered:\n{}- Saving would undo that change. Archive your edits if you need them (M-x skg-show-unsaved-changes in Emacs, :SkgShowUnsavedChanges in Neovim), reopen a fresh view, and reapply them there.\n",
               change_since_rendered_lines (gnid, change)) },
+    BufferValidationError::RenderedUnderAnotherSkgrepoRestriction {
+      skgrepos_then, skgrepos_now } => {
+      format!("{}\n", rendered_under_another_skgrepo_restriction_text (
+        skgrepos_then, skgrepos_now )) },
     BufferValidationError::Other (msg) => {
       format!("{}\n", msg) }, }}
 

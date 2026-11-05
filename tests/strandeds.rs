@@ -81,7 +81,7 @@ fn open_view (
   let (buffer, pids, viewforest) : (String, Vec<ID>, Tree<Viewnode>) =
     multi_root_view (&f . config, None, &root_ids) ?;
   f . views_state . open_views . register_view (
-    &f . graph . load_full (), viewforest_id . clone (), viewforest, &pids );
+    &f . graph . load_full (), viewforest_id . clone (), viewforest, &pids, &SkgrepoRestriction::unrestricted (&f . config) );
   Ok (buffer) }
 
 /// Save 'buffer' as the view 'viewforest_id', with 'review'. Returns the

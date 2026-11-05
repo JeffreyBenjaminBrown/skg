@@ -180,7 +180,7 @@ pub fn update_views_after_save (
         &release, saved_view_mut, saved_viewnode_id_record,
         saved_diffView_buffer_kind, &collateral_viewforest_ids,
         viewforest_id_from_request_result, views_state,
-        &context . runtime . graph )); }}
+        &context . runtime . graph, skgrepo_restriction )); }}
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "refresh_view (saved)" ). entered();
       refresh_view ( // saved view first; collateral ones later
@@ -210,7 +210,7 @@ pub fn update_views_after_save (
           &decision, saved_view_mut, saved_viewnode_id_record,
           saved_diffView_buffer_kind, &collateral_viewforest_ids,
           viewforest_id_from_request_result, views_state,
-          &context . runtime . graph )); }
+          &context . runtime . graph, skgrepo_restriction )); }
       TextReleaseDecision::AllowWithWarning { warning } =>
         context . warnings . push (warning),
       TextReleaseDecision::Allow => {}, }}
@@ -218,10 +218,11 @@ pub fn update_views_after_save (
   if let Ok (viewforest_id) = viewforest_id_from_request_result {
     register_saved_view (
       views_state, &context . runtime . graph, viewforest_id,
-      saved_view_mut, saved_viewnode_id_record, saved_diffView_buffer_kind );
+      saved_view_mut, saved_viewnode_id_record, saved_diffView_buffer_kind,
+      skgrepo_restriction );
     register_and_send_rerendered_views (
-      stream, views_state, &context . runtime, collateral_views,
-      TcpToClient::CollateralView ); }
+      stream, views_state, &context . runtime, skgrepo_restriction,
+      collateral_views, TcpToClient::CollateralView ); }
   Ok ( SaveResponse::saved (
     saved_text, context . errors, context . warnings,
     readiness_summary )) }
@@ -243,12 +244,14 @@ fn withhold_save_rerender (
   viewforest_id_from_request_result : &Result<ViewforestId, String>,
   views_state                       : &mut ViewsState,
   graph                             : &InRustGraph,
+  skgrepo_restriction               : &SkgrepoRestriction, // the save's, under which the saved view is registered
 ) -> SaveResponse {
   let mut withheld_viewforest_ids : Vec<ViewforestId> = Vec::new ();
   if let Ok (viewforest_id) = viewforest_id_from_request_result {
     register_saved_view (
       views_state, graph, viewforest_id,
-      saved_view, saved_viewnode_id_record, saved_diffView_buffer_kind );
+      saved_view, saved_viewnode_id_record, saved_diffView_buffer_kind,
+      skgrepo_restriction );
     withheld_viewforest_ids . push (viewforest_id . clone ()); }
   withheld_viewforest_ids . extend (
     collateral_viewforest_ids . iter () . cloned () );
@@ -256,7 +259,8 @@ fn withhold_save_rerender (
 
 /// Register the saved view 'viewforest_id' in place of what the
 /// connection held, as the buffer of the diff view
-/// 'saved_diffView_buffer_kind' if it is one.
+/// 'saved_diffView_buffer_kind' if it is one, rendered under the
+/// save's 'skgrepo_restriction'.
 fn register_saved_view (
   views_state                : &mut ViewsState,
   graph                      : &InRustGraph,
@@ -264,9 +268,11 @@ fn register_saved_view (
   saved_view                 : ViewForest,
   saved_viewnode_id_record   : ViewnodeIdRecord,
   saved_diffView_buffer_kind : Option<DiffViewBufferKind>,
+  skgrepo_restriction        : &SkgrepoRestriction,
 ) {
   views_state . open_views . update_view (
-    graph, viewforest_id, saved_view, saved_viewnode_id_record );
+    graph, viewforest_id, saved_view, saved_viewnode_id_record,
+    skgrepo_restriction );
   if let Some (buffer_kind) = saved_diffView_buffer_kind {
     views_state . open_views . mark_as_diffView_buffer (viewforest_id, buffer_kind); }}
 

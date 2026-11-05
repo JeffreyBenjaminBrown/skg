@@ -18,6 +18,7 @@ use std::error::Error;
 use crate::git_fixture_helpers::{
   save_and_read_collateral, without_lines_containing};
 
+use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::dbs::in_rust_graph::{
   InRustGraphHandle};
 use skg::test_utils::{
@@ -75,7 +76,7 @@ fn collateral_partner_folder_update_and_warning_scoping
                 && s_view . contains ("(gnid N)"),
         "S's view should show N in a subscribeeFolder:\n{}", s_view );
       views_state . open_views . register_view (
-        &graph . load_full (), s_viewforest_id . clone (), s_vf, &s_pids );
+        &graph . load_full (), s_viewforest_id . clone (), s_vf, &s_pids, &SkgrepoRestriction::unrestricted (config) );
 
       // Drop N from S's subscribeeFolder (emptying it = explicit empty
       // set) and save S's view.

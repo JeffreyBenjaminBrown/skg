@@ -56,7 +56,7 @@ fn deleting_a_node_present_in_another_view_reports_no_errors
       assert! ( p_view . contains ("(gnid L)"),
         "P's view should show L:\n{}", p_view );
       views_state . open_views . register_view (
-        &graph . load_full (), p_viewforest_id . clone (), p_vf, &p_pids );
+        &graph . load_full (), p_viewforest_id . clone (), p_vf, &p_pids, &SkgrepoRestriction::unrestricted (config) );
 
       { // A second content view rooted at L, and a search view whose
         // result list holds L, both stay open too -- the deleted node
@@ -67,13 +67,13 @@ fn deleting_a_node_present_in_another_view_reports_no_errors
             config, Some (tantivy), &ID::from ("L") ) ?;
         views_state . open_views . register_view (
           &graph . load_full (),
-          ViewforestId::ContentView ("collat-del-L-2" . into ()), vf2, &pids2 );
+          ViewforestId::ContentView ("collat-del-L-2" . into ()), vf2, &pids2, &SkgrepoRestriction::unrestricted (config) );
         let (_v3, pids3, vf3) =
           single_root_view (
             config, Some (tantivy), &ID::from ("L") ) ?;
         views_state . open_views . register_view (
           &graph . load_full (),
-          ViewforestId::SearchView ("to X" . into ()), vf3, &pids3 ); }
+          ViewforestId::SearchView ("to X" . into ()), vf3, &pids3, &SkgrepoRestriction::unrestricted (config) ); }
 
       { // A write-protected image is not search-specific. A normal
         // multi-root content view can contain the same PID more than
@@ -90,7 +90,7 @@ fn deleting_a_node_present_in_another_view_reports_no_errors
         views_state . open_views . register_view (
           &graph . load_full (),
           ViewforestId::ContentView (
-            "collat-del-write-protected-L" . into ()), vf, &pids ); }
+            "collat-del-write-protected-L" . into ()), vf, &pids, &SkgrepoRestriction::unrestricted (config) ); }
 
       // A second view of L alone; register it, then save it with L
       // marked for deletion.
@@ -98,7 +98,7 @@ fn deleting_a_node_present_in_another_view_reports_no_errors
         single_root_view (
           config, Some (tantivy), &ID::from ("L") ) ?;
       views_state . open_views . register_view (
-        &graph . load_full (), l_viewforest_id . clone (), l_vf, &l_pids );
+        &graph . load_full (), l_viewforest_id . clone (), l_vf, &l_pids, &SkgrepoRestriction::unrestricted (config) );
       let delete_buffer : String =
         "* (skg node (gnid L) (skgRepos (nodeRepo main)) (editRequest delete)) [[id:X][to X]]\n"
         . to_string ();
@@ -156,12 +156,12 @@ fn a_deleted_root_vanishes_and_a_buffer_may_end_with_no_roots
             IdResolution::AsWritten ) ? . 0;
         views_state . open_views . register_view (
           &graph . load_full (), both_viewforest_id . clone (), stored,
-          &[ID::from ("L"), ID::from ("P")] ); }
+          &[ID::from ("L"), ID::from ("P")], &SkgrepoRestriction::unrestricted (config) ); }
       let (_l_view, l_pids, l_vf) =
         single_root_view (
           config, Some (tantivy), &ID::from ("L") ) ?;
       views_state . open_views . register_view (
-        &graph . load_full (), l_viewforest_id . clone (), l_vf, &l_pids );
+        &graph . load_full (), l_viewforest_id . clone (), l_vf, &l_pids, &SkgrepoRestriction::unrestricted (config) );
       let delete_buffer : String =
         "* (skg node (gnid L) (skgRepos (nodeRepo main)) (editRequest delete)) [[id:X][to X]]\n"
         . to_string ();

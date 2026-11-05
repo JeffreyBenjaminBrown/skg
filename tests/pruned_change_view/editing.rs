@@ -3,6 +3,7 @@
 // 'kinds' fixture is described in 'buffer.rs'. The 'overrides'
 // fixture: r overrides n, and p, which contains n, is retitled.
 
+use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::metadata_canon::without_viewnode_ids;
 use crate::git_fixture::{Fixture, edit_line, skg_files};
 use crate::pruned_change_view::common::{
@@ -206,7 +207,7 @@ fn register_content_view_of (
   let (text, pids, tree) : (String, Vec<ID>, Tree<Viewnode>) =
     multi_root_view ( &f . config, Some (&f . tantivy), &[ ID::from (root) ] ) ?;
   f . views_state . open_views . register_view (
-    &f . graph . load_full (), viewforest_id . clone (), tree, &pids );
+    &f . graph . load_full (), viewforest_id . clone (), tree, &pids, &SkgrepoRestriction::unrestricted (&f . config) );
   Ok (text) }
 
 /// The diff view shows the graph as stored: a member that an
@@ -250,7 +251,7 @@ fn a_diff_view_rerendered_as_collateral_draws_the_child_a_save_added (
     let (text, pids, tree) : (String, Vec<ID>, Tree<Viewnode>) =
       multi_root_view ( &f . config, Some (&f . tantivy), &[ ID::from ("n") ] ) ?;
     f . views_state . open_views . register_view (
-      &f . graph . load_full (), view_of_n . clone (), tree, &pids );
+      &f . graph . load_full (), view_of_n . clone (), tree, &pids, &SkgrepoRestriction::unrestricted (&f . config) );
     let (mut stream, _read_end) : (TcpStream, TcpStream) = mk_test_tcp_stream_pair ();
     let response : SaveResponse = block_on (
       update_from_and_rerender_buffer_test (

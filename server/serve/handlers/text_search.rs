@@ -229,7 +229,7 @@ pub fn handle_text_search_request (
             // Replace prior search with the same terms.
             views_state . open_views . unregister_view (&viewforest_id); }
           views_state . open_views . register_view (
-            &runtime . graph, viewforest_id, viewforest, &drawn_pids );
+            &runtime . graph, viewforest_id, viewforest, &drawn_pids, restriction );
           send_response_with_length_prefix (
             stream,
             & mk_search_results_sexp (
