@@ -1,0 +1,1312 @@
+#+title: Glossary for the review of plan 2_2
+This document defines the terms, names and phrases that
+'3_review.org', the review of plan 2_2, uses without defining, so
+that a reader who knows Skg's documentation but did not follow
+the plan can read the review. 'docs/glossary.org' remains the
+project's glossary; where it already defines a term, the entry
+here is short and names the glossary's entry.
+* The graph and its nodes
+** graphnode and viewnode
+'docs/glossary.org' defines both under "graphnode, viewnode"; the
+review says "node" where only a graphnode can be meant.
+** gnid, pid and extra ID
+The glossary defines all three under "gnid, pid, extra ID"; in
+the review "pid" never means a process ID.
+** resolving an ID to its pid
+To resolve a gnid is to replace it by the pid of the graphnode it
+names, through 'InRustGraph::pid_else_raw_id'
+('server/dbs/in_rust_graph.rs'), which returns the ID unchanged
+when the graph knows no graphnode by it. Since slice 1 every
+comparison of IDs in the save's staleness and merge code is made
+between resolved IDs, so that an extra ID and its graphnode's pid
+count as the same graphnode. The review's "the acquiree's ID
+becomes a pid" means that the merge request's ID, as the user
+wrote it, is resolved this way before the save carries it.
+** the in-Rust graph
+The in-Rust graph ('InRustGraph', 'server/dbs/in_rust_graph.rs')
+is the server's in-memory copy of every graphnode, bodies
+included, built from the '.skg' files at startup and at a
+rebuild. It is a session-lifetime store (see the glossary's
+"view-lifetime"). When the review says "the graph" without a
+qualifier it means this, as it stands at the moment of the save.
+** the graph as stored
+The graph as stored is a graphnode exactly as the in-Rust graph
+holds it, which is exactly as its file says. It can differ from
+what a view of that graphnode reads back without anything having
+changed (see 'the graphnode as a view reads it back', under
+staleness).
+** candidate graph
+A candidate graph is a new in-Rust graph that a save prepares but
+has not yet made live. 'prepare_save_under_mutation_gate' builds
+two: 'graph_after_save', the graph as phase one leaves it, and
+'final_candidate', the graph as phase two leaves it. Neither is
+visible to any reader until the swap-in.
+** relationship list, member and container
+The glossary defines these words under "relation, relationship,
+member, membership, partner"; the review's "relationship lists"
+are a graphnode's 'contains', 'subscribesTo', 'hidesFromSubs' and
+'overrides' lists.
+** content list
+A graphnode's content list is its 'contains' list. The stale
+error reports a change in it as "the content", with the IDs
+gained and lost.
+** link
+A link is an ID written inside a body's text, which the graph
+records as a 'linksTo' relationship from the graphnode whose body
+holds it (the mentioner) to the graphnode it names. A view can
+show, under a graphnode, a folder of the graphnodes that link to
+it: the mentioner folder (the glossary's "partner folder"). The
+review's "a link" in a dirty view means such an ID in the view's
+text, which names a graphnode without holding a copy of it.
+** owned and foreign
+The glossary defines both under "owned, foreign"; the review's
+"foreign graphnode" is one whose home skgrepo is foreign.
+** a fork clone and its original
+The glossary defines the clone under "clone, and the fork
+operation"; the review's "original" is the forked foreign
+graphnode, named by 'ForkSpec::original_gnid'
+('server/types/save.rs'), which the stale check counts among the
+buffer's writes because the clone copies the buffer's copy of it.
+* The save and its phases
+** a save
+A save is one client request that sends a buffer's text to the
+server and asks it to write what the text says into the graph and
+the '.skg' files, then to redraw the view. It either writes
+everything it plans or nothing ("the refusal is whole"). The
+review's subject, plan 2_2, changed how a save decides whether
+the buffer is stale.
+** the save envelope
+The save envelope is the length-prefixed S-expression a client
+sends after the 'save buffer' request line, carrying everything
+the save needs besides the request's own header fields
+('SaveRequestEnvelope' in 'server/serve/handlers/save_buffer.rs';
+"Save buffer" in 'docs/api-and-formats.org'). Its
+'Content-Length' is its UTF-8 byte length. It has three mandatory
+fields, 'saved-buffer', 'baseline' and 'other-views'; the answers
+to the save's confirmations ride as optional fields of the
+request, not in these three. A save whose envelope the server
+cannot read is refused with the refusal header, and nothing is
+written.
+*** saved-buffer
+The 'saved-buffer' field holds the text of the buffer being
+saved, as it stands with the user's edits.
+*** baseline
+The '(baseline "TEXT")' field holds the saved buffer's baseline,
+the text the server last drew for it. It is mandatory since slice
+2 and has no 'unavailable' form: a request without it is refused
+and nothing is saved. Slice 2 made one commit for server and
+clients because the server refuses an envelope that lacks the
+field, so neither side could change without the other.
+*** other-views
+The 'other-views' field lists every other live view of the
+client, even when empty, each as a buffer snapshot: its view ID,
+whether it is dirty, and for a dirty one its baseline (or the
+atom 'unavailable') and its current text. The dirty-view check
+reads it.
+** the refusal header
+The refusal header is the line "NOTHING WAS SAVED" with which a
+refused save's message begins. Slice 7 gave it to the refusal of
+an envelope that lacks its baseline, and to every other envelope
+the server cannot read, which the review calls arguable because
+the plan asked only for the first case.
+** the save handler
+The save handler is the server code that answers a save, chiefly
+'update_from_and_rerender_buffer_with_approvals'
+('server/serve/handlers/save_buffer.rs'). It refuses a view drawn
+under another restriction, parses the buffer into a SavePlan,
+runs the stale check, adds the derived writes, asks the
+confirmations, runs the dirty-view check, prepares and applies
+both phases, swaps in the result and redraws the views.
+** parse
+To parse a buffer is to turn its Org text into a viewforest
+('org_to_viewforest'), the tree of viewnodes it shows. The parse
+trims trailing whitespace from every line, which is why a body
+with trailing whitespace on disk reads back without it.
+** the plan-builder
+The review's "plan-builder" is
+'buffer_to_validated_saveplan_with_fork_skgrepos_in_graph'
+('server/from_text.rs'), which parses the saved text, runs the
+validators, extracts the nodeInstructions and returns a SavePlan.
+Before slice 1 it also built the NodeMerge triples.
+** the validators
+The validators are the checks the plan-builder runs on a parsed
+buffer before it extracts anything: that IDs are legal, that a
+merge request is admissible, that the buffer does not move and
+merge one graphnode, and so on. They judge edits. The baseline is
+not run through them, because a baseline holds no edits.
+** nodeInstruction, Save instruction, Delete instruction
+The glossary defines nodeInstruction ('Save' or 'Delete',
+'server/types/save.rs') under "fieldIntent, nodeIntent,
+nodeInstruction, savePlan"; the review's "Save instruction" is a
+'SaveNode' and its "Delete instruction" a 'DeleteNode'.
+** the save's ordinary nodeInstructions
+A save's ordinary nodeInstructions are all its nodeInstructions
+except the NodeMerge triples': those the buffer's text yields,
+plus the derived writes and the fork clones the handler adds. The
+handler holds them in 'nonmerge_nodeInstructions'. Phase one
+applies them.
+** supplementation
+Supplementation fills in every field of a graphnode that the
+buffer said nothing about, from the graph, so that a nodeIntent
+becomes a complete Save instruction
+('build_diskSupplemented_nodeInstructions' in
+'server/from_text/supplement_from_disk.rs'). Despite the file's
+name it reads the in-Rust graph, not the disk. The baseline's
+writes are supplemented exactly as the buffer's are.
+** the noop filter
+The noop filter drops every Save instruction whose graphnode the
+graph already holds unchanged, so that a save writes only what it
+changes ('filter_wouldbe_noop_nodeInstructions' in
+'server/from_text/local_fieldintent_collection/mod.rs'). It
+compares each supplemented Save with the graph as stored, by
+'buffernode_differs_from_disknode'; it keeps every Delete, and
+every Save of a graphnode the graph lacks. It runs inside
+'extract_nonmergeSavePlan_locally_in_graph', for the saved text
+and, since slice 3, for the baseline too. An unedited graphnode
+of the buffer is therefore not written, and so never stale.
+** the SavePlan
+The SavePlan ('SavePlan' in 'server/types/save.rs') is everything
+the plan-builder returns for one save: the ordinary
+nodeInstructions the text yields, the merge pairs (field
+'nodeMerge_pairs'), the home skgrepo moves, the fork specs and
+some notices. Before slice 1 it held the NodeMerge triples
+instead of the pairs.
+** phase one
+Phase one of a save is the preparation and application of its
+ordinary nodeInstructions, before any nodeMerge. In
+'prepare_save_under_mutation_gate' ('server/save.rs') it prepares
+a graph update over the graph before the save, whose candidate is
+'graph_after_save'. The review's "phase one saving the acquiree"
+means an ordinary Save instruction of the acquiree, from the
+buffer's edit of it or from a Hoist repair.
+*** not the delete propagation's passes
+Phase one is not the first pass of delete propagation. Comments
+in 'save.rs' once called those passes "Phase 1" and "Phase 2";
+slice 7 renamed them "first pass" and "second pass" to end the
+collision.
+** phase two
+Phase two of a save is the preparation and application of its
+NodeMerges. 'prepare_save_under_mutation_gate' builds the
+NodeMerge triples from 'graph_after_save', the candidate phase
+one leaves, and prepares their nodeInstructions as a second graph
+update over it, whose candidate is 'final_candidate'. Both phases
+are prepared, files included, before either is applied;
+'PreparedSave::apply' then applies phase one and phase two in
+that order.
+** the PreparedSave
+A PreparedSave ('PreparedSave' in 'server/save.rs') is a save
+with both phases prepared and nothing yet written: the graph
+before the save, the NodeMerge triples, both candidate graphs,
+both prepared file writes and the IDs the save will write. Its
+'apply' writes the files and updates the graph and the search
+index; its 'nodeMerges' gives the triples to the handler since
+slice 1.
+** the mutation gate
+The mutation gate ('MutationGate' in 'server/types/env.rs') is a
+lock that every writer of the graph holds from before it reads
+the graph until after it swaps in the result: a save, a rebuild,
+a whitespace strip, an import. It keeps two writers from acting
+on one state. Readers do not take it. The name
+'prepare_save_under_mutation_gate' says that its caller holds the
+gate.
+** swap-in
+The glossary defines it under "swap in (a runtime generation), vs
+publish"; it is 'SharedRuntime::swap_in' in
+'server/types/env.rs'.
+** runtime generation
+The glossary's "swap in (a runtime generation), vs publish" uses
+the term for the bundle of config, in-Rust graph and search index
+a swap-in installs ('RuntimeGeneration' in
+'server/types/env.rs'); the review, like plan 2_2's vocabulary,
+uses it for that bundle's number, its 'generation' field, one
+more at every swap-in.
+*** the number after plan 2_2
+The number stays, for the reload notices, the rerender pass and
+the search-index rebuild; only its use for staleness is gone.
+*** where it starts
+The number now starts at 0 when the server starts. Before slice 3
+it started at the microseconds since the epoch, which only the
+retired staleness check needed. The number still appears in the
+server's log, and Jeff has asked (in the review) for absolute
+time instead.
+** derived writes
+Derived writes are the writes a save computes from the graph as
+it stands at save time, rather than copying from the buffer:
+delete propagation, the resets of stranded relationships, the
+writes of restore requests, Hoist repairs and fork clones. They
+are added to the nodeInstructions after the stale check, so the
+check never sees them; a write computed from the current graph
+cannot undo a change the user never saw. The NodeMerge triples
+are computed the same way and are not checked either.
+** delete propagation
+Delete propagation is the save's cleanup after a delete: every
+owned graphnode whose relationship lists name a deleted graphnode
+is rewritten without it, so that no file is left naming a
+graphnode that is gone ('apply_delete_propagation_cleanup' in
+'server/save.rs'). Links in bodies are not stripped. Delete
+propagation is a derived write, and only the buffer's own deletes
+count for the delete-and-merge refusal.
+*** the first pass and the second pass
+Delete propagation runs in two passes. The first pass adds a Save
+instruction for every owned graphnode that names a deleted one
+and that the save does not already write; the second pass strips
+the deleted IDs from the lists of every Save in the save.
+** the Hoist repair
+A Hoist repair is a Save instruction the save adds, after the
+user approves Hoist, for a graphnode whose telescope shows text
+from below its home section and which the save would not
+otherwise write ('repair_saves_for_unwritten_candidates' in
+'server/serve/handlers/telescope_hoist.rs'). Its main case is a
+merge's acquiree: the repair saves it in phase one, so that phase
+two copies its repaired text into the text preserver before
+deleting it. The glossary defines Hoist under "Hoist, the Hoist
+confirmation, Abort" and the condition under "overPrivateText".
+** the confirmations
+A save may stop before writing anything to ask the user a
+question, and is then re-sent with the answer: the delete-from,
+strandeds, Hoist and fork confirmations, asked in that order. A
+save that stops to ask writes nothing. The stale check runs
+before all of them, so a stale save never asks.
+** the coherence assertion
+The coherence assertion is a check, compiled only into debug
+builds (as in the test suites), that the graph a save has just
+swapped in agrees with the nodeInstructions the save applied. It
+is 'in_rust_graph_coherent_with_nodeInstructions_in'
+('server/dbs/in_rust_graph.rs'), called inside a 'debug_assert!'
+in 'update_from_and_rerender_buffer_with_approvals', after the
+swap-in and before the views are redrawn.
+*** what it checks
+It walks the save's nodeInstructions: the ordinary ones, followed
+by the three of each NodeMerge triple. Every Save instruction's
+pid must be present in the new graph, and every Delete
+instruction's gnid absent. A failure would mean that the views
+are being redrawn from a graph that does not yet hold the save,
+for instance because someone moved the redraw before the swap-in.
+The code's own comment calls it a weak assertion.
+*** the last instruction per ID
+Since slice 1, when several instructions name one ID, only the
+last of them in the list counts. The function walks the list from
+its end and skips any ID it has already checked. "Last" means
+last in the order the save applies them, so a phase-two
+instruction beats a phase-one instruction for the same graphnode.
+*** why it changed
+A save that edits a merge's acquiree, or Hoist-repairs it, saves
+the acquiree in phase one and deletes it in phase two. Before the
+change the assertion demanded that the acquiree be both present
+(for the Save) and absent (for the Delete), and it fired. The
+graph was right: the acquiree is gone. Slice 1 made the first
+case reachable through the buffer, which is why it surfaced then;
+the Hoist case was reachable before.
+*** the alternative the review calls arguable
+The review notes that the assertion could instead have been given
+only phase two's instructions. The chosen fix keeps checking
+every graphnode the save touches, by its final instruction.
+* Staleness and the baseline
+** baseline
+The glossary defines it under "baseline, stale", including its
+synonym "clean baseline", where each client keeps it
+('skg-clean-baseline', 'vim.b.skg_clean_baseline', the AI tool's
+'.full.org' file) and how it differs from a git stage's
+"baseline"; the review uses it in that sense.
+** the baseline's copy
+The baseline's copy of a graphnode is the supplemented Save
+instruction that the baseline yields for it: what the buffer
+showed of the graphnode when the server drew it, completed from
+the graph. 'baseline_writes' ('save_staleness.rs') computes these
+copies, by pid.
+** the buffer's copy
+The buffer's copy of a graphnode is the supplemented Save
+instruction that the saved text yields for it, after the noop
+filter. It differs from the baseline's copy exactly when the user
+edited the graphnode. Plan 4 defines the term.
+** the baseline's writes
+The glossary defines them under "baseline, stale": the Save
+instructions that saving the baseline itself would produce, which
+are exactly the graphnodes whose copy in the buffer is out of
+date; 'baseline_writes' ('save_staleness.rs') computes them.
+** the buffer's writes
+The buffer's writes are the graphnodes the save would write or
+delete from the buffer's own text: the pids of its
+nodeInstructions after the noop filter, plus the originals of its
+fork clones ('buffer_written_pids' in 'save_staleness.rs'). The
+derived writes and the NodeMerge triples are not among them.
+** stale
+The glossary defines it under "baseline, stale", with its
+extension to buffers, views and saves; the review's open
+questions use the narrow sense, a graphnode the buffer writes or
+deletes whose copy in the buffer no longer matches the graph.
+** outdated
+A graphnode is outdated, for a buffer, when its baseline copy
+differs from the graph, whether or not the buffer writes it.
+Stale is outdated and written or deleted by the buffer. Plan 4
+coins the word; the review uses it in "an untouched but outdated
+copy".
+** untouched
+A graphnode is untouched by a buffer when the buffer's copy of it
+equals the baseline's copy, compared in canonical form: the user
+did not edit it, and the buffer merely still shows what the
+server drew. A delete is never untouched, and neither is a fork
+clone's original. Plan 4, slice 1, will leave an untouched
+outdated graphnode out of the save, with a warning, instead of
+refusing the save.
+*** not the "touched IDs"
+"Untouched" is about the user's edits. The "touched IDs" of the
+dirty-view check are something else: the IDs a save writes (see
+'touched IDs', under views).
+** the stale check
+The stale check is the step of the save that refuses a stale
+save. It is 'stale_write_errors'
+('server/serve/handlers/save_staleness.rs'), called in the save
+handler right after the plan-builder returns, before any
+confirmation is asked and before anything is written. It computes
+the baseline's writes and the buffer's writes and returns one
+error per graphnode in both.
+** the stale error
+The stale error is the message a refused stale save shows, one
+per stale graphnode. Its org form is built in
+'server/types/save.rs', its one-line form in
+'server/types/errors.rs', both from the variant
+'BufferValidationError::ChangedSinceRendered'.
+*** its first line
+The first line reads "A node this save would write changed after
+the buffer was rendered:". Client tests and two Rust tests match
+on it, which is why slice 7 left it as it was.
+*** the Title line
+The "Title:" line shows the graphnode's current title, from the
+graph. The old title appears in the title aspect. The plan's
+example had shown the old title there; Jeff has accepted the
+change.
+*** the "Changed since" line
+This line lists only the change aspects that differ between the
+baseline's copy and the graph. A title and a home skgrepo show
+both values; a list shows the IDs it gained and lost.
+*** the body's changed lines
+When the body changed, its line diff follows, baseline against
+graph: each lost line prefixed "- ", each gained line "+ ",
+unchanged lines omitted, at most forty each way.
+*** the remedy text
+The error's last line tells the user how to recover: archive the
+edits with the recovery command, reopen a fresh view, and reapply
+them there. The review says this text describes the case of a
+graphnode the user edited that changed under them.
+*** a deleted graphnode
+When the graph no longer has the graphnode, the error omits the
+title and says "It was deleted after this buffer was rendered."
+** change aspects
+The glossary's "baseline, stale" names them ('StaleAspect' in
+'server/types/errors.rs', renamed from 'ChangedAspect' in slice
+7): the parts of a stale graphnode the stale error can name as
+changed, at a coarser grain than the diff view's diff aspects.
+** 'StaleGraphnodeReport'
+'StaleGraphnodeReport' ('server/types/errors.rs') is what the
+stale error says about one graphnode: either 'Deleted', or
+'Changed' with the current title, the changed aspects and the
+body's changed lines. Slice 7 renamed it from
+'ChangeSinceRendered', which differed by one letter from the
+variant 'ChangedSinceRendered' that carries it.
+** the graphnode as a view reads it back
+The graphnode as a view reads it back is the graph's graphnode
+transformed as drawing it in a view and parsing the view would
+transform it: its body without the trailing whitespace the parse
+trims, and its relationship lists in canonical form
+('graphnode_as_read_back_from_a_view' in 'save_staleness.rs').
+The stale check compares the baseline's copy with this, not with
+the graph as stored, so that a difference no view could show does
+not make a graphnode stale.
+*** why trailing whitespace matters
+A body whose file still carries trailing whitespace is drawn with
+it and parsed without it. Compared with the graph as stored, the
+baseline's copy of it would always differ and survive the noop
+filter, and the graphnode would be stale at every save that wrote
+it. Slice 3 found this and added the second comparison.
+*** the former name
+Slice 3 named the function 'graphnode_as_drawn'; slice 7 renamed
+it, because the view draws the whitespace and the parse trims it,
+so the old name said the opposite of what the body does.
+** canonical form
+Two copies of a graphnode are compared in canonical form when
+each member of their relationship lists ('contains',
+'subscribesTo', 'hidesFromSubs', 'overrides') is resolved to its
+pid and every later duplicate is dropped, keeping order
+('with_relationships_by_distinct_pid' in 'save_staleness.rs').
+Aliases are text and are not resolved. Slice 7 made both sides of
+the stale check canonical, after the duplicate-member regression
+(see 'a sibling merge and its container's duplicate member').
+** a graphnode without a baseline copy
+A graphnode the buffer writes but its baseline does not show, for
+instance one pasted into a view by ID or typed into a new empty
+view, has no baseline copy to compare. The stale check cannot
+judge it and does not check it. The review lists this under "by
+accident" because the retired clock check did protect it in one
+case; the discussion decided it and the docs say so.
+** an unreadable baseline
+A baseline that fails to parse, or to extract, refuses the save
+with a message that says so and points at the recovery command,
+as an outright parse failure of the saved text does. Slice 3 also
+counts a parse error inside the baseline as such a failure.
+** the missing-baseline refusal
+The missing-baseline refusal is the server's answer to a save
+envelope without its baseline field: nothing is saved. Since
+slice 7 it carries the refusal header. The clients also refuse,
+before sending, to save a view that has no baseline; the review
+notes that this is a second copy of the server's rule, kept for
+its clearer message, and Jeff accepted it.
+** "base equals mine, take theirs"
+This is the rule of a three-way merge in version control, applied
+to one graphnode: when my copy equals the common base, I did not
+change it, so the other side's version wins. Here the base is the
+baseline's copy, mine is the buffer's copy and theirs is the
+graph. It is what plan 4, slice 1, does for an untouched outdated
+graphnode. It has nothing to do with a nodeMerge.
+** the recovery command and its document
+The recovery command archives a buffer's unsaved edits for manual
+recovery: 'skg-show-unsaved-changes' in Emacs,
+':SkgShowUnsavedChanges' in Neovim. It writes a recovery
+document, an Org file holding the buffer's baseline, its current
+text and a diff between them, and touches neither the graph nor
+the view ('docs/COMMANDS.org'). The stale error and the
+dirty-view error both point at it.
+** reconciliation by hand
+Reconciliation by hand is the documented recovery from a stale
+save. The user holds two diffs from one base, the baseline: their
+own edits, in the recovery document, and the graph's change, in
+the stale error. They redraw or reopen the view and reapply their
+diff where it still applies. Slice 7 renamed it from "a three-way
+merge by hand", to keep the word "merge" for nodeMerges.
+** a re-sent save
+A client never re-sends a save automatically. Since slice 3 a
+re-sent save would write nothing for a graphnode the first save
+already wrote, because its copy now matches the graph, and would
+create any new graphnode a second time. Before slice 3 the docs
+said a re-sent save was refused as stale; slice 7 corrected them.
+** rendered-at
+'rendered-at' was, before slice 3, the runtime generation number
+at which the server drew a view. Every view response carried it,
+the clients stored it, and every save sent it back. It is gone
+from the server, both editors, the AI tool, the tests and the
+docs. The review's "rendered-at" always means this retired field;
+"rendered" alone keeps its ordinary sense of drawn.
+** the generation machinery
+The generation machinery is everything that dated views and
+graphnodes by runtime generation for the retired staleness check.
+Slice 3 removed it.
+*** 'LastChangeGenerations'
+'LastChangeGenerations' was a map in the in-Rust graph from each
+graphnode to the generation in which it last changed, stamped by
+every swap-in. A save was refused when a graphnode it wrote had
+changed in a later generation than the view's rendered-at.
+*** the runtime-generation request
+The runtime-generation request let a client ask the server for
+the current generation number, which a new empty view used as its
+rendered-at. It and its handler are gone.
+** the generation proxy
+The review's "the generation proxy" is the retired clock check: a
+generation number stood in for the question whether the buffer's
+copy still matches the graph. The proxy refused saves needlessly
+(after a merge request, a strip, a restart or a rebuild), which
+is why plan 2_2 replaced it with the content comparison.
+** a whitespace strip
+A whitespace strip rewrites bodies on disk without their trailing
+whitespace and refreshes the graph and the search index
+('strip_body_whitespace_and_refresh_caches'). It changes nothing
+a parsed baseline shows, so it makes nothing stale.
+* Merges
+** nodeMerge
+The glossary defines it under "nodeMerge ("merge" is always
+qualified)"; 'docs/merging.org' describes it.
+** merge request
+The glossary defines it under "nodeMerge": the edit request
+'(editRequest (merge ID))' that C-c s m writes on a headline,
+which the next save applies.
+** acquirer
+The glossary defines it under "nodeMerge": the graphnode of the
+headline that carries the merge request, which survives it.
+** acquiree
+The glossary defines it under "nodeMerge": the graphnode the
+merge request's ID names, which the nodeMerge deletes.
+** merge node
+Slice 7 added it to the glossary under "nodeMerge": either
+graphnode of a merge pair, the acquirer or the acquiree.
+** merge pair
+The glossary defines it under "nodeMerge" (the acquirer's pid and
+the acquiree's); since slice 1 the plan-builder resolves the
+acquiree's ID as written, possibly an extra ID, to its pid before
+the pair enters the SavePlan.
+** NodeMerge, the triple
+A NodeMerge ('NodeMerge' in 'server/types/save.rs') is the three
+nodeInstructions one merge pair becomes, which phase two applies.
+The review also calls it "the triple".
+*** the text preserver
+The first is a Save instruction of the acquiree's text preserver,
+which the glossary defines under "text preserver".
+*** the updated acquirer
+The second is a Save instruction of the acquirer with the
+acquiree's IDs, content and relationships merged in.
+*** the acquiree's delete
+The third is a Delete instruction of the acquiree. Since slice 1
+it carries the acquiree's pid, even when the merge request named
+an extra ID.
+** a merge built on the save's own edits
+Since slice 1 the NodeMerge triples are built inside
+'prepare_save_under_mutation_gate', from 'graph_after_save', the
+graph as phase one leaves it ('nodeMerge_instructions_from_pairs'
+in 'server/nodeMerge/nodeMergeInstructionTriple.rs'). So the
+updated acquirer keeps the buffer's edits to the acquirer, the
+text preserver keeps its edits to the acquiree, and the merged
+content reflects the save's deletes. Before, the plan-builder
+built the triples from the graph before the save, and phase two
+silently undid phase one's edits to either merge node.
+** the move-and-merge refusal
+The move-and-merge refusal rejects a save that both moves a
+graphnode's home skgrepo and merges it
+('CannotMoveAndMergeSimultaneously', checked by
+'validate_no_simultaneous_move_and_nodeMerge' in
+'server/from_text/validate.rs'). Plan 2_2 did not change it.
+** the delete-and-merge refusal
+The delete-and-merge refusal rejects, before anything is written,
+a save whose buffer deletes the acquirer or the acquiree of one
+of its merge pairs. Slice 1 added it: the variant
+'CannotDeleteAndMergeSimultaneously { pid, title, role }' in
+'server/types/errors.rs', whose 'NodeMergeRole' says which merge
+node it is, checked by
+'validate_no_simultaneous_delete_and_nodeMerge'
+('server/from_text/validate.rs'), by pid. Only the buffer's own
+deletes count, not delete propagation.
+** the old string-level deletion check
+Before slice 1, 'validate_nodeMerge_pair'
+('server/nodeMerge/validate_nodeMerge.rs') refused a merge whose
+acquirer or acquiree the buffer marked for deletion, with a plain
+message, "... cannot be marked for deletion". It compared IDs as
+the user wrote them, not as pids, and ran before the new refusal,
+which it would have hidden. Slice 1 removed it in favour of the
+delete-and-merge refusal.
+** the foreign merge refusal
+A merge whose acquirer or acquiree is foreign is refused, never
+read as a fork. 'validate_and_filter_foreign_instructions'
+('server/from_text/validate.rs') once ran the foreign policy over
+the triples' nodeInstructions to find this; since slice 1 it
+checks the merge pairs, with the same error.
+** a sibling merge and its container's duplicate member
+When two siblings k1 and k2 of a container c are merged, c's file
+still lists both IDs, which now name one graphnode, k2 being an
+extra ID of k1. A view draws c's content once per pid, so the
+baseline's copy of c lists k1 alone while the graph's lists k1
+and k2. Until slice 7 the stale check compared those raw lists,
+and every save of a view holding c was refused as stale ("gained
+k2"). The retired clock check had let such saves through, and the
+save itself rewrote c without the duplicate, as it still does.
+Slice 7 fixed the comparison by putting both sides in canonical
+form. The review calls this "the duplicate-member regression".
+** "merge" unqualified
+The glossary's "nodeMerge" entry says "merge" is always qualified
+in Skg's prose; the review's "three-way rule" and "merge-conflict
+view" borrow the version-control sense instead.
+* Views, dirty views and redraws
+** view, buffer and viewforest
+The glossary defines them under "view, buffer, viewforest".
+** content view and search view
+The glossary defines both under "view, buffer, viewforest" and
+"text search, search view, enrichment"; a buffer of the diff view
+is a content view.
+** open views and 'ViewState'
+The glossary defines open views under "open views, single-root";
+each open view's entry is a 'ViewState' (see its entry under
+files, functions and types).
+** render, draw, rerender and redraw
+The glossary defines the redraw under "extend, rerender,
+refresh"; the review uses "drawn" and "rendered" for the same
+moment, which the vocabulary review noticed and left, because
+client tests match the error text that says "rendered".
+** clean view
+A clean view is an open view without unsaved edits. Only clean
+views are ever redrawn by a save, a reload or "rerender all
+views".
+** dirty view
+A dirty view is an open view with unsaved edits other than the
+buffer being saved. The client sends each with a save, as a
+buffer snapshot, so that the server can refuse a save that would
+invalidate it. The server never redraws a dirty view.
+** buffer snapshot
+The glossary defines it under ""snapshot" is always qualified";
+in code it is 'ClientViewSnapshot'
+('server/serve/handlers/save_buffer.rs'), one per entry of the
+envelope's 'other-views'.
+** a dirty view's dependencies
+A dirty view's dependencies are the graphnodes it holds viewnodes
+of: its occurrences and the overrides each shows, its gnid-only
+viewnodes, its ghosts and its ID property members
+('dependencies_from_viewforest' in
+'server/serve/handlers/save_dependencies/mod.rs'). Since slice 4
+a merge request's target and a link's target are not
+dependencies, since the view holds no copy of either.
+** the dirty-view check
+The dirty-view check refuses a save when a dirty view depends on
+a graphnode the save would change, so that the dirty view's later
+save cannot undo this one ('dirty_view_conflicts' in
+'server/serve/handlers/save_dependencies/mod.rs'). It parses the
+dirty view's baseline and current text, gathers their
+dependencies, and matches them against the save's touched IDs and
+their collateral neighborhood, in the graphs before and after the
+save. It runs after the confirmations, just before the save is
+applied.
+** over-matching through links
+Over-matching is the dirty-view check refusing a save on account
+of a relationship that puts nothing of the dirty view at risk.
+Slice 4 removed the links of a dirty view's own text from its
+dependencies, which one existing test had relied on.
+*** the inbound direction
+Links still over-match in the other direction. The save side
+matches through the collateral neighborhood, which includes the
+graphnodes that link to a saved graphnode, so a dirty view of L,
+where L links to the saved A, still conflicts with A's save (the
+probes' probe 9). Jeff agreed to remove this, and plan 4, slice
+2, will compute the dirty-view match from a neighborhood without
+the link relation.
+** touched IDs
+A save's touched IDs are the IDs it will write: every gnid of
+every nodeInstruction in both phases, the graphnodes it moves
+between skgrepos, and those whose telescopes it affects
+('PreparedSave::final_write_identities', held as 'raw_touched' in
+'SaveAffectedIds'). They are unrelated to "untouched", which
+concerns the user's edits.
+** the collateral neighborhood
+The glossary defines it as the "update-relevant neighborhood"
+('update_relevant_neighborhood'); "collateral neighborhood" is
+plan 4's name for it, and the review uses it for the set of IDs a
+save's touched IDs reach in the graphs before and after the save.
+** the collateral redraw and the collateral view
+The glossary defines the collateral view under "collateral view";
+the review's "collateral redraw" is the redrawing of those views
+after a save ('SaveAffectedIds::collateral_viewforest_ids').
+** the "rerender all views" request
+"Rerender all views" asks the server to redraw every open view
+the client names as clean; the client skips every buffer with
+unsaved edits and says which it skipped
+('skg-request-rerender-all-views' in Emacs, its mirror in Neovim;
+"Rerender all views" in 'docs/api-and-formats.org'). Since slice
+6 the clients send it after every successful rebuild.
+** the reload notice
+The reload notice is the message the server sends unprompted when
+its repo watcher has reloaded '.skg' files changed on disk
+('repo-files-reloaded' in 'docs/api-and-formats.org'). It names
+the skgrepos and counts, and the open views that show a changed
+graphnode; the client then asks to rerender those that are clean.
+Its runtime generation number survives plan 2_2.
+** the switch to an open view
+A view request for a graphnode that is already a root of an open
+content view does not draw a new view: the server answers
+'((switch-to-view "ID"))' and the client shows that view
+('handle_single_root_view_request' in
+'server/serve/handlers/single_root_view.rs'). The lookup is
+'OpenViews::content_viewforest_id_for_root_gnid', which today
+also finds buffers of the diff view; plan 4, slice 3, will make
+it skip them.
+** a hand-built view
+A hand-built view is a test's buffer whose text the test wrote,
+rather than one the server drew. Slice 2 recorded such text as
+the baseline in several Neovim integration scripts
+('open_org_buffer_from_text'); where it differed from the graph,
+slice 3's check would have refused their saves, so slice 3 gave
+them the empty baseline, as the Emacs scripts already had. The
+empty baseline writes nothing, so nothing is stale.
+** a new empty view
+A new empty view is a view the user creates with no roots, to
+type new graphnodes into. Its baseline is the text the client
+created it with, captured at creation; before slice 3 it also
+asked the server for a generation to use as its rendered-at.
+** a graphnode pasted in by ID
+A graphnode pasted in by ID is one the user brings into a view by
+typing or pasting a headline that carries its ID, rather than one
+the server drew there. The baseline holds no copy of it, so the
+stale check does not judge it.
+* The restriction and the rebuild
+** skgrepo
+The glossary defines it under "skgrepo, home skgrepo,
+skgrepo-set, gitrepo".
+** the skgrepo restriction
+The glossary defines it under "skgrepo, home skgrepo,
+skgrepo-set, gitrepo" ('SkgrepoRestriction'); the review says
+"the restriction" for short.
+** the set of shown skgrepos
+The set of shown skgrepos is the public 'skgrepos' field of a
+'SkgrepoRestriction': the skgrepos it lets the connection see.
+Two restrictions count as the same, for the restriction refusal,
+when these sets are equal.
+** switching the restriction, and the switch handler
+The glossary defines the switch under "skgrepo, home skgrepo,
+skgrepo-set, gitrepo"; the review's "switch handler" is
+'handle_skgrepo_set_request'
+('server/serve/handlers/skgrepo_sets.rs'), which rerenders every
+open view under the new restriction, so that an ordinary switch
+leaves no view drawn under the old one and slice 5's test had to
+set the connection's restriction back by hand.
+** the restriction a view was rendered under
+Since slice 5 each 'ViewState' records the restriction its view
+was last rendered or registered under, in
+'skgrepo_restriction_at_last_render'. 'register_view',
+'register_diffView_view' and 'update_view' set it, and the
+rerender stream carries it. The review's phrase "a view remembers
+the restriction it was drawn under" means this field.
+** the restriction refusal
+The restriction refusal is the save handler's refusal of a save
+of a view the connection holds, when the set of skgrepos recorded
+in the view's 'ViewState::skgrepo_restriction_at_last_render'
+differs from the set the connection's current restriction shows.
+It is 'error_unless_view_was_rendered_under_current_restriction'
+('server/serve/handlers/save_buffer.rs'), the first thing
+'update_from_and_rerender_buffer_with_approvals' does, and its
+error is 'RenderedUnderAnotherSkgrepoRestriction': "This view was
+rendered under a different skgrepo restriction (then: ...; now:
+...). Rerender it, or archive its edits and reopen it." A view
+the connection does not hold has no record and is not checked.
+*** what it protects against
+A buffer shows only what its restriction let it show, so its
+silence about a restricted graphnode or record means something
+else under another restriction. Saved under the new one, that
+silence could be read as a request to drop members or records the
+old restriction merely hid, or to keep ones it now shows. The
+clients refuse to switch the restriction while a view has unsaved
+edits; the refusal makes the server independent of that courtesy,
+and covers the case the clients cannot see, a rebuild whose
+reloaded config changes the connection's set of shown skgrepos
+while a dirty view is open.
+*** where it runs
+Slice 5 put it first in the save handler, before the parse, so
+that the parse's validators never judge a buffer under the wrong
+restriction; the plan had placed it later, before the stale
+check, and the review marks the choice arguable.
+** config order
+Config order is the order of the skgrepos in the config: the
+owned ones in privacy order, most public first. Since slice 7 the
+restriction refusal lists each set in that order.
+** a rebuild
+A rebuild rereads the config and every '.skg' file and swaps in a
+fresh in-Rust graph and search index
+('skg-rebuild-session-lifetime-stores';
+'rebuild_session_lifetime_stores_in_place' in
+'server/serve/handlers/rebuild_session_lifetime_stores.rs').
+Since slice 3 it makes nothing stale by itself; since slice 6 the
+open views survive it.
+** session-lifetime stores
+The glossary defines them under "view-lifetime": the in-Rust
+graph and the search index, which a rebuild or a restart builds
+anew.
+** the reconciliation of the restriction
+After a rebuild that reloads a changed config, each connection's
+restriction follows the new config at its next request: the
+connection loop ('server/serve.rs') calls
+'SkgrepoRestriction::under_config' at the start of every request.
+That is why slice 6 needed no restriction code. The clients'
+"rerender all views" after the rebuild is that next request, so
+the clean views are redrawn under the reconciled restriction and
+record it; a dirty view keeps its old record and is refused by
+the restriction refusal if the set changed.
+** views survive a rebuild
+Before slice 6 a rebuild forgot every open view and the clients
+told the user to close them. Now
+'rebuild_session_lifetime_stores_in_place' keeps them and drops
+only the graph straddle; each client, on a successful rebuild,
+asks for the herald rules and then for "rerender all views".
+** 'OpenViews::clear'
+'OpenViews::clear' emptied a connection's open views. The rebuild
+was its only caller, so slice 6 removed it.
+** the herald-rules request
+The herald-rules request ("herald rules" in
+'docs/api-and-formats.org') fetches the rules by which a client
+draws heralds, including the skgrepo labels, which a reloaded
+config may have changed. After a rebuild the clients send it and
+then "rerender all views", outside the rebuild's response
+handler, so that the rerender's reset of the receiver drops
+nothing that follows the rebuild's answer.
+** a restart
+A restart stops the server and starts it again, which rebuilds
+the session-lifetime stores from the files. Since slice 3 it
+makes nothing stale by itself.
+* The diff view
+** the diff view
+The glossary defines it under "diff view"; 'docs/diff-view.org'
+describes it.
+** a buffer of the diff view
+A buffer of the diff view is one of those four buffers, an open
+content view whose 'ViewState::diffView_buffer_kind' is set
+('server/types/views_state.rs'). The review's "diff-view buffers"
+means these.
+** buffer kind
+The glossary defines it under "buffer kind"
+('DiffViewBufferKind').
+** the graph straddle
+The glossary defines it under "graph straddle, before-graph,
+after-graph"; a rebuild drops it, and the next request of the
+diff view builds it again.
+** 'node_changes_between'
+'node_changes_between' ('server/graph_straddle/union_walk.rs')
+compares two versions of one graphnode and reports which of its
+title, body, aliases, extra IDs, flags and home skgrepo differ.
+The diff view uses it; since slice 3 the stale error uses it too,
+to name the changed aspects, and it is 'pub(crate)' for that.
+** 'interleaved_diff_without_reorders'
+'interleaved_diff_without_reorders' ('server/types/list.rs')
+diffs two lists, reporting each item as kept, gained or lost. The
+stale error uses it for the content list and for the body's
+lines.
+** diff aspect, against change aspect
+The glossary defines the diff aspect under "diff object, diff
+aspect"; a change aspect of the stale error is a different,
+coarser grain (see 'change aspects', under staleness).
+** the rendered stale-save buffer
+The rendered stale-save buffer is a proposal, outside plan 2_2: a
+write-protected buffer in the style of the diff view showing a
+stale graphnode's old and new text. It would be drawn in
+diff-view mode over a graph straddle whose before-graph holds the
+baseline's copies and whose after-graph is the live graph. Today
+the stale error reuses only the diff view's comparison functions,
+as text.
+** the merge-conflict view
+The merge-conflict view is a later view Jeff has described, which
+would show two graphs of the server's choosing in the same way.
+The review proposes the rendered stale-save buffer as its first
+use. "Merge" here has its version-control sense, not nodeMerge.
+** the diff-view test's workaround
+The integration test 'diff-view', in both clients, closes its
+buffers of the diff view before asking for a view of a root they
+hold, because the view request would otherwise switch to one of
+them. Slice 6 added this, because views now survive the rebuild
+that used to hide the behavior; plan 4, slice 3, changes the
+request and removes the workaround.
+* The process of running a plan
+** plan
+A plan is an Org document under 'TODO/<topic>/' that tells
+unattended agents what to build, in slices, with its vocabulary,
+agreed behavior, pitfalls, code map and tests
+('coding-advice/plans.org'). It is a declaration, not a
+discussion: nothing in it is open while it runs.
+** plan 2_2 and plan 4
+Plan 2_2 ('TODO/merge-save-refused/2_2_plan.org') is the plan the
+review reviews: stale saves decided by content, not by clock. It
+replaced an earlier '2_plan.org'. Plan 4 ('4_plan.org') is the
+plan the review's "Decide" section led to, three slices not yet
+run. "Plan 04.1" and "plans 17 and 19", which the advice files
+mention, are plans of other topics.
+** slice
+A slice is one step of a plan's implementation sequence: one
+behavior, built, tested, documented and committed by one agent.
+Plan 2_2 had seven; slice 7 was added after the review reports,
+for their corrections.
+*** a Rust slice is something else
+In the churn ledger, "an empty nodeMerges slice" is a Rust slice,
+'&[NodeMerge]' with no elements, which slice 1 passed to
+'stale_write_errors' until slice 3 removed the parameter.
+** agent and launch
+An agent is one Claude instance given a brief and run to its
+report; to launch one is to start it. Each slice of plan 2_2 was
+one Opus 5.5 agent at high effort, launched in sequence. "Agent
+time" is the wall-clock time agents spent working.
+** the orchestrator
+The orchestrator is the Claude session that runs a plan: it
+launches one agent per slice, reads each report and diff, carries
+corrections into the plan, and keeps the record
+('coding-advice/orchestration.org'). In plan 2_2 it was the
+review's author. "The orchestrator's notes" are its dated entries
+in 'progress.org'.
+** triage
+Triage is the orchestrator's reading of a slice's report and diff
+before the next launch, deciding which findings become
+corrections carried, which go to Jeff, and whether the run must
+stop. The word keeps its ordinary sense of sorting by urgency.
+** correction carried
+A correction carried is a small fix, needing no decision of
+Jeff's, that the orchestrator writes into the plan under the next
+slice's headline "Corrections carried from slice N", and commits
+before that slice's launch. Most were names that changed and
+facts about the code found since the plan was written. "No
+correction changed behavior" means none altered what the plan
+asked for.
+** the record
+The record is 'progress.org', beside the plan: one headline per
+slice with the agent's report (commits, suites, deviations,
+fixtures, what was left), and the orchestrator's notes between
+slices. "What the record lost" asks what it failed to capture.
+** the report
+A report is what an agent returns when its slice ends, in a fixed
+shape: commits, suites with every failure classified, deviations
+from the plan's "how", fixtures changed, what was left
+unfinished, and whether the slice is DONE.
+** the commit rule
+The commit rule is the plan's "Commits" section: one commit per
+slice, or a few, each naming the plan and the slice, the slice's
+last code commit carrying its docs and turning its headline DONE.
+** a DONE headline
+A slice's headline in the plan reads TODO until its last commit
+turns it DONE. In the review's discussion headlines, TODO,
+ONGOING and DONE mark what awaits whom
+('coding-advice/org-discussions.org').
+** the suites
+The suites are the project's automated tests, which
+'bash/all-tests.sh' runs together and summarizes in
+'tests/results/ALL.org'.
+*** 'bash/all-tests.sh'
+It builds the server and runs the Emacs and Neovim unit tests,
+nextest, the doctests and the integration tests for both clients.
+Two full runs at once collide on fixed temporary paths and the
+search-index writer, so they run one at a time.
+*** nextest and doctests
+Nextest ('cargo nextest', 'bash/nextest.sh') runs the Rust tests,
+1128 after slice 7, grouped into a few test binaries
+('grouped_saves' holds the save tests). Doctests are the examples
+in Rust doc comments, which 'cargo test --doc' runs.
+*** the integration tests
+The integration tests drive a real client against a real server,
+one folder per scenario under 'tests/integration/', each run once
+per client: 72 runs in all, of which 70 pass.
+*** the Emacs-only integration script
+'bash/integration-tests.sh' runs the integration tests for the
+Emacs client only; the Neovim pass is what 'bash/all-tests.sh'
+adds. Slice 2 learned this, and the correction was carried into
+slice 3.
+** a pre-existing failure
+A pre-existing failure is a test that failed before the plan's
+first slice, so that no slice is to blame for it. In plan 2_2 it
+is the integration test 'import-md-and-org', in both clients,
+which the plan's pitfalls name so that no agent investigates it.
+** a fixture, and fixture adaptation
+A fixture is the test data a test runs against, such as
+'tests/save_stale_buffers/fixtures/'. A fixture adaptation is a
+change to a fixture or test that the planned behavior change
+makes necessary, as opposed to a regression; it is one of the
+classes a report gives every failure.
+** a regression
+A regression is a behavior that worked before the plan and is
+broken after it. The review's one regression is the
+duplicate-member case (see 'a sibling merge and its container's
+duplicate member', under merges).
+** probe
+A probe is one behavior of the plan driven end to end against an
+isolated server, through the real TCP protocol, with what was
+sent and received recorded. A probe can find what the suites
+miss: in plan 2_2 it found the duplicate-member regression. The
+review's "probe 9" and the like are numbered sections of
+'3_1_review-reports/probes.org'.
+*** probe pass
+A probe pass is one agent's run of a probe for each behavior in
+the plan's "Agreed behavior", after the last slice. The review
+proposes making it part of every plan's check.
+*** "not as asked"
+Two probes (2 and 6) found behavior "as the plan says, not as
+asked": the orchestrator's probe brief had expected more than the
+plan promised, namely that an unedited outdated copy would not
+refuse the save. That gap became plan 4, slice 1.
+** the verify skill
+The verify skill is a Claude Code skill of this repository that
+explains how to start an isolated server on scratch data and
+drive it over its TCP protocol, without touching Jeff's real
+data. The probes follow it.
+** an isolated server
+An isolated server is a second Skg server on scratch data and its
+own port, sharing nothing with the server on Jeff's real data but
+the binary.
+** the reviewers and their reports
+The reviewers are the two agents that ran after slice 6, in
+parallel and read-only: one for vocabulary and citations, one for
+probes. Their reports are kept in '3_1_review-reports/' beside
+the review. They ran no suites.
+** the vocabulary review
+The vocabulary review is the report
+'3_1_review-reports/vocabulary-and-citations.org': which terms
+the plan's code coined or reused, whether they agree with the
+glossary, and whether any code cites 'TODO/'. It made eleven
+findings; slice 7 applied the first ten.
+** the churn ledger
+The churn ledger is the review's list of what one slice built and
+a later one rewrote or removed, with its cost and its cause
+('coding-advice/code-reviews.org'). "Planned" churn was foreseen
+by the plan, as when one slice adds a parameter the next uses.
+*** cause classes
+Each entry has a cause class: a requirement the plan got wrong; a
+requirement the human changed with new information; a design the
+agent chose and the reviewer rejected; a mechanism built on a
+false belief about the existing code; or naming and housekeeping.
+** the per-plan review
+The per-plan review is the review written when a plan's last
+slice is DONE, in a fixed shape: verdict, what the reviewer
+checked, results, what each slice did beyond the plan, the churn
+ledger, what the user sees differently, the reviewers' reports,
+open questions, "Decide" and suggestions for the advice
+('coding-advice/code-reviews.org'). '3_review.org' is one. It is
+smaller than a post-mortem of a whole feature.
+** "beyond the plan's words"
+What a slice did beyond the plan's words is each choice its agent
+made that the plan did not dictate. The review marks TODO those
+it thinks could be argued, so that Jeff can rule on them.
+** "Decide"
+The review's "Decide" section holds the items that need Jeff's
+decision, each with the reviewer's recommendation; Jeff's answers
+became plan 4.
+** "what the user sees differently"
+This section lists the visible changes, "by decision" when the
+discussion chose them and "by accident" when they followed
+unasked from something else.
+** the problems file
+The problems file is 'TODO/problems.org', where discovered bugs
+and design problems are recorded; a solved entry moves to the top
+of 'TODO/DONE/problems.org'. Slice 6 moved the three entries
+under "The stale-save check refuses saves needlessly
+(2026-11-05)".
+** the provenance note
+The provenance note is the entry that stays in
+'TODO/problems.org' proposing that each nodeInstruction record
+where it came from (the buffer, delete propagation, a Hoist
+repair, a nodeMerge), so that later stages need not guess. Plan
+2_2 left it out of scope.
+** the advice files
+The advice files are 'coding-advice/', the instructions agents
+read before working. The review's last section suggests changes
+to 'orchestration.org' and 'plans.org', which Jeff approved and
+which are applied.
+** the durations and the counts
+The durations are each slice's span, from the times of its
+commits, in UTC. The counts are the commits, files and lines the
+plan changed and the tests before and after it. The orchestrator
+had estimated its own clock times, which drifted up to twenty
+minutes from the commits'.
+* Files, functions and types
+** The stale check
+*** 'server/serve/handlers/save_staleness.rs'
+This file holds the stale check. Its module comment states the
+principle: only a write from a copy the buffer took, or a delete,
+can discard graph state the user never saw. Slice 3 rewrote it
+around the baseline; the review read it whole.
+*** 'stale_write_errors'
+'stale_write_errors' (in 'save_staleness.rs') is the stale
+check's one entry point. It takes the graph, config, restriction,
+baseline text, viewforest, the buffer's nodeInstructions and the
+fork specs, and returns one 'ChangedSinceRendered' error per
+stale graphnode, or one error if the baseline cannot be read.
+*** 'baseline_writes'
+'baseline_writes' (in 'save_staleness.rs') computes the
+baseline's writes, as a map from pid to the baseline's copy,
+comparing each copy with the graphnode as a view reads it back.
+*** 'graphnode_as_read_back_from_a_view'
+This function (in 'save_staleness.rs') returns the graph's
+graphnode as a view reads it back: body trimmed, relationship
+lists in canonical form. It was 'graphnode_as_drawn' until slice
+7.
+*** 'with_relationships_by_distinct_pid'
+This function (in 'save_staleness.rs') puts a graphnode's
+relationship lists in canonical form: members resolved to pids,
+later duplicates dropped, order kept. Slice 7 added it.
+*** 'buffer_written_pids'
+This function (in 'save_staleness.rs') computes the buffer's
+writes: the pids its nodeInstructions write or delete, plus its
+fork clones' originals.
+** Parsing and extraction
+*** 'org_to_viewforest'
+'org_to_viewforest' parses Org text into a viewforest. With
+'IdResolution::ThroughGraph' it reads IDs through the graph and
+gives new headlines IDs; the dirty-view check uses
+'IdResolution::AsWritten'.
+*** 'buffer_to_validated_saveplan_with_fork_skgrepos_in_graph'
+This function ('server/from_text.rs') is the plan-builder: parse,
+validators, extraction, foreign policy, and the SavePlan.
+*** 'extract_nonmergeSavePlan_locally_in_graph'
+This function
+('server/from_text/local_fieldintent_collection/mod.rs') turns a
+viewforest into nodeInstructions: local fieldIntent collection,
+lowering, supplementation, the noop filter, and the suppression
+of writes the restriction hides. It returns the instructions and
+the merge pairs. The stale check runs it on the baseline as well
+as on the saved text.
+*** 'filter_wouldbe_noop_nodeInstructions'
+This function (same file) is the noop filter.
+*** 'buffernode_differs_from_disknode'
+This function ('server/from_text/validate.rs') decides whether a
+buffer's copy of a graphnode differs from another copy, field by
+field; a field the buffer leaves unspecified counts as no
+difference. The noop filter and the stale check both use it.
+*** 'validate_and_filter_foreign_instructions'
+This function ('server/from_text/validate.rs') applies the
+foreign policy: it turns real edits of foreign graphnodes into
+fork specs, and refuses a merge whose acquirer or acquiree is
+foreign.
+** The save handler and the save
+*** 'server/serve/handlers/save_buffer.rs'
+This file holds the save request's envelope parser and the save
+handler.
+*** 'update_from_and_rerender_buffer_with_approvals'
+This function (in 'save_buffer.rs') is the save handler proper.
+The review's "the handler" means it. Since slice 2 it takes the
+baseline as a parameter.
+*** 'error_unless_view_was_rendered_under_current_restriction'
+This function (in 'save_buffer.rs') is the restriction refusal.
+*** 'server/save.rs'
+This file prepares and applies a save's graph and file writes:
+the two phases, delete propagation and the PreparedSave.
+*** 'prepare_save_under_mutation_gate'
+This function (in 'save.rs') runs delete propagation, prepares
+phase one, builds the NodeMerge triples from phase one's
+candidate, prepares phase two, prepares both phases' file writes,
+and returns a PreparedSave. Its caller holds the mutation gate.
+*** 'graph_after_save' and 'final_candidate'
+These are the candidate graphs inside
+'prepare_save_under_mutation_gate': the graph after phase one,
+and the graph after phase two.
+*** 'PreparedSave'
+The type (in 'save.rs') of a save prepared and not yet applied.
+*** 'apply_delete_propagation_cleanup'
+This function (in 'save.rs') is delete propagation.
+*** 'SavePlan'
+The type ('server/types/save.rs') of the plan-builder's result.
+*** 'NodeMerge'
+The type ('server/types/save.rs') of a NodeMerge triple: fields
+'acquiree_text_preserver', 'updated_acquirer' and
+'acquiree_to_delete'.
+*** 'nodeMerge_instructions_from_pairs'
+This function ('server/nodeMerge/nodeMergeInstructionTriple.rs')
+builds the NodeMerge triples from the merge pairs, reading both
+merge nodes from the graph it is given, which since slice 1 is
+phase one's candidate. Its local names 'acquirer_from_disk' and
+'acquiree_from_disk' are older than that and misleading: the
+graph already holds phase one's edits.
+*** 'repair_saves_for_unwritten_candidates'
+This function ('server/serve/handlers/telescope_hoist.rs') makes
+the Hoist repairs.
+*** 'in_rust_graph_coherent_with_nodeInstructions_in'
+This function ('server/dbs/in_rust_graph.rs') is the coherence
+assertion's check.
+*** 'ForkSpec'
+The type ('server/types/save.rs') of one fork: the clone's Save
+instruction and the original's ID, title and skgrepo.
+** Errors
+*** 'BufferValidationError'
+The type ('server/types/errors.rs') of the errors that refuse a
+save before anything is written. Each variant has an org form
+('server/types/save.rs') and a one-line form ('errors.rs').
+*** 'ChangedSinceRendered'
+The variant of 'BufferValidationError' that is the stale error:
+'ChangedSinceRendered { change, headlines, gnid }', the change a
+'StaleGraphnodeReport', the headlines the buffer's occurrences of
+the graphnode.
+*** 'CannotDeleteAndMergeSimultaneously' and 'NodeMergeRole'
+The variant of the delete-and-merge refusal, and the enum
+('Acquirer', 'Acquiree') that says which merge node it names.
+*** 'CannotMoveAndMergeSimultaneously'
+The variant of the move-and-merge refusal.
+*** 'RenderedUnderAnotherSkgrepoRestriction'
+The variant of the restriction refusal.
+** Views and their dependencies
+*** 'server/types/views_state.rs'
+This file holds the per-connection bookkeeping of open views:
+'ViewforestId', 'OpenViews', 'ViewState' and
+'DiffViewBufferKind'.
+*** 'ViewState'
+'ViewState' is what the server keeps about one open view: its
+viewforest, the pids of its occurrences ('pids'), its
+'diffView_buffer_kind' (set for a buffer of the diff view), its
+viewnode ID record, whether the next "rerender all views" should
+extend it, and since slice 5
+'skgrepo_restriction_at_last_render'. It is built in two places,
+'OpenViews::register_view' and 'OpenViews::update_view'.
+*** 'OpenViews'
+The type of a connection's open views: a map from 'ViewforestId'
+to 'ViewState', and a map from every root ID, primary and extra,
+to the views it is a root of.
+*** 'OpenViews::content_viewforest_id_for_root_gnid'
+This method returns the first open content view whose roots
+include a given ID. It filters by the 'ViewforestId' variant
+only, so it also finds buffers of the diff view; it is the lookup
+behind the switch to an open view.
+*** 'OpenViews::clear'
+A removed method; see its entry under the rebuild.
+*** 'server/serve/handlers/save_dependencies/mod.rs'
+This file holds the dirty-view check and the choice of collateral
+views.
+*** 'SaveAffectedIds'
+'SaveAffectedIds' (in that file) holds a save's touched IDs and
+their collateral neighborhood in the graphs before and after the
+save, built by 'SaveAffectedIds::from_prepared'. Its
+'matching_identity' tells whether a gnid is among them, and both
+the collateral redraw and the dirty-view check use it; plan 4
+gives it a second pair of sets without links, for the check.
+*** 'dirty_view_conflicts'
+This function (in that file) is the dirty-view check.
+*** 'dependencies_from_viewforest' and 'dependencies_from_text'
+These functions (in that file) compute a dirty view's
+dependencies, from a viewforest the server holds and from a
+snapshot's text. Slice 4 removed a merge request's target from
+the first and the links of the text from the second.
+*** 'update_relevant_neighborhood'
+This method ('server/dbs/in_rust_graph/relation_accessors.rs')
+computes the collateral neighborhood of a set of IDs in one
+graph.
+** The rebuild and the runtime
+*** 'rebuild_session_lifetime_stores_in_place'
+This function
+('server/serve/handlers/rebuild_session_lifetime_stores.rs') is
+the rebuild. Since slice 6 it keeps the open views and drops only
+the graph straddle.
+*** 'RuntimeGeneration' and 'SharedRuntime::swap_in'
+'RuntimeGeneration' ('server/types/env.rs') is the bundle a
+swap-in installs, with its number 'generation';
+'SharedRuntime::swap_in' installs one.
+*** 'MutationGate'
+The type ('server/types/env.rs') of the mutation gate.
+*** 'LastChangeGenerations' and 'last_change_generations.rs'
+The retired map of last-change generations and its file, removed
+by slice 3.
+** Clients and the AI tool
+*** 'skg-clean-baseline'
+The Emacs buffer-local variable ('elisp/skg-buffer.el') holding a
+buffer's baseline.
+*** 'skg_clean_baseline'
+The Neovim buffer variable ('vim.b.skg_clean_baseline') holding a
+buffer's baseline.
+*** the AI tool, its '.full.org' file and its sidecar
+The AI tool is 'tools/skg-for-ai', a command-line client for AI
+agents. For each view it writes 'view_ID.full.org', the text as
+the server sent it, which serves as the view's baseline, and a
+sidecar, 'view_ID.view.json', recording the view's ID and server.
+The plan had assumed the sidecar held the text in a 'content'
+field; it does not.
+*** 'open_org_buffer_from_text'
+A Neovim test helper that opens a hand-built view from text the
+test supplies.
+** Tests
+*** 'tests/save_stale_buffers.rs'
+The Rust tests of the stale check. They drive several
+connections, open views through the server ('open_view') and save
+them with the text they were opened with as baseline ('save').
+*** 'tests/save_dirty_conflicts.rs'
+The Rust tests of the dirty-view check, which build dirty
+snapshots with 'dirty_buffer_snapshot'.
+*** 'update_from_and_rerender_buffer_test'
+A test harness ('server/test_utils.rs') that runs the same
+handler as a real save. Since slice 2 it passes the empty
+baseline, because its hand-written buffers were drawn by no
+server.
+*** 'import-md-and-org'
+The integration test that fails before and after the plan, in
+both clients; see 'a pre-existing failure'.
+*** 'diff-view'
+The integration test of the diff view; see 'the diff-view test's
+workaround'.
+** Records and documents
+*** 'progress.org'
+The record of plan 2_2's run, beside the plan.
+*** '3_1_review-reports/'
+The folder beside the review holding the reviewers' reports,
+'vocabulary-and-citations.org' and 'probes.org', and the final
+suite summary.
+*** 'ALL-after-slice-7.org'
+The copy, in '3_1_review-reports/', of 'tests/results/ALL.org'
+after the final 'bash/all-tests.sh' run, kept because the next
+run wipes 'tests/results/'.
+*** 'docs/api-and-formats.org'
+The protocol and format reference, which states the save request,
+the baseline of a view, the stale rule, the dirty-view rule, the
+restriction refusal and the rebuild; the plan's slices updated
+it.
+*** 'docs/glossary.org'
+The project's glossary, which plan 2_2 extended with "baseline,
+stale" and "merge node" and "merge pair" under "nodeMerge".
+*** 'TODO/problems.org' and 'TODO/DONE/problems.org'
+The problems file and its archive of solved entries; see 'the
+problems file'.
