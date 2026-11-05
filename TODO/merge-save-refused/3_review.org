@@ -1,0 +1,243 @@
+#+title: Plan 2_2 reviewed: stale saves decided by content
+* Verdict
+The plan did what it set out to do, in seven slices and about
+two and a half hours of agent time. The stale-save check now
+compares the buffer's baseline with the graph instead of
+comparing clock numbers; a merge is built on the save's own
+edits; every trace of 'rendered-at' and the runtime-generation
+request is gone from the server, both editors and the AI tool;
+a dirty view depends on what it shows; a view remembers the
+restriction it was drawn under; views survive a rebuild. The
+suites were green after every slice, with the one failure that
+predates the plan ('import-md-and-org', both clients).
+
+The probes found one regression the suites did not: after a
+nodeMerge of two siblings, their container's file lists both
+IDs, which now name one graphnode, and the content comparison
+read that as a change under every view of the container. The
+generation check had let such a save through, and the save
+cleaned the duplicate. Slice 7 fixes it by comparing the
+baseline's copy with the graphnode as a view reads it back,
+members resolved to pids and deduplicated. Slice 7 also applies
+the vocabulary review's ten cheap findings.
+
+Two behaviors deserve your decision (section "Decide"): whether
+an untouched but outdated copy in a buffer should refuse the
+save or be skipped, and whether the dirty-view check's remaining
+link over-matching should go.
+* What I checked myself
+The launches and the record in 'progress.org'; every slice's
+diff, and 'save_staleness.rs' read whole after slice 3 and the
+handler, plan-builder and 'save.rs' hunks after slice 1; the
+docs' statement of the model in 'docs/api-and-formats.org'
+through the agents' reports and the vocabulary review; the
+suites by the record, plus a baseline run of 'bash/all-tests.sh'
+before slice 1 (70 of 72 integration, all else green). I did not
+run the suites during the run; the agents did, and the two
+reviewers ran none.
+* Results
+** The run
+Seven slices, one Opus 5.5 agent each at high effort, launched
+in sequence with triage between. No slice stopped early. No
+slice needed a correction that changed behavior; the
+corrections carried forward were names, one test-script detail
+(the hand-built Neovim views' baselines), the Emacs-only
+integration script, and the review's findings as slice 7.
+** Durations, by the commits' times (UTC, 2026-11-05)
+Slice 1: 20:26 to 20:35 (two commits). Slice 2: 20:38 to 20:52.
+Slice 3: 20:54 to 21:25 (two commits). Slice 4: 21:26 to 21:30.
+Slice 5: 21:30 to 21:38. Slice 6: 21:39 to 21:53 (two commits).
+The two reviews ran in parallel from about 21:55 to 22:03.
+Slice 7: 22:05 to 22:14 (two commits). The orchestrator's
+notes in 'progress.org' give later clock times for slices 3 to
+6 than the commits do; the commits are right, the notes were
+estimates.
+** Counts
+Fifteen commits in 44464f2d..c7501d27 before slice 7: eight
+code commits, seven plan and record commits; slice 7 added two
+code commits and the review added three of record. The code
+commits before slice 7 changed 48 files of server, clients and
+tool (+872 -726), 78 test files (+1320 -556) and 6 docs (+261
+-155). The Rust suite
+went from 1115 to 1126 tests; Emacs from 445 to 444 and Neovim
+from 482 to 481, the removed generation tests outnumbering the
+new baseline tests by one each.
+** The final run
+'bash/all-tests.sh' after slice 7 (22:18): build, Emacs, Neovim,
+nextest (1128 tests) and doctests green; integration 70 of 72,
+the two failures the pre-existing 'import-md-and-org' in both
+clients, as in the baseline before slice 1. The summary is kept
+at '3_1_review-reports/ALL-after-slice-7.org'.
+** The commit rule
+Kept: each slice's last commit carries its docs and its DONE
+headline, and names the plan. Slice 2 made one commit where the
+plan suggested two, rightly: the server refuses an envelope with
+or without the new field, so server and clients could not land
+apart.
+** The problems file
+The three entries under "The stale-save check refuses saves
+needlessly (2026-11-05)" moved to 'TODO/DONE/problems.org' with
+slice 6. The provenance note stays in 'TODO/problems.org'.
+** What the record lost
+Nothing of substance. The orchestrator's clock times are off by
+up to twenty minutes for slices 3 to 6; the git times stand.
+* What each slice did beyond the plan's words
+** Slice 1
+Resolved the acquiree's ID to its pid before the pair enters the
+plan, so every later comparison is by pid. Replaced the old
+string-level "cannot be marked for deletion" check, which ran
+first and would have hidden the new error, with the new refusal
+by pid. Fixed the post-swap coherence assertion to count only
+the last instruction per ID, which phase one saving and phase
+two deleting the acquiree had tripped.
+** Slice 2
+The tool's baseline is its '.full.org' file, not a sidecar
+field the plan assumed. A client refuses locally to save a view
+without a baseline. New empty views needed no change: both
+clients already captured a baseline at creation.
+** Slice 3
+Met one case the plan missed: a body whose file still carries
+trailing whitespace is drawn with it and parsed without it, so
+the baseline's copy would have survived the noop filter forever;
+the baseline's writes are filtered once more against the graph
+as a view reads it back. The error's "Title:" line shows the
+graph's current title; the old one appears in the title aspect.
+The runtime generation now starts at 0. Parse errors in the
+baseline refuse the save.
+** Slice 4
+As planned; one existing test had relied on the over-matching
+the slice removes and was rewritten.
+** Slice 5
+Placed the restriction refusal first in the save handler,
+before the parse, so the parse's validators never judge a buffer
+under the wrong restriction. The test cannot use a switch that
+skips a view, since the switch handler rerenders every view; it
+sets the connection's restriction back by hand instead.
+** Slice 7
+Made the relationship lists canonical (pids, later duplicates
+dropped) on both sides of the baseline comparison, not the
+aliases, which are text. Gave the "NOTHING WAS SAVED" header to
+every unreadable envelope, not only the missing baseline. The
+glossary now defines "merge node" and "merge pair" as the plan
+did. While editing, the agent emptied Jeff's uncommitted
+'docs/glossary.org' by accident and rebuilt it from HEAD plus his
+one hunk; I checked afterwards that his hunk is in the working
+tree as it was.
+** Slice 6
+Both clients send the herald-rules request and then "rerender
+all views" just after the rebuild handler returns, outside it,
+so nothing behind the rebuild's answer is dropped. No
+restriction code was needed: the connection loop reconciles the
+restriction at the start of every request. Removed the now
+unused 'OpenViews::clear'. The diff-view integration test had
+to close its diff-view buffers before asking for a view of a
+root they hold: a view request switches to any open view with
+that root, diff-view buffers included, which the rebuild's
+forgetting of views had hidden (see "Decide").
+* The churn ledger within the plan
+- Slice 1 passed 'stale_write_errors' an empty nodeMerges slice;
+  slice 3 removed the parameter. Planned, two slices apart.
+- Slice 2 added an unused baseline parameter with an allow and a
+  TODO comment naming the plan; slice 3 used it and removed
+  both. Planned; the comment was a correction carried.
+- Slice 2 wrote 'skg_clean_baseline' from the hand-built text in
+  Neovim integration scripts; slice 3 set it to the empty text.
+  A false belief about the test scripts, caught by the agent's
+  own warning.
+- Slice 3's 'graphnode_as_drawn' is renamed and widened in slice
+  7 after the probes found the duplicate-member case. A
+  requirement the plan got wrong: it said a graphnode the buffer
+  shows as the graph has it is never stale, and did not know
+  that a graph's content list can name one graphnode twice.
+Cost of the churn: under an hour of agent time in all.
+* What the user sees differently
+** By decision
+- A save that edits a merge node and merges it keeps both; a
+  save that deletes a merge node and merges it is refused.
+- A stale save's error names what changed, with the body's
+  changed lines; no generation numbers anywhere.
+- A merge request, a whitespace strip, a restart or a rebuild no
+  longer makes a buffer stale; a node changed and changed back
+  does not either.
+- A dirty view whose only tie to a saved node is a merge request
+  or a link no longer blocks the save (but see "Decide" for the
+  other direction of links).
+- After a rebuild the clients redraw every view without unsaved
+  edits instead of telling the user to close them.
+- A save of a view rendered under another restriction is refused
+  by the server, not only prevented by the client.
+** By accident
+- A graphnode pasted into a view by ID, or into a new empty
+  view, is no longer checked for staleness: the buffer holds no
+  baseline copy of it. Decided in the discussion and documented,
+  but a protection the generation proxy gave in one case.
+- The container of merged siblings refused every save until
+  slice 7 (above).
+- Following a link to a node that is a root of an open diff-view
+  buffer lands in that buffer. This was always so; the rebuild's
+  forgetting of views had hidden it in one test.
+* The reviewers' reports
+'3_1_review-reports/vocabulary-and-citations.org': no code cites
+'TODO/'; no generation vocabulary survives; eleven findings, ten
+cheap and applied by slice 7, the eleventh ("drawn" and
+"rendered" both name the moment; "the buffer" and "this buffer"
+in one error) left as is because client tests match the error's
+first line. '3_1_review-reports/probes.org': twelve probes, nine
+as the plan says, one differing in the dirty-view link case
+(below), one revealing the duplicate-member regression, and two
+where my probe brief expected more than the plan promised
+(probes 2 and 6: a view holding an outdated, unedited copy of a
+changed node is refused, as before the plan).
+* Open questions
+Each stands alone; "stale" means a graphnode whose copy in the
+buffer no longer matches the graph.
+* Decide
+** TODO An untouched outdated copy: refuse, or skip?
+Today a buffer that shows A as it was, while A changed in the
+graph, is refused as stale when it saves, even if the user
+edited only B. The noop filter compares A's copy with the graph,
+finds a difference, and counts it as a write. This was so before
+the plan too. The baseline makes a finer rule possible: when the
+buffer's copy of A equals the baseline's copy, the user did not
+touch A, and the save could leave A out instead of refusing,
+redrawing the view with A's new state afterwards. That is the
+three-way rule "base equals mine, take theirs". It would be a
+few lines in 'stale_write_errors' and the noop filter's caller,
+and the error would then fire only for a graphnode the user
+edited that changed under them, which is the case the remedy
+text describes. I would do it.
+** TODO The dirty-view check still matches through links inbound
+Slice 4 stopped a dirty view's links from counting as its
+dependencies. But the save side still uses the collateral
+neighborhood, which includes the nodes linking to a saved node,
+so a dirty view of L, where L links to the saved A, still
+conflicts with A's save ('probes.org', probe 9). The neighborhood
+is right for redrawing clean views (a view can show a node's
+mentioners). For the dirty-view match it over-approximates, and
+the only render it protects is a mentioner folder in a dirty
+view, which that view cannot redraw anyway and never writes. I
+would compute the dirty-view match from the neighborhood without
+the link relation, leaving the collateral redraw as it is.
+** TODO Following a link to a diff-view root
+A view request for a node that is a root of an open diff-view
+buffer switches to that buffer. Slice 6's agent asked whether
+that is wanted; it predates the plan. I would have a view
+request prefer a content view, and open one when none shows the
+node, treating diff-view buffers as what they are.
+** TODO The rendered stale-save buffer
+Out of this plan by your decision: a write-protected diff-style
+buffer showing a stale graphnode's old and new text, drawn by
+the refresh in diff-view mode over a straddle of the baseline's
+copies and the graph. The pieces exist. When you want the
+merge-conflict generalization, this is its first use.
+* Suggestions for the advice
+- 'orchestration.org': the orchestrator should take its clock
+  times from 'date -u' at each launch and report, not estimate
+  them; my notes drifted by twenty minutes.
+- 'plans.org': a probe pass after the last slice found the one
+  regression the suites missed, as it did in plan 04.1; make the
+  probes part of the per-plan check, not only the full method.
+- 'plans.org', "Before writing a rule about existing behavior":
+  add that a rule about equality of two copies must say which
+  canonical form they are compared in; the duplicate-member case
+  was a comparison of raw lists where the view shows pids.

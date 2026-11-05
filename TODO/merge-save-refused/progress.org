@@ -677,3 +677,15 @@ resembles 'dedup_vector' ('types/list.rs') and 'dedup_members_by_gnid'
 'RelPartner's by member, so neither fits.
 *** Headline
 DONE.
+** Orchestrator's notes after slice 7 (2026-11-05, 22:18 UTC)
+Slice 7 launched 22:05, reported 22:14. The duplicate-member fix
+and its two tests read as the plan asked; Jeff's uncommitted
+glossary hunk survived the agent's accident (checked by 'git
+diff'). Final 'bash/all-tests.sh' at 22:18: build, Emacs,
+Neovim, nextest (1128) and doctests green; integration 70 of 72,
+the two failures the pre-existing 'import-md-and-org'. Summary
+kept at '3_1_review-reports/ALL-after-slice-7.org'. The per-plan
+review is '3_review.org'; its "Decide" section holds what awaits
+Jeff. The orchestrator's clock times in the notes above for
+slices 3 to 6 are estimates that ran late; the commits' times in
+the review are right.
