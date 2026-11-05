@@ -388,3 +388,8 @@ Slice 4 launched 21:52.
 Nothing.
 *** Headline
 DONE.
+** Orchestrator's notes after slice 4 (2026-11-05, 21:58 UTC)
+Slice 4 launched 21:52, reported 21:56 (4 minutes). One commit,
+as the plan asked; the one adapted test had relied on exactly
+the over-matching the slice removes. No correction needed.
+Slice 5 launched 21:59.

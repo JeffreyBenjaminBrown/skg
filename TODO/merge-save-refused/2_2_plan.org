@@ -654,6 +654,11 @@ Docs: the dirty-view paragraph of 'docs/api-and-formats.org'
 says what a dependency is and that a merge request's target and
 a link's target are not.
 ** TODO Slice 5: a view remembers its restriction
+*** Corrections carried from slice 4
+None. Slices 1 to 4 are DONE; the stale check runs in
+'update_from_and_rerender_buffer_with_approvals' right after the
+'SavePlan' is destructured, which is where this slice's refusal
+goes, before it.
 Add the restriction to 'ViewState' and set it at both
 constructions. In the save handler, before the stale check,
 refuse a save of a held view whose recorded set of shown
