@@ -1,0 +1,607 @@
+#+TITLE: A save carrying a merge request was refused as stale
+* The short answer
+The save was refused by the stale-save check, which protects a
+buffer's older text from overwriting newer changes. It fired on
+'event horizon' (e03f8bfd), the node the merge request names: the
+'acquiree', the node to be absorbed. That node changed (at
+15:32:03 today, most likely, when a save moved 'settling on
+eternity' into personal-ish) after the buffer was drawn.
+
+The refusal protects nothing. The buffer holds no text of the
+acquiree, and a merge reads the acquiree from the graph at save
+time, so the merge would have absorbed the newer change, not
+undone it. The check counts the acquiree as a node the buffer
+'writes' and dates it by the buffer, which never showed it.
+
+To proceed now, reopen the view and reapply the merge request
+(section 'Right now'). The fix I recommend is to stop checking
+the acquiree against the buffer's render time (section
+'Recommended fix').
+* DONE [jeff]
+It sounds like the problem is we're not updating the buffer's
+timestamp when it is rerendered. Each time a buffer is saved,
+collateral buffers are rerendered alongside it.
+If that had happened in this case, I wouldn't have gotten
+the errors, right? Is that the natural solution?
+(I had 'event horizon' open earlier, and had saved it,
+and then went to 'singularity' to merge them.)
+** DONE Claude says: a rerender does update it; this had none
+*** Every rerender stores the new timestamp
+A collateral rerender ends in 'skg--apply-streamed-view-update'
+('elisp/skg-request-save.el'), which replaces the buffer's text
+and then calls 'skg--store-rendered-at'. The "rerender views"
+stream goes through the same function. So a rerendered buffer
+does get the new rendered-at.
+*** The singularity view was not collateral to that save
+A save's 'collateral' views are the open views that show a node
+in the save's neighborhood. The neighborhood is the nodes the
+save wrote, plus every node related to one of them by contains,
+linksTo, subscribesTo, hidesFromSubs or an override chain
+('SaveAffectedIds' in
+'server/serve/handlers/save_dependencies/mod.rs', over
+'update_relevant_neighborhood').
+
+Your save from event horizon's buffer is the 15:32:03 one I
+found. It wrote event horizon and settling on eternity. No record
+in any .skg file connects either of them to the three nodes the
+singularity view shows, so nothing in that view changed. The
+server rightly skipped it, and its rendered-at stayed at ...809.
+*** Would a rerender have prevented the error? Yes
+A rerender of the singularity view after that save would have
+raised its rendered-at past ...812, and the check would have
+passed.
+*** Is that the natural solution? It works, but I'd do otherwise
+I'd still drop the acquiree from the check.
+
+Your idea has a cheap form. After each swap-in, the server could
+tell every open view the swap left alone that it is current as of
+the new generation, without resending its text. That is sound
+even for a buffer with unsaved edits, because the text under
+those edits still matches the graph. It is the section 'Not
+recommended: advance unaffected views' rendered-at' below, which
+I dismissed too quickly.
+
+I still prefer to stop checking the acquiree ('Recommended fix'),
+for three reasons.
+
+First, the two fixes cure the same cases. Apart from an acquiree,
+every node a save writes is one its buffer shows. A view showing
+a node that changed is collateral, so it is rerendered, or
+flagged as a conflict if it has unsaved edits. So the only check
+that re-dating would let through is the acquiree check.
+
+Second, re-dating costs more. Every path that swaps in a
+generation (save, reload of files changed on disk, whitespace
+strip, rebuild) would have to send it, and both clients, Emacs
+and Neovim, would need a handler for the new message.
+
+Third, dropping the acquiree removes the cause. The check
+compares the acquiree with a buffer that never contained it.
+Re-dating would make that comparison pass without making it mean
+anything.
+
+ANSWER:
+
+I'll default to: drop the acquiree from the check, and not
+re-date views.
+* The processes involved
+** Runtime generations
+The server's graph state moves through numbered 'runtime
+generations'. Each graph mutation (a save, a reload of files
+changed on disk, a body-whitespace strip, a rebuild) builds a new
+graph and swaps it in as the next generation: the previous number
+plus one ('SharedRuntime::swap_in' in 'server/types/env.rs').
+
+A server starts at the microseconds since the Unix epoch, so a
+buffer drawn by an earlier server process is always older than
+anything the current one has. Your numbers decode that way: the
+server started at about Tue 3 Nov 2026 15:31:26 UTC.
+** Last-change generations
+The in-Rust graph records, for every node, the generation at
+which it last changed ('LastChangeGenerations' in
+'server/dbs/in_rust_graph/last_change_generations.rs'). A node
+untouched since startup dates from startup. A mutation notes each
+node it wrote, and the swap-in stamps them with the new
+generation. A deleted node keeps its entry, so an old buffer
+cannot quietly recreate it.
+
+What counts as a write is wide. A save writes every node whose
+file changes, and that includes a node whose relationship records
+move between repos even though its title and body stay the same.
+** A buffer's 'rendered-at'
+Every view response carries the generation it was drawn at. The
+Emacs client keeps it in the buffer-local 'skg-rendered-at'
+('elisp/skg-buffer.el') and sends it back with every save, as
+'(rendered-at . "N")'.
+
+A buffer's rendered-at advances only when that buffer is redrawn.
+After a save, the server redraws the saved view and the
+'collateral' views, which are the open views that show a node the
+save changed. A view that shows none of those nodes keeps its old
+rendered-at. Its text is still accurate, but its date is not
+current.
+** The stale-save check
+Before a save writes anything or asks for any confirmation, it
+runs 'stale_write_errors'
+('server/serve/handlers/save_staleness.rs'). It collects the
+nodes the save would write:
+- the nodeInstructions the buffer's text yields, after dropping
+  the ones identical to the graph;
+- for each nodeMerge, both the acquirer and the acquiree.
+
+If any of them last changed at a generation later than the
+buffer's rendered-at, the whole save is refused, with one error
+per node. The reasoning: the buffer's text of that node predates
+the change, so writing it would silently undo the change.
+** How a save carries out a merge request
+A merge request, '(editRequest (merge ACQUIREE))' on the
+acquirer's headline, is set by 'skg-set-merge-request' (C-c s m).
+The save turns each request into a 'NodeMerge' triple
+('nodeMerge_from_acquirer_and_acquiree' in
+'server/nodeMerge/nodeMergeInstructionTriple.rs'):
+- a 'text preserver', a new node titled "MERGED: " plus the
+  acquiree's title, holding the acquiree's body;
+- the 'updated acquirer', which gains the acquiree's IDs,
+  contents, aliases and subscriptions, with relRepos kept (the
+  more private repo wins on a shared member);
+- a delete of the acquiree.
+
+The save builds all three from both nodes as the graph and the
+disk hold them at save time. They are not built from the buffer.
+That matters below.
+* What happened in this case
+** The buffer
+The buffer shows 'singularity' (3af6f2d0) and two of its
+children. The root carries '(editRequest (merge e03f8bfd-...))',
+which asks singularity to absorb 'event horizon'. Event horizon
+appears nowhere in the buffer.
+
+The buffer's rendered-at, ...809, is at most singularity's last
+change: singularity is also checked as the acquirer, and was not
+flagged. Singularity's file was last written at 15:28:17, when
+'the OpenAI math research dump' (336ddd2d) was added to its
+contents. So the buffer was presumably drawn by that save or soon
+after it.
+** What changed 'event horizon'
+At 15:32:03 a save moved 'settling on eternity' (743fd40c) from
+public to personal-ish. The move carried the containment record
+'event horizon contains settling on eternity' along with it, out
+of event horizon's public file and into a new personal-ish
+section:
+#+begin_example
+  public/e03f8bfd...skg        personal-ish/e03f8bfd...skg (new)
+  title: event horizon         pid: e03f8bfd-...
+  pid: e03f8bfd-...            contains:
+                               - 743fd40c-...
+#+end_example
+That save wrote event horizon, so its last change became a
+generation after ...809. ...812 is three swap-ins later. Other
+saves wrote files in public at 15:28:39, 15:30:36 and 15:31:08,
+so the count is plausible. I cannot confirm the exact mapping
+because the server keeps no log on disk and the files do not
+record generations. Whatever wrote e03f8bfd after ...809, the
+conclusion below is the same.
+
+Your singularity view does not show event horizon, so the 15:32
+save did not redraw it, and its rendered-at stayed at ...809.
+** Why the check fired
+The save named e03f8bfd as an acquiree. The check counts an
+acquiree among the nodes the buffer writes, compared its last
+change (...812) with the buffer's rendered-at (...809), and
+refused.
+
+The error lists no occurrences of the node under its heading. The
+check names the buffer's occurrences of each stale node, and this
+buffer has none. That absence is the sign of the misfire.
+* Why this refusal is a false positive
+** The merge reads the acquiree from the graph, not the buffer
+Every part of the merge's output that comes from the acquiree
+comes from 'graphnode_by_gnid' at save time: the text preserver's
+title and body, the contents, aliases and subscriptions joined
+into the acquirer, and the delete. Here, the merge would have
+joined 'settling on eternity' into singularity's contents at its
+new relRepo, personal-ish, which is exactly the 15:32 change.
+Nothing of the acquiree that is older than the save is written.
+** The error message's claims do not hold for an acquiree
+The message says "Saving would overwrite that change with this
+buffer's older text". The buffer has no text of the acquiree, so
+there is nothing older to write. Its remedy, reopening a fresh
+view and reapplying, works, but only because a fresh view carries
+a newer rendered-at. The fresh view still does not show the
+acquiree.
+** Where the inclusion came from
+Both merge nodes have been in the check since it landed
+('140fe7f5 The server refuses stale saves', 2026-11-01). I found
+no discussion of the merge case in TODO/; it looks unexamined
+rather than decided. The same rule is restated in
+'docs/api-and-formats.org' (the stale-buffer paragraph, around
+line 305) and in the module comment of 'save_staleness.rs'.
+* DONE [jeff] I still don't understand the error message.
+** DONE Claude says: here it is line by line, then rewritten
+*** "A node this save would write changed after ..."
+The line in full: "A node this save would write changed after the
+buffer was rendered".
+
+'A node this save would write' was event horizon. You didn't
+edit it, but the merge would delete it, after copying its text
+into a new node and its contents into singularity. The check
+counts that delete as writing event horizon.
+
+'The buffer was rendered' refers to the last time the server
+sent this buffer's text, as opposed to the edits you made since.
+*** "- ID: e03f8bfd-..."
+That is event horizon. The message gives only the ID, never the
+title, which is part of why it was hard to read.
+*** "- The buffer was rendered at runtime generation ..."
+The line in full: "The buffer was rendered at runtime generation
+...809; the node last changed at runtime generation ...812."
+
+A 'runtime generation' is a counter the server keeps. It goes up
+by one each time the graph changes: each save, each reload of
+files edited outside skg. When a server starts, the counter is
+set to the current time in microseconds, which is why the numbers
+are so long. Only the last few digits matter.
+
+So the line says: the server last drew this buffer at tick 809,
+and event horizon changed at tick 812, three changes later. That
+change was your save from event horizon's buffer, which moved
+settling on eternity into personal-ish.
+*** "- Saving would overwrite that change with ..."
+The line in full: "Saving would overwrite that change with this
+buffer's older text."
+
+This is the check's reason for refusing, and it does not fit this
+case. The check was written for a node the buffer shows: if the
+buffer's copy of a node is older than the graph's, saving the
+buffer would replace the newer version with the older one.
+
+This buffer holds no copy of event horizon, so it has no older
+text to write. The merge would read event horizon as it is now,
+change included. This sentence is false here, and that is the
+false positive.
+*** "Archive your edits ..., reopen a fresh view, ..."
+This is the generic remedy. A reopened view is drawn at the
+current tick, so the check passes. If the merge request was your
+only edit, there is nothing to archive: reopen singularity and
+set the merge request again.
+*** What it could have said
+Once the fix lands, this message cannot occur for a merge. Until
+then, or for any stale node, it would read better with the title,
+the node's role in the save, and no generation numbers:
+#+begin_example
+  ** Error 1
+  'event horizon' (e03f8bfd-...) changed after this buffer
+  was drawn, 3 graph changes later, by another save or a file
+  change.
+  This buffer's merge request would absorb it.
+  Reopen this view and set the merge request again.
+#+end_example
+For a node the buffer shows, the last two lines would instead
+say: "Saving would replace that change with this buffer's older
+copy of it. Archive your edits (M-x skg-show-unsaved-changes),
+reopen the view, and reapply them."
+
+Including the title and replacing the generation numbers with a
+count of changes would help every stale-save error, not only
+merges. Both are cheap: the graph has the title, and the count is
+the difference of the two numbers.
+
+ANSWER:
+
+I'll default to: the title and the change count go into every
+stale-save error, alongside the merge fix.
+
+* DONE [jeff] So this applies only to merges?
+Is there no other situation in which a similar problem could arise?
+** DONE Claude says: mostly merges; one mirror, one minor case
+*** What made the merge case go wrong
+Two things had to hold at once. The check covered a node whose
+written content does not come from the buffer's text. And a
+change to that node did not redraw the buffer, so the buffer's
+date fell behind.
+
+For most writes the second condition cannot hold. Apart from
+merge nodes, everything the check covers is a node the buffer
+shows, and a change to a shown node makes the buffer collateral,
+so it is redrawn. If the buffer has unsaved edits, the save that
+would change the node is refused instead, as a conflict with that
+dirty view. The writes a save derives from the graph (delete
+propagation, Hoist repairs, fork clones and the rest) are not
+checked at all.
+*** The mirror: a dirty buffer's merge request blocks other saves
+Before any save, the server refuses it if it would affect an open
+view that has unsaved edits ('dirty_view_conflicts' in
+'server/serve/handlers/save_dependencies/mod.rs'). Among a dirty
+view's dependencies it counts the target of every merge request
+in its text, which is to say the acquiree.
+
+So had you set the merge request on singularity before saving
+event horizon, the event-horizon save would have been refused as
+a conflict with the singularity buffer. That refusal protects
+nothing either, for the same reason: the merge will read the
+acquiree at its own save time. If the acquiree leaves the stale
+check, it should leave this list too. Add this to the
+'Recommended fix'.
+*** Minor: a whitespace strip dates nodes without redrawing
+'skg-strip-trailing-whitespace-from-bodies' marks every node it
+changes as changed at a new generation
+('server/serve/handlers/strip_body_whitespace.rs'), but no open
+view is redrawn. A buffer that shows such a node, and then edits
+it, is refused as stale.
+
+Nothing would be undone, though: every save already strips
+trailing whitespace from every line it parses
+('divide_into_viewNodeLineCols' in
+'server/from_text/buffer_to_viewnodes/uninterpreted.rs'). The fix
+is for the strip not to mark the nodes as changed. The graph
+stores no body text, so the graph itself does not change. This
+only matters if you run the strip with views open, so I would
+just note it in 'TODO/problems.org'.
+*** Deliberate refusals, which are not this problem
+A server restart and a 'skg-rebuild-session-lifetime-stores' both
+make every existing buffer stale for every node it would write.
+The restart does it on purpose (see 'Runtime generations' below),
+and the rebuild tells you to close all views. In both cases the
+buffer's text genuinely may be out of date.
+*** A cousin, already known: dirty-view conflicts over-match
+The dirty-view conflict check counts every node a dirty view
+mentions, links included. A comment there (a PITFALL) already
+says that two buffers can conflict merely because both link to
+some third node. That is the same kind of over-caution, but it is
+known and was chosen for convenience.
+* Solutions
+** DONE Right now: reapply the merge on a fresh render
+1. If the buffer holds any edit besides the merge request,
+   archive it first (M-x skg-show-unsaved-changes). The error
+   shows only the stale node, so it does not tell you whether
+   other edits exist.
+2. Close the buffer and reopen a view of singularity. 'rerender
+   all views' will not help, because it skips buffers with
+   unsaved edits.
+3. On the fresh root, run C-c s m with event horizon's ID and
+   save.
+
+This succeeds unless event horizon changes again between the
+reopen and the save.
+
+One thing to watch when it succeeds: settling on eternity's
+containment record now lives in personal-ish. The merge keeps
+that relRepo, so singularity will gain a personal-ish contains
+section. That is correct, but the diff will show it.
+** DONE Recommended fix: do not date the acquiree by the buffer
+*** The change
+In 'stale_write_errors', stop contributing 'acquiree_gnid' from
+nodeMerges. The acquirer stays (see the open question about it).
+This is a one-line change to the 'chain' over nodeMerges.
+**** DONE UPDATED [Claude] drop the acquirer too
+The acquirer investigation showed that the merge-specific
+acquirer entry protects nothing. The stale check should cover
+only the nodeInstructions, so the whole 'chain' over nodeMerges
+goes. The same investigation found that a merge discards the
+buffer's edits to its nodes, which is a separate fix. See the
+reply under 'Should the merge's check also skip the acquirer?'.
+*** The one acquiree change worth refusing
+One change to an acquiree since the render would make the request
+mean something other than what the user asked for: the acquiree's
+ID being absorbed by some other node X through another merge.
+'pid_else_raw_id' would then resolve the ID to X, and the save
+would merge X, a node the user never chose. (Today that case is
+refused only incidentally, by the same check.)
+
+That case is not about staleness, and the generation comparison
+does not even catch it reliably: an ID absorbed before the render
+passes the check. The right guard is a merge validation in
+'validate_nodeMerge.rs' that refuses an acquiree ID that is no
+longer a node's primary ID ("e03f8bfd was merged into X; merge X
+instead?"). This needs checking first: 'graphnode_by_gnid' and
+the existing validation may already refuse it.
+**** DONE UPDATED [Claude] withdrawn
+You pointed out that merging by an extra ID is legitimate. There
+is no guard to add. See the reply under 'Refuse an acquiree ID
+that was absorbed elsewhere?'.
+*** DONE UPDATED [Claude] the dirty-view conflict check too
+The same change belongs in 'dependencies_from_viewforest'
+('server/serve/handlers/save_dependencies/mod.rs'): it should
+stop counting a merge request's target as a dependency of a dirty
+view.
+See the reply under 'So this applies only to merges?'.
+*** Docs to update
+- 'docs/api-and-formats.org', the stale-buffer paragraph: "plus
+  the two nodes of each nodeMerge" goes, replaced by one sentence
+  on why a merge's nodes are not dated by the buffer.
+- The module comment of
+  'server/serve/handlers/save_staleness.rs'.
+*** Tests
+A unit test beside the existing staleness tests should cover both
+cases:
+- acquirer A in the buffer, acquiree B written after the render:
+  no stale error;
+- acquirer A unedited in the buffer, A written after the render:
+  no stale error;
+- the buffer edits A's title, and A was written after the render:
+  still refused (the ordinary rule, unchanged).
+
+The lost-edits fix needs its own test: edit A's title and merge B
+into A in one save, then check A's title (or check the refusal,
+if that is the fix chosen).
+** Alternative: date the merge request instead of the buffer
+The client could stamp the merge request with the generation at
+which the user picked the acquiree (C-c s m runs then), and the
+server could compare against that. This would protect the user's
+intent: "I chose to absorb the node as I saw it then."
+
+I don't recommend it. The user usually picks the acquiree from a
+different buffer, which has its own rendered-at, and the merge
+preserves the acquiree's text in full. Nothing is lost if the
+acquiree changed in between, and the cost is a new field in the
+editRequest grammar of both clients.
+** Not recommended: advance unaffected views' rendered-at
+The server could advance the rendered-at of every view that a
+swap did not touch, since its text is still current. That would
+fix this case too, but it means a message to every client on
+every mutation, to cure a false positive that, as far as I can
+see, only merges produce. A node the view shows is redrawn when
+it changes, and a node the view does not show is written only
+through a merge.
+** Smaller, either way: a clearer message
+If the acquiree check stays in any form, its error should name
+the role and drop the false claim. For example: "The node this
+buffer's merge request would absorb (e03f8bfd) changed after the
+buffer was rendered. Reopen the view and set the merge request
+again." The 'ChangedSinceRendered' error would need to carry the
+role, or a sibling variant would be added.
+* DONE Open questions
+** DONE Should the merge's check also skip the acquirer?
+The 'acquirer' is the node that absorbs the other. When the
+buffer does not edit the acquirer, its nodeInstruction is dropped
+as a no-op, but the merge still counts it as written. Like the
+acquiree, it is rebuilt from the graph, so an acquirer changed
+after the render (in a view that was not redrawn) is refused for
+no reason too. When the buffer does edit the acquirer, the
+ordinary rule already checks it.
+
+I have not traced how the buffer's edits to an acquirer combine
+with the 'updated acquirer' the merge builds from the graph. If
+the merge's version wins, the buffer's edits to the acquirer are
+silently dropped, which is a separate bug. Until that is traced,
+I would keep the acquirer in the check: it is conservative, and
+in this case it did not fire.
+
+ANSWER:
+
+I'll default to: drop only the acquiree now, and trace the
+acquirer before deciding.
+*** DONE [jeff] Please do the investigation.
+**** DONE Claude says: a merge discards edits to its own nodes
+***** The experiment
+I ran an isolated server on scratch data. The data had a root
+containing 'A old' (body "a body old") and 'B'. In one buffer I
+retitled A to 'A new', changed its body to "a body new", added
+'(editRequest (merge b))' to A, and saved.
+
+The save succeeded with no error and no warning. The redrawn
+buffer and A's file both say 'A old' and "a body old". The merge
+itself happened: B's ID is now one of A's extra IDs, and 'MERGED:
+B' is A's first child. Only the edits were lost, without a word.
+***** Why
+A save runs in two phases ('prepare_save_under_mutation_gate' in
+'server/save.rs'). Phase one writes the buffer's ordinary edits,
+including the edits to A. Phase two writes the merge.
+
+But the merge was computed before phase one, from the graph and
+files as they stood before the save
+('nodeMerge_instructions_from_pairs', called from
+'server/from_text.rs'). So phase two writes a version of A that
+predates the buffer's edits, over the version phase one just
+wrote.
+
+By the same reading, though I did not run it, the acquiree's
+edits are lost the same way when the buffer shows the acquiree
+and edits it. The text preserver gets the acquiree's title and
+body from before the save.
+***** What this means for the stale check
+At the moment the merge-specific check on the acquirer protects
+nothing, for the same reason as the acquiree. Whatever the buffer
+says about the acquirer, the merge writes the graph's version.
+
+Once this bug is fixed, the buffer's text of the acquirer will be
+written. But it will be written through its ordinary
+nodeInstruction, which the ordinary rule already checks whenever
+the buffer edits it. So the merge-specific entry for the acquirer
+is redundant either way. I now recommend that the stale check
+cover only the nodeInstructions and drop both merge nodes.
+***** Two ways to fix the lost edits
+The first way is to build the merge on top of the buffer's
+edits. This is the behavior a user expects. It is not a
+one-line change, because the merge reads bodies from disk
+('graphnode_by_gnid'), and the disk does not have phase one's
+edits yet. The merge would
+have to read A and B from phase one's nodeInstructions where they
+exist, and from the disk only where they do not.
+
+The second way is to refuse a save that both edits a merge node
+and merges it, saying "save your edits to A first, then merge".
+There is a precedent, 'CannotMoveAndMergeSimultaneously'. It is
+small and safe, but it costs the user an extra save.
+
+I'd do the second now and the first if refusals become annoying.
+The first is what you would want eventually.
+
+ANSWER:
+
+I'll default to: refuse edit-plus-merge in one save, and drop
+both merge nodes from the stale check.
+****** DONE [jeff] your defaults are good
+** DONE Refuse an acquiree ID that was absorbed elsewhere?
+This is the guard described under 'The one acquiree change worth
+refusing': refuse a merge request whose acquiree ID has become an
+extra ID of another node, rather than silently merging that other
+node.
+
+ANSWER:
+
+I'll default to: yes, as a nodeMerge validation, independent of
+generations.
+*** DONE [jeff] You're losing me at "has become".
+Are you saying to not permit any merge request
+for which the acquiree ID is an extra-id?
+If so, no, that seems wrong.
+We should be able to merge on extra-IDs.
+**** DONE Claude says: yes, that's what it said, and you're right
+I meant a timing case. You set a merge request naming B. Before
+you save it, B is merged into some other node X, so B's ID now
+names X. Your save then merges X, which you never chose.
+
+But an extra ID exists to go on naming the node that absorbed
+it. Merging by an extra ID is the same as merging by any old link
+to that node, and the server cannot tell the timing case apart
+from the deliberate one. The case is also rare: it needs a second
+merge of B between your choosing B and your saving. So I withdraw
+the guard and the open question. Merges by extra ID stay allowed.
+* DONE Claude says: questions from writing 2_plan.org
+** DONE (chosen, switchable) The refusal covers derived writes
+The refusal of a save that merges a node and also changes it
+(slice 1) looks at more than the buffer's own edits. It also
+counts the writes a save adds by itself: delete propagation,
+strandeds resets and restore requests. Phase two would undo those
+too. For example, deleting a child of the acquirer while merging
+into it would [before or after this plan is executed? --jeff] leave the acquirer still listing the deleted child.
+
+Hoist repairs are the exception. The server deliberately writes
+the acquiree before a merge when its text sits below its home
+(see 'repair_saves_for_unwritten_candidates' in
+'save_buffer.rs'), so the refusal runs before those are added.
+
+The alternative is to refuse only the buffer's own edits, and let
+derived writes to a merge node be silently undone.
+
+ANSWER:
+
+I'll default to: refuse derived writes too, Hoist repairs
+excepted, as the plan says.
+*** DONE Claude says: before the plan; after it, refused
+That sentence describes the code as it is now, before the plan
+runs. I have now checked it on a scratch server, not only by
+reading. The data was a root containing A and B, with A
+containing D. One save marked D for deletion and merged B into A.
+It succeeded with no error or warning. D's file was deleted, but
+A's file still lists D, and the redrawn buffer shows D under A as
+an unknown node.
+
+After slice 1, that same save will be refused, naming A, because
+the delete's propagation writes A and A is a merge node. The user
+saves the delete first and then the merge, and neither undoes the
+other.
+**** DONE [jeff] perfect
+** DONE (chosen, switchable) The whitespace-strip fix is slice 4
+You did not explicitly decide the whitespace-strip case. I put
+its fix in the plan as the last slice, because it is a one-line
+change in the same mechanism. Checking it for the plan, I
+confirmed that a save cannot undo a strip. Every save trims
+trailing whitespace from each line, and the YAML writer cannot
+store a body's trailing newlines.
+
+ANSWER:
+
+I'll default to: keep slice 4.
+*** DONE [jeff] default is good

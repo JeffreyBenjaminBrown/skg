@@ -72,6 +72,12 @@ A config option, for recording videos.
 Could put a second minibuffer line,
 that reads if anything (key sequence -> command),
 leaving a trail for five seconds or until interrupted.
+** TODO URGENT : diff mode
+*** is too slow
+each request hits the server. maybe don't; accumulate them.
+*** should not count among the views one is taken to
+when visiting a node. e.g. I should be able to ask to open a view
+of one of the roots of that buffer, and go to a new buffer.
 ** TODO CRITICAL : don't force that we keep owned files under 'owned/'
 Let the user do that,
 but have them write out an explicit path for each owned repo,

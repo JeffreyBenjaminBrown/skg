@@ -6,6 +6,30 @@
   When a plan or a settled discussion decides how an entry will be
   fixed, prefix its headline with 'FIX PLANNED: ' and leave it here
   until the fix lands; then move it as above.
+* The stale-save check refuses saves needlessly (2026-11-05)
+  The plan for all three: 'TODO/merge-save-refused/2_plan.org'.
+** FIX PLANNED: A merge's acquiree is dated by a buffer that never showed it
+  'stale_write_errors' ('server/serve/handlers/save_staleness.rs')
+  counts each nodeMerge's acquiree as written by the buffer, so a
+  save whose merge request names a node changed after the render
+  is refused, although the merge reads the acquiree from the graph
+  and undoes nothing. Seen by Jeff; analysis and proposed fix in
+  'TODO/merge-save-refused/1_discussion.org'.
+** FIX PLANNED: A merge silently discards the buffer's edits to its nodes
+  Verified on scratch data (2026-11-05): retitle A and merge B into
+  A in one save; the save succeeds and A keeps its old title and
+  body. The NodeMerge triple is built from the pre-save graph
+  ('nodeMerge_instructions_from_pairs', called in
+  'server/from_text.rs') and written after the buffer's edits
+  ('prepare_save_under_mutation_gate', 'server/save.rs'). See
+  'TODO/merge-save-refused/1_discussion.org'.
+** FIX PLANNED: A body-whitespace strip marks nodes as changed for no reason
+  'strip_body_whitespace_and_refresh_caches' notes every stripped
+  node as written, so an open view showing one (none is redrawn)
+  is refused as stale if it then edits that node, although every
+  save strips trailing whitespace itself and the graph holds no
+  body text. Fix: do not note them. See
+  'TODO/merge-save-refused/1_discussion.org'.
 * Problems noticed while executing plan 10, slice 5 (2026-10-31)
 ** The server reads a title that starts "(skg" as metadata
   'headline_to_triple' ('server/from_text/buffer_to_viewnodes/

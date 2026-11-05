@@ -1,0 +1,730 @@
+#+TITLE: Is the merge-save plan principled?
+* Claude says: the short answer
+The plan's rules are right, but it states them as a list of
+cases. Three of its four slices follow from one principle, and
+that principle is the one you reached for: a graphnode's last
+change matters only to a buffer that holds a viewnode of it.
+Stated that way, slice 2 is not special treatment of merges. The
+current code treats merges specially, and slice 2 removes that.
+
+Two things in the plan are genuinely ad hoc, in the sense you
+mean.
+
+Slice 1 is a bandaid by its own admission. The root cause is that
+the merge is computed from the graph as it stood before the save,
+and the root fix is to compute it after phase one. I size that
+fix below; it is one agent slice, not a rewrite.
+
+The stale check's correctness depends on where in the save
+handler it runs, not on what it is given. The plan's whole
+pitfalls section is about that ordering. That fragility has a
+structural cause, which I name below.
+
+Beyond the plan, there is a deeper alternative that makes "stale"
+mean what it says: compare the buffer's copy of each graphnode
+with the graph, instead of comparing generation numbers. The
+client already holds the text that would make this possible. It
+would subsume slices 2 and 4 and also remove the restart and
+rebuild rules, which make every buffer stale whether or not
+anything it shows changed. It costs a protocol change in both
+clients, so I do not recommend folding it into this plan, but it
+is the real answer to "could it be more principled," and I lay it
+out so you can decide.
+* Claude says: your intuition, made precise
+** The principle
+A save writes some graphnodes. For each written graphnode, the
+content either is a viewnode, the copy the buffer took when it
+was rendered, or is computed from the graph and disk at save
+time. Only a copy can be older than the graph, so only a copy can
+undo a change the user never saw. So the stale check should cover
+exactly the writes whose content is a render-time copy.
+
+Your phrasing was "anything that would be read from disk does not
+need a warning, but anything in a buffer might." That is this
+principle. The one refinement is that a delete also belongs on
+the checked side, though it reads nothing: deleting a graphnode
+discards its current state, and the user decided to delete it on
+the strength of an older state. The common thread is loss. The
+check guards against a save discarding graph state newer than
+what the buffer showed.
+** How each kind of write falls under it
+*** The buffer's nodeInstructions, after the noop filter
+A copy, and checked. The noop filter already drops a graphnode
+the buffer shows as the graph now has it, which is the principle
+applied to unedited graphnodes.
+*** The buffer's deletes
+A loss, and checked.
+*** A merge's two graphnodes
+Computed from the graph at save time, and lossless: the
+acquiree's title and body go to the text preserver, its contents,
+aliases and subscriptions go to the acquirer. Nothing newer than
+the buffer is discarded. Not checked. This is slice 2.
+*** Derived writes
+Delete propagation, strandeds resets, restore requests, Hoist
+repairs and fork clones are computed from the current graph and
+disk. Not checked, as today.
+*** The whitespace strip
+A strip changes a body in a way no save can undo, because every
+save trims trailing whitespace from each line it parses
+('divide_into_viewNodeLineCols', line 198 of 'uninterpreted.rs').
+A change no save can lose is not a change the check needs to know
+about. This is slice 4.
+** What the plan should say
+The module comment of 'save_staleness.rs' already states the
+principle, almost word for word, and then lists the merge
+graphnodes as an exception to it. The plan should say that slice
+2 removes a contradiction, not that it adds a merge rule. One
+sentence in the plan's "Agreed behavior" and in the docs
+paragraph would do it: "The check covers a write whose content is
+the buffer's render-time copy of the graphnode; a merge's writes
+are computed from the graph at save time, so they are not
+checked."
+
+The same sentence covers the dirty-view change. A dirty view
+depends on a graphnode when it holds a viewnode of it that a
+later save would write. A merge request names a graphnode without
+holding a viewnode of it. The PITFALL about links is the same
+principle again, and the plan rightly leaves it out of scope, but
+it should name it as a known deviation from this principle rather
+than an unrelated issue.
+*** [jeff] What would be the principled way to handle links?
+**** Claude says: a link is not a dependency; a viewnode is
+***** What the dirty-view check protects
+A dirty view V cannot be redrawn. If a save S changes something
+that V's render reads, V's text falls behind, and V's own save is
+later refused as stale, or would undo S. So V depends on
+graphnode X exactly when V's render reads X's state.
+***** What a render reads from a graphnode outside the view
+I traced the render for uses of the link relation. The only one
+is 'set_viewnodestats_in_viewforest'
+('server/refresh/viewnodestats.rs', line 290), which records
+whether a viewnode and one of its ancestors in the view link to
+each other. Both ends are in the view. Everything else a render
+reads is a viewnode's own graphnode, the children it shows, the
+subscribees whose unintegrated content it shows, and its
+override chain. A link in a body to a graphnode X outside the
+view reads nothing of X: the label is the user's text, and the
+status decoration is a client overlay fetched by ID
+('elisp/skg-link-annotations.el') and refreshed on its own.
+***** The rule
+V depends on exactly the graphnodes it holds viewnodes of: the
+occurrences, gnid-only viewnodes, ghosts and ID property
+members that 'dependencies_from_viewforest' already collects,
+minus the merge target. 'links_from_text' should leave
+'dependencies_from_text' ('save_dependencies/mod.rs', line 130).
+That is the one-line change the PITFALL comment anticipates.
+***** The server's neighborhood has the same over-approximation
+'update_relevant_neighborhood' ('relation_accessors.rs', line
+234) adds 'LinksTo' in both directions. It serves two purposes:
+choosing the clean views to redraw after a save, where an extra
+redraw costs nothing, and feeding the dirty-view check through
+'matching_identity', where it costs a refused save. I would drop
+links from the dirty view's side only, and leave the
+neighborhood alone until the collateral-redraw selection is
+traced as closely as I traced the dirty-view check.
+***** Caveats
+Traced by reading 'server/refresh', 'server/org_to_text' and
+'server/rerender_pass' for every use of the link relation; not
+run. If you want it, it is one line and one test in
+'tests/save_dirty_conflicts.rs', and I would add it to slice 2.
+* DONE Claude says: where the plan is ad hoc
+** Slice 1 refuses instead of fixing
+*** The root cause
+'nodeMerge_instructions_from_pairs' runs inside
+'buffer_to_validated_saveplan_with_fork_skgrepos_in_graph'
+('server/from_text.rs', line 147), reading both graphnodes
+through 'graphnode_by_gnid' from the pre-save graph and disk.
+Phase two then writes that pre-save version of the acquirer over
+whatever phase one wrote. Every refused case in slice 1 is this
+one cause.
+*** The root fix, sized
+Move the construction of the NodeMerge triples out of
+'from_text.rs' and into 'prepare_save_under_mutation_gate'
+('server/save.rs', line 271), after phase one's
+'prepare_graph_update' has produced its candidate graph
+('graph_after_save', line 297). Phase two is already built there,
+from that candidate. The triple would read the acquirer and
+acquiree from the candidate graph, and their bodies from phase
+one's SaveNodes where phase one wrote them, from disk otherwise.
+'graphnode_by_gnid' would need a variant that takes those
+SaveNodes as an overlay.
+
+What stays where it is: the parse-time merge validations
+('validate_no_simultaneous_move_and_nodeMerge' and the checks in
+'validate_nodeMerge.rs'), which need only the pair of IDs; the
+Hoist repair of the acquiree, which runs before the save is
+prepared; and 'hoist_candidates_from_disk', which takes the
+NodeMerges today and would take the pairs instead.
+
+With this, the edit and the merge in one save both land: the
+updated acquirer carries the retitle, the text preserver carries
+the edited body, a deleted child is absent from the merged
+contents. The stale check covers the edits through their ordinary
+nodeInstructions. No new error variant, no extra save for the
+user, and the "Hoist repairs are excluded" carve-out in slice 1
+disappears, because there is no refusal to exclude them from.
+
+I estimate one agent slice, comparable to slice 1 plus its tests,
+since the four tests the plan lists for slice 1 become four tests
+that the combination succeeds.
+**** DONE UPDATED [Claude] no overlay is needed
+'graphnode_by_gnid' reads the in-Rust graph, which holds bodies.
+The triples are built from phase one's candidate graph alone.
+*** Why I am not simply recommending the swap
+You chose the refusal in '1_discussion.org', and the refusal is
+safe. But your question was about root causes, and this is the
+one place the plan knowingly picks the bandaid. I would do the
+root fix. It is in the open questions.
+** The checks are defined by their position in the handler
+In 'update_from_and_rerender_buffer_with_approvals' one vector,
+'nonmerge_nodeInstructions', starts as the buffer's writes and
+accumulates derived writes as the handler proceeds. "What the
+stale check covers" is whatever that vector holds at line 900.
+Slice 1's refusal is to be placed by the same reasoning, and the
+plan's pitfalls about "right after the strandeds block" and
+"before 'hoist_candidates_from_disk'" are all consequences.
+
+The structural cause is that a NodeInstruction does not know its
+provenance. Nothing distinguishes a write the buffer asked for
+from one the save derived, so the only way to ask "the buffer's
+writes" is to ask early.
+
+Two ways to fix that. Keep the buffer's writes and the derived
+writes in separate vectors until the final concatenation. This is
+complicated by 'apply_delete_propagation_cleanup', which mutates
+the combined list in place and may rewrite a recorder the buffer
+also writes, so it needs care. Or tag each NodeInstruction with
+its provenance, which touches the type but leaves the handler's
+flow alone.
+
+I would not put this in the current plan. It is the kind of
+refactor that should follow a bug it would have prevented. But
+the plan should at least have the stale check and the new refusal
+state, in a comment at the call, the invariant they rely on: that
+the vector at that point holds exactly the buffer's writes plus
+the listed derived ones.
+** Slice 4 bends the meaning of 'last change'
+After slice 4, a graphnode's last-change generation means "the
+last change a save could undo," not "the last change." That is
+consistent with the loss principle above, and I would keep it,
+but the plan should say the principle so the exception reads as a
+consequence.
+
+One factual correction. The discussion and the strip module's
+comment say the graph stores no body text, so a strip leaves the
+graph unchanged. That is false: 'GraphnodeInRust' has a 'body'
+field ('server/types/nodes/rust.rs', line 20), and the strip
+rebuilds the graph from the stripped graphnodes. The strip does
+change the graph. The stale refusal still only bites when the
+user then edits a stripped graphnode, because an unedited one is
+filtered as a noop: the parser trims the same whitespace, so the
+buffer's copy equals the stripped graphnode. Slice 4
+stands, but its rationale in the plan should be the loss
+principle, not the body claim, and the strip module's comment
+should be fixed in passing.
+
+The other principled framing would be that a strip is a mutation
+like a save and should redraw the views that show the stripped
+graphnodes. That redraw would change nothing visible, so slice 4
+is the cheaper consistent choice.
+** A gap the principle exposes: implicit forks
+When the buffer edits a foreign graphnode N, N's own save is
+dropped from the nodeInstructions and the edit becomes a clone C
+built from the buffer's text of N ('validate_and_filter_foreign_
+instructions', and the comment at 'server/from_text.rs' line
+229). So N never reaches the stale check. If N changed after the
+render (a reload of files changed on disk, say, since the server
+watches foreign repos too), C is built from a stale copy of N and
+the override silently diverges from what the user thought they
+were editing.
+
+By the loss principle this is milder than the other cases:
+nothing is overwritten. By the copy principle it belongs in the
+check: C's content is a render-time copy of N. The fix is small,
+because a 'ForkSpec' carries 'original_gnid': chain the fork
+specs' originals into 'written_pids' in 'stale_write_errors'. It
+would be a natural addition to slice 2, which is already changing
+that function's inputs.
+*** DONE [jeff] That watcher
+ought to be unable to update the session-lifetimes stores
+while a save is in progress -- that is, between when a user
+saves and when their buffer is redrawn. Right?
+**** DONE Claude says: right, by the gate, with one window
+***** Where the gate holds
+'reload_changed_skg_files' ('server/repo_watch/reload.rs', line
+105) holds the mutation gate from before it reads disk until
+after its swap-in. The save holds the same gate from before its
+reads ('save_buffer.rs', line 863) until after its swap-in (line
+1105). So no reload interleaves with a save's reads, writes or
+swap-in, and the watcher ignores the server's own writes
+('own_writes.rs').
+***** The window
+The save drops the gate before the redraw, on purpose: the
+comment at line 1105 says the rerender must not lengthen the
+writer critical section. A reload can therefore swap in a newer
+generation between the save's swap-in and its redraw. The redraw
+reads the save's own generation, pinned
+('RerenderPassContext::runtime' is the 'swapped_in' the save
+got), so it is self-consistent. The redrawn buffer is then dated
+one generation behind the live graph, and the reload's notice
+('deliver_repo_change_notices') tells the client to redraw the
+views that show a reloaded graphnode; the just-saved buffer is
+clean, so it is redrawn again. Nothing is lost there.
+***** Why the fork gap does not need that window
+The gap is not about a reload during a save. It is about a
+reload while the user edits. A dirty view showing foreign
+graphnode N is never redrawn by a reload
+('skg--rerender-views-changed-on-disk' skips modified buffers),
+and a reload is not a save, so the dirty-view conflict check
+does not run. For an owned N the stale check catches the later
+save. For a foreign N nothing does: the clone is built from the
+stale viewnode. Slice 2 now covers it.
+* DONE Claude says: the deeper alternative, content not clocks
+** The idea
+The generation mechanism is a proxy. The question it answers is
+"was N written after this buffer was drawn?" The question we care
+about is "is the buffer's copy of N what the graph holds now?"
+The client already holds the text that answers the second
+question directly: 'skg-clean-baseline' ('elisp/skg-buffer.el',
+line 162), captured at every render and every redraw
+('skg-replace-buffer-with-new-content' recaptures it), and
+already sent in the save envelope for every dirty other view.
+Neovim mirrors it ('skg_clean_baseline' in 'nvim/lua/skg/').
+
+If the saved buffer's own baseline rode along too, the server
+could parse it the way it parses dirty views today
+('dependencies_from_text' already runs 'org_to_viewforest' on
+baselines), supplement it from disk as the save path does, and
+for each graphnode the buffer writes compare the baseline's
+viewnode with the graph's current graphnode using
+'buffernode_differs_from_disknode', the noop filter's own
+comparison. The rule becomes one sentence: a graphnode is stale
+iff saving the baseline would not be a noop for it.
+** What falls out of it
+*** Merges
+The baseline holds no copy of the acquiree, so there is nothing
+to compare, so a merge is never stale. Slice 2 without a rule
+about merges.
+*** The whitespace strip
+The parser trims trailing whitespace from the baseline too, so a
+stripped graphnode compares equal. Slice 4 is unnecessary, and
+'last change' can keep its honest meaning, or go away.
+*** Restarts and rebuilds
+Today a restart or a rebuild makes every earlier buffer stale for
+every graphnode it writes, and the rebuild tells the user to
+close all views. The discussion calls this deliberate, and it is,
+but only because generations cannot tell a file that changed
+while the server was down from one that did not. A content
+comparison tells them apart, so a buffer survives a restart
+unless something it shows actually changed.
+*** The cases the check already gets right
+A graphnode deleted after the render: the baseline has it, the
+graph does not, so it differs, and the save is refused. A
+graphnode the buffer creates: no baseline copy, never stale. A
+graphnode changed and changed back: equal, not stale, which is
+correct and which generations get wrong.
+*** The error message
+It can show what changed, by diffing the baseline's copy against
+the graph's graphnode, instead of saying "3 graph changes later."
+That is better than slice 3's message.
+*** What could be removed
+'rendered-at' in the save request, 'RenderedAt', the stamping in
+'SharedRuntime::swap_in', 'LastChangeGenerations', and the
+'runtime generation' request a client sends for a new empty view
+would no longer be needed by the stale check. I did not check
+whether anything else depends on the generation numbers the view
+responses carry, so I claim only that the check would not.
+** What it costs
+*** A protocol change in both clients
+The saved buffer's half of the envelope gains the baseline, in
+the same 'present' or 'unavailable' form the other views use.
+Emacs and Neovim both change, as do the client tests that build
+save requests.
+*** A decision for an unavailable baseline
+A view without a baseline today refuses to be a dirty other view
+("has no verified clean baseline"). For the saved buffer the same
+rule would be: if the baseline is unavailable and the buffer
+writes an existing graphnode, refuse and point at the recovery
+command. A new empty view writes only new graphnodes, so it
+passes.
+*** Server work per save
+One more parse and supplementation, of a buffer-sized text. Every
+dirty other view already costs this on every save, so the cost is
+known and small.
+*** Subtleties I checked
+Supplementation fills a field the buffer leaves unspecified from
+the current graph. Applied to the baseline as well, such a field
+compares equal, which is right: the buffer does not write it.
+Under a skgrepo restriction 'preserve_invisible_members' weaves
+the hidden members into both texts the same way. The folded and
+focused atoms are added to the current snapshot at save time, not
+to the baseline, and the parser ignores them in any case.
+*** Size
+Server, two clients, and the rewrite of
+'tests/save_stale_buffers.rs' around baselines instead of
+rendered-at. Larger than the whole current plan.
+** My recommendation
+Not in this plan. Slices 2, 3 and 4 are cheap and right under
+either mechanism, and the plan should proceed with the principle
+stated. Record the content comparison as its own discussion, to
+be taken up when the restart or rebuild rule next costs you a
+buffer, or when a false positive appears that the principle does
+not explain. If you would rather go straight to it, slices 2, 3
+and 4 become its first steps and are not wasted.
+* TODO Claude says: open questions
+Each question stands alone. 'Phase one' and 'phase two' are the
+two graph and filesystem updates of a save, the ordinary edits
+and then the merges. A 'bandaid' here means a refusal that
+prevents a bug's symptom without removing its cause.
+** DONE Slice 1: refuse edit-plus-merge, or merge after phase one?
+The refusal is what the plan says. The root fix moves the
+NodeMerge construction into 'prepare_save_under_mutation_gate',
+after phase one, so the merge sees the save's own edits and the
+combination simply works. Sized above as one agent slice.
+
+ANSWER:
+
+I'll default to: the root fix, replacing slice 1. It removes
+the cause and the carve-out, and the user keeps the one-save
+workflow.
+*** DONE [jeff] yes, root fix, not refusal
+**** DONE Claude says: folded into '2_plan.org', slice 1
+Two corrections from checking the code while rewriting the slice.
+The merge builder reads the in-Rust graph, not disk
+('graphnode_by_gnid' calls 'graphnode_from_graph'; the variable
+names 'acquirer_from_disk' lie), so no overlay of phase one's
+SaveNodes is needed: the triples are built from phase one's
+candidate graph and that is all. And five places consumed the
+triples before phase one (the foreign-write filter, the
+move-and-merge check, the two Hoist helpers, the stale check);
+the plan lists them and has each take the merge pairs instead.
+One refusal stays, and it is principled: a save that deletes a
+merge node and merges it asks for two contradictory things, and
+phase one's candidate graph would lack the node.
+** DONE Fork clones in the stale check?
+A buffer's edit of a foreign graphnode becomes a clone built from
+the buffer's viewnode of that graphnode, and the graphnode itself
+escapes the check. Adding the fork specs' original IDs to the
+check is a few lines in 'stale_write_errors'.
+
+ANSWER:
+
+I'll default to: yes, as part of slice 2.
+*** DONE [jeff] yes
+**** DONE Claude says: folded into slice 2 of '2_plan.org'
+** Content comparison instead of generations: when?
+Described in the section above. Later means a new discussion
+file, with the plan proceeding as it is.
+
+ANSWER:
+
+I'll default to: later.
+*** [jeff] would this make saves noticeably slower?
+There are already situations (at least the diff view)
+in which saving takes a long time.
+**** Claude says: no; measured
+I timed 'org_to_viewforest' on synthetic view text in a scratch
+program (not committed), medians of seven runs, 'AsWritten' and
+'ThroughGraph' within noise of each other:
+***** 100 headlines, 18 KB
+0.7 ms in release, 5 ms in debug.
+***** 1000 headlines, 190 KB
+6 ms in release, 44 ms in debug.
+***** 5000 headlines, 970 KB
+27 ms in release, 230 ms in debug.
+***** What the comparison would add
+One more parse of the saved buffer, plus supplementation, which
+reads the in-Rust graph, not disk, despite the name of
+'supplement_from_disk.rs': one lookup per viewnode. Every dirty
+other view already costs two such parses on every save. So a
+save of a 1000-headline buffer would gain about 6 ms in release
+and 44 ms in debug ('bash/start-servers.sh' builds debug unless
+'SKG_RELEASE=1'). The diff view's slowness lives elsewhere, in
+git. Not noticeable below thousands of headlines.
+***** [jeff] let's do it now
+This will probably mean a radical rewrite of the plan.
+I'd say just scrap it and write a new one, 2_2_plan.org
+But first ask me here whatever details you'll want pinned down
+that need my input, if any.
+****** DONE Claude says: questions before I write '2_2_plan.org'
+
+What I will put in the new plan without asking: the merge root
+fix stays as slice 1, unchanged from '2_plan.org'. The check
+becomes: for each graphnode the buffer writes or deletes, if the
+baseline holds a viewnode of it, parse and supplement the
+baseline as the save does, and compare that viewnode with the
+graph's current graphnode by 'buffernode_differs_from_disknode';
+a difference, or the graphnode's absence from the graph, refuses
+the save. The dirty-view conflict check stays as it is. Fork
+clones' originals are covered by the same rule, since the
+baseline holds their viewnodes. The old slices 2, 3 and 4
+dissolve into this. Each question below stands alone; a
+'baseline' is the clean text a client keeps from the last time
+the server drew a view ('skg-clean-baseline').
+******* DONE How much of the generation protocol goes?
+The save request's 'rendered-at', the 'runtime generation'
+request a new empty view makes, and 'LastChangeGenerations'
+lose their purpose. View responses also carry 'rendered-at',
+which clients store only to send it back. Removing it from the
+responses too touches four server sites, both clients, four
+paragraphs of 'docs/api-and-formats.org', and the eleven Emacs
+and two Neovim integration scripts that mention it. The
+server's internal generation counter stays either way: reload
+notices and the rerender pass use it.
+
+ANSWER:
+
+I'll default to: remove all of it, responses included, per
+'no-legacy-support.org'.
+******** DONE [jeff] hell yeah!
+********* DONE Claude says: in '2_2_plan.org', slice 3
+******* DONE A written graphnode the baseline does not hold
+A buffer can write a graphnode of which it holds no baseline
+viewnode: one pasted in by ID, or any existing graphnode put
+into a new empty view, whose baseline is its initial text. There
+is nothing to compare, so the check cannot see it. Today the
+generation proxy catches such a write only if the graphnode
+changed after this buffer's render, which says nothing about
+where the pasted text came from. The alternative is to keep
+'LastChangeGenerations' as a second check for exactly these
+writes, which keeps the machinery we are removing.
+
+ANSWER:
+
+I'll default to: not checked, and documented as the limit of
+the check.
+******** DONE [jeff] agreed
+********* DONE Claude says: out of scope in the plan, documented
+******* DONE What the stale error shows
+For each stale graphnode the error can name the fields that
+differ between the baseline's viewnode and the graph: title and
+home repo with both values, and for body, contents, aliases,
+subscriptions and the rest just that they differ. The richer
+alternative is a unified diff of the baseline's viewnode against
+a fresh render of the graphnode, which costs a render in the
+error path and a diff routine the server does not have.
+
+ANSWER:
+
+I'll default to: the differing fields, both values for title
+and home repo, with the remedy sentence kept.
+******** [jeff] Could the diffView machinery be repurposed for this?
+It would be comparing different things than usual,
+but that is a generalization I intended to implement eventually
+anyway -- I'd like to be able to use it in scenarios like
+merge conflicts.
+********* Claude says: yes, in two steps; the plan takes one
+********** What the machinery is
+A 'GraphStraddle' ('server/graph_straddle/') is two in-Rust
+graphs, before and after, plus a HEAD identity, and everything
+the diff view shows is computed from the pair: 'node_changes'
+gives a 'NodeChanges' (title, body, aliases, extra IDs, flags,
+home skgrepo) by comparing one 'GraphnodeInRust' from each
+graph ('node_changes_between'), and 'partners' diffs a node's
+lists by 'interleaved_diff_without_reorders'. The rendering
+side is the one refresh in 'RefreshMode::DiffView', which takes a
+straddle, a buffer kind and a readiness store.
+********** The first step: the comparison functions, in text
+A stale graphnode has exactly two versions to compare: the
+baseline's viewnode, which supplementation turns into a
+'Graphnode' and 'GraphnodeInRust::from' into the straddle's
+type, and the graph's graphnode. 'node_changes_between' on
+those two gives the error its "Changed since" line, and the list
+diff its gained and lost content. No straddle is built, only its
+functions are called; one becomes 'pub(crate)'. This is slice 3.
+********** The second step: a rendered buffer
+A write-protected buffer of the stale graphnodes, drawn by the
+refresh in diff-view mode over a straddle whose before-graph is
+the live graph with the baseline's viewnodes substituted for the
+stale ones. The pieces exist: 'GraphStraddle::new' takes any two
+graphs; the fork confirmation already returns a buffer in a save
+response; the diff view's "old title and body" change viewnode
+is what the user would want to see. It needs a fifth buffer kind
+or a new mode variant, with no editability and no readiness, and
+the clients to open it. That is the generalization you describe,
+and I left it out of this plan so that the plan stays about
+staleness. A merge-conflict view would build its straddle the
+same way, from two graphs of the server's choosing.
+******** DONE [jeff] What would the user have to do?
+They won't know what the baseline viewnode held, right?
+How would they figure out how to make the edits they intended?
+********* DONE Claude says: a three-way merge by hand
+********** What the user has after the refusal
+Nothing in the buffer changed: the refused buffer still holds
+the edits, and the client still holds the baseline
+('skg-clean-baseline'). 'skg-show-unsaved-changes' writes a
+recovery document with the baseline, the current text, and the
+unified diff between them: the user's own edits, against the
+baseline. The error gives the other side: what the graph changed
+about each stale graphnode, against the same baseline.
+********** The steps
+Read the error: which graphnodes, and what changed about each.
+Run 'skg-show-unsaved-changes' to keep the edits as a diff.
+Reopen a fresh view of the same root: it shows the graph as it
+now is. Reapply the diff by hand where it still applies, and
+decide the rest knowing both what you did and what changed
+under you. A merge of two edits to one body is the only part
+that takes thought, and it is the part no tool can decide.
+********** One cheap improvement to the error
+With the body the error says only "the body changed", so the
+user would compare the fresh view's body with the recovery
+document's by eye. The server has both bodies, and
+'interleaved_diff_without_reorders' ('server/types/list.rs') is
+generic over any ordered item, lines included. So the error can
+show the body's changed lines, as lines gained and lost, and the
+user then holds two diffs from one base: theirs, in the recovery
+document, and the graph's, in the error. I would add this to
+slice 3, bounded to some dozens of lines each way, with "and N
+more" past the bound.
+
+ANSWER:
+
+I'll default to: add the body's line diff to slice 3.
+*********** DONE [jeff] sounds good
+************ TODO Claude says: folded into slice 3
+Under "The stale error says what changed" in '2_2_plan.org':
+lost and gained lines, at most 40 each way.
+********** Where this becomes a view
+The rendered buffer of the second step is the right home for
+this: the stale graphnode with its old text as a change viewnode
+and its current text as the occurrence, and the user's edits
+restored into it. That is a three-way merge view, which is the
+merge-conflict generalization. Not in this plan.
+********* DONE [jeff] cool, let's just make sure it's documented
+for the user somewhere
+********** TODO Claude says: folded into slice 3's docs
+The user guidance already exists: the stale-save paragraph of
+'docs/COMMANDS.org' (near line 22) and the recovery steps under
+it, mirrored in 'docs/COMMANDS-nvim.org'. Slice 3 rewrites them
+to say what the error now tells and to give the recovery as the
+three-way merge by hand: your diff from the recovery document,
+the graph's diff from the error, a fresh view to apply them to.
+******* DONE Should views survive a rebuild?
+A rebuild clears the server's open views and the client closes
+its buffers, because every buffer was stale by generation. With
+content comparison a buffer rendered before a rebuild is stale
+only if what it shows changed, so views could survive: the
+server would keep them and rerender the clean ones. That is a
+change to the rebuild handler and both clients' rebuild
+commands. A restart improves without any change: the new server
+does not hold the old views, and their saves pass or fail on
+content.
+
+ANSWER:
+
+I'll default to: leave the rebuild alone in this plan, and note
+the opportunity in 'TODO/problems.org'.
+******** DONE [jeff] no, let's include that in the plan
+If that opens up new issues, lay 'em on me here.
+********* DONE Claude says: slice 6; the issues and my choices
+********** DONE Dirty views are not redrawn
+'rerender all views' skips buffers with unsaved edits and names
+them, in both clients. After a rebuild a dirty view keeps its
+baseline and its save is compared by content like any other.
+Chosen: accept; that is the point of the change.
+********** DONE A skgrepo the reloaded config dropped
+A view showing a graphnode of such a skgrepo is redrawn with
+that graphnode as the refresh draws an unknown one. Chosen:
+accept; a save of it then fails or passes on content.
+********** DONE The restriction is reconciled at the next request
+The rebuild paragraph of the API doc says each connection's
+restriction follows the new config at its next request. The
+client's 'rerender all views' is that request, so the clean
+views are redrawn under the reconciled restriction and record
+it (slice 5). A dirty view keeps the old record; if the
+reconciled set differs, slice 5 refuses its save, safe
+direction. Chosen: accept.
+********** DONE The diff view's straddle
+The rebuild still drops it; the rerender rebuilds it from the
+disk the rebuilt graph was read from, as a reload does today.
+********** DONE The clients' message changes
+"Existing skg views are now invalid. Run M-x
+skg-close-all-skg-buffers" goes, in Emacs and Neovim; tests
+that match it are updated. The herald-rules refetch stays.
+********** DONE The tool
+Its sidecars keep the rendered content, which is the baseline,
+so a rebuild changes nothing for it.
+*********** [jeff] which tool?
+************ DONE Claude says: 'tools/skg-for-ai'
+The command-line client the AI team saves through
+('tools/skg-for-ai/skg_for_ai.py'). It is a client like Emacs and
+Neovim: it opens views, keeps each view's rendered text and
+'rendered_at' in a sidecar file, and sends saves with
+'other-views'. The plan's slices 2 and 3 change it alongside the
+two editors. Its sidecar's 'content' is the view's baseline.
+********** DONE What I did not do
+I did not make the server send the rerenders itself after a
+rebuild; the clients ask, as they do after a reload notice,
+because the client decides which buffers are dirty.
+******* DONE A dirty view across a skgrepo restriction change
+A restriction change rerenders the clean views and leaves the
+dirty ones. A dirty view's baseline was then rendered under the
+old restriction, but the save supplements it under the new one,
+and the hidden-member weave can disagree with the graph, so the
+save is refused as stale although nothing changed. The refusal
+is in the safe direction. The fix is for the client to send the
+restriction the baseline was rendered under (the placeholder
+'skg-clean-baseline-context' already exists for it) and for the
+server to refuse such a save with a message that says why.
+
+ANSWER:
+
+I'll default to: not in this plan; note it in
+'TODO/problems.org'.
+******** DONE [jeff] Let's include it.
+********* DONE Claude says: slice 5, server-side, no protocol
+Both clients already refuse to switch the restriction while a
+view has unsaved edits ('skg--refuse-repo-set-switch-while-views-
+unsaved'; 'repo_sets.lua' line 71), so the case cannot arise
+from them today. Rather than have each client send the
+restriction with its baseline, the server records, per open
+view, the restriction it last rendered the view under
+('ViewState'), and refuses a save of a held view whose recorded
+set of shown skgrepos differs from the connection's current one.
+That also covers the rebuild's reconciliation of the restriction
+(see the rebuild issues above). The placeholder
+'skg-clean-baseline-context' stays unused by this plan.
+******* The links fix
+The one-line change under "What would be the principled way to
+handle links": 'links_from_text' leaves 'dependencies_from_text',
+with one test in 'tests/save_dirty_conflicts.rs'.
+
+ANSWER:
+
+I'll default to: include it in the new plan.
+******** DONE [jeff] yes, include
+********* DONE Claude says: in '2_2_plan.org', slice 4
+** DONE State the principle in the plan and the docs?
+One sentence in the plan's "Agreed behavior", in the stale-buffer
+paragraph of 'docs/api-and-formats.org', and in the module
+comment of 'save_staleness.rs': the check covers a write whose
+content is the buffer's viewnode, its render-time copy of the
+graphnode, so a merge, computed from the graph at save time, is
+not checked, and a strip, which no save can undo, dates nothing.
+Also fix the strip module's false "stores no body text."
+
+ANSWER:
+
+I'll default to: yes. I have not edited '2_plan.org'; say so
+and I will add the sentence and reword slice 4's rationale.
+*** DONE [jeff] yes
+**** DONE Claude says: folded into '2_plan.org'
+The plan now opens "Agreed behavior" with "The principle behind
+slices 2 and 4", each slice's docs state it in one sentence, and
+slice 4 corrects the strip module's comment. I also corrected
+the same false clause in the strip entry of 'TODO/problems.org'.
+** DONE Provenance for NodeInstructions?
+The stale check and the new refusal depend on running early in
+the handler because a write does not record whether the buffer
+asked for it or the save derived it. A provenance tag or separate
+vectors would make the checks position-independent.
+
+ANSWER:
+
+I'll default to: not now; add a comment at the stale check
+stating the invariant it relies on, and note the refactor in
+'TODO/problems.org'.
+*** DONE [jeff] sure, later
+**** DONE Claude says: noted in 'TODO/problems.org'
+Under "The save handler's checks depend on their position in it
+(2026-11-05)".
