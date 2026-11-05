@@ -137,8 +137,8 @@ three comparisons share.
 handler mutates in place through the rest of the pipeline
 (restore requests, delete propagation, strandeds, Hoist, forks).
 Remove the untouched outdated Saves right after the stale check,
-before anything reads the vector again, so that delete propagation and
-the Hoist classification never see them. A 'SkgrepoMove' in
+before anything reads the vector again, so that delete propagation
+and the Hoist classification never see them. A 'SkgrepoMove' in
 'skgrepo_moves' for a dropped graphnode cannot exist: a move
 changes the copy's home skgrepo, so the graphnode is not
 untouched. The save's warnings travel in 'parse_warnings' and the
@@ -284,9 +284,25 @@ Docs: the switch-to-view sentence under the single-root view
 request in 'docs/api-and-formats.org', and 'docs/diff-view.org'
 where it describes following a link from a diff-view buffer, if
 it does.
+** TODO Slice 4: the runtime generation starts at the epoch again
+Plan 2_2's slice 3 made a server start its runtime generation at
+0 ('server/types/env.rs', near line 80, 'generation : 0'); before
+it, a server started at the microseconds since the Unix epoch
+(the removed 'startup_generation' in that file, see commit
+d6ea5ccc), which the staleness check needed and nothing else.
+Jeff wants the epoch start back: a generation in the server's log
+then places itself in time, at no cost. So 'SharedRuntime' will
+start at the microseconds since the Unix epoch again, and each
+swap-in will still add one. Nothing reads the number for
+staleness. Check for a test that asserts the start at 0 (grep
+for "generation" under 'tests/' and 'server/', around the swap-in
+and the reload notice) and adapt it; update the comment at the
+start value and 'docs/data-model_technical.org' ("Runtime
+generations and rebuilding") where it says what the number is.
+Run 'bash/nextest.sh'. One commit.
 * Verification and completion
 Each slice runs its own tests and the binaries it touched. After
-slice 3, run 'bash/all-tests.sh' and record its summary in
+slice 4, run 'bash/all-tests.sh' and record its summary in
 'progress.org'. Then mark the three settled items of
 '3_review.org''s "Decide" section DONE with a child saying this
 plan did them.

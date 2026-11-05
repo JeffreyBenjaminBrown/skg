@@ -2013,6 +2013,20 @@ An /instructionMerge/ is the combining of emitted save intents into
 the map during local fieldIntent collection. It shares nothing with
 a nodeMerge (the =NodeMerge= type) but the word.
 
+*** save envelope
+
+The /save envelope/ is the length-prefixed S-expression a client
+sends right after the "save buffer" request line. It carries
+'saved-buffer' (the buffer's text, with the client's focus and fold
+metadata added), 'baseline' (the same buffer's text as the server
+last drew it, with that metadata removed; see "baseline, stale") and
+'other-views' (every other open view of the connection, each clean
+or dirty with its baseline and current text). The server parses it
+into 'SaveRequestEnvelope' ('server/serve/handlers/save_buffer.rs');
+'docs/api-and-formats.org' documents it under "Save buffer". An
+envelope missing a field, or carrying an unknown one, is refused
+under the "NOTHING WAS SAVED" header, and nothing is written.
+
 *** collateral view
 
 When a save changes nodes that other open views show, those views are
