@@ -468,3 +468,10 @@ Slice 5 launched 21:59.
 Nothing.
 *** Headline
 DONE.
+** Orchestrator's notes after slice 5 (2026-11-05, 22:10 UTC)
+Slice 5 launched 21:59, reported 22:07 (8 minutes). One commit.
+The refusal runs first in the handler rather than after the
+parse, as the agent chose: it reads only the connection's views,
+and the parse's validators would otherwise judge the buffer under
+the wrong restriction. Good. Names and the rebuild interplay are
+carried into slice 6. Slice 6 launched 22:12.

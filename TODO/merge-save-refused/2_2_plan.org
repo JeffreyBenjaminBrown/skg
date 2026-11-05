@@ -676,6 +676,25 @@ with 'grep -rl SetSkgrepoRestriction tests/'.
 Docs: "Save buffer" in 'docs/api-and-formats.org' documents the
 refusal next to the stale-buffer paragraph.
 ** TODO Slice 6: views survive a rebuild
+*** Corrections carried from slice 5
+- The restriction a view was rendered under is
+  'ViewState::skgrepo_restriction_at_last_render'; the refusal is
+  'error_unless_view_was_rendered_under_current_restriction',
+  first thing in the save handler; the error is
+  'RenderedUnderAnotherSkgrepoRestriction'. 'register_view',
+  'register_diffView_view' and 'update_view' take the
+  restriction; the rerender stream carries it.
+- The "Save buffer" paragraph of 'docs/api-and-formats.org' says
+  the refusal covers "any change of the connection's restriction
+  that rerenders no view". Once views survive a rebuild, add the
+  rebuild as the case that produces one: a dirty view kept across
+  a rebuild whose config reconciliation changed the connection's
+  set of shown skgrepos is refused at its save by this rule.
+- After a rebuild the connection's restriction is reconciled "at
+  its next request" (the rebuild paragraph). Check how that
+  reconciliation reaches 'skgrepo_restriction' in the connection
+  loop, and make sure the clean views' rerender after the rebuild
+  records the reconciled restriction, not the stale one.
 Server: 'rebuild_session_lifetime_stores_in_place' stops clearing
 'open_views'. Clients: on a successful rebuild, Emacs and Neovim
 send 'rerender all views' instead of telling the user to close
