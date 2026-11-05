@@ -306,6 +306,54 @@ fn a_merge_request_is_never_stale
             "a text preserver titled after b's new title" );
   Ok (()) }
 
+/// Through a view of s, merge k2 into its sibling k1, and return the
+/// view's text as the save redrew it. s's file still lists both IDs,
+/// which now name one graphnode.
+fn merge_the_siblings_of_s (
+  f           : &mut Fixture,
+  views_state : &mut ViewsState,
+) -> String {
+  let s_view : String = open_view (f, views_state, "s", "s-view");
+  let result : String = save (
+    f, views_state, "s-view",
+    &s_view . replacen ("(gnid k1)", "(gnid k1) (editRequest (merge k2))", 1),
+    Some (&s_view) );
+  assert! ( saved (&result), "{}", result );
+  assert! ( ! file_path (f, "main", "k2") . exists () );
+  assert! ( file_text (f, "s") . contains ("- k2"), "{}", file_text (f, "s") );
+  extract_string_field_from_sexp (&result, "content") . expect ("content") }
+
+#[test]
+fn a_fresh_view_of_a_container_of_merged_siblings_saves
+  () -> Result<(), Box<dyn Error>> {
+  // The baseline draws s's members once per pid; the graph's s lists
+  // k1 and k2, now one graphnode. That is no change since the render.
+  let mut f : Fixture = fixture () ?;
+  let mut connection : ViewsState = new_connection ();
+  merge_the_siblings_of_s (&mut f, &mut connection);
+  let mut fresh : ViewsState = new_connection ();
+  let s_fresh : String = open_view (&mut f, &mut fresh, "s", "s-fresh");
+  let result : String = save (
+    &mut f, &mut fresh, "s-fresh", &s_fresh, Some (&s_fresh) );
+  assert! ( saved (&result), "{}", result );
+  Ok (()) }
+
+#[test]
+fn the_view_that_merged_two_siblings_can_edit_their_container
+  () -> Result<(), Box<dyn Error>> {
+  let mut f : Fixture = fixture () ?;
+  let mut connection : ViewsState = new_connection ();
+  let s_redrawn : String = merge_the_siblings_of_s (&mut f, &mut connection);
+  let result : String = save (
+    &mut f, &mut connection, "s-view",
+    &s_redrawn . replace ("s, a container of two siblings", "s retitled"),
+    Some (&s_redrawn) );
+  assert! ( saved (&result), "{}", result );
+  assert! ( file_text (&f, "s") . contains ("s retitled")
+            && ! file_text (&f, "s") . contains ("- k2"),
+            "{}", file_text (&f, "s") );
+  Ok (()) }
+
 #[test]
 fn a_whitespace_strip_does_not_make_a_buffer_stale
   () -> Result<(), Box<dyn Error>> {
@@ -330,7 +378,7 @@ fn trailing_whitespace_on_disk_does_not_make_a_buffer_stale
   () -> Result<(), Box<dyn Error>> {
   // The view draws w's body with its trailing whitespace, and the
   // parser trims it, so the baseline's copy of w differs from the
-  // file; it still matches the graph as drawn.
+  // file; it still matches the graph as a view reads it back.
   let mut f : Fixture = fixture () ?;
   let mut connection : ViewsState = new_connection ();
   let w_view : String = open_view (&mut f, &mut connection, "w", "w-view");

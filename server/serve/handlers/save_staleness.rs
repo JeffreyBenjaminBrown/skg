@@ -104,30 +104,64 @@ fn baseline_writes (
   Ok ( nonmerge_plan . node_instructions . into_iter ()
        . filter_map ( |nodeInstruction| match nodeInstruction {
          NodeInstruction::Save (SaveNode (node)) =>
-           Some (( graph . pid_else_raw_id (&node . pid), node )),
+           Some (( graph . pid_else_raw_id (&node . pid),
+                   with_relationships_by_distinct_pid (graph, node) )),
          NodeInstruction::Delete (_) => None, } )
-       . filter ( |(pid, node)| match graphnode_as_drawn (graph, pid) {
-         // The noop filter compares with the graph as stored. A body
-         // with trailing whitespace is drawn with it, but the parser
-         // trims it, so the baseline's copy survives that filter
-         // though it matches the graph as drawn.
-         Some (as_drawn) => buffernode_differs_from_disknode (node, &as_drawn),
+       . filter ( |(pid, node)| match graphnode_as_read_back_from_a_view (graph, pid) {
+         // The noop filter compares with the graph as stored. What a
+         // view of a graphnode reads back can differ from that without
+         // anything having changed: the parser trims the trailing
+         // whitespace a body is drawn with, and a view draws a
+         // relationship member once per pid. So the baseline's copy is
+         // compared with the graph as a view reads it back.
+         Some (as_read_back) => buffernode_differs_from_disknode (node, &as_read_back),
          None => true, } )
        . collect () ) }
 
-/// The graph's graphnode 'pid' as a buffer drawn from it reads back:
-/// its body without the trailing whitespace the parser trims (as
-/// 'strip_trailing_whitespace_from_body' strips it on disk).
-fn graphnode_as_drawn (
+/// The graph's graphnode 'pid' as a view drawn from it would read it
+/// back: its body without the trailing whitespace the parser trims (as
+/// 'strip_trailing_whitespace_from_body' strips it on disk), and its
+/// relationship lists by distinct pid ('with_relationships_by_distinct_pid').
+fn graphnode_as_read_back_from_a_view (
   graph : &InRustGraph,
   pid   : &ID,
 ) -> Option<Graphnode> {
   graphnode_from_graph (graph, pid)
-    . map ( |node| Graphnode {
+    . map ( |node| with_relationships_by_distinct_pid ( graph, Graphnode {
       body : node . body . as_deref ()
              . map (strip_trailing_whitespace_from_body)
              . filter ( |body| ! body . is_empty () ),
-      .. node } ) }
+      .. node } )) }
+
+/// 'node' with each member of its relationship lists ('contains',
+/// 'subscribesTo', 'hidesFromSubs', 'overrides') replaced by its pid,
+/// and every later member with the same pid dropped, keeping order. A
+/// nodeMerge of two members of one list leaves both IDs in the file,
+/// naming one graphnode, which a view draws once.
+/// (Aliases are text, not IDs. The extra IDs are not compared, and
+/// each would resolve to 'node' itself.)
+fn with_relationships_by_distinct_pid (
+  graph : &InRustGraph,
+  node  : Graphnode,
+) -> Graphnode {
+  let by_distinct_pid = |members : Vec<RelPartner<ID>>| -> Vec<RelPartner<ID>> {
+    let mut seen : BTreeSet<ID> = BTreeSet::new ();
+    members . into_iter ()
+      . map ( |member| RelPartner {
+        member : graph . pid_else_raw_id (&member . member),
+        .. member } )
+      . filter ( |member| seen . insert ( member . member . clone () ))
+      . collect () };
+  let msv_by_distinct_pid = |members : MSV<RelPartner<ID>>| -> MSV<RelPartner<ID>> {
+    match members {
+      MSV::Specified (members) => MSV::Specified ( by_distinct_pid (members) ),
+      MSV::Unspecified => MSV::Unspecified, }};
+  Graphnode {
+    contains      : by_distinct_pid     (node . contains),
+    subscribesTo  : msv_by_distinct_pid (node . subscribesTo),
+    hidesFromSubs : msv_by_distinct_pid (node . hidesFromSubs),
+    overrides     : msv_by_distinct_pid (node . overrides),
+    .. node } }
 
 /// The pids of the graphnodes the buffer writes or deletes: its
 /// nodeInstructions, and the originals of its fork clones.
@@ -153,7 +187,7 @@ fn change_since_rendered (
   pid   : &ID,
   then  : &Graphnode,
 ) -> ChangeSinceRendered {
-  let Some (now) : Option<Graphnode> = graphnode_as_drawn (graph, pid)
+  let Some (now) : Option<Graphnode> = graphnode_as_read_back_from_a_view (graph, pid)
     else { return ChangeSinceRendered::Deleted; };
   let (then, now) : (GraphnodeInRust, GraphnodeInRust) =
     ( GraphnodeInRust::from (then), GraphnodeInRust::from (&now) );
