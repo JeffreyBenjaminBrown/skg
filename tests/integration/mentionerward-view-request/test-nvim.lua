@@ -47,6 +47,7 @@ local function request_on_line (line_number)
   local buf = buffer.open_org_buffer_from_text(
     base_buffer_text, 'skg://mentionerward-test-view', view_id,
     T.runtime_generation())
+  vim.b[buf].skg_clean_baseline = '' -- the baseline of a new empty view, which a hand-built view stands in for
   vim.api.nvim_win_set_cursor(0, { line_number + 1, 0 })
   print(string.format(
     'requesting-mentionerward-view-line-%d', line_number))

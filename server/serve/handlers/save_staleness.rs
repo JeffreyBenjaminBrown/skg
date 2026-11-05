@@ -1,28 +1,55 @@
-//! The save's refusal of a stale buffer: one rendered before a node it
-//! would write last changed. Writing it would silently undo that
-//! change, so the whole save is refused and nothing is written.
+//! The save's refusal of a stale buffer, decided by content.
 //!
-//! Only what the buffer itself asks to write is checked: the
-//! nodeInstructions the buffer's text yields once the noop filter has
-//! dropped the ones identical to the graph, and the nodes its
-//! nodeMerges write or delete. A node the buffer creates has no last
-//! change, and is never stale. A node the buffer shows as the graph
-//! has it is not written, so it saves silently however old the
-//! buffer. The writes a save derives from the current graph (delete
-//! propagation, strandeds resets, Hoist repairs, fork clones, restore
-//! requests) undo nothing, and are not checked. A buffer no view
-//! response drew, such as a client's new empty view, is dated by the
-//! 'runtime generation' request its client sent on opening it.
+//! A save's write of a graphnode has one of two sources: a copy the
+//! buffer took when it was rendered, or the graph as it stands at save
+//! time. Only a copy can be older than the graph, and only a write
+//! from a copy, or a delete, can discard graph state the user never
+//! saw. The buffer's copies are in its baseline: the text the server
+//! last drew for it, which the client keeps and sends with the save.
+//! The baseline is parsed and extracted as the saved text is, up to
+//! the noop filter; the graphnodes its Save instructions still write
+//! are those whose copy no longer matches the graph (or that the graph
+//! no longer has). A graphnode the buffer writes or deletes among them
+//! is stale, and the whole save is refused, before anything is asked
+//! or written, with one error per stale graphnode saying what changed.
+//!
+//! What the buffer writes is the nodeInstructions its text yields once
+//! the noop filter has dropped the ones identical to the graph, plus
+//! the originals of its fork clones. So a graphnode the buffer shows
+//! unchanged is never stale. A merge is built from the graph at save
+//! time, and the writes a save derives from the current graph (delete
+//! propagation, strandeds resets, Hoist repairs, restore requests)
+//! undo nothing, so none of those is checked. A strip of whitespace
+//! changes nothing a parsed baseline shows, and a restart or a rebuild
+//! changes no graphnode, so neither makes a buffer stale. A graphnode
+//! the buffer writes without a baseline copy of it (pasted in by ID,
+//! or typed into a new empty view, whose baseline is the text the
+//! client created it with) has nothing to compare, and is not checked.
 
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::types::errors::{BufferValidationError, HeadlineName};
-use crate::types::misc::ID;
-use crate::types::save::{DeleteNode, NodeInstruction, NodeMerge, SaveNode};
+use crate::dbs::node_lookup::graphnode_from_graph;
+use crate::from_text::buffer_to_viewnodes::add_missing_info::{
+  IdResolution, WhatTheParseSupplied};
+use crate::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewforest;
+use crate::from_text::local_fieldintent_collection::{
+  NonmergeSavePlan, extract_nonmergeSavePlan_locally_in_graph};
+use crate::from_text::validate::{buffernode_differs_from_disknode, flatten_ms};
+use crate::graph_straddle::types::NodeChanges;
+use crate::graph_straddle::union_walk::node_changes_between;
+use crate::skgrepo_sets::SkgrepoRestriction;
+use crate::types::errors::{
+  BufferValidationError, ChangeSinceRendered, ChangedAspect, HeadlineName};
+use crate::types::list::{Diff_Item, interleaved_diff_without_reorders};
+use crate::types::misc::{ID, MSV, RelPartner, SkgConfig};
+use crate::types::nodes::complete::Graphnode;
+use crate::types::nodes::rust::GraphnodeInRust;
+use crate::types::save::{DeleteNode, ForkSpec, NodeInstruction, SaveNode};
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{ViewnodeKind, Vognode};
+use crate::serve::handlers::strip_body_whitespace::strip_trailing_whitespace_from_body;
 use crate::serve::util::value_from_request_sexp;
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// When the saved buffer's text was rendered, as its save request
 /// says: '(rendered-at . "N")', runtime generation N, as the response
@@ -49,36 +76,219 @@ pub fn rendered_at_from_request (
       "The save request's 'rendered-at' is {:?}, not a runtime generation number. Nothing was saved.",
       value )) }
 
-/// One error per node the buffer would write that changed after
-/// 'rendered_at', naming the buffer's occurrences of it.
+/// One error per graphnode the buffer would write or delete whose
+/// copy in 'baseline' no longer matches the graph, naming the buffer's
+/// occurrences of it and what changed. A baseline that cannot be
+/// parsed or extracted yields one error saying so.
 pub fn stale_write_errors (
-  graph            : &InRustGraph,
-  rendered_at      : RenderedAt,
-  viewforest       : &ViewForest,
-  nodeInstructions : &[NodeInstruction],
-  nodeMerges       : &[NodeMerge],
+  graph               : &InRustGraph,
+  config              : &SkgConfig,
+  skgrepo_restriction : &SkgrepoRestriction,
+  baseline            : &str,
+  viewforest          : &ViewForest,
+  nodeInstructions    : &[NodeInstruction],
+  fork_specs          : &[ForkSpec],
 ) -> Vec<BufferValidationError> {
-  let rendered_at : u64 = rendered_at . 0;
-  let written_pids : BTreeSet<ID> =
-    // BTreeSet, so the errors come in a stable order.
-    nodeInstructions . iter ()
-    . map ( |nodeInstruction| match nodeInstruction {
-      NodeInstruction::Save (SaveNode (node)) => node . pid . clone (),
-      NodeInstruction::Delete (DeleteNode { gnid, .. }) => gnid . clone (), } )
-    . chain ( nodeMerges . iter () . flat_map ( |nodeMerge| [
-      nodeMerge . acquirer_gnid () . clone (),
-      nodeMerge . acquiree_gnid () . clone () ] ))
-    . map ( |gnid| graph . pid_else_raw_id (&gnid) )
-    . collect ();
-  written_pids . into_iter ()
+  let baseline_writes : BTreeMap<ID, Graphnode> =
+    match baseline_writes (graph, config, skgrepo_restriction, baseline) {
+      Ok (writes) => writes,
+      Err (message) => return vec! [ BufferValidationError::Other ( format! (
+        "The saved buffer's baseline, the text the server last drew for it, could not be read: {}. Nothing was saved. Archive your edits (M-x skg-show-unsaved-changes in Emacs, :SkgShowUnsavedChanges in Neovim), reopen a fresh view, and reapply them there.",
+        message )) ], };
+  if baseline_writes . is_empty () { return Vec::new (); }
+  buffer_written_pids (graph, nodeInstructions, fork_specs)
+    . into_iter ()
     . filter_map ( |pid| {
-      let last_change : u64 = graph . last_change_of (&pid) ?;
-      ( last_change > rendered_at ) . then ( || {
-        let headlines : Vec<HeadlineName> =
-          occurrence_headlines_of (graph, viewforest, &pid);
-        BufferValidationError::ChangedSinceRendered {
-          gnid : pid, rendered_at, last_change, headlines } } ) } )
+      let then : &Graphnode = baseline_writes . get (&pid) ?;
+      Some ( BufferValidationError::ChangedSinceRendered {
+        change    : change_since_rendered (graph, &pid, then),
+        headlines : occurrence_headlines_of (graph, viewforest, &pid),
+        gnid      : pid, } ) } )
     . collect () }
+
+/// The baseline's writes, by pid: the graphnodes saving the baseline
+/// itself would write, each as the baseline has it once supplemented.
+/// The baseline is parsed and extracted as the saved text is
+/// ('buffer_to_validated_saveplan_with_fork_skgrepos_in_graph'), minus
+/// the validators, which judge edits, and a baseline has none.
+fn baseline_writes (
+  graph               : &InRustGraph,
+  config              : &SkgConfig,
+  skgrepo_restriction : &SkgrepoRestriction,
+  baseline            : &str,
+) -> Result<BTreeMap<ID, Graphnode>, String> {
+  let (viewforest, parsing_errors, _warnings, _supplied)
+    : (ViewForest, Vec<BufferValidationError>, Vec<String>, WhatTheParseSupplied) =
+    org_to_viewforest (baseline, IdResolution::ThroughGraph (graph)) ?;
+  if ! parsing_errors . is_empty () {
+    return Err ( parsing_errors . iter () . map (ToString::to_string)
+                 . collect::<Vec<String>> () . join ("; ") ); }
+  let (nonmerge_plan, _nodeMerge_pairs) : (NonmergeSavePlan, Vec<(ID, ID)>) =
+    extract_nonmergeSavePlan_locally_in_graph (
+      &viewforest, graph, config, skgrepo_restriction )
+    . map_err ( |error| error . to_string () ) ?;
+  Ok ( nonmerge_plan . node_instructions . into_iter ()
+       . filter_map ( |nodeInstruction| match nodeInstruction {
+         NodeInstruction::Save (SaveNode (node)) =>
+           Some (( graph . pid_else_raw_id (&node . pid), node )),
+         NodeInstruction::Delete (_) => None, } )
+       . filter ( |(pid, node)| match graphnode_as_drawn (graph, pid) {
+         // The noop filter compares with the graph as stored. A body
+         // with trailing whitespace is drawn with it, but the parser
+         // trims it, so the baseline's copy survives that filter
+         // though it matches the graph as drawn.
+         Some (as_drawn) => buffernode_differs_from_disknode (node, &as_drawn),
+         None => true, } )
+       . collect () ) }
+
+/// The graph's graphnode 'pid' as a buffer drawn from it reads back:
+/// its body without the trailing whitespace the parser trims (as
+/// 'strip_trailing_whitespace_from_body' strips it on disk).
+fn graphnode_as_drawn (
+  graph : &InRustGraph,
+  pid   : &ID,
+) -> Option<Graphnode> {
+  graphnode_from_graph (graph, pid)
+    . map ( |node| Graphnode {
+      body : node . body . as_deref ()
+             . map (strip_trailing_whitespace_from_body)
+             . filter ( |body| ! body . is_empty () ),
+      .. node } ) }
+
+/// The pids of the graphnodes the buffer writes or deletes: its
+/// nodeInstructions, and the originals of its fork clones.
+/// (A BTreeSet, so the errors come in a stable order.)
+fn buffer_written_pids (
+  graph            : &InRustGraph,
+  nodeInstructions : &[NodeInstruction],
+  fork_specs       : &[ForkSpec],
+) -> BTreeSet<ID> {
+  nodeInstructions . iter ()
+    . map ( |nodeInstruction| match nodeInstruction {
+      NodeInstruction::Save (SaveNode (node)) => &node . pid,
+      NodeInstruction::Delete (DeleteNode { gnid, .. }) => gnid, } )
+    . chain ( fork_specs . iter () . map ( |fork_spec| &fork_spec . original_gnid ))
+    . map ( |gnid| graph . pid_else_raw_id (gnid) )
+    . collect () }
+
+/// How the graph's graphnode 'pid' differs from 'then', the
+/// baseline's copy of it, compared as the diff view compares two
+/// graphnodes ('node_changes_between').
+fn change_since_rendered (
+  graph : &InRustGraph,
+  pid   : &ID,
+  then  : &Graphnode,
+) -> ChangeSinceRendered {
+  let Some (now) : Option<Graphnode> = graphnode_as_drawn (graph, pid)
+    else { return ChangeSinceRendered::Deleted; };
+  let (then, now) : (GraphnodeInRust, GraphnodeInRust) =
+    ( GraphnodeInRust::from (then), GraphnodeInRust::from (&now) );
+  let changes : NodeChanges = node_changes_between (&then, &now);
+  let mut aspects : Vec<ChangedAspect> = Vec::new ();
+  if changes . title_changed {
+    aspects . push ( ChangedAspect {
+      name : "title",
+      detail : Some ( format! ( "then \"{}\", now \"{}\"",
+                                then . title, now . title )) } ); }
+  if changes . body_changed {
+    aspects . push ( ChangedAspect { name : "body", detail : None } ); }
+  if then . contains != now . contains {
+    aspects . push ( ChangedAspect {
+      name : "content",
+      detail : Some ( content_change (&then . contains, &now . contains) ) } ); }
+  for (name, changed) in [
+    ( "aliases",
+      ! changes . aliases_gained . is_empty ()
+      || ! changes . aliases_lost . is_empty ()
+      || relationships_changed (&then . aliases, &now . aliases) ),
+    ( "extra IDs",
+      ! changes . extra_ids_gained . is_empty ()
+      || ! changes . extra_ids_lost . is_empty () ),
+    ( "flags",
+      ! changes . flags_gained . is_empty ()
+      || ! changes . flags_lost . is_empty () ),
+    ( "subscriptions",
+      relationships_changed (&then . subscribesTo, &now . subscribesTo) ),
+    ( "hides",
+      relationships_changed (&then . hidesFromSubs, &now . hidesFromSubs) ),
+    ( "overrides",
+      relationships_changed (&then . overrides, &now . overrides) ), ] {
+    if changed { aspects . push ( ChangedAspect { name, detail : None } ); }}
+  if let Some (home) = &changes . home {
+    aspects . push ( ChangedAspect {
+      name : "home skgrepo",
+      detail : Some ( format! ( "then {}, now {}", home . old, home . new )) } ); }
+  ChangeSinceRendered::Changed {
+    title      : now . title . clone (),
+    aspects,
+    body_lines : if changes . body_changed {
+                   body_line_diff ( then . body . as_deref (), now . body . as_deref () )
+                 } else { Vec::new () }, } }
+
+/// Whether a relationship list the baseline specifies differs from the
+/// graph's, as the noop filter judges it: an unspecified list matches
+/// anything, and an empty one matches an unspecified one.
+fn relationships_changed<T : Clone + PartialEq> (
+  then : &MSV<T>,
+  now  : &MSV<T>,
+) -> bool {
+  ! then . is_unspecified () && flatten_ms (then) != flatten_ms (now) }
+
+/// "gained X, Y, lost Z", by ID, from the diff view's comparison of
+/// two lists; a change in only the order or the relationships'
+/// skgrepos says so.
+fn content_change (
+  then : &[RelPartner<ID>],
+  now  : &[RelPartner<ID>],
+) -> String {
+  let ids = |partners : &[RelPartner<ID>]| -> Vec<ID> {
+    partners . iter () . map ( |partner| partner . member . clone () ) . collect () };
+  let (then_ids, now_ids) : (Vec<ID>, Vec<ID>) = (ids (then), ids (now));
+  let (gained, lost) : (Vec<String>, Vec<String>) = {
+    let mut gained : Vec<String> = Vec::new ();
+    let mut lost   : Vec<String> = Vec::new ();
+    for item in interleaved_diff_without_reorders (&then_ids, &now_ids) {
+      match item {
+        Diff_Item::New (id)     => gained . push (id . 0),
+        Diff_Item::Removed (id) => lost   . push (id . 0),
+        Diff_Item::Unchanged (_) => {}, }}
+    (gained, lost) };
+  let none_else = |ids : Vec<String>| -> String {
+    if ids . is_empty () { "none" . to_string () } else { ids . join (", ") } };
+  if gained . is_empty () && lost . is_empty () {
+    if then_ids == now_ids { "the skgrepos of its relationships" . to_string () }
+    else { "reordered" . to_string () }
+  } else { format! ( "gained {}, lost {}", none_else (gained), none_else (lost) ) }}
+
+/// The body's changed lines, then against now, from the diff view's
+/// comparison of two lists: each lost line prefixed "- ", each gained
+/// one "+ ", unchanged ones omitted, at most
+/// 'MAX_BODY_DIFF_LINES_EACH_WAY' lost and as many gained, then a line
+/// counting the rest.
+fn body_line_diff (
+  then : Option<&str>,
+  now  : Option<&str>,
+) -> Vec<String> {
+  let lines = |body : Option<&str>| -> Vec<String> {
+    body . unwrap_or ("") . lines () . map (str::to_string) . collect () };
+  let mut shown : Vec<String> = Vec::new ();
+  let (mut lost_shown, mut gained_shown, mut omitted)
+    : (usize, usize, usize) = (0, 0, 0);
+  for item in interleaved_diff_without_reorders ( &lines (then), &lines (now) ) {
+    match item {
+      Diff_Item::Removed (line) if lost_shown < MAX_BODY_DIFF_LINES_EACH_WAY => {
+        lost_shown += 1;
+        shown . push ( format! ("- {}", line) ); }
+      Diff_Item::New (line) if gained_shown < MAX_BODY_DIFF_LINES_EACH_WAY => {
+        gained_shown += 1;
+        shown . push ( format! ("+ {}", line) ); }
+      Diff_Item::Removed (_) | Diff_Item::New (_) => omitted += 1,
+      Diff_Item::Unchanged (_) => {}, }}
+  if omitted > 0 {
+    shown . push ( format! ("... and {} more", omitted) ); }
+  shown }
+
+const MAX_BODY_DIFF_LINES_EACH_WAY : usize = 40;
 
 /// The headline names of the occurrences of 'pid' in 'viewforest'.
 fn occurrence_headlines_of (

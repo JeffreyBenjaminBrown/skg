@@ -136,21 +136,24 @@ fn open_view (
     extract_string_field_from_sexp (response, "rendered-at") . expect ("rendered-at")
       . parse () . unwrap () ) }
 
-/// Save 'buffer' as 'view_id', rendered at 'rendered_at': the
-/// terminal save-result message.
+/// Save 'buffer' as 'view_id', rendered at 'rendered_at' as
+/// 'baseline': the terminal save-result message.
 fn save (
   f           : &mut Fixture,
   views_state : &mut ViewsState,
   view_id     : &str,
   buffer      : &str,
+  baseline    : &str,
   rendered_at : u64,
 ) -> String {
   let request : String = format! (
     "((request . \"save buffer\") (view-id . \"{}\") (rendered-at . \"{}\"))",
     view_id, rendered_at );
+  let sexp_string_body = |text : &str| -> String {
+    text . replace ('\\', "\\\\") . replace ('"', "\\\"") };
   let envelope : String = format! (
-    "((saved-buffer \"{}\") (baseline \"\") (other-views ()))", // the empty baseline, which writes nothing
-    buffer . replace ('\\', "\\\\") . replace ('"', "\\\"") );
+    "((saved-buffer \"{}\") (baseline \"{}\") (other-views ()))",
+    sexp_string_body (buffer), sexp_string_body (baseline) );
   let (mut client_writes, server_reads) : (TcpStream, TcpStream) =
     mk_test_tcp_stream_pair ();
   write! ( client_writes, "Content-Length: {}\r\n\r\n{}",
@@ -328,7 +331,7 @@ fn the_servers_own_save_is_not_reloaded_again
     &mut f, &mut connection, "a-view",
     &a_view . replace ("a as first written", "a saved by the server")
             . replace ("b as first written", "b saved by the server"),
-    rendered_at );
+    &a_view, rendered_at );
   assert! ( result . contains ("a saved by the server"), "{}", result );
   assert! ( fs::read_to_string ( skg_path (&f, "mine", "b") ) ?
             . contains ("b saved by the server") );
@@ -361,7 +364,7 @@ fn a_buffer_rendered_before_a_reload_cannot_write_a_reloaded_node
     &mut f, &mut connection, "a-view",
     &a_view . replace ("b as first written", "b from the old buffer")
             . replace ("a as first written", "a from the old buffer"),
-    rendered_at );
+    &a_view, rendered_at );
   assert! ( result . contains ("changed after the buffer was rendered")
             && result . contains ("- ID: b")
             && ! result . contains ("- ID: a"),

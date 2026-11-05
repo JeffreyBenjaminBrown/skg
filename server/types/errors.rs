@@ -22,6 +22,26 @@ pub enum NodeMergeRole {
   Acquiree,
 }
 
+/// How a graphnode the save would write changed after its buffer was
+/// rendered: what the graph holds now, against the buffer's baseline
+/// copy of it.
+#[derive (Debug, Clone, PartialEq)]
+pub enum ChangeSinceRendered {
+  Deleted, // the graph no longer has the graphnode
+  Changed {
+    title      : String, // the graph's title of it now
+    aspects    : Vec<ChangedAspect>, // only those that differ
+    body_lines : Vec<String>, // the body's changed lines, baseline against graph, each prefixed "- " or "+ "; empty when the body did not change
+  }, }
+
+/// One aspect of a graphnode that differs between a buffer's baseline
+/// and the graph.
+#[derive (Debug, Clone, PartialEq)]
+pub struct ChangedAspect {
+  pub name   : &'static str, // as the one-line message names it, e.g. "title"
+  pub detail : Option<String>, // what the org message adds in parentheses, e.g. the old and new values
+}
+
 #[derive (Debug)]
 pub enum LinkParseError {
   InvalidFormat,
@@ -85,10 +105,9 @@ pub enum BufferValidationError {
   ForkRequestMultiple            (ID, Vec<HeadlineName>),  // Two headlines for the same id both carry an explicit fork request; at most one is allowed.
   OverrideInvariantViolation     (String),
   ChangedSinceRendered {
-    gnid        : ID,  // the node's pid
-    rendered_at : u64, // the runtime generation the buffer was rendered at
-    last_change : u64, // the runtime generation the node last changed at, later than 'rendered_at'
-    headlines   : Vec<HeadlineName>, // the buffer's occurrences of the node
+    gnid      : ID, // the node's pid
+    change    : ChangeSinceRendered, // how the graph's graphnode differs from the buffer's baseline copy of it
+    headlines : Vec<HeadlineName>, // the buffer's occurrences of the node
   }, // The save would write a node that changed after its buffer was rendered: writing the buffer's text would silently undo that change.
   MultipleEditableViewRequestsForSameId    (ID, Vec<HeadlineName>), // Multiple editable view requests for the same ID
   WriteProtectAndEditableViewRequestsOnOneOccurrence (ID, HeadlineName), // One occurrence asks to become both write-protected and the editable one. (On different occurrences of a node, the two requests move editability, and are allowed.)
@@ -329,9 +348,15 @@ impl std::fmt::Display for BufferValidationError {
       BufferValidationError::OverridesHere_Mismatch(carrier, original, effective, headline) =>
         write!(f, "Node {:?} ({}) carries the fact (overridesHere {:?}), but it is not on the override chain of that original (which resolves to {:?}). The fact looks hand-edited or stale; saving it would rewrite a contains list. Re-render the view and retry.", carrier, headline, original, effective),
       BufferValidationError::ChangedSinceRendered {
-        gnid, rendered_at, last_change, headlines } =>
-        write!(f, "Node {:?} ({}) changed at runtime generation {}, after this buffer was rendered at runtime generation {}. Nothing was saved; reopen a fresh view and reapply the edit.",
-               gnid, name_headlines (headlines), last_change, rendered_at),
+        gnid, change : ChangeSinceRendered::Deleted, headlines } =>
+        write!(f, "Node {:?} ({}) was deleted after this buffer was rendered. Nothing was saved; reopen a fresh view and reapply the edit.",
+               gnid, name_headlines (headlines)),
+      BufferValidationError::ChangedSinceRendered {
+        gnid, change : ChangeSinceRendered::Changed { title, aspects, .. }, headlines } =>
+        write!(f, "Node {:?} \"{}\" ({}) changed after this buffer was rendered: {}. Nothing was saved; reopen a fresh view and reapply the edit.",
+               gnid, title, name_headlines (headlines),
+               aspects . iter () . map ( |aspect| aspect . name )
+               . collect::<Vec<&str>> () . join (", ")),
       BufferValidationError::Other (msg) =>
         write!(f, "{}", msg), }} }
 

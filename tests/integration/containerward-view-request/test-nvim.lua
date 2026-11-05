@@ -52,6 +52,7 @@ local initial_content = table.concat({
 }, '\n')
 local buf = buffer.open_org_buffer_from_text(
   initial_content, buffer_name, view_id, T.runtime_generation())
+vim.b[buf].skg_clean_baseline = '' -- the baseline of a new empty view, which a hand-built view stands in for
 print('Created initial buffer with full structure')
 
 print('Saving initial buffer to establish relationships...')
@@ -70,6 +71,7 @@ local new_content = table.concat({
 }, '\n')
 buf = buffer.open_org_buffer_from_text(new_content, buffer_name, view_id,
                                        T.runtime_generation())
+vim.b[buf].skg_clean_baseline = '' -- the baseline of a new empty view, which a hand-built view stands in for
 print('Created new buffer without node 0')
 
 -- Position on line 3 ('** (skg node (gnid 12)) 12').

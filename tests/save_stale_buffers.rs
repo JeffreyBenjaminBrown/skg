@@ -1,15 +1,17 @@
 // cargo nextest run --test grouped_saves -E 'test(save_stale_buffers::)'
 //
-// A save refuses a buffer rendered before a node it would write last
-// changed (server/serve/handlers/save_staleness.rs). Two connections
-// share one runtime, as Emacs and skg-for-ai do: each holds its own
-// views, so neither's save rerenders the other's buffers.
+// A save refuses a buffer whose copy of a graphnode it would write no
+// longer matches the graph (server/serve/handlers/save_staleness.rs).
+// Each save sends the text the view was opened with as its baseline.
+// Two connections share one runtime, as Emacs and skg-for-ai do: each
+// holds its own views, so neither's save rerenders the other's buffers.
 
+use skg::repo_watch::reload::reload_changed_skg_files;
 use skg::serve::ViewsState;
 use skg::serve::handlers::rebuild_session_lifetime_stores::rebuild_session_lifetime_stores_in_place;
-use skg::serve::handlers::runtime_generation::handle_runtime_generation_request;
 use skg::serve::handlers::save_buffer::handle_save_buffer_request;
 use skg::serve::handlers::single_root_view::handle_single_root_view_request;
+use skg::serve::handlers::strip_body_whitespace::handle_strip_body_whitespace_request;
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::test_utils::{
   copy_dir_all, extract_string_field_from_sexp, graph_handle_from_config,
@@ -20,11 +22,12 @@ use skg::types::misc::{SkgConfig, TantivyIndex};
 use skg::types::views_state::OpenViews;
 
 use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
+use std::collections::BTreeSet;
 use std::error::Error;
 use std::fs;
 use std::io::{BufReader, Write};
 use std::net::TcpStream;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 
 struct Fixture {
@@ -41,7 +44,8 @@ fn fixture (
   let config : SkgConfig = load_config_with_overrides (
     root . join ("skgconfig.toml") . to_str () . unwrap (),
     Some ("save-stale-buffers"),
-    &[ ("main", root . join ("main")) ] ) ?;
+    &[ ("main",   root . join ("main")),
+       ("theirs", root . join ("theirs")) ] ) ?;
   let config : SkgConfig = SkgConfig {
     tantivy_folder : root . join ("tantivy"),
     data_root      : root . to_path_buf (),
@@ -57,14 +61,14 @@ fn new_connection (
   ViewsState { open_views     : OpenViews::new (),
                graph_straddle : None, } }
 
-/// Open a content view of 'gnid' as 'view_id': its text, and the
-/// generation it was rendered at.
+/// Open a content view of 'gnid' as 'view_id': its text, which the
+/// client keeps as the view's baseline.
 fn open_view (
   f           : &mut Fixture,
   views_state : &mut ViewsState,
   gnid        : &str,
   view_id     : &str,
-) -> (String, u64) {
+) -> String {
   let (mut stream, read_end) : (TcpStream, TcpStream) = mk_test_tcp_stream_pair ();
   handle_single_root_view_request (
     &mut stream,
@@ -75,26 +79,20 @@ fn open_view (
   drop (stream);
   let messages : Vec<String> = read_all_lp_messages (&mut BufReader::new (read_end));
   let response : &String = messages . last () . expect ("a content-view response");
-  ( extract_string_field_from_sexp (response, "content") . expect ("content"),
-    extract_string_field_from_sexp (response, "rendered-at") . expect ("rendered-at")
-      . parse () . unwrap () ) }
+  extract_string_field_from_sexp (response, "content") . expect ("content") }
 
-/// Save 'buffer' as 'view_id' through the save handler, with
-/// '(rendered-at . RENDERED_AT)' when given, and with the envelope's
-/// '(baseline BASELINE)' when given: the terminal save-result message.
+/// Save 'buffer' as 'view_id' through the save handler, with the
+/// envelope's '(baseline BASELINE)' when given: the terminal message.
 fn save (
   f           : &mut Fixture,
   views_state : &mut ViewsState,
   view_id     : &str,
   buffer      : &str,
-  rendered_at : Option<String>,
   baseline    : Option<&str>,
 ) -> String {
   let request : String = format! (
-    "((request . \"save buffer\") (view-id . \"{}\"){})",
-    view_id,
-    rendered_at . map ( |n| format! (" (rendered-at . \"{}\")", n) )
-      . unwrap_or_default () );
+    "((request . \"save buffer\") (view-id . \"{}\") (rendered-at . \"0\"))",
+    view_id );
   let envelope : String = format! (
     "((saved-buffer \"{}\"){} (other-views ()))",
     sexp_string_body (buffer),
@@ -112,9 +110,22 @@ fn save (
     &SkgrepoRestriction::unrestricted (&f . config) );
   drop (server_writes);
   read_all_lp_messages (&mut BufReader::new (client_reads))
-    . into_iter ()
-    . find ( |message| message . contains ("save-result") )
-    . expect ("a save-result") }
+    . pop ()
+    . expect ("a terminal message") }
+
+/// Open 'gnid' on a connection of its own, apply 'edit' to the view,
+/// and save it: a change made elsewhere. It must succeed.
+fn change_elsewhere (
+  f     : &mut Fixture,
+  gnid  : &str,
+  edit  : &dyn Fn (&str) -> String,
+) {
+  let mut elsewhere : ViewsState = new_connection ();
+  let view_id : String = format! ("{}-elsewhere", gnid);
+  let view : String = open_view (f, &mut elsewhere, gnid, &view_id);
+  let result : String = save (
+    f, &mut elsewhere, &view_id, &edit (&view), Some (&view) );
+  assert! ( saved (&result), "{}", result ); }
 
 /// 'text' escaped to sit between the quotes of a sexp string.
 fn sexp_string_body (
@@ -122,147 +133,247 @@ fn sexp_string_body (
 ) -> String {
   text . replace ('\\', "\\\\") . replace ('"', "\\\"") }
 
+fn file_path (
+  f       : &Fixture,
+  skgrepo : &str,
+  gnid    : &str,
+) -> PathBuf {
+  f . dir . path () . join (skgrepo) . join (format! ("{}.skg", gnid)) }
+
 fn file_text (
   f    : &Fixture,
   gnid : &str,
 ) -> String {
-  fs::read_to_string (
-    f . dir . path () . join ("main") . join (format! ("{}.skg", gnid)) )
-    . unwrap () }
+  fs::read_to_string ( file_path (f, "main", gnid) ) . unwrap () }
 
 fn errors_of (
   save_result : &str,
 ) -> String {
   save_result . split ("(errors") . nth (1) . unwrap_or ("") . to_string () }
 
-#[test]
-fn a_buffer_rendered_before_a_node_changed_cannot_write_it
-  () -> Result<(), Box<dyn Error>> {
-  let mut f : Fixture = fixture () ?;
-  let mut first  : ViewsState = new_connection ();
-  let mut second : ViewsState = new_connection ();
-  let (a_in_first, rendered_at) : (String, u64) =
-    open_view (&mut f, &mut first, "a", "a-first");
-  let (a_in_second, second_rendered_at) : (String, u64) =
-    open_view (&mut f, &mut second, "a", "a-second");
-  let (c_in_second, _) : (String, u64) =
-    open_view (&mut f, &mut second, "c", "c-second");
-  assert_eq! (second_rendered_at, rendered_at);
-  { // The first connection's save of a succeeds, and says when its rerender was drawn.
-    let result : String = save (
-      &mut f, &mut first, "a-first",
-      &a_in_first . replace ("a as first written", "a by first"), Some (rendered_at . to_string ()),
-      Some (&a_in_first) );
-    assert! ( errors_of (&result) . starts_with (" ())"), "{}", result );
-    assert_eq! (
-      extract_string_field_from_sexp (&result, "rendered-at"),
-      Some ( (rendered_at + 1) . to_string () )); }
-  { // The second connection's older view of a would undo that: refused, nothing written.
-    let result : String = save (
-      &mut f, &mut second, "a-second",
-      &a_in_second . replace ("a as first written", "a by second"), Some (rendered_at . to_string ()),
-      Some (&a_in_second) );
-    let errors : String = errors_of (&result);
-    assert! ( errors . contains ("NOTHING WAS SAVED")
-              && errors . contains ("changed after the buffer was rendered")
-              && errors . contains ("- ID: a")
-              && errors . contains ( &format! (
-                "rendered at runtime generation {}", rendered_at ))
-              && errors . contains ( &format! (
-                "last changed at runtime generation {}", rendered_at + 1 ))
-              && errors . contains ("- graphnode ID: a"),
-              "{}", result );
-    assert! ( extract_string_field_from_sexp (&result, "rendered-at") . is_none () );
-    assert! ( file_text (&f, "a") . contains ("a by first") ); }
-  { // The same old buffer, a's text untouched, still differs from the graph,
-    // so saving it would also undo the change: refused.
-    let result : String = save (
-      &mut f, &mut second, "a-second", &a_in_second, Some (rendered_at . to_string ()),
-      Some (&a_in_second) );
-    assert! ( errors_of (&result) . contains ("NOTHING WAS SAVED"), "{}", result );
-    assert! ( file_text (&f, "a") . contains ("a by first") ); }
-  { // An equally old buffer that does not write a saves.
-    let result : String = save (
-      &mut f, &mut second, "c-second",
-      &c_in_second . replace ("c as first written", "c by second"), Some (rendered_at . to_string ()),
-      Some (&c_in_second) );
-    assert! ( errors_of (&result) . starts_with (" ())"), "{}", result );
-    assert! ( file_text (&f, "c") . contains ("c by second") ); }
-  Ok (()) }
+/// Whether a terminal save message is a save-result without errors.
+fn saved (
+  save_result : &str,
+) -> bool {
+  save_result . starts_with ("((response-type save-result)")
+  && errors_of (save_result) . starts_with (" ())") }
 
-/// The 'runtime generation' request's answer, as a client dating a
-/// new empty view receives it.
-fn runtime_generation_answer (
-  f : &Fixture,
+/// Replace b's body in a view of b.
+fn with_b_body_edited (
+  view : &str,
 ) -> String {
-  let (mut stream, read_end) : (TcpStream, TcpStream) = mk_test_tcp_stream_pair ();
-  handle_runtime_generation_request (&mut stream, &f . env);
-  drop (stream);
-  let messages : Vec<String> = read_all_lp_messages (&mut BufReader::new (read_end));
-  assert! ( messages [0] . starts_with ("((response-type runtime-generation)"),
-            "{}", messages [0] );
-  extract_string_field_from_sexp (&messages [0], "content") . expect ("content") }
+  view . replace ("b's second line", "b's second line, edited") }
 
 #[test]
-fn a_new_empty_view_is_dated_by_the_runtime_generation_request
+fn a_buffer_whose_copy_of_a_node_changed_cannot_write_it
   () -> Result<(), Box<dyn Error>> {
-  // A buffer the client built itself, like a new empty view the user
-  // typed an existing node's headline into, saves as rendered at the
-  // generation the client asked for when it opened the view.
+  // Connection two retitles b after connection one opened it; one's
+  // edit of b's body would undo the new title: refused, saying what
+  // changed, and nothing written.
   let mut f : Fixture = fixture () ?;
-  let mut connection : ViewsState = new_connection ();
-  let opened_at : String = runtime_generation_answer (&f);
-  let (c_view, rendered_at) : (String, u64) =
-    open_view (&mut f, &mut connection, "c", "c-view");
-  assert_eq! (opened_at, rendered_at . to_string ());
-  let first : String = save (
-    &mut f, &mut connection, "c-view",
-    &c_view . replace ("c as first written", "c once"), Some (rendered_at . to_string ()),
-    Some (&c_view) );
-  assert! ( errors_of (&first) . starts_with (" ())"), "{}", first );
-  { // Typed into a view opened before c changed: saving it would undo that change.
-    let typed : String = save (
-      &mut f, &mut connection, "typed-view",
-      "* (skg node (gnid c) (skgRepos (nodeRepo main))) c typed\n",
-      Some (opened_at), Some ("") );
-    assert! ( errors_of (&typed) . contains ("changed after the buffer was rendered"),
-              "{}", typed );
-    assert! ( file_text (&f, "c") . contains ("c once") ); }
-  { // An empty view opened after the change saves.
-    let opened_later_at : String = runtime_generation_answer (&f);
-    let typed : String = save (
-      &mut f, &mut connection, "typed-later-view",
-      "* (skg node (gnid c) (skgRepos (nodeRepo main))) c typed\n",
-      Some (opened_later_at), Some ("") );
-    assert! ( errors_of (&typed) . starts_with (" ())"), "{}", typed );
-    assert! ( file_text (&f, "c") . contains ("c typed") ); }
-  Ok (()) }
-
-#[test]
-fn a_save_whose_rendered_at_is_not_a_number_is_refused
-  () -> Result<(), Box<dyn Error>> {
-  let mut f : Fixture = fixture () ?;
-  let mut connection : ViewsState = new_connection ();
+  let mut first : ViewsState = new_connection ();
+  let b_in_first : String = open_view (&mut f, &mut first, "b", "b-first");
+  change_elsewhere (&mut f, "b", &|view : &str|
+    view . replace ("b as first written", "b retitled"));
   let result : String = save (
-    &mut f, &mut connection, "typed-view",
-    "* (skg node (gnid c) (skgRepos (nodeRepo main))) c typed\n",
-    Some ("never" . to_string ()), Some ("") );
-  assert! ( errors_of (&result) . contains ("not a runtime generation number"),
+    &mut f, &mut first, "b-first",
+    &with_b_body_edited (&b_in_first), Some (&b_in_first) );
+  let errors : String = errors_of (&result);
+  assert! ( errors . contains ("NOTHING WAS SAVED")
+            && errors . contains ("changed after the buffer was rendered")
+            && errors . contains ("- Title: b retitled")
+            && errors . contains ("- ID: b")
+            && errors . contains (
+              "- Changed since this buffer was rendered: the title (then \\\"b as first written\\\", now \\\"b retitled\\\").")
+            && ! errors . contains ("the body")
+            && errors . contains ("- graphnode ID: b"),
             "{}", result );
-  assert! ( file_text (&f, "c") . contains ("c as first written") );
+  assert! ( file_text (&f, "b") . contains ("b retitled")
+            && ! file_text (&f, "b") . contains ("edited") );
   Ok (()) }
 
 #[test]
-fn a_save_without_rendered_at_is_refused
+fn the_stale_error_shows_the_bodys_changed_lines
+  () -> Result<(), Box<dyn Error>> {
+  let mut f : Fixture = fixture () ?;
+  let mut first : ViewsState = new_connection ();
+  let b_in_first : String = open_view (&mut f, &mut first, "b", "b-first");
+  change_elsewhere (&mut f, "b", &|view : &str|
+    view . replace ("b's first line", "b's new first line"));
+  let result : String = save (
+    &mut f, &mut first, "b-first",
+    &b_in_first . replace ("b as first written", "b retitled"),
+    Some (&b_in_first) );
+  let errors : String = errors_of (&result);
+  assert! ( errors . contains (
+              "- Changed since this buffer was rendered: the body.\n\
+               - The body's changed lines, then against now:\n  \
+               - b's first line\n  \
+               + b's new first line\n" ),
+            "{}", result );
+  assert! ( file_text (&f, "b") . contains ("b as first written") );
+  Ok (()) }
+
+#[test]
+fn an_old_buffer_that_does_not_write_the_changed_node_saves
+  () -> Result<(), Box<dyn Error>> {
+  let mut f : Fixture = fixture () ?;
+  let mut first : ViewsState = new_connection ();
+  let c_in_first : String = open_view (&mut f, &mut first, "c", "c-first");
+  change_elsewhere (&mut f, "b", &|view : &str|
+    view . replace ("b as first written", "b retitled"));
+  let result : String = save (
+    &mut f, &mut first, "c-first",
+    &c_in_first . replace ("c as first written", "c edited"), Some (&c_in_first) );
+  assert! ( saved (&result), "{}", result );
+  assert! ( file_text (&f, "c") . contains ("c edited") );
+  Ok (()) }
+
+#[test]
+fn a_buffer_cannot_write_a_node_deleted_after_it_was_rendered
+  () -> Result<(), Box<dyn Error>> {
+  let mut f : Fixture = fixture () ?;
+  let mut first : ViewsState = new_connection ();
+  let b_in_first : String = open_view (&mut f, &mut first, "b", "b-first");
+  change_elsewhere (&mut f, "b", &|view : &str|
+    view . replacen ("(gnid b)", "(gnid b) (editRequest delete)", 1));
+  assert! ( ! file_path (&f, "main", "b") . exists () );
+  let result : String = save (
+    &mut f, &mut first, "b-first",
+    &with_b_body_edited (&b_in_first), Some (&b_in_first) );
+  let errors : String = errors_of (&result);
+  assert! ( errors . contains ("changed after the buffer was rendered")
+            && errors . contains ("- ID: b\n- It was deleted after this buffer was rendered.")
+            && ! errors . contains ("- Title:"),
+            "{}", result );
+  assert! ( ! file_path (&f, "main", "b") . exists () );
+  Ok (()) }
+
+#[test]
+fn a_change_undone_before_the_save_leaves_the_buffer_current
+  () -> Result<(), Box<dyn Error>> {
+  let mut f : Fixture = fixture () ?;
+  let mut first : ViewsState = new_connection ();
+  let b_in_first : String = open_view (&mut f, &mut first, "b", "b-first");
+  change_elsewhere (&mut f, "b", &|view : &str|
+    view . replace ("b as first written", "b retitled"));
+  change_elsewhere (&mut f, "b", &|view : &str|
+    view . replace ("b retitled", "b as first written"));
+  let result : String = save (
+    &mut f, &mut first, "b-first",
+    &with_b_body_edited (&b_in_first), Some (&b_in_first) );
+  assert! ( saved (&result), "{}", result );
+  assert! ( file_text (&f, "b") . contains ("edited") );
+  Ok (()) }
+
+#[test]
+fn a_merge_request_is_never_stale
+  () -> Result<(), Box<dyn Error>> {
+  // The merge is built from the graph at save time, so the text
+  // preserver carries b's new title.
+  let mut f : Fixture = fixture () ?;
+  let mut first : ViewsState = new_connection ();
+  let a_in_first : String = open_view (&mut f, &mut first, "a", "a-first");
+  change_elsewhere (&mut f, "b", &|view : &str|
+    view . replace ("b as first written", "b retitled"));
+  let result : String = save (
+    &mut f, &mut first, "a-first",
+    &a_in_first . replacen ("(gnid a)", "(gnid a) (editRequest (merge b))", 1),
+    Some (&a_in_first) );
+  assert! ( saved (&result), "{}", result );
+  assert! ( ! file_path (&f, "main", "b") . exists () );
+  assert! ( fs::read_dir ( f . dir . path () . join ("main") ) ?
+            . any ( |entry| fs::read_to_string ( entry . unwrap () . path () )
+                    . unwrap () . contains ("MERGED: b retitled") ),
+            "a text preserver titled after b's new title" );
+  Ok (()) }
+
+#[test]
+fn a_whitespace_strip_does_not_make_a_buffer_stale
   () -> Result<(), Box<dyn Error>> {
   let mut f : Fixture = fixture () ?;
   let mut connection : ViewsState = new_connection ();
-  let (c_view, _) : (String, u64) =
-    open_view (&mut f, &mut connection, "c", "c-view");
+  let w_view : String = open_view (&mut f, &mut connection, "w", "w-view");
+  { let (mut stream, read_end) : (TcpStream, TcpStream) = mk_test_tcp_stream_pair ();
+    handle_strip_body_whitespace_request (&mut stream, &mut f . env);
+    drop (stream);
+    let messages : Vec<String> = read_all_lp_messages (&mut BufReader::new (read_end));
+    assert! ( messages [0] . contains ("1"), "{:?}", messages ); }
+  assert! ( ! file_text (&f, "w") . contains ("w's body "), "{}", file_text (&f, "w") );
+  let result : String = save (
+    &mut f, &mut connection, "w-view",
+    &w_view . replace ("its second line", "its edited second line"), Some (&w_view) );
+  assert! ( saved (&result), "{}", result );
+  assert! ( file_text (&f, "w") . contains ("its edited second line") );
+  Ok (()) }
+
+#[test]
+fn trailing_whitespace_on_disk_does_not_make_a_buffer_stale
+  () -> Result<(), Box<dyn Error>> {
+  // The view draws w's body with its trailing whitespace, and the
+  // parser trims it, so the baseline's copy of w differs from the
+  // file; it still matches the graph as drawn.
+  let mut f : Fixture = fixture () ?;
+  let mut connection : ViewsState = new_connection ();
+  let w_view : String = open_view (&mut f, &mut connection, "w", "w-view");
+  assert! ( w_view . contains ("w's body   \n"), "{}", w_view );
+  let result : String = save (
+    &mut f, &mut connection, "w-view",
+    &w_view . replace ("its second line", "its edited second line"), Some (&w_view) );
+  assert! ( saved (&result), "{}", result );
+  assert! ( file_text (&f, "w") . contains ("its edited second line") );
+  Ok (()) }
+
+#[test]
+fn a_rebuild_does_not_make_a_buffer_stale
+  () -> Result<(), Box<dyn Error>> {
+  let mut f : Fixture = fixture () ?;
+  let mut connection : ViewsState = new_connection ();
+  let c_view : String = open_view (&mut f, &mut connection, "c", "c-view");
+  rebuild_session_lifetime_stores_in_place (&mut f . env, &mut connection) ?;
   let result : String = save (
     &mut f, &mut connection, "c-view",
-    &c_view . replace ("c as first written", "c edited"), None, Some (&c_view) );
-  assert! ( errors_of (&result) . contains ("rendered-at"), "{}", result );
+    &c_view . replace ("c as first written", "c edited"), Some (&c_view) );
+  assert! ( saved (&result), "{}", result );
+  assert! ( file_text (&f, "c") . contains ("c edited") );
+  Ok (()) }
+
+#[test]
+fn a_buffer_cannot_fork_a_foreign_node_reloaded_after_it_was_rendered
+  () -> Result<(), Box<dyn Error>> {
+  // Editing a foreign node asks to fork it; the clone would copy the
+  // buffer's stale text of it, so the save is refused, naming it.
+  let mut f : Fixture = fixture () ?;
+  let mut connection : ViewsState = new_connection ();
+  let n_view : String = open_view (&mut f, &mut connection, "n", "n-view");
+  { let n_path : PathBuf = file_path (&f, "theirs", "n");
+    fs::write ( &n_path, "pid: n\ntitle: n as they rewrote it\n" ) ?;
+    let (notice, _unread) = reload_changed_skg_files (
+      &f . env, & BTreeSet::from ([ n_path ]) );
+    assert! ( ! notice . files_reloaded . is_empty (), "{:?}", notice . files_reloaded ); }
+  let result : String = save (
+    &mut f, &mut connection, "n-view",
+    &n_view . replace ("n as they wrote it", "n as I would have it"), Some (&n_view) );
+  let errors : String = errors_of (&result);
+  assert! ( errors . contains ("changed after the buffer was rendered")
+            && errors . contains ("- Title: n as they rewrote it")
+            && errors . contains ("- ID: n"),
+            "{}", result );
+  Ok (()) }
+
+#[test]
+fn an_unreadable_baseline_refuses_the_save
+  () -> Result<(), Box<dyn Error>> {
+  let mut f : Fixture = fixture () ?;
+  let mut connection : ViewsState = new_connection ();
+  let c_view : String = open_view (&mut f, &mut connection, "c", "c-view");
+  let result : String = save (
+    &mut f, &mut connection, "c-view",
+    &c_view . replace ("c as first written", "c edited"),
+    Some ("* (skg (node (gnid c) c\n") );
+  assert! ( errors_of (&result) . contains ("baseline")
+            && errors_of (&result) . contains ("could not be read"),
+            "{}", result );
   assert! ( file_text (&f, "c") . contains ("c as first written") );
   Ok (()) }
 
@@ -273,40 +384,10 @@ fn a_save_without_a_baseline_is_refused
   // save is refused, naming the field, and nothing is written.
   let mut f : Fixture = fixture () ?;
   let mut connection : ViewsState = new_connection ();
-  let (c_view, rendered_at) : (String, u64) =
-    open_view (&mut f, &mut connection, "c", "c-view");
+  let c_view : String = open_view (&mut f, &mut connection, "c", "c-view");
   let result : String = save (
     &mut f, &mut connection, "c-view",
-    &c_view . replace ("c as first written", "c edited"),
-    Some (rendered_at . to_string ()), None );
+    &c_view . replace ("c as first written", "c edited"), None );
   assert! ( errors_of (&result) . contains ("missing baseline"), "{}", result );
   assert! ( file_text (&f, "c") . contains ("c as first written") );
-  Ok (()) }
-
-#[test]
-fn a_rebuild_makes_every_earlier_buffer_stale
-  () -> Result<(), Box<dyn Error>> {
-  let mut f : Fixture = fixture () ?;
-  let mut connection : ViewsState = new_connection ();
-  let (c_view, rendered_at) : (String, u64) =
-    open_view (&mut f, &mut connection, "c", "c-view");
-  rebuild_session_lifetime_stores_in_place (&mut f . env, &mut connection) ?;
-  { let result : String = save (
-      &mut f, &mut connection, "c-view",
-      &c_view . replace ("c as first written", "c edited"), Some (rendered_at . to_string ()),
-      Some (&c_view) );
-    assert! ( errors_of (&result) . contains ( &format! (
-                "last changed at runtime generation {}", rendered_at + 1 )),
-              "{}", result );
-    assert! ( file_text (&f, "c") . contains ("c as first written") ); }
-  { // A view opened after the rebuild saves.
-    let (fresh, fresh_rendered_at) : (String, u64) =
-      open_view (&mut f, &mut connection, "c", "c-fresh");
-    assert_eq! (fresh_rendered_at, rendered_at + 1);
-    let result : String = save (
-      &mut f, &mut connection, "c-fresh",
-      &fresh . replace ("c as first written", "c edited"), Some (fresh_rendered_at . to_string ()),
-      Some (&fresh) );
-    assert! ( errors_of (&result) . starts_with (" ())"), "{}", result );
-    assert! ( file_text (&f, "c") . contains ("c edited") ); }
   Ok (()) }

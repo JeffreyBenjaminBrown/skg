@@ -1,6 +1,6 @@
 use super::misc::{ID, SkgrepoChange, SkgrepoName};
 use super::nodes::complete::Graphnode;
-use super::errors::{SaveError, BufferValidationError, HeadlineName, with_org_subheadlines};
+use super::errors::{SaveError, BufferValidationError, ChangeSinceRendered, HeadlineName, with_org_subheadlines};
 
 
 /////////////////
@@ -285,12 +285,38 @@ fn buffer_validation_error_text (
     BufferValidationError::FlagEditOnUnknownNode (gnid) => {
       format!("Cannot change a flag on an unsaved or unknown graphnode:\n- ID: {}\n- Save the node first, then run the flag setter.\n",
               gnid . 0) },
-    BufferValidationError::ChangedSinceRendered {
-      gnid, rendered_at, last_change, .. } => {
-      format!("A node this save would write changed after the buffer was rendered:\n- ID: {}\n- The buffer was rendered at runtime generation {}; the node last changed at runtime generation {}.\n- Saving would overwrite that change with this buffer's older text. Archive your edits if you need them (M-x skg-show-unsaved-changes in Emacs, :SkgShowUnsavedChanges in Neovim), reopen a fresh view, and reapply them there.\n",
-              gnid . 0, rendered_at, last_change) },
+    BufferValidationError::ChangedSinceRendered { gnid, change, .. } => {
+      format!("A node this save would write changed after the buffer was rendered:\n{}- Saving would undo that change. Archive your edits if you need them (M-x skg-show-unsaved-changes in Emacs, :SkgShowUnsavedChanges in Neovim), reopen a fresh view, and reapply them there.\n",
+              change_since_rendered_lines (gnid, change)) },
     BufferValidationError::Other (msg) => {
       format!("{}\n", msg) }, }}
+
+/// The lines of a stale-write error between its first line and its
+/// advice: the graphnode, and what changed in it.
+fn change_since_rendered_lines (
+  gnid   : &ID,
+  change : &ChangeSinceRendered,
+) -> String {
+  match change {
+    ChangeSinceRendered::Deleted =>
+      format! ("- ID: {}\n- It was deleted after this buffer was rendered.\n",
+               gnid . 0),
+    ChangeSinceRendered::Changed { title, aspects, body_lines } => {
+      let aspects_text : String =
+        aspects . iter ()
+        . map ( |aspect| match &aspect . detail {
+          Some (detail) => format! ("the {} ({})", aspect . name, detail),
+          None          => format! ("the {}", aspect . name), } )
+        . collect::<Vec<String>> () . join ("; ");
+      let body_text : String =
+        if body_lines . is_empty () { String::new () }
+        else { format! (
+          "- The body's changed lines, then against now:\n{}",
+          body_lines . iter ()
+          . map ( |line| format! ("  {}\n", line) )
+          . collect::<String> () ) };
+      format! ("- Title: {}\n- ID: {}\n- Changed since this buffer was rendered: {}.\n{}",
+               title, gnid . 0, aspects_text, body_text) }, }}
 
 impl NodeInstruction {
   pub fn is_delete (&self) -> bool {

@@ -187,7 +187,7 @@ impl GraphStraddle {
     ChangedPids { out_changed, in_changed } }
 }
 
-fn node_changes_between (
+pub(crate) fn node_changes_between (
   before : &GraphnodeInRust,
   after  : &GraphnodeInRust,
 ) -> NodeChanges {

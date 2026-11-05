@@ -33,6 +33,7 @@ local content = table.concat({
 local buf = buffer.open_org_buffer_from_text(
   content, 'skg://focus-and-folded-metadata-test', nil,
   T.runtime_generation())
+vim.b[buf].skg_clean_baseline = '' -- the baseline of a new empty view, which a hand-built view stands in for
 print('Created buffer with 6 headlines')
 
 T.write_file('initial.log', T.buffer_text(buf))

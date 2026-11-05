@@ -78,22 +78,25 @@ fn open_tele_view (
   ( extract_string_field_from_sexp (response, "content") . expect ("content"),
     extract_string_field_from_sexp (response, "rendered-at") . expect ("rendered-at") ) }
 
-/// Save 'buffer' as "tele-view", rendered at 'rendered_at', under the
-/// restriction, with 'extra_fields' in the request: every message the
-/// save sent.
+/// Save 'buffer' as "tele-view", rendered at 'rendered_at' as
+/// 'baseline', under the restriction, with 'extra_fields' in the
+/// request: every message the save sent.
 fn save_tele_view (
   f            : &mut Fixture,
   views_state  : &mut ViewsState,
   buffer       : &str,
+  baseline     : &str,
   rendered_at  : &str,
   extra_fields : &str,
 ) -> Vec<String> {
   let request : String = format! (
     "((request . \"save buffer\") (view-id . \"tele-view\") (rendered-at . \"{}\"){})",
     rendered_at, extra_fields );
+  let sexp_string_body = |text : &str| -> String {
+    text . replace ('\\', "\\\\") . replace ('"', "\\\"") };
   let envelope : String = format! (
-    "((saved-buffer \"{}\") (baseline \"\") (other-views ()))", // the empty baseline, which writes nothing
-    buffer . replace ('\\', "\\\\") . replace ('"', "\\\"") );
+    "((saved-buffer \"{}\") (baseline \"{}\") (other-views ()))",
+    sexp_string_body (buffer), sexp_string_body (baseline) );
   let (mut client_writes, server_reads) : (TcpStream, TcpStream) =
     mk_test_tcp_stream_pair ();
   write! ( client_writes, "Content-Length: {}\r\n\r\n{}",
@@ -144,7 +147,7 @@ fn a_withheld_save_rerender_is_released_by_rerendering_its_views
   let edited : String = format! ("{}*** a new node\n", view);
   { // The save writes the new node, and withholds its rerender.
     let messages : Vec<String> =
-      save_tele_view (&mut f, &mut connection, &edited, &rendered_at, "");
+      save_tele_view (&mut f, &mut connection, &edited, &view, &rendered_at, "");
     let terminal : &String = messages . last () . unwrap ();
     assert! ( terminal . starts_with (
                 "((response-type overPrivateText-telescope-confirmation) \
@@ -157,7 +160,7 @@ fn a_withheld_save_rerender_is_released_by_rerendering_its_views
     assert_eq! ( main_files_titled (&f, "a new node") . len (), 1 ); }
   { // Sent again, the same save is stale: it wrote the child.
     let messages : Vec<String> = save_tele_view (
-      &mut f, &mut connection, &edited, &rendered_at,
+      &mut f, &mut connection, &edited, &view, &rendered_at,
       " (approved-overPrivateText-pids \"tele\")" );
     let terminal : &String = messages . last () . unwrap ();
     assert! ( terminal . contains ("NOTHING WAS SAVED")
@@ -197,7 +200,7 @@ fn a_withheld_save_rerender_is_released_by_rerendering_its_views
   { // The released view saves: it is not stale.
     let messages : Vec<String> = save_tele_view (
       &mut f, &mut connection,
-      &fresh . replace ("a new node", "a renamed node"), &fresh_rendered_at, "" );
+      &fresh . replace ("a new node", "a renamed node"), &fresh, &fresh_rendered_at, "" );
     let terminal : &String = messages . last () . unwrap ();
     assert! ( terminal . contains ("(operation save-rerender)"), "{}", terminal );
     assert_eq! ( main_files_titled (&f, "a renamed node") . len (), 1 );

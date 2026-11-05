@@ -88,8 +88,10 @@ local function bfp_build_buffer (name)
   }, '\n') .. '\n'
   -- The trailing newline matches the server's rendering convention,
   -- so the rerender does not change the line count under the snapshot.
-  return buffer.open_org_buffer_from_text(content, 'skg://bfp-' .. name,
-                                         nil, T.runtime_generation())
+  local buf = buffer.open_org_buffer_from_text(content, 'skg://bfp-' .. name,
+                                               nil, T.runtime_generation())
+  vim.b[buf].skg_clean_baseline = '' -- the baseline of a new empty view, which a hand-built view stands in for
+  return buf
 end
 
 ---Run one save-round-trip scenario. APPLY_FOLDS closes the folds that

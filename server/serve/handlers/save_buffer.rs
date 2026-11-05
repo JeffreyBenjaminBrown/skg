@@ -853,7 +853,6 @@ pub async fn update_from_and_rerender_buffer_with_hoist_approval (
 pub async fn update_from_and_rerender_buffer_with_approvals (
   stream                      : &mut TcpStream,
   org_buffer_text             : &str,
-  #[allow(unused_variables)] // TODO: the stale check reads it (plan 'TODO/merge-save-refused/2_2_plan.org', slice 3)
   baseline                    : &str, // the buffer's text as the server last drew it
   env                         : &mut SkgEnv,
   viewforest_id_from_request_result : &Result<ViewforestId, String>,
@@ -865,7 +864,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
   strandeds_review          : &StrandedsReview,
   delete_from               : DeleteFrom,
   other_views               : &[ClientViewSnapshot],
-  rendered_at               : RenderedAt, // when the buffer's text was rendered
+  _rendered_at              : RenderedAt,
   named_diffView_buffer_kind : Option<DiffViewBufferKind>, // the request's '(diff-view-buffer . "...")': the buffer of the diff view it saves, for a view the connection does not hold
 ) -> Result<SaveResponse, Box<dyn Error>> {
   // Save-plan construction reads the current files and graph.  Hold the sole
@@ -909,11 +908,10 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
   { // A node the buffer would write that changed after the buffer was
     // rendered refuses the whole save, before any confirmation is asked.
     let stale_errors : Vec<BufferValidationError> =
-      // A merge is built from the graph at save time, so it is never
-      // stale: no NodeMerges are checked.
       stale_write_errors (
-        &runtime . graph, rendered_at, &viewforest,
-        &nonmerge_nodeInstructions, &[] );
+        &runtime . graph, &runtime . config, skgrepo_restriction,
+        baseline, &viewforest,
+        &nonmerge_nodeInstructions, &fork_specs );
     if ! stale_errors . is_empty () {
       return Err (Box::new (SaveError::BufferValidationErrors {
         errors : stale_errors, warnings : parse_warnings, })); }}
