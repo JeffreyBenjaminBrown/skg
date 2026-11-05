@@ -136,8 +136,8 @@ three comparisons share.
 'nonmerge_nodeInstructions' is a 'Vec<NodeInstruction>' the
 handler mutates in place through the rest of the pipeline
 (restore requests, delete propagation, strandeds, Hoist, forks).
-Remove the untouched outdated Saves right after the stale check, before
-anything reads the vector again, so that delete propagation and
+Remove the untouched outdated Saves right after the stale check,
+before anything reads the vector again, so that delete propagation and
 the Hoist classification never see them. A 'SkgrepoMove' in
 'skgrepo_moves' for a dropped graphnode cannot exist: a move
 changes the copy's home skgrepo, so the graphnode is not
@@ -242,7 +242,8 @@ Docs: the stale-buffer paragraph of 'docs/api-and-formats.org'
 says what is left out and warned of, and what is refused; the
 recovery steps in 'docs/COMMANDS.org' and
 'docs/COMMANDS-nvim.org' say that only edited outdated graphnodes
-refuse a save; the glossary gains 'untouched' and 'outdated' and narrows 'stale'.
+refuse a save; the glossary gains 'untouched' and 'outdated' and
+narrows 'stale'.
 ** TODO Slice 2: the dirty-view check ignores links
 Implement "The dirty-view check will not match through links" as
 the pitfall "The neighborhood has one definition and two readers"
