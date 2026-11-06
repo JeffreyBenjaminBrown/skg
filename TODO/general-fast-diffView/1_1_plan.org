@@ -295,7 +295,7 @@ loop and 'target/debug/skg'; stop it the same way. Do not edit
 'server/' to test the rebuild (Pitfalls). Delete the scratch
 data root's 'logs/' after reading it, if you care to; the
 scratch root is yours.
-** TODO Slice 3: the two memos in the lens
+** DONE Slice 3: the two memos in the lens
 'skg-shared-style-keywords' computed once into a constant;
 'skg--rule-header' cached in a weak 'eq' hash table. Tests:
 'bash/emacs-tests.sh', green. Then, if the scratch script

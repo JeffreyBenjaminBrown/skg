@@ -93,3 +93,35 @@ one-node repo and no 'logs/', port 1772.
 Nothing in this slice.
 *** Headline
 DONE.
+** Slice 3
+Finished 2026-11-06 06:27 UTC.
+*** Commits
+- d3cf31af plan 1_1 slice 3: the lens computes the style keywords once and caches each rule's header
+- the next commit: this record and the slice headline flipped to DONE
+*** Checks
+Logs and the one-time scripts are in 'tests/results/plan-1_1/slice3/'
+(untracked).
+- 'bash/emacs-tests.sh': 446 tests, 446 as expected, 0 unexpected.
+- Timing, 'scripts/overlay-floor.el' case (a), client from source,
+  best of three herald passes over the saved 202 KB, 858-headline
+  buffer: 787.1 ms before, 456.5 ms after. Calls to
+  'skg-shared-style-keywords' per pass: 66,909 before, 1,032 after
+  (the header cache spares most style tests). The plan expected
+  about 557 ms; that figure memoized the keyword list alone, and the
+  header cache accounts for the rest.
+- Output unchanged: a one-time dump of every herald overlay (start,
+  end, display string with its text properties) over the same buffer,
+  once with the two files as at HEAD and once as committed: 858
+  lines each, byte-identical.
+- No failures to classify.
+*** Deviations from the plan's how
+- 'skg--rule-header' is now the cache lookup; its former body, with
+  its docstring, is the new 'skg--parse-rule-header' below it. The
+  cache is the 'defvar' 'skg--rule-header-cache' beside them.
+- The keyword list is the 'defconst'
+  'skg-shared--style-keywords-computed-at-load', placed after
+  'skg-shared-styles' because its value calls that function at load.
+*** Unfinished
+Nothing in this slice.
+*** Headline
+DONE.
