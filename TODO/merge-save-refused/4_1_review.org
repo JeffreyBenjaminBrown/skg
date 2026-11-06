@@ -1,0 +1,193 @@
+#+title: Plan 4 reviewed: three refinements and two renamings
+* Verdict
+Plan 4 did what it set out to do, in seven slices and about an
+hour and a half of agent time. A buffer that still shows a
+graphnode as the server drew it, while the graph changed it, no
+longer refuses the save: the graphnode is left as the graph has
+it and the response says so, whichever path the copy took (its
+own Save, a fork, a move back, a write-protected occurrence). A
+dirty view no longer conflicts with a save through a link, in
+either direction. A view request no longer lands in a buffer of
+the diff view. The runtime generation starts at the epoch again,
+and the save's phases and delete propagation's passes carry
+names, not numbers.
+
+The probes found one defect the suites missed, as they did after
+plan 2_2: once links stopped blocking a save, the save redrew the
+dirty view that had been in its way, and both clients would have
+replaced the buffer and lost the edits. Slice 6 fixed it on the
+server, which now skips every dirty view when choosing collateral
+views, and in both clients, which no longer replace a buffer with
+unsaved edits. Slice 7 closed a second gap (a graphnode shown
+only write-protected was still refused after a retitle elsewhere)
+and applied the vocabulary review's cheap findings.
+
+Two renamings the vocabulary review proposes are costly and are
+yours to decide (section "Decide").
+* What I checked myself
+The launches and the record in 'progress.org'; each slice's diff
+of the server (the plan builder and 'save_staleness.rs' after
+slice 1, the neighborhood and matcher after slice 2, the lookup
+after slice 3, the collateral selection after slice 6); the
+suites by the record; and the two reviewers' reports. I ran the
+final 'bash/all-tests.sh' myself after slice 7 (its summary is in
+'progress.org' and beside this review).
+* Results
+** The run
+Seven slices, one Opus 5.5 agent each at high effort, launched in
+sequence with triage between. No slice stopped early. The two
+corrections carried between slices were the glossary's
+neighborhood entry (done at completion) and the two slices the
+reviews produced (6 and 7). Jeff edited '4_plan.org' and the
+glossary during the run; every agent staged only its own hunks of
+those files, and his edits are still in the working tree,
+uncommitted.
+** Durations, by the commits' times (UTC, 2026-11-06)
+Slice 1: 00:41 to 00:53. Slice 2: 00:57 to 01:00. Slice 3: 01:05
+to 01:13. Slice 4: 01:14 to 01:16. Slice 5 and the completion
+step: 01:17 to 01:24. The two reviews ran in parallel from
+01:25.
+Slice 6: 01:36 to 01:48. Slice 7: 01:49 to about 02:00.
+** Counts
+Seven code commits in 763bc9d8..HEAD, plus the plan and record
+commits. Before slice 7 the code commits changed 15 files of
+server and clients (+437 -140), 23 test files (+752 -25) and 6
+docs (+135 -62). The Rust suite grew from 1137 to 1144 tests; the
+Emacs suite from 444 to 445; the Neovim suite gained one.
+** The commit rule
+Kept: one commit per slice, each carrying its docs and its DONE
+line; the completion step had its own commit.
+** The problems file
+Plan 4 fixed no entry of 'TODO/problems.org'; its sources were
+the review of plan 2_2 and two later notes of Jeff's, which now
+carry "done by plan 4" children.
+* What each slice did beyond the plan's words
+** Slice 1
+*** TODO The untouched Saves are dropped in the plan builder
+Before the foreign policy, because by the handler an untouched
+foreign copy would already have been forked and judged. Arguable
+only in that 'from_text.rs' now imports a function from
+'serve::handlers', which has one precedent.
+*** The untouched graphnodes travel in the 'SavePlan'
+A new field, turned into warnings beside the strandeds warnings.
+*** An unreadable baseline is refused before the plan is built
+So a buffer that is also invalid shows the baseline error only.
+*** The warning's title is the buffer's
+The graph may no longer have the graphnode.
+** Slice 2
+*** One constant lists the four relations
+The walk takes the list; the link-free list is the constant with
+'LinksTo' filtered out.
+*** The two neighborhoods share one type and one matching rule
+'NeighborhoodBeforeAndAfter', with 'matching_identity' and
+'matching_identity_without_links' both delegating to it.
+** Slice 3
+*** The rule is one predicate
+'is_content_view_proper' (named by slice 7), so a kind a later
+plan adds is skipped without another edit.
+*** The handler runs on a thread in the new tests
+It uses 'block_on', which panics inside the shared test stores'
+executor.
+*** More docs than the plan named
+'COMMANDS.org', 'COMMANDS-nvim.org' and 'override.org' also
+described the switch.
+** Slice 4
+*** The old helper came back
+'startup_generation', with its reason in its doc comment. No test
+had asserted the start at 0.
+** Slice 5
+*** TODO Three other numbered passes were named too
+The extra-ID-mapping pass and the node-insertion pass in
+'InRustGraph::from_graphnodes', and the overrider-collection pass
+in 'validate_override_invariants'. Arguable only in the names
+chosen.
+** Slice 6
+*** The server derives the dirty IDs from the envelope itself
+'collateral_viewforest_ids' takes 'other_views'.
+*** Each client's guard is an argument of its update function
+Only the 'collateral-view' handler sets it; the rerender stream
+already leaves dirty views out.
+** Slice 7
+*** The baseline is read once into a struct
+'WhatTheBaselineShows': the baseline's writes and the title and
+home skgrepo of every occurrence, by pid.
+*** TODO "Ordinary content view" became "content view proper"
+Defined in the glossary. Arguable: the name is the reviewer's
+suggestion, not yours.
+*** The deleted case of the warning shares the stale error's test
+'deleted_from_the_graph', from 'graph_lacks'.
+* The churn ledger within the plan
+- Slice 2 dropped links from the dirty-view check; slice 6 then
+  had to keep the save from redrawing the dirty view that no
+  longer blocked it. A requirement the plan got wrong: it did not
+  see that the conflict had been doing a second job.
+- Slice 1's write-protected exception needed a baseline copy,
+  which exists only for an editable occurrence; slice 7 widened
+  it to every occurrence the baseline shows. The plan's wording
+  ("an occurrence equal to the baseline's copy") was narrower
+  than the decision behind it.
+- Slice 3's 'is_ordinary_content_view' was renamed in slice 7
+  after the vocabulary review. Naming.
+- Slice 5's "referencer-collection pass" became the
+  "recorder-collection pass" in slice 7. Naming.
+Cost of the churn: about half an hour of agent time.
+* What the user sees differently
+** By decision
+- A buffer that shows a graphnode as it was, unedited, while the
+  graph changed it, saves; the graphnode is left as the graph has
+  it, the redraw shows it so, and the response warns which ones.
+  The stale refusal fires only for an edited or deleted outdated
+  graphnode.
+- A dirty view whose only tie to a save is a link, in either
+  direction, no longer blocks the save.
+- A view request for a graphnode that is a root of a diff-view
+  buffer renders a content view instead of switching to that
+  buffer.
+- The server's log numbers its generations from the epoch's
+  microseconds again.
+** By accident
+- None found. The probes' defect (a dirty view redrawn) was fixed
+  before the plan closed.
+* The reviewers' reports
+'4_1_review-reports/vocabulary-and-citations.org': no code cites
+'TODO/'; thirteen findings, nine applied by slice 7, two costly
+ones below, one (the write-protected exception's breadth) made
+slice 7's first part, and one minor set. '4_1_review-reports/
+probes.org': ten probes, nine as the plan says and one revealing
+the dirty-view redraw, fixed by slice 6.
+* Decide
+** TODO "Outdated" beside "stale"
+'names.org' forbids giving two near-synonyms private meanings.
+The glossary now defines "outdated" (the baseline's copy differs
+from the graph) and "stale" (outdated and edited or deleted by
+the buffer). The reviewer calls the pair confusible and the
+rename costly; it is used in two identifiers and five docs. I
+would keep both, since the glossary states the difference in one
+line, and the alternative ("changed under the user" for outdated)
+is longer wherever it would go.
+** TODO "Untouched" beside "touched IDs"
+"Untouched" (the buffer did not edit it) sits in the same module
+as "touched IDs" (the IDs a save writes), which mean unrelated
+things. The reviewer suggests "unedited". I would rename to
+"unedited": it is the word the docs already use in the sentence
+that explains the rule, and the rename is a handful of
+identifiers and the glossary entry.
+** TODO Numbered steps outside the plan's list
+Slice 5 named every numbered pass in the server. These remain
+and fall under your rule as worded: "Phase N" headers in 22
+integration-test folders and 'tests/profiling', "Pass 1" and
+"Pass 2" in 'elisp/skg-org-fold.el' near line 62, "the second
+phase" in 'server/from_text/buffer_to_viewnodes/validate_tree.rs'
+near line 51, "phase 5" and "phase 7" cited in one integration
+test, and "(step 3)" in 'server/prominence.rs'. I would rename
+the four in code and leave the test scripts' phase headers, which
+are labels of a script's progress, not names of things.
+* Suggestions for the advice
+- 'plans.org': when a plan removes a refusal, it should ask what
+  else that refusal was preventing. The dirty-view conflict was
+  also what kept a dirty view from being redrawn; removing one
+  half exposed the other.
+- 'orchestration.org': when Jeff edits a planning file during a
+  run, agents stage only their own hunks (a HEAD-plus-edits copy
+  written to the index); this worked seven times and should be
+  the written rule, not a brief's instruction.

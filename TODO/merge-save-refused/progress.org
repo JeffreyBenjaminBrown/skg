@@ -1273,3 +1273,8 @@ Nothing. The report's findings 1 and 5 (the two costly renamings)
 are Jeff's to decide, as the slice says.
 *** Headline
 DONE.
+** Orchestrator's notes after slice 7 (2026-11-06 02:01 UTC)
+Slice 7 reported; one commit. The baseline is now read once into
+'WhatTheBaselineShows'. Plan 4 is complete. The per-plan review is
+'4_1_review.org'; a final 'bash/all-tests.sh' is running and its
+summary will be added here.
