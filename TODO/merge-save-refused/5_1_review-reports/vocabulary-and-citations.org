@@ -1,0 +1,120 @@
+#+title: Plan 5 review: vocabulary and citations
+Range 12b59de9..HEAD (64676216, e95e0ba6). No tests run.
+* Ranked findings
+** 1. "stale" for an edited write-protected occurrence (cheap)
+'tests/multi_repo_errors.rs':280,299,304,312 call a
+write-protected skgrepo that differs from the graph "stale" and
+assert it is refused, as 'EditedWriteProtectedOccurrence'. The
+glossary (214-217) says the opposite of a stale one: a skgrepo
+the baseline shows, the graph having changed it since, is no
+edit and is not refused. Same word,
+'tests/multi_repo_errors/fixtures/README.md':32. Say "differs
+from the graph" or "edited".
+** 2. The old sense ("stale" = refused) survives (cheap)
+- 'elisp/skg-request-save.el':860, 'nvim/lua/skg/save.lua':894,
+  'tools/skg-for-ai/README.org':1364,
+  'tools/skg-for-ai/test_skg_for_ai.py':2417: "refused as stale
+  for a container it gave a new child". Now: refused for an
+  edited stale graphnode, as 'COMMANDS.org':94 now says.
+- 'server/repo_watch/reload.rs':6-8: a buffer that showed a
+  reloaded node "and would write it, is then stale". Under the
+  glossary (660-662) it is stale once it shows the node; "would
+  write" was the refused case.
+- 'coding-advice/plans.org':26,29: "never stale" means never
+  refused. The plan's scope named no client nor 'tools/'.
+** 3. A third "stale": a skgrepo behind the buffer's move (cheap)
+'server/from_text/buffer_to_viewnodes/add_missing_info.rs':118,
+'server/from_text/fork.rs':45, 'tests/unit/fork.rs':114 and
+'tests/new/buffer_to_viewnodes/add_missing_info.rs':142,145
+(a skgrepo literally named 'stale') call a write-protected
+occurrence's skgrepo stale when the same buffer moved the node.
+Nothing in the graph changed, which the glossary's "stale"
+requires. Say "superseded by the move" or similar.
+** 4. Slice 2's own correction missed one sibling (cheap)
+'tests/unit/weave.rs':65: "a stale occurrence of it, drawn
+before a switch of the skgrepo restriction". e95e0ba6 reworded
+exactly this sense in 'server/from_text/validate.rs':375 and
+'tests/restricted_suppression.rs'; this one was left.
+** 5. A numbered step name remains in elisp (cheap)
+'elisp/skg-org-fold.el':133: "This is a third pass through the
+entire buffer." It walks the collected parent markers, not the
+buffer; its siblings (116, 127) are named for what they do.
+Say: fold the parents of the 'folded' headlines.
+** 6. A diff-view "stale", in the glossary too (cheap)
+'docs/glossary.org':1473 offers "stale member" as a phrase,
+right after defining "former member", the term it means. Tests
+use the same sense: 'tests/what_the_refresh_keeps.rs':48-67,
+171,323-325,440,465; 'tests/pruned_change_view/users_notes.rs'
+:43,100,104; 'tests/pruned_change_view/after_a_commit.rs'
+:149,152. The glossary line is cheap; the test renames are
+cheap but noisy (reset labels too), so optional.
+** 7. "whole-viewforest checks" is a new synonym (cheap)
+'server/from_text/buffer_to_viewnodes/validate_tree.rs':48-54.
+'server/from_text.rs':53 already says "global/local buffer
+structure", and the old comment said "global operations". Some
+of the group (idFolder membership, overridesHere parts,
+write-protected relRepo requests) judge one viewnode at a time
+against the graph, which "whole-viewforest" misdescribes and
+"many of which" concedes. "the global checks" fits both. The
+second name, "local-structure validation", is accurate
+('local.rs' checks each viewnode's own shape).
+** 8. Prominence's new cross-reference overstates (cheap comment)
+'server/prominence.rs':203-207 now points the "assigned later"
+note at the save-time check too, but the "(That's safe because
+the only higher-priority thing is a Root...)" reason holds only
+at init: 'prominence.rs':166-170 skip every node already an
+origin, so at save time a Mentioned, HadID or MultiContained
+cycle member never becomes CycleMember, and the comment at 166
+("not already a higher-priority origin") is wrong. The behavior
+predates the plan; whether save time should match init is
+Jeff's call. The section names (196-311) are accurate.
+** 9. Prose that reads the old way (cheap)
+- 'docs/api-and-formats.org':308: "A stale buffer is refused
+  for its edited stale graphnodes" reads as if every stale
+  buffer is refused; one holding only unedited ones saves.
+- 'docs/api-and-formats.org':349 "refused for if it did";
+  'server/from_text.rs':144 and 'save_staleness.rs':2,25
+  "refused for": stilted; "refuses the save" reads better.
+- 'tests/save_stale_buffers.rs':3: "a buffer whose copy of a
+  graphnode ... no longer matches the graph": it is the
+  baseline's copy, and the buffer must edit it.
+** 10. Aside, outside the plan: a fold loop can spin (cheap)
+'skg-org-fold.el':70-87: a top-level headline carrying 'folded'
+has no parent, so nothing folds and the search finds it again,
+forever; the new doc's "until none is visible" hides that.
+* Question 1: vocabulary
+** Renamed correctly
+Every listed identifier, the test names, the six server files'
+comments, the four docs. No "outdated" or "untouched" remains
+in the plan's sense; "outdated" is only in 'glossary.org':667.
+'StaleAspect' and 'stale_write_errors' fit the new sense.
+** "untouched": 75 hits, all ordinary English
+'docs/data-model_technical.org':90,117,136 and the invariants
+set "untouched" against "touched" (the saved set); retiring it
+from the save vocabulary removed a collision there.
+** "unedited": all the plan's sense
+Except 'TODO.org':272-273 (work-cycle sense, a planning record)
+and 'thoughts/smsn/find-keywords.rs':1 (ordinary).
+** "stale": about 280 hits
+The plan's sense, consistent: the slice-1 files,
+'save_rerender_release.rs':8,159,196, 'traverse.rs':476, the
+docs' "stale buffer" paragraphs, 'tools/skg-for-ai/README.org'
+:632,750-764,1317. Ordinary English (caches, sockets, preview
+tokens, reports, the graph straddle): rightly left.
+Missed or colliding: findings 1-4 and 6.
+** "edited": one meaning, differs from the baseline's copy
+'EditedWriteProtectedOccurrence' agrees; finding 1 is the
+test's word, not the error's.
+** Glossary and the docs that cite it
+Both citations match the heading ('types/save.rs':81,
+'glossary.org':2075); the docs agree, apart from finding 9.
+** The three step names
+'skg-org-fold.el':60-68 is accurate (but see finding 10);
+'validate_tree.rs': finding 7; 'prominence.rs': finding 8.
+No numbered name remains in 'server/' or 'nvim/'; one in
+'elisp/' (finding 5).
+* Question 2: citations
+None, in added lines or older ones of the touched files; "the
+plan" in 'save_staleness.rs':24-28 means 'SavePlan'. Only
+'glossary.org':667 names "the records in 'TODO/'", in docs,
+as the plan asked.

@@ -160,6 +160,61 @@ the code there actually means after reading it. No behavior
 change. Rename as "Three numbered steps will be named" says,
 reading each site first. Run 'bash/nextest.sh' and
 'bash/emacs-tests.sh'. One commit.
+** TODO Slice 3: corrections from the review
+The vocabulary review of plan 5
+('5_1_review-reports/vocabulary-and-citations.org') found these.
+Read it in full; apply its findings 1 to 7 and 9 as it says, in
+brief:
+- 1: 'tests/multi_repo_errors.rs' (near lines 280 to 312) and its
+  fixtures' README call a write-protected skgrepo "stale" where
+  the case asserted is an edit; say "edited" or "differs from the
+  graph".
+- 2: "refused as stale" for a re-sent save that created a child
+  again, in 'elisp/skg-request-save.el' (near 860),
+  'nvim/lua/skg/save.lua' (near 894), 'tools/skg-for-ai/
+  README.org' (near 1364) and 'tools/skg-for-ai/
+  test_skg_for_ai.py' (near 2417): say what happens (the child is
+  created twice; the save is not refused), as plan 2_2's slice 7
+  did elsewhere. 'server/repo_watch/reload.rs' (near line 6): a
+  buffer that would write a reloaded graphnode is refused only if
+  it edited it. 'coding-advice/plans.org' (near 26 and 29): "never
+  stale" means never refused; say so.
+- 3: a write-protected skgrepo that lags the buffer's own move is
+  not "stale" in the glossary's sense
+  ('add_missing_info.rs' near 118, 'fork.rs' near 45,
+  'tests/unit/fork.rs' near 114, 'tests/new/buffer_to_viewnodes/
+  add_missing_info.rs' near 142, where a skgrepo is even named
+  'stale'); say "lagging" or what the code means.
+- 4: 'tests/unit/weave.rs' (near 65): "a stale occurrence drawn
+  before a switch of the skgrepo restriction" takes slice 2's
+  wording.
+- 5: 'elisp/skg-org-fold.el' (near 133): "a third pass through the
+  entire buffer" walks the collected parent markers; name it so.
+- 6: 'docs/glossary.org' (near 1473) offers "stale member" as a
+  synonym of "former member"; drop the synonym. The tests that use
+  it ('tests/what_the_refresh_keeps.rs', 'tests/pruned_change_view/')
+  keep their names.
+- 7: 'validate_tree.rs' (near 48): "whole-viewforest checks"
+  duplicates the existing "global" of 'server/from_text.rs' (near
+  53) and misdescribes checks that judge one viewnode against the
+  graph; use the existing word and say what the group holds.
+- 9: 'docs/api-and-formats.org' (near 308): a stale buffer is
+  refused only for its edited stale graphnodes; "refused for" at
+  349, 'server/from_text.rs' 144 and 'save_staleness.rs' 2 and 25
+  reads awkwardly, reword; the header of
+  'tests/save_stale_buffers.rs' says the buffer's copy where it
+  means the baseline's.
+And one fix, finding 10: in 'skg--restore-folds' ('elisp/skg-org-
+fold.el', near line 70) a top-level headline marked 'folded' has
+no parent to fold, 'org-up-heading-safe' fails, the headline stays
+visible, and the loop finds it again forever. Skip a found headline
+whose parent cannot be reached (remember it, or clear its mark
+for the search), so the loop ends; add an Emacs unit test with a
+top-level 'folded' headline beside the fold tests in 'tests/elisp/'.
+Finding 8 (the prominence comment at save time) is a behavior
+question for Jeff and is not here. Run 'bash/nextest.sh',
+'bash/emacs-tests.sh' and 'bash/nvim-tests.sh'; 'bash/all-tests.sh'
+only if a text an integration script matches changes. One commit.
 * Verification and completion
 After slice 2, run 'bash/all-tests.sh' and record its summary in
 'progress.org'. Then add under the three "Decide" items of
