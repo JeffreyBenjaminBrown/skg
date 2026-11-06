@@ -51,10 +51,14 @@ atom.")
   "The herald styles: an alist from style name (a symbol) to its look."
   (alist-get 'styles skg-shared-herald-styles))
 
+(defconst skg-shared--style-keywords-computed-at-load
+  (mapcar (lambda (style) (intern (upcase (symbol-name (car style)))))
+          (skg-shared-styles))
+  "The value of `skg-shared-style-keywords', computed once.")
+
 (defun skg-shared-style-keywords ()
   "Each style name in capitals, as the served rule table spells it."
-  (mapcar (lambda (style) (intern (upcase (symbol-name (car style)))))
-          (skg-shared-styles)))
+  skg-shared--style-keywords-computed-at-load)
 
 (defun skg-shared-relations-in-display-order ()
   "The relations, sorted by their display position."

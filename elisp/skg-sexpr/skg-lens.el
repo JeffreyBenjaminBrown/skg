@@ -183,7 +183,19 @@ else is `format'-ed as a last resort."
 'shared/herald-styles.json', in capitals."
   (memq sym (skg-shared-style-keywords)))
 
+(defvar skg--rule-header-cache
+  ;; Weak, because the rule table is replaced at connect and at reload.
+  (make-hash-table :test 'eq :weakness 'key)
+  "Each rule object's header, as `skg--parse-rule-header' returned it.")
+
 (defun skg--rule-header (rule)
+  "Return RULE's header, parsing RULE only the first time it is asked
+for. The header is the alist `skg--parse-rule-header' describes."
+  (or (gethash rule skg--rule-header-cache)
+      (puthash rule (skg--parse-rule-header rule)
+               skg--rule-header-cache)))
+
+(defun skg--parse-rule-header (rule)
   "Parse RULE once and return an alist classifying it.
 Keys:
   kind      -- one of `interc', `when', `any-leaf', `atomic-leaf',
