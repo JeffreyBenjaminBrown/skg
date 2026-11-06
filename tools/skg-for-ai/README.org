@@ -748,7 +748,8 @@ a move to another parent, a removal (the node then still has its other
 container), a deletion through 'delete' in a handle, two bad handles
 (refused before any save), a retitled write-protected occurrence
 (refused by the server, the files left as they were), a stale view
-(refused by the server),
+(refused by the server where it edits the stale node, saved with a
+warning where it does not),
 'new' (refused in the foreign skgrepo; in the owned one a root
 whose view then saves a body and a child), one view saved again
 and again, and retyped headlines: a headline removed and retyped
@@ -758,11 +759,12 @@ retyped reworded (asked about, and not saved with '--yes' alone; with
 '--keep-ids' the node keeps its ID and file under the new title; with
 '--all-new', in a later view, a new node is made).
 It compares each report with the text expected and reads the '.skg'
-files after each save. The stale case renders a view, changes a node
-it shows through a second view's save, and saves the first view's
-edit of another node: the server refuses, naming the changed node, and
-nothing is written; a fresh view then saves the same edit, and the
-second save's change stays. The last case adds a headline and
+files after each save. The stale case renders two views, changes a
+node they show through a third view's save, and saves each of the two:
+the one that edits the changed node too is refused, naming the node,
+and nothing is written; the one that edits another node only is saved,
+with the warning "Left as the graph has it: ..." for the changed node,
+whose change stays. The last case adds a headline and
 retitles another, saves, does the same again, saves, and checks that
 every handle names the headline it named, and each new headline has
 a new handle; then it removes a headline, saves, and checks the same

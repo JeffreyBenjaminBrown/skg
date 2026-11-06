@@ -215,7 +215,7 @@ Finding 8 (the prominence comment at save time) is a behavior
 question for Jeff and is not here. Run 'bash/nextest.sh',
 'bash/emacs-tests.sh' and 'bash/nvim-tests.sh'; 'bash/all-tests.sh'
 only if a text an integration script matches changes. One commit.
-** TODO Slice 4: the tool's stale-view check expects plan 4's behavior
+** DONE Slice 4: the tool's stale-view check expects plan 4's behavior
 'tools/skg-for-ai/test_skg_for_ai.py' has a check,
 'check_stale_view', that expects a save to be refused where, since
 plan 4 (commit a6f1d04d), the save goes through with the "Left as

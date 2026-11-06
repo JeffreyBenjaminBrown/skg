@@ -732,25 +732,31 @@ def check_server_refusal (context):
                   full_before )
 
 def check_stale_view (context):
-  """View A is rendered, then view B saves a change to a node A shows.
-  Saving A would write A's older text of that node, so the server
-  refuses the whole save, naming the node, and nothing is written; the
-  tool prints the refusal and leaves A's files. A fresh view saves the
-  same edit, and B's change stays."""
+  """Views A and E are rendered, then view B saves a retitle of a node
+  both show, which makes that node stale in A and E. E edits it too;
+  A edits another node only and leaves it unedited."""
   folder_a = fresh_root_view (context, "stale-a")
+  folder_e = fresh_root_view (context, "stale-e")
   folder_b = fresh_root_view (context, "stale-b")
   edit_compact ( folder_b, [ ( "** Second child, a subscriber ⟨0e ",
                                "** Second child, renamed in B ⟨0e " ) ])
   require_save_succeeds (folder_b)
-  a_edit = [ ( "** First child, renamed ⟨0d⟩",
-               "** First child, renamed in A ⟨0d⟩" ) ]
-  edit_compact (folder_a, a_edit)
+  require_edited_stale_save_refused (context, folder_e)
+  require_unedited_stale_save_warned (context, folder_a)
+
+def require_edited_stale_save_refused (context, folder):
+  """Writing FOLDER's copy of the node B retitled would discard B's
+  change, so the server refuses the whole save, naming the node, and
+  nothing is written; the tool prints the refusal and leaves the
+  view's files."""
+  edit_compact ( folder, [ ( "** Second child, a subscriber ⟨0e ",
+                             "** Second child, renamed in E ⟨0e " ) ])
   graph_before = skg_files (context)
-  full_before = read_file ( os . path . join (folder_a, ROOT_BASE_NAME + ".full.org") )
-  completed = run_save (folder_a, "--yes")
+  full_before = read_file ( os . path . join (folder, ROOT_BASE_NAME + ".full.org") )
+  completed = run_save (folder, "--yes")
   expected_head = (
     REPORT_HEAD +
-    "Title: ⟨0d⟩ 'First child, renamed' → 'First child, renamed in A'.\n"
+    "Title: ⟨0e⟩ 'Second child, a subscriber' → 'Second child, renamed in E'.\n"
     "Server: nothing was saved, 1 error, 0 warnings.\n"
     "Server error: NOTHING WAS SAVED" )
   if ( completed . returncode != 1
@@ -760,18 +766,32 @@ def check_stale_view (context):
        or "The server refused the save" not in completed . stderr ):
     raise CaseFailure (
       f"'save' printed {completed . stdout!r}, {completed . stderr!r}" )
-  require_equal ( "the graph after the stale save",
+  require_equal ( "the graph after the edited stale save",
                   skg_files (context), graph_before )
-  require_equal ( "A's full view after the stale save",
-                  read_file ( os . path . join (folder_a, ROOT_BASE_NAME + ".full.org") ),
+  require_equal ( "the full view after the edited stale save",
+                  read_file ( os . path . join (folder, ROOT_BASE_NAME + ".full.org") ),
                   full_before )
-  folder_fresh = fresh_root_view (context, "stale-a-again")
-  edit_compact (folder_fresh, a_edit)
-  require_save_succeeds (folder_fresh)
-  require_equal ( "A's edit", skg_title (context, "child-a-id"),
-                  "First child, renamed in A" )
-  require_equal ( "B's title after A's edit",
+
+def require_unedited_stale_save_warned (context, folder):
+  """FOLDER's view leaves the node B retitled unedited, so the server
+  writes the view's edit, leaves that node as the graph has it, and
+  warns of it; B's title stays, and the redraw shows it."""
+  edit_compact ( folder, [ ( "** First child, renamed ⟨0d⟩",
+                             "** First child, renamed in A ⟨0d⟩" ) ])
+  require_output (
+    run_save (folder, "--yes"),
+    REPORT_HEAD +
+    "Title: ⟨0d⟩ 'First child, renamed' → 'First child, renamed in A'.\n" +
+    saved_line (1) +
+    "Server warning: Left as the graph has it: Second child, a subscriber "
+    "(child-b-id), which changed after this buffer was rendered and which "
+    "this buffer did not edit.\n" +
+    written_paths (folder) )
+  require_equal ( "the unedited stale save's edit",
+                  skg_title (context, "child-a-id"), "First child, renamed in A" )
+  require_equal ( "B's title after the unedited stale save",
                   skg_title (context, "child-b-id"), "Second child, renamed in B" )
+  require_in_compact ( folder, "** Second child, renamed in B ⟨0e " )
 
 def check_new_root (context):
   """'new' refuses a foreign skgrepo without saving; in an owned one

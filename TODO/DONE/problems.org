@@ -1,3 +1,15 @@
+* skg-for-ai's 'check_stale_view' expects the refusal plan 4 removed (2026-11-06; fixed 2026-11-06)
+  'check_stale_view' ('tools/skg-for-ai/test_skg_for_ai.py') has view
+  A save after view B retitled a node A shows but does not edit, and
+  expects "nothing was saved, 1 error". Since plan 4
+  ('TODO/merge-save-refused/4_plan.org'; a6f1d04d) that node is an
+  unedited stale graphnode: the save succeeds with the warning "Left
+  as the graph has it: ...". The test fails on that, and is the
+  tool suite's only failure. Found while running the tool's tests for
+  plan 5, slice 3, which changed no behavior. To fix: have A edit the
+  node B changed (the refused case), or expect the warning.
+  Fixed by plan 5, slice 4: the check now saves one view that edits
+  the node (refused) and one that does not (saved, with the warning).
 * The stale-save check refuses saves needlessly (2026-11-05; fixed 2026-11-05)
   The plan for all three: 'TODO/merge-save-refused/2_plan.org', replaced by
   'TODO/merge-save-refused/2_2_plan.org', which fixed them.
