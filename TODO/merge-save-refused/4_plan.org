@@ -2,9 +2,11 @@
 * Assignment and authority
 This plan is a unitary declaration: nothing in it is open for
 discussion. It follows '3_review.org' in this folder, whose
-"Decide" section Jeff answered on 2026-11-05; that review and
-'2_2_plan.org' are background nobody executing this plan needs
-to read. Every term is defined below or in 'docs/glossary.org'.
+"Decide" section Jeff answered on 2026-11-05, and two later notes
+of his: "let's use absolute time" in that review (slice 4) and
+"Never use numbers as names" in '3_2_glossary.org' (slice 5).
+Those documents and '2_2_plan.org' are background nobody
+executing this plan needs to read. Every term is defined below or in 'docs/glossary.org'.
 
 Execute the slices in order, one agent per slice. The plan
 expects no stop. Otherwise stop only under the conditions in
@@ -30,6 +32,10 @@ TODO to DONE. Never commit anything under 'data/'.
 - A view request for a graphnode that is a root of an open
   buffer of the diff view will no longer switch to that buffer
   (slice 3).
+- A server will start its runtime generation at the microseconds
+  since the Unix epoch again (slice 4).
+- The save's two phases and delete propagation's two passes will
+  be named for what they are, not numbered (slice 5).
 ** Out of scope
 - Any change to what the stale error says when it does fire.
 - The rendered stale-save buffer ('3_review.org', "The rendered
@@ -53,7 +59,8 @@ TODO to DONE. Never commit anything under 'data/'.
 - 'outdated': a graphnode whose baseline copy differs from the
   graph. Stale, as the glossary has it, is outdated and written
   or deleted by the buffer.
-- 'the collateral neighborhood': the IDs
+- 'the update-relevant neighborhood' (the glossary's term; the
+  review said "collateral neighborhood"): the IDs
   'update_relevant_neighborhood' ('server/dbs/in_rust_graph/
   relation_accessors.rs') returns for a save's touched IDs: one
   hop over contains, linksTo, subscribesTo and hidesFromSubs in
@@ -71,8 +78,28 @@ graphnode that is outdated and untouched, write the rest, and
 redraw the view, which then shows A as the graph has it. The
 stale refusal will fire only for an outdated graphnode the
 buffer edited or deletes. A delete is never untouched: deleting
-is an edit. A fork clone's original is never untouched: an
-unchanged foreign graphnode makes no fork. The error's text does
+is an edit. Three more places today treat an untouched outdated
+copy as an edit, and will stop:
+- A foreign graphnode is a fork candidate when the buffer's copy
+  differs from the graph ('apply_foreign_policy' in
+  'server/from_text/validate.rs', near line 121), so a foreign A
+  that changed under the user, unedited, would be forked and
+  then refused as stale through 'fork_specs'. After slice 1 a
+  fork spec whose clone equals the baseline's copy of its
+  original will be dropped, and no fork made.
+- Supplementation yields a 'SkgrepoMove' whenever the buffer's
+  '(nodeRepo ...)' differs from the graph's home
+  ('supplement_from_disk.rs', near lines 159 and 619), so a
+  graphnode another save moved between owned skgrepos would be
+  moved back by an untouched copy. After slice 1 the move of an
+  untouched outdated graphnode will be dropped with its Save.
+- 'errors_for_writeProtected_occurrences'
+  ('server/from_text/write_protected_edits.rs', near line 60)
+  refuses a write-protected occurrence whose title or home
+  differs from the graph. After slice 1 an occurrence equal to
+  the baseline's copy of its graphnode will not be refused: it
+  is not an edit.
+The error's text does
 not change. What the save response says: a warning per dropped
 graphnode, "Left as the graph has it: TITLE (ID), which changed
 after this buffer was rendered and which this buffer did not
@@ -83,7 +110,8 @@ dropped.
 ** The dirty-view check will not match through links
 'dirty_view_conflicts' ('server/serve/handlers/
 save_dependencies/mod.rs') matches each dirty view's dependencies
-against the save's touched IDs and their collateral neighborhood
+against the save's touched IDs and their update-relevant
+neighborhood
 in the before and after graphs. After slice 2 that match will use
 a neighborhood computed without the link relation, in both
 directions, so a dirty view of L, where L links to the saved A,
@@ -138,18 +166,30 @@ handler mutates in place through the rest of the pipeline
 (restore requests, delete propagation, strandeds, Hoist, forks).
 Remove the untouched outdated Saves right after the stale check,
 before anything reads the vector again, so that delete
-propagation and the Hoist classification never see them. A 'SkgrepoMove' in
-'skgrepo_moves' for a dropped graphnode cannot exist: a move
-changes the copy's home skgrepo, so the graphnode is not
-untouched. The save's warnings travel in 'parse_warnings' and the
+propagation and the Hoist classification never see them. Remove
+with each the 'SkgrepoMove' in 'skgrepo_moves' naming the same
+pid, if any, and the 'ForkSpec' whose 'original_gnid' resolves
+to it, if any (a foreign copy's "untouched" is judged by
+comparing the spec's clone with the baseline's copy, since its
+Save already left the vector). The save's warnings travel in 'parse_warnings' and the
 'SaveResponse'; add the new warnings beside the strandeds
 warnings ('strandeds_warnings'), which reach the response the
 same way.
-** Only the stale check knows the baseline's copies
-'baseline_writes' is private to 'save_staleness.rs'. Give
-'stale_write_errors' a richer result (errors, the untouched
-outdated pids with their titles for the warning) rather than
-exposing the map; keep the function's one call site.
+** The baseline's copies are needed before the plan is built
+'baseline_writes' is private to 'save_staleness.rs' and runs
+inside 'stale_write_errors', after
+'buffer_to_validated_saveplan_with_fork_skgrepos_in_graph' has
+run its validators. The write-protected check
+('errors_for_writeProtected_occurrences', called from
+'server/from_text.rs' near line 116) needs the baseline's copies
+to tell an untouched occurrence from an edit. So compute the
+baseline's copies first, in the handler, before the plan builder
+(the baseline parse depends only on the graph, config and
+restriction), and pass the map into the plan builder for that
+check and into 'stale_write_errors' for the rest. Give
+'stale_write_errors' a richer result: the errors, and the
+untouched outdated pids with their titles for the warning. Keep
+one computation of the map.
 ** The neighborhood has one definition and two readers
 'update_relevant_neighborhood' ('relation_accessors.rs', line
 234) is called twice, both in 'SaveAffectedIds::from_prepared'
@@ -167,9 +207,13 @@ sets without 'LinksTo' and a second matcher that
 ('views_state.rs', line 22); a buffer of the diff view is a
 'ContentView' whose 'ViewState::diffView_buffer_kind' is 'Some'
 ('register_diffView_view', line 176, sets it after
-'register_view'). 'content_viewforest_id_for_root_gnid' (line
-141) filters by the variant only, which is why it finds
-diff-view buffers. 'root_gnids' maps every root ID, primary and
+'register_view'; 'mark_as_diffView_buffer', line 190, sets it
+after a save's redraw). 'content_viewforest_id_for_root_gnid'
+(line 141) filters by the variant only, which is why it finds
+diff-view buffers. Word the new rule as "an ordinary content
+view": a 'ContentView' whose state marks it as nothing else, so
+that a kind a later plan adds (a stale-save buffer, say) is
+skipped too without another edit. 'root_gnids' maps every root ID, primary and
 extra, to the view IDs; the lookup must consult 'self.views' for
 the kind.
 ** The diff-view integration test's workaround
@@ -207,14 +251,25 @@ investigate it.
   parameterized neighborhood.
 - 'server/serve/handlers/save_dependencies/mod.rs':
   'SaveAffectedIds', 'dirty_view_conflicts'.
+- 'server/from_text.rs' and 'server/from_text/
+  write_protected_edits.rs': the write-protected check takes the
+  baseline's copies.
+- 'server/from_text/validate.rs' (the fork policy) and the
+  handler's handling of 'fork_specs' and 'skgrepo_moves'.
 - 'server/types/views_state.rs': the root lookup.
 - 'server/serve/handlers/single_root_view.rs': the switch.
+- 'server/types/env.rs': the generation's start (slice 4).
+- 'server/save.rs', 'server/dbs/in_rust_graph.rs',
+  'server/dbs/in_rust_graph/override_invariants.rs': the names of
+  the phases and passes (slice 5).
 - Docs: 'docs/api-and-formats.org' (the stale-buffer paragraph
   and the dirty-view paragraph under "Save buffer"; the
   switch-to-view sentence under the single-root view request),
   'docs/COMMANDS.org' and 'docs/COMMANDS-nvim.org' (the
   stale-save paragraph and recovery steps near the top),
-  'docs/glossary.org' ('stale'; add 'untouched' and 'outdated').
+  'docs/glossary.org' ('stale'; add 'untouched' and 'outdated'),
+  'docs/data-model_technical.org' ("Runtime generations and
+  rebuilding", slice 4).
 * Implementation sequence
 ** TODO Slice 1: an untouched outdated graphnode is left out
 Implement "An untouched outdated graphnode will be left out of
@@ -232,7 +287,18 @@ Tests, in 'tests/save_stale_buffers.rs':
 - the same, but connection one deletes A: refused as stale;
 - connection two deletes A (its file goes and is reloaded);
   connection one edits B and saves: succeeds, A left out, with
-  the warning.
+  the warning;
+- connection two moves A to another owned skgrepo; connection
+  one edits B and saves: succeeds, A stays in its new home, no
+  move back, with the warning;
+- with a foreign repo in the fixture (one exists since plan 2_2,
+  slice 3): foreign N changes on disk and is reloaded; connection
+  one's view shows N unedited and edits B: succeeds, no fork of
+  N, with the warning; and if connection one edited N too, the
+  save is refused as stale naming N, as today;
+- a view holding a write-protected second occurrence of A, after
+  A is retitled by connection two; the view edits B and saves:
+  succeeds.
 
 Run the saves binary and 'bash/nextest.sh'. The response gains
 a warning, which the clients already display as they display
@@ -256,9 +322,9 @@ Tests, in 'tests/save_dirty_conflicts.rs':
   change is a new link to A;
 - a dirty view showing A still refuses a save that edits A, and
   one that edits A's container's content list.
-And one in the collateral-redraw tests (find them with 'grep -rl
-collateral_viewforest_ids tests/'): a clean view showing A is
-still redrawn when X gains a link to A.
+And one beside the collateral tests ('tests/collateral_*.rs', in
+the 'grouped_overrides' binary): a clean view showing A is still
+redrawn when X gains a link to A.
 
 Run the saves binary and 'bash/nextest.sh'.
 
@@ -271,10 +337,14 @@ diff view": 'content_viewforest_id_for_root_gnid' returns the
 first open view with that root that is not a buffer of the diff
 view.
 
-Tests: beside the existing switch-to-view tests, one where the
-requested graphnode is a root only of a diff-view buffer (the
-request renders a content view) and one where it is a root of
-both (the request switches to the content view). Then restore
+Tests: there is no Rust test of the switch today (the client
+tests cover it: 'tests/nvim/single_root_content_view_spec.lua'
+and its Emacs twin). Add two server tests beside the content-view
+tests ('tests/content_view.rs', in the 'grouped_views' binary),
+driving 'handle_single_root_view_request' or the lookup: one
+where the requested graphnode is a root only of a diff-view
+buffer (the request renders a content view) and one where it is
+a root of both (the request switches to the content view). Then restore
 the 'diff-view' integration test of both clients to request the
 view of 'r' without closing the diff-view buffers first, and run
 the integration tests for both clients (as 'bash/all-tests.sh'
@@ -285,9 +355,6 @@ request in 'docs/api-and-formats.org', and 'docs/diff-view.org'
 where it describes following a link from a diff-view buffer, if
 it does.
 ** TODO Slice 4: the runtime generation starts at the epoch again
-*** TODO Claude says: added after you read the plan
-From your note under "The runtime generation starts at 0" in
-'3_review.org' (2026-11-05 night).
 Plan 2_2's slice 3 made a server start its runtime generation at
 0 ('server/types/env.rs', near line 80, 'generation : 0'); before
 it, a server started at the microseconds since the Unix epoch
@@ -303,10 +370,10 @@ and the reload notice) and adapt it; update the comment at the
 start value and 'docs/data-model_technical.org' ("Runtime
 generations and rebuilding") where it says what the number is.
 Run 'bash/nextest.sh'. One commit.
-** TODO Slice 5: phases and passes named for what they are
 *** TODO Claude says: added after you read the plan
-From your note "Never use numbers as names" in
-'3_2_glossary.org' (2026-11-06).
+From your note under "The runtime generation starts at 0" in
+'3_review.org' (2026-11-05 night).
+** TODO Slice 5: phases and passes named for what they are
 Jeff's rule: never use numbers as names; a name says what the
 thing is. Rename, in code comments, doc comments and the two
 plans' and the review glossary's vocabulary:
@@ -323,19 +390,29 @@ plans' and the review glossary's vocabulary:
   'server/save.rs', near line 481);
 - its "second pass" becomes "the ID-stripping pass": it strips
   the deleted IDs from every Save's relationship lists.
-The names occur in 'server/save.rs' and
-'server/dbs/in_rust_graph.rs' (five mentions of the phases; the
-passes in 'save.rs' only), in 'TODO/merge-save-refused/
-2_2_plan.org', '4_plan.org' and '3_2_glossary.org' (their
-vocabulary and the entries 'phase one' and 'phase two', which
-become entries under the new names, with one line each saying
-what they were called). Identifiers that carry the old words
-('graph_after_save' does not; check for 'phase_one',
-'phase_two', 'first_pass', 'second_pass') are renamed too. No
-behavior changes; run 'bash/nextest.sh'. One commit.
+The names occur in 'server/save.rs' (comments near lines 214,
+282 to 284 and 302, and the identifier
+'phase_one_filesystem_outputs') and
+'server/dbs/in_rust_graph.rs' (near lines 329 and 330), in
+'TODO/merge-save-refused/2_2_plan.org', '4_plan.org' and
+'3_2_glossary.org' (their vocabulary and the entries 'phase one'
+and 'phase two', which become entries under the new names, with
+one line each saying what they were called). '3_review.org' is a
+record and keeps its words. Two other numbered passes fall under
+the same rule and are renamed for what they do: the "first pass"
+comments in 'server/dbs/in_rust_graph.rs' near line 104 and in
+'server/dbs/in_rust_graph/override_invariants.rs' near line 44;
+read each and name it. Identifiers that carry the old words are
+renamed too. No behavior changes; run 'bash/nextest.sh'. One
+commit.
+*** TODO Claude says: added after you read the plan
+From your note "Never use numbers as names" in
+'3_2_glossary.org' (2026-11-06).
 * Verification and completion
 Each slice runs its own tests and the binaries it touched. After
 slice 5, run 'bash/all-tests.sh' and record its summary in
-'progress.org'. Then mark the three settled items of
-'3_review.org''s "Decide" section DONE with a child saying this
-plan did them.
+'progress.org'. Then add under each of the five sources in
+'3_review.org' (the three "Decide" items and "The runtime
+generation starts at 0") and '3_2_glossary.org' ("Never use
+numbers as names") a child "Claude says: done by plan 4, slice
+N", without changing their keywords, which are Jeff's.
