@@ -12,8 +12,8 @@
 #   Any other argument prints a usage line and exits with status 2.
 # - WHAT RUNS
 #   After the config check, bash/compile-elisp.sh byte-compiles the
-#   Emacs client (elisp/), unless emacs is not on the path; a failure
-#   there is shown in red, and the server starts anyway.
+#   Emacs client (elisp/), unless emacs is not on the path, printing its
+#   warnings; a failure there is shown in red, and the server starts anyway.
 #   The rerun loop, bash/run-skg-rerunning-on-exit.sh, runs the server,
 #   and runs it again whenever it exits, so killing the server (by its
 #   PID, or with the 'shutdown' request) restarts it, rereading the config.
@@ -91,7 +91,8 @@ preflight_check_config() {
 }
 
 compile_emacs_client() {
-  # Byte-compile elisp/ beside its sources (bash/compile-elisp.sh). A
+  # Byte-compile elisp/ beside its sources (bash/compile-elisp.sh), and
+  # print all its output: the summary and the warnings worth reading. A
   # failure does not withhold the server: skg-init.el loads any .el
   # newer than its .elc as source, so a stale .elc is never loaded.
   echo ""
@@ -103,7 +104,7 @@ compile_emacs_client() {
   fi
   local compile_output
   if compile_output="$( bash/compile-elisp.sh 2>&1 )"; then
-    echo "$compile_output" | tail -2
+    echo "$compile_output"
   else
     printf '\033[1;31m%s\033[0m\n' "$compile_output"   # bold red
     printf '\033[1;31m%s\033[0m\n' \
