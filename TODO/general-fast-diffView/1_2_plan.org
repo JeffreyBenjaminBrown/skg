@@ -63,8 +63,8 @@ writes anything. It no longer creates '<data root>/logs/'.
 'CONFIG.running/stop-servers.sh', with the same one-line body
 ('kill -TERM -PGID') as today's 'bash/stop-servers.sh', rewritten
 at every start. The script no longer writes
-'bash/stop-servers.sh' and does not delete it either: the untracked file there is the
-stop command of Jeff's live server until he restarts (Pitfalls).
+'bash/stop-servers.sh' and does not delete it either: the
+untracked file there is the stop command of Jeff's live server until he restarts (Pitfalls).
 Its startup messages name the new path.
 ** The script log
 'CONFIG.running/start-servers.START.log', START the start's own
@@ -109,8 +109,8 @@ stop script's new path; 'api-and-formats.org:1725' and
 says where "Server ready." appears
 ('docs/troubleshooting/build-artifacts-corrupted-by-power-loss.org:136');
 'docs/usage.org' where it shows 'cargo run --
-data/skgconfig.toml' gains the one clause that the server writes its logs to
-'CONFIG.running/START/'; '.claude/skills/verify/SKILL.md' recipe
+data/skgconfig.toml' gains the one clause that the server
+writes its logs to 'CONFIG.running/START/'; '.claude/skills/verify/SKILL.md' recipe
 says where an isolated instance's logs land and that its stop
 script, when started by the start script, is in its own run
 folder. 'docs/glossary.org' gains "run folder" beside "hot
