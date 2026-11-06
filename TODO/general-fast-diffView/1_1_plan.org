@@ -1,0 +1,352 @@
+#+title: Plan 1_1: a release server, a compiled client, two memos
+
+* Assignment and authority
+This plan is a unitary declaration: nothing in it is open for
+discussion. It answers Jeff's requests of 2026-11-06 in
+'1_discussion.org' (the thread under "Byte- or native-compile
+the client"), which nobody executing it needs to read.
+Background, not required reading: 'report_perf.org' and
+'report_overlay-floor.org' beside this file measured the debug
+server at about three times the cost of the release server, the
+client loaded from source at about three times the cost of the
+byte-compiled client, and one elisp function rebuilding the
+same list 66,909 times per herald pass.
+
+* Commits
+Jeff has asked for commits. One commit per slice, naming this
+plan and the slice in its first line, e.g. "plan 1_1 slice 1:
+start-servers.sh takes --deb; release is the default". Read
+'coding-advice/commit-messages.org' first. Stage only the files
+this plan names, by path; other tracked files are dirty with
+Jeff's edits ('TODO.org', 'TODO/team/Corey/1_discussion.org'
+and more) and untracked files of his lie about the tree. Do not
+stage 'bash/stop-servers.sh': the script generates it on every
+run and it is untracked. The slice's last commit carries its
+docs and flips the slice's headline to DONE.
+
+* Scope
+Three things, all on the machinery around the server and the
+Emacs client, none in the server itself.
+** The start script
+'bash/start-servers.sh' gains two command-line options and loses
+the environment variable 'SKG_RELEASE'. The default profile
+becomes release. Hot reload (cargo-watch rebuilding and
+restarting the server on edits under 'server/') becomes opt-in.
+** Two memoizations in the Emacs client
+The style-keyword list and the lens's rule headers are computed
+once instead of per headline; the fold and focus atom tests stop
+parsing headlines that cannot carry the atom.
+** Byte compilation of the Emacs client, from inside Docker
+A script compiles 'elisp/' to '.elc' files beside the sources;
+the start script runs it; 'skg-init.el' prefers a newer '.el'
+over a stale '.elc'. Jeff's host Emacs (31.1, the container's
+version) then loads the compiled client unchanged in how it is
+started.
+** Not in scope
+'bash/run-skg-rerunning-on-exit.sh' (unchanged),
+'windows/container/start-servers.sh' (a different script for a
+prebuilt binary), the server, the Cargo profiles, native
+compilation ('.eln' is per machine), the Neovim client, and any
+change to what the client draws.
+
+* Vocabulary
+"Profile" means the Cargo profile, debug or release, and so the
+binary 'target/debug/skg' or 'target/release/skg'.
+"Hot reload" means running the server under cargo-watch, which
+rebuilds the binary and restarts the server whenever a file
+under 'server/' changes.
+"The rerun loop" means 'bash/run-skg-rerunning-on-exit.sh',
+which runs an already built binary and runs it again whenever
+it exits, so that a killed server (by PID or by the 'shutdown'
+request) comes back rereading its config.
+"Isolated instance" means a server on a scratch data root and a
+free port, as '.claude/skills/verify/SKILL.md' describes; it
+shares nothing with Jeff's server but the binary.
+"The herald pass" means 'heralds-apply-to-buffer' in
+'elisp/heralds-minor-mode.el': one herald overlay per headline,
+computed from the headline's '(skg ...)' metadata through the
+lens engine ('elisp/skg-sexpr/skg-lens.el') and the rule table
+the server serves.
+"The fold and focus atoms" are the bare atoms 'folded',
+'bodyFolded' and 'focused' that the client writes into headline
+metadata before a save and strips after a save or a redraw.
+
+* Agreed behavior
+** Options
+'bash/start-servers.sh [--deb] [--hot-reload]'. Both options
+default to off when omitted. Any other argument prints a usage
+line to stderr and exits with status 2. 'SKG_CONFIG' stays an
+environment variable, as today.
+** '--deb'
+With it, the script builds and runs the debug profile; without
+it, the release profile. (Today the default is debug and
+'SKG_RELEASE=1' selects release; that variable will be removed,
+not kept as an alias.) 'CARGO_PROFILE_FLAG' and 'PROFILE_DIR'
+will be set from the option exactly as they are set from the
+variable today ('start-servers.sh:28-34').
+** '--hot-reload'
+With it, the script runs cargo-watch exactly as today
+('start_skg_with_restart', ':125-128'). Without it, the script
+runs the rerun loop directly, in the foreground, with the same
+'PROFILE_DIR' and 'SKG_CONFIG' arguments, appending its output
+to the same log file cargo-watch's output goes to today. The
+preflight already builds the binary with the chosen profile
+('preflight_check_config', ':46'), so no second build is needed.
+Nothing then watches 'server/'; an edit there changes nothing
+until the user restarts the script.
+** The log directory exists
+Before starting either way, 'mkdir -p "$DATA_ROOT/logs"', so
+that a fresh data root does not make the redirection fail.
+** What stays as it is
+The config preflight and its red error; 'kill_stale_skg', whose
+patterns already match both profiles and cover a run with or
+without cargo-watch; the free-port check; the generated
+'bash/stop-servers.sh'; the INT/TERM trap; the log file's name
+'logs/cargo-watch.log' (kept; see Pitfalls); the rerun loop's
+behavior; 'SKG_CONFIG'.
+** The style keywords are computed once
+'skg-shared-style-keywords' ('elisp/skg-shared.el:54-57') maps
+over 'skg-shared-herald-styles', a 'defconst' read from
+'shared/herald-styles.json' at load ('skg-shared.el:27-29'). It
+will compute its list once, at load, into a constant, and
+return that constant; callers ('heralds-minor-mode.el:148',
+'skg-lens.el:184') are unchanged. The list is the same symbols
+in the same order as today.
+** The lens caches each rule's header
+'skg--rule-header' ('skg-lens.el:186') says "Parse RULE once"
+and is called once per rule per headline. It will keep its
+result in a hash table keyed by the rule object ('eq') with
+':weakness key', so that a rule table replaced at connect or
+reload drops its entries by itself and no invalidation site is
+needed. Its result for a rule is unchanged.
+** The atom tests parse only lines that can carry the atom
+'skg--headline-has-bare-atom-p' ('skg-org-fold.el:241-247') and
+'skg-headline-has-focused-in-view-p' ('skg-focus.el:57-64')
+parse the headline's metadata sexp for every headline they are
+asked about. Each will first look for the atom's name as a
+whole symbol on the current line (a regexp bounded by
+'line-beginning-position' and 'line-end-position', with symbol
+boundaries), and return nil without parsing when it is absent.
+When it is present, they parse as today, so a title that
+happens to contain the word still gets the exact answer. The
+answers are unchanged for every line.
+** 'bash/compile-elisp.sh'
+A new script. It runs the container's 'emacs --batch' with the
+load path 'skg-init.el:5-22' sets up (read it for the directory
+list), loads 'elisp/skg-init.el' first so every macro is
+defined, then byte-compiles every '.el' under 'elisp/' and its
+subdirectories, writing each '.elc' beside its source. It also
+deletes any '.elc' whose '.el' no longer exists. A compile
+error makes it exit nonzero and print the file; warnings are
+printed and do not fail it. It takes no arguments and runs from
+any directory.
+** The start script compiles the client
+After the config preflight and before starting the server, in
+both modes, 'start-servers.sh' runs 'bash/compile-elisp.sh'. If
+'emacs' is not on the path it prints a yellow one-line warning
+and continues; if the compile fails it prints the script's
+output in red and continues, since a server should not be
+withheld over a client warning, and the next rule keeps a stale
+'.elc' from being loaded.
+** 'skg-init.el' prefers the newer file
+Its 'require's ('skg-init.el:24-34') will run inside a 'let'
+that binds 'load-prefer-newer' to t, so an edited '.el' newer
+than its '.elc' is loaded as source, and an unedited one as
+compiled. The binding is a 'let', not a 'setq', so that Jeff's
+Emacs keeps its own value elsewhere. 'skg-reload.el' loads
+three files with 'load-file' on their '.el' names
+(':68, :134-136'); those stay source after a reload, which is
+harmless.
+** '.elc' files are ignored by git
+'.gitignore' gains a line for '*.elc'.
+** The usage header and the docs
+The script's header comment ('start-servers.sh:1-24') will
+describe the two options, say that release is the default and
+that hot reload is off by default, and drop 'SKG_RELEASE'.
+'docs/setup.org' will also say that the start script compiles
+the Emacs client, and that an Emacs loading the client from the
+tree must be at least the container's version (31.1) for the
+'.elc' files to load.
+'docs/setup.org:20-26' will say the same instead of "The script
+builds and runs the debug profile ... SKG_RELEASE=1".
+'.claude/skills/verify/SKILL.md:15' ("starts (under
+cargo-watch, which rebuilds ...") will say the script runs
+without hot reload unless given '--hot-reload'; its lines 59
+and 125 ("If cargo-watch is running ...", "Editing server/ makes
+cargo-watch rebuild ...") will be conditioned the same way.
+
+* Pitfalls the slices must respect
+** Jeff's server runs on this tree, under cargo-watch, right now
+'ps' shows cargo-watch, the rerun loop and 'target/debug/skg
+data/skgconfig.toml'. Never run 'bash/start-servers.sh' or
+'bash/stop-servers.sh' without 'SKG_CONFIG' pointing at a
+scratch config, never kill those processes, and never create,
+touch or edit any file under 'server/', not even to test hot
+reload: cargo-watch would rebuild and restart Jeff's server.
+Test hot reload only by checking that cargo-watch and the loop
+appear in 'ps' for the scratch config, then stop them.
+** Every kill pattern is scoped by the config path
+'kill_stale_skg' matches the config path in each pattern
+('start-servers.sh:105-107'), so a run with
+'SKG_CONFIG=<scratch>/skgconfig.toml' leaves Jeff's processes
+alone. Keep that scoping when touching any pattern.
+** The rerun loop must run in the script's foreground
+The trap 'cleanup' and the generated 'stop-servers.sh' ('kill
+-TERM -PGID') reach the loop only if it is a child in the
+script's process group and the script is waiting on it. Do not
+background it with '&' and exit. The loop traps TERM and stops
+the server itself ('run-skg-rerunning-on-exit.sh:27-34').
+** 'stop-servers.sh' is generated and untracked
+The script rewrites it with its own PID on every run
+(':157-160'). Do not edit it by hand and do not commit it.
+** The first release build is slow
+A cold 'cargo build --release --bin skg' takes minutes. The
+preflight runs it before anything else, so the first run of the
+new default will sit at "Validating config" for that long.
+This is expected, not a hang; the usage header should say so
+in one line.
+** The log file keeps its name
+'logs/cargo-watch.log' is named in 'elisp/skg-client.el:132'
+and 'nvim/lua/skg/client.lua:88', which point a user at it when
+the connection fails. Renaming it would touch both clients and
+Jeff's loaded client; this plan keeps the name. Without hot
+reload the name is slightly wrong, which Jeff may decide on
+later (noted in the discussion).
+** No shellcheck here
+'shellcheck' is not installed. 'bash -n' is the syntax check.
+** Jeff's Emacs loads the client from this tree, live
+His host Emacs reads 'elisp/' from the mounted tree. A
+half-finished edit to a '.el' file breaks his next reload, so
+each elisp commit leaves every file loadable. He is asleep
+during this run, but the rule holds.
+** Compiling may print many warnings; fix none of them here
+The client has never been byte-compiled. Expect warnings
+(unused variables, undefined functions at compile time, docstring
+widths). Only an error that stops a file from compiling is this
+plan's business; report the warning count in the slice report
+and change no code to silence a warning.
+** The herald rule table comes from the server, or a fixture
+'heralds--transform-rules' is fetched at connect time; the
+elisp tests install one from a fixture. A memo keyed by rule
+object must survive the table being replaced; hence the weak
+hash table, not a flag.
+** 'require' prefers '.elc' unless told otherwise
+Without 'load-prefer-newer', a '.elc' older than its '.el' is
+loaded silently. Agents edit '.el' files daily. The 'let' in
+'skg-init.el' is what makes stale '.elc' files harmless; do the
+'skg-init.el' change in the same slice as the compile script.
+** The elisp suite
+'bash/emacs-tests.sh' runs every 'tests/elisp/test-*.el' in one
+batch Emacs with 'elisp/' and 'elisp/skg-sexpr' on the load
+path. Once '.elc' files exist, it loads them, which is the check
+that compiled code behaves. Serialize it with any other suite.
+
+* Code map
+'bash/start-servers.sh': the whole change. ':28-34' profile
+selection; ':46' preflight build; ':105-107' kill patterns;
+':115-129' 'start_skg_with_restart'; ':1-24' usage header.
+'bash/run-skg-rerunning-on-exit.sh': read only, to see its
+arguments and its trap.
+'docs/setup.org:20-26' and '.claude/skills/verify/SKILL.md:15,
+59, 125': the prose that follows.
+'elisp/skg-shared.el:27-29, :54-57': the styles constant and
+the keyword list. 'elisp/skg-sexpr/skg-lens.el:180-186' and the
+body of 'skg--rule-header' below it: the style test and the
+header parse. 'elisp/heralds-minor-mode.el:148': the other
+caller of the keyword list.
+'elisp/skg-org-fold.el:229-247' and 'elisp/skg-focus.el:57-64':
+the atom tests; their callers are the collectors and
+'skg-remove-folded-metadata' in 'skg-org-fold.el:110-160' and
+'skg-remove-focused-metadata' in 'skg-focus.el'.
+'elisp/skg-init.el:5-34': the load path and the requires.
+'elisp/skg-reload.el:68, :134-136': the three 'load-file's.
+'bash/emacs-tests.sh': the elisp suite and how it sets the load
+path. '.gitignore'.
+
+* Implementation sequence
+** TODO Slice 1: option parsing, '--deb', release by default
+Add a loop over "$@" that sets two flags, 'DEB' and
+'HOT_RELOAD', refusing anything else with a usage line and exit
+2. Replace the 'SKG_RELEASE' test with the 'DEB' flag, release
+when unset. Update the usage header for this slice's part.
+Tests: 'bash -n bash/start-servers.sh'. Then, with an isolated
+instance's config (make a scratch data root per the verify
+skill, with a free port and a one-node repo), run
+'SKG_CONFIG=<scratch>/skgconfig.toml bash/start-servers.sh
+--deb' in the background, wait for the port, check 'ps' shows
+'target/debug/skg <scratch>/skgconfig.toml', then run the
+generated 'bash/stop-servers.sh' and check the port is free and
+the processes gone. Repeat without '--deb' and expect
+'target/release/skg'. Run 'bash/start-servers.sh --bogus' and
+expect the usage line and status 2. Hot reload is still always
+on in this slice, so cargo-watch appears in 'ps' both times.
+** TODO Slice 2: '--hot-reload', off by default; 'mkdir -p' logs
+In 'start_skg_with_restart', branch on 'HOT_RELOAD': with it the
+cargo-watch command as today; without it the rerun loop in the
+foreground with the same log redirection. Add the 'mkdir -p'.
+Finish the usage header. Tests: 'bash -n'. Isolated instance,
+default options: 'ps' shows the rerun loop and
+'target/release/skg' and no cargo-watch; kill the server by its
+PID ('kill -TERM <skg pid>') and see it return within a few
+seconds, serving again (the port rebinds); then
+'bash/stop-servers.sh' and check everything is gone. Isolated
+instance with '--hot-reload --deb': 'ps' shows cargo-watch, the
+loop and 'target/debug/skg'; stop it the same way. Do not edit
+'server/' to test the rebuild (Pitfalls). Delete the scratch
+data root's 'logs/' after reading it, if you care to; the
+scratch root is yours.
+** TODO Slice 3: the two memos in the lens
+'skg-shared-style-keywords' computed once into a constant;
+'skg--rule-header' cached in a weak 'eq' hash table. Tests:
+'bash/emacs-tests.sh', green. Then, if the scratch script
+'/tmp/claude-1000/-home-ubuntu-host/aaec9b50-f7cc-4280-8e2f-1ba19dfda799/scratchpad/scripts/overlay-floor.el'
+still exists, run its case (a) from source before and after
+the change and put the two numbers in the report (the measured
+expectation: 789 ms to about 557 ms from source; the compiled
+numbers come after slice 5). If it is gone, skip the timing
+and say so.
+** TODO Slice 4: the atom tests look before they parse
+The regexp pre-test in 'skg--headline-has-bare-atom-p' and
+'skg-headline-has-focused-in-view-p'. Tests:
+'bash/emacs-tests.sh', green; and a batch Emacs check that, on
+a buffer with a headline whose title contains the word "folded"
+and no atom, both the old and the new predicate return nil, and
+on a headline with the atom both return t (a one-time check in
+the slice's log directory, not a new test file, unless a fold
+test already exists to extend).
+** TODO Slice 5: byte compilation from inside Docker
+'bash/compile-elisp.sh'; the call in 'start-servers.sh' with
+its two warnings; the 'let' in 'skg-init.el'; the '.gitignore'
+line. Tests: run the compile script once by hand and report the
+error and warning counts; 'ls' shows one '.elc' per '.el';
+'bash/emacs-tests.sh' green with the '.elc' files present;
+touch one '.el' file's mtime (the file content unchanged) and
+confirm in a batch Emacs that 'require' of that feature inside
+the 'let' loads the '.el' (check 'load-history' or
+'symbol-file'); the isolated start of slice 2's default mode
+again, now showing the compile step's output in the terminal
+and the server still starting. Commit the elisp files and the
+scripts; never a '.elc'.
+** TODO Slice 6: docs
+'docs/setup.org:20-26' (options, defaults, the compile step,
+the Emacs version condition) and the three places in
+'.claude/skills/verify/SKILL.md'. Check the links and the diff;
+run no application tests. Commit as "plans/docs".
+
+* Verification and completion
+When slice 6 is committed: 'bash -n' passes on both scripts;
+the isolated runs of slices 2 and 5 were observed;
+'bash/emacs-tests.sh' is green with '.elc' files present; 'git
+grep SKG_RELEASE' finds nothing outside 'TODO/' and '_burying/';
+'git status' shows no '.elc' and no file of this plan unstaged.
+Then every slice headline is DONE and the plan is complete. Tell
+Jeff, in the report, that his running server is still the old
+debug one under cargo-watch until he restarts it with the new
+script himself, and that his client picks up the compiled files
+at his next 'skg-reload'.
+
+* Stops and deviations
+No stop is expected. Stopping is otherwise for the conditions
+in 'coding-advice/when-to-stop.org'. Deviations and the slice
+report go to 'progress.org' beside this file, under a headline
+naming this plan, one subheadline per slice.
