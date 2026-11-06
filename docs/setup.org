@@ -19,12 +19,31 @@ client connects, it shows the same warnings in a buffer
 (=*SKG Server Warnings*= in Emacs, =skg://messages/server-warnings=
 in Neovim).
 
-The script builds and runs the debug profile. To build and run the
-release profile instead (faster, but slower to rebuild on each code
-change):
+It takes two options, both off by default:
 #+begin_example
-   SKG_RELEASE=1 ../bash/start-servers.sh
+   ../bash/start-servers.sh [--deb] [--hot-reload]
 #+end_example
+- Without =--deb= it builds and runs the release profile
+  (=target/release/skg=), which is fast. The first release build
+  takes minutes, during which the script sits at "Validating config";
+  that is not a hang. With =--deb= it builds and runs the debug
+  profile (=target/debug/skg=), slower to run but quicker to rebuild.
+  (The environment variable that used to select release is gone;
+  release is now the default.)
+- Without =--hot-reload= nothing watches the server's source: the
+  server runs, and comes back if it exits or is killed, but an edit
+  under =server/= takes effect only when you run the script again.
+  With =--hot-reload=, cargo-watch rebuilds and restarts the server
+  on every edit under =server/=, which is for working on the server.
+
+Before starting the server, the script byte-compiles the Emacs client
+(=../bash/compile-elisp.sh=), writing a =.elc= file beside each =.el=
+file under =elisp/=. An Emacs that loads the client from this tree
+must be at least the container's version (31.1) for those =.elc=
+files to load. A =.el= file newer than its =.elc= (one edited since
+the last compile) is loaded as source, so a stale =.elc= does no
+harm. If =emacs= is not on the path, or the compile fails, the
+script says so and starts the server anyway.
 *** optional : import data from org-roam
 See [[file:COMMANDS.org::#import-org-roam][importing from Org-roam]] for arguments,
 supported input, and setup steps. Use a fresh staging directory:

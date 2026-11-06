@@ -12,10 +12,13 @@ the server can be driven directly over the socket. Verified working
 
 ## Never edit through the main instance
 
-`./bash/start-servers.sh` starts (under cargo-watch, which rebuilds and
-restarts it whenever `server/` changes) a skg server on Jeff's REAL data
-(`data/skgconfig.toml`, port 1731). Saves and imports through it write
-Jeff's `.skg` files. For verification, run a second, isolated instance
+`./bash/start-servers.sh` starts a skg server on Jeff's REAL data
+(`data/skgconfig.toml`, port 1731). It runs the release profile
+(`target/release/skg`) unless given `--deb` (`target/debug/skg`), and
+only with `--hot-reload` does it run under cargo-watch, which rebuilds
+and restarts it whenever `server/` changes; `ps` shows which way Jeff's
+server is running. Saves and imports through it write Jeff's `.skg`
+files. For verification, run a second, isolated instance
 on scratch data instead. Instances share nothing but the binary.
 
 ## Recipe for an isolated instance
@@ -45,7 +48,8 @@ on scratch data instead. Instances share nothing but the binary.
    pid: "1"
    contains: []
    ```
-3. Build and start it, recording its PID:
+3. Build and start it, recording its PID. This recipe uses the debug
+   profile, its own choice (the start script's default is release):
    ```bash
    cargo build --bin skg
    cd <scratch>
@@ -56,8 +60,9 @@ on scratch data instead. Instances share nothing but the binary.
    the whole list is backgrounded as a subshell, so '$!' is that
    subshell's PID: killing it leaves the server running on its port.
    Then wait for "Server ready." in `server.log` (a few seconds on a
-   tiny dataset). If cargo-watch is running, it keeps `target/debug/skg`
-   current, so `cargo build` is then instant.
+   tiny dataset). If Jeff's server runs with `--hot-reload --deb`,
+   cargo-watch keeps `target/debug/skg` current, so `cargo build` is
+   then instant.
 
 ## Speaking the protocol
 
@@ -122,8 +127,10 @@ scenario from a script file that records `$!`.
 
 - Tantivy commits lag saves (see coding-advice/common-gotchas.md);
   direct index reads right after a save race the background writer.
-- Editing `server/` makes cargo-watch rebuild `target/debug/skg` and
-  restart Jeff's main server. A scratch instance already running keeps
-  its old code; restart it to test new code. Running the Rust test
-  suite during such a rebuild has produced spurious failures (e.g.
-  "Directory not empty" during test cleanup); rerun before believing one.
+- If Jeff's server runs with `--hot-reload`, editing `server/` makes
+  cargo-watch rebuild its binary (`target/release/skg`, or
+  `target/debug/skg` with `--deb`) and restart his main server. A
+  scratch instance already running keeps its old code; restart it to
+  test new code. Running the Rust test suite during such a rebuild has
+  produced spurious failures (e.g. "Directory not empty" during test
+  cleanup); rerun before believing one.
