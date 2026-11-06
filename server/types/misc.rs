@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::ffi::OsString;
 use std::fmt;
 use std::ops::Deref;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, OnceLock};
 use tantivy::Index;
 use tantivy::schema::Field;
@@ -325,19 +325,46 @@ pub fn server_process_start_as_file_name (
               now . year (), u8::from (now . month ()), now . day (),
               now . hour (), now . minute (), now . second () ) } ) }
 
+/// The run folder 'CONFIG.running/', CONFIG the config file's path as
+/// given to the server, so a symlinked config gets its folder beside
+/// the symlink, where the start script and the clients look. Set once,
+/// in 'main.rs', before the config loads; never set by tests or
+/// 'check-config'. Like START, it cannot move during a process.
+static RUN_FOLDER : OnceLock<PathBuf> = OnceLock::new ();
+
+/// Fix this process's run folder ('RUN_FOLDER'). A second call
+/// changes nothing.
+pub fn set_run_folder_from_config_path_as_given (
+  config_path_as_given : &Path,
+) {
+  let _already_set : Result<(), PathBuf> =
+    RUN_FOLDER . set ( run_folder_beside (config_path_as_given) ); }
+
+/// 'PATH.running', a sibling of the config at PATH: '.running'
+/// appended to the file name as given. No canonicalization, so for a
+/// symlink it is beside the symlink, not beside its target.
+pub fn run_folder_beside (
+  config_path_as_given : &Path,
+) -> PathBuf {
+  let mut path_text : OsString =
+    config_path_as_given . as_os_str () . to_os_string ();
+  path_text . push (".running");
+  PathBuf::from (path_text) }
+
 impl SkgConfig {
   /// Where this server process writes its logs: 'CONFIG.running/START/',
-  /// CONFIG the config file's path ('config_path') and START this
-  /// process's start ('server_process_start_as_file_name'). The run
-  /// folder 'CONFIG.running/' is the one the start script keeps its
-  /// stop script and script logs in; each server run gets its own
-  /// subfolder there.
+  /// CONFIG the config file's path as given to the server
+  /// ('RUN_FOLDER'), so a symlinked config gets its folder beside the
+  /// symlink, where the start script and the clients look, and START
+  /// this process's start ('server_process_start_as_file_name'). The
+  /// run folder 'CONFIG.running/' is the one the start script keeps
+  /// its stop script and script logs in; each server run gets its own
+  /// subfolder there. Where 'main.rs' set no run folder (tests),
+  /// CONFIG is 'config_path', which is canonical.
   pub fn logs_dir ( &self ) -> PathBuf {
-    let run_folder : PathBuf = {
-      let mut path_text : OsString =
-        self . config_path . clone () . into_os_string ();
-      path_text . push (".running");
-      PathBuf::from (path_text) };
+    let run_folder : PathBuf =
+      RUN_FOLDER . get () . cloned ()
+      . unwrap_or_else ( || run_folder_beside (&self . config_path) );
     run_folder . join ( server_process_start_as_file_name () ) }
 
   /// The readiness store's file: 'readiness_marks_file' resolved
@@ -914,3 +941,7 @@ impl SkgConfig {
       ordered . split_off (position + 1);
     Ok (( ordered, more_private )) }
 }
+
+#[cfg(test)]
+#[path = "../../tests/unit/run_folder.rs"]
+mod tests;

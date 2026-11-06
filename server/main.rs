@@ -20,7 +20,7 @@ use skg::types::env::SkgEnv;
 use skg::import_org_roam::{ImportStats, import_org_roam_directory};
 use skg::repo_watch::watcher::{RepoWatcherHandle, start_repo_watcher};
 use skg::serve::serve;
-use skg::types::misc::{ID, SkgConfig, SkgrepoName, TantivyIndex};
+use skg::types::misc::{ID, SkgConfig, SkgrepoName, TantivyIndex, set_run_folder_from_config_path_as_given};
 use skg::types::nodes::complete::Graphnode;
 
 use std::collections::HashSet;
@@ -28,7 +28,7 @@ use std::error::Error;
 use std::env;
 use std::io::{BufRead, BufReader, Write};
 use std::net::TcpListener;
-use std::path::{Path, PathBuf};
+use std::path::{Path, PathBuf, absolute};
 use std::process::{Command, Stdio};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -80,6 +80,13 @@ fn main() -> Result<(), Box<dyn Error>> {
   let config_path: String =
     if args . len() > 1 { args[1] . clone() } // config from command line, if given
     else { "data/skgconfig.toml" . to_string() }; // default config
+  { // The run folder follows the config path as given (made absolute,
+    // not canonical), so a symlinked config gets its folder beside the
+    // symlink, where the start script and the clients look.
+    let config_path_as_given : PathBuf =
+      absolute (&config_path)
+      . unwrap_or_else ( |_| PathBuf::from (&config_path) );
+    set_run_folder_from_config_path_as_given (&config_path_as_given); }
   let (config, config_warnings) : (SkgConfig, Vec<String>) =
     match load_config (&config_path) {
       Ok (loaded) => loaded,
@@ -414,7 +421,9 @@ fn run_export_org (
 /// 2. Human-readable file (always on):
 ///    Same format and content as stderr,
 ///    appended to CONFIG.running/START/server-to-user.log
-///    ('SkgConfig::logs_dir': CONFIG the config file, START this
+///    ('SkgConfig::logs_dir': CONFIG the config file's path as given
+///    to the server, so a symlinked config gets its folder beside the
+///    symlink, where the start script and the clients look; START this
 ///    process's start, so each server run has its own folder).
 ///    Useful when the server runs in the background and stderr is lost.
 ///
