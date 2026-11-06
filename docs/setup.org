@@ -87,7 +87,7 @@ Emacs), which re-reads it, so a skgrepo added to it needs no restart.
 ** Now you can use it. See [[./COMMANDS.org][commands]].
 ** stop the server later if you want
 #+begin_example
-   ../bash/stop-servers.sh
+   ../data/skgconfig.toml.running/stop-servers.sh
 #+end_example
 
 You can't use the client (much) when the server isn't running.

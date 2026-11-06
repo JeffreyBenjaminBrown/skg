@@ -1288,7 +1288,9 @@ one automatically.
   - Behavior: exits after sending the response. Derived graph and search state
     are reconstructed from disk at the next startup.
     Under 'bash/start-servers.sh' the server then starts again at once,
-    as after any exit; 'bash/stop-servers.sh' stops it for good.
+    as after any exit; the 'stop-servers.sh' it writes in the run folder
+    beside the config ('data/skgconfig.toml.running/stop-servers.sh' for
+    'data/skgconfig.toml') stops it for good.
   - TODO | PITFALL: Any client can shut down the server. If ever multiple users share a server, one could bother the other. The server exits immediately after sending the response, which interrupts any in-flight requests from other clients.
 
 ** Busy-initializing signal
