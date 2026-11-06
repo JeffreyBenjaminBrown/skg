@@ -1,4 +1,4 @@
-#+title: Review of plan 1_1: release server, compiled client, memos
+#+title: Review of plan 1_1: release server, compiled client
 
 * Verdict
 The plan ran to completion unattended in 21 minutes of wall
@@ -21,14 +21,14 @@ agent reported checking it.
 
 * Results
 ** The run
-| slice | commits            | reported | effect measured          |
-|-------+--------------------+----------+--------------------------|
-|     1 | 731bc7bf 46278815  | 06:22    | --deb; release default   |
-|     2 | ce66f160 b1c62f88  | 06:25    | no cargo-watch by default|
-|     3 | d3cf31af 5709976e  | 06:27    | herald pass 787 -> 457 ms|
-|     4 | 0a7ab501 6a6cc2b4  | 06:30    | atom strip 216 -> 10 ms  |
-|     5 | 6fd9480a 66c4fd6b  | 06:35    | pass compiled: 66 ms     |
-|     6 | 917ee7a0 47e76b40  | 06:37    | docs                     |
+| slice | commits           | at    | effect measured         |
+|-------+-------------------+-------+-------------------------|
+|     1 | 731bc7bf 46278815 | 06:22 | --deb; release default  |
+|     2 | ce66f160 b1c62f88 | 06:25 | no cargo-watch default  |
+|     3 | d3cf31af 5709976e | 06:27 | heralds 787 -> 457 ms   |
+|     4 | 0a7ab501 6a6cc2b4 | 06:30 | atom strip 216 -> 10 ms |
+|     5 | 6fd9480a 66c4fd6b | 06:35 | heralds compiled: 66 ms |
+|     6 | 917ee7a0 47e76b40 | 06:37 | docs                    |
 Timings are from source unless marked, best of runs, on the
 858-headline, 202 KB diff buffer the reports describe. Before
 the plan the full herald pass cost 789 ms from source and 234
