@@ -999,3 +999,7 @@ by prefix, so it is unaffected.
 Nothing.
 *** Headline
 DONE.
+** Orchestrator's notes after slice 4 (2026-11-06 01:16 UTC)
+Slice 4 launched 01:19, reported 01:21. One commit, the old
+'startup_generation' restored with its reason in its doc comment.
+No correction needed. Slice 5 launched 01:16.
