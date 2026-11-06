@@ -1602,3 +1602,6 @@ DONE.
   'nvim/import-md-and-org' fail, and fail again on the script's
   retry: pre-existing (they fail before plan 5), not investigated.
 No new failure, no fixture adaptation, no flake. Plan 5 is done.
+** Orchestrator's notes after slice 4 (2026-11-06 03:41 UTC)
+Plan 5 complete; final suite green but the pre-existing failure.
+Review: '5_1_review.org', one Decide item (the prominence comment).
