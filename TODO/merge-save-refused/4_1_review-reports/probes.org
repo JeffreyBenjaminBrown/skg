@@ -1,0 +1,148 @@
+#+title: Plan 4 probes at the TCP surface
+* Setup
+Built 'target/debug/skg' at 7c053a3f (current), copied it to a
+scratch dir, ran it on port 1763 with three skgrepos: 'main'
+and 'priv' owned, 'theirs' foreign. Seed in 'main': r contains
+a, b, n; a "A first"; b body "B line one"; l body links to a;
+x plain; q contains a, qb, b; qb contains a. 'theirs' holds n.
+Each probe reset the data and restarted the server. Driven by
+a Python script over 'skg_for_ai.SkgConnection', which sends
+the envelope with an explicit 'baseline' and 'other-views'.
+"c1" and "c2" are two TCP connections. The scratch dir and the
+server are gone.
+* Findings
+** One defect: a dirty view is redrawn as collateral (probe 7)
+Slice 2 split the two matches, but 'collateral_viewforest_ids'
+('save_dependencies/mod.rs') does not skip dirty views. Before
+slice 2 a dirty view in the neighborhood always refused the
+save, so it could never be a collateral target. Now a dirty
+view linked to the save passes the check and is still in the
+full neighborhood, so the server sends it a 'collateral-view'.
+Both clients' 'apply-streamed-view-update' replace the buffer
+without looking at its modified flag, so the user's unsaved
+edits there would be lost. The plan and the docs say "a dirty
+view is never redrawn".
+** Everything else behaves as the plan says
+* 1. Untouched outdated copy left out: as the plan says
+Setup: c1 views r. c2 views a, retitles it "A retitled by two"
+and saves with its baseline; a.skg has the new title.
+
+Sent: c1 saves r with B's body edited, baseline = r's text as
+drawn.
+
+Response: no errors; warning 'Left as the graph has it: A
+first (a), which changed after this buffer was rendered and
+which this buffer did not edit.'; the redraw shows "A
+retitled by two" and B's new body. On disk a.skg keeps c2's
+title and b.skg has the new body.
+* 2. Edited outdated copy refused: as the plan says
+Setup as in 1; c1 also retitles A to "A edited by one".
+
+Response: 'NOTHING WAS SAVED', Error 1 "A node this save would
+write changed after the buffer was rendered: Title: A retitled
+by two, ID: a, the title (then "A first", now "A retitled by
+two")", naming occurrence 0b; content nil. On disk a.skg keeps
+c2's title; b.skg is unchanged.
+* 3. Delete of an outdated copy refused: as the plan says
+Setup as in 1; c1 adds '(editRequest delete)' to A.
+
+Response: the same stale error naming a, sent before any
+'save-relax-lock'. Nothing written.
+* 4. Moved under the user: as the plan says
+Setup: c1 views r. c2 views a, changes '(nodeRepo main)' to
+'(nodeRepo priv)' and saves: a.skg moves to 'me/priv', with
+three "Raised the relationship ... to 'priv'" warnings.
+
+Sent: c1 saves r with B's body edited, original baseline.
+
+Response: no errors; the "Left as the graph has it: A first
+(a)" warning; the redraw shows A with '(nodeRepo priv)'. On
+disk 'me/main/a.skg' is absent and 'me/priv/a.skg' present:
+no move back. b.skg written.
+* 5. Foreign copy changed under the user: as the plan says
+Setup: c1 views r. n.skg in 'theirs' rewritten on disk to "N
+as they rewrote it"; the log shows the reload, and the client
+got "reloaded 1 file from repo theirs".
+
+Sent: c1 saves r with only B's body edited.
+
+Response: no errors; warning "Left as the graph has it: N as
+they wrote it (n), ..."; no fork confirmation; the redraw
+shows the new title. No clone file in 'main' or 'priv'.
+
+Variant, c1 also retitles N: the stale error naming n (then
+"N as they wrote it", now "N as they rewrote it"); nothing
+written.
+* 6. Write-protected second occurrence: as the plan says
+Setup: c1 views q: a at top level, a again under qb with
+'writeProtected', and b. c2 retitles a.
+
+Sent: c1 saves q with B's body edited, original baseline.
+
+Response: no errors; the warning for a; both occurrences of a
+redrawn with the new title; b.skg written.
+
+Control: the same, but the write-protected occurrence's title
+edited to "A wp edited": refused with "Write-protected
+occurrence differs from the graph", as before the plan.
+* 7. Dirty view linked to the saved node: differs
+** Part 1: no conflict, as the plan says, but L is redrawn
+Setup: c1 views l and a. Sent: a save of a retitled "A
+edited", with other-views '((view-id "content-view:l") (dirty
+true) (baseline (present L0)) (current L0 plus an edit))'.
+
+Response: 'save-relax-lock (content-view:l)', then a
+'collateral-view' for content-view:l whose text is drawn from
+the graph, without the dirty edit; then save-result with no
+errors. a.skg retitled. The redraw of a dirty view is what
+the plan says does not happen.
+** Part 2: link save succeeds, as the plan says, but r redrawn
+Setup: c1 views r (dirty in other-views, B's body edited) and
+x. Sent: a save of x with body "X now links [[id:a][to A]]".
+
+Response: no errors; x.skg has the link; but a
+'collateral-view' for content-view:r arrived (the log: "save
+preparation selected 1 collateral view(s): content-view:r"),
+its text without the dirty edit.
+** Part 3: edit of A refused, as the plan says
+Response: "this save conflicts with unsaved dependencies in
+content-view:r ... Conflicts: content-view:r [a, r]"; content
+nil; a.skg unchanged.
+** Why it matters
+The keep-set lists the dirty view, so the client keeps it
+locked; then the collateral-view handler unlocks it and
+replaces its text, and the unsaved edits are silently gone.
+The fix belongs in the server ('collateral_viewforest_ids'
+skipping the envelope's dirty view IDs), in both clients
+(skip a modified buffer), or both.
+* 8. Clean view redrawn through a link: as the plan says
+Setup: c1 views a and r, both listed clean in other-views.
+
+Sent: a save of x adding "[[id:a][to A]]" to its body.
+
+Response: 'save-relax-lock (content-view:a content-view:r)',
+then a 'collateral-view' for each: a's root now shows
+'(linksTo (in 2 (substantive 2)))', where it showed 'in 1';
+r's child a likewise. The default view shows no mentioner
+folder, so the count is what changed.
+* 9. View request and diff-view buffers: as the plan says
+Setup: 'me' made a git repo with one commit (scratch only).
+c2 retitled r to "r root changed". c1 sent '((request . "diff
+view") (buffer . "all changes") (view-id . "diff-view:all"))'
+and got a 'diff-view' whose root is r, with an '(oldText
+title)' child.
+
+Sent: on c1, single root content view of r, view-id
+"content-view:r". Response: '(response-type content-view)
+(content "* ... r root changed ...")', a rendered view, not
+a switch.
+
+Sent again on c1: response '((response-type content-view)
+(switch-to-view content-view:r))', the content view.
+* 10. Generation from the epoch: as the plan says
+The server started at 01:32:14.53Z (log). Its first swap-in
+logged 'generation=1793928734578419', which is 1793928734.578
+seconds: 01:32:14.578Z on 2026-11-06. 'date +%s%6N' just
+after gave 1793928751251394. An earlier run logged
+1793928599203811 and 1793928599203812 for two swap-ins: its
+start time, 01:29:59Z, plus one each.

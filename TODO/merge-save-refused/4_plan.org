@@ -409,6 +409,44 @@ commit.
 *** TODO Claude says: added after you read the plan
 From your note "Never use numbers as names" in
 '3_2_glossary.org' (2026-11-06).
+** TODO Slice 6: a dirty view is never redrawn by a save
+The probes of plan 4 ('4_1_review-reports/probes.org', probe 7)
+found this: a save on a connection that holds a dirty view of L,
+where L links to the saved A, is no longer refused (slice 2), but
+the save then redraws the dirty L view as a collateral view, drawn
+from the graph without its unsaved edits, and both clients replace
+the buffer on 'collateral-view' without checking for unsaved
+edits. Before slice 2 this could not happen: a dirty view in the
+save's neighborhood always refused the save. The plan and
+'docs/api-and-formats.org' both say a dirty view is never
+redrawn.
+
+Fix, server side, which is authoritative: 'collateral_viewforest_ids'
+('server/serve/handlers/save_dependencies/mod.rs') will skip every
+view the save envelope's 'other-views' marks dirty; the handler has
+them as 'other_views' ('ClientViewSnapshot::dirty'). The dirty
+views stay in 'narrowed_lock_viewforest_ids' as today. Fix, client
+side, as a guard: on a 'collateral-view' message for a buffer with
+unsaved edits, Emacs ('elisp/skg-request-save.el') and Neovim
+('nvim/lua/skg/save.lua') will leave the buffer alone and say so in
+a message, never replace its text.
+
+Tests: in 'tests/save_dirty_conflicts.rs' (or beside the collateral
+tests, whichever harness sends an envelope with dirty other-views
+and reads the collateral views), a dirty view of L linking to A is
+not among the collateral views of a save of A, while a clean view
+of L is. Client unit tests: a 'collateral-view' for a modified
+buffer leaves it unchanged, in 'tests/elisp/' and 'tests/nvim/'
+beside the existing collateral-view tests. Run the saves binary,
+'bash/nextest.sh', the two clients' unit suites, and, since the
+clients change what they do with a message, 'bash/all-tests.sh'
+for both integration passes.
+
+Docs: the dirty-view paragraph of 'docs/api-and-formats.org' says a
+dirty view is skipped by the collateral redraw as well as never
+refusing through a link; the 'collateral-view' message's entry says
+a client never replaces a buffer with unsaved edits. One commit,
+naming the plan path and "slice 6".
 * Verification and completion
 Each slice runs its own tests and the binaries it touched. After
 slice 5, run 'bash/all-tests.sh' and record its summary in
