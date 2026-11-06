@@ -23,15 +23,16 @@ its documentation changes and turns the slice's headline from
 TODO to DONE. Never commit anything under 'data/'.
 * Scope
 ** In scope
-- The words for a graphnode the graph changed under a buffer,
-  and for whether the buffer edited it, will be "stale",
-  "edited" and "unedited"; "outdated" and "untouched" go
-  (slice 1). No behavior changes.
+- The words for a graphnode the graph changed under a buffer, and
+  for whether the buffer edited it, will be "stale", "edited" and
+  "unedited"; "outdated" and "untouched" go (slice 1). No
+  behavior changes.
 - Three numbered steps in code will be named for what they do
   (slice 2). No behavior changes.
 ** Out of scope
 - The stale error's first line, "A node this save would write
-  changed after the buffer was rendered", which client tests match.
+  changed after the buffer was rendered", which client tests
+  match.
 - The warning text "Left as the graph has it: ...".
 - "Phase N" headers in integration-test scripts and 'tests/
   profiling', 'bash/all-tests.sh' and the 'tools/' scripts: they
@@ -47,11 +48,11 @@ TODO to DONE. Never commit anything under 'data/'.
   the client keeps and sends with a save ('docs/glossary.org',
   "baseline, outdated, untouched, stale", which slice 1 renames).
 - 'the baseline's copy' of a graphnode: the supplemented Save
-  instruction the baseline yields for it; 'the buffer's copy': the
-  one the saved text yields.
+  instruction the baseline yields for it; 'the buffer's copy':
+  the one the saved text yields.
 - 'stale' (after slice 1; "outdated" before it): a graphnode
-  whose baseline copy differs from the graph. The graph changed it
-  under the buffer.
+  whose baseline copy differs from the graph. The graph changed
+  it under the buffer.
 - 'edited' and 'unedited' (after slice 1; "untouched" before it
   for the latter): whether the buffer's copy of a graphnode
   differs from the baseline's copy. The user changed it in the
@@ -74,27 +75,29 @@ line what each was called before. Identifiers follow:
 'without_untouched_outdated_saves' becomes
 'without_unedited_stale_saves', 'untouched_outdated_graphnodes'
 becomes 'unedited_stale_graphnodes', 'is_untouched' becomes
-'is_unedited', and the test names in 'tests/save_stale_buffers.rs'
-that carry the old words are renamed to the new. 'StaleAspect' and
-'StaleGraphnodeReport' keep their names: they describe an edited
-stale graphnode's report, and "stale" in them is right under the
-new sense too. Every suite behaves as before.
+'is_unedited', and the test names in
+'tests/save_stale_buffers.rs' that carry the old words are
+renamed to the new. 'StaleAspect' and 'StaleGraphnodeReport' keep
+their names: they describe an edited stale graphnode's report,
+and "stale" in them is right under the new sense too. Every suite
+behaves as before.
 ** Three numbered steps will be named
 - 'elisp/skg-org-fold.el', near line 62: "Pass 1" and "Pass 2"
   will be named for what each does (hiding the entries of
   'bodyFolded' headlines; folding the 'folded'-marked headlines
-  until none is left visible, or whatever the code does; read it).
+  until none is left visible, or whatever the code does; read
+  it).
 - 'server/from_text/buffer_to_viewnodes/validate_tree.rs', near
-  line 51: "the second phase (local structure validation)" will be
-  named the local-structure validation, and whatever it is
+  line 51: "the second phase (local structure validation)" will
+  be named the local-structure validation, and whatever it is
   contrasted with named too.
 - 'server/prominence.rs', near line 203: "(step 3)" will name the
   step it refers to.
 ** What stays as it is
 - The stale error, its first line, its aspects and its body diff.
 - The warning "Left as the graph has it: TITLE (ID), which
-  changed after this buffer was rendered and which this buffer did
-  not edit." and its deleted variant. (Its "did not edit" is
+  changed after this buffer was rendered and which this buffer
+  did not edit." and its deleted variant. (Its "did not edit" is
   already the new word.)
 - Every behavior of plans 2_2 and 4.
 * Pitfalls the slices must respect
@@ -129,8 +132,8 @@ The Rust tests run in grouped binaries ('Cargo.toml', 'autotests
 and 'bash/nvim-tests.sh' run the clients' unit tests. Run full
 suites one at a time.
 * Code map
-- 'server/serve/handlers/save_staleness.rs', 'server/from_text.rs',
-  'server/from_text/validate.rs',
+- 'server/serve/handlers/save_staleness.rs',
+  'server/from_text.rs', 'server/from_text/validate.rs',
   'server/from_text/write_protected_edits.rs',
   'server/serve/handlers/save_buffer.rs', 'server/types/save.rs',
   'tests/save_stale_buffers.rs': slice 1's code.
@@ -142,9 +145,9 @@ suites one at a time.
 ** DONE Slice 1: stale, edited, unedited
 Rename as "Agreed behavior" says, in code, comments, tests, docs
 and the glossary, respecting "Two senses of two words". Run
-'bash/nextest.sh', 'bash/emacs-tests.sh' and 'bash/nvim-tests.sh';
-the integration suite only if a text a client test matches
-changes, which it should not. One commit.
+'bash/nextest.sh', 'bash/emacs-tests.sh' and
+'bash/nvim-tests.sh'; the integration suite only if a text a
+client test matches changes, which it should not. One commit.
 ** DONE Slice 2: three numbered steps named
 *** Corrections carried from slice 1
 'server/from_text/validate.rs' (near line 382, "an untouched
@@ -154,10 +157,9 @@ and "untouched" for identical to disk, senses that predate plan 4
 and now collide with the glossary's. Reword them: "drawn under
 the previous restriction" and "identical to the graph", or what
 the code there actually means after reading it. No behavior
-change.
-Rename as "Three numbered steps will be named" says, reading each
-site first. Run 'bash/nextest.sh' and 'bash/emacs-tests.sh'. One
-commit.
+change. Rename as "Three numbered steps will be named" says,
+reading each site first. Run 'bash/nextest.sh' and
+'bash/emacs-tests.sh'. One commit.
 * Verification and completion
 After slice 2, run 'bash/all-tests.sh' and record its summary in
 'progress.org'. Then add under the three "Decide" items of
