@@ -225,7 +225,7 @@ took. Links checked; no application tests. Commit as docs.
 add it, with one sentence on the default. The script's startup
 line already says the server's logs go to a folder per server
 run; that becomes true at slice 4 and needs no doc until then.
-** TODO Slice 4: the server's run subfolder (gated; see Pitfalls)
+** DONE Slice 4: the server's run subfolder (gated; see Pitfalls)
 'logs_dir' and START; the doc comments at 'misc.rs:257' and
 'main.rs:416-422'; the profiling tools' paths. Tests: 'cargo
 check --all-targets'; the Rust suite;

@@ -462,3 +462,112 @@ the server's logs at the old place; carried into slice 4 as a
 correction (the plan had put 'windows/' out of scope, but the
 server change reaches them). Slice 4 waits for Jeff's server to
 leave cargo-watch; at 14:26 it still watches 'server/'.
+** Slice 4
+Finished 2026-11-06 14:40 UTC.
+*** Commits
+- cb42d8e4 plan 1_2 slice 4: the server writes its logs to CONFIG.running/START/, one folder per run
+- 5489578f plan 1_2 slice 4: the profiling tools and Windows scripts read the server's logs in its run folder
+  (unexecuted: no samply or Callgrind run, no Windows host; 'bash -n'
+  passes on the bash ones)
+- 94d3c182 plan 1_2 slice 4: integration tests remove their server's run folder at cleanup
+- the next commit: this record and the slice headline flipped to DONE
+*** Checks
+Logs and the one-time runners ('isolated.sh', 'probe_busy.py') are in
+'tests/results/plan-1_2/slice4/' (untracked). Run serialized, on the
+tree of the server commit but for one comment (the 'die_bad_config'
+doc comment, edited afterwards; 'cargo check --all-targets' rerun).
+- 'cargo check --all-targets': clean, no warnings.
+- 'bash/nextest.sh': 1144 of 1144 pass.
+- 'bash/integration-tests.sh': 35 of 36 pass. 'import-md-and-org'
+  fails: the import preview refuses its sample ("a line that looks
+  like a heading is inside a #+begin_... block", 'notes.org:7').
+  Pre-existing: with 'server/' restored to HEAD (3d5cb352) and the
+  debug binary rebuilt, the test alone fails the same way
+  ('import-at-HEAD.log'). Not about logs. After 94d3c182 the suite
+  was run again ('integration-2.log'): the same 35 pass, the same one
+  fails, and no run folder is left in 'tests/integration/'.
+- 'python3 tools/skg-for-ai/test_skg_for_ai.py': PASS.
+- Also, for the plan's completion conditions: 'bash/emacs-tests.sh'
+  447 of 447; 'bash/nvim-tests.sh' 483 successes, 0 failed, 0 errors.
+- Isolated instance ('isolated.sh'): a scratch config with
+  'timing_log = true', port 1784 and 3000 one-line nodes (so startup
+  lasts long enough to probe), started by 'bash/start-servers.sh
+  SCRATCH/skgconfig.toml --deb' under 'set -m'. The first server's
+  busy reply, caught over TCP:
+  : ((busy-initializing . "Server is initializing, please wait. See SCRATCH/skgconfig.toml.running/2026-11-06T14-36-40Z/server-to-user.log for progress."))
+  Its folder held both logs and "Server ready.". After 'kill -KILL'
+  of the server's PID the rerun loop brought it back with a second
+  folder, and the second server's busy reply named that one
+  ('.../2026-11-06T14-36-43Z/server-to-user.log'). 'ls -R' of the run
+  folder then (SCRATCH = the session scratchpad's 'p12-slice4/'):
+  : SCRATCH/skgconfig.toml.running:
+  : 2026-11-06T14-36-40Z
+  : 2026-11-06T14-36-43Z
+  : start-servers.2026-11-06T14-36-40Z.log
+  : stop-servers.sh
+  :
+  : SCRATCH/skgconfig.toml.running/2026-11-06T14-36-40Z:
+  : server-to-user.log
+  : server.jsonl
+  :
+  : SCRATCH/skgconfig.toml.running/2026-11-06T14-36-43Z:
+  : server-to-user.log
+  : server.jsonl
+  Its stop script ('kill -TERM -<group>') freed port 1784 and left no
+  process naming the scratch config. Jeff's server
+  ('target/release/skg data/skgconfig.toml', rerun loop) ran
+  throughout, untouched; nothing under 'data/' was touched and no
+  release build was made.
+- The reload path, by reading: 'logs_dir' takes START from a
+  process-wide 'OnceLock' ('server_process_start_as_file_name'), set
+  at its first read (in 'init_tracing', right after the config load),
+  so a config reloaded by the rebuild command yields the same folder.
+  Only 'main.rs' calls 'logs_dir'.
+*** Deviations from the plan's how
+- START lives in a static, not in 'SkgConfig', so the hand-built
+  configs ('dummyFromSkgrepos', 'fromSkgreposAndTantivyFolder') and
+  the tests needed no change.
+- 'config_path' is canonical ('config_from_file_before_checking_paths'),
+  so for a config reached through a symlink the server's run folder is
+  beside the symlink's target, while the start script's is beside the
+  path it was given. With no symlink (every config here) the two are
+  the same folder.
+- The profiling scripts no longer truncate the copied logs; they
+  remove the copied run folder, so the newest (only) run subfolder is
+  their run's.
+- The first integration run left 30 'skgconfig-tmp-*.toml.running/'
+  folders (ignored, but one per test per run, since most tests use a
+  'mktemp' config); the old '<data root>/logs/' was one folder per
+  data root. So 'cleanup' in 'tests/integration/test-lib.sh' now
+  removes '$TEMP_CONFIG.running' once the server has stopped (every
+  test's trap calls it), and the 30 were deleted. A file the plan did
+  not name; its own commit.
+- The 'die_bad_config' doc comment cited cargo-watch.log; it now says
+  the start script's log, which the completion grep required.
+*** Verification and completion conditions on the final tree
+- 'bash -n bash/start-servers.sh': passes. The two-instance test
+  (slice 1) and the folder listing (above) were observed.
+- Suites: all green but the pre-existing 'import-md-and-org'
+  integration failure above.
+- 'git grep -n SKG_CONFIG -- bash/start-servers.sh docs/setup.org
+  .claude': nothing. Holds.
+- 'git grep -n "cargo-watch.log"' outside 'TODO/' and '_burying/':
+  nothing. Holds.
+- 'git grep -n "bash/stop-servers.sh"' outside 'TODO/', '_burying/'
+  and 'coding-advice/': three hits, so it does not hold literally:
+  '.gitignore:27' (keeps Jeff's leftover stop script ignored until he
+  deletes it), 'tests/import_md_and_org_samples/docs/setup.org:35' (an
+  import sample, an old copy of the setup doc) and
+  'thoughts/multi-client.org:144' (notes). All are history or fixtures,
+  outside this plan's files; left as is.
+*** Unfinished
+Nothing in this slice. Jeff's leftovers: 'data/logs/' and
+'bash/stop-servers.sh' may be deleted once his server runs from the
+new script (it now does; its logs go to
+'data/skgconfig.toml.running/START/' once it runs a release build of
+this code, which the running binary predates). Likewise the
+integration tests' old ignored 'data/logs/' folders under
+'tests/integration/*/' are no longer written. 'docs/setup.org' showed
+an uncommitted edit at 14:38 that is not this slice's (not staged).
+*** Headline
+DONE.
