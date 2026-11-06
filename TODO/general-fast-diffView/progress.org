@@ -357,3 +357,10 @@ without '[CONFIG]'; it is true (the default) and is not among the
 lines the plan assigns.
 *** Headline
 DONE.
+** Orchestrator's notes after slice 1 of plan 1_2 (14:20 UTC)
+Launched 14:16, reported 14:19. Diff read. Two corrections
+carried into the plan: 'docs/setup.org:24' goes to slice 3, and
+the completion check for 'SKG_CONFIG' is narrowed to the start
+script and its docs, since 'bash/import-org-roam.sh',
+'data/bash/lib.sh' and 'windows/' read an environment variable
+of that name for their own purposes, outside this plan.

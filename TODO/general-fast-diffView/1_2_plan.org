@@ -62,8 +62,8 @@ writes anything. It no longer creates '<data root>/logs/'.
 ** The stop script
 'CONFIG.running/stop-servers.sh', with the same one-line body
 ('kill -TERM -PGID') as today's 'bash/stop-servers.sh', rewritten
-at every start. The script no longer writes 'bash/stop-servers.sh'
-and does not delete it either: the untracked file there is the
+at every start. The script no longer writes
+'bash/stop-servers.sh' and does not delete it either: the untracked file there is the
 stop command of Jeff's live server until he restarts (Pitfalls).
 Its startup messages name the new path.
 ** The script log
@@ -72,8 +72,9 @@ time, created at the start; both modes append the rerun loop's
 or cargo-watch's output there. The old 'logs/cargo-watch.log' is
 not written anymore and not deleted.
 ** The two mode functions
-'run_skg_rerunning_on_exit' becomes 'run_skg_without_hot_reload'
-and 'run_skg_under_cargo_watch' becomes 'run_skg_with_hot_reload'.
+'run_skg_rerunning_on_exit' becomes
+'run_skg_without_hot_reload', and 'run_skg_under_cargo_watch'
+becomes 'run_skg_with_hot_reload'.
 ** What stays in the script
 The config preflight and its red error; 'compile_emacs_client';
 'kill_stale_skg' with its patterns scoped by the config path
@@ -107,8 +108,8 @@ stop script's new path; 'api-and-formats.org:1725' and
 ':1887-1888' the run subfolder; the troubleshooting doc that
 says where "Server ready." appears
 ('docs/troubleshooting/build-artifacts-corrupted-by-power-loss.org:136');
-'docs/usage.org' where it shows 'cargo run -- data/skgconfig.toml'
-gains the one clause that the server writes its logs to
+'docs/usage.org' where it shows 'cargo run --
+data/skgconfig.toml' gains the one clause that the server writes its logs to
 'CONFIG.running/START/'; '.claude/skills/verify/SKILL.md' recipe
 says where an isolated instance's logs land and that its stop
 script, when started by the start script, is in its own run
@@ -125,7 +126,7 @@ out of scope and keep writing their own stdout log where they do.
 with is theirs to know). Edited, read for sense, not executed.
 
 * Pitfalls the slices must respect
-** Jeff's live server still runs under cargo-watch, debug, on this tree
+** Jeff's live server still runs under cargo-watch on this tree
 At planning time (14:13 UTC) 'ps' shows cargo-watch watching
 'server/' for 'data/skgconfig.toml'. Slices 1 to 3 touch no file
 under 'server/' (not even a 'touch'). Slice 4 edits the server
@@ -178,12 +179,14 @@ sliceN/', untracked.
 'bash -n' is the syntax check.
 
 * Code map
-'bash/start-servers.sh': all of slice 1. 'bash/run-skg-rerunning-
-on-exit.sh': read only. 'server/types/misc.rs:202' ('config_path'),
-':257' ('timing_log' comment), ':312-316' ('logs_dir'), ':319-332'
+'bash/start-servers.sh': all of slice 1.
+'bash/run-skg-rerunning-on-exit.sh': read only.
+'server/types/misc.rs:202' ('config_path'), ':257' ('timing_log'
+comment), ':312-316' ('logs_dir'), ':319-332'
 ('readiness_marks_path', the precedent for deriving a path from
 'config_path'), ':539, :562'. 'server/main.rs:59-90' (config
-load and 'check-config'), ':132-139' and ':209-217' (busy signal),
+load and 'check-config'), ':132-139' and ':209-217' (busy
+signal),
 ':416-460' (the appenders and their doc comment). The clients'
 messages: 'elisp/skg-client.el:77, :126-140';
 'nvim/lua/skg/client.lua:70-95'. Docs and tools: the paths in
@@ -215,10 +218,16 @@ makes that easy, else say so.
 ** TODO Slice 3: docs
 Everything under "The docs follow" except the two lines slice 1
 took. Links checked; no application tests. Commit as docs.
+*** Corrections carried from slice 1
+'docs/setup.org:24' shows the script's usage without '[CONFIG]';
+add it, with one sentence on the default. The script's startup
+line already says the server's logs go to a folder per server
+run; that becomes true at slice 4 and needs no doc until then.
 ** TODO Slice 4: the server's run subfolder (gated; see Pitfalls)
 'logs_dir' and START; the doc comments at 'misc.rs:257' and
 'main.rs:416-422'; the profiling tools' paths. Tests: 'cargo
-check --all-targets'; the Rust suite; 'bash/integration-tests.sh';
+check --all-targets'; the Rust suite;
+'bash/integration-tests.sh';
 the AI tool's tests; then an isolated instance started by the
 new start script: its run folder shows 'stop-servers.sh', one
 'start-servers.START.log', and one 'START/' subfolder holding
@@ -233,8 +242,11 @@ code and say so).
 When slice 4 is committed: 'bash -n' on the start script; the
 two-instance test of slice 1 and the folder listing of slice 4
 observed; all suites named in Pitfalls green on the final tree;
-'git grep -n SKG_CONFIG' finds nothing outside 'TODO/' and
-'_burying/'; 'git grep -n "cargo-watch.log"' likewise;
+'git grep -n SKG_CONFIG -- bash/start-servers.sh docs/setup.org
+.claude' finds nothing (other scripts, 'bash/import-org-roam.sh',
+'data/bash/lib.sh' and 'windows/', read an 'SKG_CONFIG' of their
+own and are out of scope); 'git grep -n "cargo-watch.log"' finds
+nothing outside 'TODO/' and '_burying/';
 'git grep -n "bash/stop-servers.sh"' finds only 'TODO/',
 '_burying/' and 'coding-advice/' (history). Then every slice is
 DONE. The report tells Jeff that 'data/logs/' and
