@@ -790,3 +790,14 @@ elsewhere.
 Nothing.
 *** Headline
 DONE.
+** Orchestrator's notes after slice 1 (2026-11-06 00:54 UTC)
+Slice 1 launched 00:41, reported 00:54. One commit. The agent
+moved the dropping of untouched Saves from the handler into the
+plan builder, before the foreign policy, which is right: by the
+handler the foreign policy would already have forked an untouched
+foreign copy. It costs 'from_text.rs' an import from
+'serve::handlers', which has a precedent; noted for the review.
+The baseline's copies are computed once, before the plan builder,
+as the pitfall asked. No correction needed. Jeff is editing
+'4_plan.org' (he removed my two notes after reading them); agents
+stage only their own DONE line of it. Slice 2 launched 00:54.
