@@ -81,7 +81,7 @@ function M.server_unavailable_message (err)
     .. " hold the start script's output.\n"
     .. 'Connection error: %s',
     M.port and tostring(M.port) or '[unknown]',
-    M.server_run_folder_for_messages(),
+    M.run_folder_for_messages(),
     tostring(err))
 end
 
@@ -92,7 +92,7 @@ end
 ---config file is unknown, this says so in words instead of guessing a
 ---path.
 ---@return string
-function M.server_run_folder_for_messages ()
+function M.run_folder_for_messages ()
   local config_file = config.config_file()
   if config_file then
     return vim.fn.fnamemodify(config_file, ':p') .. '.running/' end

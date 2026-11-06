@@ -63,7 +63,8 @@ cleanup() {
     fi
   fi
 
-  # The server's run folder ('SkgConfig::logs_dir'): its logs repeat
+  # The run folder, CONFIG.running/; the server's logs are in its
+  # START/ subfolders ('SkgConfig::logs_dir'). Those logs repeat
   # server.log, and a temporary config's would otherwise pile up.
   if [ -n "$TEMP_CONFIG" ]; then
     rm -rf "$TEMP_CONFIG.running"

@@ -2113,12 +2113,17 @@ with the Emacs client's 'skg-reload'.
 'CONFIG.running/', beside a config file whose path is CONFIG
 ('data/skgconfig.toml.running/' for 'data/skgconfig.toml'), where a
 server's run-time files go. 'bash/start-servers.sh' creates it and
-writes there 'stop-servers.sh', which stops that start, and one
-'start-servers.START.log' per start, the output of the rerun loop
-(or of cargo-watch, with hot reload). The server writes its logs into
-a subfolder, 'START/', one per server run, START being the run's UTC
-start time ('YYYY-MM-DDTHH-MM-SSZ'). So two servers on two configs
-over one data root share no log and no stop script.
+writes there 'stop-servers.sh', which stops that start (one run of
+the script), and one 'start-servers.START.log' per start, the output
+of the rerun loop (or of cargo-watch, with hot reload). The server
+writes its logs into a subfolder, 'START/', one per server run (one
+process of the server, from launch to exit). Both STARTs are UTC times
+('YYYY-MM-DDTHH-MM-SSZ'), but not the same time: in the script log's
+name it is when the start script began, in the subfolder's when that
+server process began. So they usually differ by a few seconds, and a
+start whose rerun loop (or cargo-watch) reruns the server has one
+script log and several subfolders. Two servers on two configs over
+one data root share no log and no stop script.
 'docs/api-and-formats.org' says more under "Log files".
 
 *** "snapshot" is always qualified: graph, git or buffer snapshot

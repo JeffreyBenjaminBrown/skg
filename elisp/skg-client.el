@@ -75,7 +75,7 @@
        (concat "skg connected on port %s, but the herald rule table"
                " came back empty, so heralds will not render."
                " See server-to-user.log in the newest folder of %s .")
-       skg-port (skg--server-run-folder-for-messages)))))
+       skg-port (skg--run-folder-for-messages)))))
   ;; Skg, magit and global keybindings are in skg-keymaps-and-aliases.el.
 
 (defun skg--end-connection-to-another-port (port)
@@ -136,10 +136,10 @@ other server, and saving one would write it into this server's graph."
     " hold the start script's output.\n"
     "Connection error: %s")
    (or skg-port "[unknown]")
-   (skg--server-run-folder-for-messages)
+   (skg--run-folder-for-messages)
    (error-message-string err)))
 
-(defun skg--server-run-folder-for-messages ()
+(defun skg--run-folder-for-messages ()
   "The run folder, CONFIG.running/ beside the config, as messages name it.
 It is the config file's path plus \".running/\". The newest folder in it
 holds the server's logs, one folder per server run; the client cannot

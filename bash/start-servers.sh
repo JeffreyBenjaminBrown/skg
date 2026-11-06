@@ -9,8 +9,10 @@
 #   An unknown option, or a second CONFIG, prints a usage line
 #     and exits with status 2, before anything is written.
 # - THE RUN FOLDER
-#   Everything this script writes goes in CONFIG.running/, beside the
-#   config (data/skgconfig.toml.running/ by default):
+#   The files this script writes itself go in CONFIG.running/, beside
+#   the config (data/skgconfig.toml.running/ by default). (The build
+#   steps write elsewhere: the .elc files beside their sources in
+#   elisp/, the server binary under target/.) The script's own files:
 #   - stop-servers.sh, which stops this start (rewritten at every start).
 #   - start-servers.START.log, one per start, START its UTC time
 #     (YYYY-MM-DDTHH-MM-SSZ): the output of the rerun loop, and of
@@ -23,7 +25,7 @@
 #   warnings; a failure there is shown in red, and the server starts anyway.
 #   The rerun loop, bash/run-skg-rerunning-on-exit.sh, runs the server,
 #   and runs it again whenever it exits, so killing the server (by its
-#   PID, or with the 'shutdown' request) restarts it, rereading the config.
+#   PID, or with the 'shutdown' request) reruns it, rereading the config.
 #   Hot reload is off unless given --hot-reload: nothing watches server/,
 #   and an edit there takes effect only when this script is run again.
 #   With --hot-reload, cargo-watch also rebuilds and restarts the server
@@ -130,7 +132,7 @@ compile_emacs_client() {
 skg_api_port() {
   # Never assume 1730: Jeff runs several containers at once, each with
   # its own config naming a different port (see coding-advice/docker.org),
-  # so the port must come from the config this run was given.
+  # so the port must come from the config this start was given.
   sed -n 's/^[[:space:]]*port[[:space:]]*=[[:space:]]*\([0-9][0-9]*\).*/\1/p' \
     "$CONFIG" | head -1
 }
@@ -186,9 +188,9 @@ wait_for_free_api_port() {
 start_skg_with_restart() {
   echo ""
   if [ -n "$HOT_RELOAD" ]; then
-    echo "Starting skg server with hot reload, and restart on exit..."
+    echo "Starting skg server with hot reload, and rerun on exit..."
   else
-    echo "Starting skg server with restart on exit (no hot reload)..."
+    echo "Starting skg server with rerun on exit (no hot reload)..."
   fi
   kill_stale_skg
   wait_for_free_api_port
@@ -243,7 +245,7 @@ echo "=== Server Startup Script ==="
 echo "Script PID: $$"
 echo "Process group: $(ps -o pgid= -p $$)"
 
-# The run folder holds everything this script writes.
+# The run folder holds every file this script writes itself.
 mkdir -p "$RUN_FOLDER"
 echo "Run folder: $RUN_FOLDER/"
 

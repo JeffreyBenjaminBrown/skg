@@ -95,8 +95,8 @@ sed -i -E 's/^timing_log[[:space:]]*=.*/timing_log = true/' \
 # CONFIG.running/START/ ('SkgConfig::logs_dir'). The copied data root
 # may carry the live server's run folder; it is removed, so the only
 # run subfolder is this profile's.
-server_run_folder="$copied_data/skgconfig.toml.running"
-rm -rf "$server_run_folder"
+run_folder="$copied_data/skgconfig.toml.running"
+rm -rf "$run_folder"
 
 find "$copied_data/owned" -type f -name '*.skg' -printf '%P\t%s\n' \
   | LC_ALL=C sort > "$raw_dir/files-before.tsv"
@@ -168,7 +168,7 @@ if [[ -n "$samply_pid" ]]; then
   samply_pid=""
 fi
 
-newest_server_run_subfolder="$(find "$server_run_folder" -mindepth 1 -maxdepth 1 -type d \
+newest_server_run_subfolder="$(find "$run_folder" -mindepth 1 -maxdepth 1 -type d \
   | LC_ALL=C sort | tail -1)"
 cp "$newest_server_run_subfolder/server.jsonl" "$raw_dir/server.jsonl"
 find "$copied_data/owned" -type f -name '*.skg' -printf '%P\t%s\n' \
