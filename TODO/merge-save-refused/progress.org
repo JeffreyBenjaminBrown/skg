@@ -689,3 +689,10 @@ review is '3_review.org'; its "Decide" section holds what awaits
 Jeff. The orchestrator's clock times in the notes above for
 slices 3 to 6 are estimates that ran late; the commits' times in
 the review are right.
+* Plan 4: three refinements of the save's checks, and two renamings
+Orchestrated by Ed (Fable 5.1), one Opus 5.5 agent per slice,
+from 2026-11-06 00:40 UTC. Jeff's server is pinned at
+ec36a08a ('_burying/skg-stable') for the run; his client stays
+on the live tree, which plan 4 does not touch.
+** Orchestrator's launches
+Slice 1 launched 00:40 UTC.
