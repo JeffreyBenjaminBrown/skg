@@ -154,16 +154,3 @@ ANSWER:
 I'll default to: allow the buffer under any restriction, drawn
 under the connection's current one, and let plan 2_2's rule
 guard its save.
-* TODO Order against plan 4
-Plan 4 is small (five slices) and its first slice narrows what a
-stale save is, which this buffer depends on.
-
-ANSWER:
-
-I'll default to: plan 4 first, then this as plan 5.
-** TODO Claude says: plan 4 runs first; your server is pinned
-On 2026-11-06 you asked for plan 4 to run. I pinned your server
-to a worktree at the commit the run starts from
-('_burying/skg-stable'), so the run's edits do not restart it;
-your client needs no change, since plan 4 touches the server
-only.

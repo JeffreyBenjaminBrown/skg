@@ -1149,7 +1149,7 @@ skgrepo, and the floor check is what refuses a choice too public.
 A home skgrepo move can strand a relationship touching the moved
 node: a *stranded relationship* is one that sat at its default relRepo
 before the move and that the sticky rule would leave off its new
-default. *Strandeds* is the noun for stranded relationships; "strand"
+default. *Stranded* can be both noun and adjective; "strand"
 is only a verb. A save finds every one, of every relation, in both
 directions, shown in some view or not ('server/from_text/strandeds.rs').
 It raises the inbound strandeds of a privatizing move to the new home

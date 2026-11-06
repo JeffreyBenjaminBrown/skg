@@ -74,6 +74,7 @@ Before the foreign policy, because by the handler an untouched
 foreign copy would already have been forked and judged. Arguable
 only in that 'from_text.rs' now imports a function from
 'serve::handlers', which has one precedent.
+**** TODO [jeff] what's the foreign policy?
 *** The untouched graphnodes travel in the 'SavePlan'
 A new field, turned into warnings beside the strandeds warnings.
 *** An unreadable baseline is refused before the plan is built
@@ -102,7 +103,7 @@ described the switch.
 'startup_generation', with its reason in its doc comment. No test
 had asserted the start at 0.
 ** Slice 5
-*** TODO Three other numbered passes were named too
+*** DONE Three other numbered passes were named too
 The extra-ID-mapping pass and the node-insertion pass in
 'InRustGraph::from_graphnodes', and the overrider-collection pass
 in 'validate_override_invariants'. Arguable only in the names
@@ -117,7 +118,7 @@ already leaves dirty views out.
 *** The baseline is read once into a struct
 'WhatTheBaselineShows': the baseline's writes and the title and
 home skgrepo of every occurrence, by pid.
-*** TODO "Ordinary content view" became "content view proper"
+*** DONE "Ordinary content view" became "content view proper"
 Defined in the glossary. Arguable: the name is the reviewer's
 suggestion, not yours.
 *** The deleted case of the warning shares the stale error's test
@@ -162,7 +163,7 @@ slice 7's first part, and one minor set. '4_1_review-reports/
 probes.org': ten probes, nine as the plan says and one revealing
 the dirty-view redraw, fixed by slice 6.
 * Decide
-** TODO "Outdated" beside "stale"
+** ONGOING "Outdated" beside "stale"
 'names.org' forbids giving two near-synonyms private meanings.
 The glossary now defines "outdated" (the baseline's copy differs
 from the graph) and "stale" (outdated and edited or deleted by
@@ -171,14 +172,21 @@ rename costly; it is used in two identifiers and five docs. I
 would keep both, since the glossary states the difference in one
 line, and the alternative ("changed under the user" for outdated)
 is longer wherever it would go.
-** TODO "Untouched" beside "touched IDs"
+*** TODO [jeff] No, we must distinguish them better.
+Call one stale, the other "stale with requested edits".
+(If in fact that's accurate -- push back if I have misunderstood.)
+** ONGOING "Untouched" beside "touched IDs"
 "Untouched" (the buffer did not edit it) sits in the same module
 as "touched IDs" (the IDs a save writes), which mean unrelated
 things. The reviewer suggests "unedited". I would rename to
 "unedited": it is the word the docs already use in the sentence
 that explains the rule, and the rename is a handful of
 identifiers and the glossary entry.
-** TODO Numbered steps outside the plan's list
+*** TODO [jeff] Let me see if I understand correctly.
+By 'unedited' we would be talking about the edits the *user* could have made
+but didn't, yes? Or are we talking about changes that skg itself might have done?
+If the former, the rename you suggest is good.
+** ONGOING Numbered steps outside the plan's list
 Slice 5 named every numbered pass in the server. These remain
 and fall under your rule as worded: "Phase N" headers in 22
 integration-test folders and 'tests/profiling', "Pass 1" and
@@ -188,6 +196,7 @@ near line 51, "phase 5" and "phase 7" cited in one integration
 test, and "(step 3)" in 'server/prominence.rs'. I would rename
 the four in code and leave the test scripts' phase headers, which
 are labels of a script's progress, not names of things.
+*** TODO [jeff] agreed
 * Suggestions for the advice
 - 'plans.org': when a plan removes a refusal, it should ask what
   else that refusal was preventing. The dirty-view conflict was

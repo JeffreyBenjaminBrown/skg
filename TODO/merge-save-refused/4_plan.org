@@ -373,9 +373,6 @@ and the reload notice) and adapt it; update the comment at the
 start value and 'docs/data-model_technical.org' ("Runtime
 generations and rebuilding") where it says what the number is.
 Run 'bash/nextest.sh'. One commit.
-*** TODO Claude says: added after you read the plan
-From your note under "The runtime generation starts at 0" in
-'3_review.org' (2026-11-05 night).
 ** DONE Slice 5: phases and passes named for what they are
 Jeff's rule: never use numbers as names; a name says what the
 thing is. Rename, in code comments, doc comments and the two
@@ -408,9 +405,6 @@ comments in 'server/dbs/in_rust_graph.rs' near line 104 and in
 read each and name it. Identifiers that carry the old words are
 renamed too. No behavior changes; run 'bash/nextest.sh'. One
 commit.
-*** TODO Claude says: added after you read the plan
-From your note "Never use numbers as names" in
-'3_2_glossary.org' (2026-11-06).
 ** DONE Slice 6: a dirty view is never redrawn by a save
 The probes of plan 4 ('4_1_review-reports/probes.org', probe 7)
 found this: a save on a connection that holds a dirty view of L,

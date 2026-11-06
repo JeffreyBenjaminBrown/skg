@@ -90,14 +90,14 @@ no long run-on list-paragraphs.
 Then, please mark TODO any of those branches for which
 the choice could, you think, perhaps be argued.
 *** DONE Claude says: done below; the arguable branches are TODO
-** ONGOING Slice 1
+** DONE Slice 1
 *** The acquiree's ID becomes a pid before the plan
 So every later comparison is by pid.
 *** The old deletion check was replaced, not kept beside the new
 The old string-level "cannot be marked for deletion" check ran
 first and would have hidden the new refusal; the new one compares
 by pid.
-*** AWAITS glossary clarification : The coherence assertion counts the last instruction
+*** DONE The coherence assertion counts the last instruction
 Phase one saving the acquiree and phase two deleting it had
 tripped it. Arguable: the assertion could instead have been fed
 only phase two's instructions.
@@ -166,7 +166,7 @@ and restores the test.
 ** Slice 7
 *** The relationship lists are canonical on both sides
 Pids, later duplicates dropped; not the aliases, which are text.
-*** TODO Every unreadable envelope gets the refusal header
+*** DONE Every unreadable envelope gets the refusal header
 Not only the missing baseline. Arguable: the plan asked for the
 one case.
 **** DONE 'save envelope"?
@@ -177,11 +177,11 @@ yet used there, so add it to both that and 3_2_glossary.org
 the implementation", before "collateral view", committed on its
 own; your "Stranded" edit there stays unstaged.
 '3_2_glossary.org' defines it too.
-**** TODO [jeff] Is it natural that 'baseline' is a giant blob of text?
+**** DONE [jeff] Is it natural that 'baseline' is a giant blob of text?
 It seems like it should refer to a viewnode tree in the server.
 That way we don't have to re-parse.
 Those viewnode trees are already stored in the server, right?
-***** TODO Claude says: it does; two reasons for text anyway
+***** DONE Claude says: it does; two reasons for text anyway
 ****** The server does hold the tree
 Every view the connection holds has its viewforest in 'ViewState'
 ('server/types/views_state.rs'), replaced at every redraw
@@ -208,6 +208,7 @@ of it"). Until the user approves the rerender, the server's tree
 and the buffer differ, and a baseline taken from the tree would
 describe a text the user has not seen. The client's text is what
 the user actually saw, so it is the right base.
+******* DONE jeff : ah, that clinches it
 ****** What I would do
 Keep the text as the baseline the client sends, and let the
 server, when it holds the view and the stored tree renders to
@@ -217,6 +218,8 @@ meaning, and I would not do it until the parse shows up in a
 timing. A hash in place of the text would shrink the envelope
 but needs the full text as a fallback for the two cases above,
 so it adds a path rather than removing one.
+******* DONE jeff : no, skip the optimization
+we should optimize based on measurement, not theory
 *** The glossary defines "merge node" and "merge pair"
 As the plan did.
 *** The agent emptied the glossary by accident and rebuilt it
