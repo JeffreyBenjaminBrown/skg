@@ -888,3 +888,11 @@ and override walk do.
 Nothing.
 *** Headline
 DONE.
+** Orchestrator's notes after slice 2 (2026-11-06 01:01 UTC)
+Slice 2 launched 00:57, reported 01:04. One commit. The walk is
+parameterized by one constant list and never copied; the two
+neighborhoods share one type and one matching rule. No correction
+needed. Carried to the end of the run: the glossary's
+"update-relevant neighborhood" entry should mention the
+dirty-view variant without links (the agent left it, since the
+glossary carries Jeff's edits). Slice 3 launched 01:01.
