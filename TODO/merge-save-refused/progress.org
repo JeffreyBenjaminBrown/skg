@@ -1101,3 +1101,11 @@ numbered passes outside the slice's list are listed under slice 5,
 "Unfinished".
 *** Headline
 DONE: all five slices are DONE.
+** Orchestrator's notes after slice 5 (2026-11-06 01:25 UTC)
+Slice 5 launched 01:22, reported 01:30, with the completion step.
+Two commits. The three other numbered passes the agent named for
+what they do read well. The numbered steps it found elsewhere
+(integration and profiling tests, 'skg-org-fold.el',
+'validate_tree.rs') are outside the plan; they go to the review's
+Decide section. The per-plan review's two agents (vocabulary and
+citations; probes) launched 01:25.
