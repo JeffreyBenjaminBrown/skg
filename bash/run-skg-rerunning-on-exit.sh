@@ -4,10 +4,11 @@
 #
 # Runs the already built server binary PROFILE_DIR/skg on SKG_CONFIG,
 # and runs it again whenever it exits, so a killed server comes back
-# (with whatever config the file now holds). bash/start-servers.sh has
-# cargo-watch run this after each build; when cargo-watch rebuilds on
-# an edit under server/, it signals this script, which stops the binary
-# and exits, and cargo-watch starts a fresh copy.
+# (with whatever config the file now holds). bash/start-servers.sh
+# runs this directly, or, given --hot-reload, has cargo-watch run it
+# after each build; then, when cargo-watch rebuilds on an edit under
+# server/, it signals this script, which stops the binary and exits,
+# and cargo-watch starts a fresh copy.
 #
 # A run that ends quickly (a bad config, say, or a port still held)
 # doubles the pause before the next, up to a minute, so a server that

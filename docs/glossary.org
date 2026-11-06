@@ -2099,6 +2099,15 @@ Warnings*' in Emacs, 'skg://messages/server-warnings' in Neovim),
 under a headline "Startup warnings", erasing nothing the buffer
 holds.
 
+*** hot reload
+
+The server rebuilt and restarted by cargo-watch on every edit under
+'server/'. It is on when 'bash/start-servers.sh' is given
+=--hot-reload=, and off by default, when an edit under 'server/' takes
+effect only once that script is run again. Not to be confused with
+the server rereading changed '.skg' files ('server/repo_watch/'), nor
+with the Emacs client's 'skg-reload'.
+
 *** "snapshot" is always qualified: graph, git or buffer snapshot
 
 A /graph snapshot/ is one immutable state of the in-Rust graph

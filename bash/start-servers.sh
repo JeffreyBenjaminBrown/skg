@@ -11,18 +11,18 @@
 #   The first release build takes minutes, sitting at "Validating config".
 #   Any other argument prints a usage line and exits with status 2.
 # - WHAT RUNS
-#   First bash/compile-elisp.sh byte-compiles the Emacs client (elisp/),
-#   unless emacs is not on the path; a failure there is shown in red,
-#   and the server starts anyway.
-#   bash/run-skg-rerunning-on-exit.sh runs the server, and runs it again
-#   whenever it exits, so killing the server (by its PID, or with the
-#   'shutdown' request) restarts it, rereading the config.
+#   After the config check, bash/compile-elisp.sh byte-compiles the
+#   Emacs client (elisp/), unless emacs is not on the path; a failure
+#   there is shown in red, and the server starts anyway.
+#   The rerun loop, bash/run-skg-rerunning-on-exit.sh, runs the server,
+#   and runs it again whenever it exits, so killing the server (by its
+#   PID, or with the 'shutdown' request) restarts it, rereading the config.
 #   Hot reload is off unless given --hot-reload: nothing watches server/,
 #   and an edit there takes effect only when this script is run again.
 #   With --hot-reload, cargo-watch also rebuilds and restarts the server
 #   on every edit under server/.
-#   Either way, the loop's output goes to logs/cargo-watch.log beside
-#   the config.
+#   Either way, the rerun loop's output goes to logs/cargo-watch.log
+#   beside the config.
 # - TO SHUTDOWN
 #   - If foregrounded at command line, use
 #     Ctrl-C
@@ -33,11 +33,11 @@
 #     If you do it yourself, the PID was printed when it started,
 #       and if that printout is buried, can be found running `ps -af`.
 
-DEB=""        # set by --deb: build and run the debug profile
-HOT_RELOAD="" # set by --hot-reload
+DEBUG_PROFILE="" # set by --deb: build and run the debug profile
+HOT_RELOAD=""    # set by --hot-reload
 for arg in "$@"; do
   case "$arg" in
-    --deb)        DEB=1 ;;
+    --deb)        DEBUG_PROFILE=1 ;;
     --hot-reload) HOT_RELOAD=1 ;;
     *) echo "usage: bash/start-servers.sh [--deb] [--hot-reload]" >&2
        exit 2 ;;
@@ -46,7 +46,7 @@ done
 
 SKG_CONFIG="${SKG_CONFIG:-data/skgconfig.toml}"
 DATA_ROOT="$(dirname "$SKG_CONFIG")"
-if [ -n "$DEB" ]; then
+if [ -n "$DEBUG_PROFILE" ]; then
   CARGO_PROFILE_FLAG=""
   PROFILE_DIR="target/debug"
 else
@@ -58,8 +58,8 @@ preflight_check_config() {
   # Validate the config before starting the server, using skg's own loader
   # (the 'check-config' subcommand runs the same load_config the server
   # runs at startup). A malformed skgconfig.toml otherwise makes skg
-  # exit(1) before binding port 1730, and -- because cargo-watch only
-  # watches server/ -- it crash-loops with the error buried in
+  # exit(1) before binding port 1730, and the rerun loop reruns it,
+  # crash-looping (with backoff) with the error buried in
   # logs/cargo-watch.log, which presents as a connection failure. Catching
   # it here, in red, turns that into an obvious fix.
   echo ""
@@ -133,8 +133,8 @@ kill_stale_skg() {
   # logs/cargo-watch.log. Match both spellings, and match the server
   # binary itself ('target/debug/skg <config>'), which neither old
   # pattern caught -- cargo-watch does not always take its child down
-  # with it. Kill cargo-watch first so it cannot respawn the rerunning
-  # loop, then the loop so it cannot rerun skg, then skg.
+  # with it. Kill cargo-watch first so it cannot respawn the rerun
+  # loop, then the rerun loop so it cannot rerun skg, then skg.
   # Every pattern is scoped to this config, so skg instances serving
   # other configs (other ports, other data) are left alone. Each matches
   # the debug (--deb) and the release form of its command.
@@ -146,8 +146,8 @@ kill_stale_skg() {
 }
 
 wait_for_free_api_port() {
-  # Refuse to launch into an occupied port: skg would exit(1) and
-  # cargo-watch would idle, silently, forever.
+  # Refuse to launch into an occupied port: skg would exit(1), and the
+  # rerun loop would rerun it, silently, forever.
   local port
   port="$( skg_api_port )"
   if [ -z "$port" ]; then return 0; fi
@@ -170,9 +170,9 @@ wait_for_free_api_port() {
 start_skg_with_restart() {
   echo ""
   if [ -n "$HOT_RELOAD" ]; then
-    echo "Starting skg server with auto-restart on code changes and on exit..."
+    echo "Starting skg server with hot reload, and restart on exit..."
   else
-    echo "Starting skg server with auto-restart on exit (no hot reload)..."
+    echo "Starting skg server with restart on exit (no hot reload)..."
   fi
   kill_stale_skg
   wait_for_free_api_port
@@ -197,7 +197,7 @@ run_skg_under_cargo_watch() {
 }
 
 run_skg_rerunning_on_exit() {
-  # PITFALL: the loop must run in the foreground, in this script's
+  # PITFALL: the rerun loop must run in the foreground, in this script's
   # process group, so that Ctrl-C and the generated bash/stop-servers.sh
   # reach it, and this script waits on it. Bash runs the 'cleanup' trap
   # only once the loop exits; the loop traps TERM and INT itself and

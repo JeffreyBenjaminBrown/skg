@@ -184,7 +184,9 @@ else is `format'-ed as a last resort."
   (memq sym (skg-shared-style-keywords)))
 
 (defvar skg--rule-header-cache
-  ;; Weak, because the rule table is replaced at connect and at reload.
+  ;; Weak, because each connect to the server installs a new rule table,
+  ;; and the old table's rules should drop out with it. ('skg-reload'
+  ;; puts back the same table, so it replaces nothing.)
   (make-hash-table :test 'eq :weakness 'key)
   "Each rule object's header, as `skg--parse-rule-header' returned it.")
 
@@ -196,7 +198,8 @@ for. The header is the alist `skg--parse-rule-header' describes."
                skg--rule-header-cache)))
 
 (defun skg--parse-rule-header (rule)
-  "Parse RULE once and return an alist classifying it.
+  "Parse RULE and return an alist classifying it. This parses on
+every call; `skg--rule-header' caches the result.
 Keys:
   kind      -- one of `interc', `when', `any-leaf', `atomic-leaf',
                `non-leaf'.
