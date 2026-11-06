@@ -1368,3 +1368,9 @@ None.
 Nothing.
 *** Headline
 DONE.
+** Orchestrator's notes after slice 1 (2026-11-06 03:09 UTC)
+One commit; renames only, suites green. The agent found an older
+near-synonym in 'server/from_text/validate.rs' (near line 382, "an
+untouched stale node", meaning drawn before a restriction switch
+and identical to disk) and 'tests/restricted_suppression.rs';
+carried into slice 2 as a correction. Slice 2 launched 03:09.

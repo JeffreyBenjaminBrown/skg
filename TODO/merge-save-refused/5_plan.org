@@ -146,6 +146,15 @@ and the glossary, respecting "Two senses of two words". Run
 the integration suite only if a text a client test matches
 changes, which it should not. One commit.
 ** TODO Slice 2: three numbered steps named
+*** Corrections carried from slice 1
+'server/from_text/validate.rs' (near line 382, "an untouched
+stale node") and 'tests/restricted_suppression.rs' use "stale"
+for a buffer drawn before the skgrepo restriction was switched
+and "untouched" for identical to disk, senses that predate plan 4
+and now collide with the glossary's. Reword them: "drawn under
+the previous restriction" and "identical to the graph", or what
+the code there actually means after reading it. No behavior
+change.
 Rename as "Three numbered steps will be named" says, reading each
 site first. Run 'bash/nextest.sh' and 'bash/emacs-tests.sh'. One
 commit.
