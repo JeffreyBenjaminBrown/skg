@@ -54,6 +54,12 @@ commits. Before slice 7 the code commits changed 15 files of
 server and clients (+437 -140), 23 test files (+752 -25) and 6
 docs (+135 -62). The Rust suite grew from 1137 to 1144 tests; the
 Emacs suite from 444 to 445; the Neovim suite gained one.
+** The final run
+'bash/all-tests.sh' after slice 7: build, Emacs, Neovim, nextest
+(1144 tests) and doctests green; integration 70 of 72, the two
+failures the pre-existing 'import-md-and-org' in both clients, as
+in the baseline before plan 2_2. Summary at
+'4_1_review-reports/ALL-after-slice-7.org'.
 ** The commit rule
 Kept: one commit per slice, each carrying its docs and its DONE
 line; the completion step had its own commit.
