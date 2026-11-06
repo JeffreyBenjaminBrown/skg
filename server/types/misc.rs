@@ -1,11 +1,13 @@
 use serde::{Serialize, Deserialize, Serializer, Deserializer};
 use std::collections::HashMap;
+use std::ffi::OsString;
 use std::fmt;
 use std::ops::Deref;
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use tantivy::Index;
 use tantivy::schema::Field;
+use time::OffsetDateTime;
 
 use crate::consts::{DEFAULT_INITIAL_NODE_LIMIT, DEFAULT_PORT};
 
@@ -254,7 +256,7 @@ pub struct SkgConfig {
   pub initial_node_limit : usize, // Max nodes to render in initial content views.
 
   #[serde (default)] // defaults to false
-  pub timing_log     : bool, // Write JSON log to <data_root>/logs/server.jsonl.
+  pub timing_log     : bool, // Write a JSON log, server.jsonl, beside server-to-user.log in the run subfolder ('logs_dir').
 
   #[serde(default = "default_beep_when_server_becomes_available")]
   pub beep_when_server_becomes_available : bool, // Play a local sound when server initialization finishes.
@@ -308,9 +310,35 @@ pub enum SkgrepoOwner {
   Foreign (SkgrepoName),
 }
 
+/// START: when this server process began, UTC, as
+/// 'YYYY-MM-DDTHH-MM-SSZ' (hyphens only, so a legal file name on
+/// every filesystem). Set at its first read and the same at every
+/// later one, so that a config reload cannot move the run subfolder
+/// ('SkgConfig::logs_dir') the log appenders already write to.
+static SERVER_PROCESS_START : OnceLock<String> = OnceLock::new ();
+
+pub fn server_process_start_as_file_name (
+) -> &'static str {
+  SERVER_PROCESS_START . get_or_init ( || {
+    let now : OffsetDateTime = OffsetDateTime::now_utc ();
+    format! ( "{:04}-{:02}-{:02}T{:02}-{:02}-{:02}Z",
+              now . year (), u8::from (now . month ()), now . day (),
+              now . hour (), now . minute (), now . second () ) } ) }
+
 impl SkgConfig {
+  /// Where this server process writes its logs: 'CONFIG.running/START/',
+  /// CONFIG the config file's path ('config_path') and START this
+  /// process's start ('server_process_start_as_file_name'). The run
+  /// folder 'CONFIG.running/' is the one the start script keeps its
+  /// stop script and script logs in; each server run gets its own
+  /// subfolder there.
   pub fn logs_dir ( &self ) -> PathBuf {
-    self . data_root . join ("logs") }
+    let run_folder : PathBuf = {
+      let mut path_text : OsString =
+        self . config_path . clone () . into_os_string ();
+      path_text . push (".running");
+      PathBuf::from (path_text) };
+    run_folder . join ( server_process_start_as_file_name () ) }
 
   /// The readiness store's file: 'readiness_marks_file' resolved
   /// against the data root, or else 'readiness-marks-STEM.json' in the

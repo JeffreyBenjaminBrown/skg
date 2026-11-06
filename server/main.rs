@@ -187,7 +187,7 @@ fn main() -> Result<(), Box<dyn Error>> {
   Ok (( )) }
 
 /// Report a config-load failure and exit(1). Bold red when stderr is a
-/// terminal; plain text otherwise (e.g. cargo-watch.log), so the
+/// terminal; plain text otherwise (e.g. the start script's log), so the
 /// message reads cleanly wherever skg's stderr points. Routing every
 /// 'load_config' failure here -- the real startup and the
 /// 'check-config' pre-flight alike -- means a bad skgconfig.toml is
@@ -413,13 +413,16 @@ fn run_export_org (
 ///
 /// 2. Human-readable file (always on):
 ///    Same format and content as stderr,
-///    appended to <data_root>/logs/server-to-user.log.
+///    appended to CONFIG.running/START/server-to-user.log
+///    ('SkgConfig::logs_dir': CONFIG the config file, START this
+///    process's start, so each server run has its own folder).
 ///    Useful when the server runs in the background and stderr is lost.
 ///
 /// 3. JSON file (when timing_log = true in skgconfig.toml):
-///    Appends one JSON object per log event to <data_root>/logs/server.jsonl.
-///    Queryable with jq, e.g.:
-///      jq 'select(.fields.message | test("rerender"))' data/logs/server.jsonl
+///    Appends one JSON object per log event to
+///    CONFIG.running/START/server.jsonl. Queryable with jq, e.g.:
+///      jq 'select(.fields.message | test("rerender"))' \
+///        data/skgconfig.toml.running/START/server.jsonl
 fn init_tracing (
   config : &SkgConfig,
 ) {
