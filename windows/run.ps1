@@ -263,7 +263,7 @@ function Wait-For-Port($Port) {
     }
     Start-Sleep -Seconds 1
   }
-  throw "Skg did not listen on 127.0.0.1:$Port within 60 seconds. Check logs under the data folder."
+  throw "Skg did not listen on 127.0.0.1:$Port within 60 seconds. Check server-to-user.log in the newest folder under skgconfig.toml.running in the data folder, and logs\skg-stdout-stderr.log there."
 }
 
 function Invoke-Emacs($Emacs, $ElispRoot, $ConfigPath) {
@@ -302,4 +302,5 @@ Save-Settings $settings
 
 Write-Host ""
 Write-Host "Skg is starting. If Emacs reports that the server is initializing, wait a moment and retry the Skg command."
-Write-Host "Data logs are under: $(Join-Path $dataRoot 'logs')"
+Write-Host "Server logs are in the newest folder under: $configPath.running"
+Write-Host "Container output is in: $(Join-Path $dataRoot 'logs')"

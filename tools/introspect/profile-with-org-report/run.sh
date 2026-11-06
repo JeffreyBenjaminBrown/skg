@@ -91,8 +91,12 @@ sed -i -E "s/^port[[:space:]]*=.*/port = $profile_port/" \
   "$copied_data/skgconfig.toml"
 sed -i -E 's/^timing_log[[:space:]]*=.*/timing_log = true/' \
   "$copied_data/skgconfig.toml"
-truncate -s 0 "$copied_data/logs/server.jsonl" 2>/dev/null || true
-truncate -s 0 "$copied_data/logs/server-to-user.log" 2>/dev/null || true
+# The server writes its logs to a folder per server run,
+# CONFIG.running/START/ ('SkgConfig::logs_dir'). The copied data root
+# may carry the live server's run folder; it is removed, so the only
+# run subfolder is this profile's.
+server_run_folder="$copied_data/skgconfig.toml.running"
+rm -rf "$server_run_folder"
 
 find "$copied_data/owned" -type f -name '*.skg' -printf '%P\t%s\n' \
   | LC_ALL=C sort > "$raw_dir/files-before.tsv"
@@ -164,7 +168,9 @@ if [[ -n "$samply_pid" ]]; then
   samply_pid=""
 fi
 
-cp "$copied_data/logs/server.jsonl" "$raw_dir/server.jsonl"
+newest_server_run_subfolder="$(find "$server_run_folder" -mindepth 1 -maxdepth 1 -type d \
+  | LC_ALL=C sort | tail -1)"
+cp "$newest_server_run_subfolder/server.jsonl" "$raw_dir/server.jsonl"
 find "$copied_data/owned" -type f -name '*.skg' -printf '%P\t%s\n' \
   | LC_ALL=C sort > "$raw_dir/files-after.tsv"
 {

@@ -25,5 +25,5 @@ else
 fi
 
 echo "Logs:"
-echo "  $DATA_ROOT/logs/server-to-user.log"
+echo "  $SKG_CONFIG.running/ (its newest folder, one per server run, holds server-to-user.log)"
 echo "  $DATA_ROOT/logs/skg-stdout-stderr.log"

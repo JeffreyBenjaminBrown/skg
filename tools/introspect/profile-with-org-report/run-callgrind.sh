@@ -81,7 +81,12 @@ sed -i -E "s/^port[[:space:]]*=.*/port = $profile_port/" \
   "$copied_data/skgconfig.toml"
 sed -i -E 's/^timing_log[[:space:]]*=.*/timing_log = true/' \
   "$copied_data/skgconfig.toml"
-truncate -s 0 "$copied_data/logs/server.jsonl" 2>/dev/null || true
+# The server writes its logs to a folder per server run,
+# CONFIG.running/START/ ('SkgConfig::logs_dir'). The copied data root
+# may carry the live server's run folder; it is removed, so the only
+# run subfolder is this profile's.
+server_run_folder="$copied_data/skgconfig.toml.running"
+rm -rf "$server_run_folder"
 
 printf 'Starting the isolated server under Callgrind on port %s...\n' "$profile_port"
 RUST_LOG=info "$valgrind_binary" \
@@ -136,7 +141,9 @@ emacs_pid=""
 kill -INT "$server_pid"
 wait "$server_pid"
 server_pid=""
-cp "$copied_data/logs/server.jsonl" "$callgrind_raw/server.jsonl"
+newest_server_run_subfolder="$(find "$server_run_folder" -mindepth 1 -maxdepth 1 -type d \
+  | LC_ALL=C sort | tail -1)"
+cp "$newest_server_run_subfolder/server.jsonl" "$callgrind_raw/server.jsonl"
 "$valgrind_root/bin/callgrind_annotate" --inclusive=yes \
   "$callgrind_raw/callgrind.out.1" >"$callgrind_raw/callgrind-annotate.txt"
 python3 "$profile_dir/generate_report.py"

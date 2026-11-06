@@ -3,8 +3,15 @@ set -euo pipefail
 
 source "$(dirname "$0")/common.sh"
 
+# The server writes server-to-user.log to a folder per server run,
+# CONFIG.running/START/; the container's config is /data/skgconfig.toml.
+server_run_folder="$HOST_DATA_ROOT/skgconfig.toml.running"
+newest_server_run_subfolder="$(
+  find "$server_run_folder" -mindepth 1 -maxdepth 1 -type d 2>/dev/null \
+    | LC_ALL=C sort | tail -1 || true)"
+
 for log in \
-  "$HOST_DATA_ROOT/logs/server-to-user.log" \
+  "${newest_server_run_subfolder:-$server_run_folder/NO-RUN-SUBFOLDER}/server-to-user.log" \
   "$HOST_DATA_ROOT/logs/skg-stdout-stderr.log"
 do
   echo
