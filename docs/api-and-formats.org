@@ -308,19 +308,36 @@ So far there are these endpoints:
     that drops nodeInstructions identical to the graph as no-ops, under
     the same skgrepo restriction; what survives are the baseline's
     writes, the graphnodes whose copy in the baseline no longer
-    matches the graph (or that the graph no longer has). A graphnode
-    the buffer writes or deletes that is among them is stale: writing
-    the buffer's text of it would silently undo a change made since
-    the buffer was drawn. What the buffer writes is what its text
-    yields after that filter, plus the original of each fork clone;
-    the writes the save derives from the current graph (nodeMerges,
-    delete propagation, strandeds resets, Hoist repairs, restore
-    requests) undo nothing and are not checked. So a node the buffer
-    shows as the graph has it never refuses a save, however old the
-    buffer; a node the graph deleted after the buffer was drawn is
-    stale, so an old buffer cannot recreate it; a merge request is
-    never stale; and a restart, a rebuild or a body-whitespace strip
-    makes nothing stale by itself. A graphnode the buffer writes
+    matches the graph (or that the graph no longer has): the outdated
+    ones. An outdated graphnode the buffer shows exactly as its
+    baseline does (compared as a view reads a graphnode back: its
+    relationship lists by distinct pid, its body without trailing
+    whitespace) is untouched: the user did not edit it, and writing
+    it would only undo what changed. The save leaves it out, before
+    the plan's validators judge it ('without_untouched_outdated_saves'
+    in the same file): its write, its move back to the home skgrepo
+    the buffer shows, and, if it is foreign, its fork; and a
+    write-protected occurrence of it showing the title and home
+    skgrepo the baseline shows is not refused. The rest of the save
+    proceeds, and its response carries one warning per graphnode left
+    out, =Left as the graph has it: TITLE (ID), which changed after
+    this buffer was rendered and which this buffer did not edit.=,
+    TITLE as the buffer shows it; the redraw shows the graph's
+    version. An outdated graphnode the buffer edits or deletes is
+    stale: writing the buffer's text of it would silently undo a
+    change made since the buffer was drawn. A delete is never
+    untouched. What the buffer writes is what its text yields after
+    that filter, minus its untouched graphnodes, plus the original of
+    each fork clone; the writes the save derives from the current
+    graph (nodeMerges, delete propagation, strandeds resets, Hoist
+    repairs, restore requests) undo nothing and are not checked. So a
+    node the buffer shows as the graph has it, or as its baseline
+    does, never refuses a save, however old the buffer; a node the
+    graph deleted after the buffer was drawn is left out if the
+    buffer did not edit it and stale if it did, so an old buffer
+    cannot recreate it; a merge request is never stale; and a
+    restart, a rebuild or a body-whitespace strip makes nothing stale
+    by itself. A graphnode the buffer writes
     without holding a copy of it in its baseline (pasted in by ID, or
     typed into a new empty view) has nothing to compare, and is not
     checked. A baseline that cannot be parsed refuses the save, saying
@@ -370,7 +387,9 @@ So far there are these endpoints:
     refused, before anything is written, if one differs from the graph
     ('errors_for_writeProtected_occurrences' in
     'server/from_text/write_protected_edits.rs'): in its title or home
-    skgrepo, or in its alias folder, when present, by lacking or
+    skgrepo (unless the buffer's baseline shows the same, the graph
+    having changed since: see the stale buffer above), or in its alias
+    folder, when present, by lacking or
     reordering one of the node's aliases or by carrying a relRepo
     request. Under a write-protected occurrence no child claims
     membership, so anything else standing there -- an alias the node

@@ -70,6 +70,19 @@ pub struct SavePlan {
   /// handler turns them into user messages only after filesystem and
   /// graph mutation succeeds.
   pub post_skgsave_commit_notice_candidates : Vec<PostSkgsaveCommitNoticeCandidate>,
+  /// The graphnodes the saved buffer shows outdated but did not edit,
+  /// whose Saves the plan left out ('without_untouched_outdated_saves'
+  /// in 'server/serve/handlers/save_staleness.rs'). The save handler
+  /// warns of each once the save succeeds.
+  pub untouched_outdated_graphnodes : Vec<UntouchedOutdatedGraphnode>,
+}
+
+/// A graphnode a save left as the graph has it: untouched and outdated
+/// in the saved buffer ('docs/glossary.org', "untouched, outdated").
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UntouchedOutdatedGraphnode {
+  pub pid   : ID,
+  pub title : String, // as the buffer shows it
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

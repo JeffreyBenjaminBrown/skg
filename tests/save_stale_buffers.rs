@@ -46,7 +46,9 @@ fn fixture (
     root . join ("skgconfig.toml") . to_str () . unwrap (),
     Some ("save-stale-buffers"),
     &[ ("main",   root . join ("main")),
-       ("theirs", root . join ("theirs")) ] ) ?;
+       ("theirs", root . join ("theirs")),
+       ("other",  root . join ("other")) ] ) ?;
+  fs::create_dir_all ( root . join ("other") ) ?;
   let config : SkgConfig = SkgConfig {
     tantivy_folder : root . join ("tantivy"),
     data_root      : root . to_path_buf (),
@@ -163,6 +165,15 @@ fn file_text (
   gnid : &str,
 ) -> String {
   fs::read_to_string ( file_path (f, "main", gnid) ) . unwrap () }
+
+/// The text of every file in the skgrepo folder 'skgrepo'.
+fn texts_of_files_in (
+  f       : &Fixture,
+  skgrepo : &str,
+) -> Vec<String> {
+  fs::read_dir ( f . dir . path () . join (skgrepo) ) . unwrap ()
+    . map ( |entry| fs::read_to_string ( entry . unwrap () . path () ) . unwrap () )
+    . collect () }
 
 fn errors_of (
   save_result : &str,
@@ -463,11 +474,7 @@ fn a_buffer_cannot_fork_a_foreign_node_reloaded_after_it_was_rendered
   let mut f : Fixture = fixture () ?;
   let mut connection : ViewsState = new_connection ();
   let n_view : String = open_view (&mut f, &mut connection, "n", "n-view");
-  { let n_path : PathBuf = file_path (&f, "theirs", "n");
-    fs::write ( &n_path, "pid: n\ntitle: n as they rewrote it\n" ) ?;
-    let (notice, _unread) = reload_changed_skg_files (
-      &f . env, & BTreeSet::from ([ n_path ]) );
-    assert! ( ! notice . files_reloaded . is_empty (), "{:?}", notice . files_reloaded ); }
+  rewrite_and_reload_n (&mut f) ?;
   let result : String = save (
     &mut f, &mut connection, "n-view",
     &n_view . replace ("n as they wrote it", "n as I would have it"), Some (&n_view) );
@@ -509,4 +516,222 @@ fn a_save_without_a_baseline_is_refused
             && errors_of (&result) . contains ("missing baseline"),
             "{}", result );
   assert! ( file_text (&f, "c") . contains ("c as first written") );
+  Ok (()) }
+
+/// Replace rb's body in a view showing rb.
+fn with_rb_body_edited (
+  view : &str,
+) -> String {
+  view . replace ("rb's second line", "rb's second line, edited") }
+
+/// The warning a save gives for leaving 'gnid', titled 'title' in the
+/// buffer, as the graph has it.
+fn left_as_the_graph_has_it (
+  title : &str,
+  gnid  : &str,
+) -> String {
+  format! ( "Left as the graph has it: {} ({}), which changed after this buffer was rendered and which this buffer did not edit.",
+            title, gnid ) }
+
+/// Retitle ra on a connection of its own.
+fn retitle_ra_elsewhere (
+  f : &mut Fixture,
+) {
+  change_elsewhere (f, "ra", &|view : &str|
+    view . replace ("ra as first written", "ra retitled")); }
+
+#[test]
+fn an_untouched_outdated_node_is_left_out_of_the_save
+  () -> Result<(), Box<dyn Error>> {
+  // Connection one's view of r still shows ra as first written; it
+  // edits only rb. ra is left as the graph has it, with a warning, and
+  // the redraw shows ra's new title.
+  let mut f : Fixture = fixture () ?;
+  let mut first : ViewsState = new_connection ();
+  let r_in_first : String = open_view (&mut f, &mut first, "r", "r-first");
+  retitle_ra_elsewhere (&mut f);
+  let result : String = save (
+    &mut f, &mut first, "r-first",
+    &with_rb_body_edited (&r_in_first), Some (&r_in_first) );
+  assert! ( saved (&result), "{}", result );
+  assert! ( file_text (&f, "rb") . contains ("rb's second line, edited") );
+  assert! ( file_text (&f, "ra") . contains ("ra retitled") );
+  assert! ( result . contains (
+              &left_as_the_graph_has_it ("ra as first written", "ra") )
+            && ! result . contains ("Left as the graph has it: r,")
+            && ! result . contains ("Left as the graph has it: rb"),
+            "{}", result );
+  let redrawn : String = extract_string_field_from_sexp (&result, "content")
+    . expect ("content");
+  assert! ( redrawn . contains ("ra retitled")
+            && ! redrawn . contains ("ra as first written"),
+            "{}", redrawn );
+  Ok (()) }
+
+#[test]
+fn an_edited_outdated_node_still_refuses_the_save
+  () -> Result<(), Box<dyn Error>> {
+  let mut f : Fixture = fixture () ?;
+  let mut first : ViewsState = new_connection ();
+  let r_in_first : String = open_view (&mut f, &mut first, "r", "r-first");
+  retitle_ra_elsewhere (&mut f);
+  let result : String = save (
+    &mut f, &mut first, "r-first",
+    &with_rb_body_edited (&r_in_first)
+      . replace ("ra as first written", "ra as I would have it"),
+    Some (&r_in_first) );
+  assert! ( errors_of (&result) . contains ("changed after the buffer was rendered")
+            && errors_of (&result) . contains ("- ID: ra")
+            && ! result . contains ("Left as the graph has it"),
+            "{}", result );
+  assert! ( ! file_text (&f, "rb") . contains ("edited")
+            && file_text (&f, "ra") . contains ("ra retitled") );
+  Ok (()) }
+
+#[test]
+fn deleting_an_outdated_node_still_refuses_the_save
+  () -> Result<(), Box<dyn Error>> {
+  // A delete is an edit, never untouched.
+  let mut f : Fixture = fixture () ?;
+  let mut first : ViewsState = new_connection ();
+  let r_in_first : String = open_view (&mut f, &mut first, "r", "r-first");
+  retitle_ra_elsewhere (&mut f);
+  let result : String = save (
+    &mut f, &mut first, "r-first",
+    &with_rb_body_edited (&r_in_first)
+      . replacen ("(gnid ra)", "(gnid ra) (editRequest delete)", 1),
+    Some (&r_in_first) );
+  assert! ( errors_of (&result) . contains ("changed after the buffer was rendered")
+            && errors_of (&result) . contains ("- ID: ra"),
+            "{}", result );
+  assert! ( file_path (&f, "main", "ra") . exists ()
+            && ! file_text (&f, "rb") . contains ("edited") );
+  Ok (()) }
+
+#[test]
+fn an_untouched_node_deleted_elsewhere_stays_deleted
+  () -> Result<(), Box<dyn Error>> {
+  // Connection two deletes ra, which also drops it from r's content.
+  // Connection one's view still shows both, unedited: each is left as
+  // the graph has it, so ra is not recreated.
+  let mut f : Fixture = fixture () ?;
+  let mut first : ViewsState = new_connection ();
+  let r_in_first : String = open_view (&mut f, &mut first, "r", "r-first");
+  change_elsewhere (&mut f, "ra", &|view : &str|
+    view . replacen ("(gnid ra)", "(gnid ra) (editRequest delete)", 1));
+  assert! ( ! file_path (&f, "main", "ra") . exists () );
+  let result : String = save (
+    &mut f, &mut first, "r-first",
+    &with_rb_body_edited (&r_in_first), Some (&r_in_first) );
+  assert! ( saved (&result), "{}", result );
+  assert! ( ! file_path (&f, "main", "ra") . exists ()
+            && ! file_text (&f, "r") . contains ("- ra")
+            && file_text (&f, "rb") . contains ("rb's second line, edited") );
+  assert! ( result . contains (
+              &left_as_the_graph_has_it ("ra as first written", "ra") )
+            && result . contains (
+              &left_as_the_graph_has_it ("r, a root", "r") ),
+            "{}", result );
+  Ok (()) }
+
+#[test]
+fn an_untouched_node_moved_elsewhere_is_not_moved_back
+  () -> Result<(), Box<dyn Error>> {
+  // Connection two moves ra from main to other, both owned. Connection
+  // one's view still shows ra's home as main, unedited: no move back.
+  let mut f : Fixture = fixture () ?;
+  let mut first : ViewsState = new_connection ();
+  let r_in_first : String = open_view (&mut f, &mut first, "r", "r-first");
+  change_elsewhere (&mut f, "ra", &|view : &str| {
+    assert! ( view . contains ("(gnid ra) (skgRepos (nodeRepo main))"), "{}", view );
+    view . replacen ( "(gnid ra) (skgRepos (nodeRepo main))",
+                      "(gnid ra) (skgRepos (nodeRepo other))", 1 ) });
+  assert! ( file_path (&f, "other", "ra") . exists ()
+            && ! file_path (&f, "main", "ra") . exists () );
+  let result : String = save (
+    &mut f, &mut first, "r-first",
+    &with_rb_body_edited (&r_in_first), Some (&r_in_first) );
+  assert! ( saved (&result), "{}", result );
+  assert! ( file_path (&f, "other", "ra") . exists ()
+            && ! file_path (&f, "main", "ra") . exists ()
+            && file_text (&f, "rb") . contains ("rb's second line, edited") );
+  assert! ( result . contains (
+              &left_as_the_graph_has_it ("ra as first written", "ra") ),
+            "{}", result );
+  Ok (()) }
+
+/// Rewrite foreign n on disk and reload it, as the repo watcher would.
+fn rewrite_and_reload_n (
+  f : &mut Fixture,
+) -> Result<(), Box<dyn Error>> {
+  let n_path : PathBuf = file_path (f, "theirs", "n");
+  fs::write ( &n_path, "pid: n\ntitle: n as they rewrote it\n" ) ?;
+  let (notice, _unread) = reload_changed_skg_files (
+    &f . env, & BTreeSet::from ([ n_path ]) );
+  assert! ( ! notice . files_reloaded . is_empty (), "{:?}", notice . files_reloaded );
+  Ok (()) }
+
+#[test]
+fn an_untouched_outdated_foreign_node_is_not_forked
+  () -> Result<(), Box<dyn Error>> {
+  let mut f : Fixture = fixture () ?;
+  let mut first : ViewsState = new_connection ();
+  let r_in_first : String = open_view (&mut f, &mut first, "r", "r-first");
+  rewrite_and_reload_n (&mut f) ?;
+  let result : String = save (
+    &mut f, &mut first, "r-first",
+    &with_rb_body_edited (&r_in_first), Some (&r_in_first) );
+  assert! ( saved (&result), "{}", result );
+  assert! ( result . contains (
+              &left_as_the_graph_has_it ("n as they wrote it", "n") ),
+            "{}", result );
+  assert! ( file_text (&f, "rb") . contains ("rb's second line, edited")
+            && fs::read_to_string ( file_path (&f, "theirs", "n") ) ?
+               . contains ("n as they rewrote it") );
+  assert! ( ! texts_of_files_in (&f, "main") . iter ()
+              . chain ( texts_of_files_in (&f, "other") . iter () )
+              . any ( |text| text . contains ("overrides") ),
+            "no clone of n" );
+  Ok (()) }
+
+#[test]
+fn an_edited_outdated_foreign_node_still_refuses_the_save
+  () -> Result<(), Box<dyn Error>> {
+  let mut f : Fixture = fixture () ?;
+  let mut first : ViewsState = new_connection ();
+  let r_in_first : String = open_view (&mut f, &mut first, "r", "r-first");
+  rewrite_and_reload_n (&mut f) ?;
+  let result : String = save (
+    &mut f, &mut first, "r-first",
+    &with_rb_body_edited (&r_in_first)
+      . replace ("n as they wrote it", "n as I would have it"),
+    Some (&r_in_first) );
+  assert! ( errors_of (&result) . contains ("changed after the buffer was rendered")
+            && errors_of (&result) . contains ("- ID: n"),
+            "{}", result );
+  assert! ( ! file_text (&f, "rb") . contains ("edited") );
+  Ok (()) }
+
+#[test]
+fn a_write_protected_occurrence_as_the_baseline_drew_it_saves
+  () -> Result<(), Box<dyn Error>> {
+  // q's view shows ra twice, the repeat write-protected. After ra is
+  // retitled elsewhere, both still show its first title.
+  let mut f : Fixture = fixture () ?;
+  let mut first : ViewsState = new_connection ();
+  let q_in_first : String = open_view (&mut f, &mut first, "q", "q-first");
+  assert! ( q_in_first . matches ("ra as first written") . count () == 2
+            && q_in_first . contains ("writeProtected"),
+            "{}", q_in_first );
+  retitle_ra_elsewhere (&mut f);
+  let result : String = save (
+    &mut f, &mut first, "q-first",
+    &q_in_first . replace ("qb as first written", "qb edited"),
+    Some (&q_in_first) );
+  assert! ( saved (&result), "{}", result );
+  assert! ( file_text (&f, "qb") . contains ("qb edited")
+            && file_text (&f, "ra") . contains ("ra retitled") );
+  assert! ( result . contains (
+              &left_as_the_graph_has_it ("ra as first written", "ra") ),
+            "{}", result );
   Ok (()) }

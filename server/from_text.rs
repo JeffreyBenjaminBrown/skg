@@ -17,7 +17,8 @@ pub mod validate;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::errors::{BufferValidationError, SaveError};
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::save::{NodeInstruction, SavePlan};
+use crate::types::save::{NodeInstruction, SavePlan, SkgrepoMove, UntouchedOutdatedGraphnode};
+use crate::serve::handlers::save_staleness::without_untouched_outdated_saves;
 use crate::types::tree::forest::ViewForest;
 
 use buffer_to_viewnodes::uninterpreted::org_to_viewforest;
@@ -40,7 +41,7 @@ use validate::{
 use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
 use crate::types::nodes::complete::Graphnode;
 use crate::types::viewnode::{ViewnodeKind, Vognode, ViewRequest};
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use crate::types::misc::SkgrepoName;
 use crate::types::save::ForkSpec;
 
@@ -49,7 +50,9 @@ use crate::types::save::ForkSpec;
 /// - raw org parse: errors only visible before tree construction;
 /// - the parsed viewforest, its missing gnids and skgrepos supplied:
 ///   global/local buffer structure, then saved-view role policy;
-/// - disk-supplemented NodeInstructions: foreign write policy;
+/// - disk-supplemented NodeInstructions: untouched outdated graphnodes
+///   left out ('without_untouched_outdated_saves'), then foreign write
+///   policy;
 /// - non-nodeMerge plan plus the merge pairs: cross-plan
 ///   repo-move/nodeMerge and delete/nodeMerge policy.
 ///
@@ -71,21 +74,28 @@ pub fn buffer_to_validated_saveplan_in_graph (
 ) -> Result<(ViewForest, SavePlan, Vec<String>), SaveError> {
   // No user-set clone skgrepos: every fork's skgrepo resolves by
   // inference-else-default. The fork-confirmation re-save uses the
-  // _with_fork_repos entry below.
+  // _with_fork_repos entry below. No baseline: nothing is outdated.
   buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
-    buffer_text, graph, config, skgrepo_restriction, &HashMap::new () )
+    buffer_text, graph, config, skgrepo_restriction, &HashMap::new (),
+    &BTreeMap::new () )
     }
 
 /// As 'buffer_to_validated_saveplan', but with the per-fork clone
 /// skgrepos the user chose in the confirmation buffer ('fork_repos',
 /// keyed by each forked node N's pid). These take priority over the
 /// inferred/default skgrepo when each clone's skgrepo is resolved.
+/// 'baseline_writes' are the saved buffer's baseline's copies of the
+/// graphnodes the graph changed after the buffer was rendered
+/// ('baseline_writes' in 'server/serve/handlers/save_staleness.rs'):
+/// the plan leaves out the ones the buffer did not edit, and the
+/// write-protected check excuses an occurrence that shows one.
 pub fn buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
   buffer_text        : &str,
   graph              : &crate::dbs::in_rust_graph::InRustGraph,
   config             : &SkgConfig,
   skgrepo_restriction : &SkgrepoRestriction,
   fork_skgrepos      : &HashMap<ID, SkgrepoName>,
+  baseline_writes    : &BTreeMap<ID, Graphnode>,
 ) -> Result<(ViewForest, SavePlan, Vec<String>), SaveError> {
   let ( viewforest, parsing_errors, parsing_warnings, supplied )
     : ( ViewForest, Vec<BufferValidationError>, Vec<String>,
@@ -114,7 +124,7 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
         warnings : parsing_warnings, } ); }}
   { let errors : Vec<BufferValidationError> =
       write_protected_edits::errors_for_writeProtected_occurrences (
-        &viewforest, graph, skgrepo_restriction );
+        &viewforest, graph, skgrepo_restriction, baseline_writes );
     if ! errors . is_empty () {
       return Err ( SaveError::BufferValidationErrors {
         errors,
@@ -125,6 +135,17 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
       ::extract_nonmergeSavePlan_locally_in_graph (
         &viewforest, graph, config, skgrepo_restriction )
  . map_err (SaveError::DatabaseError) ?;
+  let ( nonmerge_plan, untouched_outdated_graphnodes )
+    : ( NonmergeSavePlan, Vec<UntouchedOutdatedGraphnode> ) =
+  { // Before any validator judges them: an untouched outdated graphnode
+    // is neither forked, nor moved back, nor stale.
+    let (node_instructions, skgrepo_moves, untouched)
+      : (Vec<NodeInstruction>, Vec<SkgrepoMove>, Vec<UntouchedOutdatedGraphnode>) =
+      without_untouched_outdated_saves (
+        graph, baseline_writes,
+        nonmerge_plan . node_instructions, nonmerge_plan . skgrepo_moves );
+    ( NonmergeSavePlan { node_instructions, skgrepo_moves, .. nonmerge_plan },
+      untouched ) };
   { // A flag preference is never an implicit-fork gesture.
     // Validate while its side-channel identity is still available; the
     // ordinary foreign-write filter below sees only supplemented SaveNodes.
@@ -274,7 +295,8 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
           skgrepo_moves : nonmerge_plan . skgrepo_moves,
           fork_specs,
           post_skgsave_commit_notice_candidates :
-            nonmerge_plan . post_skgsave_commit_notice_candidates },
+            nonmerge_plan . post_skgsave_commit_notice_candidates,
+          untouched_outdated_graphnodes },
         warnings )) }
 
 /// Transitional compatibility for callers not yet carrying a generation.
@@ -302,7 +324,8 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos (
     . map_err (|e| SaveError::DatabaseError (Box::new (e)))?;
   let graph = crate::dbs::in_rust_graph::InRustGraph::from_graphnodes (&nodes);
   buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
-    buffer_text, &graph, config, skgrepo_restriction, fork_skgrepos ) }
+    buffer_text, &graph, config, skgrepo_restriction, fork_skgrepos,
+    &BTreeMap::new () ) }
 
 /// One nonfatal warning per dangling link this save writes: a
 /// '[[id:X][label]]' in a saved title or body where X is neither in

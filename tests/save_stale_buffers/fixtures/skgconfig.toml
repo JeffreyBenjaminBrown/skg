@@ -10,3 +10,7 @@ path = "main"
 name = "theirs"
 path = "theirs"
 foreign = true
+
+[[repos]]
+name = "other"
+path = "other"

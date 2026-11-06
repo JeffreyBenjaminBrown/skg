@@ -696,3 +696,97 @@ ec36a08a ('_burying/skg-stable') for the run; his client stays
 on the live tree, which plan 4 does not touch.
 ** Orchestrator's launches
 Slice 1 launched 00:40 UTC.
+** Slice 1
+*** Commits
+- The commit carrying this entry: a save leaves out an untouched
+  outdated graphnode instead of refusing it (code, tests, fixtures,
+  docs, and the slice's headline turned DONE).
+*** Suites
+- 'cargo nextest run --test grouped_saves -E
+  'test(save_stale_buffers::)'': 24 of 24 pass (8 new). With the
+  new filter disabled, 5 of the new ones fail (the four that must
+  save, and the write-protected one); with the write-protected
+  excuse disabled, the write-protected one fails with "title ...
+  differs from the graph's". The other 3 new ones are refusals that
+  held before too, kept as guards.
+- 'cargo nextest run --lib -E 'test(write_protected_edits::)'': 11
+  of 11 pass (1 new).
+- 'cargo nextest run --test grouped_saves': 188 of 188 pass.
+- 'bash/nextest.sh': 1137 of 1137 pass, no compiler warnings.
+- The integration suite was not run: the slice changes no text a
+  client test matches (grepped under 'tests/', 'elisp/', 'nvim/' for
+  the new warning and every changed message), as the brief allows.
+  'import-md-and-org' is pre-existing and was not run.
+- No failure occurred, so none needed classifying.
+*** Deviations from the plan's how
+**** The untouched Saves are left out by the plan builder
+The plan removes them in the handler right after the stale check.
+By then the plan builder's validators have judged them: the
+foreign policy has made an untouched foreign N a fork spec and run
+the fork validators (monogamy, restriction) on it, and
+'refuse_records_landing_restricted' and
+'validate_no_simultaneous_move_and_nodeMerge' have judged its
+records and its move back. And a fork spec's clone cannot be
+compared with the baseline's copy as it stands (a new pid, floored
+relRepos, the added subscribesTo and overrides, hides from the
+children the edit dropped), so judging it would need a subset of
+fields or the buffer's copy kept in the 'ForkSpec'. So
+'without_untouched_outdated_saves' ('save_staleness.rs') runs in
+'buffer_to_validated_saveplan_with_fork_skgrepos_in_graph' right
+after extraction, where the Saves are exactly the plan's "buffer's
+copy" (supplemented, noop-filtered), before the foreign policy. It
+removes each untouched outdated Save and the 'SkgrepoMove' of its
+pid; one comparison serves owned and foreign graphnodes, no fork is
+ever made, and nothing later (validators, stale check, delete
+propagation, strandeds, Hoist, forks) sees them. 'from_text.rs' thus
+imports from 'serve::handlers::save_staleness', as 'from_text'
+already imports 'serve::parse_metadata_sexp'.
+**** The untouched graphnodes travel in the 'SavePlan'
+Not in a richer result of 'stale_write_errors', which still returns
+only errors and now takes the precomputed map instead of the
+baseline text. The new field 'SavePlan::untouched_outdated_graphnodes'
+(type 'UntouchedOutdatedGraphnode', 'server/types/save.rs') travels
+as 'post_skgsave_commit_notice_candidates' does; the handler makes
+the warnings beside the strandeds warnings once the save succeeds,
+so a refused or confirmation-pending save does not claim to have
+left anything out.
+**** An unreadable baseline is refused before the plan is built
+The handler computes the map first ('baseline_writes', now public
+and returning the refusal itself). A buffer whose baseline is
+unreadable and whose text is also invalid now gets the baseline
+error alone, where it got the validation errors before.
+**** The warning's TITLE is the buffer's
+The title the buffer shows (equal to the baseline's), since the
+graph may no longer have the graphnode (one deleted elsewhere).
+'docs/api-and-formats.org' says so.
+**** The write-protected excuse covers title and home only
+As the plan words it. Two limits remain, neither a regression: an
+alias folder under a write-protected occurrence is still judged
+against the graph alone, so aliases changed elsewhere still refuse
+such a buffer; and the excuse needs the baseline's copy, which
+exists only when the baseline holds an editable occurrence of the
+graphnode, so a buffer showing it only write-protected (a search
+view, a write-protected subtree) is still refused after a retitle
+elsewhere.
+*** Fixtures changed
+- 'tests/save_stale_buffers/fixtures/': a second owned skgrepo,
+  'other', for the move test ('skgconfig.toml'; 'fixture ()' creates
+  its folder, which git cannot hold empty); r (contains ra, rb and
+  the foreign n), ra, rb, and q (contains ra and qb) with qb
+  (contains ra), so q's view shows ra twice, the repeat
+  write-protected. No existing node changed, so no existing test
+  needed adapting.
+- The existing foreign-fork test now calls the new helper
+  'rewrite_and_reload_n', which holds its former inline steps.
+*** Observations
+- "Untouched" now has a glossary sense; the glossary still uses the
+  word in its ordinary sense elsewhere ("N is left untouched on
+  disk", under forks). No conflict in context; reported as
+  'names.org' asks.
+- '4_plan.org' carried uncommitted edits that are not mine when I
+  committed: slice 4's headline and its "Claude says" child turned
+  DONE. I left those hunks unstaged.
+*** Unfinished
+Nothing.
+*** Headline
+DONE.

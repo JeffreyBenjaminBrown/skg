@@ -16,17 +16,22 @@ also refused conservatively. There is no "save anyway" choice.
 
 Each view also keeps the text the server last drew for it, its
 baseline, and sends it with every save. A save is refused, before any
-write, if a node it would write has changed since the server drew the
-view: by a save from another client or from 'tools/skg-for-ai', which
-this client's views do not follow, or by another writer of the '.skg'
-files (a second server over the same data, a 'git pull', an editor),
-which the server reloads as the files change. The server compares the
-view's copy of each node it would write with the graph, so only real
-changes count: a node the view shows as the graph has it is not
-written, so an untouched node never refuses a save, however old the
-view; and a restart, a rebuild or a whitespace strip makes no view
-stale by itself. A node the view writes without having been drawn in
-it (pasted in by ID, or typed into a new empty view) is not checked.
+write, if a node you edited or deleted in the view has changed since
+the server drew the view: by a save from another client or from
+'tools/skg-for-ai', which this client's views do not follow, or by
+another writer of the '.skg' files (a second server over the same
+data, a 'git pull', an editor), which the server reloads as the files
+change. The server compares the view's copy of each node with the
+graph, so only real changes count: a node the view shows as the graph
+has it is not written, however old the view; and a restart, a rebuild
+or a whitespace strip makes no view stale by itself. A node that
+changed but that you did not edit, which the view still shows as the
+server drew it, refuses nothing: the save leaves it as the graph has
+it, writes the rest, and warns "Left as the graph has it: TITLE (ID),
+which changed after this buffer was rendered and which this buffer did
+not edit."; the redrawn view shows the graph's version. A node the
+view writes without having been drawn in it (pasted in by ID, or typed
+into a new empty view) is not checked.
 The error names each such node, the view's headlines for it, and what
 changed in it since the view was drawn: the title (old and new), the
 body (with its changed lines, then against now), the content (the IDs
@@ -35,8 +40,9 @@ aliases, extra IDs, flags, subscriptions, hides or overrides; or that
 the node was deleted. Your edits stay in the view: archive them if
 needed (M-x skg-show-unsaved-changes), open a fresh view, and reapply them.
 
-The refusal is whole: nothing the buffer asks is written, not even
-its edits of nodes nobody else changed. Recovering is a reconciliation
+Only a changed node you edited or deleted refuses a save, and the
+refusal is whole: nothing the buffer asks is written, not even its
+edits of nodes nobody else changed. Recovering is a reconciliation
 by hand of two diffs from one common base, the text the server last drew:
 the recovery document holds your edits as a diff against that text,
 and the error holds the graph's change against the same text. To
@@ -62,7 +68,7 @@ show, as C-c r u would extend it. When something
 could not be reloaded (a file it could not read, say), the whole
 notice goes instead to the server-warnings buffer
 (=*SKG Server Warnings*=), under "Repo changes", which is shown. A view with unsaved edits keeps them, and its save
-is refused if it would write a changed node. No rebuild is needed after
+is refused if you edited a changed node in it. No rebuild is needed after
 a 'git pull'. A changed config still needs one ('M-x skg-rebuild-session-lifetime-stores').
 
 If the current files for anything being saved select a title or body

@@ -272,7 +272,7 @@ investigate it.
   'docs/data-model_technical.org' ("Runtime generations and
   rebuilding", slice 4).
 * Implementation sequence
-** TODO Slice 1: an untouched outdated graphnode is left out
+** DONE Slice 1: an untouched outdated graphnode is left out
 Implement "An untouched outdated graphnode will be left out of
 the save" as the pitfalls say.
 

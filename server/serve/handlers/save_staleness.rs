@@ -13,10 +13,23 @@
 //! is stale, and the whole save is refused, before anything is asked
 //! or written, with one error per stale graphnode saying what changed.
 //!
+//! A graphnode among the baseline's writes is outdated. The buffer
+//! may still show it exactly as the baseline does: the user did not
+//! edit it, and the buffer's copy of it differs from the graph only
+//! because the graph changed. Such an untouched outdated graphnode is
+//! left out of the save before any validator judges its write
+//! ('without_untouched_outdated_saves', called by the plan builder),
+//! with its home skgrepo move, and so is never forked, moved back or
+//! stale; the save warns of it, and the redraw shows it as the graph
+//! has it. The baseline's writes are computed once, before the plan is
+//! built, since the plan builder needs them for this and for the
+//! write-protected check ('errors_for_writeProtected_occurrences').
+//!
 //! What the buffer writes is the nodeInstructions its text yields once
-//! the noop filter has dropped the ones identical to the graph, plus
-//! the originals of its fork clones. So a graphnode the buffer shows
-//! unchanged is never stale. A nodeMerge is built from the graph at
+//! the noop filter has dropped the ones identical to the graph and the
+//! untouched outdated ones have been left out, plus the originals of
+//! its fork clones. So a graphnode the buffer shows unchanged, or as
+//! the baseline has it, is never stale. A nodeMerge is built from the graph at
 //! save time, and the writes a save derives from the current graph
 //! (delete propagation, strandeds resets, Hoist repairs, restore
 //! requests) undo nothing, so none of those is checked. A strip of
@@ -44,32 +57,25 @@ use crate::types::list::{Diff_Item, interleaved_diff_without_reorders};
 use crate::types::misc::{ID, MSV, RelPartner, SkgConfig};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::nodes::rust::GraphnodeInRust;
-use crate::types::save::{DeleteNode, ForkSpec, NodeInstruction, SaveNode};
+use crate::types::save::{
+  DeleteNode, ForkSpec, NodeInstruction, SaveNode, SkgrepoMove,
+  UntouchedOutdatedGraphnode};
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{ViewnodeKind, Vognode};
 use crate::serve::handlers::strip_body_whitespace::strip_trailing_whitespace_from_body;
 
 use std::collections::{BTreeMap, BTreeSet};
 
-/// One error per graphnode the buffer would write or delete whose
-/// copy in 'baseline' no longer matches the graph, naming the buffer's
-/// occurrences of it and what changed. A baseline that cannot be
-/// parsed or extracted yields one error saying so.
+/// One error per graphnode the buffer would write or delete that is
+/// among the baseline's writes ('baseline_writes'), naming the
+/// buffer's occurrences of it and what changed.
 pub fn stale_write_errors (
-  graph               : &InRustGraph,
-  config              : &SkgConfig,
-  skgrepo_restriction : &SkgrepoRestriction,
-  baseline            : &str,
-  viewforest          : &ViewForest,
-  nodeInstructions    : &[NodeInstruction],
-  fork_specs          : &[ForkSpec],
+  graph            : &InRustGraph,
+  baseline_writes  : &BTreeMap<ID, Graphnode>,
+  viewforest       : &ViewForest,
+  nodeInstructions : &[NodeInstruction],
+  fork_specs       : &[ForkSpec],
 ) -> Vec<BufferValidationError> {
-  let baseline_writes : BTreeMap<ID, Graphnode> =
-    match baseline_writes (graph, config, skgrepo_restriction, baseline) {
-      Ok (writes) => writes,
-      Err (message) => return vec! [ BufferValidationError::Other ( format! (
-        "The saved buffer's baseline, the text the server last drew for it, could not be read: {}. Nothing was saved. Archive your edits (M-x skg-show-unsaved-changes in Emacs, :SkgShowUnsavedChanges in Neovim), reopen a fresh view, and reapply them there.",
-        message )) ], };
   if baseline_writes . is_empty () { return Vec::new (); }
   buffer_written_pids (graph, nodeInstructions, fork_specs)
     . into_iter ()
@@ -82,11 +88,25 @@ pub fn stale_write_errors (
     . collect () }
 
 /// The baseline's writes, by pid: the graphnodes saving the baseline
-/// itself would write, each as the baseline has it once supplemented.
-/// The baseline is parsed and extracted as the saved text is
+/// itself would write, each as the baseline has it once supplemented,
+/// and as a view reads it back ('as_a_view_reads_it_back'). The
+/// baseline is parsed and extracted as the saved text is
 /// ('buffer_to_validated_saveplan_with_fork_skgrepos_in_graph'), minus
-/// the validators, which judge edits, and a baseline has none.
-fn baseline_writes (
+/// the validators, which judge edits, and a baseline has none. A
+/// baseline that cannot be parsed or extracted yields one error saying
+/// so, which refuses the save.
+pub fn baseline_writes (
+  graph               : &InRustGraph,
+  config              : &SkgConfig,
+  skgrepo_restriction : &SkgrepoRestriction,
+  baseline            : &str,
+) -> Result<BTreeMap<ID, Graphnode>, BufferValidationError> {
+  baseline_writes_else_why_not (graph, config, skgrepo_restriction, baseline)
+    . map_err ( |message| BufferValidationError::Other ( format! (
+      "The saved buffer's baseline, the text the server last drew for it, could not be read: {}. Nothing was saved. Archive your edits (M-x skg-show-unsaved-changes in Emacs, :SkgShowUnsavedChanges in Neovim), reopen a fresh view, and reapply them there.",
+      message )) ) }
+
+fn baseline_writes_else_why_not (
   graph               : &InRustGraph,
   config              : &SkgConfig,
   skgrepo_restriction : &SkgrepoRestriction,
@@ -106,7 +126,7 @@ fn baseline_writes (
        . filter_map ( |nodeInstruction| match nodeInstruction {
          NodeInstruction::Save (SaveNode (node)) =>
            Some (( graph . pid_else_raw_id (&node . pid),
-                   with_relationships_by_distinct_pid (graph, node) )),
+                   as_a_view_reads_it_back (graph, node) )),
          NodeInstruction::Delete (_) => None, } )
        . filter ( |(pid, node)| match graphnode_as_read_back_from_a_view (graph, pid) {
          // The noop filter compares with the graph as stored. What a
@@ -119,20 +139,74 @@ fn baseline_writes (
          None => true, } )
        . collect () ) }
 
+/// The buffer's Saves of untouched outdated graphnodes removed, with
+/// their home skgrepo moves, and each such graphnode named. A
+/// graphnode is outdated when it is among 'baseline_writes', and
+/// untouched when the buffer's copy of it (its Save here, supplemented
+/// and noop-filtered) equals the baseline's copy, compared as a view
+/// reads a graphnode back. Writing it would only undo what changed in
+/// the graph; left out, it stays as the graph has it. A Delete is an
+/// edit, and is kept.
+pub fn without_untouched_outdated_saves (
+  graph            : &InRustGraph,
+  baseline_writes  : &BTreeMap<ID, Graphnode>,
+  nodeInstructions : Vec<NodeInstruction>,
+  skgrepo_moves    : Vec<SkgrepoMove>,
+) -> ( Vec<NodeInstruction>, Vec<SkgrepoMove>, Vec<UntouchedOutdatedGraphnode> ) {
+  if baseline_writes . is_empty () {
+    return (nodeInstructions, skgrepo_moves, Vec::new ()); }
+  let mut kept      : Vec<NodeInstruction> = Vec::new ();
+  let mut untouched : Vec<UntouchedOutdatedGraphnode> = Vec::new ();
+  for nodeInstruction in nodeInstructions {
+    let NodeInstruction::Save (SaveNode (node)) = &nodeInstruction
+      else { kept . push (nodeInstruction); continue; };
+    let pid : ID = graph . pid_else_raw_id (&node . pid);
+    let is_untouched : bool =
+      baseline_writes . get (&pid) . is_some_and ( |baseline_copy|
+        ! buffernode_differs_from_disknode (
+          &as_a_view_reads_it_back (graph, node . clone ()), baseline_copy ));
+    if is_untouched {
+      untouched . push ( UntouchedOutdatedGraphnode {
+        pid, title : node . title . clone () } );
+    } else { kept . push (nodeInstruction); }}
+  let skgrepo_moves : Vec<SkgrepoMove> = skgrepo_moves . into_iter ()
+    . filter ( |skgrepo_move| ! untouched . iter () . any ( |node|
+      node . pid == graph . pid_else_raw_id (&skgrepo_move . pid) ))
+    . collect ();
+  (kept, skgrepo_moves, untouched) }
+
+/// The save's warning that it left 'node' as the graph has it.
+pub fn left_as_the_graph_has_it_warning (
+  node : &UntouchedOutdatedGraphnode,
+) -> String {
+  format! ( "Left as the graph has it: {} ({}), which changed after this buffer was rendered and which this buffer did not edit.",
+            node . title, node . pid . 0 ) }
+
 /// The graph's graphnode 'pid' as a view drawn from it would read it
-/// back: its body without the trailing whitespace the parser trims (as
-/// 'strip_trailing_whitespace_from_body' strips it on disk), and its
-/// relationship lists by distinct pid ('with_relationships_by_distinct_pid').
+/// back ('as_a_view_reads_it_back').
 fn graphnode_as_read_back_from_a_view (
   graph : &InRustGraph,
   pid   : &ID,
 ) -> Option<Graphnode> {
   graphnode_from_graph (graph, pid)
-    . map ( |node| with_relationships_by_distinct_pid ( graph, Graphnode {
-      body : node . body . as_deref ()
-             . map (strip_trailing_whitespace_from_body)
-             . filter ( |body| ! body . is_empty () ),
-      .. node } )) }
+    . map ( |node| as_a_view_reads_it_back (graph, node) ) }
+
+/// 'node' as a view drawn from it would read it back: its body without
+/// the trailing whitespace the parser trims (as
+/// 'strip_trailing_whitespace_from_body' strips it on disk), and its
+/// relationship lists by distinct pid ('with_relationships_by_distinct_pid').
+/// Every comparison of copies here, the baseline's with the graph's
+/// and the buffer's with the baseline's, compares two graphnodes so
+/// read back.
+fn as_a_view_reads_it_back (
+  graph : &InRustGraph,
+  node  : Graphnode,
+) -> Graphnode {
+  with_relationships_by_distinct_pid ( graph, Graphnode {
+    body : node . body . as_deref ()
+           . map (strip_trailing_whitespace_from_body)
+           . filter ( |body| ! body . is_empty () ),
+    .. node } ) }
 
 /// 'node' with each member of its relationship lists ('contains',
 /// 'subscribesTo', 'hidesFromSubs', 'overrides') replaced by its pid,
