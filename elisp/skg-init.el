@@ -21,14 +21,19 @@
    'load-path
    (expand-file-name "elisp/skg-sexpr-edit" project-root)) )
 
-(require 'skg-log)
-(require 'skg-buffer)
-(require 'skg-client)
-(require 'skg-id-search)
-(require 'skg-request-text-search)
-(require 'skg-request-views)
-(require 'skg-sexpr-edit)
-(require 'skg-sexpr-search)
-(require 'skg-view-ancestry)
-(require 'skg-readable-ids)
-(require 'skg-file-minor-mode)
+(let ;; bash/compile-elisp.sh writes a .elc beside each .el, and agents
+    ;; edit .el files daily; so a .el newer than its .elc loads as
+    ;; source, and a stale .elc never shadows it. A 'let', not a
+    ;; 'setq', so the user's own value holds everywhere else.
+    ((load-prefer-newer t))
+  (require 'skg-log)
+  (require 'skg-buffer)
+  (require 'skg-client)
+  (require 'skg-id-search)
+  (require 'skg-request-text-search)
+  (require 'skg-request-views)
+  (require 'skg-sexpr-edit)
+  (require 'skg-sexpr-search)
+  (require 'skg-view-ancestry)
+  (require 'skg-readable-ids)
+  (require 'skg-file-minor-mode) )

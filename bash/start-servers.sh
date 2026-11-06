@@ -11,6 +11,9 @@
 #   The first release build takes minutes, sitting at "Validating config".
 #   Any other argument prints a usage line and exits with status 2.
 # - WHAT RUNS
+#   First bash/compile-elisp.sh byte-compiles the Emacs client (elisp/),
+#   unless emacs is not on the path; a failure there is shown in red,
+#   and the server starts anyway.
 #   bash/run-skg-rerunning-on-exit.sh runs the server, and runs it again
 #   whenever it exits, so killing the server (by its PID, or with the
 #   'shutdown' request) restarts it, rereading the config.
@@ -85,6 +88,27 @@ preflight_check_config() {
     printf '\033[1;33m%s\033[0m\n' "$config_err"   # bold yellow
   fi
   echo "Config OK."
+}
+
+compile_emacs_client() {
+  # Byte-compile elisp/ beside its sources (bash/compile-elisp.sh). A
+  # failure does not withhold the server: skg-init.el loads any .el
+  # newer than its .elc as source, so a stale .elc is never loaded.
+  echo ""
+  echo "Compiling the Emacs client: bash/compile-elisp.sh"
+  if ! command -v emacs >/dev/null 2>&1; then
+    printf '\033[1;33m%s\033[0m\n' \
+      "WARNING: emacs is not on the path; the Emacs client was not compiled."
+    return 0
+  fi
+  local compile_output
+  if compile_output="$( bash/compile-elisp.sh 2>&1 )"; then
+    echo "$compile_output" | tail -2
+  else
+    printf '\033[1;31m%s\033[0m\n' "$compile_output"   # bold red
+    printf '\033[1;31m%s\033[0m\n' \
+      "ERROR: the Emacs client failed to compile (above). Starting the server anyway."
+  fi
 }
 
 skg_api_port() {
@@ -214,6 +238,9 @@ echo "Created bash/stop-servers.sh - run it to stop all servers"
 # Abort with a red error if the config is invalid, so a typo cannot
 # silently crash-loop skg later.
 preflight_check_config
+
+# Byte-compile the Emacs client; warns, but never stops the start.
+compile_emacs_client
 
 # Start skg server with auto-restart
 start_skg_with_restart

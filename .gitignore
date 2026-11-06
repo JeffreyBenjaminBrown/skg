@@ -1,4 +1,6 @@
 *.log
+# bash/compile-elisp.sh writes these beside each elisp/ source
+*.elc
 *~
 /**/.index.tantivy
 /.bash_history
