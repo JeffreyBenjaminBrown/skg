@@ -47,7 +47,12 @@ must be at least the container's version (31.1) for those =.elc=
 files to load. A =.el= file newer than its =.elc= (one edited since
 the last compile) is loaded as source, so a stale =.elc= does no
 harm. If =emacs= is not on the path, or the compile fails, the
-script says so and starts the server anyway.
+script says so and starts the server anyway. An Emacs built with
+native compilation does not native-compile Skg's files, because
+=skg-init.el= denies it, so that all building stays in the
+container; an =.eln= entry for them made before this change may be
+deleted by hand from the eln-cache (typically
+=~/.emacs.d/eln-cache/=).
 *** optional : import data from org-roam
 See [[file:COMMANDS.org::#import-org-roam][importing from Org-roam]] for arguments,
 supported input, and setup steps. Use a fresh staging directory:

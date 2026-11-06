@@ -21,6 +21,20 @@
    'load-path
    (expand-file-name "elisp/skg-sexpr-edit" project-root)) )
 
+(when (featurep 'native-compile)
+  ;; Jeff keeps all compilation inside Docker (bash/compile-elisp.sh
+  ;; writes the .elc). Without this, an Emacs built with native compilation
+  ;; would compile every loaded .elc to .eln on the host in the background,
+  ;; printing cross-file "not known to be defined" warnings each time.
+  (or (require 'comp-run nil t) ;; Emacs 30+ defines the deny list here,
+      (require 'comp nil t))    ;; Emacs 29 here.
+  (when (boundp 'native-comp-jit-compilation-deny-list)
+    (add-to-list
+     'native-comp-jit-compilation-deny-list
+     (concat "\\`" (regexp-quote
+                     (file-name-directory
+                      (or load-file-name buffer-file-name)) )) )) )
+
 (let ;; bash/compile-elisp.sh writes a .elc beside each .el, and agents
     ;; edit .el files daily; so a .el newer than its .elc loads as
     ;; source, and a stale .elc never shadows it. A 'let', not a
