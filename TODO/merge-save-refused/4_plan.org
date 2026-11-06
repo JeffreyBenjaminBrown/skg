@@ -311,7 +311,7 @@ recovery steps in 'docs/COMMANDS.org' and
 'docs/COMMANDS-nvim.org' say that only edited outdated graphnodes
 refuse a save; the glossary gains 'untouched' and 'outdated' and
 narrows 'stale'.
-** TODO Slice 2: the dirty-view check ignores links
+** DONE Slice 2: the dirty-view check ignores links
 Implement "The dirty-view check will not match through links" as
 the pitfall "The neighborhood has one definition and two readers"
 says.

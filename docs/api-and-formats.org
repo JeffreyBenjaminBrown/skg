@@ -400,8 +400,11 @@ So far there are these endpoints:
     node, must equal the node's flags.
   - Before mutation, the server computes the update-relevant neighborhood of
     every prepared write/delete identity independently in the before and
-    candidate graphs. Other registered views containing an affected unrestricted ID
-    are rerendered. For every dirty client view, the server parses and unions
+    candidate graphs, twice: over every ordinary relation, and over them
+    without links ('SaveAffectedIds' in
+    'server/serve/handlers/save_dependencies/mod.rs'). Other registered views
+    containing an unrestricted ID of the full neighborhood are rerendered. For
+    every dirty client view, the server parses and unions
     dependencies from its clean baseline, current text, and registered viewforest
     when present. A dependency is a graphnode the view holds a viewnode of: an
     occurrence, the overrides an occurrence shows, a gnid-only viewnode, a
@@ -409,7 +412,13 @@ So far there are these endpoints:
     target are not dependencies merely by being named there: the request or
     the link holds no copy of the target, so a save that changes the target
     clobbers nothing the view holds.
-    Any intersection refuses the save conservatively; malformed
+    Any intersection with the neighborhood without links refuses the save
+    conservatively. The dirty-view match ignores links in both directions: a
+    dirty view of L, where L links to a saved A, does not conflict, nor does a
+    dirty view showing A conflict with a save that only adds a link to A. The
+    collateral redraw does not ignore them; a dirty view is never redrawn, so
+    what a link changes in it (A's mentionerFolder, say) is refreshed at its
+    next redraw. Malformed
     or missing dirty dependency data also refuses. A refusal returns
     =save-result= with nil content and actionable errors naming view IDs and
     IDs, and performs no filesystem, graph, search index, registry, or collateral

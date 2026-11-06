@@ -4,6 +4,7 @@ use skg::dbs::in_rust_graph::relation_accessors::{
   GnidPresence,
   NodeRelation,
   RelationRole,
+  UPDATE_RELEVANT_ORDINARY_RELATIONS,
 };
 use skg::types::misc::{ID, MSV, RelPartner, RelationshipMemberKey, SkgConfig, SkgrepoName, rel_partners_at_relRepo};
 use skg::types::nodes::complete::{Graphnode, empty_graphnode};
@@ -208,6 +209,33 @@ fn update_relevant_neighborhood_includes_each_ordinary_relation_both_ways () {
       "seed", "contained", "container", "subscribee", "subscriber",
       "hidden", "hider", "link-dest", "link-source", "dangling-link",
     ]));
+}
+
+/// The neighborhood over the ordinary relations but links, as the
+/// dirty-view check reads it: no link partner in either direction, but
+/// every other ordinary partner and the override walks.
+#[test]
+fn update_relevant_neighborhood_over_relations_but_links_omits_link_partners () {
+  let graph : InRustGraph = InRustGraph::from_graphnodes (&[
+    node_with_all_relations (
+      "seed", &["contained"], &[], &[], &["overridden"], &["link-dest"]),
+    node_with_all_relations ("contained", &[], &[], &[], &[], &[]),
+    node_with_all_relations ("overridden", &[], &[], &[], &[], &[]),
+    node_with_all_relations ("link-dest", &[], &[], &[], &[], &[]),
+    node_with_all_relations ("link-source", &[], &[], &[], &[], &["seed"]),
+  ]);
+  let ordinary_relations_but_links : Vec<NodeRelation> =
+    UPDATE_RELEVANT_ORDINARY_RELATIONS . iter () . copied ()
+    . filter (|relation| *relation != NodeRelation::LinksTo)
+    . collect ();
+  assert_eq! (
+    graph . update_relevant_neighborhood_over (
+      [ID::from ("seed")], &ordinary_relations_but_links),
+    gnid_set (&["seed", "contained", "overridden"]));
+  assert_eq! (
+    graph . update_relevant_neighborhood ([ID::from ("seed")]),
+    gnid_set (&[
+      "seed", "contained", "overridden", "link-dest", "link-source"]));
 }
 
 #[test]

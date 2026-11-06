@@ -801,3 +801,90 @@ The baseline's copies are computed once, before the plan builder,
 as the pitfall asked. No correction needed. Jeff is editing
 '4_plan.org' (he removed my two notes after reading them); agents
 stage only their own DONE line of it. Slice 2 launched 00:54.
+** Slice 2
+*** Commits
+- The commit carrying this entry: the dirty-view check matches a
+  save's neighborhood without links, the collateral redraw keeps
+  the full one (code, tests, fixtures, the dirty-view paragraph of
+  'docs/api-and-formats.org', and the slice's headline turned DONE).
+*** Suites
+- 'cargo nextest run --test grouped_saves -E
+  'test(save_dirty_conflicts::)'': 8 of 8 pass (3 new). With the
+  dirty-view check switched back to the full matcher, the two new
+  "does not refuse" tests fail; the container test held before too
+  and is kept as a guard.
+- 'cargo nextest run --test grouped_overrides -E
+  'test(collateral_)'': 9 of 9 pass (1 new). With the collateral
+  redraw switched to the matcher without links, the new test fails.
+- 'cargo nextest run --test grouped_unit -E
+  'test(update_relevant_neighborhood)'': 5 of 5 pass (1 new).
+- 'cargo nextest run --test grouped_saves': 191 of 191 pass.
+- 'cargo nextest run --test grouped_overrides': 27 of 27 pass.
+- 'bash/nextest.sh': 1142 of 1142 pass; 'cargo check
+  --all-targets' gives no warnings.
+- One failure on the way, classified as an expected fixture
+  adaptation:
+  'conflicting_dirty_view_refuses_before_mutation_and_disjoint_view_succeeds'
+  asserted that a dirty view of X conflicts with a save of A, whose
+  title links to X: the very match the slice removes. Its refusing
+  half now uses a dirty view showing A ('client-only-a'), which
+  keeps what the test is for (refusal before any mutation or
+  message); its second half, the clean view of X redrawn through
+  A's link, is unchanged and passes, a second witness that the
+  collateral redraw keeps links.
+- The integration suite was not run, as the brief allows (no buffer
+  text or protocol changes). 'import-md-and-org' is pre-existing
+  and was not run.
+*** Deviations from the plan's how
+**** The relation list is a constant; the list without links is filtered from it
+'UPDATE_RELEVANT_ORDINARY_RELATIONS' ('relation_accessors.rs')
+names the four ordinary relations once. The walk is
+'update_relevant_neighborhood_over (seeds, ordinary_relations)';
+'update_relevant_neighborhood' keeps its signature and passes the
+constant. 'SaveAffectedIds::from_prepared' derives the list without
+links by filtering 'LinksTo' out of the constant, so no relation is
+listed twice.
+**** The two pairs of sets are one type
+Rather than four loose fields, 'SaveAffectedIds' holds
+'raw_touched' and two 'NeighborhoodBeforeAndAfter' values,
+'neighborhood' and 'neighborhood_without_links'; that type owns the
+one computation of a pair ('of_touched') and the one matching rule
+('matching_identity'). 'SaveAffectedIds::matching_identity' (the
+collateral redraw's) and 'matching_identity_ignoring_links' (the
+dirty-view check's) each delegate to it, so neither the walk nor the
+matcher is copied.
+**** The plan's two tests on a shown graphnode use a view of its root alone
+A view of T draws T's container P in a containerFolder, so a dirty
+view with that text depends on P itself, and appending a line to it
+gives P a body. The two tests whose dirty view shows T therefore
+use the view's root headline alone ('root_headline_of_view'), so
+that the container test passes only through the contains hop of
+the neighborhood (the refusal names "showing-t [T]", not P).
+**** "A dirty view showing A still refuses a save that edits A"
+Already covered by the existing
+'a_dirty_view_showing_a_graphnode_refuses_a_save_of_it'; no copy
+added.
+**** A unit test of the parameterized walk
+Added beside the neighborhood's unit tests
+('tests/dbs/in_rust_graph/relation_accessors.rs'): over the
+relations but links, neither link partner appears and the contents
+and override walk do.
+*** Fixtures changed
+- New 'tests/save_dirty_conflicts/fixtures-links/': T, L (body links
+  to T), P (contains T), Y. A separate folder, so the existing tests'
+  graph (A, B, C, X) is unchanged.
+- New 'tests/collateral_new_link/fixtures/': A, M (body links to A),
+  X, for 'tests/collateral_new_link.rs' (joined to
+  'grouped_overrides' through its module file). M is there because
+  an empty mentionerFolder is pruned; the test checks that A's
+  redrawn folder holds M and X.
+*** Observations
+- The glossary's "update-relevant neighborhood" entry still lists
+  =linksTo= and does not say the dirty-view check reads it without
+  links. It stays true as a definition; I left it, since
+  'docs/glossary.org' carries Jeff's edits in progress and the plan
+  names only 'docs/api-and-formats.org' for this slice.
+*** Unfinished
+Nothing.
+*** Headline
+DONE.

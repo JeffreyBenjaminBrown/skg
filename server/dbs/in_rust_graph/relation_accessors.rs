@@ -36,6 +36,16 @@ pub enum NodeRelation {
   Overrides,
 }
 
+/// The ordinary relations of the update-relevant neighborhood
+/// ('InRustGraph::update_relevant_neighborhood'): each contributes one
+/// hop in either direction from a seed.
+pub const UPDATE_RELEVANT_ORDINARY_RELATIONS : &[NodeRelation] = &[
+  NodeRelation::Contains,
+  NodeRelation::LinksTo,
+  NodeRelation::SubscribesTo,
+  NodeRelation::HidesFromSubs,
+];
+
 /// Where the relRepos of a recorder's relationships under one relation
 /// are stored: in its list, member by member, or, for links, nowhere
 /// but its home ('InRustGraph::stored_rel_partners').
@@ -227,25 +237,33 @@ impl<'g> RelRepoLookup<'g> {
 }
 
 impl InRustGraph {
-  /// IDs whose rendered relationship context can change when any seed changes.
-  /// Ordinary relations contribute one hop in either direction. Override
-  /// relations instead contribute complete, independently visited walks in
-  /// each direction, beginning only at the seeds.
+  /// IDs whose rendered relationship context can change when any seed changes:
+  /// the neighborhood over every relation in
+  /// 'UPDATE_RELEVANT_ORDINARY_RELATIONS' and the override walks
+  /// ('update_relevant_neighborhood_over').
   pub fn update_relevant_neighborhood (
     &self,
     seeds : impl IntoIterator<Item = ID>,
+  ) -> HashSet<ID> {
+    self . update_relevant_neighborhood_over (
+      seeds, UPDATE_RELEVANT_ORDINARY_RELATIONS) }
+
+  /// The seeds, every ID one hop from a seed in either direction over
+  /// each relation in 'ordinary_relations', and the override walks.
+  /// The override relation is not ordinary: it contributes complete,
+  /// independently visited walks in each direction, beginning only at
+  /// the seeds, whatever 'ordinary_relations' holds.
+  pub fn update_relevant_neighborhood_over (
+    &self,
+    seeds              : impl IntoIterator<Item = ID>,
+    ordinary_relations : &[NodeRelation],
   ) -> HashSet<ID> {
     let seed_gnids : HashSet<ID> = seeds . into_iter ()
       . map (|gnid| self . pid_else_raw_id (&gnid))
       . collect ();
     let mut result : HashSet<ID> = seed_gnids . clone ();
     for seed in &seed_gnids {
-      for relation in [
-        NodeRelation::Contains,
-        NodeRelation::LinksTo,
-        NodeRelation::SubscribesTo,
-        NodeRelation::HidesFromSubs,
-      ] {
+      for &relation in ordinary_relations {
         result . extend (
           self . outbound_gnids_for_relation (seed, relation)
             . into_iter ()

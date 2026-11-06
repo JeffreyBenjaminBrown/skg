@@ -1,4 +1,7 @@
 use crate::dbs::in_rust_graph::InRustGraph;
+use crate::dbs::in_rust_graph::relation_accessors::{
+  NodeRelation, UPDATE_RELEVANT_ORDINARY_RELATIONS,
+};
 use crate::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewforest;
 use crate::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
 use crate::save::PreparedSave;
@@ -13,10 +16,23 @@ use crate::types::views_state::ViewforestId;
 
 use std::collections::{HashMap, HashSet};
 
+/// What a save touches: its touched IDs and their update-relevant
+/// neighborhood twice over. The collateral redraw of clean views reads
+/// the full neighborhood ('matching_identity'); the dirty-view check
+/// reads the neighborhood without links ('matching_identity_ignoring_links'),
+/// since a link holds no copy of its target, nor its target of it.
 pub(crate) struct SaveAffectedIds {
-  before      : HashSet<ID>,
-  after       : HashSet<ID>,
-  raw_touched : HashSet<ID>,
+  raw_touched                : HashSet<ID>,
+  neighborhood               : NeighborhoodBeforeAndAfter,
+  neighborhood_without_links : NeighborhoodBeforeAndAfter,
+}
+
+/// The update-relevant neighborhood of a save's touched IDs over some
+/// ordinary relations, in the graph before the save and in its final
+/// candidate graph.
+struct NeighborhoodBeforeAndAfter {
+  before : HashSet<ID>,
+  after  : HashSet<ID>,
 }
 
 impl SaveAffectedIds {
@@ -25,29 +41,39 @@ impl SaveAffectedIds {
   ) -> SaveAffectedIds {
     let raw_touched : HashSet<ID> =
       prepared . final_write_identities () . clone ();
-    let before : HashSet<ID> = prepared . graph_before_save ()
-      . update_relevant_neighborhood (raw_touched . iter () . cloned ());
-    let after : HashSet<ID> = prepared . final_candidate ()
-      . update_relevant_neighborhood (raw_touched . iter () . cloned ());
-    SaveAffectedIds { before, after, raw_touched }
+    let ordinary_relations_but_links : Vec<NodeRelation> =
+      UPDATE_RELEVANT_ORDINARY_RELATIONS . iter () . copied ()
+      . filter (|relation| *relation != NodeRelation::LinksTo)
+      . collect ();
+    SaveAffectedIds {
+      neighborhood : NeighborhoodBeforeAndAfter::of_touched (
+        prepared, &raw_touched, UPDATE_RELEVANT_ORDINARY_RELATIONS),
+      neighborhood_without_links : NeighborhoodBeforeAndAfter::of_touched (
+        prepared, &raw_touched, &ordinary_relations_but_links),
+      raw_touched, }
   }
 
+  /// The identity under which 'gnid' is touched or in the full
+  /// neighborhood, if it is.
   pub(crate) fn matching_identity (
     &self,
     gnid  : &ID,
     before : &InRustGraph,
     after  : &InRustGraph,
   ) -> Option<ID> {
-    if self . raw_touched . contains (gnid) {
-      return Some (gnid . clone ()); }
-    if let Some (canonical) = before . pid_of (gnid) {
-      if self . before . contains (&canonical) {
-        return Some (canonical); }}
-    if let Some (canonical) = after . pid_of (gnid) {
-      if self . after . contains (&canonical) {
-        return Some (canonical); }}
-    None
-  }
+    self . neighborhood . matching_identity (
+      &self . raw_touched, gnid, before, after) }
+
+  /// The identity under which 'gnid' is touched or in the neighborhood
+  /// without links, if it is.
+  pub(crate) fn matching_identity_ignoring_links (
+    &self,
+    gnid  : &ID,
+    before : &InRustGraph,
+    after  : &InRustGraph,
+  ) -> Option<ID> {
+    self . neighborhood_without_links . matching_identity (
+      &self . raw_touched, gnid, before, after) }
 
   pub(crate) fn collateral_viewforest_ids (
     &self,
@@ -64,6 +90,39 @@ impl SaveAffectedIds {
       .collect ();
     viewforest_ids . sort_by_key (ViewforestId::repr_in_client);
     viewforest_ids
+  }
+}
+
+impl NeighborhoodBeforeAndAfter {
+  fn of_touched (
+    prepared           : &PreparedSave,
+    raw_touched        : &HashSet<ID>,
+    ordinary_relations : &[NodeRelation],
+  ) -> NeighborhoodBeforeAndAfter {
+    NeighborhoodBeforeAndAfter {
+      before : prepared . graph_before_save ()
+        . update_relevant_neighborhood_over (
+          raw_touched . iter () . cloned (), ordinary_relations),
+      after : prepared . final_candidate ()
+        . update_relevant_neighborhood_over (
+          raw_touched . iter () . cloned (), ordinary_relations), }}
+
+  fn matching_identity (
+    &self,
+    raw_touched : &HashSet<ID>,
+    gnid        : &ID,
+    before      : &InRustGraph,
+    after       : &InRustGraph,
+  ) -> Option<ID> {
+    if raw_touched . contains (gnid) {
+      return Some (gnid . clone ()); }
+    if let Some (canonical) = before . pid_of (gnid) {
+      if self . before . contains (&canonical) {
+        return Some (canonical); }}
+    if let Some (canonical) = after . pid_of (gnid) {
+      if self . after . contains (&canonical) {
+        return Some (canonical); }}
+    None
   }
 }
 
@@ -96,7 +155,8 @@ pub(crate) fn dirty_view_conflicts (
         . viewforest_id_to_view (&buffer_snapshot . viewforest_id)
     { dependencies . extend (dependencies_from_viewforest (registered)); }
     let mut matching : Vec<ID> = dependencies . iter ()
-      .filter_map (|gnid| affected . matching_identity (gnid, before, after))
+      .filter_map (|gnid| affected . matching_identity_ignoring_links (
+        gnid, before, after))
       .collect ();
     matching . sort_by (|left, right| left . 0 . cmp (&right . 0));
     matching . dedup ();
