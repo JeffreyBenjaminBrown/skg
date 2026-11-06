@@ -25,8 +25,10 @@ It takes the config's path and two options, both off by default:
 #+end_example
 Without CONFIG it uses =data/skgconfig.toml=, relative to the folder
 it is run from, so run it from the top of this repository.
-Everything it writes, and the server's logs, go in the
-[[file:glossary.org::*run folder][run folder]] =CONFIG.running/= beside the config.
+Its stop script and its own log, and the server's logs, go in
+the [[file:glossary.org::*run folder][run folder]] =CONFIG.running/= beside the config (the
+compiled client's =.elc= files sit beside their sources, and
+builds go to =target/=).
 - Without =--deb= it builds and runs the release profile
   (=target/release/skg=), which is fast. The first release build
   takes minutes, during which the script sits at "Validating config";
@@ -95,8 +97,10 @@ Emacs), which re-reads it, so a skgrepo added to it needs no restart.
 #+end_src
 ** Now you can use it. See [[./COMMANDS.org][commands]].
 ** stop the server later if you want
+Run the stop script in the run folder: for the default config,
+from the top of this repository,
 #+begin_example
-   ../data/skgconfig.toml.running/stop-servers.sh
+   data/skgconfig.toml.running/stop-servers.sh
 #+end_example
 
 You can't use the client (much) when the server isn't running.
