@@ -364,3 +364,59 @@ the completion check for 'SKG_CONFIG' is narrowed to the start
 script and its docs, since 'bash/import-org-roam.sh',
 'data/bash/lib.sh' and 'windows/' read an environment variable
 of that name for their own purposes, outside this plan.
+** Slice 2
+Finished 2026-11-06 14:22 UTC.
+*** Commits
+- 802ff9d9 plan 1_2 slice 2: both clients point a failed connection at the run folder
+- the next commit: this record and the slice headline flipped to DONE
+*** Checks
+Logs and printed messages are in 'tests/results/plan-1_2/slice2/'
+(untracked).
+- 'bash/emacs-tests.sh' (alone): 447 of 447 pass, including the
+  rewritten 'test-skg-connect-failure-points-to-startup-logs' and the
+  new 'test-skg-connect-failure-without-config-names-run-folder-in-words'.
+- 'bash/nvim-tests.sh': 483 successes, 0 failed, 0 errors, including
+  the rewritten "reports a helpful message when the server is
+  unreachable" and the new "names the run folder in words when the
+  config is unknown".
+- 'skg-client.el' byte-compiled into the scratchpad (not beside its
+  source) with every 'elisp/' folder on the load path: no warnings.
+- A batch Emacs evaluation of 'skg--server-unavailable-message' and a
+  'nvim --headless --clean' evaluation of 'server_unavailable_message'
+  (the plugin's folder put on the runtimepath; easy, so done), each
+  with a scratch 'skgconfig.toml' set and with none
+  ('messages-emacs.txt', 'messages-nvim.txt'). The Emacs ones:
+  : Could not connect to the SKG server on port 1799.
+  : The server may have failed during startup.
+  : Look for the startup error in the run folder
+  :   <scratchpad>/p12-slice2/skgconfig.toml.running/
+  : where the newest folder holds server-to-user.log,
+  : and the start-servers.*.log files beside it hold the start script's output.
+  : Connection error: make client process failed: Connection refused
+  and, with no config path, port "[unknown]" and the folder line
+  : CONFIG.running/, beside the config file the server was started with (its path is unknown here)
+  The Neovim ones are identical but for the error text
+  ('ECONNREFUSED').
+- No failures to classify. Nothing under 'server/' or 'data/' was
+  touched; no start or stop script was run.
+*** Deviations from the plan's how
+- Each client has one helper that names the run folder,
+  'skg--server-run-folder-for-messages' and
+  'server_run_folder_for_messages'; the Emacs empty-herald-table
+  message (':77') uses it too.
+- The two tests that asserted the old 'logs/' paths
+  ('tests/elisp/test-skg-client.el', 'tests/nvim/client_spec.lua')
+  were rewritten and committed with the code, though the launch named
+  only the two client files: without them both suites go red. Each now
+  also asserts that no 'logs/' appears, and each gained a test of the
+  no-config wording. The Emacs test now writes a 'skgconfig.toml' into
+  its temporary folder, since 'skg-config-file' returns nil without one.
+*** Unfinished
+Nothing in this slice. One limit, not new: 'skg-config-file'
+('elisp/skg-config.el:16') assumes the config is named
+'skgconfig.toml' in 'skg-config-dir'. A client started with
+'skg-client-init' on another name (as a scratch config may be) gets
+the no-config wording, or, if a 'skgconfig.toml' sits beside it, that
+file's run folder. Neovim keeps the full path and has no such limit.
+*** Headline
+DONE.

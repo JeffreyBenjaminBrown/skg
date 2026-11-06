@@ -208,7 +208,7 @@ start of one of them appends a second 'start-servers.*.log';
 line and exit 2; the default config path is exercised only by
 reading the code (never start on Jeff's config). Record 'ls' of
 a run folder.
-** TODO Slice 2: the clients' messages
+** DONE Slice 2: the clients' messages
 Emacs and Neovim failure messages name the run folder. Tests:
 'bash/emacs-tests.sh' and 'bash/nvim-tests.sh' green; a batch
 Emacs call of 'skg--server-unavailable-message' with a config
