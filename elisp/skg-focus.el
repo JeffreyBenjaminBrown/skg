@@ -5,6 +5,7 @@
 
 (require 'org)
 (require 'skg-metadata)
+(require 'skg-org-fold)
 (require 'skg-sexpr-search)
 
 (defun skg-add-focused-metadata ()
@@ -58,9 +59,6 @@ If no focused headline is found, does nothing."
   "Return t if the current headline has 'focused' in its metadata.
 Assumes point is at the beginning of a headline.
 Verifies the structure is (skg ... focused ...)."
-  (when (org-at-heading-p)
-    (let ((metadata-sexp (skg--metadata-sexp-at-point-or-nil)))
-      (and metadata-sexp
-           (skg-sexp-subtree-p metadata-sexp '(skg focused))))))
+  (skg--headline-has-bare-atom-p 'focused))
 
 (provide 'skg-focus)

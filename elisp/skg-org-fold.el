@@ -240,10 +240,28 @@ Verifies the structure is (skg ... bodyFolded ...)."
 
 (defun skg--headline-has-bare-atom-p (atom)
   "Return t if the current headline's metadata contains the bare atom ATOM.
-Assumes point is at the beginning of a headline."
-  (when (org-at-heading-p)
+Assumes point is at the beginning of a headline.
+Parses the metadata only if ATOM's name is on the line
+(`skg--line-names-symbol-p'), since most lines carry no such atom."
+  (when (and (org-at-heading-p)
+             (skg--line-names-symbol-p atom))
     (let ((metadata-sexp (skg--metadata-sexp-at-point-or-nil)))
       (and metadata-sexp
            (skg-sexp-subtree-p metadata-sexp (list 'skg atom))))))
+
+(defun skg--line-names-symbol-p (symbol)
+  "Non-nil if SYMBOL's name appears as a whole symbol on the line at point.
+A necessary condition for the line's metadata to read as containing
+SYMBOL, and far cheaper than reading it. Symbol boundaries come from
+the Emacs Lisp syntax table, so they fall where the reader's do;
+in Org's own table an apostrophe is a word constituent, which would
+hide the 'focused' in '(skg focused'x)'. Case matters, as to the reader."
+  (save-excursion
+    (beginning-of-line)
+    (let ((case-fold-search nil))
+      (with-syntax-table emacs-lisp-mode-syntax-table
+        (re-search-forward
+         (concat "\\_<" (regexp-quote (symbol-name symbol)) "\\_>")
+         (line-end-position) t)))))
 
 (provide 'skg-org-fold)
