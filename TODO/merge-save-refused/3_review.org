@@ -97,24 +97,10 @@ So every later comparison is by pid.
 The old string-level "cannot be marked for deletion" check ran
 first and would have hidden the new refusal; the new one compares
 by pid.
-*** ONGOING The coherence assertion counts the last instruction
+*** AWAITS glossary clarification : The coherence assertion counts the last instruction
 Phase one saving the acquiree and phase two deleting it had
 tripped it. Arguable: the assertion could instead have been fed
 only phase two's instructions.
-**** ONGOING [#B] [jeff] I need a glossary.
-I don't know what 'last instruction' means,
-or 'coherence assertion', or 'phase one'.
-Let's have a '3_2_glossary.org' doc here,
-again org all the way down.
-That'll be a lot of tokens so please have Opus 5.5 do it,
-scouring this document.
-Anything that's already in docs/glossary needn't be repeated.
-***** TODO Claude says: written, '3_2_glossary.org', committed
-Nine topical sections, 205 terms, every line under 66 columns.
-A term the project glossary defines gets one sentence naming that
-entry; the rest are defined in full. "Phase one", "the coherence
-assertion" and "the last instruction per ID" are there, the last
-as a sub-entry of the assertion.
 ** DONE Slice 2
 *** The tool's baseline is its '.full.org' file
 The sidecar has no 'content' field, as the plan assumed.
@@ -134,13 +120,13 @@ filtered once more against the graphnode as a view reads it back.
 The old title appears in the title aspect. Arguable: the plan's
 example showed the old title there.
 **** DONE [jeff] good
-*** ONGOING The runtime generation starts at 0
+*** DONE The runtime generation starts at 0
 It had started at the microseconds since the epoch, which only
 the staleness check needed. Arguable only in that the number is
 still visible in the server's log.
-**** TODO [jeff] let's use absolute time
+**** DONE [jeff] let's use absolute time
 It's more information, and no more work.
-***** TODO Claude says: slice 4 of '4_plan.org'
+***** DONE Claude says: slice 4 of '4_plan.org'
 A server will start its runtime generation at the microseconds
 since the Unix epoch again, and each swap-in will add one.
 *** Parse errors in the baseline refuse the save
@@ -149,21 +135,13 @@ As an outright parse failure does.
 *** One existing test was rewritten
 It had relied on the over-matching the slice removes.
 ** Slice 5
-*** ONGOING The restriction refusal runs first in the save handler
+*** DONE The restriction refusal runs first in the save handler
 Before the parse, so the parse's validators never judge a buffer
 under the wrong restriction. Arguable: the plan placed it after
 the plan is built, before the stale check.
-**** TODO [jeff] what's the restriction refusal?
+**** DONE [jeff] what's the restriction refusal?
 add to the new glossary neighbor doc
-***** TODO Claude says: in '3_2_glossary.org', and in brief here
-Since plan 2_2's slice 5, each open view records the skgrepo
-restriction it was last drawn under. A save of such a view is
-refused, before anything else, when that restriction shows a
-different set of skgrepos than the connection's current one. So
-a buffer drawn under one restriction is never saved under
-another: what it leaves unsaid about a graphnode means one thing
-under the restriction it was drawn under and another under the
-next.
+***** DONE Claude says: in '3_2_glossary.org'
 *** The test sets the connection's restriction back by hand
 The switch handler rerenders every view, so no switch can leave
 a view behind for the test to save.
@@ -185,17 +163,57 @@ and restores the test.
 ** Slice 7
 *** The relationship lists are canonical on both sides
 Pids, later duplicates dropped; not the aliases, which are text.
-*** ONGOING Every unreadable envelope gets the refusal header
+*** TODO Every unreadable envelope gets the refusal header
 Not only the missing baseline. Arguable: the plan asked for the
 one case.
-**** TODO 'save envelope"?
+**** DONE 'save envelope"?
 This appears to be undocumented in docs/glossary.org,
 yet used there, so add it to both that and 3_2_glossary.org
-***** TODO Claude says: added to both
+***** DONE Claude says: added to both glossaries
 'docs/glossary.org' has a 'save envelope' entry under "Terms of
 the implementation", before "collateral view", committed on its
 own; your "Stranded" edit there stays unstaged.
 '3_2_glossary.org' defines it too.
+**** TODO [jeff] Is it natural that 'baseline' is a giant blob of text?
+It seems like it should refer to a viewnode tree in the server.
+That way we don't have to re-parse.
+Those viewnode trees are already stored in the server, right?
+***** TODO Claude says: yes, the server stores them; two reasons for text
+****** The server does hold the tree
+Every view the connection holds has its viewforest in 'ViewState'
+('server/types/views_state.rs'), replaced at every redraw
+('update_view', called from the rerender pass and the rerender
+stream). The baseline's writes are computed by
+'extract_nonmergeSavePlan_locally_in_graph', which takes a
+'ViewForest', so for a held view the server could feed it the
+stored tree and skip the parse of the text. The parse costs a
+few milliseconds in release, tens in debug.
+****** Reason one: views the server does not hold
+The server forgets every view at a restart. The client keeps its
+buffers and their baselines, so after a restart a save is still
+checked against what was drawn; that was one of the gains of
+plan 2_2. With the server's tree as the only baseline, a buffer
+that outlives the server would have no baseline, and its save
+would be either unchecked or refused until redrawn.
+****** Reason two: the server's tree can be ahead of the buffer
+A save whose redraw is withheld by the text-release challenge
+registers the saved view as the save left it, while the client's
+buffer still shows the text from before the save
+('withhold_save_rerender' in 'server/rerender_pass.rs': "the
+saved view is registered as this save left it, sending nothing
+of it"). Until the user approves the rerender, the server's tree
+and the buffer differ, and a baseline taken from the tree would
+describe a text the user has not seen. The client's text is what
+the user actually saw, so it is the right base.
+****** What I would do
+Keep the text as the baseline the client sends, and let the
+server, when it holds the view and the stored tree renders to
+that same text, use the tree and skip the parse. That is an
+optimization with a cheap equality check, not a change of
+meaning, and I would not do it until the parse shows up in a
+timing. A hash in place of the text would shrink the envelope
+but needs the full text as a fallback for the two cases above,
+so it adds a path rather than removing one.
 *** The glossary defines "merge node" and "merge pair"
 As the plan did.
 *** The agent emptied the glossary by accident and rebuilt it
@@ -293,10 +311,10 @@ as little duplication of code as possible.
 **** DONE Claude says: plan 4, slice 2
 The plan parameterizes the one neighborhood walk by its relation
 list and forbids copying it.
-***** TODO [jeff] Why forbid copying the relation list?
+***** DONE [jeff] Why forbid copying the relation list?
 (This isn't pushback; I just don't get it.)
 What might want to copy it where?
-****** TODO Claude says: unclear; I meant the walk, not the list
+****** DONE Claude says: unclear; I meant the walk, not the list
 The plan forbids copying the neighborhood walk, the function
 'update_relevant_neighborhood', which an agent might otherwise
 duplicate as a second function without the link relation. The
@@ -310,7 +328,7 @@ request prefer a content view, and open one when none shows the
 node, treating diff-view buffers as what they are.
 *** DONE [jeff] yes please
 **** DONE Claude says: plan 4, slice 3
-** ONGOING The rendered stale-save buffer
+** DONE The rendered stale-save buffer
 You left this out of plan 2_2. It would be a write-protected
 buffer in the style of the diff view, showing a stale
 graphnode's old text and its new text. The refresh would draw it
@@ -321,10 +339,10 @@ response can already carry a buffer, as the fork confirmation
 does. When you want the merge-conflict view you have described,
 this buffer is its first use, since a merge conflict is the same
 picture over two graphs of the server's choosing.
-*** TODO [jeff] let's do it!
+*** DONE [jeff] let's do it!
 I imagine that opens up more cans of worms
 for this branch of the discussion.
-**** TODO Claude says: I will open the cans in '5_discussion.org'
+**** DONE Claude says: I will open the cans in '5_discussion.org'
 The rendered stale-save buffer is the first use of a general
 two-graph view, and its design has questions only you can
 answer: what the buffer shows and what it is for (reading, or
@@ -334,9 +352,9 @@ new thing, and what the merge-conflict case adds. I am reading
 the refresh's diff-view mode and the clients' handling of the
 fork-confirmation buffer now, and will write the discussion with
 the questions laid out, each with a default.
-** TODO [jeff] please begin 4_plan.org
+** DONE [jeff] please begin 4_plan.org
 but first process this doc and ping me audibly to look at it
-*** TODO Claude says: '4_plan.org' is written, not yet run
+*** DONE Claude says: '4_plan.org' is written, not yet run
 Three slices, one per settled item. I will run it on your word,
 since its first slice changes what a save writes.
 * Suggestions for the advice
