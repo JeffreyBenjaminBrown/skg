@@ -1,13 +1,15 @@
 # USAGE:
 # - TO START
-#   By default, this uses data/skgconfig.toml:
-#     ./bash/start-servers.sh
+#     ./bash/start-servers.sh [--deb] [--hot-reload]
+#   By default, this uses data/skgconfig.toml.
 #   You can override that default to use data somewhere else,
 #     by running this:
 #       SKG_CONFIG=another_skg_config ./bash/start-servers.sh
 #     or by editing SKG_CONFIG in ./bash/start-servers.sh
-#   To build and run the release profile instead of the debug one:
-#       SKG_RELEASE=1 ./bash/start-servers.sh
+#   It builds and runs the release profile unless given --deb,
+#     which builds and runs the debug profile instead.
+#   The first release build takes minutes, sitting at "Validating config".
+#   Any other argument prints a usage line and exits with status 2.
 # - WHAT RUNS
 #   cargo-watch rebuilds and restarts the server on every edit under
 #   server/. Between edits, bash/run-skg-rerunning-on-exit.sh runs the
@@ -23,14 +25,25 @@
 #     If you do it yourself, the PID was printed when it started,
 #       and if that printout is buried, can be found running `ps -af`.
 
+DEB=""        # set by --deb: build and run the debug profile
+HOT_RELOAD="" # set by --hot-reload
+for arg in "$@"; do
+  case "$arg" in
+    --deb)        DEB=1 ;;
+    --hot-reload) HOT_RELOAD=1 ;;
+    *) echo "usage: bash/start-servers.sh [--deb] [--hot-reload]" >&2
+       exit 2 ;;
+  esac
+done
+
 SKG_CONFIG="${SKG_CONFIG:-data/skgconfig.toml}"
 DATA_ROOT="$(dirname "$SKG_CONFIG")"
-if [ "${SKG_RELEASE:-}" = "1" ]; then
-  CARGO_PROFILE_FLAG="--release"
-  PROFILE_DIR="target/release"
-else
+if [ -n "$DEB" ]; then
   CARGO_PROFILE_FLAG=""
   PROFILE_DIR="target/debug"
+else
+  CARGO_PROFILE_FLAG="--release"
+  PROFILE_DIR="target/release"
 fi
 
 preflight_check_config() {
@@ -95,7 +108,7 @@ kill_stale_skg() {
   # loop, then the loop so it cannot rerun skg, then skg.
   # Every pattern is scoped to this config, so skg instances serving
   # other configs (other ports, other data) are left alone. Each matches
-  # the debug and the release (SKG_RELEASE=1) form of its command.
+  # the debug (--deb) and the release form of its command.
   # bash/stop-servers.sh signals this script's process group, whose
   # 'cleanup' trap runs this function, so it kills by these patterns too.
   pkill -f "cargo[- ]watch .*--bin skg .*$SKG_CONFIG"                2>/dev/null || true
