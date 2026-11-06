@@ -49,6 +49,17 @@ next slice depends on the answer. The orchestrator's own notes
 go into 'progress.org' under "Orchestrator's notes after slice
 N", dated.
 
+* Files Jeff is editing during a run
+Jeff reads and annotates the plan and the review while a run is
+on, so the plan file, the review and the glossary are often dirty
+with his edits when an agent starts. The brief names them, and the
+agent commits only its own hunks of such a file: it writes a copy
+of HEAD's version plus its own edits and puts that copy in the
+index ('git update-index' with the blob, or 'git apply --cached'
+with a patch against HEAD), leaving Jeff's hunks unstaged in the
+working tree. This worked for every slice of plan 4. If a hunk
+cannot be separated, the agent leaves that edit out and says so.
+
 * Pre-existing failures belong in the pitfalls
 A failure that predates the plan (in 04.1, the 'import-md-and-org'
 integration test) is listed in the plan's pitfalls by name, so

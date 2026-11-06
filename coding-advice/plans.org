@@ -61,6 +61,15 @@ it must not report. Plan 04.1 defined corrections and said
 nothing about what is not one; slice 9 then reported every
 drawn child, and the definition had to be narrowed afterwards.
 
+* When a plan removes a refusal, ask what else that refusal prevented
+A refusal often does a second job nobody wrote down. Plan 4 stopped
+the dirty-view check from matching through links, so a save a dirty
+view had blocked went through; but that block was also what kept
+the save from redrawing the dirty view, and the redraw would have
+discarded its edits. Before removing a refusal, list the saves (or
+requests) it was stopping and follow each through the pipeline
+without it.
+
 * Prefer deleting a mechanism to adding a rule
 When a mechanism misbehaves, the first proposal is usually a rule to
 tame it: a refusal, a special case, a comparison with history. In the

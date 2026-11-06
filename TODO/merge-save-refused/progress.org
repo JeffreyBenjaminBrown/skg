@@ -1280,3 +1280,9 @@ Slice 7 reported; one commit. The baseline is now read once into
 summary will be added here.
 ** Completion of plan 4, final run (2026-11-06 02:03 UTC)
 'bash/all-tests.sh' after slice 7: 5 of 5 suites green; integration 70 passing runs, the failures the pre-existing 'import-md-and-org' in both clients. Summary kept at '4_1_review-reports/ALL-after-slice-7.org'.
+* Plan 5: the stale vocabulary, and three numbered steps
+Orchestrated by Ed (Fable 5.1), one Opus 5.5 agent per slice,
+from 2026-11-06 03:02 UTC. Jeff's server stays pinned at
+ec36a08a ('_burying/skg-stable'); plan 5 changes no behavior.
+** Orchestrator's launches
+Slice 1 launched 03:02 UTC.

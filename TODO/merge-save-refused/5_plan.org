@@ -1,0 +1,156 @@
+#+title: After plan 4: the stale vocabulary, and three numbered steps
+* Assignment and authority
+This plan is a unitary declaration: nothing in it is open for
+discussion. It follows '4_1_review.org' in this folder, whose
+"Decide" section Jeff answered on 2026-11-06. That review and the
+plans before it are background nobody executing this plan needs
+to read. Every term is defined below or in 'docs/glossary.org'.
+
+Execute the slices in order, one agent per slice. The plan
+expects no stop. Otherwise stop only under the conditions in
+'coding-advice/when-to-stop.org'. Record deviations, surprises
+and choices you made alone in 'progress.org' beside this plan,
+under a headline naming this plan and the slice.
+
+Before writing code, read 'coding-advice/names.org',
+'formatting.org', 'ai-agents.org', 'no-legacy-support.org' and
+'common-gotchas.md'.
+* Commits
+One commit per slice. Each message names this plan
+('TODO/merge-save-refused/5_plan.org') and the slice, and follows
+'coding-advice/commit-messages.org'. The slice's commit carries
+its documentation changes and turns the slice's headline from
+TODO to DONE. Never commit anything under 'data/'.
+* Scope
+** In scope
+- The words for a graphnode the graph changed under a buffer,
+  and for whether the buffer edited it, will be "stale",
+  "edited" and "unedited"; "outdated" and "untouched" go
+  (slice 1). No behavior changes.
+- Three numbered steps in code will be named for what they do
+  (slice 2). No behavior changes.
+** Out of scope
+- The stale error's first line, "A node this save would write
+  changed after the buffer was rendered", which client tests match.
+- The warning text "Left as the graph has it: ...".
+- "Phase N" headers in integration-test scripts and 'tests/
+  profiling', 'bash/all-tests.sh' and the 'tools/' scripts: they
+  label a script's progress and name nothing.
+- The ordinary-English uses of "untouched" and "outdated"
+  elsewhere in the tree ("left untouched on disk", "outdated
+  herald rules"), which keep their words.
+- The records in 'TODO/' ('2_2_plan.org', '4_plan.org',
+  '3_review.org', '3_2_glossary.org', '4_1_review.org'), which
+  keep the words they were written with.
+* Vocabulary
+- 'baseline': a buffer's text as the server last drew it, which
+  the client keeps and sends with a save ('docs/glossary.org',
+  "baseline, outdated, untouched, stale", which slice 1 renames).
+- 'the baseline's copy' of a graphnode: the supplemented Save
+  instruction the baseline yields for it; 'the buffer's copy': the
+  one the saved text yields.
+- 'stale' (after slice 1; "outdated" before it): a graphnode
+  whose baseline copy differs from the graph. The graph changed it
+  under the buffer.
+- 'edited' and 'unedited' (after slice 1; "untouched" before it
+  for the latter): whether the buffer's copy of a graphnode
+  differs from the baseline's copy. The user changed it in the
+  buffer, or did not.
+- 'edited stale graphnode' (before slice 1 just "stale"): one the
+  save refuses for, since writing the user's edit would discard
+  the graph's change. 'unedited stale graphnode' (before slice 1
+  "untouched outdated"): one the save leaves as the graph has it,
+  with a warning.
+* Agreed behavior
+** The words change; nothing else does
+After slice 1 the code, its comments, the docs and the glossary
+will say "stale" where they said "outdated", "unedited" where
+they said "untouched", and "edited stale" where "stale" alone
+meant the refused case. The glossary entry "baseline, outdated,
+untouched, stale" will become "baseline, stale, edited, unedited"
+and define the four as the vocabulary above does, saying in one
+line what each was called before. Identifiers follow:
+'UntouchedOutdatedGraphnode' becomes 'UneditedStaleGraphnode',
+'without_untouched_outdated_saves' becomes
+'without_unedited_stale_saves', 'untouched_outdated_graphnodes'
+becomes 'unedited_stale_graphnodes', 'is_untouched' becomes
+'is_unedited', and the test names in 'tests/save_stale_buffers.rs'
+that carry the old words are renamed to the new. 'StaleAspect' and
+'StaleGraphnodeReport' keep their names: they describe an edited
+stale graphnode's report, and "stale" in them is right under the
+new sense too. Every suite behaves as before.
+** Three numbered steps will be named
+- 'elisp/skg-org-fold.el', near line 62: "Pass 1" and "Pass 2"
+  will be named for what each does (hiding the entries of
+  'bodyFolded' headlines; folding the 'folded'-marked headlines
+  until none is left visible, or whatever the code does; read it).
+- 'server/from_text/buffer_to_viewnodes/validate_tree.rs', near
+  line 51: "the second phase (local structure validation)" will be
+  named the local-structure validation, and whatever it is
+  contrasted with named too.
+- 'server/prominence.rs', near line 203: "(step 3)" will name the
+  step it refers to.
+** What stays as it is
+- The stale error, its first line, its aspects and its body diff.
+- The warning "Left as the graph has it: TITLE (ID), which
+  changed after this buffer was rendered and which this buffer did
+  not edit." and its deleted variant. (Its "did not edit" is
+  already the new word.)
+- Every behavior of plans 2_2 and 4.
+* Pitfalls the slices must respect
+** Two senses of two words
+"untouched" and "outdated" occur in some fifty files of the tree
+in their ordinary senses (grep them). Only the sense plan 4 gave
+them is renamed: the identifiers listed above, the comments and
+doc comments of 'server/serve/handlers/save_staleness.rs',
+'server/from_text.rs', 'server/from_text/validate.rs',
+'server/from_text/write_protected_edits.rs',
+'server/serve/handlers/save_buffer.rs' and 'server/types/save.rs'
+where they speak of the baseline and the buffer's copies; the
+tests of 'tests/save_stale_buffers.rs'; and the docs: the
+stale-buffer paragraph under "Save buffer" in
+'docs/api-and-formats.org', the stale-save paragraph and recovery
+steps near the top of 'docs/COMMANDS.org' and
+'docs/COMMANDS-nvim.org', and the glossary entry. Read each
+occurrence before changing it.
+** Texts that tests match
+The stale error's first line is matched by 'tests/elisp/',
+'tests/nvim/' and several Rust tests; it does not change. The
+warning's text is matched in 'tests/save_stale_buffers.rs' only;
+it does not change either. Grep 'tests/' for any text you do
+change.
+** A failure that predates the plan
+The integration test 'import-md-and-org' fails in both clients
+before this plan runs. Report it as pre-existing; do not
+investigate it.
+** Test harnesses
+The Rust tests run in grouped binaries ('Cargo.toml', 'autotests
+= false'); 'bash/nextest.sh' runs them all; 'bash/emacs-tests.sh'
+and 'bash/nvim-tests.sh' run the clients' unit tests. Run full
+suites one at a time.
+* Code map
+- 'server/serve/handlers/save_staleness.rs', 'server/from_text.rs',
+  'server/from_text/validate.rs',
+  'server/from_text/write_protected_edits.rs',
+  'server/serve/handlers/save_buffer.rs', 'server/types/save.rs',
+  'tests/save_stale_buffers.rs': slice 1's code.
+- 'docs/glossary.org', 'docs/api-and-formats.org',
+  'docs/COMMANDS.org', 'docs/COMMANDS-nvim.org': slice 1's docs.
+- 'elisp/skg-org-fold.el', 'server/from_text/buffer_to_viewnodes/
+  validate_tree.rs', 'server/prominence.rs': slice 2.
+* Implementation sequence
+** TODO Slice 1: stale, edited, unedited
+Rename as "Agreed behavior" says, in code, comments, tests, docs
+and the glossary, respecting "Two senses of two words". Run
+'bash/nextest.sh', 'bash/emacs-tests.sh' and 'bash/nvim-tests.sh';
+the integration suite only if a text a client test matches
+changes, which it should not. One commit.
+** TODO Slice 2: three numbered steps named
+Rename as "Three numbered steps will be named" says, reading each
+site first. Run 'bash/nextest.sh' and 'bash/emacs-tests.sh'. One
+commit.
+* Verification and completion
+After slice 2, run 'bash/all-tests.sh' and record its summary in
+'progress.org'. Then add under the three "Decide" items of
+'4_1_review.org' a child "TODO Claude says: done by plan 5, slice
+N", without changing their keywords.

@@ -69,13 +69,13 @@ the review of plan 2_2 and two later notes of Jeff's, which now
 carry "done by plan 4" children.
 * What each slice did beyond the plan's words
 ** Slice 1
-*** TODO The untouched Saves are dropped in the plan builder
+*** DONE The untouched Saves are dropped in the plan builder
 Before the foreign policy, because by the handler an untouched
 foreign copy would already have been forked and judged. Arguable
 only in that 'from_text.rs' now imports a function from
 'serve::handlers', which has one precedent.
-**** TODO [jeff] what's the foreign policy?
-***** TODO Claude says: the rule for saving a foreign graphnode
+**** DONE [jeff] what's the foreign policy?
+***** DONE Claude says: the rule for saving a foreign graphnode
 'apply_foreign_policy' ('server/from_text/validate.rs') decides,
 for each Save the buffer yields, what to do when the graphnode's
 home skgrepo is foreign (not owned; glossary "owned, foreign").
@@ -177,7 +177,7 @@ slice 7's first part, and one minor set. '4_1_review-reports/
 probes.org': ten probes, nine as the plan says and one revealing
 the dirty-view redraw, fixed by slice 6.
 * Decide
-** ONGOING "Outdated" beside "stale"
+** DONE "Outdated" beside "stale"
 'names.org' forbids giving two near-synonyms private meanings.
 The glossary now defines "outdated" (the baseline's copy differs
 from the graph) and "stale" (outdated and edited or deleted by
@@ -186,10 +186,10 @@ rename costly; it is used in two identifiers and five docs. I
 would keep both, since the glossary states the difference in one
 line, and the alternative ("changed under the user" for outdated)
 is longer wherever it would go.
-*** TODO [jeff] No, we must distinguish them better.
+*** DONE [jeff] No, we must distinguish them better.
 Call one stale, the other "stale with requested edits".
 (If in fact that's accurate -- push back if I have misunderstood.)
-**** TODO Claude says: accurate; I would say "edited stale"
+**** DONE Claude says: accurate; I would say "edited stale"
 You have it right: the second is the first plus the user's edit.
 "Stale" for the first (the graph changed under the buffer's copy)
 is good. For the second I would not say "requested edits": in Skg
@@ -203,25 +203,27 @@ graph has it. The identifiers follow
 and so on); the stale error's first line stays as it is, since
 the client tests match it. If you agree, this and the next item
 become one plan with the numbered steps below.
-** ONGOING "Untouched" beside "touched IDs"
+***** TODO [jeff] yes that's perfect
+****** TODO Claude says: '5_plan.org', slice 1
+** DONE "Untouched" beside "touched IDs"
 "Untouched" (the buffer did not edit it) sits in the same module
 as "touched IDs" (the IDs a save writes), which mean unrelated
 things. The reviewer suggests "unedited". I would rename to
 "unedited": it is the word the docs already use in the sentence
 that explains the rule, and the rename is a handful of
 identifiers and the glossary entry.
-*** TODO [jeff] Let me see if I understand correctly.
+*** DONE [jeff] Let me see if I understand correctly.
 By 'unedited' we would be talking about the edits the *user* could have made
 but didn't, yes? Or are we talking about changes that skg itself might have done?
 If the former, the rename you suggest is good.
-**** TODO Claude says: the former
+**** DONE Claude says: the former
 "Unedited" says the user did not change that graphnode in the
 buffer: the buffer's copy equals the baseline's copy. What skg
 itself did, or another connection did, is the other side, which
 "stale" names: the graph no longer matches the baseline's copy.
 So the rename is good, and with the item above the two words make
 the pair "edited stale" and "unedited stale".
-** ONGOING Numbered steps outside the plan's list
+** DONE Numbered steps outside the plan's list
 Slice 5 named every numbered pass in the server. These remain
 and fall under your rule as worded: "Phase N" headers in 22
 integration-test folders and 'tests/profiling', "Pass 1" and
@@ -231,8 +233,8 @@ near line 51, "phase 5" and "phase 7" cited in one integration
 test, and "(step 3)" in 'server/prominence.rs'. I would rename
 the four in code and leave the test scripts' phase headers, which
 are labels of a script's progress, not names of things.
-*** TODO [jeff] agreed
-**** TODO Claude says: into the same small plan
+*** DONE [jeff] agreed
+**** DONE Claude says: into the same small plan
 The four renamings in code (not the test scripts' phase headers)
 join the two above in one plan, '5_plan.org' in this folder,
 which I will write when you confirm "edited stale" and "unedited
@@ -246,3 +248,5 @@ stale".
   run, agents stage only their own hunks (a HEAD-plus-edits copy
   written to the index); this worked seven times and should be
   the written rule, not a brief's instruction.
+** TODO [jeff] sure
+*** TODO Claude says: applied to both advice files
