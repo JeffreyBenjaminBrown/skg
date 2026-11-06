@@ -125,3 +125,55 @@ Logs and the one-time scripts are in 'tests/results/plan-1_1/slice3/'
 Nothing in this slice.
 *** Headline
 DONE.
+** Slice 4
+Finished 2026-11-06 06:30 UTC.
+*** Commits
+- 0a7ab501 plan 1_1 slice 4: the fold and focus atom tests parse only lines that name the atom
+- the next commit: this record and the slice headline flipped to DONE
+*** Checks
+Logs and the one-time scripts are in 'tests/results/plan-1_1/slice4/'
+(untracked); the old predicates were loaded from 'git show HEAD:'
+copies of the two files in its 'old/'.
+- 'bash/emacs-tests.sh': 446 tests, 446 as expected, 0 unexpected.
+- Agreement, 'agreement-check.el', old and new predicates on a
+  12-line org buffer; identical on every line:
+  | line                                          | folded | bodyFolded | focused |
+  |-----------------------------------------------+--------+------------+---------|
+  | title has "folded", "focused", "bodyFolded"   | nil    | nil        | nil     |
+  | '(skg folded ...)'                            | t      | nil        | nil     |
+  | '(skg bodyFolded ...)'                        | nil    | t          | nil     |
+  | '(skg focused ...)'                           | nil    | nil        | t       |
+  | '(skg node (gnid e))', no atom                | nil    | nil        | nil     |
+  | title has lowercase "bodyfolded"              | nil    | nil        | nil     |
+  | '(skg (folded x) ...)', a list, not an atom   | nil    | nil        | nil     |
+  | '(skg focused'x ...)'                         | nil    | nil        | t       |
+  | '(skg folded-not ...)'                        | nil    | nil        | nil     |
+  | headline with no metadata, title "folded"     | nil    | nil        | nil     |
+  | body line '(skg folded)', not a headline      | nil    | nil        | nil     |
+  | '(skg node folded focused bodyFolded ...)'    | t      | t          | t       |
+- Agreement on the 202 KB, 858-headline buffer of
+  'scripts/overlay-floor.el' ('big-buffer-check.el'): the three
+  answers for all 910 lines, old and new, byte-identical (7 lines
+  carry an atom).
+- Timing, 'skg-remove-folded-metadata' on that buffer, client from
+  source, best of five: 216.0 ms before, 10.2 ms after.
+- No failures to classify.
+*** Deviations from the plan's how
+- The pre-test is a new function, 'skg--line-names-symbol-p', in
+  'skg-org-fold.el'. It searches with the Emacs Lisp syntax table
+  and 'case-fold-search' nil, so its symbol boundaries and case fall
+  where the reader's do: in Org's table an apostrophe is a word
+  constituent, which would have made '(skg focused'x)' (which reads
+  as containing 'focused') a false negative. The agreement table's
+  eighth line checks that case.
+- 'skg-headline-has-focused-in-view-p' had the same body as
+  'skg--headline-has-bare-atom-p' with 'focused' ('(list 'skg atom)'
+  equals ''(skg focused)'), so it now calls it; 'skg-focus.el'
+  requires 'skg-org-fold' (no cycle: the latter requires neither).
+- One spelling still escapes the pre-test: a backslash-escaped name
+  like 'fo\cused', which the reader reads as 'focused'. Neither
+  client nor server writes such a thing.
+*** Unfinished
+Nothing in this slice.
+*** Headline
+DONE.

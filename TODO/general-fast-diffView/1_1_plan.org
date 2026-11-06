@@ -305,7 +305,7 @@ the change and put the two numbers in the report (the measured
 expectation: 789 ms to about 557 ms from source; the compiled
 numbers come after slice 5). If it is gone, skip the timing
 and say so.
-** TODO Slice 4: the atom tests look before they parse
+** DONE Slice 4: the atom tests look before they parse
 The regexp pre-test in 'skg--headline-has-bare-atom-p' and
 'skg-headline-has-focused-in-view-p'. Tests:
 'bash/emacs-tests.sh', green; and a batch Emacs check that, on
