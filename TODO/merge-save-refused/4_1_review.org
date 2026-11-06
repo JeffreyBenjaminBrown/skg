@@ -205,6 +205,10 @@ the client tests match it. If you agree, this and the next item
 become one plan with the numbered steps below.
 ***** TODO [jeff] yes that's perfect
 ****** TODO Claude says: '5_plan.org', slice 1
+*** TODO Claude says: done by plan 5, slice 1
+Commit 64676216: "outdated" became "stale", and the refused case
+"edited stale", in code, comments, tests and docs; the glossary
+entry is now "baseline, stale, edited, unedited".
 ** DONE "Untouched" beside "touched IDs"
 "Untouched" (the buffer did not edit it) sits in the same module
 as "touched IDs" (the IDs a save writes), which mean unrelated
@@ -223,6 +227,10 @@ itself did, or another connection did, is the other side, which
 "stale" names: the graph no longer matches the baseline's copy.
 So the rename is good, and with the item above the two words make
 the pair "edited stale" and "unedited stale".
+*** TODO Claude says: done by plan 5, slice 1
+Commit 64676216: "untouched" became "unedited"
+('UneditedStaleGraphnode', 'without_unedited_stale_saves',
+'is_unedited' and the tests' names).
 ** DONE Numbered steps outside the plan's list
 Slice 5 named every numbered pass in the server. These remain
 and fall under your rule as worded: "Phase N" headers in 22
@@ -239,6 +247,12 @@ The four renamings in code (not the test scripts' phase headers)
 join the two above in one plan, '5_plan.org' in this folder,
 which I will write when you confirm "edited stale" and "unedited
 stale".
+*** TODO Claude says: done by plan 5, slice 2
+Commit e95e0ba6: "Pass 1" and "Pass 2" in 'skg-org-fold.el', "the
+second phase" in 'validate_tree.rs' and "(step 3)" in
+'prominence.rs' (with that file's numbered section headers) are
+named for what they do. The "phase 5" and "phase 7" an integration
+test cites stay, with the scripts' phase headers.
 * Suggestions for the advice
 - 'plans.org': when a plan removes a refusal, it should ask what
   else that refusal was preventing. The dirty-view conflict was

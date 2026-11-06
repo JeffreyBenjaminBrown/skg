@@ -1425,3 +1425,27 @@ None.
 Nothing.
 *** Headline
 DONE.
+** Completion
+*** Commits
+- e95e0ba6 Name three numbered steps for what they do; reword an
+  older "untouched stale" (slice 2).
+- The commit carrying this entry: the full suite's summary, and
+  replies under the three "Decide" items of '4_1_review.org'.
+*** Suites
+'bash/all-tests.sh' after slice 2 (184 s; logs in 'tests/results/'):
+- Emacs unit tests: 445 of 445 as expected.
+- Neovim unit tests: 482 pass in 41 spec files; 0 failed, 0 errors.
+- Nextest: 1144 of 1144 pass.
+- Doctests: 2 pass, 2 ignored.
+- Integration: 70 of 72 pass. 'emacs/import-md-and-org' and
+  'nvim/import-md-and-org' fail, and fail again on the script's
+  retry: pre-existing (they fail before plan 5), not investigated.
+*** Deviations from the plan's how
+- Each reply under a "Decide" item names the commit that did the
+  work in a line or two besides the headline.
+*** Fixtures changed
+None.
+*** Unfinished
+Nothing.
+*** Headline
+Slice 2 is DONE; plan 5 is done.
