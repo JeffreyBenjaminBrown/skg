@@ -332,7 +332,7 @@ Run the saves binary and 'bash/nextest.sh'.
 Docs: the dirty-view paragraph of 'docs/api-and-formats.org' says
 the dirty-view match ignores links and the collateral redraw
 does not.
-** TODO Slice 3: a view request skips buffers of the diff view
+** DONE Slice 3: a view request skips buffers of the diff view
 Implement "A view request will not switch to a buffer of the
 diff view": 'content_viewforest_id_for_root_gnid' returns the
 first open view with that root that is not a buffer of the diff

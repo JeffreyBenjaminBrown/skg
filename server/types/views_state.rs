@@ -135,8 +135,8 @@ impl OpenViews {
     self . views . get (viewforest_id)
       . map ( |vs| &vs . viewforest ) }
 
-  /// Returns the first (if any exists) content buffer (not a search
-  /// view) for which the ID is a root
+  /// Returns the first (if any exists) ordinary content view
+  /// ('is_ordinary_content_view') for which the ID is a root
   /// (level-1 headline).
   pub fn content_viewforest_id_for_root_gnid (
     &self,
@@ -144,8 +144,19 @@ impl OpenViews {
   ) -> Option<&ViewforestId> {
     self . root_gnids . get_right (gnid)
       . and_then ( |viewforest_ids| viewforest_ids . iter ()
-                   . find ( |u| matches! (
-                       u, ViewforestId::ContentView (_) ))) }
+                   . find ( |viewforest_id|
+                             self . is_ordinary_content_view (viewforest_id) )) }
+
+  /// Whether 'viewforest_id' is an open content view whose state marks
+  /// it as nothing else: not a search view, and not a buffer of the
+  /// diff view.
+  pub fn is_ordinary_content_view (
+    &self,
+    viewforest_id : &ViewforestId,
+  ) -> bool {
+    matches! ( viewforest_id, ViewforestId::ContentView (_) )
+      && self . views . get (viewforest_id)
+         . is_some_and ( |state| state . diffView_buffer_kind . is_none () ) }
 
   pub fn register_view (
     &mut self,

@@ -365,7 +365,8 @@ which cannot follow skg links.
 Calling this when the cursor is on a link, a node's metadata,
 a bare UUID, or a .skg filename
 will open a new view from the ID it finds there,
-or go to the view of it that was already open if that exists.
+or go to the content view of it that was already open if that exists
+(a buffer of the diff view does not count: the node gets a new view).
 
 The requested node itself is always the raw root. Recursive content
 below it can still use override substitution. Override facts remain

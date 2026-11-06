@@ -10,8 +10,9 @@
 --          foreign one is not, and the buffers keep their roots,
 --          which show no change any more.
 -- Phase 4: With d referenced again by hand, rebuild, which
---          rerenders every view; open a view of r and investigate
---          the unknown node d.
+--          rerenders every view; open a view of r beside the
+--          buffers of the diff view, one of which r is a root of,
+--          and investigate the unknown node d.
 
 local T = dofile('../test-nvim-lib.lua')
 T.arm_timeout(120)
@@ -167,11 +168,10 @@ do
     return rerender_sent and not require('skg.lock').stream_in_progress end, 30),
     'every view was rerendered after the rebuild')
   rerender.request_rerender_all_views = request_rerender_all_views
-  -- The buffers of the diff view survive the rebuild, and r is a root
-  -- of one; a view request for r would switch to it. Close them.
-  for _, buf in ipairs(diffView_buffers()) do
-    vim.api.nvim_buf_delete(buf, { force = true }) end
 end
+-- The buffers of the diff view survive the rebuild, and r is a root of
+-- one. A view request for r does not switch to it: a content view of r
+-- opens beside them.
 require('skg.single_root_content_view').request_single_root_content_view_from_id('r')
 local view = T.wait_for(function ()
   for _, buf in ipairs(vim.api.nvim_list_bufs()) do
@@ -183,6 +183,8 @@ local view = T.wait_for(function ()
   return nil
 end)
 if not view then T.fail('Timeout waiting for a view of r showing d as unknown') end
+T.check(#diffView_buffers() > 0,
+        'a content view of r opened beside the buffers of the diff view')
 vim.api.nvim_set_current_buf(view)
 for lnum, line in ipairs(vim.api.nvim_buf_get_lines(view, 0, -1, false)) do
   if line:find('unknown (gnid d)', 1, true) then

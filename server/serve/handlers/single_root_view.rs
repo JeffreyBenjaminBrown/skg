@@ -29,7 +29,8 @@ use std::net::TcpStream; // handles two-way communication
 /// and sends the response to Emacs (length-prefixed).
 /// Response format:
 /// ((content "...") (errors ("error1" ...)) (warnings ("warning1" ...)))
-/// If the requested ID is already a root of an open view,
+/// If the requested ID is already a root of an open ordinary content
+/// view ('OpenViews::is_ordinary_content_view'),
 /// returns ((switch-to-view "VIEW_ID")) instead of rendering.
 pub fn handle_single_root_view_request (
   stream     : &mut TcpStream,

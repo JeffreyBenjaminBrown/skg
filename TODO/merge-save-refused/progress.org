@@ -896,3 +896,64 @@ needed. Carried to the end of the run: the glossary's
 "update-relevant neighborhood" entry should mention the
 dirty-view variant without links (the agent left it, since the
 glossary carries Jeff's edits). Slice 3 launched 01:01.
+** Slice 3
+*** Commits
+- The commit carrying this entry: a view request skips buffers of
+  the diff view when it looks for an open view to switch to (code,
+  two server tests, the 'diff-view' integration test of both
+  clients without its workaround, the docs, and the slice's
+  headline turned DONE).
+*** Suites
+- 'cargo nextest run --test grouped_views': 26 of 26 pass (the two
+  new tests run inside 'content_view::all_tests'). With the lookup's
+  diff-view filter switched off, the first new test fails: the
+  request answers '(switch-to-view diff-view-of-1)'.
+- 'bash/nextest.sh': 1142 of 1142 pass; 'cargo check --all-targets'
+  gives no warnings.
+- 'bash/all-tests.sh' (199s): build, Emacs unit tests (444 of 444),
+  Neovim unit tests, nextest and doctests pass. Integration: 70 of
+  72 pass, 'diff-view' among them in both clients. The two failures
+  are 'emacs/import-md-and-org' and 'nvim/import-md-and-org',
+  pre-existing (the plan's "A failure that predates the plan"), not
+  investigated.
+- Observation, no failure: 'emacs/diff-view' takes about 21s against
+  1s for 'nvim/diff-view'. Run alone, the test as committed took 22s
+  and the test as it stood before this slice 21s, so the time
+  predates the slice.
+*** Deviations from the plan's how
+**** The rule is a public predicate
+'OpenViews::is_ordinary_content_view' ('server/types/views_state.rs')
+says what an ordinary content view is: a 'ContentView' that is open
+in 'views' and whose state marks it as nothing else (today, no
+'diffView_buffer_kind'). 'content_viewforest_id_for_root_gnid' finds
+the first root view passing it. A view ID in 'root_gnids' but not in
+'views' does not pass; the two are maintained together, so that
+case does not arise. The handler's doc comment names the predicate.
+**** The handler runs on a scoped thread in the tests
+The two tests drive 'handle_single_root_view_request' itself over a
+loopback stream pair ('mk_test_tcp_stream_pair'). The handler calls
+'block_on', which panics inside the executor the shared test stores
+run the test in, so the test helper 'request_view_of_1' runs it on
+a 'std::thread::scope' thread.
+**** The integration tests check that the diff view stays open
+Beyond dropping the closing of the diff-view buffers, both clients'
+phase 4 now asserts that the buffers of the diff view are still
+open once the content view of r has appeared ("A content view of r
+opened beside the buffers of the diff view"). The view-finder
+already skipped buffers named "diff-view: ", so it waits for the
+new content view, not the diff-view buffer that has r as a root.
+**** Docs beyond the two the plan names
+'docs/api-and-formats.org' had no switch-to-view sentence under the
+single-root request; one was added, saying which views count and
+that a root only of diff-view buffers gets a new content view.
+'docs/diff-view.org' does not describe following a link, so it is
+unchanged. Three other places stated the switch and now say a
+diff-view buffer does not count: 'docs/COMMANDS.org' and
+'docs/COMMANDS-nvim.org' (C-c g RET / :SkgGoto) and
+'docs/override.org' ("Direct visits are exact").
+*** Fixtures changed
+None. The new tests use 'tests/content_view/fixtures-2' as it is.
+*** Unfinished
+Nothing.
+*** Headline
+DONE.

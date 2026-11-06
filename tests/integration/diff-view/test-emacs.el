@@ -9,8 +9,9 @@
 ;;;          foreign one is not, and the buffers keep their roots,
 ;;;          which show no change any more.
 ;;; Phase 4: With d referenced again by hand, rebuild, which
-;;;          rerenders every view; open a view of r and investigate
-;;;          the unknown node d.
+;;;          rerenders every view; open a view of r beside the
+;;;          buffers of the diff view, one of which r is a root of,
+;;;          and investigate the unknown node d.
 
 (load-file "../../../elisp/skg-init.el")
 (load-file "../test-wait.el")
@@ -188,8 +189,8 @@
   (advice-remove 'skg-request-rerender-all-views
                  #'test-note-rerender-all-views-sent)
   ;; The buffers of the diff view survive the rebuild, and r is a root
-  ;; of one; a view request for r would switch to it. Close them.
-  (mapc #'kill-buffer (diff-view-buffers))
+  ;; of one. A view request for r does not switch to it: a content
+  ;; view of r opens beside them.
   (skg-request-single-root-content-view-from-id "r")
   (let ((view (skg-test-wait-for
                (lambda ()
@@ -201,6 +202,9 @@
                            (string-match-p "unknown (gnid d)" (buffer-string)))))
                   (buffer-list))))))
     (unless view (test-fail "Timeout waiting for a view of r showing d as unknown"))
+    (unless (diff-view-buffers)
+      (test-fail "The buffers of the diff view closed when the view of r opened"))
+    (test-pass "A content view of r opened beside the buffers of the diff view")
     (switch-to-buffer view)
     (goto-char (point-min))
     (re-search-forward "unknown (gnid d)")

@@ -1,12 +1,24 @@
 // cargo nextest run --test grouped_views -E 'test(content_view::)'
 
+use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use indoc::indoc;
 use std::error::Error;
+use std::io::BufReader;
+use std::net::TcpStream;
+use std::sync::Arc;
 
 use skg::test_utils::{multi_root_view, single_root_view};
 use skg::assert_metadata_eq;
-use skg::test_utils::run_with_shared_test_stores;
-use skg::types::misc::{ID, SkgConfig};
+use skg::serve::ViewsState;
+use skg::serve::handlers::single_root_view::handle_single_root_view_request;
+use skg::skgrepo_sets::SkgrepoRestriction;
+use skg::test_utils::{extract_string_field_from_sexp, graph_handle_from_config, read_all_lp_messages, run_with_shared_test_stores, skg_env_from_parts};
+use skg::types::env::{RuntimeGeneration, SkgEnv};
+use skg::types::misc::{ID, SkgConfig, TantivyIndex};
+use skg::types::viewnode::Viewnode;
+use skg::types::views_state::{DiffViewBufferKind, OpenViews, ViewforestId};
+
+use ego_tree::Tree;
 
 
 #[test]
@@ -35,6 +47,14 @@ fn all_tests
                  "tests/content_view/fixtures-3") ?;
       test_limit_with_multiple_sibling_groups (
         &s . config ) . await ?;
+      s . reset ("a_root_only_of_a_diffView_buffer_gets_a_content_view",
+                 "tests/content_view/fixtures-2") ?;
+      a_root_only_of_a_diffView_buffer_gets_a_content_view (
+        &s . config, &s . tantivy ) ?;
+      s . reset ("a_root_of_a_content_view_and_a_diffView_buffer_switches_to_the_content_view",
+                 "tests/content_view/fixtures-2") ?;
+      a_root_of_a_content_view_and_a_diffView_buffer_switches_to_the_content_view (
+        &s . config, &s . tantivy ) ?;
       Ok (( )) } )) }
 
 async fn test_multi_root_view_logic (
@@ -223,3 +243,106 @@ async fn test_limit_with_multiple_sibling_groups (
                  "limit=4: whole groups shown (111,112 and 121); extension stops at the budget");
 
       Ok (( )) }}
+
+/// A view request for 1, which is a root only of a buffer of the diff
+/// view, renders a content view of 1 and registers it, instead of
+/// switching to the diff-view buffer.
+fn a_root_only_of_a_diffView_buffer_gets_a_content_view (
+  config  : &SkgConfig,
+  tantivy : &TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  let env : SkgEnv =
+    skg_env_from_parts (config, tantivy, &graph_handle_from_config (config) ?);
+  let mut views_state : ViewsState =
+    ViewsState { open_views     : OpenViews::new (),
+                 graph_straddle : None, };
+  register_view_of_1 (
+    config, &env, &mut views_state, "diff-view-of-1",
+    Some (DiffViewBufferKind::AllChanges) ) ?;
+  let messages : Vec<String> =
+    request_view_of_1 (config, &env, &mut views_state, "requested-view-of-1");
+  assert_eq! ( messages . len (), 1, "{:?}", messages );
+  assert! ( extract_string_field_from_sexp (&messages [0], "switch-to-view") . is_none ()
+            && messages [0] . contains ("(gnid 1)"),
+            "the request renders a content view of 1: {}", messages [0] );
+  assert! ( views_state . open_views . is_ordinary_content_view (
+              &ViewforestId::ContentView ( "requested-view-of-1" . to_string () )),
+            "the rendered view is registered as an ordinary content view" );
+  Ok (( )) }
+
+/// A view request for 1, which is a root of both a buffer of the diff
+/// view and an ordinary content view, switches to the content view.
+fn a_root_of_a_content_view_and_a_diffView_buffer_switches_to_the_content_view (
+  config  : &SkgConfig,
+  tantivy : &TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  let env : SkgEnv =
+    skg_env_from_parts (config, tantivy, &graph_handle_from_config (config) ?);
+  let mut views_state : ViewsState =
+    ViewsState { open_views     : OpenViews::new (),
+                 graph_straddle : None, };
+  register_view_of_1 (
+    config, &env, &mut views_state, "diff-view-of-1",
+    Some (DiffViewBufferKind::AllChanges) ) ?;
+  register_view_of_1 (
+    config, &env, &mut views_state, "content-view-of-1", None ) ?;
+  let messages : Vec<String> =
+    request_view_of_1 (config, &env, &mut views_state, "requested-view-of-1");
+  assert_eq! ( messages . len (), 1, "{:?}", messages );
+  assert_eq! ( extract_string_field_from_sexp (&messages [0], "switch-to-view"),
+               Some ( "content-view-of-1" . to_string () ),
+               "the request switches to the content view: {}", messages [0] );
+  assert! ( ! views_state . open_views . views . contains_key (
+              &ViewforestId::ContentView ( "requested-view-of-1" . to_string () )),
+            "a switch registers no new view" );
+  Ok (( )) }
+
+/// Register a view of 1 as 'view_id': a buffer of the diff view of
+/// kind 'diffView_buffer_kind' if that is given, else an ordinary
+/// content view.
+fn register_view_of_1 (
+  config               : &SkgConfig,
+  env                  : &SkgEnv,
+  views_state          : &mut ViewsState,
+  view_id              : &str,
+  diffView_buffer_kind : Option<DiffViewBufferKind>,
+) -> Result<(), Box<dyn Error>> {
+  let (_text, pids, viewforest) : (String, Vec<ID>, Tree<Viewnode>) =
+    single_root_view ( config, None, &ID ( "1" . to_string () )) ?;
+  let runtime : Arc<RuntimeGeneration> =
+    env . runtime_snapshot ();
+  let viewforest_id : ViewforestId =
+    ViewforestId::ContentView ( view_id . to_string () );
+  let all : SkgrepoRestriction =
+    SkgrepoRestriction::unrestricted (config);
+  match diffView_buffer_kind {
+    Some (kind) =>
+      views_state . open_views . register_diffView_view (
+        &runtime . graph, viewforest_id, viewforest, &pids, kind, &all ),
+    None =>
+      views_state . open_views . register_view (
+        &runtime . graph, viewforest_id, viewforest, &pids, &all ), }
+  Ok (( )) }
+
+/// Send a single-root view request for 1 carrying 'view_id', and
+/// return every message the server sent.
+fn request_view_of_1 (
+  config      : &SkgConfig,
+  env         : &SkgEnv,
+  views_state : &mut ViewsState,
+  view_id     : &str,
+) -> Vec<String> {
+  let (mut server, client) : (TcpStream, TcpStream) =
+    mk_test_tcp_stream_pair ();
+  let request : String =
+    format! ( "((request . \"single root content view\") (id . \"1\") (view-id . \"{}\"))",
+              view_id );
+  let all : SkgrepoRestriction =
+    SkgrepoRestriction::unrestricted (config);
+  std::thread::scope ( |scope| {
+    // The handler runs its own executor, which cannot start inside
+    // the one the test stores run the test in.
+    scope . spawn ( || handle_single_root_view_request (
+      &mut server, &request, env, views_state, &all )); } );
+  drop (server);
+  read_all_lp_messages (&mut BufReader::new (client)) }

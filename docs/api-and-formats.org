@@ -135,6 +135,12 @@ So far there are these endpoints:
     no list names a root, so the ID rule makes it a tombstone, which
     the refresh prunes. Under a skgrepo restriction the request is
     refused instead, as for a restricted node.
+  - If =NODE_ID= is a root of an open ordinary content view (one that
+    is neither a search view nor a buffer of the diff view), the
+    response is LP =((response-type content-view) (switch-to-view
+    VIEW_ID))=, naming that view, and the client switches to its
+    buffer; nothing is rendered. A node that is a root only of buffers
+    of the diff view gets a new content view.
   - The requested node opens as itself, shown raw. Because the raw root
     is an overridden node shown raw, its immediate children are also shown
     raw (one level); substitution resumes at the grandchildren. See
