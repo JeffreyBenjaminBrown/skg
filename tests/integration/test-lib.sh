@@ -62,6 +62,12 @@ cleanup() {
       wait $CARGO_PID 2>/dev/null || true
     fi
   fi
+
+  # The server's run folder ('SkgConfig::logs_dir'): its logs repeat
+  # server.log, and a temporary config's would otherwise pile up.
+  if [ -n "$TEMP_CONFIG" ]; then
+    rm -rf "$TEMP_CONFIG.running"
+  fi
 }
 
 # Function to find available port by trying random ports in range
