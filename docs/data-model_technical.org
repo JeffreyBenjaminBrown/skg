@@ -151,11 +151,12 @@ vector.  A live rebuild swaps in only after the complete candidate succeeds;
 failure leaves the prior generation visible.  The operation never rewrites
 authoritative =.skg= files.
 
-The generation number starts at 0 when the server starts, and each swap-in
-adds one.  It is internal: it names the generation a reload notice swapped
-in, the generation a rerender pass refreshes against, and the search index
-a rebuild builds, and it dates nothing a client holds.  No view response
-carries it.  Whether a save is stale is decided by content, not by
+The generation number starts at the microseconds since the Unix epoch when
+the server starts, so that a generation in the server's log places itself in
+time, and each swap-in adds one.  It is internal: it names the generation a
+reload notice swapped in, the generation a rerender pass refreshes against,
+and the search index a rebuild builds, and it dates nothing a client holds.
+No view response carries it.  Whether a save is stale is decided by content, not by
 generation: the save compares the buffer's baseline, the text the server
 last drew for it, with the graph (=docs/api-and-formats.org=, "Save buffer"
 and "The baseline of a view").  So a restart, a rebuild or a strip of body

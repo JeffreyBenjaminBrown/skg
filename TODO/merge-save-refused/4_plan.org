@@ -355,7 +355,7 @@ Docs: the switch-to-view sentence under the single-root view
 request in 'docs/api-and-formats.org', and 'docs/diff-view.org'
 where it describes following a link from a diff-view buffer, if
 it does.
-** TODO Slice 4: the runtime generation starts at the epoch again
+** DONE Slice 4: the runtime generation starts at the epoch again
 Plan 2_2's slice 3 made a server start its runtime generation at
 0 ('server/types/env.rs', near line 80, 'generation : 0'); before
 it, a server started at the microseconds since the Unix epoch

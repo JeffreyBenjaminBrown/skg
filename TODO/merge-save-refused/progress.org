@@ -963,3 +963,39 @@ one predicate, 'is_ordinary_content_view', as the pitfall asked,
 so a kind a later plan adds is skipped without another edit. Both
 clients' diff-view integration tests lost their workaround and
 pass. No correction needed. Slice 4 launched 01:13.
+** Slice 4
+*** Commits
+- The commit carrying this entry: a server starts its runtime
+  generation at the microseconds since the Unix epoch again
+  ('startup_generation' in 'server/types/env.rs'), the docs say
+  so, and the slice's headline turns DONE.
+*** Suites
+- 'cargo nextest run --test grouped_unit --test grouped_saves':
+  441 of 441 pass ('runtime_generation' is in 'grouped_unit';
+  'repo_watch' and 'reload_config' in 'grouped_saves').
+- 'bash/nextest.sh': 1142 of 1142 pass.
+- No failures to classify. The integration suite was not run (no
+  buffer text or protocol change).
+- An isolated server on scratch data (the 'verify' skill) opened a
+  view and saved a new child; its log showed the swap-in at
+  generation 1793927763314842, the wall clock's epoch seconds
+  (1793927766) in microseconds.
+*** Deviations from the plan's how
+**** The start value is a named function
+'startup_generation' returns to 'server/types/env.rs' as commit
+d6ea5ccc removed it, with a doc comment that says what the number
+is for (placing a logged generation in time) and that nothing
+reads it for staleness, instead of an inline comment at the start
+value. There was no comment at the start value to update.
+*** Fixtures changed
+None. No test asserted the start at 0: the tests of 'tests/'
+that read the generation ('repo_watch.rs', 'reload_config.rs',
+'runtime_generation.rs') compare it with the generation before,
+plus one or plus nothing. The Tantivy rebuild's folder name
+('rebuild_tantivy_as_generation', 'server/dbs/init.rs') now
+carries the larger number; the retirement of old folders matches
+by prefix, so it is unaffected.
+*** Unfinished
+Nothing.
+*** Headline
+DONE.

@@ -9,6 +9,7 @@ use crate::repo_watch::reload::RepoChangeNotice;
 use crate::types::misc::{SkgConfig, TantivyIndex};
 
 use std::sync::{Arc, OnceLock};
+use std::time::{SystemTime, UNIX_EPOCH};
 use std::sync::Mutex as SyncMutex;
 use std::sync::MutexGuard as SyncMutexGuard;
 use arc_swap::ArcSwap;
@@ -77,7 +78,8 @@ impl SharedRuntime {
       ReadinessStore::load ( &config . readiness_marks_path () );
     SharedRuntime {
       current : ArcSwap::from_pointee (RuntimeGeneration {
-        config : Arc::new (config), graph, tantivy_index, generation : 0,
+        config : Arc::new (config), graph, tantivy_index,
+        generation : startup_generation (),
       }),
       mutation_gate : new_mutation_gate (),
       legacy_graph,
@@ -157,6 +159,16 @@ impl SharedRuntime {
     self . legacy_graph . clone ()
   }
 }
+
+/// The generation a server starts at: the microseconds since the
+/// Unix epoch, so that a generation in the server's log places
+/// itself in time. Each swap-in adds one. Nothing reads the number
+/// for staleness.
+fn startup_generation (
+) -> u64 {
+  SystemTime::now () . duration_since (UNIX_EPOCH)
+    . map ( |since_epoch| since_epoch . as_micros () as u64 )
+    . unwrap_or (0) }
 
 #[derive(Clone)]
 pub struct SkgEnv {
