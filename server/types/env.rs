@@ -160,10 +160,11 @@ impl SharedRuntime {
   }
 }
 
-/// The generation a server starts at: the microseconds since the
-/// Unix epoch, so that a generation in the server's log places
-/// itself in time. Each swap-in adds one. Nothing reads the number
-/// for staleness.
+/// The runtime generation a server starts at: the microseconds since
+/// the Unix epoch, so that this startup generation, in the server's
+/// log, places itself in time. Each swap-in adds one, so a later
+/// runtime generation is the startup one plus its count of swap-ins.
+/// Nothing reads the number for staleness.
 fn startup_generation (
 ) -> u64 {
   SystemTime::now () . duration_since (UNIX_EPOCH)

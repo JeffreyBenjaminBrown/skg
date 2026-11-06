@@ -1,12 +1,15 @@
 //! Detect edits that a save would otherwise ignore because the occurrence
 //! carrying them is write-protected (or, for a flags folder, server-owned).
 //! A write-protected occurrence emits nothing at save extraction, so each is
-//! judged by the graph: it must say what the graph says, or, where the
-//! graph changed after the buffer was rendered, what the baseline says.
+//! judged by the graph: it must say what the graph says, or, for its
+//! title and home skgrepo, where the graph changed them after the
+//! buffer was rendered, what the baseline's occurrences of its
+//! graphnode say.
 
 use crate::types::errors::{BufferValidationError, HeadlineName};
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::nodes::complete::{Flag, Graphnode};
+use crate::serve::handlers::save_staleness::OccurrenceInTheBaseline;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{RelationshipEditRequest, Folder, PropertyMember, Occurrence, Viewnode, ViewnodeKind, Vognode};
 use crate::dbs::in_rust_graph::InRustGraph;
@@ -18,9 +21,9 @@ use ego_tree::NodeRef;
 use std::collections::BTreeMap;
 
 /// Every write-protected occurrence of the saved view must agree with
-/// the graph: its title and home skgrepo equal the node's (or the
-/// baseline's copy of it, in 'baseline_writes': an occurrence still
-/// showing what the server drew is no edit), and its
+/// the graph: its title and home skgrepo equal the node's (or those of
+/// an occurrence of it in the baseline, editable or write-protected:
+/// an occurrence still showing what the server drew is no edit), and its
 /// alias folder, when present, shows the node's aliases whose records
 /// the skgrepo 'restriction' shows (each, unrestricted) in order and
 /// takes no relRepo request. Under a write-protected parent no child
@@ -34,7 +37,7 @@ pub fn errors_for_writeProtected_occurrences (
   viewforest      : &ViewForest,
   graph           : &InRustGraph,
   restriction     : &SkgrepoRestriction,
-  baseline_writes : &BTreeMap<ID, Graphnode>, // the outdated graphnodes' baseline copies, by pid ('baseline_writes' in 'server/serve/handlers/save_staleness.rs')
+  baseline_occurrences : &BTreeMap<ID, Vec<OccurrenceInTheBaseline>>, // by pid ('WhatTheBaselineShows::occurrences' in 'server/serve/handlers/save_staleness.rs')
 ) -> Vec<BufferValidationError> {
   let mut errors : Vec<BufferValidationError> =
     flags_surface_errors_against_graph (viewforest, graph);
@@ -46,7 +49,8 @@ pub fn errors_for_writeProtected_occurrences (
       let differences : Vec<String> =
         writeProtected_differences_from_graph (
           node, occurrence, &graphnode,
-          baseline_writes . get ( &graph . pid_else_raw_id (&occurrence . gnid) ),
+          baseline_occurrences . get ( &graph . pid_else_raw_id (&occurrence . gnid) )
+            . map (Vec::as_slice) . unwrap_or_default (),
           restriction );
       if ! differences . is_empty () {
         errors . push (BufferValidationError::EditedWriteProtectedOccurrence {
@@ -57,22 +61,25 @@ pub fn errors_for_writeProtected_occurrences (
   errors }
 
 /// What the occurrence says that the graph does not. A title or home
-/// skgrepo equal to the baseline's copy's is not counted.
+/// skgrepo equal to an occurrence's of the same graphnode in the
+/// baseline is not counted.
 fn writeProtected_differences_from_graph (
-  node                : NodeRef<Viewnode>,
-  occurrence          : &Occurrence,
-  graphnode           : &Graphnode,
-  baseline_copy       : Option<&Graphnode>,
-  restriction         : &SkgrepoRestriction,
+  node                 : NodeRef<Viewnode>,
+  occurrence           : &Occurrence,
+  graphnode            : &Graphnode,
+  baseline_occurrences : &[OccurrenceInTheBaseline],
+  restriction          : &SkgrepoRestriction,
 ) -> Vec<String> {
   let mut differences : Vec<String> = Vec::new ();
   if occurrence . title != graphnode . title
-    && baseline_copy . is_none_or ( |copy| copy . title != occurrence . title ) {
+    && ! baseline_occurrences . iter () . any (
+      |drawn| drawn . title == occurrence . title ) {
     differences . push (format! (
       "title {:?} differs from the graph's {:?}",
       occurrence . title, graphnode . title )); }
   if occurrence . home_skgrepo != graphnode . home_skgrepo
-    && baseline_copy . is_none_or ( |copy| copy . home_skgrepo != occurrence . home_skgrepo ) {
+    && ! baseline_occurrences . iter () . any (
+      |drawn| drawn . home_skgrepo == occurrence . home_skgrepo ) {
     differences . push (format! (
       "home skgrepo {} differs from the graph's {}",
       occurrence . home_skgrepo, graphnode . home_skgrepo )); }
@@ -383,15 +390,17 @@ mod tests {
   /// has since changed, is no edit; one showing a third title is.
   #[test]
   fn a_title_as_the_baseline_drew_it_passes () {
-    let baseline_writes : BTreeMap<ID, Graphnode> = BTreeMap::from ([ (
-      ID::from ("recorder"),
-      Graphnode { title : "recorder as drawn" . to_string (),
-                  .. graphnode_from_graph (&graph (), &ID::from ("recorder")) . unwrap () } ) ]);
+    let baseline_occurrences : BTreeMap<ID, Vec<OccurrenceInTheBaseline>> =
+      BTreeMap::from ([ (
+        ID::from ("recorder"),
+        vec! [ OccurrenceInTheBaseline {
+          title        : "recorder as drawn" . to_string (),
+          home_skgrepo : SkgrepoName::from ("main"), } ] ) ]);
     let errors_in_with_baseline = |text : &str| -> Vec<BufferValidationError> {
       errors_for_writeProtected_occurrences (
         &forest (text), &graph (),
         &SkgrepoRestriction::unrestricted (&SkgConfig::dummyFromSkgrepos (HashMap::new ())),
-        &baseline_writes ) };
+        &baseline_occurrences ) };
     assert_eq! (errors_in_with_baseline (
       "* (skg node (gnid recorder) (skgRepos (nodeRepo main)) writeProtected) recorder as drawn\n"),
       vec! []);

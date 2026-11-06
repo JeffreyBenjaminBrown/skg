@@ -1164,3 +1164,112 @@ Slice 6 reported at 01:48; one commit. The server skips
 the envelope's dirty views when choosing collateral views, and
 both clients refuse to replace a buffer with unsaved edits. Diff
 read; no correction needed. Slice 7 launched 01:48.
+** Slice 7
+*** Commits
+- The commit carrying this entry: corrections from the review. A
+  write-protected occurrence showing what the baseline's
+  occurrence of its graphnode shows is no edit, whether or not the
+  baseline also had an editable occurrence; the warning for a
+  graphnode the graph deleted says "was deleted"; the vocabulary
+  report's findings 2, 3, 6, 7, 8, 9, 10, 11 and 13; the new test;
+  the docs; the slice's headline turned DONE.
+*** Suites
+- 'cargo nextest run --test grouped_saves': the new test
+  'a_node_shown_only_write_protected_as_the_baseline_drew_it_saves'
+  was run first against the unchanged code and failed as the
+  slice says (refused: "Write-protected occurrence differs from the
+  graph ... ra"). After the change, 193 of 193 pass.
+- 'cargo nextest run --test grouped_views': 26 of 26 pass.
+- 'bash/nextest.sh': 1144 of 1144 pass (slice 6's 1143 plus the
+  new test).
+- No failure of any kind.
+- The '/verify' skill, at the TCP surface, on an isolated scratch
+  server: a view showing ra only write-protected (after a
+  '(viewRequests writeProtectedView)' save), ra retitled on another
+  connection, an edit of rb saved with the redraw as baseline:
+  saved, rb edited, ra keeps the new title. A node d deleted on
+  another connection, an untouched view of its container saving an
+  edit of e: the warning says "d first (d), which was deleted after
+  this buffer was rendered", and the container's "which changed".
+- 'bash/all-tests.sh' not run: no text a client test or
+  integration script matches changed. The warning's new "was
+  deleted" variant and the renamed predicate appear under 'tests/'
+  only in Rust tests ('save_stale_buffers.rs', 'content_view.rs').
+*** Deviations from the plan's how
+- The baseline is read once into a struct,
+  'WhatTheBaselineShows' ('save_staleness.rs'): 'writes' (what
+  'baseline_writes' returned) and 'occurrences', the title and home
+  skgrepo of every occurrence in the baseline's parsed viewforest,
+  by pid. The function 'baseline_writes' became
+  'what_the_baseline_shows', since it now returns both; the handler
+  passes the struct to the plan builder (its 'occurrences' to the
+  write-protected check, its 'writes' to
+  'without_untouched_outdated_saves') and its 'writes' to
+  'stale_write_errors'. The parameters named 'baseline_writes' in
+  those two functions keep their name.
+- The write-protected check excuses a title, or a home skgrepo,
+  that any baseline occurrence of the graphnode shows, aspect by
+  aspect as before. 'occurrences' keeps every occurrence, not
+  only the first, so a baseline drawing one graphnode two ways
+  (none known) cannot refuse an unedited occurrence. The
+  check's unit test ('a_title_as_the_baseline_drew_it_passes')
+  now builds that map instead of a baseline copy.
+- The new test reaches a view showing ra only write-protected
+  through the server: connection one saves r's view with a
+  '(viewRequests writeProtectedView)' on ra, and the redraw it
+  gets back is the baseline of its next save. That save writes
+  nothing of ra, so no "Left as the graph has it" warning names it;
+  the test asserts only that the save succeeds and that ra keeps
+  its new title.
+- The deleted distinction: 'UntouchedOutdatedGraphnode' gained
+  'deleted_from_the_graph', set by 'graph_lacks', the same test
+  the stale error's 'change_since_rendered' makes (it reads the
+  graphnode back and reports 'Deleted' where the graph has none).
+  The warning's prefix, "Left as the graph has it", is unchanged
+  for a deleted graphnode too; only the clause differs. The test
+  'an_untouched_node_deleted_elsewhere_stays_deleted' now expects
+  the "was deleted" wording for ra.
+- Finding 3: the predicate is 'is_content_view_proper'; the docs
+  say "content view proper", defined in the glossary under "view,
+  buffer, viewforest". 'docs/override.org' now says a re-visit
+  switches to the open content view proper, never to a buffer of
+  the diff view. One more test comment
+  ('tests/pruned_change_view/write_protecting.rs') said "ordinary
+  content view" in the same sense, and changed too.
+- Finding 6: only the pass's name changed, plus its own comment's
+  "referencers" (now "recorders of a deleted ID"). The older uses
+  of "referencer" in 'save.rs' ('referencer_pids' and the doc
+  comment's later lines) predate the plan and stay.
+- Finding 8: the plan says a bare "generation" in 'save.rs' near
+  line 423 becomes "runtime generation", but there it meant
+  producing ("cleanup-SaveNode generation"), not a runtime
+  generation, as the report says. It now reads "(it produces the
+  cleanup SaveNodes)".
+- Finding 11: the glossary defines "the buffer's writes" and
+  "dirty view" (and "clean") in the entry "baseline, outdated,
+  untouched, stale"; the plan's vocabulary line now names the two
+  glossary headlines it relies on.
+- Finding 13: 'matching_identity_ignoring_links' became
+  'matching_identity_without_links', 'ordinary_relations_but_links'
+  'ordinary_relations_without_links' (also in
+  'tests/dbs/in_rust_graph/relation_accessors.rs', whose test
+  '..._over_relations_but_links_omits_link_partners' became
+  '..._over_relations_without_links_...'). Rewrapping line 44 of
+  'override_invariants.rs' meant rewrapping its whole comment.
+  "Full" in the code beside "whole" in the glossary was left.
+- 'docs/api-and-formats.org': the write-protected sentence moved
+  out of the untouched-graphnode sentence, since a graphnode shown
+  only write-protected is not among the baseline's writes, so not
+  outdated in the glossary's sense.
+- '3_2_glossary.org' still calls the pass "the
+  referencer-collection pass"; it is a dirty file of Jeff's and a
+  record, so it was not touched. The plan's slice 5 text keeps the
+  old name too, as a record of that slice.
+*** Fixtures changed
+None. The new test uses 'tests/save_stale_buffers/fixtures' as
+it stands.
+*** Unfinished
+Nothing. The report's findings 1 and 5 (the two costly renamings)
+are Jeff's to decide, as the slice says.
+*** Headline
+DONE.

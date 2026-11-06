@@ -525,12 +525,20 @@ fn with_rb_body_edited (
   view . replace ("rb's second line", "rb's second line, edited") }
 
 /// The warning a save gives for leaving 'gnid', titled 'title' in the
-/// buffer, as the graph has it.
+/// buffer, as the graph has it, after the graph changed it.
 fn left_as_the_graph_has_it (
   title : &str,
   gnid  : &str,
 ) -> String {
   format! ( "Left as the graph has it: {} ({}), which changed after this buffer was rendered and which this buffer did not edit.",
+            title, gnid ) }
+
+/// The same warning, for a 'gnid' the graph deleted.
+fn left_deleted_as_the_graph_has_it (
+  title : &str,
+  gnid  : &str,
+) -> String {
+  format! ( "Left as the graph has it: {} ({}), which was deleted after this buffer was rendered and which this buffer did not edit.",
             title, gnid ) }
 
 /// Retitle ra on a connection of its own.
@@ -628,7 +636,7 @@ fn an_untouched_node_deleted_elsewhere_stays_deleted
             && ! file_text (&f, "r") . contains ("- ra")
             && file_text (&f, "rb") . contains ("rb's second line, edited") );
   assert! ( result . contains (
-              &left_as_the_graph_has_it ("ra as first written", "ra") )
+              &left_deleted_as_the_graph_has_it ("ra as first written", "ra") )
             && result . contains (
               &left_as_the_graph_has_it ("r, a root", "r") ),
             "{}", result );
@@ -734,4 +742,37 @@ fn a_write_protected_occurrence_as_the_baseline_drew_it_saves
   assert! ( result . contains (
               &left_as_the_graph_has_it ("ra as first written", "ra") ),
             "{}", result );
+  Ok (()) }
+
+#[test]
+fn a_node_shown_only_write_protected_as_the_baseline_drew_it_saves
+  () -> Result<(), Box<dyn Error>> {
+  // A write-protect request makes r's view show ra only
+  // write-protected, so the baseline writes nothing of ra. After ra
+  // is retitled elsewhere, the view still shows its first title.
+  let mut f : Fixture = fixture () ?;
+  let mut first : ViewsState = new_connection ();
+  let r_in_first : String = open_view (&mut f, &mut first, "r", "r-first");
+  let ra_metadata : &str = "(gnid ra) (skgRepos (nodeRepo main))";
+  assert! ( r_in_first . matches (ra_metadata) . count () == 1, "{}", r_in_first );
+  let write_protecting : String = save (
+    &mut f, &mut first, "r-first",
+    &r_in_first . replacen (
+      ra_metadata,
+      &format! ("{} (viewRequests writeProtectedView)", ra_metadata), 1 ),
+    Some (&r_in_first) );
+  assert! ( saved (&write_protecting), "{}", write_protecting );
+  let r_redrawn : String = extract_string_field_from_sexp (&write_protecting, "content")
+    . expect ("content");
+  assert! ( r_redrawn . matches ("(gnid ra)") . count () == 1
+            && r_redrawn . lines () . any ( |line|
+                 line . contains ("(gnid ra)") && line . contains ("writeProtected") ),
+            "{}", r_redrawn );
+  retitle_ra_elsewhere (&mut f);
+  let result : String = save (
+    &mut f, &mut first, "r-first",
+    &with_rb_body_edited (&r_redrawn), Some (&r_redrawn) );
+  assert! ( saved (&result), "{}", result );
+  assert! ( file_text (&f, "rb") . contains ("rb's second line, edited")
+            && file_text (&f, "ra") . contains ("ra retitled") );
   Ok (()) }

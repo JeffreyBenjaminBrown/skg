@@ -265,13 +265,13 @@ fn a_root_only_of_a_diffView_buffer_gets_a_content_view (
   assert! ( extract_string_field_from_sexp (&messages [0], "switch-to-view") . is_none ()
             && messages [0] . contains ("(gnid 1)"),
             "the request renders a content view of 1: {}", messages [0] );
-  assert! ( views_state . open_views . is_ordinary_content_view (
+  assert! ( views_state . open_views . is_content_view_proper (
               &ViewforestId::ContentView ( "requested-view-of-1" . to_string () )),
-            "the rendered view is registered as an ordinary content view" );
+            "the rendered view is registered as a content view proper" );
   Ok (( )) }
 
 /// A view request for 1, which is a root of both a buffer of the diff
-/// view and an ordinary content view, switches to the content view.
+/// view and a content view proper, switches to the content view.
 fn a_root_of_a_content_view_and_a_diffView_buffer_switches_to_the_content_view (
   config  : &SkgConfig,
   tantivy : &TantivyIndex,

@@ -215,7 +215,7 @@ fn update_relevant_neighborhood_includes_each_ordinary_relation_both_ways () {
 /// dirty-view check reads it: no link partner in either direction, but
 /// every other ordinary partner and the override walks.
 #[test]
-fn update_relevant_neighborhood_over_relations_but_links_omits_link_partners () {
+fn update_relevant_neighborhood_over_relations_without_links_omits_link_partners () {
   let graph : InRustGraph = InRustGraph::from_graphnodes (&[
     node_with_all_relations (
       "seed", &["contained"], &[], &[], &["overridden"], &["link-dest"]),
@@ -224,13 +224,13 @@ fn update_relevant_neighborhood_over_relations_but_links_omits_link_partners () 
     node_with_all_relations ("link-dest", &[], &[], &[], &[], &[]),
     node_with_all_relations ("link-source", &[], &[], &[], &[], &["seed"]),
   ]);
-  let ordinary_relations_but_links : Vec<NodeRelation> =
+  let ordinary_relations_without_links : Vec<NodeRelation> =
     UPDATE_RELEVANT_ORDINARY_RELATIONS . iter () . copied ()
     . filter (|relation| *relation != NodeRelation::LinksTo)
     . collect ();
   assert_eq! (
     graph . update_relevant_neighborhood_over (
-      [ID::from ("seed")], &ordinary_relations_but_links),
+      [ID::from ("seed")], &ordinary_relations_without_links),
     gnid_set (&["seed", "contained", "overridden"]));
   assert_eq! (
     graph . update_relevant_neighborhood ([ID::from ("seed")]),

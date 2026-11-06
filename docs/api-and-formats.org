@@ -135,8 +135,9 @@ So far there are these endpoints:
     no list names a root, so the ID rule makes it a tombstone, which
     the refresh prunes. Under a skgrepo restriction the request is
     refused instead, as for a restricted node.
-  - If =NODE_ID= is a root of an open ordinary content view (one that
-    is neither a search view nor a buffer of the diff view), the
+  - If =NODE_ID= is a root of an open content view proper (a content
+    view that is no buffer of the diff view; see "view, buffer,
+    viewforest" in =docs/glossary.org=), the
     response is LP =((response-type content-view) (switch-to-view
     VIEW_ID))=, naming that view, and the client switches to its
     buffer; nothing is rendered. A node that is a root only of buffers
@@ -307,11 +308,12 @@ So far there are these endpoints:
   - A stale buffer is refused, before anything is written and before
     any confirmation is asked ('stale_write_errors' in
     'server/serve/handlers/save_staleness.rs'). A save writes a
-    graphnode either from a copy the buffer took when it was drawn or
-    from the graph as it stands at save time; only a copy can be older
-    than the graph, and only a write from a copy, or a delete, can
-    discard graph state the user never saw. The buffer's copies are in
-    its baseline (see "The baseline of a view" below). So the server
+    graphnode either from the buffer's copy of it, the Save
+    instruction its saved text yields, or from the graph as it stands
+    at save time; only the buffer's copy can be older than the graph,
+    and only a write from it, or a delete, can discard graph state the
+    user never saw. What the buffer showed before any edit is its
+    baseline (see "The baseline of a view" below). So the server
     parses the baseline as it parses the saved text, up to the filter
     that drops nodeInstructions identical to the graph as no-ops, under
     the same skgrepo restriction; what survives are the baseline's
@@ -324,14 +326,17 @@ So far there are these endpoints:
     it would only undo what changed. The save leaves it out, before
     the plan's validators judge it ('without_untouched_outdated_saves'
     in the same file): its write, its move back to the home skgrepo
-    the buffer shows, and, if it is foreign, its fork; and a
-    write-protected occurrence of it showing the title and home
-    skgrepo the baseline shows is not refused. The rest of the save
-    proceeds, and its response carries one warning per graphnode left
-    out, =Left as the graph has it: TITLE (ID), which changed after
-    this buffer was rendered and which this buffer did not edit.=,
-    TITLE as the buffer shows it; the redraw shows the graph's
-    version. An outdated graphnode the buffer edits or deletes is
+    the buffer shows, and, if it is foreign, its fork. The rest of the
+    save proceeds, and its response carries one warning per graphnode
+    left out, =Left as the graph has it: TITLE (ID), which changed
+    after this buffer was rendered and which this buffer did not
+    edit.=, TITLE as the buffer shows it, or =... which was deleted
+    after ...= for one the graph no longer has; the redraw shows the
+    graph's version. A write-protected occurrence, which writes
+    nothing, is not refused for showing a title or home skgrepo that
+    an occurrence of its graphnode in the baseline shows, editable or
+    write-protected, though the graph changed it since: it is no edit.
+    An outdated graphnode the buffer edits or deletes is
     stale: writing the buffer's text of it would silently undo a
     change made since the buffer was drawn. A delete is never
     untouched. What the buffer writes is what its text yields after

@@ -29,8 +29,8 @@ use std::net::TcpStream; // handles two-way communication
 /// and sends the response to Emacs (length-prefixed).
 /// Response format:
 /// ((content "...") (errors ("error1" ...)) (warnings ("warning1" ...)))
-/// If the requested ID is already a root of an open ordinary content
-/// view ('OpenViews::is_ordinary_content_view'),
+/// If the requested ID is already a root of an open content view
+/// proper ('OpenViews::is_content_view_proper'),
 /// returns ((switch-to-view "VIEW_ID")) instead of rendering.
 pub fn handle_single_root_view_request (
   stream     : &mut TcpStream,
@@ -68,7 +68,7 @@ pub fn handle_single_root_view_request (
         = views_state . open_views
           . content_viewforest_id_for_root_gnid ( &gnid )
         { // Following a link to a root that is already open lands in
-          // that ordinary content buffer.
+          // that content view proper's buffer.
           let switch_sexp : String =
             sexp_to_client_string ( &Sexp::List ( vec! [
               Sexp::List ( vec! [

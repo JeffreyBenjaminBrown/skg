@@ -414,13 +414,13 @@ pub enum DeleteFrom {
 }
 
 /// Cleanup so deletes don't leave dangling references on disk, in
-/// two passes, the referencer-collection pass and then the
+/// two passes, the recorder-collection pass and then the
 /// ID-stripping pass:
 ///
 /// Foreign raw references deliberately survive: delete propagation never
 /// manufactures or modifies a foreign telescope write.
 ///
-/// The referencer-collection pass (cleanup-SaveNode generation): for
+/// The recorder-collection pass (it produces the cleanup SaveNodes): for
 /// any owned node N still on disk that references a being-deleted pid
 /// in any of its out bound list fields, *maybe* append a verbatim
 /// Save(N) to NODE_DEFS so that the ID-stripping pass will rewrite N.
@@ -429,7 +429,7 @@ pub enum DeleteFrom {
 /// - nodes also being deleted (because why bother)
 ///
 /// The ID-stripping pass: for every Save in NODE_DEFS regardless of
-/// origin (which could be the referencer-collection pass or the save
+/// origin (which could be the recorder-collection pass or the save
 /// itself),
 /// remove every id in 'deleted_id_set' from the four
 /// outbound list fields (contains, subscribesTo,
@@ -482,7 +482,7 @@ pub(crate) fn apply_delete_propagation_cleanup (
           s . insert ( e . clone () ); }}}
     s };
 
-  { // The referencer-collection pass: append "save-it-unchanged" SaveNodes for referencers not already covered by the user's nodeInstructions. As-is, these would have no effect, but the ID-stripping pass strips some IDs.
+  { // The recorder-collection pass: append "save-it-unchanged" SaveNodes for recorders of a deleted ID not already covered by the user's nodeInstructions. As-is, these would have no effect, but the ID-stripping pass strips some IDs.
     let user_save_pids : HashSet<ID> = node_defs . iter ()
       . filter_map ( |d| match d {
         NodeInstruction::Save (SaveNode (n)) => Some ( n . pid . clone ()),

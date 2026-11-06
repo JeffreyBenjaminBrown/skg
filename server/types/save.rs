@@ -78,11 +78,13 @@ pub struct SavePlan {
 }
 
 /// A graphnode a save left as the graph has it: untouched and outdated
-/// in the saved buffer ('docs/glossary.org', "untouched, outdated").
+/// in the saved buffer ('docs/glossary.org', "baseline, outdated,
+/// untouched, stale").
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UntouchedOutdatedGraphnode {
-  pub pid   : ID,
-  pub title : String, // as the buffer shows it
+  pub pid                    : ID,
+  pub title                  : String, // as the buffer shows it
+  pub deleted_from_the_graph : bool, // else changed in it
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

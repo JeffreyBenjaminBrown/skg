@@ -18,7 +18,8 @@ use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::errors::{BufferValidationError, SaveError};
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::save::{NodeInstruction, SavePlan, SkgrepoMove, UntouchedOutdatedGraphnode};
-use crate::serve::handlers::save_staleness::without_untouched_outdated_saves;
+use crate::serve::handlers::save_staleness::{
+  WhatTheBaselineShows, without_untouched_outdated_saves};
 use crate::types::tree::forest::ViewForest;
 
 use buffer_to_viewnodes::uninterpreted::org_to_viewforest;
@@ -41,7 +42,7 @@ use validate::{
 use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
 use crate::types::nodes::complete::Graphnode;
 use crate::types::viewnode::{ViewnodeKind, Vognode, ViewRequest};
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 use crate::types::misc::SkgrepoName;
 use crate::types::save::ForkSpec;
 
@@ -77,25 +78,27 @@ pub fn buffer_to_validated_saveplan_in_graph (
   // _with_fork_repos entry below. No baseline: nothing is outdated.
   buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
     buffer_text, graph, config, skgrepo_restriction, &HashMap::new (),
-    &BTreeMap::new () )
+    &WhatTheBaselineShows::default () )
     }
 
 /// As 'buffer_to_validated_saveplan', but with the per-fork clone
 /// skgrepos the user chose in the confirmation buffer ('fork_repos',
 /// keyed by each forked node N's pid). These take priority over the
 /// inferred/default skgrepo when each clone's skgrepo is resolved.
-/// 'baseline_writes' are the saved buffer's baseline's copies of the
-/// graphnodes the graph changed after the buffer was rendered
-/// ('baseline_writes' in 'server/serve/handlers/save_staleness.rs'):
-/// the plan leaves out the ones the buffer did not edit, and the
-/// write-protected check excuses an occurrence that shows one.
+/// 'baseline' is what the saved buffer's baseline shows
+/// ('what_the_baseline_shows' in
+/// 'server/serve/handlers/save_staleness.rs'): of its writes, the
+/// copies of the graphnodes the graph changed after the buffer was
+/// rendered, the plan leaves out the ones the buffer did not edit; and
+/// the write-protected check excuses an occurrence that shows a title
+/// or home skgrepo as one of the baseline's occurrences does.
 pub fn buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
   buffer_text        : &str,
   graph              : &crate::dbs::in_rust_graph::InRustGraph,
   config             : &SkgConfig,
   skgrepo_restriction : &SkgrepoRestriction,
   fork_skgrepos      : &HashMap<ID, SkgrepoName>,
-  baseline_writes    : &BTreeMap<ID, Graphnode>,
+  baseline           : &WhatTheBaselineShows,
 ) -> Result<(ViewForest, SavePlan, Vec<String>), SaveError> {
   let ( viewforest, parsing_errors, parsing_warnings, supplied )
     : ( ViewForest, Vec<BufferValidationError>, Vec<String>,
@@ -124,7 +127,7 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
         warnings : parsing_warnings, } ); }}
   { let errors : Vec<BufferValidationError> =
       write_protected_edits::errors_for_writeProtected_occurrences (
-        &viewforest, graph, skgrepo_restriction, baseline_writes );
+        &viewforest, graph, skgrepo_restriction, &baseline . occurrences );
     if ! errors . is_empty () {
       return Err ( SaveError::BufferValidationErrors {
         errors,
@@ -142,7 +145,7 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
     let (node_instructions, skgrepo_moves, untouched)
       : (Vec<NodeInstruction>, Vec<SkgrepoMove>, Vec<UntouchedOutdatedGraphnode>) =
       without_untouched_outdated_saves (
-        graph, baseline_writes,
+        graph, &baseline . writes,
         nonmerge_plan . node_instructions, nonmerge_plan . skgrepo_moves );
     ( NonmergeSavePlan { node_instructions, skgrepo_moves, .. nonmerge_plan },
       untouched ) };
@@ -325,7 +328,7 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos (
   let graph = crate::dbs::in_rust_graph::InRustGraph::from_graphnodes (&nodes);
   buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
     buffer_text, &graph, config, skgrepo_restriction, fork_skgrepos,
-    &BTreeMap::new () ) }
+    &WhatTheBaselineShows::default () ) }
 
 /// One nonfatal warning per dangling link this save writes: a
 /// '[[id:X][label]]' in a saved title or body where X is neither in

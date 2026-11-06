@@ -186,7 +186,7 @@ fn write_protecting_a_node_outside_u_saves (
               "{}", response . saved_view );
     Ok (( )) }) }
 
-/// In an ordinary content view, write-protecting n, its root, whose
+/// In a content view proper, write-protecting n, its root, whose
 /// content a and b are shown, saves: under a write-protected
 /// occurrence no child claims membership, so nothing is refused.
 #[test]

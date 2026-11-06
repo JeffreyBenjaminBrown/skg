@@ -19,7 +19,7 @@ use std::collections::{HashMap, HashSet};
 /// What a save touches: its touched IDs and their update-relevant
 /// neighborhood twice over. The collateral redraw of clean views reads
 /// the full neighborhood ('matching_identity'); the dirty-view check
-/// reads the neighborhood without links ('matching_identity_ignoring_links'),
+/// reads the neighborhood without links ('matching_identity_without_links'),
 /// since a link holds no copy of its target, nor its target of it.
 pub(crate) struct SaveAffectedIds {
   raw_touched                : HashSet<ID>,
@@ -41,7 +41,7 @@ impl SaveAffectedIds {
   ) -> SaveAffectedIds {
     let raw_touched : HashSet<ID> =
       prepared . final_write_identities () . clone ();
-    let ordinary_relations_but_links : Vec<NodeRelation> =
+    let ordinary_relations_without_links : Vec<NodeRelation> =
       UPDATE_RELEVANT_ORDINARY_RELATIONS . iter () . copied ()
       . filter (|relation| *relation != NodeRelation::LinksTo)
       . collect ();
@@ -49,7 +49,7 @@ impl SaveAffectedIds {
       neighborhood : NeighborhoodBeforeAndAfter::of_touched (
         prepared, &raw_touched, UPDATE_RELEVANT_ORDINARY_RELATIONS),
       neighborhood_without_links : NeighborhoodBeforeAndAfter::of_touched (
-        prepared, &raw_touched, &ordinary_relations_but_links),
+        prepared, &raw_touched, &ordinary_relations_without_links),
       raw_touched, }
   }
 
@@ -66,7 +66,7 @@ impl SaveAffectedIds {
 
   /// The identity under which 'gnid' is touched or in the neighborhood
   /// without links, if it is.
-  pub(crate) fn matching_identity_ignoring_links (
+  pub(crate) fn matching_identity_without_links (
     &self,
     gnid  : &ID,
     before : &InRustGraph,
@@ -168,7 +168,7 @@ pub(crate) fn dirty_view_conflicts (
         . viewforest_id_to_view (&buffer_snapshot . viewforest_id)
     { dependencies . extend (dependencies_from_viewforest (registered)); }
     let mut matching : Vec<ID> = dependencies . iter ()
-      .filter_map (|gnid| affected . matching_identity_ignoring_links (
+      .filter_map (|gnid| affected . matching_identity_without_links (
         gnid, before, after))
       .collect ();
     matching . sort_by (|left, right| left . 0 . cmp (&right . 0));

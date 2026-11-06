@@ -64,6 +64,13 @@ say "viewforest" rather than "viewtree" or "forest". The buffer as a
 whole is named by its viewforest id (see "viewnode ID, vnid,
 viewforest id").
 
+A *content view proper* is a content view that is nothing else: not
+a buffer of the diff view, which the server registers as a content
+view ('ViewforestId::ContentView') marked as one of the diff view's
+buffers ('OpenViews::is_content_view_proper' in
+'server/types/views_state.rs'). A view request for a node that is a
+root of an open view switches only to a content view proper.
+
 A *view root* is a root of a viewforest: a level-one headline.
 
 A *viewbranch* is any subtree of a viewforest: a viewnode with all its
@@ -617,7 +624,12 @@ the text the client created it with. *The baseline's writes* are the
 Save instructions that saving the baseline itself would produce,
 parsed, supplemented and filtered of no-ops as the saved text is:
 a baseline viewnode equal to the graph's graphnode yields none; one
-that differs, or whose graphnode the graph lacks, survives. (The
+that differs, or whose graphnode the graph lacks, survives. *The
+buffer's writes* are the graphnodes the saved buffer writes or deletes:
+the nodeInstructions its text yields, filtered of no-ops and of its
+untouched outdated graphnodes, plus the original of each fork clone. A
+view is *dirty* while its buffer holds edits not yet saved (the
+client's modified flag), and *clean* otherwise. (The
 "baseline" of a git stage in 'server/types/git.rs', HEAD for the staged
 changes and the git index for the unstaged, is a git notion, not a
 buffer's baseline.)
@@ -2009,6 +2021,22 @@ What a save turns the buffer into, in order:
   nodeIntent after disk supplementation: complete, ready to write.
 - the *savePlan* ('SavePlan') is everything one save applies: its
   nodeInstructions, plus forks and nodeMerges.
+
+*** the nodeInstructions phase, the nodeMerge phase
+
+A save applies its savePlan in two phases, both prepared, files
+included, before either is applied ('prepare_save_under_mutation_gate'
+and 'PreparedSave::apply' in 'server/save.rs'). *The nodeInstructions
+phase* prepares and applies the save's ordinary nodeInstructions:
+those the buffer yields and those the save derives (delete
+propagation, strandeds resets, Hoist repairs, restore requests), not
+the ones a nodeMerge yields; its candidate graph is
+'graph_after_save'. *The
+nodeMerge phase* then builds the NodeMerge triples from that
+candidate and prepares and applies their nodeInstructions too, as a
+second graph update over it ('final_candidate'). The first phase's
+name means the save's ordinary nodeInstructions, then, not that the
+other phase applies none.
 
 *** local fieldIntent collection
 

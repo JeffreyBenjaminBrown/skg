@@ -45,7 +45,9 @@ TODO to DONE. Never commit anything under 'data/'.
 * Vocabulary
 - 'baseline', 'stale', 'the baseline's writes', 'the buffer's
   writes', 'merge node', 'merge pair', 'dirty view': as
-  'docs/glossary.org' defines them since plan 2_2.
+  'docs/glossary.org' defines them, under "baseline, outdated,
+  untouched, stale" and "nodeMerge" ('the buffer's writes' and
+  'dirty view' since slice 7, the rest since plan 2_2).
 - 'the buffer's copy' of a graphnode: the supplemented Save
   instruction the saved text yields for it, after the noop
   filter ('nonmerge_nodeInstructions' in the save handler).
@@ -449,7 +451,7 @@ a dirty view is skipped by the collateral redraw as well as never
 refusing through a link; the 'collateral-view' message's entry
 says a client never replaces a buffer with unsaved edits. One
 commit, naming the plan path and "slice 6".
-** TODO Slice 7: corrections from the review
+** DONE Slice 7: corrections from the review
 The two review reports in '4_1_review-reports/' found these. Each
 is a correction, not a design change; nothing here is open. The
 two costly renamings the vocabulary report proposes ("outdated"

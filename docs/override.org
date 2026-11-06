@@ -34,7 +34,7 @@ automatic substitution.
 Visiting an ID opens that exact node as the raw root of a content view.
 It does not redirect to an overrider and does not stop at a choice
 buffer.  Re-visiting an ID that is already a root switches to its open
-content view; a buffer of the diff view is not one.  A node whose home skgrepo the current
+content view proper, never to a buffer of the diff view.  A node whose home skgrepo the current
 skgrepo restriction keeps out cannot be visited.
 
 This makes every viewnode used for navigation a stable destination.  In

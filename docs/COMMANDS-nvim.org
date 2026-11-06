@@ -19,7 +19,9 @@ You may edit several views at once, but Neovim asks when an edit
 first dirties a view while another view already has unsaved edits;
 choosing Cancel restores the view's last clean text. On save, Skg checks the other dirty
 views' last clean text and current text against every graph identity the
-prepared save can affect. A conflict is a hard refusal before any write;
+prepared save can affect, except through a link: a node that only links
+to a saved node, or that a saved node only links to, does not count, since
+a link holds no copy of its target. A conflict is a hard refusal before any write;
 the error names the views and IDs. Missing or malformed baseline data is
 also refused conservatively. There is no "save anyway" choice.
 
@@ -38,7 +40,8 @@ changed but that you did not edit, which the view still shows as the
 server drew it, refuses nothing: the save leaves it as the graph has
 it, writes the rest, and warns "Left as the graph has it: TITLE (ID),
 which changed after this buffer was rendered and which this buffer did
-not edit."; the redrawn view shows the graph's version. A node the
+not edit." (or "which was deleted after ..." for a node the graph no
+longer has); the redrawn view shows the graph's version. A node the
 view writes without having been drawn in it (pasted in by ID, or typed
 into a new empty view) is not checked.
 The error names each such node, the view's headlines for it, and what

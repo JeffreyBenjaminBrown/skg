@@ -39,7 +39,8 @@ use crate::serve::handlers::save_dependencies::{
   SaveAffectedIds, dirty_view_conflicts, format_conflict_error,
 };
 use crate::serve::handlers::save_staleness::{
-  baseline_writes, left_as_the_graph_has_it_warning, stale_write_errors};
+  WhatTheBaselineShows, left_as_the_graph_has_it_warning, stale_write_errors,
+  what_the_baseline_shows};
 use crate::serve::util::{
   viewforest_id_from_request,
   buffer_response_entries,
@@ -55,7 +56,6 @@ use crate::types::env::SkgEnv;
 use crate::types::errors::{BufferValidationError, SaveError};
 use crate::types::git::SkgrepoDiff;
 use crate::types::misc::{ID, SkgrepoName, SkgConfig};
-use crate::types::nodes::complete::Graphnode;
 use crate::types::save::{
   NodeInstruction, PostSkgsaveCommitNoticeCandidate, SavePlan, format_save_error_as_org };
 use crate::types::tree::forest::ViewForest;
@@ -64,7 +64,7 @@ use crate::rerender_pass::update_views_after_save;
 
 use futures::executor::block_on;
 use sexp::{Sexp, Atom};
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::error::Error;
 use std::io::BufReader;
 use std::net::TcpStream;
@@ -863,11 +863,11 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
   let runtime = env . runtime_snapshot ();
   let working_graph = new_handle ((*runtime . graph) . clone ());
   let mut working_tantivy = runtime . tantivy_index . clone ();
-  let baseline_writes : BTreeMap<ID, Graphnode> =
-    // The baseline's copies of the graphnodes changed since the buffer
-    // was rendered. The plan builder leaves out the ones the buffer did
-    // not edit; the stale check refuses the rest.
-    baseline_writes (
+  let baseline : WhatTheBaselineShows =
+    // Its writes are its copies of the graphnodes changed since the
+    // buffer was rendered. The plan builder leaves out the ones the
+    // buffer did not edit; the stale check refuses the rest.
+    what_the_baseline_shows (
       &runtime . graph, &runtime . config, skgrepo_restriction, baseline )
     . map_err ( |error| Box::new ( SaveError::BufferValidationErrors {
         errors : vec! [error], warnings : Vec::new (), } ) as Box<dyn Error> ) ?;
@@ -878,7 +878,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
           ) . entered();
         buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
           org_buffer_text, &runtime . graph, &runtime . config,
-          skgrepo_restriction, fork_skgrepos, &baseline_writes )
+          skgrepo_restriction, fork_skgrepos, &baseline )
       } . map_err (
         |e| Box::new (e) as Box<dyn Error> ) ?;
   if viewforest . is_empty ()
@@ -905,7 +905,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
     // rendered refuses the whole save, before any confirmation is asked.
     let stale_errors : Vec<BufferValidationError> =
       stale_write_errors (
-        &runtime . graph, &baseline_writes, &viewforest,
+        &runtime . graph, &baseline . writes, &viewforest,
         &nonmerge_nodeInstructions, &fork_specs );
     if ! stale_errors . is_empty () {
       return Err (Box::new (SaveError::BufferValidationErrors {

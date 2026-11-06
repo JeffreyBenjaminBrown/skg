@@ -135,8 +135,8 @@ impl OpenViews {
     self . views . get (viewforest_id)
       . map ( |vs| &vs . viewforest ) }
 
-  /// Returns the first (if any exists) ordinary content view
-  /// ('is_ordinary_content_view') for which the ID is a root
+  /// Returns the first (if any exists) content view proper
+  /// ('is_content_view_proper') for which the ID is a root
   /// (level-1 headline).
   pub fn content_viewforest_id_for_root_gnid (
     &self,
@@ -145,12 +145,12 @@ impl OpenViews {
     self . root_gnids . get_right (gnid)
       . and_then ( |viewforest_ids| viewforest_ids . iter ()
                    . find ( |viewforest_id|
-                             self . is_ordinary_content_view (viewforest_id) )) }
+                             self . is_content_view_proper (viewforest_id) )) }
 
-  /// Whether 'viewforest_id' is an open content view whose state marks
-  /// it as nothing else: not a search view, and not a buffer of the
-  /// diff view.
-  pub fn is_ordinary_content_view (
+  /// Whether 'viewforest_id' is a content view proper: an open
+  /// content view whose state marks it as nothing else, such as a
+  /// buffer of the diff view.
+  pub fn is_content_view_proper (
     &self,
     viewforest_id : &ViewforestId,
   ) -> bool {
