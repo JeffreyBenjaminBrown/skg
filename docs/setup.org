@@ -19,10 +19,14 @@ client connects, it shows the same warnings in a buffer
 (=*SKG Server Warnings*= in Emacs, =skg://messages/server-warnings=
 in Neovim).
 
-It takes two options, both off by default:
+It takes the config's path and two options, both off by default:
 #+begin_example
-   ../bash/start-servers.sh [--deb] [--hot-reload]
+   ../bash/start-servers.sh [CONFIG] [--deb] [--hot-reload]
 #+end_example
+Without CONFIG it uses =data/skgconfig.toml=, relative to the folder
+it is run from, so run it from the top of this repository.
+Everything it writes, and the server's logs, go in the
+[[file:glossary.org::*run folder][run folder]] =CONFIG.running/= beside the config.
 - Without =--deb= it builds and runs the release profile
   (=target/release/skg=), which is fast. The first release build
   takes minutes, during which the script sits at "Validating config";

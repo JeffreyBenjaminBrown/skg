@@ -133,7 +133,8 @@ python3 docs/troubleshooting/check-rlibs.py    # expect "all intact"
 ./bash/start-servers.sh &
 #+end_src
 
-Then look for =Server ready.= in =data/logs/cargo-watch.log=, preceded
+Then look for =Server ready.= in the newest script log,
+=data/skgconfig.toml.running/start-servers.*.log=, preceded
 by a plausible node/edge count, e.g.:
 
 #+begin_example

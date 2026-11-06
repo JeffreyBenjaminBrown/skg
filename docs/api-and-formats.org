@@ -1724,7 +1724,7 @@ Pass its path as a command-line argument (default: =data/skgconfig.toml=) when s
 | =tantivy_folder=     | yes      |         | Directory for the Tantivy search index. Relative to data root.   |
 | =port=               | no       | 1730    | TCP port for Rust-Emacs communication.                           |
 | =initial_node_limit= | no       | 1000    | Max nodes to render in initial content views.                    |
-| =timing_log=         | no       | false   | When true, writes a JSON log to =<data_root>/logs/server.jsonl=. |
+| =timing_log=         | no       | false   | When true, writes a JSON log, =server.jsonl=, beside =server-to-user.log= (see "Log files"). |
 | =beep_when_server_becomes_available= | no | true | When true, plays a local sound after server initialization finishes. |
 | =default_repo_set= | no | the most private owned skgrepo | The skgrepo restriction when a client connects: the most private owned skgrepo to show, foreign skgrepos shown. It must name an owned skgrepo; a foreign one is refused. The default is no skgrepo restriction. Runtime changes are per connection and are not written back. |
 | =max_roleTree_depth= | no | 20 | Max breadth-first depth of a containerward chain. |
@@ -1885,9 +1885,22 @@ reads the bare-string =dependencies= shape.)
 
 ** Log files
 
-The server writes to =<data_root>/logs/=:
+Each server run writes its logs to a folder of its own,
+=CONFIG.running/START/=, CONFIG being the config file's path as the
+server was given it, and START the run's start time in UTC,
+=YYYY-MM-DDTHH-MM-SSZ= (hyphens, not colons, so that it is a valid
+file name everywhere). START is fixed once per process, so a config
+reload keeps the folder. 'skg check-config' creates none.
 - =server-to-user.log= — human-readable log (always on).
 - =server.jsonl= — structured JSON log (when ~timing_log = true~). Queryable with =jq=.
+
+=CONFIG.running/= is the *run folder* ('docs/glossary.org'). When
+'bash/start-servers.sh' started the server, the run folder also holds
+the script's =stop-servers.sh= and one =start-servers.START.log= per
+start of the script (START there being that start's time), holding
+the output of the rerun loop, or of cargo-watch with =--hot-reload=.
+Each time the rerun loop restarts the server, a new subfolder
+appears, so the newest one holds the current run's logs.
 
 ** Readiness marks file
 

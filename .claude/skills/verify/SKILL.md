@@ -12,14 +12,15 @@ the server can be driven directly over the socket. Verified working
 
 ## Never edit through the main instance
 
-`./bash/start-servers.sh` starts a skg server on Jeff's REAL data
-(`data/skgconfig.toml`, port 1731). It runs the release profile
-(`target/release/skg`) unless given `--deb` (`target/debug/skg`), and
-only with `--hot-reload` does it run under cargo-watch, which rebuilds
-and restarts it whenever `server/` changes; `ps` shows which way Jeff's
-server is running. Saves and imports through it write Jeff's `.skg`
-files. For verification, run a second, isolated instance
-on scratch data instead. Instances share nothing but the binary.
+`./bash/start-servers.sh`, given no config path, starts a skg server
+on Jeff's REAL data (`data/skgconfig.toml`, port 1731). It runs the
+release profile (`target/release/skg`) unless given `--deb`
+(`target/debug/skg`), and only with `--hot-reload` does it run under
+cargo-watch, which rebuilds and restarts it whenever `server/`
+changes; `ps` shows which way Jeff's server is running. Saves and
+imports through it write Jeff's `.skg` files. For verification, run a
+second, isolated instance on scratch data instead. Instances share
+nothing but the binary.
 
 ## Recipe for an isolated instance
 
@@ -62,7 +63,19 @@ on scratch data instead. Instances share nothing but the binary.
    Then wait for "Server ready." in `server.log` (a few seconds on a
    tiny dataset). If Jeff's server runs with `--hot-reload --deb`,
    cargo-watch keeps `target/debug/skg` current, so `cargo build` is
-   then instant.
+   then instant. The server writes its own logs (`server-to-user.log`,
+   and `server.jsonl` if `timing_log`) to
+   `<scratch>/skgconfig.toml.running/START/`, a folder per server run,
+   START its UTC start time.
+
+   To test the start script instead, run it from the repo root with
+   the scratch config, `bash/start-servers.sh <scratch>/skgconfig.toml
+   --deb &`, from a script that sets `set -m` first, so the start gets
+   a process group of its own (the container has no `setsid`). Its
+   run folder, `<scratch>/skgconfig.toml.running/`, then also holds
+   its stop script, `stop-servers.sh`, which stops that instance and
+   no other, and a `start-servers.START.log` per start. Never run a
+   start or stop script against `data/skgconfig.toml`.
 
 ## Speaking the protocol
 
@@ -114,8 +127,10 @@ fresh and check the edit persisted.
 
 ## Cleanup
 
-`kill $SKG_PID`, confirm it is gone (`ps -p $SKG_PID`, and nothing
-listening on the scratch port), then delete the scratch dir.
+`kill $SKG_PID` (or, if the start script started it,
+`<scratch>/skgconfig.toml.running/stop-servers.sh`), confirm it is
+gone (`ps -p $SKG_PID`, and nothing listening on the scratch port),
+then delete the scratch dir, run folder and all.
 
 Do not stop a scratch server with `pkill -f` or `kill $(pgrep -f ...)`:
 a pattern naming the binary or config also matches the command line of
