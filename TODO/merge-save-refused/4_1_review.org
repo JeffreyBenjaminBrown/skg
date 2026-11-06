@@ -75,20 +75,20 @@ foreign copy would already have been forked and judged. Arguable
 only in that 'from_text.rs' now imports a function from
 'serve::handlers', which has one precedent.
 **** TODO [jeff] what's the foreign policy?
-***** TODO Claude says: the rule for a save of a foreign graphnode
+***** TODO Claude says: the rule for saving a foreign graphnode
 'apply_foreign_policy' ('server/from_text/validate.rs') decides,
 for each Save the buffer yields, what to do when the graphnode's
-home skgrepo is foreign (not owned; glossary "owned, foreign"). An
-unchanged foreign copy is dropped, since there is nothing to
-write. A foreign graphnode the user edited directly becomes a fork
-candidate: the save creates a clone in an owned skgrepo that
-overrides it (glossary "clone, and the fork operation"). A foreign
-graphnode reached through a nodeMerge, or created new in a foreign
-skgrepo, is refused. The point for slice 1: that policy judged the
-buffer's copy against the graph, so an unedited copy of a foreign
-graphnode that had changed on disk looked like an edit and was
-forked. Dropping unedited outdated copies before the policy runs
-is what stops that.
+home skgrepo is foreign (not owned; glossary "owned, foreign").
+An unchanged foreign copy is dropped, since there is nothing to
+write. A foreign graphnode the user edited directly becomes a
+fork candidate: the save creates a clone in an owned skgrepo that
+overrides it (glossary "clone, and the fork operation"). A
+foreign graphnode reached through a nodeMerge, or created new in
+a foreign skgrepo, is refused. The point for slice 1: that policy
+judged the buffer's copy against the graph, so an unedited copy
+of a foreign graphnode that had changed on disk looked like an
+edit and was forked. Dropping unedited outdated copies before the
+policy runs is what stops that.
 *** The untouched graphnodes travel in the 'SavePlan'
 A new field, turned into warnings beside the strandeds warnings.
 *** An unreadable baseline is refused before the plan is built
@@ -192,17 +192,17 @@ Call one stale, the other "stale with requested edits".
 **** TODO Claude says: accurate; I would say "edited stale"
 You have it right: the second is the first plus the user's edit.
 "Stale" for the first (the graph changed under the buffer's copy)
-is good. For the second I would not say "requested edits": in
-Skg an "edit request" is the '(editRequest ...)' metadata, so
+is good. For the second I would not say "requested edits": in Skg
+an "edit request" is the '(editRequest ...)' metadata, so
 "requested edits" would read as those. Since the other rename
 below settles on "unedited", the pair that falls out is "edited
 stale" and "unedited stale": a stale graphnode the buffer edited
-refuses the save; an unedited stale graphnode is left as the graph
-has it. The identifiers follow ('UntouchedOutdatedGraphnode'
-becomes 'UneditedStaleGraphnode', and so on); the stale error's
-first line stays as it is, since the client tests match it. If
-you agree, this and the next item become one plan with the
-numbered steps below.
+refuses the save; an unedited stale graphnode is left as the
+graph has it. The identifiers follow
+('UntouchedOutdatedGraphnode' becomes 'UneditedStaleGraphnode',
+and so on); the stale error's first line stays as it is, since
+the client tests match it. If you agree, this and the next item
+become one plan with the numbered steps below.
 ** ONGOING "Untouched" beside "touched IDs"
 "Untouched" (the buffer did not edit it) sits in the same module
 as "touched IDs" (the IDs a save writes), which mean unrelated
@@ -234,8 +234,9 @@ are labels of a script's progress, not names of things.
 *** TODO [jeff] agreed
 **** TODO Claude says: into the same small plan
 The four renamings in code (not the test scripts' phase headers)
-join the two above in one plan, '5_plan.org' in this folder, which
-I will write when you confirm "edited stale" and "unedited stale".
+join the two above in one plan, '5_plan.org' in this folder,
+which I will write when you confirm "edited stale" and "unedited
+stale".
 * Suggestions for the advice
 - 'plans.org': when a plan removes a refusal, it should ask what
   else that refusal was preventing. The dirty-view conflict was
