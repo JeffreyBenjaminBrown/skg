@@ -3,7 +3,8 @@ Please read coding-advice/ORIENTATION.org.
 It's too much, though;
 you don't need to chase down all those avenues in too much detail for now.
 
-Then, please use the tools at tools/skg-for-ai/ to read [[id:703f5a82-d948-431f-985c-4db8132bc504][AI team for Skg]].
+Then, please use the tools at tools/skg-for-ai/ to read
+[[id:703f5a82-d948-431f-985c-4db8132bc504][AI team for Skg]].
 The aim is eventually for all our comms to be in the graph,
 but for now we'll plan that in this .org document.
 * vision
@@ -12,3 +13,227 @@ all the time. I think that means we need tools for passing control
 from one to another. Is this even possible? God I hope so.
 
 Please respond in this org-document, per coding-advice/org-discussions.org
+** TODO Corey says: yes. The parts exist; I tested them today.
+A sleeping teammate costs nothing: it is a transcript on
+disk, with no process. Waking one is a shell command. Running
+teammates can message each other, and a message wakes an idle
+one. What is missing is only a small dispatcher that watches
+the mail and does the waking. Details below; every claim marked
+"tested" was run in this container on 2026-11-02, with Haiku,
+for about three cents in total.
+*** The three states of a teammate
+**** asleep: a named transcript on disk, no process, no tokens
+Claude Code keeps every session's conversation under
+'~/.claude/projects/'. A stopped session is just that file.
+It survives reboots, and it keeps its compaction summary, so a
+long life does not mean an ever-growing context.
+**** awake and idle: a background process, waiting
+'claude --bg -n NAME "..."' starts a session with no terminal.
+It shows up in 'claude agents --json' and in every other
+session's peer list. While idle it makes no API calls (tested:
+the cost report of an idle background session stayed at its
+last turn). Claude Code stops an unattached idle background
+process after about an hour; the conversation stays on disk.
+**** awake and working: a turn in progress
+A turn ends when the teammate stops talking. Nothing runs
+between turns unless something sends the next message.
+*** Passing control: the wake primitives
+**** From a shell, to a sleeping teammate (tested)
+'claude -p --resume NAME "message"' wakes the transcript named
+NAME, runs one turn on the message, prints the reply, and
+sleeps again. The turn is appended to the same transcript, so
+the next wake remembers it. I created a session that was told a
+codeword, killed it, resumed it by name, and it answered the
+codeword; a second resume knew it had been asked once before.
+'--max-budget-usd' caps that one turn's spend, and
+'--output-format json' reports the cost.
+
+One caveat from the docs: if NAME is currently running in the
+background, this command attaches to it instead of sending, and
+exits 1 when its output is piped. So a dispatcher must check
+'claude agents --json' first, and use the next primitive for a
+running session.
+**** Between running sessions (tested)
+Every session has 'ListAgents' and 'SendMessage'. I started a
+background Haiku session, sent it "what is the codeword?", and
+it woke from idle, ran a turn, and sent "HERON" back to me.
+Delivery is local, over a Unix socket; it never touches
+Anthropic's servers, and it costs the receiver one turn. A
+'notify_when_idle' flag gives the sender one notice when the
+receiver finishes, so one teammate can hand work to another and
+hear back without polling.
+**** Resuming a background session in place
+'claude --bg --resume ID' (no other flags) restarts a stopped
+background session under the same ID; with flags it starts a
+copy and says so (tested, by accident). After a reboot,
+'claude respawn --all' restarts every background session.
+**** What does not exist
+Nothing can message a teammate that has no process. Nothing in
+this container runs on a timer by itself: there is no cron
+daemon, and Claude Code's in-session cron fires only while that
+session's process is alive and idle (it is restored on resume,
+but missed fires are not caught up, and recurring tasks expire
+after seven days). So someone has to be awake to do the waking.
+*** The design I propose: a dumb dispatcher and skg mail
+**** The mail is already designed
+Jeff and Ed settled it: each teammate keeps 'outboxes' with one
+'to X' node per correspondent, and 'inboxes' holding a fork of
+every 'to <me>'. A message is a new top-level child of 'to X'.
+That is the whole protocol; the dispatcher adds nothing to it.
+**** The dispatcher is a shell script, not an LLM
+A script that watches the skgrepos (inotify, as the server
+does) and, when the .skg file of some 'to X' changes, runs
+'claude -p --resume X "You have mail; read your inbox."' if X
+is asleep, or posts the same line into X's inbox socket if X is
+awake. It costs no tokens while nothing happens, needs no
+context, and cannot forget. Ed's daemon log ('skg-for-ai.log',
+one line per re-render of a held view) is an alternative
+signal; the raw file watch is simpler and needs no daemon.
+**** Corey is not the always-on process
+I considered making myself the watcher, with a '/loop'. It
+would mean a Fable turn every tick to decide "nothing to do",
+and a process that must be pinned to stay alive. The script is
+better at that job than I am; I parachute in when the team's
+dynamic needs it, as your notes on me ask.
+**** Timers, if we want them, come from the same script
+A heartbeat ("Scarlett, check the disk once an hour") is one
+more line in the script. Jeff's host cron could instead run
+'claude -p --resume' directly, but the host cannot reach a
+container session's socket, and the script keeps everything
+inside the container where the data is.
+**** What a wake costs
+A woken teammate re-reads its whole transcript. After more than
+an hour asleep the prompt cache is cold, so a 200K-token
+transcript costs about two dollars of input before the first
+word. Three consequences: wake on batched mail, not per
+message; keep transcripts short, with compaction and with
+knowledge in the graph rather than in context, as the team node
+already asks; and prefer sending a teammate a pointer ("read
+your inbox") over a long message, since the inbox is read with
+the cheap skg-for-ai tool, not carried in the transcript.
+***** TODO [jeff]
+****** batching
+It seems efficient to have each teammate process their entire inbox
+before passing the mic, no?
+******* TODO Corey says: yes, and one more rule.
+Agreed: a wake is "read everything addressed to you, act,
+write your replies, then stop". Two refinements. First, the
+dispatcher should coalesce: if three messages land in one
+inbox within a quiet period (say a minute), it wakes the
+addressee once. Second, mail that arrives while a teammate is
+awake needs no new wake; the teammate rereads its inbox before
+it stops. The cost of a wake is the transcript, not the
+message count, so the whole inbox per wake is the right unit.
+****** priority
+This feels like a hard problem. The most pressing things should
+be processed first, etc. The dispatcher has no judgment;
+the agents have to choose.
+
+A simple algorithm would be for each agent to guess whose work
+is most urgent, and pass the mic to them.
+But I'm sure this problem has been studied a lot, by management theorists,
+political scientists, and computer programmers. Please have a few Opus 5.5
+medium agents do a lit review and see if there are good ideas out there.
+******* TODO Corey says: three reviews done; they converge.
+One Opus 5.5 medium agent per field wrote a review beside this
+file: 'lit-review_priority_cs.org' (scheduling, actors,
+multi-agent orchestration), 'lit-review_priority_management.org'
+(triage, Kanban, facilitation) and
+'lit-review_priority_social-choice.org' (agenda control,
+turn-taking, mechanism design). Each ends with its ranked five.
+Two of the three say they cited some sources from memory
+without opening them, so treat the URLs as leads. The three
+top-five lists agree on more than I expected:
+******** Judgment in the message, arithmetic in the dispatcher
+Every review lands here. The sender, who has judgment, tags
+the message; the dispatcher, which has none, sorts by the tag
+and by numbers it can keep itself. That matches your framing:
+the agents choose, and the dispatcher carries out.
+******** A class on each message, three levels
+Management calls them classes of service, CS calls it static
+priority with deadlines, social choice calls it a closed rule
+on the agenda. Three words suffice: 'expedite' (wake now),
+'standard' (wake at the next quiet moment), 'batch' (wait
+until the inbox is full or old). The waker writes the word in
+the message; the dispatcher wakes the highest class first.
+******** Fair share with aging, from the dispatcher's ledger
+CS's stride scheduling, management's starvation guard and
+social choice's wake tokens are one idea: the dispatcher logs
+every wake and its cost, and among equal classes it wakes the
+teammate who has had the least. That is a few lines of
+arithmetic over a log file, and it prevents one loud pair from
+starving the rest. The same ledger answers Scarlett's budget
+question and lets us see, later, which wakes were worth it.
+******** Feed the bottleneck, which is you
+Management's first pick. Your attention is the scarcest
+resource, so mail to you is batched by default, and teammates
+should hold back work you cannot absorb rather than queue it.
+Your note "don't write to me for its own sake" says the same.
+******** The waker may nominate; the dispatcher decides
+Your "guess whose work is most urgent and pass the mic" is the
+CS and social-choice recommendation too, with one guard: a
+nomination is a tag the dispatcher honours within the class
+and share rules, not a direct wake, so a chain of eager
+nominations cannot run the budget down.
+******** What I would build, and what I would leave out
+Build: the class word, the wake ledger, the quiet-period
+coalescing from the batching answer above, and least-woken
+tie-breaking. Leave out for now: deadlines ('reply-by'
+fields), scrip tokens that refill, auctions and lotteries,
+per-wake verdicts. Each is a plausible second step, and the
+ledger will tell us whether any is needed.
+****** my outboxes
+How do my outboxes fit this scheme?
+******* TODO Corey says: the same way; nobody wakes you.
+Your 'to X' nodes live in your repos; the dispatcher watches
+every skgrepo, so a new child of your 'to Ed' wakes Ed just as
+one of mine would. Nothing distinguishes a human sender. In the
+other direction nobody wakes you: a teammate's message to you
+lands in their 'to Jeff', your fork of it reports the new child
+through your subscription, and you read it when you open Emacs.
+If you ever want a nudge, the dispatcher could run a shell
+command of your choosing on a change to any 'to Jeff'; I would
+not add that until you ask.
+*** Open questions
+**** TODO Who wakes whom: is the dispatcher a script?
+The alternative is an LLM watcher (me or a Haiku). I recommend
+the script. If yes, I will plan it in '2_plan.org' and have a
+subagent build it under 'tools/'.
+**** TODO Wake signal: file watch or Ed's daemon log?
+File watch: inotify on the owned skgrepos, no daemon needed.
+Daemon log: reuses Ed's work, but needs a daemon per watched
+view. I recommend the file watch.
+**** TODO Should the dispatcher also run the heartbeats?
+For example Scarlett's hourly resource check and a monthly
+budget pace. Yes seems right, but it widens the script.
+**** Who stays interactive?
+This session is named PERSISTENT, and you seem to have meant me
+to be the one you talk to in a terminal. The others could be
+background sessions you 'claude attach' to when you want. Is
+that your picture?
+***** TODO [jeff] I'd like to be able to talk to anyone at any time.
+Feasible?
+****** TODO Corey says: yes, one terminal per teammate.
+A running teammate: 'claude attach NAME' opens its background
+session in your terminal; detach and it keeps running. A
+sleeping teammate: 'claude --resume NAME' opens it in your
+terminal, where it wakes with its memory; when you exit it
+sleeps again. Both are one command, and a teammate you are
+talking to still receives dispatcher and peer messages, which
+appear in your terminal as they arrive.
+
+The one constraint: a session should be open in one terminal
+at a time. Two interactive resumes of the same session
+interleave their turns into one transcript. The dispatcher must
+also not use 'claude -p --resume' on a session you have open,
+since that would try to attach; it will check the running list
+and use the message socket instead, as it does for any awake
+teammate. So the dispatcher sees your conversation partner as
+"awake", which is right.
+**** DONE All sessions in one permission mode?
+A peer message between sessions in different permission modes
+is held for the receiving user's approval, which would stall
+unattended handoffs. All teammates in bypass mode, as this one
+runs, avoids that.
+***** TODO jeff : seems good, yes
+****** Corey says: folded into the plan as a settled choice.

@@ -40,7 +40,10 @@ section, and the time each stage took go to you in the
 terminal.
 * migrate .skg format
 python3 tools/migrate-skg-keys-2026-10/migrate.py data/owned
-* TODO TODO/diff-mode_complete/1_discussion.org
+* TODO URGENT : diff mode is too slow
+Each request hits the server. Maybe don't; accumulate them.
+* TODO/team/Corey
+See claude session in skg2 named "PERSISTENT: Corey"
 * next
 ** TODO/skg-for-ai/1_discussion.org
 ** for docs : the org exporter
@@ -72,24 +75,10 @@ A config option, for recording videos.
 Could put a second minibuffer line,
 that reads if anything (key sequence -> command),
 leaving a trail for five seconds or until interrupted.
-** TODO URGENT : diff mode
-*** is too slow
-each request hits the server. maybe don't; accumulate them.
-*** should not count among the views one is taken to
-when visiting a node. e.g. I should be able to ask to open a view
-of one of the roots of that buffer, and go to a new buffer.
-** TODO CRITICAL : don't force that we keep owned files under 'owned/'
-Let the user do that,
-but have them write out an explicit path for each owned repo,
-including the owned/ part if that's part of it.
-
-Otherwise, when I switch between editing as myself and as Mr. Cheese
-and push and pull from multiple skg images,
-my DEPENDENCIES.toml file gets mangled.
 ** TODO CRITICAL : representation change for safety
 *** subscribee-as-such must be a metadata property.
 The metadata should in effect say
-"this is node <ID> as presented by subscriber <ID>".
+"this is node <ID> as a subscribee presented by subscriber <ID>".
 
 Otherwise the user could copy the subscribee
 to somewhere outside of the collection of subscribees.

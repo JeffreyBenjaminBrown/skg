@@ -1,0 +1,74 @@
+* [Jeff speaking]
+We need to solve two problems.
+** part of my motivation
+skg is just getting to the point where I can share graphs with others,
+starting with Claude. If Claude edits the graph, even if only their own
+(as will probably usually be the case) I need to be able to see what changed.
+** The diff view is slow.
+When I mark something commit-ready, something laborious happens.
+Maybe it's hitting git a lot, and we could keep that git data
+in Rust to speed it up.
+Maybe every save is slow, even without commit-readiness changes.
+
+Please analyze the problem and write it up in this document.
+Don't change what I've written but add top-level branches
+and sub-branches wherever you like.
+My data at data/ is real, so don't change it,
+but feel free to experiment on copies of it.
+** The diff view is rigid.
+It always compares HEAD to the worktree.
+It ought to let you compare any pair of graphs.
+I think the principled way to do this would be to let the user choose,
+for every skgrepo, which among (worktree, head, head-1, head-2, ...)
+(call that series "the commit history plus worktree")
+is the old and which is the new, subject to the constraint that
+old must be older than new.
+
+As a UI experience, skg should offer an org buffer,
+where S-<left|right> cycles the "old" value along that series,
+and S-<up|down> cycles the "new" value.
+Doing that changes the headline's metadata.
+
+The buffer is organized like this:
+```
+  * "all repos"
+  ** "owned repos"
+  *** "repo" : <repo name>
+  *** "repo" : <repo name>
+  ** "foreign repos"
+  *** "repo" : <repo name>
+  *** "repo" : <repo name>
+  *** "repo" : <repo name>
+```
+The quoted strings are written in the (system? black text on white bg) font.
+'repoNode' is a new kind of leaf, and 'repoFolder' a new kind of folder.
+(If they need it, we should futz with those names
+to fit the conventions of the existing type hierarchy.)
+The user can add ordinary headlines and bodies all they want;
+they will be ignored. (They might do so to group repos:
+```
+  * "all repos"
+  ** "owned repos"
+  *** "repo" : <repo name>
+  *** "repo" : <repo name>
+  ** "foreign repos"
+  *** repos about sharks // NEW, ignored by skg
+  **** "repo" : <repo name>
+  **** "repo" : <repo name>
+  *** "repo" : <repo name>
+```
+
+The user can cycle the old and new values on a folder, which causes
+those metadata values to be written to all of the folder's descendents
+(and nothing to be written to the folder's metadata,
+because that would be confusing).
+** Diff view need not imply commit readiness marks.
+The user should be able to ask for a diff of any two graphs
+constructible via the UI described above.
+It might be that for all but one of those choices (HEAD v. worktree)
+the commit readiness marks have no utility. Or maybe I'm wrong.
+But anyway they need to be separable.
+** My request
+What have I left out?
+What decisions will need to be made?
+Is any of this dumb? Dangerous? Inelegant?
