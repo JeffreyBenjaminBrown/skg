@@ -34,6 +34,21 @@ twice (an extra ID after a nodeMerge) where a view draws it once, so
 every save of a view of such a container was refused until a probe
 found it.
 
+* A claim about a field reads the field's definition
+Plan 1_2 said the server's 'config_path' is the config path as
+given; the comment on the field's neighbor said it is canonical,
+and the user's config is a symlink, so the server's run folder
+would have landed beside the wrong file. When a plan derives a
+path or a name from a field, cite the field's definition and its
+comment, not only the function that uses it.
+
+* Grep for every reader of a file the system writes
+Before a plan moves a log, a lock or a generated script, 'git
+grep' its name across the whole tree, 'windows/', 'tools/' and
+'tests/' included, and list every reader in the code map. Plan
+1_2 found three Windows scripts and the integration test library
+reading the moved logs only while its slices ran.
+
 * Design the shared model once, before any plan
 When several slices will touch one model (for the TDV: editability,
 write-protection, members and non-members, view requests), write that
