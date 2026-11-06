@@ -46,6 +46,11 @@ TEMP_TEST_FILE=$(mktemp)
 cat > "$TEMP_TEST_FILE" << 'EOF'
 ;; Temporary test runner
 
+;; A .el edited after its .elc (bash/compile-elisp.sh writes them beside
+;; the sources) must be the one under test; without this, Emacs loads
+;; the stale .elc, as skg-init.el also guards against.
+(setq load-prefer-newer t)
+
 ;; Add current directory to load path for relative requires
 (add-to-list 'load-path default-directory)
 ;; Add elisp directory to load path for project files

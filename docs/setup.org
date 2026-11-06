@@ -77,7 +77,7 @@ place on it and may be listed anywhere. A config which sets
 'bash/migrate-to-foreign-flag.sh CONFIG [NEW_FOLDER]'; see
 'api-and-formats.org', "Skgrepos".
 
-Two people (or a person and an AI teammate) can share one data tree,
+Two users can share one data tree,
 each running a server from a config of their own: both configs list
 the same skgrepos, each marks the other's 'foreign = true', and each
 gives its server its own 'port' and its own 'tantivy_folder', so the
