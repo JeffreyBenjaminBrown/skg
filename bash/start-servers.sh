@@ -11,10 +11,15 @@
 #   The first release build takes minutes, sitting at "Validating config".
 #   Any other argument prints a usage line and exits with status 2.
 # - WHAT RUNS
-#   cargo-watch rebuilds and restarts the server on every edit under
-#   server/. Between edits, bash/run-skg-rerunning-on-exit.sh runs the
-#   server again whenever it exits, so killing the server (by its PID,
-#   or with the 'shutdown' request) restarts it, rereading the config.
+#   bash/run-skg-rerunning-on-exit.sh runs the server, and runs it again
+#   whenever it exits, so killing the server (by its PID, or with the
+#   'shutdown' request) restarts it, rereading the config.
+#   Hot reload is off unless given --hot-reload: nothing watches server/,
+#   and an edit there takes effect only when this script is run again.
+#   With --hot-reload, cargo-watch also rebuilds and restarts the server
+#   on every edit under server/.
+#   Either way, the loop's output goes to logs/cargo-watch.log beside
+#   the config.
 # - TO SHUTDOWN
 #   - If foregrounded at command line, use
 #     Ctrl-C
@@ -47,7 +52,7 @@ else
 fi
 
 preflight_check_config() {
-  # Validate the config before starting the watcher, using skg's own loader
+  # Validate the config before starting the server, using skg's own loader
   # (the 'check-config' subcommand runs the same load_config the server
   # runs at startup). A malformed skgconfig.toml otherwise makes skg
   # exit(1) before binding port 1730, and -- because cargo-watch only
@@ -140,17 +145,42 @@ wait_for_free_api_port() {
 
 start_skg_with_restart() {
   echo ""
-  echo "Starting skg server with auto-restart on code changes and on exit..."
+  if [ -n "$HOT_RELOAD" ]; then
+    echo "Starting skg server with auto-restart on code changes and on exit..."
+  else
+    echo "Starting skg server with auto-restart on exit (no hot reload)..."
+  fi
   kill_stale_skg
   wait_for_free_api_port
-  echo "cargo-watch starting..."
+  mkdir -p "$DATA_ROOT/logs" # a fresh data root has none
   echo "Server logs go to $DATA_ROOT/logs/server-to-user.log and $DATA_ROOT/logs/server.jsonl"
+  if [ -n "$HOT_RELOAD" ]; then
+    run_skg_under_cargo_watch
+  else
+    run_skg_rerunning_on_exit
+  fi
+}
+
+run_skg_under_cargo_watch() {
+  echo "cargo-watch starting..."
   echo "cargo-watch/stdout-stderr go to $DATA_ROOT/logs/cargo-watch.log"
   # "-w server/" says "only watch server/". cargo-watch runs the -s
   # command only if the -x build succeeds.
   cargo watch -w server/ \
     -x "build ${CARGO_PROFILE_FLAG:+$CARGO_PROFILE_FLAG }--bin skg" \
     -s "bash/run-skg-rerunning-on-exit.sh $PROFILE_DIR $SKG_CONFIG" \
+    >> "$DATA_ROOT/logs/cargo-watch.log" 2>&1
+}
+
+run_skg_rerunning_on_exit() {
+  # PITFALL: the loop must run in the foreground, in this script's
+  # process group, so that Ctrl-C and the generated bash/stop-servers.sh
+  # reach it, and this script waits on it. Bash runs the 'cleanup' trap
+  # only once the loop exits; the loop traps TERM and INT itself and
+  # stops the server first. The preflight already built the binary.
+  # The log keeps the name 'cargo-watch.log', which both clients cite.
+  echo "Rerun loop stdout-stderr go to $DATA_ROOT/logs/cargo-watch.log"
+  bash/run-skg-rerunning-on-exit.sh "$PROFILE_DIR" "$SKG_CONFIG" \
     >> "$DATA_ROOT/logs/cargo-watch.log" 2>&1
 }
 
