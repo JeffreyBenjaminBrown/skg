@@ -292,3 +292,68 @@ cargo-watch until he restarts it with the new script; his client
 picks up the compiled files at his next 'skg-reload'.
 *** Headline
 DONE.
+* Plan 1_2
+** Slice 1
+Finished 2026-11-06 14:20 UTC.
+*** Commits
+- 517fd831 plan 1_2 slice 1: start-servers.sh takes the config path and keeps its files in CONFIG.running/
+- 27fff7c4 docs: the stop script is CONFIG.running/stop-servers.sh
+  ('docs/setup.org:90', 'docs/api-and-formats.org:1291')
+- the next commit: this record and the slice headline flipped to DONE
+*** Checks
+Logs and the one-time runner ('two-instances.sh') are in
+'tests/results/plan-1_2/slice1/' (untracked). Scratch data roots
+'a' (port 1781) and 'b' (port 1782), each with a one-node repo,
+under the session scratchpad's 'p12-slice1/'; release binary.
+- 'bash -n bash/start-servers.sh': passes.
+- Two instances started at once, each given its config as the
+  argument: both ports up in about 2 s, each start in its own process
+  group with its rerun loop and 'target/release/skg <its config>'.
+  Each config got its own 'skgconfig.toml.running/' holding
+  'stop-servers.sh' and one 'start-servers.2026-11-06T14-18-00Z.log'.
+  a's stop script ('kill -TERM -<a's group>') stopped a: port 1781
+  free, no a process left, while b kept port 1782 and all its
+  processes. Pass.
+- A second start of a: port up in about 2 s; its run folder then
+  held two script logs, the first ending with the first server's
+  "Shutdown complete.", the second with this run's "Server ready.".
+  Stopping a and then b with their own stop scripts left both ports
+  free and no process. Pass. 'ls -la' of a's run folder then:
+  : -rw-rw-rw- 1 ubuntu ubuntu 2467 Nov  6 14:18 start-servers.2026-11-06T14-18-00Z.log
+  : -rw-rw-rw- 1 ubuntu ubuntu 2352 Nov  6 14:18 start-servers.2026-11-06T14-18-05Z.log
+  : -rwxrwxrwx 1 ubuntu ubuntu   31 Nov  6 14:18 stop-servers.sh
+- '--bogus', 'CONFIG --bogus', 'CONFIG CONFIG2' and
+  '--deb CONFIG CONFIG2': each prints "usage: bash/start-servers.sh
+  [CONFIG] [--deb] [--hot-reload]" to stderr, nothing to stdout,
+  status 2, and creates no run folder ('usage.log'). Pass.
+- The default config path was checked by reading only:
+  'CONFIG="${CONFIG:-data/skgconfig.toml}"' after the argument loop.
+- No failures to classify. Jeff's server (cargo-watch, loop,
+  'target/debug/skg data/skgconfig.toml', port 1731) ran throughout,
+  and 'bash/stop-servers.sh' is byte-identical to before (sha1 checked
+  after every run); no script run touched it.
+*** Deviations from the plan's how
+- The script's variable is now 'CONFIG' (the plan's word), not
+  'SKG_CONFIG', so the script no longer names 'SKG_CONFIG' at all.
+  'bash/run-skg-rerunning-on-exit.sh' still calls its second argument
+  'SKG_CONFIG' (read only in this plan), as do 'bash/import-org-roam.sh',
+  'data/bash/lib.sh', 'docs/COMMANDS.org:1510', 'thoughts/' and the
+  'windows/' scripts; the plan's final 'git grep -n SKG_CONFIG' check
+  will find those unless a later slice or Jeff decides otherwise.
+- The script's line "Server logs go to a folder per server run in
+  CONFIG.running/" already describes slice 4's behavior; until slice 4
+  lands, the server still writes '<data root>/logs/' (creating it
+  itself), as the scratch instances did.
+- A new 'exit_with_usage' serves the two usage errors. The script log
+  is created with ': >>' right after the stop script, so it exists
+  even when the preflight stops the start. Comments that cited
+  'logs/cargo-watch.log' now say "the script log"; the comment that
+  said both clients cite 'cargo-watch.log' is gone (slice 2's).
+- The api-and-formats line names the file in words plus the default's
+  example path, since that doc has no CONFIG placeholder.
+*** Unfinished
+Nothing in this slice. 'docs/setup.org:24' still shows the usage
+without '[CONFIG]'; it is true (the default) and is not among the
+lines the plan assigns.
+*** Headline
+DONE.

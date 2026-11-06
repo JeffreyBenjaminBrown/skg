@@ -190,7 +190,7 @@ messages: 'elisp/skg-client.el:77, :126-140';
 "Agreed behavior".
 
 * Implementation sequence
-** TODO Slice 1: the start script
+** DONE Slice 1: the start script
 Argument parsing with CONFIG; the run folder; the stop script
 and script log inside it; the two renames; 'SKG_CONFIG' gone;
 the header rewritten (USAGE, WHAT RUNS, TO SHUTDOWN). Also the
