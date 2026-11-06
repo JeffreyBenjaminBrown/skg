@@ -413,40 +413,108 @@ From your note "Never use numbers as names" in
 The probes of plan 4 ('4_1_review-reports/probes.org', probe 7)
 found this: a save on a connection that holds a dirty view of L,
 where L links to the saved A, is no longer refused (slice 2), but
-the save then redraws the dirty L view as a collateral view, drawn
-from the graph without its unsaved edits, and both clients replace
-the buffer on 'collateral-view' without checking for unsaved
-edits. Before slice 2 this could not happen: a dirty view in the
-save's neighborhood always refused the save. The plan and
+the save then redraws the dirty L view as a collateral view,
+drawn from the graph without its unsaved edits, and both clients
+replace the buffer on 'collateral-view' without checking for
+unsaved edits. Before slice 2 this could not happen: a dirty view
+in the save's neighborhood always refused the save. The plan and
 'docs/api-and-formats.org' both say a dirty view is never
 redrawn.
 
-Fix, server side, which is authoritative: 'collateral_viewforest_ids'
-('server/serve/handlers/save_dependencies/mod.rs') will skip every
-view the save envelope's 'other-views' marks dirty; the handler has
-them as 'other_views' ('ClientViewSnapshot::dirty'). The dirty
-views stay in 'narrowed_lock_viewforest_ids' as today. Fix, client
-side, as a guard: on a 'collateral-view' message for a buffer with
-unsaved edits, Emacs ('elisp/skg-request-save.el') and Neovim
-('nvim/lua/skg/save.lua') will leave the buffer alone and say so in
-a message, never replace its text.
+Fix, server side, which is authoritative:
+'collateral_viewforest_ids'
+('server/serve/handlers/save_dependencies/mod.rs') will skip
+every view the save envelope's 'other-views' marks dirty; the
+handler has them as 'other_views' ('ClientViewSnapshot::dirty').
+The dirty views stay in 'narrowed_lock_viewforest_ids' as today.
+Fix, client side, as a guard: on a 'collateral-view' message for
+a buffer with unsaved edits, Emacs ('elisp/skg-request-save.el')
+and Neovim ('nvim/lua/skg/save.lua') will leave the buffer alone
+and say so in a message, never replace its text.
 
-Tests: in 'tests/save_dirty_conflicts.rs' (or beside the collateral
-tests, whichever harness sends an envelope with dirty other-views
-and reads the collateral views), a dirty view of L linking to A is
-not among the collateral views of a save of A, while a clean view
-of L is. Client unit tests: a 'collateral-view' for a modified
-buffer leaves it unchanged, in 'tests/elisp/' and 'tests/nvim/'
-beside the existing collateral-view tests. Run the saves binary,
-'bash/nextest.sh', the two clients' unit suites, and, since the
-clients change what they do with a message, 'bash/all-tests.sh'
-for both integration passes.
+Tests: in 'tests/save_dirty_conflicts.rs' (or beside the
+collateral tests, whichever harness sends an envelope with dirty
+other-views and reads the collateral views), a dirty view of L
+linking to A is not among the collateral views of a save of A,
+while a clean view of L is. Client unit tests: a
+'collateral-view' for a modified buffer leaves it unchanged, in
+'tests/elisp/' and 'tests/nvim/' beside the existing
+collateral-view tests. Run the saves binary, 'bash/nextest.sh',
+the two clients' unit suites, and, since the clients change what
+they do with a message, 'bash/all-tests.sh' for both integration
+passes.
 
-Docs: the dirty-view paragraph of 'docs/api-and-formats.org' says a
-dirty view is skipped by the collateral redraw as well as never
-refusing through a link; the 'collateral-view' message's entry says
-a client never replaces a buffer with unsaved edits. One commit,
-naming the plan path and "slice 6".
+Docs: the dirty-view paragraph of 'docs/api-and-formats.org' says
+a dirty view is skipped by the collateral redraw as well as never
+refusing through a link; the 'collateral-view' message's entry
+says a client never replaces a buffer with unsaved edits. One
+commit, naming the plan path and "slice 6".
+** TODO Slice 7: corrections from the review
+The two review reports in '4_1_review-reports/' found these. Each
+is a correction, not a design change; nothing here is open. The
+two costly renamings the vocabulary report proposes ("outdated"
+beside "stale"; "untouched" beside "touched IDs") are not here;
+they are Jeff's to decide in the review.
+*** The write-protected exception covers every occurrence
+'errors_for_writeProtected_occurrences' excuses a write-protected
+occurrence only when the baseline's writes hold a copy of its
+graphnode, which exists only if the baseline has an editable
+occurrence of it. A view that shows A only write-protected, after
+A was retitled elsewhere, is still refused although the user
+touched nothing. Compare the occurrence instead with the
+baseline's own occurrence of that graphnode (the baseline's parsed
+viewforest holds it, title and home, whether editable or not): an
+occurrence equal to the baseline's is not an edit. Pass what the
+check needs from the baseline's viewforest, which
+'baseline_writes' already parses; do not parse twice. Test in
+'tests/save_stale_buffers.rs': a view showing A only
+write-protected, A retitled by another connection, the view edits
+B and saves: succeeds.
+*** The warning for a graphnode the graph deleted
+"Left as the graph has it: ... which changed after this buffer was
+rendered" misdescribes a graphnode the graph no longer has. For
+one, say "which was deleted after this buffer was rendered"; the
+stale error already distinguishes the two cases, so share its
+distinction.
+*** Names and wording, from 'vocabulary-and-citations.org'
+Apply its findings 2, 3, 6, 7, 8, 9, 10, 11 and 13, in brief:
+- 2: 'save_staleness.rs' (module comment) and the stale-buffer
+  paragraph of 'docs/api-and-formats.org' still say "the buffer's
+  copy" where the baseline's copy is meant; use the glossary's
+  senses.
+- 3: "ordinary content view" collides with the glossary's uses of
+  "ordinary" (a search view is "an ordinary view"; "ordinary
+  content" is the contains relation) and 'docs/override.org' says
+  a diff-view buffer is not a content view. Rename the predicate
+  and the docs' phrase to "a content view that is no buffer of the
+  diff view", or a shorter name that does not reuse "ordinary"
+  (for instance 'is_content_view_proper'), and define it in the
+  glossary beside "view, buffer, viewforest".
+- 6: the "referencer-collection pass" collects what the glossary
+  calls recorders; name it "the recorder-collection pass".
+- 7: define "the nodeInstructions phase" and "the nodeMerge phase"
+  in 'docs/glossary.org', saying that the nodeMerge phase applies
+  the triples' nodeInstructions too and the first phase's name
+  means the save's ordinary ones.
+- 8: a bare "generation" in 'env.rs' (near line 163) and 'save.rs'
+  (near line 423) becomes "runtime generation"; the 'env.rs' doc
+  comment says only the startup generation places itself in time.
+- 9: 'server/types/save.rs' (near line 81) cites a glossary
+  headline that does not exist; cite "baseline, outdated,
+  untouched, stale".
+- 10: 'docs/COMMANDS.org' (near line 11) and 'docs/COMMANDS-nvim.
+  org' (near line 20) say a dirty view is checked against
+  everything a save can affect; say that a link's partner is not
+  counted.
+- 11: this plan's vocabulary claims the glossary defines "dirty
+  view" and "the buffer's writes"; it defines neither. Define
+  both in the glossary (one sentence each, beside "baseline,
+  outdated, untouched, stale").
+- 13: spell "the neighborhood without links" one way in the code;
+  rewrap the two over-wide lines in 'override_invariants.rs'.
+Run 'bash/nextest.sh' and the saves binary; the integration suite
+only if a text a client test matches changes. One commit, naming
+the plan path and "slice 7".
 * Verification and completion
 Each slice runs its own tests and the binaries it touched. After
 slice 5, run 'bash/all-tests.sh' and record its summary in

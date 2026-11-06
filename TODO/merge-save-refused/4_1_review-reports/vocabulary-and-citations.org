@@ -1,0 +1,199 @@
+#+title: Plan 4: vocabulary, citations, stale text
+Reviewed: 763bc9d8..HEAD, read-only; lines as in the worktree.
+Findings in rank order; later sections cite them by name.
+* Ranked findings
+** Outdated and stale: ordinary-English synonyms
+'names.org' forbids two near-synonyms with private meanings.
+Glossary 625-641 defines stale as "outdated and edited". Used
+alike in 'save_staleness.rs':16,144, 'types/save.rs':73-81,
+'from_text.rs':53,77,140, 'write_protected_edits.rs':37,
+api-and-formats 317-332, and 'UntouchedOutdatedGraphnode',
+'without_untouched_outdated_saves'. One meaning everywhere,
+but a reader cannot guess which word is which. A qualifier
+would show it: "changed since drawn", or "graph-changed".
+Costly (two identifiers, five docs), but cheapest now.
+** The buffer's copy: still the baseline's in two places
+New sense (glossary 628, 'save_staleness.rs':145): the Save the
+saved text yields. Old sense survives: 'save_staleness.rs':3-8
+("a copy the buffer took when it was rendered ... The buffer's
+copies are in its baseline") and api-and-formats 308-312, same
+words. Both now contradict the glossary. Cheap: say "the
+baseline's copies" there.
+** Ordinary content view: coined, and it collides
+'views_state.rs':138-157 ('is_ordinary_content_view'),
+'single_root_view.rs':32,71, api-and-formats 138-139,
+'tests/content_view.rs':270,274. Not in the glossary. It
+collides with: glossary 656 (a search view is "an ordinary
+view") and 1297 (each diff-view buffer is "an ordinary editable
+view"); "ordinary content" = the contains relation (COMMANDS
+785, 'skg-metadata.el':429,480); "ordinary nodeInstructions"
+('save.rs':283) and "ordinary relations" in this same range.
+'override.org':37 says a diff-view buffer is not a content view;
+'views_state.rs' says it is one, just not ordinary. The doc
+"not a search view" (155) is a property of the ID's variant,
+not of the state. Cheap: a name saying what it excludes
+('is_content_view_outside_the_diff_view'), or a glossary entry.
+** The write-protected excuse, stated too broadly
+'write_protected_edits.rs':4-5 says an occurrence may say "what
+the baseline says"; glossary 210-211 says a title or skgrepo the
+baseline shows "is no edit". The code excuses only title and
+home skgrepo (68-77; aliases and flags are not), and only when
+'baseline_writes' holds the graphnode, i.e. when the baseline
+also had an editable occurrence of it: a write-protected
+occurrence emits nothing at extraction ('traverse.rs':150-152).
+A graphnode shown only write-protected, retitled elsewhere,
+still refuses. api-and-formats 326-327 is accurate (it speaks
+of outdated ones). Docs: cheap. The gap itself is a behavior
+question for Ed, outside this review.
+** Untouched meets touched
+'SaveAffectedIds' says "touched IDs" for what a save writes or
+deletes ('save_dependencies/mod.rs':19,30,56,67;
+'raw_touched'); 'untouched' now means "the buffer did not edit
+it", and delete propagation can make one graphnode both.
+Glossary 1167 uses "left untouched on disk" in its plain sense,
+as do ~20 server comments. The glossary restricts 'untouched' to
+outdated graphnodes (627); the plan's vocabulary does not.
+"Unedited" says what the docs explain it as ("which this buffer
+did not edit"). Costly (the same sites as outdated); optional.
+** Referencer: the glossary says recorder
+'save.rs':417,423,432,485 "the referencer-collection pass".
+Glossary 1669: the node recording a relationship is its
+*recorder*; the plan itself says the pass collects "every
+graphnode that records a deleted one". "Referencer" predates
+the range ('save.rs':440-455, 'override.org':247), but now it
+is fixed in a pass name. Cheap: "the recorder-collection pass".
+** The nodeInstructions phase is not set apart by its name
+The nodeMerge phase applies nodeInstructions too
+('nodeMerge_nodeInstructions', 'save.rs':320-331), and the
+code names the first phase's results 'prepared_save' and
+'graph_after_save' (305-312). The names rest on "ordinary".
+Neither phase is in 'docs/glossary.org' (only in
+'3_2_glossary.org'). Cheap: an entry in the docs glossary;
+"the ordinary-nodeInstructions phase" if renamed.
+** Bare generation
+'env.rs':163-164 ("The generation a server starts at", "a
+generation in the server's log"); the function is
+'startup_generation'. 'save.rs':423 "(cleanup-SaveNode
+generation)" means production. Both break 'names.org'. Also
+163-165 claims a generation "places itself in time": only the
+startup one does; later ones are start plus swap count.
+Cheap.
+** A cited glossary headline that does not exist
+'types/save.rs':81 cites "untouched, outdated"; the headline
+is "baseline, outdated, untouched, stale". Cheap.
+** The user docs overstate the dirty-view check
+'COMMANDS.org':11-13 and 'COMMANDS-nvim.org':20-22: dirty views
+are checked "against every graph identity the prepared save can
+affect". Since 687d7ca7 a link's partner is not among them, and
+neither user doc says so (api-and-formats 418-427 does).
+Cheap.
+** The plan's vocabulary cites absent glossary terms
+'4_plan.org':46-48: "dirty view" and "the buffer's writes" are
+"as 'docs/glossary.org' defines them". Neither is defined;
+glossary 1621-1622 uses "clean views" and "the dirty-view
+conflict check" undefined. Cheap: an entry.
+** The warning misdescribes a deleted graphnode
+'save_staleness.rs':182: for an untouched graphnode the graph
+deleted ('tests/save_stale_buffers.rs':631) it says "Left as
+the graph has it ... which changed", where the stale error says
+"was deleted". Cheap: a deleted variant.
+** Minor
+"The neighborhood without links" is spelt three ways
+('neighborhood_without_links',
+'matching_identity_ignoring_links',
+'ordinary_relations_but_links'), and "full" in code is "whole"
+in glossary 1621. "The plan" and "the plan builder"
+('from_text.rs':86, 'save_staleness.rs':21-25,
+'save_buffer.rs':868, 'types/save.rs':74) mean the savePlan,
+while this repo's "plan" also names TODO plans; "savePlan"
+would say which. The glossary entry sits under "Terms a user
+meets", though no user doc says "outdated" or "untouched".
+'override_invariants.rs':44 and 90 exceed the file's width.
+Pre-existing, in touched lines: 'from_text.rs':77 says
+"_with_fork_repos entry", 83-84 "'fork_repos'" and "As
+'buffer_to_validated_saveplan'" (it is '..._in_graph'). All
+cheap.
+* Question 1: the terms, one by one
+** untouched, outdated
+See "Outdated and stale" and "Untouched meets touched". The
+glossary defines both (606-637); one meaning in server, tests
+and docs.
+** the buffer's copy, the baseline's copy
+See "The buffer's copy". The variant "baseline copies"
+('write_protected_edits.rs':37) is harmless.
+** ordinary content view
+See "Ordinary content view". Undefined, and it collides.
+** the nodeInstructions phase, the nodeMerge phase
+See "The nodeInstructions phase". Consistent in 'save.rs' and
+'in_rust_graph.rs':330-332; the docs glossary lacks both.
+** the referencer-collection and ID-stripping passes
+See "Referencer". "ID-stripping" is clear, and agrees with
+the code's "strip".
+** the extra-ID-mapping and node-insertion passes
+'in_rust_graph.rs':104-107. "Extra ID" is a glossary term;
+"node" bare is ordinary there. Local names; fine.
+** the overrider-collection pass
+'override_invariants.rs':44,90. Says what it does (it collects
+owned overriders by overridden). Its sibling loops are called
+"constraints", so "pass" implies a partner pass. Fine.
+** "left as the graph has it"
+Warning text, COMMANDS 29-31, api-and-formats 328-331,
+glossary 634-635, tests: one wording everywhere; it reuses
+"rendered" exactly as the stale errors do ('errors.rs':361,365,
+'types/save.rs':302,319,335). See "The warning misdescribes".
+The neighborhood without links: see "Minor"; glossary
+1620-1624 defines the neighborhood's two readers.
+** Tense
+New doc comments use the present, and no future;
+'types/save.rs':73-74,80 use the past for a record of what a
+save did, which reads right. 'names.org' has no tense rule.
+* Question 2: citations
+No code, test, comment or doc comment in the range cites a
+'TODO/' file, a plan or a slice. Commit messages and 'TODO/'
+cite them, as allowed. 'types/save.rs':81 cites
+'docs/glossary.org' (allowed, but see "A cited glossary
+headline").
+* Question 3: stale text, and numbered names
+** Statements no longer true
+'save_staleness.rs':3-8 and api-and-formats 308-312 ("The
+buffer's copy"); 'write_protected_edits.rs':4-5 and glossary
+210-211 ("The write-protected excuse"); COMMANDS 11-13 and
+COMMANDS-nvim 20-22 ("The user docs overstate"); 'override.org'
+37 against 'views_state.rs' ("Ordinary content view");
+'env.rs':163-165 ("Bare generation").
+Checked and still true: api-and-formats 135-140, 305-349,
+393-427, 611-628; data-model_technical 154-161; COMMANDS 17-46,
+71-72, 88-92, 368-369; glossary 606-651, 1610-1624, 2101-2107;
+'from_text.rs':48-61; 'relation_accessors.rs':240-258;
+'save_dependencies/mod.rs':19-35, 187-191; 'save.rs':211-285,
+416-436.
+** Counts, not names: allowed
+The server has no numbered phase or pass left.
+'in_rust_graph.rs':99 "Two-pass", 'save.rs':417 "two passes",
+'data-model_technical.org':114 "two-pass" and
+'tools/introspect/profile-with-org-report/how-it-works.toml':41
+count passes; they name none.
+** A number cited as the step's name: forbidden
+'tests/integration/save_collateral_delete_then_edit_under_it':
+'README/detail.org':14-82 ("as in phase 5"), 'test-emacs.el'
+286 and 'test-nvim.lua':300 ("from phase 7"); it also says
+"buffer 1", "buffer 2". 'server/prominence.rs':196-268 "Step
+1..3", cited at 203 as "(step 3)" (a step, not a phase or
+pass; the same rule).
+** Numbered labels beside a description: forbidden, uncited
+'elisp/skg-org-fold.el':62-63 "Pass 1", "Pass 2". The ';;;
+Phase N' headers and "=== PHASE N ===" prints in 22
+'tests/integration/' folders, both clients (diff-view,
+repo-cycling, root-folded-save, the view-magit ones,
+visit-link, the save_collateral ones, save_lock_lifecycle,
+fold-preservation and others), and
+'tests/profiling/profiling-lib.el':45-118.
+'bash/all-tests.sh':88,106. In 'tools/': find-danglers/find.py
+130-155; md-to-org (converter 5-6, 54, 258, 292-295; README
+40-41); scope-reducer.rs 85-96; introspect/call-graph 560,
+677; introspect/change-forest 637, 660;
+reformat_parens_and_dot_in_rust.py 238, 312.
+'coding-advice/common-gotchas.md':2 states the rule.
+** Connections named by number
+'tests/save_stale_buffers.rs':546, 614-615, 640 add
+"Connection one/two" (199 is older): the same rule, mildly.
