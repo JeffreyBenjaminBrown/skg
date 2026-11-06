@@ -137,8 +137,8 @@ three comparisons share.
 handler mutates in place through the rest of the pipeline
 (restore requests, delete propagation, strandeds, Hoist, forks).
 Remove the untouched outdated Saves right after the stale check,
-before anything reads the vector again, so that delete propagation
-and the Hoist classification never see them. A 'SkgrepoMove' in
+before anything reads the vector again, so that delete
+propagation and the Hoist classification never see them. A 'SkgrepoMove' in
 'skgrepo_moves' for a dropped graphnode cannot exist: a move
 changes the copy's home skgrepo, so the graphnode is not
 untouched. The save's warnings travel in 'parse_warnings' and the
