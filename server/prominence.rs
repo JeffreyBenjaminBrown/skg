@@ -163,7 +163,11 @@ pub fn prominence_sources_for_saved_from_inRustGraph (
     identify_origins (
       &saved_gnids, &map_to_containers, &mentioned_gnids, &had_id_set );
   for gnid in &saved_gnids {
-    // CycleMember, only for nodes not already a higher-priority origin.
+    // CycleMember, only for a saved node with no other source. This is
+    // stricter than the startup rule in 'extend_regions_for_cycles',
+    // where CycleMember outranks every source but Root; the two have
+    // differed since before 2026-11, and nobody has reported either as
+    // wrong.
     if ! prominence_sources . contains_key (gnid)
        && node_is_in_containerward_cycle (graph, gnid) {
       prominence_sources . insert (
@@ -200,11 +204,12 @@ fn node_is_in_containerward_cycle (
 /// We impose priority order: If something is a Root,
 /// it doesn't matter that it's Mentioned, etc.
 /// Therefore higher-priority prominence sources are processed later.
-/// CycleMember is assigned later, when cycles are handled
-/// ('extend_regions_for_cycles'; at save time, the containerward-cycle
-/// check in 'prominence_sources_for_saved_from_inRustGraph').
-/// (That's safe because the only higher-priority thing is a Root,
-/// and a Root cannot be a CycleMember.)
+/// CycleMember is assigned afterwards, by the caller, and the two
+/// callers differ: at startup 'extend_regions_for_cycles' gives it to
+/// every cycle member that is not a Root (Root outranks it; every
+/// other source yields to it); at save time
+/// 'prominence_sources_for_saved_from_inRustGraph' gives it only to a
+/// saved node that has no other source.
 fn identify_origins (
   all_node_gnids : &HashSet<ID>,
   map_to_containers  : &MapToContainers,

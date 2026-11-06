@@ -21,6 +21,11 @@ run stopped). The habit: find the function that decides the behavior,
 read it, and cite it in the plan. If you cannot find it, say so in the
 plan as an open question rather than stating the rule.
 
+The rule binds the planner's own sentences as much as the plan's
+rules. In plan 5 the planner wrote that a save re-sent after it
+created a child is not refused, without tracing it; the executing
+agent tested it and found the opposite.
+
 A rule that two copies of a thing are equal must say in which
 canonical form they are compared. Plan 2_2 said a graphnode the
 buffer shows "as the graph has it" never refuses a save, and

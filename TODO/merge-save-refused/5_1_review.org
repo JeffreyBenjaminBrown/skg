@@ -42,7 +42,7 @@ under the new sense.
 *** 'prominence.rs' lost the numbers from its section headers too
 Named references beside numbered headers would have aged.
 ** Slice 3
-*** TODO A claim of mine was wrong; the agent said so
+*** DONE A claim of mine was wrong; the agent said so
 I wrote that a save re-sent after it created a child creates the
 child twice and is not refused. The agent tested it: the save is
 refused, since the container is then an edited stale graphnode.
@@ -74,8 +74,8 @@ warned of.
 landed everywhere in scope; no code cites 'TODO/'; ten findings,
 eight applied by slice 3, one the fold fix, and one for you
 below.
-* Decide
-** TODO The prominence comment at save time
+* ONGOING Decide
+** ONGOING The prominence comment at save time
 'server/prominence.rs' (near line 203) now points to the
 save-time cycle check as well as the startup one, but its reason,
 "only Root outranks", holds only at startup. At save time (near
@@ -85,10 +85,12 @@ these plans. Whether save time should match startup is a behavior
 question; the comments are cheap to correct either way. I would
 correct the comments to say what each site does, and leave the
 behavior, which nobody has reported as wrong.
-* Suggestions for the advice
+*** TODO [jeff] agreed
+* ONGOING Suggestions for the advice
 - 'orchestration.org': a brief lists every suite whose assertions
   could depend on the slice's behavior, not only the suites whose
   code the slice touches; the tool's tests assert server
   behavior.
 - 'plans.org': the planner, too, obeys the first rule; my slice 3
   text stated a behavior I had not traced.
+** TODO [jeff] agreed

@@ -17,7 +17,11 @@ plan and should not need to. The brief holds:
   changed since the plan was written, pitfalls found since;
 - the suites to run, each named with its command, with the
   instruction to serialize full runs (two at once collide on
-  fixed temp paths and the Tantivy writer);
+  fixed temp paths and the Tantivy writer). List every suite
+  whose assertions could depend on the slice's behavior, not
+  only those whose code the slice touches: the AI tool's tests
+  assert the server's behavior, and plan 4's briefs left them
+  out, so one failed unseen for a day;
 - the tracked files that are dirty before the launch and whose
   they are, so that the agent neither commits Jeff's edits nor
   takes them for a stopped slice's leftovers;
