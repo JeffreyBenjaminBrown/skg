@@ -139,7 +139,7 @@ suites one at a time.
 - 'elisp/skg-org-fold.el', 'server/from_text/buffer_to_viewnodes/
   validate_tree.rs', 'server/prominence.rs': slice 2.
 * Implementation sequence
-** TODO Slice 1: stale, edited, unedited
+** DONE Slice 1: stale, edited, unedited
 Rename as "Agreed behavior" says, in code, comments, tests, docs
 and the glossary, respecting "Two senses of two words". Run
 'bash/nextest.sh', 'bash/emacs-tests.sh' and 'bash/nvim-tests.sh';

@@ -549,7 +549,7 @@ fn retitle_ra_elsewhere (
     view . replace ("ra as first written", "ra retitled")); }
 
 #[test]
-fn an_untouched_outdated_node_is_left_out_of_the_save
+fn an_unedited_stale_node_is_left_out_of_the_save
   () -> Result<(), Box<dyn Error>> {
   // Connection one's view of r still shows ra as first written; it
   // edits only rb. ra is left as the graph has it, with a warning, and
@@ -577,7 +577,7 @@ fn an_untouched_outdated_node_is_left_out_of_the_save
   Ok (()) }
 
 #[test]
-fn an_edited_outdated_node_still_refuses_the_save
+fn an_edited_stale_node_still_refuses_the_save
   () -> Result<(), Box<dyn Error>> {
   let mut f : Fixture = fixture () ?;
   let mut first : ViewsState = new_connection ();
@@ -597,9 +597,9 @@ fn an_edited_outdated_node_still_refuses_the_save
   Ok (()) }
 
 #[test]
-fn deleting_an_outdated_node_still_refuses_the_save
+fn deleting_a_stale_node_still_refuses_the_save
   () -> Result<(), Box<dyn Error>> {
-  // A delete is an edit, never untouched.
+  // A delete is an edit, never unedited.
   let mut f : Fixture = fixture () ?;
   let mut first : ViewsState = new_connection ();
   let r_in_first : String = open_view (&mut f, &mut first, "r", "r-first");
@@ -617,7 +617,7 @@ fn deleting_an_outdated_node_still_refuses_the_save
   Ok (()) }
 
 #[test]
-fn an_untouched_node_deleted_elsewhere_stays_deleted
+fn an_unedited_node_deleted_elsewhere_stays_deleted
   () -> Result<(), Box<dyn Error>> {
   // Connection two deletes ra, which also drops it from r's content.
   // Connection one's view still shows both, unedited: each is left as
@@ -643,7 +643,7 @@ fn an_untouched_node_deleted_elsewhere_stays_deleted
   Ok (()) }
 
 #[test]
-fn an_untouched_node_moved_elsewhere_is_not_moved_back
+fn an_unedited_node_moved_elsewhere_is_not_moved_back
   () -> Result<(), Box<dyn Error>> {
   // Connection two moves ra from main to other, both owned. Connection
   // one's view still shows ra's home as main, unedited: no move back.
@@ -680,7 +680,7 @@ fn rewrite_and_reload_n (
   Ok (()) }
 
 #[test]
-fn an_untouched_outdated_foreign_node_is_not_forked
+fn an_unedited_stale_foreign_node_is_not_forked
   () -> Result<(), Box<dyn Error>> {
   let mut f : Fixture = fixture () ?;
   let mut first : ViewsState = new_connection ();
@@ -703,7 +703,7 @@ fn an_untouched_outdated_foreign_node_is_not_forked
   Ok (()) }
 
 #[test]
-fn an_edited_outdated_foreign_node_still_refuses_the_save
+fn an_edited_stale_foreign_node_still_refuses_the_save
   () -> Result<(), Box<dyn Error>> {
   let mut f : Fixture = fixture () ?;
   let mut first : ViewsState = new_connection ();

@@ -1286,3 +1286,85 @@ from 2026-11-06 03:02 UTC. Jeff's server stays pinned at
 ec36a08a ('_burying/skg-stable'); plan 5 changes no behavior.
 ** Orchestrator's launches
 Slice 1 launched 03:02 UTC.
+** Slice 1
+*** Commits
+- The commit carrying this entry: "outdated" becomes "stale",
+  "untouched" becomes "unedited", and "stale" for the refused case
+  becomes "edited stale", in code, comments, tests and docs; the
+  glossary entry "baseline, stale, edited, unedited"; the slice's
+  headline turned DONE. No behavior change.
+*** Suites
+- 'cargo nextest run --test grouped_saves': 193 of 193 pass.
+- 'bash/nextest.sh': 1144 of 1144 pass; no compiler warning.
+- 'bash/emacs-tests.sh': 445 of 445 as expected.
+- 'bash/nvim-tests.sh': 482 pass in 41 spec files; 0 failed, 0 errors.
+- No failure of any kind.
+- The '/verify' skill, at the TCP surface, on an isolated scratch
+  server: a view of a containing b and c; b retitled on another
+  connection; the view saved with only c edited: saved, c edited, b
+  keeps the other title, warning "Left as the graph has it: b first
+  (b), which changed ...". The view saved with b edited: refused,
+  NOTHING WAS SAVED, "A node this save would write changed ...", b
+  unchanged on disk.
+- 'bash/all-tests.sh' not run: no string literal changed (the diff
+  under 'server/' and 'tests/' touches identifiers and comments
+  only), so no text a client test or integration script matches
+  changed. The pre-existing 'import-md-and-org' failure was
+  therefore not exercised.
+*** Deviations from the plan's how
+- The first line of 'save_staleness.rs' said "The save's refusal of
+  a stale buffer"; under the new sense a stale buffer is not
+  refused unless it edits what went stale, so it now says the save
+  refuses for an edited stale graphnode and leaves an unedited one
+  out. The module doc's first two paragraphs were re-split around
+  the new definition.
+- Where "stale" meant the refused case in a list of things that do
+  not happen to an unedited stale graphnode ("never forked, moved
+  back or stale"; "neither forked, nor moved back, nor stale" in
+  'server/from_text.rs'), it became "refused for", since "edited
+  stale" cannot negate there.
+- The local variable 'untouched' in 'without_unedited_stale_saves'
+  and in 'server/from_text.rs' became 'unedited', following the
+  listed identifiers.
+- Test renames in 'tests/save_stale_buffers.rs':
+  'an_unedited_stale_node_is_left_out_of_the_save',
+  'an_edited_stale_node_still_refuses_the_save',
+  'deleting_a_stale_node_still_refuses_the_save',
+  'an_unedited_node_deleted_elsewhere_stays_deleted',
+  'an_unedited_node_moved_elsewhere_is_not_moved_back',
+  'an_unedited_stale_foreign_node_is_not_forked',
+  'an_edited_stale_foreign_node_still_refuses_the_save'.
+- 'docs/api-and-formats.org' keeps "A stale buffer" as the item's
+  subject, since several passages cite it as "the stale buffer", and
+  qualifies it: "is refused for its edited stale graphnodes". Its
+  rebuild paragraph said "a save is refused only where a buffer's
+  baseline no longer matches the rebuilt graph", which plan 4 made
+  inexact; it now says "where a buffer edits a graphnode whose
+  baseline copy no longer matches". Its "would make that container
+  stale ... and so refuse it" (the overPrivateText re-save) became
+  "an edited stale graphnode"; the same sentence in both COMMANDS
+  files became "stale and edited". The COMMANDS stale-save
+  paragraphs and recovery steps already say "edited" and "did not
+  edit" in plain English and keep their words.
+- The glossary's one line on the earlier words is phrased as what
+  the 'TODO/' records that predate the words say, since those keep
+  them.
+- Kept, since the glossary's extension ("a save or write is stale
+  when it would write one") covers them: 'stale_write_errors', "the
+  stale check", "the stale error", the file names 'save_staleness.rs'
+  and 'save_stale_buffers.rs', 'a_merge_request_is_never_stale',
+  and "stale" in 'tests/save_rerender_release.rs'.
+*** A synonym met on the way
+'server/from_text/validate.rs' near line 382 ("an untouched stale
+node") and 'tests/restricted_suppression.rs' ("an untouched stale
+buffer") predate plan 4 (594b0bcf) and were left as they are:
+there "stale" means rendered before a switch of the skgrepo
+restriction, and "untouched" means identical to disk, so the noop
+filter drops it. Their "untouched" is near today's "unedited" and
+their "stale" is not today's "stale"; a reader may conflate them.
+*** Fixtures changed
+None.
+*** Unfinished
+Nothing.
+*** Headline
+DONE.

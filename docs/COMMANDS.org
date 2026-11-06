@@ -91,7 +91,7 @@ leaves the save skgsave-committed and the buffers as they were: the saved
 buffer still holds what was saved, unrendered. Do not save it again:
 the save would apply a second time. Its edits of existing nodes would
 write nothing, but a new node it put under a container would make that
-container stale, refusing the save, and a new root of the view would be
+container stale and edited, refusing the save, and a new root of the view would be
 created twice. Reopen the view to go on.
 *** what a save does to other views
 A save rerenders every other open view that shows what it changed,

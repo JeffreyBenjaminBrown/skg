@@ -899,7 +899,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
     skgrepo_moves,
     fork_specs,
     post_skgsave_commit_notice_candidates,
-    untouched_outdated_graphnodes }
+    unedited_stale_graphnodes }
     = save_plan;
   { // A node the buffer would write that changed after the buffer was
     // rendered refuses the whole save, before any confirmation is asked.
@@ -1144,7 +1144,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
       let mut warnings : Vec<String> = parse_warnings;
       warnings . extend ( response . warnings );
       warnings . extend ( strandeds_warnings );
-      warnings . extend ( untouched_outdated_graphnodes . iter ()
+      warnings . extend ( unedited_stale_graphnodes . iter ()
                           . map (left_as_the_graph_has_it_warning) );
       warnings . extend ( restore_warnings );
       warnings . extend ( readiness_warnings );

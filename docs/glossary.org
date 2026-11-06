@@ -215,7 +215,7 @@ write-protected occurrence shows no body and saves nothing of its own,
 so a save is refused if one differs from the graph in its title,
 skgrepo, aliases (one lacked, reordered, or with a relRepo request) or
 flags; a title or skgrepo as the buffer's baseline shows it, which the
-graph changed since, is no edit (see "untouched"). No child of a
+graph changed since, is no edit (see "unedited"). No child of a
 write-protected occurrence claims membership,
 whatever it carries: a child the user typed under it, which stays
 unwarranted, since no save reads claims there, is saved as an
@@ -610,7 +610,7 @@ of the implementation), which keeps what the user put in it. Org
 folding keeps the words "fold" and "unfold"; drawing more of a view
 is not called unfolding.
 
-*** baseline, outdated, untouched, stale
+*** baseline, stale, edited, unedited
 
 A buffer's *baseline* is the text the server last drew for it, as
 the client installed it (without the focus and fold metadata the
@@ -627,31 +627,33 @@ a baseline viewnode equal to the graph's graphnode yields none; one
 that differs, or whose graphnode the graph lacks, survives. *The
 buffer's writes* are the graphnodes the saved buffer writes or deletes:
 the nodeInstructions its text yields, filtered of no-ops and of its
-untouched outdated graphnodes, plus the original of each fork clone. A
+unedited stale graphnodes, plus the original of each fork clone. A
 view is *dirty* while its buffer holds edits not yet saved (the
 client's modified flag), and *clean* otherwise. (The
 "baseline" of a git stage in 'server/types/git.rs', HEAD for the staged
 changes and the git index for the unstaged, is a git notion, not a
 buffer's baseline.)
 
-A graphnode among the baseline's writes is *outdated* in the buffer:
+A graphnode among the baseline's writes is *stale* in the buffer:
 the baseline's copy of it no longer matches the graph, or the graph no
-longer has it. An outdated graphnode is *untouched* by the buffer when
-the buffer's copy of it (the Save instruction the saved text yields
-for it, supplemented and filtered of no-ops) equals the baseline's
-copy, both compared as a view reads a graphnode back (relationship
-lists by distinct pid, the body without trailing whitespace): the user
-did not edit it, and the buffer merely still shows what the server
-drew. A save leaves an untouched outdated graphnode out, with its home
-skgrepo move and any fork of it, writes the rest, and warns of it
-("Left as the graph has it: ..."); the redraw shows the graph's
-version ('without_untouched_outdated_saves'). A delete is never
-untouched.
+longer has it. The graph changed it under the buffer.
 
-A graphnode is *stale* in a save when it is outdated and the buffer
-edits it (writes it from a copy unlike the baseline's, or forks it) or
-deletes it: writing the buffer's copy would undo a change the user
-never saw. A save with a stale graphnode is refused whole
+The buffer *edited* a graphnode when the buffer's copy of it (the Save
+instruction the saved text yields for it, supplemented and filtered of
+no-ops) differs from the baseline's copy, both compared as a view reads
+a graphnode back (relationship lists by distinct pid, the body without
+trailing whitespace), and left it *unedited* when the two are equal:
+the user did not edit it, and the buffer merely still shows what the
+server drew. A delete is an edit, never unedited. A save leaves an
+unedited stale graphnode out, with its home skgrepo move and any fork
+of it, writes the rest, and warns of it ("Left as the graph has it:
+..."); the redraw shows the graph's version
+('without_unedited_stale_saves').
+
+An *edited stale graphnode* is a stale one the buffer edits (writes
+from a copy unlike the baseline's, or forks) or deletes: writing the
+buffer's copy would undo a change the user never saw. A save with an
+edited stale graphnode is refused whole
 ('server/serve/handlers/save_staleness.rs'). Staleness is decided by
 content, not by time: a restart, a rebuild or a whitespace strip makes
 nothing stale by itself, and a graphnode changed and changed back is
@@ -661,6 +663,9 @@ write is stale when it would write one. The stale error names what
 changed at its own grain ('StaleAspect': the title, body, content,
 aliases, extra IDs, flags, subscriptions, hides, overrides or home
 skgrepo), not as diff aspects: it says "body" where they say "text".
+
+The records in 'TODO/' that predate these words say "outdated" for
+stale, "untouched" for unedited, and "stale" alone for edited stale.
 
 *** text search, search view, enrichment
 
@@ -2067,7 +2072,7 @@ The /save envelope/ is the length-prefixed S-expression a client
 sends right after the "save buffer" request line. It carries
 'saved-buffer' (the buffer's text, with the client's focus and fold
 metadata added), 'baseline' (the same buffer's text as the server
-last drew it, with that metadata removed; see "baseline, outdated, untouched, stale") and
+last drew it, with that metadata removed; see "baseline, stale, edited, unedited") and
 'other-views' (every other open view of the connection, each clean
 or dirty with its baseline and current text). The server parses it
 into 'SaveRequestEnvelope' ('server/serve/handlers/save_buffer.rs');

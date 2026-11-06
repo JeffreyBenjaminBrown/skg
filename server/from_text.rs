@@ -17,9 +17,9 @@ pub mod validate;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::errors::{BufferValidationError, SaveError};
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::save::{NodeInstruction, SavePlan, SkgrepoMove, UntouchedOutdatedGraphnode};
+use crate::types::save::{NodeInstruction, SavePlan, SkgrepoMove, UneditedStaleGraphnode};
 use crate::serve::handlers::save_staleness::{
-  WhatTheBaselineShows, without_untouched_outdated_saves};
+  WhatTheBaselineShows, without_unedited_stale_saves};
 use crate::types::tree::forest::ViewForest;
 
 use buffer_to_viewnodes::uninterpreted::org_to_viewforest;
@@ -51,8 +51,8 @@ use crate::types::save::ForkSpec;
 /// - raw org parse: errors only visible before tree construction;
 /// - the parsed viewforest, its missing gnids and skgrepos supplied:
 ///   global/local buffer structure, then saved-view role policy;
-/// - disk-supplemented NodeInstructions: untouched outdated graphnodes
-///   left out ('without_untouched_outdated_saves'), then foreign write
+/// - disk-supplemented NodeInstructions: unedited stale graphnodes
+///   left out ('without_unedited_stale_saves'), then foreign write
 ///   policy;
 /// - non-nodeMerge plan plus the merge pairs: cross-plan
 ///   repo-move/nodeMerge and delete/nodeMerge policy.
@@ -75,7 +75,7 @@ pub fn buffer_to_validated_saveplan_in_graph (
 ) -> Result<(ViewForest, SavePlan, Vec<String>), SaveError> {
   // No user-set clone skgrepos: every fork's skgrepo resolves by
   // inference-else-default. The fork-confirmation re-save uses the
-  // _with_fork_repos entry below. No baseline: nothing is outdated.
+  // _with_fork_repos entry below. No baseline: nothing is stale.
   buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
     buffer_text, graph, config, skgrepo_restriction, &HashMap::new (),
     &WhatTheBaselineShows::default () )
@@ -138,17 +138,17 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
       ::extract_nonmergeSavePlan_locally_in_graph (
         &viewforest, graph, config, skgrepo_restriction )
  . map_err (SaveError::DatabaseError) ?;
-  let ( nonmerge_plan, untouched_outdated_graphnodes )
-    : ( NonmergeSavePlan, Vec<UntouchedOutdatedGraphnode> ) =
-  { // Before any validator judges them: an untouched outdated graphnode
-    // is neither forked, nor moved back, nor stale.
-    let (node_instructions, skgrepo_moves, untouched)
-      : (Vec<NodeInstruction>, Vec<SkgrepoMove>, Vec<UntouchedOutdatedGraphnode>) =
-      without_untouched_outdated_saves (
+  let ( nonmerge_plan, unedited_stale_graphnodes )
+    : ( NonmergeSavePlan, Vec<UneditedStaleGraphnode> ) =
+  { // Before any validator judges them: an unedited stale graphnode
+    // is neither forked, nor moved back, nor refused for.
+    let (node_instructions, skgrepo_moves, unedited)
+      : (Vec<NodeInstruction>, Vec<SkgrepoMove>, Vec<UneditedStaleGraphnode>) =
+      without_unedited_stale_saves (
         graph, &baseline . writes,
         nonmerge_plan . node_instructions, nonmerge_plan . skgrepo_moves );
     ( NonmergeSavePlan { node_instructions, skgrepo_moves, .. nonmerge_plan },
-      untouched ) };
+      unedited ) };
   { // A flag preference is never an implicit-fork gesture.
     // Validate while its side-channel identity is still available; the
     // ordinary foreign-write filter below sees only supplemented SaveNodes.
@@ -299,7 +299,7 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
           fork_specs,
           post_skgsave_commit_notice_candidates :
             nonmerge_plan . post_skgsave_commit_notice_candidates,
-          untouched_outdated_graphnodes },
+          unedited_stale_graphnodes },
         warnings )) }
 
 /// Transitional compatibility for callers not yet carrying a generation.

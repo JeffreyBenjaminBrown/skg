@@ -1,4 +1,5 @@
-//! The save's refusal of a stale buffer, decided by content.
+//! The save's handling of stale graphnodes, decided by content: it
+//! refuses for an edited one and leaves an unedited one out.
 //!
 //! A save's write of a graphnode has one of two sources: the buffer's
 //! copy of it (the Save instruction the saved text yields), or the
@@ -10,29 +11,30 @@
 //! parsed and extracted as the saved text is, up to the noop filter;
 //! the graphnodes its Save instructions still write are those whose
 //! baseline's copy no longer matches the graph (or that the graph no
-//! longer has). A graphnode the buffer writes or deletes among them
-//! is stale, and the whole save is refused, before anything is asked
-//! or written, with one error per stale graphnode saying what changed.
+//! longer has). Each of them is stale: the graph changed it under the
+//! buffer. A stale graphnode the buffer writes or deletes is an edited
+//! stale graphnode, and the whole save is refused, before anything is
+//! asked or written, with one error per edited stale graphnode saying
+//! what changed.
 //!
-//! A graphnode among the baseline's writes is outdated. The buffer
-//! may still show it exactly as the baseline does: the user did not
-//! edit it, and the buffer's copy of it differs from the graph only
-//! because the graph changed. Such an untouched outdated graphnode is
-//! left out of the save before any validator judges its write
-//! ('without_untouched_outdated_saves', called by the plan builder),
-//! with its home skgrepo move, and so is never forked, moved back or
-//! stale; the save warns of it, and the redraw shows it as the graph
-//! has it. The baseline is read once, before the plan is built
-//! ('what_the_baseline_shows'), since the plan builder needs its
+//! The buffer may still show a stale graphnode exactly as the baseline
+//! does: the user did not edit it, and the buffer's copy of it differs
+//! from the graph only because the graph changed. Such an unedited
+//! stale graphnode is left out of the save before any validator judges
+//! its write ('without_unedited_stale_saves', called by the plan
+//! builder), with its home skgrepo move, and so is never forked, moved
+//! back or refused for; the save warns of it, and the redraw shows it
+//! as the graph has it. The baseline is read once, before the plan is
+//! built ('what_the_baseline_shows'), since the plan builder needs its
 //! writes for this and its occurrences' titles and home skgrepos for
 //! the write-protected check ('errors_for_writeProtected_occurrences').
 //!
 //! What the buffer writes is the nodeInstructions its text yields once
 //! the noop filter has dropped the ones identical to the graph and the
-//! untouched outdated ones have been left out, plus the originals of
+//! unedited stale ones have been left out, plus the originals of
 //! its fork clones. So a graphnode the buffer shows unchanged, or as
-//! the baseline has it, is never stale. A nodeMerge is built from the graph at
-//! save time, and the writes a save derives from the current graph
+//! the baseline has it, is never an edited stale graphnode. A
+//! nodeMerge is built from the graph at save time, and the writes a save derives from the current graph
 //! (delete propagation, strandeds resets, Hoist repairs, restore
 //! requests) undo nothing, so none of those is checked. A strip of
 //! whitespace changes nothing a parsed baseline shows, and a restart
@@ -61,7 +63,7 @@ use crate::types::nodes::complete::Graphnode;
 use crate::types::nodes::rust::GraphnodeInRust;
 use crate::types::save::{
   DeleteNode, ForkSpec, NodeInstruction, SaveNode, SkgrepoMove,
-  UntouchedOutdatedGraphnode};
+  UneditedStaleGraphnode};
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{ViewnodeKind, Vognode};
 use crate::serve::handlers::strip_body_whitespace::strip_trailing_whitespace_from_body;
@@ -69,8 +71,9 @@ use crate::serve::handlers::strip_body_whitespace::strip_trailing_whitespace_fro
 use std::collections::{BTreeMap, BTreeSet};
 
 /// One error per graphnode the buffer would write or delete that is
-/// among the baseline's writes ('baseline_writes'), naming the
-/// buffer's occurrences of it and what changed.
+/// among the baseline's writes ('baseline_writes'), that is, per
+/// edited stale graphnode, naming the buffer's occurrences of it and
+/// what changed.
 pub fn stale_write_errors (
   graph            : &InRustGraph,
   baseline_writes  : &BTreeMap<ID, Graphnode>,
@@ -182,55 +185,55 @@ fn occurrences_in_the_baseline (
         home_skgrepo : occurrence . home_skgrepo . clone (), } ); }
   occurrences }
 
-/// The buffer's Saves of untouched outdated graphnodes removed, with
+/// The buffer's Saves of unedited stale graphnodes removed, with
 /// their home skgrepo moves, and each such graphnode named. A
-/// graphnode is outdated when it is among 'baseline_writes', and
-/// untouched when the buffer's copy of it (its Save here, supplemented
+/// graphnode is stale when it is among 'baseline_writes', and
+/// unedited when the buffer's copy of it (its Save here, supplemented
 /// and noop-filtered) equals the baseline's copy, compared as a view
 /// reads a graphnode back. Writing it would only undo what changed in
 /// the graph; left out, it stays as the graph has it. A Delete is an
 /// edit, and is kept.
-pub fn without_untouched_outdated_saves (
+pub fn without_unedited_stale_saves (
   graph            : &InRustGraph,
   baseline_writes  : &BTreeMap<ID, Graphnode>,
   nodeInstructions : Vec<NodeInstruction>,
   skgrepo_moves    : Vec<SkgrepoMove>,
-) -> ( Vec<NodeInstruction>, Vec<SkgrepoMove>, Vec<UntouchedOutdatedGraphnode> ) {
+) -> ( Vec<NodeInstruction>, Vec<SkgrepoMove>, Vec<UneditedStaleGraphnode> ) {
   if baseline_writes . is_empty () {
     return (nodeInstructions, skgrepo_moves, Vec::new ()); }
   let mut kept      : Vec<NodeInstruction> = Vec::new ();
-  let mut untouched : Vec<UntouchedOutdatedGraphnode> = Vec::new ();
+  let mut unedited : Vec<UneditedStaleGraphnode> = Vec::new ();
   for nodeInstruction in nodeInstructions {
     let NodeInstruction::Save (SaveNode (node)) = &nodeInstruction
       else { kept . push (nodeInstruction); continue; };
     let pid : ID = graph . pid_else_raw_id (&node . pid);
-    let is_untouched : bool =
+    let is_unedited : bool =
       baseline_writes . get (&pid) . is_some_and ( |baseline_copy|
         ! buffernode_differs_from_disknode (
           &as_a_view_reads_it_back (graph, node . clone ()), baseline_copy ));
-    if is_untouched {
-      untouched . push ( UntouchedOutdatedGraphnode {
+    if is_unedited {
+      unedited . push ( UneditedStaleGraphnode {
         deleted_from_the_graph : graph_lacks (graph, &pid),
         title                  : node . title . clone (),
         pid, } );
     } else { kept . push (nodeInstruction); }}
   let skgrepo_moves : Vec<SkgrepoMove> = skgrepo_moves . into_iter ()
-    . filter ( |skgrepo_move| ! untouched . iter () . any ( |node|
+    . filter ( |skgrepo_move| ! unedited . iter () . any ( |node|
       node . pid == graph . pid_else_raw_id (&skgrepo_move . pid) ))
     . collect ();
-  (kept, skgrepo_moves, untouched) }
+  (kept, skgrepo_moves, unedited) }
 
 /// The save's warning that it left 'node' as the graph has it.
 pub fn left_as_the_graph_has_it_warning (
-  node : &UntouchedOutdatedGraphnode,
+  node : &UneditedStaleGraphnode,
 ) -> String {
   format! ( "Left as the graph has it: {} ({}), which {} after this buffer was rendered and which this buffer did not edit.",
             node . title, node . pid . 0,
             if node . deleted_from_the_graph { "was deleted" } else { "changed" } ) }
 
-/// Whether the graph no longer has the outdated graphnode 'pid': what
+/// Whether the graph no longer has the stale graphnode 'pid': what
 /// tells a deleted one from a changed one, in the warning as in the
-/// stale error ('change_since_rendered', which reads the graphnode
+/// edited stale graphnode's error ('change_since_rendered', which reads the graphnode
 /// back where the graph has it).
 fn graph_lacks (
   graph : &InRustGraph,
