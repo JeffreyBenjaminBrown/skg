@@ -45,10 +45,11 @@ pub fn find_buffer_errors_for_saving_in_graph (
   config: &SkgConfig,
 ) -> Result<Vec<BufferValidationError>,
             Box<dyn std::error::Error>>
-{ // Two kinds of check, in order: the whole-viewforest checks
-  // (instructions, nodeMerges, view requests, idFolders, overrides,
-  // view roots, write-protected requests), many of which
-  // need to take the entire viewforest into account;
+{ // Two kinds of check, in order: the global checks
+  // (instructions, nodeMerges, view requests, idFolder membership,
+  // overridesHere parts, view roots, write-protected relRepo requests),
+  // which judge viewnodes against each other across the viewforest,
+  // or one viewnode against the graph;
   // then the local-structure validation,
   // which performs only local structural verifications:
   // each ID belongs to an idFolder, etc.

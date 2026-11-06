@@ -160,7 +160,7 @@ the code there actually means after reading it. No behavior
 change. Rename as "Three numbered steps will be named" says,
 reading each site first. Run 'bash/nextest.sh' and
 'bash/emacs-tests.sh'. One commit.
-** TODO Slice 3: corrections from the review
+** DONE Slice 3: corrections from the review
 The vocabulary review of plan 5
 ('5_1_review-reports/vocabulary-and-citations.org') found these.
 Read it in full; apply its findings 1 to 7 and 9 as it says, in

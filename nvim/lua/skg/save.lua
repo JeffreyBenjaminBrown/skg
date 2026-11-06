@@ -891,7 +891,8 @@ end
 ---rerender those views, approving the PIDs the challenge lists
 ---('rerender_all_views.request_rerender_views'); the save is not sent
 ---again, since it would apply a second time (creating a new root of the
----view again, or refused as stale for a container it gave a new child).
+---view again, or refused because a container it gave a new child would
+---be an edited stale graphnode).
 ---Declining keeps the buffers as they are.
 ---@param response any
 function M.save_text_release_confirmation_handler (response)

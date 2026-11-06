@@ -62,8 +62,8 @@ fn weave_all_visible_deleted () {
 
 #[test]
 fn weave_positioned_invisible_member_moves_with_buffer () {
-  // R is hidden but present in the buffer (a stale occurrence of it,
-  // drawn before a switch of the skgrepo restriction): the buffer's
+  // R is hidden but present in the buffer (an occurrence of it drawn
+  // under the previous skgrepo restriction): the buffer's
   // order wins for it, and it serves as an anchor for the run that
   // follows it on disk.
   assert_eq! ( w (&["a","R","X","b"], &["b","R","a"]),

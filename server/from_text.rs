@@ -141,7 +141,7 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
   let ( nonmerge_plan, unedited_stale_graphnodes )
     : ( NonmergeSavePlan, Vec<UneditedStaleGraphnode> ) =
   { // Before any validator judges them: an unedited stale graphnode
-    // is neither forked, nor moved back, nor refused for.
+    // is neither forked nor moved back, and never refuses the save.
     let (node_instructions, skgrepo_moves, unedited)
       : (Vec<NodeInstruction>, Vec<SkgrepoMove>, Vec<UneditedStaleGraphnode>) =
       without_unedited_stale_saves (

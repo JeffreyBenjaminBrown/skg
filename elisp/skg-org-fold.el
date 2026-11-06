@@ -65,11 +65,14 @@ METHOD, in order:
 - Fold the parents of the `folded' headlines: repeatedly find a
   visible `folded'-marked headline and fold its parent, until none is
   visible. We loop because folding a parent makes more `folded'
-  headlines invisible, removing them from the search."
+  headlines invisible, removing them from the search. A top-level
+  `folded' headline has no parent to fold and stays visible, so the
+  search skips it once found; otherwise it would find it forever."
   (org-show-all)
   (skg--fold-bodies-of-bodyfolded-headlines)
   (goto-char (point-min))
-  (let ((found t))
+  (let ((found t)
+        (positions-of-folded-headlines-without-parent '()))
     (while found
       (setq found nil)
       (save-excursion
@@ -79,14 +82,17 @@ METHOD, in order:
           (beginning-of-line)
           (when (and (looking-at org-heading-regexp)
                      (not (invisible-p (point)))
+                     (not (memq (point)
+                                positions-of-folded-headlines-without-parent))
                      (skg-headline-has-folded-in-view-p))
             (setq found (point)))
           (forward-line 1)))
       (when found
         ;; If we found one, go to its parent and fold.
         (goto-char found)
-        (when (org-up-heading-safe)
-          (org-cycle)) )) ))
+        (if (org-up-heading-safe)
+            (org-cycle)
+          (push found positions-of-folded-headlines-without-parent)) )) ))
 
 (defun skg--fold-bodies-of-bodyfolded-headlines ()
   "Hide the entry of every headline tagged `bodyFolded' in metadata.
@@ -130,7 +136,7 @@ and re-hides entries that had `bodyFolded'."
           (when (org-at-heading-p)
             (org-fold-hide-entry))
           (set-marker m nil)))
-      (progn;; This is a third pass through the entire buffer.
+      (progn ;; Fold the parents of the `folded' headlines.
         (dolist (parent-marker parent-markers)
           (goto-char parent-marker)
           (when (org-at-heading-p)

@@ -2414,8 +2414,9 @@ def check_releasing_a_save_s_rerender (context):
   overPrivateText telescope's text happens, but the view is withheld:
   '--yes' alone leaves the files stale. With '--show-overPrivateText'
   the tool asks for the withheld rerender, approving it, rather than
-  sending the save again, which the server would refuse as stale once
-  the save had made a node; the files then show the new node."""
+  sending the save again, which the server would refuse once the save
+  had made a node, whose container would then be an edited stale
+  graphnode; the files then show the new node."""
   folder = context [ "daemon_folder" ]
   edit_compact ( folder, [ ( "** Contained twice ⟨0b 3aC⟩",
                              "** Contained twice, retitled ⟨0b 3aC⟩" ) ],

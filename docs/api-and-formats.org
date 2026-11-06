@@ -305,8 +305,9 @@ So far there are these endpoints:
     =A restore request ...=), in the words of the diff view's refusal. A request that names no current change is dropped, with
     the warning =A readiness request names no current change; it was
     dropped.=, which names its headline as a subheadline.
-  - A stale buffer is refused for its edited stale graphnodes, before
-    anything is written and before any confirmation is asked ('stale_write_errors' in
+  - A save from a stale buffer is refused only if the buffer edited one
+    of its stale graphnodes, before anything is written and before any
+    confirmation is asked ('stale_write_errors' in
     'server/serve/handlers/save_staleness.rs'). A save writes a
     graphnode either from the buffer's copy of it, the Save
     instruction its saved text yields, or from the graph as it stands
@@ -347,7 +348,7 @@ So far there are these endpoints:
     node the buffer shows as the graph has it, or as its baseline
     does, never refuses a save, however old the buffer; a node the
     graph deleted after the buffer was drawn is left out if the
-    buffer did not edit it and refused for if it did, so an old buffer
+    buffer did not edit it and refuses the save if it did, so an old buffer
     cannot recreate it; a merge request is never stale; and a
     restart, a rebuild or a body-whitespace strip makes nothing stale
     by itself. A graphnode the buffer writes

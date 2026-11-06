@@ -23,10 +23,11 @@ plan as an open question rather than stating the rule.
 
 A rule that two copies of a thing are equal must say in which
 canonical form they are compared. Plan 2_2 said a graphnode the
-buffer shows "as the graph has it" is never stale, and compared
-raw ID lists; a graph's content list can name one graphnode twice
-(an extra ID after a nodeMerge) where a view draws it once, so
-every view of such a container was stale until a probe found it.
+buffer shows "as the graph has it" never refuses a save, and
+compared raw ID lists; a graph's content list can name one graphnode
+twice (an extra ID after a nodeMerge) where a view draws it once, so
+every save of a view of such a container was refused until a probe
+found it.
 
 * Design the shared model once, before any plan
 When several slices will touch one model (for the TDV: editability,

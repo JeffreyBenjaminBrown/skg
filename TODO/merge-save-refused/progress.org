@@ -1453,3 +1453,92 @@ Slice 2 is DONE; plan 5 is done.
 Two commits; renames only; full suite green but the pre-existing
 failure. Plan 5 is complete. The post-plan vocabulary check
 launched 03:16; no probe pass, since nothing changed behavior.
+** Slice 3
+*** Commits
+- The commit carrying this entry: the review's findings 1 to 7 and
+  9 reworded ('5_1_review-reports/vocabulary-and-citations.org'),
+  and finding 10 fixed: 'skg-fold-marked-headlines'
+  ('elisp/skg-org-fold.el') no longer loops forever on a top-level
+  headline marked 'folded', with an Emacs unit test; the slice's
+  headline turned DONE.
+*** Suites
+- 'bash/emacs-tests.sh': 446 of 446 as expected (one new test).
+  The new test, run against HEAD's 'skg-org-fold.el', fails (its
+  lookup counter errors where the old loop would spin); against the
+  fix it passes.
+- 'bash/nextest.sh': 1144 of 1144 pass.
+- 'bash/nvim-tests.sh': 482 pass in 41 spec files; 0 failed, 0 errors.
+- 'python3 tools/skg-for-ai/test_skg_for_ai.py' (its test file's
+  docstring changed): one failure, 'check_stale_view', pre-existing
+  since plan 4 (a6f1d04d), not caused by this slice. The check has
+  view A save after view B retitled a node A shows but does not
+  edit, and expects "nothing was saved, 1 error"; since plan 4 that
+  node is an unedited stale graphnode, so the save succeeds with
+  "Left as the graph has it: ...". Every other check of the tool
+  passes. Recorded in 'TODO/problems.org'.
+- 'bash/all-tests.sh' not run: no text an integration script or a
+  client test matches changed (the server changes are comments; the
+  Rust test changes are comments, a local variable, an assertion
+  message and a skgrepo name inside one test's own input).
+- The '/verify' skill, on an isolated scratch server: a view of a
+  root, a new child saved under it with the baseline; the same save
+  sent again with the same baseline is refused, NOTHING WAS SAVED,
+  and only one child's file is on disk.
+*** Deviations from the plan's how
+- Finding 2, the re-sent save: the plan's brief says to write that
+  the child is created twice and the save is not refused. The code
+  does the opposite, as the review report and 'COMMANDS.org' (near
+  92) and 'api-and-formats.org' (near 532) already say: the
+  container the first save gave a new child is then stale (the
+  graph has the child, the baseline does not) and edited (the
+  buffer's copy names a new child the baseline's does not), so the
+  save is refused. A throwaway test in 'tests/save_stale_buffers.rs'
+  (removed) and the '/verify' run above both showed the refusal.
+  The four sites now say the save would be refused because a
+  container it gave a new child would be an edited stale graphnode.
+- Finding 10: the loop remembers the position of each found
+  headline whose parent 'org-up-heading-safe' cannot reach, and the
+  search skips those positions. Positions are stable because
+  folding changes no text. Only such headlines are remembered, as
+  the plan says. A parent hidden by 'bodyFolded' whose 'folded'
+  child it must fold was checked by hand: it ends after one lookup.
+- The plan names the function 'skg--restore-folds'; it is
+  'skg-fold-marked-headlines'. The new test is
+  'test-skg-fold-marked-headlines-ends-on-a-top-level-folded-headline'
+  in 'tests/elisp/test-skg-org-fold.el'. It wraps
+  'org-up-heading-safe' to count lookups and error past 100, so a
+  regression fails instead of hanging the suite.
+- Finding 3: "lags the move" in 'add_missing_info.rs' and 'fork.rs';
+  in 'tests/unit/fork.rs' the assertion message says "not the one
+  it shows, which lags the move". In
+  'tests/new/buffer_to_viewnodes/add_missing_info.rs' the cases have
+  no move: the write-protected occurrence's skgrepo differs from the
+  graph's, and the comments say so; the skgrepo named 'stale' in
+  both cases there is now 'shown'.
+- Finding 1: the write-protected skgrepo "differs from the graph" and
+  "is an edit, and refused"; the variable became
+  'buffer_with_edited_write_protected_skgrepo'.
+- Finding 6: the glossary sentence now reads 'The phrase, like "new
+  member", names the node by its membership's fate.'; the tests that
+  say "stale member" keep their names, as the plan says.
+- Finding 7: "the global checks", listing them by their functions'
+  names (idFolder membership, overridesHere parts, write-protected
+  relRepo requests), "which judge viewnodes against each other
+  across the viewforest, or one viewnode against the graph".
+- Finding 9: "refused for" became "refuses the save" in
+  'server/from_text.rs' and 'save_staleness.rs';
+  'api-and-formats.org' now says a save from a stale buffer is
+  refused only if the buffer edited one of its stale graphnodes.
+  The other uses of "refused for", "is not refused for showing ..."
+  in 'api-and-formats.org' (near 336) and "not refused for it" in
+  'COMMANDS.org' (near 1645) and 'COMMANDS-nvim.org' (near 1407),
+  mean "refused because of" and were left.
+*** Fixtures changed
+- 'tests/multi_repo_errors/fixtures/README.md': one line's wording.
+  No fixture data changed.
+*** Unfinished
+- Finding 8 (prominence at save time), Jeff's question, by the
+  plan's design.
+- The tool's 'check_stale_view' (above), outside this plan.
+*** Headline
+DONE.

@@ -111,7 +111,7 @@ fn writeProtected_ancestor_skgrepo_is_read_from_its_gnid () {
     & forest, & writeProtected_skgrepos_after_save, & config );
   assert_eq! ( map . get (& ID::from ("N")),
                Some (& SkgrepoName::from ("owned2")),
-    "a write-protected ancestor's repo must come from its ID, not its stale display" ); }
+    "a write-protected ancestor's repo must come from its ID, not the one it shows, which lags the move" ); }
 
 /// A fork-to-be (clone) with an edited title over the original N it
 /// overrides, in N's foreign repo. (original_title is N's disk title.)

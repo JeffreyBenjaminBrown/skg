@@ -1,7 +1,8 @@
 // cargo nextest run --test grouped_saves -E 'test(save_stale_buffers::)'
 //
-// A save refuses a buffer whose copy of a graphnode it would write no
-// longer matches the graph (server/serve/handlers/save_staleness.rs).
+// A save is refused when the buffer edited a graphnode whose copy in
+// its baseline no longer matches the graph, and leaves out one the
+// buffer did not edit (server/serve/handlers/save_staleness.rs).
 // Each save sends the text the view was opened with as its baseline.
 // Two connections share one runtime, as Emacs and skg-for-ai do: each
 // holds its own views, so neither's save rerenders the other's buffers.

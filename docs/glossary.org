@@ -1470,8 +1470,8 @@ content alike. In content position it follows the editability rule
 as any occurrence the refresh draws: editable at its node's first
 occurrence in level order, write-protected at a later one. A *former
 member* is any viewnode standing for such a before-only relationship,
-ghosts included. These phrases, like "stale member" and "new member",
-name the node by its membership's fate.
+ghosts included. The phrase, like "new member", names the node by its
+membership's fate.
 
 **** old text
 

@@ -6,6 +6,16 @@
   When a plan or a settled discussion decides how an entry will be
   fixed, prefix its headline with 'FIX PLANNED: ' and leave it here
   until the fix lands; then move it as above.
+* skg-for-ai's 'check_stale_view' expects the refusal plan 4 removed (2026-11-06)
+  'check_stale_view' ('tools/skg-for-ai/test_skg_for_ai.py') has view
+  A save after view B retitled a node A shows but does not edit, and
+  expects "nothing was saved, 1 error". Since plan 4
+  ('TODO/merge-save-refused/4_plan.org'; a6f1d04d) that node is an
+  unedited stale graphnode: the save succeeds with the warning "Left
+  as the graph has it: ...". The test fails on that, and is the
+  tool suite's only failure. Found while running the tool's tests for
+  plan 5, slice 3, which changed no behavior. To fix: have A edit the
+  node B changed (the refused case), or expect the warning.
 * The save handler's checks depend on their position in it (2026-11-05)
   In 'update_from_and_rerender_buffer_with_approvals'
   ('server/serve/handlers/save_buffer.rs') one vector,

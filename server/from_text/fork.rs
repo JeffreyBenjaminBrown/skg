@@ -42,8 +42,8 @@ use std::iter::once;
 /// means at most one clone anyway, and the user can override the choice
 /// in the confirmation buffer.
 /// A write-protected ancestor's skgrepo is read from its ID
-/// (WRITEPROTECTED_SKGREPOS_AFTER_SAVE): what it shows is stale when the
-/// same buffer moved that node's editable occurrence.
+/// (WRITEPROTECTED_SKGREPOS_AFTER_SAVE): what it shows lags the move when
+/// the same buffer moved that node's editable occurrence.
 pub fn owned_ancestor_skgrepos_for_foreign_vognodes (
   viewforest                         : &ViewForest,
   writeProtected_skgrepos_after_save : &HashMap<ID, SkgrepoName>,

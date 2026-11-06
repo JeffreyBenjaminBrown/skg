@@ -3,6 +3,7 @@
 (load-file (expand-file-name "../../elisp/skg-test-utils.el"
                              (file-name-directory load-file-name)))
 (require 'ert)
+(require 'cl-lib)
 (require 'org)
 (require 'skg-org-fold)
 
@@ -51,6 +52,34 @@
         (should (equal actual
                        expected))))
     (kill-buffer buf)))
+
+(ert-deftest test-skg-fold-marked-headlines-ends-on-a-top-level-folded-headline ()
+  "A top-level headline marked `folded' has no parent to fold, so it
+stays visible. The search must skip it once found rather than find it
+again forever; the other `folded' headlines still fold their parents.
+The count of parent lookups turns a regression into an error, not a hang."
+  (with-temp-buffer
+    (org-mode)
+    (insert "* (skg folded) 1
+** (skg folded) 11
+* 2
+** (skg folded) 21")
+    (let ((parent-lookups 0)
+          (original-org-up-heading-safe
+           (symbol-function 'org-up-heading-safe)))
+      (cl-letf (((symbol-function 'org-up-heading-safe)
+                 (lambda ()
+                   (setq parent-lookups (1+ parent-lookups))
+                   (when (> parent-lookups 100)
+                     (error "skg-fold-marked-headlines does not end"))
+                   (funcall original-org-up-heading-safe))))
+        (skg-fold-marked-headlines)))
+    (should (= (count-visible-nonempty-lines)
+               2))
+    (goto-char (point-min))
+    (should-not (invisible-p (point)))
+    (search-forward "* 2")
+    (should-not (invisible-p (line-beginning-position)))))
 
 (ert-deftest test-skg-remove-folded-metadata ()
   "Test that skg-remove-folded-metadata handles all cases correctly."

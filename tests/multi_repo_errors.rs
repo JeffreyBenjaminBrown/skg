@@ -277,7 +277,7 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
     // (This arises with a skgrepo move: the move edits only the
     // editable occurrence, leaving its write-protected repeats as rendered.)
     // A write-protected occurrence must agree with the graph, though, so
-    // one whose skgrepo is stale is refused.
+    // one whose skgrepo differs from the graph is an edit, and refused.
     {
       let buffer_moving_with_a_write_protected_repeat: &str = indoc! {"
         * (skg node (gnid pub-1) (skgRepos (nodeRepo private))) pub-1               # editable instance moved to 'private'
@@ -296,12 +296,12 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
       assert_eq!(save_plan . skgrepo_moves . len(), 1,
                  "Only the editable occurrence should move pub-1");
       assert_eq!(save_plan . skgrepo_moves[0] . skgrepo_change . new . as_str(), "private");
-      let buffer_with_stale_write_protected_skgrepo: &str = indoc! {"
+      let buffer_with_edited_write_protected_skgrepo: &str = indoc! {"
         * (skg node (gnid pub-1) (skgRepos (nodeRepo public))) pub-1
         * (skg node (gnid pub-1) (skgRepos (nodeRepo private)) writeProtected) pub-1
       "};
       let result = buffer_to_validated_saveplan(
-        buffer_with_stale_write_protected_skgrepo,
+        buffer_with_edited_write_protected_skgrepo,
         &config,
         &SkgrepoRestriction::unrestricted (&config) ) ;
       assert!(matches!(
@@ -309,7 +309,7 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
                 Err (SaveError::BufferValidationErrors { errors, .. })
                 if matches!(&errors[..],
                   [BufferValidationError::EditedWriteProtectedOccurrence { .. }])),
-              "A stale write-protected skgrepo should be refused, got: {:?}",
+              "An edited write-protected skgrepo should be refused, got: {:?}",
               result . err());
     }
 

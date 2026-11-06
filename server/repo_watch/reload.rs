@@ -3,8 +3,9 @@
 //! again from every skgrepo, and the nodes that differ from the graph
 //! are written to it (or deleted from it) as nodeInstructions, through
 //! the save's incremental validation ('prepare_graph_update'). A
-//! buffer that showed a node so reloaded, and would write it, is then
-//! stale: its copy no longer matches the graph
+//! buffer that showed a node so reloaded is then stale: its baseline's
+//! copy no longer matches the graph. Its save is refused only if it
+//! edited that node, and otherwise leaves the node as the graph has it
 //! ('server/serve/handlers/save_staleness.rs').
 //!
 //! Nothing is written to disk: the files are already what the graph

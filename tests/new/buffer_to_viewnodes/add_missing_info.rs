@@ -139,10 +139,10 @@ async fn test_new_headline_inherits_through_ghosts_and_folders (
         *** (skg node noClaim) new note
       "}, "alt", false ),
     ( // In a partner folder under a write-protected occurrence whose
-      // shown skgrepo is stale: the graph says 'main'.
+      // shown skgrepo differs from the graph's: the graph says 'main'.
       indoc! {"
         * (skg node (gnid other) (skgRepos (nodeRepo alt))) other
-        ** (skg node (gnid root) (skgRepos (nodeRepo stale)) writeProtected) root again
+        ** (skg node (gnid root) (skgRepos (nodeRepo shown)) writeProtected) root again
         *** (skg containerFolder)
         **** (skg node noClaim) new note
       "}, "main", false ), ] {
@@ -173,9 +173,9 @@ async fn test_new_headline_at_top_level_is_refused (
   Ok (( )) }
 
 /// A new child of a write-protected occurrence inherits the skgrepo its
-/// parent's ID will have after the save, not the (stale) one that
-/// occurrence shows: its editable occurrence's, if the buffer has one,
-/// else the graph's. (Fixture node 'root-pid' lives in 'main'.)
+/// parent's ID will have after the save, not the one that occurrence
+/// shows, which may lag a move or differ from the graph: its editable
+/// occurrence's, if the buffer has one, else the graph's. (Fixture node 'root-pid' lives in 'main'.)
 async fn test_child_of_writeProtected_occurrence_inherits_its_gnid_skgrepo (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
@@ -190,7 +190,7 @@ async fn test_child_of_writeProtected_occurrence_inherits_its_gnid_skgrepo (
     ( // No editable occurrence: the graph says 'main'.
       indoc! {"
         * (skg node (gnid other) (skgRepos (nodeRepo main))) other
-        ** (skg node (gnid root) (skgRepos (nodeRepo stale)) writeProtected) root again
+        ** (skg node (gnid root) (skgRepos (nodeRepo shown)) writeProtected) root again
         *** new child
       "}, "main" ), ] {
     let viewforest : ViewForest =

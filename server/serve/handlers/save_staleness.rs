@@ -1,5 +1,5 @@
-//! The save's handling of stale graphnodes, decided by content: it
-//! refuses for an edited one and leaves an unedited one out.
+//! The save's handling of stale graphnodes, decided by content: an
+//! edited one refuses the save, and an unedited one is left out.
 //!
 //! A save's write of a graphnode has one of two sources: the buffer's
 //! copy of it (the Save instruction the saved text yields), or the
@@ -22,12 +22,13 @@
 //! from the graph only because the graph changed. Such an unedited
 //! stale graphnode is left out of the save before any validator judges
 //! its write ('without_unedited_stale_saves', called by the plan
-//! builder), with its home skgrepo move, and so is never forked, moved
-//! back or refused for; the save warns of it, and the redraw shows it
-//! as the graph has it. The baseline is read once, before the plan is
-//! built ('what_the_baseline_shows'), since the plan builder needs its
-//! writes for this and its occurrences' titles and home skgrepos for
-//! the write-protected check ('errors_for_writeProtected_occurrences').
+//! builder), with its home skgrepo move, and so is never forked or moved
+//! back, and never refuses the save; the save warns of it, and the
+//! redraw shows it as the graph has it. The baseline is read once,
+//! before the plan is built ('what_the_baseline_shows'), since the plan
+//! builder needs its writes for this and its occurrences' titles and
+//! home skgrepos for the write-protected check
+//! ('errors_for_writeProtected_occurrences').
 //!
 //! What the buffer writes is the nodeInstructions its text yields once
 //! the noop filter has dropped the ones identical to the graph and the

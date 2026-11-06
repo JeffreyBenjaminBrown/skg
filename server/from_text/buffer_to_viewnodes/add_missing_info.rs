@@ -115,8 +115,8 @@ pub fn replace_gnid_with_pid (
 /// this save lands: that of its editable occurrence in this buffer, if
 /// one carries a skgrepo (it may be moving the node), else the graph's.
 /// A write-protected occurrence's own skgrepo is not an instruction, and
-/// it is stale whenever the buffer moved the node's editable occurrence
-/// (C-c s s edits only that one). Whatever reads an ancestor's skgrepo
+/// it lags the move whenever the buffer moved the node's editable
+/// occurrence (C-c s s edits only that one). Whatever reads an ancestor's skgrepo
 /// must therefore read a write-protected ancestor's from here.
 /// Reads the headlines as written (gnids already pids), before the
 /// parse supplies any skgrepo.

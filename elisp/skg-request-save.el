@@ -857,7 +857,8 @@ names the views withheld, the saved one first. Approval asks the
 server to rerender those views, approving the PIDs the challenge
 lists (`skg--request-rerender-views'); the save is not sent again,
 since it would apply a second time (creating a new root of the view
-again, or refused as stale for a container it gave a new child).
+again, or refused because a container it gave a new child would be an
+edited stale graphnode).
 Declining leaves the buffers as they are."
   (dolist (response-type
            '(collateral-view save-relax-lock fork-confirmation
