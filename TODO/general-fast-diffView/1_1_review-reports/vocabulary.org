@@ -1,0 +1,91 @@
+#+TITLE: Plan 1_1: vocabulary, plan citations, comments
+Range d954ed23..HEAD; code commits 731bc7bf ce66f160 d3cf31af
+0a7ab501 6fd9480a. Read only; nothing changed.
+* Q2: code citing 'TODO/' -- none
+Grepped the added lines and the eight changed files for 'TODO',
+'plan', 'slice', '1_1', 'discussion': no hits. Clean.
+* Q1: terms, ranked
+** 1. 'at reload', skg-lens.el:187 -- cheap
+Bare "reload" already has two meanings: the server rereading
+changed '.skg' files ('server/repo_watch/reload.rs',
+docs/COMMANDS.org:65) and the client's 'skg-reload'. It is also
+inaccurate; see C1 below. Say "'skg-reload'" or drop it.
+** 2. "hot reload" beside "reload" -- cheap doc; rename unwise
+New, not in docs/glossary.org, one meaning throughout
+(cargo-watch rebuilds and restarts the server). Confusible with
+the server's file reload ("the server reloads files",
+COMMANDS.org:25). The option is agreed, so keep it; a glossary
+entry, or "reload" added to names.org's never-bare list (hot /
+file / client reload), closes the gap.
+** 3. Two names for hot reload, start-servers.sh:173,175 -- cheap
+One echo says "auto-restart on code changes", its twin says "(no
+hot reload)". Use "hot reload" in both.
+** 4. 'run_skg_rerunning_on_exit' vs 'run_skg_under_cargo_watch'
+start-servers.sh:188,199 -- cheap. Both paths rerun on exit
+(cargo-watch's '-s' runs the same rerunning script, :195), so the
+pair differs by a property they share. E.g.
+'run_skg_with_hot_reload' / 'run_skg_without_hot_reload'.
+** 5. "rerun loop" / "rerunning loop" / "the loop" -- cheap
+New "Rerun loop" (start-servers.sh:206) beside the older
+"rerunning loop" (:136-137) and "the loop" (:24, :202). One
+spelling would do; "rerun loop" is the plan's.
+** 6. 'skg--line-names-symbol-p', skg-org-fold.el:252 -- cheap
+"line-names" first reads as a noun ("the names of lines"). New,
+with one caller ('skg--headline-has-bare-atom-p'), so a
+rename now costs little: e.g. 'skg--line-mentions-symbol-p'.
+** 7. 'DEB' (start-servers.sh:36) -- cheap; '--deb' -- unwise
+names.org prefers long names; 'DEB' also reads as Debian. Jeff
+chose '--deb' himself (1_discussion.org:82), so keep the option;
+the variable could be 'DEBUG_PROFILE'.
+** 8. 'cargo-watch.log' without cargo-watch -- costly
+start-servers.sh:205-208 logs the rerun loop there by default.
+Commented, plan-agreed, and both clients and their tests cite the
+name; leave it.
+** 9. "profile" -- none
+Elsewhere "profile" means profiling ('profile_step',
+git_snapshot.rs:217; tools/introspect/profile-with-org-report),
+but every new use says "release profile"/"debug profile".
+** None
+'skg--parse-rule-header' (matches nvim 'rule_header', python
+'lens_rule_header'); 'skg--rule-header-cache' (elisp's '-cache'
+convention: skg-readable-ids.el:32, skg-link-annotations.el:13);
+'skg-shared--style-keywords-computed-at-load' (accurate: a
+defconst runs at load, compiled or not; "style keywords" matches
+nvim lens.lua:41); 'compile_emacs_client', "Emacs client"
+(widespread); '--hot-reload' as a flag. No names.org never-bare
+word (merge, commit, index, generation...) appears.
+* Comments that misstate the code
+** C1. skg-lens.el:187 "replaced ... at reload" -- cheap
+'skg-reload' captures the table and reinstalls the same object
+(skg-reload.el:52-69), so nothing is replaced; and its
+'unload-feature' unbinds the cache anyway. Only a connect
+installs a new table. The weakness is still right for connects.
+** C2. start-servers.sh:14 "First bash/compile-elisp.sh" -- cheap
+The preflight (cargo build, check-config) runs first (:240), then
+the compile (:243).
+** C3. skg-lens.el:199 "Parse RULE once" -- cheap
+Now the uncached half: it parses on every call; the once-ness
+lives in 'skg--rule-header'. Drop "once".
+** C4. Comments made stale by the range, not edited -- cheap
+*** run-skg-rerunning-on-exit.sh:7-10
+"start-servers.sh has cargo-watch run this after each build": now
+only with '--hot-reload'; by default it runs it directly.
+*** start-servers.sh:61-63
+The crash-loop is explained "because cargo-watch only watches
+server/"; by default no cargo-watch runs, and the rerun loop
+crash-loops (with backoff).
+*** start-servers.sh:150
+"cargo-watch would idle": by default the rerun loop retries.
+** C5. compile-elisp.sh:7-8 -- cheap, minor
+"skg-init.el ... defines every macro the client uses": it
+requires the modules that define them; loose, not wrong.
+** Checked and accurate
+start-servers.sh:95-96 "a stale .elc is never loaded": every
+module loads inside skg-init.el's 'let', and 'skg-reload' uses
+'load-file' on .el paths; the one 'autoload'
+(skg-readiness.el:44) targets a module already required eagerly.
+The rerun-loop PITFALL (:200-205) matches
+run-skg-rerunning-on-exit.sh:36 (traps TERM INT HUP).
+skg-org-fold.el:252-258's apostrophe example matches the Lisp
+reader. skg-focus.el's new require of skg-org-fold makes no
+cycle.

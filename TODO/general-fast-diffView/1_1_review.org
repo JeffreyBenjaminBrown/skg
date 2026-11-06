@@ -1,0 +1,141 @@
+#+title: Review of plan 1_1: release server, compiled client, memos
+
+* Verdict
+The plan ran to completion unattended in 21 minutes of wall
+clock (six slices, 06:16 to 06:37 UTC, 2026-11-06), with no
+stop, no red suite and no deviation that changed agreed
+behavior. Every measured effect met or beat the plan's
+expectation. One hazard in existing machinery surfaced (the
+generated stop script's fixed path), and the vocabulary check
+found stale comments, which a correction commit fixed. Two
+items remain for Jeff.
+
+* What the reviewer checked itself
+The launches and the record ('progress.org', one record per
+slice plus my notes after slice 1); each slice's code diff in
+full before the next launch; the compile script's header and
+the 'skg-init.el' hunk; the suite counts and the timings from
+the records (not rerun). Jeff's live server (port 1731, debug,
+under cargo-watch) ran untouched through the whole run; every
+agent reported checking it.
+
+* Results
+** The run
+| slice | commits            | reported | effect measured          |
+|-------+--------------------+----------+--------------------------|
+|     1 | 731bc7bf 46278815  | 06:22    | --deb; release default   |
+|     2 | ce66f160 b1c62f88  | 06:25    | no cargo-watch by default|
+|     3 | d3cf31af 5709976e  | 06:27    | herald pass 787 -> 457 ms|
+|     4 | 0a7ab501 6a6cc2b4  | 06:30    | atom strip 216 -> 10 ms  |
+|     5 | 6fd9480a 66c4fd6b  | 06:35    | pass compiled: 66 ms     |
+|     6 | 917ee7a0 47e76b40  | 06:37    | docs                     |
+Timings are from source unless marked, best of runs, on the
+858-headline, 202 KB diff buffer the reports describe. Before
+the plan the full herald pass cost 789 ms from source and 234
+ms byte-compiled; after it, with the client compiled from the
+tree, 66 ms. The elisp suite: 446 of 446 after every elisp
+slice, and again with the '.elc' files present.
+** The commit rule
+Held: one code commit and one record commit per slice, the plan
+and slice named in each first line, the DONE keyword riding in
+the record commit (a commit cannot name its own hash, so the
+record follows the code). Correction commit after the review:
+af2b1ddf.
+** The problems file
+Nothing added by the run. The stop-script hazard is a Decide
+item below, not a problem entry, since the fix is a choice.
+** What the record lost
+Nothing known. The one-time scripts and logs are under
+'tests/results/plan-1_1/sliceN/', untracked; 'bash/all-tests.sh'
+wipes that directory, so they are evidence until the next full
+run only.
+
+* What each slice did beyond the plan's words
+** Slice 1
+Ran the argument loop before the 'stop-servers.sh' rewrite, so a
+bad argument changes nothing. Found that every scratch run
+clobbers Jeff's generated stop script; saved and restored it.
+Its first test runner used 'setsid', absent here, and would have
+run the pre-existing stop script after a timeout; the agent
+caught this before it fired. Carried into later briefs as a
+rule.
+** Slice 2
+Split the start into two functions by mode; kept the log name.
+** Slice 3
+Split 'skg--rule-header' into a cached wrapper and
+'skg--parse-rule-header'. Dumped every herald overlay before and
+after: byte-identical. The gain exceeded the plan's estimate
+because the header cache, not only the keyword memo, counted.
+** Slice 4
+One shared predicate for the three atoms; the focus test now
+calls the fold file's function ('skg-focus' requires
+'skg-org-fold'). Used the Emacs Lisp syntax table so symbol
+boundaries fall where the reader's do (Org's table makes an
+apostrophe a word constituent). Checked all 910 lines of the big
+buffer: identical answers.
+** Slice 5
+A failing file also loses its stale '.elc'; Emacs lock files are
+skipped; the start script prints two summary lines on success
+and the whole output in red on failure. 59 files, 0 errors, 140
+warnings left as the plan said.
+** Slice 6
+Named the removed variable nowhere, so the 'git grep' check
+holds.
+
+* Churn within the plan, and cost
+No slice rewrote another's work. The correction commit touched
+comments and one variable name only. Agent time: about 2 to 6
+minutes per slice; tokens about 70k to 100k per slice, 60k to
+85k for the two review agents. Jeff's time: none during the run.
+
+* What the user sees differently
+** By decision
+'bash/start-servers.sh' builds release unless given '--deb' (the
+first build takes minutes), does not watch 'server/' unless
+given '--hot-reload', and byte-compiles 'elisp/' before starting.
+'SKG_RELEASE' is gone. The Emacs client loads '.elc' files at
+the next 'skg-reload'; an edited '.el' still loads as source.
+** By accident
+None found. Heralds and fold answers were shown identical.
+
+* The reviewers' reports
+'1_1_review-reports/vocabulary.org': no code cites a plan; the
+findings about "reload" meaning three things, the doubled
+startup messages, "rerun" against "rerunning", the stale
+cargo-watch comments and the 'DEB' variable were fixed in
+af2b1ddf, which also added "hot reload" to the glossary. Left
+for Jeff: the two function names below, and the log file's name.
+
+* Open questions
+None that block anything. The two Decide items are choices.
+
+* Decide
+** TODO The generated stop script lives at one fixed path
+'bash/start-servers.sh' writes 'bash/stop-servers.sh' with its
+own process group on every run, so a second instance (a scratch
+server for a probe) overwrites the first's stop command. Agents
+now save and restore it by hand. It would be safer if the path
+depended on the config (e.g. 'bash/stop-servers-STEM.sh', STEM
+the config's name) or if the script refused to overwrite a stop
+script whose process group is alive. Your call; the plan's "What
+stays" kept the file as it is.
+** TODO Two function names in the start script
+'run_skg_rerunning_on_exit' and 'run_skg_under_cargo_watch'
+both rerun the server on exit; the first is named by what both
+do. Would 'run_skg_without_hot_reload' and
+'run_skg_with_hot_reload' read better? Cheap either way.
+** TODO The log file is still 'logs/cargo-watch.log'
+Both clients name it when a connection fails. Without hot reload
+the name is slightly wrong. Renaming touches two client files
+and the troubleshooting doc.
+
+* Suggestions for the advice
+** A pitfall about shared generated files
+'orchestration.org' could say: before a brief sends an agent to
+run a script that writes a fixed-path file the live system
+depends on, name that file in the brief as one to save and
+restore. Slice 1 found this the hard way.
+** Measured expectations belong to one cause each
+Plan 1_1 expected 557 ms for slice 3 from a measurement that
+covered one of the slice's two changes. Harmless here, but a
+plan's number should say which change it measures.
