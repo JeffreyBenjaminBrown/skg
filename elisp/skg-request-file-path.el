@@ -7,6 +7,7 @@
 (require 'skg-readable-ids)
 (require 'skg-state)
 (require 'skg-length-prefix)
+(require 'eieio) ; 'oref' is its macro and must be known at compile time
 
 (defun skg-goto-in-magit ()
   "Open magit-status and go to the first section for the .skg file
