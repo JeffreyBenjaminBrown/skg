@@ -75,16 +75,29 @@ impl SaveAffectedIds {
     self . neighborhood_without_links . matching_identity (
       &self . raw_touched, gnid, before, after) }
 
+  /// The open views, other than the saved one, that the save redraws:
+  /// those holding a graphnode that is touched or in the full
+  /// neighborhood. A view the save envelope's 'other_views' marks dirty
+  /// is never one of them, since a redraw would replace its unsaved
+  /// edits; it can reach this far only through a link, which the
+  /// dirty-view check ignores.
   pub(crate) fn collateral_viewforest_ids (
     &self,
     saved_viewforest_id : &ViewforestId,
+    other_views : &[ClientViewSnapshot],
     views_state : &ViewsState,
     before     : &InRustGraph,
     after      : &InRustGraph,
   ) -> Vec<ViewforestId> {
+    let dirty_viewforest_ids : HashSet<&ViewforestId> = other_views . iter ()
+      . filter (|view| view . dirty)
+      . map (|view| &view . viewforest_id)
+      . collect ();
     let mut viewforest_ids : Vec<ViewforestId> = views_state . open_views . views . iter ()
       .filter (|(viewforest_id, state)| {
-        *viewforest_id != saved_viewforest_id && state . pids . iter () . any (|gnid|
+        *viewforest_id != saved_viewforest_id
+        && ! dirty_viewforest_ids . contains (viewforest_id)
+        && state . pids . iter () . any (|gnid|
           self . matching_identity (gnid, before, after) . is_some ()) })
       .map (|(viewforest_id, _)| viewforest_id . clone ())
       .collect ();

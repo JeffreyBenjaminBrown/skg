@@ -401,3 +401,63 @@ fn a_dirty_view_showing_a_graphnode_refuses_a_save_of_its_containers_content_lis
       Ok (( ))
     }))
 }
+
+/// Two open views of L, whose body links to T: 'clean-l' and
+/// 'dirty-l', which the save envelope marks dirty. A save that retitles
+/// T redraws the clean one collaterally and never the dirty one, which
+/// stays in the narrowed lock set.
+#[test]
+fn a_dirty_view_of_a_linker_is_not_redrawn_by_a_save_of_its_link_target
+  () -> Result<(), Box<dyn Error>> {
+  run_with_test_stores (
+    "skg-test-save-dirty-linker-not-redrawn",
+    "tests/save_dirty_conflicts/fixtures-links",
+    "/tmp/tantivy-test-save-dirty-linker-not-redrawn",
+    |config, tantivy| Box::pin (async move {
+      let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
+      let mut views_state : ViewsState = ViewsState {
+        open_views        : OpenViews::new (),
+        graph_straddle    : None,
+      };
+      let (l_view, l_pids, l_forest) = single_root_view (
+        config, Some (tantivy), &ID::from ("L")) ?;
+      for viewforest_id in ["clean-l", "dirty-l"] {
+        views_state . open_views . register_view (
+          &graph . load_full (),
+          ViewforestId::ContentView (viewforest_id . into ()),
+          l_forest . clone (), &l_pids,
+          &SkgrepoRestriction::unrestricted (config)); }
+      let dirty_l : String = format! ("{}\nlocal edit", l_view . trim_end ());
+      let (t_view, _, _) = single_root_view (
+        config, Some (tantivy), &ID::from ("T")) ?;
+      let retitled_t : String = t_view . replace (
+        "T is a target", "T is a target, retitled");
+      assert_ne! (retitled_t, t_view);
+      let (mut stream, read_end) = mk_test_tcp_stream_pair ();
+      let response = update_from_and_rerender_buffer_with_snapshots_test (
+        &mut stream, &retitled_t, config, tantivy, &graph,
+        &Ok (ViewforestId::ContentView ("saved-t" . into ())),
+        &mut views_state,
+        &[dirty_buffer_snapshot ("dirty-l", Some (&l_view), &dirty_l)])
+        . await . map_err (|error| error_text (error . as_ref ())) ?;
+      drop (stream);
+      assert! (response . errors . is_empty (), "{:?}", response . errors);
+      let messages : Vec<String> =
+        read_all_lp_messages (&mut BufReader::new (read_end));
+      let relax_lock : &String = messages . iter ()
+        . find (|message| message . contains ("save-relax-lock"))
+        . expect ("the save must narrow its lock");
+      assert! (relax_lock . contains ("clean-l")
+               && relax_lock . contains ("dirty-l"),
+               "both views of L stay locked: {}", relax_lock);
+      let collateral_view_ids : Vec<String> = messages . iter ()
+        . filter (|message| message . contains ("collateral-view"))
+        . map (|message| extract_string_field_from_sexp (message, "view-id")
+               . unwrap_or_else (|| panic! (
+                 "no view-id in collateral-view: {}", message)))
+        . collect ();
+      assert_eq! (collateral_view_ids, vec! ["clean-l" . to_string ()],
+                  "only the clean view of L is redrawn: {:?}", messages);
+      Ok (( ))
+    }))
+}

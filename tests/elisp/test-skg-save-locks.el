@@ -64,4 +64,38 @@
       (kill-buffer saved)
       (kill-buffer other))))
 
+;; A collateral-view for a buffer with unsaved edits leaves its text and
+;; baseline as they are; one for a clean buffer replaces them.
+(ert-deftest test-skg-collateral-view-leaves-a-modified-buffer-alone ()
+  (let ((modified (generate-new-buffer " *skg-collateral-modified*"))
+        (clean (generate-new-buffer " *skg-collateral-clean*")))
+    (unwind-protect
+        (progn
+          (dolist (buffer-and-id `((,modified . "view-id-modified")
+                                   (,clean . "view-id-clean")))
+            (with-current-buffer (car buffer-and-id)
+              (skg-content-view-mode)
+              (setq-local skg-view-id (cdr buffer-and-id))
+              (insert "* (skg node (gnid a)) a\n")
+              (skg--capture-clean-baseline)
+              (set-buffer-modified-p nil)))
+          (with-current-buffer modified
+            (goto-char (point-max))
+            (insert "unsaved edit\n"))
+          (should (buffer-modified-p modified))
+          (skg--collateral-view-handler
+           "((response-type collateral-view) (view-id \"view-id-modified\") (content \"* (skg node (gnid a)) a2\n\"))")
+          (skg--collateral-view-handler
+           "((response-type collateral-view) (view-id \"view-id-clean\") (content \"* (skg node (gnid a)) a2\n\"))")
+          (with-current-buffer modified
+            (should (equal (buffer-string)
+                           "* (skg node (gnid a)) a\nunsaved edit\n"))
+            (should (equal skg-clean-baseline "* (skg node (gnid a)) a\n"))
+            (should (buffer-modified-p)))
+          (with-current-buffer clean
+            (should (equal skg-clean-baseline
+                           "* (skg node (gnid a)) a2\n"))))
+      (kill-buffer modified)
+      (kill-buffer clean))))
+
 (provide 'test-skg-save-locks)

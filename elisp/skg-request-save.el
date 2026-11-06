@@ -384,26 +384,34 @@ before the add/remove cycle."
      ;; identify a buffer whose checked contents are no longer needed.
      (skg-log 'error 'save "save-relax-lock handler error: %S" err)) ))
 
-(defun skg--apply-streamed-view-update (payload log-category handler-name)
+(defun skg--apply-streamed-view-update (
+         payload log-category handler-name &optional keep-unsaved-edits)
   "Apply one streamed view update from PAYLOAD: unlock and replace the buffer for
 its view ID.  Shared by the save (collateral-view) and rerender (rerender-view)
-streams; LOG-CATEGORY and HANDLER-NAME label any error."
+streams; LOG-CATEGORY and HANDLER-NAME label any error.
+If KEEP-UNSAVED-EDITS is non-nil, a buffer with unsaved edits is left
+as it is, and named in the echo area."
   (condition-case err
       (let* ((response (read payload))
              (view-id (cadr (assoc 'view-id response)))
              (content (cadr (assoc 'content response)))
              (buf (skg-find-buffer-by-view-id view-id)))
         (when buf
-          (with-current-buffer buf
-            (skg--unlock-after-save)
-            (skg-replace-buffer-with-new-content nil content))))
+          (if (and keep-unsaved-edits (buffer-modified-p buf))
+              (message "skg: not redrawn by the save, having unsaved edits: %s"
+                       (buffer-name buf))
+            (with-current-buffer buf
+              (skg--unlock-after-save)
+              (skg-replace-buffer-with-new-content nil content)))))
     (error (skg-log 'error log-category
                     "%s handler error: %S" handler-name err))))
 
 (defun skg--collateral-view-handler (payload)
   "Handle one streamed collateral-view update.
-Unlocks and updates the buffer for the given view ID."
-  (skg--apply-streamed-view-update payload 'save "collateral-view"))
+Unlocks and updates the buffer for the given view ID, unless that
+buffer has unsaved edits: the server never redraws a dirty view, and
+this guard keeps a client from losing those edits if it did."
+  (skg--apply-streamed-view-update payload 'save "collateral-view" t))
 
 (defun skg--save-result-handler (save-buffer payload)
   "Handle the full save-result LP message (tagged with response-type).

@@ -409,7 +409,7 @@ commit.
 *** TODO Claude says: added after you read the plan
 From your note "Never use numbers as names" in
 '3_2_glossary.org' (2026-11-06).
-** TODO Slice 6: a dirty view is never redrawn by a save
+** DONE Slice 6: a dirty view is never redrawn by a save
 The probes of plan 4 ('4_1_review-reports/probes.org', probe 7)
 found this: a save on a connection that holds a dirty view of L,
 where L links to the saved A, is no longer refused (slice 2), but

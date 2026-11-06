@@ -1109,3 +1109,53 @@ what they do read well. The numbered steps it found elsewhere
 'validate_tree.rs') are outside the plan; they go to the review's
 Decide section. The per-plan review's two agents (vocabulary and
 citations; probes) launched 01:25.
+** Slice 6
+*** Commits
+- The commit carrying this entry: a dirty view is never redrawn
+  by a save. 'collateral_viewforest_ids' skips every view the
+  envelope's other-views marks dirty; both clients leave a buffer
+  with unsaved edits alone on a 'collateral-view' and say so; the
+  tests, 'docs/api-and-formats.org', and the slice's headline
+  turned DONE.
+*** Suites
+- 'cargo nextest run --test grouped_saves' (the
+  'save_dirty_conflicts' tests, 9 of 9) while working; the new
+  server test was checked to fail without the server change (the
+  dirty view of L arrived as a second 'collateral-view').
+- 'bash/nextest.sh': 1143 of 1143 pass.
+- 'bash/emacs-tests.sh': 445 of 445 pass.
+- 'bash/nvim-tests.sh': all pass, no failures or errors.
+- 'bash/all-tests.sh' (195 s): build, Emacs unit (445 of 445),
+  Neovim unit (all pass), nextest (1143 of 1143), doctests (2
+  pass, 2 ignored) pass. Integration: 36 per client, 70 of 72
+  pass. 'import-md-and-org' fails in both clients, and again on
+  the script's retry ("Import preview ..."): pre-existing, as the
+  plan's pitfall "A failure that predates the plan" says; not
+  investigated. No other failure.
+*** Deviations from the plan's how
+- 'collateral_viewforest_ids' takes the envelope's 'other_views'
+  ('&[ClientViewSnapshot]') and builds the set of dirty view IDs
+  itself, rather than taking a prepared set; the handler already
+  had 'other_views' in hand.
+- Each client's guard is an optional argument of the shared
+  streamed-update function ('skg--apply-streamed-view-update',
+  'apply_streamed_view_update'), which only the 'collateral-view'
+  handler passes; the 'rerender-view' stream is unchanged (its
+  request already excludes dirty views). Neovim's handler became a
+  named function, 'collateral_view_handler', so the unit test can
+  call it. A skipped buffer keeps its save lock until 'save-result'
+  unlocks everything, as a dirty view in the keep-set already did.
+  The message follows the rerender's existing one: "skg: not
+  redrawn by the save, having unsaved edits: NAME".
+- The comment on the narrowed lock set in 'save_buffer.rs' now
+  says no dirty view is a collateral target.
+- The 'collateral-view' entry in 'docs/api-and-formats.org' said
+  "Emacs unlocks and updates"; it now says each client does, since
+  both do.
+*** Fixtures changed
+None. The new server test reuses
+'tests/save_dirty_conflicts/fixtures-links' (L links to T).
+*** Unfinished
+Nothing.
+*** Headline
+DONE.

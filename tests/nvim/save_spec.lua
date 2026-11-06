@@ -466,6 +466,29 @@ describe('skg.save pipeline', function ()
     assert.is_true(vim.bo[saved].modifiable)
   end)
 
+  it('leaves a buffer with unsaved edits alone on a collateral-view',
+     function ()
+    local modified = open_view('* (skg node (gnid a)) a',
+                               'skg://a', 'view_id-modified')
+    local clean = open_view('* (skg node (gnid b)) b',
+                            'skg://b', 'view_id-clean')
+    vim.api.nvim_buf_set_lines(modified, 1, 1, false, { 'unsaved edit' })
+    assert.is_true(vim.bo[modified].modified)
+    save.collateral_view_handler(nil, sexpr.read(
+      '((response-type collateral-view) (view-id view_id-modified)'
+      .. ' (content "* (skg node (gnid a)) a updated"))'))
+    save.collateral_view_handler(nil, sexpr.read(
+      '((response-type collateral-view) (view-id view_id-clean)'
+      .. ' (content "* (skg node (gnid b)) b updated"))'))
+    assert.are.same({ '* (skg node (gnid a)) a', 'unsaved edit' },
+      vim.api.nvim_buf_get_lines(modified, 0, -1, false))
+    assert.are.equal('* (skg node (gnid a)) a',
+                     vim.b[modified].skg_clean_baseline)
+    assert.is_true(vim.bo[modified].modified)
+    assert.are.equal('* (skg node (gnid b)) b updated',
+      vim.api.nvim_buf_get_lines(clean, 0, 1, false)[1])
+  end)
+
   it('keeps dirty conflict-check inputs locked through relaxation',
      function ()
     local respond_fn = nil

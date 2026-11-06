@@ -1071,7 +1071,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
   // the other connections' views.
   let collateral_viewforest_ids : Vec<ViewforestId> = viewforest_id_from_request_result . as_ref ()
     .map (|saved_viewforest_id| affected_gnids . collateral_viewforest_ids (
-      saved_viewforest_id, views_state,
+      saved_viewforest_id, other_views, views_state,
       prepared_save . graph_before_save (),
       prepared_save . final_candidate ()))
     .unwrap_or_default ();
@@ -1082,8 +1082,8 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
   narrowed_lock_viewforest_ids . sort_by_key (ViewforestId::repr_in_client);
   narrowed_lock_viewforest_ids . dedup ();
   // The client keeps the saved view ID implicitly. Every dirty view stays locked
-  // because its exact buffer snapshot was an input to the conflict decision, even
-  // when that view is client-only and not a collateral target.
+  // because its exact buffer snapshot was an input to the conflict decision,
+  // though no dirty view is a collateral target, client-only or not.
   send_response_with_length_prefix (
     stream,
     & tag_sexp_response (

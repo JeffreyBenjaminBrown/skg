@@ -250,8 +250,10 @@ So far there are these endpoints:
        all locks held until terminal cleanup.
     3. Zero or more collateral-view messages (one per collateral view, streamed as each finishes):
        =Content-Length: N\r\n\r\n((response-type collateral-view) (view-id "VIEW_ID") (content "..."))=
-       Emacs unlocks and updates each buffer as it arrives, and keeps
-       its text as the buffer's baseline.
+       No dirty view is among them. Each client unlocks and updates
+       each buffer as it arrives, and keeps its text as the buffer's
+       baseline; a client never replaces a buffer with unsaved edits,
+       but leaves it as it is and names it in a message.
     4. Final save response:
        =Content-Length: N\r\n\r\n((response-type save-result) (content "...") (errors ("..." ...)) (warnings ("..." ...)) (point-lines-below-focused-headline N) (point-column C) (point-screen-lines-below-window-start M))=
        =content= is the re-rendered saved buffer (nil on failure).
@@ -409,7 +411,8 @@ So far there are these endpoints:
     candidate graphs, twice: over every ordinary relation, and over them
     without links ('SaveAffectedIds' in
     'server/serve/handlers/save_dependencies/mod.rs'). Other registered views
-    containing an unrestricted ID of the full neighborhood are rerendered. For
+    containing an unrestricted ID of the full neighborhood are rerendered,
+    except any the save envelope's other-views marks dirty. For
     every dirty client view, the server parses and unions
     dependencies from its clean baseline, current text, and registered viewforest
     when present. A dependency is a graphnode the view holds a viewnode of: an
@@ -422,9 +425,10 @@ So far there are these endpoints:
     conservatively. The dirty-view match ignores links in both directions: a
     dirty view of L, where L links to a saved A, does not conflict, nor does a
     dirty view showing A conflict with a save that only adds a link to A. The
-    collateral redraw does not ignore them; a dirty view is never redrawn, so
-    what a link changes in it (A's mentionerFolder, say) is refreshed at its
-    next redraw. Malformed
+    collateral redraw does not ignore them, but it skips every dirty view: a
+    dirty view is never redrawn, even one that reaches the save only through a
+    link, so what a link changes in it (A's mentionerFolder, say) is refreshed
+    at its next redraw. Malformed
     or missing dirty dependency data also refuses. A refusal returns
     =save-result= with nil content and actionable errors naming view IDs and
     IDs, and performs no filesystem, graph, search index, registry, or collateral

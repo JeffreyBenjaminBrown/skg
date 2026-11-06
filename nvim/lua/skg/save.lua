@@ -100,10 +100,7 @@ function M.send_save_buffer (save_buf, saved_view_id, approved_forks, fork_skgre
       M.save_relax_lock_handler(saved_view_id, response)
     end, false)
   state.register_response_handler('collateral-view',
-    function (payload_text, response)
-      M.apply_streamed_view_update(payload_text, response,
-                                   'save', 'collateral-view')
-    end, false)
+    M.collateral_view_handler, false)
   state.register_response_handler('save-result',
     function (_payload_text, response)
       M.save_result_handler(save_buf, response)
@@ -382,27 +379,46 @@ end
 
 ---Apply one streamed view update: unlock and replace the buffer for
 ---its view ID. Shared by the save (collateral-view) and rerender
----(rerender-view) streams.
+---(rerender-view) streams. If KEEP_UNSAVED_EDITS is true, a buffer
+---with unsaved edits is left as it is, and named in a notification.
 ---@param _payload_text string
 ---@param response any
 ---@param log_category string
 ---@param handler_name string
+---@param keep_unsaved_edits boolean|nil
 function M.apply_streamed_view_update (_payload_text, response,
-                                       log_category, handler_name)
+                                       log_category, handler_name,
+                                       keep_unsaved_edits)
   local ok, err = pcall(function ()
     local view_id = payload.field_text(response, 'view-id')
     local content = payload.field(response, 'content')
     local buf = view_id and buffer.find_buffer_by_view_id(view_id) or nil
     if buf and content ~= nil and not sexpr.is_list(content) then
-      lock.unlock_after_save(buf)
-      M.replace_buffer_with_new_content(
-        buf, sexpr.atom_text(content), nil)
+      if keep_unsaved_edits and vim.bo[buf].modified then
+        vim.notify('skg: not redrawn by the save, having unsaved edits: '
+                   .. vim.api.nvim_buf_get_name(buf))
+      else
+        lock.unlock_after_save(buf)
+        M.replace_buffer_with_new_content(
+          buf, sexpr.atom_text(content), nil)
+      end
     end
   end)
   if not ok then
     log.log('error', log_category, '%s handler error: %s',
             handler_name, tostring(err))
   end
+end
+
+---Handle one streamed collateral-view update: unlock and replace the
+---buffer for its view ID, unless that buffer has unsaved edits. The
+---server never redraws a dirty view; this guard keeps a client from
+---losing those edits if it did.
+---@param payload_text string
+---@param response any
+function M.collateral_view_handler (payload_text, response)
+  M.apply_streamed_view_update(payload_text, response,
+                               'save', 'collateral-view', true)
 end
 
 ---Handle the terminal save-result: remove the streaming handlers and
