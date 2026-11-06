@@ -244,3 +244,51 @@ Nothing in this slice. The '.elc' files now in 'elisp/' are what
 Jeff's Emacs loads at his next 'skg-reload' or restart.
 *** Headline
 DONE.
+** Slice 6
+Finished 2026-11-06 06:37 UTC.
+*** Commits
+- 917ee7a0 docs: start-servers.sh options, the compiled Emacs client (plan 1_1 slice 6)
+- the next commit: this record and the slice headline flipped to DONE
+*** Checks
+Documentation only; no application tests run.
+- 'docs/setup.org', "start the Skg server": the two options and their
+  defaults, what each profile and hot reload mean, the slow first
+  release build, the compile step ('../bash/compile-elisp.sh'), the
+  Emacs 31.1 condition, and that a newer '.el' is loaded as source.
+  No org link was touched; the two near it ('COMMANDS.org::#...') are
+  unchanged, and the new '../bash/compile-elisp.sh' resolves.
+- '.claude/skills/verify/SKILL.md': lines 15, 59 and 125 now hold
+  only under '--hot-reload' and name the release default; step 3 of
+  the isolated-instance recipe says its debug build is its own choice.
+- 'git grep -n SKG_RELEASE' outside 'TODO/' and '_burying/': nothing.
+- Prose still naming cargo-watch, left as accurate or out of scope:
+  'coding-advice/docker.org:36' (lists it as installed);
+  'docs/troubleshooting/build-artifacts-corrupted-by-power-loss.org:136'
+  (the log file, which keeps its name); the comment in
+  'bash/run-skg-rerunning-on-exit.sh:8-10' (the plan leaves that
+  script unchanged); 'thoughts/multi-client.org:130-160' (a design
+  note on running two servers); SKILL.md lines 43 and 106 use
+  './target/debug/skg', which the recipe's own step 3 builds.
+*** The plan's "Verification and completion", from the records and git
+- 'bash -n' on both scripts: passes (rerun now; a syntax check only).
+- Isolated runs of slices 2 and 5: observed, per their records above.
+- 'bash/emacs-tests.sh' green with '.elc' files present: slice 5's
+  record (446 of 446). Not rerun.
+- 'git grep SKG_RELEASE' outside 'TODO/' and '_burying/': nothing.
+- 'git status': no '.elc' listed (they are ignored); no file of this
+  plan unstaged after this commit. The tracked files dirty before
+  this slice, 'TODO/general-fast-diffView/1_discussion.org' and
+  'TODO/problems.org', are Jeff's and not this plan's.
+- Every slice headline is DONE; the plan is complete.
+*** Deviations from the plan's how
+- 'docs/setup.org' says the variable that used to select release is
+  gone without naming it, so that the plan's 'git grep SKG_RELEASE'
+  condition holds.
+- SKILL.md line 15 also says 'ps' shows how Jeff's server is running,
+  since the skill's later conditions depend on it.
+*** Unfinished
+Nothing. Jeff's running server is still the old debug one under
+cargo-watch until he restarts it with the new script; his client
+picks up the compiled files at his next 'skg-reload'.
+*** Headline
+DONE.

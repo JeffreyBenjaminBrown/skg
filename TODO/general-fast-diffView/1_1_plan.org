@@ -327,7 +327,7 @@ the 'let' loads the '.el' (check 'load-history' or
 again, now showing the compile step's output in the terminal
 and the server still starting. Commit the elisp files and the
 scripts; never a '.elc'.
-** TODO Slice 6: docs
+** DONE Slice 6: docs
 'docs/setup.org:20-26' (options, defaults, the compile step,
 the Emacs version condition) and the three places in
 '.claude/skills/verify/SKILL.md'. Check the links and the diff;
