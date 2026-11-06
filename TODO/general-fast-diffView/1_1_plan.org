@@ -264,7 +264,7 @@ the atom tests; their callers are the collectors and
 path. '.gitignore'.
 
 * Implementation sequence
-** TODO Slice 1: option parsing, '--deb', release by default
+** DONE Slice 1: option parsing, '--deb', release by default
 Add a loop over "$@" that sets two flags, 'DEB' and
 'HOT_RELOAD', refusing anything else with a usage line and exit
 2. Replace the 'SKG_RELEASE' test with the 'DEB' flag, release

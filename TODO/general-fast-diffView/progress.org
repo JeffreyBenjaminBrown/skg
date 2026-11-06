@@ -1,0 +1,44 @@
+#+title: Progress on the general-fast-diffView plans
+
+* Plan 1_1
+** Slice 1
+Finished 2026-11-06 06:22 UTC.
+*** Commits
+- 731bc7bf plan 1_1 slice 1: start-servers.sh takes --deb; release is the default
+- the next commit: this record and the slice headline flipped to DONE
+*** Checks
+Logs and the one-time runner are in 'tests/results/plan-1_1/slice1/'
+(untracked). Isolated instance: scratch data root with a one-node
+repo, port 1771.
+- 'bash -n bash/start-servers.sh': passes.
+- '--deb': port up in about 2 s; 'ps' showed cargo-watch with
+  'build --bin skg', the rerun loop and 'target/debug/skg
+  <scratch>/skgconfig.toml'. The generated 'bash/stop-servers.sh'
+  stopped it: port free, no process left. Pass.
+- No option: cold release build, port up in about 64 s; 'ps' showed
+  cargo-watch with 'build --release --bin skg', the rerun loop with
+  'target/release' and 'target/release/skg <scratch>/skgconfig.toml'.
+  Stopped the same way: port free, no process left. Pass.
+- '--bogus': prints "usage: bash/start-servers.sh [--deb]
+  [--hot-reload]" to stderr, nothing to stdout, status 2. Pass.
+- No failures to classify. Jeff's server (cargo-watch, loop,
+  'target/debug/skg data/skgconfig.toml', port 1731) ran throughout.
+*** Deviations from the plan's how
+- The argument loop sits before 'SKG_CONFIG' is read, so a bad
+  argument exits before the script rewrites 'bash/stop-servers.sh'.
+- The comment in 'kill_stale_skg' that named 'SKG_RELEASE=1' now says
+  "the debug (--deb) and the release form", so that 'git grep
+  SKG_RELEASE' outside 'TODO/' leaves only 'docs/setup.org:26'
+  (slice 6's).
+- Each test run rewrote the untracked 'bash/stop-servers.sh', which
+  held Jeff's 'kill -TERM -485475'. I saved it before and restored it
+  after, so it still stops his running server. The first runner
+  attempt used 'setsid', which this container lacks; it was stopped
+  before it reached its stop step, and the runner now uses 'set -m'
+  and runs the stop script only if it names the run's own group.
+*** Unfinished
+Nothing in this slice. '--hot-reload' is parsed but changes nothing
+until slice 2; the usage header's "WHAT RUNS" still describes
+cargo-watch, for slice 2 to finish.
+*** Headline
+DONE.
