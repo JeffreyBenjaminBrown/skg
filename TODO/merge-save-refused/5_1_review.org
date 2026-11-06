@@ -42,7 +42,7 @@ under the new sense.
 *** 'prominence.rs' lost the numbers from its section headers too
 Named references beside numbered headers would have aged.
 ** Slice 3
-*** TODO A claim of mine in the slice was wrong; the agent said so
+*** TODO A claim of mine was wrong; the agent said so
 I wrote that a save re-sent after it created a child creates the
 child twice and is not refused. The agent tested it: the save is
 refused, since the container is then an edited stale graphnode.
@@ -58,8 +58,8 @@ warned of.
 - Slice 1 reworded two sites with "refused for"; slice 3 reworded
   them again. Naming.
 - My slice 3 text asserted the opposite of the code's behavior
-  for a re-sent save; caught by the agent. A false belief about the
-  code, stated without reading the path that decides it, against
+  for a re-sent save; caught by the agent. A false belief about
+  the code, stated without reading the path that decides it, against
   'plans.org''s first rule.
 - Plan 4's briefs never ran the tool's tests, so one check failed
   for a day. A brief omission; slice 4 repaired it.
