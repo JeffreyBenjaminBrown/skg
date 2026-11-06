@@ -215,7 +215,7 @@ Emacs call of 'skg--server-unavailable-message' with a config
 path set and with none, printed into the slice's log, and the
 Neovim equivalent via 'nvim --headless' if the test harness
 makes that easy, else say so.
-** TODO Slice 3: docs
+** DONE Slice 3: docs
 Everything under "The docs follow" except the two lines slice 1
 took. Links checked; no application tests. Commit as docs.
 *** Corrections carried from slice 1

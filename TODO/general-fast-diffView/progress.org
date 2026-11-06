@@ -420,3 +420,38 @@ the no-config wording, or, if a 'skgconfig.toml' sits beside it, that
 file's run folder. Neovim keeps the full path and has no such limit.
 *** Headline
 DONE.
+** Slice 3
+Finished 2026-11-06 14:24 UTC.
+*** Commits
+- be8bcb53 docs: the run folder beside each config, where the logs and the stop script live (plan 1_2 slice 3)
+- the next commit: this record and the slice headline flipped to DONE
+*** Checks
+- Each edited place read in its surrounding text; the diff read.
+- The one org link added, 'docs/setup.org' to
+  '[[file:glossary.org::*run folder]]', resolves: the glossary
+  headline "*** run folder" exists, beside "*** hot reload".
+- No application tests (documentation only). Nothing under
+  'server/' or 'data/' touched; no start or stop script run.
+*** Deviations from the plan's how
+- 'docs/setup.org' gained, beside '[CONFIG]' and the default, one
+  sentence pointing at the run folder (linked to the glossary).
+- The verify skill also says, at its first mention of the start
+  script, that it means Jeff's data only when given no config path,
+  and how to run the start script on a scratch config ('set -m' for
+  its own process group, which its stop script, 'kill -TERM -$$',
+  needs); its cleanup names that stop script. The paragraph it
+  edited there was rewrapped whole.
+- 'docs/troubleshooting/...power-loss.org:165' ("the log files
+  (data/logs/*) were left with a tail of NUL") is left as is: it
+  records what one incident left, not where logs go.
+*** Unfinished
+Nothing in this slice. No Windows doc ('windows/README.org',
+'windows/docs/', 'docker-diagnostics.org') names '<data root>/logs/',
+so none gained a line. Scripts do, out of this docs slice:
+'windows/run.ps1:266, :305' tell the user the logs are under the data
+folder's 'logs/', and 'windows/testing/04-logs.sh:7' reads
+'server-to-user.log' there; after slice 4 the container's server will
+write that file to its config's run folder instead (its
+'skg-stdout-stderr.log' stays in 'logs/').
+*** Headline
+DONE.
