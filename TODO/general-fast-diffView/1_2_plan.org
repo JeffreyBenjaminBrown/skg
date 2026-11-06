@@ -64,7 +64,8 @@ writes anything. It no longer creates '<data root>/logs/'.
 ('kill -TERM -PGID') as today's 'bash/stop-servers.sh', rewritten
 at every start. The script no longer writes
 'bash/stop-servers.sh' and does not delete it either: the
-untracked file there is the stop command of Jeff's live server until he restarts (Pitfalls).
+untracked file there is the stop command of Jeff's live server
+until he restarts (Pitfalls).
 Its startup messages name the new path.
 ** The script log
 'CONFIG.running/start-servers.START.log', START the start's own
@@ -110,8 +111,8 @@ says where "Server ready." appears
 ('docs/troubleshooting/build-artifacts-corrupted-by-power-loss.org:136');
 'docs/usage.org' where it shows 'cargo run --
 data/skgconfig.toml' gains the one clause that the server
-writes its logs to 'CONFIG.running/START/'; '.claude/skills/verify/SKILL.md' recipe
-says where an isolated instance's logs land and that its stop
+writes its logs to 'CONFIG.running/START/';
+'.claude/skills/verify/SKILL.md' recipe says where an isolated instance's logs land and that its stop
 script, when started by the start script, is in its own run
 folder. 'docs/glossary.org' gains "run folder" beside "hot
 reload". 'windows/README.org' or the Windows docs get one line
@@ -237,6 +238,15 @@ set 'timing_log'); kill the server by PID and see a second
 busy-initializing reply during startup names that folder (probe
 it over TCP if startup is long enough to catch, else read the
 code and say so).
+*** Corrections carried from slice 3
+Three Windows scripts read the server's logs at the old place
+and would break when the server moves them: 'windows/run.ps1:266,
+:305', 'windows/testing/04-logs.sh:7', and the printed path at
+'windows/container/run-servers.sh:28'. Slice 4 points each at the
+newest 'CONFIG.running/*/' (the container's config is
+'/data/skgconfig.toml'), by reading only: no Windows here, so
+say in the record that they are unexecuted. The scripts'
+own stdout log ('skg-stdout-stderr.log') stays where it is.
 
 * Verification and completion
 When slice 4 is committed: 'bash -n' on the start script; the

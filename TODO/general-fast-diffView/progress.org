@@ -455,3 +455,10 @@ write that file to its config's run folder instead (its
 'skg-stdout-stderr.log' stays in 'logs/').
 *** Headline
 DONE.
+** Orchestrator's notes after slice 3 of plan 1_2 (14:26 UTC)
+Slices 2 and 3 launched 14:19 and 14:22, reported 14:22 and
+14:25. Diffs read. Slice 3 found three Windows scripts reading
+the server's logs at the old place; carried into slice 4 as a
+correction (the plan had put 'windows/' out of scope, but the
+server change reaches them). Slice 4 waits for Jeff's server to
+leave cargo-watch; at 14:26 it still watches 'server/'.
