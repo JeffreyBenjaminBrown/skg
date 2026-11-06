@@ -1,0 +1,119 @@
+#+title: Plan 1_2 review: vocabulary, citations, comments, docs
+Range 09fee54f..HEAD (8d2814de). Read-only; nothing run.
+
+* Headline: a symlinked config splits the run folder (HEAD)
+'load_config' canonicalizes 'config_path'
+('server/dbs/filesystem/not_nodes.rs:250'), and in HEAD
+'logs_dir' appends '.running' to it. 'data/skgconfig.toml' is a
+symlink to 'skgconfig-jeff.toml', so the server's logs go to
+'/home/.../data/skgconfig-jeff.toml.running/START/' while the
+script, clients and docs name 'data/skgconfig.toml.running/'.
+Not seen yet: Jeff's server started 14:27, before 'cb42d8e4'.
+An uncommitted fix is already in the worktree ('RUN_FOLDER',
+'run_folder_beside' in 'server/types/misc.rs', plus
+'server/main.rs'); not reviewed here. Cheap; in progress.
+
+* Q1: terms coined or reused, ranked
+** 1. 'server run folder' names the run folder
+Vocabulary: "server run" is one binary invocation, so its
+folder is 'START/'. Yet these name 'CONFIG.running/':
+'skg--server-run-folder-for-messages' (skg-client.el:142),
+'M.server_run_folder_for_messages' (client.lua:95),
+'server_run_folder' (run.sh:98, run-callgrind.sh:88,
+04-logs.sh:8), beside 'newest_server_run_subfolder' for the
+'START/' one. Say 'run_folder' / 'run-folder'. Cheap.
+** 2. START names two different times
+'start-servers.START.log' is the start's time;
+'CONFIG.running/START/' is the server run's. Glossary 'run
+folder' (glossary.org:2111) uses both without saying they
+differ; only api-and-formats.org:1900 does. A reader expects
+one START per log pair. Say so in the glossary, or give the
+subfolder its own placeholder. Cheap.
+** 3. "server run" and "a start" are undefined
+Used in glossary.org:2111, api-and-formats.org:1888-1903,
+start-servers.sh:19 and :195, but only the plan defines
+them. "start" also collides with "startup" ("startup
+warnings channel", the clients' "startup error"). Add both
+to the 'run folder' entry. Cheap.
+** 4. CONFIG vs SKG_CONFIG for one value
+start-servers.sh now says 'CONFIG' and dropped the
+'SKG_CONFIG' env var; run-skg-rerunning-on-exit.sh:2,18 still
+calls its argument 'SKG_CONFIG', and
+windows/container/run-servers.sh:4 still reads an env var of
+that name. Rerun script: cheap. Container: out of scope.
+** 5. "run" also means the start
+start-servers.sh:133 "the config this run was given" means
+the start, not a server run (pre-existing line, now wrong
+by the plan's words). Glossary "run-time files"
+(glossary.org:2115) is near 'runtime'
+('RuntimeGeneration'). Cheap.
+** 6. restart vs rerun
+api-and-formats.org:1902 "the rerun loop restarts the
+server"; start-servers.sh:189, :191 "restart on exit". Same act,
+two verbs; pre-existing. Cheap, low value.
+** 7. 'SERVER_PROCESS_START' vs "server run"
+misc.rs:318, ':320' say "server process start"; docs say
+"server run". One thing, two names, but the docstring ties
+them. Unwise to rename (names.org: no gratuitous renames).
+** None
+'RUN_FOLDER', 'SCRIPT_LOG', 'START', 'CONFIG' in the script;
+'run_skg_with_hot_reload' / 'run_skg_without_hot_reload'
+(match glossary "hot reload"); 'logs_dir' kept; the glossary
+"run folder" coinage is new and clashes with nothing.
+
+* Q2: citations of 'TODO/', plans or slices in code
+None. No added line in bash/, server/, elisp/, nvim/, tests/,
+tools/, windows/, docs/ or SKILL.md names 'TODO/', a plan or
+a slice. (Commit messages do; that is allowed.)
+
+* Comments that say what the code does not
+** 1. 'logs_dir' docstring, HEAD misc.rs:327-332
+"The run folder 'CONFIG.running/' is the one the start
+script keeps its stop script ... in": false for a symlinked
+config (headline). Fixed in the worktree. Cheap.
+** 2. test-lib.sh:66
+"The server's run folder ('SkgConfig::logs_dir')":
+'logs_dir' is the 'START/' subfolder; the code removes
+'$TEMP_CONFIG.running', the run folder. Cheap.
+** 3. "Everything this script writes" is in the run folder
+start-servers.sh:12, :246 and setup.org:28. The script also
+writes 'elisp/*.elc' (compile-elisp.sh) and 'target/'
+(cargo). Say "every file it writes itself". Cheap.
+** 4. Profiling tools: "the live server's run folder"
+run.sh:95-97, run-callgrind.sh:85-87: with the symlink, the
+live server's logs sit in 'skgconfig-jeff.toml.running',
+which is not removed; the removed one holds only the script's
+files. It works only because 'sed -i' (:91) replaces the
+copied symlink with a file; unsaid. Cheap.
+** 5. api-and-formats.org:1902
+"Each time the rerun loop restarts the server, a new
+subfolder appears": also each cargo-watch restart; and two
+server runs in one second share one ('%S' resolution).
+Cheap, low value.
+** None
+skg-init.el:24-36 (comp-run in Emacs 30, comp in 29; deny
+list keyed on 'elisp/') matches the code; the clients'
+docstrings; main.rs:197, :416-425.
+
+* Docs vs code: where each file lives
+** Stop script: agrees
+Code: '$CONFIG.running/stop-servers.sh', CONFIG as given.
+api-and-formats.org:1291, glossary, SKILL.md agree.
+setup.org:99 writes '../data/skgconfig.toml.running/...',
+doc-relative, while setup.org:26-27 says run from the repo
+top; typed there it fails. Pre-existing '../' style. Cheap.
+** Script log: agrees
+'$CONFIG.running/start-servers.$START.log'; header, api,
+glossary, troubleshooting:136, SKILL.md and both clients
+agree.
+** Server logs: disagree in HEAD
+Code: canonical CONFIG + '.running/START/'. Docs say "the
+config file's path as the server was given it"
+(api-and-formats.org:1889), and name
+'data/skgconfig.toml.running/START/' (usage.org:24,
+glossary). Start script echo start-servers.sh:195 and both
+clients point there too. Wrong for Jeff's symlinked default;
+the worktree fix makes the docs true. Cheap.
+** Per-run folder name: agrees
+'YYYY-MM-DDTHH-MM-SSZ' in misc.rs:323-325, the script's
+'date -u +%Y-%m-%dT%H-%M-%SZ' (:62) and every doc.

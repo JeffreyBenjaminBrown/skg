@@ -1,0 +1,149 @@
+#+title: Review of plan 1_2: a run folder beside each config
+
+* Verdict
+The plan ran unattended in four slices between 14:16 and 14:40
+UTC on 2026-11-06, no stop, every suite green but one
+pre-existing failure. One defect reached HEAD and was caught
+within the hour, twice over: the planner's belief that the
+server's 'config_path' is the path as given was false (it is
+canonical, as a comment two lines below the cited function
+says), and your config is a symlink, so the server's logs would
+have gone beside 'skgconfig-jeff.toml' while everything else
+pointed at 'skgconfig.toml.running/'. The slice-4 agent flagged
+it, the vocabulary reviewer found it independently, and a
+correction (fc207e20) fixed it with a test. Two side quests
+happened in the same window: a host-side native-compilation
+leak from plan 1_1 (3d5cb352) and an eieio compile regression
+found through your question about the warnings (25ecae27).
+
+* What the reviewer checked itself
+Each slice's diff before the next launch; the server diff in
+full ('misc.rs', 'main.rs'); the records in 'progress.org'; the
+'ls -R' of the scratch run folders; 'ps' for your server before
+slice 4 (gated until your restart at 14:27). Suites were not
+rerun by me; the counts below are from the records.
+
+* Results
+** The run
+| slice | code commits        | at    | checked                 |
+|-------+---------------------+-------+-------------------------|
+|     1 | 517fd831 27fff7c4   | 14:18 | two instances side by   |
+|       |                     |       | side, each stopped alone|
+|     2 | 802ff9d9            | 14:21 | Emacs 447, Neovim 483   |
+|     3 | be8bcb53            | 14:24 | docs, links             |
+|     4 | cb42d8e4 5489578f   | 14:39 | Rust 1144, integration  |
+|       | 94d3c182            |       | 35 of 36, tool, clients |
+| fix   | fc207e20            | 14:43 | Rust 1145, symlink run  |
+The integration failure is 'import-md-and-org', pre-existing
+and already in 'TODO/problems.org' ("fails at baseline").
+** The commit rule
+Held: code commits then a record commit per slice, the plan and
+slice in each first line.
+** The problems file
+Nothing added by this plan. The two incidental fixes above were
+fixed, not filed.
+** What the record lost
+Nothing known. Logs under 'tests/results/plan-1_2/'.
+
+* What each slice did beyond the plan's words
+** Slice 1
+Parsed the config as the first non-option argument; errors exit
+before anything is written. Found that 'SKG_CONFIG' is also a
+variable of other scripts' own ('import-org-roam.sh',
+'data/bash/lib.sh', 'windows/'), so the completion check was
+narrowed to the start script.
+** Slice 2
+Changed the two existing client tests that asserted the old
+'logs/' path, and added one each for the no-config wording.
+Noted a pre-existing limit: Emacs's 'skg-config-file' finds only
+a file named 'skgconfig.toml' in 'skg-config-dir'.
+** Slice 3
+Added the 'set -m' note to the verify skill. Found three Windows
+scripts reading the old log location; carried to slice 4.
+** Slice 4
+START as a process-wide static, so no hand-built config changed.
+Integration tests now delete their temporary config's run folder
+('test-lib.sh'); the first run had left thirty behind. Flagged
+the symlink consequence of the canonical 'config_path'.
+** Correction
+'main.rs' fixes the run folder once from the argument (made
+absolute without resolving symlinks) before loading the config;
+'logs_dir' falls back to the canonical path only where nothing
+set it. A unit test with a real symlink.
+
+* Churn and cost
+** The one false belief
+The plan said "CONFIG is 'config_path'". 'misc.rs:319' says
+'config_path' is canonical. 'plans.org' asks the planner to read
+the code path that decides a claim; I read 'logs_dir' and
+'readiness_marks_path' and missed the sentence between them.
+Cost: one correction commit, about ten minutes of agent time, no
+user-visible effect since your server had not restarted on the
+new binary.
+** Scope reached outside the plan twice
+Windows scripts and the integration test library both needed
+edits the plan had not named. Both were cheap; both are the
+kind of reader of a moved file that 'plans.org' says to grep
+for before writing "only X reads Y".
+** Time
+Four slices, 24 minutes wall clock; the correction 10 more.
+Agents: 70k to 126k tokens per slice.
+
+* What the user sees differently
+** By decision
+'bash/start-servers.sh [CONFIG] [--deb] [--hot-reload]'; the stop
+script at 'CONFIG.running/stop-servers.sh'; one
+'start-servers.START.log' per start; the server's logs in
+'CONFIG.running/START/', one folder per server run; both
+clients' failure messages point there. 'SKG_CONFIG' is gone from
+the start script. Your Emacs no longer native-compiles Skg
+files.
+** By accident
+Until fc207e20, a symlinked config would have split the folder.
+Fixed before any server of yours ran on it.
+
+* The reviewers' reports
+'1_2_review-reports/vocabulary.org': no plan citations in code;
+the symlink defect; names saying "server run folder" for the
+run folder; START meaning two times; a few comment slips. The
+code items went into a correction commit (see the UPDATED child
+below); the two in 'docs/setup.org' are left for you because
+that file holds your uncommitted edit.
+** TODO UPDATED [Claude]: the code items landed in 253c009a
+"run folder" now names 'CONFIG.running/' in both clients, the
+profiling tools and the Windows test script; the glossary says
+which START is which and defines a start and a server run; the
+start script's header promises only what it writes itself and
+says "rerun" where it meant that. Emacs 447, Neovim 483. Left:
+'start_skg_with_restart' keeps its name (the report had not
+asked), and the two 'docs/setup.org' items below.
+
+* Decide
+** TODO 'docs/setup.org', two small things, in your dirty file
+Line 28's "everything this script writes" overstates (the
+'.elc' files go beside the sources, builds to 'target/'); line
+99 gives the stop script's path relative to 'docs/' though the
+text now says to run from the repo root.
+** TODO Emacs's 'skg-config-file' knows only 'skgconfig.toml'
+'elisp/skg-config.el:16' finds that one name in
+'skg-config-dir'. A config with another name gets the
+no-config wording in the failure message, and the same limit
+touches whatever else reads the config client-side. Neovim
+keeps the full path. Worth a variable the user can set?
+** TODO The leftovers
+'data/logs/' and 'bash/stop-servers.sh' are no longer written.
+Yours to delete. Your server's next start (the script rebuilds
+release first) moves its logs into
+'data/skgconfig.toml.running/'.
+
+* Suggestions for the advice
+** A claim about a field reads the field's definition
+"'config_path' is the path as given" was a claim about a struct
+field; the comment on the field's neighbor said otherwise. When
+a plan derives a path or name from a field, cite the field's
+definition and its comment, not only the function that uses it.
+** Grep for readers of a moved file
+Before moving a file the system writes (a log, a lock, a
+generated script), 'git grep' its name across the whole tree,
+'windows/' and 'tests/' included, and list every reader in the
+plan's code map.
