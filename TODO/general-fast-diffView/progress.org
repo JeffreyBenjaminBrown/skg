@@ -42,3 +42,54 @@ until slice 2; the usage header's "WHAT RUNS" still describes
 cargo-watch, for slice 2 to finish.
 *** Headline
 DONE.
+** Orchestrator's notes after slice 1 (2026-11-06 06:23 UTC)
+Slice 1 launched 06:16 UTC, reported 06:22 UTC. Diff read: as
+the plan says, plus the argument loop running before the
+'stop-servers.sh' rewrite, which is right.
+*** Hazard found: 'bash/stop-servers.sh' is one fixed path
+Every run of 'start-servers.sh' rewrites it with its own PID,
+so a scratch run clobbers the stop command of Jeff's live
+server. The slice saved and restored the file. Carried into the
+briefs of slices 2 and 5 as a rule; whether the generated path
+should depend on the config is a Decide item for Jeff in the
+review, since the plan's "What stays" keeps the file as it is.
+** Slice 2
+Finished 2026-11-06 06:25 UTC.
+*** Commits
+- ce66f160 plan 1_1 slice 2: start-servers.sh runs the rerun loop directly unless --hot-reload
+- the next commit: this record and the slice headline flipped to DONE
+*** Checks
+Logs and the one-time runner are in 'tests/results/plan-1_1/slice2/'
+(untracked). Isolated instance: a fresh scratch data root with a
+one-node repo and no 'logs/', port 1772.
+- 'bash -n bash/start-servers.sh': passes.
+- No option: the script created 'logs/' and the port came up in
+  about 2 s (the release binary was already built). 'ps' showed only
+  the rerun loop ('target/release') and 'target/release/skg
+  <scratch>/skgconfig.toml', both in the script's process group; no
+  cargo-watch. 'kill -TERM' of the skg PID: the port went down, and
+  about 2 s later a new skg (new PID) served it again; the log shows
+  "skg exited with status 0; running it again in 2 s." The generated
+  'bash/stop-servers.sh' then stopped it all: script exited, port
+  free, no process left. Pass.
+- '--hot-reload --deb': port up in about 2 s; 'ps' showed cargo-watch
+  with 'build --bin skg', the loop with 'target/debug' and
+  'target/debug/skg <scratch>/skgconfig.toml'. Stopped the same way:
+  port free, no process left. Pass. 'server/' was not touched, so the
+  rebuild itself was not exercised (Pitfalls).
+- No failures to classify. Jeff's server (cargo-watch, loop,
+  'target/debug/skg data/skgconfig.toml', port 1731) ran throughout,
+  and 'bash/stop-servers.sh' was saved before the runs and restored
+  after; it again reads 'kill -TERM -485475'.
+*** Deviations from the plan's how
+- 'start_skg_with_restart' keeps the kill, the port check, the
+  'mkdir -p' and the "Server logs go to" line, then calls one of two
+  new functions, 'run_skg_under_cargo_watch' (today's command,
+  unchanged) or 'run_skg_rerunning_on_exit'. Its first line names the
+  mode.
+- The preflight's comment said "before starting the watcher"; it now
+  says "the server", since without '--hot-reload' there is none.
+*** Unfinished
+Nothing in this slice.
+*** Headline
+DONE.

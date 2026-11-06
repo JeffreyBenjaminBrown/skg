@@ -280,7 +280,7 @@ the processes gone. Repeat without '--deb' and expect
 'target/release/skg'. Run 'bash/start-servers.sh --bogus' and
 expect the usage line and status 2. Hot reload is still always
 on in this slice, so cargo-watch appears in 'ps' both times.
-** TODO Slice 2: '--hot-reload', off by default; 'mkdir -p' logs
+** DONE Slice 2: '--hot-reload', off by default; 'mkdir -p' logs
 In 'start_skg_with_restart', branch on 'HOT_RELOAD': with it the
 cargo-watch command as today; without it the rerun loop in the
 foreground with the same log redirection. Add the 'mkdir -p'.
