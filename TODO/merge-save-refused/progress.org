@@ -957,3 +957,9 @@ None. The new tests use 'tests/content_view/fixtures-2' as it is.
 Nothing.
 *** Headline
 DONE.
+** Orchestrator's notes after slice 3 (2026-11-06 01:13 UTC)
+Slice 3 launched 01:05, reported 01:17. One commit; the rule is
+one predicate, 'is_ordinary_content_view', as the pitfall asked,
+so a kind a later plan adds is skipped without another edit. Both
+clients' diff-view integration tests lost their workaround and
+pass. No correction needed. Slice 4 launched 01:13.
