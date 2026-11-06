@@ -11,8 +11,8 @@
 
 (ert-deftest test-skg-connect-failure-points-to-startup-logs ()
   (let* ((tmp-dir (make-temp-file "skg-client-test" t))
-         (skg-config-dir (file-name-as-directory tmp-dir))
-         (config-file (expand-file-name "skgconfig.toml" skg-config-dir))
+         (config-file (expand-file-name "skgconfig.toml" tmp-dir))
+         (skg-config-file-path config-file)
          (skg-port 1731)
          (skg-rust-tcp-proc nil))
     (write-region "port = 1731\n" nil config-file nil 'silent)
@@ -37,7 +37,7 @@
     (delete-directory tmp-dir t)))
 
 (ert-deftest test-skg-connect-failure-without-config-names-run-folder-in-words ()
-  (let ((skg-config-dir nil)
+  (let ((skg-config-file-path nil)
         (skg-port 1731))
     (let ((message (skg--server-unavailable-message
                     '(error "connection refused"))))

@@ -43,7 +43,8 @@
   (let ((port (skg-port-from-toml file)))
     (skg--end-connection-to-another-port port)
     (setq skg-port port))
-  (setq skg-config-dir (file-name-directory (expand-file-name file)))
+  (setq skg-config-file-path (expand-file-name file))
+  (setq skg-config-dir (file-name-directory skg-config-file-path))
   (skg-tcp-connect-to-rust)
   (skg-connection-verify)
   ;; Re-fetch the herald rule table from the (possibly rebuilt) server,

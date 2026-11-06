@@ -60,8 +60,13 @@ by `skg-register-response-handler' and the dispatcher."
   (setq skg-lp--buf        (unibyte-string)
         skg-lp--bytes-left nil))
 
+(defvar skg-config-file-path nil
+  "Absolute path of the config file the client was started with.
+Set by `skg-client-init' from its FILE argument, whatever that file
+is named. Read through `skg-config-file'.")
+
 (defvar skg-config-dir nil
-  "Directory containing the skgconfig.toml file.
+  "Directory containing the config file (`skg-config-file-path').
 Set by `skg-client-init'. Used to resolve relative paths
 returned by the server (e.g. for get-file-path responses).")
 

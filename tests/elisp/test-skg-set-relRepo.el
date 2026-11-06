@@ -39,10 +39,10 @@ depends on; the server enforces the real floor at save.)")
 (defun test--with-skg-content-view (org-text config-text body-fn)
   "Run BODY-FN in a temp skg content-view buffer with ORG-TEXT.
 CONFIG-TEXT is written to a temporary skgconfig.toml so that
-skg-config-dir is set and `skg--repo-names' works."
+skg-config-file-path is set and `skg--repo-names' works."
   (let* ((config-dir (make-temp-file "skg-test-config" t))
          (config-file (expand-file-name "skgconfig.toml" config-dir))
-         (skg-config-dir (file-name-as-directory config-dir)))
+         (skg-config-file-path config-file))
     (with-temp-file config-file
       (insert config-text))
     (unwind-protect

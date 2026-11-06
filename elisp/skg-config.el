@@ -8,18 +8,17 @@
 (require
  ;; PITFALL:
  ;; A tiny bit of config-related code is found outside this module:
- ;; The variable `skg-config-dir' (the directory containing skgconfig.toml)
- ;; is defined in skg-state.el, alongside the other global state.
- ;; It is set once, by `skg-client-init'.
+ ;; The variables `skg-config-file-path' (the config file's path)
+ ;; and `skg-config-dir' (the directory containing it)
+ ;; are defined in skg-state.el, alongside the other global state.
+ ;; They are set once, by `skg-client-init'.
  'skg-state)
 
 (defun skg-config-file ()
-  "Return the skgconfig.toml path for `skg-config-dir', or nil."
-  (when skg-config-dir
-    (let ((config-file
-           (expand-file-name "skgconfig.toml" skg-config-dir)))
-      (when (file-exists-p config-file)
-        config-file))))
+  "Return `skg-config-file-path' if it names an existing file, or nil."
+  (when (and skg-config-file-path
+             (file-exists-p skg-config-file-path))
+    skg-config-file-path))
 
 (defun skg--completing-read-with-cycle
     (prompt collection &optional predicate require-match
