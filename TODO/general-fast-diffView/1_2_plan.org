@@ -113,8 +113,9 @@ says where "Server ready." appears
 data/skgconfig.toml' gains the one clause that the server
 writes its logs to 'CONFIG.running/START/';
 '.claude/skills/verify/SKILL.md' recipe says where an isolated
-instance's logs land and that its stop script, when started by the start script, is in its own run
-folder. 'docs/glossary.org' gains "run folder" beside "hot
+instance's logs land and that its stop script, when started by
+the start script, is in its own run folder.
+'docs/glossary.org' gains "run folder" beside "hot
 reload". 'windows/README.org' or the Windows docs get one line
 saying the server's logs moved, if they name the old place
 (grep 'logs' under 'windows/'); the container scripts there are
