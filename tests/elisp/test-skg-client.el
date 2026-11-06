@@ -12,30 +12,39 @@
 (ert-deftest test-skg-connect-failure-points-to-startup-logs ()
   (let* ((tmp-dir (make-temp-file "skg-client-test" t))
          (skg-config-dir (file-name-as-directory tmp-dir))
+         (config-file (expand-file-name "skgconfig.toml" skg-config-dir))
          (skg-port 1731)
          (skg-rust-tcp-proc nil))
+    (write-region "port = 1731\n" nil config-file nil 'silent)
     (cl-letf (((symbol-function 'make-network-process)
                (lambda (&rest _args)
                  (error "connection refused"))))
-      (let ((err
-             (should-error (skg-tcp-connect-to-rust)
-                           :type 'user-error)))
+      (let* ((err
+              (should-error (skg-tcp-connect-to-rust)
+                            :type 'user-error))
+             (message (error-message-string err)))
         (should (string-match-p
                  "Could not connect to the SKG server on port 1731"
-                 (error-message-string err)))
+                 message))
         (should (string-match-p
-                 (regexp-quote
-                  (expand-file-name "logs/server-to-user.log"
-                                    skg-config-dir))
-                 (error-message-string err)))
+                 (regexp-quote (concat config-file ".running/"))
+                 message))
+        (should (string-match-p "server-to-user.log" message))
         (should (string-match-p
-                 (regexp-quote
-                  (expand-file-name "logs/cargo-watch.log"
-                                    skg-config-dir))
-                 (error-message-string err)))
-        (should (string-match-p
-                 "connection refused"
-                 (error-message-string err)))))))
+                 (regexp-quote "start-servers.*.log") message))
+        (should-not (string-match-p "logs/" message))
+        (should (string-match-p "connection refused" message))))
+    (delete-directory tmp-dir t)))
+
+(ert-deftest test-skg-connect-failure-without-config-names-run-folder-in-words ()
+  (let ((skg-config-dir nil)
+        (skg-port 1731))
+    (let ((message (skg--server-unavailable-message
+                    '(error "connection refused"))))
+      (should (string-match-p
+               (regexp-quote "CONFIG.running/, beside the config file")
+               message))
+      (should-not (string-match-p "logs/" message)))))
 
 (provide 'test-skg-client)
 

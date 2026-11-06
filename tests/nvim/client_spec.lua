@@ -47,10 +47,20 @@ describe('skg.client', function ()
     assert.is_truthy(message:find(
       'Could not connect to the SKG server on port 1', 1, true))
     assert.is_truthy(message:find(
-      config_dir .. '/logs/server-to-user.log', 1, true))
-    assert.is_truthy(message:find(
-      config_dir .. '/logs/cargo-watch.log', 1, true))
+      vim.fn.fnamemodify(config_file, ':p') .. '.running/', 1, true))
+    assert.is_truthy(message:find('server-to-user.log', 1, true))
+    assert.is_truthy(message:find('start-servers.*.log', 1, true))
+    assert.is_falsy(message:find('logs/', 1, true))
     vim.fn.delete(config_dir, 'rf')
+  end)
+
+  it('names the run folder in words when the config is unknown',
+     function ()
+    config.config_file_path = nil
+    local message = client.server_unavailable_message('refused')
+    assert.is_truthy(message:find(
+      'CONFIG.running/, beside the config file', 1, true))
+    assert.is_falsy(message:find('logs/', 1, true))
   end)
 
   it('connects, sends a request, and dispatches the framed reply',

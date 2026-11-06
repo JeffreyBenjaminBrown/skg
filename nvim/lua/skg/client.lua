@@ -72,21 +72,32 @@ end
 ---@param err string
 ---@return string
 function M.server_unavailable_message (err)
-  local config_file = config.config_file()
-  local logs_dir
-  if config_file then
-    logs_dir = vim.fn.fnamemodify(config_file, ':h') .. '/logs'
-  else
-    logs_dir = vim.fn.getcwd() .. '/logs' end
   return string.format(
     'Could not connect to the SKG server on port %s.\n'
     .. 'The server may have failed during startup.\n'
-    .. 'Look for the startup error in:\n  %s\n  %s\n'
+    .. 'Look for the startup error in the run folder\n  %s\n'
+    .. 'where the newest folder holds server-to-user.log,\n'
+    .. 'and the start-servers.*.log files beside it'
+    .. " hold the start script's output.\n"
     .. 'Connection error: %s',
     M.port and tostring(M.port) or '[unknown]',
-    logs_dir .. '/server-to-user.log',
-    logs_dir .. '/cargo-watch.log',
+    M.server_run_folder_for_messages(),
     tostring(err))
+end
+
+---The run folder, CONFIG.running/ beside the config, as messages name
+---it: the config file's path plus '.running/'. The newest folder in it
+---holds the server's logs, one folder per server run; the client cannot
+---know which run is current, so this names no timestamp. When the
+---config file is unknown, this says so in words instead of guessing a
+---path.
+---@return string
+function M.server_run_folder_for_messages ()
+  local config_file = config.config_file()
+  if config_file then
+    return vim.fn.fnamemodify(config_file, ':p') .. '.running/' end
+  return 'CONFIG.running/, beside the config file the server'
+    .. ' was started with (its path is unknown here)'
 end
 
 ---Route a chunk from the server to the LP machine -- unless it is the

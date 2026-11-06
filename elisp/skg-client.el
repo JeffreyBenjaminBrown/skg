@@ -74,8 +74,8 @@
       (message
        (concat "skg connected on port %s, but the herald rule table"
                " came back empty, so heralds will not render."
-               " See %slogs/server-to-user.log .")
-       skg-port skg-config-dir))))
+               " See server-to-user.log in the newest folder of %s .")
+       skg-port (skg--server-run-folder-for-messages)))))
   ;; Skg, magit and global keybindings are in skg-keymaps-and-aliases.el.
 
 (defun skg--end-connection-to-another-port (port)
@@ -125,23 +125,31 @@ other server, and saving one would write it into this server's graph."
 
 (defun skg--server-unavailable-message (err)
   "Return a user-facing message for a failed Rust server connection ERR."
-  (let* ((logs-dir (expand-file-name
-                    "logs"
-                    (or skg-config-dir default-directory)))
-         (user-log (expand-file-name "server-to-user.log" logs-dir))
-         (watch-log (expand-file-name "cargo-watch.log" logs-dir)))
-    (format
-     (concat
-      "Could not connect to the SKG server on port %s.\n"
-      "The server may have failed during startup.\n"
-      "Look for the startup error in:\n"
-      "  %s\n"
-      "  %s\n"
-      "Connection error: %s")
-     (or skg-port "[unknown]")
-     user-log
-     watch-log
-     (error-message-string err))))
+  (format
+   (concat
+    "Could not connect to the SKG server on port %s.\n"
+    "The server may have failed during startup.\n"
+    "Look for the startup error in the run folder\n"
+    "  %s\n"
+    "where the newest folder holds server-to-user.log,\n"
+    "and the start-servers.*.log files beside it"
+    " hold the start script's output.\n"
+    "Connection error: %s")
+   (or skg-port "[unknown]")
+   (skg--server-run-folder-for-messages)
+   (error-message-string err)))
+
+(defun skg--server-run-folder-for-messages ()
+  "The run folder, CONFIG.running/ beside the config, as messages name it.
+It is the config file's path plus \".running/\". The newest folder in it
+holds the server's logs, one folder per server run; the client cannot
+know which run is current, so this names no timestamp. When the config
+file is unknown, this says so in words instead of guessing a path."
+  (let ((config-file (skg-config-file)))
+    (if config-file
+        (concat config-file ".running/")
+      (concat "CONFIG.running/, beside the config file the server"
+              " was started with (its path is unknown here)"))))
 
 (defun skg-handle-rust-response (tcp-proc string)
   "Route the response from Rust to the LP handler.
