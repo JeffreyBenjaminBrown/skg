@@ -215,6 +215,23 @@ Finding 8 (the prominence comment at save time) is a behavior
 question for Jeff and is not here. Run 'bash/nextest.sh',
 'bash/emacs-tests.sh' and 'bash/nvim-tests.sh'; 'bash/all-tests.sh'
 only if a text an integration script matches changes. One commit.
+** TODO Slice 4: the tool's stale-view check expects plan 4's behavior
+'tools/skg-for-ai/test_skg_for_ai.py' has a check,
+'check_stale_view', that expects a save to be refused where, since
+plan 4 (commit a6f1d04d), the save goes through with the "Left as
+the graph has it" warning: the view's copy was unedited. Plan 4's
+briefs did not run the tool's tests, since the tool's code did not
+change, so the failure went unseen until slice 3 ran them. Adapt
+the check to the behavior the glossary now states: an unedited
+stale graphnode is left as the graph has it and warned of; an
+edited one still refuses. Keep a check of each case if the harness
+allows. Run 'python3 tools/skg-for-ai/test_skg_for_ai.py' (it needs
+a built server; its README near line 710 says how it finds one)
+and then 'bash/all-tests.sh' for the plan's final record, since
+slice 3 changed 'elisp/skg-org-fold.el', which the integration
+tests exercise. Remove the entry slice 3 added to
+'TODO/problems.org' for this failure, as that file's header says
+(move it to the top of 'TODO/DONE/problems.org'). One commit.
 * Verification and completion
 After slice 2, run 'bash/all-tests.sh' and record its summary in
 'progress.org'. Then add under the three "Decide" items of

@@ -1542,3 +1542,11 @@ launched 03:16; no probe pass, since nothing changed behavior.
 - The tool's 'check_stale_view' (above), outside this plan.
 *** Headline
 DONE.
+** Orchestrator's notes after slice 3 (2026-11-06 03:30 UTC)
+One commit. The agent corrected a false claim of mine in the slice
+(a re-sent save that created a child is refused, since the
+container is then an edited stale graphnode; I had written the
+opposite) and fixed the fold loop with a bounded test. It also
+found that the tool's 'check_stale_view' has failed since plan 4,
+unseen because plan 4's briefs did not run the tool's tests: a
+brief omission of mine, carried as slice 4. Slice 4 launched 03:30.
