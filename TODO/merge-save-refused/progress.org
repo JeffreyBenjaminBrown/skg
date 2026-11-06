@@ -1060,3 +1060,44 @@ None.
   them.
 *** Headline
 DONE.
+** Completion
+*** Commits
+- 6b304792: the save's phases and passes are named for what they
+  are (slice 5).
+- The commit carrying this entry: plan 4 done; the "done by plan
+  4" replies and the glossary's neighborhood sentence.
+*** Suites
+'bash/all-tests.sh', after slice 5's commit (187 s):
+- Emacs unit tests: 444 of 444 pass.
+- Neovim unit tests: 481 of 481 pass.
+- Nextest: 1142 of 1142 pass.
+- Doctests: 2 pass, 2 ignored.
+- Integration: 37 per client; 36 of 37 pass in each.
+  'import-md-and-org' fails in both clients, and again on the
+  script's retry ("Import preview cannot be applied": a heading-like
+  line inside a block in the fixture's 'notes.org'): pre-existing,
+  as the plan's pitfall "A failure that predates the plan" says;
+  not investigated.
+*** Deviations from the plan's how
+None. The five sources have a child "Claude says: done by plan 4,
+slice N", TODO for Jeff, naming its slice's commit: in
+'3_review.org' under the three "Decide" items and "The runtime
+generation starts at 0", and in '3_2_glossary.org' under "Never
+use numbers as names". Each file's commit holds only these
+additions; Jeff's uncommitted edits stay unstaged.
+*** Documentation carried from earlier slices
+- 'docs/glossary.org', "update-relevant neighborhood": now says the
+  collateral redraw uses the whole neighborhood and the dirty-view
+  conflict check uses it without 'linksTo'. Jeff's uncommitted
+  "Stranded" edit in that file stays unstaged.
+- The glossary has no entries 'phase one' or 'phase two', and no
+  numbered phase or pass anywhere, so nothing there needed the
+  renaming.
+*** Fixtures changed
+None.
+*** Unfinished
+Nothing of the plan. The numbered test steps and the other
+numbered passes outside the slice's list are listed under slice 5,
+"Unfinished".
+*** Headline
+DONE: all five slices are DONE.

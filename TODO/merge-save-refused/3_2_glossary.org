@@ -203,6 +203,9 @@ pass (it strips the deleted IDs from those Saves). The names
 appear five times in 'server/save.rs' and
 'server/dbs/in_rust_graph.rs', and in the plans and this
 glossary, which the slice updates.
+***** TODO Claude says: done by plan 4, slice 5
+Commit 6b304792: the phases and passes are renamed in the code's
+comments, the one identifier, the two plans and this glossary.
 ** the nodeMerge phase
 The nodeMerge phase of a save is the preparation and application
 of its NodeMerges. 'prepare_save_under_mutation_gate' builds the

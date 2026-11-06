@@ -129,6 +129,9 @@ It's more information, and no more work.
 ***** DONE Claude says: slice 4 of '4_plan.org'
 A server will start its runtime generation at the microseconds
 since the Unix epoch again, and each swap-in will add one.
+**** TODO Claude says: done by plan 4, slice 4
+Commit b2786bc5: a server starts its runtime generation at the
+microseconds since the Unix epoch again.
 *** Parse errors in the baseline refuse the save
 As an outright parse failure does.
 ** Slice 4
@@ -293,6 +296,9 @@ edited that changed under them, which is the case the remedy
 text describes. I would do it.
 *** DONE [jeff] yes please
 **** DONE Claude says: plan 4, slice 1
+*** TODO Claude says: done by plan 4, slice 1
+Commit a6f1d04d: an untouched outdated graphnode is left out of
+the save, with a warning, instead of refusing it.
 ** DONE The dirty-view check still matches through links inbound
 Slice 4 stopped a dirty view's links from counting as its
 dependencies. But the save side still uses the collateral
@@ -320,6 +326,10 @@ The plan forbids copying the neighborhood walk, the function
 duplicate as a second function without the link relation. The
 relation list becomes that function's parameter; the full
 version and the link-free version both call the one walk.
+*** TODO Claude says: done by plan 4, slice 2
+Commit 687d7ca7: the dirty-view check uses the update-relevant
+neighborhood without the link relation; the collateral redraw
+keeps it whole.
 ** DONE Following a link to a diff-view root
 A view request for a node that is a root of an open diff-view
 buffer switches to that buffer. Slice 6's agent asked whether
@@ -328,6 +338,10 @@ request prefer a content view, and open one when none shows the
 node, treating diff-view buffers as what they are.
 *** DONE [jeff] yes please
 **** DONE Claude says: plan 4, slice 3
+*** TODO Claude says: done by plan 4, slice 3
+Commit ea4e945d: a view request switches only to an ordinary
+content view, and renders one when only diff-view buffers have
+the root.
 ** DONE The rendered stale-save buffer
 You left this out of plan 2_2. It would be a write-protected
 buffer in the style of the diff view, showing a stale

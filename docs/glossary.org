@@ -1617,6 +1617,10 @@ start independently at the original IDs, never reverse direction, and
 never continue from an ordinary neighbor. Thus it includes no mixed
 ordinary/override path and no two-hop ordinary path. Saves compute this
 neighborhood independently in the before and after graph snapshots.
+The collateral redraw of clean views uses the whole neighborhood;
+the dirty-view conflict check uses it without =linksTo=, in both
+directions ('update_relevant_neighborhood_over' in
+'server/dbs/in_rust_graph/relation_accessors.rs').
 
 *** vognode, non-vognode
 
