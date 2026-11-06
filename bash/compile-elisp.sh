@@ -2,8 +2,9 @@
 # USAGE: bash/compile-elisp.sh
 #   No arguments; runs from any directory. bash/start-servers.sh runs it.
 #
-# Byte-compiles every .el under elisp/ (subdirectories too), writing each
-# .elc beside its source, with the container's Emacs. It loads
+# Byte-compiles every .el under elisp/ (subdirectories too, except
+# elisp/abandoned/, which holds dead code), writing each .elc beside its
+# source, with the container's Emacs. It loads
 # elisp/skg-init.el first, which puts elisp/'s load path in place and
 # defines every macro the client uses. It deletes any .elc whose .el is
 # gone. Warnings are printed and do not fail it; a file that fails to
@@ -25,6 +26,13 @@ COMPILE_PROGRAM='
      (failed-files nil))
   (load (expand-file-name "skg-init.el" elisp-dir)
         nil t t) ; nosuffix: the source, never a stale skg-init.elc
+  (require (quote bytecomp))
+  (setq byte-compile-warnings
+        ;; Docstrings here put plain apostrophes around names, as code
+        ;; references do throughout (coding-advice/ORIENTATION.org), and
+        ;; some run past 80 columns; those two stylistic classes are off.
+        ;; Every class that can signal a bug stays on.
+        (quote (not docstrings docstrings-wide)))
   (dolist (elc-file (directory-files-recursively elisp-dir "\\.elc\\'"'"'"))
     (unless (file-exists-p (concat (file-name-sans-extension elc-file) ".el"))
       (delete-file elc-file)
@@ -32,7 +40,9 @@ COMPILE_PROGRAM='
   (dolist (el-file (directory-files-recursively elisp-dir "\\.el\\'"'"'"))
     (when (and (file-regular-p el-file) ; not a dangling symlink
                (not (string-prefix-p ; nor an Emacs lock file
-                     ".#" (file-name-nondirectory el-file))))
+                     ".#" (file-name-nondirectory el-file)))
+               (not (string-prefix-p ; nor dead code
+                     (expand-file-name "abandoned/" elisp-dir) el-file)))
       (if (byte-compile-file el-file)
           (setq compiled-count (1+ compiled-count))
         (push el-file failed-files)
