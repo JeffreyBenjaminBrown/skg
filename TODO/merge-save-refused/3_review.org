@@ -178,7 +178,7 @@ own; your "Stranded" edit there stays unstaged.
 It seems like it should refer to a viewnode tree in the server.
 That way we don't have to re-parse.
 Those viewnode trees are already stored in the server, right?
-***** TODO Claude says: yes, the server stores them; two reasons for text
+***** TODO Claude says: it does; two reasons for text anyway
 ****** The server does hold the tree
 Every view the connection holds has its viewforest in 'ViewState'
 ('server/types/views_state.rs'), replaced at every redraw
