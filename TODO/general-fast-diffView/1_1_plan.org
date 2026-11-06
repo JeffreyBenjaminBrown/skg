@@ -314,7 +314,7 @@ and no atom, both the old and the new predicate return nil, and
 on a headline with the atom both return t (a one-time check in
 the slice's log directory, not a new test file, unless a fold
 test already exists to extend).
-** TODO Slice 5: byte compilation from inside Docker
+** DONE Slice 5: byte compilation from inside Docker
 'bash/compile-elisp.sh'; the call in 'start-servers.sh' with
 its two warnings; the 'let' in 'skg-init.el'; the '.gitignore'
 line. Tests: run the compile script once by hand and report the

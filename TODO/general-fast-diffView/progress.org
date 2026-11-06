@@ -177,3 +177,70 @@ copies of the two files in its 'old/'.
 Nothing in this slice.
 *** Headline
 DONE.
+** Slice 5
+Finished 2026-11-06 06:35 UTC.
+*** Commits
+- 6fd9480a plan 1_1 slice 5: the start script byte-compiles the Emacs client; skg-init prefers a newer .el
+- the next commit: this record and the slice headline flipped to DONE
+*** Checks
+Logs and the one-time scripts are in 'tests/results/plan-1_1/slice5/'
+(untracked). Isolated instance: a scratch data root with a one-node
+repo, port 1775.
+- 'bash -n' on both scripts: passes.
+- 'bash/compile-elisp.sh' by hand, run from '/': 59 files compiled,
+  0 errors, 140 warnings, status 0, about 0.34 s (best of three).
+  The warnings by kind: 97 docstring quoting, 18 docstring width, 13
+  free variables, 8 functions not known to be defined, 2 obsolete
+  org functions, 1 defface without a group, 1 unused variable. None
+  fixed (Pitfalls).
+- One '.elc' beside each of the 59 '.el' files, none orphaned; 'git
+  status' lists no '.elc' ('.gitignore:3').
+- Failure paths, with throwaway files in 'elisp/', removed after: an
+  orphan '.elc' is deleted and named; an unbalanced file makes the
+  script name it, print the error and exit 1; a file that compiled
+  once and then broke loses its old '.elc'.
+- 'bash/emacs-tests.sh' with the '.elc' files present: 446 tests, 446
+  as expected, 0 unexpected.
+- 'load-prefer-newer' ('prefer-newer-check.sh'): 'skg-focus.el'
+  touched, content unchanged (md5 checked). Before the touch both
+  ways load 'skg-focus.elc'. After it, '(require 'skg-focus)' alone
+  loads the '.elc' (Emacs warns "newer than byte-compiled file; using
+  older file"); inside '(let ((load-prefer-newer t)) ...)' it loads
+  'skg-focus.el', by 'symbol-file' and 'load-history' both. Through
+  'load-file' of 'skg-init.el' itself: 'skg-focus' from '.el', the
+  rest from '.elc', and 'load-prefer-newer' nil again afterwards.
+- Isolated start, default options: the terminal showed "Compiling
+  the Emacs client", "Compiled 59 files; 0 failed." and the warning
+  count between "Config OK." and the server start; the port came up
+  in about 2 s; 'ps' showed the rerun loop and 'target/release/skg'
+  and no cargo-watch; the generated stop script stopped it all (port
+  free, no process left). A TCP 'view 1' on a second scratch start of
+  the binary answered (verify skill).
+- The two warnings of the start script, its function run alone: with
+  no 'emacs' on the path, the yellow line and status 0; with a broken
+  file, the output in red, a red "starting the server anyway" line,
+  status 0.
+- Timing, 'scripts/overlay-floor.el' case (a), client loaded from the
+  tree's '.elc' files: 66.3 ms (before this plan: 788.8 ms from
+  source, 233.5 ms from a compiled copy; after slice 3, 456.5 ms from
+  source).
+- No failures to classify. Jeff's server (cargo-watch, loop,
+  'target/debug/skg data/skgconfig.toml', port 1731) ran throughout,
+  and 'bash/stop-servers.sh' was saved before the run and restored
+  after; it again reads 'kill -TERM -485475'.
+*** Deviations from the plan's how
+- A file that fails to compile also loses its old '.elc', so that no
+  '.elc' outlives a compile of its source that failed.
+- The script skips Emacs lock files ('.#name.el', dangling symlinks
+  that Jeff's Emacs leaves beside a file being edited), and it loads
+  'skg-init.el' with 'load-prefer-newer' bound to t, so a stale '.elc'
+  never stands in while compiling.
+- On success the start script prints only the last two lines (the
+  file count and the warning count), not the 140 warnings; on failure
+  it prints everything in red. The usage header gained three lines
+  saying the compile step runs first.
+*** Unfinished
+Nothing in this slice. The '.elc' files now in 'elisp/' are what
+Jeff's Emacs loads at his next 'skg-reload' or restart.
+*** Headline
+DONE.
