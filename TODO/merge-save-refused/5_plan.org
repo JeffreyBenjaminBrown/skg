@@ -145,7 +145,7 @@ and the glossary, respecting "Two senses of two words". Run
 'bash/nextest.sh', 'bash/emacs-tests.sh' and 'bash/nvim-tests.sh';
 the integration suite only if a text a client test matches
 changes, which it should not. One commit.
-** TODO Slice 2: three numbered steps named
+** DONE Slice 2: three numbered steps named
 *** Corrections carried from slice 1
 'server/from_text/validate.rs' (near line 382, "an untouched
 stale node") and 'tests/restricted_suppression.rs' use "stale"

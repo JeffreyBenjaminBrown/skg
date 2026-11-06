@@ -57,12 +57,15 @@ Two atoms are recognised:
                   (e.g. via `org-fold-hide-entry'). We restore that
                   by hiding this headline's entry directly.
 .
-METHOD:
-- First unfold everything.
-- Pass 1: find every headline with `bodyFolded' and hide its entry.
-- Pass 2: iteratively find a visible `folded'-marked headline and
-  fold its parent. We loop because folding a parent makes more
-  `folded' headlines invisible, removing them from the search."
+METHOD, in order:
+- Unfold everything.
+- Hide the entries of the `bodyFolded' headlines: find every headline
+  with `bodyFolded' and hide its entry
+  (`skg--fold-bodies-of-bodyfolded-headlines').
+- Fold the parents of the `folded' headlines: repeatedly find a
+  visible `folded'-marked headline and fold its parent, until none is
+  visible. We loop because folding a parent makes more `folded'
+  headlines invisible, removing them from the search."
   (org-show-all)
   (skg--fold-bodies-of-bodyfolded-headlines)
   (goto-char (point-min))

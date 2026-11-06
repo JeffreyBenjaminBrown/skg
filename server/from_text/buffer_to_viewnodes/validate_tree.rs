@@ -45,11 +45,12 @@ pub fn find_buffer_errors_for_saving_in_graph (
   config: &SkgConfig,
 ) -> Result<Vec<BufferValidationError>,
             Box<dyn std::error::Error>>
-{ // Two phases: instruction validation and structure validation.
-  // Many of the first are global operations --
-  // they need to take the entire viewforest into account.
-  // By contrast the second phase (local structure validation)
-  // performs only local structural verifications:
+{ // Two kinds of check, in order: the whole-viewforest checks
+  // (instructions, nodeMerges, view requests, idFolders, overrides,
+  // view roots, write-protected requests), many of which
+  // need to take the entire viewforest into account;
+  // then the local-structure validation,
+  // which performs only local structural verifications:
   // each ID belongs to an idFolder, etc.
   let mut errors: Vec<BufferValidationError> = Vec::new();
   { // inconsistent instructions (deletion, defining containers, readiness)
@@ -86,7 +87,7 @@ pub fn find_buffer_errors_for_saving_in_graph (
       viewforest, &mut errors);
   writeProtected_relRepo_request_errors (
     viewforest, &mut errors );
-  { // local structure validation
+  { // local-structure validation
     let root_gnids : Vec<NodeId> =
       viewforest . root_gnids ();
     for root_gnid in root_gnids {

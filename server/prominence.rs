@@ -193,14 +193,16 @@ fn node_is_in_containerward_cycle (
   false }
 
 //
-// Step 1: identify origins (using the in-Rust graph)
+// Identify origins (using the in-Rust graph)
 //
 
 /// Build the prominence-sources map from graph data and imported flags.
 /// We impose priority order: If something is a Root,
 /// it doesn't matter that it's Mentioned, etc.
 /// Therefore higher-priority prominence sources are processed later.
-/// CycleMember is assigned later (step 3).
+/// CycleMember is assigned later, when cycles are handled
+/// ('extend_regions_for_cycles'; at save time, the containerward-cycle
+/// check in 'prominence_sources_for_saved_from_inRustGraph').
 /// (That's safe because the only higher-priority thing is a Root,
 /// and a Root cannot be a CycleMember.)
 fn identify_origins (
@@ -248,7 +250,7 @@ pub fn find_roots_and_multiply_contained (
   ( roots, multi ) }
 
 //
-// Step 2: grow treelike regions (using the in-Rust graph)
+// Grow treelike regions (using the in-Rust graph)
 //
 
 /// Grow regions from all origins using the in-Rust-graph map.
@@ -265,7 +267,7 @@ fn grow_all_regions (
     . collect () }
 
 //
-// Step 3: handle cycles (using the in-Rust graph)
+// Handle cycles (using the in-Rust graph)
 //
 
 /// The treelike regions, grown first, might not cover all nodes.
@@ -306,7 +308,7 @@ pub fn extend_regions_for_cycles (
     regions . push (region); }}
 
 //
-// Shared callee of steps 2 and 3
+// Shared callee of growing treelike regions and handling cycles
 //
 
 /// Grow a region contentward from `grow_from`, merging results

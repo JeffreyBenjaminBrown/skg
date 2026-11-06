@@ -5,12 +5,12 @@
 // under a restricted skgrepo-set, any nodeInstruction that would modify a
 // restricted node is dropped, not executed and not fatal, with the warning
 // "Restricted nodes present in saved buffer remain unchanged in graph." --
-// and only when something was actually suppressed: an untouched stale
-// node's identical-to-disk nodeInstruction is discarded by the noop filter
-// first, so it saves silently.
+// and only when something was actually suppressed: a now-restricted
+// node the buffer shows identical to the graph has its nodeInstruction
+// discarded by the noop filter first, so it saves silently.
 //
-// This lives in its own test target because the silent-untouched
-// case needs the explicit in-Rust graph installed (the noop
+// This lives in its own test target because the silent
+// identical-to-the-graph case needs the explicit in-Rust graph installed (the noop
 // filter reads it), and installing it inside a shared-process
 // target would couple unrelated tests.
 
@@ -79,7 +79,8 @@ fn writes_to_restricted_nodes_are_suppressed_with_warning (
           members_of (&saved_node_by_gnid (&plan . node_instructions, "root") . contains),
           vec![ ID::from ("active-b"), ID::from ("private-a") ],
           "the unrestricted parent keeps containing the restricted child" ); }
-      { // The same stale node untouched: the noop filter drops its
+      { // The same node, drawn under the previous restriction and
+        // identical to the graph: the noop filter drops its
         // nodeInstruction before suppression looks, so no warning.
         let buffer = indoc! {"
           * (skg node (gnid root) (skgRepos (nodeRepo public))) root
@@ -93,11 +94,11 @@ fn writes_to_restricted_nodes_are_suppressed_with_warning (
         assert! (
           ! save_gnids (&plan . node_instructions)
             . contains (&ID::from ("private-a")),
-          "an untouched stale node writes nothing" );
+          "a node identical to the graph writes nothing" );
         assert! (
           ! warnings . iter () . any ( |w| w . contains (
             "remain unchanged in graph")),
-          "an untouched stale buffer saves without the suppression \
+          "a buffer identical to the graph saves without the suppression \
            warning: {:?}", warnings ); }
       { // Moving a node into a restricted skgrepo: move suppressed,
         // warning attached, node unmoved.

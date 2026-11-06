@@ -1374,3 +1374,54 @@ near-synonym in 'server/from_text/validate.rs' (near line 382, "an
 untouched stale node", meaning drawn before a restriction switch
 and identical to disk) and 'tests/restricted_suppression.rs';
 carried into slice 2 as a correction. Slice 2 launched 03:09.
+** Slice 2
+*** Commits
+- The commit carrying this entry: the three numbered steps named
+  ('elisp/skg-org-fold.el', 'validate_tree.rs', 'prominence.rs');
+  the older "untouched stale" in 'server/from_text/validate.rs' and
+  'tests/restricted_suppression.rs' reworded; the slice's headline
+  turned DONE. No behavior change.
+*** Suites
+- 'bash/nextest.sh': 1144 of 1144 pass.
+- 'bash/emacs-tests.sh': 445 of 445 as expected.
+- No failure of any kind.
+- The '/verify' skill, on an isolated scratch server: view of one
+  root, a new child saved under it (prominence and validation both
+  run), the child's '.skg' file written, the re-opened view shows it;
+  no errors, no warnings.
+*** Deviations from the plan's how
+- 'skg-fold-marked-headlines' (elisp): the docstring's METHOD now
+  reads "in order", and its two passes are named "hide the entries
+  of the 'bodyFolded' headlines" (citing the function that does it,
+  'skg--fold-bodies-of-bodyfolded-headlines') and "fold the parents
+  of the 'folded' headlines", which loops until no 'folded'
+  headline is visible. The loop stays inline; no function extracted.
+- 'validate_tree.rs': the opening comment now contrasts "the
+  whole-viewforest checks" (listing them: instructions, nodeMerges,
+  view requests, idFolders, overrides, view roots, write-protected
+  requests) with "the local-structure validation". The plan's
+  "instruction validation" name did not fit: half the checks before
+  the local pass are not about instructions. The block comment
+  "local structure validation" gained the hyphen to match.
+- 'prominence.rs': besides the "(step 3)" reference, the four
+  section headers that numbered the steps ("Step 1: identify
+  origins", "Step 2: grow treelike regions", "Step 3: handle
+  cycles", "Shared callee of steps 2 and 3") lost their numbers,
+  since a named reference beside numbered headers would leave the
+  numbers to go stale ('no-legacy-support.org'). The reference now
+  names where CycleMember is assigned in each of the two callers of
+  'identify_origins': 'extend_regions_for_cycles' at init, and the
+  containerward-cycle check in
+  'prominence_sources_for_saved_from_inRustGraph' at save time.
+- 'validate.rs' and 'restricted_suppression.rs': "a stale buffer"
+  became "a buffer drawn under the previous skgrepo restriction";
+  "untouched" became "identical to the graph", which is what the
+  noop filter ('filter_wouldbe_noop_nodeInstructions') compares
+  against, not disk. Two assertion messages in the test changed
+  with them; no other test or client matches them.
+*** Fixtures changed
+None.
+*** Unfinished
+Nothing.
+*** Headline
+DONE.

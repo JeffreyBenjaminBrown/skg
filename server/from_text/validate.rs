@@ -372,16 +372,16 @@ pub(super) fn validate_no_simultaneous_delete_and_nodeMerge (
 
 /// Restricted-node rewrite suppression (the API doc's "Restricted-skgrepo nodes"): under a skgrepo restriction, any nodeInstruction that
 /// would modify a restricted node is dropped rather than executed or
-/// fatal.  A stale buffer (rendered before a switch of the skgrepo restriction) can
+/// fatal.  A buffer drawn under the previous skgrepo restriction (before a switch of it) can
 /// legitimately hold whole now-restricted subtrees; aborting would
 /// force the user to delete them from view, which would itself be
 /// destructive.  A node is restricted when the skgrepo restriction
 /// keeps out its home as the graph has it, or as the buffer gives it:
 /// a headline for a restricted graphnode, pasted with a visible
 /// nodeRepo, leaves the graphnode where it is.  Runs after the noop
-/// filter, so an untouched stale node (whose identical-to-disk
-/// nodeInstruction the noop filter already discarded) does not count
-/// as suppressed.  Returns whether anything was dropped, so the caller
+/// filter, so a now-restricted node the buffer shows identical to the
+/// graph (whose nodeInstruction the noop filter already discarded) does
+/// not count as suppressed.  Returns whether anything was dropped, so the caller
 /// can attach the warning "Restricted nodes present in saved buffer
 /// remain unchanged in graph."
 pub fn suppress_writes_to_restricted_nodes (
