@@ -374,7 +374,7 @@ Run 'bash/nextest.sh'. One commit.
 *** TODO Claude says: added after you read the plan
 From your note under "The runtime generation starts at 0" in
 '3_review.org' (2026-11-05 night).
-** TODO Slice 5: phases and passes named for what they are
+** DONE Slice 5: phases and passes named for what they are
 Jeff's rule: never use numbers as names; a name says what the
 thing is. Rename, in code comments, doc comments and the two
 plans' and the review glossary's vocabulary:

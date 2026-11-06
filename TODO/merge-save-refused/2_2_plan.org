@@ -40,8 +40,8 @@ it never makes a buffer stale. A server restart or a rebuild
 makes nothing stale by itself.
 * Scope
 ** In scope
-- A merge will be built from the graph as phase one leaves it, so
-  a save that merges a graphnode and also changes it will keep
+- A merge will be built from the graph as the nodeInstructions
+  phase leaves it, so a save that merges a graphnode and also changes it will keep
   both. A save that deletes a merge node will be refused (slice
   1).
 - The saved buffer's baseline will ride with every save, from all
@@ -91,7 +91,7 @@ makes nothing stale by itself.
   also among the baseline's writes. Its copy in the buffer no
   longer matches the graph.
 - 'merge request', 'acquirer', 'acquiree', 'merge pair', 'merge
-  nodes', 'NodeMerge', 'phase one', 'phase two', 'derived
+  nodes', 'NodeMerge', 'the nodeInstructions phase', 'the nodeMerge phase', 'derived
   writes': as the deleted '2_plan.org' defined them, repeated here. A
   merge request is '(editRequest (merge ID))' on a headline; the
   headline's graphnode is the acquirer, the named one the
@@ -100,9 +100,11 @@ makes nothing stale by itself.
   (possibly an extra ID) to its pid before the pair enters the
   'SavePlan' as 'nodeMerge_pairs'. A
   NodeMerge is the triple a pair becomes: text preserver, updated
-  acquirer, delete of the acquiree. Phase one applies the
-  ordinary nodeInstructions and phase two the NodeMerges, in
-  'prepare_save_under_mutation_gate' ('server/save.rs').
+  acquirer, delete of the acquiree. The nodeInstructions
+  phase applies the ordinary nodeInstructions and the nodeMerge
+  phase the NodeMerges, in 'prepare_save_under_mutation_gate'
+  ('server/save.rs'). This plan called them 'phase one' and
+  'phase two' until plan 4, slice 5.
 - 'dirty view': an open view with unsaved edits, sent with a save
   as a 'ClientViewSnapshot'.
 - 'runtime generation': the server's internal counter of graph
@@ -111,8 +113,8 @@ makes nothing stale by itself.
 * Agreed behavior
 ** A merge will be built on the save's own edits
 The NodeMerge triples will be built inside
-'prepare_save_under_mutation_gate', from phase one's candidate
-graph ('graph_after_save'), and no longer in
+'prepare_save_under_mutation_gate', from the nodeInstructions
+phase's candidate graph ('graph_after_save'), and no longer in
 'buffer_to_validated_saveplan_with_fork_skgrepos_in_graph'.
 'SavePlan' will carry the merge pairs instead of the triples. So
 the updated acquirer will carry the buffer's edits to the
@@ -280,10 +282,10 @@ graphnode as the refresh shows an unknown one.
 writes. Slice 1 moves the call into
 'prepare_save_under_mutation_gate' ('server/save.rs'), right
 after 'graph_after_save' is known. 'graphnode_by_gnid' reads the
-in-Rust graph, which holds bodies, so no overlay of phase one's
-SaveNodes is needed, whatever the names 'acquirer_from_disk' and
+in-Rust graph, which holds bodies, so no overlay of the nodeInstructions
+phase's SaveNodes is needed, whatever the names 'acquirer_from_disk' and
 'acquiree_from_disk' suggest.
-** What else consumed the triples before phase one
+** What else consumed the triples before the nodeInstructions phase
 Each of these takes the triples today and must take the pairs,
 or the triples from the 'PreparedSave', after slice 1:
 - 'validate_and_filter_foreign_instructions'
@@ -309,11 +311,11 @@ or the triples from the 'PreparedSave', after slice 1:
   'debug_assert!' after the swap-in
   ('update_from_and_rerender_buffer_with_approvals'): take the
   triples from the 'PreparedSave', which must expose them.
-** Hoist repairs deliberately write the acquiree in phase one
+** Hoist repairs deliberately write the acquiree in the nodeInstructions phase
 'repair_saves_for_unwritten_candidates' ('save_buffer.rs', after
 the Hoist confirmation) adds saves for Hoist candidates,
 including a merge's acquiree. Keep it before the save is
-prepared. With the triple built from phase one's candidate, the
+prepared. With the triple built from the nodeInstructions phase's candidate, the
 text preserver copies the acquiree as the repair left it.
 ** IDs are compared as pids
 A merge pair holds two pids (since slice 1). A 'DeleteNode'
@@ -481,7 +483,7 @@ which it skipped. The herald-rules refetch stays.
 ** DONE Slice 1: a merge is built on the save's own edits
 Replace the triples in 'SavePlan' with the merge pairs; move the
 triple construction into 'prepare_save_under_mutation_gate',
-after phase one's candidate graph exists; move the consumers to
+after the nodeInstructions phase's candidate graph exists; move the consumers to
 pairs as the pitfalls say; expose the triples from
 'PreparedSave'. Add 'CannotDeleteAndMergeSimultaneously' and
 its two text forms beside the move-and-merge refusal.
@@ -767,8 +769,11 @@ Read 'vocabulary-and-citations.org' and apply its findings 1 to
 - 2: the rename above.
 - 3: in 'save.rs', the delete-propagation cleanup's passes are
   commented "Phase 1" and "Phase 2", colliding with the save's
-  phase one and phase two; rename those comments to "first
-  pass" and "second pass".
+  phases; rename those comments to "first pass" and "second
+  pass". (Plan 4, slice 5, renamed the save's phases the
+  nodeInstructions phase and the nodeMerge phase, and these
+  passes the referencer-collection pass and the ID-stripping
+  pass.)
 - 4: 'docs/glossary.org', 'stale': say it applies to a graphnode
   (its copy in a buffer no longer matches the graph), and by
   extension to the buffer, view, save or write that holds or

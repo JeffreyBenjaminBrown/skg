@@ -41,7 +41,7 @@ pub fn validate_override_invariants (
 ) -> Vec<OverrideInvariantViolation> {
   let mut violations : Vec<OverrideInvariantViolation> = Vec::new ();
 
-  // First pass: collect automatic replacement candidates by the
+  // The overrider-collection pass: collect automatic replacement candidates by the
   // resolved node they replace.  Only owned overriders count for
   // automatic replacement; foreign override relationships remain graph facts
   // but do not participate in substitution.
@@ -87,7 +87,7 @@ pub fn validate_override_invariants (
       let owned : bool =
         config . skgrepos . get (&node . home_skgrepo)
         . map ( |sc| sc . owned )
-        . unwrap_or (false); // unknown skgrepo reported by pass 1 above
+        . unwrap_or (false); // unknown skgrepo reported by the overrider-collection pass above
       if ! owned { continue; }
       let resolution = resolve_override (config, graph, &unrestricted, pid);
       if resolution . cycle_detected {

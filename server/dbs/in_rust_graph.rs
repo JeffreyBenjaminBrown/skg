@@ -101,9 +101,10 @@ impl InRustGraph {
   /// [[docs/data-model_technical.org]]) to its corresponding pid (which might
   /// be the id itself) via 'extra_id_to_pid' while building the recorderward relmaps. A
   /// single-pass load couldn't do this for a reference to an
-  /// extra_id of a not-yet-loaded node. First pass populates
-  /// 'extra_id_to_pid' only; second pass inserts nodes and builds
-  /// inverse entries with full lookup available.
+  /// extra_id of a not-yet-loaded node. The extra-ID-mapping pass
+  /// populates 'extra_id_to_pid' only; the node-insertion pass then
+  /// inserts nodes and builds inverse entries with full lookup
+  /// available.
   pub fn from_graphnodes (completes: &[Graphnode]) -> Self {
     let mut g : InRustGraph = InRustGraph::new ();
     for c in completes {
@@ -326,9 +327,9 @@ pub fn apply_nodeInstructions_to_inRustGraph (
 /// Check that in-Rust graph reflects the expected post-apply state
 /// for a batch of nodeInstructions: every Save's pid is present in
 /// in_rust_graph, and every Delete's id is absent. When several
-/// instructions name one ID, only the last counts: a save's phase two
-/// (its NodeMerges) deletes an acquiree that its phase one (its ordinary
-/// nodeInstructions) may have saved.
+/// instructions name one ID, only the last counts: a save's nodeMerge
+/// phase (its NodeMerges) deletes an acquiree that its nodeInstructions
+/// phase (its ordinary nodeInstructions) may have saved.
 /// Used as a 'debug_assert!'
 /// invariant guard at the top of 'update_views_after_save' to catch
 /// pipeline-ordering regressions (someone reshuffles the pipeline so

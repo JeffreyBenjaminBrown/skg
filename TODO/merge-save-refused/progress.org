@@ -1003,3 +1003,60 @@ DONE.
 Slice 4 launched 01:19, reported 01:21. One commit, the old
 'startup_generation' restored with its reason in its doc comment.
 No correction needed. Slice 5 launched 01:16.
+** Slice 5
+*** Commits
+- The commit carrying this entry: the save's phases and delete
+  propagation's passes, and the two other numbered passes, are
+  named for what they are in 'server/save.rs',
+  'server/dbs/in_rust_graph.rs' and
+  'server/dbs/in_rust_graph/override_invariants.rs'; the two
+  plans and the review glossary follow; the slice's headline
+  turns DONE.
+*** Suites
+- 'bash/nextest.sh': 1142 of 1142 pass. No failures to classify.
+  The integration suite was not run here (comments and one local
+  identifier only); the completion step runs 'bash/all-tests.sh'.
+*** Deviations from the plan's how
+**** Names for the two other numbered passes
+The plan left them to be read and named:
+- 'InRustGraph::from_graphnodes' ('server/dbs/in_rust_graph.rs'):
+  "the extra-ID-mapping pass" (fills 'extra_id_to_pid') and "the
+  node-insertion pass" (inserts the nodes and builds the inverse
+  entries).
+- 'validate_override_invariants' ('override_invariants.rs'): "the
+  overrider-collection pass" (collects the owned overriders by the
+  graphnode they override). Its comment had no named second pass
+  left; a later comment there said "pass 1 above", which now
+  names the overrider-collection pass too.
+**** The identifier
+'phase_one_filesystem_outputs' became
+'nodeInstructions_phase_filesystem_outputs'. No other identifier
+under 'server/', 'tests/', 'elisp/' or 'nvim/' carried the old
+words.
+**** Plan 2_2's slice 7 record
+'2_2_plan.org' recorded slice 7's renaming of delete
+propagation's "Phase 1" and "Phase 2" comments to "first pass"
+and "second pass". That record keeps its quoted words and gains a
+parenthesis naming the passes and phases as slice 5 named them;
+the glossary's subsection "not the delete propagation's passes"
+does the same.
+**** The glossary and the plan, staged apart from Jeff's edits
+'3_2_glossary.org' and '4_plan.org' carried Jeff's uncommitted
+keyword changes and deletions, some next to my edits. The commit
+holds a copy of each file as HEAD had it with only my edits
+applied (written to the index by 'git update-index'); Jeff's
+edits stay unstaged in the worktree.
+*** Fixtures changed
+None.
+*** Unfinished
+- Numbered steps outside the slice's list were left: the
+  integration and profiling tests' "Phase 1" and "Phase 2" steps
+  ('tests/integration/*/test-*.el', 'test-nvim.lua',
+  'tests/profiling/'), "Pass 1" and "Pass 2" in the docstring of
+  'elisp/skg-org-fold.el' (near line 62), and "the second phase
+  (local structure validation)" in
+  'server/from_text/buffer_to_viewnodes/validate_tree.rs' (near
+  line 51). They fall under the same rule; the slice did not name
+  them.
+*** Headline
+DONE.
