@@ -571,3 +571,52 @@ integration tests' old ignored 'data/logs/' folders under
 an uncommitted edit at 14:38 that is not this slice's (not staged).
 *** Headline
 DONE.
+** Correction after slice 4: the run folder follows the path as given
+Finished 2026-11-06 14:46 UTC.
+*** Commits
+- fc207e20 the server's run folder sits beside the config path as given, so a symlinked config shares it with the start script
+- the next commit: this record
+*** The defect
+'logs_dir' built 'CONFIG.running/' from 'config_path', which the load
+canonicalizes, so a server on 'data/skgconfig.toml' (a symlink to
+'data/skgconfig-jeff.toml') would have logged to
+'data/skgconfig-jeff.toml.running/START/', while the start script and
+both clients use 'data/skgconfig.toml.running/'.
+*** The fix
+'main.rs' fixes the run folder once, from its argument made absolute
+but not canonical ('std::path::absolute'), before 'load_config':
+'set_run_folder_from_config_path_as_given' fills a process-wide
+'OnceLock' ('RUN_FOLDER', 'server/types/misc.rs') with
+'run_folder_beside', a pure function appending '.running' to the path
+as given. 'logs_dir' uses it, and falls back to
+'run_folder_beside(config_path)' where nothing set it (tests;
+'check-config' creates no folder). The folder cannot move during a
+process, reload included. 'readiness_marks_path' stays canonical.
+*** Checks
+Logs and the runner ('isolated.sh') are in
+'tests/results/plan-1_2/symlink-fix/' (untracked).
+- New unit test 'run_folder_sits_beside_the_path_as_given'
+  ('tests/unit/run_folder.rs', included by 'misc.rs'): in a temp dir
+  a config and a symlink to it; the symlink's run folder is beside the
+  symlink, the target's beside the target.
+- 'cargo check --all-targets': clean, no warnings.
+- 'bash/nextest.sh': 1145 of 1145 pass.
+- Isolated instance: SCRATCH (the scratchpad's 'p12-fix/') holds
+  'real.toml' (port 1786, 'timing_log = true', three nodes) and
+  'skgconfig.toml -> real.toml'; started by 'bash/start-servers.sh
+  SCRATCH/skgconfig.toml --deb'. Once "Server ready." was logged:
+  : SCRATCH/skgconfig.toml.running:
+  : 2026-11-06T14-43-27Z
+  : start-servers.2026-11-06T14-43-18Z.log
+  : stop-servers.sh
+  :
+  : SCRATCH/skgconfig.toml.running/2026-11-06T14-43-27Z:
+  : server-to-user.log
+  : server.jsonl
+  No 'SCRATCH/real.toml.running' appeared. The symlinked start had no
+  other trouble ('check-config' and the data root resolved fine). Its
+  own stop script freed port 1786 and left no process naming SCRATCH.
+  Jeff's server ('target/release/skg data/skgconfig.toml') ran
+  throughout, untouched; nothing under 'data/' was touched.
+*** Headline
+DONE.
