@@ -300,9 +300,36 @@ and the reload notice) and adapt it; update the comment at the
 start value and 'docs/data-model_technical.org' ("Runtime
 generations and rebuilding") where it says what the number is.
 Run 'bash/nextest.sh'. One commit.
+** TODO Slice 5: phases and passes named for what they are
+Jeff's rule: never use numbers as names; a name says what the
+thing is. Rename, in code comments, doc comments and the two
+plans' and the review glossary's vocabulary:
+- "phase one" of a save becomes "the nodeInstructions phase": the
+  preparation and application of the save's ordinary
+  nodeInstructions, before any nodeMerge;
+- "phase two" becomes "the nodeMerge phase": the preparation and
+  application of the NodeMerge triples, built from the
+  nodeInstructions phase's candidate graph;
+- delete propagation's "first pass" becomes "the
+  referencer-collection pass": it appends an unchanged Save for
+  every graphnode that records a deleted one and that the save
+  does not already write ('apply_delete_propagation_cleanup',
+  'server/save.rs', near line 481);
+- its "second pass" becomes "the ID-stripping pass": it strips
+  the deleted IDs from every Save's relationship lists.
+The names occur in 'server/save.rs' and
+'server/dbs/in_rust_graph.rs' (five mentions of the phases; the
+passes in 'save.rs' only), in 'TODO/merge-save-refused/
+2_2_plan.org', '4_plan.org' and '3_2_glossary.org' (their
+vocabulary and the entries 'phase one' and 'phase two', which
+become entries under the new names, with one line each saying
+what they were called). Identifiers that carry the old words
+('graph_after_save' does not; check for 'phase_one',
+'phase_two', 'first_pass', 'second_pass') are renamed too. No
+behavior changes; run 'bash/nextest.sh'. One commit.
 * Verification and completion
 Each slice runs its own tests and the binaries it touched. After
-slice 4, run 'bash/all-tests.sh' and record its summary in
+slice 5, run 'bash/all-tests.sh' and record its summary in
 'progress.org'. Then mark the three settled items of
 '3_review.org''s "Decide" section DONE with a child saying this
 plan did them.

@@ -184,6 +184,20 @@ Phase one is not the first pass of delete propagation. Comments
 in 'save.rs' once called those passes "Phase 1" and "Phase 2";
 slice 7 renamed them "first pass" and "second pass" to end the
 collision.
+**** TODO [jeff] Never use numbers as names.
+All of these phases need to be renamed.
+They should say what they are, not their order.
+Otherwise a reader has to look them up.
+Please add this to 4_plan.org
+***** TODO Claude says: slice 5 of '4_plan.org'
+The save's two phases become the nodeInstructions phase and the
+nodeMerge phase; delete propagation's two passes become the
+referencer-collection pass (it appends an unchanged Save for
+every graphnode that records a deleted one) and the ID-stripping
+pass (it strips the deleted IDs from those Saves). The names
+appear five times in 'server/save.rs' and
+'server/dbs/in_rust_graph.rs', and in the plans and this
+glossary, which the slice updates.
 ** phase two
 Phase two of a save is the preparation and application of its
 NodeMerges. 'prepare_save_under_mutation_gate' builds the
@@ -321,6 +335,24 @@ the Hoist case was reachable before.
 The review notes that the assertion could instead have been given
 only phase two's instructions. The chosen fix keeps checking
 every graphnode the save touches, by its final instruction.
+*** TODO [jeff] I still don't get it.
+Is this "last instruction" something that conflicts with earlier instructions? Are they all going to be applied? Why would we prefer it?
+**** TODO Claude says: all are applied; the last fixes the end state
+Every instruction in the list is applied, in order: a save that
+edits an acquiree and merges it first writes the edited acquiree
+(the nodeInstructions phase) and then deletes it (the nodeMerge
+phase). The two do not conflict; the second simply comes after
+the first, and the graph that results has no acquiree. The
+assertion is not applying anything. It runs after the graph is
+swapped in and asks whether the graph matches the instructions.
+Before slice 1 it asked, for every instruction, "is this Save's
+graphnode present?" and "is this Delete's graphnode absent?", and
+for the acquiree both questions were asked, so one failed though
+the graph was right. Now it asks each question only of the last
+instruction naming a graphnode, because the last instruction
+applied is the one that determines the graphnode's end state.
+Nothing is preferred over anything; the earlier instruction did
+its work and was then superseded.
 * Staleness and the baseline
 ** baseline
 The glossary defines it under "baseline, stale", including its
