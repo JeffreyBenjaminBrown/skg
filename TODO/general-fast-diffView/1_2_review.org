@@ -70,7 +70,6 @@ the symlink consequence of the canonical 'config_path'.
 absolute without resolving symlinks) before loading the config;
 'logs_dir' falls back to the canonical path only where nothing
 set it. A unit test with a real symlink.
-
 * Churn and cost
 ** The one false belief
 The plan said "CONFIG is 'config_path'". 'misc.rs:319' says
@@ -109,7 +108,7 @@ run folder; START meaning two times; a few comment slips. The
 code items went into a correction commit (see the UPDATED child
 below); the two in 'docs/setup.org' are left for you because
 that file holds your uncommitted edit.
-** TODO UPDATED [Claude]: the code items landed in 253c009a
+** DONE UPDATED [Claude]: the code items landed in 253c009a
 "run folder" now names 'CONFIG.running/' in both clients, the
 profiling tools and the Windows test script; the glossary says
 which START is which and defines a start and a server run; the
@@ -119,18 +118,55 @@ says "rerun" where it meant that. Emacs 447, Neovim 483. Left:
 asked), and the two 'docs/setup.org' items below.
 
 * Decide
-** TODO 'docs/setup.org', two small things, in your dirty file
+** DONE 'docs/setup.org', two small things, in your dirty file
 Line 28's "everything this script writes" overstates (the
 '.elc' files go beside the sources, builds to 'target/'); line
 99 gives the stop script's path relative to 'docs/' though the
 text now says to run from the repo root.
-** TODO Emacs's 'skg-config-file' knows only 'skgconfig.toml'
+*** DONE jeff : please do fix
+Which dirty file are you talking about?
+**** DONE Claude says: 'docs/setup.org'; fixed, your hunk kept
+Your uncommitted edit there is line 78, "Two users can share one
+data tree" (it was "Two people (or a person and an AI
+teammate)"). I committed only my two fixes, f7381715 (the file's
+HEAD plus my hunks went into the index); your line is still
+unstaged in the working tree.
+** Emacs's 'skg-config-file' knows only 'skgconfig.toml'
 'elisp/skg-config.el:16' finds that one name in
 'skg-config-dir'. A config with another name gets the
 no-config wording in the failure message, and the same limit
 touches whatever else reads the config client-side. Neovim
 keeps the full path. Worth a variable the user can set?
-** TODO The leftovers
+*** DONE j
+I always launch by evaluating this snippet in docs/setup.org:
+(progn (load-file "../elisp/skg-reload.el")
+         (skg-reload)
+         (skg-client-init "../data/skgconfig.toml"))
+I imagine there's something equivalent for Neovim?
+(I've never actually run the Neovim client. Albatross.)
+Anyway, it should be that if the user adjusts that path
+in that snippet, everything just works.
+**** DONE Claude says: an agent is making it so
+'skg-client-init' already receives the path ('skg-client.el:42')
+and keeps only its directory ('skg-config-dir'); 'skg-config-
+file' then guesses the name 'skgconfig.toml' in it. The fix keeps
+the path itself in the client's state and has 'skg-config-file'
+return it, so the snippet's path is the one every client-side
+reader uses. Neovim already keeps the full path
+('config.lua:15-21'), set by its init; its equivalent of your
+snippet is in 'nvim/README.org'. I will put the commit here when
+it lands.
+***** DONE UPDATED [Claude]: landed in b28961c3, runner fixed
+'skg-client-init' keeps the expanded path in 'skg-config-file-
+path' (skg-state.el) and 'skg-config-file' returns it, no
+fallback to the old name; five tests that bound the directory now
+bind the path. Neovim's equivalent of your snippet is
+`require('skg').init(PATH)`, 'nvim/lua/skg/init.lua:38'. Found on
+the way: 'bash/emacs-tests.sh' loaded the stale '.elc' files over
+the edited sources (15 failures that vanished once it preferred
+the newer file), so the runner now sets 'load-prefer-newer' too
+(f96ff122); 447 of 447.
+** DONE The leftovers
 'data/logs/' and 'bash/stop-servers.sh' are no longer written.
 Yours to delete. Your server's next start (the script rebuilds
 release first) moves its logs into
@@ -147,3 +183,6 @@ Before moving a file the system writes (a log, a lock, a
 generated script), 'git grep' its name across the whole tree,
 'windows/' and 'tests/' included, and list every reader in the
 plan's code map.
+** DONE j : sure
+*** DONE Claude says: both added to 'coding-advice/plans.org'
+As two sections before "Design the shared model once".

@@ -6,6 +6,22 @@
   When a plan or a settled discussion decides how an entry will be
   fixed, prefix its headline with 'FIX PLANNED: ' and leave it here
   until the fix lands; then move it as above.
+* A readiness mark leaves the other diff buffers' marks stale (2026-11-06)
+  'skg-cycle-commit-ready' saves only the buffer it is in, and the
+  server redraws only that buffer. The other diff buffers keep
+  their old '(ready ...)' facts until something else redraws
+  them, so their check heralds and derived folder readiness lie.
+  Found while measuring the mark gesture; see
+  'TODO/general-fast-diffView/1_discussion.org'.
+* Every small server response waits about 40 ms for Nagle (2026-11-06)
+  'send_response_with_length_prefix' ('server/serve/util.rs:63')
+  writes the length header and the payload in two 'write_all'
+  calls on a stream without 'set_nodelay', so the payload waits
+  for the client's delayed ACK. Measured: 41 ms round trips for
+  5-8 ms of server work. One write per message, or
+  'set_nodelay(true)' on accepted streams, removes it. Also
+  noted: 'ReadinessStore::save' uses 'fs::write', which is not
+  atomic.
 * The save handler's checks depend on their position in it (2026-11-05)
   In 'update_from_and_rerender_buffer_with_approvals'
   ('server/serve/handlers/save_buffer.rs') one vector,

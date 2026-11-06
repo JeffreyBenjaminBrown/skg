@@ -21,7 +21,7 @@ agent reported checking it.
 
 * Results
 ** The run
-| slice | commits           | at    | effect measured         |
+| slice | commits           |    at | effect measured         |
 |-------+-------------------+-------+-------------------------|
 |     1 | 731bc7bf 46278815 | 06:22 | --deb; release default  |
 |     2 | ce66f160 b1c62f88 | 06:25 | no cargo-watch default  |
@@ -51,37 +51,190 @@ wipes that directory, so they are evidence until the next full
 run only.
 
 * What each slice did beyond the plan's words
+** DONE [jeff]
+Please rewrite this to be org all the way down,
+so I can subheadline each point separately if needed.
+Then mark each subheadline TODO if you think the choice
+might be arguable.
+*** DONE Claude says: done below
+Seven points are TODO; the rest I think no one would argue.
 ** Slice 1
-Ran the argument loop before the 'stop-servers.sh' rewrite, so a
-bad argument changes nothing. Found that every scratch run
-clobbers Jeff's generated stop script; saved and restored it.
-Its first test runner used 'setsid', absent here, and would have
-run the pre-existing stop script after a timeout; the agent
-caught this before it fired. Carried into later briefs as a
-rule.
+*** The argument loop runs before the stop-script rewrite
+So a bad argument changes nothing on disk.
+*** Every scratch run clobbers your generated stop script
+The agent saved and restored 'bash/stop-servers.sh' by hand; the
+fix is the first Decide item of the review.
+*** Its first test runner would have killed your server
+It used 'setsid', absent here, so the test never started, and
+after a timeout it would have run the pre-existing stop script,
+which was yours. The agent caught this before it fired, and
+rewrote the runner to stop only its own process group. Carried
+into every later brief as a rule.
 ** Slice 2
-Split the start into two functions by mode; kept the log name.
+*** The start is split into two functions by mode
+'run_skg_under_cargo_watch' and 'run_skg_rerunning_on_exit';
+their names are the second Decide item.
+*** DONE The log keeps the name 'logs/cargo-watch.log'
+The plan said so; the third Decide item.
 ** Slice 3
-Split 'skg--rule-header' into a cached wrapper and
-'skg--parse-rule-header'. Dumped every herald overlay before and
-after: byte-identical. The gain exceeded the plan's estimate
-because the header cache, not only the keyword memo, counted.
+*** 'skg--rule-header' is a cached wrapper around the old body
+The body is now 'skg--parse-rule-header', its docstring with
+it. The cache is a weak 'eq' hash table keyed by the rule object.
+*** Every herald overlay was dumped before and after
+858 lines each, byte-identical.
+*** The gain beat the plan's estimate
+787 to 457 ms from source against an expected 557, because the
+header cache counted as well as the keyword memo, and the plan's
+number had measured only the memo.
 ** Slice 4
-One shared predicate for the three atoms; the focus test now
-calls the fold file's function ('skg-focus' requires
-'skg-org-fold'). Used the Emacs Lisp syntax table so symbol
-boundaries fall where the reader's do (Org's table makes an
-apostrophe a word constituent). Checked all 910 lines of the big
-buffer: identical answers.
+*** One predicate serves the three atoms
+'skg--headline-has-bare-atom-p' with 'folded', 'bodyFolded' or
+'focused'.
+*** DONE 'skg-focus' now requires 'skg-org-fold'
+The focus test calls the fold file's predicate. The dependency
+runs from the focus file to the fold file; a shared home for
+the predicate would avoid it. No cycle.
+*** DONE Symbol boundaries come from the Emacs Lisp syntax table
+Not Org's, so they fall where the reader's do: in Org's table an
+apostrophe is a word constituent, which would hide the atom in
+'(skg focused'x)'. Case-sensitive, as the reader is. A
+backslash-escaped name ('fo\cused') would still be missed;
+nothing writes names that way.
+*** All 910 lines of the big buffer were checked
+Old and new answers identical for the three atoms.
 ** Slice 5
-A failing file also loses its stale '.elc'; Emacs lock files are
-skipped; the start script prints two summary lines on success
-and the whole output in red on failure. 59 files, 0 errors, 140
-warnings left as the plan said.
+*** DONE A file that fails to compile loses its stale '.elc'
+So a broken '.el' is loaded as source rather than as an old
+compiled version. The alternative, keeping the old '.elc', would
+load stale code silently.
+**** DONE [jeff] WHen does compilation happen?
+Is it the user's responsibility?
+***** DONE Claude says: at every start of the server, in Docker
+'bash/start-servers.sh' runs 'bash/compile-elisp.sh' after the
+config check and before the server, in both modes, every time.
+Nothing else triggers it; your host Emacs compiles nothing. A
+'.el' edited after the start loads as source until the next
+start, because of the 'load-prefer-newer' binding, so a stale
+'.elc' is never used, only a slower one. So no, not the user's
+responsibility, beyond starting the server the usual way. The
+script can also be run by hand, which is how an agent checks a
+compile without starting anything.
+*** Emacs lock files are skipped
+A '.#name.el' left by a file open in your Emacs does not break
+the compile.
+*** DONE The start script shows two summary lines on success
+And the whole compiler output in red on failure. The 140
+warnings are therefore not seen at a normal start; the compile
+script alone prints them.
+**** [jeff] What 140 warnings?
+***** Claude says: mostly cosmetic, but ten were a bug
+The client had never been byte-compiled, so the compiler had
+never spoken. The 140, from slice 5's log:
+****** 97 docstrings with unescaped single quotes
+The compiler wants \=' or curved quotes inside docstrings;
+the code uses plain apostrophes around names, as this file does.
+Cosmetic; silencing them is a style decision about docstrings.
+******* j : let's silence these
+******** Claude says: by class, in the compile script
+Not by rewriting 97 docstrings: plain apostrophes around names
+are this codebase's style ('ORIENTATION.org' asks for them). The
+compile script will set 'byte-compile-warnings' to exclude the
+'docstrings' class, with a comment saying why. An agent is doing
+it now, with the other items below, outside a plan since each is
+a line or a mechanical replacement.
+****** 18 docstrings wider than 80 columns
+Cosmetic.
+******* j : let's silence these
+******** Claude says: same way, the 'docstrings-wide' class
+****** 8 uses of an obsolete Org function
+'org-show-all' (obsolete since Org 9.6; 'org-fold-show-all' is
+the replacement), in 'skg-org-fold.el:71, :121' and elsewhere.
+Cheap to fix; works today.
+******* j : yes please, fix
+******** Claude says: doing it, 'org-fold-show-all'
+Your Org (9.8 with Emacs 31.1) has it; it arrived in 9.6.
+****** 4 minor
+Unused lexical variables, a 'defface' without a group.
+******* j : also easy to fix, yes?
+******** Claude says: yes; doing it
+****** 13 free variables and 8 unknown functions: three stories
+******* Two are optional-package keymaps
+'magit-mode-map' and 'shell-mode-map' in
+'skg-keymaps-and-aliases.el:44, :59'. Harmless if the code
+guards them; the agent below is checking.
+******** j : how did that turn out?
+********* Claude says: harmless; see the UPDATED entry below
+Both sit inside 'with-eval-after-load' for their package, and a
+global variable compiles to the same lookup known or not, so the
+warning is about compile time only. I will not silence it: it is
+the class that caught the real bug.
+******* One is a dead reference in 'elisp/abandoned/'
+'skg-advice-for-paste' is called in
+'abandoned/skg-id-copy-minor-mode.el' and defined nowhere. Not
+loaded by anything. The compile script compiles 'abandoned/'
+because it walks every subdirectory; it should skip that folder
+(a TODO for plan 1_3).
+******** j : yes please
+********* Claude says: doing it now, not waiting for 1_3
+******* Ten are a regression the compile introduced; fix underway
+'skg-request-file-path.el:170-294' uses 'oref' on magit section
+objects. 'oref' is a macro from 'eieio', which the file does not
+require. Loaded from source, the macro expanded at run time with
+magit already present, so it worked. Byte-compiled without
+'eieio' loaded, each '(oref child type)' became a call to a
+function named 'oref' with 'type' read as a variable: that is
+what the "free variable" warnings for 'type', 'value',
+'children', 'start' and 'end' and the "function 'oref' not
+known" warning say. In the compiled client the magit-section
+helpers would fail with void-variable. Fix: '(require 'eieio)'
+in that file, one line; an agent is applying it, confirming the
+bad bytecode first, and rerunning the compile and the suite. I
+will report the result below.
+******** UPDATED [Claude]: fixed in 25ecae27
+The agent compiled '(defun probe (x) (oref x type))' without
+eieio: the bytecode read 'type' as a variable and called a
+function 'oref'; calling it failed with void-variable. With
+eieio required it compiles to 'eieio-oref' with the slot name
+quoted, and the file's '.elc' now holds only that. Warnings 140
+to 131; the suite 446 of 446. Three new "Unknown slot" warnings
+are compile-time only (the magit class is not loaded then) and
+harmless. The two keymaps are inside 'with-eval-after-load', so
+not the same bug.
+***** Claude says: the summary lines hid a bug
+The start script hides the warnings on success, and these ten
+were among them. I propose the start script print every
+"free variable" and "not known to be defined" warning (the
+classes that can be bugs) and hide only the docstring and
+obsolescence classes, with the count. Plan 1_3 can carry it.
+****** j : this conforms to what I asked for too, yes?
+******* Claude says: yes, and it gets simpler
+Once the compiler itself no longer emits the two docstring
+classes and the obsolete calls are fixed, what remains is the
+classes that can be bugs. So the start script needs no filter:
+it will print the compiler's whole output, always, and drop the
+two-line summary. Deleting the mechanism rather than adding a
+rule. In the same agent run.
+******** UPDATED [Claude]: done, 131 warnings to 11
+Commits 915ec9ca (the two docstring classes off, 'abandoned/'
+skipped), 704ea8e8 ('org-fold-show-all' at the two sites the
+compiler actually reported, not eight; an unused binding
+removed; the face given ':group 'faces', as the client's other
+faces are), c84440b2 (the start script prints the compiler's
+whole output). The 11 left are the ones we agreed to keep: the
+two optional keymaps, three "Unknown slot" and six magit
+functions, all in two files. Suite 446 of 446. My counts of 8
+obsolete calls and 4 minor warnings had come from logs that
+held several compile runs; the real figures were 2 and 2.
+*** 59 files, 0 errors, 140 warnings
+Left as the plan said: 97 about quotes in docstrings, 18 wide
+docstrings, 13 free variables, 8 functions not known at compile
+time, 4 minor.
 ** Slice 6
-Named the removed variable nowhere, so the 'git grep' check
-holds.
-
+*** DONE The removed variable is not named in the docs
+'docs/setup.org' says the old switch is gone without spelling
+'SKG_RELEASE', so that the plan's check that 'git grep' finds it
+nowhere outside 'TODO/' holds. A reader who remembers the name
+finds no mention of its removal.
 * Churn within the plan, and cost
 No slice rewrote another's work. The correction commit touched
 comments and one variable name only. Agent time: about 2 to 6
@@ -110,7 +263,7 @@ for Jeff: the two function names below, and the log file's name.
 None that block anything. The two Decide items are choices.
 
 * Decide
-** TODO The generated stop script lives at one fixed path
+** The generated stop script lives at one fixed path
 'bash/start-servers.sh' writes 'bash/stop-servers.sh' with its
 own process group on every run, so a second instance (a scratch
 server for a probe) overwrites the first's stop command. Agents
@@ -119,16 +272,95 @@ depended on the config (e.g. 'bash/stop-servers-STEM.sh', STEM
 the config's name) or if the script refused to overwrite a stop
 script whose process group is alive. Your call; the plan's "What
 stays" kept the file as it is.
-** TODO Two function names in the start script
+*** [jeff]
+Let's give it an argument that is the path to the config,
+and have it create a folder, sibling to that config:
+abbreviating, 'run data/skgconfig.toml'
+would create 'run data/skgconfig.toml.running/'
+with whatever data it needs.
+Logs should go there too, rather than to the shared whatever.
+**** Claude says: yes, and it fixes a second collision
+Agreed on all of it: the config path as the argument, a folder
+'CONFIG.running/' beside the config, the stop script and the
+script's own log inside it. The clobbering disappears because
+every config has its own folder, and agents stop saving and
+restoring anything. Four things to settle, then it is a short
+plan, '1_3_plan.org' (1_2 is the redraw delta).
+***** The server's own logs are shared today, by two servers
+The server writes 'logs/server-to-user.log' and
+'logs/server.jsonl' under the data root
+('SkgConfig::logs_dir', 'server/types/misc.rs:313'). Your
+config and Ed's both live in 'data/', so both servers append to
+the same two files, interleaved. If "logs should go there too"
+includes these, 'logs_dir' becomes 'CONFIG.running/', a one-line
+change in the server plus its doc comments ('main.rs:416-422'),
+and the collision is gone. Both clients compute the log paths
+they print on a failed connection from the config's directory
+plus 'logs' ('skg-client.el:128-132', 'client.lua:76-88'); they
+would point at the new folder instead. The server change waits
+until your server runs without hot reload. Say whether you want
+the server's logs moved too; I would.
+***** The default when the argument is omitted
+I propose: no argument means 'data/skgconfig.toml', as today
+with 'SKG_CONFIG'; the variable goes away like 'SKG_RELEASE'.
+****** TODO j : agreed
+***** The stop script removes its folder when it stops
+Then an existing 'CONFIG.running/' means a server is, or was
+until a crash, running; and the folder never collects stale
+stop commands. The logs would go with it, so keep them if you
+would rather read a stopped server's log: say so and the stop
+script will remove only the stop script itself.
+****** TODO j : Let's keep the logs.
+But when the new log started should be legible.
+It seems like we put them in a subfolder,
+whose name includes the time it started (or ended? does it matter?)
+so that one needn't scan through a long file to see
+whether there were multiple runs.
+***** The script's log is no longer 'cargo-watch.log'
+Inside the folder it can be named for what it is,
+'start-servers.log', since cargo-watch is off by default. That
+retires the third Decide item. The clients' pointers change
+with it (same two places as above).
+****** TODO j : nice
+***** What does not change
+The kill patterns of 'kill_stale_skg' still match the config
+path in each command line, so instances stay apart. 'data/*' is
+already ignored by git, so the folder needs no '.gitignore'
+line; a scratch config elsewhere gets a folder beside it, which
+the verify skill's recipe will say.
+** DONE Two function names in the start script
 'run_skg_rerunning_on_exit' and 'run_skg_under_cargo_watch'
 both rerun the server on exit; the first is named by what both
 do. Would 'run_skg_without_hot_reload' and
 'run_skg_with_hot_reload' read better? Cheap either way.
-** TODO The log file is still 'logs/cargo-watch.log'
+*** DONE [jeff] definitely
+**** DONE Claude says: into plan 1_3, with the folder change
+Renamed as proposed, in the same slice that rewrites the start
+script around 'CONFIG.running/', so the script is touched once.
+** DONE The log file is still 'logs/cargo-watch.log'
 Both clients name it when a connection fails. Without hot reload
 the name is slightly wrong. Renaming touches two client files
 and the troubleshooting doc.
-
+*** DONE [jeff] yes please; what sound like good candidates to you?
+**** DONE Claude says: 'start-servers.log'
+What the file holds is everything the start script's children
+print: the rerun loop's output, and with hot reload also
+cargo-watch's build output. So the honest name is the script's.
+Candidates, in my order:
+***** 'start-servers.log'
+Named for the script that writes it; a reader who sees it knows
+which script to open. Inside 'CONFIG.running/' there is no
+ambiguity about which server.
+****** TODO j : yes, this one
+***** 'server-process.log'
+Names the content (the process's stdout and stderr) rather than
+the writer. Slightly confusible with the server's own
+'server-to-user.log', which the server writes itself.
+***** 'rerun-loop.log'
+True only without hot reload; with it, cargo-watch writes there
+too. Not this one.
+The clients' two pointers and the troubleshooting doc change
+with whichever you pick; same slice as the folder.
 * Suggestions for the advice
 ** A pitfall about shared generated files
 'orchestration.org' could say: before a brief sends an agent to
@@ -139,3 +371,28 @@ restore. Slice 1 found this the hard way.
 Plan 1_1 expected 557 ms for slice 3 from a measurement that
 covered one of the slice's two changes. Harmless here, but a
 plan's number should say which change it measures.
+* TODO Claude says: choices made while writing plan 1_2
+Jeff asked for issues met while planning to land here. Four
+choices, each taken so the plan could be written; each
+switchable before its slice runs.
+** TODO The server's logs move into the run folder too
+You did not answer that question directly, but your first words
+were "logs should go there too, rather than to the shared
+whatever", so the plan moves them: each server run writes to
+'CONFIG.running/START/'. The script's own log stays one level
+up, one file per start, since a start spans several server runs.
+** TODO The run subfolder is per server process, named by start time
+A kill or a 'shutdown' request makes the rerun loop start a new
+process, and that is a new folder. So "how many runs, and when"
+is one 'ls'. The stop script is one per config, overwritten per
+start, since a config has one server at a time.
+** TODO Slice 4 waits for your server
+At 14:13 UTC your server still runs under cargo-watch on this
+tree, debug, up ten hours. The server slice would restart it on
+every edit. Slices 1 to 3 run now; slice 4 waits until you have
+run the new 'bash/start-servers.sh' (release, no hot reload) or
+tell me the restarts are fine.
+** TODO 'bash/stop-servers.sh' and 'data/logs/' become leftovers
+The new script neither writes nor deletes them. Your live
+server's stop command is in that file until you restart; after
+that, both are yours to delete.

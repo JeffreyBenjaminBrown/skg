@@ -15,6 +15,383 @@ Don't change what I've written but add top-level branches
 and sub-branches wherever you like.
 My data at data/ is real, so don't change it,
 but feel free to experiment on copies of it.
+*** Claude says: it is the Emacs client, mostly, and not git
+An Opus agent measured this end to end on a copy of all your
+repos plus Ed's (55,536 nodes), with 39 titles edited so that
+the "all changes" buffer had 1,035 headlines and 234 KB. The
+full report, with every path traced to file and function, is
+'report_perf.org' beside this file (untracked; delete or
+keep as you like). The architecture agent's report, which the
+rest of this reply distills, is 'report_arch.org'. What
+follows is what matters.
+**** What a mark does
+'skg-cycle-commit-ready' writes a '(ready ...)' request into the
+headline and saves the whole buffer: the client sends the buffer
+and its baseline (2 x 234 KB). The server parses both, installs
+a new graph although no node changed, re-pairs the straddle,
+recomputes C and the change-forest by comparing all 55k nodes,
+applies the mark, redraws the whole buffer and sends it back.
+The client erases the buffer, inserts the new text, and runs
+the herald code on every one of the 1,035 lines, then refolds,
+strips fold atoms and refreshes link annotations.
+**** Where the two seconds go
+Per mark, batch Emacs plus the debug server you run:
+***** Client, loaded from source as 'skg-init.el' does: 2,050 ms
+Byte-compiled the same work takes 600 ms. No '.elc' exists.
+Of the 2,050 ms: heralds on every line about 880 ms, of which
+'skg-shared-style-keywords' rebuilding the same list on every
+call is about 250 ms; the snapshot before sending (fold-atom
+stripping that parses each headline a character at a time)
+330 ms; garbage collection 235 ms; refold, strip and link
+annotations about 310 ms.
+***** Server, debug build: 465 ms (release: 146 ms)
+Parsing the two 234 KB texts 265 ms; recomputing C and the
+change-forest 105 ms; the refresh 77 ms. Your Nov 4 log agrees:
+about 225 ms on the server, then about 2 s before your client's
+next request. Batch Emacs skips redisplay, so your real client
+cost is higher still.
+***** Git: 1.4 ms
+Two lookups of each repo's HEAD, through git2, no shell.
+**** Your two hypotheses
+***** "Hitting git a lot": no
+The parsed HEAD graph is already cached in Rust, keyed by the
+HEAD commits ('git_snapshot.rs:28'); a mark never reads a blob.
+Across ten diff-view opens the cache missed once. Git is
+expensive only on the first open after a start or a commit:
+10.7 s debug, 1.35 s release for your data. Also costly: the
+validated before-graph dies with the last diff buffer, so a
+reopen is 2.1 s debug even with the cache warm.
+***** "Every save is slow": partly
+The server's work on a plain save is 5-8 ms, but the client's
+cost grows with the buffer, and the uncompiled client makes it
+3.4x worse (an 82-line node: 180 ms from source, 75 compiled).
+A save of a node the diff buffer shows also redraws the whole
+diff buffer: 2.0 s from source, 0.6 compiled. Saves of nodes
+not in the diff pay nothing extra for an open diff view.
+***** One more: every small response waits 40 ms
+The server writes the length header and the payload in two
+writes with no 'TCP_NODELAY' ('serve/util.rs:63'), so Nagle's
+algorithm holds the payload until the client's delayed ACK.
+Measured: 41 ms round trips for 5-8 ms of work.
+**** Fixes, by effect, measured where it says so
+***** DONE Byte- or native-compile the client: -70% per mark, measured
+From 2,050 to 600 ms. This is a setup change, not code; or a
+compile step in 'skg-init'.
+****** DONE jeff : please plan this now
+Please adjust bash/start-servers.sh
+to have a --deb option, defaulting to false (omitted).
+(I've been running in debug mode the whole time, right?)
+Also give it a --hot-reload CLI option, also defaulting to false;
+when false, it does not watch cargo or rebuild the code
+because the source changed.
+
+Probably a very short plan. Call it 1_1_plan.org.
+******* DONE Claude says: '1_1_plan.org' is written; yes, debug
+You have been running debug all along.
+'ps' right now shows cargo-watch running 'target/debug/skg
+data/skgconfig.toml' through the rerun loop, up about two hours;
+the script's only switch to release was 'SKG_RELEASE=1', which
+'docs/setup.org' mentions and nothing else sets. So every number
+in the report's debug columns is what you have been paying.
+The plan (3 slices, one agent) is beside this file. Choices I
+made alone, each switchable:
+******** The plan removes 'SKG_RELEASE', no alias kept
+Per 'no-legacy-support.org'. '--deb' is the only switch.
+******** The log keeps the name 'logs/cargo-watch.log'
+Both clients name that file when a connection fails
+('skg-client.el:132', 'client.lua:88'). Without hot reload the
+name lies a little. Renaming it is a three-file change I left
+out of a "very short plan"; say so if you want it in.
+******** The script will 'mkdir -p' the data root's 'logs/'
+Today it assumes the directory exists.
+******** Sequencing with the second plan
+Your server watches 'server/' now, so an agent executing the
+redraw plan would rebuild and restart your server on every
+edit. I will not run that plan until you have restarted your
+server with the new script (no '--hot-reload'), or told me you
+do not mind the restarts.
+******** Not started
+A plan request ends with the plan. Say "run it" and I will.
+***** DONE Redraw only the changed headlines: about -1.2 s from source
+Either 'replace-buffer-contents' against the new text so that
+heralds run only where text changed, or the server sends only
+the headlines it changed. Risk: folds, overlays, point. Estimate.
+****** DONE jeff : let's plan this now
+It seems much safer for the server to send the whole buffer, no?
+But it could include a token, 'newHerald',
+in everything whose herald changed, and in every new node.
+That way Emacs (being slower than Rust) doesn't do the compare.
+Emacs consumes those tokens and only redraws the heralds
+that need it.
+******* DONE Claude says: yes, the whole buffer should travel
+But the token alone cannot work; here is why and what can.
+A second Opus agent traced the client and measured the
+alternatives; its report is 'report_heralds.org' beside this
+file. Three facts decide the design.
+******** A herald is a client-computed overlay; erasing kills it
+The server sends no herald text. The client parses each
+headline's '(skg ...)' and draws one overlay per headline whose
+'display' property hides the sexp and shows the herald
+('heralds-minor-mode.el:268-273'). 'erase-buffer' deletes every
+one of them (measured: 0 of 858 survive). So if the client
+keeps erasing and reinserting, a 'newHerald' token lets it
+redraw N heralds and leaves the other 858-N headlines bare.
+The token only helps if the client keeps the unchanged lines
+and edits the changed ones in place. That is the design's
+missing half, and it is the main work.
+******** Emacs's own diff is too slow to be that half
+'replace-buffer-contents' keeps unchanged text, overlays and
+folds, but its diff runs 280-500 ms on 200 KB in C, more than a
+full compiled herald pass (230-250 ms), and compiling the client
+does not shrink it. So you were right to want Emacs out of the
+comparing business; the comparison belongs on the server.
+******** The server already has both renderings, keyed by vnid
+Every headline carries '(vnid X)', and an old headline and its
+new rendering share the vnid. In 'update_views_after_save'
+('rerender_pass.rs:186-191') the held forest and the fresh one
+are both in hand after the '(ready ...)' facts are set, so the
+server can say exactly which headlines render differently, and
+whether the skeleton (the vnid sequence and the bodies) changed
+at all.
+******** The design I will plan
+The server keeps sending the whole buffer. Beside it, in the
+response envelope rather than inside headline metadata, it
+sends a delta: either "whole" (the skeleton changed; the client
+replaces the buffer as today) or the list of vnids whose
+headline differs. The client, given a list, finds each headline
+by its vnid (a regexp search in C, under a millisecond),
+replaces that line, lets the existing herald hook redraw it and
+the folders above it, and re-heralds its children and
+grandchildren (a pending detachment reads the parent and
+grandparent, 'skg-metadata.el:1028'). Then a safety check: the
+patched buffer must equal the server's full text with the fold
+and focus atoms stripped; if not, fall back to the whole
+replace. That check is a string equality in C, microseconds,
+not a diff; correctness never rests on the delta.
+******** Why the envelope and not a token in the metadata
+A token in the text would reach the buffer and the next save's
+baseline, so the client would have to strip it, one more
+whole-buffer edit of the kind we are removing; and the client
+would have to parse the new text to find it. A list beside the
+text costs nothing to find. The effect is the same as your
+token: the server, not Emacs, decides what changed.
+******** What a mark will cost after this, from the measurements
+Patching 2 lines and re-heralding them: 1-11 ms. What remains
+per mark is the fold restore and atom strip (350-400 ms from
+source, 60 compiled; the folds are built twice today), the
+pre-send snapshot (260-280 / 43 ms) and link annotations
+(60-85 / 9-11 ms). The plan will take the two cheap client
+fixes from the report along ('skg-shared-style-keywords'
+memoized; a regexp test before parsing a headline for fold
+atoms), and skip the fold restore when the delta was applied,
+since unchanged lines keep their folds (measured). Byte
+compilation stays the single biggest win and is your setup.
+******** Neovim
+It replaces every line with one 'nvim_buf_set_lines' and
+redraws every extmark herald; it diffs nothing either. The same
+delta serves it; the plan gives it a slice.
+******** The plan
+'1_2_plan.org', written once a code-mapping agent has returned
+(UPDATED: that plan is now '1_3_plan.org'; 1_2 took the review's
+leftovers, the run folder)
+(UPDATED 14:50 UTC: plan 1_2 is done and reviewed in
+'1_2_review.org'.)
+the exact envelope and test surface, so the plan cites code
+rather than memory. Not started until you say so, and not
+before your server stops watching 'server/'.
+********* TODO UPDATED [Claude]: what the code map corrected
+Report: 'report_envelope.org' beside this file. Three
+corrections to the design above, none fatal.
+********** The reference is the saved text, not the held forest
+The held forest predates the user's edits, and the parse of the
+saved buffer lacks derived facts and new vnids. What the client
+shows is exactly the text it sent in the save request
+('envelope.saved_buffer'), fold atoms included. So the server
+will split that text at its '(vnid X)' headlines and compare
+each with the new rendering, ignoring the fold and focus
+atoms; the comparison is textual, per vnid. That text is not
+passed to 'update_views_after_save' today: one new parameter.
+For collateral views, rendering the held forest reproduces
+the text last sent, so no new input there.
+********** Children must be re-heralded by the patcher
+The Emacs hook re-heralds the line and its two nearest folder
+ancestors, Neovim its folder ancestors at any depth; neither
+re-heralds children, whose pending-detachment herald reads the
+parent and grandparent. As the design already says.
+********** Folds survive a one-line replace only with 'overlays'
+With 'org-fold-core-style' set to 'text-properties', replacing
+a headline whose body is folded hides the headline itself. The
+default is 'overlays'; the plan will have the client check the
+style and fall back to the whole replace otherwise.
+********** Also noted
+The envelope's keys are kebab-case ('(changed-headlines ...)'
+fits); no client parser rejects unknown keys; three Rust tests
+print whole envelopes and would need the new field; an empty
+list must not be written as '()', which Emacs reads as nil.
+
+This will go in 1_1_plan.org as well,
+once we've hashed it out here.
+******** [jeff] wait, might it not be better
+if Emacs just outsourced the job of computing the overlays
+to some other coding language that's fast?
+It wouldn't be the server -- the server shouldn't have to know
+how to do that -- but it could still be Rust.
+********* TODO Claude says: possible, complementary, and second
+And yes, its advantage is real: it speeds up every whole
+redraw, including nontrivial edits and first opens, which the
+delta leaves alone. The two are not rivals; they cut different
+costs. Here is what each would buy, and why I would still do the
+delta first.
+********** What a helper would take over
+Per headline the client today: 'read's the sexp (C, cheap),
+runs the lens engine over the rule table ('skg-lens.el'),
+renders the relationship spans with per-character styles, adds
+the three context heralds (folder readiness from the members,
+pending detachment from parent and grandparent, the repo label
+from a table), then 'make-overlay' plus 'overlay-put'. A helper
+that sees the whole text can do everything but the overlays.
+The lens engine lives in the clients by design: 'heralds.rs'
+says the data is in Rust and "Rust never interprets labels". A
+Rust helper is therefore a Rust lens engine: it replaces the
+elisp one (Neovim keeps lua), and relationship heralds carry
+styles, so it returns styled spans, a small protocol of its own.
+********** How it would plug in
+An Emacs dynamic module (this Emacs has module support, '.so',
+and native-comp) through the 'emacs' crate, in-process and
+microseconds per call; or a subprocess over stdio, a few ms per
+round trip plus 200 KB each way. The module could live in a
+crate the server also depends on, so the server keeps not
+applying the rules while the code is shared. Neovim would need
+LuaJIT FFI or the subprocess: a second integration.
+********** What it buys, in the measured numbers
+The herald pass only: 880 of about 2,000 ms from source, 230 of
+600-800 compiled, per redraw of 858 headlines. The rest is
+Emacs editing the whole buffer: fold restore and atom strip
+(350-400 / 60), the pre-send snapshot (260 / 43), link
+annotations (60-85 / 10), GC. Those a helper cannot touch; the
+delta removes them for the common save by not touching the
+unchanged lines, and keeps their folds, which nothing else does.
+An agent is now measuring the floor Emacs pays for the overlays
+alone with the strings given; I will add the number below.
+********** The cheap elisp version of the same win
+Memoizing the style keywords halves the compiled pass
+(130 of 250 ms). Native compilation, available here, takes more.
+A tuned elisp pass is then roughly 100 ms for 858 headlines,
+so the helper's edge over it is about that much per whole
+redraw, growing with buffer size.
+********** What it costs
+A '.so' or '.dll' built and shipped per platform ('windows/'
+has an installer), an Emacs built with modules on every machine
+of yours, version coupling between module and client, a Rust
+engine kept in step with the lua one, and the Neovim
+integration. All ordinary, none free.
+********** My order
+Compile the client (setup); memoize the style keywords and the
+fold-atom test (tiny); the delta, for marks and small saves;
+then time whole redraws of your largest buffers. If a first
+open or a big edit still hurts, the helper is the right lever,
+and it will be sized to a measured need. If you would rather
+have the helper first, the plan becomes "a Rust lens engine as
+an Emacs module"; say so and I will plan that instead.
+********** UPDATED [Claude]: the floor is measured
+Report: 'report_overlay-floor.org' beside this file. Per full
+herald pass over 858 headlines, best of 3, ms:
+*********** compiled: 234 today; 81 with keywords memoized
+*********** compiled: 25 with every string given (helper ceiling)
+Of those 25, 16 are the two context reads and 8 the walk that
+finds each sexp; the 858 overlays themselves cost 0.6.
+*********** from source: 789 today; 557 memoized; 157 given
+So: memoizing one function takes the compiled pass from 234
+to 81 ms, 65 percent, with no new machinery, and the helper's
+further edge over that is 56 ms per whole redraw of this
+buffer, growing linearly with headlines. From source the
+helper's edge is 400 ms, but the source client is the thing to
+stop using. This settles my order: memoize first, helper only
+if a measured whole redraw still hurts after that.
+************ TODO [jeff] Does memoization require changing the host-side client?
+I don't want to do that. I'm trying to keep all the
+building of new software inside Docker.
+************* TODO Claude says: no build; it is a source edit
+Memoizing is an edit to two elisp files in the repo
+('skg-shared.el:54', 'skg-lens.el:180-186'). Your host Emacs
+loads the client's source from the mounted tree with 'require'
+('skg-init.el:24-34'), so it picks the change up on the next
+reload exactly as it picked up every client change of the last
+weeks. Nothing is built anywhere. The same holds for the
+fold-atom regexp test and for the in-place patcher: all source.
+************** Byte compilation is the one that is a build
+And it can stay inside Docker. The container's Emacs can run
+'batch-byte-compile' over 'elisp/', writing '.elc' files beside
+the sources in the mounted tree; since the client is loaded by
+'require', your host Emacs would then load the '.elc' without
+any change to how you start it. Two conditions:
+*************** Your host Emacs must be at least the container's
+The container has Emacs 31.1. A '.elc' loads on an Emacs at
+least as new as the one that wrote it; an older one may refuse
+it or misbehave. What version runs on the host? If it is older,
+the compile step would have to run there, which you do not
+want, and we drop byte compilation and rely on the elisp fixes.
+Native compilation ('.eln') is per machine and per Emacs build,
+so it is host-only in any case; I am not proposing it.
+*************** A stale '.elc' must never shadow an edited '.el'
+'require' prefers the '.elc' even when the '.el' is newer,
+unless 'load-prefer-newer' is set. With agents editing elisp
+daily that is a trap, so the compile step would also set
+'load-prefer-newer' to t in 'skg-init.el', and the compile
+would run from a script in 'bash/' that 'start-servers.sh'
+could call, so the '.elc' files are rebuilt whenever the server
+is. The '.elc' files would be ignored by git.
+************** So the order becomes
+Memoize and the regexp test first (source, no build, 65 percent
+of the compiled herald pass and about a quarter of the source
+one); then byte compilation from inside Docker if your host
+Emacs is 31 or newer; then the delta. I will fold the compile
+step into '1_1_plan.org' as a slice once you answer the version
+question, since that plan already touches 'start-servers.sh'.
+*************** TODO Claude says: folded into '1_1_plan.org'
+Your Emacs is 31.1, so the plan now has six slices: the two
+script slices, the two memos (slice 3), the atom pre-test
+(slice 4), byte compilation from inside Docker with the
+'load-prefer-newer' guard (slice 5), docs (slice 6). Committed
+as d954ed23; the run started 2026-11-06 06:16 UTC.
+**************** TODO Claude says: plan 1_1 is done
+The review is '1_1_review.org'.
+Six slices DONE by 06:37 UTC, a correction commit at 06:52, the
+review beside the plan with three Decide items. Your server is
+still the old debug one under cargo-watch until you run the new
+script; your client takes the '.elc' files at your next reload.
+***** Memoize the style keywords and rule headers: about -250 ms
+'skg-shared-style-keywords' ('skg-shared.el:54') derives from a
+constant; the lens's rule header is recomputed per line. Small
+change, every save gains. Estimate from the profile.
+****** TODO j : we did this too, right?
+***** Test for "folded" by regexp before parsing: about -250 ms
+In 'skg-remove-folded-metadata' ('skg-org-fold.el:110'), before
+send and again after insert. Estimate.
+***** Run an optimized server: all server work /3, measured
+A release build, or 'opt-level' for dependencies in the dev
+profile. First diff open 10.7 s to 1.35 s.
+***** Skip installing a new graph on a no-op save: -105 ms debug
+When a save has no node instructions, leave the graph 'Arc'
+alone ('save_buffer.rs:1108'); the straddle then reuses C and
+the change-forest. To check first: whatever reads the
+generation number (staleness, 'rendered-at').
+***** Re-pair the straddle incrementally: -100 ms debug
+Carry the old change-forest forward and recompare only the pids
+the save touched. This also removes the O(N) step from every
+collateral redraw and matters more as the graph grows.
+***** One write per message, or 'set_nodelay': -40 ms each
+Every request to the server gains this, not only the diff view.
+***** Keep the validated before-graph process-wide: -1.5 s
+That is the saving on a reopen, debug build.
+Today only the parsed snapshot is cached; validation and the
+clone are redone per straddle.
+**** A correctness problem found on the way
+A mark redraws only the buffer that was saved. The other three
+diff buffers keep their old '(ready ...)' facts until something
+else redraws them, so their check heralds lie. I will put this
+in 'TODO/problems.org'.
+***** TODO j : let's make solving that part of this
 ** The diff view is rigid.
 It always compares HEAD to the worktree.
 It ought to let you compare any pair of graphs.
@@ -68,7 +445,375 @@ constructible via the UI described above.
 It might be that for all but one of those choices (HEAD v. worktree)
 the commit readiness marks have no utility. Or maybe I'm wrong.
 But anyway they need to be separable.
+*** Claude says: separable, and already nearly separate
+The diff computation never reads the readiness store; only the
+'(ready ...)' facts and the readiness summary do. So a diff can
+be served with no marks at all, mechanically by passing an
+empty store ('handlers/diff_view.rs:61-62'); I have not tried
+it.
+**** You are right: marks have utility only for the default pair
+A mark approves one change for the next commit, and the commit
+is always HEAD to worktree. Under another pair the marks are
+worse than useless: the store is one per server, keyed by the
+leaf alone, not by the pair ('readiness_store.rs:21'), and an
+alias, extra-ID or flag leaf's fingerprint records only its
+direction, gained or lost ('change_leaves.rs:455-475'). So a
+leaf marked under (HEAD~3, worktree) could count as ready under
+(HEAD, worktree) and be committed unreviewed. The rule I
+propose: marks, the readiness gestures, the '(ready ...)' facts
+and stage-and-commit exist only for the default pair; any other
+pair prints no '(ready ...)' and refuses a readiness request.
+**** What a buffer without '(ready ...)' loses
+The check heralds, the next/previous ready and unready motions,
+and the clients' derived folder readiness; and each gesture's
+toggle direction, since a headline reads as ready when its
+'(ready ...)' names every object of its '(leaves ...)'. Without
+the facts a gesture would always mark, so the client must also
+refuse the gesture in a non-default view. The '(leaves N ...)'
+facts and the next-change motions do not depend on the store
+and would stay.
+**** Whether the default pair itself can be opened without marks
+Possible with the same gate, as a flag on the request. I see
+little use: the performance section says whether the store is
+part of the cost; if it is not, a markless default view only
+hides information. I would not add the flag unless you want it.
+***** TODO j : yes, better without that flag
 ** My request
 What have I left out?
 What decisions will need to be made?
 Is any of this dumb? Dangerous? Inelegant?
+* Claude says: how the diff view is built today
+Six facts of the current code that the rest of this reply leans
+on. Citations are 'file:line' under 'server/' as of 2026-11-06.
+** The straddle holds two whole graphs
+A 'GraphStraddle' ('graph_straddle/types.rs:22') holds a
+before-graph and an after-graph, each a full 'InRustGraph'.
+Everything the diff view shows (the union walk, C/R/U/D, the
+change-forest) is computed from those two graphs alone. Nothing
+in that computation knows that the before-graph came from HEAD.
+** The before-graph is read with git2, not by shelling out
+'read_skgrepo_from_head' ('git_ops/git_snapshot.rs:335') opens
+the gitrepo, peels HEAD to a tree, walks the tree, and parses
+each '.skg' blob with today's serde. The one HEAD-specific line
+is ':349-353'. Reading another commit is a small change there.
+** The after-graph is the live graph itself
+'build.rs:40-41' sets 'after = live'. "Worktree" is not read
+from disk; it is the graph the server already holds. A worktree
+can also be read from disk ('GitSnapshotKind::Worktree'), which
+is how foreign skgrepos enter the before-graph, but that copy
+differs from the live graph: illegal sections are dropped, and
+a homeless telescope gets a placeholder title.
+*** TODO j : ah, let's use "live" rather than "worktree" then
+** Foreign skgrepos contribute no change, by construction
+'git_snapshot.rs:75-76' reads every foreign skgrepo at its
+worktree on both sides, so Ed's repo can never show a change in
+your diff view today. This matters for your motivation; see
+"what you left out".
+** One straddle per connection, one cache slot per server
+The straddle lives in the connection's 'ViewsState'
+('serve.rs:58'), shared by its four diff buffers, and takes no
+input beyond the config and the live graph. The before-graph
+cache ('git_snapshot.rs:28') is one process-wide slot, keyed by
+the owned skgrepos' HEAD commits.
+** Readiness is already separate from the diff computation
+The change-forest and C/R/U/D never read the readiness store.
+The store enters only to print the '(ready ...)' facts and the
+readiness summary ('readiness_requests.rs:323, :514'). So your
+third problem is mostly a matter of gating, not of untangling.
+
+* Claude says: generalizing to any pair of graphs
+"Pair" below means the (old, new) choice for the whole diff.
+"Default pair" means (HEAD, worktree) for every owned skgrepo,
+which is what the diff view does today.
+** What generalizes for free
+The union walk, 'Existence::Added/Removed', C/R/U/D, the
+change-forest, the four buffer kinds, the change viewnodes and
+the heralds all read only 'before' and 'after'. Pointing them
+at two other graphs costs nothing. The "merges" buffer's test
+('acquired_since_head', 'refresh/id_rule.rs:136') is generic
+despite its name.
+** TODO What needs a decision
+*** Editability: a diff whose "new" is a commit must be read-only
+Today a node of U gets an editable occurrence and a save of a
+diff buffer is an ordinary save into the live graph and disk.
+If "new" were HEAD~1, the buffer would show HEAD~1's text as
+editable, and saving it would write HEAD~1's content over the
+worktree. That is the one dangerous spot in the proposal. The
+simple rule: editable occurrences, saves, restore requests and
+the extend request exist only when "new" is the worktree for
+every repo; any other pair is a read-only view. The write
+protection mechanism already exists; this is a rule at the
+request handler, not a new mechanism.
+**** TODO [jeff]
+***** We'll need editable view requests.
+(The name is unfortunate.) If node G in the graph is shown via
+viewnode V(G), an editable view request on V(G) is the only way
+we have currently to show G's content as descendents of V(G).
+We'll still need that.
+***** We'll need to be able to visit either graph.
+skg-goto from a diff becomes ambiguous: The user might want
+to visit either foot of the straddle. They should be offered
+the choice (o for older, n for newer).
+***** The commit-readiness markers are actually useful.
+If I'm reading a diff of your graph, I'll want to be able to
+mark which changes I have understood and which I haven't yet.
+Since it's read-only, the markers are the only mechanism
+available for doing that.
+I can't commit based on it, and it won't mean 'commit-ready'
+so much as 'processed', but I guess I still want the markers.
+*** The restore requests under (HEAD~N, worktree)
+'restoreNode' and 'restoreRel' copy a node or membership from
+'before' into the live graph. With old = HEAD~3 and new =
+worktree they would mean "bring back what HEAD~3 had". That is
+coherent and arguably useful; it falls out for free. With new
+a commit they have no target and must be refused. Decide
+whether to allow the first case or restrict restores to the
+default pair.
+**** TODO j : seems good, just warn
+Warn the user in the minibuffer that they are restoring
+from a commit older than head.
+*** Per-skgrepo choices compose nodes from mixed revisions
+A node's sections can live in several owned skgrepos
+(telescoping), and the before-graph is composed from all
+skgrepos' sections in fold order ('git_snapshot.rs:261'). If
+'public' is at HEAD~5 and 'pers-i' at HEAD, a node with sections
+in both is assembled from two moments. Your proposal allows
+this. It is not dangerous once the view is read-only, but it
+can produce a graph that never existed, and 'validated_graph'
+('build.rs:31-39') may refuse it as it refuses a broken HEAD
+today ("At HEAD:"). Decide: tolerate it (and make validation
+of a historical graph lenient), or constrain the UI so one
+cycle moves every owned skgrepo together, with per-repo choice
+as the exception rather than the default.
+**** TODO j : lenience
+Mostly the user will want to use the same straddle across
+every owned skgrepo, but conceivably not always, esp.
+if they made individual manual commits.
+And foreign skgrepos could refer to outside nodes
+that have since vanished.
+*** Each of your skgrepos is its own gitrepo
+So "commit" is per skgrepo for you.
+I checked: every path under 'data/jeff/' and 'data/ed/first' is
+its own git toplevel. So the series "commit history plus
+worktree" is well defined per skgrepo for you. The code allows
+several skgrepos in one gitrepo ('stage_and_commit.rs:53-60'),
+and there a commit is the gitrepo's; the series could list every
+commit, or only those touching the skgrepo's prefix. Decide the
+general rule; for your data it does not matter yet.
+**** TODO j : I don't understand.
+What is the choice?
+*** Relative or resolved: what the metadata stores
+"HEAD~1" resolved at request time shifts after every commit.
+I propose the metadata stores the resolved commit (a short
+hash) and the clients display "HEAD~N" beside it, computed when
+the buffer is drawn. Cycling walks the first-parent chain, as
+'vanished.rs:89-92' already does for another purpose. A merge
+commit's second parent is not in the series.
+**** TODO j : "walks the first-parent chain"?
+What is the parent of a commit?
+When you say cycling, you mean the user is cycling to choose
+where each foot of the straddle is, yes?
+*** JEFF RESUME HERE
+*** Old commits may not parse under today's format
+'parse_blob_section' uses today's serde and aborts the whole
+read on the first error ('git_snapshot.rs:373-375'). A commit
+from before a format change would refuse the whole diff. Decide
+whether a historical read skips unparsable sections with a
+warning, or refuses as today. I lean to skipping with a count
+in the buffer root, since the view is read-only anyway.
+*** Where the pair lives and how it reaches the server
+Today the straddle takes no input. The pair must travel in the
+diff-view request (the client reads it from the repos buffer),
+and the straddle must remember which pair it was built for, so
+that a save or rerender with a different pair rebuilds it. The
+cache key must name each skgrepo's revision or "worktree", and
+the cache needs more than one slot once both halves can be
+snapshots. (The performance section says what else the cache
+should change.)
+*** A mixed "new": worktree for some repos, a commit for others
+When every repo picks "worktree", 'after' is the live graph and
+the straddle can be re-paired cheaply. When some pick a commit,
+'after' must be assembled from disk and git, and the worktree
+part then differs slightly from the live graph (see the facts
+above). I propose: 'after' is the live graph iff every repo
+picks worktree; otherwise both halves are snapshots, read the
+same way, so that their small differences cancel. Such a view
+is read-only, so the difference from the live graph is
+harmless.
+*** One diff view at a time, or one per pair
+Buffer names are "diff-view: KIND", and the straddle is per
+connection. Two pairs open at once would collide in both. I
+propose one diff view per connection: opening with a new pair
+replaces the old buffers, and the buffer root shows the pair.
+Decide whether you ever want two pairs side by side.
+** TODO What only the default pair can do
+*** Stage and commit
+It commits every owned change onto HEAD regardless of the
+straddle, but its gate reads the connection's straddle's
+readiness summary, and afterwards it prunes the marks to that
+straddle's leaves ('handlers/stage_and_commit.rs:134-155').
+Under another pair the gate would judge the wrong changes and
+the pruning would drop valid marks. Rule: stage-and-commit
+requires the default pair, else it is refused with a message.
+*** Readiness marks
+See the reply under your readiness headline.
+*** Messages and names that say HEAD
+"Cannot read HEAD of skgrepo", "At HEAD:", the clients' "nothing
+changed since the last commits" and "Only a node deleted since
+HEAD can be restored", the atom 'ghostWarrant' (meaning: only
+the before-graph relates it). These are cosmetic; each would
+name the old revision instead.
+*** Untouched by the proposal
+'compute_diff_for_skgrepo' (HEAD to index to worktree) backs the
+titles of deleted nodes in "titles by ids", and
+'investigate_vanished_gnids' walks history from HEAD. Neither
+is part of the diff view's straddle; neither needs to change.
+
+* TODO Claude says: the repo chooser buffer
+** Names: 'skgrepo' leaf and 'skgrepoFolder' folder
+Folder atoms are lowerCamel plus "Folder" ('subscribeeFolder',
+'illegalEditFolder'); leaf atoms are bare lowerCamel ('node',
+'ghost', 'tombstone'). So 'repoFolder' and 'repo' fit the
+pattern, except that '(repo ...)' as a list head is refused as a
+retired spelling ('parse_metadata_sexp.rs:695'). Since the
+glossary's word is skgrepo, I propose 'skgrepo' and
+'skgrepoFolder', with the old and new choices as fields:
+'(skg skgrepo (name "public") (old "a1b2c3d") (new worktree))'.
+The folder kinds today are all partner or property folders of a
+viewparent ('Folder', 'viewnode.rs:580'); a repos tree is a new
+top-level category of viewnode, beside 'Folder' and
+'ChangeViewnode', not a new 'Folder' variant.
+** Keys: S-up/down are free to take, with one guard to add
+In skg view buffers no shift-arrow is rebound, so Org's own
+apply: S-left/right cycle TODO keywords (skg guards that with
+advice around 'org-todo') and S-up/down change the priority
+cookie, which nothing guards. The chooser would be its own
+minor mode with its own map, as the metadata editor
+('skg-sexp-edit-mode', C-c v m) already is: there S-left/right
+cycle a field's value. That editor is the precedent to copy;
+it edits one headline and cascades nothing, so the folder
+cascade is new. Neovim: skg maps no shift-arrows in view
+buffers; what nvim-orgmode binds there I could not check (the
+plugin is not installed here).
+** The constraint old < new
+Decide what happens when cycling pushes old past new: refuse
+the keystroke, or push new along. I propose refusing, with the
+message naming both values; pushing silently changes a value
+the user did not touch.
+** The series of a skgrepo without a gitrepo
+A foreign skgrepo need not be under git. Its series is then
+"worktree" alone, and the leaf says so.
+** Where the chooser's state lives
+I propose: the buffer is the state. C-c v d inside the chooser
+reads every 'skgrepo' leaf's old and new and sends them with
+the diff-view request; C-c v d anywhere else sends the default
+pair. The server stores nothing between requests but the
+straddle it built. Alternative: the server remembers the last
+pair per connection, so a later C-c v d reuses it; that is one
+more piece of hidden state, and I would not add it.
+** Cycling one step at a time through a long history
+Walking HEAD~40 one keystroke at a time is tedious. A prompt
+that accepts "HEAD~N", a short hash, or a date, bound beside
+the arrows, costs little. Not needed for a first version.
+
+* TODO Claude says: what you left out
+** Foreign skgrepos must become diffable
+Your first motivation is seeing what Claude changed. Ed's repo
+is foreign in your config, and today foreign skgrepos show no
+change by construction ('git_snapshot.rs:61-76'). The chooser
+lists foreign repos, so the proposal implies lifting that; but
+the code's reason for it (foreign changes are not yours to
+commit) survives as: a foreign repo's changes can be viewed and
+never marked. A foreign repo at (HEAD~1, HEAD) after Ed commits
+is exactly the "what did Claude do" view.
+** The two-server setup
+Ed's server commits Ed's repo; your server watches it and
+reloads foreign files, which drops your straddle
+('repo_files_reloaded.rs:48-51'). With the pair stored as
+resolved commits that is fine: the next request rebuilds the
+same pair. With relative "HEAD~N" it would silently shift.
+** Validation of a historical or mixed graph
+See "per-skgrepo choices" above: a historical before-graph goes
+through today's validator, and a refusal kills the whole diff.
+** The cache must be keyed by the pair and hold more than one
+See "where the pair lives" above and the performance section.
+** Neovim parity
+Every piece (chooser, keys, request field, read-only rule) has
+a twin in 'nvim/'. The metadata table
+'shared/metadata-fields.json' is read by the server and both
+clients, so the new leaf's fields belong there.
+** Nothing records which pair a buffer shows
+The buffer root should carry the pair in its metadata, so a
+reader of the buffer, and a save, know what they are looking
+at. Today the root carries nothing of the kind, because there
+was only one pair.
+
+* TODO Claude says: dumb, dangerous, inelegant
+** Dangerous: a save from a buffer whose "new" is a commit
+Covered above; the fix is the read-only rule, which should land
+in the same slice as the first non-default pair.
+** Dangerous: marks leaking across pairs
+Covered under your readiness headline; the fix is gating marks
+to the default pair.
+** Inelegant: per-skgrepo choice as the primary gesture
+The per-repo choice is what makes mixed-revision graphs
+possible, and it is the choice that costs validation leniency
+and a disk-read 'after'. The folder cascade already gives the
+"move everything together" gesture, so the UI is right; I only
+suggest that the first version supports uniform pairs plus the
+foreign-repo case, and mixed owned pairs come after, once the
+validator's behavior on them is known.
+** Not dumb
+Storing nothing on the folder, reading the chooser as plain org
+with ignored user headlines, and separating readiness from the
+diff are all consistent with how the rest of skg thinks
+(stateless, decided from the buffer and the graph as they are).
+
+* TODO Claude says: open questions
+Each is self-contained. A one-line answer under each is enough.
+** Q1 Is every pair whose "new" is not the worktree read-only?
+Read-only means: no editable occurrence, saves refused, no
+restore or extend requests. I propose yes.
+** Q2 Restores under (older commit, worktree): allowed?
+A restore copies a node or membership from the old graph into
+the live graph. With old = HEAD~3 it means "bring back what
+HEAD~3 had". I propose allowing it; it falls out for free.
+** Q3 Readiness only for the default pair?
+Default pair means HEAD vs worktree for every owned skgrepo.
+I propose: marks, check heralds, readiness gestures and
+stage-and-commit exist only there; elsewhere no '(ready ...)'
+facts are printed and the gesture is refused.
+** Q4 Mixed revisions across owned skgrepos: when?
+A node telescoped across two skgrepos at different revisions
+is assembled from two moments and may fail validation. I
+propose the first version supports one choice for all owned
+skgrepos, plus independent choices for foreign ones, and mixed
+owned choices come after we know how the validator behaves.
+** Q5 Store the resolved commit, display "HEAD~N"?
+The resolved commit does not shift after a commit; "HEAD~N"
+does. I propose storing the short hash and displaying both.
+** Q6 Unparsable historical sections: skip, or refuse?
+Today the HEAD read aborts on the first section that today's
+parser cannot read. I propose skipping with a count in the
+buffer root for any non-default pair.
+** Q7 One diff view per connection?
+Opening a new pair replaces the current four buffers; the pair
+is shown in the buffer root. I propose yes.
+** Q8 Cycling old past new: refuse, or push new along?
+I propose refusing with a message naming both values.
+** Q9 Chooser state lives in the buffer only?
+C-c v d inside the chooser sends the leaves' choices; C-c v d
+elsewhere sends the default pair; the server remembers only
+the straddle it built. I propose yes.
+** Q10 Names 'skgrepo' and 'skgrepoFolder'?
+'repo' collides with a retired spelling in the metadata parser
+when written as a list head. I propose 'skgrepo'.
+** Q11 Which performance fixes first?
+My order: compile the client (setup, no code); memoize the
+style keywords and rule headers; 'set_nodelay'; skip the graph
+swap on no-op saves; then redraw-only-changed, which is the big
+one and the risky one. The server-side items are small and
+independent of the any-pair work; the client items are too.
+** Q12 Keep the two agents' reports beside this file?
+They are 'report_perf.org' and 'report_arch.org',
+untracked. Keep, move, or delete as you like.
