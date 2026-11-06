@@ -68,7 +68,7 @@ METHOD, in order:
   headlines invisible, removing them from the search. A top-level
   `folded' headline has no parent to fold and stays visible, so the
   search skips it once found; otherwise it would find it forever."
-  (org-show-all)
+  (org-fold-show-all)
   (skg--fold-bodies-of-bodyfolded-headlines)
   (goto-char (point-min))
   (let ((found t)
@@ -118,7 +118,7 @@ and re-hides entries that had `bodyFolded'."
            (skg-collect-parent-markers-of-folded-headlines))
           (bodyfolded-markers
            (skg-collect-markers-of-bodyfolded-headlines)))
-      (org-show-all) ;; so that text editing works
+      (org-fold-show-all) ;; so that text editing works
       (progn ;; Remove "folded" from metadata using DELETE operation.
         ;; This also processes the entire buffer.
         (goto-char (point-min))

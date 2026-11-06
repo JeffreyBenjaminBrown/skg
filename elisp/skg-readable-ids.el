@@ -14,7 +14,8 @@
 
 (defface skg-magit-title-face
   '((t :foreground "cornflower blue"))
-  "Face for skg title annotations in magit buffers.")
+  "Face for skg title annotations in magit buffers."
+  :group 'faces)
 
 (defvar-local skg-readable-ids--positions nil
   "List of (start end id-string) triples from the last scan.")

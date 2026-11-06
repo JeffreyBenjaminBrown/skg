@@ -38,8 +38,6 @@ If point is not on a link, print a message and do nothing."
   (let* ( ( pos ( point ))
           ( line-start ( line-beginning-position ))
           ( line-end ( line-end-position ))
-          ( line-text ( buffer-substring-no-properties
-                        line-start line-end ))
           ( link-regex "\\[\\[id:\\([^]]+\\)\\]\\[\\([^]]+\\)\\]\\]" )
           ( found-link nil ) ;; mutates
           ( link-gnid nil ))   ;; mutates
