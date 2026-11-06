@@ -1159,3 +1159,8 @@ None. The new server test reuses
 Nothing.
 *** Headline
 DONE.
+** Orchestrator's notes after slice 6 (2026-11-06 01:48 UTC)
+Slice 6 reported at 01:48; one commit. The server skips
+the envelope's dirty views when choosing collateral views, and
+both clients refuse to replace a buffer with unsaved edits. Diff
+read; no correction needed. Slice 7 launched 01:48.
