@@ -18,10 +18,11 @@ Jeff, and a TODO in Jeff's voice is for Claude. A TODO of Jeff's that
 already has a 'Claude says' child is answered and waiting for Jeff to
 close it; Claude leaves it alone.
 ** The voice switch is visible
-Every reply begins its headline with an author marker: 'Claude says'
-or 'Jeff says'. Jeff often abbreviates his to 'js'; Claude always
-writes the full 'Claude says'. More title text after the marker is
-optional, e.g. 'Claude says: yes for data, and I'd stop there'.
+Every reply begins its headline with an author marker:
+"[Claude]" or "[Jeff]", meaning "Claude says" or "Jeff says".
+Jeff often abbreviates his to '[j]' or '[js]; Claude, who "types
+faster", needn't. More title text after the marker is
+optional, e.g. '[Claude]: yes for data, and I'd stop there'.
 Headings beneath a marked heading are by the same author until another
 marker starts a reply, so the marker need not be repeated.
 * Habits that help
@@ -33,7 +34,7 @@ Jeff's direct edits to Claude's text in place.
 ** Folding decisions
 When Jeff settles something, fold it into the body (a table, a plan
 step, an open-question answer), and leave a one-line child saying
-where it went, e.g. 'Claude says: folded into the relation-sides
+where it went, e.g. '[Claude]: folded into the relation-sides
 table.'
 ** One answer per question
 When one question appears in several places, answer it once and point
