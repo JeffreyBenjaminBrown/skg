@@ -19,7 +19,7 @@ for file in "$DATA"/claude/public/*.skg; do
   for id in $(grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' "$file" | sort -u); do
     [ -f "$DATA/jeff/public/$id.skg" ] && continue
     [ -f "$DATA/claude/public/$id.skg" ] && continue
-    ls "$DATA"/claude/team/*/"$id.skg" >/dev/null 2>&1 && continue
+    ls "$DATA"/claude/team/*/notes/"$id.skg" >/dev/null 2>&1 && continue
     where="in no skgrepo"
     for repo in "$DATA"/jeff/*/ "$DATA"/claude/private/; do
       [ -f "$repo$id.skg" ] && where="in ${repo#"$DATA"/}"
