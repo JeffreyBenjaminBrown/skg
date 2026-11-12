@@ -667,6 +667,20 @@ skgrepo), not as diff aspects: it says "body" where they say "text".
 The records in 'TODO/' that predate these words say "outdated" for
 stale, "untouched" for unedited, and "stale" alone for edited stale.
 
+*** delta (redraw delta), stripped form
+
+A response that redraws a view may carry its *delta* (in full, its
+*redraw delta*): the viewnode IDs of the headlines whose text changed
+between the text the client shows and the new text, so that the
+client can rewrite only those lines. It compares the two texts in
+their *stripped form*, the text with the fold and focus atoms
+('focused', 'folded', 'bodyFolded') removed from each headline's
+=(skg ...)= form, since the client holds those as org folds and
+point rather than as text. A response without a delta means "whole":
+the client redraws the whole buffer. The rule, and when the delta is
+"whole", are in 'docs/api-and-formats.org', "The redraw delta"; the
+server computes it in 'server/view_text_delta.rs'.
+
 *** text search, search view, enrichment
 
 A *text search* (=C-c f=) answers with one message, which opens a

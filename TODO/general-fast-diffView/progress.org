@@ -620,3 +620,60 @@ Logs and the runner ('isolated.sh') are in
   throughout, untouched; nothing under 'data/' was touched.
 *** Headline
 DONE.
+* Plan 1_3
+** Slice 1
+Finished 2026-11-12.
+*** Commits
+- dd6b8044 plan 1_3 slice 1: the save-result names the headlines the save changed
+- the next commit: docs, the plan's headline, this record
+*** Suites
+Logs in 'tests/results/plan-1_3/slice1/' (untracked).
+- 'bash/nextest.sh': 1163 of 1163 pass, no warnings.
+- 'python3 tools/skg-for-ai/test_skg_for_ai.py', after 'cargo build
+  --bin skg': PASS, no failures (it prints no count).
+No failure to classify.
+*** Deviations from the plan's "how"
+**** The title-edit envelope test asserts what the reference makes true
+The plan's "a save of a view whose only edit is one title shows that
+headline's vnid alone" contradicts its own reference text: the
+reference is the saved buffer's text, which already holds the new
+title, so the retitled headline comes back as saved and is not
+listed. The test ('tests/redraw_delta.rs') instead shows c twice (r
+contains a and b, both contain c): retitling the editable c lists
+the write-protected c alone, the one headline whose line the save
+changed. A second test saves the view as drawn plus fold and focus
+atoms and gets '(changed-headlines ())'.
+**** Where the envelope tests live
+Both are in the 'grouped_repos' binary, which has the git fixture:
+the content-view ones in a new module 'tests/redraw_delta.rs'; the
+readiness one in 'tests/pruned_change_view/request.rs', beside
+'save_through_the_handler', so that it reads the wire envelope. Over
+the "sets" fixture, marking mc's old text ready lists exactly two
+headlines, the requesting old text and mc's own headline, whose
+'(ready all)' the mark also changed; the test pins both, and that the
+entry ends the envelope after the readiness summary.
+**** Precisions the plan left open
+- A headline line's own newline counts with its body, so a last
+  headline that gains or loses its newline makes the delta "whole".
+- The '(skg ...)' form is only the one right after the stars and a
+  space, opening with '(skg' then a space or ')'. An unclosed form
+  runs to the end of the line. The cases file pins both, and its
+  header states the whole rule so that elisp and Lua can follow it
+  without reading the Rust.
+- 'changed_headlines_entry' (the sexp entry) sits in
+  'server/view_text_delta.rs' for slice 5's 'format_single_view_sexp'
+  to reuse.
+**** Docs
+The rule (records, "whole", the stripped form) is a section of its
+own, "The redraw delta" in 'docs/api-and-formats.org', which the
+save-result's paragraph points to and slices 2 to 5 can extend; the
+glossary entry is "delta (redraw delta), stripped form". The
+save-result paragraph said the response "ends with" the readiness
+summary; it now says the summary follows the point entries.
+*** Fixtures changed
+None. The content-view test writes its four nodes into a temporary
+case ('write_unchanged_skgrepos').
+*** Unfinished
+Nothing in this slice.
+*** Headline
+DONE.

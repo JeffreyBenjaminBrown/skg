@@ -297,7 +297,7 @@ Serialize full runs; two at once collide on fixed temp paths.
 - 'docs/diff-view.org', "Readiness requests and gestures" (slice 6).
 
 * Implementation sequence
-** TODO Slice 1: the server computes the delta for the save-result
+** DONE Slice 1: the server computes the delta for the save-result
 - A new module, 'server/view_text_delta.rs' (declared in
   'server/lib.rs' as its neighbors are): the stripped form of a
   headline line, the split into preamble and headline records, and

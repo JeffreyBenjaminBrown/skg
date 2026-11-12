@@ -267,8 +267,8 @@ So far there are these endpoints:
        (see "How a message names a headline" below). A failed save
        sends one error, =NOTHING WAS SAVED=, whose validation errors
        follow as =** Error N= headlines.
-       When the saved buffer is one of the diff view's, the response
-       ends with =(readiness-summary (ready N) (changed M) (foreign F) (order-only O) (notEditable K))=:
+       When the saved buffer is one of the diff view's, the point
+       entries are followed by =(readiness-summary (ready N) (changed M) (foreign F) (order-only O) (notEditable K))=:
        of the M changed files of the owned skgrepos (O of them changed only
        in order, and so ready), N are commit-ready; F files changed in
        foreign skgrepos; and K changes are not editable in the view: they
@@ -291,6 +291,13 @@ So far there are these endpoints:
        =initial_node_limit=, but the budget refuses only the extension
        of a node outside U; nothing else in the buffer is bounded by
        it.
+       After everything else comes =(changed-headlines (V ...))=, the
+       redraw delta from the saved buffer's text (the envelope's
+       =saved-buffer=) to =content=, when the two differ only in
+       headline lines (see "The redraw delta" below). Each V is a
+       viewnode ID, a bare symbol; =(changed-headlines ())= means no
+       headline changed. Without the entry, the client redraws the
+       whole buffer. A failed save and every confirmation carry none.
   - Readiness requests (=(ready OBJECTS)= and =(unready OBJECTS)=
     inside a headline's =(editRequest ...)=; see "Metadata of the
     diff view") are
@@ -636,6 +643,47 @@ buffer); a dirty other view's baseline serves the dirty-view
 conflict check. The fork-confirmation buffer has none: it is not
 saved, and approving it re-saves the source buffer, with that
 buffer's baseline.
+** The redraw delta
+A response that redraws a view may name the headlines whose text
+changed, so that the client rewrites only those lines: the entry
+=(changed-headlines (V1 V2 ...))=, whose Vs are viewnode IDs (bare
+symbols, none read as a number) in the new text's order. Its absence
+means "whole": the client redraws the whole buffer. Present and
+empty, =(changed-headlines ())=, it means no headline changed. Only
+the =save-result= carries it (see "Save buffer"); the server
+computes it in 'server/view_text_delta.rs'. It never changes the
+text sent: =content= is the whole new text, fold and focus atoms
+included.
+
+The server compares the new text with a reference text, for the
+=save-result= the saved buffer's text. It splits each into a
+preamble, the text before the first headline line, and headline
+records: a headline line (one matching '^\*+ '; the server escapes a
+body line that would match with a leading comma,
+'encode_body_for_view' in 'server/body_view_escape.rs') with the
+body lines after it, up to the next headline line or the
+end. The viewnode ID of a headline line is the X of a line beginning
+=^\*+ (skg (vnid X)=. The delta is "whole" when the preambles differ,
+when the record counts differ, when some headline line of either
+text has no viewnode ID, when the sequences of viewnode IDs differ,
+or when the body lines of some record differ (a headline line's
+own newline counts with its body). Otherwise it lists each viewnode
+ID whose stripped headline lines differ, perhaps none.
+
+The stripped form of a headline line is the line with each of the
+bare atoms =focused=, =folded= and =bodyFolded= that stands at depth
+1 of its =(skg ...)= form removed, together with the one space before
+it. The form is the one right after the stars and a space, beginning
+=(skg= and then a space or =)=. Depth counts parentheses outside
+string literals (a literal runs from a double quote to the next
+unescaped one, a backslash escaping the character after it); a bare
+atom is a maximal run of characters that are not whitespace,
+parentheses or double quotes. A line without such a form is its own
+stripped form, as is any line that is not a headline line. The
+stripped form of a text strips each of its headline lines and leaves
+its body lines and preamble alone. The server and both clients
+implement this rule, and test it against the cases in
+'tests/shared/fold-and-focus-atom-strip-cases.txt'.
 ** Server warnings
   - Request: ((request . "server warnings"))
   - Response: LP =((response-type server-warnings) (warnings ("WARNING" ...)))=,
