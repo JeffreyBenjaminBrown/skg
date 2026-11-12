@@ -1,0 +1,94 @@
+# The stripped form of a line: the cases the three implementations
+# test against. They are the server's ('server/view_text_delta.rs'),
+# the Emacs client's and the Neovim client's.
+#
+# The rule ('docs/api-and-formats.org', "The redraw delta"): in a
+# headline line (one or more stars, then a space) whose text after
+# the stars and the space begins with '(skg' and then a space or ')',
+# remove each of the bare atoms 'focused', 'folded' and 'bodyFolded'
+# that stands at depth 1 of that '(skg ...)' form, together with the
+# one space before it. Depth counts parentheses outside string
+# literals; a string literal runs from a double quote to the next
+# unescaped one, a backslash escaping the character after it. A bare
+# atom is a maximal run of characters that are not whitespace,
+# parentheses or double quotes. Text after the form closes is kept.
+# Any other line is its own stripped form.
+#
+# Format: a line beginning '#' is a comment. A case is two
+# consecutive lines: the line, then its stripped form. Cases are
+# separated by one or more blank lines. No case line is blank, begins
+# with '#' or carries trailing whitespace.
+
+# Atoms in the renderer's place, right after the viewnode ID.
+* (skg (vnid ab) focused node (gnid a)) a
+* (skg (vnid ab) node (gnid a)) a
+
+** (skg (vnid 1c) focused folded bodyFolded node (gnid b)) b
+** (skg (vnid 1c) node (gnid b)) b
+
+# An atom at the front of the form, in its middle, and at its end.
+* (skg folded (vnid ab) node (gnid a)) a
+* (skg (vnid ab) node (gnid a)) a
+
+* (skg (vnid ab) node folded (gnid a)) a
+* (skg (vnid ab) node (gnid a)) a
+
+* (skg (vnid ab) node (gnid a) bodyFolded) a
+* (skg (vnid ab) node (gnid a)) a
+
+# The form holds nothing else.
+* (skg focused) a
+* (skg) a
+
+# An empty title: the line ends with the form.
+** (skg (vnid ab) node (gnid a) folded)
+** (skg (vnid ab) node (gnid a))
+
+# Atom-like words inside a nested form, inside a string literal, in
+# the title, or only resembling an atom, are kept.
+* (skg (vnid ab) node (gnid folded) (view (focused bodyFolded))) folded
+* (skg (vnid ab) node (gnid folded) (view (focused bodyFolded))) folded
+
+* (skg (vnid ab) node (gnid a) "x focused y") a
+* (skg (vnid ab) node (gnid a) "x focused y") a
+
+* (skg (vnid ab) focused) focused and folded
+* (skg (vnid ab)) focused and folded
+
+* (skg (vnid ab) unfolded foldedX bodyfolded node) a
+* (skg (vnid ab) unfolded foldedX bodyfolded node) a
+
+# A string literal holding a parenthesis, an escaped quote, or ending
+# in an escaped backslash does not change the depth after it.
+* (skg (vnid ab) "x) folded" folded) a
+* (skg (vnid ab) "x) folded") a
+
+* (skg (vnid ab) "say \"hi\" (" bodyFolded node) a
+* (skg (vnid ab) "say \"hi\" (" node) a
+
+* (skg (vnid ab) "a\\" folded) a
+* (skg (vnid ab) "a\\") a
+
+# A form that is not closed: everything after '(skg' is inside it.
+*** (skg (vnid ab) node folded
+*** (skg (vnid ab) node
+
+# Lines without a '(skg ...)' form right after the stars.
+* plain title folded
+* plain title folded
+
+* (skgx folded) a
+* (skgx folded) a
+
+* title (skg folded) a
+* title (skg folded) a
+
+# Lines that are not headline lines.
+*(skg folded) a
+*(skg folded) a
+
+(skg folded) a body line
+(skg folded) a body line
+
+,* (skg (vnid ab) folded) an escaped body line
+,* (skg (vnid ab) folded) an escaped body line

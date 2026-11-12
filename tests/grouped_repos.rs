@@ -33,6 +33,9 @@ mod search_buffer;
 #[path = "readiness_requests.rs"]
 mod readiness_requests;
 
+#[path = "redraw_delta.rs"]
+mod redraw_delta;
+
 #[path = "repo_sets.rs"]
 mod skgrepo_sets;
 

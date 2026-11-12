@@ -27,3 +27,4 @@ pub mod test_utils;
 pub mod types;
 pub mod update_buffer;
 pub mod util;
+pub mod view_text_delta;

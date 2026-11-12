@@ -6,7 +6,7 @@
 // brought up to date.
 
 use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
-use crate::git_fixture::{Fixture, everything_written, save_view};
+use crate::git_fixture::{Fixture, edit_line, everything_written, save_view};
 use crate::pruned_change_view::common::{open_all_changes_buffer, with_fixture};
 
 use skg::graph_straddle::types::GraphStraddle;
@@ -147,6 +147,43 @@ fn a_save_of_a_diffView_buffer_not_held_keeps_its_viewnode_ids (
     { let refused : String = saved_on_a_new_connection (
         f, " (diff-view-buffer . \"no such buffer\")" );
       assert! ( refused . contains ("which the diff view does not have"), "{}", refused ); }
+    Ok (( )) }) }
+
+/// A save of a buffer of the diff view whose one edit is a readiness
+/// request answers, after its readiness summary, with the redraw
+/// delta ('docs/api-and-formats.org', "The redraw delta"). It lists
+/// the requesting headline, the old text of mc, which now shows
+/// '(ready)' where it carried the request, and mc's own headline,
+/// whose file the mark made ready; no other.
+#[test]
+fn a_readiness_saves_delta_lists_the_requesting_headline (
+) -> Result<(), Box<dyn Error>> {
+  with_fixture ("sets", &["main"], |f| {
+    let buffer : String = open_all_changes_buffer (f) ?;
+    let marked : String = edit_line (
+      &buffer, "** (skg (oldText title) (diff (leaves 1))) mc",
+      |_| "** (skg (oldText title) (editRequest (ready)) (diff (leaves 1))) mc" . to_string () );
+    let viewnode_id_of_line = |is_the_line : &dyn Fn (&str) -> bool| -> String {
+      marked . lines () . find ( |line| is_the_line (line) )
+        . and_then (viewnode_id_atom_of)
+        . expect ("the line has a viewnode ID")
+        . trim_start_matches ("(vnid ") . trim_end_matches (')') . to_string () };
+    let requesting : String = viewnode_id_of_line (
+      &|line| line . contains ("(editRequest (ready))") );
+    let mc : String = viewnode_id_of_line (
+      &|line| line . starts_with ("* ") && line . contains ("(gnid mc)") );
+    let mut views_state : ViewsState = ViewsState {
+      open_views : OpenViews::new (), graph_straddle : None };
+    let answer : String = save_through_the_handler (
+      f, &mut views_state,
+      "((request . \"save buffer\") (view-id . \"diff-view-1\") (diff-view-buffer . \"all changes\"))",
+      &marked );
+    let delta_entry : String = format! ( "(changed-headlines ({} {}))", mc, requesting );
+    assert! ( answer . trim_end () . ends_with ( &format! ( "{})", delta_entry )),
+              "the answer ends with {}:\n{}", delta_entry, answer );
+    assert! ( answer . find ("(readiness-summary") . is_some_and ( |summary|
+                Some (summary) < answer . find ("(changed-headlines") ),
+              "the delta follows the readiness summary:\n{}", answer );
     Ok (( )) }) }
 
 /// The viewnode ID atoms of 'text', in order.

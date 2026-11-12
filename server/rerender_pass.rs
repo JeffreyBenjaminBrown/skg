@@ -131,6 +131,7 @@ pub(crate) struct RerenderedView {
 pub fn update_views_after_save (
   stream                      : &mut TcpStream,
   saved_view                  : ViewForest,
+  saved_buffer_text           : &str, // the request's text, which 'saved_view' was parsed from: the reference of the save-result's redraw delta
   collateral_viewforest_ids   : Vec<ViewforestId>,
   env                         : &SkgEnv,
   runtime                     : Arc<RuntimeGeneration>,
@@ -224,7 +225,7 @@ pub fn update_views_after_save (
       stream, views_state, &context . runtime, skgrepo_restriction,
       collateral_views, TcpToClient::CollateralView ); }
   Ok ( SaveResponse::saved (
-    saved_text, context . errors, context . warnings,
+    saved_buffer_text, saved_text, context . errors, context . warnings,
     readiness_summary )) }
 
 /// Withhold a save's rerender over the text-release challenge

@@ -59,8 +59,10 @@ use crate::types::misc::{ID, SkgrepoName, SkgConfig};
 use crate::types::save::{
   NodeInstruction, PostSkgsaveCommitNoticeCandidate, SavePlan, format_save_error_as_org };
 use crate::types::tree::forest::ViewForest;
+use crate::types::viewnode::ViewnodeId;
 use crate::types::views_state::{DiffViewBufferKind, ViewforestId, ViewnodeIdRecord};
 use crate::rerender_pass::update_views_after_save;
+use crate::view_text_delta::{changed_headlines, changed_headlines_entry};
 
 use futures::executor::block_on;
 use sexp::{Sexp, Atom};
@@ -109,6 +111,10 @@ pub struct SaveResponse {
   /// Some when the saved buffer is one of the diff view's: the
   /// readiness summary the client shows after the save.
   pub readiness_summary   : Option<BufferReadinessSummary>,
+  /// The redraw delta from the saved buffer's text to 'saved_view'
+  /// ('changed_headlines'): Some on a save-result whose texts differ
+  /// only in headline lines, None otherwise.
+  pub changed_headlines   : Option<Vec<ViewnodeId>>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -136,14 +142,19 @@ pub struct SavePointPosition {
 }
 
 impl SaveResponse {
-  /// The response of a save that skgsave-committed and rerendered.
+  /// The response of a save that skgsave-committed and rerendered
+  /// 'saved_buffer_text' as 'saved_view'.
   pub fn saved (
+    saved_buffer_text  : &str,
     saved_view         : String,
     errors             : Vec<String>,
     warnings           : Vec<String>,
     readiness_summary  : Option<BufferReadinessSummary>,
   ) -> SaveResponse {
+    let changed_headlines : Option<Vec<ViewnodeId>> =
+      changed_headlines (saved_buffer_text, &saved_view);
     SaveResponse { saved_view, errors, warnings, readiness_summary,
+                   changed_headlines,
                    .. SaveResponse::empty () } }
 
   /// A save that skgsave-committed nothing, asking to review the
@@ -212,11 +223,13 @@ impl SaveResponse {
       text_release_confirmation : None,
       strandeds_confirmation    : None,
       delete_from_confirmation  : None,
-      readiness_summary         : None, } }
+      readiness_summary         : None,
+      changed_headlines         : None, } }
 
   /// Format: ((content "...") (errors (...)) (warnings (...))
-  /// POINT... (readiness-summary ...)), where the point entries and
-  /// the readiness summary are there when the save has them.
+  /// POINT... (readiness-summary ...) (changed-headlines (V...))),
+  /// where the point entries, the readiness summary and the redraw
+  /// delta are there when the save has them.
   fn to_sexp_string (&self) -> String {
     let mut items : Vec<Sexp> = buffer_response_entries (
       & self . saved_view, & self . errors, & self . warnings );
@@ -224,6 +237,8 @@ impl SaveResponse {
       push_save_point_position_to_sexp_items (&mut items, point_position); }
     if let Some (readiness_summary) = &self . readiness_summary {
       items . push (readiness_summary . to_sexp ()); }
+    if let Some (changed_headlines) = &self . changed_headlines {
+      items . push (changed_headlines_entry (changed_headlines)); }
     sexp_to_client_string (&Sexp::List (items)) }}
 
 /// Handles save buffer requests from Emacs.
@@ -1131,6 +1146,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
       update_views_after_save (
         stream,
         viewforest,
+        org_buffer_text,
         collateral_viewforest_ids,
         env,
         swapped_in . clone (),
