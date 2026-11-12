@@ -1365,8 +1365,8 @@ one automatically.
     are reconstructed from disk at the next startup.
     Under 'bash/start-servers.sh' the server then starts again at once,
     as after any exit; the 'stop-servers.sh' it writes in the run folder
-    beside the config ('data/skgconfig.toml.running/stop-servers.sh' for
-    'data/skgconfig.toml') stops it for good.
+    beside the config ('data/jeff/skgconfig.toml.running/stop-servers.sh'
+    for 'data/jeff/skgconfig.toml') stops it for good.
   - TODO | PITFALL: Any client can shut down the server. If ever multiple users share a server, one could bother the other. The server exits immediately after sending the response, which interrupts any in-flight requests from other clients.
 
 ** Busy-initializing signal
@@ -1800,7 +1800,7 @@ unwarranted as itself, vanishes.
 
 The server's configuration file. See example-data/ for an example.
 
-Pass its path as a command-line argument (default: =data/skgconfig.toml=) when starting the server (see =bash/start-servers.sh=). The directory containing the file is the *data root*; all relative paths in the config are resolved against it.
+Pass its path as a command-line argument (default: =data/jeff/skgconfig.toml=) when starting the server (see =bash/start-servers.sh=). The directory containing the file is the *data root*; all relative paths in the config are resolved against it. A relative path may leave the data root: a config in =data/jeff/= names a skgrepo in =data/claude/public= as =../claude/public=, and its =..= is resolved when the config loads.
 
 ** Fields
 
@@ -1850,9 +1850,12 @@ Two skgrepos of one name are rejected.
 *Ownership is declared per entry*: a skgrepo is owned (writable)
 unless its entry says =foreign = true=; a foreign skgrepo is never
 written. No folder name means anything to the server. The intended
-layout is =<data_root>/AUTHOR/REPO=, one author folder per person, so
-that people sharing one data tree list the same skgrepos and differ
-only in which entries say =foreign=. Since a config orders only its
+layout is one author folder per person, =data/AUTHOR/=, holding that
+person's config and skgrepos (=data/AUTHOR/REPO=). The config's
+folder is its data root, so it names another person's skgrepos by
+paths that leave it (=../OTHER/REPO=). People sharing one data tree
+list the same skgrepos and differ only in which entries say
+=foreign=. Since a config orders only its
 owned skgrepos, two people's configs never disagree about an order:
 each states only its own ladder.
 
@@ -1945,7 +1948,11 @@ its config loads. An entry names the receiver's foreign skgrepo at
 the same data-root-relative path, else the one foreign skgrepo whose
 folder has the same name (the receiver may keep a publisher's
 skgrepos in another author folder); an entry matching neither way, or
-several foreign skgrepos by folder name, is skipped. The manifests do
+several foreign skgrepos by folder name, is skipped. With each
+config in its owner's folder, a manifest's paths are relative to the
+publisher's folder (=public=, not =claude/public=), so a receiver
+matches them by folder name; foreign skgrepos of different owners
+that share a folder name are matched by neither. The manifests do
 two things:
 - *Ownership.* Foreign skgrepos that manifests chain together (a
   manifest's own skgrepo and every one it lists, transitively) are
@@ -1995,9 +2002,11 @@ diff view ('server/diff_view/readiness_store.rs'). It is the config's
 =<data_root>/readiness-marks-STEM.json=, STEM the config file's name
 without its extension, after any symlink to it is resolved
 ('SkgConfig::readiness_marks_path'): a server started with
-=data/skgconfig-jeff.toml=, or with the symlink =data/skgconfig.toml=
-to it, keeps its marks in =data/readiness-marks-skgconfig-jeff.json=,
-so that servers over one data root keep their marks apart. The server reads
+=data/jeff/skgconfig.toml= keeps its marks in
+=data/jeff/readiness-marks-skgconfig.json=, and one started with
+=data/skgconfig-ed.toml=, or with a symlink =data/skgconfig.toml= to
+it, in =data/readiness-marks-skgconfig-ed.json=, so that servers over
+one data root keep their marks apart. The server reads
 it at startup and rewrites it after every change; a missing or
 unreadable file means no marks. It is a JSON object whose =marks= is a
 list of ={"leaf": KEY, "fingerprint": N}= entries. KEY names one

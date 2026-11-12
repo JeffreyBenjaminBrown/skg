@@ -13,7 +13,7 @@ the server can be driven directly over the socket. Verified working
 ## Never edit through the main instance
 
 `./bash/start-servers.sh`, given no config path, starts a skg server
-on Jeff's REAL data (`data/skgconfig.toml`, port 1731). It runs the
+on Jeff's REAL data (`data/jeff/skgconfig.toml`, port 1731). It runs the
 release profile (`target/release/skg`) unless given `--deb`
 (`target/debug/skg`), and only with `--hot-reload` does it run under
 cargo-watch, which rebuilds and restarts it whenever `server/`
@@ -75,7 +75,7 @@ nothing but the binary.
    run folder, `<scratch>/skgconfig.toml.running/`, then also holds
    its stop script, `stop-servers.sh`, which stops that instance and
    no other, and a `start-servers.START.log` per start. Never run a
-   start or stop script against `data/skgconfig.toml`.
+   start or stop script against `data/jeff/skgconfig.toml`.
 
 ## Speaking the protocol
 

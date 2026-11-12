@@ -16,13 +16,13 @@ skgconfig.toml (the analog of docs/setup.org's elisp snippet):
 #+begin_src lua
   vim.opt.runtimepath:append('/path/to/skg/nvim')
   -- after startup, or in init.lua:
-  require('skg').init('/path/to/skg/data/skgconfig.toml')
+  require('skg').init('/path/to/skg/data/jeff/skgconfig.toml')
 #+end_src
 
 or interactively:
 
 : :set rtp+=/path/to/skg/nvim
-: :SkgInit /path/to/skg/data/skgconfig.toml
+: :SkgInit /path/to/skg/data/jeff/skgconfig.toml
 
 The server must be running (../bash/start-servers.sh). Init connects,
 verifies the connection, and fetches the herald rule table.

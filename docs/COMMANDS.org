@@ -1518,7 +1518,7 @@ Declining its cleanup prompt does not prevent the underlying importer from
 deleting existing '.skg' files.
 
 It also offers to request a server rebuild, reading the port from 'SKG_CONFIG'
-(default 'data/skgconfig.toml'). Its Docker working directory is hard-coded
+(default 'data/jeff/skgconfig.toml'). Its Docker working directory is hard-coded
 to '/home/ubuntu', while host-side paths use the shell's working directory.
 Check that the mounts and paths identify the intended directories on both
 sides. Use the Cargo command directly when you do not want Git operations.

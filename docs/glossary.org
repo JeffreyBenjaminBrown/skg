@@ -2135,7 +2135,7 @@ with the Emacs client's 'skg-reload'.
 *** run folder
 
 'CONFIG.running/', beside a config file whose path is CONFIG
-('data/skgconfig.toml.running/' for 'data/skgconfig.toml'), where a
+('data/jeff/skgconfig.toml.running/' for 'data/jeff/skgconfig.toml'), where a
 server's run-time files go. 'bash/start-servers.sh' creates it and
 writes there 'stop-servers.sh', which stops that start (one run of
 the script), and one 'start-servers.START.log' per start, the output
