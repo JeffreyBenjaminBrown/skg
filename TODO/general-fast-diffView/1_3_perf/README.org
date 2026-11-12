@@ -1,0 +1,39 @@
+#+title: One-time tool of plan 1_3: time two readiness gestures
+
+'perf.el' opens the diff view of a copy of Jeff's data in batch
+Emacs, against an isolated server, and times a plain mark on a
+changeset marker and the recursive mark on a new root, the two
+gestures Jeff found slow on 2026-11-12. It reports the time per
+client function and how many lines of the server's new text the
+buffer did not already hold.
+
+Batch Emacs runs no redisplay and none of Jeff's interactive
+configuration, so its times are a floor: Jeff's Emacs took 5.7 s
+after the server answered the plain mark, where batch takes about
+0.4 s. The line counts are exact.
+
+* Run
+#+begin_src sh
+P=<a scratch directory>
+mkdir -p $P/data
+cp -a data/jeff data/ed $P/data/
+cp data/readiness-marks-skgconfig-jeff.json $P/data/readiness-marks-skgconfig.json
+sed -e 's/^port = 1731.*/port = 1758/' data/skgconfig.toml > $P/data/skgconfig.toml
+cargo build --bin skg
+(cd $P/data && /home/ubuntu/host/target/debug/skg skgconfig.toml > $P/server.log 2>&1 &)
+# wait for "Server ready." in $P/server.log, then:
+(cd $P && PERF_DATA=$P/data PERF_PORT=1758 emacs --batch -l /home/ubuntu/host/TODO/general-fast-diffView/1_3_perf/perf.el)
+#+end_src
+Stop the server by its PID afterwards (the verify skill's
+"Cleanup"), and delete the copy. The gestures mark and unmark the
+copy's readiness store only.
+
+* Baseline, 2026-11-12, before plan 1_3 (compiled client, debug server)
+The buffer: 569 KB, 2,624 headlines, 3,413 lines.
+| gesture   | lines changed | replace | heralds | before send |
+|-----------+---------------+---------+---------+-------------|
+| marker    |            19 | 411 ms  | 281 ms  | 170 ms      |
+| recursive |           558 | 410 ms  | 317 ms  | 212 ms      |
+"replace" is 'skg-replace-buffer-with-new-content'; "heralds" is
+'heralds-after-change', which runs inside the replace and inside
+the snapshot; "before send" is 'skg-request-save-buffer'.

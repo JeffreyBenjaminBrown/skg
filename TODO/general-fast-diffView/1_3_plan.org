@@ -1,0 +1,442 @@
+#+title: Plan 1_3: redraw only the headlines a save changed
+
+* Assignment and authority
+This plan is a unitary declaration: nothing in it is open for
+discussion. It carries out the design Jeff and Claude settled in
+'1_discussion.org' ("Redraw only the changed headlines" and "A
+correctness problem found on the way"), with the corrections of
+'report_envelope.org'; nobody executing it needs to read either.
+Background, not required: on 2026-11-12 a plain commit-readiness
+mark took Jeff's Emacs 5.7 s after the server had answered in
+0.24 s, and the recursive mark of plan 3afd79c4 felt as slow.
+
+What the measurements say ('1_3_perf/README.org'): Jeff's "all
+changes" buffer has 2,624 headlines in 3,413 lines. A plain mark
+changes 19 of those lines, the recursive mark on a new root 558.
+The client today erases and reinserts all 3,413, re-heralds every
+headline, rewrites every line that carries a fold atom (twice
+before the save is sent, and again after the answer), and refolds.
+Each of those edits also runs whatever change hooks Jeff's own
+Emacs adds. This plan makes the client touch only the changed
+lines.
+
+* Commits
+Jeff has asked for commits. One code commit per slice (more if a
+slice touches disparate things), its first line naming the plan
+and the slice, e.g. "plan 1_3 slice 2: ...". The slice's last
+commit carries its docs and flips its headline here to DONE; the
+slice's record goes into 'progress.org' beside this plan, under a
+top-level headline "* Plan 1_3", one subheadline per slice, in
+the shape 'coding-advice/orchestration.org' gives ("The report
+shape"). Read 'coding-advice/commit-messages.org'. Stage only
+files this slice touched, by path. 'TODO.org' and
+'TODO/general-fast-diffView/1_discussion.org' are Jeff's and
+dirty; never stage them. Never stage a '.elc', nor anything under
+'tests/results/'. End every commit message with
+'Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>'.
+
+* Scope
+In scope: the save-result and the two streamed view messages
+(collateral-view, rerender-view) gain a list of the headlines whose
+text changed; both clients patch only those lines when the list is
+present and the result checks out, and otherwise redraw as today;
+the Emacs client builds its pre-send snapshot without editing the
+buffer; and a save that consumes readiness requests redraws the
+other open buffers of the diff view, which today keep stale
+'(ready ...)' facts.
+
+Not in scope: a Rust herald engine (discussed, deferred); the
+server's own costs (0.24 s for Jeff's mark, release build); the
+Neovim pre-send snapshot; any change to what the server renders
+into a buffer.
+
+* Vocabulary
+"Headline record": a headline line of a view's text together with
+the body lines after it, up to the next headline line or the end.
+A headline line is a line matching '^\*+ ' (org's rule; a body line
+that would match is escaped by 'encode_body_for_view',
+'server/body_view_escape.rs'). The text before the first headline
+line is the preamble.
+
+"The vnid of a headline line": the X of a line beginning
+'^\*+ (skg (vnid X)', the renderer's form ('viewnode_to_string_where_it_stands',
+'server/org_to_text.rs:171'). A headline line not of that form
+has no vnid.
+
+"Fold and focus atoms": the bare atoms 'focused', 'folded' and
+'bodyFolded' at depth 1 of a headline's '(skg ...)' form (the
+server parses them anywhere there, 'server/serve/parse_metadata_sexp.rs:626-631';
+it renders them right after '(vnid X)', 'foldAndFocus_atoms',
+'server/org_to_text.rs:214').
+
+"The stripped form" of a headline line: the line with each fold and
+focus atom at depth 1 of its '(skg ...)' form removed together with
+the one space before it. Depth counts parentheses outside string
+literals ('"..."' with backslash escapes, as 'metadata_value_atom'
+writes them, 'server/org_to_text.rs:18-24'). A line without a
+'(skg ...)' form is its own stripped form. The stripped form of a
+text strips every headline line and leaves body lines and the
+preamble alone. This is one rule implemented three times (Rust,
+elisp, Lua); slice 1 writes the shared cases file all three test
+against.
+
+"The delta": the envelope entry '(changed-headlines (V1 V2 ...))',
+the vnids of the headline records whose stripped headline lines
+differ, in the new text's order. Its absence means "whole": the
+client redraws as today. Present and empty, '(changed-headlines
+())', it means no headline changed.
+
+"The reference text": what the server compares the new text with.
+For the save-result, the saved buffer text of the request
+('envelope . saved_buffer'). For a streamed view, the rendering of
+the forest the connection holds for that view before the refresh,
+which reproduces the text last sent for it ('report_envelope.org',
+section 2).
+
+"Patch": the client's way of applying a delta: replace each listed
+headline line by the corresponding line of the new text's stripped
+form, re-herald what those lines' heralds depend on, then check the
+buffer against the new text's stripped form, falling back to the
+whole redraw on any mismatch.
+
+* Agreed behavior
+** The server computes the delta
+For a save-result and for each streamed view, the server will
+compute the delta from the reference text and the new text:
+- Split both into a preamble and headline records.
+- The delta is "whole" (the entry absent) when the preambles
+  differ, when the record counts differ, when some headline line
+  of either text has no vnid, when the vnid sequences differ, or
+  when some record's body lines differ.
+- Otherwise it lists, in the new text's order, each vnid whose
+  stripped headline lines differ. It may be empty.
+It never changes the text sent: the 'content' entry stays the whole
+new text, fold and focus atoms included.
+
+** The envelope
+The save-result gains '(changed-headlines (V...))' after its
+existing entries, when the delta is not "whole". A collateral-view
+or rerender-view gains it after its 'content' entry (an entry
+between 'view-id' and 'content' would break
+'tests/pruned_change_view/stage_and_commit.rs:252'). vnids print as
+bare symbols; none reads as a number ('server/types/views_state.rs:384-398').
+The confirmations, error replies and withheld saves carry none.
+
+** The clients patch, check, and fall back
+Given a delta, a client will:
+1. decline to patch (whole redraw) if a precondition fails: in
+   Emacs, 'org-fold-core-style' must be 'overlays' (with
+   'text-properties' a replaced headline under a folded body hides
+   itself, 'report_envelope.org' section 3); in either client, a
+   streamed view's buffer with unsaved edits keeps today's
+   treatment;
+2. compute the stripped form of the new text;
+3. replace each listed headline line, located by its vnid, by that
+   vnid's line in the stripped form; a vnid it cannot locate makes
+   it fall back;
+4. re-herald each replaced line's folder ancestors (the existing
+   hooks do) and its children and grandchildren (no hook does; a
+   pending-detachment herald reads its parent and grandparent,
+   'skg--pending-detachment-at-point-p', 'elisp/skg-metadata.el:1028');
+5. compare the whole buffer text with the stripped form; on any
+   difference, redraw the whole buffer from the new text as today.
+On success the client leaves folds and point as they are, skips the
+fold restore and the atom removal, marks the buffer unmodified,
+captures the baseline (it equals the stripped form) and refreshes
+the link annotations as today. Correctness never rests on the
+delta: whatever the client shows after a patch equals what a whole
+redraw would show, folds and point aside.
+
+** The pre-send snapshot edits nothing (Emacs)
+'skg--buffer-snapshot-with-save-metadata' ('elisp/skg-request-save.el:214')
+will return the same string it returns today, byte for byte, but
+build it without editing the buffer: it will read the fold and
+focus state from the live buffer, copy the text into a temporary
+buffer with no change hooks, add the atoms there with the existing
+editing functions, and return that text. The live buffer then sees
+no edit, no unfold and no refold before a save.
+
+** A readiness save redraws the other buffers of the diff view
+A save whose buffer carries a readiness request will add to its
+collateral views every other open view of the connection that is a
+buffer of the diff view ('diffView_buffer_kind' is Some) and that
+the save envelope does not mark dirty. Their refresh recomputes
+their '(ready ...)' facts; with the delta, each client patches the
+few lines that changed.
+
+** What stays as it is
+- The text the server renders, and what a whole redraw does, fold
+  restore and point placement included.
+- Every response without a delta.
+- What a dirty view gets: never redrawn by a save.
+- Neovim's pre-send snapshot.
+- The save lock, the readiness summary, the link annotations.
+
+* Pitfalls the slices must respect
+** Jeff's live server and client run from this tree
+His server is 'target/release/skg', started by
+'bash/start-servers.sh' without '--hot-reload', so edits under
+'server/' do not reach it until he restarts it. A restart rebuilds
+from whatever the tree holds, so every slice must leave the tree
+green; the delta is additive (absent means "whole"), so any mix of
+old and new client and server works. Never build the release
+profile; tests use 'target/debug'. Never start or stop anything
+with 'data/skgconfig.toml'; isolated instances only
+('.claude/skills/verify/SKILL.md').
+** Emacs reads '()' as nil
+'(cadr (assoc 'changed-headlines response))' is nil both for an
+empty delta and for none. Test presence with 'assq', as the
+readiness summary does ('skg-handle-save-sexp',
+'elisp/skg-request-save.el:1088').
+** Unknown envelope keys
+Every client parser ignores unknown keys (Emacs, Neovim
+'payload.field', the AI tool's 'response_field'), but three Rust
+tests pin whole envelopes: 'tests/unit/serve_util.rs:47-59'
+(spared if the field is pushed in 'SaveResponse::to_sexp_string',
+'server/serve/handlers/save_buffer.rs:220', not in
+'buffer_response_entries'), 'tests/unit/serve_util.rs:73-82'
+('format_single_view_sexp' gains a parameter) and the entry order
+of 'tests/pruned_change_view/stage_and_commit.rs:252'.
+** The saved buffer's text is not passed to the rerender today
+'update_views_after_save' ('server/rerender_pass.rs:131') does not
+receive the request's buffer text; the caller
+('update_from_and_rerender_buffer_with_approvals',
+'server/serve/handlers/save_buffer.rs', the call near :1131) has
+it as 'org_buffer_text'. The held forest and the parsed forest are
+not the reference: the first predates the user's edits, the second
+lacks derived facts and new vnids.
+** A withheld save registers a forest that matches no sent text
+'withhold_save_rerender' ('server/rerender_pass.rs:238') registers
+the parsed saved view without sending it. A later rerender-view's
+delta is then computed against the wrong reference; the client's
+check falls back. Acceptable; do not special-case it.
+** The client reprints lines it edits
+'skg-edit-metadata-at-point' and Neovim's 'edit_metadata_at_line'
+reprint the whole line ('report_envelope.org' section 5); a reprint
+can differ from the server's form (an empty title gains a trailing
+space). The patch must insert the stripped line as text, never
+through those functions, and the check catches the rest by falling
+back.
+** Folds
+Emacs: with 'overlays', a one-line replacement keeps every fold
+around and below it ('report_envelope.org' section 3, measured).
+Neovim: whether a closed expr fold survives a one-line
+'nvim_buf_set_lines' is unverified; slice 3 finds out before
+relying on it.
+** The pre-send snapshot runs with the save lock suspended
+It unlocks and relocks around its edits
+('elisp/skg-request-save.el:214-242'). Once it edits nothing, it
+need not unlock; keep 'skg--inhibit-dirty-view-confirmation' only
+where an edit remains.
+** Integration tests
+A slice that changes what a client does with a server response
+runs the integration suite in both clients ('bash/all-tests.sh'
+runs everything; 'bash/integration-tests.sh' only the Emacs side;
+'SKG_TEST_CLIENT=nvim' selects Neovim per test dir). Failing before
+this plan, not its business: 'emacs/import-md-and-org' and
+'nvim/import-md-and-org' (long-standing), 'emacs/repo-cycling'
+and 'emacs/set-relRepo' (seen failing on 2026-11-12 at a prompt
+for a skgrepo; cause unknown).
+** Suites
+Serialize full runs; two at once collide on fixed temp paths.
+- Rust: 'bash/nextest.sh' (or 'cargo nextest run --test NAME').
+- Emacs: 'bash/emacs-tests.sh' (it loads a '.el' newer than its
+  '.elc').
+- Neovim: 'bash/nvim-tests.sh'.
+- AI tool: 'python3 tools/skg-for-ai/test_skg_for_ai.py' after
+  'cargo build --bin skg'.
+- Everything: 'bash/all-tests.sh' (about 3 to 4 minutes; run it in
+  the background with no timeout shorter than 15 minutes).
+
+* Code map
+** Server
+- Save-result: 'SaveResponse' ('server/serve/handlers/save_buffer.rs:78'),
+  'SaveResponse::saved' (:140-147, sole caller
+  'server/rerender_pass.rs:226'), 'SaveResponse::empty' (:203),
+  'to_sexp_string' (:220).
+- The saved text: rendered at 'server/rerender_pass.rs:191'
+  ('saved_text').
+- Streamed views: 'rerender_open_view' ('server/rerender_pass.rs:336-363'),
+  'RerenderedView' (:112-117), 'register_and_send_rerendered_views'
+  ('server/serve/rerender_stream.rs:165-181'),
+  'format_single_view_sexp' ('server/serve/util.rs:162-177').
+- The held forest of a view:
+  'views_state . open_views . viewforest_id_to_view (id)'; render it
+  with 'viewforest_to_string' ('server/org_to_text.rs:61').
+- Collateral selection: 'collateral_viewforest_ids'
+  ('server/serve/handlers/save_dependencies/mod.rs:84'), called in
+  'save_buffer.rs' before the save-relax-lock is sent (near :1075);
+  'viewforest_has_readiness_requests'
+  ('server/diff_view/readiness_requests.rs').
+** Emacs
+- 'skg-handle-save-sexp' and 'skg-replace-buffer-with-new-content'
+  ('elisp/skg-request-save.el:1088, :1134'); the streamed path
+  'skg--apply-streamed-view-update' (:387), its callers
+  'skg--collateral-view-handler' (:409) and
+  'elisp/skg-request-rerender-all-views.el:199'.
+- Locating a headline by vnid: 'skg--viewnode-id-headline-regex'
+  ('elisp/skg-id-search.el:162').
+- Line replacement: 'skg-replace-current-line' ('elisp/skg-metadata.el:1470').
+- Heralds: 'heralds-after-change', 'heralds--refresh-folders-above',
+  'heralds-apply-to-line', 'heralds-clear-overlays-in-region'
+  ('elisp/heralds-minor-mode.el:223-290').
+- Snapshot: 'skg--buffer-snapshot-with-save-metadata'
+  ('elisp/skg-request-save.el:214'), 'skg-add-folded-metadata'
+  ('elisp/skg-org-fold.el:160'), 'skg-add-focused-metadata'
+  ('elisp/skg-focus.el:11').
+** Neovim
+- 'M.handle_save_sexp', 'M.replace_buffer_with_new_content',
+  'M.apply_streamed_view_update' ('nvim/lua/skg/save.lua:449, :497, :389').
+- Heralds: 'M.watch_buffer', 'M.apply_to_line',
+  'M.reapply_to_folder_ancestors' ('nvim/lua/skg/heralds.lua:751, :694, :731').
+- Locating by vnid: 'M.goto_viewnode_id' ('nvim/lua/skg/id_search.lua:327').
+** Docs
+- 'docs/api-and-formats.org': "Save buffer" (save-result shape near
+  :259, collateral-view near :253), "Rerender all views"
+  (rerender-view near :1129), "The baseline of a view" (:621).
+- 'docs/diff-view.org', "Readiness requests and gestures" (slice 6).
+
+* Implementation sequence
+** TODO Slice 1: the server computes the delta for the save-result
+- A new module, 'server/view_text_delta.rs' (declared in
+  'server/lib.rs' as its neighbors are): the stripped form of a
+  headline line, the split into preamble and headline records, and
+  'changed_headlines (reference_text, new_text) ->
+  Option<Vec<ViewnodeId>>', None meaning "whole", exactly as
+  "The server computes the delta" says.
+- A shared cases file, 'tests/shared/fold-and-focus-atom-strip-cases.txt':
+  pairs of a headline line and its stripped form, covering atoms at
+  the front, the middle and the end of the form, an atom-like word
+  inside a nested form or a string literal (kept), a line without a
+  '(skg ...)' form, and an empty title. Its header comment says
+  the three implementations test against it. Rust unit tests read
+  it, and test 'changed_headlines' on small texts: nothing
+  changed (Some, empty), one headline changed, a fold atom alone
+  changed (not listed), a body changed (None), a vnid added or
+  missing (None), a level changed (listed).
+- 'update_views_after_save' gains the saved buffer's text as a
+  parameter; the caller passes 'org_buffer_text'. 'SaveResponse'
+  gains 'changed_headlines : Option<Vec<ViewnodeId>>', None in
+  'empty' and on every non-save-result path, set by 'saved' from
+  'changed_headlines (saved_buffer_text, &saved_text)', printed by
+  'to_sexp_string' after the readiness summary when Some.
+- An envelope test in an existing save test binary: a save of a
+  view whose only edit is one title shows that headline's vnid
+  alone; a save of a diff-view buffer carrying a readiness request
+  lists the requesting headline.
+- Docs: the save-result shape in 'docs/api-and-formats.org', with
+  the stripped form and the rule for "whole"; a glossary entry
+  "delta (redraw delta)" in 'docs/glossary.org'.
+- Tests: 'bash/nextest.sh'; 'python3 tools/skg-for-ai/test_skg_for_ai.py'.
+
+** TODO Slice 2: Emacs patches the saved buffer
+- A new module, 'elisp/skg-redraw-delta.el': the stripped form of a
+  line and of a text (same rule, tested against the shared cases
+  file); 'skg--patch-buffer-with-delta (new-content vnids)', which
+  returns non-nil on success after doing steps 1-5 of "The clients
+  patch, check, and fall back" in the current buffer. Locate all
+  listed vnids in one pass over the buffer, and their new lines in
+  one pass over the stripped text; replace from the end of the
+  buffer backwards so earlier positions stay valid; bind
+  'inhibit-read-only' and 'skg--inhibit-dirty-view-confirmation'.
+  Re-heralding children and grandchildren: after the replacements,
+  for each replaced headline, clear and re-apply the herald of each
+  headline one and two levels below it.
+- 'skg-handle-save-sexp': when the response has a
+  'changed-headlines' entry ('assq') and content, try the patch;
+  on success do what "On success" lists and skip
+  'skg-replace-buffer-with-new-content'; otherwise call it as today.
+  Log which path ran at debug level ('skg-log').
+- Tests: an ERT file 'tests/elisp/test-skg-redraw-delta.el': the
+  shared cases; a patch that succeeds keeps a closed fold and point
+  and leaves the buffer equal to the stripped form; a patch whose
+  check fails falls back to the whole redraw; an unlocatable vnid
+  falls back; a child carrying 'noClaim' under a patched parent is
+  re-heralded. Run 'bash/emacs-tests.sh', then 'bash/all-tests.sh'.
+- Measure: '1_3_perf/README.org' says how; add the slice's numbers
+  under a new headline there.
+- Docs: 'docs/api-and-formats.org', what a client does with the
+  delta.
+
+** TODO Slice 3: Neovim patches the saved buffer
+- First find out whether a closed expr fold survives replacing a
+  headline line inside and above it with 'nvim_buf_set_lines', in a
+  headless test. If it does not, the patch must restore the fold
+  state of the buffer's headlines itself (the client already knows
+  how to compute and apply it, 'nvim/lua/skg/folds.lua'); if that
+  is not possible without the whole fold pass, Neovim declines to
+  patch, and the slice records that as a deviation and stops after
+  the docs.
+- 'nvim/lua/skg/redraw_delta.lua': the same stripped form (tested
+  against the shared cases file) and patch, using one
+  'nvim_buf_set_lines' per replaced line, then the children's and
+  grandchildren's heralds ('heralds.apply_to_line'), then the check
+  against the buffer's lines. 'M.handle_save_sexp' tries it as
+  Emacs does.
+- Tests: 'tests/nvim/redraw_delta_spec.lua', mirroring slice 2's.
+  Run 'bash/nvim-tests.sh', then 'bash/all-tests.sh'.
+
+** TODO Slice 4: Emacs builds the pre-send snapshot without editing the buffer
+- Rewrite 'skg--buffer-snapshot-with-save-metadata' as "The
+  pre-send snapshot edits nothing" says. In the live buffer, one
+  read-only pass records, by line number, which headlines are
+  invisible ('folded'), which visible ones have a hidden body
+  ('bodyFolded', 'skg-headline-body-hidden-p') and which one holds
+  point ('focused'), exactly as 'skg-add-folded-metadata' and
+  'skg-add-focused-metadata' decide today. A temporary buffer gets
+  the text, Org mode without its hooks ('delay-mode-hooks'), no
+  heralds; the atoms are added there with 'skg-edit-metadata-at-point'
+  so the result is byte-identical to today's.
+- Test first, then rewrite: an ERT test that, on fixture buffers
+  with entry folds, subtree folds, nested folds, a focused headline
+  without metadata and one with, compares the new function's string
+  with the old one's (keep the old one in the test file as the
+  oracle) and checks that the live buffer saw no change (its
+  'buffer-modified-tick' is unchanged and no herald overlay was
+  recreated).
+- Run 'bash/emacs-tests.sh', then 'bash/all-tests.sh'. Measure as in
+  slice 2.
+
+** TODO Slice 5: the streamed views carry the delta
+- Server: 'rerender_open_view' renders the held forest before the
+  refresh as the reference and sets 'RerenderedView .
+  changed_headlines'; 'format_single_view_sexp' gains the parameter
+  and appends the entry after 'content'; update the two pinned
+  tests ("Unknown envelope keys"). A Rust test: a save whose
+  collateral view changes in one headline gets that vnid.
+- Emacs: 'skg--apply-streamed-view-update' tries the patch after
+  its unsaved-edits guard, and falls back as today.
+- Neovim: 'M.apply_streamed_view_update' likewise.
+- Docs: the collateral-view and rerender-view shapes.
+- Run 'bash/all-tests.sh'.
+
+** TODO Slice 6: a readiness save redraws the other buffers of the diff view
+- In 'save_buffer.rs', where the collateral views are selected: when
+  'viewforest_has_readiness_requests' holds for the saved forest,
+  add every other open view of the connection whose
+  'diffView_buffer_kind' is Some and which the envelope does not mark
+  dirty, keeping the list sorted and deduplicated as today.
+- A Rust test over a git fixture with two diff-view buffers open: a
+  mark in one redraws the other with the new '(ready ...)' fact.
+- The diff-view integration test (both clients): after phase 2,
+  the "skgrepo changes" buffer's move headline shows '(ready' without
+  any request for that buffer.
+- Docs: 'docs/diff-view.org', "Readiness requests and gestures", and
+  remove the entry for this problem from 'TODO/problems.org' if it is
+  there, moving it to 'TODO/DONE/problems.org' as that file says.
+- Run 'bash/all-tests.sh'. Measure as in slice 2, with the
+  collateral redraws counted.
+
+* Verification and completion
+Each slice ends with its tests green except the failures named in
+"Integration tests" above, its docs, its record in 'progress.org',
+and its headline DONE. After slice 6: the numbers in
+'1_3_perf/README.org' for each slice, and the orchestrator's review
+('coding-advice/code-reviews.org', 'plans.org' "After each plan").
+
+* Stops and deviations
+Stop only for the conditions in 'coding-advice/when-to-stop.org'.
+The one stop this plan expects is in slice 3 (Neovim folds), and it
+is a stop of that slice only: record it and go on to slice 4.
+Deviations from the "how" go into 'progress.org' under the slice's
+record.
