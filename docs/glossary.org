@@ -1375,7 +1375,14 @@ object, never the member. A request, a '(leaves ...)' change fact and
 a '(ready ...)' change fact may also say 'all', which names every leaf a
 modified node records (so one gesture on it marks its file), or every
 leaf of a commit readiness aggregate one level down; 'all' is shorthand, not a third
-object. A *diff aspect* is what a
+object. A request alone may also say 'newContent' or 'newOutward',
+shorthand too: each names leaves of the new nodes reached from the
+headline's node through new nodes only, as the change forest says,
+whatever the buffer shows. 'newContent' follows content relationships
+and names each new node's existence (which covers its text) and its
+content relationships; 'newOutward' follows every relationship in its
+recorded direction ("out") and names every leaf each new node
+records. A *diff aspect* is what a
 change-forest leaf is about: existence, text, home skgrepo, an alias,
 an extra ID, a flag, or relRepo.
 

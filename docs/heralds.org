@@ -256,7 +256,7 @@ changes are marked commit-ready, so =∃+✓ ~+= is a new node, approved,
 in a new relationship that is not; =M✓= is a modified node every
 change of whose file is marked. A commit readiness aggregate (a
 folder or changeset marker) shows a =✓= when everything under it is ready. =request:ready= and
-=request:unready=, with =:node=, =:rel= or =:all=, are pending readiness
+=request:unready=, with =:node=, =:rel=, =:all=, =:newContent= or =:newOutward=, are pending readiness
 requests, consumed by the next save.
 
 These heralds render the headline's one =(diff ...)= form (see

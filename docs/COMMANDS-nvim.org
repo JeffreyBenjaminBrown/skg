@@ -800,7 +800,19 @@ toggles each change one level down. Works on write-protected
 headlines too.
 *** <localleader>rR : :SkgCycleCommitReadyRecursive
 Marks every change in the subtree at point, or unmarks them if the
-headline at point is ready, then saves. (Emacs: C-u C-c r r.)
+headline at point is ready, then saves. At a new node (∃+) that is not
+in a folder, it leaves the rest of that subtree to the server, which
+marks the new node, its text and its content, then the same for each
+new node the graph says it contains, and each new node those contain,
+and so on, whether or not the buffer shows them, write-protected or
+not. It does not mark the relationship of the node at point to its
+container, nor any subscription, hiding or override. Unmarking that
+way always asks first. (Emacs: C-u C-c r r.)
+*** <localleader>rO : :SkgCycleCommitReadyRecursiveOutward
+As <localleader>rR, but at a new node the server follows every
+relationship each new node records (contains, subscribes to, hides,
+overrides), and marks everything each records. (Emacs: C-u C-u C-c r
+r.)
 *** <localleader>rh : :SkgToggleHomeSkgrepoMoveCommitReady
 Toggles the commit-readiness of the home-skgrepo move of the node at
 point (or of the move at point), then saves: it unmarks the move if

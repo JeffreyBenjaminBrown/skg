@@ -549,7 +549,15 @@ object it lists: one leaf; on a new member, its existence and its
 relationship; on a modified node, every leaf it records, and its
 relationship when that changed, so one gesture marks the file; on a
 changed folder, its leaves one level down; with a prefix argument,
-every leaf of the subtree. Below the headline it acts on, a gesture
+every leaf of the subtree, except that at a new node (=(node
+added)=) in content position (not in a folder) it names =newContent=
+(with two prefix arguments, =newOutward=) and skips the rest of the
+node's subtree: the server then walks the graph from it through new
+nodes only, shown or not, write-protected or not, contentward marking
+each new node's existence and content relationships, outward marking
+everything each records. At the headline it acts on, such a node
+names that object alone, not its relationship to its viewparent, and
+toggles by its existence. Below the headline it acts on, a gesture
 names no 'all': the leaves of a modified node or a commit readiness
 aggregate there are named by the headlines under it, or are not
 shown there; the other objects such a headline lists are named. C-c r h

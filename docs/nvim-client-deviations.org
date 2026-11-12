@@ -69,7 +69,8 @@ refusal at error level without the Lua traceback and without the
   is ':SkgDeleteRecursive' on '<localleader>dR', the flag command's
   ':SkgSetFlagSearchMatchingRecursive' on '<localleader>sX', and the
   commit-readiness gestures' are on '<localleader>rR' and
-  '<localleader>rH'.
+  '<localleader>rH', and the one Emacs runs with 'C-u C-u C-c r r' on
+  '<localleader>rO'.
 - Extra vim-idiomatic surfaces beyond the Emacs set: ']i' / '[i' as
   id-next/prev motions; '^' plays the C-a title toggle; '<Tab>'
   toggles the fold at point and '<S-Tab>' global visibility.
