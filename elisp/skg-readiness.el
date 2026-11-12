@@ -56,14 +56,19 @@ modified node (M) every leaf its file records, beside its
 relationship when that changed. On a changed folder, toggle each
 leaf one level down. With a prefix argument RECURSIVE, mark (or, if
 the headline at point is ready, unmark) every leaf named in the
-subtree at point. Before unmarking more than one leaf, ask. Works on
-write-protected occurrences too."
+subtree at point, except that at a new node the server walks the
+graph instead of the buffer: with one C-u, contentward, marking each
+new node's text and content; with two, along every relationship each
+new node records, marking everything it records
+\(`skg--readiness-requests-for-subtree'). Before unmarking more than
+one leaf, ask. Works on write-protected occurrences too."
   (interactive "P")
   (unless (org-at-heading-p)
     (user-error "Not on a headline"))
   (let ((requests (save-excursion
                     (if recursive
-                        (skg--readiness-requests-for-subtree)
+                        (skg--readiness-requests-for-subtree
+                         (if (equal recursive '(16)) 'newOutward 'newContent))
                       (skg--readiness-requests-at-point)))))
     (unless requests
       (user-error "Nothing here can be marked commit-ready"))
@@ -202,33 +207,82 @@ in buffer order."
              (when child-leaves
                (skg--readiness-request-at-point ready (cdr child-leaves)))))))))))
 
-(defun skg--readiness-requests-for-subtree ()
+(defun skg--readiness-requests-for-subtree (walk-object)
   "The requests of the recursive gesture on the headline at point: one
 on every headline in the subtree that names leaves, readying them
-unless the headline at point is ready."
+unless the headline at point is ready. At a new node in content
+position (`skg--readiness-hands-to-the-server-p'), the request names
+WALK-OBJECT, `newContent' or `newOutward', which the server expands
+from the graph, through new nodes only, whatever the buffer shows or
+write-protects; so the walk skips the rest of that node's subtree.
+There the start names WALK-OBJECT alone, leaving the relationship to
+its viewparent, which is no part of what it reaches, and is ready
+when its existence is."
+  (org-back-to-heading t)
   (let* ((metadata-sexp (skg--current-headline-metadata-sexp))
-         (root (line-beginning-position))
-         (ready (not (skg--readiness-ready-p metadata-sexp))))
-    (skg--readiness-walk-subtree
-     (lambda (headline-sexp)
-       (let ((leaves (if (= (line-beginning-position) root)
-                         (skg--readiness-leaves headline-sexp)
-                       (skg--readiness-leaves-below headline-sexp))))
-         (when leaves
-           (skg--readiness-request-at-point ready (cdr leaves))))))))
+         (root (point))
+         (end (save-excursion (org-end-of-subtree t t) (point)))
+         (root-is-handed-over (skg--readiness-node-added-p metadata-sexp))
+         (ready (not (if root-is-handed-over
+                         (skg--readiness-objects-ready-p metadata-sexp '(node))
+                       (skg--readiness-ready-p metadata-sexp))))
+         (requests '()))
+    (while (< (point) end)
+      (let* ((headline-sexp (skg--metadata-sexp-at-point-or-nil))
+             (at-root (= (point) root))
+             (handed-over (if at-root
+                              root-is-handed-over
+                            (and headline-sexp
+                                 (skg--readiness-hands-to-the-server-p
+                                  headline-sexp))))
+             (leaves
+              (and headline-sexp
+                   (not (and at-root handed-over)) ; the start names the walk alone
+                   (if at-root
+                       (skg--readiness-leaves headline-sexp)
+                     (skg--readiness-leaves-below headline-sexp)))))
+        (when (or leaves handed-over)
+          (push (save-excursion
+                  (skg--readiness-request-at-point
+                   ready (append (cdr leaves)
+                                 (and handed-over (list walk-object)))))
+                requests))
+        (if handed-over
+            (org-end-of-subtree t t)
+          (outline-next-heading))))
+    (nreverse requests)))
+
+(defun skg--readiness-hands-to-the-server-p (metadata-sexp)
+  "Non-nil when the recursive gesture hands the headline at point, with
+METADATA-SEXP, to the server: a new node whose viewparent is not a
+folder, so that it stands in its viewparent's content."
+  (and (skg--readiness-node-added-p metadata-sexp)
+       (save-excursion
+         (and (org-up-heading-safe)
+              (not (skg--folder-atom
+                    (skg--metadata-sexp-at-point-or-nil)))))))
+
+(defun skg--readiness-node-added-p (metadata-sexp)
+  "Non-nil when METADATA-SEXP's headline is a new node: its '(diff ...)'
+says '(node added)'."
+  (eq (cadr (skg--readiness-form metadata-sexp 'node)) 'added))
 
 (defun skg--readiness-request-at-point (ready objects)
   "A request that marks (READY non-nil) or unmarks the leaves on OBJECTS
 of the headline at point, with how many leaves it touches as the
 server counts them: N of the headline's '(leaves N OBJECT...)' when
-OBJECTS are the ones it lists, else one for each of `node' and `rel'.
-A headline without the fact, which only the home skgrepo move gesture can
-reach, counts one."
+OBJECTS are the ones it lists, else one for each object, and two for
+`newContent' or `newOutward', so that unmarking new nodes always asks
+first: the client cannot count what the server will reach. A
+headline without the fact, which only the home skgrepo move gesture
+can reach, counts one."
   (let ((leaves (skg--readiness-leaves (skg--current-headline-metadata-sexp))))
     (list (copy-marker (line-beginning-position)) ready objects
           (if (equal objects (cdr leaves))
               (or (car leaves) 1)
-            (length objects)))))
+            (+ (length objects)
+               (seq-count (lambda (object) (memq object '(newContent newOutward)))
+                          objects))))))
 
 (defun skg--readiness-unmarks-several-leaves-p (requests)
   "Non-nil when the unmark requests among REQUESTS touch more than one

@@ -172,6 +172,42 @@ its view requests and its derived facts."
                   1 #'skg-cycle-commit-ready '(4))
                  '("** (skg (changesetMarker content) (editRequest (ready all)) (diff (leaves 2 all))) "))))
 
+;; At a new node in content position, the recursive gesture names
+;; 'newContent' (one C-u) or 'newOutward' (two), which the server
+;; expands from the graph, and skips the rest of that node's subtree;
+;; it walks on past it. A new node in a folder is no content; the walk
+;; treats it as any other headline.
+(ert-deftest test-skg-cycle-commit-ready-recursively-hands-new-nodes-to-the-server ()
+  (let ((lines '("* (skg node (gnid r) (skgRepos (nodeRepo r)) (diff (leaves 1 all))) r"
+                 "** (skg node (gnid n) (skgRepos (nodeRepo r)) (diff (node added) (rel added) (leaves 2 node rel))) n"
+                 "*** (skg node (gnid n2) (skgRepos (nodeRepo r)) (diff (node added) (rel added) (leaves 2 node rel))) n2"
+                 "*** (skg node (gnid m) (skgRepos (nodeRepo r)) writeProtected (diff (rel added) (properties changed) (leaves 2 rel all))) m"
+                 "** (skg subscriberFolder)"
+                 "*** (skg node (gnid s) (skgRepos (nodeRepo r)) writeProtected (diff (node added) (rel added) (leaves 2 node rel))) s"
+                 "** (skg node (gnid c) (skgRepos (nodeRepo r)) (diff (rel added) (leaves 1 rel))) c")))
+    (dolist (case '(((4) . "newContent") ((16) . "newOutward")))
+      (should (equal (test-skg-readiness--run lines 1 #'skg-cycle-commit-ready (car case))
+                     (list
+                      "* (skg node (gnid r) (skgRepos (nodeRepo r)) (editRequest (ready all)) (diff (leaves 1 all))) r"
+                      (format "** (skg node (gnid n) (skgRepos (nodeRepo r)) (editRequest (ready node rel %s)) (diff (node added) (rel added) (leaves 2 node rel))) n"
+                              (cdr case))
+                      (nth 2 lines)
+                      (nth 3 lines)
+                      (nth 4 lines)
+                      "*** (skg node (gnid s) (skgRepos (nodeRepo r)) writeProtected (editRequest (ready node rel)) (diff (node added) (rel added) (leaves 2 node rel))) s"
+                      "** (skg node (gnid c) (skgRepos (nodeRepo r)) (editRequest (ready rel)) (diff (rel added) (leaves 1 rel))) c"))))
+    ;; At a new start: the walk object alone, not the relationship to
+    ;; its viewparent, which is no part of what the walk reaches.
+    (should (equal (test-skg-readiness--run (cdr lines) 1 #'skg-cycle-commit-ready '(4))
+                   (cons "** (skg node (gnid n) (skgRepos (nodeRepo r)) (editRequest (ready newContent)) (diff (node added) (rel added) (leaves 2 node rel))) n"
+                         (cddr lines))))
+    ;; A new start toggles by its existence alone, and unmarking asks
+    ;; first, since the client cannot count what the server will reach.
+    (should (equal (test-skg-readiness--run
+                    '("* (skg node (gnid n) (skgRepos (nodeRepo r)) (diff (node added) (rel added) (leaves 2 node rel) (ready node))) n")
+                    1 #'skg-cycle-commit-ready '(4) 'yes)
+                   '("* (skg node (gnid n) (skgRepos (nodeRepo r)) (editRequest (unready newContent)) (diff (node added) (rel added) (leaves 2 node rel) (ready node))) n")))))
+
 (ert-deftest test-skg-toggle-homeSkgrepo-move-commitReady ()
   (let ((lines '("* (skg node (gnid a) (skgRepos (nodeRepo b)) (diff (leaves 1 all))) a"
                  "** (skg (homeSkgrepoMove (old x) (new b)) (diff (leaves 1)))"
