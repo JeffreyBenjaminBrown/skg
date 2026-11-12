@@ -3,7 +3,7 @@
  * by following 'contains' from the node). Cycles and diamonds
  * are counted once.
  * Usage: cargo run --bin top-contentward-descendants [<config>] [<top-n>]
- *   default config: data/skgconfig.toml
+ *   default config: data/jeff/skgconfig.toml
  *   default top-n: 20
  *
  * Reads .skg files once,
@@ -24,7 +24,7 @@ fn main () -> Result<(), Box<dyn std::error::Error>> {
   let args : Vec<String> = env::args () . collect ();
   let config_path : &str =
     if args . len () > 1 { &args[1] }
-    else { "data/skgconfig.toml" };
+    else { "data/jeff/skgconfig.toml" };
   let top_n : usize =
     if args . len () > 2 {
       args[2] . parse () . unwrap_or (20) }

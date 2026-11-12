@@ -1,6 +1,6 @@
 #!/bin/bash
 # USAGE: bash/run-skg-rerunning-on-exit.sh PROFILE_DIR SKG_CONFIG
-#   e.g. bash/run-skg-rerunning-on-exit.sh target/debug data/skgconfig.toml
+#   e.g. bash/run-skg-rerunning-on-exit.sh target/debug data/jeff/skgconfig.toml
 #
 # Runs the already built server binary PROFILE_DIR/skg on SKG_CONFIG,
 # and runs it again whenever it exits, so a killed server comes back

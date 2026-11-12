@@ -30,7 +30,7 @@ if [ -z "$CONTAINER" ]; then
   exit 1
 fi
 
-SKG_CONFIG="${SKG_CONFIG:-data/skgconfig.toml}"
+SKG_CONFIG="${SKG_CONFIG:-data/jeff/skgconfig.toml}"
 SKG_PORT="$(grep -m1 '^[[:space:]]*port' "$SKG_CONFIG" \
   | sed 's/.*=[[:space:]]*//' | sed 's/[[:space:]]*#.*//')"
 

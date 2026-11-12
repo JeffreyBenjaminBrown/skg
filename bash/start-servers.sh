@@ -2,7 +2,7 @@
 # - TO START
 #     ./bash/start-servers.sh [CONFIG] [--deb] [--hot-reload]
 #   CONFIG is the path of an skg config file, by default
-#     data/skgconfig.toml. The options may come before or after it.
+#     data/jeff/skgconfig.toml. The options may come before or after it.
 #   It builds and runs the release profile unless given --deb,
 #     which builds and runs the debug profile instead.
 #   The first release build takes minutes, sitting at "Validating config".
@@ -10,7 +10,7 @@
 #     and exits with status 2, before anything is written.
 # - THE RUN FOLDER
 #   The files this script writes itself go in CONFIG.running/, beside
-#   the config (data/skgconfig.toml.running/ by default). (The build
+#   the config (data/jeff/skgconfig.toml.running/ by default). (The build
 #   steps write elsewhere: the .elc files beside their sources in
 #   elisp/, the server binary under target/.) The script's own files:
 #   - stop-servers.sh, which stops this start (rewritten at every start).
@@ -59,7 +59,7 @@ for arg in "$@"; do
   esac
 done
 
-CONFIG="${CONFIG:-data/skgconfig.toml}"
+CONFIG="${CONFIG:-data/jeff/skgconfig.toml}"
 RUN_FOLDER="$CONFIG.running"
 START="$(date -u +%Y-%m-%dT%H-%M-%SZ)" # no colons: a legal file name everywhere
 SCRIPT_LOG="$RUN_FOLDER/start-servers.$START.log"

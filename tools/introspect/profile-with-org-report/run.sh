@@ -88,14 +88,14 @@ cp -a "$project_root/data/." "$copied_data/"
 
 profile_port="$(find_available_port)"
 sed -i -E "s/^port[[:space:]]*=.*/port = $profile_port/" \
-  "$copied_data/skgconfig.toml"
+  "$copied_data/jeff/skgconfig.toml"
 sed -i -E 's/^timing_log[[:space:]]*=.*/timing_log = true/' \
-  "$copied_data/skgconfig.toml"
+  "$copied_data/jeff/skgconfig.toml"
 # The server writes its logs to a folder per server run,
 # CONFIG.running/START/ ('SkgConfig::logs_dir'). The copied data root
 # may carry the live server's run folder; it is removed, so the only
 # run subfolder is this profile's.
-run_folder="$copied_data/skgconfig.toml.running"
+run_folder="$copied_data/jeff/skgconfig.toml.running"
 rm -rf "$run_folder"
 
 find "$copied_data/owned" -type f -name '*.skg' -printf '%P\t%s\n' \
@@ -103,7 +103,7 @@ find "$copied_data/owned" -type f -name '*.skg' -printf '%P\t%s\n' \
 
 printf 'Starting isolated server on port %s...\n' "$profile_port"
 RUST_LOG=info "$project_root/target/debug/skg" \
-  "$copied_data/skgconfig.toml" >"$server_log" 2>&1 &
+  "$copied_data/jeff/skgconfig.toml" >"$server_log" 2>&1 &
 server_pid=$!
 for _attempt in $(seq 1 1200); do
   if rg -q 'Server ready\.' "$server_log" 2>/dev/null; then

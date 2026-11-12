@@ -1,7 +1,7 @@
 //! USAGE:
 //! There is an optional command-line argument: the config file path.
 //! See docs/api-and-formats.org § skgconfig.toml,
-//! or the example at data/skgconfig.toml.
+//! or the config at data/jeff/skgconfig.toml.
 //!
 //! Subcommand: import-org-roam <org-dir> <skg-output-dir> <repo-name>
 //! Converts org-roam .org files to .skg files.
@@ -63,7 +63,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // printed, one per line, and do not change the exit status.
     let config_path: String =
       if args . len() > 2 { args[2] . clone() }
-      else { "data/skgconfig.toml" . to_string() };
+      else { "data/jeff/skgconfig.toml" . to_string() };
     return match load_config (&config_path) {
       Ok (( _config, warnings )) => {
         for warning in &warnings {
@@ -79,7 +79,7 @@ fn main() -> Result<(), Box<dyn Error>> {
   // default '?' that dumps an unreadable Debug blob of the whole file.
   let config_path: String =
     if args . len() > 1 { args[1] . clone() } // config from command line, if given
-    else { "data/skgconfig.toml" . to_string() }; // default config
+    else { "data/jeff/skgconfig.toml" . to_string() }; // default config
   { // The run folder follows the config path as given (made absolute,
     // not canonical), so a symlinked config gets its folder beside the
     // symlink, where the start script and the clients look.
@@ -369,7 +369,7 @@ fn run_export_org (
     . collect ();
   let config_path : String =
     if ! positional . is_empty () { positional[0] . clone () }
-    else { "data/skgconfig.toml" . to_string() };
+    else { "data/jeff/skgconfig.toml" . to_string() };
   let config : SkgConfig =
     load_config (&config_path) ? . 0;
   let restriction : SkgrepoRestriction =
@@ -431,7 +431,7 @@ fn run_export_org (
 ///    Appends one JSON object per log event to
 ///    CONFIG.running/START/server.jsonl. Queryable with jq, e.g.:
 ///      jq 'select(.fields.message | test("rerender"))' \
-///        data/skgconfig.toml.running/START/server.jsonl
+///        data/jeff/skgconfig.toml.running/START/server.jsonl
 fn init_tracing (
   config : &SkgConfig,
 ) {

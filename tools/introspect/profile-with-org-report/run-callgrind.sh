@@ -78,14 +78,14 @@ printf 'Copying data into an isolated Callgrind root...\n'
 cp -a "$project_root/data/." "$copied_data/"
 profile_port="$(find_available_port)"
 sed -i -E "s/^port[[:space:]]*=.*/port = $profile_port/" \
-  "$copied_data/skgconfig.toml"
+  "$copied_data/jeff/skgconfig.toml"
 sed -i -E 's/^timing_log[[:space:]]*=.*/timing_log = true/' \
-  "$copied_data/skgconfig.toml"
+  "$copied_data/jeff/skgconfig.toml"
 # The server writes its logs to a folder per server run,
 # CONFIG.running/START/ ('SkgConfig::logs_dir'). The copied data root
 # may carry the live server's run folder; it is removed, so the only
 # run subfolder is this profile's.
-run_folder="$copied_data/skgconfig.toml.running"
+run_folder="$copied_data/jeff/skgconfig.toml.running"
 rm -rf "$run_folder"
 
 printf 'Starting the isolated server under Callgrind on port %s...\n' "$profile_port"
@@ -93,7 +93,7 @@ RUST_LOG=info "$valgrind_binary" \
   --tool=callgrind \
   --instr-atstart=no \
   --callgrind-out-file="$callgrind_raw/callgrind.out" \
-  "$project_root/target/debug/skg" "$copied_data/skgconfig.toml" \
+  "$project_root/target/debug/skg" "$copied_data/jeff/skgconfig.toml" \
   >"$server_log" 2>&1 &
 server_pid=$!
 for _attempt in $(seq 1 7200); do
