@@ -74,7 +74,12 @@ set_up_test_data () {
     rm "$ALPHA/m.skg"
     node "$BETA/m.skg" m "a mover"
     rm "$ALPHA/d.skg"
-    node "$ALPHA/r.skg" r "the root" t m x
+    node "$ALPHA/r.skg" r "the root" t m x n
+    # New content under r, which the recursive gesture at n hands to
+    # the server ('newContent') instead of walking.
+    node "$ALPHA/n.skg" n "new" n2 t
+    node "$ALPHA/n2.skg" n2 "new child" n3
+    node "$ALPHA/n3.skg" n3 "new grandchild"
     rm "$ALPHA/y.skg"
     { echo "pid: x"
       echo "extra_ids:"

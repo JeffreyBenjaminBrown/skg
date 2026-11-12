@@ -79,7 +79,8 @@ do
       '(oldText title)',                    -- t's text edit
       '(homeSkgrepoMove (old alpha) (new beta))',  -- m's move
       'ghost (gnid d)',                    -- d's deletion
-      'acquiredFolder' }) do                -- x's nodeMerge
+      'acquiredFolder',                     -- x's nodeMerge
+      '(gnid n3)' }) do                     -- new content, three deep
     T.check(text:find(expected, 1, true) ~= nil,
             'the "all changes" buffer shows ' .. expected)
   end

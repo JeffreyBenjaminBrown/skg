@@ -80,7 +80,8 @@
     (dolist (expected '("(oldText title)"        ; t's text edit
                         "(homeSkgrepoMove (old alpha) (new beta))" ; m's move
                         "ghost (gnid d)"        ; d's deletion
-                        "acquiredFolder"))       ; x's nodeMerge
+                        "acquiredFolder"         ; x's nodeMerge
+                        "(gnid n3)"))            ; new content, three deep
       (unless (string-match-p (regexp-quote expected) all-changes)
         (test-fail "The \"all changes\" buffer lacks %s:\n%s"
                    expected all-changes)))
