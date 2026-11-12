@@ -5,13 +5,13 @@
 ;;;
 ;;; PITFALL: ORPHANED OVERLAYS
 ;;; Switching major modes (e.g. org -> text -> org) kills all
-;;; buffer-local variables, including `heralds-overlays'. But the
-;;; overlay objects themselves are attached to the buffer and survive.
-;;; With nothing referencing them, they become orphans: still setting
-;;; `display' properties on the text, but invisible to our clearing
-;;; code. To guard against this, every overlay we create is tagged
-;;; with (overlay-put ov 'heralds t), and the clearing functions scan
-;;; for that property rather than relying solely on the tracking list.
+;;; buffer-local variables. But the overlay objects themselves are
+;;; attached to the buffer and survive it, still setting `display'
+;;; properties on the text. So no list of them is kept: every overlay
+;;; we create is tagged with (overlay-put ov 'heralds t), and the
+;;; clearing functions find them by that property. Finding them so is
+;;; also fast: `overlays-in' reads only the overlays of its region,
+;;; where a list would be scanned whole at every edit.
 
 (require 'cl-lib)
 (require 'skg-metadata) ;; for skg--folder-change-readiness-at-point and skg--pending-detachment-at-point-p
@@ -209,9 +209,6 @@ levels (a member's '(relRepoMove ...)' child counts)."
       (remove-hook 'after-revert-hook #'heralds-apply-to-buffer t)
       (heralds-clear-overlays))))
 
-(defvar-local heralds-overlays nil
-  "List of overlays created by `heralds-minor-mode'.")
-
 (defun heralds-apply-to-buffer ()
   "Do `heralds-apply-to-line` to each line."
   (save-excursion
@@ -251,7 +248,7 @@ members and on their children."
 
 (defun heralds-apply-to-line ()
   "On the current line, lens only the first (skg ...) occurrence.
-Creates one overlay (at most) and pushes it onto `heralds-overlays`."
+Creates one overlay (at most), tagged with the property `heralds'."
   (save-excursion
     (let ((bol (line-beginning-position))
           (eol (line-end-position)))
@@ -269,34 +266,18 @@ Creates one overlay (at most) and pushes it onto `heralds-overlays`."
                 (let ((ov (make-overlay start end)))
                   (overlay-put ov 'display heralds)
                   (overlay-put ov 'heralds t)
-                  (overlay-put ov 'evaporate t)
-                  (push ov heralds-overlays))))))))))
+                  (overlay-put ov 'evaporate t))))))))))
 
 (defun heralds-clear-overlays ()
-  "Remove all heralds overlays from buffer.
-Scans every overlay for the `heralds' property so that orphaned
-overlays (e.g. from a major-mode switch that killed the
-buffer-local `heralds-overlays' list) are also deleted."
-  (dolist (ov (overlays-in (point-min) (point-max)))
-    (when (overlay-get ov 'heralds)
-      (delete-overlay ov)))
-  (setq heralds-overlays nil))
+  "Remove all heralds overlays from buffer, orphans among them (see
+the PITFALL at the top of this file)."
+  (heralds-clear-overlays-in-region (point-min) (point-max)))
 
 (defun heralds-clear-overlays-in-region (start end)
   "Delete heralds overlays that overlap [START, END)."
-  (let (keep)
-    (dolist (ov heralds-overlays)
-      (let ((valid (heralds-overlay-valid-and-useable-p ov)))
-        (if (and valid
-                 (< (overlay-start ov) end)
-                 (> (overlay-end ov) start))
-            (delete-overlay ov)
-          (when valid
-            (push ov keep)))))
-    (dolist (ov (overlays-in start end))
-      (when (overlay-get ov 'heralds)
-        (delete-overlay ov)))
-    (setq heralds-overlays (nreverse keep))))
+  (dolist (ov (overlays-in start end))
+    (when (overlay-get ov 'heralds)
+      (delete-overlay ov))))
 
 (defconst heralds--rels-sentinel "__RELS_SPANS__"
   "Placeholder token the server's `rels' and `props' rules emit
@@ -617,13 +598,6 @@ property facts are rendered from `(view ...)'."
   (condition-case nil
       (car (read-from-string metadata-sexp))
     (error nil)))
-
-(defun heralds-overlay-valid-and-useable-p (ov)
-  "Check if overlay OV is valid and usable."
-  (and (overlayp ov)
-       (overlay-buffer ov)
-       (overlay-start ov)
-       (overlay-end ov)))
 
 ;; One face per herald style, heralds-STYLE-face, defined from
 ;; shared/herald-styles.json, which the Neovim client also reads.

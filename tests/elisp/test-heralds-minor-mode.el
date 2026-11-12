@@ -203,9 +203,7 @@ unwarranted, it shows no request."
                                 overlays-after-disable))
         (message "After disabling: %d overlays with display property found"
                  (length overlays-after-disable))
-        (should (= (length overlays-after-disable) 0)))
-      (should ;; Also check that heralds-overlays variable is cleared
-       (null heralds-overlays)))))
+        (should (= (length overlays-after-disable) 0))))))
 
 (ert-deftest test-heralds-props-render-with-or-without-rels ()
   "The property counts in '(view (props ...))' render after the
@@ -278,8 +276,8 @@ should still remove them."
     ;; Overlays exist
     (should (cl-some (lambda (ov) (overlay-get ov 'heralds))
                      (overlays-in (point-min) (point-max))))
-    ;; Major-mode switch kills buffer-local heralds-overlays but
-    ;; leaves the actual overlay objects in the buffer.
+    ;; Major-mode switch kills buffer-local variables but leaves
+    ;; the actual overlay objects in the buffer.
     (text-mode)
     (should (cl-some (lambda (ov) (overlay-get ov 'heralds))
                      (overlays-in (point-min) (point-max))))
