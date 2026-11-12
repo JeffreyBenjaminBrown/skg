@@ -86,7 +86,9 @@ you own. =C=:
 - *overrides* =N=, so /override substitution/ shows =C= wherever =N=
   would otherwise appear as content — you see and edit =C= in =N='s
   place from then on, without =N='s containers being rewritten to point
-  at =C=;
+  at =C=. (Not in a view rooted at a foreign node: that shows what the
+  root's author would see, so =N= stays there, unedited; see
+  [[file:./override.org][override.org]], "Automatic override substitution");
 - *hides* any child of =N= that your forking edit /deleted/, so what
   you dismissed does not come straight back as unintegrated subscribed
   content (below). Later deletions from =C= hide likewise — see

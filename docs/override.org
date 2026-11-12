@@ -129,6 +129,18 @@ overrider can be shown, it shows =N=.  A monogamy violation makes the
 resolver refuse to choose a branch; a cycle makes it abandon
 substitution and return the originally requested node.
 
+"Owned" here is relative to the owner whose overrides a top-level
+tree of the view follows ('override_follower_of_tree_containing'):
+the user, where the tree's root is a node the user owns (a fork
+included), and otherwise the root's author, throughout the tree,
+beneath a third author's nodes too. A view rooted at a foreign node
+shows what its author would see, the author's own overriders included,
+and not the user's. So a child the user forks in such a view is
+shown there, after the save, as the original; the clone is shown
+where the user's overrides are followed. Editing the foreign root
+itself forks it, and the saved buffer's root becomes the clone (see
+below), so that tree then follows the user's overrides.
+
 Substitution is disabled in the diff view.  Every refresh of a content
 view substitutes, deciding from the buffer and the graph as they are
 now, so a raw content occurrence whose node gains a visible overrider
@@ -181,7 +193,7 @@ stored relationship list rather than the carrier's ID.  Editing the
 carrier's title, body, or folders still edits the carrier itself.
 
 The server rejects a forged or stale part whose carrier is not on
-=N='s owned override chain.  The validation walk is intentionally
+=N='s chain of the overriders its tree follows.  The validation walk is intentionally
 visibility-ungated so that a part which was honest when rendered does
 not become invalid merely because the skgrepo restriction changed.
 

@@ -901,8 +901,11 @@ N is legal; only a cycle is forbidden), and visibility gating can
 stop it at a middle node when a later link's mentioner is restricted --
 so the shown node is the last visible link, not necessarily the
 chain's end. The resolver is 'resolve_override' in
-'server/dbs/in_rust_graph/override_resolution.rs'. Foreign override
-relationships are display-only facts and never substitute.
+'server/dbs/in_rust_graph/override_resolution.rs'. "Owned" is
+relative to the owner whose overrides the occurrence's top-level tree
+follows: the user, unless that tree's root is foreign, in which case
+it is the root's author ('override_follower_of_tree_containing'). Other
+override relationships are display-only facts and never substitute.
 
 The shown substitute carries the fact '(overridesHere N)'
 (the crucial herald =ĥ= after =O=), naming the original it stands for. A viewnode's
