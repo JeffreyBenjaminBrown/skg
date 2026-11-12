@@ -358,7 +358,7 @@ Serialize full runs; two at once collide on fixed temp paths.
 - Docs: 'docs/api-and-formats.org', what a client does with the
   delta.
 
-** TODO Slice 3: Neovim patches the saved buffer
+** DONE Slice 3: Neovim patches the saved buffer
 - First find out whether a closed expr fold survives replacing a
   headline line inside and above it with 'nvim_buf_set_lines', in a
   headless test. If it does not, the patch must restore the fold

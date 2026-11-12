@@ -692,7 +692,7 @@ inserted as text; re-heralds the replaced lines, the folders among
 their two nearest ancestors and the headlines one or two levels
 below them (whose heralds read them); and then compares the whole
 buffer with the stripped form of the new text. On success it keeps
-its org folds and point, marks the buffer unmodified, takes the
+its folds and point, marks the buffer unmodified, takes the
 stripped form as the view's baseline (see "The baseline of a view")
 and refreshes the link annotations. It redraws the whole buffer
 from the new text instead when a listed viewnode ID is missing from
@@ -700,9 +700,18 @@ the buffer or from the new text, when the comparison finds any
 difference (a line the client reprinted otherwise than the server,
 say), or, in Emacs, when 'org-fold-core-style' is not 'overlays'
 (under 'text-properties' a replaced headline above a folded body
-would hide itself). The Emacs client does this for the
-=save-result= ('skg--patch-buffer-with-delta' in
-'elisp/skg-redraw-delta.el').
+would hide itself). Both clients do this for the =save-result=:
+Emacs in 'skg--patch-buffer-with-delta'
+('elisp/skg-redraw-delta.el'), Neovim in 'patch_buffer_with_delta'
+('nvim/lua/skg/redraw_delta.lua'). Each rewrites only the span of a
+line between the prefix and the suffix the old and new line share,
+so the cursor keeps its character on the line; in Neovim this also
+keeps the vim folds, since replacing a whole line
+('nvim_buf_set_lines') opens closed expr folds where replacing a
+span ('nvim_buf_set_text') does not. A Neovim view opened from text
+acts on that text's fold and focus atoms as a whole redraw does,
+removing them, so its first save can be patched; the Emacs opener
+keeps them as text ('TODO/problems.org').
 ** Server warnings
   - Request: ((request . "server warnings"))
   - Response: LP =((response-type server-warnings) (warnings ("WARNING" ...)))=,

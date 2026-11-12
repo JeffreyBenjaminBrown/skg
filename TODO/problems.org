@@ -17,7 +17,10 @@
   first save after opening a diff view cannot be patched by its redraw
   delta and redraws the whole buffer (plan 1_3, slice 2; measured on
   Jeff's "all changes" buffer, where folder headlines open with
-  'folded').
+  'folded'). Neovim's opener, 'open_org_buffer_from_text'
+  ('nvim/lua/skg/buffer.lua'), had the same defect; plan 1_3 slice 3
+  made it act on the atoms through 'act_on_fold_and_focus_atoms',
+  which its whole redraw shares.
 * A readiness mark leaves the other diff buffers' marks stale (2026-11-06)
   'skg-cycle-commit-ready' saves only the buffer it is in, and the
   server redraws only that buffer. The other diff buffers keep

@@ -755,3 +755,71 @@ perf runs were lost: 'bash/all-tests.sh' deletes every directory under
 'plan-1_3' is not), so the logs now live in 'tests/results/1_3/'.
 *** Headline
 DONE.
+** Slice 3
+Finished 2026-11-12.
+*** Commits
+- d3b0460a plan 1_3 slice 3: a Neovim view opens with its fold and focus atoms acted on
+- 13da82e9 plan 1_3 slice 3: Neovim patches the saved buffer by the save-result's delta
+- the next commit: docs, the plan's headline, this record
+*** Suites
+Logs in 'tests/results/1_3/slice3/' (untracked).
+- 'bash/nvim-tests.sh': 495 pass, no failure (11 of them new, in
+  'tests/nvim/redraw_delta_spec.lua'); 496 after the open-path test
+  in 'tests/nvim/buffer_spec.lua'.
+- 'bash/all-tests.sh', first run: Emacs 458 pass; Neovim pass;
+  nextest 1163 of 1163; doctests pass; integration 67 of 72. The
+  four pre-existing failures the plan names (emacs/import-md-and-org,
+  nvim/import-md-and-org, emacs/repo-cycling, emacs/set-relRepo, the
+  last at its skgrepo prompt), and nvim/search-buffer, an expected
+  fixture adaptation (below).
+- After the adaptation, nvim/search-buffer alone: PASS; then
+  'bash/all-tests.sh' again: Emacs 458, Neovim 496, nextest 1163 of
+  1163, doctests pass, integration 68 of 72, the four failures being
+  the pre-existing ones. No new failure.
+*** Deviations from the plan's "how"
+**** Each rewrite replaces only the changed span of the line
+The plan said one 'nvim_buf_set_lines' per line. A headless
+experiment showed that replacing a whole line opens closed expr
+folds: the fold starting at that line, and a closed body fold further
+down. 'nvim_buf_set_text' over the span between the prefix and suffix
+the old and new line share (as slice 2 does in Emacs) kept every fold
+in every case tried: the closed fold's own first line, lines inside a
+closed fold, an ancestor above it, a sibling, a level change, all at
+once. It also keeps the cursor on its character of the line. So
+Neovim patches; the expected stop did not happen. The prefix and
+suffix end on UTF-8 character boundaries.
+**** The herald watcher is off during the rewrites; one pass re-heralds
+'heralds.watch_buffer' schedules, per edit, a refresh that reads the
+whole buffer and re-heralds every folder above the edit. The rewrites
+now run inside a new 'heralds.call_without_watching', and
+'redraw_delta.reherald_after_rewrites' re-heralds each affected line
+once: the rewritten lines, the folders among their two nearest
+ancestors (a folder's herald reads its members and their children)
+and the headlines one and two levels below. Measured headless on a
+synthetic buffer of 3,443 lines and 2,600 headlines, patching 560: 60
+ms with the watcher off, against about 65 ms plus 95 ms of deferred
+refreshes with it on; the whole redraw took about 105 ms plus 85 ms
+deferred.
+**** Where the vnid lookup lives
+The plan pointed at 'id_search.goto_viewnode_id', which moves the
+cursor and opens folds. The patch reads the viewnode IDs of the
+buffer's lines and of the stripped text in one pass each, with the
+renderer's form, as slice 2 does.
+**** The open-path fix shares the whole redraw's code
+The atom handling of 'save.replace_buffer_with_new_content' moved to
+'buffer.act_on_fold_and_focus_atoms', which both it and
+'buffer.open_org_buffer_from_text' call; the opener now switches to
+the buffer before acting, so a window shows it. A sentence in the
+'TODO/problems.org' entry (still open for Emacs) says Neovim's is
+fixed.
+*** Fixtures changed
+'tests/integration/search-buffer/test-nvim.lua' looked for
+'** (skg folded containerFolder' in the opened search buffer. The
+opener now acts on that atom, so the test looks for '** (skg
+containerFolder' hidden in leaf-b's closed fold. Its Emacs mirror is
+unchanged until slice 4 fixes the Emacs opener.
+*** Unfinished
+Nothing in this slice. Not measured on Jeff's data: the perf tool
+('1_3_perf/perf.el') drives Emacs only.
+*** Headline
+DONE.
