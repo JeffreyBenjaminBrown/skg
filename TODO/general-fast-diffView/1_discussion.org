@@ -308,10 +308,10 @@ buffer, growing linearly with headlines. From source the
 helper's edge is 400 ms, but the source client is the thing to
 stop using. This settles my order: memoize first, helper only
 if a measured whole redraw still hurts after that.
-************ TODO [jeff] Does memoization require changing the host-side client?
+************ DONE [jeff] Does memoization require changing the host-side client?
 I don't want to do that. I'm trying to keep all the
 building of new software inside Docker.
-************* TODO Claude says: no build; it is a source edit
+************* DONE Claude says: no build; it is a source edit
 Memoizing is an edit to two elisp files in the repo
 ('skg-shared.el:54', 'skg-lens.el:180-186'). Your host Emacs
 loads the client's source from the mounted tree with 'require'
@@ -348,13 +348,13 @@ one); then byte compilation from inside Docker if your host
 Emacs is 31 or newer; then the delta. I will fold the compile
 step into '1_1_plan.org' as a slice once you answer the version
 question, since that plan already touches 'start-servers.sh'.
-*************** TODO Claude says: folded into '1_1_plan.org'
+*************** DONE Claude says: folded into '1_1_plan.org'
 Your Emacs is 31.1, so the plan now has six slices: the two
 script slices, the two memos (slice 3), the atom pre-test
 (slice 4), byte compilation from inside Docker with the
 'load-prefer-newer' guard (slice 5), docs (slice 6). Committed
 as d954ed23; the run started 2026-11-06 06:16 UTC.
-**************** TODO Claude says: plan 1_1 is done
+**************** DONE Claude says: plan 1_1 is done
 The review is '1_1_review.org'.
 Six slices DONE by 06:37 UTC, a correction commit at 06:52, the
 review beside the plan with three Decide items. Your server is
@@ -364,7 +364,10 @@ script; your client takes the '.elc' files at your next reload.
 'skg-shared-style-keywords' ('skg-shared.el:54') derives from a
 constant; the lens's rule header is recomputed per line. Small
 change, every save gains. Estimate from the profile.
-****** TODO j : we did this too, right?
+****** DONE j : we did this too, right?
+******* DONE Claude says: yes, plan 1_1 slice 3, d3cf31af
+Both memos. The herald pass from source went 787 to 457 ms; with
+the compiled client the whole pass is 66 ms now.
 ***** Test for "folded" by regexp before parsing: about -250 ms
 In 'skg-remove-folded-metadata' ('skg-org-fold.el:110'), before
 send and again after insert. Estimate.
@@ -391,7 +394,13 @@ A mark redraws only the buffer that was saved. The other three
 diff buffers keep their old '(ready ...)' facts until something
 else redraws them, so their check heralds lie. I will put this
 in 'TODO/problems.org'.
-***** TODO j : let's make solving that part of this
+***** DONE j : let's make solving that part of this
+****** DONE Claude says: yes, into plan 1_3 (the redraw delta)
+The delta makes it cheap: after a mark, the server will treat the
+other three diff buffers as collateral views of the save and send
+each the list of headlines whose '(ready ...)' changed, and the
+client patches those lines in place. Today the other buffers are
+left alone because a whole redraw of each was too costly.
 ** The diff view is rigid.
 It always compares HEAD to the worktree.
 It ought to let you compare any pair of graphs.
@@ -463,6 +472,12 @@ leaf marked under (HEAD~3, worktree) could count as ready under
 propose: marks, the readiness gestures, the '(ready ...)' facts
 and stage-and-commit exist only for the default pair; any other
 pair prints no '(ready ...)' and refuses a readiness request.
+***** DONE UPDATED [Claude]: reversed by your "processed" marks
+Marks will exist for every pair, as "processed" marks outside the
+default pair, and the store will be keyed by the pair as well as
+the leaf, which removes the leak this entry describes. Stage-and-
+commit alone stays bound to the default pair. See the thread
+under the read-only rule.
 **** What a buffer without '(ready ...)' loses
 The check heralds, the next/previous ready and unready motions,
 and the clients' derived folder readiness; and each gesture's
@@ -477,7 +492,8 @@ Possible with the same gate, as a flag on the request. I see
 little use: the performance section says whether the store is
 part of the cost; if it is not, a markless default view only
 hides information. I would not add the flag unless you want it.
-***** TODO j : yes, better without that flag
+***** DONE j : yes, better without that flag
+****** DONE Claude says: folded; no flag
 ** My request
 What have I left out?
 What decisions will need to be made?
@@ -503,7 +519,13 @@ can also be read from disk ('GitSnapshotKind::Worktree'), which
 is how foreign skgrepos enter the before-graph, but that copy
 differs from the live graph: illegal sections are dropped, and
 a homeless telescope gets a placeholder title.
-*** TODO j : ah, let's use "live" rather than "worktree" then
+*** DONE j : ah, let's use "live" rather than "worktree" then
+**** DONE Claude says: adopted
+From here on "live" names the graph the server holds, and a
+repo's series reads (live, HEAD, HEAD~1, ...). Below the ONGOING
+marker I have rewritten my unread text to say live; above it I
+add UPDATED children where it matters. The glossary already has
+"live graph", so the word costs nothing.
 ** Foreign skgrepos contribute no change, by construction
 'git_snapshot.rs:75-76' reads every foreign skgrepo at its
 worktree on both sides, so Ed's repo can never show a change in
@@ -561,6 +583,44 @@ Since it's read-only, the markers are the only mechanism
 available for doing that.
 I can't commit based on it, and it won't mean 'commit-ready'
 so much as 'processed', but I guess I still want the markers.
+***** TODO Claude says: all three change the design; here is how
+****** Expanding content in a read-only pair
+Agreed that the request must stay. Today it does two things at
+once: it shows G's content under V(G), and it makes that
+occurrence editable. In a pair whose new foot is not live, the
+server will answer the same request with the content but write-
+protected. The catch is where the content comes from: the
+refresh's truth is the live graph ('Truth::of_runtime',
+'buffer_rerender.rs:58-62'), and some sites read 'runtime.graph'
+directly ('handlers/diff_view.rs:80', 'refresh/tail.rs:56-58';
+'report_arch.org', "What the refresh treats as the truth"). For a
+non-live pair the truth must be the pair's new graph, so every
+such site must take the straddle's graph instead. That is the one
+structural change the any-pair work needs, and it is also what
+makes the next point possible. A plan pitfall will list every
+site.
+****** Visiting either foot
+Agreed: 'skg-goto' from a diff offers o (older) and n (newer).
+Newer in the default pair is an ordinary view. Every other case
+is a view of a graph that is not live: a read-only content view
+drawn with the snapshot as truth. Once the truth can be a
+snapshot (previous point), such a view is the ordinary refresh
+over another graph plus write protection, and it needs a buffer
+root that says which graph it shows, since the user can no longer
+tell from context.
+****** Marks for every pair, as "processed" marks
+Agreed, and it simplifies rather than complicates. The store will
+be keyed by the pair as well as the leaf: the pair is the list of
+each skgrepo's two feet as resolved commits or live. Then marks
+of different pairs never meet, the leak I worried about
+disappears, and the fingerprint keeps its job (unmark when the
+change itself changed). Only stage-and-commit stays bound to the
+default pair. The word: the wire fact is '(ready ...)' and the
+herald a check mark; I propose keeping both forms and letting the
+pair give the meaning, since a user who opened an (HEAD~3, HEAD)
+diff knows the check cannot mean commit-ready. If you want the
+word to differ, say so; it is one label in two clients. An
+UPDATED child under my readiness reply records this.
 *** The restore requests under (HEAD~N, worktree)
 'restoreNode' and 'restoreRel' copy a node or membership from
 'before' into the live graph. With old = HEAD~3 and new =
@@ -569,9 +629,10 @@ coherent and arguably useful; it falls out for free. With new
 a commit they have no target and must be refused. Decide
 whether to allow the first case or restrict restores to the
 default pair.
-**** TODO j : seems good, just warn
+**** DONE j : seems good, just warn
 Warn the user in the minibuffer that they are restoring
 from a commit older than head.
+***** DONE Claude says: folded; the message names the commit
 *** Per-skgrepo choices compose nodes from mixed revisions
 A node's sections can live in several owned skgrepos
 (telescoping), and the before-graph is composed from all
@@ -585,12 +646,20 @@ today ("At HEAD:"). Decide: tolerate it (and make validation
 of a historical graph lenient), or constrain the UI so one
 cycle moves every owned skgrepo together, with per-repo choice
 as the exception rather than the default.
-**** TODO j : lenience
+**** DONE j : lenience
 Mostly the user will want to use the same straddle across
 every owned skgrepo, but conceivably not always, esp.
 if they made individual manual commits.
 And foreign skgrepos could refer to outside nodes
 that have since vanished.
+***** DONE Claude says: agreed; mixed pairs from the start
+So the validator must not refuse a non-live graph. What
+'validated_graph' refuses today I have not enumerated; the plan
+will list each check and turn each into a count in the buffer
+root for any graph that is not live (a dangling reference, a
+section without a home, an ID resolving two ways), so that the
+diff still draws and says what it could not trust. Q4 below is
+answered by this.
 *** Each of your skgrepos is its own gitrepo
 So "commit" is per skgrepo for you.
 I checked: every path under 'data/jeff/' and 'data/ed/first' is
@@ -602,6 +671,17 @@ commit, or only those touching the skgrepo's prefix. Decide the
 general rule; for your data it does not matter yet.
 **** TODO j : I don't understand.
 What is the choice?
+***** TODO Claude says: which commits appear in a repo's series
+A gitrepo may hold several skgrepos as subfolders; the code
+allows it, your data does not use it. A commit belongs to the
+gitrepo, and may have touched only one of its skgrepos. So when
+the user cycles skgrepo A's foot through the history, the series
+could list every commit of the gitrepo (some of which changed
+nothing in A, so two neighboring feet give an empty diff for A),
+or only the commits that touched A's folder (what 'git log -- A/'
+lists). I propose the second: every step changes something in A.
+For your data the two are the same, since each skgrepo is its own
+gitrepo.
 *** Relative or resolved: what the metadata stores
 "HEAD~1" resolved at request time shifts after every commit.
 I propose the metadata stores the resolved commit (a short
@@ -613,7 +693,17 @@ commit's second parent is not in the series.
 What is the parent of a commit?
 When you say cycling, you mean the user is cycling to choose
 where each foot of the straddle is, yes?
-*** JEFF RESUME HERE
+***** TODO Claude says: yes to the second; the first explained
+Every commit records the commit it was made on top of: its
+parent. HEAD~1 is HEAD's parent, HEAD~2 the parent of that, and
+so on; the series is this chain, which is what 'git log' shows. A
+merge commit has two parents, the branch you were on (the first)
+and the one you merged in (the second); following first parents
+gives the history of your branch without the merged branch's own
+commits, and that is the chain the series follows. Your repos are
+linear, so the distinction will not show. And yes: cycling is the
+user pressing S-left or S-right to move a repo's old foot along
+that chain, S-up or S-down its new foot.
 *** Old commits may not parse under today's format
 'parse_blob_section' uses today's serde and aborts the whole
 read on the first error ('git_snapshot.rs:373-375'). A commit
@@ -621,6 +711,8 @@ from before a format change would refuse the whole diff. Decide
 whether a historical read skips unparsable sections with a
 warning, or refuses as today. I lean to skipping with a count
 in the buffer root, since the view is read-only anyway.
+**** DONE j : sure
+***** DONE Claude says: folded; Q6 below is this
 *** Where the pair lives and how it reaches the server
 Today the straddle takes no input. The pair must travel in the
 diff-view request (the client reads it from the repos buffer),
@@ -630,6 +722,33 @@ cache key must name each skgrepo's revision or "worktree", and
 the cache needs more than one slot once both halves can be
 snapshots. (The performance section says what else the cache
 should change.)
+**** TODO j : what do you suggest?
+***** TODO Claude says: four parts
+****** The request carries the pair
+The diff-view request gains one list, one entry per skgrepo: the
+repo's name, its old foot and its new foot, each foot a commit
+hash or the atom 'live'. The client reads the list off the
+chooser buffer's leaves; with no chooser it sends the default
+pair. The server rejects a pair whose old is not older than new,
+or that names a commit the repo lacks.
+****** The straddle remembers its pair
+The straddle records the pair it was built for. A request with
+the same pair reuses it (re-pairing the live side as today); a
+different pair rebuilds it. One straddle per connection, as you
+agreed below.
+****** The snapshot cache is per repo and commit
+Today one process-wide slot holds the parsed snapshot of all
+owned repos at HEAD. It becomes a small cache (say eight entries)
+keyed by (skgrepo, commit), each entry one repo's parsed sections
+at one commit. Moving one repo's foot then reparses that repo
+alone, and two pairs that share most feet share most entries. The
+composed and validated graph of a pair is kept with its straddle,
+as now, plus one process-wide slot for the default pair's before-
+graph, so that reopening the default diff view costs no
+validation ('report_perf.org', fix J).
+****** The buffer root carries the pair
+Every diff buffer's root metadata names the pair, so a reader, a
+save and the clients' goto know which graphs they are looking at.
 *** A mixed "new": worktree for some repos, a commit for others
 When every repo picks "worktree", 'after' is the live graph and
 the straddle can be re-paired cheaply. When some pick a commit,
@@ -640,13 +759,37 @@ picks worktree; otherwise both halves are snapshots, read the
 same way, so that their small differences cancel. Such a view
 is read-only, so the difference from the live graph is
 harmless.
+**** TODO j : please elaborate, I don't understand
+***** TODO Claude says: with "live" the puzzle is clearer
+The live graph is one whole, built in memory from every repo's
+files on disk. A snapshot graph is built the same way from each
+repo's files at some commit. Now suppose repo A's new foot is
+live and repo B's new foot is HEAD~2. The new graph of that pair
+is neither the live graph (B is wrong there) nor any single
+snapshot (A is at no commit). It must be assembled: A's sections
+from disk as they are now, B's from git at HEAD~2. Reading A from
+disk gives almost the live graph, but not quite: the live graph
+keeps illegal sections and reports them, the snapshot reader
+drops them; a telescope without a home gets a placeholder title
+in the snapshot. So my rule: when every repo's new foot is live,
+the new graph is the live graph itself, cheap and exact; when any
+repo's new foot is a commit, both graphs of the pair are
+assembled from disk and git the same way, so that the small
+differences fall on both sides alike. Such a pair is not editable
+anyway, so the differences cannot reach the files.
 *** One diff view at a time, or one per pair
 Buffer names are "diff-view: KIND", and the straddle is per
 connection. Two pairs open at once would collide in both. I
 propose one diff view per connection: opening with a new pair
 replaces the old buffers, and the buffer root shows the pair.
 Decide whether you ever want two pairs side by side.
+**** TODO j : sure, one per connection is fine
+***** TODO Claude says: folded; Q7 below is this
 ** TODO What only the default pair can do
+*** TODO UPDATED [Claude]: only stage-and-commit now
+Your point about "processed" marks moves readiness out of this
+list: marks exist for every pair, keyed by the pair. What stays
+bound to (HEAD, live): stage-and-commit, and the messages below.
 *** Stage and commit
 It commits every owned change onto HEAD regardless of the
 straddle, but its gate reads the connection's straddle's
@@ -669,6 +812,7 @@ titles of deleted nodes in "titles by ids", and
 'investigate_vanished_gnids' walks history from HEAD. Neither
 is part of the diff view's straddle; neither needs to change.
 
+* ONGOING Jeff has processed above and not yet below.
 * TODO Claude says: the repo chooser buffer
 ** Names: 'skgrepo' leaf and 'skgrepoFolder' folder
 Folder atoms are lowerCamel plus "Folder" ('subscribeeFolder',
@@ -678,7 +822,7 @@ pattern, except that '(repo ...)' as a list head is refused as a
 retired spelling ('parse_metadata_sexp.rs:695'). Since the
 glossary's word is skgrepo, I propose 'skgrepo' and
 'skgrepoFolder', with the old and new choices as fields:
-'(skg skgrepo (name "public") (old "a1b2c3d") (new worktree))'.
+'(skg skgrepo (name "public") (old "a1b2c3d") (new live))'.
 The folder kinds today are all partner or property folders of a
 viewparent ('Folder', 'viewnode.rs:580'); a repos tree is a new
 top-level category of viewnode, beside 'Folder' and
@@ -702,7 +846,7 @@ message naming both values; pushing silently changes a value
 the user did not touch.
 ** The series of a skgrepo without a gitrepo
 A foreign skgrepo need not be under git. Its series is then
-"worktree" alone, and the leaf says so.
+"live" alone, and the leaf says so.
 ** Where the chooser's state lives
 I propose: the buffer is the state. C-c v d inside the chooser
 reads every 'skgrepo' leaf's old and new and sends them with
@@ -753,16 +897,16 @@ was only one pair.
 Covered above; the fix is the read-only rule, which should land
 in the same slice as the first non-default pair.
 ** Dangerous: marks leaking across pairs
-Covered under your readiness headline; the fix is gating marks
-to the default pair.
-** Inelegant: per-skgrepo choice as the primary gesture
+Solved by keying the readiness store by the pair as well as the
+leaf, now that marks exist for every pair (your "processed"
+marks); see the thread under the read-only rule.
+** DONE-CLAUDE Inelegant: per-skgrepo choice as the gesture
 The per-repo choice is what makes mixed-revision graphs
 possible, and it is the choice that costs validation leniency
-and a disk-read 'after'. The folder cascade already gives the
-"move everything together" gesture, so the UI is right; I only
-suggest that the first version supports uniform pairs plus the
-foreign-repo case, and mixed owned pairs come after, once the
-validator's behavior on them is known.
+and a disk-read new graph. You chose lenience and mixed pairs
+from the start (under "Per-skgrepo choices" above), so this
+entry is settled: the validator reports instead of refusing.
+*** WHY-CLAUDE your "lenience" under "Per-skgrepo choices"
 ** Not dumb
 Storing nothing on the folder, reading the chooser as plain org
 with ignored user headlines, and separating readiness from the
@@ -771,34 +915,38 @@ diff are all consistent with how the rest of skg thinks
 
 * TODO Claude says: open questions
 Each is self-contained. A one-line answer under each is enough.
-** Q1 Is every pair whose "new" is not the worktree read-only?
-Read-only means: no editable occurrence, saves refused, no
-restore or extend requests. I propose yes.
-** Q2 Restores under (older commit, worktree): allowed?
+** Q1 Is every pair whose "new" is not live read-only?
+Read-only means: no editable occurrence and saves refused. The
+expand request stays (it answers with write-protected content
+from the pair's new graph), as you asked under the read-only
+rule; restores are allowed only when new is live. I propose yes.
+** DONE-CLAUDE Q2 Restores under (older commit, live): allowed?
 A restore copies a node or membership from the old graph into
 the live graph. With old = HEAD~3 it means "bring back what
-HEAD~3 had". I propose allowing it; it falls out for free.
-** Q3 Readiness only for the default pair?
-Default pair means HEAD vs worktree for every owned skgrepo.
-I propose: marks, check heralds, readiness gestures and
-stage-and-commit exist only there; elsewhere no '(ready ...)'
-facts are printed and the gesture is refused.
-** Q4 Mixed revisions across owned skgrepos: when?
-A node telescoped across two skgrepos at different revisions
-is assembled from two moments and may fail validation. I
-propose the first version supports one choice for all owned
-skgrepos, plus independent choices for foreign ones, and mixed
-owned choices come after we know how the validator behaves.
+HEAD~3 had". Allowed, with a minibuffer warning naming the
+commit.
+*** WHY-CLAUDE you answered under "The restore requests" above
+** DONE-CLAUDE Q3 Readiness only for the default pair?
+No: marks exist for every pair, keyed by the pair, meaning
+"processed" outside the default pair; stage-and-commit alone
+stays bound to (HEAD, live). Open only: whether the check
+mark's label should differ outside the default pair.
+*** WHY-CLAUDE your "processed" marks under the read-only rule
+** DONE-CLAUDE Q4 Mixed revisions across owned skgrepos: when?
+From the first version; the validator reports instead of
+refusing for any graph that is not live.
+*** WHY-CLAUDE your "lenience" under "Per-skgrepo choices"
 ** Q5 Store the resolved commit, display "HEAD~N"?
 The resolved commit does not shift after a commit; "HEAD~N"
 does. I propose storing the short hash and displaying both.
-** Q6 Unparsable historical sections: skip, or refuse?
-Today the HEAD read aborts on the first section that today's
-parser cannot read. I propose skipping with a count in the
-buffer root for any non-default pair.
-** Q7 One diff view per connection?
-Opening a new pair replaces the current four buffers; the pair
-is shown in the buffer root. I propose yes.
+** DONE-CLAUDE Q6 Unparsable historical sections: skip?
+Skip, with a count in the buffer root, for any graph that is
+not live.
+*** WHY-CLAUDE your "sure" under "Old commits may not parse"
+** DONE-CLAUDE Q7 One diff view per connection?
+Yes; opening a new pair replaces the current buffers; the pair
+is shown in the buffer root.
+*** WHY-CLAUDE your answer under "One diff view at a time"
 ** Q8 Cycling old past new: refuse, or push new along?
 I propose refusing with a message naming both values.
 ** Q9 Chooser state lives in the buffer only?
@@ -808,12 +956,15 @@ the straddle it built. I propose yes.
 ** Q10 Names 'skgrepo' and 'skgrepoFolder'?
 'repo' collides with a retired spelling in the metadata parser
 when written as a list head. I propose 'skgrepo'.
-** Q11 Which performance fixes first?
-My order: compile the client (setup, no code); memoize the
-style keywords and rule headers; 'set_nodelay'; skip the graph
-swap on no-op saves; then redraw-only-changed, which is the big
-one and the risky one. The server-side items are small and
-independent of the any-pair work; the client items are too.
-** Q12 Keep the two agents' reports beside this file?
-They are 'report_perf.org' and 'report_arch.org',
-untracked. Keep, move, or delete as you like.
+** DONE-CLAUDE Q11 Which performance fixes first?
+Done: the compiled client and the memos (plan 1_1). Next: the
+redraw delta with the stale-marks fix (plan 1_3). Still open,
+small and server-side: 'set_nodelay', the no-op graph swap, the
+incremental re-pairing, the process-wide before-graph. They can
+ride in plan 1_3 or in the any-pair plan; say which.
+*** WHY-CLAUDE plans 1_1 and 1_2 happened; the rest is sequencing
+** Q12 Keep the agents' reports beside this file?
+Five now: 'report_perf.org', 'report_arch.org',
+'report_heralds.org', 'report_overlay-floor.org',
+'report_envelope.org', all untracked. Keep, move, or delete as
+you like; the plans cite them as background only.
