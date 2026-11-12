@@ -41,7 +41,7 @@
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::dbs::in_rust_graph::override_resolution::{
-  carrier_on_owned_chain, resolve_override};
+  carrier_on_override_chain_followed_by, resolve_override};
 use crate::refresh::editability::{
   DrawnEditability, EditabilityAndClaim, carries_editableView_request,
   consume_editableView_request,
@@ -65,7 +65,7 @@ use crate::types::nodes::rust::GraphnodeInRust;
 use crate::refresh::diff_view;
 use crate::refresh::chain::draw_containerward_chain;
 use crate::skgrepo_sets::SkgrepoRestriction;
-use crate::types::misc::ID;
+use crate::types::misc::{ID, SkgrepoOwner};
 use crate::types::tree::moves::{move_after, move_to_first_child, move_to_last_child};
 use crate::types::viewnode::{
   FoldAndFocus, Folder, FolderRelation, PropertyMember, ViewRequest, Viewnode,
@@ -745,18 +745,18 @@ fn substitute_overriders (
       None => if warrant == Warrant::ByGraph {
         let effective : ID = resolve_override (
           walk . truth . config, walk . truth . graph, walk . truth . restriction,
-          &gnid ) . effective;
+          &SkgrepoOwner::User, &gnid ) . effective;
         if effective != gnid {
           show_overrider (tree, child, &effective, Some (gnid), walk) ?; }},
       Some (original) => {
         let effective : ID = resolve_override (
           walk . truth . config, walk . truth . graph, walk . truth . restriction,
-          &original ) . effective;
+          &SkgrepoOwner::User, &original ) . effective;
         if effective == original {
           stop_substituting (tree, parent, child, &original, goal, walk) ?;
-        } else if ! carrier_on_owned_chain (
+        } else if ! carrier_on_override_chain_followed_by (
                       walk . truth . config, walk . truth . graph, &walk . unrestricted,
-                      &original, &gnid ) {
+                      &SkgrepoOwner::User, &original, &gnid ) {
           show_overrider (tree, child, &effective, Some (original), walk) ?; }}, }}
   Ok (( )) }
 
@@ -840,7 +840,7 @@ fn is_overridden_and_shown_raw (
   raw_position
   && occurrence . overridesHere . is_none ()
   && resolve_override ( walk . truth . config, walk . truth . graph,
-                        &walk . unrestricted,
+                        &walk . unrestricted, &SkgrepoOwner::User,
                         &occurrence . gnid ) . effective != occurrence . gnid }
 
 //

@@ -1,14 +1,14 @@
 //! The override resolver: given an ID, which node should be shown
-//! in its place? Follows owned 'overrides' relationships from
-//! overridden to overrider, transitively, with a seen-set cycle
-//! guard. Foreign override relationships never participate in substitution;
-//! they are display-only facts (search enrichment, folders, heralds,
-//! and paths).
+//! in its place? Follows the 'overrides' relationships of one owner,
+//! the follower ('SkgrepoOwner'), from overridden to overrider,
+//! transitively, with a seen-set cycle guard. Override relationships
+//! whose overrider is not the follower's do not participate; they are
+//! display-only facts (search enrichment, folders, heralds, and paths).
 //!
 //! Two gates, applied per relationship:
 //! - ownership is set-independent: a relationship is followed only if its
-//!   overrider's skgrepo is owned, regardless of the
-//!   skgrepo restriction.
+//!   overrider's home skgrepo belongs to the follower
+//!   ('SkgConfig::skgrepo_owner'), regardless of the skgrepo restriction.
 //! - visibility: a relationship is followed only if the skgrepo
 //!   restriction shows both its relRepo and its overrider's home
 //!   skgrepo. A restricted relationship cannot affect visible topology,
@@ -20,31 +20,31 @@
 //! A path of any length is normal: an owned override chain
 //! (D overrides C overrides N, all owned) resolves to the end of the
 //! chain, and any node on the path is a node the server could
-//! legitimately show (see 'carrier_on_owned_chain'). Only a
-//! cycle is anomalous — forbidden upstream by the invariant validators
-//! (see [[./override_invariants.rs]]) at save and init/rebuild, and
-//! handled here as a backstop: the resolver still terminates and
-//! substitutes nothing on a cycle. A multi-overrider hop (monogamy
-//! violation) is likewise forbidden upstream; the resolver refuses to
-//! choose a branch.
+//! legitimately show (see 'carrier_on_override_chain_followed_by'). Only a
+//! cycle is anomalous — forbidden upstream for owned data by the invariant
+//! validators (see [[./override_invariants.rs]]) at save and init/rebuild,
+//! and handled here as a backstop: the resolver still terminates and
+//! substitutes nothing on a cycle. A multi-overrider hop (a monogamy
+//! violation) is likewise forbidden upstream for owned data; the resolver
+//! refuses to choose a branch.
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::skgrepo_sets::SkgrepoRestriction;
-use crate::types::misc::{ID, SkgConfig};
+use crate::types::misc::{ID, SkgConfig, SkgrepoOwner};
 
 use std::collections::HashSet;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct OverrideResolution {
   /// The PID to show. Equal to the (resolved) input when no
-  /// owned, visible overrider exists.
+  /// visible overrider of the follower's exists.
   pub effective      : ID,
   /// The chain of overriders traversed, in order. Empty = no
-  /// substitution. A path of any length is normal: an owned
-  /// override chain (D overrides C overrides N) resolves to the end
+  /// substitution. A path of any length is normal: an override
+  /// chain (D overrides C overrides N) resolves to the end
   /// of the chain, and middle carriers are honest (see
-  /// 'carrier_on_owned_chain').
+  /// 'carrier_on_override_chain_followed_by').
   pub path           : Vec<ID>,
   /// True iff the walk met an already-seen PID. In that case no
   /// substitution is performed ('effective' = the input, 'path'
@@ -59,11 +59,14 @@ pub struct OverrideResolution {
   pub cycle          : Vec<ID>,
 }
 
+/// Walk from 'gnid' along the override relationships whose overriders
+/// are 'follower''s, under 'restriction'.
 pub fn resolve_override (
-  config : &SkgConfig,
-  graph  : &InRustGraph,
+  config   : &SkgConfig,
+  graph    : &InRustGraph,
   restriction : &SkgrepoRestriction,
-  gnid  : &ID,
+  follower : &SkgrepoOwner, // whose overrides the walk follows
+  gnid     : &ID,
 ) -> OverrideResolution {
   let input_pid : ID = // extra-ID safety: resolve before walking
     graph . pid_else_raw_id (gnid);
@@ -73,9 +76,9 @@ pub fn resolve_override (
   let mut path : Vec<ID> = Vec::new ();
   loop {
     let candidates : Vec<ID> =
-      followable_overriders_of (config, graph, restriction, &current);
+      followable_overriders_of (config, graph, restriction, follower, &current);
     if candidates . len () != 1 {
-      // 0: nothing (visible, owned) overrides 'current'.
+      // 0: nothing (visible, the follower's) overrides 'current'.
       // >1: monogamy-violating data; refuse to choose a branch.
       // Either way 'current' is the destination.
       return OverrideResolution {
@@ -106,52 +109,54 @@ pub fn resolve_override (
     path . push ( next . clone () );
     current = next; }}
 
-/// Whether 'carrier' is a node on 'original''s owned override
-/// chain — i.e. a node the server could legitimately show, marked
+/// Whether 'carrier' is a node on 'original''s chain of 'follower''s
+/// overriders — i.e. a node the server could legitimately show, marked
 /// '(overridesHere original)', wherever 'original' would appear as
-/// content. The tamper check at save uses this: with chains the shown
-/// node can be any link of the chain (a middle carrier, when a later
+/// content in a tree that follows 'follower''s overrides. The tamper
+/// check at save uses this: with chains the shown node can be any
+/// link of the chain (a middle carrier, when a later
 /// link's skgrepo is hidden), not only the end, so it must accept any
 /// honest carrier and reject only an off-chain (faked/stale) fact.
 /// Visibility-ungated ('unrestricted', the config's unrestricted
 /// skgrepo restriction, which the caller builds once) so a fact that
 /// was honest when rendered does not start failing after a switch of
-/// the skgrepo restriction; 'path' is the full owned chain (ownership
-/// still gates).
-pub fn carrier_on_owned_chain (
+/// the skgrepo restriction; 'path' is the follower's full chain
+/// (ownership still gates).
+pub fn carrier_on_override_chain_followed_by (
   config       : &SkgConfig,
   graph        : &InRustGraph,
   unrestricted : &SkgrepoRestriction,
+  follower     : &SkgrepoOwner,
   original     : &ID,   // the fact's N
   carrier      : &ID,   // the shown node's own id
 ) -> bool {
-  resolve_override (config, graph, unrestricted, original)
+  resolve_override (config, graph, unrestricted, follower, original)
     . path . contains (carrier) }
 
 /// The overriders of 'pid' that substitution may follow: the relationship's
-/// relRepo is unrestricted, and the overrider is both owned and at an
+/// relRepo is unrestricted, and the overrider is both 'follower''s
+/// ('SkgConfig::skgrepo_owner' of its home skgrepo) and at an
 /// unrestricted home skgrepo. Relationship visibility comes from the same
 /// directional gated accessor used by folders, paths, and counts.
-/// Ownership is modeled on 'owned_overriders_of' in
+/// For 'SkgrepoOwner::User', ownership is that of 'owned_overriders_of' in
 /// [[./override_invariants.rs]], which serves validation and so applies no
 /// visibility filter.
 fn followable_overriders_of (
-  config : &SkgConfig,
-  graph  : &InRustGraph,
+  config   : &SkgConfig,
+  graph    : &InRustGraph,
   restriction : &SkgrepoRestriction,
-  pid    : &ID,
+  follower : &SkgrepoOwner,
+  pid      : &ID,
 ) -> Vec<ID> {
   let mut result : Vec<ID> = Vec::new ();
   for overrider in graph . other_member_pids_gated (
     pid, RelationRole::OVERRIDDEN, restriction ) {
     if let Some (overrider_node) = graph . nodes . get (&overrider) {
-      let owned : bool =
-        config . skgrepos . get (&overrider_node . home_skgrepo)
-        . map ( |sc| sc . owned )
-        . unwrap_or (false);
+      let is_the_followers : bool =
+        &config . skgrepo_owner (&overrider_node . home_skgrepo) == follower;
       let home_visible : bool =
         ! SkgrepoRestriction::node_is_restricted (
           restriction, &overrider_node . home_skgrepo );
-      if owned && home_visible {
+      if is_the_followers && home_visible {
         result . push (overrider); }} }
   result }

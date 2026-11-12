@@ -5,7 +5,7 @@ use skg::dbs::in_rust_graph::override_resolution::{
 };
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::types::misc::{
-  ID, MSV, RelPartner, SkgConfig, Skgrepo, SkgrepoName,
+  ID, MSV, RelPartner, SkgConfig, Skgrepo, SkgrepoName, SkgrepoOwner,
   rel_partners_at_relRepo};
 use skg::types::nodes::complete::{Graphnode, empty_graphnode};
 
@@ -82,7 +82,8 @@ fn resolve (
 ) -> OverrideResolution {
   let graph : InRustGraph =
     InRustGraph::from_graphnodes (&nodes);
-  resolve_override (&config (), &graph, restriction, &ID::from (gnid)) }
+  resolve_override (
+    &config (), &graph, restriction, &SkgrepoOwner::User, &ID::from (gnid)) }
 
 #[test]
 fn no_overrider_resolves_to_self () {
@@ -246,7 +247,8 @@ fn extra_id_input_and_extra_id_relationship_both_resolve () {
     InRustGraph::from_graphnodes (&nodes);
   let by_extra_id : OverrideResolution = // input is the extra ID
     resolve_override (
-      &config (), &graph, &SkgrepoRestriction::unrestricted (&config ()), &ID::from ("target-extra") );
+      &config (), &graph, &SkgrepoRestriction::unrestricted (&config ()),
+      &SkgrepoOwner::User, &ID::from ("target-extra") );
   assert_eq! (
     by_extra_id,
     OverrideResolution {
@@ -256,7 +258,8 @@ fn extra_id_input_and_extra_id_relationship_both_resolve () {
       cycle          : vec![], } );
   let by_pid : OverrideResolution =
     resolve_override (
-      &config (), &graph, &SkgrepoRestriction::unrestricted (&config ()), &ID::from ("target") );
+      &config (), &graph, &SkgrepoRestriction::unrestricted (&config ()),
+      &SkgrepoOwner::User, &ID::from ("target") );
   assert_eq! (by_pid, by_extra_id); }
 
 #[test]

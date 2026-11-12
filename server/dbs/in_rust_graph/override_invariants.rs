@@ -1,7 +1,7 @@
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::override_resolution::resolve_override;
 use crate::skgrepo_sets::SkgrepoRestriction;
-use crate::types::misc::{ID, SkgConfig, SkgrepoName, members_of};
+use crate::types::misc::{ID, SkgConfig, SkgrepoName, SkgrepoOwner, members_of};
 
 use std::collections::{HashMap, HashSet};
 
@@ -91,7 +91,8 @@ pub fn validate_override_invariants (
         . unwrap_or (false); // unknown skgrepo reported by the
                              // overrider-collection pass above
       if ! owned { continue; }
-      let resolution = resolve_override (config, graph, &unrestricted, pid);
+      let resolution = resolve_override (
+        config, graph, &unrestricted, &SkgrepoOwner::User, pid);
       if resolution . cycle_detected {
         let canonical : Vec<ID> =
           canonicalize_cycle (resolution . cycle);
@@ -190,7 +191,8 @@ pub(crate) fn validate_affected_override_invariants_with_counts (
       config, skgrepo, &node . home_skgrepo, &mut violations)
       else { continue; };
     if ! owned { continue; }
-    let resolution = resolve_override (config, graph, &unrestricted, skgrepo);
+    let resolution = resolve_override (
+      config, graph, &unrestricted, &SkgrepoOwner::User, skgrepo);
     chain_steps += if resolution . cycle_detected {
       resolution . cycle . len ()
     } else {

@@ -118,7 +118,7 @@ pub(crate) struct Walk<'a> {
   pub added_compound_folders   : HashSet<NodeId>,
   /// The skgrepo restriction that keeps nothing out, of the truth's
   /// config: what override resolution asks under when it must not
-  /// depend on the connection's ('carrier_on_owned_chain'). Built
+  /// depend on the connection's ('carrier_on_override_chain_followed_by'). Built
   /// once per walk.
   pub unrestricted             : SkgrepoRestriction,
 }
