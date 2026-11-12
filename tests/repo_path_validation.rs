@@ -327,3 +327,41 @@ fn the_retired_owned_folder_key_is_refused (
             && refusal . contains ("foreign = true"),
             "the refusal names the key and the flag: {}", refusal );
   Ok (( )) }
+
+/// A config in an owner's folder names the other owners' skgrepos by
+/// paths that leave it ('../claude/public'). Each resolves to a plain
+/// absolute path, with no '..' left in it; what the config's location
+/// gives (the search index, the readiness marks) stays in that folder.
+#[test]
+fn a_skgrepo_path_that_leaves_the_data_root_resolves_without_dot_dot (
+) -> Result<(), Box<dyn std::error::Error>> {
+  let data_parent : TempDir = tempdir () ?;
+  for folder in ["jeff/public", "claude/public", "claude/team/ed/notes"] {
+    fs::create_dir_all ( data_parent . path () . join (folder) ) ?; }
+  let config_path : PathBuf =
+    data_parent . path () . join ("jeff/skgconfig.toml");
+  fs::write ( &config_path, concat! (
+    "tantivy_folder = \".index.tantivy\"\n",
+    "[[repos]]\nname = \"public\"\npath = \"public\"\n",
+    "[[repos]]\nname = \"claude-public\"\npath = \"../claude/public\"\n",
+    "foreign = true\n",
+    "[[repos]]\nname = \"ed\"\npath = \"./../claude/team/ed/notes\"\n",
+    "foreign = true\n" )) ?;
+  let (config, _warnings) : (SkgConfig, Vec<String>) =
+    load_config ( config_path . to_str () . unwrap () ) ?;
+  let data_parent_path : PathBuf =
+    fs::canonicalize ( data_parent . path () ) ?;
+  let path_of = |name : &str| -> PathBuf {
+    config . skgrepos [&SkgrepoName::from (name)] . path . clone () };
+  assert_eq! ( config . data_root, data_parent_path . join ("jeff") );
+  assert_eq! ( path_of ("public"), data_parent_path . join ("jeff/public") );
+  assert_eq! ( path_of ("claude-public"),
+               data_parent_path . join ("claude/public") );
+  assert_eq! ( path_of ("ed"),
+               data_parent_path . join ("claude/team/ed/notes") );
+  assert_eq! ( config . tantivy_folder,
+               data_parent_path . join ("jeff/.index.tantivy") );
+  assert_eq! ( config . readiness_marks_path (),
+               data_parent_path . join (
+                 "jeff/readiness-marks-skgconfig.json" ));
+  Ok (( )) }

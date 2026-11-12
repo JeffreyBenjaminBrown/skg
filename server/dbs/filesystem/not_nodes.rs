@@ -5,7 +5,7 @@ use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs;
 use std::io;
-use std::path::{Components, Path, PathBuf};
+use std::path::{Component, Components, Path, PathBuf};
 
 /// If a skgrepo path does not exist:
 /// - If it is marked owned (in the config), create it.
@@ -283,18 +283,61 @@ fn validate_skgrepo_sets (
   Ok (()) }
 
 /// Resolve relative paths in the config against data_root.
-/// Absolute paths are left unchanged.
+/// Absolute paths are left unchanged. A relative path may leave the
+/// data root ('../claude/public'); its '..' is resolved here, so that
+/// every path the server holds compares and strips as a plain one.
 fn make_paths_absolute (
   config : &mut SkgConfig,
 ) {
   let root : PathBuf = config . data_root . clone ();
   if config . tantivy_folder . is_relative () {
-    config . tantivy_folder = root . join (
-      &config . tantivy_folder ); }
+    config . tantivy_folder = joined_without_dot_segments (
+      &root, &config . tantivy_folder ); }
   for skgrepo in config . skgrepos . values_mut () {
     if skgrepo . path . is_relative () {
-      skgrepo . path = root . join (
-        &skgrepo . path ); } } }
+      skgrepo . path = joined_without_dot_segments (
+        &root, &skgrepo . path ); } } }
+
+/// 'base' joined with 'relative', each '.' dropped and each '..'
+/// removing the folder before it. Lexical: no symlink is followed,
+/// and the result need not exist ('validate_skgrepo_paths_creating_owned_ones_if_needed'
+/// may create it). A '..' with no folder before it is kept: the data
+/// root is relative, even empty, when it cannot be canonicalized
+/// (a config given as a bare file name).
+fn joined_without_dot_segments (
+  base     : &Path,
+  relative : &Path,
+) -> PathBuf {
+  let mut joined : PathBuf = base . to_path_buf ();
+  for component in relative . components () {
+    match component {
+      Component::CurDir    => (),
+      Component::ParentDir => {
+        match joined . components () . next_back () {
+          Some (Component::Normal (_)) => { joined . pop (); },
+          Some (Component::RootDir)    => (),
+          _ => joined . push (".."), }},
+      other                => joined . push (other), }}
+  joined }
+
+#[cfg(test)]
+mod joined_without_dot_segments_tests {
+  use super::joined_without_dot_segments;
+  use std::path::{Path, PathBuf};
+
+  #[test]
+  fn a_dot_dot_with_no_folder_before_it_is_kept () {
+    let joined = |base : &str, relative : &str| -> PathBuf {
+      joined_without_dot_segments ( Path::new (base), Path::new (relative) ) };
+    assert_eq! ( joined ("/data/jeff", "./../claude/public"),
+                 PathBuf::from ("/data/claude/public") );
+    assert_eq! ( joined ("", "../claude/public"),
+                 PathBuf::from ("../claude/public") );
+    assert_eq! ( joined ("data", "../../x"),
+                 PathBuf::from ("../x") );
+    assert_eq! ( joined ("/", "../x"),
+                 PathBuf::from ("/x") ); }
+}
 
 #[cfg(test)]
 mod retired_typedb_config_tests {
