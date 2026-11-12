@@ -16,6 +16,11 @@
 // visibility gates: FR (skgrepo "foreign", not owned) overrides
 // N1; R2 (skgrepo "other", owned) overrides N2; N3 lives in
 // "other" while P3 and its overrider R3 live in "main".
+//
+// The foreign-root fixture (fixtures-foreign-root) gives a view the
+// overrides of its root's author to follow: R (skgrepo "foreign", not
+// owned) contains M and K; A, also foreign, and U, in "main", each
+// override M; P, in "main", contains M.
 
 use skg::test_utils::save_and_rerender;
 use indoc::indoc;
@@ -38,6 +43,7 @@ use skg::types::nodes::complete::Graphnode;
 use skg::types::save::{NodeInstruction, SaveNode};
 use skg::types::views_state::OpenViews;
 
+use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 
 #[test]
@@ -63,6 +69,23 @@ fn all_tests
       s . reset_from_config ("chain_half_visible_keeps_the_original",
                              "tests/override_substitution/fixtures-chain/skgconfig.toml") ?;
       chain_half_visible_keeps_the_original (
+        &s . config, &mut s . tantivy ) . await ?;
+      let foreign_root : &str =
+        "tests/override_substitution/fixtures-foreign-root";
+      s . reset ("a_view_follows_the_overrides_of_its_roots_author", foreign_root) ?;
+      a_view_follows_the_overrides_of_its_roots_author (
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("under_a_foreign_root_a_save_roundtrips_its_authors_overrider", foreign_root) ?;
+      under_a_foreign_root_a_save_roundtrips_its_authors_overrider (
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("under_an_owned_root_a_foreign_authors_carrier_is_rejected", foreign_root) ?;
+      under_an_owned_root_a_foreign_authors_carrier_is_rejected (
+        &s . config ) . await ?;
+      s . reset ("under_a_foreign_root_a_forked_child_is_shown_as_the_original", foreign_root) ?;
+      under_a_foreign_root_a_forked_child_is_shown_as_the_original (
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("a_forked_foreign_root_follows_the_users_overrides", foreign_root) ?;
+      a_forked_foreign_root_follows_the_users_overrides (
         &s . config, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
 
@@ -431,3 +454,184 @@ async fn chain_half_visible_keeps_the_original (
             "off-chain fact must abort the save; got: {:?}",
             other . map ( |v| v . len () ) ), }}
       Ok (( )) }
+
+/// The text of 'pid''s .skg file in the skgrepo 'skgrepo'.
+fn read_skgrepo_file (
+  config  : &SkgConfig,
+  skgrepo : &str,
+  pid     : &str,
+) -> String {
+  let path : std::path::PathBuf =
+    config . skgrepos . get ( &SkgrepoName::from (skgrepo) ) . unwrap ()
+    . path . join ( format! ("{}.skg", pid) );
+  std::fs::read_to_string (&path)
+    . unwrap_or_else ( |e| panic! ("reading {:?}: {}", path, e) ) }
+
+/// The one node on disk that overrides 'original'.
+fn overrider_on_disk (
+  config   : &SkgConfig,
+  original : &str,
+) -> Result<Graphnode, Box<dyn Error>> {
+  let overriders : Vec<Graphnode> =
+    read_all_skg_files_from_skgrepos (config) ?
+    . into_iter ()
+    . filter ( |node| node . overrides . or_default () . iter ()
+               . any ( |m| m . member == ID::from (original) ) )
+    . collect ();
+  match overriders . as_slice () {
+    [one] => Ok (one . clone ()),
+    _ => Err ( format! ( "expected one overrider of {} on disk; found {:?}",
+                         original,
+                         overriders . iter () . map ( |n| &n . pid )
+                         . collect::<Vec<&ID>> () ) . into () ), }}
+
+/// The view's line for the occurrence whose gnid is 'gnid'.
+fn line_of_gnid<'a> (
+  view : &'a str,
+  gnid : &str,
+) -> Option<&'a str> {
+  let fact : String = format! ("(gnid {})", gnid);
+  view . lines () . find ( |l| l . contains (&fact) ) }
+
+/// R, foreign, contains M; A, of R's author, and U, the user's, each
+/// override M; P, owned, contains M. A view of R shows A in M's
+/// place, a view of P shows U, and a view of both shows each under
+/// its own root.
+async fn a_view_follows_the_overrides_of_its_roots_author (
+  config  : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  graph_handle_from_config (config) ?;
+  let (view, _pids, _tree) =
+    multi_root_view (
+      config, Some (tantivy), &[ ID::from ("R"), ID::from ("P") ] ) ?;
+  let marked : Vec<&str> = marked_lines (&view, "M");
+  assert_eq! ( marked . len (), 2, "{}", view );
+  assert! ( marked [0] . starts_with ("** ")
+            && marked [0] . contains ("(gnid A)"),
+    "under R, R's author's A is shown in M's place:\n{}", view );
+  assert! ( ! marked [0] . contains ("writeProtected"),
+    "and editable, so the substitution is the editable kind:\n{}", view );
+  assert! ( marked [1] . starts_with ("** ")
+            && marked [1] . contains ("(gnid U)"),
+    "under P, the user's U is shown in M's place:\n{}", view );
+  Ok (( )) }
+
+/// Saving a view of foreign R, unchanged, where A stands for M, writes
+/// nothing to R, passes the overridesHere tamper check, and is a
+/// fixpoint.
+async fn under_a_foreign_root_a_save_roundtrips_its_authors_overrider (
+  config  : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  graph_handle_from_config (config) ?;
+  let r_before : String = read_skgrepo_file (config, "foreign", "R");
+  let (view, _pids, _tree) =
+    multi_root_view ( config, Some (tantivy), &[ ID::from ("R") ] ) ?;
+  assert! ( line_of_gnid (&view, "A")
+            . is_some_and ( |l| l . contains ("(overridesHere M)") ),
+    "{}", view );
+  let saved : String = save_and_rerender (&view, config, tantivy) . await ?;
+  assert_eq! ( read_skgrepo_file (config, "foreign", "R"), r_before,
+    "R, still containing M, is untouched by the save" );
+  assert! ( overrider_on_disk (config, "K") . is_err (),
+    "an unchanged save forks nothing" );
+  assert_metadata_eq! ( view, saved,
+    "the save of an unchanged view of R is a fixpoint" );
+  Ok (( )) }
+
+/// A buffer under owned P that shows A, of a foreign author, in M's
+/// place is rejected: P's tree follows the user's overrides, and A is
+/// not on M's chain of them.
+async fn under_an_owned_root_a_foreign_authors_carrier_is_rejected (
+  config : &SkgConfig,
+) -> Result<(), Box<dyn Error>> {
+  graph_handle_from_config (config) ?;
+  let buffer : &str = indoc! {"
+    * (skg node (gnid P) (skgRepos (nodeRepo main))) P
+    ** (skg node (gnid A) (skgRepos (nodeRepo foreign)) (overridesHere M)) A
+  "};
+  match node_instructions_from (buffer, config) . await {
+    Err (SaveError::BufferValidationErrors { errors, .. }) =>
+      assert! ( errors . iter () . any ( |e| matches! (
+        e, BufferValidationError::OverridesHere_Mismatch (..) )),
+        "a carrier only on the foreign author's chain must abort; got: {:?}",
+        errors ),
+    other => panic! (
+      "a carrier only on the foreign author's chain must abort the save; got: {:?}",
+      other . map ( |v| v . len () ) ), }
+  Ok (( )) }
+
+/// Intended: under a foreign root the view shows what the root's
+/// author would see, so a child of R the user edits there, which
+/// forks it into the user's clone, is shown afterward as the
+/// original, unedited, and not as the clone. The clone is shown where
+/// the user's own overrides are followed (under an owned root, or
+/// under a fork of R: 'a_forked_foreign_root_follows_the_users_overrides').
+async fn under_a_foreign_root_a_forked_child_is_shown_as_the_original (
+  config  : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  graph_handle_from_config (config) ?;
+  let (view, _pids, _tree) =
+    multi_root_view ( config, Some (tantivy), &[ ID::from ("R") ] ) ?;
+  let k_line : &str = line_of_gnid (&view, "K")
+    . ok_or_else ( || format! ("K is shown under R:\n{}", view) ) ?;
+  assert! ( ! k_line . contains ("writeProtected"), "{}", view );
+  let edited : String = view . replace (
+    k_line, &k_line . replace (") K", ") K-edited") );
+  let saved : String = save_and_rerender (&edited, config, tantivy) . await ?;
+  let clone : Graphnode = overrider_on_disk (config, "K") ?;
+  assert_eq! ( clone . title, "K-edited", "the edit forked K" );
+  assert_eq! ( clone . home_skgrepo, SkgrepoName::from ("main") );
+  assert! ( line_of_gnid (&saved, "K")
+            . is_some_and ( |l| l . ends_with (") K") ),
+    "under R, K is shown as itself, unedited:\n{}", saved );
+  assert! ( line_of_gnid (&saved, &clone . pid . 0) . is_none ()
+            && ! saved . contains ("K-edited"),
+    "under R, the user's clone of K is not shown:\n{}", saved );
+  assert! ( line_of_gnid (&saved, "A")
+            . is_some_and ( |l| l . contains ("(overridesHere M)") ),
+    "under R, A still stands for M:\n{}", saved );
+  { // Editing K there again would fork it again; the save refuses,
+    // naming the clone to edit instead.
+    let k_line : &str = line_of_gnid (&saved, "K") . unwrap ();
+    let edited_again : String = saved . replace (
+      k_line, &k_line . replace (") K", ") K-edited-again") );
+    match node_instructions_from (&edited_again, config) . await {
+      Err (SaveError::BufferValidationErrors { errors, .. }) =>
+        assert! ( errors . iter () . any ( |e| matches! (
+          e, BufferValidationError::ForkAlreadyExists (original, existing)
+             if *original == ID::from ("K") && *existing == clone . pid )),
+          "got: {:?}", errors ),
+      other => panic! ( "a second fork of K must be refused; got: {:?}",
+                        other . map ( |v| v . len () ) ), }}
+  Ok (( )) }
+
+/// Editing foreign root R forks it; the saved view's root becomes the
+/// user's clone of R, and beneath it the user's overrides are
+/// followed: U, not A, is shown in M's place.
+async fn a_forked_foreign_root_follows_the_users_overrides (
+  config  : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  graph_handle_from_config (config) ?;
+  let (view, _pids, _tree) =
+    multi_root_view ( config, Some (tantivy), &[ ID::from ("R") ] ) ?;
+  let r_line : &str = view . lines () . next () . unwrap ();
+  assert! ( r_line . contains ("(gnid R)")
+            && ! r_line . contains ("writeProtected"), "{}", view );
+  let edited : String = view . replacen (
+    r_line, &r_line . replace (") R", ") R-edited"), 1 );
+  let saved : String = save_and_rerender (&edited, config, tantivy) . await ?;
+  let clone : Graphnode = overrider_on_disk (config, "R") ?;
+  let root_line : &str = saved . lines () . next () . unwrap ();
+  assert! ( root_line . contains (&format! ("(gnid {})", clone . pid . 0))
+            && root_line . contains ("(overridesHere R)"),
+    "the root is R's clone:\n{}", saved );
+  let marked : Vec<&str> = marked_lines (&saved, "M");
+  assert! ( marked . len () == 1 && marked [0] . contains ("(gnid U)"),
+    "under the clone of R, the user's U is shown in M's place:\n{}", saved );
+  assert! ( line_of_gnid (&saved, "A") . is_none (),
+    "under the clone of R, A is not shown:\n{}", saved );
+  Ok (( )) }
