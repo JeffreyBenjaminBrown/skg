@@ -29,8 +29,8 @@
     (when test-port (setq skg-port (string-to-number test-port))))
   (let ((config-file (getenv "SKG_CONFIG_FILE")))
     (when config-file
-      (setq skg-config-dir
-            (file-name-directory (expand-file-name config-file)))))
+      (setq skg-config-file-path (expand-file-name config-file))
+      (setq skg-config-dir (file-name-directory skg-config-file-path))))
   (setq integration-test-phase "open the view")
   (skg-request-single-root-content-view-from-id "r")
   (let ((view (skg-test-wait-for

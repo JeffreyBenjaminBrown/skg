@@ -112,8 +112,8 @@
       (message "Using test port: %d" skg-port)))
   (let ((config-file (getenv "SKG_CONFIG_FILE")))
     (when config-file
-      (setq skg-config-dir
-            (file-name-directory (expand-file-name config-file)))))
+      (setq skg-config-file-path (expand-file-name config-file))
+      (setq skg-config-dir (file-name-directory skg-config-file-path))))
 
   (phase-1-open-view)
   (phase-2-open-metadata-edit)
