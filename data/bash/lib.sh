@@ -4,7 +4,8 @@
 # Source this file, then loop over one of:
 #   skg_all_repos     -- every repo in skgconfig.toml
 #   skg_owned_repos   -- only repos whose entry does not say foreign = true
-# Each prints one repo path (relative to the data dir) per line.
+# Each prints one repo path (relative to the config's folder, its data
+# root) per line.
 #
 # Operate on a repo with "$SKG_DATA_DIR/$repo", e.g.
 #   for repo in $(skg_owned_repos); do
@@ -20,8 +21,9 @@
 # rather than forcing absolute paths -- yet still resolve correctly from any
 # cwd, since they track the script file's location, not the current directory.
 SKG_LIB_DIR="$(dirname "${BASH_SOURCE[0]}")"
-SKG_DATA_DIR="$SKG_LIB_DIR/.."
-SKG_CONFIG="${SKG_CONFIG:-$SKG_DATA_DIR/skgconfig.toml}"
+SKG_CONFIG="${SKG_CONFIG:-$SKG_LIB_DIR/../jeff/skgconfig.toml}"
+# The config's folder: the data root its repo paths are relative to.
+SKG_DATA_DIR="$(dirname "$SKG_CONFIG")"
 
 # Print the `path` of each [[repos]] block in skgconfig.toml.
 # $1 = "all" (every repo) or "owned". A repo is owned unless its
