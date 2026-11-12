@@ -28,7 +28,8 @@
 
 use crate::types::tree::forest::stands_in_containerward_chain;
 use crate::diff_view::change_leaves::{
-  BufferReadinessSummary, ChangeLeaves, LeafKey, NodeAspect, RelationshipAspect};
+  BufferReadinessSummary, ChangeLeaves, LeafKey, NewNodeWalk, NodeAspect,
+  RelationshipAspect};
 use crate::diff_view::pruned_change_view::nodes_editable_in_diffView;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::{
@@ -121,25 +122,31 @@ pub type NamedLeaves = Vec<NamedLeafSet>;
 /// forest: one leaf; every leaf a node records ('all'); or the
 /// content relationships a node records, of one aspect (a changeset
 /// marker's). Which leaves each holds is 'holds'; which of them the
-/// forest has, 'keys_in_forest'.
+/// forest has, 'keys_in_forest'. The exception is 'NewNodesFrom'
+/// ('newContent', 'newOutward'): the leaves of the new nodes a walk
+/// reaches from a node ('ChangeLeaves::leaves_of_new_nodes_reached_from'),
+/// which only the forest can tell, so without it the set is taken to
+/// hold every leaf.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum NamedLeafSet {
   Leaf                   (LeafKey),
   AllOf                  (ID),
   ContentRelationshipsOf (ID, RelationshipAspect),
+  NewNodesFrom           (ID, NewNodeWalk),
 }
 
 impl NamedLeafSet {
   /// Whether the set holds the leaf 'key', whatever the forest holds:
   /// the one leaf; any leaf its node records; or, for a changeset
   /// marker's set, a content relationship its node records, of its
-  /// aspect.
+  /// aspect. A 'NewNodesFrom' set might hold any leaf.
   pub fn holds (
     &self,
     key : &LeafKey,
   ) -> bool {
     match self {
       NamedLeafSet::Leaf (leaf) => leaf == key,
+      NamedLeafSet::NewNodesFrom (..) => true,
       NamedLeafSet::AllOf (pid) => recorder_of_leaf (key) == pid,
       NamedLeafSet::ContentRelationshipsOf (pid, aspect) => matches! (
         key,
@@ -151,6 +158,9 @@ impl NamedLeafSet {
 
   /// The leaves both sets name, whatever the forest holds, as the
   /// narrower of the two; None when they can name no leaf in common.
+  /// Every set might share a leaf with a 'NewNodesFrom' set, so
+  /// validation refuses any request of the opposite readiness beside
+  /// one.
   pub fn overlap (
     &self,
     other : &NamedLeafSet,
@@ -162,6 +172,7 @@ impl NamedLeafSet {
         (NamedLeafSet::ContentRelationshipsOf (pid, _),
          NamedLeafSet::AllOf (wider_pid)) =>
           pid == wider_pid,
+        (_, NamedLeafSet::NewNodesFrom (..)) => true,
         _ => narrower == wider, } };
     if narrower_within (self, other) { Some ( self . clone () ) }
     else if narrower_within (other, self) { Some ( other . clone () ) }
@@ -179,6 +190,10 @@ impl NamedLeafSet {
         forest . leaves_under (pid) . iter ()
           . map ( |leaf| leaf . key . clone () )
           . filter ( |key| self . holds (key) && forest . leaf (key) . is_some () )
+          . collect (),
+      NamedLeafSet::NewNodesFrom (pid, walk) =>
+        forest . leaves_of_new_nodes_reached_from (pid, *walk) . into_iter ()
+          . map ( |leaf| leaf . key . clone () )
           . collect (), } }
 
   /// The set in words, for a message.
@@ -205,7 +220,12 @@ impl NamedLeafSet {
         format! ("every change node {} records", pid),
       NamedLeafSet::ContentRelationshipsOf (pid, aspect) =>
         format! ("the {} of every content relationship node {} records",
-                 relationship_aspect_name (*aspect), pid), } }
+                 relationship_aspect_name (*aspect), pid),
+      NamedLeafSet::NewNodesFrom (pid, walk) =>
+        format! ("the changes of the new nodes {} of node {}",
+                 match walk { NewNodeWalk::Contentward => "contentward",
+                              NewNodeWalk::Outward     => "outward", },
+                 pid), } }
 }
 
 /// The node that records a leaf: a node's own aspect, its node; a
@@ -259,7 +279,13 @@ fn leaves_named_at (
               node, &pid, pid_of, RelationshipAspect::Existence )
               . map (NamedLeafSet::Leaf) ),
           DiffObject::All =>
-            named . push ( NamedLeafSet::AllOf ( pid . clone () )), }} },
+            named . push ( NamedLeafSet::AllOf ( pid . clone () )),
+          DiffObject::NewContent =>
+            named . push ( NamedLeafSet::NewNodesFrom (
+              pid . clone (), NewNodeWalk::Contentward )),
+          DiffObject::NewOutward =>
+            named . push ( NamedLeafSet::NewNodesFrom (
+              pid . clone (), NewNodeWalk::Outward )), }} },
     ViewnodeKind::PropertyMember (member) => {
       // The change-forest leaf of a property member belongs to the
       // folder's viewparent.

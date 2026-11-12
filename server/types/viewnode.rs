@@ -82,14 +82,23 @@ pub struct DiffChange {
 pub enum Existence { Added, Removed }
 
 /// The diff objects of a viewnode's change-forest leaves: 'node' (the node's
-/// own existence), 'rel' (its relationship to its viewparent), and
+/// own existence), 'rel' (its relationship to its viewparent),
 /// 'all' (every leaf the node records, or every leaf of a commit
-/// readiness aggregate, one level down).
+/// readiness aggregate, one level down), 'newContent' (of each new node
+/// reached contentward from the node, through new nodes only, as the
+/// change forest says, whatever the buffer shows: its existence, which
+/// covers its text, and its content relationships) and 'newOutward'
+/// (the same along every relationship, in its recorded direction:
+/// every leaf each new node reached records). Only a readiness request
+/// names the last two; no '(leaves ...)' or '(ready ...)' change fact
+/// lists them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum DiffObject {
   Node,
   Rel,
   All,
+  NewContent,
+  NewOutward,
 }
 
 /// '(editRequest (ready OBJECTS))' or '(editRequest (unready OBJECTS))':
@@ -1090,8 +1099,9 @@ impl Existence {
 }
 
 impl DiffObject {
-  pub const ALL : [DiffObject; 3] =
-    [ DiffObject::Node, DiffObject::Rel, DiffObject::All ];
+  pub const ALL : [DiffObject; 5] =
+    [ DiffObject::Node, DiffObject::Rel, DiffObject::All,
+      DiffObject::NewContent, DiffObject::NewOutward ];
 
   pub fn wire_name (
     self,
@@ -1099,7 +1109,9 @@ impl DiffObject {
     match self {
       DiffObject::Node => "node",
       DiffObject::Rel  => "rel",
-      DiffObject::All  => "all", } }
+      DiffObject::All  => "all",
+      DiffObject::NewContent => "newContent",
+      DiffObject::NewOutward => "newOutward", } }
 
   pub fn from_wire_name (
     s : &str,

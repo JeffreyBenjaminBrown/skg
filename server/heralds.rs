@@ -332,7 +332,9 @@ fn readiness_request_rule (
               match object {
                 DiffObject::Node => ":node",
                 DiffObject::Rel  => ":rel",
-                DiffObject::All  => ":all", } ) ] ))
+                DiffObject::All  => ":all",
+                DiffObject::NewContent => ":newContent",
+                DiffObject::NewOutward => ":newOutward", } ) ] ))
             . collect () ] . concat () ) }
 
 /// The position glyphs, first among a headline's heralds: ᗣ on a
@@ -942,7 +944,8 @@ fn change_fact_atoms () -> Vec<&'static str> {
       moved_like_ancestor : _, // -> the movedLikeAncestor atom, below
     } = facts;
     match object { // compile error here = update DiffObject::ALL
-      DiffObject::Node | DiffObject::Rel | DiffObject::All => () }}
+      DiffObject::Node | DiffObject::Rel | DiffObject::All
+        | DiffObject::NewContent | DiffObject::NewOutward => () }}
   let _ = guard;
   [ vec! [ "diff", "ready", "leaves",
            "homeSkgrepoMove", "movedLikeAncestor" ],

@@ -3,6 +3,9 @@
 use super::*;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
+use crate::diff_view::readiness_requests::{
+  NamedLeafSet, RequestedReadiness, apply_readiness_requests};
+use crate::types::errors::HeadlineName;
 use crate::types::misc::{MSV, RelPartner};
 use crate::types::nodes::complete::{Graphnode, empty_graphnode};
 
@@ -154,3 +157,91 @@ fn readiness_aggregates_over_the_leaves_that_exist () {
   assert_eq! ( forest . readiness_summary (&store), ReadinessSummary {
     ready_files : 1, changed_files : 1,
     foreign_changed_files : 0, order_only_files : 0 } ); }
+
+/// Before: r contains a. After: r also contains the new node n1, which
+/// contains the new n2 and the existing a, and subscribes to the new
+/// n5; n2 contains n1 back; a contains the new n3; n5 contains the new
+/// n6; the new n4 stands alone.
+fn straddle_with_new_nodes () -> GraphStraddle {
+  let mut n1 : Graphnode = node ("n1", "n1", &["n2", "a"]);
+  n1 . subscribesTo = MSV::Specified ( vec! [ RelPartner::at_relRepo (
+    SkgrepoName::from ("main"), ID::from ("n5") ) ] );
+  straddle (
+    vec! [ node ("r", "r", &["a"]), node ("a", "a", &[]) ],
+    vec! [ node ("r", "r", &["a", "n1"]),
+           node ("a", "a", &["n3"]),
+           n1,
+           node ("n2", "n2", &["n1"]),
+           node ("n3", "n3", &[]),
+           node ("n4", "n4", &[]),
+           node ("n5", "n5", &["n6"]),
+           node ("n6", "n6", &[]) ] ) }
+
+fn n1_subscribes_to_n5 () -> LeafKey {
+  LeafKey::Relationship {
+    relationship : RelationshipKey {
+      relation : NodeRelation::SubscribesTo,
+      recorder : ID::from ("n1"),
+      member   : ID::from ("n5") },
+    aspect : RelationshipAspect::Existence } }
+
+#[test]
+fn a_walk_through_new_nodes_follows_its_relations_only () {
+  let straddle : GraphStraddle = straddle_with_new_nodes ();
+  let forest : &ChangeLeaves = straddle . change_leaves ();
+  let walk = |pid : &str, walk : NewNodeWalk| -> Vec<ID> {
+    forest . new_nodes_reached_from (&ID::from (pid), walk) };
+  let ids = |pids : &[&str]| -> Vec<ID> {
+    pids . iter () . map ( |pid| ID::from (*pid) ) . collect () };
+  assert_eq! ( walk ("n1", NewNodeWalk::Contentward), ids (&["n1", "n2"]),
+               "through the cycle once, not into the existing a, nor n5" );
+  assert_eq! ( walk ("n1", NewNodeWalk::Outward),
+               ids (&["n1", "n2", "n5", "n6"]),
+               "into what n1 subscribes to, and on from there" );
+  assert_eq! ( walk ("r", NewNodeWalk::Contentward), ids (&["n1", "n2"]),
+               "from a node that is not new, into its new members" );
+  assert_eq! ( walk ("a", NewNodeWalk::Contentward), ids (&["n3"]) );
+  assert_eq! ( walk ("n4", NewNodeWalk::Contentward), ids (&["n4"]) ); }
+
+/// The marks a ready request on 'set' leaves in an empty store.
+fn marked_by (
+  forest : &ChangeLeaves,
+  set    : NamedLeafSet,
+) -> HashSet<LeafKey> {
+  let mut store : ReadinessStore = ReadinessStore::default ();
+  let warnings : Vec<String> = apply_readiness_requests (
+    &[ RequestedReadiness {
+      ready    : true,
+      named    : vec! [ set ],
+      headline : HeadlineName { title        : String::new (),
+                                graphnode_id : None,
+                                viewnode_id  : None }, } ],
+    forest, &mut store );
+  assert! ( warnings . is_empty (), "{:?}", warnings );
+  store . marks . into_keys () . collect () }
+
+#[test]
+fn a_request_on_new_nodes_marks_what_its_walk_follows () {
+  let straddle : GraphStraddle = straddle_with_new_nodes ();
+  let forest : &ChangeLeaves = straddle . change_leaves ();
+  let contentward : HashSet<LeafKey> = [
+    node_key ("n1", NodeAspect::Existence),
+    contains_key ("n1", "n2", RelationshipAspect::Existence),
+    contains_key ("n1", "a",  RelationshipAspect::Existence),
+    node_key ("n2", NodeAspect::Existence),
+    contains_key ("n2", "n1", RelationshipAspect::Existence),
+  ] . into_iter () . collect ();
+  assert_eq! (
+    marked_by ( forest, NamedLeafSet::NewNodesFrom (
+      ID::from ("n1"), NewNodeWalk::Contentward )),
+    contentward,
+    "neither r's relationship to n1, nor n1's subscription, nor a or n3" );
+  assert_eq! (
+    marked_by ( forest, NamedLeafSet::NewNodesFrom (
+      ID::from ("n1"), NewNodeWalk::Outward )),
+    contentward . into_iter ()
+      . chain ([ n1_subscribes_to_n5 (),
+                 node_key ("n5", NodeAspect::Existence),
+                 contains_key ("n5", "n6", RelationshipAspect::Existence),
+                 node_key ("n6", NodeAspect::Existence) ])
+      . collect::<HashSet<LeafKey>> () ); }

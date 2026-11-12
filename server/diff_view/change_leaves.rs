@@ -10,7 +10,7 @@
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::{
-  RelationRole, RelationshipKey};
+  NodeRelation, RelationRole, RelationshipKey};
 use crate::graph_straddle::types::{GraphStraddle, NodeChanges, Partner};
 use crate::graph_straddle::union_walk::ROLES_OF_LISTED_MEMBERS;
 use crate::diff_view::readiness_store::ReadinessStore;
@@ -21,7 +21,7 @@ use crate::types::nodes::rust::GraphnodeInRust;
 
 use serde::{Deserialize, Serialize};
 use sexp::{Atom, Sexp};
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
@@ -141,6 +141,27 @@ pub fn readiness_response_trailing_entries (
                 format_string_list_sexp ("warnings", warnings) ] )
     . collect () }
 
+/// Which relationships a walk through new nodes follows, from recorder
+/// to member, and so which relationship leaves of the new nodes it
+/// reaches it names ('ChangeLeaves::leaves_of_new_nodes_reached_from').
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum NewNodeWalk {
+  /// Content only ('newContent').
+  Contentward,
+  /// Every relationship a node records ('newOutward').
+  Outward,
+}
+
+impl NewNodeWalk {
+  pub fn follows (
+    self,
+    relation : NodeRelation,
+  ) -> bool {
+    match self {
+      NewNodeWalk::Contentward => relation == NodeRelation::Contains,
+      NewNodeWalk::Outward     => true, } }
+}
+
 /// See the module comment.
 #[derive(Clone, Debug, Default)]
 pub struct ChangeLeaves {
@@ -152,6 +173,9 @@ pub struct ChangeLeaves {
   index_by_member       : HashMap<ID, Vec<(ID, usize)>>,
   order_only_pids       : BTreeSet<ID>,
   order_only_files      : BTreeSet<ChangedFile>,
+  /// The new nodes: those the after-graph holds and the before-graph
+  /// lacks.
+  new_pids              : BTreeSet<ID>,
   foreign_changed_files : usize,
   /// The nodes whose set of mentioners changed: the mentioned nodes,
   /// in one graph only, of the recorders. A mention is no leaf: it
@@ -202,6 +226,13 @@ impl ChangeLeaves {
         ! leaves_by_recorder . contains_key (pid)
         && straddle . node_in_both_graphs (pid) )
       . collect ();
+    let new_pids : BTreeSet<ID> =
+      leaves_by_recorder . keys ()
+      . filter ( |pid|
+        straddle . after . nodes . contains_key (*pid)
+        && ! straddle . before . nodes . contains_key (*pid) )
+      . cloned ()
+      . collect ();
     let order_only_files : BTreeSet<ChangedFile> =
       order_only_pids . iter ()
       . filter_map ( |pid| straddle . after . nodes . get (pid) )
@@ -216,7 +247,7 @@ impl ChangeLeaves {
       . map ( |partner| partner . id )
       . collect ();
     ChangeLeaves { leaves_by_recorder, index, index_by_member, order_only_pids,
-                   order_only_files,
+                   order_only_files, new_pids,
                    foreign_changed_files : straddle . foreign_changed_files,
                    mentioner_sets_changed } }
 
@@ -259,6 +290,50 @@ impl ChangeLeaves {
     self . index_by_member . get (pid) . into_iter () . flatten ()
       . filter_map ( |(recorder, position)|
         self . leaves_by_recorder . get (recorder) ? . get (*position) ) }
+
+  /// The leaves of the new nodes reached from 'pid' by 'walk': of each,
+  /// its existence (which covers its text) and the relationships it
+  /// records that 'walk' follows ('NewNodeWalk::follows').
+  pub fn leaves_of_new_nodes_reached_from (
+    &self,
+    pid  : &ID,
+    walk : NewNodeWalk,
+  ) -> Vec<&ChangeLeaf> {
+    self . new_nodes_reached_from (pid, walk) . iter ()
+      . flat_map ( |new_pid| self . leaves_under (new_pid) )
+      . filter ( |leaf| match &leaf . key {
+        LeafKey::Relationship { relationship, .. } =>
+          walk . follows (relationship . relation),
+        LeafKey::Node { .. } => true, } )
+      . collect () }
+
+  /// The new nodes reached from 'pid' through new nodes only, along the
+  /// relationships 'walk' follows, in their recorded direction,
+  /// breadth-first, each once: 'pid' itself when it is new, and every
+  /// new member of such a relationship that a node reached (or 'pid')
+  /// records. A new node's relationships are all leaves, so the walk
+  /// reads the after-graph's lists from the forest alone.
+  pub fn new_nodes_reached_from (
+    &self,
+    pid  : &ID,
+    walk : NewNodeWalk,
+  ) -> Vec<ID> {
+    let mut reached : HashSet<ID> = HashSet::from ([ pid . clone () ]);
+    let mut queue : VecDeque<ID> = VecDeque::from ([ pid . clone () ]);
+    let mut new_nodes : Vec<ID> = Vec::new ();
+    while let Some (current) = queue . pop_front () {
+      if self . new_pids . contains (&current) {
+        new_nodes . push ( current . clone () ); }
+      for leaf in self . leaves_under (&current) {
+        if let LeafKey::Relationship {
+          relationship : RelationshipKey { relation, recorder, member },
+          aspect : RelationshipAspect::Existence } = &leaf . key {
+          if walk . follows (*relation)
+            && recorder == &current
+            && self . new_pids . contains (member)
+            && reached . insert ( member . clone () ) {
+            queue . push_back ( member . clone () ); }} }}
+    new_nodes }
 
   /// The members of the relationship leaves whose relationship
   /// exists in one graph only.
