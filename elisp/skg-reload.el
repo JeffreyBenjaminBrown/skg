@@ -126,6 +126,7 @@ rather than via `unload-feature'."
             skg-readable-ids
             skg-link-annotations
             skg-file-minor-mode
+            skg-zippy-mode
             skg-view-ancestry
             heralds-minor-mode )))
     (dolist (feat skg-features)

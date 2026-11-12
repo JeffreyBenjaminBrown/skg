@@ -50,4 +50,5 @@
   (require 'skg-sexpr-search)
   (require 'skg-view-ancestry)
   (require 'skg-readable-ids)
-  (require 'skg-file-minor-mode) )
+  (require 'skg-file-minor-mode)
+  (require 'skg-zippy-mode) )

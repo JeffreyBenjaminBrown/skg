@@ -89,7 +89,8 @@ and hide INTERNAL from M-x completion."
   (define-key map (kbd "C-c o n")   #'skg-paste-node)
   (define-key map (kbd "C-c O n")   #'skg-pop-node)
   (define-key map (kbd "C-c O i")   #'skg-pop-id)
-  (define-key map (kbd "C-c O l")   #'skg-pop-link))
+  (define-key map (kbd "C-c O l")   #'skg-pop-link)
+  (define-key map (kbd "C-c z")     #'skg-zippy-mode))
 
 (defvar skg-content-view-mode-map (make-sparse-keymap)
   "Keymap for `skg-content-view-mode'.")
@@ -182,7 +183,9 @@ and hide INTERNAL from M-x completion."
     (define-key map (kbd "C-c O i") #'skg-pop-id)
     (define-key map (kbd "C-c O l") #'skg-pop-link))
   (progn;; git history
-    (define-key map (kbd "C-c t r") #'skg-investigate-unknown-node)))
+    (define-key map (kbd "C-c t r") #'skg-investigate-unknown-node))
+  (progn;; zippy: typing K runs C-c K, in every skg buffer, until z
+    (define-key map (kbd "C-c z") #'skg-zippy-mode)))
 
 (defvar skg-linkstack-mode-map (make-sparse-keymap)
   "Keymap for `skg-linkstack-mode'.")
@@ -223,7 +226,8 @@ and hide INTERNAL from M-x completion."
     (define-key map (kbd "C-c o n") #'skg-paste-node)
     (define-key map (kbd "C-c O n") #'skg-pop-node)
     (define-key map (kbd "C-c O i") #'skg-pop-id)
-    (define-key map (kbd "C-c O l") #'skg-pop-link)))
+    (define-key map (kbd "C-c O l") #'skg-pop-link))
+  (define-key map (kbd "C-c z") #'skg-zippy-mode))
 
 (defvar skg-sexp-edit-mode-map (make-sparse-keymap)
   "Keymap for skg-sexp-edit-mode.")
