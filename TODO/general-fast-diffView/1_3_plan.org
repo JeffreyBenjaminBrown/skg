@@ -375,6 +375,19 @@ Serialize full runs; two at once collide on fixed temp paths.
   Emacs does.
 - Tests: 'tests/nvim/redraw_delta_spec.lua', mirroring slice 2's.
   Run 'bash/nvim-tests.sh', then 'bash/all-tests.sh'.
+*** Corrections carried from slice 2
+- Logs go under 'tests/results/1_3/slice3/': 'bash/all-tests.sh'
+  deletes every directory under 'tests/results/' whose name is not
+  a plain plan number, 'plan-1_3/' included.
+- Slice 2 found that Emacs's open path,
+  'skg-open-org-buffer-from-text' ('elisp/skg-buffer.el'), inserts
+  the server's text verbatim, leaving 'folded' and 'bodyFolded' as
+  text ('TODO/problems.org', "An opened view keeps the server's fold
+  atoms as text"); slice 4 fixes Emacs. Check whether Neovim's open
+  path does the same. If it does, make it apply and remove the fold
+  and focus atoms exactly as its whole redraw
+  ('M.replace_buffer_with_new_content') does, in this slice, with a
+  test.
 
 ** TODO Slice 4: Emacs builds the pre-send snapshot without editing the buffer
 - Rewrite 'skg--buffer-snapshot-with-save-metadata' as "The
@@ -396,6 +409,24 @@ Serialize full runs; two at once collide on fixed temp paths.
   recreated).
 - Run 'bash/emacs-tests.sh', then 'bash/all-tests.sh'. Measure as in
   slice 2.
+*** Corrections carried from slice 2
+- Logs go under 'tests/results/1_3/slice4/' (see slice 3's
+  corrections).
+- Fix 'TODO/problems.org', "An opened view keeps the server's fold
+  atoms as text": 'skg-open-org-buffer-from-text'
+  ('elisp/skg-buffer.el') will treat the server's fold and focus
+  atoms as the whole redraw ('skg-replace-buffer-with-new-content')
+  does, folding the marked headlines, removing the atoms and placing
+  point on the focused headline, through the same functions rather
+  than a copy of them; its baseline is then the stripped text. The
+  server writes 'folded' meaning the client should fold
+  ('docs/diff-view.org', "Stub roots"), so this is a client bug, not
+  a behavior to keep. A test: a view opened from text carrying
+  'folded' and 'bodyFolded' shows those folds and no atom, and the
+  first save of an unedited diff view after opening is patched, not
+  redrawn whole (the perf tool's first "marker" row shows it). Move
+  the problems.org entry to 'TODO/DONE/problems.org' as that file
+  says.
 
 ** TODO Slice 5: the streamed views carry the delta
 - Server: 'rerender_open_view' renders the held forest before the
