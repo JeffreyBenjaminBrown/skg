@@ -9,6 +9,7 @@
 (require 'skg-buffer)
 (require 'skg-lock-buffers)
 (require 'skg-readiness) ; for skg--readiness-summary-message
+(require 'skg-redraw-delta)
 (declare-function skg--request-rerender-views "skg-request-rerender-all-views"
                   (view-ids approved-pids))
 
@@ -1096,8 +1097,10 @@ Expected shape: ((content ...) (errors (...)) (warnings (...)))."
              (save-point-position
               (skg--save-point-position-from-response response)))
         (when content-value
-          (skg-replace-buffer-with-new-content
-           nil content-value save-point-position))
+          (skg--redraw-saved-buffer
+           content-value
+           (assq 'changed-headlines response)
+           save-point-position))
         (when (or (skg--message-list-nonempty-p errors-list)
                   (skg--message-list-nonempty-p warnings-list))
           (skg-show-save-errors-and-warnings
@@ -1107,6 +1110,31 @@ Expected shape: ((content ...) (errors (...)) (warnings (...)))."
             (message "%s" (skg--readiness-summary-message summary)))))
     (error (skg-log 'error 'save "parsing save response: %S" err)
            (skg-log 'error 'save "sexp string was: %S" sexp-string))))
+
+(defun skg--redraw-saved-buffer (new-content
+                                  changed-headlines-entry
+                                  save-point-position)
+  "Show NEW-CONTENT in the current buffer. When CHANGED-HEADLINES-ENTRY,
+the response's '(changed-headlines (V ...))', is present, rewrite only
+the headlines it names (`skg--patch-buffer-with-delta'), leaving folds
+and point as they are; otherwise, or when the patch fails, redraw the
+whole buffer, restoring folds and point from the atoms and
+SAVE-POINT-POSITION."
+  (if (and changed-headlines-entry
+           (skg--patch-buffer-with-delta
+            new-content (cadr changed-headlines-entry)))
+      (progn
+        (skg-log 'debug 'save "redraw: patched %d headlines"
+                 (length (cadr changed-headlines-entry)))
+        (set-buffer-modified-p nil)
+        (skg--capture-clean-baseline)
+        (when (fboundp 'skg-link-annotations-refresh)
+          (skg-link-annotations-refresh))
+        (message "Buffer updated with processed content from Rust"))
+    (skg-log 'debug 'save "redraw: whole buffer (%s)"
+             (if changed-headlines-entry "the patch failed" "no delta"))
+    (skg-replace-buffer-with-new-content
+     nil new-content save-point-position)))
 
 (defun skg--save-point-position-from-response (response)
   "Extract optional save point position from RESPONSE."
