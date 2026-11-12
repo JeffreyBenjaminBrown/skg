@@ -114,8 +114,12 @@ up() {
   if ! port_is_bound "$port"; then
     # 'cd' on its own line: after 'cd && nohup ... &', $! would be the
     # pid of a subshell, and 'down' would kill that and leave the server.
+    # 'setsid' puts the server in a session of its own, and '< /dev/null'
+    # detaches its input, so it outlives the shell that started it
+    # (a tool's shell may kill its whole process group when it returns).
+    # Not 'setsid -f': it would fork, and $! would not be the server.
     ( cd "$ROOT"
-      nohup "$SKG" "$config" > "$views/server.log" 2>&1 &
+      setsid nohup "$SKG" "$config" > "$views/server.log" 2>&1 < /dev/null &
       echo $! > "$views/server.pid" )
     for _ in $(seq 1 60); do
       grep -q "Server ready" "$views/server.log" 2>/dev/null && break
@@ -126,8 +130,8 @@ up() {
   fi
   if [ ! -S "$views/skg-for-ai.sock" ] || ! pgrep -f "daemon --out-dir $views" >/dev/null; then
     rm -f "$views/skg-for-ai.sock"
-    ( nohup python3 "$READER" daemon --out-dir "$views" --port "$port" \
-        > "$views/daemon.out" 2>&1 & )
+    ( setsid nohup python3 "$READER" daemon --out-dir "$views" --port "$port" \
+        > "$views/daemon.out" 2>&1 < /dev/null & )
     sleep 1
   fi
   echo "port=$port"
