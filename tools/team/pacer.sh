@@ -39,7 +39,7 @@ LOG="$DIR/pacer.log"
 FIVE_HOUR_CAP="${FIVE_HOUR_CAP:-0.80}"
 RESERVE="${RESERVE:-0.15}"
 POLL_SECONDS="${POLL_SECONDS:-600}"
-SESSION_TIMEOUT="${SESSION_TIMEOUT:-3600}"
+SESSION_TIMEOUT="${SESSION_TIMEOUT:-6000}" # a session that runs and tends one specialist has taken an hour
 MODEL="${MODEL:-claude-fable-5-2}"
 mkdir -p "$DIR"
 
