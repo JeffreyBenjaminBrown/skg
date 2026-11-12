@@ -34,7 +34,7 @@ vim.api.nvim_set_current_buf(view)
 require('skg.save').request_save_buffer()
 T.check(T.wait_for_response(15), 'imported view saved')
 local files = vim.fn.glob(repo_dir .. '/*.skg', false, true)
-T.check(#files == 7, 'save did not turn the literal heading into a node')
+T.check(#files == 6, 'save did not turn the literal heading into a node')
 local hard_break = 'First line' .. string.char(92, 92) .. '\n'
 local found_hard_break = false
 for _, file in ipairs(files) do

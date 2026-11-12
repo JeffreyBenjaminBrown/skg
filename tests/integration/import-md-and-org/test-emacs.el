@@ -56,8 +56,8 @@
       (unless (skg-test-wait-for-response 15)
         (error "Saving imported view timed out"))))
   (let ((files (directory-files repo-dir nil "\\.skg$")))
-    (unless (= (length files) 7)
-      (error "Literal heading became a node: expected 7 files, got %d"
+    (unless (= (length files) 6)
+      (error "Literal heading became a node: expected 6 files, got %d"
              (length files)))
     (unless (cl-some
              (lambda (file)

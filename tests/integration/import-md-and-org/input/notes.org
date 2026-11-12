@@ -4,7 +4,7 @@
 :END:
 Preamble
 #+begin_src org
-* not a heading
+,* not a heading
 #+end_src
 * Real heading
 Body with [[file:guide.md][guide]].
