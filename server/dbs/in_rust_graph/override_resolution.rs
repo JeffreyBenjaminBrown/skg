@@ -5,6 +5,13 @@
 //! whose overrider is not the follower's do not participate; they are
 //! display-only facts (search enrichment, folders, heralds, and paths).
 //!
+//! A top-level tree of a view follows the overrides of its root's
+//! author ('override_follower_of_tree_containing'): a view rooted at a
+//! foreign node shows what that node's author would see, throughout the
+//! tree, even under a third author's nodes; a view rooted at an owned
+//! node follows the user's overrides. Validation of the user's own data
+//! ([[./override_invariants.rs]]) always follows the user's.
+//!
 //! Two gates, applied per relationship:
 //! - ownership is set-independent: a relationship is followed only if its
 //!   overrider's home skgrepo belongs to the follower
@@ -31,9 +38,12 @@
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::skgrepo_sets::SkgrepoRestriction;
-use crate::types::misc::{ID, SkgConfig, SkgrepoOwner};
+use crate::types::misc::{ID, SkgConfig, SkgrepoName, SkgrepoOwner};
+use crate::types::viewnode::{Viewnode, ViewnodeKind, Vognode};
 
+use ego_tree::NodeRef;
 use std::collections::HashSet;
+use std::iter::once;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct OverrideResolution {
@@ -108,6 +118,31 @@ pub fn resolve_override (
         cycle, }; }
     path . push ( next . clone () );
     current = next; }}
+
+/// The owner whose overrides the top-level tree containing 'position'
+/// follows: the owner ('SkgConfig::skgrepo_owner') of the home
+/// skgrepo, as 'graph' knows it, of that tree's root, the child of the
+/// buffer root. The user when that root is not an occurrence of a node
+/// 'graph' knows (a new node, a ghost, a tombstone), or when
+/// 'position' is the buffer root itself.
+pub fn override_follower_of_tree_containing (
+  config   : &SkgConfig,
+  graph    : &InRustGraph,
+  position : NodeRef<Viewnode>,
+) -> SkgrepoOwner {
+  let tree_root : Option<NodeRef<Viewnode>> =
+    once (position) . chain ( position . ancestors () )
+    . find ( |node| node . parent () . is_some_and ( |parent|
+      matches! ( parent . value () . kind, ViewnodeKind::BufferRoot )));
+  let root_home : Option<SkgrepoName> =
+    tree_root . and_then ( |root| match &root . value () . kind {
+      ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =>
+        graph . pid_and_skgrepo (&occurrence . gnid)
+        . map ( |(_pid, home)| home ),
+      _ => None, } );
+  match root_home {
+    Some (home) => config . skgrepo_owner (&home),
+    None        => SkgrepoOwner::User, }}
 
 /// Whether 'carrier' is a node on 'original''s chain of 'follower''s
 /// overriders — i.e. a node the server could legitimately show, marked

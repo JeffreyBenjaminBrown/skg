@@ -2,7 +2,8 @@ pub mod contradictory_instructions;
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::override_resolution::{
-  carrier_on_override_chain_followed_by, resolve_override};
+  carrier_on_override_chain_followed_by, override_follower_of_tree_containing,
+  resolve_override};
 use crate::dbs::in_rust_graph::override_invariants::existing_owned_overrider_of;
 use crate::dbs::node_lookup::opt_graphnode_by_gnid;
 use crate::types::misc::{ID, SkgConfig, SkgrepoOwner};
@@ -176,8 +177,10 @@ fn idFolder_membership_errors (
 /// part the server would not have rendered must abort the save --
 /// otherwise hand-edited (or yanked, or stale) metadata could
 /// rewrite arbitrary contains members. The check: the carrier's ID
-/// must be on N's owned override chain
-/// ('carrier_on_override_chain_followed_by', visibility-ungated so ownership
+/// must be on N's chain of overriders of the owner whose overrides
+/// the occurrence's top-level tree follows, as the refresh rendered
+/// it ('override_follower_of_tree_containing';
+/// 'carrier_on_override_chain_followed_by', visibility-ungated so ownership
 /// still gates but a part honest when rendered does not start
 /// failing after a switch of the skgrepo restriction). With chains the shown node can
 /// be a middle link (when a later link's mentioner is hidden), so the
@@ -203,13 +206,15 @@ fn overridesHere_part_errors (
               ( t . gnid . clone (), original . clone () ),
             None => continue },
         _ => continue };
+    let follower : SkgrepoOwner =
+      override_follower_of_tree_containing (config, graph, node_ref);
     let chain_ok : bool =
       carrier_on_override_chain_followed_by (
-        config, graph, &unrestricted, &SkgrepoOwner::User, &original, &carrier);
+        config, graph, &unrestricted, &follower, &original, &carrier);
     if ! chain_ok {
       let effective : Option<ID> = // the chain end, for the message
         Some (resolve_override (
-          config, graph, &unrestricted, &SkgrepoOwner::User, &original)
+          config, graph, &unrestricted, &follower, &original)
           . effective);
       errors . push (
         BufferValidationError::OverridesHere_Mismatch (

@@ -65,8 +65,8 @@ pub(super) fn msv_ids (
 ) -> MSV<RelPartner<ID>> {
   MSV::Specified ( ids (pids) ) }
 
-/// The skgrepos 'main' and 'private', both owned, and 'theirs',
-/// foreign.
+/// The skgrepos 'main' and 'private', both owned, and 'theirs' and
+/// 'third', foreign, of two foreign owners.
 pub(super) fn config () -> SkgConfig {
   SkgConfig::dummyFromSkgrepos ( HashMap::from ([
     ( SkgrepoName::from ("main"),
@@ -77,7 +77,10 @@ pub(super) fn config () -> SkgConfig {
                 path : PathBuf::from ("private"), owned : true } ),
     ( SkgrepoName::from ("theirs"),
       Skgrepo { name : SkgrepoName::from ("theirs"), abbreviation : None,
-                path : PathBuf::from ("theirs"), owned : false } ) ])) }
+                path : PathBuf::from ("theirs"), owned : false } ),
+    ( SkgrepoName::from ("third"),
+      Skgrepo { name : SkgrepoName::from ("third"), abbreviation : None,
+                path : PathBuf::from ("third"), owned : false } ) ])) }
 
 /// No skgrepo restriction, under 'config'.
 pub(super) fn unrestricted () -> SkgrepoRestriction {

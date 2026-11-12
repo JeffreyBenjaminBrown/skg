@@ -106,3 +106,102 @@ node p
   node q
     node o wp
 node o" ); }
+
+/// 'node (pid)', but at home in 'skgrepo'.
+fn node_in (
+  skgrepo : &str,
+  pid     : &str,
+) -> Graphnode {
+  Graphnode { home_skgrepo : SkgrepoName::from (skgrepo), .. node (pid) } }
+
+/// The metadata of an occurrence of 'pid' in 'skgrepo'.
+fn occurrence_metadata_in (
+  skgrepo : &str,
+  pid     : &str,
+) -> String {
+  format! ( "(skg node (gnid {}) (skgRepos (nodeRepo {})))", pid, skgrepo ) }
+
+/// r, in 'theirs', and p, in 'main', each contain m, in 'theirs'.
+/// a, in 'theirs', and u, in 'main', each override m.
+fn m_overridden_by_its_author_and_the_user () -> InRustGraph {
+  graph (&[
+    Graphnode { contains : ids (&["m"]), .. node_in ("theirs", "r") },
+    Graphnode { contains : ids (&["m"]), .. node ("p") },
+    node_in ("theirs", "m"),
+    Graphnode { overrides : msv_ids (&["m"]), .. node_in ("theirs", "a") },
+    Graphnode { overrides : msv_ids (&["m"]), .. node ("u") }, ]) }
+
+#[test]
+fn under_a_foreign_root_its_authors_overrider_is_shown_and_not_the_users () {
+  assert_eq! ( run_asserting_fixpoint (
+    &format! ("* {} r\n", occurrence_metadata_in ("theirs", "r")),
+    &m_overridden_by_its_author_and_the_user () ) . outline (), "\
+node r
+  node a (overridesHere m)" ); }
+
+#[test]
+fn under_an_owned_root_the_users_overrider_is_shown () {
+  assert_eq! ( run_asserting_fixpoint (
+    &format! ("* {} p\n", occurrence_metadata ("p", "")),
+    &m_overridden_by_its_author_and_the_user () ) . outline (), "\
+node p
+  node u (overridesHere m)" ); }
+
+/// r, in 'theirs', contains e, in 'third', which contains c, in
+/// 'third'. c is overridden by j, in 'theirs' (r's author), by d, in
+/// 'third' (e's author), and by u, in 'main' (the user). Under r,
+/// only r's author's overrides are followed, even beneath e.
+#[test]
+fn under_a_foreign_root_its_authors_overrides_are_followed_beneath_a_third_authors_node () {
+  let graph : InRustGraph = graph (&[
+    Graphnode { contains : ids (&["e"]), .. node_in ("theirs", "r") },
+    Graphnode { contains : ids (&["c"]), .. node_in ("third", "e") },
+    node_in ("third", "c"),
+    Graphnode { overrides : msv_ids (&["c"]), .. node_in ("theirs", "j") },
+    Graphnode { overrides : msv_ids (&["c"]), .. node_in ("third", "d") },
+    Graphnode { overrides : msv_ids (&["c"]), .. node ("u") }, ]);
+  assert_eq! ( run_asserting_fixpoint (
+    &format! ("* {} r\n", occurrence_metadata_in ("theirs", "r")),
+    &graph ) . outline (), "\
+node r
+  node e
+    node j (overridesHere c)" ); }
+
+/// A chain of overriders stops where the next is not the follower's:
+/// m is overridden by a, in 'theirs', which u, in 'main', overrides.
+/// Under r, in 'theirs', a is shown.
+#[test]
+fn under_a_foreign_root_a_chain_stops_before_the_users_overrider () {
+  let graph : InRustGraph = graph (&[
+    Graphnode { contains : ids (&["m"]), .. node_in ("theirs", "r") },
+    node_in ("theirs", "m"),
+    Graphnode { overrides : msv_ids (&["m"]), .. node_in ("theirs", "a") },
+    Graphnode { overrides : msv_ids (&["a"]), .. node ("u") }, ]);
+  assert_eq! ( run_asserting_fixpoint (
+    &format! ("* {} r\n", occurrence_metadata_in ("theirs", "r")),
+    &graph ) . outline (), "\
+node r
+  node a (overridesHere m)" ); }
+
+/// Whether a foreign root is overridden and so shows its content raw
+/// asks of its author's overrides, not the user's: the user's k
+/// overrides r, yet r's author's overrider of m is shown; r's
+/// author's s overrides q, so q's content is raw.
+#[test]
+fn a_foreign_root_is_shown_raw_only_when_its_author_overrides_it () {
+  let graph : InRustGraph = graph (&[
+    Graphnode { contains : ids (&["m"]), .. node_in ("theirs", "r") },
+    Graphnode { contains : ids (&["m"]), .. node_in ("theirs", "q") },
+    node_in ("theirs", "m"),
+    Graphnode { overrides : msv_ids (&["m"]), .. node_in ("theirs", "a") },
+    Graphnode { overrides : msv_ids (&["r"]), .. node ("k") },
+    Graphnode { overrides : msv_ids (&["q"]), .. node_in ("theirs", "s") }, ]);
+  assert_eq! ( run_asserting_fixpoint (
+    &format! ("* {} r\n* {} q\n",
+              occurrence_metadata_in ("theirs", "r"),
+              occurrence_metadata_in ("theirs", "q")),
+    &graph ) . outline (), "\
+node r
+  node a (overridesHere m)
+node q
+  node m" ); }

@@ -381,8 +381,9 @@ pub struct Occurrence {
   /// round-trips to the original ID instead of rewriting the
   /// parent's contains. Serialized as the keyed form
   /// '(overridesHere N)' at the top level; tamper-checked at
-  /// buffer validation (the carrier's ID must equal the
-  /// visibility-ungated 'resolve_override (N).effective').
+  /// buffer validation (the carrier's ID must be on N's
+  /// visibility-ungated chain of the overriders its tree follows:
+  /// 'carrier_on_override_chain_followed_by').
   pub overridesHere    : Option<ID>,
 
   // The next two *Stats fields only influence how the node is shown. Editing them and saving the buffer leaves the graph unchanged, and those edits will be immediately lost, as this data is regenerated each time the view is rebuilt.

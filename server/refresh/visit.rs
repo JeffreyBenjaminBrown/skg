@@ -41,7 +41,8 @@
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::dbs::in_rust_graph::override_resolution::{
-  carrier_on_override_chain_followed_by, resolve_override};
+  carrier_on_override_chain_followed_by, override_follower_of_tree_containing,
+  resolve_override};
 use crate::refresh::editability::{
   DrawnEditability, EditabilityAndClaim, carries_editableView_request,
   consume_editableView_request,
@@ -716,13 +717,16 @@ fn keep_hidden_outside_folder_last (
 
 /// In a content view, under an editable occurrence, an overridden
 /// member is shown as its overrider, marked '(overridesHere N)' for
-/// the original N, which the save collects instead. Not where the
-/// parent is itself overridden and shown raw (a root, or a member of
-/// a folder other than the subscribee folder): there its children are
-/// raw too. When the override is gone, the shown overrider loses
-/// 'overridesHere', is warranted only as itself (and so, unwarranted,
-/// vanishes), and the original is reinstated beside it. The
-/// diff view substitutes nothing.
+/// the original N, which the save collects instead. The overriders
+/// followed are those of the author of the parent's top-level tree's
+/// root ('override_follower_of_tree_containing'): the user's under an
+/// owned root, that author's under a foreign one. Not where the
+/// parent is itself overridden (by those same overriders) and shown
+/// raw (a root, or a member of a folder other than the subscribee
+/// folder): there its children are raw too. When the override is
+/// gone, the shown overrider loses 'overridesHere', is warranted only
+/// as itself (and so, unwarranted, vanishes), and the original is
+/// reinstated beside it. The diff view substitutes nothing.
 fn substitute_overriders (
   tree   : &mut Tree<Viewnode>,
   parent : NodeId,
@@ -732,7 +736,10 @@ fn substitute_overriders (
   let Some (goal) : Option<&Goal> = goal else { return Ok (( )); };
   if walk . is_diff_view ()
      || tree . get (parent) . unwrap () . value () . editable_gnid () . is_none ()
-     || is_overridden_and_shown_raw (tree, parent, walk)
+  { return Ok (( )); }
+  let follower : SkgrepoOwner = override_follower_of_tree_containing (
+    walk . truth . config, walk . truth . graph, tree . get (parent) . unwrap () );
+  if is_overridden_and_shown_raw (tree, parent, &follower, walk)
   { return Ok (( )); }
   for child in children_of (tree, parent) {
     let (gnid, overridesHere, warrant) : (ID, Option<ID>, Warrant) =
@@ -745,18 +752,18 @@ fn substitute_overriders (
       None => if warrant == Warrant::ByGraph {
         let effective : ID = resolve_override (
           walk . truth . config, walk . truth . graph, walk . truth . restriction,
-          &SkgrepoOwner::User, &gnid ) . effective;
+          &follower, &gnid ) . effective;
         if effective != gnid {
           show_overrider (tree, child, &effective, Some (gnid), walk) ?; }},
       Some (original) => {
         let effective : ID = resolve_override (
           walk . truth . config, walk . truth . graph, walk . truth . restriction,
-          &SkgrepoOwner::User, &original ) . effective;
+          &follower, &original ) . effective;
         if effective == original {
           stop_substituting (tree, parent, child, &original, goal, walk) ?;
         } else if ! carrier_on_override_chain_followed_by (
                       walk . truth . config, walk . truth . graph, &walk . unrestricted,
-                      &SkgrepoOwner::User, &original, &gnid ) {
+                      &follower, &original, &gnid ) {
           show_overrider (tree, child, &effective, Some (original), walk) ?; }}, }}
   Ok (( )) }
 
@@ -819,13 +826,14 @@ fn reinstate_original_after (
     after_drawing (tree, parent, treeid, walk) ?; }
   Ok (( )) }
 
-/// Whether the occurrence at 'treeid' is overridden and yet shown
-/// raw, where it stands: at a root, or as a member of a folder other
-/// than the subscribee folder.
+/// Whether the occurrence at 'treeid' is overridden, by 'follower',
+/// and yet shown raw, where it stands: at a root, or as a member of a
+/// folder other than the subscribee folder.
 fn is_overridden_and_shown_raw (
-  tree   : &Tree<Viewnode>,
-  treeid : NodeId,
-  walk   : &Walk,
+  tree     : &Tree<Viewnode>,
+  treeid   : NodeId,
+  follower : &SkgrepoOwner,
+  walk     : &Walk,
 ) -> bool {
   let node : NodeRef<Viewnode> = tree . get (treeid) . unwrap ();
   let raw_position : bool = node . parent () . is_some_and ( |parent|
@@ -840,7 +848,7 @@ fn is_overridden_and_shown_raw (
   raw_position
   && occurrence . overridesHere . is_none ()
   && resolve_override ( walk . truth . config, walk . truth . graph,
-                        &walk . unrestricted, &SkgrepoOwner::User,
+                        &walk . unrestricted, follower,
                         &occurrence . gnid ) . effective != occurrence . gnid }
 
 //
