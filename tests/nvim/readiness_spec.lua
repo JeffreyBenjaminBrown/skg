@@ -197,6 +197,42 @@ describe('skg.readiness', function ()
           1, readiness.cycle_commit_ready_recursive))
   end)
 
+  it('hands new nodes in content position to the server, skipping their subtrees', function ()
+    local lines = {
+      '* (skg node (gnid r) (skgRepos (nodeRepo r)) (diff (leaves 1 all))) r',
+      '** (skg node (gnid n) (skgRepos (nodeRepo r)) (diff (node added) (rel added) (leaves 2 node rel))) n',
+      '*** (skg node (gnid n2) (skgRepos (nodeRepo r)) (diff (node added) (rel added) (leaves 2 node rel))) n2',
+      '*** (skg node (gnid m) (skgRepos (nodeRepo r)) writeProtected (diff (rel added) (properties changed) (leaves 2 rel all))) m',
+      '** (skg subscriberFolder)',
+      '*** (skg node (gnid s) (skgRepos (nodeRepo r)) writeProtected (diff (node added) (rel added) (leaves 2 node rel))) s',
+      '** (skg node (gnid c) (skgRepos (nodeRepo r)) (diff (rel added) (leaves 1 rel))) c' }
+    for walk, gesture in pairs({
+        newContent = readiness.cycle_commit_ready_recursive,
+        newOutward = readiness.cycle_commit_ready_recursive_outward }) do
+      assert.are.same({
+        '* (skg node (gnid r) (skgRepos (nodeRepo r)) (editRequest (ready all)) (diff (leaves 1 all))) r',
+        '** (skg node (gnid n) (skgRepos (nodeRepo r)) (editRequest (ready node rel ' .. walk .. ')) (diff (node added) (rel added) (leaves 2 node rel))) n',
+        lines[3], lines[4], lines[5],
+        '*** (skg node (gnid s) (skgRepos (nodeRepo r)) writeProtected (editRequest (ready node rel)) (diff (node added) (rel added) (leaves 2 node rel))) s',
+        '** (skg node (gnid c) (skgRepos (nodeRepo r)) (editRequest (ready rel)) (diff (rel added) (leaves 1 rel))) c' },
+        run(lines, 1, gesture))
+    end
+    -- At a new start: the walk object alone, not the relationship to
+    -- its viewparent, which is no part of what the walk reaches.
+    assert.are.same({
+      '* (skg node (gnid n) (skgRepos (nodeRepo r)) (editRequest (ready newContent)) (diff (node added) (rel added) (leaves 2 node rel))) n',
+      '** (skg node (gnid n2) (skgRepos (nodeRepo r)) (diff (node added) (rel added) (leaves 2 node rel))) n2' },
+      run({ '* (skg node (gnid n) (skgRepos (nodeRepo r)) (diff (node added) (rel added) (leaves 2 node rel))) n',
+            '** (skg node (gnid n2) (skgRepos (nodeRepo r)) (diff (node added) (rel added) (leaves 2 node rel))) n2' },
+          1, readiness.cycle_commit_ready_recursive))
+    -- A new start toggles by its existence alone, and unmarking asks
+    -- first: the client cannot count what the server will reach.
+    assert.are.same({
+      '* (skg node (gnid n) (skgRepos (nodeRepo r)) (editRequest (unready newContent)) (diff (node added) (rel added) (leaves 2 node rel) (ready node))) n' },
+      run({ '* (skg node (gnid n) (skgRepos (nodeRepo r)) (diff (node added) (rel added) (leaves 2 node rel) (ready node))) n' },
+          1, readiness.cycle_commit_ready_recursive, 'yes'))
+  end)
+
   it('marks home skgrepo moves, recursively only those like the first', function ()
     local lines = {
       '* (skg node (gnid a) (skgRepos (nodeRepo b)) (diff (leaves 1 all))) a',

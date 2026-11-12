@@ -157,7 +157,11 @@ M.commands = {
                       desc = 'Toggle the commit-readiness of the change at point, and save' },
   CycleCommitReadyRecursive = { module = 'skg.readiness',
                                 fn = 'cycle_commit_ready_recursive',
-                                desc = 'Mark (or unmark) every change in the subtree commit-ready, and save' },
+                                desc = 'Mark (or unmark) every change in the subtree commit-ready, new nodes by the graph contentward, and save' },
+  CycleCommitReadyRecursiveOutward = {
+    module = 'skg.readiness',
+    fn = 'cycle_commit_ready_recursive_outward',
+    desc = 'Mark (or unmark) every change in the subtree commit-ready, new nodes by the graph along every relationship they record, and save' },
   ToggleHomeSkgrepoMoveCommitReady = { module = 'skg.readiness',
                                        fn = 'toggle_homeSkgrepo_move_commitReady',
                                        desc = "Toggle the commit-readiness of the node's home-skgrepo move, and save" },
@@ -313,6 +317,7 @@ M.content_view_bindings = {
   { 'sa', 'Attach' },                    -- C-c s a
   { 'rr', 'CycleCommitReady' },          -- C-c r r
   { 'rR', 'CycleCommitReadyRecursive' }, -- C-u C-c r r
+  { 'rO', 'CycleCommitReadyRecursiveOutward' }, -- C-u C-u C-c r r
   { 'rh', 'ToggleHomeSkgrepoMoveCommitReady' }, -- C-c r h
   { 'rH', 'ToggleHomeSkgrepoMoveCommitReadyRecursive' }, -- C-u C-c r h
   { 'ru', 'DiffViewExtend' },            -- C-c r u

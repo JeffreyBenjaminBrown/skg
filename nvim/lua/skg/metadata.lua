@@ -1005,6 +1005,13 @@ function M.readiness_leaves (metadata_sexp)
 end
 
 ---@param metadata_sexp any
+---@return boolean is the headline with METADATA_SEXP a new node? Its
+---'(diff ...)' says '(node added)'.
+function M.readiness_node_added_p (metadata_sexp)
+  return arguments(M.readiness_form(metadata_sexp, 'node'))[1] == 'added'
+end
+
+---@param metadata_sexp any
 ---@param objects string[]
 ---@return boolean is every one of OBJECTS ready? It is when the
 ---headline carries a '(ready ...)' that names each of them. A

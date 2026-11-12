@@ -48,12 +48,23 @@ function M.cycle_commit_ready ()
 end
 
 ---Mark (or, if the headline at point is ready, unmark) every leaf
----named in the subtree at point, then save. Before unmarking more
----than one leaf, ask.
+---named in the subtree at point, then save; at a new node, instead of
+---its subtree, the server walks the graph contentward, marking each
+---new node's text and content ('requests_for_subtree_at_line').
+---Before unmarking more than one leaf, ask.
 function M.cycle_commit_ready_recursive ()
   if not metadata.at_headline_p() then error('Not on a headline') end
-  write_and_save(
-    M.requests_for_subtree_at_line(metadata.current_line_number()))
+  write_and_save(M.requests_for_subtree_at_line(
+    metadata.current_line_number(), 'newContent'))
+end
+
+---As 'cycle_commit_ready_recursive', but at a new node the server
+---walks along every relationship each new node records, marking
+---everything it records.
+function M.cycle_commit_ready_recursive_outward ()
+  if not metadata.at_headline_p() then error('Not on a headline') end
+  write_and_save(M.requests_for_subtree_at_line(
+    metadata.current_line_number(), 'newOutward'))
 end
 
 ---Toggle the commit-readiness of the home-skgrepo move of the node at
@@ -222,32 +233,72 @@ end
 
 ---The requests of the recursive gesture on the headline at
 ---LINE_NUMBER: one on every headline in the subtree that names leaves,
----readying them unless the headline is ready.
+---readying them unless the headline is ready. At a new node in content
+---position ('hands_to_the_server_p'), the request names WALK_OBJECT,
+---'newContent' or 'newOutward', which the server expands from the
+---graph, through new nodes only, whatever the buffer shows or
+---write-protects; so the walk skips the rest of that node's subtree.
+---There the start names WALK_OBJECT alone, leaving the relationship to
+---its viewparent, which is no part of what it reaches, and is ready
+---when its existence is.
 ---@param line_number integer
+---@param walk_object string
 ---@return table[]
-function M.requests_for_subtree_at_line (line_number)
+function M.requests_for_subtree_at_line (line_number, walk_object)
   local metadata_sexp = metadata.metadata_sexp_at_line_or_nil(line_number)
   if not metadata_sexp then return {} end
-  local ready = not M.ready_at_line(line_number)
+  local root_is_handed_over = metadata.readiness_node_added_p(metadata_sexp)
+  local ready
+  if root_is_handed_over then
+    ready = not metadata.readiness_objects_ready_p(metadata_sexp, { 'node' })
+  else ready = not M.ready_at_line(line_number) end
   local requests = {}
+  local handed_over_level = nil -- while in a handed-over subtree, its level
   for _, line in ipairs(M.subtree_lines(line_number)) do
-    local headline = metadata.metadata_sexp_at_line_or_nil(line)
-    local leaves = nil
-    if headline and line == line_number then
-      leaves = metadata.readiness_leaves(headline)
-    elseif headline then
-      leaves = M.leaves_below(headline) end
-    if leaves then
-      table.insert(requests, M.request_at_line(line, ready, leaves.objects)) end
+    local level = metadata.outline_level(line) or 0
+    if handed_over_level and level <= handed_over_level then
+      handed_over_level = nil end
+    if not handed_over_level then
+      local headline = metadata.metadata_sexp_at_line_or_nil(line)
+      local at_root = line == line_number
+      local handed_over
+      if at_root then handed_over = root_is_handed_over
+      else handed_over = headline and M.hands_to_the_server_p(line, headline) end
+      local leaves = nil
+      if headline and not (at_root and handed_over) then -- the start names the walk alone
+        if at_root then leaves = metadata.readiness_leaves(headline)
+        else leaves = M.leaves_below(headline) end end
+      if leaves or handed_over then
+        local objects = vim.list_extend(
+          vim.deepcopy(leaves and leaves.objects or {}),
+          handed_over and { walk_object } or {})
+        table.insert(requests, M.request_at_line(line, ready, objects)) end
+      if handed_over then handed_over_level = level end
+    end
   end
   return requests
 end
 
+---Does the recursive gesture hand the headline at LINE_NUMBER, with
+---METADATA_SEXP, to the server? It does a new node whose viewparent is
+---not a folder, so that it stands in its viewparent's content.
+---@param line_number integer
+---@param metadata_sexp any
+---@return boolean
+function M.hands_to_the_server_p (line_number, metadata_sexp)
+  if not metadata.readiness_node_added_p(metadata_sexp) then return false end
+  local parent = metadata.parent_line(line_number)
+  return parent ~= nil and metadata.folder_atom(
+    metadata.metadata_sexp_at_line_or_nil(parent)) == nil
+end
+
 ---A request on the headline at LINE_NUMBER, with how many leaves it
 ---touches as the server counts them: N of the headline's '(leaves N
----OBJECT...)' when OBJECTS are the ones it lists, else one for each of
----'node' and 'rel'. A headline without the fact, which only the
----home skgrepo move gesture can reach, counts one.
+---OBJECT...)' when OBJECTS are the ones it lists, else one for each
+---object, and two for 'newContent' or 'newOutward', so that unmarking
+---new nodes always asks first: the client cannot count what the
+---server will reach. A headline without the fact, which only the home
+---skgrepo move gesture can reach, counts one.
 ---@param line_number integer
 ---@param ready boolean
 ---@param objects string[]
@@ -256,6 +307,10 @@ function M.request_at_line (line_number, ready, objects)
   local leaves = metadata.readiness_leaves(
     metadata.metadata_sexp_at_line_or_nil(line_number))
   local count = #objects
+  for _, object in ipairs(objects) do
+    if object == 'newContent' or object == 'newOutward' then
+      count = count + 1 end
+  end
   if vim.deep_equal(objects, leaves and leaves.objects or {}) then
     count = leaves and leaves.count or 1 end
   return { line = line_number, ready = ready, objects = objects,
