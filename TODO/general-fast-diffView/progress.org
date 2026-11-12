@@ -677,3 +677,81 @@ case ('write_unchanged_skgrepos').
 Nothing in this slice.
 *** Headline
 DONE.
+** Slice 2
+Finished 2026-11-12.
+*** Commits
+- df537106 plan 1_3 slice 2: heralds find their overlays by property, keeping no list
+- 402578b5 plan 1_3 slice 2: Emacs patches the saved buffer by the save-result's delta
+- the next commit: docs, the perf tool and its numbers, the plan's headline, this record
+*** Suites
+Logs in 'tests/results/1_3/slice2/' (untracked).
+- 'bash/emacs-tests.sh': 458 of 458 pass (10 of them new, in
+  'tests/elisp/test-skg-redraw-delta.el').
+- 'bash/all-tests.sh': Emacs 458 pass; Neovim pass, no failure;
+  nextest 1163 of 1163; doctests pass; integration 68 of 72. The four
+  failures are the pre-existing ones the plan names:
+  emacs/import-md-and-org, nvim/import-md-and-org, emacs/repo-cycling
+  and emacs/set-relRepo (the last two at the skgrepo prompt, as on
+  2026-11-12). No new failure.
+*** Deviations from the plan's "how"
+**** Each rewrite replaces only the changed span of the line
+'skg--rewrite-line-at-point' deletes and inserts only what lies
+between the prefix and the suffix the old and new line share, not the
+whole line. So point keeps its place on a rewritten line (a mark
+gesture rewrites the very headline point is on), as do window points
+and other markers. It edits inside
+'org-fold-core-ignore-fragility-checks', as 'skg-replace-current-line'
+does; a test shows a rewritten headline above its folded subtree stays
+visible and the subtree folded.
+**** The herald hook is off during the rewrites; one pass re-heralds
+The plan let the existing hook re-herald the folder ancestors. Measured
+on Jeff's buffer, that made the recursive mark's patch (560 headlines)
+slower than the whole redraw: the hook re-heralds a folder once per
+rewritten member, each time reading all its members, and its overlay
+clearing scanned the buffer's whole overlay list. Now
+'skg--rewrite-headline-lines' binds 'after-change-functions' without
+'heralds-after-change' (every other change hook still runs), and
+'skg--reherald-after-rewrites' re-heralds each affected line once: the
+rewritten lines, the folders among their two nearest ancestors (what
+the hook would have done) and the headlines one and two levels below
+(as the plan asks). A test covers each of the two dependencies.
+**** The herald overlay list is gone
+'heralds-clear-overlays-in-region' scanned 'heralds-overlays' whole at
+every call; the clearing functions now find herald overlays by their
+'heralds' property alone, which they already did for orphans, and the
+list and 'heralds-overlay-valid-and-useable-p' are deleted. Its own
+commit; it speeds every herald edit, not only the patch.
+**** The patch's errors fall back
+'skg--patch-buffer-with-delta' logs any error and returns nil, so a
+bug in the patch costs a whole redraw rather than a buffer left
+unredrawn.
+**** The perf tool
+It captures the new text from 'skg--patch-buffer-with-delta' too,
+prints how each buffer was redrawn ("redrawn"), and runs a third
+gesture, the plain mark again, since the first save after opening
+cannot be patched (below). Its first two gestures and their output are
+as before.
+*** Found
+The first save after a view opens cannot be patched: the opener,
+'skg-open-org-buffer-from-text', inserts the server's text verbatim,
+so 'folded' atoms stay in the buffer as text (and are never applied
+as folds), and the buffer differs from the stripped form of what it
+sent. Recorded in 'TODO/problems.org', "An opened view keeps the
+server's fold atoms as text". Every later save patches.
+*** Measured
+'1_3_perf/README.org', "After slice 2": the plain mark repeated takes
+46 ms in 'skg-handle-save-sexp' (patch of 16 headlines), against 410
+ms for the whole redraw; the recursive mark 315 ms (patch of 560
+headlines) against about 410.
+*** Fixtures changed
+'tests/elisp/test-heralds-minor-mode.el': two lines named the deleted
+'heralds-overlays' variable; one assertion on it is gone (the same
+test already checks that no herald overlay remains), and a comment
+reworded.
+*** Unfinished
+Nothing in this slice. The logs of slice 1 and this slice's first
+perf runs were lost: 'bash/all-tests.sh' deletes every directory under
+'tests/results/' not named like a plan number ('1_3' is kept,
+'plan-1_3' is not), so the logs now live in 'tests/results/1_3/'.
+*** Headline
+DONE.

@@ -3,9 +3,12 @@
 'perf.el' opens the diff view of a copy of Jeff's data in batch
 Emacs, against an isolated server, and times a plain mark on a
 changeset marker and the recursive mark on a new root, the two
-gestures Jeff found slow on 2026-11-12. It reports the time per
-client function and how many lines of the server's new text the
-buffer did not already hold.
+gestures Jeff found slow on 2026-11-12, then the plain mark again
+(added in slice 2, since the first save after opening is redrawn
+whole). It reports the time per client function, how many lines of
+the server's new text the buffer did not already hold, and how each
+buffer was redrawn ("redrawn": a patch of N headlines, a failed
+patch, or whole).
 
 Batch Emacs runs no redisplay and none of Jeff's interactive
 configuration, so its times are a floor: Jeff's Emacs took 5.7 s
@@ -37,3 +40,34 @@ The buffer: 569 KB, 2,624 headlines, 3,413 lines.
 "replace" is 'skg-replace-buffer-with-new-content'; "heralds" is
 'heralds-after-change', which runs inside the replace and inside
 the snapshot; "before send" is 'skg-request-save-buffer'.
+
+* After slice 2, 2026-11-12 (compiled client, debug server)
+Emacs patches the saved buffer by the delta. The buffer as before,
+in the copy of Jeff's data made for slice 1's measurement, reused, so
+the marks toggle from where earlier runs left them. Log:
+'tests/results/1_3/slice2/perf.log' (untracked).
+| gesture      | lines changed | redrawn                | save-result | patch  | heralds | before send |
+|--------------+---------------+------------------------+-------------+--------+---------+-------------|
+| marker       |            19 | patch failed, whole    | 410 ms      | 13 ms  | 240 ms  | 163 ms      |
+| recursive    |           558 | patch of 560 headlines | 315 ms      | 285 ms | 144 ms  | 219 ms      |
+| marker again |            13 | patch of 16 headlines  | 46 ms       | 16 ms  | 5 ms    | 195 ms      |
+"save-result" is 'skg-handle-save-sexp', the whole of the client's
+work on the answer (the baseline's "replace" plus the link
+annotations and the rest). "patch" is 'skg--patch-buffer-with-delta';
+"heralds" is 'heralds-after-change' on the whole path and
+'skg--reherald-after-rewrites' on the patch path.
+
+The first save after the view opened cannot be patched: the opened
+text keeps the server's 'folded' atoms as text ('TODO/problems.org',
+"An opened view keeps the server's fold atoms as text"), so the
+buffer differs from the stripped form of the new text and the check
+falls back. Every later save patches. The "before send" column is
+slice 4's business.
+
+Two changes beyond the patch made the recursive mark cheaper than
+the whole redraw (first attempt: 737 ms, of which 432 ms in
+'heralds-clear-overlays-in-region'): the herald hook no longer keeps
+a list of its overlays, which it scanned whole at every edit, and
+the patch runs without the herald hook and re-heralds each affected
+line once, where the hook re-heralded a folder once per rewritten
+member.

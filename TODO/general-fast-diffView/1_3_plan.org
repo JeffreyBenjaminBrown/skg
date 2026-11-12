@@ -329,7 +329,7 @@ Serialize full runs; two at once collide on fixed temp paths.
   "delta (redraw delta)" in 'docs/glossary.org'.
 - Tests: 'bash/nextest.sh'; 'python3 tools/skg-for-ai/test_skg_for_ai.py'.
 
-** TODO Slice 2: Emacs patches the saved buffer
+** DONE Slice 2: Emacs patches the saved buffer
 - A new module, 'elisp/skg-redraw-delta.el': the stripped form of a
   line and of a text (same rule, tested against the shared cases
   file); 'skg--patch-buffer-with-delta (new-content vnids)', which

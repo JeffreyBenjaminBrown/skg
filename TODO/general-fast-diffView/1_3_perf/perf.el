@@ -13,8 +13,24 @@
 (defvar perf-depth (make-hash-table :test 'equal))
 (defvar perf-before nil)
 (defvar perf-new nil)
+(defvar perf-paths nil
+  "How each buffer the gesture redrew was redrawn, latest first.")
 (advice-add 'skg-replace-buffer-with-new-content :before
-            (lambda (_p content &rest _) (setq perf-new content))
+            (lambda (_p content &rest _)
+              (setq perf-new content)
+              (push (cons (buffer-name) 'whole) perf-paths))
+            '((name . capture)))
+(advice-add 'skg--patch-buffer-with-delta :around
+            (lambda (orig content viewnode-ids)
+              (setq perf-new content)
+              (let ((patched (funcall orig content viewnode-ids)))
+                (push (cons (buffer-name)
+                            (if patched
+                                (format "patch of %d headlines"
+                                        (length viewnode-ids))
+                              "patch failed"))
+                      perf-paths)
+                patched))
             '((name . capture)))
 (defun perf-strip (line)
   (replace-regexp-in-string " \\(focused\\|folded\\|bodyFolded\\)\\_>" "" line))
@@ -47,6 +63,7 @@
     skg-remove-focused-metadata skg-fold-marked-headlines
     skg-remove-folded-metadata skg--capture-clean-baseline
     skg-link-annotations-refresh heralds-after-change heralds-apply-to-line
+    skg--patch-buffer-with-delta skg--reherald-after-rewrites
     skg--collateral-view-handler skg--apply-streamed-view-update
     garbage-collect))
 (defun perf-report (label t0)
@@ -87,7 +104,7 @@
   (message "--- %s on: %s" label
            (buffer-substring (point) (min (line-end-position) (+ (point) 120))))
   (clrhash perf-times)
-  (setq perf-before (buffer-string) perf-new nil)
+  (setq perf-before (buffer-string) perf-new nil perf-paths nil)
   (garbage-collect)
   (let ((t0 (float-time)))
     (cl-letf (((symbol-function 'yes-or-no-p) (lambda (&rest _) t)))
@@ -95,11 +112,18 @@
     (skg-test-wait-for-response 120)
     (skg-test-wait-for (lambda () nil) 2) ; let link statuses settle
     (perf-report label (+ t0 2.0))
-    (message "  lines: %S" (perf-changed-lines))))
+    (message "  lines: %S" (perf-changed-lines))
+    (message "  redrawn: %S" (reverse perf-paths))))
 ;; Jeff's gestures of 2026-11-12: a plain mark on a changeset marker,
 ;; and the recursive one on a new root.
 (perf-gesture "marker"
               "(gnid 3e404b13-5f5a-4a68-a72c-8b701895a83f)[^\n]*\n\\*+ (skg (vnid [0-9a-z]+) (changesetMarker"
               nil)
 (perf-gesture "recursive" "(gnid 0311410f-7c27-42bc-9705-37da7d1af688)" '(4))
+;; The plain mark again, toggling it back: the first save after the
+;; view opened is redrawn whole (the opened text keeps the server's
+;; fold atoms as text), so this one shows a later save.
+(perf-gesture "marker again"
+              "(gnid 3e404b13-5f5a-4a68-a72c-8b701895a83f)[^\n]*\n\\*+ (skg (vnid [0-9a-z]+) (changesetMarker"
+              nil)
 (kill-emacs 0)

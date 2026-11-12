@@ -684,6 +684,25 @@ stripped form of a text strips each of its headline lines and leaves
 its body lines and preamble alone. The server and both clients
 implement this rule, and test it against the cases in
 'tests/shared/fold-and-focus-atom-strip-cases.txt'.
+
+A client given a delta patches the buffer instead of redrawing it.
+It replaces each listed headline line, found by its viewnode ID, by
+that viewnode ID's line in the stripped form of the new text,
+inserted as text; re-heralds the replaced lines, the folders among
+their two nearest ancestors and the headlines one or two levels
+below them (whose heralds read them); and then compares the whole
+buffer with the stripped form of the new text. On success it keeps
+its org folds and point, marks the buffer unmodified, takes the
+stripped form as the view's baseline (see "The baseline of a view")
+and refreshes the link annotations. It redraws the whole buffer
+from the new text instead when a listed viewnode ID is missing from
+the buffer or from the new text, when the comparison finds any
+difference (a line the client reprinted otherwise than the server,
+say), or, in Emacs, when 'org-fold-core-style' is not 'overlays'
+(under 'text-properties' a replaced headline above a folded body
+would hide itself). The Emacs client does this for the
+=save-result= ('skg--patch-buffer-with-delta' in
+'elisp/skg-redraw-delta.el').
 ** Server warnings
   - Request: ((request . "server warnings"))
   - Response: LP =((response-type server-warnings) (warnings ("WARNING" ...)))=,

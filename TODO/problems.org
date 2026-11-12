@@ -6,6 +6,18 @@
   When a plan or a settled discussion decides how an entry will be
   fixed, prefix its headline with 'FIX PLANNED: ' and leave it here
   until the fix lands; then move it as above.
+* An opened view keeps the server's fold atoms as text (2026-11-12)
+  'skg-open-org-buffer-from-text' ('elisp/skg-buffer.el'), which
+  both the content view and the diff view open through, inserts the
+  server's text verbatim. A 'folded' or 'bodyFolded' atom in it is
+  neither applied as an org fold nor removed; the heralds hide it, so
+  the user sees an unfolded headline, and the atom sits in the
+  buffer and its baseline until the first whole redraw. Since the
+  buffer then differs from the stripped form of what it sent, the
+  first save after opening a diff view cannot be patched by its redraw
+  delta and redraws the whole buffer (plan 1_3, slice 2; measured on
+  Jeff's "all changes" buffer, where folder headlines open with
+  'folded').
 * A readiness mark leaves the other diff buffers' marks stale (2026-11-06)
   'skg-cycle-commit-ready' saves only the buffer it is in, and the
   server redraws only that buffer. The other diff buffers keep
