@@ -35,7 +35,11 @@ gestures, 'write-protect', 'detach' or 'repo:NAME' among them ("Words
 in a handle").
 
 Then save with the report: 'save DIR/view_ID.view.json' prints, line
-by line, what the save would do, and changes nothing. Read it. If it
+by line, what the save would do, and changes nothing. Read it. For
+each new node it names the parent, "New: 'TITLE', under ...": as in
+Org, that is the nearest shallower headline above it, so a headline
+appended to the end of the file joins whatever subtree is last there,
+which may be a folder or a teammate's note. If the report
 says what you meant, run it again with '--yes' to save; the files
 are then rewritten with the server's new rendering. If it reports an
 error or asks a question, answer it as it says and run it again.
