@@ -744,9 +744,28 @@ function M.reapply_to_folder_ancestors (buf, row, lines)
   end
 end
 
+---The buffers whose edits M.watch_buffer leaves alone, set by
+---M.call_without_watching: their editor re-heralds what it touched.
+---@type table<integer, boolean>
+M.buffers_edited_unwatched = {}
+
+---Call EDIT, whose edits to BUF M.watch_buffer does not re-herald: it
+---would schedule one refresh per edit, each reading the whole buffer
+---and every folder above the edit, where the caller can re-herald each
+---line it touched once. Errors from EDIT pass through.
+---@param buf integer
+---@param edit fun()
+function M.call_without_watching (buf, edit)
+  M.buffers_edited_unwatched[buf] = true
+  local ok, err = pcall(edit)
+  M.buffers_edited_unwatched[buf] = nil
+  if not ok then error(err, 0) end
+end
+
 ---Refresh heralds on the lines an edit touched, and on the folders
 ---above them, via nvim_buf_attach. Detaches (by returning true from
 ---the callback) once heralds are disabled or the buffer is gone.
+---Edits made inside M.call_without_watching are left alone.
 ---@param buf integer
 function M.watch_buffer (buf)
   if vim.b[buf].skg_heralds_watched then return end
@@ -760,6 +779,7 @@ function M.watch_buffer (buf)
           vim.b[buf].skg_heralds_watched = false end
         return true -- detach
       end
+      if M.buffers_edited_unwatched[buf] then return end
       vim.schedule(function ()
         if not vim.api.nvim_buf_is_valid(buf)
            or not M.enabled_p(buf) then return end

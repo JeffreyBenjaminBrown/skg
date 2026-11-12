@@ -14,6 +14,7 @@ local messages = require('skg.messages')
 local metadata = require('skg.metadata')
 local payload = require('skg.payload')
 local readiness = require('skg.readiness')
+local redraw_delta = require('skg.redraw_delta')
 local sexpr = require('skg.sexpr.parse')
 local state = require('skg.state')
 
@@ -455,8 +456,9 @@ function M.handle_save_sexp (save_buf, response)
   local warnings =
     payload.string_list(payload.field(response, 'warnings'))
   if content_text then
-    M.replace_buffer_with_new_content(
+    M.redraw_saved_buffer(
       save_buf, content_text,
+      payload.field(response, 'changed-headlines'),
       M.save_point_position_from_response(response))
   end
   if #errors > 0 or #warnings > 0 then
@@ -466,6 +468,36 @@ function M.handle_save_sexp (save_buf, response)
   local summary = readiness.readiness_summary_from_response(response)
   if summary then -- the saved buffer is one of the diff view's
     vim.notify(readiness.readiness_summary_message(summary)) end
+end
+
+---Show NEW_CONTENT in BUF. When CHANGED_HEADLINES, the value of the
+---response's '(changed-headlines (V ...))', is present (an empty list
+---included), rewrite only the headlines it names
+---('redraw_delta.patch_buffer_with_delta'), leaving folds and the
+---cursor as they are; otherwise, or when the patch fails, redraw the
+---whole buffer, restoring folds and the cursor from the atoms and
+---SAVE_POINT_POSITION.
+---@param buf integer
+---@param new_content string
+---@param changed_headlines any|nil
+---@param save_point_position table|nil
+function M.redraw_saved_buffer (buf, new_content, changed_headlines,
+                                save_point_position)
+  local viewnode_ids = changed_headlines ~= nil
+                       and payload.string_list(changed_headlines) or nil
+  if viewnode_ids
+     and redraw_delta.patch_buffer_with_delta(buf, new_content,
+                                              viewnode_ids) then
+    log.log('debug', 'save', 'redraw: patched %d headlines', #viewnode_ids)
+    vim.bo[buf].modified = false
+    buffer.capture_clean_baseline(buf)
+    require('skg.link_annotations').refresh(buf)
+    vim.notify('Buffer updated with processed content from Rust')
+  else
+    log.log('debug', 'save', 'redraw: whole buffer (%s)',
+            viewnode_ids and 'the patch failed' or 'no delta')
+    M.replace_buffer_with_new_content(buf, new_content, save_point_position)
+  end
 end
 
 ---@param response any
