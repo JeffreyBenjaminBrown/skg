@@ -485,12 +485,8 @@ function M.save_point_position_from_response (response)
 end
 
 ---Replace BUF's contents with NEW_CONTENT from the server, then act
----on the atoms it carries: move to the focused headline and drop
----its atom, restore folds and drop their atoms, restore
----point/scroll, and clear the modified flag. Fold restoration is per-window (vim folds live on
----windows): it runs in the first window showing BUF; an undisplayed
----buffer still gets its atoms stripped, it just has no fold state
----to restore into.
+---on the atoms it carries ('buffer.act_on_fold_and_focus_atoms'),
+---restore point/scroll, and clear the modified flag.
 ---@param buf integer
 ---@param new_content string
 ---@param save_point_position table|nil
@@ -499,27 +495,8 @@ function M.replace_buffer_with_new_content (buf, new_content,
   vim.bo[buf].modifiable = true
   vim.api.nvim_buf_set_lines(buf, 0, -1, false,
                              vim.split(new_content, '\n'))
-  local window = nil
-  for _, win in ipairs(vim.api.nvim_list_wins()) do
-    if vim.api.nvim_win_get_buf(win) == buf then
-      window = win break end
-  end
-  local function act_on_save_metadata ()
-    folds.show_all()
-    -- Focus first, while everything is visible.
-    focus.goto_focused_headline()
-    focus.remove_focused_metadata()
-    local cursor = vim.api.nvim_win_get_cursor(0)
-    folds.fold_marked_headlines()
-    folds.remove_folded_metadata()
-    vim.api.nvim_win_set_cursor(0, cursor)
-    M.restore_save_point_position(save_point_position)
-  end
-  if window then
-    vim.api.nvim_win_call(window, act_on_save_metadata)
-  else
-    vim.api.nvim_buf_call(buf, act_on_save_metadata)
-  end
+  buffer.act_on_fold_and_focus_atoms(buf, function ()
+    M.restore_save_point_position(save_point_position) end)
   vim.bo[buf].modified = false
   buffer.capture_clean_baseline(buf)
   require('skg.link_annotations').refresh(buf)

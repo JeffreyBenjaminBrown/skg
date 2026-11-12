@@ -150,8 +150,10 @@ end
 
 ---Find-or-create the buffer named BUFFER_NAME, fill it with ORG_TEXT,
 ---mark it as an skg view (view_id = VIEW_ID or a fresh UUID), enable
----heralds, arm the lifecycle autocmds, clear the modified flag, and
----switch to it. ORG_TEXT becomes its baseline
+---heralds, arm the lifecycle autocmds, switch to it, act on the fold
+---and focus atoms ORG_TEXT carries as a save's redraw does
+---('act_on_fold_and_focus_atoms'), and clear the modified flag. The
+---text without those atoms becomes its baseline
 ---('capture_clean_baseline'). The port of
 ---'skg-open-org-buffer-from-text'.
 ---@param org_text string
@@ -174,11 +176,46 @@ function M.open_org_buffer_from_text (org_text, buffer_name, view_id)
   vim.api.nvim_buf_set_lines(buf, 0, -1, false,
                              vim.split(org_text, '\n'))
   M.configure_view_buffer(buf, view_id)
+  vim.api.nvim_set_current_buf(buf)
+  M.act_on_fold_and_focus_atoms(buf, nil)
   vim.bo[buf].modified = false
   M.capture_clean_baseline(buf)
-  vim.api.nvim_set_current_buf(buf)
-  vim.api.nvim_win_set_cursor(0, { 1, 0 })
   return buf
+end
+
+---Act on the fold and focus atoms in BUF's text, removing them: move
+---the cursor to the focused headline (the first line when none is),
+---fold what the 'folded' and 'bodyFolded' atoms mark, then call
+---PLACE_CURSOR, when given, with the cursor on the focused headline.
+---Folds live on windows, so this runs in the first window showing BUF;
+---an undisplayed buffer still loses its atoms, having no fold state to
+---restore them into.
+---@param buf integer
+---@param place_cursor fun()|nil
+function M.act_on_fold_and_focus_atoms (buf, place_cursor)
+  local focus = require('skg.focus')
+  local folds = require('skg.folds')
+  local window = nil
+  for _, win in ipairs(vim.api.nvim_list_wins()) do
+    if vim.api.nvim_win_get_buf(win) == buf then
+      window = win break end
+  end
+  local function act_on_atoms ()
+    folds.show_all()
+    -- Focus first, while everything is visible.
+    focus.goto_focused_headline()
+    focus.remove_focused_metadata()
+    local cursor = vim.api.nvim_win_get_cursor(0)
+    folds.fold_marked_headlines()
+    folds.remove_folded_metadata()
+    vim.api.nvim_win_set_cursor(0, cursor)
+    if place_cursor then place_cursor() end
+  end
+  if window then
+    vim.api.nvim_win_call(window, act_on_atoms)
+  else
+    vim.api.nvim_buf_call(buf, act_on_atoms)
+  end
 end
 
 ---Buffer-local setup shared by every server-fed view.

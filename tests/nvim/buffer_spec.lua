@@ -69,6 +69,31 @@ describe('skg.buffer lifecycle and registry', function ()
     assert.are.equal(buf, vim.api.nvim_get_current_buf())
   end)
 
+  it('acts on the fold and focus atoms of the text it opens', function ()
+    -- As a save's whole redraw does: 'folded' closes the parent's fold,
+    -- 'bodyFolded' the body's, 'focused' places the cursor, and no atom
+    -- stays in the buffer or its baseline.
+    local buf = buffer.open_org_buffer_from_text(table.concat({
+      '* (skg node (gnid a)) a',
+      '** (skg focused folded node (gnid b)) b',
+      '* (skg bodyFolded node (gnid c)) c',
+      'c body',
+      'c body 2' }, '\n'), 'skg://t', 'view_id-1')
+    local stripped = table.concat({
+      '* (skg node (gnid a)) a',
+      '** (skg node (gnid b)) b',
+      '* (skg node (gnid c)) c',
+      'c body',
+      'c body 2' }, '\n')
+    assert.are.equal(stripped, buffer.text(buf))
+    assert.are.equal(stripped, vim.b[buf].skg_clean_baseline)
+    assert.is_false(vim.bo[buf].modified)
+    assert.are.equal(1, vim.fn.foldclosed(2))
+    assert.are.equal(-1, vim.fn.foldclosed(3))
+    assert.are.equal(4, vim.fn.foldclosed(4))
+    assert.are.equal(2, vim.api.nvim_win_get_cursor(0)[1])
+  end)
+
   it('reuses the buffer bearing the same name', function ()
     local first = buffer.open_org_buffer_from_text(
       '* t\nold', 'skg://t', 'view_id-1')

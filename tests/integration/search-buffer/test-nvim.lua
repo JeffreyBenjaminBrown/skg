@@ -54,7 +54,9 @@ T.check(buf ~= nil, 'search buffer never created')
 assert_leaf_b_root_is_content(buf)
 T.check(T.buffer_text(buf):find('(skgRepos (nodeRepo "Mr Cheese"))', 1, true) ~= nil,
   'spaced repo name is quoted')
-do -- leaf-b's first child is its folded containers folder, holding container-a.
+do -- leaf-b's first child is its folded containers folder, holding
+   -- container-a. The opened buffer acts on the server's 'folded' atom:
+   -- the folder hides in leaf-b's closed fold, and the atom is gone.
   local lines = vim.split(
     T.without_viewnode_ids(table.concat(
       vim.api.nvim_buf_get_lines(buf, 0, -1, false), '\n')), '\n')
@@ -65,9 +67,13 @@ do -- leaf-b's first child is its folded containers folder, holding container-a.
       break
     end
   end
+  local window = vim.fn.win_findbuf(buf)[1]
   T.check(root
-          and lines[root + 1]:sub(1, #'** (skg folded containerFolder')
-              == '** (skg folded containerFolder'
+          and lines[root + 1]:sub(1, #'** (skg containerFolder')
+              == '** (skg containerFolder'
+          and window ~= nil
+          and vim.api.nvim_win_call(window, function ()
+                return vim.fn.foldclosed(root + 1) end) == root
           and lines[root + 2]:find(
                 '*** (skg node (gnid container-a) (skgRepos (nodeRepo "Mr Cheese")) writeProtected ',
                 1, true) == 1,
