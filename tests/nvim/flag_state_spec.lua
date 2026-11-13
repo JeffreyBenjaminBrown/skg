@@ -74,12 +74,12 @@ describe('skg.flag_state staging', function ()
     end
   end)
 
-  it('lets a headline holding only a readiness request take the flag'
+  it('lets a headline holding only a processed request take the flag'
      .. ' request', function ()
-    -- Mirrors test-skg-flag-a-readiness-request-takes-the-flag-request:
+    -- Mirrors test-skg-flag-a-processed-request-takes-the-flag-request:
     -- such a headline holds no edit request
     -- (metadata.node_edit_request_p), so the command asks the server,
-    -- and a recursive staging stamps it, keeping the readiness request
+    -- and a recursive staging stamps it, keeping the processed request
     -- after the flag request.
     local sent
     client.send_string = function (text) sent = text end

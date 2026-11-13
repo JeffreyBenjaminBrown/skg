@@ -268,7 +268,7 @@ describe('skg.metadata commands', function ()
     -- each command, run on a headline that carries view requests and
     -- derived facts, writes its edit request or 'noClaim' at its rank
     -- in the 'parts' list of 'shared/metadata-fields.json', replacing
-    -- any edit request held and keeping a readiness request.
+    -- any edit request held and keeping a processed request.
     local flag = require('skg.flag_state')
     local parent = '* (skg node (gnid p) (skgRepos (nodeRepo r))) p'
     local head = '** (skg (vnid 0a) node (gnid X) (skgRepos (nodeRepo r))'
@@ -284,7 +284,7 @@ describe('skg.metadata commands', function ()
       { 'delete', '', metadata.delete, ' (editRequest delete)' },
       { 'delete over a merge', ' (editRequest (merge y))',
         metadata.delete, ' (editRequest delete)' },
-      { 'delete beside a readiness request', ' (editRequest (merge y) (ready node))',
+      { 'delete beside a processed request', ' (editRequest (merge y) (ready node))',
         metadata.delete, ' (editRequest delete (ready node))' },
       { 'delete_recursive over a merge', ' (editRequest (merge y))',
         metadata.delete_recursive, ' (editRequest delete)' },
@@ -298,7 +298,7 @@ describe('skg.metadata commands', function ()
         ' (editRequest (merge z))' },
       { 'the flag stamp', '', function () flag._apply(2, false, false) end,
         ' (editRequest (flag noSearchMatching false))' },
-      { 'the flag stamp beside a readiness request', ' (editRequest (ready node))',
+      { 'the flag stamp beside a processed request', ' (editRequest (ready node))',
         function () flag._apply(2, true, false) end,
         ' (editRequest (flag noSearchMatching true) (ready node))' },
       { 'detach', '', metadata.detach, ' noClaim' },
@@ -398,11 +398,11 @@ describe('skg.metadata commands', function ()
     end
   end)
 
-  it('the merge and restore commands keep the readiness request',
+  it('the merge and restore commands keep the processed request',
      function ()
-    -- Mirrors test-skg-edit-request-commands-keep-the-readiness-request:
+    -- Mirrors test-skg-edit-request-commands-keep-the-processed-request:
     -- each replaces the edit request in '(editRequest ...)' and keeps
-    -- the readiness request pending there.
+    -- the processed request pending there.
     local function edit_request_after (headline, command)
       buffer_at_last_line(headline)
       command()
@@ -801,7 +801,7 @@ describe('skg.metadata relRepo gesture', function ()
       '(skgRepos (nodeRepo public) (relRepo private))', 1, true))
   end)
 
-  it('keeps the readiness request', function ()
+  it('keeps the processed request', function ()
     buffer_with('* (skg node (gnid x) (skgRepos (nodeRepo public)) (editRequest (relRepo trusted) (ready rel))) x')
     metadata.apply_relRepo_choice(1, 'private')
     assert.is_truthy(buffer_text():find(
@@ -810,7 +810,7 @@ describe('skg.metadata relRepo gesture', function ()
     assert.is_truthy(buffer_text():find('(editRequest (ready rel)))', 1, true))
   end)
 
-  it('is not blocked by a readiness request, but by a delete', function ()
+  it('is not blocked by a processed request, but by a delete', function ()
     buffer_with({
       '* (skg node (gnid x) (skgRepos (nodeRepo public)) (editRequest (ready rel))) x',
       '* (skg node (gnid y) (skgRepos (nodeRepo public)) (editRequest (unready))) y',

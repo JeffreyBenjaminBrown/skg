@@ -52,8 +52,8 @@ describe('the metadata editor', function ()
         for _, writer in ipairs({
             { 'edit request', 'with the edit request',
               metadata.metadata_with_edit_request },
-            { 'readiness request', 'with the readiness request',
-              metadata.metadata_with_readiness_request } }) do
+            { 'processed request', 'with the processed request',
+              metadata.metadata_with_processed_request } }) do
           local request = case[writer[1]]
           if request then
             assert.are.same(

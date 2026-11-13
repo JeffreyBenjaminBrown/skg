@@ -475,9 +475,9 @@ function M.metadata_with_new_parts_at_their_ranks (host_sexp, edited_sexp)
 end
 
 ---@param request any a part of an '(editRequest ...)'
----@return boolean is it a readiness request, '(ready OBJECT...)' or
+---@return boolean is it a processed request, '(ready OBJECT...)' or
 ---'(unready OBJECT...)'?
-function M.readiness_request_p (request)
+function M.processed_request_p (request)
   local head = head_name(request)
   return head == 'ready' or head == 'unready'
 end
@@ -510,42 +510,42 @@ local function metadata_with_editRequest_parts (metadata_sexp, requests_from)
   return result
 end
 
----METADATA_SEXP with READINESS_REQUEST, '(ready OBJECT...)' or
+---METADATA_SEXP with PROCESSED_REQUEST, '(ready OBJECT...)' or
 ---'(unready OBJECT...)', in its '(editRequest ...)' in place of any
----readiness request there, after the headline's other request if it
+---processed request there, after the headline's other request if it
 ---has one. A headline without the form gets one, where the server
 ---writes it: before its '(viewRequests ...)', '(view ...)' and '(diff
 ---...)'.
 ---@param metadata_sexp any
----@param readiness_request any
+---@param processed_request any
 ---@return any
-function M.metadata_with_readiness_request (metadata_sexp, readiness_request)
+function M.metadata_with_processed_request (metadata_sexp, processed_request)
   return metadata_with_editRequest_parts(metadata_sexp, function (requests)
     local kept = vim.tbl_filter(
-      function (request) return not M.readiness_request_p(request) end,
+      function (request) return not M.processed_request_p(request) end,
       requests)
-    table.insert(kept, readiness_request)
+    table.insert(kept, processed_request)
     return kept end)
 end
 
 ---METADATA_SEXP with EDIT_REQUEST as the edit request of its
----'(editRequest ...)': any edit request there replaced, its readiness
+---'(editRequest ...)': any edit request there replaced, its processed
 ---request kept after it. A nil EDIT_REQUEST removes the edit request,
 ---and with it an '(editRequest ...)' left empty. A headline without the
----form gets one, where M.metadata_with_readiness_request puts it. The
----counterpart of M.metadata_with_readiness_request.
+---form gets one, where M.metadata_with_processed_request puts it. The
+---counterpart of M.metadata_with_processed_request.
 ---@param metadata_sexp any
 ---@param edit_request any|nil
 ---@return any
 function M.metadata_with_edit_request (metadata_sexp, edit_request)
   return metadata_with_editRequest_parts(metadata_sexp, function (requests)
-    local kept = vim.tbl_filter(M.readiness_request_p, requests)
+    local kept = vim.tbl_filter(M.processed_request_p, requests)
     if edit_request ~= nil then table.insert(kept, 1, edit_request) end
     return kept end)
 end
 
 ---Make REQUEST the edit request of the headline at LINE_NUMBER,
----replacing any it holds and keeping the readiness request its
+---replacing any it holds and keeping the processed request its
 ---'(editRequest ...)' holds (M.metadata_with_edit_request). A nil
 ---REQUEST removes the edit request. KIND, when given, is the kind atom
 ---a headline without metadata gets. Mirrors skg--write-edit-request.
@@ -567,7 +567,7 @@ end
 
 ---Whether METADATA_SEXP is an occurrence's that already holds an edit
 ---request: a part of its '(editRequest ...)' that is neither a
----relRepo request nor a readiness request. Mirrors
+---relRepo request nor a processed request. Mirrors
 ---skg--node-edit-request-p.
 ---@param metadata_sexp any|nil
 ---@return boolean
@@ -577,7 +577,7 @@ function M.node_edit_request_p (metadata_sexp)
                           metadata_sexp, { 'skg', 'editRequest' }) or {}) do
     local head = sexpr.is_list(part) and sexpr.atom_text(part[1]) or nil
     if not (head == 'relRepo'
-            or M.readiness_request_p(part)) then
+            or M.processed_request_p(part)) then
       return true end
   end
   return false
@@ -978,7 +978,7 @@ end
 ---the top level, or nil.
 ---@param metadata_sexp any
 ---@return any|nil
-function M.readiness_diff_form (metadata_sexp)
+function M.processed_diff_form (metadata_sexp)
   return child_with_head(metadata_sexp, 'diff')
 end
 
@@ -986,8 +986,8 @@ end
 ---@param metadata_sexp any
 ---@param key string
 ---@return any|nil
-function M.readiness_form (metadata_sexp, key)
-  local diff = M.readiness_diff_form(metadata_sexp)
+function M.processed_form (metadata_sexp, key)
+  local diff = M.processed_diff_form(metadata_sexp)
   if not diff then return nil end
   return child_with_head(diff, key)
 end
@@ -996,8 +996,8 @@ end
 ---as { count = N, objects = OBJECTS }, or nil when it names no leaf.
 ---@param metadata_sexp any
 ---@return table|nil
-function M.readiness_leaves (metadata_sexp)
-  local form = M.readiness_form(metadata_sexp, 'leaves')
+function M.processed_leaves (metadata_sexp)
+  local form = M.processed_form(metadata_sexp, 'leaves')
   if not form then return nil end
   local atoms = arguments(form)
   return { count = tonumber(atoms[1]) or 0,
@@ -1007,35 +1007,35 @@ end
 ---@param metadata_sexp any
 ---@return boolean is the headline with METADATA_SEXP a new node? Its
 ---'(diff ...)' says '(node added)'.
-function M.readiness_node_added_p (metadata_sexp)
-  return arguments(M.readiness_form(metadata_sexp, 'node'))[1] == 'added'
+function M.processed_node_added_p (metadata_sexp)
+  return arguments(M.processed_form(metadata_sexp, 'node'))[1] == 'added'
 end
 
 ---@param metadata_sexp any
 ---@param objects string[]
----@return boolean is every one of OBJECTS ready? It is when the
+---@return boolean is every one of OBJECTS processed? It is when the
 ---headline carries a '(ready ...)' that names each of them. A
----headline that lists no object (one naming a single leaf) is ready
+---headline that lists no object (one naming a single leaf) is processed
 ---when it carries any '(ready ...)'.
-function M.readiness_objects_ready_p (metadata_sexp, objects)
-  local ready = M.readiness_form(metadata_sexp, 'ready')
-  if not ready then return false end
-  local ready_objects = {}
-  for _, object in ipairs(arguments(ready)) do
-    ready_objects[object] = true
+function M.objects_processed_p (metadata_sexp, objects)
+  local processed = M.processed_form(metadata_sexp, 'ready')
+  if not processed then return false end
+  local processed_objects = {}
+  for _, object in ipairs(arguments(processed)) do
+    processed_objects[object] = true
   end
   for _, object in ipairs(objects) do
-    if not ready_objects[object] then return false end
+    if not processed_objects[object] then return false end
   end
   return true
 end
 
 ---Whether a folder member carries a change of its relationship to
----the folder's viewparent, and if so whether that change is ready.
+---the folder's viewparent, and if so whether that change is processed.
 ---MEMBER_SEXP is the member's metadata; CHILD_SEXPS that of its own
 ---child headlines. The member carries such a change when its
 ---'(diff ...)' has a '(rel ...)', or when one of its children is a
----'(relRepoMove ...)'. The change is ready when both of these hold:
+---'(relRepoMove ...)'. The change is processed when both of these hold:
 ---if the member has a '(rel ...)', its '(diff ...)' has a '(ready
 ---...)' that, when its '(leaves ...)' lists 'rel', names 'rel'; if
 ---it has a '(relRepoMove ...)' child, that child's '(diff ...)' has
@@ -1043,37 +1043,37 @@ end
 ---@param member_sexp any
 ---@param child_sexps any[]
 ---@return boolean|nil nil when the member carries no such change,
----else whether it is ready
-function M.membership_change_readiness (member_sexp, child_sexps)
-  local changed, ready = false, true
-  if M.readiness_form(member_sexp, 'rel') then
+---else whether it is processed
+function M.membership_change_processed (member_sexp, child_sexps)
+  local changed, processed = false, true
+  if M.processed_form(member_sexp, 'rel') then
     changed = true
-    local leaves = M.readiness_leaves(member_sexp)
+    local leaves = M.processed_leaves(member_sexp)
     local objects = {}
     if leaves and vim.tbl_contains(leaves.objects, 'rel') then
       objects = { 'rel' } end
-    ready = M.readiness_objects_ready_p(member_sexp, objects)
+    processed = M.objects_processed_p(member_sexp, objects)
   end
   for _, child in ipairs(child_sexps) do
     if child_with_head(child, 'relRepoMove') then
       changed = true
-      ready = ready and M.readiness_form(child, 'ready') ~= nil end
+      processed = processed and M.processed_form(child, 'ready') ~= nil end
   end
   if not changed then return nil end
-  return ready
+  return processed
 end
 
 ---Whether the folder whose headline is LINES[INDEX] is changed, and
----if so whether it is ready. LINES are a buffer's lines, 1-based. The
+---if so whether it is processed. LINES are a buffer's lines, 1-based. The
 ---folder is changed when one of its members (its direct child
 ---headlines) carries a change of its relationship to the folder's
----viewparent (M.membership_change_readiness), and ready when every such
----change is ready. Nil when the headline is no folder or no member
----carries such a change; else { ready = BOOLEAN }.
+---viewparent (M.membership_change_processed), and processed when every such
+---change is processed. Nil when the headline is no folder or no member
+---carries such a change; else { processed = BOOLEAN }.
 ---@param lines string[]
 ---@param index integer
 ---@return table|nil
-function M.folder_change_readiness_in_lines (lines, index)
+function M.folder_change_processed_in_lines (lines, index)
   local level = M.headline_level_on_line(lines[index])
   if not (level and M.folder_atom(M.metadata_on_line(lines[index]))) then
     return nil end
@@ -1092,24 +1092,24 @@ function M.folder_change_readiness_in_lines (lines, index)
       end
     end
   end
-  local changed, ready = false, true
+  local changed, processed = false, true
   for _, member in ipairs(members) do
-    local member_ready = member.sexp
-      and M.membership_change_readiness(member.sexp, member.child_sexps)
-    if member_ready ~= nil then
+    local member_processed = member.sexp
+      and M.membership_change_processed(member.sexp, member.child_sexps)
+    if member_processed ~= nil then
       changed = true
-      ready = ready and member_ready end
+      processed = processed and member_processed end
   end
   if not changed then return nil end
-  return { ready = ready }
+  return { processed = processed }
 end
 
----M.folder_change_readiness_in_lines for the headline at LINE_NUMBER of the
+---M.folder_change_processed_in_lines for the headline at LINE_NUMBER of the
 ---current buffer.
 ---@param line_number integer
 ---@return table|nil
-function M.folder_change_readiness_at_line (line_number)
-  return M.folder_change_readiness_in_lines(
+function M.folder_change_processed_at_line (line_number)
+  return M.folder_change_processed_in_lines(
     vim.api.nvim_buf_get_lines(0, 0, -1, false), line_number)
 end
 

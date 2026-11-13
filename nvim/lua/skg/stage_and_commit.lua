@@ -1,7 +1,7 @@
 -- PURPOSE: Stage every change and git-commit it, in every owned
 -- skgrepo that has changes, with one message
 -- ('docs/diff-view.org', "Stage and commit").
--- When the readiness summary is incomplete, or some owned gitrepo
+-- When the processed summary is incomplete, or some owned gitrepo
 -- has entries already staged, the server asks for confirmation
 -- instead and changes nothing; only the typed word "yes" resends the
 -- request confirmed. Every answer is followed by a rerender
@@ -14,7 +14,7 @@
 local buffer = require('skg.buffer')
 local messages = require('skg.messages')
 local payload = require('skg.payload')
-local readiness = require('skg.readiness')
+local processed = require('skg.processed')
 local rerender = require('skg.rerender_all_views')
 local sexpr = require('skg.sexpr.parse')
 
@@ -192,7 +192,7 @@ end
 
 M.already_staged_buffer_name = '*skg already staged*'
 
----Show the readiness summary of RESPONSE, a request for confirmation,
+---Show the processed summary of RESPONSE, a request for confirmation,
 ---and how many entries it lists as already staged in each gitrepo,
 ---the entries themselves in the buffer M.already_staged_buffer_name.
 ---On "yes" resend MESSAGE confirmed; otherwise, an interrupt at the
@@ -206,9 +206,9 @@ function M.confirm_and_resend (message, response)
     messages.big_nonfatal_message(M.already_staged_buffer_name,
       'Entries already staged are listed in ' .. M.already_staged_buffer_name,
       listing) end
-  local summary = readiness.readiness_summary_from_response(response)
+  local summary = processed.processed_summary_from_response(response)
   local ok, typed = pcall(vim.fn.input,
-    readiness.readiness_summary_message(summary):gsub('%.$', '')
+    processed.processed_summary_message(summary):gsub('%.$', '')
     .. M.already_staged_message(already_staged)
     .. '. Type yes to commit anyway: ')
   if ok and typed == 'yes' then

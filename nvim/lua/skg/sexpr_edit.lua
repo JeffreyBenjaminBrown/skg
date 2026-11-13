@@ -34,7 +34,7 @@ M.help_text =
 ---opens the
 ---empty-node view over it: skgrepo pre-filled, the other editable
 ---fields childless, so an untouched apply yields just the skgrepo. A
----readiness request in its '(editRequest ...)' is shown beside the
+---processed request in its '(editRequest ...)' is shown beside the
 ---other request, so that deleting it there clears it.
 function M.view_metadata ()
   if not metadata.at_headline_p() then error('Not on a headline') end

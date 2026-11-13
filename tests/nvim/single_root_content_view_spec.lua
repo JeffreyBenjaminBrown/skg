@@ -123,7 +123,7 @@ describe('skg.single_root_content_view responses', function ()
     local error_text = 'NOTHING WAS SAVED\n\nValidation errors found in buffer.\n\n'
       .. '** Error 1\nLocal structure violation:\n- ID: p\n'
       .. '*** a stray alias\n- viewnode ID: 0f. To find it: C-c g v 0f\n'
-    local warning_text = 'A readiness request names no current change; it was dropped.\n'
+    local warning_text = 'A processed request names no current change; it was dropped.\n'
       .. '*** b\n- graphnode ID: b\n'
       .. '- viewnode ID: 0z. To find it: C-c g v 0z\n'
     assert.are.equal(
@@ -132,7 +132,7 @@ describe('skg.single_root_content_view responses', function ()
       .. '** Error 1\nLocal structure violation:\n- ID: p\n'
       .. '*** a stray alias\n- viewnode ID: 0f. To find it: <localleader>gv 0f\n'
       .. '\n* warnings\n'
-      .. '** A readiness request names no current change; it was dropped.\n'
+      .. '** A processed request names no current change; it was dropped.\n'
       .. '*** b\n- graphnode ID: b\n'
       .. '- viewnode ID: 0z. To find it: <localleader>gv 0z\n',
       messages.errors_and_warnings_to_org_string(

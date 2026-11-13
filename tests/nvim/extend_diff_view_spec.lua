@@ -73,7 +73,7 @@ describe('skg extend diff view', function ()
     assert.is_truthy(requests[1]:find(
       '(view-id . "diff-view: all changes")', 1, true))
     assert.is_truthy(vim.tbl_contains(
-      notices, '1 of 3 changed files are ready'), vim.inspect(notices))
+      notices, '1 of 3 changed files are processed'), vim.inspect(notices))
     assert.are.same({ '* (skg node (gnid b)) b' },
                     vim.api.nvim_buf_get_lines(view, 0, -1, false))
   end)

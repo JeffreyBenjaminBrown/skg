@@ -92,7 +92,7 @@ describe('skg stage and commit', function ()
     assert.is_truthy(requests[1]:find('(message-lines "one message")', 1, true))
     assert.is_falsy(requests[1]:find('confirmed', 1, true))
     assert.is_truthy(requests[2]:find('(confirmed . t)', 1, true))
-    assert.is_truthy(prompts[1]:find('1 of 3 changed files are ready', 1, true))
+    assert.is_truthy(prompts[1]:find('1 of 3 changed files are processed', 1, true))
     assert.is_nil(stage_and_commit.commit_message_buffer())
     assert.is_truthy(vim.tbl_contains(
       notices, 'Committed in public (5f135fe), private (bff3a57).'), vim.inspect(notices))
@@ -145,7 +145,7 @@ describe('skg stage and commit', function ()
     vim.wait(3000, function ()
       return #prompts == 1 and lock.stream_in_progress == nil end, 10)
     assert.are.equal(
-      'Commit ready. All 3 of 3 changed files are ready.'
+      'Commit ready. All 3 of 3 changed files are processed.'
       .. ' Already staged, so committed too: /data/public: 2 paths'
       .. ' (listed in *skg already staged*).'
       .. ' Type yes to commit anyway: ',

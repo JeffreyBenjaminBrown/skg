@@ -313,7 +313,7 @@ describe('skg.sexpr.metadata_fields other kinds, arguments, conditions', functio
       fields.strip_defaults_from_org(filledIn, kind)))
   end)
 
-  it('keeps a readiness request beside the other edit request',
+  it('keeps a processed request beside the other edit request',
      function ()
     -- Alone, it is shown beside the other request at its default.
     local sexp = sexpr.read('(skg unknown (gnid x) (editRequest (ready rel)))')

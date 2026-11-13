@@ -257,7 +257,7 @@ describe('skg.redraw_delta patch', function ()
 
   it('re-heralds the folder above', function ()
     -- A folder's herald reads its members. When the patch makes its one
-    -- changed member ready, the folder's herald shows it ready too, at
+    -- changed member processed, the folder's herald shows it processed too, at
     -- once: the patch re-heralds without the watcher's deferred pass.
     local root_and_folder =
       '* (skg (vnid r) node (gnid r) (skgRepos (nodeRepo r))) r\n'

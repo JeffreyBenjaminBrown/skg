@@ -3,7 +3,7 @@
 -- the data.
 --
 -- Phase 1: Open the diff view; its buffers open.
--- Phase 2: Mark every change commit-ready, through the recursive
+-- Phase 2: Mark every change processed, through the recursive
 --          gesture on each root of the "all changes" buffer, and see
 --          "Commit ready".
 -- Phase 3: Stage and commit; every owned skgrepo is committed, the
@@ -88,9 +88,9 @@ end
 
 -- PHASE 2: mark every root, recursively. Each gesture saves, which
 -- rerenders the buffer, so the roots are found afresh. A root an
--- earlier gesture already readied is skipped: the gesture toggles, so
--- it would unready it.
-print('=== PHASE 2: Mark everything commit-ready ===')
+-- earlier gesture already marked processed is skipped: the gesture toggles, so
+-- it would mark it unprocessed.
+print('=== PHASE 2: Mark everything processed ===')
 vim.api.nvim_set_current_buf(all_changes)
 local function root_lines ()
   local found = {}
@@ -105,20 +105,20 @@ for i = 1, #root_lines() do
   if not line:find('(ready', 1, true) then
     local before = #notified
     vim.api.nvim_win_set_cursor(0, { lnum, 0 })
-    require('skg.readiness').cycle_commit_ready_recursive()
+    require('skg.processed').cycle_processed_recursive()
     T.check(T.wait_for(function ()
       for j = before + 1, #notified do
-        if notified[j]:find('changed files are ready', 1, true) then return true end
+        if notified[j]:find('changed files are processed', 1, true) then return true end
       end
       return nil
-    end, 20), 'a readiness summary after the gesture on root ' .. i)
+    end, 20), 'a processed summary after the gesture on root ' .. i)
     T.wait_for_response(20)
   end
 end
 do
-  local summary = newest_notification('changed files are ready')
+  local summary = newest_notification('changed files are processed')
   T.check(summary and summary:find('^Commit ready%.'),
-          'commit-ready after marking every root: ' .. tostring(summary)
+          'processed after marking every root: ' .. tostring(summary)
           .. '\n' .. T.buffer_text(all_changes))
 end
 

@@ -69,8 +69,8 @@ describe('skg.heralds', function ()
   it('renders the cases shared with Emacs', function ()
     local cases = shared_cases()
     assert.is_true(#cases > 40)
-    local folder_changes = { ['folderChange ready'] = { ready = true },
-                             ['folderChange unready'] = { ready = false } }
+    local folder_changes = { ['folderChange ready'] = { processed = true },
+                             ['folderChange unready'] = { processed = false } }
     for _, case in ipairs(cases) do
       local chunks = heralds.chunks_from_metadata(
         case.metadata, folder_changes[case.context],
@@ -231,10 +231,10 @@ describe('skg.heralds', function ()
     assert.are.equal('☮ its other containers changed (other files)✓',
                      folder_herald())
     heralds.disable(buf)
-    -- A changed folder's label stands in for its own, with ✓ when ready.
+    -- A changed folder's label stands in for its own, with ✓ when processed.
     assert.are.equal('its aliases changed (this file)✓',
       heralds.chunks_text(heralds.chunks_from_metadata(
-        '(skg aliasFolder)', { ready = true })))
+        '(skg aliasFolder)', { processed = true })))
     assert.are.equal('aliases',
       heralds.chunks_text(heralds.chunks_from_metadata('(skg aliasFolder)')))
   end)

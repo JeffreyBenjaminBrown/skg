@@ -10,7 +10,7 @@ local client = require('skg.client')
 local log = require('skg.log')
 local messages = require('skg.messages')
 local payload = require('skg.payload')
-local readiness = require('skg.readiness')
+local processed = require('skg.processed')
 local sexpr = require('skg.sexpr.parse')
 local state = require('skg.state')
 
@@ -69,7 +69,7 @@ end
 
 ---Open the diff view's BUFFER_NAME from RESPONSE under
 ---VIEW_ID, unless the server answered '(empty . t)'. Shows its
----readiness summary, as a save does, and any errors and warnings.
+---processed summary, as a save does, and any errors and warnings.
 ---@return string 'opened', 'empty' or 'failed' (no buffer, and errors)
 function M.handle_diffView_response (response, buffer_name, view_id)
   local ok, outcome = pcall(function ()
@@ -84,9 +84,9 @@ function M.handle_diffView_response (response, buffer_name, view_id)
         content, 'skg://diff-view: ' .. buffer_name, view_id)
       -- Its save names it ('save.save_request_sexp').
       vim.b[buf].skg_diffView_buffer_kind = buffer_name
-      local summary = readiness.readiness_summary_from_response(response)
+      local summary = processed.processed_summary_from_response(response)
       if summary then
-        vim.notify(readiness.readiness_summary_message(summary)) end end
+        vim.notify(processed.processed_summary_message(summary)) end end
     if #errors > 0 or #warnings > 0 then
       messages.big_nonfatal_message(
         'skg://messages/diff-view',

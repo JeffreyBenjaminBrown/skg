@@ -294,7 +294,7 @@ end
 
 ---The headlines that show the child NAME of KIND, whose group is GROUP
 ---or nil when absent: a missing field at its default; an editRequest
----holding nothing but a readiness request with the other request at
+---holding nothing but a processed request with the other request at
 ---its default before it; a bare atom with a 'true' child.
 ---@param name string
 ---@param group table[]|nil
@@ -307,7 +307,7 @@ function M.fillIn_one (name, group, child_level, kind)
     return { { level = child_level, text = name },
              { level = child_level + 1, text = M.shown_default(field) } } end
   if field and name == 'editRequest'
-     and M.only_readiness_requests_p(group, child_level) then
+     and M.only_processed_requests_p(group, child_level) then
     return M.concatenated(
       { group[1],
         { level = child_level + 1, text = M.shown_default(field) } },
@@ -318,13 +318,13 @@ function M.fillIn_one (name, group, child_level, kind)
 end
 
 ---Whether GROUP, an editRequest at CHILD_LEVEL, holds nothing but a
----readiness request, '(ready ...)' or '(unready ...)', which the
----readiness commands set and the editor shows. Its fill-in then shows
+---processed request, '(ready ...)' or '(unready ...)', which the
+---processed commands set and the editor shows. Its fill-in then shows
 ---the other request at its default beside it.
 ---@param group table[]
 ---@param child_level integer
 ---@return boolean
-function M.only_readiness_requests_p (group, child_level)
+function M.only_processed_requests_p (group, child_level)
   local value_groups =
     M.group_children(vim.list_slice(group, 2), child_level + 1)
   if #value_groups == 0 then return false end

@@ -13,7 +13,7 @@ local log = require('skg.log')
 local messages = require('skg.messages')
 local metadata = require('skg.metadata')
 local payload = require('skg.payload')
-local readiness = require('skg.readiness')
+local processed = require('skg.processed')
 local redraw_delta = require('skg.redraw_delta')
 local sexpr = require('skg.sexpr.parse')
 local state = require('skg.state')
@@ -573,9 +573,9 @@ function M.handle_save_sexp (save_buf, response)
     M.show_save_errors_and_warnings(errors, warnings,
                                     content_text ~= nil)
   end
-  local summary = readiness.readiness_summary_from_response(response)
+  local summary = processed.processed_summary_from_response(response)
   if summary then -- the saved buffer is one of the diff view's
-    vim.notify(readiness.readiness_summary_message(summary)) end
+    vim.notify(processed.processed_summary_message(summary)) end
 end
 
 ---Show NEW_CONTENT in BUF. When CHANGED_HEADLINES, the value of the

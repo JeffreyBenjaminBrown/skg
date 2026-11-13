@@ -153,46 +153,46 @@ M.commands = {
               desc = 'Paste a link to the top-of-stack node and pop it' },
   PopNode = { module = 'skg.linkstack', fn = 'pop_node',
               desc = 'Paste the top-of-stack node and pop it' },
-  CycleCommitReady = { module = 'skg.readiness', fn = 'cycle_commit_ready',
-                      desc = 'Toggle the commit-readiness of the change at point, and save' },
-  CycleCommitReadyRecursive = { module = 'skg.readiness',
-                                fn = 'cycle_commit_ready_recursive',
-                                desc = 'Mark (or unmark) every change in the subtree commit-ready, new nodes by the graph contentward, and save' },
-  CycleCommitReadyRecursiveOutward = {
-    module = 'skg.readiness',
-    fn = 'cycle_commit_ready_recursive_outward',
-    desc = 'Mark (or unmark) every change in the subtree commit-ready, new nodes by the graph along every relationship they record, and save' },
-  ToggleHomeSkgrepoMoveCommitReady = { module = 'skg.readiness',
-                                       fn = 'toggle_homeSkgrepo_move_commitReady',
-                                       desc = "Toggle the commit-readiness of the node's home-skgrepo move, and save" },
-  ToggleHomeSkgrepoMoveCommitReadyRecursive = {
-    module = 'skg.readiness',
-    fn = 'toggle_homeSkgrepo_move_commitReady_recursive',
-    desc = 'Toggle the commit-readiness of every home skgrepo move in the subtree like this one, and save' },
+  CycleProcessed = { module = 'skg.processed', fn = 'cycle_processed',
+                      desc = 'Toggle whether the change at point is processed, and save' },
+  CycleProcessedRecursive = { module = 'skg.processed',
+                                fn = 'cycle_processed_recursive',
+                                desc = 'Mark (or unmark) every change in the subtree processed, new nodes by the graph contentward, and save' },
+  CycleProcessedRecursiveOutward = {
+    module = 'skg.processed',
+    fn = 'cycle_processed_recursive_outward',
+    desc = 'Mark (or unmark) every change in the subtree processed, new nodes by the graph along every relationship they record, and save' },
+  ToggleHomeSkgrepoMoveProcessed = { module = 'skg.processed',
+                                       fn = 'toggle_homeSkgrepo_move_processed',
+                                       desc = "Toggle whether the node's home-skgrepo move is processed, and save" },
+  ToggleHomeSkgrepoMoveProcessedRecursive = {
+    module = 'skg.processed',
+    fn = 'toggle_homeSkgrepo_move_processed_recursive',
+    desc = 'Toggle whether every home skgrepo move in the subtree like this one is processed, and save' },
   DiffViewExtend = {
     module = 'skg.extend_diff_view',
     fn = 'diffView_extend',
     desc = 'Extend this diff-view buffer to the changes it does not show, appending roots as needed' },
   StageAndCommit = { module = 'skg.stage_and_commit', fn = 'stage_and_commit',
                      desc = 'Stage and git-commit every owned skgrepo with changes, with one message' },
-  DiffViewGotoNextChange = { module = 'skg.readiness',
+  DiffViewGotoNextChange = { module = 'skg.processed',
                              fn = 'diffView_goto_next_change',
                              desc = 'Move to the next headline with change facts' },
-  DiffViewGotoNextUnreadyChange = { module = 'skg.readiness',
-                                    fn = 'diffView_goto_next_unready_change',
-                                    desc = 'Move to the next unready headline with change facts' },
-  DiffViewGotoNextReadyChange = { module = 'skg.readiness',
-                                  fn = 'diffView_goto_next_ready_change',
-                                  desc = 'Move to the next ready headline with change facts' },
-  DiffViewGotoPreviousChange = { module = 'skg.readiness',
+  DiffViewGotoNextUnprocessedChange = { module = 'skg.processed',
+                                    fn = 'diffView_goto_next_unprocessed_change',
+                                    desc = 'Move to the next unprocessed headline with change facts' },
+  DiffViewGotoNextProcessedChange = { module = 'skg.processed',
+                                  fn = 'diffView_goto_next_processed_change',
+                                  desc = 'Move to the next processed headline with change facts' },
+  DiffViewGotoPreviousChange = { module = 'skg.processed',
                                  fn = 'diffView_goto_previous_change',
                                  desc = 'Move to the previous headline with change facts' },
-  DiffViewGotoPreviousUnreadyChange = { module = 'skg.readiness',
-                                        fn = 'diffView_goto_previous_unready_change',
-                                        desc = 'Move to the previous unready headline with change facts' },
-  DiffViewGotoPreviousReadyChange = { module = 'skg.readiness',
-                                      fn = 'diffView_goto_previous_ready_change',
-                                      desc = 'Move to the previous ready headline with change facts' },
+  DiffViewGotoPreviousUnprocessedChange = { module = 'skg.processed',
+                                        fn = 'diffView_goto_previous_unprocessed_change',
+                                        desc = 'Move to the previous unprocessed headline with change facts' },
+  DiffViewGotoPreviousProcessedChange = { module = 'skg.processed',
+                                      fn = 'diffView_goto_previous_processed_change',
+                                      desc = 'Move to the previous processed headline with change facts' },
   InvestigateUnknownNode = { module = 'skg.investigate_unknown_node',
                              fn = 'investigate_unknown_node',
                              desc = 'Show what git history says about an unknown graphnode' },
@@ -315,19 +315,19 @@ M.content_view_bindings = {
   { 'sR', 'SetRelRepoRecursive' },       -- C-c s R
   { 'st', 'Detach' },                    -- C-c s t
   { 'sa', 'Attach' },                    -- C-c s a
-  { 'rr', 'CycleCommitReady' },          -- C-c r r
-  { 'rR', 'CycleCommitReadyRecursive' }, -- C-u C-c r r
-  { 'rO', 'CycleCommitReadyRecursiveOutward' }, -- C-u C-u C-c r r
-  { 'rh', 'ToggleHomeSkgrepoMoveCommitReady' }, -- C-c r h
-  { 'rH', 'ToggleHomeSkgrepoMoveCommitReadyRecursive' }, -- C-u C-c r h
+  { 'rr', 'CycleProcessed' },          -- C-c r r
+  { 'rR', 'CycleProcessedRecursive' }, -- C-u C-c r r
+  { 'rO', 'CycleProcessedRecursiveOutward' }, -- C-u C-u C-c r r
+  { 'rh', 'ToggleHomeSkgrepoMoveProcessed' }, -- C-c r h
+  { 'rH', 'ToggleHomeSkgrepoMoveProcessedRecursive' }, -- C-u C-c r h
   { 'ru', 'DiffViewExtend' },            -- C-c r u
   { 'rc', 'StageAndCommit' },            -- C-c r c
   { 'rnc', 'DiffViewGotoNextChange' },            -- C-c r n c
-  { 'rnu', 'DiffViewGotoNextUnreadyChange' },     -- C-c r n u
-  { 'rnr', 'DiffViewGotoNextReadyChange' },       -- C-c r n r
+  { 'rnu', 'DiffViewGotoNextUnprocessedChange' },     -- C-c r n u
+  { 'rnr', 'DiffViewGotoNextProcessedChange' },       -- C-c r n r
   { 'rpc', 'DiffViewGotoPreviousChange' },        -- C-c r p c
-  { 'rpu', 'DiffViewGotoPreviousUnreadyChange' }, -- C-c r p u
-  { 'rpr', 'DiffViewGotoPreviousReadyChange' },   -- C-c r p r
+  { 'rpu', 'DiffViewGotoPreviousUnprocessedChange' }, -- C-c r p u
+  { 'rpr', 'DiffViewGotoPreviousProcessedChange' },   -- C-c r p r
   { 'sx', 'SetFlagSearchMatching' },
   { 'sX', 'SetFlagSearchMatchingRecursive' },
   { 'mc', 'ReplaceLinkWithContent' },    -- C-c m c
