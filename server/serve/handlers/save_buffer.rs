@@ -305,6 +305,9 @@ pub fn handle_save_buffer_request (
           & sexp_to_client_string ( &empty_response_sexp (
             &error_msg, &[], &save_point_position )) )); }
     (Ok (envelope), Ok (named_diffView_buffer_kind)) => {
+      if let Ok (viewforest_id) = &viewforest_id_from_request_result {
+        crate::view_snapshots::record_received (
+          viewforest_id, &envelope . saved_buffer ); }
       { let _span : tracing::span::EnteredSpan = tracing::info_span!(
           "update_from_and_rerender_buffer" ). entered();
         match block_on(

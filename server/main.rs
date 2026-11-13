@@ -432,6 +432,12 @@ fn run_export_org (
 ///    CONFIG.running/START/server.jsonl. Queryable with jq, e.g.:
 ///      jq 'select(.fields.message | test("rerender"))' \
 ///        data/jeff/skgconfig.toml.running/START/server.jsonl
+///
+/// 4. View snapshots (always on): CONFIG.running/START/views/ holds,
+///    for each view, the text it was last sent and the buffer of its
+///    last save, each overwritten at every exchange
+///    ('server/view_snapshots.rs'). The logs above hold each request's
+///    header only; these hold what the buffer looked like.
 fn init_tracing (
   config : &SkgConfig,
 ) {
@@ -478,4 +484,5 @@ fn init_tracing (
     . with (stderr_layer)
     . with (user_log_layer)
     . with (json_layer)
-    . init (); }
+    . init ();
+  skg::view_snapshots::enable (&logs_dir); }

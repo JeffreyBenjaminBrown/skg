@@ -2009,6 +2009,21 @@ file name everywhere). START is fixed once per process, so a config
 reload keeps the folder. 'skg check-config' creates none.
 - =server-to-user.log= — human-readable log (always on).
 - =server.jsonl= — structured JSON log (when ~timing_log = true~). Queryable with =jq=.
+- =views/= — what each view held at its last exchange (always on;
+  'server/view_snapshots.rs'). For each view, =VIEW.sent.org= is the
+  view as the server holds it after its last render, metadata and
+  all, and =VIEW.received.org= the buffer of its last save as the
+  client sent it, whose =folded= and =bodyFolded= atoms say what the
+  user had folded. VIEW is the view ID, each character but a letter,
+  digit, =-= or =_= made =_=, and, unless it is a content view's
+  UUID, followed by a hash of the whole ID ('file_stem'). Each file is
+  overwritten at every exchange, and a closed view's files stay. When
+  a save is refused for releasing text the skgrepo restriction hides,
+  =sent= holds the saved buffer as the server registered it, which the
+  client was not sent. The logs hold only each request's header line;
+  these hold the buffers: the views' text, private skgrepos included,
+  kept after the graph loses it, and never deleted by the server. So a
+  run folder is no longer safe to attach whole to a public report.
 
 =CONFIG.running/= is the *run folder* ('docs/glossary.org'). When
 'bash/start-servers.sh' started the server, the run folder also holds

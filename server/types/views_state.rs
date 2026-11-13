@@ -176,6 +176,7 @@ impl OpenViews {
         pids . iter () . cloned () . collect ();
       let viewnode_id_record : ViewnodeIdRecord =
         ViewnodeIdRecord::of_viewforest (&viewforest);
+      crate::view_snapshots::record_sent (&viewforest_id, &viewforest);
       let state : ViewState =
         ViewState { viewforest, pids, diffView_buffer_kind : None,
                     viewnode_id_record,
@@ -270,6 +271,7 @@ impl OpenViews {
     rendered_under : &SkgrepoRestriction,
   ) { let new_viewforest : ViewForest =
         new_viewforest . into ();
+      crate::view_snapshots::record_sent (viewforest_id, &new_viewforest);
       let pids : HashSet<ID> =
         pids_from_viewforest ( &new_viewforest );
       self . root_gnids . remove_right (viewforest_id);
