@@ -253,10 +253,11 @@ relationship, of the folder's kind, to the folder's viewparent. On an alias, ID 
 flag member, which has one diff object, the same change facts read =+= and
 =-=, and the one object of an unknown viewnode or a restricted viewnode reads =~+= or =~-=. A =✓= after a diff object's change facts says its
 changes are marked processed, so =∃+✓ ~+= is a new node, approved,
-in a new relationship that is not; =M✓= is a modified node every
-change of whose file is marked. A processed aggregate (a
+in a new relationship that is not; =M✓= is a modified node whose
+changes that neither its =~= nor a headline under it shows are marked
+(what =node= names there, 'docs/diff-view.org', "What a request names"). A processed aggregate (a
 folder or changeset marker) shows a =✓= when everything under it is processed. =request:processed= and
-=request:unprocessed=, with =:node=, =:rel=, =:all=, =:newContent= or =:newOutward=, are pending processed
+=request:unprocessed=, with =:node=, =:rel=, =:newContent= or =:newOutward=, are pending processed
 requests, consumed by the next save.
 
 These heralds render the headline's one =(diff ...)= form (see
@@ -265,7 +266,7 @@ come from its =(node added)= and =(node removed)= parts, =M= from
 =(properties changed)=, =~+= and =~-= from =(rel added)= and =(rel
 removed)= (the style keys 'existence' and 'properties' in
 'shared/herald-styles.json'), each =✓= from its =(processed ...)= part
-(=M='s from =all= there), and the pending processed request from the
+(=M='s, like =∃='s, from =node= there), and the pending processed request from the
 =(processed ...)= or =(unprocessed ...)= in the headline's =(editRequest ...)=;
 its =(leaves ...)= part shows nothing. The rules match the processed part once
 per diff object, so a =✓= follows its own object whatever the raw

@@ -2301,23 +2301,29 @@ carry none). On an alias, id or flag member, the single diff object
 is written =(rel added)= or =(rel removed)=: the member's existence
 in its list. A removed alias or ID (below) carries =(rel removed)=.
 **** =(properties changed)= -- the node's other properties
-The node is in both graphs and its file records a change ("modified",
-herald =M=), on a member, a removed member, a folder member or a
-root. Never beside =(node added)= or =(node removed)=, and never on a ghost.
+The node is in both graphs and its file records a change that =node=
+names on this headline ("modified", herald =M=): one no headline under
+it, nor its own =rel=, shows (below), on a member, a removed member, a folder member or a
+root. So a node whose only changes are its relationships to members
+shown under it, or its own relationship to its viewparent, carries no
+=M= there. Never beside =(node added)= or =(node removed)=, and never
+on a ghost.
 **** =(leaves N OBJECT...)= -- on every viewnode that names leaves
-It gives the OBJECTs a request there may name (=node= and/or =rel= on
-a vognode or ghost, each worth one leaf; =all= on a
-vognode whose properties changed, beside =rel= when that names a leaf;
-=all= on another changed vognode neither of whose objects names a
-leaf, or on a changeset marker; none where a bare request names them),
-and N, how many distinct leaves a request naming all of them touches.
-The clients read it to build their requests and to count the leaves
-an unmark touches.
+It gives the OBJECTs that name some leaf there: =node= and/or =rel= on
+a vognode or ghost, =rel= on a changeset marker, none where a bare
+request names a single leaf. N is how many distinct leaves a request
+naming all of them touches. What each object names is under "The
+processed requests" below. A request may also name =node= on a
+changeset marker, which this fact never lists, since the members
+drawn beside the marker show those leaves. The clients read it to build
+their requests and to count the leaves an unmark touches.
 **** =(processed OBJECT...)= -- the diff objects whose change-forest leaves are all marked processed
-The objects are =node=, =rel=, and =all= on a headline whose =(leaves
-...)= lists it, so a processed changeset marker carries =(processed all)=. A
-bare =(processed)= marks a headline that lists no object (one naming a
-single leaf). Absent when nothing is processed.
+The objects are those of =(leaves ...)= that are processed. A bare
+=(processed)= marks a headline that lists no object (one naming a
+single leaf), and the order-only changeset marker, which names no
+leaf and is always processed. Absent when nothing is processed. A
+headline is processed when its =(processed ...)= names every object its
+=(leaves ...)= lists.
 **** =(homeSkgrepoMove (old OLD) (new NEW))=, =(movedLikeAncestor LETTER)= -- a node's home skgrepo moved
 In the skgrepo-changes buffer, on a node whose home skgrepo moved
 from OLD to NEW since HEAD; herald "-OLD +NEW". Beside it, when the
@@ -2328,9 +2334,23 @@ relationship tokens do (a = the viewparent); herald "Δ⌂=LETTER".
 *** The processed requests: =(editRequest (processed ...))=
 =(processed OBJECT...)= and =(unprocessed OBJECT...)= inside =(editRequest
 ...)= ask the save to set or clear the processed marks of the
-leaves those objects name; the object =all= names every leaf a
-vognode's node records, or every leaf of a processed
-aggregate, one level down. On a vognode, the objects =newContent=
+leaves those objects name. On a vognode or ghost, =rel= names the
+existence of its relationship to its viewparent, and =node= every
+leaf its node records but the relationships shown on it or under it:
+its own relationship to its viewparent, that of each member drawn
+under it (in its content or in a partner folder), whatever its
+aspect, and the content relationships a changeset marker under it
+gathers. So on a new or deleted node =node= names its existence, and
+on a modified node its text, home skgrepo, aliases, extra IDs and
+flags, with any relationship it records that no headline under it
+shows; never its children's containment where the children are
+drawn. On a changeset marker, =rel= names the relationships it
+gathers and =node= the own leaves (existence, text, home skgrepo,
+aliases, extra IDs, flags) of their members, one level down. With no
+object a request names what =(leaves ...)= can list: =node= and =rel=
+on a vognode, =rel= on a changeset marker or an unknown viewnode, and
+the one leaf elsewhere. There is no object =all=; a request naming it
+is refused as an unknown diff object. On a vognode, the objects =newContent=
 and =newOutward= name leaves of the new nodes a walk reaches from its
 node, through new nodes only: the node itself when it is new, and
 each new member of a relationship the walk follows that a node
@@ -2340,12 +2360,20 @@ existence (which covers its text) and its content relationships;
 =newOutward= follows every relationship in its recorded direction,
 and names every leaf each new node records
 ('ChangeLeaves::leaves_of_new_nodes_reached_from', 'NewNodeWalk').
-Neither names the relationship of the node to its container. The
+Neither names the relationship of the node to its container. Beside
+a walk, =node= and =rel= also filter what it reaches: =node= names
+each new node's existence, =rel= the relationships it records that
+the walk follows, and a walk with neither names both:
+=(processed rel newContent)= marks the headline's relationship to its
+viewparent and the content relationships of the new nodes reached. The
 server reads all this from the change forest; what the buffer shows,
 or write-protects, does not matter. No change fact lists either
-object. Since which leaves they name only the change forest can tell,
-validation takes such a request to share a leaf with every request
-of the opposite kind in the same save, and refuses the save. At most one per headline, written after
+object. Since which leaves they name only the change forest can
+tell, validation takes such a request to share a leaf with every
+request of the opposite kind in the same save that can name a leaf of
+the same kind (a node's own, or a relationship), and refuses the
+save; likewise =node= on a changeset marker, with every request that
+can name an own leaf of a content member drawn beside it. At most one per headline, written after
 the headline's other edit request if it has one: =(editRequest
 delete (processed node))=. Any headline that may carry =(diff ...)= may
 carry one.
@@ -2387,14 +2415,13 @@ Hoist, forks) or fails consumes none, and leaves them in the buffer. A
 request that names no current change is dropped, with the warning =A
 processed request names no current change; it was dropped.=, naming its
 headline as a subheadline. See "Save buffer" above.
-**** One gesture on a modified node marks its file, on a write-protected occurrence too
-On a modified node (=(properties changed)=), =C-c r r= names every leaf the node
-records, and its relationship when that changed, so one gesture marks
-the file; both =C-c r r= and =C-c r h= work on write-protected
-occurrences. See =docs/diff-view.org=, "Processed requests and
-gestures", and the glossary's "diff object, diff aspect", which says
-that =all= names every leaf a modified node records, so one gesture on
-it marks its file.
+**** A mark names what its headline shows, on a write-protected occurrence too
+=node= on a modified node marks what its =M= stands for, and =rel=
+what its =~= does; neither marks its children's containment, which
+each child's =rel= marks. Where no member is drawn under it, as on a
+folder member, =node= and =rel= together mark its file. Requests work
+on write-protected occurrences. See =docs/diff-view.org=, "Processed
+requests and gestures".
 
 *** The diff view's viewnodes
 **** =alias noClaim (view ghostWarrant)=, =id (view ghostWarrant)= with =(rel removed)= -- in an alias or ID folder: an alias or extra ID that HEAD has and the worktree lacks
@@ -2445,14 +2472,15 @@ A processed gesture on such a folder acts on each changed membership.
 *** Examples
 #+begin_example
 (skg node (gnid 7) (skgRepos (nodeRepo main)) (diff (node added) (rel added) (leaves 2 node rel) (processed node)))
-(skg node (gnid 8) (skgRepos (nodeRepo main)) writeProtected (diff (rel added) (properties changed) (leaves 3 rel all) (processed all)))
+(skg node (gnid 8) (skgRepos (nodeRepo main)) writeProtected (diff (rel added) (properties changed) (leaves 3 node rel) (processed node rel)))
 (skg node (gnid 9) (skgRepos (nodeRepo main)) noClaim writeProtected (view noWarrant) (diff (rel removed) (leaves 1 rel)))
 (skg alias (editRequest (processed)) (diff (rel added) (leaves 1)))
 (skg alias noClaim (view ghostWarrant) (diff (rel removed) (leaves 1) (processed)))
 (skg ghost (gnid 4) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed) (leaves 2 node rel)))
 (skg (oldText title) (diff (leaves 1) (processed)))
-(skg (changesetMarker content) (diff (leaves 3 all) (processed all)))
-(skg (changesetMarker content) (editRequest (processed all)) (diff (leaves 3 all)))
+(skg (changesetMarker content) (diff (leaves 3 rel) (processed rel)))
+(skg (changesetMarker content) (editRequest (processed node rel)) (diff (leaves 3 rel)))
+(skg node (gnid 6) (skgRepos (nodeRepo main)) (editRequest (processed rel newContent)) (diff (node added) (rel added) (leaves 2 node rel)))
 (skg node (gnid 5) (skgRepos (nodeRepo pub)) (diff (homeSkgrepoMove (old priv) (new pub)) (movedLikeAncestor a)))
 #+end_example
 

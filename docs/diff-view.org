@@ -220,7 +220,13 @@ A node was added when only the after-graph has it, and removed when
 only the before-graph does ('GraphStraddle::node_existence'); its
 other properties changed ("modified", herald M) when both graphs have
 it and it records at least one leaf
-('GraphStraddle::node_properties_changed'). A ghost never carries
+('GraphStraddle::node_properties_changed') that neither its own 'rel'
+nor a headline under it shows: the tail of the refresh clears '(properties changed)' where
+the object 'node' names no leaf ("Change facts on the wire"), so
+that M stands for what a mark of 'node' marks there. A node whose
+only changes are its relationships to the members drawn under it
+shows no M where it stands with them; its changeset markers and
+members show those changes. A ghost never carries
 '(properties changed)'.
 ** What each kind of change looks like
 Every label is a herald rule on a metadata atom; 'docs/heralds.org'
@@ -251,9 +257,9 @@ node's headline under its parent already carries that containment
 change ('changed_partner_folder_kinds' in
 'server/diff_view/changes.rs'). A folder holds the partners in either
 graph, each tagged as a content member is: its node's existence and
-other properties, so a modified member shows ☮ M and one gesture
-there marks its file, and the existence of its relationship to the
-folder's viewparent, of the folder's kind. The two compound partner
+other properties, so a modified member shows ☮ M, and 'node' with
+'rel' there marks its file, and the existence of its relationship to
+the folder's viewparent, of the folder's kind. The two compound partner
 folders ("It contains these, but the subscribing ancestor hides them" and
 "The subscriber ancestor hides these, but subscribes to nothing that
 contains them") show no change and carry no '(rel ...)'. Under each
@@ -494,10 +500,9 @@ that can be processed is processed. An unchanged membership has no leaf and is
 never asked. The content changeset marker gathers the
 content relationship leaves of its node; a member's existence leaf
 belongs to the member's own file. A file whose only change is order
-has no leaf and is processed. A modified node stands for every leaf it
-records, nearly its file (a home skgrepo move and a relRepo move name
-a second file): it shows M✓ when each of those is marked, wherever it
-stands.
+has no leaf and is processed. A headline's ✓ after ∃ or M says that
+the leaves 'node' names there are marked, and after ~ that the one
+'rel' names is ("What a request names").
 ** Change facts on the wire
 A headline's change facts form one form, '(diff (node added|removed)
 (rel added|removed) (properties changed) (leaves N OBJECT...) (processed
@@ -513,23 +518,60 @@ request is no change fact; it rides in the headline's '(editRequest
 ...)' (below).
 
 The part '(processed OBJECT...)' is a derived fact the server sets in the
-tail of the refresh ('set_processed_facts_in_viewforest'): the diff
-objects ('node', 'rel', and on a headline that lists it 'all') whose
-leaves are all marked, so a processed changeset marker carries '(processed
-all)'; a bare '(processed)' on a headline that names one leaf, which
-lists no object. Nothing reads it at save.
+tail of the refresh ('set_processed_facts_in_viewforest'): the objects
+of '(leaves ...)' whose leaves are all marked; a bare '(processed)' on
+a headline that names one leaf, which lists no object, and on the
+order-only changeset marker, which names none. Nothing reads it at
+save.
 
 Before it, a headline that names leaves
 carries the part '(leaves N OBJECT...)': N is the number of distinct
 leaves a request naming every listed object would touch, and the
-OBJECTs are those a request on this headline may name ('node' and/or
-'rel' on a vognode, each worth one leaf; 'all' on a
-modified node, every leaf it records, beside 'rel' when its
-relationship changed; 'all' on a processed aggregate, worth N; none on a
-headline that names exactly one leaf, which a bare request marks).
+OBJECTs are those of 'node' and 'rel' that name some leaf there, 'rel'
+alone on a changeset marker; none on a headline that names exactly
+one leaf, which a bare request marks. The same tail clears '(properties
+changed)' where 'node' names no leaf.
 The server's 'leaves_named_at' is the single rule; the change fact
 is display-only, and the clients read it instead of keeping tables of
 headline kinds.
+
+** What a request names
+A mark marks what its headline shows. A headline shows two things
+that can change: its node, whose glyph is ∃ or M, and its
+relationship to its viewparent, whose glyph is ~. 'node' names the
+first and 'rel' the second ('leaves_named_at' in
+'server/diff_view/processed_requests.rs'). So 'rel' names the
+existence of the relationship by which the headline stands where it
+does, and 'node' names every leaf its node records but the
+relationships shown on it or under it: its own 'rel', that of each
+member drawn under it, in its content or a partner folder, whatever
+the aspect (a relRepo move hangs under the member), and the content
+relationships a changeset marker under it gathers. On a new or
+deleted node that is its existence; on a modified node, its text,
+home skgrepo, aliases, extra IDs and flags, and any relationship it
+records that no headline under it shows. Where the node stands with
+its members, as at its editable occurrence, 'node' leaves their
+containment to each member's 'rel'; where it stands alone, as in a
+folder, 'node' and 'rel' together name its whole file. Every leaf is
+thus named by some headline without a walk; a reordering is no leaf.
+
+A changeset marker gathers relationships: 'rel' names them, and
+'node' the own leaves (existence, text, home skgrepo, aliases, extra
+IDs, flags) of their members, one level down: the content members
+drawn beside it. Its '(leaves ...)' lists only 'rel', what its label
+describes; the members show their own leaves under their own glyphs,
+so a client cannot count from it how many leaves 'node' there names. A request with no object names what
+'(leaves ...)' can list there: 'node' and 'rel' on a vognode, 'rel'
+on a changeset marker or an unknown viewnode, the one leaf elsewhere.
+
+The walks, 'newContent' and 'newOutward', name leaves of the new
+nodes reached from the headline's node, and the letters beside a walk
+filter them: 'node' each new node's existence, 'rel' the
+relationships it records that the walk follows, neither both. Each
+letter also names its own object on the headline, which the walk
+never reaches: '(processed rel newContent)' marks the headline's
+relationship to its viewparent and the content relationships of the
+new nodes reached. There is no object 'all'; the parser refuses it.
 
 ** Processed requests and gestures
 A gesture writes processed requests, '(processed OBJECTS)' or '(unprocessed
@@ -542,17 +584,15 @@ current change is dropped with a warning. Validation refuses a save
 in which two headlines name one leaf, one processed and the other
 unprocessed, naming the leaf and both headlines
 ('find_contradictory_processed_requests'); requests that agree are
-consumed as usual. 'all' names every leaf a
-modified node records, or every leaf of a processed aggregate
-one level down.
+consumed as usual.
 
 Every gesture toggles: it unmarks what is processed and marks what is
 not, and every headline is processed when its own '(processed ...)' names
 every object its '(leaves ...)' lists. C-c r r
 ('skg-cycle-processed') acts on the headline at point, naming every
 object it lists: one leaf; on a new member, its existence and its
-relationship; on a modified node, every leaf it records, and its
-relationship when that changed, so one gesture marks the file; on a
+relationship; on a modified node, what 'node' names there, and its
+relationship when that changed; on a
 changed folder, its leaves one level down; with a prefix argument,
 every leaf of the subtree, except that at a new node (=(node
 added)=) in content position (not in a folder) it names =newContent=
@@ -562,10 +602,7 @@ nodes only, shown or not, write-protected or not, contentward marking
 each new node's existence and content relationships, outward marking
 everything each records. At the headline it acts on, such a node
 names that object alone, not its relationship to its viewparent, and
-toggles by its existence. Below the headline it acts on, a gesture
-names no 'all': the leaves of a modified node or a processed
-aggregate there are named by the headlines under it, or are not
-shown there; the other objects such a headline lists are named. C-c r h
+toggles by its existence. C-c r h
 ('skg-toggle-homeSkgrepo-move-processed') acts on the home skgrepo
 move of the node at point, and with a prefix argument on every
 descendant whose home skgrepo moved between the same two skgrepos. Both work

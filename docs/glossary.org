@@ -1360,7 +1360,9 @@ existence of its relationship to its viewparent, '(rel added)' or
 '(rel removed)' (herald ~+, ~-); and the node's other properties,
 '(properties changed)' (herald M, "modified"), on a node in both
 graphs that records at least one change-forest leaf
-('GraphStraddle::node_properties_changed'). The two existences are
+('GraphStraddle::node_properties_changed') that the object 'node'
+names on that headline: one neither its own 'rel' nor a headline
+under it shows. The two existences are
 'Existence { Added, Removed }'. A member, a removed member, a folder's
 member and a root carry the node's two; a ghost never carries
 '(properties changed)'. The relationship is the viewparent's content
@@ -1388,14 +1390,16 @@ names on a headline: the node itself ('node'), or the node's
 relationship to its viewparent ('rel'; in a partner folder, to the
 folder's viewparent). There are exactly these two.
 A change-forest leaf about a relationship has the relationship as its
-object, never the member. A request, a '(leaves ...)' change fact and
-a '(processed ...)' change fact may also say 'all', which names every leaf a
-modified node records (so one gesture on it marks its file), or every
-leaf of a processed aggregate one level down; 'all' is shorthand, not a third
-object. A request alone may also say 'newContent' or 'newOutward',
-shorthand too: each names leaves of the new nodes reached from the
+object, never the member. 'node' names every leaf the node records but
+the relationships shown on it or under it (its own 'rel', and those of
+the members drawn under it), so a mark marks what its headline shows
+('docs/diff-view.org', "What a request names"). On a changeset marker
+'rel' names the relationships it gathers and 'node' their members' own
+leaves. A request alone may also say 'newContent' or 'newOutward',
+shorthand: each names leaves of the new nodes reached from the
 headline's node through new nodes only, as the change forest says,
-whatever the buffer shows. 'newContent' follows content relationships
+whatever the buffer shows, filtered by the letters beside it ('node'
+their existence, 'rel' their relationships, neither both). 'newContent' follows content relationships
 and names each new node's existence (which covers its text) and its
 content relationships; 'newOutward' follows every relationship in its
 recorded direction ("out") and names every leaf each new node
