@@ -385,7 +385,7 @@ M.content_view_bindings = {
   { 'vl', 'RestrictRepoSet' },            -- C-c v l
   { 'vL', 'ToggleRepoOverlayOnLinks' }, -- C-c v L
   { 'vm', 'ViewMetadata' },              -- C-c v m
-  { 'vo', 'ViewAncestry' },           -- C-c v o
+  { 'va', 'ViewAncestry' },           -- C-c v a
   { 'vr', 'ReadableIdsToggle' },         -- C-c v r
   { 'vR', 'ReadableIdsRefresh' },        -- C-c v R
   { 'vs', 'ViewLinkstack' },               -- C-c v s
