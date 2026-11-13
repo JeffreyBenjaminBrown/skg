@@ -60,10 +60,11 @@ first, via a function), the handlers and the prompts."
      (should-not (string-match-p "confirmed" (car (funcall sent))))
      (funcall (gethash 'stage-and-commit handlers) 'fake-proc
               test--stage-and-commit-needs-confirmation)
-     (should (string-match-p "1 of 3 changed files are ready"
-                             (car (funcall prompts))))
+     (should (= 1 (length (funcall prompts))))
      (should skg--rerender-after-empty-stream)
      (funcall skg--rerender-after-empty-stream)
+     (should (string-match-p "1 of 3 changed files are ready"
+                             (car (funcall prompts))))
      (should (= 2 (length (funcall sent))))
      (should (string-match-p (regexp-quote "(confirmed . t)")
                              (car (funcall sent))))
@@ -75,7 +76,7 @@ first, via a function), the handlers and the prompts."
      (skg-stage-and-commit)
      (funcall (gethash 'stage-and-commit handlers) 'fake-proc
               test--stage-and-commit-needs-confirmation)
-     (should-not skg--rerender-after-empty-stream)
+     (funcall skg--rerender-after-empty-stream)
      (should (= 1 (length (funcall sent)))))))
 
 (ert-deftest test-stage-and-commit-sends-a-message-of-several-lines-on-one-line ()
@@ -94,19 +95,106 @@ the server reads up to a newline, holds no newline but its last."
        (should (string-suffix-p "\n" request))))))
 
 (ert-deftest test-stage-and-commit-prompt-names-already-staged-entries ()
-  "Entries already staged are listed in the prompt, by gitrepo, even
-when every changed file is ready; \"yes\" resends confirmed."
+  "Entries already staged are counted in the prompt, by gitrepo, and
+listed in a buffer of their own, even when every changed file is ready;
+\"yes\" resends confirmed."
   (test--stage-and-commit-run
    '("the message" "yes")
    (lambda (sent handlers prompts)
      (skg-stage-and-commit)
      (funcall (gethash 'stage-and-commit handlers) 'fake-proc
               "((needs-confirmation . t) (already-staged ((\"/data/public\" \"notes.txt\" \"a b.skg\") (\"/data/private\" \"c.skg\"))) (readiness-summary (ready 3) (changed 3) (foreign 0) (order-only 0) (notEditable 0)) (errors ()) (warnings ()))")
-     (should (equal (car (funcall prompts))
-                    "Commit ready. All 3 of 3 changed files are ready. Already staged, so committed too: /data/public (notes.txt, a b.skg); /data/private (c.skg). Type yes to commit anyway: "))
      (funcall skg--rerender-after-empty-stream)
+     (should (equal (car (funcall prompts))
+                    "Commit ready. All 3 of 3 changed files are ready. Already staged, so committed too: /data/public: 2 paths, /data/private: 1 path (listed in *skg already staged*). Type yes to commit anyway: "))
+     (should (equal (with-current-buffer "*skg already staged*"
+                      (buffer-substring-no-properties (point-min) (point-max)))
+                    "* /data/public\nnotes.txt\na b.skg\n* /data/private\nc.skg\n"))
      (should (string-match-p (regexp-quote "(confirmed . t)")
                              (car (funcall sent)))))))
+
+(defun test--stage-and-commit-framed (&rest payloads)
+  "PAYLOADS, each length-prefixed as the server sends it, in one chunk."
+  (apply #'concat
+         (mapcar (lambda (payload)
+                   (let ((bytes (encode-coding-string payload 'utf-8)))
+                     (concat (format "Content-Length: %d\r\n\r\n" (length bytes))
+                             bytes)))
+                 payloads)))
+
+(defun test--stage-and-commit-through-the-dispatcher (answer)
+  "Send a stage-and-commit through the real prologue and dispatcher, the
+server answering with the needs-confirmation PAYLOAD below and its empty
+rerender stream, all in one chunk; ANSWER, a function of the prompt,
+stands for the user at the prompt. Return the state left once the
+stream is done and the timers it scheduled have run: a plist of :sent
+(the requests, newest first), :messages (newest first), :prompts,
+:stream (`skg--stream-in-progress'), :pending (`skg-lp--pending-count')
+and :handlers (the response types still registered)."
+  (let ((skg-response-handler-map nil)
+        (skg-lp--pending-count 0)
+        (skg-lp--buf (unibyte-string))
+        (skg-lp--bytes-left nil)
+        (skg--stream-in-progress nil)
+        (skg--rerender-after-empty-stream nil)
+        (skg--rerender-overPrivateText-retry nil)
+        (skg--rerender-overPrivateText-challenged nil)
+        (sent nil) (messages nil) (prompts nil) (scheduled nil))
+    (cl-letf (((symbol-function 'skg-tcp-connect-to-rust) (lambda () 'fake-proc))
+              ((symbol-function 'skg--lock-all-skg-buffers) #'ignore)
+              ((symbol-function 'skg--unlock-all-save-locked) #'ignore)
+              ((symbol-function 'skg--unlock-buffers-not-in-view-id-list) #'ignore)
+              ((symbol-function 'process-send-string)
+               (lambda (_proc text) (push text sent)))
+              ((symbol-function 'run-at-time)
+               (lambda (_delay _repeat fn &rest args)
+                 (push (cons fn args) scheduled)))
+              ((symbol-function 'message)
+               (lambda (format-string &rest args)
+                 (push (apply #'format format-string args) messages)))
+              ((symbol-function 'read-string)
+               (lambda (prompt &rest _)
+                 (push prompt prompts)
+                 (funcall answer prompt))))
+      (skg--stage-and-commit-send "the message" nil)
+      (skg-lp-handle-generic-chunk
+       'fake-proc
+       (test--stage-and-commit-framed
+        "((response-type stage-and-commit) (needs-confirmation . t) (already-staged ((\"/data/public\" \"a.skg\" \"b.skg\") (\"/data/private\" \"c.skg\"))) (readiness-summary (ready 3) (changed 3) (foreign 0) (order-only 0) (notEditable 0)) (errors ()) (warnings ()))"
+        "((response-type rerender-lock) (lock-views ()))"
+        "((response-type rerender-done) (errors ()) (warnings ()))"))
+      (let ((stream skg--stream-in-progress)
+            (pending skg-lp--pending-count))
+        (while scheduled
+          (let ((timer (car (last scheduled))))
+            (setq scheduled (butlast scheduled))
+            (apply (car timer) (cdr timer))))
+        (list :sent sent :messages messages :prompts prompts
+              :stream stream :pending pending
+              :handlers (mapcar #'car skg-response-handler-map))))))
+
+(ert-deftest test-stage-and-commit-a-declined-confirmation-ends-the-stream ()
+  "The prompt comes after the empty rerender stream is done, so neither
+a word other than \"yes\" nor a quit at the prompt can leave the
+stream in progress; either says nothing was committed."
+  (dolist (answer (list (lambda (_prompt) "no")
+                        (lambda (_prompt) (signal 'quit nil))))
+    (let ((state (test--stage-and-commit-through-the-dispatcher answer)))
+      (should (null (plist-get state :stream)))
+      (should (= 0 (plist-get state :pending)))
+      (should (null (plist-get state :handlers)))
+      (should (= 1 (length (plist-get state :prompts))))
+      (should (= 1 (length (plist-get state :sent))))
+      (should (equal (car (plist-get state :messages)) "Not committed.")))))
+
+(ert-deftest test-stage-and-commit-confirmed-after-the-stream-resends ()
+  (let ((state (test--stage-and-commit-through-the-dispatcher
+                (lambda (_prompt) "yes"))))
+    (should (= 2 (length (plist-get state :sent))))
+    (should (string-match-p (regexp-quote "(confirmed . t)")
+                            (car (plist-get state :sent))))
+    (should (string-match-p (regexp-quote "(message-lines \"the message\")")
+                            (car (plist-get state :sent))))))
 
 (ert-deftest test-stage-and-commit-result-message ()
   (should (equal (skg--stage-and-commit-result-message

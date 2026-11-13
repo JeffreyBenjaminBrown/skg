@@ -14,6 +14,7 @@
 
 (require 'skg-buffer)
 (require 'skg-readiness) ; for skg--readiness-summary-message
+(require 'skg-request-save) ; for skg-big-nonfatal-message
 (require 'skg-request-rerender-all-views)
 
 (defun skg-stage-and-commit ()
@@ -46,44 +47,80 @@ per line."
    nil t))
 
 (defun skg--stage-and-commit-handler (commit-message payload)
-  "Handle the stage-and-commit response PAYLOAD. On a request for
-confirmation, ask for it, and on \"yes\" resend COMMIT-MESSAGE
-confirmed once the empty rerender stream that follows is done."
+  "Handle the stage-and-commit response PAYLOAD. A request for
+confirmation is asked about once the empty rerender stream that
+follows is done, and \"yes\" resends COMMIT-MESSAGE confirmed."
   (condition-case err
       (let ((response (read payload)))
         (if (assq 'needs-confirmation response)
-            (when (skg--stage-and-commit-confirmed-p response)
-              (setq skg--rerender-after-empty-stream
-                    (lambda ()
-                      (skg--stage-and-commit-send commit-message t))))
+            ;; PITFALL: asking here, inside the process filter, would let
+            ;; a quit at the prompt escape the filter with the rest of the
+            ;; stream unread, leaving the stream in progress.
+            (setq skg--rerender-after-empty-stream
+                  (lambda ()
+                    (skg--stage-and-commit-confirm-and-resend
+                     commit-message response)))
           (message "%s" (skg--stage-and-commit-result-message response))))
     (error (message "skg: stage-and-commit handler error: %S" err))))
 
+(defconst skg--stage-and-commit-already-staged-buffer-name
+  "*skg already staged*"
+  "The buffer listing every path already staged, by gitrepo, when the
+server asks to confirm a commit that would include them.")
+
+(defun skg--stage-and-commit-confirm-and-resend (commit-message response)
+  "Ask to confirm RESPONSE, a request for confirmation, and on \"yes\"
+resend COMMIT-MESSAGE confirmed. Otherwise, a quit at the prompt
+included, say that nothing was committed."
+  (if (condition-case nil
+          (skg--stage-and-commit-confirmed-p response)
+        (quit nil))
+      (skg--stage-and-commit-send commit-message t)
+    (message "Not committed.")))
+
 (defun skg--stage-and-commit-confirmed-p (response)
   "Show the readiness summary of RESPONSE, a request for confirmation,
-and the entries it lists as already staged; non-nil iff the user
-types exactly \"yes\"."
-  (string= "yes"
-           (read-string
-            (format "%s%s. Type yes to commit anyway: "
-                    (string-remove-suffix
-                     "." (skg--readiness-summary-message
-                          (assq 'readiness-summary response)))
-                    (skg--stage-and-commit-already-staged-message
-                     (cadr (assq 'already-staged response)))))))
+and how many entries it lists as already staged in each gitrepo, the
+entries themselves in the buffer
+`skg--stage-and-commit-already-staged-buffer-name'; non-nil iff the
+user types exactly \"yes\"."
+  (let ((already-staged (cadr (assq 'already-staged response))))
+    (when already-staged
+      (skg-big-nonfatal-message
+       skg--stage-and-commit-already-staged-buffer-name ""
+       (skg--stage-and-commit-already-staged-listing already-staged)))
+    (string= "yes"
+             (read-string
+              (format "%s%s. Type yes to commit anyway: "
+                      (string-remove-suffix
+                       "." (skg--readiness-summary-message
+                            (assq 'readiness-summary response)))
+                      (skg--stage-and-commit-already-staged-message
+                       already-staged))))))
 
 (defun skg--stage-and-commit-already-staged-message (already-staged)
-  "The prompt's clause for ALREADY-STAGED, '((GITREPO PATH...) ...)', or
+  "The prompt's clause for ALREADY-STAGED, '((GITREPO PATH...) ...)':
+how many paths each gitrepo has staged, and where they are listed; or
 the empty string when there is none."
   (if (null already-staged) ""
-    (format ". Already staged, so committed too: %s"
+    (format ". Already staged, so committed too: %s (listed in %s)"
             (mapconcat
              (lambda (gitrepo-and-paths)
-               (format "%s (%s)"
-                       (car gitrepo-and-paths)
-                       (mapconcat (lambda (path) (format "%s" path))
-                                  (cdr gitrepo-and-paths) ", ")))
-             already-staged "; "))))
+               (let ((count (length (cdr gitrepo-and-paths))))
+                 (format "%s: %d %s" (car gitrepo-and-paths) count
+                         (if (= count 1) "path" "paths"))))
+             already-staged ", ")
+            skg--stage-and-commit-already-staged-buffer-name)))
+
+(defun skg--stage-and-commit-already-staged-listing (already-staged)
+  "ALREADY-STAGED, '((GITREPO PATH...) ...)', as org text: a headline per
+gitrepo, then its paths, one per line."
+  (mapconcat
+   (lambda (gitrepo-and-paths)
+     (concat (format "* %s\n" (car gitrepo-and-paths))
+             (mapconcat (lambda (path) (format "%s\n" path))
+                        (cdr gitrepo-and-paths) "")))
+   already-staged ""))
 
 (defun skg--stage-and-commit-result-message (response)
   "The line shown for RESPONSE, '((commits ((SKGREPO COMMIT-ID) ...))

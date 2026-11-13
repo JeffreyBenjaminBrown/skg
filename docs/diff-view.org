@@ -675,7 +675,8 @@ Before staging anything, the server also
 reads the index of every owned gitrepo. If any has entries already
 staged, the answer is the same confirmation with a second reason,
 '(already-staged ((GITREPO PATH...) ...))', and nothing is staged or
-committed; the client lists those paths and asks the typed "yes".
+committed; the client says how many paths each such gitrepo has
+staged, lists them in a buffer of their own, and asks the typed "yes".
 One confirmed resend covers both reasons, and the commit of such a
 gitrepo then includes its already-staged entries, as a git commit
 records the whole index.

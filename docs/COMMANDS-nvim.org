@@ -837,10 +837,12 @@ git-commits it, in every owned skgrepo that has changes, with that
 message. It stages only '.skg' files (deletions included). If not
 every changed file is ready, it first shows the readiness summary and
 proceeds only if you type the word "yes". Likewise, if some owned
-gitrepo already has entries staged before the command, it first lists
-each such gitrepo and its staged paths, and proceeds only on "yes";
-the commit then includes those entries, since a git-commit records
-everything staged. Every
+gitrepo already has entries staged before the command, it first says
+how many paths each such gitrepo has staged, lists them in the buffer
+"*skg already staged*", and proceeds only on "yes"; the commit then
+includes those entries, since a git-commit records everything staged.
+Any other answer, or an interrupt, leaves everything as it was and says "Not
+committed.". Every
 open view must be saved or reverted first. Afterward the open buffers
 of the diff view are rerendered: each keeps its roots, its
 folding and what it made editable, and what was committed no longer

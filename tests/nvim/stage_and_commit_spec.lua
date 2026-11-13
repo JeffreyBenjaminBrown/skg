@@ -128,11 +128,37 @@ describe('skg stage and commit', function ()
       return #prompts == 2 and lock.stream_in_progress == nil end, 10)
     assert.are.equal(
       'Commit ready. All 3 of 3 changed files are ready.'
-      .. ' Already staged, so committed too: /data/public (notes.txt, a b.skg).'
+      .. ' Already staged, so committed too: /data/public: 2 paths'
+      .. ' (listed in *skg already staged*).'
       .. ' Type yes to commit anyway: ',
       prompts[2])
+    assert.are.same({ '* /data/public', 'notes.txt', 'a b.skg' },
+      vim.api.nvim_buf_get_lines(
+        vim.fn.bufnr('*skg already staged*'), 0, -1, false))
     assert.are.equal(1, #requests, vim.inspect(requests))
   end)
+
+  for _, case in ipairs({
+      { name = 'a decline', answer = function () return 'no' end },
+      { name = 'an interrupt',
+        answer = function () error('Keyboard interrupt') end } }) do
+    it('says "Not committed." on ' .. case.name .. ', with the stream done', function ()
+      local requests, notices = {}, {}
+      local typed_message = false
+      vim.fn.input = function ()
+        if not typed_message then typed_message = true return 'one message' end
+        return case.answer() end
+      vim.notify = function (text) table.insert(notices, text) end
+      server = serve(requests)
+      stage_and_commit.stage_and_commit()
+      vim.wait(3000, function ()
+        return vim.tbl_contains(notices, 'Not committed.') end, 10)
+      assert.is_true(vim.tbl_contains(notices, 'Not committed.'),
+                     vim.inspect({ notices = notices, requests = requests }))
+      assert.is_nil(lock.stream_in_progress)
+      assert.are.equal(1, #requests, vim.inspect(requests))
+    end)
+  end
 
   it('refuses a dirty view and an empty message', function ()
     local view = buffer.open_org_buffer_from_text(
