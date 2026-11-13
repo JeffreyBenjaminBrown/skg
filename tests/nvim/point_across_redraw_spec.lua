@@ -117,9 +117,11 @@ describe('a redraw the user did not ask for', function ()
     goto_line('body 20 one')
     vim.fn.winrestview({ topline = vim.fn.line('.') - 8 })
     assert.are.equal(9, vim.fn.winline())
+    -- Headlines 18 and 19 are new in the redraw, so their folds are
+    -- the server's.
     rerender((headlines(40)
-      :gsub('%(vnid v18%) ', '(vnid v18) bodyFolded ')
-      :gsub('%(vnid v19%) ', '(vnid v19) bodyFolded ')))
+      :gsub('%(vnid v18%) ', '(vnid x18) bodyFolded ')
+      :gsub('%(vnid v19%) ', '(vnid x19) bodyFolded ')))
     assert.are.equal('body 20 one', cursor_line_text())
     assert.are_not.equal(-1, vim.fn.foldclosed(vim.fn.search('^body 19 one$', 'bnw')))
     assert.are.equal(9, vim.fn.winline())

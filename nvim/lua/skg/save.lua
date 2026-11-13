@@ -400,7 +400,7 @@ function M.apply_streamed_view_update (_payload_text, response,
                    .. vim.api.nvim_buf_get_name(buf))
       else
         lock.unlock_after_save(buf)
-        M.replace_buffer_keeping_viewnode_points(
+        M.replace_buffer_keeping_viewnode_points_and_folds(
           buf, sexpr.atom_text(content))
       end
     end
@@ -412,8 +412,15 @@ function M.apply_streamed_view_update (_payload_text, response,
 end
 
 ---Replace BUF with NEW_CONTENT, a redraw the user did not ask for,
----keeping each window's cursor and scroll where they were. A save
----marks the headline at the cursor focused, and restores the cursor
+---keeping each window's cursor and scroll, and the folds, where they
+---were.
+---The server draws such a redraw with the folds of the view's last
+---save, since folds reach it only in a save. So the fold state of each
+---headline here, in the window whose folds a redraw sets, is recorded
+---by viewnode ID, and decides the fold atoms of NEW_CONTENT
+---('M.content_with_fold_atoms'); what only a headline new in
+---NEW_CONTENT decides keeps the server's.
+---A save marks the headline at the cursor focused, and restores the cursor
 ---relative to it ('M.restore_save_point_position'); here the server
 ---drew the view on its own, so its focused headline is the one the
 ---last save left. Instead each window's cursor is recorded as its
@@ -426,13 +433,21 @@ end
 ---server drew it. A buffer shown in no window has no cursor to keep.
 ---@param buf integer
 ---@param new_content string
-function M.replace_buffer_keeping_viewnode_points (buf, new_content)
+function M.replace_buffer_keeping_viewnode_points_and_folds (buf,
+                                                             new_content)
   local old_headlines = redraw_delta.viewnode_id_headlines(
     vim.api.nvim_buf_get_lines(buf, 0, -1, false))
   local positions_by_window = {}
   for _, window in ipairs(vim.fn.win_findbuf(buf)) do
     positions_by_window[window] = vim.api.nvim_win_call(window, function ()
       return M.viewnode_point_position(old_headlines) end) end
+  local fold_window = buffer.first_window_showing(buf)
+  if fold_window then
+    local fold_states_by_viewnode_id =
+      vim.api.nvim_win_call(fold_window, function ()
+        return M.fold_states_by_viewnode_id(old_headlines) end)
+    new_content = M.content_with_fold_atoms(new_content,
+                                            fold_states_by_viewnode_id) end
   M.replace_buffer_with_new_content(buf, new_content, nil)
   local focused_line = M.focused_line_after_redraw(buf)
   local old_ids = {}
@@ -446,16 +461,136 @@ function M.replace_buffer_keeping_viewnode_points (buf, new_content)
                                      focused_line) end) end
 end
 
+---A table from the viewnode ID of each of OLD_HEADLINES
+---('redraw_delta.viewnode_id_headlines' of the current buffer) to the
+---fold state of its headline in the current window
+---('folds.fold_state_of_headline_at_line').
+---@param old_headlines table[]
+---@return table<string, string>
+function M.fold_states_by_viewnode_id (old_headlines)
+  local fold_states = {}
+  for _, headline in ipairs(old_headlines) do
+    fold_states[headline.id] =
+      folds.fold_state_of_headline_at_line(headline.index) end
+  return fold_states
+end
+
+---CONTENT, a view's text, with the fold atoms that
+---FOLD_STATES_BY_VIEWNODE_ID ('M.fold_states_by_viewnode_id' of the
+---buffer it will replace) decides. A headline's 'folded' atom says its
+---parent's fold hides it, so its parent's state decides it
+---('M.folded_atom_decision'); its 'bodyFolded' atom, its own
+---('M.bodyFolded_atom_decision'). An atom whose deciding headline the
+---table lacks, being new in CONTENT, is kept as the server drew it.
+---Other lines, and the focus atom, are kept.
+---@param content string
+---@param fold_states_by_viewnode_id table<string, string>
+---@return string
+function M.content_with_fold_atoms (content, fold_states_by_viewnode_id)
+  local lines = vim.split(content, '\n', { plain = true })
+  local headlines = M.headline_levels_and_viewnode_ids(lines)
+  local ancestors = {} -- { level, id }, nearest last
+  for position, headline in ipairs(headlines) do
+    while #ancestors > 0 and ancestors[#ancestors].level >= headline.level do
+      table.remove(ancestors) end
+    if headline.id then
+      local parent = ancestors[#ancestors]
+      local later = headlines[position + 1]
+      local decisions = {}
+      table.insert(decisions, M.folded_atom_decision(
+        parent ~= nil,
+        parent and parent.id and fold_states_by_viewnode_id[parent.id]))
+      table.insert(decisions, M.bodyFolded_atom_decision(
+        fold_states_by_viewnode_id[headline.id],
+        later ~= nil and later.level > headline.level))
+      lines[headline.index] =
+        M.line_with_fold_atoms(lines[headline.index], decisions) end
+    table.insert(ancestors, headline)
+  end
+  return table.concat(lines, '\n')
+end
+
+---Each headline among LINES, a view's lines, as { index, level, id },
+---in order; id is nil for a headline without one.
+---@param lines string[]
+---@return table[]
+function M.headline_levels_and_viewnode_ids (lines)
+  local headlines = {}
+  for index, line in ipairs(lines) do
+    local stars = line:match('^(%*+) ')
+    if stars then
+      table.insert(headlines, {
+        index = index, level = #stars,
+        id = redraw_delta.viewnode_id_at_headline_start(line) }) end end
+  return headlines
+end
+
+---Whether a headline is 'folded', as { atom = 'folded', value = BOOL },
+---given whether it HAS_PARENT and the PARENT_FOLD_STATE that parent had
+---('folds.fold_state_of_headline_at_line'): it is when its parent hid
+---its children or was hidden, and is not when its parent showed them.
+---Nil, leaving the server's atom, for a top-level headline or one whose
+---parent had no state, being new.
+---@param has_parent boolean
+---@param parent_fold_state string|nil
+---@return table|nil
+function M.folded_atom_decision (has_parent, parent_fold_state)
+  if not has_parent then return nil end
+  if parent_fold_state == 'hidden' or parent_fold_state == 'collapsed' then
+    return { atom = 'folded', value = true } end
+  if parent_fold_state == 'open' or parent_fold_state == 'bodyHidden' then
+    return { atom = 'folded', value = false } end
+  return nil
+end
+
+---Whether a headline is 'bodyFolded', as { atom = 'bodyFolded',
+---value = BOOL }, given the FOLD_STATE it had
+---('folds.fold_state_of_headline_at_line') and whether it HAS_CHILDREN
+---now: it is when only its body was hidden, or when it was collapsed
+---and its children are gone, so that the fold hides its body still.
+---Nil, leaving the server's atom, when it had no state, being new.
+---@param fold_state string|nil
+---@param has_children boolean
+---@return table|nil
+function M.bodyFolded_atom_decision (fold_state, has_children)
+  if fold_state == 'bodyHidden' then
+    return { atom = 'bodyFolded', value = true } end
+  if fold_state == 'collapsed' then
+    return { atom = 'bodyFolded', value = not has_children } end
+  if fold_state == 'hidden' or fold_state == 'open' then
+    return { atom = 'bodyFolded', value = false } end
+  return nil
+end
+
+---LINE, a headline line beginning with its viewnode ID, with each atom
+---DECISIONS names ('M.folded_atom_decision', 'M.bodyFolded_atom_decision')
+---removed, and those whose value is true placed after the viewnode ID.
+---@param line string
+---@param decisions table[]
+---@return string
+function M.line_with_fold_atoms (line, decisions)
+  if #decisions == 0 then return line end
+  local viewnode_id_end = select(2, line:find('^%*+ %(skg %(vnid [^)]*%)'))
+  local decided_atoms, true_atoms = {}, {}
+  for _, decision in ipairs(decisions) do
+    decided_atoms[decision.atom] = true
+    if decision.value then
+      table.insert(true_atoms, ' ' .. decision.atom) end end
+  local without_decided_atoms = redraw_delta.without_fold_and_focus_atoms(
+    line, line:find('(skg', 1, true), decided_atoms)
+  return without_decided_atoms:sub(1, viewnode_id_end)
+         .. table.concat(true_atoms)
+         .. without_decided_atoms:sub(viewnode_id_end + 1)
+end
+
 ---The line of BUF's focused headline once a whole redraw has acted on
 ---its atoms: where that redraw left the cursor of the window it acted
 ---in, the first window showing BUF ('buffer.act_on_fold_and_focus_atoms').
 ---@param buf integer
 ---@return integer|nil
 function M.focused_line_after_redraw (buf)
-  for _, window in ipairs(vim.api.nvim_list_wins()) do
-    if vim.api.nvim_win_get_buf(window) == buf then
-      return vim.api.nvim_win_get_cursor(window)[1] end end
-  return nil
+  local window = buffer.first_window_showing(buf)
+  return window and vim.api.nvim_win_get_cursor(window)[1]
 end
 
 ---Where the current window's cursor stands: the save's measures

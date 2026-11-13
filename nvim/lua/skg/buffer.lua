@@ -195,11 +195,7 @@ end
 function M.act_on_fold_and_focus_atoms (buf, place_cursor)
   local focus = require('skg.focus')
   local folds = require('skg.folds')
-  local window = nil
-  for _, win in ipairs(vim.api.nvim_list_wins()) do
-    if vim.api.nvim_win_get_buf(win) == buf then
-      window = win break end
-  end
+  local window = M.first_window_showing(buf)
   local function act_on_atoms ()
     folds.show_all()
     -- Focus first, while everything is visible.
@@ -216,6 +212,16 @@ function M.act_on_fold_and_focus_atoms (buf, place_cursor)
   else
     vim.api.nvim_buf_call(buf, act_on_atoms)
   end
+end
+
+---The first window, in 'nvim_list_wins' order, showing BUF, or nil.
+---A whole redraw sets the folds of this one.
+---@param buf integer
+---@return integer|nil
+function M.first_window_showing (buf)
+  for _, window in ipairs(vim.api.nvim_list_wins()) do
+    if vim.api.nvim_win_get_buf(window) == buf then return window end end
+  return nil
 end
 
 ---Buffer-local setup shared by every server-fed view.

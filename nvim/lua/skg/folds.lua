@@ -195,6 +195,23 @@ function M.headline_body_hidden_p (lnum)
          or not M.line_invisible_p(next_headline)
 end
 
+---The fold state of the headline at LNUM in the current window:
+---'hidden' inside a closed ancestor fold; 'collapsed', its children
+---hidden by its own fold; 'bodyHidden', only its body hidden; else
+---'open'. A childless headline whose fold hides its body is
+---'bodyHidden'. A hidden headline's own fold is not looked for, as a
+---save does not. Mirrors skg--fold-state-of-headline-at-point.
+---@param lnum integer
+---@return string
+function M.fold_state_of_headline_at_line (lnum)
+  if M.line_invisible_p(lnum) then return 'hidden' end
+  local first_child = M.first_child_line(lnum)
+  if first_child and M.line_invisible_p(first_child) then
+    return 'collapsed' end
+  if M.headline_body_hidden_p(lnum) then return 'bodyHidden' end
+  return 'open'
+end
+
 -- ── atom predicates ──────────────────────────────────────────────
 
 ---@param line_number integer

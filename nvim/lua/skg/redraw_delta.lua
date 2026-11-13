@@ -274,11 +274,14 @@ local QUOTE, OPEN, CLOSE, SPACE = 34, 40, 41, 32
 ---LINE without each fold and focus atom, and the space before it, at
 ---depth 1 of the form starting at the 1-based FORM_START. Depth counts
 ---the parentheses outside string literals. The text after the form is
----kept as it is.
+---kept as it is. ATOMS, when given, is the set of atoms to remove
+---instead (default 'M.fold_and_focus_atoms').
 ---@param line string
 ---@param form_start integer
+---@param atoms table<string, boolean>|nil
 ---@return string
-function M.without_fold_and_focus_atoms (line, form_start)
+function M.without_fold_and_focus_atoms (line, form_start, atoms)
+  atoms = atoms or M.fold_and_focus_atoms
   local kept_pieces = {}
   local copied_from = 1
   local depth = 0
@@ -296,7 +299,7 @@ function M.without_fold_and_focus_atoms (line, form_start)
       position = position + 1
     elseif byte == SPACE and depth == 1 then
       local atom_end = M.end_of_bare_atom(line, position + 1)
-      if M.fold_and_focus_atoms[line:sub(position + 1, atom_end - 1)] then
+      if atoms[line:sub(position + 1, atom_end - 1)] then
         table.insert(kept_pieces, line:sub(copied_from, position - 1))
         copied_from = atom_end
         position = atom_end
