@@ -241,7 +241,7 @@ content changeset marker, "its content changed", gathers the
 relationship leaves of the content list.
 *** the in-folders and out-folders
 A changed set of containers, mentioners, subscribers, overriders or
-hiders adds a write-protected folder labelled "its containers changed
+hiders adds a write-protected folder labelled "its other containers changed
 (other files)" and so on; a changed set of subscribees, overridden or
 hidden nodes adds the existing folder labelled "its subscribees
 changed (this file)" and so on. A containers folder is drawn only

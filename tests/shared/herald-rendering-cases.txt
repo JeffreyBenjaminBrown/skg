@@ -367,8 +367,8 @@
 ==== diff view: a folder of recorders shown because of a change, ready
 (skg containerFolder)
 ---- context: folderChange ready
----- text: ☮ its containers changed (other files)✓
----- styles: crucial*1 -*1 message*36 go*1
+---- text: ☮ its other containers changed (other files)✓
+---- styles: crucial*1 -*1 message*42 go*1
 ==== diff view: a folder of the node's own list shown because of a change
 (skg aliasFolder)
 ---- context: folderChange unready

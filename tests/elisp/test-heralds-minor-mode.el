@@ -93,7 +93,7 @@ with ✓ when every such change is ready, and its ordinary label
 otherwise. Editing a member rerenders the folder's herald."
   (let ((ordinary (substring-no-properties
                    (heralds-from-metadata "(skg containerFolder)")))
-        (changed "☮ its containers changed (other files)")
+        (changed "☮ its other containers changed (other files)")
         (ready-member "*** (skg node (gnid c) (skgRepos (nodeRepo r)) noClaim writeProtected (diff (rel added) (leaves 1 rel) (ready rel))) c")
         (unready-member "*** (skg node (gnid d) (skgRepos (nodeRepo r)) noClaim writeProtected (diff (rel removed) (leaves 1 rel))) d"))
     (should (equal (test-heralds--folder-display

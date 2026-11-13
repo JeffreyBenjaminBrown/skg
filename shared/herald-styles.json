@@ -105,7 +105,7 @@
       "aliasFolder":      "its aliases changed (this file)",
       "idFolder":         "its IDs changed (this file)",
       "flagsFolder":      "its flags changed (this file)",
-      "containerFolder":  "its containers changed (other files)",
+      "containerFolder":  "its other containers changed (other files)",
       "mentionerFolder":  "its mentioners changed (other files)",
       "subscriberFolder": "its subscribers changed (other files)",
       "overriderFolder":  "its overriders changed (other files)",

@@ -657,7 +657,7 @@ def check_removal (context):
     read_file ( os . path . join ( shared_folder,
                                    "view_shared-id.compact.org" )),
     "* Contained twice ⟨0a 1C ⌂:main⟩\n"
-    "** ⟨0b ☮ These contain it.⟩\n"
+    "** ⟨0b ☮ These also contain it.⟩\n"
     "*** A second container, outside the view ⟨0c ☮ Cb⟩\n" )
 
 def check_deletion (context):
@@ -1492,8 +1492,8 @@ def check_write_protecting (context):
   folder = fresh_root_view (context, "write-protect-refused")
   edit_compact ( folder, [ ( "** First child ⟨0d aC1⟩",
                              "** First child ⟨0d aC1 write-protect editable⟩" ),
-                           ( "** ⟨0b ☮ These contain it.⟩",
-                             "** ⟨0b ☮ These contain it. write-protect⟩" ) ])
+                           ( "** ⟨0b ☮ These also contain it.⟩",
+                             "** ⟨0b ☮ These also contain it. write-protect⟩" ) ])
   require_output (
     run_save (folder, "--yes"),
     REPORT_HEAD +

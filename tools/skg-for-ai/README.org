@@ -309,7 +309,7 @@ tool fetches too ('docs/heralds.org' explains each). So a node reads
 '⟨0d ☮B 1Cb ⟳ M ~+⟩': write-protected (☮), its body omitted (B), its
 relationship heralds, a cycle (⟳), then its change facts. A headline
 that is not a node occurrence shows its label: a folder its sentence,
-'⟨0b ☮ These contain it.⟩'; an alias 'alias', a flag row '☮ had ID
+'⟨0b ☮ These also contain it.⟩'; an alias 'alias', a flag row '☮ had ID
 before import', a tombstone 'something stood here', an unknown
 viewnode 'Reference to unknown node.'; a folder has no title, so in a
 compact view it is its stars and its handle. An illegal edit to a
@@ -372,7 +372,7 @@ headlines the diff view adds to explain a change show their labels:
 'its content changed' (a changeset marker), '⌂ -OLD +NEW' (a move to
 another skgrepo) and 'relationship moved from OLD to NEW'; each takes
 a '✓' when ready. A folder shown because a member's relationship to
-the folder's parent changed reads 'its containers changed (other
+the folder's parent changed reads 'its other containers changed (other
 files)' and so on, with '✓' when every such change is ready. In the
 skgrepo-changes buffer a moved node adds '-OLD +NEW', and 'Δ⌂=a' when
 its nearest moved ancestor (here the parent) moved the same way.

@@ -12,5 +12,5 @@
 * Fred's note ⟨0a ☮ C1 1/L 1S ⌂:fred⟩
 * An aside of Fred's ⟨0b ☮ 1H ⌂:fred⟩
 * A detail of Fred's ⟨0c ☮ 1C 1H ⌂:fred⟩
-** ⟨0d ☮ These contain it. folded⟩
+** ⟨0d ☮ These also contain it. folded⟩
 *** Fred's note ⟨0e ☮ Cb 1/L 1S⟩

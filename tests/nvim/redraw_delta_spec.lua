@@ -264,7 +264,7 @@ describe('skg.redraw_delta patch', function ()
       .. '** (skg (vnid f) containerFolder)\n'
     local member = '*** (skg (vnid d) node (gnid d) (skgRepos (nodeRepo r))'
       .. ' noClaim writeProtected (diff (rel removed) (leaves 1 rel))) d'
-    local changed = '☮ its containers changed (other files)'
+    local changed = '☮ its other containers changed (other files)'
     local buf = open_view(root_and_folder .. member)
     assert.are.equal(changed,
                      herald_display_on_line_containing(buf, '(vnid f)'))

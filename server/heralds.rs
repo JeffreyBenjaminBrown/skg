@@ -464,7 +464,7 @@ pub fn herald_rule_table () -> HeraldRule {
       write_protected_leaves (Folder::Overrider . repr_in_client (),
             "These override the view of it."),
       write_protected_leaves (Folder::Container . repr_in_client (),
-            "These contain it."),
+            "These also contain it."),
       write_protected_leaves (Folder::Mentioner . repr_in_client (),
             "These link to it."),
       write_protected_leaves (Folder::AcquiredBy . repr_in_client (),

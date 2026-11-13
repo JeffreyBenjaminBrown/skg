@@ -210,25 +210,25 @@ describe('skg.heralds', function ()
         buf, heralds.namespace, { 1, 0 }, { 1, -1 }, { details = true })
       return marks[1] and heralds.chunks_text(marks[1][4].virt_text)
     end
-    assert.are.equal('☮ its containers changed (other files)✓',
+    assert.are.equal('☮ its other containers changed (other files)✓',
                      folder_herald())
     -- Editing a member, or a line below it, rerenders the folder.
     vim.api.nvim_buf_set_lines(buf, 2, 3, false, {
       '*** (skg node (gnid r) (diff (rel added) (leaves 2 node rel) (ready node))) r' })
     vim.wait(200, function ()
-      return folder_herald() == '☮ its containers changed (other files)' end, 10)
-    assert.are.equal('☮ its containers changed (other files)',
+      return folder_herald() == '☮ its other containers changed (other files)' end, 10)
+    assert.are.equal('☮ its other containers changed (other files)',
                      folder_herald())
     vim.api.nvim_buf_set_lines(buf, 2, 3, false, {
       '*** (skg node (gnid r) (diff (node added) (ready node))) r' })
     vim.wait(200, function ()
-      return folder_herald() == '☮ These contain it.' end, 10)
-    assert.are.equal('☮ These contain it.', folder_herald())
+      return folder_herald() == '☮ These also contain it.' end, 10)
+    assert.are.equal('☮ These also contain it.', folder_herald())
     vim.api.nvim_buf_set_lines(buf, 3, 4, false, {
       '**** (skg (relRepoMove (old a) (new b)) (diff (leaves 1) (ready)))' })
     vim.wait(200, function ()
-      return folder_herald() == '☮ its containers changed (other files)✓' end, 10)
-    assert.are.equal('☮ its containers changed (other files)✓',
+      return folder_herald() == '☮ its other containers changed (other files)✓' end, 10)
+    assert.are.equal('☮ its other containers changed (other files)✓',
                      folder_herald())
     heralds.disable(buf)
     -- A changed folder's label stands in for its own, with ✓ when ready.

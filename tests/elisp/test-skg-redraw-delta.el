@@ -233,7 +233,7 @@ changed member ready, the folder's herald shows it ready too."
          (concat "* (skg (vnid r) node (gnid r) (skgRepos (nodeRepo r))) r\n"
                  "** (skg (vnid f) containerFolder)\n"))
         (member "*** (skg (vnid d) node (gnid d) (skgRepos (nodeRepo r)) noClaim writeProtected (diff (rel removed) (leaves 1 rel))) d\n")
-        (changed "☮ its containers changed (other files)"))
+        (changed "☮ its other containers changed (other files)"))
     (test-skg-redraw-delta--in-view (concat root-and-folder member)
       (heralds-minor-mode 1)
       (should (equal (test-skg-redraw-delta--herald-display-on-line-containing
