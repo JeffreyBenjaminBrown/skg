@@ -2,11 +2,11 @@
 // rerender ('docs/diff-view.org', "What the refresh keeps").
 //
 // The 'users_notes' fixture: a (retitled) contains x, which b no
-// longer contains; b holds x as a removed member, x's first
-// occurrence, so editable there, and x's container folder holds a,
-// with a's member role tree (p contains a), and b as a removed
-// member; r held h, which is deleted, with m in its old content; acq
-// acquired acqd.
+// longer contains and n now does; b holds x as a removed member, x's
+// first occurrence, so editable there, and x's container folder holds
+// a, with a's member role tree (p contains a), and n as an added
+// member, but not b, which stands above it; r held h, which is
+// deleted, with m in its old content; acq acquired acqd.
 
 use skg::metadata_canon::without_viewnode_ids;
 use crate::pruned_change_view::common::{

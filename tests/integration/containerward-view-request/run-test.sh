@@ -22,8 +22,8 @@ echo "Project root: $PROJECT_ROOT"
 backup_and_reset_test_data() {
     echo "=== Backing up and resetting test data ==="
 
-    # Backup and reset each of the 6 files
-    for file in 0 1 11 12 121 13; do
+    # Backup and reset each of the 7 files
+    for file in 0 1 11 12 121 13 2; do
         if [ -f "$TEST_DIR/data/owned/skg-data/$file.skg" ]; then
             BACKUP_FILE="$TEST_DIR/data/owned/skg-data/$file.skg.backup.$(date +%s)"
             cp "$TEST_DIR/data/owned/skg-data/$file.skg" "$BACKUP_FILE"
@@ -47,7 +47,7 @@ cleanup_test_data() {
     cleanup_tantivy_index "$TEST_DIR/data/.index.tantivy"
 
     # Restore original files if backups exist
-    for file in 0 1 11 12 121 13; do
+    for file in 0 1 11 12 121 13 2; do
         BACKUP_FILE=$(find "$TEST_DIR/data/owned/skg-data" -name "$file.skg.backup.*" | head -1)
         if [ -n "$BACKUP_FILE" ] && [ -f "$BACKUP_FILE" ]; then
             cp "$BACKUP_FILE" "$TEST_DIR/data/owned/skg-data/$file.skg"

@@ -92,17 +92,20 @@ fn a_deleted_subtree_is_shown_where_it_stood (
     "** (skg node (gnid keep)" ] );
   Ok (( )) }
 
+/// lo, whose one change is that ln gained it, stands under ln. The
+/// view shows that change on lo's headline, and ln above it, so lo
+/// has no container folder, though it has another container, lp.
 #[test]
-fn an_in_changed_only_change_shows_its_changed_containers (
+fn a_change_whose_only_changed_container_stands_above_it_has_no_container_folder (
 ) -> Result<(), Box<dyn Error>> {
-  assert_lines_in_order ( &sets_buffer () ?, &[
+  let buffer : String = sets_buffer () ?;
+  assert_lines_in_order ( &buffer, &[
     "* (skg node (gnid ln)",
     "** (skg (changesetMarker content) (diff (leaves 1 all)))",
-    "** (skg node (gnid lo) ", " (diff (rel added) (leaves 1 rel))) lo",
-    "*** (skg containerFolder)",
-    "**** (skg node (gnid ln) (skgRepos (nodeRepo main)) writeProtected",
-    "(diff (rel added) (properties changed) (leaves 1 rel all))) ln",
-    "**** (skg node (gnid lp) (skgRepos (nodeRepo main)) writeProtected" ] );
+    "** (skg node (gnid lo) ", " (diff (rel added) (leaves 1 rel))) lo\n",
+    "* (skg node (gnid mc)" ] );
+  assert! ( ! without_viewnode_ids (&buffer) . contains ("(skg node (gnid lp)"),
+            "lo shows no container folder:\n{}", buffer );
   Ok (( )) }
 
 #[test]
@@ -128,7 +131,8 @@ fn a_content_change_tags_the_members_and_shows_the_removed_one (
 /// k1, whose only container ct dropped it, stands only as ct's
 /// removed member. That is its first occurrence, so it is editable
 /// there, with its content list (k1c, outside U, a write-protected
-/// member without its content) and its changed container folder.
+/// member without its content). Its container folder, which changed,
+/// is not drawn: ct, the one container it lost, stands above it.
 #[test]
 fn a_node_its_only_container_dropped_is_editable_as_the_removed_member (
 ) -> Result<(), Box<dyn Error>> {
@@ -136,9 +140,7 @@ fn a_node_its_only_container_dropped_is_editable_as_the_removed_member (
   assert_lines_in_order ( &buffer, &[
     "* (skg node (gnid ct)",
     "** (skg node (gnid k1) (skgRepos (nodeRepo public)) noClaim (view (rels",
-    "*** (skg containerFolder)",
-    "**** (skg node (gnid ct) (skgRepos (nodeRepo public)) writeProtected",
-    "*** (skg node (gnid k1c) (skgRepos (nodeRepo public)) writeProtected" ] );
+    ") k1\n*** (skg node (gnid k1c) (skgRepos (nodeRepo public)) writeProtected" ] );
   assert_eq! ( node_lines (&buffer, "k1") . len (), 1, "{}", buffer );
   Ok (( )) }
 
@@ -260,25 +262,32 @@ fn removed_partners_buffer (
     Ok (( )) }) ?;
   Ok (buffer) }
 
-/// x's container folder shows b, the container it lost, between the
-/// two it kept, as a removed member: noClaim, with '(diff (rel
-/// removed))', and, as a content member would, '(properties changed)',
-/// since b's file records the change.
+/// x, under b, the container it lost, has a container folder that
+/// leaves b out, since the view shows b above it, and shows e, the
+/// other container it lost, after the two it kept, as a removed
+/// member: noClaim, with '(diff (rel removed))', and, as a content
+/// member would, '(properties changed)', since e's file records the
+/// change.
 #[test]
-fn a_removed_container_stands_between_the_kept_ones (
+fn a_removed_container_not_above_the_node_stands_with_the_kept_ones (
 ) -> Result<(), Box<dyn Error>> {
-  assert_lines_in_order ( &removed_partners_buffer () ?, &[
+  let buffer : String = removed_partners_buffer () ?;
+  assert_lines_in_order ( &buffer, &[
+    "* (skg node (gnid b)",
     "** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim (view (rels",
     "*** (skg containerFolder)",
     "**** (skg node (gnid a) (skgRepos (nodeRepo main)) writeProtected",
-    "**** (skg node (gnid b) (skgRepos (nodeRepo main)) writeProtected",
-    "(diff (rel removed) (properties changed) (leaves 1 rel all))) b",
-    "**** (skg node (gnid c) (skgRepos (nodeRepo main)) writeProtected" ] );
+    "**** (skg node (gnid c) (skgRepos (nodeRepo main)) writeProtected",
+    "**** (skg node (gnid e) (skgRepos (nodeRepo main)) writeProtected",
+    "(diff (rel removed) (properties changed) (leaves 1 rel all))) e" ] );
+  assert! ( ! without_viewnode_ids (&buffer)
+              . contains ("**** (skg node (gnid b)"),
+            "b stands in no container folder:\n{}", buffer );
   Ok (( )) }
 
 /// x stands first as b's removed member, so it is editable there,
-/// with its content list (xc) and its container folder: b and e
-/// marked '~-' beside its kept containers a and c, each with its
+/// with its content list (xc) and its container folder: e marked '~-'
+/// beside its kept containers a and c (b, above it, is left out), each with its
 /// containerward chain, under c the chain node d, which contained c
 /// at HEAD only. Its member occurrence under c (d's removed member,
 /// editable too) is write-protected.
@@ -291,7 +300,6 @@ fn a_removed_member_first_in_level_order_is_editable_with_its_changes (
     "** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim (view (rels (contains (in 2) (out 1))) ghostWarrant) (diff (rel removed) (leaves 1 rel))) x",
     "*** (skg containerFolder)",
     "**** (skg node (gnid a) (skgRepos (nodeRepo main)) writeProtected",
-    "**** (skg node (gnid b) (skgRepos (nodeRepo main)) writeProtected",
     "**** (skg node (gnid c) (skgRepos (nodeRepo main)) writeProtected",
     "***** (skg node (gnid d) (skgRepos (nodeRepo main)) writeProtected",
     "**** (skg node (gnid e) (skgRepos (nodeRepo main)) writeProtected",

@@ -244,7 +244,12 @@ A changed set of containers, mentioners, subscribers, overriders or
 hiders adds a write-protected folder labelled "its containers changed
 (other files)" and so on; a changed set of subscribees, overridden or
 hidden nodes adds the existing folder labelled "its subscribees
-changed (this file)" and so on. A folder holds the partners in either
+changed (this file)" and so on. A containers folder is drawn only
+when a container not above the node in the view gained or lost it,
+and, as in every view, leaves out the node's view-ancestors: the
+node's headline under its parent already carries that containment
+change ('changed_partner_folder_kinds' in
+'server/diff_view/changes.rs'). A folder holds the partners in either
 graph, each tagged as a content member is: its node's existence and
 other properties, so a modified member shows ☮ M and one gesture
 there marks its file, and the existence of its relationship to the

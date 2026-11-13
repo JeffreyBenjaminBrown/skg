@@ -20,7 +20,7 @@ use crate::types::viewnode::{
   ChangesetMarkerKind, Existence, Folder, Viewnode, ViewnodeKind,
   viewnode_of};
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 
 /// The folders of a node's recorders (its in-set changed when one
@@ -48,8 +48,8 @@ pub(crate) struct ChangedAspects {
   /// The relations of the relationships the node records that were
   /// added or removed (existence) or moved (relRepo).
   recorded     : HashSet<(NodeRelation, RelationshipAspect)>,
-  /// The relations by which a recorder gained or lost the node.
-  recorders    : HashSet<NodeRelation>,
+  /// The recorders that gained or lost the node, by relation.
+  recorders    : HashMap<NodeRelation, HashSet<ID>>,
   /// Mentions are no leaves; see 'ChangeLeaves::mentioner_sets_changed'.
   mentioners   : bool,
 }
@@ -76,7 +76,8 @@ impl ChangedAspects {
     for leaf in leaves . leaves_naming_member (pid) {
       if let LeafKey::Relationship {
         relationship, aspect : RelationshipAspect::Existence } = &leaf . key {
-        aspects . recorders . insert ( relationship . relation ); }}
+        aspects . recorders . entry ( relationship . relation ) . or_default ()
+          . insert ( relationship . recorder . clone () ); }}
     aspects }
 
   /// Whether a recorded relationship of this relation changed in this
@@ -135,9 +136,12 @@ pub(crate) fn model_of_front_change_viewnodes (
 /// in the order the diff view draws them: the folders of its recorders
 /// (changed when one was added or removed), then those of the
 /// relationships it records (changed when one was added, removed or
-/// moved to another skgrepo).
+/// moved to another skgrepo). A folder that omits view-ancestors
+/// ('Folder::omits_view_ancestors') changed only if a recorder not
+/// among 'view_ancestors' did, since only such a one stands in it.
 pub(crate) fn changed_partner_folder_kinds (
-  aspects : &ChangedAspects,
+  aspects        : &ChangedAspects,
+  view_ancestors : &HashSet<ID>,
 ) -> Vec<Folder> {
   IN_FOLDERS . into_iter () . chain (OUT_FOLDERS)
     . filter ( |kind| {
@@ -147,7 +151,10 @@ pub(crate) fn changed_partner_folder_kinds (
         aspects . recorded_changed (relation, RelationshipAspect::Existence)
         || aspects . recorded_changed (relation, RelationshipAspect::RelRepo) }
       else if relation == NodeRelation::LinksTo { aspects . mentioners }
-      else { aspects . recorders . contains (&relation) } } )
+      else { aspects . recorders . get (&relation)
+             . is_some_and ( |recorders| recorders . iter () . any (
+               |recorder| ! ( kind . omits_view_ancestors ()
+                              && view_ancestors . contains (recorder) ))) } } )
     . collect () }
 
 /// The node's alias, ID and flags folders whose list changed, drawn

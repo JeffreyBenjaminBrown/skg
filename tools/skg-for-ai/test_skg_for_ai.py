@@ -1930,17 +1930,17 @@ def diff_written_paths (folder):
 
 EXPECTED_DIFF_COMPACT = (
   "# Readiness: 0 of 4 changed files are ready.\n"
-  "# Headlines with change facts 9, ready 0, not ready 9.\n"
+  "# Headlines with change facts 8, ready 0, not ready 8.\n"
   "# skg-for-ai compact view of diff_all-changes.full.org (view ID diff-view:ID)\n"
   "# Each headline ends in its handle ⟨ID HERALDS⟩: ID its viewnode ID,\n"
   "# the '(vnid ID)' of its metadata in the full view, and HERALDS what a\n"
   "# client shows for it, but a bare 'aC' (only the parent contains it);\n"
   "# 'folded' marks a headline a client shows collapsed.\n"
-  "# Headlines 15, node occurrences 9, distinct nodes 6, changesetMarker "
-  "content 2, folders 1, ghost 2, oldText title 1.\n"
-  "# Skgrepos: main (owned) 9.\n"
-  "# Foreign 0, write-protected 4, folded 0.\n"
-  "# Contained elsewhere too 2, subscribed to 0, subscribing 1.\n"
+  "# Headlines 11, node occurrences 6, distinct nodes 6, changesetMarker "
+  "content 2, ghost 2, oldText title 1.\n"
+  "# Skgrepos: main (owned) 6.\n"
+  "# Foreign 0, write-protected 1, folded 0.\n"
+  "# Contained elsewhere too 0, subscribed to 0, subscribing 1.\n"
   "# Links 3, distinct targets 3, resolved 2, unresolved 1 (missing 1).\n"
   "# Server errors 0, warnings 0.\n"
   # The deleted node's other container, a root of its own
@@ -1959,14 +1959,11 @@ EXPECTED_DIFF_COMPACT = (
   "**** First child ⟨0g old title⟩\n"
   "**** ⟨0h its content changed⟩\n"
   "**** Contained twice ⟨0i ᗣ☮ ∃- ~-⟩\n"
+  # The new node's containers changed: it had none at HEAD. Its one
+  # container stands above it, so no containers folder is drawn; its
+  # '~+' says the change.
   "**** A new grandchild ⟨0j ∃+ ~+⟩\n"
-  # The new node's containers changed: it had none at HEAD. Its chain
-  # climbs back through the nodes above it, each a cycle.
-  "***** ⟨0k ☮ its containers changed (other files)⟩\n"
-  "****** First child, renamed ⟨0l ☮B 1Cb ⟳ M ~+⟩\n"
-  "******* The fixture root ⟨0m ☮B 1C2a L2 ⟳⟩\n"
-  "******** Above the root ⟨0n ☮ Ca ⟳⟩\n"
-  "*** Second child, a subscriber ⟨0o ☮ a/L S1 H2⟩\n" )
+  "*** Second child, a subscriber ⟨0k ☮ a/L S1 H2⟩\n" )
 
 # ============================================================
 # The daemon: each case runs on the graph and the daemon the earlier
@@ -2703,7 +2700,7 @@ def check_marking_like_moves_ready (context):
   require_in_diff_compact ( folder, "** ⟨0b ⌂ -private +main✓⟩\n" )
   require_in_diff_compact ( folder, "** Its private leaf ⟨0d M✓⟩\n"
                                     "*** ⟨0e ⌂ -private +main✓⟩\n" )
-  require_in_diff_compact ( folder, "***** ⟨1c ⌂ -private +main⟩\n" )
+  require_in_diff_compact ( folder, "***** ⟨0t ⌂ -private +main⟩\n" )
 
 def check_deleting_references (context):
   """'delete-references ID' sends nothing without '--yes'; with it the

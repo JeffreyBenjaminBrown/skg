@@ -79,9 +79,7 @@ fn a_relationship_head_alone_has_is_drawn_with_a_ghost_warrant_and_no_claim () {
   assert_eq! ( run . outline (), "\
 node p
   changesetMarker content
-  node m noClaim ᗣ
-    containerFolder
-      node p wp noClaim ᗣ" );
+  node m noClaim ᗣ" );
   assert! ( run . text . contains ("ghostWarrant"), "{}", run . text ); }
 
 /// x is in neither HEAD nor the worktree, and p's list does not name
@@ -298,11 +296,9 @@ fn a_ghost_where_content_stands_holds_its_old_content () {
 node p
   changesetMarker content
   ghost d noClaim ᗣ
-    node d1 noClaim ᗣ
-      containerFolder
-        ghost d noClaim ᗣ",
-    "d1, which lost its container, is in U, so it is editable, and \
-     shows the container it lost" ); }
+    node d1 noClaim ᗣ",
+    "d1, which lost its container, is in U, so it is editable; the \
+     container it lost, d, stands above it, so it has no containers folder" ); }
 
 #[test]
 fn a_deleted_node_that_its_parent_listed_by_an_extra_id_becomes_its_ghost () {
@@ -422,25 +418,14 @@ node p
       node a wp noClaim
   ghost d noClaim ᗣ
     node d1 noClaim ᗣ
-      containerFolder
-        ghost d noClaim ᗣ
   node m noClaim ᗣ
-    containerFolder
-      node p wp noClaim ᗣ
-        node top wp noClaim
   node a
     acquiredFolder
       ghost b noClaim ᗣ
     idFolder
       id a noClaim
       id b noClaim
-    containerFolder
-      node p wp noClaim
-        node top wp noClaim
   node new
-    containerFolder
-      node p wp noClaim
-        node top wp noClaim
   node q
     relRepoMove" ); }
 
@@ -511,20 +496,22 @@ node p
     . remove (0);
   assert_eq! ( widened, opened ); }
 
-/// The worktree added h, private, to p's content, recording it in
-/// p's file. Narrowed, h is a Restricted vognode carrying the change
-/// of its relationship, and none of the change viewnodes that would
-/// show its text. The partner folder drawn under h, whose membership
-/// changed, stands under a Restricted vognode no more: as in a content
-/// view, it is a tombstone, keeping p, which is no secret.
+/// The worktree added h, private, to the content of p and of k,
+/// recording it in their files. Narrowed, h is a Restricted vognode
+/// carrying the change of its relationship, and none of the change
+/// viewnodes that would show its text. The partner folder drawn under
+/// h, whose membership changed by k (p, above h, stands in no such
+/// folder), stands under a Restricted vognode no more: as in a
+/// content view, it is a tombstone, keeping k, which is no secret.
 #[test]
 fn a_switch_makes_a_private_member_with_a_visible_record_a_restricted_vognode_with_its_change () {
   let straddle : GraphStraddle = straddle (
-    &[ node ("p"),
+    &[ node ("p"), node ("k"),
        Graphnode { title        : "h's old secret title" . into (),
                    home_skgrepo : SkgrepoName::from ("private"),
                    .. node ("h") } ],
     &[ Graphnode { contains : ids (&["h"]), .. node ("p") },
+       Graphnode { contains : ids (&["h"]), .. node ("k") },
        Graphnode { title        : "h's secret title" . into (),
                    home_skgrepo : SkgrepoName::from ("private"),
                    .. node ("h") } ] );
@@ -539,7 +526,7 @@ node p
   changesetMarker content
   restricted h
     tombstone
-      node p wp noClaim ⊥" );
+      node k wp noClaim ⊥" );
   let h : NodeRef<Viewnode> = forest . roots () . next () . unwrap ()
     . children () . nth (1) . unwrap ();
   assert_eq! ( h . value () . change_facts . change . rel, Some (Existence::Added) );

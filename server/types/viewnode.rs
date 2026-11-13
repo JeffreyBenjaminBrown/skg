@@ -805,6 +805,14 @@ impl Folder {
         | Folder::ID | Folder::Flags { .. }
         | Folder::IllegalEdit { .. } => false, } }
 
+  /// Whether the folder leaves out every partner that is a
+  /// view-ancestor of the node it describes ('view_ancestor_gnids'):
+  /// the containers folder, since the view above the node already
+  /// shows such a container. The other partner folders keep theirs,
+  /// for no view-ancestry shows their relation.
+  pub fn omits_view_ancestors (&self) -> bool {
+    matches! ( self, Folder::Container ) }
+
   /// Whether each member of a folder of this kind carries its
   /// containerward chain: every kind whose members are live nodes,
   /// partners in a role or members of a compound partner folder. The

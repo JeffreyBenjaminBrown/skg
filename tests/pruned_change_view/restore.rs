@@ -6,8 +6,9 @@
 // In the 'removed_partners' fixture b, d and e drop x or c from their
 // content and s drops its subscribee s2. Its "all changes" buffer holds
 // b with x as an editable removed member, d with c likewise, and under
-// c's container folder d as a '~-' container; and s2 with s, in its
-// subscriber folder, as a '~-' subscriber.
+// x's container folder e as a '~-' container (b, above x, stands in no
+// folder); and s2 with s, in its subscriber folder, as a '~-'
+// subscriber.
 //
 // In the 'restore' fixture g, deleted since HEAD, was contained by q
 // (between q1 and q2), subscribed to by t, and contained gc and gd; gd
@@ -47,8 +48,8 @@ fn ghosts_of (
 
 const X_REMOVED_FROM_B : &str =
   "** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim (view (rels";
-const D_REMOVED_AS_CS_CONTAINER : &str =
-  "**** (skg node (gnid d) (skgRepos (nodeRepo main)) writeProtected (view ghostWarrant cycle)";
+const E_REMOVED_AS_XS_CONTAINER : &str =
+  "**** (skg node (gnid e) (skgRepos (nodeRepo main)) writeProtected (view ghostWarrant)";
 const S_REMOVED_AS_S2S_SUBSCRIBER : &str =
   "*** (skg node (gnid s) (skgRepos (nodeRepo main)) writeProtected";
 /// d, a node of the containerward chain under c, a member of x's
@@ -126,8 +127,8 @@ fn restoring_a_removed_container_from_a_folder () -> Result<(), Box<dyn Error>> 
   with_fixture ("removed_partners", &["main"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
     let (response, files) : (SaveResponse, BTreeMap<String, String>) = saved ( f,
-      &requesting (&buffer, D_REMOVED_AS_CS_CONTAINER, "restoreRel") ) ?;
-    assert_eq! ( file_of (&files, "d"), "title: d\npid: d\ncontains:\n- c\n" );
+      &requesting (&buffer, E_REMOVED_AS_XS_CONTAINER, "restoreRel") ) ?;
+    assert_eq! ( file_of (&files, "e"), "title: e\npid: e\ncontains:\n- x\n" );
     assert! ( response . warnings . is_empty (), "{:?}", response . warnings );
     saved_and_rerendered (f, &response . saved_view) ?;
     Ok (( )) }) }
@@ -265,7 +266,7 @@ fn restoreRel_is_refused_on_a_chain_node_under_a_subscriber_folders_member (
 /// A restoreRel stands where it may by position: on a node of the
 /// containerward chain (d, under c in x's containers folder) it is
 /// refused, with or without a '(rel removed)' typed beside it, while
-/// on a containers folder's member carrying '(rel removed)' (d in c's
+/// on a containers folder's member carrying '(rel removed)' (e in x's
 /// containers folder) it saves.
 #[test]
 fn restoreRel_is_refused_on_a_chain_node_and_taken_by_a_folder_member (
@@ -291,6 +292,6 @@ fn restoreRel_is_refused_on_a_chain_node_and_taken_by_a_folder_member (
                 parts, refusal );
       assert_eq! ( skg_files (f) ?, files_before ); }
     let (_response, files) : (SaveResponse, BTreeMap<String, String>) = saved ( f,
-      &requesting (&buffer, D_REMOVED_AS_CS_CONTAINER, "restoreRel") ) ?;
-    assert_eq! ( file_of (&files, "d"), "title: d\npid: d\ncontains:\n- c\n" );
+      &requesting (&buffer, E_REMOVED_AS_XS_CONTAINER, "restoreRel") ) ?;
+    assert_eq! ( file_of (&files, "e"), "title: e\npid: e\ncontains:\n- x\n" );
     Ok (( )) }) }

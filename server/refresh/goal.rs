@@ -3,7 +3,9 @@
 //! order (for a subscribee as such, less what the subscriber hides or
 //! contains); for a node of the containerward chain under a folder's
 //! member, its containers; for a folder, its partners in the folder's
-//! relation, or the compound folders' derived lists; for a property
+//! relation (for the containers folder, those the view does not
+//! already show above the node), or the compound folders' derived
+//! lists; for a property
 //! folder, the node's aliases, IDs or true flags. In the diff view the
 //! goal also holds what HEAD alone warrants ('diff_view.rs'). Each
 //! item names a gnid or a property value. A parent whose position
@@ -26,7 +28,8 @@ use crate::dbs::in_rust_graph::relation_accessors::{GnidPresence, NodeRelation, 
 use crate::graph_straddle::types::Partner;
 use crate::refresh::Walk;
 use crate::refresh::ancestry::{
-  CompoundFolderParties, compound_folder_parties, described_node};
+  CompoundFolderParties, compound_folder_parties, described_node,
+  view_ancestor_gnids};
 use crate::refresh::diff_view;
 use crate::refresh::extent::is_chain_parent;
 use crate::skgrepo_sets::SkgrepoRestriction;
@@ -130,6 +133,19 @@ impl Goal {
     gnid : &ID,
   ) -> bool {
     self . index . contains_key ( &GoalMember::Gnid ( gnid . clone () )) }
+
+  /// The goal less each item naming one of 'gnids', in the same order.
+  pub fn without_gnids (
+    self,
+    gnids : &HashSet<ID>,
+  ) -> Goal {
+    let ordered : bool = self . ordered;
+    Goal::with_order (
+      self . items . into_iter ()
+        . filter ( |item| ! matches! ( &item . member,
+                                       GoalMember::Gnid (gnid) if gnids . contains (gnid) ))
+        . collect (),
+      ordered ) }
 }
 
 /// What a child stands for in its parent's goal, if anything: an
@@ -329,23 +345,36 @@ fn folder_goal (
       | Folder::Overridden | Folder::Overrider
       | Folder::Hider | Folder::Hidden
       | Folder::Container | Folder::Mentioner => {
-      let described : ID = described_pid () ?;
-      let member_role : RelationRole = kind . relation_member_role () ?;
-      if let Some (goal) =
-        diff_view::folder_goal (kind, &described, member_role, walk)
-      { return Some (goal); }
-      let members : Vec<ID> = partnerFolder_members_in_graph (
-        graph, &described, kind, walk . truth . restriction ) ?;
-      let relRepos : HashMap<ID, SkgrepoName> =
-        if member_role . opposite_role () . is_first_role () {
-          // The folder shows a list in the described node's own file.
-          unknown_or_restricted_members_relRepos (
-            graph, walk . truth . restriction, &described,
-            &graph . outbound_member_keys_for_relation_gated (
-              &described, member_role . relation, walk . truth . restriction ))
-        } else { HashMap::new () };
-      Some ( Goal::with_order ( gnid_items (members, &relRepos ),
-                                kind . goal_is_ordered () )) }, } }
+      let goal : Goal = partnerFolder_goal (kind, &described_pid () ?, walk) ?;
+      Some ( if kind . omits_view_ancestors () {
+               goal . without_gnids ( &view_ancestor_gnids (
+                 tree, described_node (tree, folder) ? ))
+             } else { goal } ) }, } }
+
+/// The goal of a partner folder of this kind describing 'described':
+/// its partners over the straddle in the diff view, else in the graph.
+fn partnerFolder_goal (
+  kind      : &Folder,
+  described : &ID,
+  walk      : &Walk,
+) -> Option<Goal> {
+  let graph : &InRustGraph = walk . truth . graph;
+  let member_role : RelationRole = kind . relation_member_role () ?;
+  if let Some (goal) =
+    diff_view::folder_goal (kind, described, member_role, walk)
+  { return Some (goal); }
+  let members : Vec<ID> = partnerFolder_members_in_graph (
+    graph, described, kind, walk . truth . restriction ) ?;
+  let relRepos : HashMap<ID, SkgrepoName> =
+    if member_role . opposite_role () . is_first_role () {
+      // The folder shows a list in the described node's own file.
+      unknown_or_restricted_members_relRepos (
+        graph, walk . truth . restriction, described,
+        &graph . outbound_member_keys_for_relation_gated (
+          described, member_role . relation, walk . truth . restriction ))
+    } else { HashMap::new () };
+  Some ( Goal::with_order ( gnid_items (members, &relRepos ),
+                            kind . goal_is_ordered () )) }
 
 /// The members a folder of this kind under the viewparent should hold,
 /// from 'graph': its partners in the folder's relation whose records

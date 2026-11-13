@@ -10,13 +10,16 @@
 //! The stats pass reads a folder's ancestors through the table too
 //! ('required_ancestors'). What the table's rows say stays in this
 //! module: its callers get positions in the tree, never a place in a
-//! row.
+//! row. The gnids a view shows above a headline are read here too
+//! ('view_ancestor_gnids').
 
+use crate::types::misc::ID;
 use crate::types::viewnode::{
   ChangeViewnode, Folder, PropertyMember, Viewnode, ViewnodeKind, Vognode};
 
 use ego_tree::iter::Ancestors;
 use ego_tree::{NodeId, NodeRef, Tree};
+use std::collections::HashSet;
 use std::mem::discriminant;
 
 /// One position in a descriptor's required ancestry, matched against
@@ -111,6 +114,25 @@ pub fn described_node (
       let parties : CompoundFolderParties = compound_folder_parties (tree, folder) ?;
       Some ( parties . subscribee . unwrap_or (parties . subscriber) ) },
     _ => required_ancestors (tree, folder) . first () . copied (), } }
+
+/// The gnids the view shows above the headline at 'treeid': of each
+/// vognode among its ancestors, the gnid it stands for, and an
+/// occurrence's collected gnid too when it is shown in place of an
+/// overridden node. Folders and other scaffolds stand for no gnid and
+/// are passed over. The headline's own gnid is not among them.
+pub fn view_ancestor_gnids (
+  tree   : &Tree<Viewnode>,
+  treeid : NodeId,
+) -> HashSet<ID> {
+  let Some (node) : Option<NodeRef<Viewnode>> = tree . get (treeid)
+    else { return HashSet::new (); };
+  node . ancestors ()
+    . flat_map ( |ancestor| match &ancestor . value () . kind {
+      ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =>
+        vec! [ occurrence . gnid . clone (), occurrence . collected_gnid () ],
+      ViewnodeKind::Vognode (vognode) => vec! [ vognode . gnid () . clone () ],
+      _ => Vec::new (), } )
+    . collect () }
 
 /// A compound folder's two parties, where they stand: the subscriber
 /// whose hides it shows, and, for the folder of what the subscriber

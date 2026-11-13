@@ -131,7 +131,6 @@ fn a_view_request_on_the_second_sibling_is_carried () {
 node p
   node c wp
     containerFolder
-      node p wp noClaim
       node q wp noClaim" ); }
 
 #[test]

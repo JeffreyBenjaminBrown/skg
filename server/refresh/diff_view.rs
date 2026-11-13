@@ -31,7 +31,7 @@ use crate::diff_view::pruned_change_view::{
 use crate::graph_straddle::types::{GraphStraddle, Partner};
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::refresh::Walk;
-use crate::refresh::ancestry::described_node;
+use crate::refresh::ancestry::{described_node, view_ancestor_gnids};
 use crate::refresh::extent::is_chain_parent;
 use crate::refresh::goal::{
   Goal, GoalItem, GoalMember, member_of_child};
@@ -326,7 +326,8 @@ fn expected_change_viewnodes (
         &|viewnode : &Viewnode| -> bool {
         matches! ( change_key (viewnode), Some (ChangeKey::ChangesetMarker (_)) ) };
       let partner_folders : Vec<Viewnode> =
-        if in_c { changed_partner_folder_kinds (&aspects) . into_iter ()
+        if in_c { changed_partner_folder_kinds (
+                    &aspects, &view_ancestor_gnids (tree, parent) ) . into_iter ()
                   . map ( |kind| viewnode_of (ViewnodeKind::Folder (kind)) )
                   . collect () }
         else { Vec::new () };

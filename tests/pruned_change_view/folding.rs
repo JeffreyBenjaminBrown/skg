@@ -135,25 +135,25 @@ fn a_folded_ghost_stays_folded (
               . ends_with (" delc"), "{}", saved );
     Ok (( )) }) }
 
-/// A folded headline inside a member role tree (top, under acq in pres's
-/// changed container folder) stays folded after a save that changes
-/// nothing and after one that adds a container above it.
+/// A folded headline inside a member role tree (d, under c in x's
+/// changed container folder, x under b) stays folded after a save that
+/// changes nothing and after one that adds a container above it.
 #[test]
 fn a_folded_headline_in_a_member_role_tree_stays_folded (
 ) -> Result<(), Box<dyn Error>> {
-  with_fixture ("buffers", &["public", "private"], |f| {
+  with_fixture ("removed_partners", &["main"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
-    let memberRoleTree_headline : &str = "****** (skg node (gnid top)";
+    let memberRoleTree_headline : &str = "***** (skg node (gnid d)";
     let folded : String = with_atom (&buffer, memberRoleTree_headline, "folded");
     let saved : String = save_cleanly (f, &all_changes_view (), &folded) ? . saved_view;
     assert_eq! ( saved, folded, "saved unchanged, the buffer comes back as it was" );
     let contained : String = insert_after (
-      &saved, "* (skg node (gnid txt)", &[
+      &saved, "* (skg node (gnid e)", &[
         "** a new container",
-        "*** (skg node (gnid top) (skgRepos (nodeRepo public)) writeProtected) top" ] );
+        "*** (skg node (gnid d) (skgRepos (nodeRepo main)) writeProtected) d" ] );
     let saved : String = save_cleanly (f, &all_changes_view (), &contained) ? . saved_view;
     assert! ( saved . contains ("a new container"), "{}", saved );
-    line_starting (&saved, "****** (skg folded node (gnid top)");
+    line_starting (&saved, "***** (skg folded node (gnid d)");
     Ok (( )) }) }
 
 /// A removed member keeps its fold state, and its place where the

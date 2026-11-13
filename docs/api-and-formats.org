@@ -1489,7 +1489,10 @@ no folder unasked but where something changed.
   write-protected folder is pruned. =containers= and =mentioners= each
   build one write-protected folder (=containerFolder=,
   =mentionerFolder=), pruned when empty: the other side of each is the
-  node's content, or its links, shown without a folder.
+  node's content, or its links, shown without a folder. A
+  =containerFolder= lists no view-ancestor of its node (a container
+  the view already shows above it, however far up); one drawn earlier
+  loses it at the next refresh.
   Under each member of a partner folder of any kind but the diff
   view's two acquisition folders hangs its containerward chain: the
   member's containers as write-protected occurrences claiming nothing,

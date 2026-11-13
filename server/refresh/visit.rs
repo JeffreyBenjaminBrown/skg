@@ -59,7 +59,8 @@ use crate::refresh::id_rule::{
   IdRuleAnswer, WhereTheHeadlineStands, entombstone, id_rule, point_occurrence_at,
   rekind_vognode, vognode_for_answer};
 use crate::refresh::Walk;
-use crate::refresh::ancestry::{described_node, is_unsayable, parent_reads_claims};
+use crate::refresh::ancestry::{
+  described_node, is_unsayable, parent_reads_claims, view_ancestor_gnids};
 use crate::refresh::mode::RefreshMode;
 use crate::refresh::tail::remove_viewnode_transferring_focus;
 use crate::types::nodes::rust::GraphnodeInRust;
@@ -456,10 +457,11 @@ fn orphan_under_a_tombstone (
 /// (a ghost warrant included: the worktree lacks that relationship)
 /// vanishes ('vanish_if_unwarranted'); a child that claims nothing (a
 /// pending detachment the user wrote) stays. Under any other parent
-/// no child claims; but under the hides folder ('Folder::Hidden',
-/// write-protected: what its viewparent hides), a child the graph's
-/// hides list does not name at all vanishes, so that a graphnode a
-/// save unhid leaves it ('unhidden_in_the_hides_folder'). A hide the
+/// no child claims; but an unwarranted child of a write-protected
+/// folder vanishes where the folder no longer stands for it at all
+/// ('leaves_its_write_protected_folder'): under the hides folder, a
+/// graphnode a save unhid; under a folder that omits view-ancestors,
+/// one the view shows above the node the folder describes. A hide the
 /// skgrepo restriction keeps out stays, unwarranted, for a skgrepo
 /// widening to show again.
 fn mark_claims (
@@ -481,11 +483,44 @@ fn mark_claims (
       let warrant : Option<Warrant> = warrant_of_child (goal, viewnode);
       vanish_if_unwarranted (tree, child, warrant, walk) ?; }
     else if warrant_of_child (goal, viewnode) == Some (Warrant::No)
-            && unhidden_in_the_hides_folder (tree, parent, child, walk) {
+            && leaves_its_write_protected_folder (tree, parent, child, walk) {
       vanish (tree, child, walk) ?; }
     else if claims {
       tree . get_mut (child) . unwrap () . value () . set_claim (false); }}
   Ok (( )) }
+
+/// Whether 'child', unwarranted under a write-protected folder at
+/// 'parent', vanishes from it rather than staying marked: the folder
+/// no longer stands for it by any record, visible or not
+/// ('unhidden_in_the_hides_folder'), or by design
+/// ('view_ancestor_in_its_folder').
+fn leaves_its_write_protected_folder (
+  tree   : &Tree<Viewnode>,
+  parent : NodeId,
+  child  : NodeId,
+  walk   : &Walk,
+) -> bool {
+  unhidden_in_the_hides_folder (tree, parent, child, walk)
+  || view_ancestor_in_its_folder (tree, parent, child) }
+
+/// Whether 'child' stands in a folder at 'parent' that omits
+/// view-ancestors ('Folder::omits_view_ancestors') for a gnid the view
+/// shows above the node the folder describes.
+fn view_ancestor_in_its_folder (
+  tree   : &Tree<Viewnode>,
+  parent : NodeId,
+  child  : NodeId,
+) -> bool {
+  let omits : bool = matches! ( &tree . get (parent) . unwrap () . value () . kind,
+                                ViewnodeKind::Folder (folder)
+                                  if folder . omits_view_ancestors () );
+  if ! omits { return false; }
+  let Some (described) : Option<NodeId> = described_node (tree, parent)
+    else { return false; };
+  let Some (GoalMember::Gnid (gnid)) : Option<GoalMember> =
+    member_of_child ( tree . get (child) . unwrap () . value () )
+    else { return false; };
+  view_ancestor_gnids (tree, described) . contains (&gnid) }
 
 /// Whether 'child' stands in the hides folder at 'parent' for a
 /// graphnode its described node hides by no record at all, visible or

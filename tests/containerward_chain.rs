@@ -190,8 +190,8 @@ fn a_cycle_in_the_chain_ends_in_a_leaf (
   Ok (( )) }
 
 /// The view of d shows m under b. A '(folder containers)' request on
-/// it draws its containers folder, holding b and c, each with its
-/// chain: d, under both.
+/// it draws its containers folder, holding c but not b, which the
+/// view already shows above m; under c its chain, d.
 async fn a_folder_request_draws_the_chain_under_its_members (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
@@ -217,8 +217,6 @@ async fn a_folder_request_draws_the_chain_under_its_members (
     ** b
     *** m
     **** containerFolder
-    ***** b writeProtected
-    ****** d writeProtected
     ***** c writeProtected
     ****** d writeProtected
     **** r

@@ -4,9 +4,10 @@
 // render is deterministic.
 //
 // The 'two_containers' fixture (one skgrepo, main): at HEAD b and d
-// contain c, which contains x; since then a contains x too. So a is a
-// root holding x, whose changed container folder holds a and c, and
-// under c its containerward tree has two branches, b and d.
+// contain c, which contains x; since then a and e contain x too. So a
+// is a root holding x, whose changed container folder holds e and c
+// (not a, which stands above it), and under c its containerward tree
+// has two branches, b and d.
 
 use skg::metadata_canon::without_viewnode_ids;
 use crate::git_fixture::save_cleanly;

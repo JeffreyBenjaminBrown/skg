@@ -319,6 +319,11 @@ such, less what its subscriber hides or already contains); for a node
 of the containerward chain, its containers; for a folder, its
 partners in the folder's relation, or the compound folders' derived
 lists; for a property folder, the node's aliases, IDs or true flags.
+A containers folder's goal leaves out every view-ancestor of the node
+it describes: each gnid a vognode above it stands for, folders passed
+over, since the view already shows that container
+(=Folder::omits_view_ancestors=, =view_ancestor_gnids= in
+=server/refresh/ancestry.rs=).
 Each item names a gnid, by the pid its list entry resolves to or the
 raw ID when nothing answers to it, or a property value. The goal is
 ordered where the viewparent's own file records the order (content,
@@ -428,7 +433,9 @@ text calls them the ladder):
 3. warrant: each child's warrant is set from P's goal;
 4. claims: under a parent whose claims are read, each child that
    claims and that the truth does not warrant vanishes, with its
-   subtree; under any other, no child claims;
+   subtree; under any other, no child claims, but an unwarranted
+   child of the hides folder whose hide no record names, or of a
+   containers folder that stands for a view-ancestor, vanishes;
 5. reinstate: each goal item no child stands for is drawn, as far as
    the extent allows (below); what it draws is what the ID rule makes
    of the item, and a member of a folder whose members carry the

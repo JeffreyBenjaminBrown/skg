@@ -5,7 +5,8 @@
 --    relationships;
 -- 2. Replacing the buffer with new content that has no root node;
 -- 3. Adding a containerward-view request to node 12;
--- 4. Verifying containerward path [1, 0] is integrated under node 12.
+-- 4. Verifying its containers folder holds 2, with the chain [0]
+--    under it, and not 1, which the view shows above 12.
 --
 -- NOTE: file system operations (backup/cleanup) are handled by
 -- run-test.sh.
@@ -49,6 +50,8 @@ local initial_content = table.concat({
   '*** (skg node (gnid 12)) 12',
   '**** (skg node (gnid 121)) 121',
   '*** (skg node (gnid 13)) 13',
+  '** (skg node (gnid 2)) 2',
+  '*** (skg node (gnid 12) writeProtected) 12',
 }, '\n')
 local buf = buffer.open_org_buffer_from_text(
   initial_content, buffer_name, view_id)
@@ -91,19 +94,19 @@ local expected_without_metadata =
   '* 1\n'
   .. '** 11\n'
   .. '** 12\n'    -- the folder was requested here
-  .. '**** 1\n'   -- in its containers folder
-  .. '***** 0\n'  -- the chain under 1
+  .. '**** 2\n'   -- in its containers folder, which leaves out 1, above 12
+  .. '***** 0\n'  -- the chain under 2
   .. '*** 121\n'
   .. '** 13\n'
 local expected =
   '* (skg node (gnid 1) (skgRepos (nodeRepo main)) (view (rels (contains (in 1) (out 3))))) 1\n'
   .. '** (skg node (gnid 11) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 11\n'
-  .. '** (skg node (gnid 12) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)) (out 1))) (birth (contains in 1)))) 12\n'
+  .. '** (skg node (gnid 12) (skgRepos (nodeRepo main)) (view (rels (contains (in 2 (ancestors 1)) (out 1))) (birth (contains in 1)))) 12\n'
   .. '*** (skg containerFolder)\n'
-  .. '**** (skg node (gnid 1) (skgRepos (nodeRepo main)) writeProtected'
-     .. ' (view (rels (contains (in 1) (out 3 (ancestors 2)))) (birth (contains out 2)) cycle)) 1\n'
+  .. '**** (skg node (gnid 2) (skgRepos (nodeRepo main)) writeProtected'
+     .. ' (view (rels (contains (in 1) (out 1 (ancestors 2)))) (birth (contains out 2)))) 2\n'
   .. '***** (skg node (gnid 0) (skgRepos (nodeRepo main)) writeProtected'
-     .. ' (view (rels (contains (out 1 (ancestors 1)))))) 0\n'
+     .. ' (view (rels (contains (out 2 (ancestors 1)))))) 0\n'
   .. '*** (skg node (gnid 121) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 121\n'
   .. '** (skg node (gnid 13) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 13\n'
 
@@ -117,7 +120,7 @@ T.check(T.without_viewnode_ids(buffer_content) == expected,
         'buffer-content matches expected (with metadata)')
 T.check(stripped_buffer_content == expected_without_metadata,
         'stripped buffer-content matches expected structure; '
-        .. 'the containers folder of node 12 holds 1, '
+        .. 'the containers folder of node 12 holds 2, '
         .. 'with the chain [0] under it')
 
 T.pass('PASS: Integration test successful!')

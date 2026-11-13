@@ -207,6 +207,68 @@ node p
   node d" );
   assert! ( ! run . text . contains ("viewRequests"), "{}", run . text ); }
 
+/// a and c contain b; g contains a and b. In g's view, b under a.
+fn b_under_a_and_g () -> InRustGraph {
+  graph (&[
+    Graphnode { contains : ids (&["a", "b"]), .. node ("g") },
+    Graphnode { contains : ids (&["b"]), .. node ("a") },
+    Graphnode { contains : ids (&["b"]), .. node ("c") },
+    node ("b"), ]) }
+
+/// Jeff's example: under a, b's containers folder lists c, and not a,
+/// which the view shows above b, nor g, which it shows above a.
+#[test]
+fn a_containers_folder_lists_no_view_ancestor () {
+  let input : String = formatdoc! ("
+    * {} g
+    ** {} a
+    *** {} b
+    ", occurrence_metadata ("g", ""), occurrence_metadata ("a", ""),
+       occurrence_metadata ("b", "(viewRequests (folder containers))") );
+  assert_eq! ( run_asserting_fixpoint (&input, &b_under_a_and_g ()) . outline (), "\
+node g
+  node a
+    node b
+      containerFolder
+        node c wp noClaim
+  node b wp" ); }
+
+/// A containers folder already holding view-ancestors loses them: a
+/// and g vanish from b's folder, and c stays. Once no other container
+/// is left, the folder goes too.
+#[test]
+fn a_view_ancestor_drawn_in_a_containers_folder_vanishes () {
+  let folder_holding = |members : &[&str]| -> String {
+    formatdoc! ("
+      * {} g
+      ** {} a
+      *** {} b
+      **** (skg containerFolder)
+      {}", occurrence_metadata ("g", ""), occurrence_metadata ("a", ""),
+           occurrence_metadata ("b", ""),
+      members . iter ()
+        . map ( |member| format! ( "***** {} {}\n",
+                                   occurrence_metadata (member, "writeProtected"),
+                                   member ))
+        . collect::<String> () ) };
+  assert_eq! ( run_asserting_fixpoint (
+                 &folder_holding (&["a", "c", "g"]), &b_under_a_and_g ()) . outline (), "\
+node g
+  node a
+    node b
+      containerFolder
+        node c wp noClaim
+  node b wp" );
+  let only_a : InRustGraph = graph (&[
+    Graphnode { contains : ids (&["a"]), .. node ("g") },
+    Graphnode { contains : ids (&["b"]), .. node ("a") },
+    node ("b"), ]);
+  assert_eq! ( run_asserting_fixpoint (
+                 &folder_holding (&["a"]), &only_a ) . outline (), "\
+node g
+  node a
+    node b" ); }
+
 #[test]
 fn a_subscriptions_request_adds_the_subscribee_folder_and_drops_an_empty_subscriber_folder () {
   let graph : InRustGraph = graph (&[

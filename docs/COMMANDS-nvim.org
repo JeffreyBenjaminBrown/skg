@@ -467,10 +467,11 @@ The empty folder is retained. Import provenance viewnodes have no setter; use th
 search-matching command below for =No search matching=. Delete the whole
 folder branch to dismiss this optional view without changing any flag.
 *** <localleader>lc : :SkgShowFolderOfContainers
-The containerFolder -- the nodes that contain this one. Write-protected (☮):
+The containerFolder -- the nodes that contain this one, but for those
+the view already shows above it. Write-protected (☮):
 containment is edited from the container. Its other side, the node's
-content, is shown without a folder. On a node nothing contains, nothing
-appears. Under each member of this folder, and of every other partner
+content, is shown without a folder. On a node nothing else contains,
+nothing appears. Under each member of this folder, and of every other partner
 folder but the diff view's two acquisition folders, hangs its
 containerward chain: the member's containers, write-protected and
 claiming nothing, theirs under them, up to the roots or

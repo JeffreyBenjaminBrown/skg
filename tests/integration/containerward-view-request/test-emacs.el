@@ -3,7 +3,8 @@
 ;;; 1. Creating initial buffer structure and saving to establish relationships
 ;;; 2. Creating new buffer without root node
 ;;; 3. Requesting node 12's containers folder
-;;; 4. Verifying the folder holds 1, with the containerward chain [0] under it
+;;; 4. Verifying the folder holds 2, with the containerward chain [0] under
+;;;    it, and not 1, which the view shows above 12
 ;;;
 ;;; NOTE: File system operations (backup/cleanup) are handled by run-test.sh
 
@@ -52,6 +53,8 @@
       (insert "*** (skg node (gnid 12)) 12\n")
       (insert "**** (skg node (gnid 121)) 121\n")
       (insert "*** (skg node (gnid 13)) 13\n")
+      (insert "** (skg node (gnid 2)) 2\n")
+      (insert "*** (skg node (gnid 12) writeProtected) 12\n")
       (message "✓ Created initial buffer with full structure")
 
       ;; Save to establish relationships
@@ -113,17 +116,17 @@
             (concat "* 1\n"
                     "** 11\n"
                     "** 12\n" ;; the folder was requested here
-                    "**** 1\n" ;; in its containers folder
-                    "***** 0\n" ;; the chain under 1
+                    "**** 2\n" ;; in its containers folder, which leaves out 1, above 12
+                    "***** 0\n" ;; the chain under 2
                     "*** 121\n"
                     "** 13\n"))
            (expected
             (concat "* (skg node (gnid 1) (skgRepos (nodeRepo main)) (view (rels (contains (in 1) (out 3))))) 1\n"
                     "** (skg node (gnid 11) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 11\n"
-                    "** (skg node (gnid 12) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)) (out 1))) (birth (contains in 1)))) 12\n"
+                    "** (skg node (gnid 12) (skgRepos (nodeRepo main)) (view (rels (contains (in 2 (ancestors 1)) (out 1))) (birth (contains in 1)))) 12\n"
                     "*** (skg containerFolder)\n"
-                    "**** (skg node (gnid 1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 1) (out 3 (ancestors 2)))) (birth (contains out 2)) cycle)) 1\n"
-                    "***** (skg node (gnid 0) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 1 (ancestors 1)))))) 0\n"
+                    "**** (skg node (gnid 2) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 1) (out 1 (ancestors 2)))) (birth (contains out 2)))) 2\n"
+                    "***** (skg node (gnid 0) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 2 (ancestors 1)))))) 0\n"
                     "*** (skg node (gnid 121) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 121\n"
                     "** (skg node (gnid 13) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 13\n")))
 
@@ -139,13 +142,13 @@
             (if (string= stripped-buffer-content expected-without-metadata)
                 (progn
                   (message "✓ PASS: Stripped buffer-content matches expected structure")
-                  (message "✓ PASS: The containers folder of node 12 holds 1, with the chain [0] under it"))
+                  (message "✓ PASS: The containers folder of node 12 holds 2, with the chain [0] under it"))
               (progn
                 (message "✗ FAIL: Stripped buffer-content does not match expected without metadata")
                 (kill-emacs 1))))
         (progn
           (message "✗ FAIL: Buffer-Content does not match expected (with metadata)")
-          (message "Expected the containers folder of node 12 to hold 1, with the chain [0]")
+          (message "Expected the containers folder of node 12 to hold 2, with the chain [0]")
           (kill-emacs 1))))))
 
 (defun run-all-tests ()
