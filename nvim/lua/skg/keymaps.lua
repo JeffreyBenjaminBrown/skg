@@ -153,22 +153,50 @@ M.commands = {
               desc = 'Paste a link to the top-of-stack node and pop it' },
   PopNode = { module = 'skg.linkstack', fn = 'pop_node',
               desc = 'Paste the top-of-stack node and pop it' },
-  CycleProcessed = { module = 'skg.processed', fn = 'cycle_processed',
-                      desc = 'Toggle whether the change at point is processed, and save' },
-  CycleProcessedRecursive = { module = 'skg.processed',
-                                fn = 'cycle_processed_recursive',
-                                desc = 'Mark (or unmark) every change in the subtree processed, new nodes by the graph contentward, and save' },
-  CycleProcessedRecursiveOutward = {
-    module = 'skg.processed',
-    fn = 'cycle_processed_recursive_outward',
-    desc = 'Mark (or unmark) every change in the subtree processed, new nodes by the graph along every relationship they record, and save' },
-  ToggleHomeSkgrepoMoveProcessed = { module = 'skg.processed',
-                                       fn = 'toggle_homeSkgrepo_move_processed',
-                                       desc = "Toggle whether the node's home-skgrepo move is processed, and save" },
-  ToggleHomeSkgrepoMoveProcessedRecursive = {
-    module = 'skg.processed',
-    fn = 'toggle_homeSkgrepo_move_processed_recursive',
-    desc = 'Toggle whether every home skgrepo move in the subtree like this one is processed, and save' },
+  MarkNodeProcessed = { module = 'skg.processed', fn = 'mark_node_processed',
+    desc = 'Mark the node at point (its own leaves, not its relationship) processed, and save' },
+  MarkNodeProcessedContentward = { module = 'skg.processed', fn = 'mark_node_processed_contentward',
+    desc = "Mark the node of every headline in the subtree, and new nodes reached contentward in the graph, processed, and save" },
+  MarkNodeProcessedOutward = { module = 'skg.processed', fn = 'mark_node_processed_outward',
+    desc = "Mark the node of every headline in the subtree, and new nodes reached along every relationship they record, processed, and save" },
+  MarkNodeUnprocessed = { module = 'skg.processed', fn = 'mark_node_unprocessed',
+    desc = 'Mark the node at point (its own leaves, not its relationship) unprocessed, and save' },
+  MarkNodeUnprocessedContentward = { module = 'skg.processed', fn = 'mark_node_unprocessed_contentward',
+    desc = "Mark the node of every headline in the subtree, and new nodes reached contentward in the graph, unprocessed, and save" },
+  MarkNodeUnprocessedOutward = { module = 'skg.processed', fn = 'mark_node_unprocessed_outward',
+    desc = "Mark the node of every headline in the subtree, and new nodes reached along every relationship they record, unprocessed, and save" },
+  MarkRelProcessed = { module = 'skg.processed', fn = 'mark_rel_processed',
+    desc = 'Mark the relationship of the headline at point to its viewparent processed, and save' },
+  MarkRelProcessedContentward = { module = 'skg.processed', fn = 'mark_rel_processed_contentward',
+    desc = "Mark every headline's relationship to its viewparent in the subtree, and new nodes reached contentward in the graph, processed, and save" },
+  MarkRelProcessedOutward = { module = 'skg.processed', fn = 'mark_rel_processed_outward',
+    desc = "Mark every headline's relationship to its viewparent in the subtree, and new nodes reached along every relationship they record, processed, and save" },
+  MarkRelUnprocessed = { module = 'skg.processed', fn = 'mark_rel_unprocessed',
+    desc = 'Mark the relationship of the headline at point to its viewparent unprocessed, and save' },
+  MarkRelUnprocessedContentward = { module = 'skg.processed', fn = 'mark_rel_unprocessed_contentward',
+    desc = "Mark every headline's relationship to its viewparent in the subtree, and new nodes reached contentward in the graph, unprocessed, and save" },
+  MarkRelUnprocessedOutward = { module = 'skg.processed', fn = 'mark_rel_unprocessed_outward',
+    desc = "Mark every headline's relationship to its viewparent in the subtree, and new nodes reached along every relationship they record, unprocessed, and save" },
+  MarkBothProcessed = { module = 'skg.processed', fn = 'mark_both_processed',
+    desc = 'Mark the node at point and its relationship to its viewparent processed, and save' },
+  MarkBothProcessedContentward = { module = 'skg.processed', fn = 'mark_both_processed_contentward',
+    desc = "Mark the node and relationship of every headline in the subtree, and new nodes reached contentward in the graph, processed, and save" },
+  MarkBothProcessedOutward = { module = 'skg.processed', fn = 'mark_both_processed_outward',
+    desc = "Mark the node and relationship of every headline in the subtree, and new nodes reached along every relationship they record, processed, and save" },
+  MarkBothUnprocessed = { module = 'skg.processed', fn = 'mark_both_unprocessed',
+    desc = 'Mark the node at point and its relationship to its viewparent unprocessed, and save' },
+  MarkBothUnprocessedContentward = { module = 'skg.processed', fn = 'mark_both_unprocessed_contentward',
+    desc = "Mark the node and relationship of every headline in the subtree, and new nodes reached contentward in the graph, unprocessed, and save" },
+  MarkBothUnprocessedOutward = { module = 'skg.processed', fn = 'mark_both_unprocessed_outward',
+    desc = "Mark the node and relationship of every headline in the subtree, and new nodes reached along every relationship they record, unprocessed, and save" },
+  MarkHomeSkgrepoMoveProcessed = { module = 'skg.processed', fn = 'mark_homeSkgrepo_move_processed',
+    desc = "Mark the node's home-skgrepo move processed, and save" },
+  MarkHomeSkgrepoMoveProcessedRecursive = { module = 'skg.processed', fn = 'mark_homeSkgrepo_move_processed_recursive',
+    desc = "Mark the node's home-skgrepo move and every move like it in the subtree processed, and save" },
+  MarkHomeSkgrepoMoveUnprocessed = { module = 'skg.processed', fn = 'mark_homeSkgrepo_move_unprocessed',
+    desc = "Mark the node's home-skgrepo move unprocessed, and save" },
+  MarkHomeSkgrepoMoveUnprocessedRecursive = { module = 'skg.processed', fn = 'mark_homeSkgrepo_move_unprocessed_recursive',
+    desc = "Mark the node's home-skgrepo move and every move like it in the subtree unprocessed, and save" },
   DiffViewExtend = {
     module = 'skg.extend_diff_view',
     fn = 'diffView_extend',
@@ -315,21 +343,38 @@ M.content_view_bindings = {
   { 'sR', 'SetRelRepoRecursive' },       -- C-c s R
   { 'st', 'Detach' },                    -- C-c s t
   { 'sa', 'Attach' },                    -- C-c s a
-  { 'rr', 'CycleProcessed' },          -- C-c r r
-  { 'rR', 'CycleProcessedRecursive' }, -- C-u C-c r r
-  { 'rO', 'CycleProcessedRecursiveOutward' }, -- C-u C-u C-c r r
-  { 'rh', 'ToggleHomeSkgrepoMoveProcessed' }, -- C-c r h
-  { 'rH', 'ToggleHomeSkgrepoMoveProcessedRecursive' }, -- C-u C-c r h
   { 'ru', 'DiffViewExtend' },            -- C-c r u
   { 'rc', 'StageAndCommit' },            -- C-c r c
   { 'rnc', 'DiffViewGotoNextChange' },            -- C-c r n c
   { 'rnu', 'DiffViewGotoNextUnprocessedChange' },     -- C-c r n u
-  { 'rnr', 'DiffViewGotoNextProcessedChange' },       -- C-c r n r
+  { 'rnp', 'DiffViewGotoNextProcessedChange' },       -- C-c r n p
   { 'rpc', 'DiffViewGotoPreviousChange' },        -- C-c r p c
   { 'rpu', 'DiffViewGotoPreviousUnprocessedChange' }, -- C-c r p u
-  { 'rpr', 'DiffViewGotoPreviousProcessedChange' },   -- C-c r p r
+  { 'rpp', 'DiffViewGotoPreviousProcessedChange' },   -- C-c r p p
   { 'sx', 'SetFlagSearchMatching' },
   { 'sX', 'SetFlagSearchMatchingRecursive' },
+  { 'mnp', 'MarkNodeProcessed' },                   -- C-c m n p
+  { 'mnP', 'MarkNodeProcessedContentward' },        -- C-u C-c m n p
+  { 'Mnp', 'MarkNodeProcessedOutward' },            -- C-u C-u C-c m n p
+  { 'mnu', 'MarkNodeUnprocessed' },                 -- C-c m n u
+  { 'mnU', 'MarkNodeUnprocessedContentward' },      -- C-u C-c m n u
+  { 'Mnu', 'MarkNodeUnprocessedOutward' },          -- C-u C-u C-c m n u
+  { 'mrp', 'MarkRelProcessed' },                    -- C-c m r p
+  { 'mrP', 'MarkRelProcessedContentward' },         -- C-u C-c m r p
+  { 'Mrp', 'MarkRelProcessedOutward' },             -- C-u C-u C-c m r p
+  { 'mru', 'MarkRelUnprocessed' },                  -- C-c m r u
+  { 'mrU', 'MarkRelUnprocessedContentward' },       -- C-u C-c m r u
+  { 'Mru', 'MarkRelUnprocessedOutward' },           -- C-u C-u C-c m r u
+  { 'mbp', 'MarkBothProcessed' },                   -- C-c m b p
+  { 'mbP', 'MarkBothProcessedContentward' },        -- C-u C-c m b p
+  { 'Mbp', 'MarkBothProcessedOutward' },            -- C-u C-u C-c m b p
+  { 'mbu', 'MarkBothUnprocessed' },                 -- C-c m b u
+  { 'mbU', 'MarkBothUnprocessedContentward' },      -- C-u C-c m b u
+  { 'Mbu', 'MarkBothUnprocessedOutward' },          -- C-u C-u C-c m b u
+  { 'mhp', 'MarkHomeSkgrepoMoveProcessed' },        -- C-c m h p
+  { 'mhP', 'MarkHomeSkgrepoMoveProcessedRecursive' }, -- C-u C-c m h p
+  { 'mhu', 'MarkHomeSkgrepoMoveUnprocessed' },      -- C-c m h u
+  { 'mhU', 'MarkHomeSkgrepoMoveUnprocessedRecursive' }, -- C-u C-c m h u
   { 'mc', 'ReplaceLinkWithContent' },    -- C-c m c
   { 'mf', 'Fork' },                      -- C-c m f
   { 'ml', 'ReplaceContentWithLink' },    -- C-c m l

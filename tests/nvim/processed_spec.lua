@@ -44,26 +44,45 @@ local function run (lines, line_number, command, answer)
   return result
 end
 
+---Run COMMAND with the cursor on line LINE_NUMBER of LINES; it must
+---refuse, writing nothing and saving nothing.
+local function refused (lines, line_number, command)
+  local buf = vim.api.nvim_create_buf(true, false)
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+  vim.api.nvim_set_current_buf(buf)
+  vim.api.nvim_win_set_cursor(0, { line_number, 0 })
+  local original_save = save.request_save_buffer
+  save.request_save_buffer = function () error('a refused gesture saved') end
+  local ok, err = pcall(command)
+  save.request_save_buffer = original_save
+  local after = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+  vim.api.nvim_buf_delete(buf, { force = true })
+  assert.is_false(ok)
+  assert.is_falsy(tostring(err):find('a refused gesture saved', 1, true))
+  assert.are.same(lines, after)
+end
+
 describe('skg.processed', function ()
-  it('toggles a leaf', function ()
+  it('marks a single leaf by a letter of its kind', function ()
+    -- A relRepo move is a relationship's leaf, any other the node's own.
     assert.are.same(
       { '** (skg alias noClaim (editRequest (processed)) (view ghostWarrant) (diff (rel removed) (leaves 1))) a1' },
       run({ '** (skg alias noClaim (view ghostWarrant) (diff (rel removed) (leaves 1))) a1' }, 1,
-          processed.cycle_processed))
+          processed.mark_node_processed))
     assert.are.same(
       { '** (skg (oldText title) (editRequest (unprocessed)) (diff (leaves 1) (processed))) txt' },
       run({ '** (skg (oldText title) (diff (leaves 1) (processed))) txt' }, 1,
-          processed.cycle_processed))
+          processed.mark_both_unprocessed))
+    assert.are.same(
+      { '** (skg (relRepoMove (old pub) (new priv)) (editRequest (processed)) (diff (leaves 1))) ' },
+      run({ '** (skg (relRepoMove (old pub) (new priv)) (diff (leaves 1)))' }, 1,
+          processed.mark_rel_processed))
+    refused({ '** (skg (relRepoMove (old pub) (new priv)) (diff (leaves 1)))' }, 1,
+            processed.mark_node_processed)
+    refused({ '** (skg alias (diff (rel added) (leaves 1))) a' }, 1,
+            processed.mark_rel_processed)
     -- Without the server's '(diff (leaves ...))' fact, nothing is named.
-    assert.are.same({}, (function ()
-      local buf = vim.api.nvim_create_buf(true, false)
-      vim.api.nvim_buf_set_lines(buf, 0, -1, false,
-                                 { '** (skg (oldText title)) txt' })
-      vim.api.nvim_set_current_buf(buf)
-      local requests = processed.requests_at_line(1)
-      vim.api.nvim_buf_delete(buf, { force = true })
-      return requests
-    end)())
+    refused({ '** (skg (oldText title)) txt' }, 1, processed.mark_both_processed)
   end)
 
   it('writes the request as the last part of the diff form', function ()
@@ -106,158 +125,188 @@ describe('skg.processed', function ()
     end
   end)
 
-  it('names every listed object, without asking', function ()
-    -- A new member lists two objects, one of them processed: the gesture
-    -- names both and marks them.
-    assert.are.same(
-      { '* (skg node (gnid k) (skgRepos (nodeRepo r)) (editRequest (processed node rel)) (diff (node added) (rel added) (leaves 2 node rel) (processed rel))) k' },
-      run({ '* (skg node (gnid k) (skgRepos (nodeRepo r)) (diff (node added) (rel added) (leaves 2 node rel) (processed rel))) k' },
-          1, processed.cycle_processed))
-    -- A modified node in a new relationship: one gesture marks its
-    -- file and the relationship.
-    assert.are.same(
-      { '* (skg node (gnid m) (skgRepos (nodeRepo r)) (editRequest (processed rel all)) (diff (rel added) (properties changed) (leaves 3 rel all) (processed rel))) m' },
-      run({ '* (skg node (gnid m) (skgRepos (nodeRepo r)) (diff (rel added) (properties changed) (leaves 3 rel all) (processed rel))) m' },
-          1, processed.cycle_processed))
+  it('names the letters among the listed objects', function ()
+    -- A new member lists two objects, one of them processed: each letter
+    -- names its own, without asking.
+    local line = '* (skg node (gnid k) (skgRepos (nodeRepo r)) (diff (node added) (rel added) (leaves 2 node rel) (processed rel))) k'
+    for command, request in pairs({
+        mark_node_processed = '(processed node)',
+        mark_rel_processed = '(processed rel)',
+        mark_both_processed = '(processed node rel)',
+        mark_rel_unprocessed = '(unprocessed rel)',
+        mark_node_unprocessed = '(unprocessed node)' }) do
+      assert.are.same(
+        { '* (skg node (gnid k) (skgRepos (nodeRepo r)) (editRequest ' .. request
+          .. ') (diff (node added) (rel added) (leaves 2 node rel) (processed rel))) k' },
+        run({ line }, 1, processed[command]), command)
+    end
+    -- 'b' on a headline that lists one object names that one.
     assert.are.same(
       { '* (skg ghost (gnid d) (skgRepos (nodeRepo r)) (editRequest (processed node)) (diff (node removed) (leaves 1 node))) d' },
-      run({ '* (skg ghost (gnid d) (skgRepos (nodeRepo r)) (diff (node removed) (leaves 1 node))) d' },
-          1, processed.cycle_processed))
+      run({ '* (skg ghost (gnid d) (skgRepos (nodeRepo r)) (diff (node removed) (leaves 1 node))) d' }, 1,
+          processed.mark_both_processed))
+    -- A letter naming nothing listed refuses.
+    refused({ '* (skg ghost (gnid d) (skgRepos (nodeRepo r)) (diff (node removed) (leaves 1 node))) d' }, 1,
+            processed.mark_rel_processed)
+    refused({ '* (skg node (gnid c) (skgRepos (nodeRepo r)) (diff (rel added) (leaves 1 rel))) c' }, 1,
+            processed.mark_node_unprocessed)
   end)
 
-  it("toggles a modified node by its own '(processed ...)'", function ()
-    -- '(processed all)': processed, so the gesture unmarks.
-    assert.are.same({
-      '* (skg node (gnid txt) (skgRepos (nodeRepo r)) (editRequest (unprocessed all)) (diff (properties changed) (leaves 1 all) (processed all))) txt',
-      '** (skg (oldText title) (diff (leaves 1) (processed))) txt' },
-      run({ '* (skg node (gnid txt) (skgRepos (nodeRepo r)) (diff (properties changed) (leaves 1 all) (processed all))) txt',
-            '** (skg (oldText title) (diff (leaves 1) (processed))) txt' },
-          1, processed.cycle_processed))
-    -- Without it, unprocessed, whatever its children say: the gesture marks.
-    assert.are.same({
-      '* (skg node (gnid txt) (skgRepos (nodeRepo r)) (editRequest (processed all)) (diff (properties changed) (leaves 1 all))) txt',
-      '** (skg (oldText title) (diff (leaves 1) (processed))) txt' },
-      run({ '* (skg node (gnid txt) (skgRepos (nodeRepo r)) (diff (properties changed) (leaves 1 all))) txt',
-            '** (skg (oldText title) (diff (leaves 1) (processed))) txt' },
-          1, processed.cycle_processed))
-    -- A '(processed rel)' does not make 'all' processed.
-    assert.are.same(
-      { '* (skg node (gnid m) (skgRepos (nodeRepo r)) (editRequest (processed rel all)) (diff (rel added) (properties changed) (leaves 2 rel all) (processed rel))) m' },
-      run({ '* (skg node (gnid m) (skgRepos (nodeRepo r)) (diff (rel added) (properties changed) (leaves 2 rel all) (processed rel))) m' },
-          1, processed.cycle_processed))
-  end)
-
-  it('writes one level down on a processed aggregate', function ()
-    assert.are.same({
-      '* (skg node (gnid ali) (skgRepos (nodeRepo r)) (diff (leaves 2 all))) ali',
+  it('writes one level down on a changed folder, filtered by the letter', function ()
+    local aliases = {
+      '* (skg node (gnid ali) (skgRepos (nodeRepo r)) (diff (leaves 2 node))) ali',
       '** (skg aliasFolder)',
-      '*** (skg alias noClaim (editRequest (processed)) (view ghostWarrant) (diff (rel removed) (leaves 1) (processed))) a1',
+      '*** (skg alias noClaim (view ghostWarrant) (diff (rel removed) (leaves 1) (processed))) a1',
       '*** (skg alias) a2',
-      '*** (skg alias (editRequest (processed)) (diff (rel added) (leaves 1))) a3' },
-      run({ '* (skg node (gnid ali) (skgRepos (nodeRepo r)) (diff (leaves 2 all))) ali',
-            '** (skg aliasFolder)',
-            '*** (skg alias noClaim (view ghostWarrant) (diff (rel removed) (leaves 1) (processed))) a1',
-            '*** (skg alias) a2',
-            '*** (skg alias (diff (rel added) (leaves 1))) a3' },
-          2, processed.cycle_processed))
+      '*** (skg alias (diff (rel added) (leaves 1))) a3' }
     assert.are.same({
-      '* (skg node (gnid txt) (skgRepos (nodeRepo r)) (editRequest (processed all)) (diff (leaves 1 all))) txt',
-      '** (skg (oldText title) (diff (leaves 1))) txt' },
-      run({ '* (skg node (gnid txt) (skgRepos (nodeRepo r)) (diff (leaves 1 all))) txt',
-            '** (skg (oldText title) (diff (leaves 1))) txt' },
-          1, processed.cycle_processed))
+      aliases[1], aliases[2],
+      '*** (skg alias noClaim (editRequest (processed)) (view ghostWarrant) (diff (rel removed) (leaves 1) (processed))) a1',
+      aliases[4],
+      '*** (skg alias (editRequest (processed)) (diff (rel added) (leaves 1))) a3' },
+      run(aliases, 2, processed.mark_node_processed))
+    refused(aliases, 2, processed.mark_rel_processed)
+    -- A partner folder: 'r' names each member's relationship, 'n' only
+    -- the members whose node changed.
+    local subscribers = {
+      '** (skg subscriberFolder)',
+      '*** (skg node (gnid s1) (skgRepos (nodeRepo r)) (diff (rel added) (leaves 1 rel))) s1',
+      '*** (skg node (gnid s2) (skgRepos (nodeRepo r)) (diff (node added) (rel added) (leaves 2 node rel))) s2' }
+    assert.are.same({
+      subscribers[1],
+      '*** (skg node (gnid s1) (skgRepos (nodeRepo r)) (editRequest (processed rel)) (diff (rel added) (leaves 1 rel))) s1',
+      '*** (skg node (gnid s2) (skgRepos (nodeRepo r)) (editRequest (processed rel)) (diff (node added) (rel added) (leaves 2 node rel))) s2' },
+      run(subscribers, 1, processed.mark_rel_processed))
+    assert.are.same({
+      subscribers[1], subscribers[2],
+      '*** (skg node (gnid s2) (skgRepos (nodeRepo r)) (editRequest (processed node)) (diff (node added) (rel added) (leaves 2 node rel))) s2' },
+      run(subscribers, 1, processed.mark_node_processed))
   end)
 
-  it('recursively touches only the leaves', function ()
-    -- Below the headline at point, no 'all': the changeset marker's
-    -- leaves are its siblings', and so are untouched there, and of
-    -- the modified m only the relationship is named.
-    assert.are.same({
-      '* (skg node (gnid r) (skgRepos (nodeRepo r)) (editRequest (processed all)) (diff (leaves 3 all))) r',
-      '** (skg (changesetMarker content) (diff (leaves 2 all)))',
-      '** (skg ghost (gnid d) (skgRepos (nodeRepo r)) (editRequest (processed node rel)) (diff (node removed) (rel removed) (leaves 2 node rel))) d',
+  it('takes the letters as they are on a changeset marker at point', function ()
+    -- Its 'node' names its members' own leaves, which its '(leaves ...)'
+    -- does not list nor count, so unmarking them asks first.
+    local lines = { '** (skg (changesetMarker content) (diff (leaves 1 rel) (processed rel)))' }
+    local function with (request)
+      return { '** (skg (changesetMarker content) (editRequest ' .. request
+               .. ') (diff (leaves 1 rel) (processed rel))) ' }
+    end
+    assert.are.same(with('(processed node)'), run(lines, 1, processed.mark_node_processed))
+    assert.are.same(with('(processed node rel)'), run(lines, 1, processed.mark_both_processed))
+    assert.are.same(with('(unprocessed rel)'), run(lines, 1, processed.mark_rel_unprocessed))
+    assert.are.same(lines, run(lines, 1, processed.mark_node_unprocessed, 'no'))
+  end)
+
+  it('honours the letter recursively', function ()
+    -- Below the headline at point a changeset marker names only what it
+    -- lists, its members naming their own leaves.
+    local lines = {
+      '* (skg node (gnid r) (skgRepos (nodeRepo r)) (diff (properties changed) (leaves 1 node))) r',
+      '** (skg (changesetMarker content) (diff (leaves 2 rel)))',
+      '** (skg ghost (gnid d) (skgRepos (nodeRepo r)) (diff (node removed) (rel removed) (leaves 2 node rel))) d',
       '*** (skg node (gnid k) (skgRepos (nodeRepo r)) writeProtected) k',
+      '** (skg node (gnid c) (skgRepos (nodeRepo r)) writeProtected (diff (rel added) (leaves 1 rel))) c',
+      '** (skg node (gnid m) (skgRepos (nodeRepo r)) writeProtected (diff (rel added) (properties changed) (leaves 3 node rel))) m',
+      '*** (skg (oldText title) (diff (leaves 1))) m',
+      '* (skg node (gnid other) (skgRepos (nodeRepo r)) (diff (leaves 1 node))) other' }
+    assert.are.same({
+      lines[1],
+      '** (skg (changesetMarker content) (editRequest (processed rel)) (diff (leaves 2 rel))) ',
+      '** (skg ghost (gnid d) (skgRepos (nodeRepo r)) (editRequest (processed rel)) (diff (node removed) (rel removed) (leaves 2 node rel))) d',
+      lines[4],
       '** (skg node (gnid c) (skgRepos (nodeRepo r)) writeProtected (editRequest (processed rel)) (diff (rel added) (leaves 1 rel))) c',
-      '** (skg node (gnid m) (skgRepos (nodeRepo r)) writeProtected (editRequest (processed rel)) (diff (rel added) (properties changed) (leaves 2 rel all))) m',
-      '* (skg node (gnid other) (skgRepos (nodeRepo r)) (diff (leaves 1 all))) other',
-      '** (skg (oldText title) (diff (leaves 1))) other' },
-      run({ '* (skg node (gnid r) (skgRepos (nodeRepo r)) (diff (leaves 3 all))) r',
-            '** (skg (changesetMarker content) (diff (leaves 2 all)))',
-            '** (skg ghost (gnid d) (skgRepos (nodeRepo r)) (diff (node removed) (rel removed) (leaves 2 node rel))) d',
-            '*** (skg node (gnid k) (skgRepos (nodeRepo r)) writeProtected) k',
-            '** (skg node (gnid c) (skgRepos (nodeRepo r)) writeProtected (diff (rel added) (leaves 1 rel))) c',
-            '** (skg node (gnid m) (skgRepos (nodeRepo r)) writeProtected (diff (rel added) (properties changed) (leaves 2 rel all))) m',
-            '* (skg node (gnid other) (skgRepos (nodeRepo r)) (diff (leaves 1 all))) other',
-            '** (skg (oldText title) (diff (leaves 1))) other' },
-          1, processed.cycle_processed_recursive))
-    -- At point, a changeset marker names its processed aggregate.
+      '** (skg node (gnid m) (skgRepos (nodeRepo r)) writeProtected (editRequest (processed rel)) (diff (rel added) (properties changed) (leaves 3 node rel))) m',
+      lines[7], lines[8] },
+      run(lines, 1, processed.mark_rel_processed_contentward))
+    assert.are.same({
+      '* (skg node (gnid r) (skgRepos (nodeRepo r)) (editRequest (processed node)) (diff (properties changed) (leaves 1 node))) r',
+      lines[2],
+      '** (skg ghost (gnid d) (skgRepos (nodeRepo r)) (editRequest (processed node)) (diff (node removed) (rel removed) (leaves 2 node rel))) d',
+      lines[4], lines[5],
+      '** (skg node (gnid m) (skgRepos (nodeRepo r)) writeProtected (editRequest (processed node)) (diff (rel added) (properties changed) (leaves 3 node rel))) m',
+      '*** (skg (oldText title) (editRequest (processed)) (diff (leaves 1))) m',
+      lines[8] },
+      run(lines, 1, processed.mark_node_processed_contentward))
+    assert.are.same({
+      '* (skg node (gnid r) (skgRepos (nodeRepo r)) (editRequest (processed node)) (diff (properties changed) (leaves 1 node))) r',
+      '** (skg (changesetMarker content) (editRequest (processed rel)) (diff (leaves 2 rel))) ',
+      '** (skg ghost (gnid d) (skgRepos (nodeRepo r)) (editRequest (processed node rel)) (diff (node removed) (rel removed) (leaves 2 node rel))) d',
+      lines[4],
+      '** (skg node (gnid c) (skgRepos (nodeRepo r)) writeProtected (editRequest (processed rel)) (diff (rel added) (leaves 1 rel))) c',
+      '** (skg node (gnid m) (skgRepos (nodeRepo r)) writeProtected (editRequest (processed node rel)) (diff (rel added) (properties changed) (leaves 3 node rel))) m',
+      '*** (skg (oldText title) (editRequest (processed)) (diff (leaves 1))) m',
+      lines[8] },
+      run(lines, 1, processed.mark_both_processed_contentward))
+    -- At point, a changeset marker takes the letters as they are.
     assert.are.same(
-      { '** (skg (changesetMarker content) (editRequest (processed all)) (diff (leaves 2 all))) ' },
-      run({ '** (skg (changesetMarker content) (diff (leaves 2 all)))' },
-          1, processed.cycle_processed_recursive))
+      { '** (skg (changesetMarker content) (editRequest (processed node rel)) (diff (leaves 2 rel))) ' },
+      run({ lines[2] }, 1, processed.mark_both_processed_contentward))
   end)
 
   it('hands new nodes in content position to the server, skipping their subtrees', function ()
+    -- The request names the letters and 'newContent' (contentward) or
+    -- 'newOutward' (outward), which the server expands from the graph;
+    -- the walk goes on past it. A new node in a folder is no content.
     local lines = {
-      '* (skg node (gnid r) (skgRepos (nodeRepo r)) (diff (leaves 1 all))) r',
+      '* (skg node (gnid r) (skgRepos (nodeRepo r)) (diff (properties changed) (leaves 1 node))) r',
       '** (skg node (gnid n) (skgRepos (nodeRepo r)) (diff (node added) (rel added) (leaves 2 node rel))) n',
       '*** (skg node (gnid n2) (skgRepos (nodeRepo r)) (diff (node added) (rel added) (leaves 2 node rel))) n2',
-      '*** (skg node (gnid m) (skgRepos (nodeRepo r)) writeProtected (diff (rel added) (properties changed) (leaves 2 rel all))) m',
+      '*** (skg node (gnid m) (skgRepos (nodeRepo r)) writeProtected (diff (rel added) (properties changed) (leaves 3 node rel))) m',
       '** (skg subscriberFolder)',
       '*** (skg node (gnid s) (skgRepos (nodeRepo r)) writeProtected (diff (node added) (rel added) (leaves 2 node rel))) s',
       '** (skg node (gnid c) (skgRepos (nodeRepo r)) (diff (rel added) (leaves 1 rel))) c' }
-    for walk, gesture in pairs({
-        newContent = processed.cycle_processed_recursive,
-        newOutward = processed.cycle_processed_recursive_outward }) do
+    for command, walk in pairs({ mark_both_processed_contentward = 'newContent',
+                                 mark_both_processed_outward = 'newOutward' }) do
       assert.are.same({
-        '* (skg node (gnid r) (skgRepos (nodeRepo r)) (editRequest (processed all)) (diff (leaves 1 all))) r',
-        '** (skg node (gnid n) (skgRepos (nodeRepo r)) (editRequest (processed node rel ' .. walk .. ')) (diff (node added) (rel added) (leaves 2 node rel))) n',
+        '* (skg node (gnid r) (skgRepos (nodeRepo r)) (editRequest (processed node)) (diff (properties changed) (leaves 1 node))) r',
+        '** (skg node (gnid n) (skgRepos (nodeRepo r)) (editRequest (processed node rel ' .. walk
+          .. ')) (diff (node added) (rel added) (leaves 2 node rel))) n',
         lines[3], lines[4], lines[5],
         '*** (skg node (gnid s) (skgRepos (nodeRepo r)) writeProtected (editRequest (processed node rel)) (diff (node added) (rel added) (leaves 2 node rel))) s',
         '** (skg node (gnid c) (skgRepos (nodeRepo r)) (editRequest (processed rel)) (diff (rel added) (leaves 1 rel))) c' },
-        run(lines, 1, gesture))
+        run(lines, 1, processed[command]), command)
     end
-    -- At a new start: the walk object alone, not the relationship to
-    -- its viewparent, which is no part of what the walk reaches.
+    -- The letter filters the walk, and the headlines walked in the buffer.
     assert.are.same({
-      '* (skg node (gnid n) (skgRepos (nodeRepo r)) (editRequest (processed newContent)) (diff (node added) (rel added) (leaves 2 node rel))) n',
-      '** (skg node (gnid n2) (skgRepos (nodeRepo r)) (diff (node added) (rel added) (leaves 2 node rel))) n2' },
-      run({ '* (skg node (gnid n) (skgRepos (nodeRepo r)) (diff (node added) (rel added) (leaves 2 node rel))) n',
-            '** (skg node (gnid n2) (skgRepos (nodeRepo r)) (diff (node added) (rel added) (leaves 2 node rel))) n2' },
-          1, processed.cycle_processed_recursive))
-    -- A new start toggles by its existence alone, and unmarking asks
-    -- first: the client cannot count what the server will reach.
-    assert.are.same({
-      '* (skg node (gnid n) (skgRepos (nodeRepo r)) (editRequest (unprocessed newContent)) (diff (node added) (rel added) (leaves 2 node rel) (processed node))) n' },
-      run({ '* (skg node (gnid n) (skgRepos (nodeRepo r)) (diff (node added) (rel added) (leaves 2 node rel) (processed node))) n' },
-          1, processed.cycle_processed_recursive, 'yes'))
+      lines[1],
+      '** (skg node (gnid n) (skgRepos (nodeRepo r)) (editRequest (processed rel newContent)) (diff (node added) (rel added) (leaves 2 node rel))) n',
+      lines[3], lines[4], lines[5],
+      '*** (skg node (gnid s) (skgRepos (nodeRepo r)) writeProtected (editRequest (processed rel)) (diff (node added) (rel added) (leaves 2 node rel))) s',
+      '** (skg node (gnid c) (skgRepos (nodeRepo r)) (editRequest (processed rel)) (diff (rel added) (leaves 1 rel))) c' },
+      run(lines, 1, processed.mark_rel_processed_contentward))
+    -- At a new start, the letter names the headline's own objects too.
+    local from_n = { unpack(lines, 2) }
+    local expected = vim.deepcopy(from_n)
+    expected[1] = '** (skg node (gnid n) (skgRepos (nodeRepo r)) (editRequest (processed node newContent)) (diff (node added) (rel added) (leaves 2 node rel))) n'
+    assert.are.same(expected, run(from_n, 1, processed.mark_node_processed_contentward))
+    -- The letter goes whole beside the walk, even where the headline
+    -- does not list it: without it the walk would name every kind.
+    assert.are.same(
+      { '* (skg node (gnid n) (skgRepos (nodeRepo r)) (editRequest (processed rel newContent)) (diff (node added) (leaves 1 node))) n' },
+      run({ '* (skg node (gnid n) (skgRepos (nodeRepo r)) (diff (node added) (leaves 1 node))) n' }, 1,
+          processed.mark_rel_processed_contentward))
+    -- Unmarking at a new start asks first: the client cannot count what
+    -- the server will reach.
+    assert.are.same(
+      { '* (skg node (gnid n) (skgRepos (nodeRepo r)) (editRequest (unprocessed node newContent)) (diff (node added) (rel added) (leaves 2 node rel) (processed node))) n' },
+      run({ '* (skg node (gnid n) (skgRepos (nodeRepo r)) (diff (node added) (rel added) (leaves 2 node rel) (processed node))) n' }, 1,
+          processed.mark_node_unprocessed_contentward, 'yes'))
   end)
 
   it('marks home skgrepo moves, recursively only those like the first', function ()
     local lines = {
-      '* (skg node (gnid a) (skgRepos (nodeRepo b)) (diff (leaves 1 all))) a',
+      '* (skg node (gnid a) (skgRepos (nodeRepo b)) (diff (leaves 1 node))) a',
       '** (skg (homeSkgrepoMove (old x) (new b)) (diff (leaves 1)))',
-      '** (skg node (gnid c) (skgRepos (nodeRepo b)) writeProtected (diff (leaves 1 all))) c',
+      '** (skg node (gnid c) (skgRepos (nodeRepo b)) writeProtected (diff (leaves 1 node))) c',
       '*** (skg (homeSkgrepoMove (old x) (new b)) (diff (leaves 1)))',
-      '** (skg node (gnid e) (skgRepos (nodeRepo b)) (diff (leaves 1 all))) e',
+      '** (skg node (gnid e) (skgRepos (nodeRepo b)) (diff (leaves 1 node))) e',
       '*** (skg (homeSkgrepoMove (old y) (new b)) (diff (leaves 1)))' }
-    assert.are.same({
-      '* (skg node (gnid a) (skgRepos (nodeRepo b)) (diff (leaves 1 all))) a',
-      '** (skg (homeSkgrepoMove (old x) (new b)) (editRequest (processed)) (diff (leaves 1))) ',
-      '** (skg node (gnid c) (skgRepos (nodeRepo b)) writeProtected (diff (leaves 1 all))) c',
-      '*** (skg (homeSkgrepoMove (old x) (new b)) (diff (leaves 1)))',
-      '** (skg node (gnid e) (skgRepos (nodeRepo b)) (diff (leaves 1 all))) e',
-      '*** (skg (homeSkgrepoMove (old y) (new b)) (diff (leaves 1)))' },
-      run(lines, 1, processed.toggle_homeSkgrepo_move_processed))
-    assert.are.same({
-      '* (skg node (gnid a) (skgRepos (nodeRepo b)) (diff (leaves 1 all))) a',
-      '** (skg (homeSkgrepoMove (old x) (new b)) (editRequest (processed)) (diff (leaves 1))) ',
-      '** (skg node (gnid c) (skgRepos (nodeRepo b)) writeProtected (diff (leaves 1 all))) c',
-      '*** (skg (homeSkgrepoMove (old x) (new b)) (editRequest (processed)) (diff (leaves 1))) ',
-      '** (skg node (gnid e) (skgRepos (nodeRepo b)) (diff (leaves 1 all))) e',
-      '*** (skg (homeSkgrepoMove (old y) (new b)) (diff (leaves 1)))' },
-      run(lines, 1,
-          processed.toggle_homeSkgrepo_move_processed_recursive))
+    local marked = '** (skg (homeSkgrepoMove (old x) (new b)) (editRequest (processed)) (diff (leaves 1))) '
+    assert.are.same({ lines[1], marked, lines[3], lines[4], lines[5], lines[6] },
+                    run(lines, 1, processed.mark_homeSkgrepo_move_processed))
+    assert.are.same({ lines[1], marked, lines[3], '*' .. marked, lines[5], lines[6] },
+                    run(lines, 1, processed.mark_homeSkgrepo_move_processed_recursive))
+    refused({ lines[1] }, 1, processed.mark_homeSkgrepo_move_processed)
   end)
 
   it('asks nothing before a single-leaf unmark', function ()
@@ -267,72 +316,60 @@ describe('skg.processed', function ()
       '*** (skg alias) a2' },
       run({ '** (skg aliasFolder)',
             '*** (skg alias noClaim (view ghostWarrant) (diff (rel removed) (leaves 1) (processed))) a1',
-            '*** (skg alias) a2' },
-          1, processed.cycle_processed))
+            '*** (skg alias) a2' }, 1, processed.mark_node_unprocessed))
     -- A modified node whose only leaf is processed: one leaf, as the
-    -- server counts, so nothing is asked.
+    -- server counts.
     assert.are.same({
-      '* (skg node (gnid txt) (skgRepos (nodeRepo r)) (editRequest (unprocessed all)) (diff (properties changed) (leaves 1 all) (processed all))) txt',
+      '* (skg node (gnid txt) (skgRepos (nodeRepo r)) (editRequest (unprocessed node)) (diff (properties changed) (leaves 1 node) (processed node))) txt',
       '** (skg (oldText title) (diff (leaves 1) (processed))) txt' },
-      run({ '* (skg node (gnid txt) (skgRepos (nodeRepo r)) (diff (properties changed) (leaves 1 all) (processed all))) txt',
-            '** (skg (oldText title) (diff (leaves 1) (processed))) txt' },
-          1, processed.cycle_processed))
+      run({ '* (skg node (gnid txt) (skgRepos (nodeRepo r)) (diff (properties changed) (leaves 1 node) (processed node))) txt',
+            '** (skg (oldText title) (diff (leaves 1) (processed))) txt' }, 1,
+          processed.mark_node_unprocessed))
+    -- Of two leaves, 'n' or 'r' alone unmarks one.
+    for command, request in pairs({ mark_node_unprocessed = '(unprocessed node)',
+                                    mark_rel_unprocessed = '(unprocessed rel)' }) do
+      assert.are.same(
+        { '* (skg ghost (gnid d) (skgRepos (nodeRepo r)) (editRequest ' .. request
+          .. ') (diff (node removed) (rel removed) (leaves 2 node rel) (processed node rel))) d' },
+        run({ '* (skg ghost (gnid d) (skgRepos (nodeRepo r)) (diff (node removed) (rel removed) (leaves 2 node rel) (processed node rel))) d' },
+            1, processed[command]), command)
+    end
   end)
 
   it('asks before a wide unmark, and writes nothing on refusal', function ()
     local lines = {
       '* (skg ghost (gnid d) (skgRepos (nodeRepo r)) (diff (node removed) (rel removed) (leaves 2 node rel) (processed node rel))) d',
       '** (skg (oldText title) (diff (leaves 1) (processed))) d' }
-    assert.are.same(lines,
-      run(lines, 1, processed.cycle_processed_recursive, 'no'))
+    assert.are.same(lines, run(lines, 1, processed.mark_both_unprocessed, 'no'))
     assert.are.same({
       '* (skg ghost (gnid d) (skgRepos (nodeRepo r)) (editRequest (unprocessed node rel)) (diff (node removed) (rel removed) (leaves 2 node rel) (processed node rel))) d',
       '** (skg (oldText title) (editRequest (unprocessed)) (diff (leaves 1) (processed))) d' },
-      run(lines, 1, processed.cycle_processed_recursive, 'yes'))
-    -- Unmarking a modified node unmarks every leaf it records: two here.
-    local node_lines = {
-      '* (skg node (gnid txt) (skgRepos (nodeRepo r)) (diff (properties changed) (leaves 2 all) (processed all))) txt',
+      run(lines, 1, processed.mark_both_unprocessed_contentward, 'yes'))
+    -- Unmarking a modified node unmarks every leaf it names: two here.
+    local modified = {
+      '* (skg node (gnid txt) (skgRepos (nodeRepo r)) (diff (properties changed) (leaves 2 node) (processed node))) txt',
       '** (skg (oldText title) (diff (leaves 1) (processed))) txt',
       '** (skg (homeSkgrepoMove (old x) (new r)) (diff (leaves 1) (processed)))' }
-    assert.are.same(node_lines,
-      run(node_lines, 1, processed.cycle_processed, 'no'))
+    assert.are.same(modified, run(modified, 1, processed.mark_node_unprocessed, 'no'))
   end)
 
-  it("warns before a wide unmark by the server's count", function ()
-    -- A processed changeset marker over three leaves: asked first.
-    local lines = { '** (skg (changesetMarker content) (diff (leaves 3 all) (processed all)))' }
-    assert.are.same(lines,
-      run(lines, 1, processed.cycle_processed, 'no'))
-    -- A processed single-leaf headline: nothing is asked.
-    assert.are.same(
-      { '** (skg (oldText title) (editRequest (unprocessed)) (diff (leaves 1) (processed))) txt' },
-      run({ '** (skg (oldText title) (diff (leaves 1) (processed))) txt' }, 1,
-          processed.cycle_processed))
-  end)
-
-  it('unmarks a processed home skgrepo move, asking only for several', function ()
-    local lines = {
-      '* (skg node (gnid a) (skgRepos (nodeRepo b)) (diff (leaves 1 all))) a',
-      '** (skg (homeSkgrepoMove (old x) (new b)) (diff (leaves 1) (processed)))',
-      '** (skg node (gnid c) (skgRepos (nodeRepo b)) writeProtected (diff (leaves 1 all))) c',
-      '*** (skg (homeSkgrepoMove (old x) (new b)) (diff (leaves 1) (processed)))' }
-    for _, line_number in ipairs({ 1, 2 }) do
-      assert.are.same({
-        '* (skg node (gnid a) (skgRepos (nodeRepo b)) (diff (leaves 1 all))) a',
-        '** (skg (homeSkgrepoMove (old x) (new b)) (editRequest (unprocessed)) (diff (leaves 1) (processed))) ',
-        '** (skg node (gnid c) (skgRepos (nodeRepo b)) writeProtected (diff (leaves 1 all))) c',
-        '*** (skg (homeSkgrepoMove (old x) (new b)) (diff (leaves 1) (processed)))' },
-        run(lines, line_number,
-            processed.toggle_homeSkgrepo_move_processed))
+  it('counts the leaves a request touches as the server does', function ()
+    -- An object the headline does not list counts two, so that
+    -- unmarking it asks. Mirrors test-skg-processed-leaves-touched.
+    local cases = {
+      { { count = 3, objects = { 'node', 'rel' } }, { 'node', 'rel' }, 3 },
+      { { count = 3, objects = { 'node', 'rel' } }, { 'node' }, 2 },
+      { { count = 3, objects = { 'node', 'rel' } }, { 'rel' }, 1 },
+      { { count = 2, objects = { 'node' } }, { 'node' }, 2 },
+      { { count = 1, objects = { 'rel' } }, { 'node', 'rel' }, 3 },
+      { { count = 1, objects = { 'rel' } }, { 'node' }, 2 },
+      { { count = 2, objects = { 'node', 'rel' } }, { 'node', 'rel', 'newContent' }, 4 },
+      { { count = 1, objects = { 'node' } }, { 'rel', 'newOutward' }, 4 },
+      { { count = 1, objects = {} }, {}, 1 },
+      { nil, {}, 1 } }
+    for i, case in ipairs(cases) do
+      assert.are.equal(case[3], processed.leaves_touched(case[1], case[2]), i)
     end
-    assert.are.same({
-      '* (skg node (gnid a) (skgRepos (nodeRepo b)) (diff (leaves 1 all))) a',
-      '** (skg (homeSkgrepoMove (old x) (new b)) (editRequest (unprocessed)) (diff (leaves 1) (processed))) ',
-      '** (skg node (gnid c) (skgRepos (nodeRepo b)) writeProtected (diff (leaves 1 all))) c',
-      '*** (skg (homeSkgrepoMove (old x) (new b)) (editRequest (unprocessed)) (diff (leaves 1) (processed))) ' },
-      run(lines, 1,
-          processed.toggle_homeSkgrepo_move_processed_recursive,
-          'yes'))
   end)
 
   it('computes a changed folder from its members', function ()
@@ -392,26 +429,24 @@ describe('skg.processed', function ()
             '** (skg node (gnid m) (skgRepos (nodeRepo r)) (diff (leaves 1 rel))) m',
             '*** (skg (relRepoMove (old a) (new b)) (diff (leaves 1)))',
             '** (skg alias (diff (rel added) (leaves 1))) a' },
-          1, processed.cycle_processed))
+          1, processed.mark_both_processed))
     -- On a folder whose members carry no change of their relationship,
     -- there is nothing to mark.
-    assert.has_error(function ()
-      run({ '* (skg aliasFolder)', '** (skg alias) a' },
-          1, processed.cycle_processed)
-    end)
+    refused({ '* (skg aliasFolder)', '** (skg alias) a' },
+            1, processed.mark_both_processed)
   end)
 
   it('keeps the other edit request beside a processed request', function ()
     assert.are.same(
       { '* (skg ghost (gnid d) (skgRepos (nodeRepo r)) (editRequest restoreNode (unprocessed node)) (diff (node removed) (leaves 1 node) (processed node))) d' },
       run({ '* (skg ghost (gnid d) (skgRepos (nodeRepo r)) (editRequest restoreNode (processed node)) (diff (node removed) (leaves 1 node) (processed node))) d' },
-          1, processed.cycle_processed))
+          1, processed.mark_node_unprocessed))
     -- A processed request goes before '(viewRequests ...)' and the
     -- derived forms, where the server writes it.
     assert.are.same(
       { '* (skg node (gnid d) (skgRepos (nodeRepo r)) (editRequest (processed node)) (viewRequests editableView) (diff (node added) (leaves 1 node))) d' },
       run({ '* (skg node (gnid d) (skgRepos (nodeRepo r)) (viewRequests editableView) (diff (node added) (leaves 1 node))) d' },
-          1, processed.cycle_processed))
+          1, processed.mark_node_processed))
   end)
 
   it('replaces the edit request and keeps the processed request',
@@ -504,7 +539,7 @@ describe('skg.processed moving between headlines with change facts', function ()
     '* (skg node (gnid r) (skgRepos (nodeRepo main))) r',
     '** (skg node (gnid a) (skgRepos (nodeRepo main)) (diff (node added) (leaves 1 node))) a',
     '*** (skg node (gnid b) (skgRepos (nodeRepo main))) b',
-    '** (skg node (gnid c) (skgRepos (nodeRepo main)) (diff (properties changed) (leaves 2 all) (processed all))) c',
+    '** (skg node (gnid c) (skgRepos (nodeRepo main)) (diff (properties changed) (leaves 2 node) (processed node))) c',
     '** (skg containerFolder) its containers',
     '*** (skg alias noClaim (view ghostWarrant) (diff (rel removed) (leaves 1))) a1',
     '' }
@@ -589,11 +624,11 @@ describe('skg.processed moving between headlines with change facts', function ()
       rnc = { 'DiffViewGotoNextChange', 'diffView_goto_next_change' },
       rnu = { 'DiffViewGotoNextUnprocessedChange',
               'diffView_goto_next_unprocessed_change' },
-      rnr = { 'DiffViewGotoNextProcessedChange', 'diffView_goto_next_processed_change' },
+      rnp = { 'DiffViewGotoNextProcessedChange', 'diffView_goto_next_processed_change' },
       rpc = { 'DiffViewGotoPreviousChange', 'diffView_goto_previous_change' },
       rpu = { 'DiffViewGotoPreviousUnprocessedChange',
               'diffView_goto_previous_unprocessed_change' },
-      rpr = { 'DiffViewGotoPreviousProcessedChange',
+      rpp = { 'DiffViewGotoPreviousProcessedChange',
               'diffView_goto_previous_processed_change' } }
     for lhs, names in pairs(expected) do
       assert.are.equal(names[1], by_lhs[lhs], lhs)
@@ -602,5 +637,38 @@ describe('skg.processed moving between headlines with change facts', function ()
       assert.are.equal(names[2], spec.fn, lhs)
       assert.is_function(processed[spec.fn], lhs)
     end
+  end)
+
+  it("binds each mark as m, what, which way; capitals for the walks; no toggles", function ()
+    -- '<localleader>m{n,r,b,h}{p,u}'; a capital last letter for
+    -- contentward (Emacs's C-u), a capital 'M' for outward (C-u C-u).
+    local keymaps = require('skg.keymaps')
+    local by_lhs = {}
+    for _, binding in ipairs(keymaps.content_view_bindings) do
+      by_lhs[binding[1]] = binding[2] end
+    local function check (lhs, name, fn)
+      assert.are.equal(name, by_lhs[lhs], lhs)
+      local spec = keymaps.commands[name]
+      assert.are.equal('skg.processed', spec.module, lhs)
+      assert.are.equal(fn, spec.fn, lhs)
+      assert.is_function(processed[spec.fn], lhs)
+    end
+    for letter, word in pairs({ n = 'node', r = 'rel', b = 'both' }) do
+      for way, adjective in pairs({ p = 'processed', u = 'unprocessed' }) do
+        local name = 'Mark' .. word:sub(1, 1):upper() .. word:sub(2)
+                     .. adjective:sub(1, 1):upper() .. adjective:sub(2)
+        local fn = 'mark_' .. word .. '_' .. adjective
+        check('m' .. letter .. way, name, fn)
+        check('m' .. letter .. way:upper(), name .. 'Contentward', fn .. '_contentward')
+        check('M' .. letter .. way, name .. 'Outward', fn .. '_outward')
+      end
+    end
+    check('mhp', 'MarkHomeSkgrepoMoveProcessed', 'mark_homeSkgrepo_move_processed')
+    check('mhU', 'MarkHomeSkgrepoMoveUnprocessedRecursive',
+          'mark_homeSkgrepo_move_unprocessed_recursive')
+    for _, gone in ipairs({ 'rr', 'rR', 'rO', 'rh', 'rH', 'rnr', 'rpr' }) do
+      assert.is_nil(by_lhs[gone], gone) end
+    assert.is_nil(processed.cycle_processed)
+    assert.is_nil(processed.toggle_homeSkgrepo_move_processed)
   end)
 end)

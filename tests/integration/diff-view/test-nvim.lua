@@ -3,9 +3,10 @@
 -- the data.
 --
 -- Phase 1: Open the diff view; its buffers open.
--- Phase 2: Mark every change processed, through the recursive
---          gesture on each root of the "all changes" buffer, and see
---          "Commit ready".
+-- Phase 2: Mark and unmark with each letter and each walk, and see
+--          what the server says is processed; then mark every change
+--          processed, through '<localleader>mbP' on each root of the
+--          "all changes" buffer, and see "Commit ready".
 -- Phase 3: Stage and commit; every owned skgrepo is committed, the
 --          foreign one is not, and the buffers keep their roots,
 --          which show no change any more.
@@ -86,12 +87,69 @@ do
   end
 end
 
--- PHASE 2: mark every root, recursively. Each gesture saves, which
--- rerenders the buffer, so the roots are found afresh. A root an
--- earlier gesture already marked processed is skipped: the gesture toggles, so
--- it would mark it unprocessed.
+-- PHASE 2: mark with each letter and each walk, then every root.
 print('=== PHASE 2: Mark everything processed ===')
 vim.api.nvim_set_current_buf(all_changes)
+local processed = require('skg.processed')
+
+---@param needle string plain text
+---@return integer the first line of the "all changes" buffer holding NEEDLE
+local function line_holding (needle)
+  for lnum, line in ipairs(vim.api.nvim_buf_get_lines(all_changes, 0, -1, false)) do
+    if line:find(needle, 1, true) then return lnum end
+  end
+  T.fail('No line holds ' .. needle .. ':\n' .. T.buffer_text(all_changes))
+end
+
+---Run COMMAND on the first headline holding NEEDLE, answering yes if it
+---asks, and wait for the processed summary of its save.
+local function mark_at (needle, command, what)
+  vim.api.nvim_win_set_cursor(0, { line_holding(needle), 0 })
+  local before = #notified
+  local original_input = vim.fn.input
+  vim.fn.input = function () return 'yes' end
+  command()
+  vim.fn.input = original_input
+  T.check(T.wait_for(function ()
+    for j = before + 1, #notified do
+      if notified[j]:find('changed files are processed', 1, true) then return true end
+    end
+    return nil
+  end, 20), 'a processed summary after ' .. what)
+end
+
+---Check that the headline holding NEEDLE holds PROCESSED (plain text),
+---or, when that is nil, no '(processed ...)'.
+local function expect_processed (needle, processed_text, what)
+  local line = vim.api.nvim_buf_get_lines(
+    all_changes, line_holding(needle) - 1, line_holding(needle), false)[1]
+  if processed_text then
+    T.check(line:find(processed_text, 1, true) ~= nil, what .. ': ' .. line)
+  else
+    T.check(not line:find('(processed', 1, true), what .. ': ' .. line) end
+end
+
+-- Each letter, without a walk, on the deleted node d.
+mark_at('ghost (gnid d)', processed.mark_node_processed, 'mnp on d')
+expect_processed('ghost (gnid d)', '(processed node))', 'mnp on d')
+mark_at('ghost (gnid d)', processed.mark_rel_processed, 'mrp on d')
+expect_processed('ghost (gnid d)', '(processed node rel))', 'mrp on d')
+mark_at('ghost (gnid d)', processed.mark_both_unprocessed, 'mbu on d')
+expect_processed('ghost (gnid d)', nil, 'mbu on d')
+-- The walks, on the new node n: outward naming relationships, then
+-- contentward naming nodes; n3, three deep, follows both.
+mark_at('(gnid n)', processed.mark_rel_processed_outward, 'Mrp on n')
+expect_processed('(gnid n)', '(processed rel))', 'Mrp on n')
+expect_processed('(gnid n3)', '(processed rel))', 'Mrp on n, at n3')
+mark_at('(gnid n)', processed.mark_node_processed_contentward, 'mnP on n')
+expect_processed('(gnid n)', '(processed node rel))', 'mnP on n')
+expect_processed('(gnid n3)', '(processed node rel))', 'mnP on n, at n3')
+-- m's home skgrepo move.
+mark_at('(gnid m)', processed.mark_homeSkgrepo_move_processed, 'mhp on m')
+expect_processed('(homeSkgrepoMove (old alpha) (new beta))', '(processed)', 'mhp on m')
+
+-- Every root, contentward. Each gesture saves, which rerenders the
+-- buffer, so the roots are found afresh.
 local function root_lines ()
   local found = {}
   for lnum, line in ipairs(vim.api.nvim_buf_get_lines(all_changes, 0, -1, false)) do
@@ -100,20 +158,15 @@ local function root_lines ()
   return found
 end
 for i = 1, #root_lines() do
-  local lnum = root_lines()[i]
-  local line = vim.api.nvim_buf_get_lines(all_changes, lnum - 1, lnum, false)[1]
-  if not line:find('(processed', 1, true) then
-    local before = #notified
-    vim.api.nvim_win_set_cursor(0, { lnum, 0 })
-    require('skg.processed').cycle_processed_recursive()
-    T.check(T.wait_for(function ()
-      for j = before + 1, #notified do
-        if notified[j]:find('changed files are processed', 1, true) then return true end
-      end
-      return nil
-    end, 20), 'a processed summary after the gesture on root ' .. i)
-    T.wait_for_response(20)
-  end
+  local before = #notified
+  vim.api.nvim_win_set_cursor(0, { root_lines()[i], 0 })
+  processed.mark_both_processed_contentward()
+  T.check(T.wait_for(function ()
+    for j = before + 1, #notified do
+      if notified[j]:find('changed files are processed', 1, true) then return true end
+    end
+    return nil
+  end, 20), 'a processed summary after the gesture on root ' .. i)
 end
 do
   local summary = newest_notification('changed files are processed')

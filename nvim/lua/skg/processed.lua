@@ -1,13 +1,18 @@
 -- PURPOSE: The processed gestures of the diff view
--- ('docs/diff-view.org', "Processed requests and gestures"). Each writes
--- processed requests, '(processed OBJECTS)' or '(unprocessed OBJECTS)', into
--- the '(editRequest ...)' of headline metadata, then saves. The save
+-- ('docs/diff-view.org', "Processed requests and gestures"). Each says
+-- what it marks and which way: <localleader>m, then 'n' (the node), 'r'
+-- (its relationship to its viewparent) or 'b' (both), then 'p'
+-- (processed) or 'u' (unprocessed). It writes processed requests,
+-- '(processed OBJECTS)' or '(unprocessed OBJECTS)', into the
+-- '(editRequest ...)' of headline metadata, then saves. The save
 -- consumes them, setting or clearing the marks, and answers with the
 -- buffer rerendered and the processed summary.
 -- The Lua port of elisp/skg-processed.el, which describes how the
 -- '(leaves N OBJECT...)' part of the server's '(diff ...)' form says
--- which leaves a headline names. Neovim has no prefix argument, so each recursive form is its
--- own command.
+-- which leaves a headline names, and what a letter names on each kind
+-- of headline. Neovim has no prefix argument, so each recursive form
+-- is its own command: a capital last letter for contentward ('mnP'),
+-- a capital 'M' for outward ('Mnp').
 -- It also formats the processed summary, which the save,
 -- stage-and-commit and extend-diff-view show. What a
 -- headline's change facts say, whether a folder's change is processed, and
@@ -26,61 +31,82 @@ M.WIDE_UNMARK_QUESTION =
   .. ' decision. You might discard a lot of hard-won information.'
   .. ' Continue (yes/no)? '
 
----Write REQUESTS if confirmed, then save; or report that there were
+---What a gesture with LETTER_OBJECTS says when it names nothing.
+---@param letter_objects string[]
+---@return string
+local function nothing_to_mark_text (letter_objects)
+  if #letter_objects == 2 then
+    return 'Neither its node nor its relationship has a change to mark here' end
+  if letter_objects[1] == 'node' then
+    return 'Its node has no change to mark here' end
+  return 'Its relationship to its viewparent has no change to mark here'
+end
+
+---Write REQUESTS if confirmed, then save; or refuse when there are
 ---none.
 ---@param requests table[]
-local function write_and_save (requests)
+---@param letter_objects string[]
+local function write_and_save (requests, letter_objects)
   if #requests == 0 then
-    error('Nothing here can be marked processed') end
+    error(nothing_to_mark_text(letter_objects), 0) end
   if M.write_requests_if_confirmed(requests) then
     require('skg.save').request_save_buffer() end
 end
 
----Toggle whether the change at point is processed, then save. On a
----headline that names leaves, toggle every object it lists: on a new
----member its existence and its relationship (∃ and ~), on a modified
----node (M) every leaf its file records, beside its relationship when
----that changed. On a changed folder, toggle each leaf one level down.
----Before unmarking more than one leaf, ask.
-function M.cycle_processed ()
-  if not metadata.at_headline_p() then error('Not on a headline') end
-  write_and_save(M.requests_at_line(metadata.current_line_number()))
+---Mark (PROCESSED true) or unmark what LETTER_OBJECTS, {'node'},
+---{'rel'} or {'node', 'rel'}, name on the headline at point, then
+---save. On a changed folder, act on each headline one level down.
+---With WALK_OBJECT, 'newContent' or 'newOutward', act on every headline
+---in the subtree at point, except that at a new node in content
+---position the server walks the graph instead of the buffer, the
+---letters filtering what the walk marks ('requests_for_subtree_at_line').
+---Before unmarking more than one leaf, ask. Works on write-protected
+---occurrences too.
+---@param letter_objects string[]
+---@param processed boolean
+---@param walk_object string|nil
+function M.mark (letter_objects, processed, walk_object)
+  if not metadata.at_headline_p() then error('Not on a headline', 0) end
+  local line_number = metadata.current_line_number()
+  local requests
+  if walk_object then
+    requests = M.requests_for_subtree_at_line(
+      line_number, letter_objects, processed, walk_object)
+  else
+    requests = M.requests_at_line(line_number, letter_objects, processed) end
+  write_and_save(requests, letter_objects)
 end
 
----Mark (or, if the headline at point is processed, unmark) every leaf
----named in the subtree at point, then save; at a new node, instead of
----its subtree, the server walks the graph contentward, marking each
----new node's text and content ('requests_for_subtree_at_line').
----Before unmarking more than one leaf, ask.
-function M.cycle_processed_recursive ()
-  if not metadata.at_headline_p() then error('Not on a headline') end
-  write_and_save(M.requests_for_subtree_at_line(
-    metadata.current_line_number(), 'newContent'))
+-- The commands: mark_{node,rel,both}_{processed,unprocessed}, each
+-- also '_contentward' (Emacs's C-u) and '_outward' (C-u C-u).
+do
+  local letters = { node = { 'node' }, rel = { 'rel' },
+                    both = { 'node', 'rel' } }
+  local walks = { [''] = false, _contentward = 'newContent',
+                  _outward = 'newOutward' }
+  for letter, letter_objects in pairs(letters) do
+    for way, processed in pairs({ processed = true, unprocessed = false }) do
+      for suffix, walk_object in pairs(walks) do
+        M['mark_' .. letter .. '_' .. way .. suffix] = function ()
+          M.mark(letter_objects, processed, walk_object or nil)
+        end
+      end
+    end
+  end
 end
 
----As 'cycle_processed_recursive', but at a new node the server
----walks along every relationship each new node records, marking
----everything it records.
-function M.cycle_processed_recursive_outward ()
-  if not metadata.at_headline_p() then error('Not on a headline') end
-  write_and_save(M.requests_for_subtree_at_line(
-    metadata.current_line_number(), 'newOutward'))
-end
-
----Toggle whether the home-skgrepo move of the node at point (or the
----move at point) is processed: unmark it if it is processed, else
----mark it. With RECURSIVE, do the same to the move of every
----descendant that moved between the same two skgrepos. Before
+---Mark (PROCESSED true) or unmark the home-skgrepo move of the node at
+---point (or the move at point). With RECURSIVE, do the same to the move
+---of every descendant that moved between the same two skgrepos. Before
 ---unmarking more than one move, ask. Then save.
+---@param processed boolean
 ---@param recursive boolean|nil
-function M.toggle_homeSkgrepo_move_processed (recursive)
-  if not metadata.at_headline_p() then error('Not on a headline') end
+function M.mark_homeSkgrepo_move (processed, recursive)
+  if not metadata.at_headline_p() then error('Not on a headline', 0) end
   local move_line, pair =
     M.homeSkgrepo_move_at_line(metadata.current_line_number())
   if not move_line then
-    error("This node's home skgrepo did not change") end
-  local processed = not M.processed_p(
-    metadata.metadata_sexp_at_line_or_nil(move_line))
+    error("This node's home skgrepo did not change", 0) end
   local requests = {}
   if not recursive then
     requests = { M.request_at_line(move_line, processed, {}) }
@@ -103,27 +129,54 @@ function M.toggle_homeSkgrepo_move_processed (recursive)
   require('skg.save').request_save_buffer()
 end
 
-function M.toggle_homeSkgrepo_move_processed_recursive ()
-  M.toggle_homeSkgrepo_move_processed(true)
+function M.mark_homeSkgrepo_move_processed ()
+  M.mark_homeSkgrepo_move(true, false)
+end
+
+function M.mark_homeSkgrepo_move_unprocessed ()
+  M.mark_homeSkgrepo_move(false, false)
+end
+
+function M.mark_homeSkgrepo_move_processed_recursive ()
+  M.mark_homeSkgrepo_move(true, true)
+end
+
+function M.mark_homeSkgrepo_move_unprocessed_recursive ()
+  M.mark_homeSkgrepo_move(false, true)
 end
 
 -- ── reading a headline's change facts ──────────────────────────────
 
----metadata.processed_leaves of METADATA_SEXP, for a headline below the
----one a gesture acts on, without 'all': nil when 'all' was its only
----object.
+---What a gesture with LETTER_OBJECTS names on the headline with
+---METADATA_SEXP: nil when it names nothing there, else the request's
+---objects ({} for a bare request). On a headline that lists objects,
+---the letters among them. On one that names a single leaf, the bare
+---request, when the leaf is of a kind a letter names: a relRepo move
+---is a relationship's, any other the node's own. On a changeset marker
+---AT_GESTURE (the headline the gesture acts on), the letters
+---themselves: its 'node' names its members' own leaves, which its
+---'(leaves ...)' does not list; below the gesture those members name
+---them under their own headlines. (skg--processed-objects-named-by-letters)
 ---@param metadata_sexp any
----@return table|nil
-function M.leaves_below (metadata_sexp)
+---@param letter_objects string[]
+---@param at_gesture boolean|nil
+---@return string[]|nil
+function M.objects_named_by_letters (metadata_sexp, letter_objects, at_gesture)
   local leaves = metadata.processed_leaves(metadata_sexp)
-  if not (leaves and vim.tbl_contains(leaves.objects, 'all')) then
-    return leaves end
+  if not leaves then return nil end
+  if #leaves.objects == 0 then
+    local kind = metadata.sexp_cdr_at_path(metadata_sexp, { 'skg', 'relRepoMove' })
+                 and 'rel' or 'node'
+    if vim.tbl_contains(letter_objects, kind) then return {} end
+    return nil end
+  if at_gesture and metadata.sexp_cdr_at_path(
+       metadata_sexp, { 'skg', 'changesetMarker' }) then
+    return vim.deepcopy(letter_objects) end
   local objects = vim.tbl_filter(function (object)
-    return object ~= 'all' end, leaves.objects)
+    return vim.tbl_contains(leaves.objects, object) end, letter_objects)
   if #objects == 0 then return nil end
-  return { count = #objects, objects = objects }
+  return objects
 end
-
 
 ---Whether the headline is processed: one that names leaves, on all the
 ---objects it lists. (Whether a changed folder is processed depends on its
@@ -199,59 +252,51 @@ end
 -- A gesture first gathers its requests, each { line, processed, objects,
 -- count }, then writes them all or none.
 
----The requests of the one-level gesture on the headline at
----LINE_NUMBER: on a headline that names leaves, one naming every
----object it lists; on a changed folder, one on each headline one
----level down that names leaves, naming the objects it lists but
----'all', marking them processed unless the folder is processed.
+---The requests of the one-level gesture with LETTER_OBJECTS on the
+---headline at LINE_NUMBER, marking (PROCESSED true) or unmarking: on a
+---headline that names leaves, one, naming what objects_named_by_letters
+---says; on a changed folder, one on each child that names some of them.
 ---@param line_number integer
+---@param letter_objects string[]
+---@param processed boolean
 ---@return table[]
-function M.requests_at_line (line_number)
+function M.requests_at_line (line_number, letter_objects, processed)
   local metadata_sexp = metadata.metadata_sexp_at_line_or_nil(line_number)
   if not metadata_sexp then return {} end
-  local leaves = metadata.processed_leaves(metadata_sexp)
-  if leaves then
-    return { M.request_at_line(
-               line_number,
-               not metadata.objects_processed_p(metadata_sexp,
-                                                      leaves.objects),
-               leaves.objects) } end
-  local folder_change = metadata.folder_change_processed_at_line(line_number)
-  if folder_change then
-    local processed = not folder_change.processed
-    local requests = {}
-    for _, line in ipairs(modify_graph.immediate_viewchildren(line_number)) do
-      local child = metadata.metadata_sexp_at_line_or_nil(line)
-      local child_leaves = child and M.leaves_below(child)
-      if child_leaves then
-        table.insert(requests,
-                     M.request_at_line(line, processed, child_leaves.objects)) end
-    end
-    return requests end
-  return {}
+  local named = M.objects_named_by_letters(metadata_sexp, letter_objects, true)
+  if named then
+    return { M.request_at_line(line_number, processed, named) } end
+  if metadata.processed_leaves(metadata_sexp)
+     or not metadata.folder_change_processed_at_line(line_number) then
+    return {} end
+  local requests = {}
+  for _, line in ipairs(modify_graph.immediate_viewchildren(line_number)) do
+    local child = metadata.metadata_sexp_at_line_or_nil(line)
+    local child_named = child and M.objects_named_by_letters(child, letter_objects)
+    if child_named then
+      table.insert(requests, M.request_at_line(line, processed, child_named)) end
+  end
+  return requests
 end
 
----The requests of the recursive gesture on the headline at
----LINE_NUMBER: one on every headline in the subtree that names leaves,
----marking them processed unless the headline is processed. At a new node in content
----position ('hands_to_the_server_p'), the request names WALK_OBJECT,
----'newContent' or 'newOutward', which the server expands from the
----graph, through new nodes only, whatever the buffer shows or
----write-protects; so the walk skips the rest of that node's subtree.
----There the start names WALK_OBJECT alone, leaving the relationship to
----its viewparent, which is no part of what it reaches, and is processed
----when its existence is.
+---The requests of the recursive gesture with LETTER_OBJECTS on the
+---headline at LINE_NUMBER, marking (PROCESSED true) or unmarking: one
+---on every headline in the subtree that names some of them. At a new
+---node in content position ('hands_to_the_server_p'), the request names
+---LETTER_OBJECTS and WALK_OBJECT, 'newContent' or 'newOutward', which
+---the server expands from the graph, through new nodes only, whatever
+---the buffer shows or write-protects, the letters naming both the
+---headline's own objects and the kinds of leaf the walk marks; so the
+---walk skips the rest of that node's subtree. The letters are sent
+---whole there even where the headline lists fewer, since without them
+---the walk would name every kind.
 ---@param line_number integer
+---@param letter_objects string[]
+---@param processed boolean
 ---@param walk_object string
 ---@return table[]
-function M.requests_for_subtree_at_line (line_number, walk_object)
-  local metadata_sexp = metadata.metadata_sexp_at_line_or_nil(line_number)
-  if not metadata_sexp then return {} end
-  local root_is_handed_over = metadata.processed_node_added_p(metadata_sexp)
-  local processed
-  if root_is_handed_over then
-    processed = not metadata.objects_processed_p(metadata_sexp, { 'node' })
-  else processed = not M.processed_at_line(line_number) end
+function M.requests_for_subtree_at_line (line_number, letter_objects,
+                                         processed, walk_object)
   local requests = {}
   local handed_over_level = nil -- while in a handed-over subtree, its level
   for _, line in ipairs(M.subtree_lines(line_number)) do
@@ -261,18 +306,17 @@ function M.requests_for_subtree_at_line (line_number, walk_object)
     if not handed_over_level then
       local headline = metadata.metadata_sexp_at_line_or_nil(line)
       local at_root = line == line_number
-      local handed_over
-      if at_root then handed_over = root_is_handed_over
-      else handed_over = headline and M.hands_to_the_server_p(line, headline) end
-      local leaves = nil
-      if headline and not (at_root and handed_over) then -- the start names the walk alone
-        if at_root then leaves = metadata.processed_leaves(headline)
-        else leaves = M.leaves_below(headline) end end
-      if leaves or handed_over then
-        local objects = vim.list_extend(
-          vim.deepcopy(leaves and leaves.objects or {}),
-          handed_over and { walk_object } or {})
-        table.insert(requests, M.request_at_line(line, processed, objects)) end
+      local handed_over = false
+      if headline then
+        if at_root then handed_over = metadata.processed_node_added_p(headline)
+        else handed_over = M.hands_to_the_server_p(line, headline) end end
+      local named = nil
+      if handed_over then
+        named = vim.list_extend(vim.deepcopy(letter_objects), { walk_object })
+      elseif headline then
+        named = M.objects_named_by_letters(headline, letter_objects, at_root) end
+      if named then
+        table.insert(requests, M.request_at_line(line, processed, named)) end
       if handed_over then handed_over_level = level end
     end
   end
@@ -293,12 +337,7 @@ function M.hands_to_the_server_p (line_number, metadata_sexp)
 end
 
 ---A request on the headline at LINE_NUMBER, with how many leaves it
----touches as the server counts them: N of the headline's '(leaves N
----OBJECT...)' when OBJECTS are the ones it lists, else one for each
----object, and two for 'newContent' or 'newOutward', so that unmarking
----new nodes always asks first: the client cannot count what the
----server will reach. A headline without the fact, which only the home
----skgrepo move gesture can reach, counts one.
+---touches (M.leaves_touched).
 ---@param line_number integer
 ---@param processed boolean
 ---@param objects string[]
@@ -306,15 +345,38 @@ end
 function M.request_at_line (line_number, processed, objects)
   local leaves = metadata.processed_leaves(
     metadata.metadata_sexp_at_line_or_nil(line_number))
-  local count = #objects
-  for _, object in ipairs(objects) do
-    if object == 'newContent' or object == 'newOutward' then
-      count = count + 1 end
-  end
-  if vim.deep_equal(objects, leaves and leaves.objects or {}) then
-    count = leaves and leaves.count or 1 end
   return { line = line_number, processed = processed, objects = objects,
-           count = count }
+           count = M.leaves_touched(leaves, objects) }
+end
+
+---How many leaves a request naming OBJECTS touches on a headline whose
+---'(leaves N OBJECT...)' is LEAVES ({count, objects}), as the server
+---counts them. Of the objects listed there: N when OBJECTS name them
+---all; one for 'rel' alone, since it names the one relationship to the
+---viewparent; N less that one for 'node' alone. An object the headline
+---does not list ('node' on a changeset marker, 'newContent',
+---'newOutward') counts two, so that unmarking it always asks first: the
+---client cannot count what the server will reach. A headline without
+---the fact, which only the home skgrepo move gesture can reach, and a
+---bare request count one. (skg--processed-leaves-touched)
+---@param leaves table|nil
+---@param objects string[]
+---@return integer
+function M.leaves_touched (leaves, objects)
+  local listed = leaves and leaves.objects or {}
+  local named_listed, unlisted = {}, 0
+  for _, object in ipairs(objects) do
+    if vim.tbl_contains(listed, object) then
+      table.insert(named_listed, object)
+    else unlisted = unlisted + 1 end
+  end
+  local count
+  if not leaves or #objects == 0 then count = 1
+  elseif #named_listed == 0 then count = 0
+  elseif #named_listed == #listed then count = leaves.count
+  elseif #named_listed == 1 and named_listed[1] == 'rel' then count = 1
+  else count = leaves.count - 1 end
+  return 2 * unlisted + count
 end
 
 ---Whether the unmark requests among REQUESTS touch more than one leaf.
