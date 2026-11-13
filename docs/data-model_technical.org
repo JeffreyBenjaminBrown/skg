@@ -206,7 +206,7 @@ headline already has a gnid and a skgrepo), the *truth* (=Truth=: the
 in-Rust graph as the skgrepo restriction lets it be seen, with the
 config), the mode (=RefreshMode= in
 =server/refresh/mode.rs=: a content view, or a buffer of
-the diff view over the graph straddle, with the readiness store) and
+the diff view over the graph straddle, with the processed store) and
 the node budget (=initial_node_limit=). It
 changes the viewforest in place and returns nothing of what it
 changed; each caller renders the viewforest once, when it is done
@@ -510,7 +510,7 @@ After the walk, once (=server/refresh/tail.rs=): the derived facts are
 computed, the stats of each occurrence (its relationship facts,
 property counts and birth, =cycle=, =repoBoundary=, =omittedBody=, its
 relRepo where it differs from the default), and in the diff view the
-'(ready ...)' change facts, from the readiness store, and the home
+'(ready ...)' change facts, from the processed store, and the home
 skgrepo moves; every
 childless tombstone is pruned, postorder and roots included, so a
 buffer may end with no roots, and so is a folder the pruning leaves

@@ -4,7 +4,7 @@ The diff view shows every change in the owned skgrepos since their
 last commits -- how each worktree differs from HEAD -- with the
 context needed to understand each change, in buffers that are
 ordinary editable views. It lets the user review the changes, mark
-each one commit-ready, and commit everything at once. C-c v d
+each one processed, and commit everything at once. C-c v d
 ('skg-diffView-open'; Neovim '<localleader>vd') opens it.
 
 The vocabulary (graph straddle, the three kinds of change, C, R, U,
@@ -46,7 +46,7 @@ its C is the recorders of the change-forest leaves whose aspect is
 the home skgrepo or the relRepo, that is, the nodes whose home skgrepo
 moved and the recorders of the relationships whose relRepo moved. A
 node of that C is shown as in any buffer, with all of its changes.
-The readiness summary counts every leaf whatever buffer is open;
+The processed summary counts every leaf whatever buffer is open;
 only the count of changes not editable in the buffer depends on what
 this buffer shows. In this buffer each
 moved vognode's own heralds also read "-OLD +NEW", and "Δ⌂=a" when
@@ -57,7 +57,7 @@ A flat list, in ID order, of the nodes whose file changed but which
 record no change-forest leaf: only the order of some list changed.
 Each is shown with its content in the new order, as write-protected
 members shown without their content, and with an order-only changeset
-marker, which is always ready. Its sets are empty: it renders no pruned change view.
+marker, which is always processed. Its sets are empty: it renders no pruned change view.
 ** Refusals
 Every buffer is refused, and the client stops, unless the
 connection is unrestricted, and when the graph straddle cannot be built: an
@@ -67,7 +67,7 @@ no reason to refuse.
 ** Foreign skgrepos
 Foreign skgrepos are read at their worktrees in both halves of the
 straddle, so they never produce a change: they are outside C, the
-change-forest and readiness. The readiness summary only counts their
+change-forest and the processed marks. The processed summary only counts their
 changed '.skg' files.
 ** No stages
 The diff view compares HEAD with the worktree. The git index never
@@ -146,7 +146,7 @@ A buffer of the diff view is drawn, and redrawn after every save,
 rerender and commit, by the one refresh every view uses
 ('refresh_viewforest', 'server/refresh/'), in diff-view mode: the
 mode is 'RefreshMode::DiffView', which carries the straddle, the
-buffer kind and the readiness store, from which the refresh reads
+buffer kind and the processed store, from which the refresh reads
 the marks ('server/refresh/mode.rs')
 ('refresh_diffView_viewforest' and
 'refresh_diffView_buffer_over_current_straddle' in
@@ -201,7 +201,7 @@ What a node in C shows, the refresh reads from the leaves that
 mention the node (those it records and the relationship leaves naming
 it as member), grouped by aspect ('ChangedAspects'); the graphs supply
 only what each viewnode shows, such as the old title. A new aspect of
-a leaf is added in one place, and C, the extension and readiness
+a leaf is added in one place, and C, the extension and the processed marks
 follow. The mentioner folder alone reads the nodes whose set of
 mentioners changed, since a mention is no leaf.
 
@@ -264,7 +264,7 @@ the roots or to 'max_roleTree_depth', walked over the union of the
 two graphs ('ContainerwardChainPartners::GraphStraddle'). The refresh
 draws a chain under a member it draws, and never reinstates a chain
 node. A ghost member holds no chain. A chain node
-carries no change facts and takes no commit-readiness marker; only
+carries no change facts and takes no processed marker; only
 the folder's members show change. Before the chain, where the
 member's relationship moved to another skgrepo, hangs that move.
 *** aliases, IDs and flags
@@ -402,7 +402,7 @@ by the recomputed U wherever it draws something new. Nothing the buffer
 holds editable is write-protected again by the server. But the server
 makes no occurrence editable and appends no root on its own: a change
 recorded by a node the buffer holds no editable occurrence of is not
-editable in this view, and the readiness summary counts it, until the
+editable in this view, and the processed summary counts it, until the
 buffer is extended (below).
 ** Extending the diff view
 C-c r u ('skg-diffView-extend'; Neovim '<localleader>ru',
@@ -425,7 +425,7 @@ gives each node made editable its body and draws its content list
 and the content of each appended root
 ('refresh_diffView_buffer_over_current_straddle').
 The answer
-is the readiness summary, and the rerender stream carries the buffer.
+is the processed summary, and the rerender stream carries the buffer.
 It does not matter who write-protected an occurrence: the user asked
 for every change.
 *** After a reload
@@ -451,7 +451,7 @@ since a deleted node's old content is editable nowhere and shown
 there ('nodes_editable_in_diffView'). The change-forest leaves those
 nodes record are the changes editable in the buffer.
 
-* Readiness
+* Processed marks
 ** Change-forest leaves
 The change-forest ('ChangeLeaves', built from the straddle,
 independent of any view) holds every change a user can mark: its
@@ -471,30 +471,30 @@ after-graph resolves that ID to the acquirer. Such IDs are among the
 extra-ID differences of the unequal nodes. No other node can record a
 change, so neither the leaves nor C cost a comparison of every node.
 ** Marks, fingerprints and the store
-A mark says that one leaf is commit-ready. The readiness store
-('server/diff_view/readiness_store.rs') keeps each mark with the fingerprint of
+A mark says that one leaf is processed. The processed store
+('server/diff_view/processed_store.rs') keeps each mark with the fingerprint of
 the change it approved, a hash of the leaf's before and after values.
 A mark whose fingerprint no longer matches the change counts as
 absent: editing a marked change unmarks it, and nothing signals that
 an earlier version was approved. The store lives on the server, is
 written to its file after every change, and is read at startup; a
 missing or unreadable file is an empty store. The file is the
-config's 'readiness_marks_file', or else
+config's 'processed_marks_file', or else
 '<data_root>/readiness-marks-STEM.json', STEM the config file's name
 without '.toml' (a symlink to a config resolved first), so that
 servers over one data root keep their marks apart
-('SkgConfig::readiness_marks_path').
+('SkgConfig::processed_marks_path').
 The file serializes the leaf keys, aspect names included, so their
 spelling is kept stable. After a git-commit, the store keeps exactly
 the marks whose leaves still exist in the rebuilt straddle.
-** Commit readiness aggregates
-A commit readiness aggregate -- a folder, a changeset marker, a node,
-a file or the whole changeset -- is ready when every leaf under it
-that can be ready is ready. An unchanged membership has no leaf and is
+** Processed aggregates
+A processed aggregate -- a folder, a changeset marker, a node,
+a file or the whole changeset -- is processed when every leaf under it
+that can be processed is processed. An unchanged membership has no leaf and is
 never asked. The content changeset marker gathers the
 content relationship leaves of its node; a member's existence leaf
 belongs to the member's own file. A file whose only change is order
-has no leaf and is ready. A modified node stands for every leaf it
+has no leaf and is processed. A modified node stands for every leaf it
 records, nearly its file (a home skgrepo move and a relRepo move name
 a second file): it shows M✓ when each of those is marked, wherever it
 stands.
@@ -507,15 +507,15 @@ first three only when true ('diff_form' in 'server/org_to_text.rs';
 the grammar is in 'docs/api-and-formats.org', "Metadata of the diff
 view"). Like every part of a headline it stands at the top level of
 the metadata, last; the parser skips it whole. A folder carries none:
-each client computes a changed folder's label and readiness from its
-members ("changed folder" in 'docs/glossary.org'). A readiness
+each client computes a changed folder's label and whether it is processed from its
+members ("changed folder" in 'docs/glossary.org'). A processed
 request is no change fact; it rides in the headline's '(editRequest
 ...)' (below).
 
 The part '(ready OBJECT...)' is a derived fact the server sets in the
-tail of the refresh ('set_ready_facts_in_viewforest'): the diff
+tail of the refresh ('set_processed_facts_in_viewforest'): the diff
 objects ('node', 'rel', and on a headline that lists it 'all') whose
-leaves are all marked, so a ready changeset marker carries '(ready
+leaves are all marked, so a processed changeset marker carries '(ready
 all)'; a bare '(ready)' on a headline that names one leaf, which
 lists no object. Nothing reads it at save.
 
@@ -525,31 +525,31 @@ leaves a request naming every listed object would touch, and the
 OBJECTs are those a request on this headline may name ('node' and/or
 'rel' on a vognode, each worth one leaf; 'all' on a
 modified node, every leaf it records, beside 'rel' when its
-relationship changed; 'all' on a commit readiness aggregate, worth N; none on a
+relationship changed; 'all' on a processed aggregate, worth N; none on a
 headline that names exactly one leaf, which a bare request marks).
 The server's 'leaves_named_at' is the single rule; the change fact
 is display-only, and the clients read it instead of keeping tables of
 headline kinds.
 
-** Readiness requests and gestures
-A gesture writes readiness requests, '(ready OBJECTS)' or '(unready
+** Processed requests and gestures
+A gesture writes processed requests, '(ready OBJECTS)' or '(unready
 OBJECTS)', into a headline's '(editRequest ...)' (creating the form if
 the headline lacks one) and saves; the save
 consumes them after its graph edits succeed (not when it stops for a
 confirmation), in any buffer, marking or unmarking the leaves each
 headline names at their current fingerprints. A request naming no
 current change is dropped with a warning. Validation refuses a save
-in which two headlines name one leaf, one ready and the other
-unready, naming the leaf and both headlines
-('find_contradictory_readiness_requests'); requests that agree are
+in which two headlines name one leaf, one processed and the other
+unprocessed, naming the leaf and both headlines
+('find_contradictory_processed_requests'); requests that agree are
 consumed as usual. 'all' names every leaf a
-modified node records, or every leaf of a commit readiness aggregate
+modified node records, or every leaf of a processed aggregate
 one level down.
 
-Every gesture toggles: it unmarks what is ready and marks what is
-not, and every headline is ready when its own '(ready ...)' names
+Every gesture toggles: it unmarks what is processed and marks what is
+not, and every headline is processed when its own '(ready ...)' names
 every object its '(leaves ...)' lists. C-c r r
-('skg-cycle-commit-ready') acts on the headline at point, naming every
+('skg-cycle-processed') acts on the headline at point, naming every
 object it lists: one leaf; on a new member, its existence and its
 relationship; on a modified node, every leaf it records, and its
 relationship when that changed, so one gesture marks the file; on a
@@ -563,10 +563,10 @@ each new node's existence and content relationships, outward marking
 everything each records. At the headline it acts on, such a node
 names that object alone, not its relationship to its viewparent, and
 toggles by its existence. Below the headline it acts on, a gesture
-names no 'all': the leaves of a modified node or a commit readiness
+names no 'all': the leaves of a modified node or a processed
 aggregate there are named by the headlines under it, or are not
 shown there; the other objects such a headline lists are named. C-c r h
-('skg-toggle-homeSkgrepo-move-commitReady') acts on the home skgrepo
+('skg-toggle-homeSkgrepo-move-processed') acts on the home skgrepo
 move of the node at point, and with a prefix argument on every
 descendant whose home skgrepo moved between the same two skgrepos. Both work
 on write-protected occurrences. A gesture that would unmark more than
@@ -576,27 +576,27 @@ first asks for a typed "yes".
 Six commands move point between headlines with change facts, the
 headlines whose metadata carries a '(leaves ...)' change fact: C-c r n c
 ('skg-diffView-goto-next-change') to the next, C-c r n u to the next
-unready one and C-c r n r to the next ready one, and C-c r p c, C-c r
-p u and C-c r p r to the previous ones. A headline with change facts is ready
+unprocessed one and C-c r n r to the next processed one, and C-c r p c, C-c r
+p u and C-c r p r to the previous ones. A headline with change facts is processed
 when its '(ready ...)' names every object its '(leaves ...)' lists.
 They do not wrap: at the end they say "No further change" (or "No
-earlier change", with "unready" or "ready" for the filtered forms).
-** The readiness summary
+earlier change", with "unprocessed" or "processed" for the filtered forms).
+** The processed summary
 The answer to each "diff view" request for a nonempty buffer, to each
 save of a buffer of the diff view, and to C-c r u carries the
-readiness summary, as does the answer to a stage-and-commit that
+processed summary, as does the answer to a stage-and-commit that
 would leave changes behind. When a buffer of the diff view opens,
 after every save of one, after C-c r u, and before such a
-stage-and-commit, the client shows it: "12 of 14 changed files are ready", or
-"Commit ready. All 14 of 14 changed files are ready.". A changed file
-is ready when every change it records is marked; order-only files
-count as changed and ready. It is computed over every leaf of the
+stage-and-commit, the client shows it: "12 of 14 changed files are processed", or
+"Commit ready. All 14 of 14 changed files are processed.". A changed file
+is processed when every change it records is marked; order-only files
+count as changed and processed. It is computed over every leaf of the
 change-forest, whatever buffer is open. It adds the changed files of
 the foreign skgrepos, and the changes not editable in this view:
 the leaves whose recorder the buffer does not make editable (see
 "What counts as editable here"), with the command that extends the
 buffer to them. The diff view's answer, a save and C-c r u compute it alike
-('buffer_readiness_summary_for', 'server/diff_view/readiness_requests.rs').
+('buffer_processed_summary_for', 'server/diff_view/processed_requests.rs').
 
 * Restoring what a change removed
 Two edit requests undo a removal from the diff view's buffers, without
@@ -633,7 +633,7 @@ write-protected (herald "restore membership"). The command and the
 save both refuse it anywhere else, by where the headline stands, with
 "Only a removed membership can be restored". On a ghost it refuses with "This
 node is deleted; restore it first (skg-restore-deleted-node)". The save
-re-adds the one relationship the headline stands for (the readiness
+re-adds the one relationship the headline stands for (the processed
 requests' 'relationship_to_viewparent' names it), as HEAD recorded it:
 at its index in the recorder's list at HEAD, clamped, in the skgrepo
 that recorded it. A request whose headline stands for no relationship
@@ -671,7 +671,7 @@ skgrepos, never less: a partial commit can leave HEAD inconsistent
 only, holding a moved node twice), and the next diff view against it
 would report changes that are only that inconsistency.
 ** Its confirmations
-When the readiness summary is incomplete and the request lacks
+When the processed summary is incomplete and the request lacks
 '(confirmed . t)', the answer is the summary alone with
 '(needs-confirmation . t)', and nothing changes; the client asks for
 the typed word "yes" and resends confirmed.

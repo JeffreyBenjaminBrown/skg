@@ -84,7 +84,7 @@ each running a server from a config of their own: both configs list
 the same skgrepos, each marks the other's 'foreign = true', and each
 gives its server its own 'port'. A config in each user's own folder
 ('data/jeff/skgconfig.toml' beside 'data/ed/skgconfig.toml') gives
-each server its own search index, readiness marks and run folder,
+each server its own search index, processed marks and run folder,
 since those sit in or beside the config's folder. Each server
 watches every skgrepo directory and reloads the '.skg' files that
 change on disk, so it shows another server's saves, or a 'git pull',

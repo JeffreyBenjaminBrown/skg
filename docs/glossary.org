@@ -174,25 +174,25 @@ and =restoreNode= on a ghost) asks the save to change the graph; a
 successful save consumes it, and a failed save leaves it in the
 buffer. The two restore requests are described in
 'docs/diff-view.org', "Restoring what a change removed". A
-*readiness request* (see "readiness request, readiness gesture") is a
+*processed request* (see "processed request, processed gesture") is a
 third kind, written in the same form: =(editRequest ...)= holds at
-most one edit request and one readiness request. The save consumes a
-readiness request after its graph edits succeed, to mark or unmark
-changes commit-ready, and it changes neither the view nor the graph.
+most one edit request and one processed request. The save consumes a
+processed request after its graph edits succeed, to mark or unmark
+changes processed, and it changes neither the view nor the graph.
 In code a node's own edit request is a 'NodeEditRequest', kept in
 'Editability::Editable'; a request about a headline's relationship to
 its viewparent (=relRepo=, =restoreRel=), which an occurrence, an
 unknown viewnode, a restricted viewnode or an alias may carry, is a
 'RelationshipEditRequest'; a
-readiness request is the viewnode's 'ReadinessRequest'.
+processed request is the viewnode's 'ProcessedRequest'.
 
 *** gesture
 
 A *gesture* is a client command that writes requests into headline
 metadata for the server to apply at a save. The relRepo gesture
 (=skg-set-relRepo=), the flag gesture (=skg-set-flag-search-matching=),
-the fork gesture (=skg-fork-node=) and the readiness gestures are
-kinds. The fork and readiness gestures save at once; the others leave
+the fork gesture (=skg-fork-node=) and the processed gestures are
+kinds. The fork and processed gestures save at once; the others leave
 the save to the user.
 
 *** occurrence
@@ -596,7 +596,7 @@ member, nor under a property member, and the member's
 partners in the folder's own role are not drawn below it: a folder
 request on the member draws them. No request extends a chain; a
 folder request on a chain node draws a folder under it. A chain node
-carries no change facts and takes no commit-readiness marker; a
+carries no change facts and takes no processed marker; a
 folder's member does both. Nothing in a chain node's metadata says
 that it is one: it is known by where it stands.
 
@@ -879,7 +879,7 @@ membership as an unknown viewnode does: a save keeps its gnid in the
 list it claims a place in, and deleting its line removes the record;
 the save restores to a list only the members whose records are
 restricted, which the buffer could not show. It takes a relRepo
-request and a readiness request. In the implementation it is a
+request and a processed request. In the implementation it is a
 gnid-only vognode (see "gnid-only vognode").
 
 *** ancestor generation
@@ -1328,7 +1328,7 @@ Four buffers that show every change in the owned skgrepos since their
 last commits, with the context needed to understand them: "all
 changes", "merges", "skgrepo changes" and "order-only changes". Each is
 an ordinary editable view. Foreign skgrepos are excluded; the
-readiness summary only counts their changed files.
+processed summary only counts their changed files.
 
 **** change viewnode
 
@@ -1373,17 +1373,17 @@ folders' members carry none. On an alias, ID or flag member, '(rel
 
 A headline's *change facts* are the parts of its '(diff ...)' form
 that the server writes: the three kinds of change, the '(leaves
-...)' count of its change-forest leaves, the '(ready ...)' readiness
-(its commit-readiness marker), and in the skgrepo-changes buffer its
+...)' count of its change-forest leaves, the '(ready ...)' processed state
+(its processed marker), and in the skgrepo-changes buffer its
 home skgrepo move and its moved-like-ancestor fact ('ChangeFacts' in
 'server/types/viewnode.rs'). A
-readiness request, in the headline's '(editRequest ...)', is the
+processed request, in the headline's '(editRequest ...)', is the
 user's, not a change fact. The words are never shortened to
 "facts".
 
 **** diff object, diff aspect
 
-A *diff object* is what a part of a '(diff ...)' form or a readiness request
+A *diff object* is what a part of a '(diff ...)' form or a processed request
 names on a headline: the node itself ('node'), or the node's
 relationship to its viewparent ('rel'; in a partner folder, to the
 folder's viewparent). There are exactly these two.
@@ -1391,7 +1391,7 @@ A change-forest leaf about a relationship has the relationship as its
 object, never the member. A request, a '(leaves ...)' change fact and
 a '(ready ...)' change fact may also say 'all', which names every leaf a
 modified node records (so one gesture on it marks its file), or every
-leaf of a commit readiness aggregate one level down; 'all' is shorthand, not a third
+leaf of a processed aggregate one level down; 'all' is shorthand, not a third
 object. A request alone may also say 'newContent' or 'newOutward',
 shorthand too: each names leaves of the new nodes reached from the
 headline's node through new nodes only, as the change forest says,
@@ -1434,8 +1434,8 @@ described: "the nodes to extend contentward (U; see
 
 **** change-forest, change-forest leaf, recorder of a leaf
 
-The *change-forest* is the picture of everything commit-readiness can
-be asked about, built from the graph straddle, independent of any
+The *change-forest* is the picture of everything that can be marked
+processed, built from the graph straddle, independent of any
 view: its roots are the changed graphnodes; under each come its
 changed aspects; its leaves, the *change-forest leaves* (*change
 leaves* for short, as in 'ChangeLeaves'; "change leaf" is a term of
@@ -1448,26 +1448,26 @@ that node *records* the leaf; a relationship's leaf is recorded by
 the relationship's recorder, so seen from either end it is the same
 leaf.
 
-**** mark, readiness
+**** mark, processed
 
-A *mark* says that one change-forest leaf is commit-ready; the
-readiness gestures set and clear marks. Editing a marked change
-unmarks it. A leaf's *readiness* is whether it is marked.
+A *mark* says that one change-forest leaf is processed; the
+processed gestures set and clear marks. Editing a marked change
+unmarks it. A leaf is *processed* when it is marked, and *unprocessed* otherwise.
 
-**** commit readiness aggregate
+**** processed aggregate
 
-A *commit readiness aggregate* is a thing with change-forest leaves
+A *processed aggregate* is a thing with change-forest leaves
 under it: a folder, a changeset marker, a node, a file, the whole
-changeset. It is ready iff every leaf under it that can be ready is
-ready; that derived value is *its readiness*. A view shows it as
+changeset. It is processed iff every leaf under it that can be processed is
+processed; that derived value is *its processed state*. A view shows it as
 '(ready ...)' in the '(diff ...)' form, which nothing reads at save;
-a folder carries none, and each client computes a folder's readiness
+a folder carries none, and each client computes whether a folder is processed
 from its members (see "changed folder").
 
-**** commit-readiness marker
+**** processed marker
 
 The '(ready ...)' part of a headline's '(diff ...)' form, and its
-herald: the derived readiness of a commit readiness aggregate or of
+herald: the derived processed state of a processed aggregate or of
 the leaves of a headline with change facts. A changed folder's ✓,
 which the clients draw from its members, is one too. A folder's
 member takes one; a chain node takes none. It is never called a bare "marker", since a
@@ -1477,10 +1477,10 @@ changeset marker is another thing.
 
 A childless change viewnode ('ChangeViewnode::ChangesetMarker') that
 stands for a set of changes recorded in its parent's file, and carries
-their derived readiness. There are three kinds: the content changeset
+their derived processed state. There are three kinds: the content changeset
 marker ("its content changed"), the relRepo changeset marker ("some
 content relationships changed skgrepo") and the order-only changeset marker
-("order-only change", which is always ready).
+("order-only change", which is always processed).
 
 **** removed member, former member
 
@@ -1512,7 +1512,7 @@ A partner, alias, ID or flags folder the diff view shows because its
 membership changed since HEAD. It is written as its bare folder atom,
 holds the members of either graph, each tagged with the three kinds
 of change, and reads "its X changed (this file)" or "(other files)"
-(see "in, out"), with ✓ when every changed membership is ready: each
+(see "in, out"), with ✓ when every changed membership is processed: each
 client sees the change in the members and draws that label in place
 of the folder's own.
 
@@ -1546,14 +1546,14 @@ ID folder, whose claims the save never reads, carries no 'noClaim',
 and the save's check of an ID folder refuses only one lacking an ID of
 the node. Marking it marks the leaf of the removed alias or ID.
 
-**** readiness summary
+**** processed summary
 
 The line a client shows after every save of a diff-view buffer, after the
 "extend the diff view" command (C-c r u), and before a
 stage-and-commit that would leave changes behind: "12 of 14 changed
-files are ready", or "Commit ready. All 14 of 14 changed files are
-ready." A changed file is ready when every change it records is
-marked; a file whose only change is order is ready without marks. The
+files are processed", or "Commit ready. All 14 of 14 changed files are
+processed." A changed file is processed when every change it records is
+marked; a file whose only change is order is processed without marks. The
 summary also counts the changed files of foreign skgrepos and the
 changes not editable in the view.
 
@@ -1577,18 +1577,18 @@ nodes record are the changes editable in the buffer.
 The change-forest leaves recorded by the nodes whose changes a
 buffer does not
 [[*editable in the diff view][make editable]] are the *changes
-not editable in the view*, which the readiness summary counts. A
+not editable in the view*, which the processed summary counts. A
 save never makes them editable; C-c r u extends the buffer to them,
 as does the rerender of a clean buffer after a reload.
 
-**** readiness request, readiness gesture
+**** processed request, processed gesture
 
-A *readiness request* is a metadata form, '(ready OBJECTS)' or
+A *processed request* is a metadata form, '(ready OBJECTS)' or
 '(unready OBJECTS)' inside a headline's '(editRequest ...)', that the
 save consumes, after its graph
 edits succeed, to set or clear the marks of a headline's leaves. A
-*readiness gesture* is a gesture (C-c r r, C-c r h and their
-recursive forms) that writes readiness requests on one or many
+*processed gesture* is a gesture (C-c r r, C-c r h and their
+recursive forms) that writes processed requests on one or many
 headlines, then saves.
 
 **** restore request
@@ -1607,8 +1607,8 @@ and consumes them as it does every edit request
 **** headline with change facts
 
 A headline whose metadata carries a '(leaves ...)' change fact. It
-is ready when its '(ready ...)' names every object its '(leaves ...)' lists,
-and otherwise unready. The navigation commands (C-c r n c and its
+is processed when its '(ready ...)' names every object its '(leaves ...)' lists,
+and otherwise unprocessed. The navigation commands (C-c r n c and its
 kin) move between headlines with change facts.
 
 **** tag
@@ -1836,7 +1836,7 @@ the graph straddle.
 Which kind of view a refresh refreshes ('RefreshMode' in
 'server/refresh/mode.rs', a term of plan 06): 'ContentView', or
 'DiffView', which carries three parts, the graph straddle, the buffer
-kind and the readiness store. It
+kind and the processed store. It
 decides whether a parent's goal includes what HEAD alone warrants,
 whether ghosts and change viewnodes are drawn, and what the node
 budget may refuse.
@@ -1846,7 +1846,7 @@ A rerender pass is told less: 'RerenderMode' (a term of plan 08, in
 buffer kind, built from the view being rerendered; the rerender of a
 buffer of the diff view adds the graph straddle the pass shares
 across the views it rerenders ('RerenderPassContext' in
-'server/rerender_pass.rs') and the readiness store, making the
+'server/rerender_pass.rs') and the processed store, making the
 refresh's mode.
 
 *** gnid, pid, extra ID
@@ -2217,7 +2217,7 @@ How the diff view ('docs/diff-view.org') is computed.
 
 Which of the four buffers of the diff view a buffer is
 ('DiffViewBufferKind'). A buffer of the diff view is refreshed over
-the graph straddle; the straddle, the buffer kind and the readiness
+the graph straddle; the straddle, the buffer kind and the processed
 store are the three parts of the refresh's diff-view mode
 ('RefreshMode::DiffView').
 
@@ -2241,11 +2241,11 @@ after-graph holds it, 'Existence::Removed' when only the before-graph
 does, and none when both do. A view shows it as
 [[*the three kinds of change][the three kinds of change]].
 
-**** fingerprint, the readiness store
+**** fingerprint, the processed store
 
-Marks are stored in the server's readiness marks file
+Marks are stored in the server's processed marks file
 ('<data_root>/readiness-marks-CONFIGSTEM.json' unless the config names
-another; 'docs/api-and-formats.org', "Readiness marks file"), each with a
+another; 'docs/api-and-formats.org', "Processed marks file"), each with a
 *fingerprint* of the change it approved. A mark whose fingerprint no
 longer matches the change counts as absent, which is how editing a
 marked change unmarks it.

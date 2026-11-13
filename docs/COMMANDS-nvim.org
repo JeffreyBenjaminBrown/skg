@@ -711,7 +711,7 @@ pending"). Save the view afterward to apply the changes.
 Prompts between =search matching= and =no search matching= and stages the
 desired state without saving. Foreign/write-protected/unsaved roots and a
 node that already holds an edit request (delete, a nodeMerge or a
-flag) are refused. A readiness request stays beside it. A pending
+flag) are refused. A processed request stays beside it. A pending
 relRepo request gives way to it, and the message says so: "replaced a
 pending relRepo request". ':SkgDelete' (<localleader>dd) and
 ':SkgSetMergeRequest' (<localleader>sm) replace a pending relRepo
@@ -760,49 +760,49 @@ and on any other headline that is not a removed membership with
 "Only a removed membership can be restored", at once. It does not
 save. Save with =:w= afterward to apply it. A relationship whose other end is still deleted
 is not restored; the save says so.
-** <localleader>r : commit readiness, in the diff view
+** <localleader>r : processed marks, in the diff view
 In a buffer of the diff view (<localleader>vd), each change can
-be marked commit-ready. A mark approves the change as it is now:
+be marked processed. A mark approves the change as it is now:
 editing the changed thing again makes the mark lapse. Marks live on
 the server, in a file beside its config
 ('<data_root>/readiness-marks-CONFIGSTEM.json', unless the config names
 another). A headline whose
-change is ready shows ✓ after it; a commit readiness aggregate (a
+change is processed shows ✓ after it; a processed aggregate (a
 folder of changes, a changeset marker) shows ✓ when all of its changes are. A node that
 existed at HEAD and whose file records a change shows M ("modified"),
 and M✓ once every change its file records is marked.
 
 After every save of one of the diff view's buffers, a
-notification shows the readiness summary: "12 of 14 changed files are
-ready", or "Commit ready. All 14 of 14 changed files are ready.". A
-changed file counts as ready when every change it records is marked;
-a file whose only change is the order of a list counts as ready
+notification shows the processed summary: "12 of 14 changed files are
+processed", or "Commit ready. All 14 of 14 changed files are processed.". A
+changed file counts as processed when every change it records is marked;
+a file whose only change is the order of a list counts as processed
 without marks. The summary
 adds how many changes are not editable in this view (<localleader>ru
 extends the diff view to them) and how many files changed in foreign skgrepos.
 
 A gesture that would unmark more than one change (a recursive one, one
 on a folder of changes, or one on a modified node, which unmarks every
-change the node records) first asks "Unmarking this node commit-ready
+change the node records) first asks "Unmarking this node processed
 will unmark every contributing decision. You might discard a lot of
 hard-won information. Continue (yes/no)?", and does nothing unless
 you type "yes". Unmarking a single change asks nothing. The
 server counts the changes: each headline that names changes says how
 many, in its metadata's '(leaves N ...)'.
-*** <localleader>rr : :SkgCycleCommitReady
-Toggles the commit-readiness of the change at point, then saves.
+*** <localleader>rr : :SkgCycleProcessed
+Toggles whether the change at point is processed, then saves.
 On a headline that is one change (an old text, an alias, a move, a
 changeset marker), it toggles that one. On a headline that carries
 several, it toggles them all: on a new member its existence and its
 relationship to the headline above it (∃ and ~); on a modified node
 (M) every change its file records, and its relationship (~) when that
 changed too, so one gesture marks the whole file. A headline counts
-as ready when every one of its changes is. On a folder of changes, it
+as processed when every one of its changes is. On a folder of changes, it
 toggles each change one level down. Works on write-protected
 headlines too.
-*** <localleader>rR : :SkgCycleCommitReadyRecursive
+*** <localleader>rR : :SkgCycleProcessedRecursive
 Marks every change in the subtree at point, or unmarks them if the
-headline at point is ready, then saves. At a new node (∃+) that is not
+headline at point is processed, then saves. At a new node (∃+) that is not
 in a folder, it leaves the rest of that subtree to the server, which
 marks the new node, its text and its content, then the same for each
 new node the graph says it contains, and each new node those contain,
@@ -810,16 +810,16 @@ and so on, whether or not the buffer shows them, write-protected or
 not. It does not mark the relationship of the node at point to its
 container, nor any subscription, hiding or override. Unmarking that
 way always asks first. (Emacs: C-u C-c r r.)
-*** <localleader>rO : :SkgCycleCommitReadyRecursiveOutward
+*** <localleader>rO : :SkgCycleProcessedRecursiveOutward
 As <localleader>rR, but at a new node the server follows every
 relationship each new node records (contains, subscribes to, hides,
 overrides), and marks everything each records. (Emacs: C-u C-u C-c r
 r.)
-*** <localleader>rh : :SkgToggleHomeSkgrepoMoveCommitReady
-Toggles the commit-readiness of the home-skgrepo move of the node at
-point (or of the move at point), then saves: it unmarks the move if
-it is ready, else marks it. Works on write-protected headlines too.
-*** <localleader>rH : :SkgToggleHomeSkgrepoMoveCommitReadyRecursive
+*** <localleader>rh : :SkgToggleHomeSkgrepoMoveProcessed
+Toggles whether the home-skgrepo move of the node at
+point (or the move at point) is processed, then saves: it unmarks the move if
+it is processed, else marks it. Works on write-protected headlines too.
+*** <localleader>rH : :SkgToggleHomeSkgrepoMoveProcessedRecursive
 Also toggles, in the same direction, every descendant whose home
 skgrepo moved between the same two skgrepos. (Emacs: C-u C-c r h.)
 *** <localleader>ru : :SkgDiffViewExtend
@@ -828,7 +828,7 @@ Each changed node with no editable occurrence becomes editable where
 the buffer first shows it, in content or else in a partner folder,
 with its change and its content shown under it; when a change is
 under a root the buffer lacks, that root is appended at the end. A
-notification then shows the readiness summary, as after a save.
+notification then shows the processed summary, as after a save.
 Refuses with "Save the buffer first." while the buffer has unsaved
 changes. A clean buffer the server rerenders after reloading files
 changed on disk is extended the same way, with no key pressed.
@@ -845,7 +845,7 @@ needed committing and nothing failed, the buffer is deleted. When
 nothing is committed otherwise (a "yes" declined, a refusal, an
 error), the message stays there, and ':SkgStageAndCommit' reopens it.
 It stages only '.skg' files (deletions included). If not
-every changed file is ready, it first shows the readiness summary and
+every changed file is processed, it first shows the processed summary and
 proceeds only if you type the word "yes". Likewise, if some owned
 gitrepo already has entries staged before the command, it first says
 how many paths each such gitrepo has staged, lists them in the buffer
@@ -865,23 +865,23 @@ the changes it names. The cursor lands on the headline's metadata, as
 with <localleader>in. It does not wrap: past the last one it says "No
 further change" and leaves the cursor. It works in any skg buffer;
 outside the diff view no headline names a change, so it finds none.
-*** <localleader>rnu : :SkgDiffViewGotoNextUnreadyChange
-The same, visiting only headlines with change facts that are not ready (see
-<localleader>rr for when a headline counts as ready). Past the last
-one it says "No further unready change".
-*** <localleader>rnr : :SkgDiffViewGotoNextReadyChange
-The same, visiting only ready headlines with change facts. Past the last one it
-says "No further ready change".
+*** <localleader>rnu : :SkgDiffViewGotoNextUnprocessedChange
+The same, visiting only headlines with change facts that are not processed (see
+<localleader>rr for when a headline counts as processed). Past the last
+one it says "No further unprocessed change".
+*** <localleader>rnr : :SkgDiffViewGotoNextProcessedChange
+The same, visiting only processed headlines with change facts. Past the last one it
+says "No further processed change".
 *** <localleader>rpc : :SkgDiffViewGotoPreviousChange
 Like <localleader>rnc, backward: moves the cursor to the previous
 headline with change facts before it. Before the first one it says "No earlier
 change".
-*** <localleader>rpu : :SkgDiffViewGotoPreviousUnreadyChange
+*** <localleader>rpu : :SkgDiffViewGotoPreviousUnprocessedChange
 Like <localleader>rnu, backward. Before the first one it says "No
-earlier unready change".
-*** <localleader>rpr : :SkgDiffViewGotoPreviousReadyChange
+earlier unprocessed change".
+*** <localleader>rpr : :SkgDiffViewGotoPreviousProcessedChange
 Like <localleader>rnr, backward. Before the first one it says "No
-earlier ready change".
+earlier processed change".
 ** <localleader>m : other graph modifications
 *** <localleader>mc : :SkgReplaceLinkWithContent
 Replace the leaf at point with a content relationship to the
@@ -962,7 +962,7 @@ and "...: order-only changes", skipping any that would be empty. It
 refuses unless the connection is unrestricted, and when an owned
 skgrepo is not in a git repository or has no HEAD commit (the refusal
 names the skgrepo). As each buffer opens, a notification shows its
-readiness summary, as after a save (see <localleader>r).
+processed summary, as after a save (see <localleader>r).
 
 Once the diff view's buffers are open, a switch of the
 skgrepo restriction (':SkgRestrictRepoSet', <localleader>vl)
@@ -981,7 +981,7 @@ that changed, or leads to a change, is editable with its content, and
 any other new member is a write-protected member shown without its
 content. But a
 save makes nothing editable that the buffer already shows, and
-appends no root: the readiness summary counts a change since the
+appends no root: the processed summary counts a change since the
 buffer opened that it holds nowhere editable as not editable in this
 view. <localleader>ru extends the buffer to such changes.
 Nothing the buffer holds editable is write-protected again by the
@@ -1000,7 +1000,7 @@ and not others leaves HEAD inconsistent: it can reference nodes it
 does not contain, record a relationship from one end only, or hold a
 moved node in two skgrepos at once. Such a HEAD cannot be reasoned
 about, and the next diff view against it reports changes that are
-only its own inconsistency. Review with the readiness marks
+only its own inconsistency. Review with the processed marks
 (<localleader>r) instead, and commit everything at once with
 :SkgStageAndCommit.
 The merges buffer shows each nodeMerge since HEAD: the acquiree and
@@ -1086,7 +1086,7 @@ skgrepo. A fork copies into its clone only the relationships the set
 shows; a node merge, like a delete, is refused when either node has a
 section outside the set; a delete whose cleanup would strip
 relationships outside the set asks first (see the delete). Restoring
-from HEAD, readiness requests and the cleanup of an absent ID's
+from HEAD, processed requests and the cleanup of an absent ID's
 references are refused unless the connection is unrestricted, and an
 import into a skgrepo outside the set is refused. A
 skgrepo narrowing (a switch to a smaller set) turns an open view's
@@ -1140,7 +1140,7 @@ a ghost restoreNode.
 A value that needs more (a nodeMerge's target, relRepo's skgrepo,
 a flag and its value, a folder's relation) prompts for it.
 A field left at its default is dropped when the edit is applied.
-A readiness request the diff view's gestures wrote
+A processed request the diff view's gestures wrote
 (see <localleader>r) is shown in the edit request field, beside
 the other request; deleting it there clears it.
 After each headline, in parentheses, is the herald that field or

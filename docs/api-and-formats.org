@@ -225,7 +225,7 @@ So far there are these endpoints:
       the connection does not hold (a connection that ends with each
       command, as skg-for-ai's does without its daemon, or one opened
       after a server restart): the save then re-renders the buffer as that buffer of
-      the diff view, with its readiness summary, keeps every viewnode
+      the diff view, with its processed summary, keeps every viewnode
       ID it carries (see =(vnid X)= under "The metadata headers"), and
       leaves the connection holding it as that buffer, so that an
       "Extend diff view" request can follow. A view the
@@ -270,7 +270,7 @@ So far there are these endpoints:
        When the saved buffer is one of the diff view's, the point
        entries are followed by =(readiness-summary (ready N) (changed M) (foreign F) (order-only O) (notEditable K))=:
        of the M changed files of the owned skgrepos (O of them changed only
-       in order, and so ready), N are commit-ready; F files changed in
+       in order, and so processed), N are processed; F files changed in
        foreign skgrepos; and K changes are not editable in the view: they
        are recorded by nodes whose changes the buffer does not make editable. A
        buffer makes a node's changes editable where it has an editable
@@ -298,7 +298,7 @@ So far there are these endpoints:
        viewnode ID, a bare symbol; =(changed-headlines ())= means no
        headline changed. Without the entry, the client redraws the
        whole buffer. A failed save and every confirmation carry none.
-  - Readiness requests (=(ready OBJECTS)= and =(unready OBJECTS)=
+  - Processed requests (=(ready OBJECTS)= and =(unready OBJECTS)=
     inside a headline's =(editRequest ...)=; see "Metadata of the
     diff view") are
     consumed by a save of any buffer, not only one of the diff view's,
@@ -306,11 +306,11 @@ So far there are these endpoints:
     change-forest leaves its headline names, at their current
     fingerprints. A save that stops for a confirmation (delete-from,
     strandeds, Hoist, forks) or fails consumes none, and leaves them in
-    the buffer. Under a skgrepo restriction a save carrying a readiness
+    the buffer. Under a skgrepo restriction a save carrying a processed
     request, or a restore request, is refused before anything is
-    written: =A readiness request requires no skgrepo restriction= (or
+    written: =A processed request requires no skgrepo restriction= (or
     =A restore request ...=), in the words of the diff view's refusal. A request that names no current change is dropped, with
-    the warning =A readiness request names no current change; it was
+    the warning =A processed request names no current change; it was
     dropped.=, which names its headline as a subheadline.
   - A =(folder containers)= request on an occurrence that the refresh
     leaves with no =containerFolder=, since nothing but its
@@ -604,7 +604,7 @@ it are its body. A message that concerns a headline of the
 buffer names it as a level-3 subheadline, after the message's own
 lines:
 #+begin_example
-,** A readiness request names no current change; it was dropped.
+,** A processed request names no current change; it was dropped.
 ,*** b
 - graphnode ID: b
 - viewnode ID: 0z. To find it: C-c g v 0z
@@ -829,7 +829,7 @@ keeps them as text ('TODO/problems.org').
   - Response: LP response-type "diff-view", one of:
     - =((content "ORG") (errors ()) (warnings ()) (readiness-summary ...))=:
       the buffer, now registered under VIEW_ID as a buffer of the diff
-      view, and its readiness summary, in the form
+      view, and its processed summary, in the form
       and with the counts a save of the buffer unchanged would report
       (see "Save buffer").
     - =((empty . t) (errors ()) (warnings ()))=: the buffer would show
@@ -851,7 +851,7 @@ keeps them as text ('TODO/problems.org').
     every view. Closing the last such buffer drops it, as does a
     rebuild of the session-lifetime stores, so the next request reads
     both halves from the disk the rebuilt live graph was read from. Saving such a buffer is ordinary (see "Save
-    buffer"), and its response carries the readiness summary.
+    buffer"), and its response carries the processed summary.
   - A rerender of such a buffer (after a save, collateral, or after a
     commit) is a refresh in diff-view mode (see
     =docs/data-model_technical.org=, "The refresh: how a view follows
@@ -881,7 +881,7 @@ keeps them as text ('TODO/problems.org').
     stream (rerender-lock, rerender-view*, rerender-done). The
     response is one of:
     - =((needs-confirmation . t) (already-staged (("GITREPO" "PATH" ...) ...)) (readiness-summary ...) (errors ()) (warnings ()))=
-      when the request is not confirmed and either the readiness
+      when the request is not confirmed and either the processed
       summary (the save response's form, with =(notEditable 0)=) is
       incomplete or some owned gitrepo has entries already staged.
       =already-staged= is present only in the second case: each such
@@ -902,7 +902,7 @@ keeps them as text ('TODO/problems.org').
       the diff view over the rebuilt graph straddle, as any
       rerender does: its roots and what it holds editable stay, and what
       was committed loses its change facts. The marks of the changes committed are dropped
-      from the readiness store.
+      from the processed store.
     - =((errors ("REFUSAL")) (warnings ()))= when the
       connection has a skgrepo restriction, the message is blank, or the graph
       straddle cannot be built. The rerender stream is empty.
@@ -1552,7 +1552,7 @@ A ghost takes no view request; the parser refuses one there.
 the graph. A save that succeeds consumes every request in the buffer
 it saves, after its graph edits; a save that stops for a confirmation
 or fails leaves them in the buffer. A headline carries at most one,
-beside at most one readiness request, =(ready ...)= or =(unready
+beside at most one processed request, =(ready ...)= or =(unready
 ...)= (see "Metadata of the diff view"), written after it. The
 heralds are nonstandard. The five requests on a node, and the
 one on a ghost:
@@ -1827,7 +1827,7 @@ Pass its path as a command-line argument (default: =data/jeff/skgconfig.toml=) w
 | =beep_when_server_becomes_available= | no | true | When true, plays a local sound after server initialization finishes. |
 | =default_repo_set= | no | the most private owned skgrepo | The skgrepo restriction when a client connects: the most private owned skgrepo to show, foreign skgrepos shown. It must name an owned skgrepo; a foreign one is refused. The default is no skgrepo restriction. Runtime changes are per connection and are not written back. |
 | =max_roleTree_depth= | no | 20 | Max breadth-first depth of a containerward chain. |
-| =readiness_marks_file= | no | =readiness-marks-STEM.json= | The diff view's readiness marks file (see "Readiness marks file"). Relative to data root. |
+| =processed_marks_file= | no | =readiness-marks-STEM.json= | The diff view's processed marks file (see "Processed marks file"). Relative to data root. |
 | =repo_watch_quiet_ms= | no | 500 | How long, in milliseconds, the skgrepo directories must be quiet after a =.skg= file changes on disk before the server reloads the changes (see "Repo files reloaded"). A rebuild applies a changed value. |
 
 The retired keys =db_name=, =delete_on_quit=, and =auto_audit_daily= are
@@ -2008,14 +2008,14 @@ the output of the rerun loop, or of cargo-watch with =--hot-reload=.
 Each time the rerun loop restarts the server, a new subfolder
 appears, so the newest one holds the current run's logs.
 
-** Readiness marks file
+** Processed marks file
 
-The readiness marks file holds the commit-readiness marks of the
-diff view ('server/diff_view/readiness_store.rs'). It is the config's
-=readiness_marks_file=, resolved against the data root, or else
+The processed marks file holds the processed marks of the
+diff view ('server/diff_view/processed_store.rs'). It is the config's
+=processed_marks_file=, resolved against the data root, or else
 =<data_root>/readiness-marks-STEM.json=, STEM the config file's name
 without its extension, after any symlink to it is resolved
-('SkgConfig::readiness_marks_path'): a server started with
+('SkgConfig::processed_marks_path'): a server started with
 =data/jeff/skgconfig.toml= keeps its marks in
 =data/jeff/readiness-marks-skgconfig.json=, and one started with
 =data/skgconfig-ed.toml=, or with a symlink =data/skgconfig.toml= to
@@ -2104,7 +2104,7 @@ parsed) lives in =server/serve/parse_metadata_sexp.rs=. The
 in-memory types those keys correspond to are in
 =server/types/viewnode.rs= (=Viewnode=, =ViewnodeKind=, =Vognode=,
 =Folder=, =PropertyMember=, the diff view's =ChangeViewnode=, and its
-=ChangeFacts= and =ReadinessRequest=, which every =Viewnode= carries).
+=ChangeFacts= and =ProcessedRequest=, which every =Viewnode= carries).
 
 Every headline has one shape:
 #+begin_example
@@ -2129,24 +2129,24 @@ takes only its own declared parts:
 #+begin_example
 node [(gnid ID)] [(skgRepos [(nodeRepo R)] [(relRepo R)])]
      [noClaim] [writeProtected] [(overridesHere ID)]
-     [(editRequest [REQUEST] [READINESS])] [(viewRequests ...)]
+     [(editRequest [REQUEST] [PROCESSED])] [(viewRequests ...)]
      [(view ...)] [(diff ...)]
 ghost (gnid ID) (skgRepos (nodeRepo R)) [noClaim]
-      [(editRequest [restoreNode] [READINESS])]
+      [(editRequest [restoreNode] [PROCESSED])]
       [(view ...)] [(diff ...)]
 unknown (gnid ID) [(skgRepos (relRepo R))] [noClaim]
-        [(editRequest [(relRepo R)] [READINESS])] [(diff ...)]
+        [(editRequest [(relRepo R)] [PROCESSED])] [(diff ...)]
 restricted (gnid ID) [(skgRepos (relRepo R))] [noClaim]
-           [(editRequest [(relRepo R)] [READINESS])] [(diff ...)]
+           [(editRequest [(relRepo R)] [PROCESSED])] [(diff ...)]
 alias [(skgRepos (relRepo R))] [noClaim]
-      [(editRequest [(relRepo R)] [READINESS])] [(view ...)] [(diff ...)]
-id [noClaim] [(editRequest READINESS)] [(view ...)] [(diff ...)]
-(flag F) [(editRequest READINESS)] [(view ...)] [(diff ...)]
+      [(editRequest [(relRepo R)] [PROCESSED])] [(view ...)] [(diff ...)]
+id [noClaim] [(editRequest PROCESSED)] [(view ...)] [(diff ...)]
+(flag F) [(editRequest PROCESSED)] [(view ...)] [(diff ...)]
 (oldText ASPECT), (homeSkgrepoMove ...), (relRepoMove ...),
-(changesetMarker KIND): [(editRequest READINESS)] [(diff ...)]
+(changesetMarker KIND): [(editRequest PROCESSED)] [(diff ...)]
 bodyDiff, tombstone, forestRoot, a folder atom
 #+end_example
-where READINESS is =(ready OBJECT...)= or =(unready OBJECT...)= (see
+where PROCESSED is =(ready OBJECT...)= or =(unready OBJECT...)= (see
 "Metadata of the diff view"). =(gnid ID)= names the node a node, a
 ghost, an unknown viewnode or a restricted viewnode (=restricted=, see
 "Restricted-skgrepo nodes") stands for, and =(skgRepos (nodeRepo REPO)
@@ -2164,7 +2164,7 @@ alias and a dangling partner the worktree lost (an unknown viewnode carrying
 read, so that the save, which skips the =(diff ...)= saying they were
 lost, leaves them out of the list.
 =(editRequest ...)= holds at most two requests: one edit request and
-one readiness request, written after it.
+one processed request, written after it.
 
 Every viewnode's metadata starts with its viewnode ID, =(vnid X)=, where
 X is one or more lowercase letters and digits: =(skg (vnid 0a) node
@@ -2251,7 +2251,7 @@ entombstone"). Herald "something stood here".
 
 The buffers of the diff view (see "Diff view") show changes with
 the forms below. The change facts are derived facts, which the
-parser skips; the readiness requests and the restore edit requests
+parser skips; the processed requests and the restore edit requests
 are declared parts, which the save consumes. Saving a buffer reads
 none of the new viewnodes, which are save-inert, but for a ghost's
 restore request and the gnid of a ghost that claims membership (one
@@ -2298,11 +2298,11 @@ leaf, or on a changeset marker; none where a bare request names them),
 and N, how many distinct leaves a request naming all of them touches.
 The clients read it to build their requests and to count the leaves
 an unmark touches.
-**** =(ready OBJECT...)= -- the diff objects whose change-forest leaves are all marked commit-ready
+**** =(ready OBJECT...)= -- the diff objects whose change-forest leaves are all marked processed
 The objects are =node=, =rel=, and =all= on a headline whose =(leaves
-...)= lists it, so a ready changeset marker carries =(ready all)=. A
+...)= lists it, so a processed changeset marker carries =(ready all)=. A
 bare =(ready)= marks a headline that lists no object (one naming a
-single leaf). Absent when nothing is ready.
+single leaf). Absent when nothing is processed.
 **** =(homeSkgrepoMove (old OLD) (new NEW))=, =(movedLikeAncestor LETTER)= -- a node's home skgrepo moved
 In the skgrepo-changes buffer, on a node whose home skgrepo moved
 from OLD to NEW since HEAD; herald "-OLD +NEW". Beside it, when the
@@ -2310,11 +2310,11 @@ nearest vognode ancestor whose home skgrepo moved moved the same way,
 =(movedLikeAncestor LETTER)=, LETTER naming that ancestor as the
 relationship tokens do (a = the viewparent); herald "Δ⌂=LETTER".
 
-*** The readiness requests: =(editRequest (ready ...))=
+*** The processed requests: =(editRequest (ready ...))=
 =(ready OBJECT...)= and =(unready OBJECT...)= inside =(editRequest
-...)= ask the save to set or clear the commit-readiness marks of the
+...)= ask the save to set or clear the processed marks of the
 leaves those objects name; the object =all= names every leaf a
-vognode's node records, or every leaf of a commit readiness
+vognode's node records, or every leaf of a processed
 aggregate, one level down. On a vognode, the objects =newContent=
 and =newOutward= name leaves of the new nodes a walk reaches from its
 node, through new nodes only: the node itself when it is new, and
@@ -2330,7 +2330,7 @@ server reads all this from the change forest; what the buffer shows,
 or write-protects, does not matter. No change fact lists either
 object. Since which leaves they name only the change forest can tell,
 validation takes such a request to share a leaf with every request
-of the opposite readiness in the same save, and refuses the save. At most one per headline, written after
+of the opposite kind in the same save, and refuses the save. At most one per headline, written after
 the headline's other edit request if it has one: =(editRequest
 delete (ready node))=. Any headline that may carry =(diff ...)= may
 carry one.
@@ -2339,7 +2339,7 @@ carry one.
 **** The server writes the change facts
 The server writes the =(diff ...)= form (=diff_form= in
 =server/org_to_text.rs=), and it sets =(ready ...)= and =(leaves
-...)= in the tail of the refresh (=set_ready_facts_in_viewforest=); see
+...)= in the tail of the refresh (=set_processed_facts_in_viewforest=); see
 =docs/diff-view.org=, "Change facts on the wire". A rerender of a
 buffer of the diff view recomputes each kept viewnode's change facts
 in place from the graph straddle, and so does a save of such a
@@ -2347,36 +2347,36 @@ buffer; see "Diff view" and "Save buffer" above. The parser skips
 =(diff ...)= whole, so editing a change fact changes nothing. The
 clients read =(leaves ...)= to build their requests and to count the
 leaves an unmark touches.
-**** The client's readiness gestures write the readiness requests
+**** The client's processed gestures write the processed requests
 A gesture writes =(ready ...)= or =(unready ...)= into the headline's
 =(editRequest ...)=, creating the form if the headline lacks one, and
-saves; see =docs/diff-view.org=, "Readiness requests and gestures".
-In Emacs the gestures are =C-c r r= (=skg-cycle-commit-ready=), which
-toggles the commit-readiness of the change at point, and =C-c r h=
-(=skg-toggle-homeSkgrepo-move-commitReady=), which toggles the
-commit-readiness of the home-skgrepo move of the node at point. Their
+saves; see =docs/diff-view.org=, "Processed requests and gestures".
+In Emacs the gestures are =C-c r r= (=skg-cycle-processed=), which
+toggles whether the change at point is processed, and =C-c r h=
+(=skg-toggle-homeSkgrepo-move-processed=), which toggles whether the
+home-skgrepo move of the node at point is processed. Their
 recursive forms take a prefix argument: =C-u C-c r r= marks every
 change in the subtree at point, or unmarks them if the headline at
-point is ready, leaving each new node in content position to the
+point is processed, leaving each new node in content position to the
 server (=newContent=; with =C-u C-u=, =newOutward=), and =C-u C-c r h= does the same as =C-c r h= to every
 descendant whose home skgrepo moved between the same two skgrepos; see
-=docs/COMMANDS.org=, "C-c r : commit readiness, in the diff view". The
+=docs/COMMANDS.org=, "C-c r : processed marks, in the diff view". The
 Neovim keys are in =docs/COMMANDS-nvim.org=. A gesture that would
 unmark more than one change first asks for a typed "yes".
 **** The save of any buffer consumes the requests
 A save of any buffer, not only one of the diff view's, consumes the
-readiness requests after its graph edits succeed: each sets or clears
+processed requests after its graph edits succeed: each sets or clears
 the marks of the change-forest leaves its headline names, at their
 current fingerprints. A save that stops for a confirmation (strandeds,
 Hoist, forks) or fails consumes none, and leaves them in the buffer. A
 request that names no current change is dropped, with the warning =A
-readiness request names no current change; it was dropped.=, naming its
+processed request names no current change; it was dropped.=, naming its
 headline as a subheadline. See "Save buffer" above.
 **** One gesture on a modified node marks its file, on a write-protected occurrence too
 On a modified node (=(properties changed)=), =C-c r r= names every leaf the node
 records, and its relationship when that changed, so one gesture marks
 the file; both =C-c r r= and =C-c r h= work on write-protected
-occurrences. See =docs/diff-view.org=, "Readiness requests and
+occurrences. See =docs/diff-view.org=, "Processed requests and
 gestures", and the glossary's "diff object, diff aspect", which says
 that =all= names every leaf a modified node records, so one gesture on
 it marks its file.
@@ -2421,11 +2421,11 @@ a change when some member of it carries a change of its relationship
 to the folder's viewparent: a =(rel ...)= part, or a =(relRepoMove
 ...)= under it. The clients compute that from the members, and label
 such a folder "its X changed (this file)" or "(other files)" (see the
-glossary's "in, out"), with ✓ when every changed membership is ready:
-a member's =(rel ...)= is ready when it carries =(ready ...)= naming
+glossary's "in, out"), with ✓ when every changed membership is processed:
+a member's =(rel ...)= is processed when it carries =(ready ...)= naming
 =rel= if its =(leaves ...)= lists =rel=, and any =(ready ...)=
-otherwise; a relRepo move is ready when it carries =(ready ...)=.
-A readiness gesture on such a folder acts on each changed membership.
+otherwise; a relRepo move is processed when it carries =(ready ...)=.
+A processed gesture on such a folder acts on each changed membership.
 
 *** Examples
 #+begin_example
@@ -2470,7 +2470,7 @@ carries the record's gnid and relRepo and nothing of the node:
 
 Its herald is "restricted". It has no content of its own drawn: no
 goal, no folders. It claims membership as an unknown viewnode does, takes a
-relRepo request and a readiness request, and refuses text typed on
+relRepo request and a processed request, and refuses text typed on
 its line. A member whose record the set shows and that resolves to
 no node at all is an unknown viewnode, as under no skgrepo restriction. A view rooted
 at a node the set keeps out (one opened before a skgrepo narrowing;
@@ -2584,6 +2584,6 @@ principle as follows.
     propagation reaches restricted records of other nodes stops for
     the delete-from confirmation ("Save buffer").
   - The cleanup of the references to an absent ID, and a save's
-    restore and readiness requests, are refused unless the connection
+    restore and processed requests, are refused unless the connection
     is unrestricted. The import of md and org files is refused when
     its destination skgrepo is restricted.

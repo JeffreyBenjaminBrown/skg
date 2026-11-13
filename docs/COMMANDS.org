@@ -638,7 +638,7 @@ described under =C-c s s= apply here too, across the whole subtree.
 Prompts between =search matching= and =no search matching=, with shift-arrow
 cycling, and stages an idempotent request on the saved occurrence at point.
 It refuses foreign and write-protected nodes and a node that already
-holds an edit request (delete, a nodeMerge or a flag). A readiness
+holds an edit request (delete, a nodeMerge or a flag). A processed
 request stays beside it. A pending relRepo request gives way to it,
 and the message says so: "replaced a pending relRepo request". Delete
 (=C-c <backspace>=) and a nodeMerge request (=C-c s m=) replace a
@@ -821,23 +821,23 @@ moved to the new default.
 
 The command only edits metadata in the current buffer.
 Save the view afterward to apply the changes.
-** C-c r : commit readiness, in the diff view
+** C-c r : processed marks, in the diff view
 *** preamble
 In a buffer of the diff view (C-c v d), each change can be
-marked commit-ready. A mark approves the change as it is now: editing
+marked processed. A mark approves the change as it is now: editing
 the changed thing again makes the mark lapse. Marks live on the
 server, in a file beside its config ('<data_root>/readiness-marks-CONFIGSTEM.json',
 unless the config names another). A headline whose
-change is ready shows ✓ after it; a commit readiness aggregate (a
+change is processed shows ✓ after it; a processed aggregate (a
 folder of changes, a changeset marker) shows ✓ when all of its changes are. A node that
 existed at HEAD and whose file records a change shows M ("modified"),
 and M✓ once every change its file records is marked.
 
 After every save of one of the diff view's buffers, the
-minibuffer shows the readiness summary: "12 of 14 changed files are
-ready", or "Commit ready. All 14 of 14 changed files are ready.". A
-changed file counts as ready when every change it records is marked;
-a file whose only change is the order of a list counts as ready
+minibuffer shows the processed summary: "12 of 14 changed files are
+processed", or "Commit ready. All 14 of 14 changed files are processed.". A
+changed file counts as processed when every change it records is marked;
+a file whose only change is the order of a list counts as processed
 without marks. The summary
 adds how many changes are not editable in this view (C-c r u
 extends the diff view to them)
@@ -845,25 +845,25 @@ and how many files changed in foreign skgrepos.
 
 A gesture that would unmark more than one change (a recursive one, one
 on a folder of changes, or one on a modified node, which unmarks every
-change the node records) first asks "Unmarking this node commit-ready
+change the node records) first asks "Unmarking this node processed
 will unmark every contributing decision. You might discard a lot of
 hard-won information. Continue?", and does nothing unless you answer
 "yes". Unmarking a single change asks nothing. The
 server counts the changes: each headline that names changes says how
 many, in its metadata's '(leaves N ...)'.
-*** C-c r r : skg-cycle-commit-ready
-Toggles the commit-readiness of the change at point, then saves.
+*** C-c r r : skg-cycle-processed
+Toggles whether the change at point is processed, then saves.
 On a headline that is one change (an old text, an alias, a move, a
 changeset marker), it toggles that one. On a headline that carries
 several, it toggles them all: on a new member its existence and its
 relationship to the headline above it (∃ and ~); on a modified node
 (M) every change its file records, and its relationship (~) when that
 changed too, so one gesture marks the whole file. A headline counts
-as ready when every one of its changes is. On a folder of changes, it
+as processed when every one of its changes is. On a folder of changes, it
 toggles each change one level down.
 
 With a prefix argument (C-u C-c r r), it marks every change in the
-subtree at point, or unmarks them if the headline at point is ready.
+subtree at point, or unmarks them if the headline at point is processed.
 At a new node (∃+) that is not in a folder, it leaves the rest of
 that subtree to the server, which marks the new node, its text and
 its content, then the same for each new node the graph says it
@@ -875,10 +875,10 @@ C-c r r), the server instead follows every relationship each new node
 records (contains, subscribes to, hides, overrides), and marks
 everything each records. Unmarking that way always asks first. Works
 on write-protected headlines too.
-*** C-c r h : skg-toggle-homeSkgrepo-move-commitReady
-Toggles the commit-readiness of the home-skgrepo move of the node at
-point (or of the move at point), then saves: it unmarks the move if
-it is ready, else marks it. With a prefix argument (C-u C-c r h), it
+*** C-c r h : skg-toggle-homeSkgrepo-move-processed
+Toggles whether the home-skgrepo move of the node at
+point (or the move at point) is processed, then saves: it unmarks the move if
+it is processed, else marks it. With a prefix argument (C-u C-c r h), it
 does the same to every descendant whose home skgrepo moved between the same
 two skgrepos. Works on write-protected headlines too.
 *** C-c r u : skg-diffView-extend
@@ -887,7 +887,7 @@ Each changed node with no editable occurrence becomes editable where
 the buffer first shows it, in content or else in a partner folder,
 with its change and its content shown under it; when a change is
 under a root the buffer lacks, that root is appended at the end. The
-minibuffer then shows the readiness summary, as after a save. Refuses
+minibuffer then shows the processed summary, as after a save. Refuses
 with "Save the buffer first." while the buffer has unsaved changes.
 A clean buffer the server rerenders after reloading files changed on
 disk is extended the same way, with no key pressed.
@@ -902,7 +902,7 @@ is committed, or nothing needed committing and nothing failed, the
 buffer is killed. When nothing is committed otherwise (a "yes"
 declined, a refusal, an error), the message stays there, and C-c r c
 reopens it. It stages only '.skg' files (deletions included). If not
-every changed file is ready, it first shows the readiness summary and
+every changed file is processed, it first shows the processed summary and
 proceeds only if you type the word "yes". Likewise, if some owned
 gitrepo already has entries staged before the command, it first says
 how many paths each such gitrepo has staged, lists them in the buffer
@@ -922,22 +922,22 @@ changes it names. Point lands on the headline's metadata, as with
 C-c i n. It does not wrap: past the last one it says "No further
 change" and leaves point. It works in any skg buffer; outside the
 diff view no headline names a change, so it finds none.
-*** C-c r n u : skg-diffView-goto-next-unready-change
-The same, visiting only headlines with change facts that are not ready (see
-C-c r r for when a headline counts as ready). Past the last one it
-says "No further unready change".
-*** C-c r n r : skg-diffView-goto-next-ready-change
-The same, visiting only ready headlines with change facts. Past the last one it
-says "No further ready change".
+*** C-c r n u : skg-diffView-goto-next-unprocessed-change
+The same, visiting only headlines with change facts that are not processed (see
+C-c r r for when a headline counts as processed). Past the last one it
+says "No further unprocessed change".
+*** C-c r n r : skg-diffView-goto-next-processed-change
+The same, visiting only processed headlines with change facts. Past the last one it
+says "No further processed change".
 *** C-c r p c : skg-diffView-goto-previous-change
 Like C-c r n c, backward: moves point to the previous headline with change facts
 before point. Before the first one it says "No earlier change".
-*** C-c r p u : skg-diffView-goto-previous-unready-change
+*** C-c r p u : skg-diffView-goto-previous-unprocessed-change
 Like C-c r n u, backward. Before the first one it says "No earlier
-unready change".
-*** C-c r p r : skg-diffView-goto-previous-ready-change
+unprocessed change".
+*** C-c r p r : skg-diffView-goto-previous-processed-change
 Like C-c r n r, backward. Before the first one it says "No earlier
-ready change".
+processed change".
 ** C-c m : other graph modifications
 *** C-c m c : skg-replace-link-with-content
 Replace the leaf at point with a content relationship to the
@@ -1023,7 +1023,7 @@ A value that needs more (a nodeMerge's target, relRepo's skgrepo,
 a flag and its value, a folder's relation) prompts for it.
 A field left at its default is dropped when the edit is applied
 (C-c C-c).
-A readiness request the diff view's gestures wrote
+A processed request the diff view's gestures wrote
 (see C-c r) is shown in the edit request field, beside the other
 request; deleting it there clears it.
 After each headline, in parentheses, is the herald that field or
@@ -1055,7 +1055,7 @@ changes" and "diff-view: order-only changes", skipping any that would
 be empty. It refuses unless the connection is unrestricted, and
 when an owned skgrepo is not in a git repository or has no HEAD
 commit (the refusal names the skgrepo). As each buffer opens, the
-minibuffer shows its readiness summary, as after a save (see C-c r).
+minibuffer shows its processed summary, as after a save (see C-c r).
 
 Once the diff view's buffers are open, a switch of the
 skgrepo restriction ('skg-restrict-repo-set', C-c v l) rerenders them under
@@ -1072,7 +1072,7 @@ decides what it adds anew by what changed: a new member that changed,
 or leads to a change, is editable with its content, and any other new
 member is a write-protected member shown without its content. But a
 save makes nothing editable that the buffer already shows, and
-appends no root: the readiness summary counts a change since the
+appends no root: the processed summary counts a change since the
 buffer opened that it holds nowhere editable as not editable in this
 view. C-c r u extends the buffer to such changes. Nothing the
 buffer holds editable is write-protected again by the server. An
@@ -1090,7 +1090,7 @@ and not others leaves HEAD inconsistent: it can reference nodes it
 does not contain, record a relationship from one end only, or hold a
 moved node in two skgrepos at once. Such a HEAD cannot be reasoned
 about, and the next diff view against it reports changes that are
-only its own inconsistency. Review with the readiness marks (C-c r)
+only its own inconsistency. Review with the processed marks (C-c r)
 instead, and commit everything at once with C-c r c.
 The merges buffer shows each nodeMerge since HEAD: the acquiree and
 its acquirer, in context. The acquiree's text preserver appears as a
@@ -1172,7 +1172,7 @@ skgrepo. A fork copies into its clone only the relationships the set
 shows; a node merge, like a delete, is refused when either node has a
 section outside the set; a delete whose cleanup would strip
 relationships outside the set asks first (see the delete). Restoring
-from HEAD, readiness requests and the cleanup of an absent ID's
+from HEAD, processed requests and the cleanup of an absent ID's
 references are refused unless the connection is unrestricted, and an
 import into a skgrepo outside the set is refused. A
 skgrepo narrowing (a switch to a smaller set) turns an open view's headline
@@ -1309,7 +1309,7 @@ repeated here; described earlier in this doc.
 In the linkstack buffer, =C-x C-s= saves your edits to the stack.
 ** C-c z : skg-zippy-mode, typing without C-c
 In zippy mode, typing a key sequence K runs what C-c K runs, and
-typing inserts no text: 'r r' cycles commit readiness, 'v d' opens the
+typing inserts no text: 'r r' cycles the processed mark, 'v d' opens the
 diff view, 'C-u r r' or '4 r r' passes a prefix argument. 'z' leaves
 zippy (skg-zippy-exit).
 

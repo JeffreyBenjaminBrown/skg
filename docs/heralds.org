@@ -69,7 +69,7 @@ assumes 'termguicolors', since the styles are given as RGB colors.
 | labels               | message     | folder labels, =alias=, =ID=, flag rows                                       |
 | requests             | nonstandard | =delete=, =merge:...=, =detach=, =restore node=, =restore membership=, =request:~NAME=, =request:...= flags, =req:...= views, =request:ready...= |
 | change facts         | nonstandard | =∃+ ∃- M ~+ ~-=, =+ -= on a leaf, ~Δ⌂=a~                                        |
-|                      | go          | =✓= commit-ready                                                              |
+|                      | go          | =✓= processed                                                                 |
 |                      | normal      | the skgrepo names in =⌂ -OLD +NEW= and =relationship moved from OLD to NEW=   |
 | diff labels          | message     | =old title=, =body diff=, =its content changed=, =its X changed (this file)=  |
 | titleless headlines  | message     | =Reference to unknown node.=, =restricted=, =something stood here=            |
@@ -252,11 +252,11 @@ modified write-protected member reads =☮ M=; its =~+= or =~-= is its
 relationship, of the folder's kind, to the folder's viewparent. On an alias, ID or
 flag member, which has one diff object, the same change facts read =+= and
 =-=, and the one object of an unknown viewnode or a restricted viewnode reads =~+= or =~-=. A =✓= after a diff object's change facts says its
-changes are marked commit-ready, so =∃+✓ ~+= is a new node, approved,
+changes are marked processed, so =∃+✓ ~+= is a new node, approved,
 in a new relationship that is not; =M✓= is a modified node every
-change of whose file is marked. A commit readiness aggregate (a
-folder or changeset marker) shows a =✓= when everything under it is ready. =request:ready= and
-=request:unready=, with =:node=, =:rel=, =:all=, =:newContent= or =:newOutward=, are pending readiness
+change of whose file is marked. A processed aggregate (a
+folder or changeset marker) shows a =✓= when everything under it is processed. =request:ready= and
+=request:unready=, with =:node=, =:rel=, =:all=, =:newContent= or =:newOutward=, are pending processed
 requests, consumed by the next save.
 
 These heralds render the headline's one =(diff ...)= form (see
@@ -265,9 +265,9 @@ come from its =(node added)= and =(node removed)= parts, =M= from
 =(properties changed)=, =~+= and =~-= from =(rel added)= and =(rel
 removed)= (the style keys 'existence' and 'properties' in
 'shared/herald-styles.json'), each =✓= from its =(ready ...)= part
-(=M='s from =all= there), and the pending readiness request from the
+(=M='s from =all= there), and the pending processed request from the
 =(ready ...)= or =(unready ...)= in the headline's =(editRequest ...)=;
-its =(leaves ...)= part shows nothing. The rules match the ready part once
+its =(leaves ...)= part shows nothing. The rules match the processed part once
 per diff object, so a =✓= follows its own object whatever the raw
 order of the parts.
 
@@ -278,7 +278,7 @@ and body= (or =old title=, =old body=) with its =body diff=, =⌂ -OLD
 changeset markers =its content changed=, =some content relationships
 changed skgrepo= and =order-only change=. A folder shown because its
 membership changed reads =its X changed (this file)= or =(other files)=,
-with =✓= when every changed membership is ready; the server writes the
+with =✓= when every changed membership is processed; the server writes the
 folder as its bare atom, and the client sees the change in its
 members and draws that label, from 'folder_heralds' in
 'shared/herald-styles.json', in place of the folder's own. The
@@ -326,10 +326,10 @@ the lens or in its place:
 - a changed folder: the server writes a folder as its bare atom, with
   no =(diff ...)=. The client sees from the folder's members whether
   some member's relationship to the folder's viewparent changed, and
-  whether every such change is ready, and then draws the folder's
+  whether every such change is processed, and then draws the folder's
   herald itself instead of the lens's: ☮ when the folder is
   write-protected, its changed label ("its X changed (this file)" or
-  "(other files)"), and ✓ when ready, from 'folder_heralds' in
+  "(other files)"), and ✓ when processed, from 'folder_heralds' in
   'shared/herald-styles.json'.
 The conformance test counts =pendingDetachment= among the atoms the
 metadata may hold ('client_computed_atoms' in 'server/heralds.rs'),
