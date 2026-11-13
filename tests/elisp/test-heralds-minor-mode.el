@@ -57,8 +57,8 @@
       (let ((display (heralds-from-metadata
                       (nth 1 case)
                       (pcase (nth 4 case)
-                        ("folderChange ready" 'ready)
-                        ("folderChange unready" 'unready))
+                        ("folderChange ready" 'processed)
+                        ("folderChange unready" 'unprocessed))
                       (equal (nth 4 case) "pendingDetachment"))))
         (should (equal (list (car case)
                              (substring-no-properties display)
@@ -89,25 +89,25 @@ if given."
   "The server writes a folder as its bare atom. Its headline renders
 \"its ... changed ...\" when a member carries a change of its
 relationship (a '(diff (rel ...))', or a '(relRepoMove ...)' child),
-with ✓ when every such change is ready, and its ordinary label
+with ✓ when every such change is processed, and its ordinary label
 otherwise. Editing a member rerenders the folder's herald."
   (let ((ordinary (substring-no-properties
                    (heralds-from-metadata "(skg containerFolder)")))
         (changed "☮ its other containers changed (other files)")
-        (ready-member "*** (skg node (gnid c) (skgRepos (nodeRepo r)) noClaim writeProtected (diff (rel added) (leaves 1 rel) (ready rel))) c")
-        (unready-member "*** (skg node (gnid d) (skgRepos (nodeRepo r)) noClaim writeProtected (diff (rel removed) (leaves 1 rel))) d"))
+        (processed-member "*** (skg node (gnid c) (skgRepos (nodeRepo r)) noClaim writeProtected (diff (rel added) (leaves 1 rel) (ready rel))) c")
+        (unprocessed-member "*** (skg node (gnid d) (skgRepos (nodeRepo r)) noClaim writeProtected (diff (rel removed) (leaves 1 rel))) d"))
     (should (equal (test-heralds--folder-display
                     (list "* (skg node (gnid r) (skgRepos (nodeRepo r))) r"
                           "** (skg containerFolder)"
-                          ready-member))
+                          processed-member))
                    (concat changed "✓")))
     (should (equal (test-heralds--folder-display
                     (list "* (skg node (gnid r) (skgRepos (nodeRepo r))) r"
                           "** (skg containerFolder)"
-                          ready-member
-                          unready-member))
+                          processed-member
+                          unprocessed-member))
                    changed))
-    ;; A member whose relRepo moved: changed, ready once the move is.
+    ;; A member whose relRepo moved: changed, processed once the move is.
     (should (equal (test-heralds--folder-display
                     '("** (skg containerFolder)"
                       "*** (skg node (gnid c) (skgRepos (nodeRepo r)) noClaim writeProtected) c"
@@ -128,7 +128,7 @@ otherwise. Editing a member rerenders the folder's herald."
                    ordinary))
     ;; Editing a member's line rerenders its folder.
     (should (equal (test-heralds--folder-display
-                    (list "** (skg containerFolder)" unready-member)
+                    (list "** (skg containerFolder)" unprocessed-member)
                     (lambda ()
                       (search-forward "(leaves 1 rel)")
                       (insert " (ready rel)")))

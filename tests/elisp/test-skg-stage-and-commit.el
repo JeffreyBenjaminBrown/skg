@@ -165,7 +165,7 @@ refusal or a declined confirmation it stays, and the line says so."
      (should (null (funcall prompts)))
      (should skg--rerender-after-empty-stream)
      (funcall skg--rerender-after-empty-stream)
-     (should (string-match-p "1 of 3 changed files are ready"
+     (should (string-match-p "1 of 3 changed files are processed"
                              (car (funcall prompts))))
      (should (= 2 (length (funcall sent))))
      (should (string-match-p (regexp-quote "(confirmed . t)")
@@ -198,7 +198,7 @@ the server reads up to a newline, holds no newline but its last."
 
 (ert-deftest test-stage-and-commit-prompt-names-already-staged-entries ()
   "Entries already staged are counted in the prompt, by gitrepo, and
-listed in a buffer of their own, even when every changed file is ready;
+listed in a buffer of their own, even when every changed file is processed;
 \"yes\" resends confirmed."
   (test--stage-and-commit-run
    '("yes")
@@ -208,7 +208,7 @@ listed in a buffer of their own, even when every changed file is ready;
               "((needs-confirmation . t) (already-staged ((\"/data/public\" \"notes.txt\" \"a b.skg\") (\"/data/private\" \"c.skg\"))) (readiness-summary (ready 3) (changed 3) (foreign 0) (order-only 0) (notEditable 0)) (errors ()) (warnings ()))")
      (funcall skg--rerender-after-empty-stream)
      (should (equal (car (funcall prompts))
-                    "Commit ready. All 3 of 3 changed files are ready. Already staged, so committed too: /data/public: 2 paths, /data/private: 1 path (listed in *skg already staged*). Type yes to commit anyway: "))
+                    "Commit ready. All 3 of 3 changed files are processed. Already staged, so committed too: /data/public: 2 paths, /data/private: 1 path (listed in *skg already staged*). Type yes to commit anyway: "))
      (should (equal (with-current-buffer "*skg already staged*"
                       (buffer-substring-no-properties (point-min) (point-max)))
                     "* /data/public\nnotes.txt\na b.skg\n* /data/private\nc.skg\n"))

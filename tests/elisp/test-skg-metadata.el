@@ -144,43 +144,43 @@ the folder commands are the way to show a node's partners."
                 (cdr pair))))
   (should-not (lookup-key skg-content-view-mode-map (kbd "C-c p"))))
 
-(ert-deftest test-skg-folder-change-readiness ()
+(ert-deftest test-skg-folder-change-processed ()
   "A folder is changed when a member carries a change of its
-relationship to the folder's viewparent, and ready when every such
+relationship to the folder's viewparent, and processed when every such
 change is. The cases the server pinned when it computed this."
-  (let ((ready-member '(skg node (gnid m) (diff (rel added) (leaves 2 node rel) (ready rel))))
-        (unready-member '(skg node (gnid m) (diff (rel added) (leaves 2 node rel) (ready node))))
-        (ready-unknown '(skg unknown (gnid u) (diff (rel added) (leaves 1) (ready))))
-        (unready-alias '(skg alias noClaim (view ghostWarrant) (diff (rel removed))))
+  (let ((processed-member '(skg node (gnid m) (diff (rel added) (leaves 2 node rel) (ready rel))))
+        (unprocessed-member '(skg node (gnid m) (diff (rel added) (leaves 2 node rel) (ready node))))
+        (processed-unknown '(skg unknown (gnid u) (diff (rel added) (leaves 1) (ready))))
+        (unprocessed-alias '(skg alias noClaim (view ghostWarrant) (diff (rel removed))))
         (unchanged '(skg node (gnid n) (diff (node added) (ready node)))))
-    (cl-flet ((readiness (&rest member-sexps)
-                (skg--folder-change-readiness
+    (cl-flet ((processed (&rest member-sexps)
+                (skg--folder-change-processed
                  (mapcar #'list member-sexps))))
-      (should (eq (readiness ready-member) 'ready))
-      (should (eq (readiness unready-member) 'unready))
-      (should (eq (readiness ready-unknown) 'ready))
-      (should (eq (readiness unready-alias) 'unready))
-      (should (null (readiness unchanged)))
-      (should (eq (readiness ready-member ready-unknown unchanged) 'ready))
-      (should (eq (readiness ready-member unready-member ready-unknown
-                             unready-alias)
-                  'unready))))
+      (should (eq (processed processed-member) 'processed))
+      (should (eq (processed unprocessed-member) 'unprocessed))
+      (should (eq (processed processed-unknown) 'processed))
+      (should (eq (processed unprocessed-alias) 'unprocessed))
+      (should (null (processed unchanged)))
+      (should (eq (processed processed-member processed-unknown unchanged) 'processed))
+      (should (eq (processed processed-member unprocessed-member processed-unknown
+                             unprocessed-alias)
+                  'unprocessed))))
   ;; A '(relRepoMove ...)' child changes its member's relationship too.
   (let ((member '(skg node (gnid m))))
-    (should (eq (skg--folder-change-readiness
+    (should (eq (skg--folder-change-processed
                  (list (list member '(skg (relRepoMove (old a) (new b))
                                           (diff (leaves 1) (ready))))))
-                'ready))
-    (should (eq (skg--folder-change-readiness
+                'processed))
+    (should (eq (skg--folder-change-processed
                  (list (list member '(skg (relRepoMove (old a) (new b))
                                           (diff (leaves 1))))))
-                'unready))
-    ;; Both must be ready.
-    (should (eq (skg--folder-change-readiness
+                'unprocessed))
+    ;; Both must be processed.
+    (should (eq (skg--folder-change-processed
                  (list (list '(skg node (gnid m) (diff (rel added) (leaves 1 rel) (ready rel)))
                              '(skg (relRepoMove (old a) (new b))
                                    (diff (leaves 1))))))
-                'unready))))
+                'unprocessed))))
 
 (ert-deftest test-skg-set-repo ()
   "Test skg-set-repo replaces the node repo field, and writes no
@@ -655,9 +655,9 @@ the request."
               headline #'skg-restore-removed-membership)
              '(skg node (editRequest restoreRel))))))
 
-(ert-deftest test-skg-edit-request-commands-keep-the-readiness-request ()
+(ert-deftest test-skg-edit-request-commands-keep-the-processed-request ()
   "The merge and restore commands replace the edit request in
-'(editRequest ...)' and keep the readiness request pending there."
+'(editRequest ...)' and keep the processed request pending there."
   (should (equal (test-skg--metadata-after
                   "* (skg node (gnid a) (skgRepos (nodeRepo main)) (editRequest delete (ready node)) (diff (node added) (leaves 1 node))) a"
                   (lambda () (skg-set-merge-request "b")))
@@ -859,7 +859,7 @@ the headline had keeps its place."
 
 (ert-deftest test-skg-write-edit-request-places-it-as-the-server-does ()
   "An edit request goes first in the headline's '(editRequest ...)',
-before its readiness request, and a new '(editRequest ...)' stands
+before its processed request, and a new '(editRequest ...)' stands
 where the server writes one: before the view requests and the derived
 facts."
   (cl-flet ((write (line request &optional kind)

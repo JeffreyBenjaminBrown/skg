@@ -9,7 +9,7 @@
 (require 'skg-metadata)
 (require 'skg-buffer)
 (require 'skg-lock-buffers)
-(require 'skg-readiness) ; for skg--readiness-summary-message
+(require 'skg-processed) ; for skg--processed-summary-message
 (require 'skg-redraw-delta)
 (declare-function skg--request-rerender-views "skg-request-rerender-all-views"
                   (view-ids approved-pids))
@@ -1208,7 +1208,7 @@ Expected shape: ((content ...) (errors (...)) (warnings (...)))."
            errors-list warnings-list content-value))
         (let ((summary (assq 'readiness-summary response)))
           (when summary ;; the saved buffer is one of the diff view's
-            (message "%s" (skg--readiness-summary-message summary)))))
+            (message "%s" (skg--processed-summary-message summary)))))
     (error (skg-log 'error 'save "parsing save response: %S" err)
            (skg-log 'error 'save "sexp string was: %S" sexp-string))))
 

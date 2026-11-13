@@ -240,7 +240,7 @@ headline's text."
     (name group child-level kind)
   "The headlines that show the child NAME of KIND, whose group is GROUP
 or nil when absent: a missing field at its default; an editRequest
-holding nothing but a readiness request with the other request at its
+holding nothing but a processed request with the other request at its
 default before it; a bare atom with a 'true' child."
   (let (( field (skg-metadata-fields--field kind name) ))
     (cond
@@ -249,7 +249,7 @@ default before it; a bare atom with a 'true' child."
             (cons (1+ child-level)
                   (skg-metadata-fields--shown-default field))))
      ((and field (equal name "editRequest")
-           (skg-metadata-fields--only-readiness-requests-p
+           (skg-metadata-fields--only-processed-requests-p
             group child-level))
       (append (list (car group)
                     (cons (1+ child-level)
@@ -261,10 +261,10 @@ default before it; a bare atom with a 'true' child."
             (cons (1+ child-level) "true")))
      (t group))))
 
-(defun skg-metadata-fields--only-readiness-requests-p (group child-level)
+(defun skg-metadata-fields--only-processed-requests-p (group child-level)
   "Whether GROUP, an editRequest at CHILD-LEVEL, holds nothing but a
-readiness request, '(ready ...)' or '(unready ...)', which the
-readiness commands set and the editor shows. Its fill-in then shows
+processed request, '(ready ...)' or '(unready ...)', which the
+processed commands set and the editor shows. Its fill-in then shows
 the other request at its default beside it."
   (let (( value-groups (car (skg-metadata-fields--group-children
                              (cdr group) (1+ child-level))) ))

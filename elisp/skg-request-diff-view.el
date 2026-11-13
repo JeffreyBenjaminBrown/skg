@@ -14,7 +14,7 @@
 (require 'skg-length-prefix)
 (require 'skg-buffer)
 (require 'skg-request-save) ; For message formatting/display helpers
-(require 'skg-readiness) ; for skg--readiness-summary-message
+(require 'skg-processed) ; for skg--processed-summary-message
 
 (defconst skg-diffView-buffers
   '("all changes" "merges" "skgrepo changes" "order-only changes")
@@ -68,7 +68,7 @@ opened so far."
 
 (defun skg--handle-diffView-response (tcp-proc payload buffer view-id)
   "Open the diff view's BUFFER from PAYLOAD under VIEW-ID,
-unless the server answered '(empty . t)'. Shows its readiness
+unless the server answered '(empty . t)'. Shows its processed
 summary, as a save does, and any errors and warnings. Returns
 'opened, 'empty, or 'failed (no buffer, and errors)."
   (condition-case err
@@ -89,7 +89,7 @@ summary, as a save does, and any errors and warnings. Returns
                 (setq skg-diffView-buffer-kind buffer))))
           (let ((summary (assq 'readiness-summary response)))
             (when summary
-              (message "%s" (skg--readiness-summary-message summary)))))
+              (message "%s" (skg--processed-summary-message summary)))))
         (when (or (skg--message-list-nonempty-p errors-list)
                   (skg--message-list-nonempty-p warnings-list))
           (skg-big-nonfatal-message

@@ -14,7 +14,7 @@
 ;;; where a list would be scanned whole at every edit.
 
 (require 'cl-lib)
-(require 'skg-metadata) ;; for skg--folder-change-readiness-at-point and skg--pending-detachment-at-point-p
+(require 'skg-metadata) ;; for skg--folder-change-processed-at-point and skg--pending-detachment-at-point-p
 (require 'skg-sexpr-search)
 (require 'skg-shared)
 
@@ -260,7 +260,7 @@ Creates one overlay (at most), tagged with the property `heralds'."
                    (end (nth 1 metadata))
                    (heralds (heralds-from-metadata
                              (buffer-substring-no-properties start end)
-                             (skg--folder-change-readiness-at-point)
+                             (skg--folder-change-processed-at-point)
                              (skg--pending-detachment-at-point-p))))
               (when heralds
                 (let ((ov (make-overlay start end)))
@@ -297,8 +297,8 @@ facts in `(view ...)' the rule table only positions with a sentinel
 token that this function replaces with `heralds--render-rel-facts'
 output. A `repoBoundary' reaches the lens with its skgrepo's label
 \(`heralds--with-repoBoundary-label').
-FOLDER-CHANGE is what `skg--folder-change-readiness' says of the
-headline when it is a folder: nil, `ready' or `unready'; a changed
+FOLDER-CHANGE is what `skg--folder-change-processed' says of the
+headline when it is a folder: nil, `processed' or `unprocessed'; a changed
 folder's herald is `heralds--changed-folder-text'.
 PENDING-DETACHMENT non-nil says the headline is a pending detachment
 \(`skg--pending-detachment-p'): the lens gets the atom
@@ -357,7 +357,7 @@ when the diff view shows it because of a change, or nil."
 (defun heralds--changed-folder-text (folder folder-change)
   "The herald of FOLDER, a folder's atom, shown because a member's
 relationship changed: its ☮ when it is write-protected, its changed
-label styled as its ordinary one, then ✓ when FOLDER-CHANGE is `ready'."
+label styled as its ordinary one, then ✓ when FOLDER-CHANGE is `processed'."
   (concat (when (member (symbol-name folder)
                         (heralds--folder-heralds 'write_protected))
             (concat (heralds--styled "☮" (heralds--node-herald-style
@@ -365,7 +365,7 @@ label styled as its ordinary one, then ✓ when FOLDER-CHANGE is `ready'."
                     " "))
           (heralds--styled (heralds--changed-folder-label folder)
                            (heralds--node-herald-style folder))
-          (when (eq folder-change 'ready)
+          (when (eq folder-change 'processed)
             (heralds--styled "✓" (heralds--node-herald-style 'ready)))))
 
 (defun heralds--splice-rel-spans (tokens rel-str)

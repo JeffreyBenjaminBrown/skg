@@ -20,7 +20,7 @@
 ;;; - Multi-word headlines become symbols with spaces.
 ;;; - Childless non-root headlines become bare atoms, not lists,
 ;;;   but for one whose text is '(ATOM)': a proper sub-sexp that wraps
-;;;   a single atom in parens, such as the readiness request '(ready)',
+;;;   a single atom in parens, such as the processed request '(ready)',
 ;;;   is that headline.
 ;;;
 ;;; ENTRY POINTS:

@@ -14,7 +14,7 @@
 #   - gamma's g is retitled (a foreign change, which the total diff
 #     view only counts).
 #
-# The client opens the diff view, marks everything commit-ready
+# The client opens the diff view, marks everything processed
 # through the gestures, sees "Commit ready", stages and commits, and
 # sees the buffers keep their roots, which show no change any more. Then r's file is made to contain d again,
 # by hand; the client opens a view of r, where d is an unknown node,

@@ -258,8 +258,8 @@ open the sexp-edit buffer (not prompt in minibuffer)."
          (should (get-text-property (point) 'read-only)))
        (kill-buffer edit-buf)))))
 
-(ert-deftest test-edit-metadata-shows-a-readiness-request ()
-  "The metadata editor shows a readiness request in the headline's
+(ert-deftest test-edit-metadata-shows-a-processed-request ()
+  "The metadata editor shows a processed request in the headline's
 '(editRequest ...)', and applying keeps it, beside the other request
 or alone; deleting it there clears it."
   (dolist (case '(("(skg node (gnid x) (skgRepos (nodeRepo public)) (editRequest delete (ready node)) (diff (node added) (leaves 1 node))) x"

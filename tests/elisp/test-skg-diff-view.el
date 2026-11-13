@@ -72,7 +72,7 @@ Returns (REQUESTED-BUFFERS OPENED-BUFFER-NAMES)."
     (should (equal requested '("all changes")))
     (should (null opened))))
 
-(ert-deftest test-skg-diff-view-shows-the-readiness-summary ()
+(ert-deftest test-skg-diff-view-shows-the-processed-summary ()
   (let ((shown nil))
     (cl-letf (((symbol-function 'message)
                (lambda (format-string &rest args)
@@ -88,7 +88,7 @@ Returns (REQUESTED-BUFFERS OPENED-BUFFER-NAMES)."
          ("skgrepo changes" . ,test-skg-diff-view--empty)
          ("order-only changes" . ,test-skg-diff-view--empty))))
     (should (equal shown
-                   (concat "1 of 3 changed files are ready, 2 changes are "
+                   (concat "1 of 3 changed files are processed, 2 changes are "
                            "not editable in this view; C-c r u extends the diff view to them")))))
 
 (ert-deftest test-skg-diff-view-a-buffer-names-itself-on-save ()

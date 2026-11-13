@@ -111,10 +111,10 @@
   (should (eq (lookup-key skg-content-view-mode-map (kbd "C-c s x"))
               #'skg-set-flag-search-matching)))
 
-(ert-deftest test-skg-flag-a-readiness-request-takes-the-flag-request ()
-  "A headline whose '(editRequest ...)' holds only a readiness request
+(ert-deftest test-skg-flag-a-processed-request-takes-the-flag-request ()
+  "A headline whose '(editRequest ...)' holds only a processed request
 holds no edit request (`skg--node-edit-request-p'): it takes the flag
-request, alone and in a recursive staging, which keeps the readiness
+request, alone and in a recursive staging, which keeps the processed
 request after it."
   (should (equal (skg--flag-eligible-root-id
                   '(skg node (gnid root) (skgRepos (nodeRepo main))

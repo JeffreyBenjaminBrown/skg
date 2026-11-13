@@ -316,7 +316,7 @@ If the headline has no metadata, populates a minimal
 \(skg node (skgRepos (nodeRepo X)))
 in place and opens the empty-node view over it -- repo pre-filled, the
 other editable fields childless (see `skg-view-metadata--open-empty-node-view').
-A readiness request in its '(editRequest ...)' is shown beside the
+A processed request in its '(editRequest ...)' is shown beside the
 other request, so that deleting it there clears it.
 Use C-c C-c to save changes back to the source buffer.
 Kill the buffer to cancel without saving."

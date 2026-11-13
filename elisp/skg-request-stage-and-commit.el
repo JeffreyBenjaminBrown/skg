@@ -5,7 +5,7 @@
 ;;; ('docs/diff-view.org', "Stage and commit").
 ;;; The message is written in a buffer of its own, as in magit:
 ;;; C-c C-c sends it and C-c C-k cancels.
-;;; When the readiness summary is incomplete, or some owned gitrepo
+;;; When the processed summary is incomplete, or some owned gitrepo
 ;;; has entries already staged, the server asks for confirmation
 ;;; instead and changes nothing; only the typed word "yes" resends the
 ;;; request confirmed. Every answer is followed by a rerender
@@ -15,7 +15,7 @@
 ;;; DATA USED/ASSUMED: See docs/api-and-formats.org.
 
 (require 'skg-buffer)
-(require 'skg-readiness) ; for skg--readiness-summary-message
+(require 'skg-processed) ; for skg--processed-summary-message
 (require 'skg-request-save) ; for skg-big-nonfatal-message
 (require 'skg-request-rerender-all-views)
 
@@ -43,8 +43,8 @@ the message; \\[skg-commit-message-cancel] cancels."
 that has changes, with one message, written in the buffer
 `skg--commit-message-buffer-name' (see `skg-commit-message-mode').
 A message left there by an earlier attempt is kept. If not every
-changed file is commit-ready, or some owned gitrepo has entries
-already staged, show the readiness summary and those entries, and
+changed file is processed, or some owned gitrepo has entries
+already staged, show the processed summary and those entries, and
 proceed only if the user types \"yes\"."
   (interactive)
   (skg--stage-and-commit-require-saved-views)
@@ -178,7 +178,7 @@ kept."
                       (concat "Not committed; " kept))))))
 
 (defun skg--stage-and-commit-confirmed-p (response)
-  "Show the readiness summary of RESPONSE, a request for confirmation,
+  "Show the processed summary of RESPONSE, a request for confirmation,
 and how many entries it lists as already staged in each gitrepo, the
 entries themselves in the buffer
 `skg--stage-and-commit-already-staged-buffer-name'; non-nil iff the
@@ -192,7 +192,7 @@ user types exactly \"yes\"."
              (read-string
               (format "%s%s. Type yes to commit anyway: "
                       (string-remove-suffix
-                       "." (skg--readiness-summary-message
+                       "." (skg--processed-summary-message
                             (assq 'readiness-summary response)))
                       (skg--stage-and-commit-already-staged-message
                        already-staged))))))

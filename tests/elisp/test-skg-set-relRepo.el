@@ -257,8 +257,8 @@ the displayed relRepo fact; its message says the saved skgrepo survives
        (should (string-match-p "(skgRepos (nodeRepo public) (relRepo private))"
                                (test--buffer-line 1)))))))
 
-(ert-deftest test-apply-relRepo-keeps-the-readiness-request ()
-  "Setting a relRepo request, and removing one, keeps the readiness
+(ert-deftest test-apply-relRepo-keeps-the-processed-request ()
+  "Setting a relRepo request, and removing one, keeps the processed
 request pending in '(editRequest ...)'."
   (test--with-skg-content-view
    "* (skg node (gnid x) (skgRepos (nodeRepo public)) (editRequest (relRepo trusted) (ready rel))) x\n"
@@ -272,8 +272,8 @@ request pending in '(editRequest ...)'."
      (should (string-match-p "(editRequest (ready rel)))"
                              (test--buffer-line 1))))))
 
-(ert-deftest test-apply-relRepo-under-a-readiness-request ()
-  "A readiness request alone in '(editRequest ...)' does not block a
+(ert-deftest test-apply-relRepo-under-a-processed-request ()
+  "A processed request alone in '(editRequest ...)' does not block a
 relRepo request, as a delete does."
   (test--with-skg-content-view
    (concat

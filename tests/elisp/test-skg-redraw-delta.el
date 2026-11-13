@@ -227,7 +227,7 @@ no change hook touches, is re-heralded."
 
 (ert-deftest test-skg-redraw-delta-re-heralds-the-folder-above ()
   "A folder's herald reads its members. When the patch makes its one
-changed member ready, the folder's herald shows it ready too."
+changed member processed, the folder's herald shows it processed too."
   (skg-test-install-herald-rules)
   (let ((root-and-folder
          (concat "* (skg (vnid r) node (gnid r) (skgRepos (nodeRepo r))) r\n"

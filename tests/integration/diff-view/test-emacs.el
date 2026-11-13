@@ -2,7 +2,7 @@
 ;;; for the data.
 ;;;
 ;;; Phase 1: Open the diff view; its buffers open.
-;;; Phase 2: Mark every change commit-ready, through the recursive
+;;; Phase 2: Mark every change processed, through the recursive
 ;;;          gesture on each root of the "all changes" buffer, and see
 ;;;          "Commit ready".
 ;;; Phase 3: Stage and commit; every owned skgrepo is committed, the
@@ -104,25 +104,25 @@
     (setq root-count (length (root-headline-positions)))
     (dotimes (i root-count)
       ;; Each gesture saves, which rerenders the buffer, so find the
-      ;; i-th root afresh. A root an earlier gesture already readied
-      ;; is skipped: the gesture toggles, so it would unready it.
+      ;; i-th root afresh. A root an earlier gesture already marked processed
+      ;; is skipped: the gesture toggles, so it would mark it unprocessed.
       (goto-char (nth i (root-headline-positions)))
       (unless (string-match-p "(ready"
                               (buffer-substring (line-beginning-position)
                                                 (line-end-position)))
         (setq test-messages nil)
-        (skg-cycle-commit-ready t)
+        (skg-cycle-processed t)
         (unless (skg-test-wait-for
                  (lambda ()
-                   (cl-some (lambda (m) (string-match-p "changed files are ready" m))
+                   (cl-some (lambda (m) (string-match-p "changed files are processed" m))
                             test-messages))
                  20)
-          (test-fail "No readiness summary after the gesture on root %d" i))))
+          (test-fail "No processed summary after the gesture on root %d" i))))
     (let ((summary (cl-find-if
-                    (lambda (m) (string-match-p "changed files are ready" m))
+                    (lambda (m) (string-match-p "changed files are processed" m))
                     test-messages)))
       (unless (string-match-p "^Commit ready\\." summary)
-        (test-fail "Not commit-ready after marking every root: %s\n%s"
+        (test-fail "Not all processed after marking every root: %s\n%s"
                    summary (buffer-string)))
       (test-pass "%s" summary))))
 

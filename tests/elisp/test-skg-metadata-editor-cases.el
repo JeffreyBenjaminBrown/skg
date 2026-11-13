@@ -67,7 +67,7 @@ the case says. The cases are shared with Neovim."
             (dolist (writer `(("edit request" "with the edit request"
                                ,#'skg--metadata-with-edit-request)
                               ("readiness request" "with the readiness request"
-                               ,#'skg--metadata-with-readiness-request)))
+                               ,#'skg--metadata-with-processed-request)))
               (let ((request (test-skg-metadata-editor--field
                               case (nth 0 writer))))
                 (when request

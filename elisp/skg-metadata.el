@@ -364,13 +364,13 @@ an ID missing."
 (defun skg--node-edit-request-p (metadata-sexp)
   "Whether METADATA-SEXP is an occurrence's that already holds an edit
 request (delete, merge or a flag): its '(editRequest ...)' holds a
-part that is neither a relRepo request nor a readiness request. Every
+part that is neither a relRepo request nor a processed request. Every
 command that asks whether a headline holds an edit request asks this."
   (let ((values (and (skg--occurrence-sexp-p metadata-sexp)
                      (skg-sexp-cdr-at-path metadata-sexp '(skg editRequest)))))
     (seq-some (lambda (part)
                 (not (or (eq (car-safe part) 'relRepo)
-                         (skg--readiness-request-p part))))
+                         (skg--processed-request-p part))))
               values)))
 
 (defun skg--alias-headline-p ()
@@ -868,35 +868,35 @@ aliases, IDs and flags. Every other folder is a partner folder.")
 
 ;;; A headline's change facts
 
-(defun skg--readiness-diff-form (metadata-sexp)
+(defun skg--processed-diff-form (metadata-sexp)
   "The '(diff ...)' form of METADATA-SEXP, or nil. Every kind's
 '(diff ...)' stands at the top level of '(skg ...)', beside its kind
 atom."
   (assq 'diff (cdr metadata-sexp)))
 
-(defun skg--readiness-form (metadata-sexp key)
+(defun skg--processed-form (metadata-sexp key)
   "The (KEY ...) part of METADATA-SEXP's '(diff ...)' form, or nil."
-  (assq key (cdr (skg--readiness-diff-form metadata-sexp))))
+  (assq key (cdr (skg--processed-diff-form metadata-sexp))))
 
-(defun skg--readiness-leaves (metadata-sexp)
+(defun skg--processed-leaves (metadata-sexp)
   "The '(leaves N OBJECT...)' fact of the headline with METADATA-SEXP,
 as (N . OBJECTS), or nil when it names no leaf."
-  (cdr (skg--readiness-form metadata-sexp 'leaves)))
+  (cdr (skg--processed-form metadata-sexp 'leaves)))
 
-(defun skg--readiness-objects-ready-p (metadata-sexp objects)
-  "Non-nil when every one of OBJECTS is ready on METADATA-SEXP's headline:
+(defun skg--objects-processed-p (metadata-sexp objects)
+  "Non-nil when every one of OBJECTS is processed on METADATA-SEXP's headline:
 when it carries a '(ready ...)' that names each of them. A headline
-that lists no object (one naming a single leaf) is ready when it
+that lists no object (one naming a single leaf) is processed when it
 carries any '(ready ...)'."
-  (let ((ready (skg--readiness-form metadata-sexp 'ready)))
-    (and ready
-         (seq-every-p (lambda (object) (memq object (cdr ready)))
+  (let ((processed (skg--processed-form metadata-sexp 'ready)))
+    (and processed
+         (seq-every-p (lambda (object) (memq object (cdr processed)))
                       objects))))
 
 ;;; A changed folder
 ;;; The server writes every folder as its bare atom. Whether the diff
 ;;; view shows it because of a change, and whether that change is
-;;; ready, follows from its members (its child headlines), as computed
+;;; processed, follows from its members (its child headlines), as computed
 ;;; here ('folder_change_facts' did it on the server before).
 
 (defun skg--folder-atom (metadata-sexp)
@@ -911,48 +911,48 @@ in 'shared/metadata-fields.json'), else nil."
                         item))
                  (cdr metadata-sexp))))
 
-(defun skg--membership-change-readiness (member-sexp child-sexps)
+(defun skg--membership-change-processed (member-sexp child-sexps)
   "Whether the folder member with metadata MEMBER-SEXP, whose child
 headlines carry CHILD-SEXPS, carries a change of its relationship to
-the folder's viewparent, and whether that change is ready: nil when
-it carries none, else `ready' or `unready'. It carries one when its
+the folder's viewparent, and whether that change is processed: nil when
+it carries none, else `processed' or `unprocessed'. It carries one when its
 '(diff ...)' has a '(rel ...)', or when a child is a
-'(relRepoMove ...)'. The change is ready when both hold: a '(rel ...)'
+'(relRepoMove ...)'. The change is processed when both hold: a '(rel ...)'
 comes with a '(ready ...)' that names 'rel' if the member's
 '(leaves ...)' lists 'rel'; every '(relRepoMove ...)' child carries
 '(diff (ready ...))'."
-  (let ((rel-change (skg--readiness-form member-sexp 'rel))
+  (let ((rel-change (skg--processed-form member-sexp 'rel))
         (relRepo-moves
          (seq-filter (lambda (child-sexp)
                        (assq 'relRepoMove (cdr child-sexp)))
                      child-sexps)))
     (when (or rel-change relRepo-moves)
       (if (and (or (not rel-change)
-                   (skg--readiness-objects-ready-p
+                   (skg--objects-processed-p
                     member-sexp
-                    (and (memq 'rel (cdr (skg--readiness-leaves member-sexp)))
+                    (and (memq 'rel (cdr (skg--processed-leaves member-sexp)))
                          '(rel))))
                (seq-every-p (lambda (relRepo-move)
-                              (skg--readiness-form relRepo-move 'ready))
+                              (skg--processed-form relRepo-move 'ready))
                             relRepo-moves))
-          'ready
-        'unready))))
+          'processed
+        'unprocessed))))
 
-(defun skg--folder-change-readiness (members)
+(defun skg--folder-change-processed (members)
   "Whether a folder whose MEMBERS are as given is changed, and whether
-that change is ready: nil when no member carries a change of its
-relationship to the folder's viewparent, `ready' when every such
-change is ready, else `unready'. Each of MEMBERS is (MEMBER-SEXP
-. CHILD-SEXPS), as `skg--membership-change-readiness' takes them."
+that change is processed: nil when no member carries a change of its
+relationship to the folder's viewparent, `processed' when every such
+change is processed, else `unprocessed'. Each of MEMBERS is (MEMBER-SEXP
+. CHILD-SEXPS), as `skg--membership-change-processed' takes them."
   (let ((changes (delq nil (mapcar (lambda (member)
-                                     (skg--membership-change-readiness
+                                     (skg--membership-change-processed
                                       (car member) (cdr member)))
                                    members))))
     (when changes
-      (if (memq 'unready changes) 'unready 'ready))))
+      (if (memq 'unprocessed changes) 'unprocessed 'processed))))
 
-(defun skg--folder-change-readiness-at-point ()
-  "`skg--folder-change-readiness' of the folder headline on the line
+(defun skg--folder-change-processed-at-point ()
+  "`skg--folder-change-processed' of the folder headline on the line
 at point, or nil when that line is no folder's headline. Reads
 headline levels by their stars, so it works in any buffer."
   (save-excursion
@@ -960,7 +960,7 @@ headline levels by their stars, so it works in any buffer."
     (let ((level (skg--headline-level-on-line)))
       (when (and level
                  (skg--folder-atom (skg--metadata-sexp-at-point-or-nil)))
-        (skg--folder-change-readiness
+        (skg--folder-change-processed
          (skg--folder-members-below level))))))
 
 (defun skg--folder-members-below (folder-level)
@@ -1340,31 +1340,31 @@ checks\" entry in PITFALLs.org."
             (skg-replace-current-line
              (skg-format-headline stars metadata-sexp title)))))))))
 
-(defun skg--readiness-request-p (part)
+(defun skg--processed-request-p (part)
   "Non-nil when PART, an element of an '(editRequest ...)', is a
-readiness request, '(ready OBJECT...)' or '(unready OBJECT...)'."
+processed request, '(ready OBJECT...)' or '(unready OBJECT...)'."
   (memq (car-safe part) '(ready unready)))
 
-(defun skg--metadata-with-readiness-request (metadata-sexp request)
-  "METADATA-SEXP with REQUEST as the readiness request of its
+(defun skg--metadata-with-processed-request (metadata-sexp request)
+  "METADATA-SEXP with REQUEST as the processed request of its
 '(editRequest ...)' (`skg--metadata-with-editRequest-parts'): any
-readiness request there replaced, the edit request kept."
+processed request there replaced, the edit request kept."
   (skg--metadata-with-editRequest-parts
-   metadata-sexp #'skg--readiness-request-p request))
+   metadata-sexp #'skg--processed-request-p request))
 
 (defun skg--metadata-with-edit-request (metadata-sexp request)
   "METADATA-SEXP with REQUEST as the edit request of its
 '(editRequest ...)' (`skg--metadata-with-editRequest-parts'): any edit
-request there replaced, the readiness request kept."
+request there replaced, the processed request kept."
   (skg--metadata-with-editRequest-parts
    metadata-sexp
-   (lambda (part) (not (skg--readiness-request-p part)))
+   (lambda (part) (not (skg--processed-request-p part)))
    request))
 
 (defun skg--metadata-with-editRequest-parts (metadata-sexp replaced-p request)
   "METADATA-SEXP with REQUEST in place of each part of its
 '(editRequest ...)' that REPLACED-P accepts, the other parts kept. In
-the form the edit request comes before the readiness request, as the
+the form the edit request comes before the processed request, as the
 server writes them. A nil REQUEST removes the replaced parts, and with
 them an '(editRequest ...)' left empty. A headline without
 '(editRequest ...)' gets one where the server writes it
@@ -1376,8 +1376,8 @@ its derived facts."
                            (and request (list request))))
          (new (when requests
                 (append '(editRequest)
-                        (seq-remove #'skg--readiness-request-p requests)
-                        (seq-filter #'skg--readiness-request-p requests)))))
+                        (seq-remove #'skg--processed-request-p requests)
+                        (seq-filter #'skg--processed-request-p requests)))))
     (cons 'skg
           (cond ((and old new)
                  (mapcar (lambda (part) (if (eq part old) new part)) parts))
@@ -1388,7 +1388,7 @@ its derived facts."
 
 (defun skg--write-edit-request (request &optional kind)
   "Make REQUEST the edit request of the headline at point, keeping the
-readiness request its '(editRequest ...)' holds
+processed request its '(editRequest ...)' holds
 \(`skg--metadata-with-edit-request'). A nil REQUEST removes the edit
 request. KIND, when given, is the kind atom a headline without
 metadata gets."

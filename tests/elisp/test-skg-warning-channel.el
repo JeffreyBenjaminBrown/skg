@@ -134,7 +134,7 @@
   "A save refusal as the server writes it, naming one headline.")
 
 (defconst test-skg-message-naming-a-headline-warning
-  (concat "A readiness request names no current change; it was dropped.\n"
+  (concat "A processed request names no current change; it was dropped.\n"
           "*** b\n- graphnode ID: b\n"
           "- viewnode ID: 0z. To find it: C-c g v 0z\n")
   "A warning as the server writes it, naming one headline.")
@@ -149,7 +149,7 @@ it names is a subheadline of the message, or of its error
              (list test-skg-message-naming-a-headline-warning)))
     (org-mode)
     (dolist (case '(("*** a stray alias" . "** Error 1")
-                    ("*** b" . "** A readiness request names no current change")
+                    ("*** b" . "** A processed request names no current change")
                     ("** Error 1" . "* errors")
                     ("** NOTHING WAS SAVED" . "* errors")))
       (goto-char (point-min))
