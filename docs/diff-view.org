@@ -480,7 +480,7 @@ an earlier version was approved. The store lives on the server, is
 written to its file after every change, and is read at startup; a
 missing or unreadable file is an empty store. The file is the
 config's 'processed_marks_file', or else
-'<data_root>/readiness-marks-STEM.json', STEM the config file's name
+'<data_root>/processed-marks-STEM.json', STEM the config file's name
 without '.toml' (a symlink to a config resolved first), so that
 servers over one data root keep their marks apart
 ('SkgConfig::processed_marks_path').

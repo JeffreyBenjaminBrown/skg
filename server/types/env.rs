@@ -75,7 +75,9 @@ impl SharedRuntime {
   ) -> Self {
     let graph : Arc<InRustGraph> = legacy_graph . load_full ();
     let processed_store : ProcessedStore =
-      ProcessedStore::load ( &config . processed_marks_path () );
+      ProcessedStore::load_or_take_over_old_file (
+        &config . processed_marks_path (),
+        config . old_readiness_marks_path () );
     SharedRuntime {
       current : ArcSwap::from_pointee (RuntimeGeneration {
         config : Arc::new (config), graph, tantivy_index,

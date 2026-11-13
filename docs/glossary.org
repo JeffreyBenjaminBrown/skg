@@ -2244,7 +2244,7 @@ does, and none when both do. A view shows it as
 **** fingerprint, the processed store
 
 Marks are stored in the server's processed marks file
-('<data_root>/readiness-marks-CONFIGSTEM.json' unless the config names
+('<data_root>/processed-marks-CONFIGSTEM.json' unless the config names
 another; 'docs/api-and-formats.org', "Processed marks file"), each with a
 *fingerprint* of the change it approved. A mark whose fingerprint no
 longer matches the change counts as absent, which is how editing a

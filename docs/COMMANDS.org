@@ -826,7 +826,7 @@ Save the view afterward to apply the changes.
 In a buffer of the diff view (C-c v d), each change can be
 marked processed. A mark approves the change as it is now: editing
 the changed thing again makes the mark lapse. Marks live on the
-server, in a file beside its config ('<data_root>/readiness-marks-CONFIGSTEM.json',
+server, in a file beside its config ('<data_root>/processed-marks-CONFIGSTEM.json',
 unless the config names another). A headline whose
 change is processed shows ✓ after it; a processed aggregate (a
 folder of changes, a changeset marker) shows ✓ when all of its changes are. A node that

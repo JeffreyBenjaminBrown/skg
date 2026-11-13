@@ -363,5 +363,5 @@ fn a_skgrepo_path_that_leaves_the_data_root_resolves_without_dot_dot (
                data_parent_path . join ("jeff/.index.tantivy") );
   assert_eq! ( config . processed_marks_path (),
                data_parent_path . join (
-                 "jeff/readiness-marks-skgconfig.json" ));
+                 "jeff/processed-marks-skgconfig.json" ));
   Ok (( )) }

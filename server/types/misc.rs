@@ -368,7 +368,7 @@ impl SkgConfig {
     run_folder . join ( server_process_start_as_file_name () ) }
 
   /// The processed store's file: 'processed_marks_file' resolved
-  /// against the data root, or else 'readiness-marks-STEM.json' in the
+  /// against the data root, or else 'processed-marks-STEM.json' in the
   /// data root, STEM the config file's name without its extension, so
   /// that servers over one data root keep separate marks.
   /// 'config_path' is canonical, so a symlink to a config file shares
@@ -379,13 +379,32 @@ impl SkgConfig {
   ) -> PathBuf {
     match &self . processed_marks_file {
       Some (stated) => self . data_root . join (stated),
-      None => {
-        let stem : String =
-          self . config_path . file_stem ()
-          . map ( |stem| stem . to_string_lossy () . to_string () )
-          . unwrap_or_else ( || "skgconfig" . to_string () );
-        self . data_root . join (
-          format! ("readiness-marks-{}.json", stem) ) }, }} }
+      None => self . data_root . join (
+        format! ("processed-marks-{}.json", self . config_file_stem ()) ), }}
+
+  /// The name 'processed_marks_path' had before marks were called
+  /// processed, 'readiness-marks-STEM.json' in the data root, which
+  /// 'ProcessedStore::load_or_take_over_old_file' reads when the new
+  /// file is absent; None when the config states the file.
+  /// TEMPORARY: once every data folder that held a
+  /// 'readiness-marks-*.json' also holds its 'processed-marks-*.json'
+  /// (one start of each server writes it), delete this, the fallback,
+  /// and the old files (Jeff's by Jeff, the team's by Top). Vic's plan
+  /// says so, at "The marks file is read from its old name".
+  pub fn old_readiness_marks_path (
+    &self,
+  ) -> Option<PathBuf> {
+    match &self . processed_marks_file {
+      Some (_) => None,
+      None => Some ( self . data_root . join (
+        format! ("readiness-marks-{}.json", self . config_file_stem ()) )), }}
+
+  fn config_file_stem (
+    &self,
+  ) -> String {
+    self . config_path . file_stem ()
+      . map ( |stem| stem . to_string_lossy () . to_string () )
+      . unwrap_or_else ( || "skgconfig" . to_string () ) } }
 
 /// Each skgrepo has a unique name, defined in the SkgConfig,
 /// used in Viewnode metadata to track provenance.

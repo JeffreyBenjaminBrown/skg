@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::io;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 /// See the module comment.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
@@ -49,6 +49,26 @@ impl ProcessedStore {
     leaves : &ChangeLeaves,
   ) {
     self . marks . retain ( |key, _| leaves . leaf (key) . is_some () ); }
+
+  /// The store saved in 'marks_file', or, when that file is absent
+  /// and 'old_marks_file' exists, the store saved there, which is
+  /// then saved in 'marks_file' at once. The old file is left in
+  /// place, so a server built before marks were called processed
+  /// still finds it. When this goes is said at
+  /// 'SkgConfig::old_readiness_marks_path'.
+  pub fn load_or_take_over_old_file (
+    marks_file     : &Path,
+    old_marks_file : Option<PathBuf>,
+  ) -> ProcessedStore {
+    match old_marks_file {
+      Some (old) if ! marks_file . exists () && old . exists () => {
+        let store : ProcessedStore = ProcessedStore::load (&old);
+        if let Err (e) = store . save (marks_file) {
+          tracing::warn! (
+            "The processed marks read from {} were not written to {}: {}",
+            old . display (), marks_file . display (), e ); }
+        store },
+      _ => ProcessedStore::load (marks_file), }}
 
   /// The store saved in 'marks_file'. A missing or unreadable file
   /// means an empty store.

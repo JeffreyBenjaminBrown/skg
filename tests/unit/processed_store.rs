@@ -124,9 +124,9 @@ fn each_config_keeps_its_own_marks_file () {
     config_of (&link) };
   let root : PathBuf = fs::canonicalize ( dir . path () ) . unwrap ();
   assert_eq! ( jeff . processed_marks_path (),
-               root . join ("readiness-marks-skgconfig-jeff.json") );
+               root . join ("processed-marks-skgconfig-jeff.json") );
   assert_eq! ( user . processed_marks_path (),
-               root . join ("readiness-marks-skgconfig-user.json") );
+               root . join ("processed-marks-skgconfig-user.json") );
   assert_eq! ( stated . processed_marks_path (),
                root . join ("marks/stated.json") );
   assert_eq! ( symlinked . processed_marks_path (),
@@ -144,3 +144,44 @@ fn each_config_keeps_its_own_marks_file () {
                user_store );
   assert_eq! ( ProcessedStore::load ( &symlinked . processed_marks_path () ),
                jeff_store ); }
+
+/// A store whose file is absent is read from the file's old name, then
+/// written under the new one at once, the old file left in place; and
+/// once the new file exists, the old one is not read. A config that
+/// states its marks file has no old name.
+#[test]
+fn a_store_under_the_old_name_loads_when_the_new_one_is_absent () {
+  let dir : TempDir = TempDir::new () . unwrap ();
+  let config_path : PathBuf = dir . path () . join ("skgconfig.toml");
+  fs::write ( &config_path,
+    "tantivy_folder = \".index\"\n[[repos]]\nname = \"main\"\npath = \"main\"\n" )
+    . unwrap ();
+  let config : SkgConfig =
+    load_config ( config_path . to_str () . unwrap () ) . unwrap () . 0;
+  let new_file : PathBuf = config . processed_marks_path ();
+  let old_file : PathBuf = config . old_readiness_marks_path () . unwrap ();
+  assert_eq! ( old_file . file_name () . unwrap (),
+               "readiness-marks-skgconfig.json" );
+  let keys : Vec<LeafKey> = some_keys ();
+  let mut old_store : ProcessedStore = ProcessedStore::default ();
+  old_store . mark (keys [0] . clone (), 7);
+  old_store . save (&old_file) . unwrap ();
+  let old_text : String = fs::read_to_string (&old_file) . unwrap ();
+  let loaded : ProcessedStore = ProcessedStore::load_or_take_over_old_file (
+    &new_file, config . old_readiness_marks_path () );
+  assert_eq! ( loaded, old_store );
+  assert_eq! ( ProcessedStore::load (&new_file), old_store );
+  assert_eq! ( fs::read_to_string (&old_file) . unwrap (), old_text );
+  let mut new_store : ProcessedStore = ProcessedStore::default ();
+  new_store . mark (keys [1] . clone (), 8);
+  new_store . save (&new_file) . unwrap ();
+  assert_eq! ( ProcessedStore::load_or_take_over_old_file (
+                 &new_file, config . old_readiness_marks_path () ),
+               new_store );
+  let stated_path : PathBuf = dir . path () . join ("skgconfig-stated.toml");
+  fs::write ( &stated_path,
+    "tantivy_folder = \".index-stated\"\nprocessed_marks_file = \"marks.json\"\n[[repos]]\nname = \"main\"\npath = \"main\"\n" )
+    . unwrap ();
+  let stated : SkgConfig =
+    load_config ( stated_path . to_str () . unwrap () ) . unwrap () . 0;
+  assert_eq! ( stated . old_readiness_marks_path (), None ); }
