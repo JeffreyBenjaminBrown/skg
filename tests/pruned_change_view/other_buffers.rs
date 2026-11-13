@@ -123,7 +123,7 @@ fn the_skgrepo_changes_buffer_shows_the_recorder_of_a_relRepo_move (
     buffer_of_case ("kinds", DiffViewBufferKind::SkgrepoChanges) ?;
   assert_lines_in_order ( &text, &[
     "* (skg node (gnid rr)",
-    "** (skg (changesetMarker relRepo) (diff (leaves 1 all)))",
+    "** (skg (changesetMarker relRepo) (diff (leaves 1 rel)))",
     "** (skg node (gnid rm)",
     "*** (skg (relRepoMove (old public) (new private)) (diff (leaves 1)))" ] );
   assert! ( ! headline_of (&text, "rr") . contains ("homeSkgrepoMove"),
@@ -188,7 +188,7 @@ fn the_order_only_buffer_is_a_flat_list_with_markers (
   assert_eq! ( roots (&text) . len (), 1, "{}", text );
   assert! ( without_viewnode_ids (lines [0]) . starts_with ("* (skg bodyFolded node (gnid ord)"),
             "{}", text );
-  assert_eq! ( lines [1], "** (skg (changesetMarker orderOnly) (diff (processed all)))" );
+  assert_eq! ( lines [1], "** (skg (changesetMarker orderOnly) (diff (processed)))" );
   assert! ( lines [2] . contains ("node (gnid o2) (skgRepos (nodeRepo public)) writeProtected")
             && lines [3] . contains ("node (gnid o1) (skgRepos (nodeRepo public)) writeProtected"),
             "the content is shown in its new order, as leaves:\n{}", text );

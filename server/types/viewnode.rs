@@ -66,7 +66,8 @@ pub struct LeavesFact {
 /// existence means the thing is in both graphs of the straddle, or
 /// that it does not apply. A node in only one graph has no other
 /// properties to compare, so 'properties' is true only when 'node' is
-/// None. On a property member the one existence it shows is 'rel': that
+/// None; and in a buffer of the diff view only where the object
+/// 'node' names a leaf ('set_processed_facts_in_viewforest'). On a property member the one existence it shows is 'rel': that
 /// of its membership in its folder.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct DiffChange {
@@ -81,22 +82,26 @@ pub struct DiffChange {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Existence { Added, Removed }
 
-/// The diff objects of a viewnode's change-forest leaves: 'node' (the node's
-/// own existence), 'rel' (its relationship to its viewparent),
-/// 'all' (every leaf the node records, or every leaf of a
-/// processed aggregate, one level down), 'newContent' (of each new node
-/// reached contentward from the node, through new nodes only, as the
-/// change forest says, whatever the buffer shows: its existence, which
-/// covers its text, and its content relationships) and 'newOutward'
-/// (the same along every relationship, in its recorded direction:
-/// every leaf each new node reached records). Only a processed request
-/// names the last two; no '(leaves ...)' or '(processed ...)' change fact
-/// lists them.
+/// The diff objects of a viewnode's change-forest leaves: 'node' (the
+/// node's own leaves: on a vognode, every leaf its node records but
+/// the relationships its 'rel' or a headline under it names; on a
+/// changeset marker, the own leaves of the members it gathers), 'rel'
+/// (its relationship to its viewparent; on a changeset marker, the
+/// relationships it gathers), 'newContent' (of each new node reached
+/// contentward from the node, through new nodes only, as the change
+/// forest says, whatever the buffer shows: its existence, which covers
+/// its text, and its content relationships) and 'newOutward' (the same
+/// along every relationship, in its recorded direction: every leaf each
+/// new node reached records). Beside a walk, 'node' and 'rel' also say
+/// which leaves of the nodes it reaches are named: 'node' their
+/// existence, 'rel' their relationships; with neither, both
+/// ('leaves_named_at' in 'server/diff_view/processed_requests.rs').
+/// Only a processed request names the last two; no '(leaves ...)' or
+/// '(processed ...)' change fact lists them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum DiffObject {
   Node,
   Rel,
-  All,
   NewContent,
   NewOutward,
 }
@@ -1108,8 +1113,8 @@ impl Existence {
 }
 
 impl DiffObject {
-  pub const ALL : [DiffObject; 5] =
-    [ DiffObject::Node, DiffObject::Rel, DiffObject::All,
+  pub const ALL : [DiffObject; 4] =
+    [ DiffObject::Node, DiffObject::Rel,
       DiffObject::NewContent, DiffObject::NewOutward ];
 
   pub fn wire_name (
@@ -1118,7 +1123,6 @@ impl DiffObject {
     match self {
       DiffObject::Node => "node",
       DiffObject::Rel  => "rel",
-      DiffObject::All  => "all",
       DiffObject::NewContent => "newContent",
       DiffObject::NewOutward => "newOutward", } }
 

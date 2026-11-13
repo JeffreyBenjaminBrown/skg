@@ -4,7 +4,7 @@ use super::*;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::diff_view::processed_requests::{
-  NamedLeafSet, RequestedProcessed, apply_processed_requests};
+  LeafKinds, NamedLeafSet, RequestedProcessed, apply_processed_requests};
 use crate::types::errors::HeadlineName;
 use crate::types::misc::{MSV, RelPartner};
 use crate::types::nodes::complete::{Graphnode, empty_graphnode};
@@ -220,6 +220,8 @@ fn marked_by (
   assert! ( warnings . is_empty (), "{:?}", warnings );
   store . marks . into_keys () . collect () }
 
+const BOTH_KINDS : LeafKinds = LeafKinds { own : true, relationships : true };
+
 #[test]
 fn a_request_on_new_nodes_marks_what_its_walk_follows () {
   let straddle : GraphStraddle = straddle_with_new_nodes ();
@@ -233,15 +235,47 @@ fn a_request_on_new_nodes_marks_what_its_walk_follows () {
   ] . into_iter () . collect ();
   assert_eq! (
     marked_by ( forest, NamedLeafSet::NewNodesFrom (
-      ID::from ("n1"), NewNodeWalk::Contentward )),
+      ID::from ("n1"), NewNodeWalk::Contentward, BOTH_KINDS )),
     contentward,
     "neither r's relationship to n1, nor n1's subscription, nor a or n3" );
   assert_eq! (
     marked_by ( forest, NamedLeafSet::NewNodesFrom (
-      ID::from ("n1"), NewNodeWalk::Outward )),
+      ID::from ("n1"), NewNodeWalk::Outward, BOTH_KINDS )),
     contentward . into_iter ()
       . chain ([ n1_subscribes_to_n5 (),
                  node_key ("n5", NodeAspect::Existence),
                  contains_key ("n5", "n6", RelationshipAspect::Existence),
                  node_key ("n6", NodeAspect::Existence) ])
       . collect::<HashSet<LeafKey>> () ); }
+
+/// The letters beside a walk filter what it marks: 'node' the
+/// existence of each new node it reaches, 'rel' the relationships
+/// those nodes record that it follows.
+#[test]
+fn the_letters_beside_a_walk_filter_what_it_marks () {
+  let straddle : GraphStraddle = straddle_with_new_nodes ();
+  let forest : &ChangeLeaves = straddle . change_leaves ();
+  assert_eq! (
+    marked_by ( forest, NamedLeafSet::NewNodesFrom (
+      ID::from ("n1"), NewNodeWalk::Contentward,
+      LeafKinds { own : true, relationships : false } )),
+    [ node_key ("n1", NodeAspect::Existence),
+      node_key ("n2", NodeAspect::Existence) ] . into_iter () . collect () );
+  assert_eq! (
+    marked_by ( forest, NamedLeafSet::NewNodesFrom (
+      ID::from ("n1"), NewNodeWalk::Contentward,
+      LeafKinds { own : false, relationships : true } )),
+    [ contains_key ("n1", "n2", RelationshipAspect::Existence),
+      contains_key ("n1", "a",  RelationshipAspect::Existence),
+      contains_key ("n2", "n1", RelationshipAspect::Existence) ]
+      . into_iter () . collect () );
+  assert_eq! (
+    marked_by ( forest, NamedLeafSet::NewNodesFrom (
+      ID::from ("n1"), NewNodeWalk::Outward,
+      LeafKinds { own : false, relationships : true } )),
+    [ contains_key ("n1", "n2", RelationshipAspect::Existence),
+      contains_key ("n1", "a",  RelationshipAspect::Existence),
+      contains_key ("n2", "n1", RelationshipAspect::Existence),
+      n1_subscribes_to_n5 (),
+      contains_key ("n5", "n6", RelationshipAspect::Existence) ]
+      . into_iter () . collect () ); }

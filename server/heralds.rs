@@ -269,7 +269,8 @@ fn diffView_property_rules (
 /// properties ('(properties changed)') as M, and the existence of its
 /// relationship to its viewparent ('(rel added)', '(rel removed)') as
 /// ~+ ~-, each followed by a ✓ when '(processed ...)' names that diff
-/// object ('all' for M), then the processed request. '(leaves ...)'
+/// object ('node' for ∃ or M, which never stand together), then the
+/// processed request. '(leaves ...)'
 /// is for the clients' gestures and shows nothing. The processed part is
 /// matched once per object, so each ✓ lands after its own object
 /// whatever the raw order.
@@ -282,8 +283,7 @@ fn change_fact_rules_for_two_objects (
         leaf_styled_as ("existence", "removed", "∃-") ]),
       rule ("properties", vec! [
         leaf_styled_as ("properties", "changed", "M") ]),
-      rule ("processed", vec! [ leaf_abut_styled_as ("processed", "node", "✓"),
-                                leaf_abut_styled_as ("processed", "all",  "✓") ]),
+      rule ("processed", vec! [ leaf_abut_styled_as ("processed", "node", "✓") ]),
       rule ("rel", vec! [
         leaf_styled_as ("existence", "added",   "~+"),
         leaf_styled_as ("existence", "removed", "~-") ]),
@@ -301,7 +301,7 @@ fn processed_request_rules (
 
 /// The same for a leaf with a single diff object (a property member, an
 /// unknown viewnode, a restricted viewnode), whose '(processed)' names no object, or
-/// 'all' on a changeset marker. 'added' and 'removed' render its
+/// 'rel' on a changeset marker. 'added' and 'removed' render its
 /// existence, whichever object it names.
 fn change_fact_rules_for_one_object (
   added   : &'static str,
@@ -332,7 +332,6 @@ fn processed_request_rule (
               match object {
                 DiffObject::Node => ":node",
                 DiffObject::Rel  => ":rel",
-                DiffObject::All  => ":all",
                 DiffObject::NewContent => ":newContent",
                 DiffObject::NewOutward => ":newOutward", } ) ] ))
             . collect () ] . concat () ) }
@@ -944,7 +943,7 @@ fn change_fact_atoms () -> Vec<&'static str> {
       moved_like_ancestor : _, // -> the movedLikeAncestor atom, below
     } = facts;
     match object { // compile error here = update DiffObject::ALL
-      DiffObject::Node | DiffObject::Rel | DiffObject::All
+      DiffObject::Node | DiffObject::Rel
         | DiffObject::NewContent | DiffObject::NewOutward => () }}
   let _ = guard;
   [ vec! [ "diff", "processed", "leaves",

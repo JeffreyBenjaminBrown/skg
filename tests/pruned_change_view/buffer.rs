@@ -85,7 +85,7 @@ fn a_deleted_subtree_is_shown_where_it_stood (
 ) -> Result<(), Box<dyn Error>> {
   assert_lines_in_order ( &sets_buffer () ?, &[
     "* (skg node (gnid r)",
-    "** (skg (changesetMarker content) (diff (leaves 1 all)))",
+    "** (skg (changesetMarker content) (diff (leaves 1 rel)))",
     "** (skg ghost (gnid del) (skgRepos (nodeRepo main)) noClaim (diff (node removed) (rel removed) (leaves 2 node rel))) del",
     "the body del had",
     "*** (skg ghost (gnid delc) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed) (leaves 2 node rel))) delc",
@@ -101,7 +101,7 @@ fn a_change_whose_only_changed_container_stands_above_it_has_no_container_folder
   let buffer : String = sets_buffer () ?;
   assert_lines_in_order ( &buffer, &[
     "* (skg node (gnid ln)",
-    "** (skg (changesetMarker content) (diff (leaves 1 all)))",
+    "** (skg (changesetMarker content) (diff (leaves 1 rel)))",
     "** (skg node (gnid lo) ", " (diff (rel added) (leaves 1 rel))) lo\n",
     "* (skg node (gnid mc)" ] );
   assert! ( ! without_viewnode_ids (&buffer) . contains ("(skg node (gnid lp)"),
@@ -122,7 +122,7 @@ fn a_content_change_tags_the_members_and_shows_the_removed_one (
 ) -> Result<(), Box<dyn Error>> {
   assert_lines_in_order ( &kinds_buffer () ?, &[
     "* (skg node (gnid ct)",
-    "** (skg (changesetMarker content) (diff (leaves 2 all)))",
+    "** (skg (changesetMarker content) (diff (leaves 2 rel)))",
     "** (skg node (gnid k1) (skgRepos (nodeRepo public)) noClaim (view (rels (contains (out 1))) ghostWarrant) (diff (rel removed) (leaves 1 rel))) k1",
     "** (skg node (gnid ctx) (skgRepos (nodeRepo public)) writeProtected",
     "** (skg node (gnid k2) (skgRepos (nodeRepo public)) ", " (diff (rel added) (leaves 1 rel))) k2" ] );
@@ -178,7 +178,7 @@ fn a_subscription_change_shows_on_both_sides (
     "* (skg node (gnid s1)",
     "** (skg subscriberFolder)",
     "*** (skg node (gnid sub) (skgRepos (nodeRepo public)) writeProtected",
-    "(diff (rel removed) (properties changed) (leaves 2 rel all))) sub" ] );
+    "(diff (rel removed) (properties changed) (leaves 2 node rel))) sub" ] );
   Ok (( )) }
 
 #[test]
@@ -190,7 +190,7 @@ fn home_and_relRepo_moves_are_shown (
     "** (skg (homeSkgrepoMove (old public) (new private)) (diff (leaves 1)))" ] );
   assert_lines_in_order ( &buffer, &[
     "* (skg node (gnid rr)",
-    "** (skg (changesetMarker relRepo) (diff (leaves 1 all)))",
+    "** (skg (changesetMarker relRepo) (diff (leaves 1 rel)))",
     "** (skg node (gnid rm)",
     "*** (skg (relRepoMove (old public) (new private)) (diff (leaves 1)))" ] );
   Ok (( )) }
@@ -278,7 +278,7 @@ fn a_removed_container_not_above_the_node_stands_between_the_kept_ones (
     "*** (skg containerFolder)",
     "**** (skg node (gnid a) (skgRepos (nodeRepo main)) writeProtected",
     "**** (skg node (gnid bb) (skgRepos (nodeRepo main)) writeProtected",
-    "(diff (rel removed) (properties changed) (leaves 1 rel all))) bb",
+    "(diff (rel removed) (leaves 1 rel))) bb",
     "**** (skg node (gnid c) (skgRepos (nodeRepo main)) writeProtected" ] );
   assert! ( ! without_viewnode_ids (&buffer)
               . contains ("**** (skg node (gnid b)"),
@@ -444,6 +444,6 @@ fn a_ghosts_old_content_is_shown_as_removed_members (
     Ok (( )) }) ?;
   assert_lines_in_order ( &buffer, &[
     "** (skg ghost (gnid h) (skgRepos (nodeRepo main)) noClaim (diff (node removed) (rel removed) (leaves 2 node rel))) h",
-    "*** (skg node (gnid m) (skgRepos (nodeRepo main)) (view ghostWarrant) (diff (rel removed) (properties changed) (leaves 2 rel all))) m, retitled",
+    "*** (skg node (gnid m) (skgRepos (nodeRepo main)) (view ghostWarrant) (diff (rel removed) (properties changed) (leaves 2 node rel))) m, retitled",
     "**** (skg (oldText title) (diff (leaves 1))) m" ] );
   saves_back_unchanged ("historical_content", &["main"], DiffViewBufferKind::AllChanges) }

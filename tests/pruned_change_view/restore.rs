@@ -72,8 +72,14 @@ const G_AT_HEAD : &str =
 fn with_request (
   request : &str,
 ) -> impl Fn (&str) -> String + '_ {
-  move |line : &str| line . replacen (
-    " (diff ", &format! (" (editRequest {}) (diff ", request), 1 ) }
+  move |line : &str|
+    if line . contains (" (diff ") {
+      line . replacen (
+        " (diff ", &format! (" (editRequest {}) (diff ", request), 1 )
+    } else { // a node whose every change other headlines show
+      line . replacen (
+        "(skgRepos (nodeRepo main)) ",
+        &format! ("(skgRepos (nodeRepo main)) (editRequest {}) ", request), 1 ) }}
 
 /// 'buffer' with 'request' on its one line starting 'prefix'.
 fn requesting (

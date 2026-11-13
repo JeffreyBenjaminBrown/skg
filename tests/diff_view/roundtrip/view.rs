@@ -261,7 +261,7 @@ fn processed_requests_on_the_new_viewnodes_name_their_leaves (
     let response : SaveResponse = save ( f,
       &buffer_with_every_new_viewnode (f) ? . replacen (
         "(changesetMarker content))",
-        "(changesetMarker content) (editRequest (processed all)))", 1 )) ?;
+        "(changesetMarker content) (editRequest (processed rel)))", 1 )) ?;
     assert! ( response . errors . is_empty (), "{:?}", response . errors );
     assert! ( ProcessedStore::load ( &f . config . processed_marks_path () ) . marks
               . contains_key (&p_contains_gone) );

@@ -72,18 +72,20 @@ fn a_save_marks_and_unmarks_the_leaves_its_requests_name (
         for key in [ r_contains_a (), a_alias () ] {
           assert! ( store . is_processed (
             &key, straddle . change_leaves () . leaf_fingerprint (&key) . unwrap () )); }} }
-    { // 'all' on a node names every leaf it owns.
+    { // 'node' on a node names the leaves it records but those a
+      // headline under it shows: r's text, not its containment of a,
+      // which a's 'rel' names and here unmarks.
       save (f, "\
-* (skg node (gnid r) (skgRepos (nodeRepo main)) (editRequest (processed all))) r, retitled
-** (skg node (gnid a) (skgRepos (nodeRepo main))) a
+* (skg node (gnid r) (skgRepos (nodeRepo main)) (editRequest (processed node))) r, retitled
+** (skg node (gnid a) (skgRepos (nodeRepo main)) (editRequest (unprocessed rel))) a
 ** (skg node (gnid b) (skgRepos (nodeRepo main))) b
 ") ?;
       assert_eq! ( marked_keys (f),
-                   [ r_text (), r_contains_a (), a_alias () ]
+                   [ r_text (), a_alias () ]
                    . into_iter () . collect () ); }
     { // Unmarking.
       save (f, "\
-* (skg node (gnid r) (skgRepos (nodeRepo main)) (editRequest (unprocessed all))) r, retitled
+* (skg node (gnid r) (skgRepos (nodeRepo main)) (editRequest (unprocessed node))) r, retitled
 ** (skg node (gnid a) (skgRepos (nodeRepo main))) a
 ** (skg node (gnid b) (skgRepos (nodeRepo main))) b
 ") ?;

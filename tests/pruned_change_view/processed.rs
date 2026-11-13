@@ -38,7 +38,7 @@ fn a_headline_carries_the_leaves_it_names (
     let saved : String =
       save_cleanly (f, &all_changes_view (), &without_ctx) ? . saved_view;
     for line in [
-      "** (skg (changesetMarker content) (diff (leaves 3 all)))",
+      "** (skg (changesetMarker content) (diff (leaves 3 rel)))",
       "*** (skg ghost (gnid gone) (skgRepos (nodeRepo public)) (diff (node removed) (rel removed) (leaves 2 node rel))) gone",
       "** (skg (oldText titleAndBody) (diff (leaves 1))) txt" ] {
       assert! ( without_viewnode_ids (&saved) . lines () . any ( |l| l == line ),
@@ -63,7 +63,7 @@ fn a_mark_shows_on_both_images_of_a_relationship (
       "the image under sub is processed:\n{}", saved );
     assert! ( without_viewnode_ids (&saved) . lines () . any ( |line|
       without_viewnode_ids (line) . starts_with ("*** (skg node (gnid sub)")
-      && line . ends_with ("(diff (rel removed) (properties changed) (leaves 2 rel all) (processed rel))) sub") ),
+      && line . ends_with ("(diff (rel removed) (properties changed) (leaves 2 node rel) (processed rel))) sub") ),
       "the image under s1 is processed:\n{}", saved );
     assert! ( ! without_viewnode_ids (&saved) . contains ("(editRequest"),
               "the request was consumed:\n{}", saved );
@@ -72,39 +72,40 @@ fn a_mark_shows_on_both_images_of_a_relationship (
 /// A folder member carries its node's other properties as a content
 /// member does: sub, in s1's subscriber folder, whose file records
 /// two leaves (its subscription to s1 removed, to s2 added), shows
-/// '(properties changed)' there, and one gesture on it, naming 'rel'
-/// and 'all', marks its file: its root shows '(processed all)', and its
-/// image in s2's subscriber folder is processed on both objects too.
+/// '(properties changed)' there, for its subscription to s2, which no
+/// headline under it shows; 'rel' is its subscription to s1. One
+/// request naming 'node' and 'rel' there marks its file: its image in
+/// s2's subscriber folder, where the two swap, is processed on both
+/// objects too, and so is each member of its root's subscribee folder.
+/// Its root shows no 'M': every change it records is shown under it.
 #[test]
 fn a_gesture_on_a_modified_folder_member_marks_its_file (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("kinds", &["public", "private"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
-    let member : &str =
-      "*** (skg node (gnid sub) (skgRepos (nodeRepo public)) writeProtected";
     let removed_ending : &str =
-      "(diff (rel removed) (properties changed) (leaves 2 rel all))) sub";
+      "(diff (rel removed) (properties changed) (leaves 2 node rel))) sub";
     assert_eq! ( buffer . matches (removed_ending) . count (), 1,
                  "sub is shown once as removed:\n{}", buffer );
     let marked : String = buffer . replacen (
       removed_ending,
-      "(editRequest (processed rel all)) (diff (rel removed) (properties changed) (leaves 2 rel all))) sub",
+      "(editRequest (processed node rel)) (diff (rel removed) (properties changed) (leaves 2 node rel))) sub",
       1 );
-    assert_ne! ( marked, buffer, "the member shows its properties:\n{}", buffer );
     let saved : String = without_viewnode_ids (
       & save_cleanly (f, &all_changes_view (), &marked) ? . saved_view );
     let lines_of_sub : Vec<&str> = saved . lines ()
       . filter ( |line| line . contains ("node (gnid sub) ") ) . collect ();
-    for (prefix, ending) in [
-      ( member,
-        "(diff (rel removed) (properties changed) (leaves 2 rel all) (processed rel all))) sub" ),
-      ( "*** (skg node (gnid sub) (skgRepos (nodeRepo public)) writeProtected",
-        "(diff (rel added) (properties changed) (leaves 2 rel all) (processed rel all))) sub" ),
-      ( "* (skg node (gnid sub)",
-        "(diff (properties changed) (leaves 2 all) (processed all))) sub" ) ] {
-      assert! ( lines_of_sub . iter () . any ( |line|
-                  without_viewnode_ids (line) . starts_with (prefix) && line . ends_with (ending) ),
-                "{:?} ... {:?} in:\n{}", prefix, ending, saved ); }
+    for ending in [
+      "(diff (rel removed) (properties changed) (leaves 2 node rel) (processed node rel))) sub",
+      "(diff (rel added) (properties changed) (leaves 2 node rel) (processed node rel))) sub" ] {
+      assert! ( lines_of_sub . iter () . any ( |line| line . ends_with (ending) ),
+                "{:?} in:\n{}", ending, saved ); }
+    assert! ( lines_of_sub . iter () . any ( |line|
+                line . starts_with ("* (skg node (gnid sub)") && ! line . contains ("(diff") ),
+              "sub's root shows no change of its own:\n{}", saved );
+    for line in [
+      "*** (skg node (gnid s1) (skgRepos (nodeRepo public)) noClaim writeProtected (view ghostWarrant) (diff (rel removed) (leaves 1 rel) (processed rel))) s1" ] {
+      assert! ( saved . contains (line), "{:?} in:\n{}", line, saved ); }
     Ok (( )) }) }
 
 /// A node of the containerward chain carries no change facts and
@@ -362,30 +363,30 @@ fn a_root_deleted_in_the_buffer_is_rerendered_as_removed (
     assert! ( ! without_viewnode_ids (&saved) . contains ("(deleted (gnid flg)"), "{}", saved );
     Ok (( )) }) }
 
-/// A node in both graphs that records a leaf is modified: its change is
-/// '(properties changed)' (herald 'M'), and its leaves fact lists
-/// 'all', every leaf it records. cy2, retitled, stands as a root
-/// and, write-protected, in cy1's content, an unchanged
-/// relationship. One request naming 'all' on the write-protected
-/// image marks its file: both images then show '(processed all)', and
-/// its old text shows processed.
+/// A node in both graphs that records a leaf no other headline shows
+/// is modified: its change is '(properties changed)' (herald 'M'),
+/// and its leaves fact lists 'node', those leaves. cy2, retitled,
+/// stands as a root and, write-protected, in cy1's content, an
+/// unchanged relationship. One request naming 'node' on the
+/// write-protected image marks its file: both images then show
+/// '(processed node)', and its old text shows processed.
 #[test]
-fn a_modified_node_lists_all_and_one_mark_makes_its_file_processed (
+fn a_modified_node_lists_node_and_one_mark_makes_its_file_processed (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("sets", &["main"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
-    let modified : &str = "(diff (properties changed) (leaves 1 all))) cy2, retitled";
+    let modified : &str = "(diff (properties changed) (leaves 1 node))) cy2, retitled";
     assert! ( without_viewnode_ids (&buffer) . lines () . any ( |line|
       without_viewnode_ids (line) . starts_with ("*** (skg node (gnid cy2) (skgRepos (nodeRepo main)) writeProtected")
       && line . ends_with (modified) ),
       "cy2 is modified in cy1's content:\n{}", buffer );
     let marked : String = edit_line (
       &buffer, "*** (skg node (gnid cy2)",
-      |line| line . replace ( "(diff (properties changed) (leaves 1 all)))",
-                              "(editRequest (processed all)) (diff (properties changed) (leaves 1 all)))" ));
+      |line| line . replace ( "(diff (properties changed) (leaves 1 node)))",
+                              "(editRequest (processed node)) (diff (properties changed) (leaves 1 node)))" ));
     let saved : String = save_cleanly (f, &all_changes_view (), &marked) ? . saved_view;
     let processed : &str =
-      "(diff (properties changed) (leaves 1 all) (processed all))) cy2, retitled";
+      "(diff (properties changed) (leaves 1 node) (processed node))) cy2, retitled";
     for prefix in [ "* (skg node (gnid cy2)", "*** (skg node (gnid cy2)" ] {
       assert! ( without_viewnode_ids (&saved) . lines () . any ( |line|
         without_viewnode_ids (line) . starts_with (prefix) && line . ends_with (processed) ),
@@ -394,11 +395,11 @@ fn a_modified_node_lists_all_and_one_mark_makes_its_file_processed (
               "cy2's old text is processed:\n{}", saved );
     Ok (( )) }) }
 
-/// A modified node in a new relationship lists 'rel' beside 'all',
+/// A modified node in a new relationship lists 'node' beside 'rel',
 /// and N counts the distinct leaves the two name: lo, new in ln's
 /// content, once retitled records its text, so N is 2.
 #[test]
-fn a_modified_node_in_a_new_relationship_lists_rel_and_all (
+fn a_modified_node_in_a_new_relationship_lists_node_and_rel (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("sets", &["main"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
@@ -410,7 +411,7 @@ fn a_modified_node_in_a_new_relationship_lists_rel_and_all (
     let saved : String = save_cleanly (f, &all_changes_view (), &retitled) ? . saved_view;
     assert! ( without_viewnode_ids (&saved) . lines () . any ( |line|
       without_viewnode_ids (line) . starts_with ("** (skg node (gnid lo)")
-      && line . ends_with ("(diff (rel added) (properties changed) (leaves 2 rel all))) lo, retitled") ),
+      && line . ends_with ("(diff (rel added) (properties changed) (leaves 2 node rel))) lo, retitled") ),
       "lo is modified, in a new relationship:\n{}", saved );
     Ok (( )) }) }
 
@@ -439,6 +440,6 @@ fn a_modified_root_carries_its_change (
     let buffer : String = open_all_changes_buffer (f) ?;
     assert! ( without_viewnode_ids (&buffer) . lines () . any ( |line|
       without_viewnode_ids (line) . starts_with ("* (skg node (gnid txt)")
-      && line . ends_with ("(diff (properties changed) (leaves 1 all))) txt, retitled") ),
+      && line . ends_with ("(diff (properties changed) (leaves 1 node))) txt, retitled") ),
       "txt is a modified root:\n{}", buffer );
     Ok (( )) }) }

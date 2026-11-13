@@ -14,7 +14,6 @@ use skg::dbs::in_rust_graph::InRustGraph;
 use skg::types::errors::HeadlineName;
 use skg::types::misc::{SkgConfig, Skgrepo, SkgrepoName};
 use skg::types::viewnode::ViewnodeId;
-use skg::diff_view::change_leaves::{LeafKey, NodeAspect};
 use skg::diff_view::processed_requests::NamedLeafSet;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -144,18 +143,46 @@ fn two_headlines_naming_one_leaf_processed_and_unprocessed_contradict () {
       ** (skg (vnid x1) node (gnid x) (editRequest (processed node))) x
       * (skg (vnid x2) node (gnid x) writeProtected (editRequest (unprocessed node))) x
       "} ),
-    vec! [ ( "the existence of node x" . to_string (),
+    vec! [ ( "every change node x records but the relationships shown on its headline or under it" . to_string (),
              vec! [ "x1" . to_string (), "x2" . to_string () ] ) ] ); }
 
+/// 'node' names the relationships its node records that no headline
+/// under it shows: x1 shows no member, so its 'node' names x's
+/// containment of c, which c1, under x2, marks the other way.
 #[test]
-fn an_all_request_contradicts_an_opposite_request_on_a_leaf_its_node_records () {
+fn a_node_request_contradicts_an_opposite_request_on_a_relationship_not_shown_under_it () {
   assert_eq! (
     processed_contradictions_in ( indoc! {"
-      * (skg (vnid x1) node (gnid x) (editRequest (unprocessed all))) x
-      * (skg (vnid x2) node (gnid x) writeProtected (editRequest (processed node))) x
+      * (skg (vnid x1) node (gnid x) (editRequest (unprocessed node))) x
+      * (skg (vnid x2) node (gnid x) writeProtected) x
+      ** (skg (vnid c1) node (gnid c) writeProtected (editRequest (processed rel))) c
       "} ),
-    vec! [ ( "the existence of node x" . to_string (),
-             vec! [ "x1" . to_string (), "x2" . to_string () ] ) ] ); }
+    vec! [ ( "the existence of the relationship x contains c" . to_string (),
+             vec! [ "x1" . to_string (), "c1" . to_string () ] ) ] ); }
+
+/// Where the member is shown under it, 'node' leaves its relationship
+/// to the member's 'rel', and the two requests name different leaves.
+#[test]
+fn a_node_request_leaves_the_relationship_of_a_member_under_it_to_that_member () {
+  assert! ( processed_contradictions_in ( indoc! {"
+      * (skg (vnid x1) node (gnid x) (editRequest (unprocessed node))) x
+      ** (skg (vnid c1) node (gnid c) (editRequest (processed rel))) c
+      "} ) . is_empty () ); }
+
+/// 'node' on a changeset marker names own leaves of the content
+/// members drawn beside it: it contradicts an opposite 'node' on c,
+/// one of them, and not one on y, which is no member of p.
+#[test]
+fn a_markers_node_request_contradicts_only_requests_on_its_members () {
+  assert_eq! (
+    processed_contradictions_in ( indoc! {"
+      * (skg (vnid p1) node (gnid p)) p
+      ** (skg (vnid m1) (changesetMarker content) (editRequest (processed node)))
+      ** (skg (vnid c1) node (gnid c) (editRequest (unprocessed node))) c
+      * (skg (vnid y1) node (gnid y) (editRequest (unprocessed node))) y
+      "} ),
+    vec! [ ( "every change node c records but the relationships shown on its headline or under it" . to_string (),
+             vec! [ "m1" . to_string (), "c1" . to_string () ] ) ] ); }
 
 #[test]
 fn processed_requests_that_agree_or_name_different_leaves_pass () {
@@ -192,7 +219,7 @@ fn validation_refuses_contradictory_processed_requests () -> Result<(), Box<dyn 
   assert! ( matches! (
               refusals [0],
               BufferValidationError::ContradictoryProcessedRequests (
-                NamedLeafSet::Leaf ( LeafKey::Node { pid, aspect : NodeAspect::Existence } ), _ )
+                NamedLeafSet::OwnLeavesOf ( pid, _ ), _ )
               if *pid == ID::from ("x") ),
             "the refusal keeps the set it found contradictory: {:?}", refusals [0] );
   assert_eq! ( refusals [0] . named_headlines () . iter ()

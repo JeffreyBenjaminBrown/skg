@@ -119,48 +119,131 @@ pub fn processed_requests_in_viewforest (
 pub type NamedLeaves = Vec<NamedLeafSet>;
 
 /// A set of change leaves a request names, told without the change
-/// forest: one leaf; every leaf a node records ('all'); or the
-/// content relationships a node records, of one aspect (a changeset
-/// marker's). Which leaves each holds is 'holds'; which of them the
-/// forest has, 'keys_in_forest'. The exception is 'NewNodesFrom'
-/// ('newContent', 'newOutward'): the leaves of the new nodes a walk
-/// reaches from a node ('ChangeLeaves::leaves_of_new_nodes_reached_from'),
-/// which only the forest can tell, so without it the set is taken to
-/// hold every leaf.
+/// forest: one leaf; the leaves a node records but the relationships
+/// its headline's 'rel' or a headline under it names ('node' on a
+/// vognode); or the content
+/// relationships a node records, of one aspect ('rel' on a changeset
+/// marker). Which leaves each holds is 'holds'; which of them the
+/// forest has, 'keys_in_forest'. The exceptions are the sets only the
+/// forest can tell, which without it are taken to hold every leaf they
+/// might: 'MembersOwnLeavesOf' ('node' on a changeset marker: the own
+/// leaves of the members of the relationships it gathers, each among
+/// the content members drawn beside the marker) and
+/// 'NewNodesFrom' ('newContent', 'newOutward': the leaves of the new
+/// nodes a walk reaches from a node, of the kinds its letters name,
+/// 'ChangeLeaves::leaves_of_new_nodes_reached_from').
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum NamedLeafSet {
   Leaf                   (LeafKey),
-  AllOf                  (ID),
+  OwnLeavesOf            (ID, RelationshipsNamedElsewhere),
   ContentRelationshipsOf (ID, RelationshipAspect),
-  NewNodesFrom           (ID, NewNodeWalk),
+  MembersOwnLeavesOf     (ID, RelationshipAspect, Vec<ID>),
+  NewNodesFrom           (ID, NewNodeWalk, LeafKinds),
+}
+
+/// The relationships recorded by the node of a headline that 'node'
+/// there does not name, because a headline shows them elsewhere: its
+/// own relationship to its viewparent, and that of each member drawn
+/// under it, in its content or in a partner folder, whatever their
+/// aspect (a relRepo move hangs under the member); and the content
+/// relationships of each aspect a changeset marker under it gathers.
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
+pub struct RelationshipsNamedElsewhere {
+  pub relationships   : Vec<RelationshipKey>,
+  pub content_aspects : Vec<RelationshipAspect>,
+}
+
+impl RelationshipsNamedElsewhere {
+  fn names (
+    &self,
+    relationship : &RelationshipKey,
+    aspect       : RelationshipAspect,
+  ) -> bool {
+    self . relationships . contains (relationship)
+    || ( relationship . relation == NodeRelation::Contains
+         && self . content_aspects . contains (&aspect) ) }
+}
+
+/// The kinds of leaf of the nodes a walk reaches that a request names:
+/// their own leaves ('node'), their relationships ('rel'), or both,
+/// which a request naming neither letter beside its walk names.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct LeafKinds {
+  pub own           : bool,
+  pub relationships : bool,
+}
+
+impl LeafKinds {
+  /// The kinds the letters among 'objects' name.
+  fn named_by_letters_among (
+    objects : &[DiffObject],
+  ) -> LeafKinds {
+    let own : bool = objects . contains (&DiffObject::Node);
+    let relationships : bool = objects . contains (&DiffObject::Rel);
+    if own || relationships { LeafKinds { own, relationships } }
+    else { LeafKinds { own : true, relationships : true } } }
+
+  fn admits (
+    &self,
+    key : &LeafKey,
+  ) -> bool {
+    match key {
+      LeafKey::Node { .. }         => self . own,
+      LeafKey::Relationship { .. } => self . relationships, } }
 }
 
 impl NamedLeafSet {
   /// Whether the set holds the leaf 'key', whatever the forest holds:
-  /// the one leaf; any leaf its node records; or, for a changeset
-  /// marker's set, a content relationship its node records, of its
-  /// aspect. A 'NewNodesFrom' set might hold any leaf.
+  /// the one leaf; a leaf its node records that neither the headline's
+  /// 'rel' nor a headline under it names; or, for a changeset marker's 'rel', a content relationship
+  /// its node records, of its aspect. A set only the forest can tell
+  /// might hold any leaf of its kinds.
   pub fn holds (
     &self,
     key : &LeafKey,
   ) -> bool {
     match self {
       NamedLeafSet::Leaf (leaf) => leaf == key,
-      NamedLeafSet::NewNodesFrom (..) => true,
-      NamedLeafSet::AllOf (pid) => recorder_of_leaf (key) == pid,
+      NamedLeafSet::OwnLeavesOf (pid, elsewhere) =>
+        recorder_of_leaf (key) == pid
+        && match key {
+          LeafKey::Node { .. } => true,
+          LeafKey::Relationship { relationship, aspect } =>
+            ! elsewhere . names (relationship, *aspect), },
       NamedLeafSet::ContentRelationshipsOf (pid, aspect) => matches! (
         key,
         LeafKey::Relationship {
           relationship : RelationshipKey {
             relation : NodeRelation::Contains, recorder, .. },
           aspect : leaf_aspect }
-        if recorder == pid && leaf_aspect == aspect ), } }
+        if recorder == pid && leaf_aspect == aspect ),
+      NamedLeafSet::MembersOwnLeavesOf (_, _, drawn_members) => matches! (
+        key, LeafKey::Node { pid, .. } if drawn_members . contains (pid) ),
+      NamedLeafSet::NewNodesFrom (_, _, kinds) => kinds . admits (key), } }
+
+  /// Whether some leaf the set can hold is a node's own, and whether
+  /// some is a relationship's.
+  fn can_hold_kinds (
+    &self,
+  ) -> LeafKinds {
+    match self {
+      NamedLeafSet::Leaf (leaf) => LeafKinds {
+        own           : matches! ( leaf, LeafKey::Node { .. } ),
+        relationships : matches! ( leaf, LeafKey::Relationship { .. } ), },
+      NamedLeafSet::OwnLeavesOf (..) =>
+        LeafKinds { own : true, relationships : true },
+      NamedLeafSet::ContentRelationshipsOf (..) =>
+        LeafKinds { own : false, relationships : true },
+      NamedLeafSet::MembersOwnLeavesOf (..) =>
+        LeafKinds { own : true, relationships : false },
+      NamedLeafSet::NewNodesFrom (_, _, kinds) => *kinds, } }
 
   /// The leaves both sets name, whatever the forest holds, as the
   /// narrower of the two; None when they can name no leaf in common.
-  /// Every set might share a leaf with a 'NewNodesFrom' set, so
-  /// validation refuses any request of the opposite kind beside
-  /// one.
+  /// A changeset marker's 'node' might share any own leaf of a member
+  /// drawn beside it, and a walk any leaf of its kinds, so validation
+  /// refuses a request of the opposite kind beside one that can hold
+  /// such a leaf.
   pub fn overlap (
     &self,
     other : &NamedLeafSet,
@@ -169,10 +252,26 @@ impl NamedLeafSet {
       &|narrower : &NamedLeafSet, wider : &NamedLeafSet| -> bool {
       match (narrower, wider) {
         (NamedLeafSet::Leaf (leaf), _) => wider . holds (leaf),
-        (NamedLeafSet::ContentRelationshipsOf (pid, _),
-         NamedLeafSet::AllOf (wider_pid)) =>
-          pid == wider_pid,
-        (_, NamedLeafSet::NewNodesFrom (..)) => true,
+        (NamedLeafSet::OwnLeavesOf (pid, _),
+         NamedLeafSet::OwnLeavesOf (wider_pid, _)) =>
+          pid == wider_pid, // its own aspects, at least
+        (NamedLeafSet::ContentRelationshipsOf (pid, aspect),
+         NamedLeafSet::OwnLeavesOf (wider_pid, elsewhere)) =>
+          pid == wider_pid
+          && ! elsewhere . content_aspects . contains (aspect),
+        (NamedLeafSet::OwnLeavesOf (pid, _),
+         NamedLeafSet::MembersOwnLeavesOf (_, _, drawn_members)) =>
+          drawn_members . contains (pid),
+        (NamedLeafSet::MembersOwnLeavesOf (_, _, drawn_members),
+         NamedLeafSet::MembersOwnLeavesOf (_, _, wider_drawn_members)) =>
+          drawn_members . iter ()
+            . any ( |member| wider_drawn_members . contains (member) ),
+        (_, NamedLeafSet::MembersOwnLeavesOf (..))
+          | (_, NamedLeafSet::NewNodesFrom (..)) => {
+          let narrower_kinds : LeafKinds = narrower . can_hold_kinds ();
+          let wider_kinds    : LeafKinds = wider    . can_hold_kinds ();
+          ( narrower_kinds . own && wider_kinds . own )
+          || ( narrower_kinds . relationships && wider_kinds . relationships ) },
         _ => narrower == wider, } };
     if narrower_within (self, other) { Some ( self . clone () ) }
     else if narrower_within (other, self) { Some ( other . clone () ) }
@@ -186,14 +285,31 @@ impl NamedLeafSet {
     match self {
       NamedLeafSet::Leaf (leaf) =>
         forest . leaf (leaf) . map ( |_| leaf . clone () ) . into_iter () . collect (),
-      NamedLeafSet::AllOf (pid) | NamedLeafSet::ContentRelationshipsOf (pid, _) =>
+      NamedLeafSet::OwnLeavesOf (pid, _)
+        | NamedLeafSet::ContentRelationshipsOf (pid, _) =>
         forest . leaves_under (pid) . iter ()
           . map ( |leaf| leaf . key . clone () )
-          . filter ( |key| self . holds (key) && forest . leaf (key) . is_some () )
+          . filter ( |key| self . holds (key) )
           . collect (),
-      NamedLeafSet::NewNodesFrom (pid, walk) =>
+      NamedLeafSet::MembersOwnLeavesOf (pid, aspect, _) => {
+        let gathered : NamedLeafSet =
+          NamedLeafSet::ContentRelationshipsOf (pid . clone (), *aspect);
+        let members : BTreeSet<ID> =
+          gathered . keys_in_forest (forest) . into_iter ()
+          . filter_map ( |key| match key {
+            LeafKey::Relationship { relationship, .. } =>
+              Some (relationship . member),
+            LeafKey::Node { .. } => None, } )
+          . collect ();
+        members . iter ()
+          . flat_map ( |member| forest . leaves_under (member) . iter () )
+          . map ( |leaf| leaf . key . clone () )
+          . filter ( |key| matches! ( key, LeafKey::Node { .. } ))
+          . collect () },
+      NamedLeafSet::NewNodesFrom (pid, walk, kinds) =>
         forest . leaves_of_new_nodes_reached_from (pid, *walk) . into_iter ()
           . map ( |leaf| leaf . key . clone () )
+          . filter ( |key| kinds . admits (key) )
           . collect (), } }
 
   /// The set in words, for a message.
@@ -216,13 +332,21 @@ impl NamedLeafSet {
                  relationship . recorder,
                  relationship . relation . relation_name (),
                  relationship . member ),
-      NamedLeafSet::AllOf (pid) =>
-        format! ("every change node {} records", pid),
+      NamedLeafSet::OwnLeavesOf (pid, _) =>
+        format! ("every change node {} records but the relationships shown on its headline or under it",
+                 pid),
       NamedLeafSet::ContentRelationshipsOf (pid, aspect) =>
         format! ("the {} of every content relationship node {} records",
                  relationship_aspect_name (*aspect), pid),
-      NamedLeafSet::NewNodesFrom (pid, walk) =>
-        format! ("the changes of the new nodes {} of node {}",
+      NamedLeafSet::MembersOwnLeavesOf (pid, aspect, _) =>
+        format! ("the own changes of each member whose content relationship's {} changed in node {}",
+                 relationship_aspect_name (*aspect), pid),
+      NamedLeafSet::NewNodesFrom (pid, walk, kinds) =>
+        format! ("the {} of the new nodes {} of node {}",
+                 match (kinds . own, kinds . relationships) {
+                   (true, false) => "existence",
+                   (false, true) => "relationships",
+                   _             => "changes", },
                  match walk { NewNodeWalk::Contentward => "contentward",
                               NewNodeWalk::Outward     => "outward", },
                  pid), } }
@@ -245,9 +369,16 @@ fn relationship_aspect_name (
     RelationshipAspect::RelRepo   => "relRepo", } }
 
 /// The leaves that a request naming the diff objects 'objects' at
-/// 'node' names. No objects on a vognode means both of its objects
-/// (only 'rel' on an unknown viewnode or a restricted viewnode); a
-/// property member has one object.
+/// 'node' names. No objects names what the headline's '(leaves ...)'
+/// can list: on a vognode both of its objects (only 'rel' on an
+/// unknown viewnode or a restricted viewnode), on a changeset marker
+/// 'rel'; a property member and any other change viewnode have one
+/// object. On a vognode 'node' names every leaf its node records but
+/// the relationships its 'rel' or a headline under it names
+/// ('relationships_named_elsewhere'); on a changeset marker, the own
+/// leaves of the members of the relationships it gathers. Beside a
+/// walk, 'node' and 'rel' also filter what it reaches
+/// ('LeafKinds::named_by_letters_among').
 /// None for a viewnode that names no leaf, among them a node of the
 /// containerward chain, which shows no change.
 fn leaves_named_at (
@@ -268,24 +399,25 @@ fn leaves_named_at (
           objects . iter () . copied () . collect ()
         } else if is_gnid_only { vec! [ DiffObject::Rel ] }
         else { vec! [ DiffObject::Node, DiffObject::Rel ] };
+      let walk_leaf_kinds : LeafKinds =
+        LeafKinds::named_by_letters_among (&objects);
       for object in objects {
         match object {
           DiffObject::Node if ! is_gnid_only =>
-            named . push ( NamedLeafSet::Leaf ( LeafKey::Node {
-              pid : pid . clone (), aspect : NodeAspect::Existence } )),
+            named . push ( NamedLeafSet::OwnLeavesOf (
+              pid . clone (),
+              relationships_named_elsewhere (node, pid_of) )),
           DiffObject::Node => {},
           DiffObject::Rel =>
             named . extend ( relationship_to_viewparent (
               node, &pid, pid_of, RelationshipAspect::Existence )
               . map (NamedLeafSet::Leaf) ),
-          DiffObject::All =>
-            named . push ( NamedLeafSet::AllOf ( pid . clone () )),
           DiffObject::NewContent =>
             named . push ( NamedLeafSet::NewNodesFrom (
-              pid . clone (), NewNodeWalk::Contentward )),
+              pid . clone (), NewNodeWalk::Contentward, walk_leaf_kinds )),
           DiffObject::NewOutward =>
             named . push ( NamedLeafSet::NewNodesFrom (
-              pid . clone (), NewNodeWalk::Outward )), }} },
+              pid . clone (), NewNodeWalk::Outward, walk_leaf_kinds )), }} },
     ViewnodeKind::PropertyMember (member) => {
       // The change-forest leaf of a property member belongs to the
       // folder's viewparent.
@@ -314,18 +446,64 @@ fn leaves_named_at (
             parent, &parent_pid () ?, pid_of,
             RelationshipAspect::RelRepo )
             . map (NamedLeafSet::Leaf) ),
-        ChangeViewnode::ChangesetMarker { kind, .. } => match kind {
-          ChangesetMarkerKind::Content =>
+        ChangeViewnode::ChangesetMarker { kind } => {
+          let aspect : RelationshipAspect = match kind {
+            ChangesetMarkerKind::Content   => RelationshipAspect::Existence,
+            ChangesetMarkerKind::RelRepo   => RelationshipAspect::RelRepo,
+            ChangesetMarkerKind::OrderOnly => return Some (named), }; // always processed
+          let pid : ID = parent_pid () ?;
+          if objects . is_empty () || objects . contains (&DiffObject::Rel) {
             named . push ( NamedLeafSet::ContentRelationshipsOf (
-              parent_pid () ?, RelationshipAspect::Existence )),
-          ChangesetMarkerKind::RelRepo =>
-            named . push ( NamedLeafSet::ContentRelationshipsOf (
-              parent_pid () ?, RelationshipAspect::RelRepo )),
-          ChangesetMarkerKind::OrderOnly => {}, }, // always processed
+              pid . clone (), aspect )); }
+          if objects . contains (&DiffObject::Node) {
+            let drawn_members : Vec<ID> = parent . children ()
+              . filter ( |sibling| matches! ( sibling . value () . kind,
+                                              ViewnodeKind::Vognode (_) ))
+              . filter_map ( |sibling| vognode_leaf_pid (sibling . value (), pid_of) )
+              . collect ();
+            named . push ( NamedLeafSet::MembersOwnLeavesOf (
+              pid, aspect, drawn_members )); }},
         ChangeViewnode::BodyDiff { .. } =>
           return None, }},
     _ => return None, }
   Some (named) }
+
+/// What 'node' on the vognode 'node' leaves to its 'rel' and the headlines under it
+/// ('RelationshipsNamedElsewhere'): the relationship its 'rel' names;
+/// that of each vognode under it and of each member of a partner
+/// folder under it; and the aspects of the changeset markers under it.
+fn relationships_named_elsewhere (
+  node   : NodeRef<Viewnode>,
+  pid_of : &dyn Fn (&ID) -> ID,
+) -> RelationshipsNamedElsewhere {
+  let relationship_of = |vognode : NodeRef<Viewnode>| -> Option<RelationshipKey> {
+    let member_pid : ID = vognode_leaf_pid (vognode . value (), pid_of) ?;
+    match relationship_to_viewparent (
+      vognode, &member_pid, pid_of, RelationshipAspect::Existence ) ? {
+      LeafKey::Relationship { relationship, .. } => Some (relationship),
+      LeafKey::Node { .. } => None, } };
+  let mut elsewhere : RelationshipsNamedElsewhere =
+    RelationshipsNamedElsewhere::default ();
+  elsewhere . relationships . extend ( relationship_of (node) );
+  for child in node . children () {
+    match &child . value () . kind {
+      ViewnodeKind::Vognode (_) =>
+        elsewhere . relationships . extend ( relationship_of (child) ),
+      ViewnodeKind::Folder (_) =>
+        elsewhere . relationships . extend (
+          child . children ()
+            . filter ( |member| matches! ( member . value () . kind,
+                                           ViewnodeKind::Vognode (_) ))
+            . filter_map (relationship_of) ),
+      ViewnodeKind::ChangeViewnode (
+        ChangeViewnode::ChangesetMarker { kind } ) => match kind {
+        ChangesetMarkerKind::Content =>
+          elsewhere . content_aspects . push (RelationshipAspect::Existence),
+        ChangesetMarkerKind::RelRepo =>
+          elsewhere . content_aspects . push (RelationshipAspect::RelRepo),
+        ChangesetMarkerKind::OrderOnly => {}, },
+      _ => {}, }}
+  elsewhere }
 
 /// The leaves of 'forest' that 'named' names.
 fn keys_in_forest (
@@ -337,15 +515,17 @@ fn keys_in_forest (
     . collect () }
 
 /// Set the '(processed ...)' and '(leaves ...)' change facts of every
-/// viewnode that carries them. An object is processed when it names some
+/// viewnode that carries them, and clear '(properties changed)' where
+/// 'node' names no leaf. An object is processed when it names some
 /// leaf of 'forest' and every leaf it names is marked at its current
-/// fingerprint ('store'); the order-only changeset marker is always
-/// processed. The
-/// '(leaves ...)' fact is 'leaves_fact_at'. On an occurrence
-/// whose leaves fact lists 'all', '(processed ...)' names 'all' when every
-/// leaf its node records is marked. A processed changeset marker's '(processed
-/// ...)' names 'all'; any other processed viewnode with a single object
-/// writes it bare, '(processed)'.
+/// fingerprint ('store'). On a vognode or a changeset marker,
+/// '(processed ...)' names the objects of its '(leaves ...)' that are
+/// processed; the order-only changeset marker is always processed; any
+/// other processed viewnode has a single object, and writes it bare,
+/// '(processed)'. The '(leaves ...)' fact is 'leaves_fact_at'.
+/// A modified node's 'M' ('(properties changed)') stands for what
+/// 'node' names there ('leaves_named_at'), and so is not drawn where
+/// its 'rel' and the headlines under it show every change it records.
 pub fn set_processed_facts_in_viewforest (
   viewforest : &mut ViewForest,
   forest     : &ChangeLeaves,
@@ -357,56 +537,55 @@ pub fn set_processed_facts_in_viewforest (
   let object_is_processed = |node : NodeRef<Viewnode>, objects : &[DiffObject]| -> bool {
     let keys : Vec<LeafKey> = keys_named_at (node, objects, forest, &pid_of);
     ! keys . is_empty () && forest . processed_of_leaves (store, &keys) };
-  let facts : Vec<(NodeId, Option<BTreeSet<DiffObject>>, Option<LeavesFact>)> =
+  let processed_among = |node : NodeRef<Viewnode>, leaves : &Option<LeavesFact>|
+                        -> Option<BTreeSet<DiffObject>> {
+    let objects : BTreeSet<DiffObject> =
+      leaves . iter () . flat_map ( |leaves| leaves . objects . iter () )
+      . filter ( |object| object_is_processed (node, &[ **object ]) )
+      . copied () . collect ();
+    ( ! objects . is_empty () ) . then_some (objects) };
+  let facts : Vec<(NodeId, Option<BTreeSet<DiffObject>>, Option<LeavesFact>, bool)> =
     viewforest . root () . descendants ()
     . filter_map ( |node| {
       let leaves : Option<LeavesFact> = leaves_fact_at (node, forest, &pid_of);
+      let properties : bool =
+        node . value () . change_facts . change . properties
+        && leaves . as_ref () . is_some_and ( |leaves|
+          leaves . objects . contains (&DiffObject::Node) );
       let processed : Option<BTreeSet<DiffObject>> =
         match &node . value () . kind {
           ViewnodeKind::Vognode (
-            vognode @ ( Vognode::Occurrence (_)
-                        | Vognode::Ghost (_) )) => {
-            let all_is_listed : bool =
-              matches! ( vognode, Vognode::Occurrence (_) )
-              && leaves . as_ref () . is_some_and ( |leaves|
-                leaves . objects . contains (&DiffObject::All) );
-            let objects : BTreeSet<DiffObject> =
-              [ DiffObject::Node, DiffObject::Rel ] . into_iter ()
-              . filter ( |object| object_is_processed (node, &[ *object ]) )
-              . chain ( ( all_is_listed
-                          && object_is_processed (node, &[ DiffObject::All ]) )
-                        . then_some (DiffObject::All) )
-              . collect ();
-            ( ! objects . is_empty () ) . then_some (objects) },
+            Vognode::Occurrence (_) | Vognode::Ghost (_) ) =>
+            processed_among (node, &leaves),
           ViewnodeKind::Vognode (Vognode::GnidOnly (_)) =>
             object_is_processed (node, &[]) . then (BTreeSet::new),
-          ViewnodeKind::ChangeViewnode ( ChangeViewnode::ChangesetMarker { kind } ) =>
-            ( *kind == ChangesetMarkerKind::OrderOnly
-              || object_is_processed (node, &[]) )
-            . then ( || BTreeSet::from ([ DiffObject::All ]) ),
+          ViewnodeKind::ChangeViewnode ( ChangeViewnode::ChangesetMarker {
+            kind : ChangesetMarkerKind::OrderOnly } ) =>
+            Some ( BTreeSet::new () ),
+          ViewnodeKind::ChangeViewnode ( ChangeViewnode::ChangesetMarker { .. } ) =>
+            processed_among (node, &leaves),
           ViewnodeKind::PropertyMember (_) =>
             object_is_processed (node, &[]) . then (BTreeSet::new),
           ViewnodeKind::ChangeViewnode (change)
             if ! matches! (change, ChangeViewnode::BodyDiff { .. }) =>
             object_is_processed (node, &[]) . then (BTreeSet::new),
           _ => return None, };
-      Some (( node . id (), processed, leaves )) } )
+      Some (( node . id (), processed, leaves, properties )) } )
     . collect ();
-  for (treeid, processed, leaves) in facts {
+  for (treeid, processed, leaves, properties) in facts {
     let mut node_mut : NodeMut<Viewnode> = viewforest . get_mut (treeid) . unwrap ();
     let change_facts : &mut ChangeFacts = &mut node_mut . value () . change_facts;
     change_facts . processed = processed;
-    change_facts . leaves = leaves; }}
+    change_facts . leaves = leaves;
+    change_facts . change . properties = properties; }}
 
 /// The '(leaves N OBJECT...)' fact of 'node', from 'leaves_named_at':
-/// on an occurrence whose node's other properties changed
-/// (modified), 'all', beside 'rel' when that names a leaf of 'forest'; on any
-/// other occurrence or a ghost, each of 'node'
-/// and 'rel' that names a leaf, or else 'all' if its node records any
-/// leaf; on anything else, 'all' when a bare request names a
-/// processed aggregate (a changeset marker), else no object. N is how many
-/// distinct leaves of 'forest' a request naming those objects names.
-/// None when that is none.
+/// on an occurrence or a ghost, each of 'node' and 'rel' that names a
+/// leaf of 'forest'; on a changeset marker, 'rel' when it names one
+/// ('node' there names what its members' own headlines show, so it is
+/// never listed); on anything else no object. N is how many distinct
+/// leaves of 'forest' a request naming those objects names, or a bare
+/// one where none is listed. None when that is none.
 fn leaves_fact_at (
   node   : NodeRef<Viewnode>,
   forest : &ChangeLeaves,
@@ -414,36 +593,26 @@ fn leaves_fact_at (
 ) -> Option<LeavesFact> {
   let names_some_leaf = |objects : &[DiffObject]| -> bool {
     ! keys_named_at (node, objects, forest, pid_of) . is_empty () };
-  let objects : BTreeSet<DiffObject> = match &node . value () . kind {
-    ViewnodeKind::Vognode (Vognode::Occurrence (_))
-      if node . value () . change_facts . change . properties =>
-      [ DiffObject::Rel ] . into_iter ()
-      . filter ( |object| names_some_leaf (&[ *object ]) )
-      . chain ([ DiffObject::All ])
-      . collect (),
+  let listable : &[DiffObject] = match &node . value () . kind {
     ViewnodeKind::Vognode (
       Vognode::Occurrence (_)
-      | Vognode::Ghost (_) ) => {
-      let one_leaf_each : BTreeSet<DiffObject> =
-        [ DiffObject::Node, DiffObject::Rel ] . into_iter ()
-        . filter ( |object| names_some_leaf (&[ *object ]) )
-        . collect ();
-      if one_leaf_each . is_empty () { BTreeSet::from ([ DiffObject::All ]) }
-      else { one_leaf_each } },
-    _ => {
-      let named : NamedLeaves =
-        leaves_named_at (node, &BTreeSet::new (), pid_of) ?;
-      if named . iter () . all ( |set| matches! ( set, NamedLeafSet::Leaf (_) ))
-      { BTreeSet::new () }
-      else { BTreeSet::from ([ DiffObject::All ]) } }, };
+      | Vognode::Ghost (_) ) => &[ DiffObject::Node, DiffObject::Rel ],
+    ViewnodeKind::ChangeViewnode ( ChangeViewnode::ChangesetMarker { .. } ) =>
+      &[ DiffObject::Rel ],
+    _ => &[], };
+  let objects : BTreeSet<DiffObject> =
+    listable . iter () . copied ()
+    . filter ( |object| names_some_leaf (&[ *object ]) )
+    . collect ();
+  if objects . is_empty () && ! listable . is_empty () { return None; }
   let count : usize = keys_named_at (
     node, &objects . iter () . copied () . collect::<Vec<_>> (),
     forest, pid_of ) . into_iter () . collect::<HashSet<LeafKey>> () . len ();
   ( count > 0 ) . then_some ( LeavesFact { count, objects } ) }
 
 /// The leaves of 'forest' that a request naming 'objects' at 'node'
-/// names. Several objects can name one leaf twice ('node' and 'all'
-/// both name the existence leaf).
+/// names. Several objects can name one leaf twice (a walk's 'node'
+/// and the headline's own 'node' both name its existence leaf).
 fn keys_named_at (
   node    : NodeRef<Viewnode>,
   objects : &[DiffObject],

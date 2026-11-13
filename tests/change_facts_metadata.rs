@@ -63,8 +63,8 @@ fn a_vognode_renders_its_change_and_processed_and_round_trips_its_request () {
         ID::from ("a"), SkgrepoName::from ("main"), "A" . into (), None ),
       facts ( Some (Existence::Added), Some (Existence::Removed),
               Some (&[DiffObject::Node, DiffObject::Rel]) ),
-      request (true, &[DiffObject::All]) ),
-    "node (gnid a) (skgRepos (nodeRepo main)) (editRequest (processed all)) (diff (node added) (rel removed) (processed node rel))" );
+      request (true, &[DiffObject::Node, DiffObject::Rel]) ),
+    "node (gnid a) (skgRepos (nodeRepo main)) (editRequest (processed node rel)) (diff (node added) (rel removed) (processed node rel))" );
   // A processed request is allowed on a write-protected occurrence.
   assert_round_trip (
     with_facts (
@@ -74,17 +74,25 @@ fn a_vognode_renders_its_change_and_processed_and_round_trips_its_request () {
       facts ( None, Some (Existence::Added), Some (&[]) ),
       request (false, &[DiffObject::Rel]) ),
     "node (gnid b) (skgRepos (nodeRepo main)) writeProtected (editRequest (unprocessed rel)) (diff (rel added) (processed))" );
-  // A modified node: its other properties changed, and '(processed all)'
-  // says every leaf it records is marked.
+  // A modified node: its other properties changed, and '(processed node
+  // rel)' says every leaf 'node' and 'rel' name there is marked.
   assert_round_trip (
     with_facts (
       mk_writeProtected_viewnode (
         ID::from ("m"), SkgrepoName::from ("main"), "M" . into (),
         true ),
       modified ( Some (Existence::Added),
-                 Some (&[DiffObject::Rel, DiffObject::All]) ),
-      request (false, &[DiffObject::Rel, DiffObject::All]) ),
-    "node (gnid m) (skgRepos (nodeRepo main)) writeProtected (editRequest (unprocessed rel all)) (diff (rel added) (properties changed) (processed rel all))" ); }
+                 Some (&[DiffObject::Node, DiffObject::Rel]) ),
+      request (false, &[DiffObject::Node, DiffObject::Rel]) ),
+    "node (gnid m) (skgRepos (nodeRepo main)) writeProtected (editRequest (unprocessed node rel)) (diff (rel added) (properties changed) (processed node rel))" );
+  // A walk names its object beside the letters that filter it.
+  assert_round_trip (
+    with_facts (
+      mk_editable_viewnode (
+        ID::from ("n"), SkgrepoName::from ("main"), "N" . into (), None ),
+      facts ( Some (Existence::Added), None, None ),
+      request (true, &[DiffObject::Rel, DiffObject::NewOutward]) ),
+    "node (gnid n) (skgRepos (nodeRepo main)) (editRequest (processed rel newOutward)) (diff (node added))" ); }
 
 /// A node's own edit request and its processed request share one
 /// '(editRequest ...)', the processed request last.
@@ -172,9 +180,16 @@ fn the_leaves_fact_renders_and_the_parser_skips_it () {
   let rendered : String = viewnode_to_string (&node) . unwrap ();
   assert_eq! ( rendered,
                "node (gnid a) (skgRepos (nodeRepo main)) (diff (rel added) (leaves 2 node rel) (processed rel))" );
-  let marker : &str = "(skg (changesetMarker content) (editRequest (processed all)) (diff (leaves 3 all)))";
+  let marker : &str = "(skg (changesetMarker content) (editRequest (processed node rel)) (diff (leaves 3 rel)))";
   assert_eq! ( parse_metadata_to_viewnodemd (marker) . unwrap () . processed_request,
-               request (true, &[DiffObject::All]) ); }
+               request (true, &[DiffObject::Node, DiffObject::Rel]) ); }
+
+/// 'all' is no diff object: a request naming it is refused.
+#[test]
+fn a_request_naming_all_is_refused () {
+  let error : String = parse_metadata_to_viewnodemd (
+    "(skg node (gnid a) (editRequest (processed all)))" ) . unwrap_err ();
+  assert! ( error . contains ("Unknown diff object: all"), "{}", error ); }
 
 /// Every part of '(diff ...)' together, in their order; a headline
 /// with nothing to say carries no '(diff ...)'.

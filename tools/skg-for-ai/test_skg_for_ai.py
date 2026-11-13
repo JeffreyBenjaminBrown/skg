@@ -1852,8 +1852,7 @@ def check_extending_the_diff_view (context):
 
 def check_marking_a_subtree_processed (context):
   """'processed subtree' marks every change in the headline's subtree, as
-  'C-u C-c r r' does, those below it without 'all'; 'unprocessed subtree'
-  unmarks them, asking first."""
+  'C-u C-c r r' does; 'unprocessed subtree' unmarks them, asking first."""
   folder = run_diff (context, "subtree-processed")
   edit_compact ( folder, [ ( "** The fixture root, retitled ⟨0b aC2 L2 M⟩",
                              "** The fixture root, retitled ⟨0b aC2 L2 M processed "
@@ -1861,8 +1860,9 @@ def check_marking_a_subtree_processed (context):
   require_output (
     run_tool ([ "save", sidecar_of_diff (folder), "--yes" ]),
     diff_report_head () +
-    "Processed: ⟨0b⟩ 'The fixture root, retitled', as '(processed all)'.\n"
+    "Processed: ⟨0b⟩ 'The fixture root, retitled', as '(processed node)'.\n"
     "Processed: ⟨0c⟩ 'The fixture root', as '(processed)'.\n"
+    "Processed: ⟨0f⟩ 'A grandchild, retitled twice', as '(processed node)'.\n"
     "Processed: ⟨0g⟩ 'A new grandchild', as '(processed)'.\n" +
     saved_line (0) + "Processed: Commit ready. All 2 of 2 changed files are processed.\n" +
     diff_written_paths (folder),
@@ -1873,10 +1873,11 @@ def check_marking_a_subtree_processed (context):
   require_output (
     run_tool ([ "save", sidecar_of_diff (folder), "--yes" ]),
     diff_report_head () +
-    "Unprocessed: ⟨0b⟩ 'The fixture root, retitled', as '(unprocessed all)'.\n"
+    "Unprocessed: ⟨0b⟩ 'The fixture root, retitled', as '(unprocessed node)'.\n"
     "Unprocessed: ⟨0c⟩ 'The fixture root', as '(unprocessed)'.\n"
+    "Unprocessed: ⟨0f⟩ 'A grandchild, retitled twice', as '(unprocessed node)'.\n"
     "Unprocessed: ⟨0g⟩ 'A new grandchild', as '(unprocessed)'.\n"
-    "Question: this unmarks 3 changes. Unmarking this node processed will "
+    "Question: this unmarks 4 changes. Unmarking this node processed will "
     "unmark every contributing decision. You might discard a lot of hard-won "
     "information. Continue? Saving with '--yes' answers yes.\n" +
     saved_line (0) + "Processed: 0 of 2 changed files are processed.\n" +
@@ -1930,7 +1931,7 @@ def diff_written_paths (folder):
 
 EXPECTED_DIFF_COMPACT = (
   "# Processed: 0 of 4 changed files are processed.\n"
-  "# Headlines with change facts 8, processed 0, unprocessed 8.\n"
+  "# Headlines with change facts 7, processed 0, unprocessed 7.\n"
   "# skg-for-ai compact view of diff_all-changes.full.org (view ID diff-view:ID)\n"
   "# Each headline ends in its handle ⟨ID HERALDS⟩: ID its viewnode ID,\n"
   "# the '(vnid ID)' of its metadata in the full view, and HERALDS what a\n"
@@ -1944,7 +1945,7 @@ EXPECTED_DIFF_COMPACT = (
   "# Links 3, distinct targets 3, resolved 2, unresolved 1 (missing 1).\n"
   "# Server errors 0, warnings 0.\n"
   # The deleted node's other container, a root of its own
-  "* A second container, outside the view ⟨0a ⌂:main M⟩\n"
+  "* A second container, outside the view ⟨0a ⌂:main⟩\n"
   "** ⟨0b its content changed⟩\n"
   "** Contained twice ⟨0c ᗣ☮ ∃- ~-⟩\n"
   "* Above the root ⟨0d C1 ⌂:main⟩\n"

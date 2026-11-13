@@ -612,7 +612,7 @@ fn the_occurrences_made_editable_include_a_member_under_a_ghost (
 fn the_command_makes_a_member_under_a_ghost_editable (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("historical_content", &["main"], |f| {
-    let m_line : &str = "*** (skg node (gnid m) (skgRepos (nodeRepo main)) (view ghostWarrant) (diff (rel removed) (properties changed) (leaves 2 rel all))) m, retitled";
+    let m_line : &str = "*** (skg node (gnid m) (skgRepos (nodeRepo main)) (view ghostWarrant) (diff (rel removed) (properties changed) (leaves 2 node rel))) m, retitled";
     let buffer : String = open_all_changes_buffer (f) ?;
     assert! ( without_viewnode_ids (&buffer) . contains (m_line), "{}", buffer );
     let requested : String = buffer . replacen (

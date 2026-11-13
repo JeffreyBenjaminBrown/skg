@@ -281,15 +281,15 @@
 ---- text: ∃+✓ ~+
 ---- styles: nonstandard*2 go*1 -*1 nonstandard*2
 ==== diff view: a modified node
-(skg node (gnid x) (diff (properties changed) (leaves 2 all)))
+(skg node (gnid x) (diff (properties changed) (leaves 2 node)))
 ---- text: M
 ---- styles: nonstandard*1
-==== diff view: a modified node in a new relationship, every leaf it records processed
-(skg node (gnid x) (diff (rel added) (properties changed) (leaves 3 rel all) (processed all)))
+==== diff view: a modified node in a new relationship, its node object processed
+(skg node (gnid x) (diff (rel added) (properties changed) (leaves 3 node rel) (processed node)))
 ---- text: M✓ ~+
 ---- styles: nonstandard*1 go*1 -*1 nonstandard*2
-==== diff view: a modified folder member, every leaf it records processed
-(skg node (gnid x) writeProtected (diff (properties changed) (leaves 1 all) (processed all)))
+==== diff view: a modified folder member, its node object processed
+(skg node (gnid x) writeProtected (diff (properties changed) (leaves 1 node) (processed node)))
 ---- text: ☮ M✓
 ---- styles: crucial*1 -*1 nonstandard*1 go*1
 ==== diff view: each ✓ follows its own object, whatever the raw order of the parts
@@ -337,7 +337,7 @@
 ---- text: relationship moved from pub to priv
 ---- styles: message*23 -*1 normal*3 -*1 message*2 -*1 normal*4
 ==== diff view: the content changeset marker, processed
-(skg (changesetMarker content) (diff (processed all)))
+(skg (changesetMarker content) (diff (leaves 2 rel) (processed rel)))
 ---- text: its content changed✓
 ---- styles: message*19 go*1
 ==== diff view: the relRepo changeset marker
@@ -345,7 +345,7 @@
 ---- text: some content relationships changed skgrepo
 ---- styles: message*42
 ==== diff view: the order-only changeset marker
-(skg (changesetMarker orderOnly) (diff (processed all)))
+(skg (changesetMarker orderOnly) (diff (processed)))
 ---- text: order-only change✓
 ---- styles: message*17 go*1
 ==== diff view: a ghost, its existence processed

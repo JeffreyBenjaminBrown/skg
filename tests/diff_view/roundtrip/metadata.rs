@@ -22,10 +22,10 @@ fn processed (
                 leaves   : None,
                 .. ChangeFacts::default () } }
 
-fn request_all () -> Option<ProcessedRequest> {
+fn request_node_and_rel () -> Option<ProcessedRequest> {
   Some ( ProcessedRequest {
     processed : true,
-    objects : [ DiffObject::All ] . into_iter () . collect::<BTreeSet<_>> () } ) }
+    objects : [ DiffObject::Node, DiffObject::Rel ] . into_iter () . collect::<BTreeSet<_>> () } ) }
 
 
 
@@ -79,17 +79,19 @@ fn skgrepo_moves_round_trip () {
     change_viewnode ( ChangeViewnode::RelRepoMove {
       skgrepo_change : SkgrepoChange { old : SkgrepoName::from ("pub"),
                                        new : SkgrepoName::from ("a repo") } },
-      ChangeFacts::default (), request_all () ),
-    "(relRepoMove (old pub) (new \"a repo\")) (editRequest (processed all))" ); }
+      ChangeFacts::default (), request_node_and_rel () ),
+    "(relRepoMove (old pub) (new \"a repo\")) (editRequest (processed node rel))" ); }
 
 #[test]
 fn changeset_markers_round_trip () {
   for (kind, expected) in [
-    ( ChangesetMarkerKind::Content,   "(changesetMarker content) (diff (processed all))" ),
-    ( ChangesetMarkerKind::RelRepo,   "(changesetMarker relRepo) (diff (processed all))" ),
-    ( ChangesetMarkerKind::OrderOnly, "(changesetMarker orderOnly) (diff (processed all))" ), ] {
+    ( ChangesetMarkerKind::Content,   "(changesetMarker content) (diff (processed rel))" ),
+    ( ChangesetMarkerKind::RelRepo,   "(changesetMarker relRepo) (diff (processed rel))" ),
+    ( ChangesetMarkerKind::OrderOnly, "(changesetMarker orderOnly) (diff (processed))" ), ] {
+    let objects : &[DiffObject] =
+      if kind == ChangesetMarkerKind::OrderOnly { &[] } else { &[ DiffObject::Rel ] };
     assert_round_trip (
-      change_viewnode ( ChangeViewnode::ChangesetMarker { kind }, processed (&[ DiffObject::All ]), None ),
+      change_viewnode ( ChangeViewnode::ChangesetMarker { kind }, processed (objects), None ),
       expected ); }}
 
 #[test]
@@ -114,8 +116,8 @@ fn ghost_warranted_aliases_and_ids_round_trip () {
     property_member ( PropertyMember::ID { gnid : ID::from ("old-id"),
                                            claimsMembership : false,
                                            warrant : Warrant::ByHead },
-                      removed, request_all () ),
-    "id noClaim (editRequest (processed all)) (view ghostWarrant) (diff (rel removed) (processed))" ); }
+                      removed, request_node_and_rel () ),
+    "id noClaim (editRequest (processed node rel)) (view ghostWarrant) (diff (rel removed) (processed))" ); }
 
 #[test]
 fn a_ghost_round_trips () {
@@ -133,8 +135,8 @@ fn a_ghost_round_trips () {
         processed : Some ( [ DiffObject::Node ] . into_iter () . collect () ),
         leaves   : None,
         .. ChangeFacts::default () },
-      request_all () ),
-    "ghost (gnid gone) (skgRepos (nodeRepo main)) (editRequest (processed all)) (diff (node removed) (rel removed) (processed node))" ); }
+      request_node_and_rel () ),
+    "ghost (gnid gone) (skgRepos (nodeRepo main)) (editRequest (processed node rel)) (diff (node removed) (rel removed) (processed node))" ); }
 
 #[test]
 fn the_acquisition_folders_round_trip () {

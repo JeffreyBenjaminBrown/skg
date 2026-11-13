@@ -56,7 +56,7 @@ fn consuming_edit_requests_covers_every_carrier_but_not_view_requests () {
   if let ViewnodeKind::Vognode (Vognode::Occurrence (node)) = &mut viewnode . kind {
     node . relationshipEditRequest = Some ( RelationshipEditRequest::RelRepo ( SkgrepoName::from ("private") )); }
   viewnode . processed_request = Some (ProcessedRequest {
-    processed : true, objects : [DiffObject::All] . into_iter () . collect () });
+    processed : true, objects : [DiffObject::Node, DiffObject::Rel] . into_iter () . collect () });
   viewnode . consume_edit_request_after_save ();
   assert_eq! (viewnode . processed_request, None);
   let ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) = &viewnode . kind
