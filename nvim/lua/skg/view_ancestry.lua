@@ -1,9 +1,11 @@
 -- PURPOSE: Show, in a new buffer, only the outline ancestry of the
 -- headline at point (parent, grandparent, ... to the root, plus the
--- headline itself). Not skg-specific; works in any org buffer. The
+-- headline itself), with heralds if the buffer it was called from
+-- shows them. Not skg-specific; works in any org buffer. The
 -- Lua port of elisp/skg-view-ancestry.el.
 
 local focus = require('skg.focus')
+local heralds = require('skg.heralds')
 local metadata = require('skg.metadata')
 
 local M = {}
@@ -22,10 +24,12 @@ function M.view_ancestry ()
   end
   local title = metadata.split_as_stars_metadata_title(
     metadata.line_text(line)).title
+  local with_heralds = heralds.enabled_p(vim.api.nvim_get_current_buf())
   local buf = vim.api.nvim_create_buf(true, true)
   vim.api.nvim_buf_set_name(buf, 'skg://ancestry/' .. title)
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, ancestry)
   vim.bo[buf].filetype = 'org'
+  if with_heralds then heralds.enable(buf) end
   vim.bo[buf].modified = false
   vim.api.nvim_set_current_buf(buf)
   vim.api.nvim_win_set_cursor(0, { 1, 0 })

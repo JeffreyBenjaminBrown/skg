@@ -315,6 +315,31 @@ describe('skg.view_ancestry and view_new_empty', function ()
     assert.are.equal('* a\n** c\n*** e', buffer_text())
   end)
 
+  it('shows heralds exactly when the buffer it was called from does',
+     function ()
+    local heralds = require('skg.heralds')
+    local original_enable = heralds.enable
+    local enabled = {}
+    heralds.enable = function (buf) table.insert(enabled, buf) end
+    local ok, err = pcall(function ()
+      for _, source_shows_heralds in ipairs({ false, true }) do
+        local buf = buffer_with('* a\n** b')
+        vim.bo[buf].filetype = 'org'
+        vim.b[buf].skg_heralds = source_shows_heralds
+        vim.api.nvim_win_set_cursor(0, { 2, 0 })
+        enabled = {}
+        require('skg.view_ancestry').view_ancestry()
+        local ancestry_buf = vim.api.nvim_get_current_buf()
+        assert.are.same(source_shows_heralds and { ancestry_buf } or {},
+                        enabled)
+        vim.api.nvim_buf_delete(ancestry_buf, { force = true })
+        vim.api.nvim_buf_delete(buf, { force = true })
+      end
+    end)
+    heralds.enable = original_enable
+    assert(ok, err)
+  end)
+
   it('view_new_empty opens a blank skg content view', function ()
     local server = helpers.connect_to_fake_server(function () end)
     local before = vim.api.nvim_get_current_buf()

@@ -22,11 +22,13 @@
 (defun skg-view-ancestry ()
   "Create a new buffer showing only the ancestry of the headline at point.
 The new buffer will contain the current headline and all its ancestors,
-from the root down to the current position."
+from the root down to the current position. It shows heralds if
+the buffer it was called from does."
   (interactive)
   (unless (derived-mode-p 'org-mode)
     (user-error "Not in an org-mode buffer"))
-  (let ((ancestry '()))
+  (let ((ancestry '())
+        (heralds (bound-and-true-p heralds-minor-mode)))
     (save-excursion
       (condition-case nil
           (unless (org-at-heading-p)
@@ -51,6 +53,7 @@ from the root down to the current position."
                   " "
                   (cdr item)
                   "\n"))
+        (when heralds (heralds-minor-mode 1))
         (goto-char (point-min)))
       (switch-to-buffer buf))))
 

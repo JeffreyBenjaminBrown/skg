@@ -1081,7 +1081,8 @@ don't change the node's metadata; change its children in the view.)
 *** C-c v o : skg-view-ancestry
 If you're at a headline so deep in the tree
 that you can't remember where it came from,
-this brings you to a new view showing only that ancestry.
+this brings you to a new view showing only that ancestry,
+with heralds if the view you called it from shows them.
 This actually works in org-mode outside of skg.
 (skg uses org-mode, but org-mode can be used without skg.)
 ** C-c v : view changes, global
