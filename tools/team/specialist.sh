@@ -7,7 +7,7 @@
 #   tools/team/specialist.sh rename OLD NEW  # both servers down; NEW must not exist
 #   tools/team/specialist.sh born   NAME "WHO" [JEFFS_NOTE_ID]  # a new specialist, with its home note
 #   tools/team/specialist.sh home   NAME HOME_ID     # record its home note, once
-#   tools/team/specialist.sh prompt NAME MISSION_ID  # print the prompt that lends it a mind
+#   tools/team/specialist.sh prompt NAME MISSION_ID KIND  # print the prompt that lends it a mind
 #
 # A specialist is a folder, 'data/claude/team/NAME/', holding its
 # skgrepo 'notes/', a config 'skgconfig.toml' that owns only that
@@ -25,7 +25,11 @@
 # Each line there is 'NAME PORT [HOME_ID]', HOME_ID the specialist's
 # home note. 'prompt' prints everything a fresh mind is told: where the
 # tool is, its port and views folder, its home note and its mission.
-# All it knows beyond that, it reads from the graph.
+# All it knows beyond that, it reads from the graph. KIND says what
+# kind of mission it is, one of MISSION_KINDS; the mind is told it, and
+# tools/team/spending_account.py reads it back from the prompt into
+# the spending account, so the wording "It is a KIND mission." is a
+# contract with that script's MISSION_KIND_IN_PROMPT.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -34,12 +38,13 @@ TEAM="$DATA/claude/team"
 PORTS="$TEAM/ports"
 SKG="$ROOT/target/release/skg"
 READER="$ROOT/tools/skg-for-ai/skg_for_ai.py"
+MISSION_KINDS="plan reading build tending" # the same four as MISSION_KINDS in tools/team/spending_account.py
 
 notes_of() { echo "$TEAM/$1/notes"; } # NAME's skgrepo
 views_of() { echo "$TEAM/$1/views"; } # NAME's skg-for-ai folder
 
 usage() {
-  echo "usage: tools/team/specialist.sh up|down NAME | list | rename OLD NEW | born NAME WHO [JEFFS_NOTE_ID] | home NAME HOME_ID | prompt NAME MISSION_ID" >&2
+  echo "usage: tools/team/specialist.sh up|down NAME | list | rename OLD NEW | born NAME WHO [JEFFS_NOTE_ID] | home NAME HOME_ID | prompt NAME MISSION_ID KIND (KIND one of: $MISSION_KINDS)" >&2
   exit 2
 }
 
@@ -216,8 +221,12 @@ set_home() { # NAME HOME_ID
   mv "$PORTS.tmp" "$PORTS"
 }
 
-prompt() { # NAME MISSION_ID
-  local name="$1" mission="$2" port home
+prompt() { # NAME MISSION_ID KIND
+  local name="$1" mission="$2" kind="$3" port home
+  case " $MISSION_KINDS " in
+    *" $kind "*) ;;
+    *) echo "'$kind' is not a kind of mission; the kinds are: $MISSION_KINDS" >&2; exit 2 ;;
+  esac
   port="$(awk -v n="$name" '$1==n {print $2}' "$PORTS")"
   home="$(awk -v n="$name" '$1==n {print $3}' "$PORTS")"
   [ -n "$port" ] && [ -n "$home" ] \
@@ -229,13 +238,15 @@ Work from $ROOT. $name's skg server is already running. Your port is $port and y
 
   python3 tools/skg-for-ai/skg_for_ai.py COMMAND ... --port $port --out-dir data/claude/team/$name/views
 
+except 'save' and 'commit', which refuse '--out-dir' and take only '--port $port'.
+
 Do these in order:
 
 1. Read the first page ("Start here") of tools/skg-for-ai/README.org, so you can view and save notes. One thing that page does not say: when adding to a view file, insert new headlines under the headline they belong to; do not append them to the end of the file, because a view can end in a write-protected folder listing the root's containers.
 
 2. Read your home note: view $home. It says who $name is and how a specialist works here. Follow what it says.
 
-3. Read your mission: view $mission. Then do it.
+3. Read your mission: view $mission. Then do it. It is a $kind mission.
 
 When you finish, your final message should be one or two sentences. Everything else belongs in the graph, as your home note explains.
 PROMPT
@@ -248,6 +259,6 @@ case "${1:-}" in
   rename) [ $# -eq 3 ] || usage; rename "$2" "$3" ;;
   born)   [ $# -ge 3 ] || usage; born "$2" "$3" "${4:-}" ;;
   home)   [ $# -eq 3 ] || usage; set_home "$2" "$3" ;;
-  prompt) [ $# -eq 3 ] || usage; prompt "$2" "$3" ;;
+  prompt) [ $# -eq 4 ] || usage; prompt "$2" "$3" "$4" ;;
   *)    usage ;;
 esac

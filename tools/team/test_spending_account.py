@@ -8,12 +8,17 @@ session the pacer started, which lent a mind to a specialist through a
 subagent, which started a subagent of its own; and an interactive
 session that began with a slash command. It checks the account's rows,
 that a response streamed into two records is counted once, the
-dollars, and that running again neither doubles a row, nor loses one
-whose transcript is gone, nor keeps a row from going out of date.
+dollars at list price and weighted, the mission's kind, the requests
+file and how it joins the account, and that running again neither
+doubles a row, nor loses one whose transcript is gone, nor keeps a row
+from going out of date. It also runs a copy of
+'tools/team/specialist.sh prompt' in the temporary folder, to check
+that the account reads back the kind the prompt prints.
 """
 import json
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -32,7 +37,8 @@ MISSION_ID = "c37b2a71-3c37-48b0-83b0-9ec489fc653b"
 SPECIALIST_PROMPT = (
   "You are being lent to a specialist named Mario, on the team that"
   " builds skg.\n\n3. Read your mission: view " + MISSION_ID +
-  ". Then do it." )
+  ". Then do it. It is a build mission." )
+TEAM_FOLDER = os . path . dirname ( os . path . abspath (__file__) )
 
 def user_record (timestamp, text, entrypoint = "sdk-cli"):
   return { "type" : "user", "timestamp" : timestamp,
@@ -72,6 +78,7 @@ class SpendingAccountTest (unittest . TestCase):
     self . transcripts = os . path . join (self . folder, "projects")
     self . project = os . path . join (self . transcripts, "-home-someone")
     self . account = os . path . join (self . folder, "spending", "account.tsv")
+    self . requests = os . path . join (self . folder, "spending", "requests.tsv")
     self . write_pacer_session ()
     self . write_jeff_session ()
 
@@ -138,7 +145,19 @@ class SpendingAccountTest (unittest . TestCase):
     self . assertEqual ( lines [0] . split ("\t"),
                          spending_account . ACCOUNT_COLUMNS )
     self . assertEqual ( len (lines) - 1, len (rows) ) # no ID twice
+    with open (self . requests, encoding = "utf-8") as requests_file:
+      self . assertEqual ( requests_file . readline () . rstrip ("\n")
+                           . split ("\t"),
+                           spending_account . REQUEST_COLUMNS,
+                           "the requests file is beside the account" )
     return rows
+
+  def request_rows (self):
+    """The requests file's rows, by (id, request), each once."""
+    request_rows = spending_account . read_table (self . requests)
+    keys = [ (row ["id"], row ["request"]) for row in request_rows ]
+    self . assertEqual ( len (keys), len ( set (keys) ), "no request twice" )
+    return { key : row for key, row in zip (keys, request_rows) }
 
   def test_rows (self):
     rows = self . run_script ()
@@ -158,6 +177,10 @@ class SpendingAccountTest (unittest . TestCase):
     self . assertEqual ( pacer ["model"], "claude-fable-5-2" )
     self . assertEqual ( pacer ["usd"], "%.4f" % (
       ( 15 * 8 + 150 * 40 + 4000 * 0.2 + 2000 * 16 ) / 1e6 ))
+    self . assertEqual ( pacer ["weighted_usd"], "%.4f" % (
+      2.5 * ( 15 * 8 + 150 * 40 + 4000 * 0.2 + 2000 * 16 ) / 1e6 ),
+      "a Fable dollar weighs 2.5" )
+    self . assertEqual ( pacer ["mission_kind"], "" )
     specialist = rows [SPECIALIST_AGENT_ID]
     self . assertEqual ( (specialist ["kind"], specialist ["origin"],
                           specialist ["session"], specialist ["parent"],
@@ -168,16 +191,107 @@ class SpendingAccountTest (unittest . TestCase):
                           "Mario builds it") )
     self . assertEqual ( specialist ["usd"], "%.4f" % (
       ( 1 * 4 + 10 * 20 + 100 * 0.2 + 1000 * 5 ) / 1e6 ))
+    self . assertEqual ( specialist ["weighted_usd"], specialist ["usd"],
+                         "an Opus dollar weighs 1" )
+    self . assertEqual ( specialist ["mission_kind"], "build" )
     helper = rows [HELPER_AGENT_ID]
     self . assertEqual ( (helper ["parent"], helper ["session"],
                           helper ["specialist"], helper ["mission"],
-                          helper ["asked"], helper ["usd"]),
+                          helper ["mission_kind"], helper ["asked"],
+                          helper ["usd"], helper ["weighted_usd"]),
                          (SPECIALIST_AGENT_ID, PACER_SESSION_ID, "mario",
-                          MISSION_ID, "Count the files.", "") )
+                          MISSION_ID, "build", "Count the files.", "", "") )
     jeff = rows [JEFF_SESSION_ID]
     self . assertEqual ( (jeff ["origin"], jeff ["asked"], jeff ["title"],
-                          jeff ["specialist"]),
-                         ("jeff", "Welcome, Claude!", "A generated title", "") )
+                          jeff ["specialist"], jeff ["mission_kind"]),
+                         ("jeff", "Welcome, Claude!", "A generated title",
+                          "", "") )
+
+  def test_requests (self):
+    rows = self . run_script ()
+    request_rows = self . request_rows ()
+    self . assertEqual ( set (request_rows), {
+      (PACER_SESSION_ID, "r1"), (PACER_SESSION_ID, "r2"),
+      (SPECIALIST_AGENT_ID, "r3"), (HELPER_AGENT_ID, "r4"),
+      (JEFF_SESSION_ID, "r5") } )
+    streamed = request_rows [ (PACER_SESSION_ID, "r1") ]
+    self . assertEqual (
+      ( streamed ["time"], streamed ["model"], streamed ["input"],
+        streamed ["output"], streamed ["cache_write"],
+        streamed ["cache_read"], streamed ["usd"], streamed ["weighted_usd"] ),
+      ( "2026-11-13T10:00:05Z", "claude-fable-5-2", "10", "100", "2000",
+        "1000", "%.6f" % ( ( 10 * 8 + 100 * 40 + 1000 * 0.2 + 2000 * 16 ) / 1e6 ),
+        "%.6f" % ( 2.5 * ( 10 * 8 + 100 * 40 + 1000 * 0.2 + 2000 * 16 ) / 1e6 )),
+      "a streamed request is one row, at its first record's time" )
+    unpriced = request_rows [ (HELPER_AGENT_ID, "r4") ]
+    self . assertEqual ( (unpriced ["usd"], unpriced ["weighted_usd"]), ("", "") )
+    for account_id, row in rows . items (): # the join on 'id'
+      its_requests = [ request_row for key, request_row in request_rows . items ()
+                       if key [0] == account_id ]
+      self . assertEqual ( str ( len (its_requests) ), row ["requests"] )
+      if row ["weighted_usd"]:
+        self . assertAlmostEqual (
+          sum ( float ( request_row ["weighted_usd"] )
+                for request_row in its_requests ),
+          float ( row ["weighted_usd"] ), places = 4 )
+
+  def test_changed_weight_reaches_rows_of_deleted_transcripts (self):
+    self . run_script ()
+    os . remove ( os . path . join (self . project, JEFF_SESSION_ID + ".jsonl") )
+    weights = spending_account . SUBSCRIPTION_WEIGHT_PER_LIST_DOLLAR
+    original_weight = weights ["claude-sonnet-5-5"]
+    weights ["claude-sonnet-5-5"] = 3
+    try:
+      rows = self . run_script ()
+    finally:
+      weights ["claude-sonnet-5-5"] = original_weight
+    jeff = rows [JEFF_SESSION_ID]
+    self . assertEqual ( jeff ["weighted_usd"],
+                         "%.4f" % ( 3 * float ( jeff ["usd"] )) )
+    self . assertEqual ( self . request_rows () [ (JEFF_SESSION_ID, "r5") ]
+                         ["weighted_usd"],
+                         "%.6f" % ( 3 * ( 2 * 2 + 20 * 10 + 400 * 2.5 ) / 1e6 ),
+                         "a deleted transcript's requests are kept" )
+
+  def test_row_older_than_the_requests_file_keeps_its_weight (self):
+    os . makedirs ( os . path . dirname (self . account) )
+    with open (self . account, "w", encoding = "utf-8") as account_file:
+      account_file . write ( "id\tbegan\trequests\tusd\tweighted_usd\n"
+                             "old\t2026-10-01T00:00:00Z\t2\t1.0000\t9.0000\n" )
+    old = self . run_script () ["old"]
+    self . assertEqual ( (old ["usd"], old ["weighted_usd"], old ["mission_kind"]),
+                         ("1.0000", "9.0000", "") )
+
+  def test_the_account_reads_the_kind_specialist_prompt_prints (self):
+    root = os . path . join (self . folder, "root")
+    os . makedirs ( os . path . join (root, "tools", "team") )
+    os . makedirs ( os . path . join (root, "data", "claude", "team") )
+    script = os . path . join (root, "tools", "team", "specialist.sh")
+    shutil . copy ( os . path . join (TEAM_FOLDER, "specialist.sh"), script )
+    with open ( os . path . join (root, "data", "claude", "team", "ports"),
+                "w", encoding = "utf-8" ) as ports_file:
+      ports_file . write ( "mario 1774 " + MISSION_ID . replace ("c", "d") + "\n" )
+    for kind in spending_account . MISSION_KINDS:
+      prompt = subprocess . run ( [ "bash", script, "prompt", "mario",
+                                    MISSION_ID, kind ],
+                                  capture_output = True, text = True,
+                                  check = True ) . stdout
+      self . assertEqual (
+        spending_account . MISSION_KIND_IN_PROMPT . search (prompt) . group (1),
+        kind )
+      self . assertEqual (
+        spending_account . MISSION_IN_PROMPT . search (prompt) . group (1),
+        MISSION_ID )
+    refused = subprocess . run ( [ "bash", script, "prompt", "mario",
+                                   MISSION_ID, "fixing" ],
+                                 capture_output = True, text = True )
+    self . assertEqual ( (refused . returncode, refused . stdout), (2, "") )
+    self . assertIn ( "not a kind of mission", refused . stderr )
+    without_kind = subprocess . run ( [ "bash", script, "prompt", "mario",
+                                        MISSION_ID ],
+                                      capture_output = True, text = True )
+    self . assertEqual ( (without_kind . returncode, without_kind . stdout),
+                         (2, "") )
 
   def test_running_again_updates_without_doubling_or_losing (self):
     self . run_script ()
@@ -193,6 +307,7 @@ class SpendingAccountTest (unittest . TestCase):
     self . assertIn ( JEFF_SESSION_ID, rows,
                       "a row outlives its deleted transcript" )
     self . assertEqual ( rows [PACER_SESSION_ID] ["requests"], "3" )
+    self . assertEqual ( len ( self . request_rows () ), 6 )
     self . assertEqual ( rows [PACER_SESSION_ID] ["ended"],
                          "2026-11-13T11:00:00Z" )
 

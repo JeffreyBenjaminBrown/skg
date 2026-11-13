@@ -38,6 +38,12 @@
 # ONE AT A TIME. Sessions run in the foreground of the loop, so two
 # never overlap. An interactive Claude should 'pause' first: two
 # sessions writing one graph would refuse each other's saves.
+#
+# THE SPENDING ACCOUNT. After each session it starts, the pacer runs
+# tools/team/spending_account.py, so the account in data/claude/spending/
+# is never more than one session behind. Claude Code deletes a
+# transcript after thirty days, and a row not written by then is lost.
+# If the script fails, the pacer logs that and goes on.
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -49,6 +55,7 @@ FIVE_HOUR_CAP="${FIVE_HOUR_CAP:-0.80}"
 RESERVE="${RESERVE:-0.15}"
 POLL_SECONDS="${POLL_SECONDS:-600}"
 SESSION_TIMEOUT="${SESSION_TIMEOUT:-6000}" # a session that runs and tends one specialist has taken an hour
+ACCOUNT_TIMEOUT=600 # the script read 177 MB of transcripts in half a second, 2026-11-13
 MODEL="${MODEL:-claude-fable-5-2}"
 mkdir -p "$DIR"
 
@@ -114,6 +121,15 @@ session() { # REASON: one session, in the foreground
       --model "$MODEL" --dangerously-skip-permissions \
       > "$DIR/session.$stamp.out" 2>&1 )
   log "session $stamp ended (exit $?): $(tail -c 600 "$DIR/session.$stamp.out" | tr '\n' ' ')"
+  update_spending_account
+}
+
+update_spending_account() { # logs only a failure
+  local output status
+  output="$(cd "$ROOT" && timeout "$ACCOUNT_TIMEOUT" python3 tools/team/spending_account.py 2>&1)"
+  status=$?
+  [ "$status" = 0 ] \
+    || log "the spending account was not brought up to date (exit $status): $(printf '%s' "$output" | tail -c 600 | tr '\n' ' ')"
 }
 
 run() {
