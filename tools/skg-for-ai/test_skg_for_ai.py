@@ -297,8 +297,8 @@ def failures_of_shared_herald_cases ():
     rendered = skg_for_ai . herald_text (
       skg_for_ai . parse_sexp (metadata_text), herald_tables,
       skg_for_ai . HeraldContext (
-        { "folderChange ready" : True,
-          "folderChange unready" : False } . get (context),
+        { "folderChange processed" : True,
+          "folderChange unprocessed" : False } . get (context),
         context == "pendingDetachment" ))
     if rendered != text:
       failures . append (
@@ -1723,7 +1723,7 @@ def check_marking_processed (context):
   require_output (
     run_tool ([ "save", sidecar_of_diff (folder), "--yes" ]),
     diff_report_head () +
-    "Processed: ⟨0j⟩ 'A new grandchild', as '(ready node rel)'.\n" +
+    "Processed: ⟨0j⟩ 'A new grandchild', as '(processed node rel)'.\n" +
     saved_line (0) +
     "Processed: 1 of 4 changed files are processed.\n" +
     diff_written_paths (folder),
@@ -1739,7 +1739,7 @@ def check_marking_processed (context):
   require_output (
     run_tool ([ "save", sidecar_of_diff (fresh) ]),
     diff_report_head () +
-    "Unprocessed: ⟨0j⟩ 'A new grandchild', as '(unready node rel)'.\n"
+    "Unprocessed: ⟨0j⟩ 'A new grandchild', as '(unprocessed node rel)'.\n"
     "Question: this unmarks 2 changes. Unmarking this node processed "
     "will unmark every contributing decision. You might discard a lot of "
     "hard-won information. Continue? Saving with '--yes' answers yes.\n" +
@@ -1861,9 +1861,9 @@ def check_marking_a_subtree_processed (context):
   require_output (
     run_tool ([ "save", sidecar_of_diff (folder), "--yes" ]),
     diff_report_head () +
-    "Processed: ⟨0b⟩ 'The fixture root, retitled', as '(ready all)'.\n"
-    "Processed: ⟨0c⟩ 'The fixture root', as '(ready)'.\n"
-    "Processed: ⟨0g⟩ 'A new grandchild', as '(ready)'.\n" +
+    "Processed: ⟨0b⟩ 'The fixture root, retitled', as '(processed all)'.\n"
+    "Processed: ⟨0c⟩ 'The fixture root', as '(processed)'.\n"
+    "Processed: ⟨0g⟩ 'A new grandchild', as '(processed)'.\n" +
     saved_line (0) + "Processed: Commit ready. All 2 of 2 changed files are processed.\n" +
     diff_written_paths (folder),
     ignoring_view_ids = True )
@@ -1873,9 +1873,9 @@ def check_marking_a_subtree_processed (context):
   require_output (
     run_tool ([ "save", sidecar_of_diff (folder), "--yes" ]),
     diff_report_head () +
-    "Unprocessed: ⟨0b⟩ 'The fixture root, retitled', as '(unready all)'.\n"
-    "Unprocessed: ⟨0c⟩ 'The fixture root', as '(unready)'.\n"
-    "Unprocessed: ⟨0g⟩ 'A new grandchild', as '(unready)'.\n"
+    "Unprocessed: ⟨0b⟩ 'The fixture root, retitled', as '(unprocessed all)'.\n"
+    "Unprocessed: ⟨0c⟩ 'The fixture root', as '(unprocessed)'.\n"
+    "Unprocessed: ⟨0g⟩ 'A new grandchild', as '(unprocessed)'.\n"
     "Question: this unmarks 3 changes. Unmarking this node processed will "
     "unmark every contributing decision. You might discard a lot of hard-won "
     "information. Continue? Saving with '--yes' answers yes.\n" +
@@ -2692,8 +2692,8 @@ def check_marking_like_moves_processed (context):
   require_output (
     run_tool ([ "save", sidecar_of_diff (folder), "--yes" ]),
     diff_report_head () +
-    "Processed: ⟨0b⟩ (homeSkgrepoMove (old private) (new main)), as '(ready)'.\n"
-    "Processed: ⟨0e⟩ (homeSkgrepoMove (old private) (new main)), as '(ready)'.\n"
+    "Processed: ⟨0b⟩ (homeSkgrepoMove (old private) (new main)), as '(processed)'.\n"
+    "Processed: ⟨0e⟩ (homeSkgrepoMove (old private) (new main)), as '(processed)'.\n"
     + saved_line (0) + "Processed: 2 of 17 changed files are processed.\n" +
     diff_written_paths (folder),
     ignoring_view_ids = True )

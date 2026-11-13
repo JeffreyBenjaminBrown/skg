@@ -286,7 +286,7 @@ String-literal children of the header are collected into a prefix.
 When any list child fires, the prefix is concatenated (no
 separator) before each of its outputs. When no list child fires
 but the prefix is non-empty, the prefix is emitted alone -- so
-rules like (NONSTANDARD ready \"request:ready\" (node \":node\"))
+rules like (NONSTANDARD processed \"request:processed\" (node \":node\"))
 serve as a label for the structure even when their sub-rules are
 vacuous."
   (let* ((new-style

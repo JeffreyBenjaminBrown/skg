@@ -2,8 +2,8 @@
 //
 // The diff view's derived facts '(diff ...)' -- its parts '(node
 // ...)', '(rel ...)', '(properties changed)', '(leaves ...)' and
-// '(ready ...)' -- and the processed requests '(editRequest (ready
-// ...))' and '(editRequest (unready ...))', on every viewnode that
+// '(processed ...)' -- and the processed requests '(editRequest (processed
+// ...))' and '(editRequest (unprocessed ...))', on every viewnode that
 // carries them: each renders; the parser skips '(diff ...)' whole and
 // reads the processed request back.
 
@@ -64,7 +64,7 @@ fn a_vognode_renders_its_change_and_processed_and_round_trips_its_request () {
       facts ( Some (Existence::Added), Some (Existence::Removed),
               Some (&[DiffObject::Node, DiffObject::Rel]) ),
       request (true, &[DiffObject::All]) ),
-    "node (gnid a) (skgRepos (nodeRepo main)) (editRequest (ready all)) (diff (node added) (rel removed) (ready node rel))" );
+    "node (gnid a) (skgRepos (nodeRepo main)) (editRequest (processed all)) (diff (node added) (rel removed) (processed node rel))" );
   // A processed request is allowed on a write-protected occurrence.
   assert_round_trip (
     with_facts (
@@ -73,8 +73,8 @@ fn a_vognode_renders_its_change_and_processed_and_round_trips_its_request () {
         true ),
       facts ( None, Some (Existence::Added), Some (&[]) ),
       request (false, &[DiffObject::Rel]) ),
-    "node (gnid b) (skgRepos (nodeRepo main)) writeProtected (editRequest (unready rel)) (diff (rel added) (ready))" );
-  // A modified node: its other properties changed, and '(ready all)'
+    "node (gnid b) (skgRepos (nodeRepo main)) writeProtected (editRequest (unprocessed rel)) (diff (rel added) (processed))" );
+  // A modified node: its other properties changed, and '(processed all)'
   // says every leaf it records is marked.
   assert_round_trip (
     with_facts (
@@ -84,14 +84,14 @@ fn a_vognode_renders_its_change_and_processed_and_round_trips_its_request () {
       modified ( Some (Existence::Added),
                  Some (&[DiffObject::Rel, DiffObject::All]) ),
       request (false, &[DiffObject::Rel, DiffObject::All]) ),
-    "node (gnid m) (skgRepos (nodeRepo main)) writeProtected (editRequest (unready rel all)) (diff (rel added) (properties changed) (ready rel all))" ); }
+    "node (gnid m) (skgRepos (nodeRepo main)) writeProtected (editRequest (unprocessed rel all)) (diff (rel added) (properties changed) (processed rel all))" ); }
 
 /// A node's own edit request and its processed request share one
 /// '(editRequest ...)', the processed request last.
 #[test]
 fn an_edit_request_and_a_processed_request_share_one_form () {
   let metadata : ViewnodeMetadata = parse_metadata_to_viewnodemd (
-    "(skg node (gnid a) (editRequest delete (ready node)))" ) . unwrap ();
+    "(skg node (gnid a) (editRequest delete (processed node)))" ) . unwrap ();
   assert_eq! ( metadata . processed_request, request (true, &[DiffObject::Node]) );
   assert! ( matches! ( metadata . kind,
                        MetadataKind::Occurrence ( OccurrenceMetadata {
@@ -108,7 +108,7 @@ fn ghosts_and_unknowns_round_trip_their_processed_requests () {
           claimsMembership : true, warrant : Warrant::ByGraph, } ))),
       facts ( Some (Existence::Removed), None, Some (&[DiffObject::Node]) ),
       request (false, &[DiffObject::Node]) ),
-    "ghost (gnid d) (skgRepos (nodeRepo main)) (editRequest (unready node)) (diff (node removed) (ready node))" );
+    "ghost (gnid d) (skgRepos (nodeRepo main)) (editRequest (unprocessed node)) (diff (node removed) (processed node))" );
   assert_round_trip (
     with_facts (
       viewnode_of ( ViewnodeKind::Vognode ( Vognode::GnidOnly ( GnidOnlyVognode::new (
@@ -116,7 +116,7 @@ fn ghosts_and_unknowns_round_trip_their_processed_requests () {
           Warrant::ByGraph ) ))),
       facts ( None, Some (Existence::Added), None ),
       request (true, &[]) ),
-    "unknown (gnid u) (editRequest (ready)) (diff (rel added))" ); }
+    "unknown (gnid u) (editRequest (processed)) (diff (rel added))" ); }
 
 #[test]
 fn property_leaves_round_trip_their_processed_requests () {
@@ -126,14 +126,14 @@ fn property_leaves_round_trip_their_processed_requests () {
         "an alias" . into (), None, None ))),
       facts ( None, Some (Existence::Added), Some (&[]) ),
       None ),
-    "alias (diff (rel added) (ready))" );
+    "alias (diff (rel added) (processed))" );
   assert_round_trip (
     with_facts (
       viewnode_of ( ViewnodeKind::PropertyMember ( PropertyMember::id (
         ID::from ("x") ))),
       facts ( None, Some (Existence::Added), None ),
       request (true, &[]) ),
-    "id (editRequest (ready)) (diff (rel added))" );
+    "id (editRequest (processed)) (diff (rel added))" );
   assert_round_trip (
     with_facts (
       viewnode_of ( ViewnodeKind::PropertyMember ( PropertyMember::flag (
@@ -155,9 +155,9 @@ fn a_ghost_warranted_property_member_claims_nothing () {
     request (true, &[]) );
   assert_round_trip (
     lost_id,
-    "id noClaim (editRequest (ready)) (view ghostWarrant) (diff (rel removed))" ); }
+    "id noClaim (editRequest (processed)) (view ghostWarrant) (diff (rel removed))" ); }
 
-/// '(leaves N OBJECT...)' is written before '(ready ...)'; the parser
+/// '(leaves N OBJECT...)' is written before '(processed ...)'; the parser
 /// skips the whole '(diff ...)'.
 #[test]
 fn the_leaves_fact_renders_and_the_parser_skips_it () {
@@ -171,8 +171,8 @@ fn the_leaves_fact_renders_and_the_parser_skips_it () {
     change_facts, None );
   let rendered : String = viewnode_to_string (&node) . unwrap ();
   assert_eq! ( rendered,
-               "node (gnid a) (skgRepos (nodeRepo main)) (diff (rel added) (leaves 2 node rel) (ready rel))" );
-  let marker : &str = "(skg (changesetMarker content) (editRequest (ready all)) (diff (leaves 3 all)))";
+               "node (gnid a) (skgRepos (nodeRepo main)) (diff (rel added) (leaves 2 node rel) (processed rel))" );
+  let marker : &str = "(skg (changesetMarker content) (editRequest (processed all)) (diff (leaves 3 all)))";
   assert_eq! ( parse_metadata_to_viewnodemd (marker) . unwrap () . processed_request,
                request (true, &[DiffObject::All]) ); }
 
@@ -190,7 +190,7 @@ fn each_part_of_the_diff_form_renders_together_and_alone () {
     change_facts, request (true, &[DiffObject::Rel]) );
   let rendered : String = viewnode_to_string (&node) . unwrap ();
   assert_eq! ( rendered,
-               "node (gnid a) (skgRepos (nodeRepo main)) (editRequest (ready rel)) (diff (node added) (rel added) (leaves 2 node rel) (ready node))" );
+               "node (gnid a) (skgRepos (nodeRepo main)) (editRequest (processed rel)) (diff (node added) (rel added) (leaves 2 node rel) (processed node))" );
   let alias = || viewnode_of ( ViewnodeKind::PropertyMember ( PropertyMember::alias (
     "an alias" . into (), None, None )));
   assert_round_trip (
@@ -198,10 +198,10 @@ fn each_part_of_the_diff_form_renders_together_and_alone () {
     "alias (diff (rel added))" );
   assert_round_trip (
     with_facts ( alias (), facts ( None, None, Some (&[]) ), None ),
-    "alias (diff (ready))" );
+    "alias (diff (processed))" );
   assert_round_trip (
     with_facts ( alias (), ChangeFacts::default (), request (false, &[]) ),
-    "alias (editRequest (unready))" );
+    "alias (editRequest (unprocessed))" );
   assert_round_trip (
     with_facts ( alias (), ChangeFacts::default (), None ),
     "alias" ); }
@@ -213,17 +213,17 @@ fn each_part_of_the_diff_form_renders_together_and_alone () {
 fn malformed_facts_and_processed_requests_are_refused () {
   for metadata in [
     "(skg tombstone (diff (rel added)))",             // a tombstone carries none
-    "(skg aliasFolder (diff (ready)))",               // nor does a folder
+    "(skg aliasFolder (diff (processed)))",               // nor does a folder
     "(skg (aliasFolder changed))",                    // a folder is its bare atom
-    "(skg bodyDiff (editRequest (ready)))",           // a body diff takes no request
+    "(skg bodyDiff (editRequest (processed)))",           // a body diff takes no request
     "(skg tombstone (view noWarrant))",               // nor any view fact
-    "(skg node (gnid a) (editRequest (ready) (unready node)))", // two requests
-    "(skg node (gnid a) (editRequest (ready sideways)))",
+    "(skg node (gnid a) (editRequest (processed) (unprocessed node)))", // two requests
+    "(skg node (gnid a) (editRequest (processed sideways)))",
     "(skg node (gnid a) (editRequest delete (merge b)))",       // two edit requests
     "(skg id (editRequest (relRepo main)))",          // an id takes only processed requests
-    "(skg alias (ready))",                            // a request is in '(editRequest ...)'
-    "(skg node (gnid a) (ready node))",
-    "(skg node (gnid a) (diff (ready)) (diff (rel added)))", // two forms
+    "(skg alias (processed))",                            // a request is in '(editRequest ...)'
+    "(skg node (gnid a) (processed node))",
+    "(skg node (gnid a) (diff (processed)) (diff (rel added)))", // two forms
     "(skg node (gnid a) (view cycle) (view noWarrant))",
     // retired spellings
     "(skg node (gnid a) (readyRequest all))",

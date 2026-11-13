@@ -96,7 +96,7 @@ fn a_buffers_answer_carries_the_processed_summary_of_its_save (
       &saved . processed_summary
         . expect ("a save of a buffer of the diff view reports its summary")
         . to_sexp () );
-    assert! ( summary_of_the_save . starts_with ("(readiness-summary (ready 0)"),
+    assert! ( summary_of_the_save . starts_with ("(processed-summary (processed 0)"),
               "{}", summary_of_the_save );
     assert! ( payload . trim_end () . ends_with (
                 &format! ( "{})", summary_of_the_save )),
@@ -137,12 +137,12 @@ fn a_save_of_a_diffView_buffer_not_held_keeps_its_viewnode_ids (
         f, " (diff-view-buffer . \"all changes\")" );
       let saved : String = extract_string_field_from_sexp (&named, "content")
         . expect ("a save-result with content");
-      assert! ( named . contains ("(readiness-summary"), "{}", named );
+      assert! ( named . contains ("(processed-summary"), "{}", named );
       assert_eq! ( viewnode_id_atoms (&saved), viewnode_id_atoms (&renumbered),
                    "every viewnode ID kept:\n{}", saved );
       assert! ( saved . contains ("(vnid zz)"), "{}", saved ); }
     { let unnamed : String = saved_on_a_new_connection (f, "");
-      assert! ( ! unnamed . contains ("(readiness-summary"),
+      assert! ( ! unnamed . contains ("(processed-summary"),
                 "without the name, a content view:\n{}", unnamed ); }
     { let refused : String = saved_on_a_new_connection (
         f, " (diff-view-buffer . \"no such buffer\")" );
@@ -153,7 +153,7 @@ fn a_save_of_a_diffView_buffer_not_held_keeps_its_viewnode_ids (
 /// request answers, after its processed summary, with the redraw
 /// delta ('docs/api-and-formats.org', "The redraw delta"). It lists
 /// the requesting headline, the old text of mc, which now shows
-/// '(ready)' where it carried the request, and mc's own headline,
+/// '(processed)' where it carried the request, and mc's own headline,
 /// whose file the mark made processed; no other.
 #[test]
 fn a_processed_saves_delta_lists_the_requesting_headline (
@@ -162,14 +162,14 @@ fn a_processed_saves_delta_lists_the_requesting_headline (
     let buffer : String = open_all_changes_buffer (f) ?;
     let marked : String = edit_line (
       &buffer, "** (skg (oldText title) (diff (leaves 1))) mc",
-      |_| "** (skg (oldText title) (editRequest (ready)) (diff (leaves 1))) mc" . to_string () );
+      |_| "** (skg (oldText title) (editRequest (processed)) (diff (leaves 1))) mc" . to_string () );
     let viewnode_id_of_line = |is_the_line : &dyn Fn (&str) -> bool| -> String {
       marked . lines () . find ( |line| is_the_line (line) )
         . and_then (viewnode_id_atom_of)
         . expect ("the line has a viewnode ID")
         . trim_start_matches ("(vnid ") . trim_end_matches (')') . to_string () };
     let requesting : String = viewnode_id_of_line (
-      &|line| line . contains ("(editRequest (ready))") );
+      &|line| line . contains ("(editRequest (processed))") );
     let mc : String = viewnode_id_of_line (
       &|line| line . starts_with ("* ") && line . contains ("(gnid mc)") );
     let mut views_state : ViewsState = ViewsState {
@@ -181,7 +181,7 @@ fn a_processed_saves_delta_lists_the_requesting_headline (
     let delta_entry : String = format! ( "(changed-headlines ({} {}))", mc, requesting );
     assert! ( answer . trim_end () . ends_with ( &format! ( "{})", delta_entry )),
               "the answer ends with {}:\n{}", delta_entry, answer );
-    assert! ( answer . find ("(readiness-summary") . is_some_and ( |summary|
+    assert! ( answer . find ("(processed-summary") . is_some_and ( |summary|
                 Some (summary) < answer . find ("(changed-headlines") ),
               "the delta follows the processed summary:\n{}", answer );
     Ok (( )) }) }

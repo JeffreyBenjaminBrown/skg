@@ -87,7 +87,7 @@ summary, as a save does, and any errors and warnings. Returns
             (when opened-buffer
               (with-current-buffer opened-buffer
                 (setq skg-diffView-buffer-kind buffer))))
-          (let ((summary (assq 'readiness-summary response)))
+          (let ((summary (assq 'processed-summary response)))
             (when summary
               (message "%s" (skg--processed-summary-message summary)))))
         (when (or (skg--message-list-nonempty-p errors-list)

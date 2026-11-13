@@ -1,6 +1,6 @@
 -- PURPOSE: The processed gestures of the diff view
 -- ('docs/diff-view.org', "Processed requests and gestures"). Each writes
--- processed requests, '(ready OBJECTS)' or '(unready OBJECTS)', into
+-- processed requests, '(processed OBJECTS)' or '(unprocessed OBJECTS)', into
 -- the '(editRequest ...)' of headline metadata, then saves. The save
 -- consumes them, setting or clearing the marks, and answers with the
 -- buffer rerendered and the processed summary.
@@ -344,8 +344,8 @@ function M.write_requests_if_confirmed (requests)
 end
 
 ---Replace the processed request of the headline at LINE_NUMBER with
----one that marks (PROCESSED true) or unmarks the leaves on OBJECTS: '(ready
----OBJECTS)' or '(unready OBJECTS)' in its '(editRequest ...)'
+---one that marks (PROCESSED true) or unmarks the leaves on OBJECTS: '(processed
+---OBJECTS)' or '(unprocessed OBJECTS)' in its '(editRequest ...)'
 ---(metadata.metadata_with_processed_request). Refuses a line that is
 ---no headline or a headline without metadata, as
 ---skg--write-processed-request does.
@@ -357,7 +357,7 @@ function M.write_processed_request (line_number, processed, objects)
     error('Not on a headline', 0) end
   if not metadata.metadata_sexp_at_line_or_nil(line_number) then
     error('Headline has no skg metadata', 0) end
-  local request = { sexpr.symbol(processed and 'ready' or 'unready') }
+  local request = { sexpr.symbol(processed and 'processed' or 'unprocessed') }
   for _, object in ipairs(objects) do
     table.insert(request, sexpr.symbol(object))
   end
@@ -368,7 +368,7 @@ end
 
 -- ── moving between headlines with change facts ─────────────────────────────
 -- A headline with change facts is one whose metadata carries a '(leaves ...)'
--- fact. It is processed when its '(ready ...)' names every object that
+-- fact. It is processed when its '(processed ...)' names every object that
 -- fact lists, and otherwise unprocessed. Outside the diff view no
 -- headline carries one, so these commands report no change there.
 
@@ -456,7 +456,7 @@ end
 
 -- ── the processed summary ──────────────────────────────────────────
 
----The save response's '(readiness-summary (ready N) (changed M)
+---The save response's '(processed-summary (processed N) (changed M)
 ---(foreign F) (order-only O) (notEditable K))' as a table of counts, or
 ---nil when it has none.
 ---@param response any
@@ -466,12 +466,12 @@ function M.processed_summary_from_response (response)
   for _, element in ipairs(response) do
     if sexpr.is_list(element) and element[1] ~= nil
        and not sexpr.is_list(element[1])
-       and sexpr.atom_text(element[1]) == 'readiness-summary' then
+       and sexpr.atom_text(element[1]) == 'processed-summary' then
       local function count (key)
         local value = payload.field_text(element, key)
         return value and tonumber(value) or 0
       end
-      return { processed = count('ready'), changed = count('changed'),
+      return { processed = count('processed'), changed = count('changed'),
                foreign = count('foreign'),
                order_only = count('order-only'),
                not_editable = count('notEditable') } end

@@ -173,7 +173,7 @@ pub fn stage_and_commit (
 /// Format, for each answer:
 ///   ((errors ("REFUSAL")) (warnings ()))
 ///   ((needs-confirmation . t) [(already-staged (("GITREPO" "PATH"...) ...))]
-///    (readiness-summary ...) (errors ()) (warnings ()))
+///    (processed-summary ...) (errors ()) (warnings ()))
 ///   ((commits (("SKGREPO" "COMMIT-ID") ...)) (errors (...)) (warnings ()))
 /// The processed summary has the save response's form, with an
 /// not-editable count of 0. 'already-staged' is there only when some

@@ -171,7 +171,7 @@ refresh so:
   changed, or where the buffer holds one;
 - what may be editable, and what the node budget may refuse, the
   buffer's sets decide ("Editability in the diff view");
-- in the tail, the '(ready ...)' change facts are set from the
+- in the tail, the '(processed ...)' change facts are set from the
   store, and in the skgrepo-changes buffer the home skgrepo moves.
 The diff view opens only on an unrestricted connection, but a
 switch of the skgrepo restriction rerenders its open buffers under
@@ -500,7 +500,7 @@ a second file): it shows M✓ when each of those is marked, wherever it
 stands.
 ** Change facts on the wire
 A headline's change facts form one form, '(diff (node added|removed)
-(rel added|removed) (properties changed) (leaves N OBJECT...) (ready
+(rel added|removed) (properties changed) (leaves N OBJECT...) (processed
 OBJECT...))', and in the skgrepo-changes buffer its home skgrepo move
 after them, each part present only when it has something to say, the
 first three only when true ('diff_form' in 'server/org_to_text.rs';
@@ -512,11 +512,11 @@ members ("changed folder" in 'docs/glossary.org'). A processed
 request is no change fact; it rides in the headline's '(editRequest
 ...)' (below).
 
-The part '(ready OBJECT...)' is a derived fact the server sets in the
+The part '(processed OBJECT...)' is a derived fact the server sets in the
 tail of the refresh ('set_processed_facts_in_viewforest'): the diff
 objects ('node', 'rel', and on a headline that lists it 'all') whose
-leaves are all marked, so a processed changeset marker carries '(ready
-all)'; a bare '(ready)' on a headline that names one leaf, which
+leaves are all marked, so a processed changeset marker carries '(processed
+all)'; a bare '(processed)' on a headline that names one leaf, which
 lists no object. Nothing reads it at save.
 
 Before it, a headline that names leaves
@@ -532,7 +532,7 @@ is display-only, and the clients read it instead of keeping tables of
 headline kinds.
 
 ** Processed requests and gestures
-A gesture writes processed requests, '(ready OBJECTS)' or '(unready
+A gesture writes processed requests, '(processed OBJECTS)' or '(unprocessed
 OBJECTS)', into a headline's '(editRequest ...)' (creating the form if
 the headline lacks one) and saves; the save
 consumes them after its graph edits succeed (not when it stops for a
@@ -547,7 +547,7 @@ modified node records, or every leaf of a processed aggregate
 one level down.
 
 Every gesture toggles: it unmarks what is processed and marks what is
-not, and every headline is processed when its own '(ready ...)' names
+not, and every headline is processed when its own '(processed ...)' names
 every object its '(leaves ...)' lists. C-c r r
 ('skg-cycle-processed') acts on the headline at point, naming every
 object it lists: one leaf; on a new member, its existence and its
@@ -578,7 +578,7 @@ headlines whose metadata carries a '(leaves ...)' change fact: C-c r n c
 ('skg-diffView-goto-next-change') to the next, C-c r n u to the next
 unprocessed one and C-c r n r to the next processed one, and C-c r p c, C-c r
 p u and C-c r p r to the previous ones. A headline with change facts is processed
-when its '(ready ...)' names every object its '(leaves ...)' lists.
+when its '(processed ...)' names every object its '(leaves ...)' lists.
 They do not wrap: at the end they say "No further change" (or "No
 earlier change", with "unprocessed" or "processed" for the filtered forms).
 ** The processed summary

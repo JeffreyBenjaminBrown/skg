@@ -118,12 +118,12 @@ request, alone and in a recursive staging, which keeps the processed
 request after it."
   (should (equal (skg--flag-eligible-root-id
                   '(skg node (gnid root) (skgRepos (nodeRepo main))
-                        (editRequest (ready node))))
+                        (editRequest (processed node))))
                  "root"))
   (with-temp-buffer
     (insert
-     "* (skg node (gnid root) (skgRepos (nodeRepo main)) (editRequest (ready node))) root\n"
-     "** (skg node (gnid child) (skgRepos (nodeRepo main)) (editRequest (unready rel)) (diff (rel added))) child")
+     "* (skg node (gnid root) (skgRepos (nodeRepo main)) (editRequest (processed node))) root\n"
+     "** (skg node (gnid child) (skgRepos (nodeRepo main)) (editRequest (unprocessed rel)) (diff (rel added))) child")
     (org-mode)
     (goto-char (point-min))
     (cl-letf (((symbol-function 'skg--owned-repos)
@@ -131,8 +131,8 @@ request after it."
       (skg--stage-flag-search-matching-recursive t))
     (should (equal (buffer-string)
                    (concat
-                    "* (skg node (gnid root) (skgRepos (nodeRepo main)) (editRequest (flag noSearchMatching true) (ready node))) root\n"
-                    "** (skg node (gnid child) (skgRepos (nodeRepo main)) (editRequest (flag noSearchMatching true) (unready rel)) (diff (rel added))) child")))))
+                    "* (skg node (gnid root) (skgRepos (nodeRepo main)) (editRequest (flag noSearchMatching true) (processed node))) root\n"
+                    "** (skg node (gnid child) (skgRepos (nodeRepo main)) (editRequest (flag noSearchMatching true) (unprocessed rel)) (diff (rel added))) child")))))
 
 (ert-deftest test-skg-flag-says-it-replaced-a-pending-relRepo-request ()
   "The flag request replaces a pending relRepo request, and the message

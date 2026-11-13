@@ -82,7 +82,7 @@ Returns (REQUESTED-BUFFERS OPENED-BUFFER-NAMES)."
           . ,(prin1-to-string
               '((content "* (skg node (gnid a)) a\n")
                 (errors ()) (warnings ())
-                (readiness-summary (ready 1) (changed 3) (foreign 0)
+                (processed-summary (processed 1) (changed 3) (foreign 0)
                                    (order-only 0) (notEditable 2)))))
          ("merges" . ,test-skg-diff-view--empty)
          ("skgrepo changes" . ,test-skg-diff-view--empty)

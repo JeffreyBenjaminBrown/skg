@@ -318,7 +318,7 @@ function M.fillIn_one (name, group, child_level, kind)
 end
 
 ---Whether GROUP, an editRequest at CHILD_LEVEL, holds nothing but a
----processed request, '(ready ...)' or '(unready ...)', which the
+---processed request, '(processed ...)' or '(unprocessed ...)', which the
 ---processed commands set and the editor shows. Its fill-in then shows
 ---the other request at its default beside it.
 ---@param group table[]
@@ -329,7 +329,7 @@ function M.only_processed_requests_p (group, child_level)
     M.group_children(vim.list_slice(group, 2), child_level + 1)
   if #value_groups == 0 then return false end
   for _, value_group in ipairs(value_groups) do
-    if not vim.tbl_contains({ 'ready', 'unready', '(ready)', '(unready)' },
+    if not vim.tbl_contains({ 'processed', 'unprocessed', '(processed)', '(unprocessed)' },
                             M.group_name(value_group)) then
       return false end
   end

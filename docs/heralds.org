@@ -67,7 +67,7 @@ assumes 'termguicolors', since the styles are given as RGB colors.
 | home skgrepo heralds | normal      | =⌂:LABEL=                                                                     |
 |                      | ugly        | =~NAME=, a relRepo more private than the default                              |
 | labels               | message     | folder labels, =alias=, =ID=, flag rows                                       |
-| requests             | nonstandard | =delete=, =merge:...=, =detach=, =restore node=, =restore membership=, =request:~NAME=, =request:...= flags, =req:...= views, =request:ready...= |
+| requests             | nonstandard | =delete=, =merge:...=, =detach=, =restore node=, =restore membership=, =request:~NAME=, =request:...= flags, =req:...= views, =request:processed...= |
 | change facts         | nonstandard | =∃+ ∃- M ~+ ~-=, =+ -= on a leaf, ~Δ⌂=a~                                        |
 |                      | go          | =✓= processed                                                                 |
 |                      | normal      | the skgrepo names in =⌂ -OLD +NEW= and =relationship moved from OLD to NEW=   |
@@ -255,8 +255,8 @@ flag member, which has one diff object, the same change facts read =+= and
 changes are marked processed, so =∃+✓ ~+= is a new node, approved,
 in a new relationship that is not; =M✓= is a modified node every
 change of whose file is marked. A processed aggregate (a
-folder or changeset marker) shows a =✓= when everything under it is processed. =request:ready= and
-=request:unready=, with =:node=, =:rel=, =:all=, =:newContent= or =:newOutward=, are pending processed
+folder or changeset marker) shows a =✓= when everything under it is processed. =request:processed= and
+=request:unprocessed=, with =:node=, =:rel=, =:all=, =:newContent= or =:newOutward=, are pending processed
 requests, consumed by the next save.
 
 These heralds render the headline's one =(diff ...)= form (see
@@ -264,9 +264,9 @@ These heralds render the headline's one =(diff ...)= form (see
 come from its =(node added)= and =(node removed)= parts, =M= from
 =(properties changed)=, =~+= and =~-= from =(rel added)= and =(rel
 removed)= (the style keys 'existence' and 'properties' in
-'shared/herald-styles.json'), each =✓= from its =(ready ...)= part
+'shared/herald-styles.json'), each =✓= from its =(processed ...)= part
 (=M='s from =all= there), and the pending processed request from the
-=(ready ...)= or =(unready ...)= in the headline's =(editRequest ...)=;
+=(processed ...)= or =(unprocessed ...)= in the headline's =(editRequest ...)=;
 its =(leaves ...)= part shows nothing. The rules match the processed part once
 per diff object, so a =✓= follows its own object whatever the raw
 order of the parts.

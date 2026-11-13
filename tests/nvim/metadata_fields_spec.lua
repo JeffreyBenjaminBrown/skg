@@ -316,7 +316,7 @@ describe('skg.sexpr.metadata_fields other kinds, arguments, conditions', functio
   it('keeps a processed request beside the other edit request',
      function ()
     -- Alone, it is shown beside the other request at its default.
-    local sexp = sexpr.read('(skg unknown (gnid x) (editRequest (ready rel)))')
+    local sexp = sexpr.read('(skg unknown (gnid x) (editRequest (processed rel)))')
     local kind = fields.kind_of_sexp(sexp)
     local filledIn = fields.fillIn_defaults_in_org(
       bijection.sexp_to_org(sexp), kind)
@@ -327,20 +327,20 @@ describe('skg.sexpr.metadata_fields other kinds, arguments, conditions', functio
         { level = 3, text = 'false (default)' },
         { level = 2, text = 'editRequest' },
         { level = 3, text = 'none (default)' },
-        { level = 3, text = 'ready' }, { level = 4, text = 'rel' } },
+        { level = 3, text = 'processed' }, { level = 4, text = 'rel' } },
       bijection.extract_headlines(filledIn))
     assert.are.same(sexp, bijection.org_to_sexp(
       fields.strip_defaults_from_org(filledIn, kind)))
     -- Beside another request, and when that request is chosen.
-    local both = sexpr.read('(skg node (editRequest delete (unready node)))')
+    local both = sexpr.read('(skg node (editRequest delete (unprocessed node)))')
     assert.are.same(both, bijection.org_to_sexp(
       fields.strip_defaults_from_org(fields.fillIn_defaults_in_org(
         bijection.sexp_to_org(both), node_kind), node_kind)))
     assert.are.same(
-      sexpr.read('(skg node (editRequest (relRepo r) (ready rel)))'),
+      sexpr.read('(skg node (editRequest (relRepo r) (processed rel)))'),
       strip_to_sexp(table.concat({
         '* skg', '** node', '** editRequest', '*** relRepo r',
-        '*** ready', '**** rel' }, '\n')))
+        '*** processed', '**** rel' }, '\n')))
   end)
 
   it('leaves a kind without fields alone', function ()

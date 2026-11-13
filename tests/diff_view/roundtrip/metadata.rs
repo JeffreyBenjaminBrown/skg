@@ -48,11 +48,11 @@ fn property_member (
 #[test]
 fn old_text_round_trips_each_aspect () {
   for (title, body, expected) in [
-    ( Some ("the old title"), Some ("the old body\n"), "(oldText titleAndBody) (diff (ready))" ),
-    ( Some ("the old title"), None,                    "(oldText title) (diff (ready))" ),
-    ( None,                   Some ("the old body\n"), "(oldText body) (diff (ready))" ),
+    ( Some ("the old title"), Some ("the old body\n"), "(oldText titleAndBody) (diff (processed))" ),
+    ( Some ("the old title"), None,                    "(oldText title) (diff (processed))" ),
+    ( None,                   Some ("the old body\n"), "(oldText body) (diff (processed))" ),
     // A body HEAD lacked is the empty string.
-    ( None,                   Some (""),               "(oldText body) (diff (ready))" ), ] {
+    ( None,                   Some (""),               "(oldText body) (diff (processed))" ), ] {
     assert_round_trip (
       change_viewnode ( ChangeViewnode::OldText {
                    title : title . map (String::from),
@@ -74,20 +74,20 @@ fn skgrepo_moves_round_trip () {
       skgrepo_change : SkgrepoChange { old : SkgrepoName::from ("pub"),
                                        new : SkgrepoName::from ("priv") } },
       processed (&[]), None ),
-    "(homeSkgrepoMove (old pub) (new priv)) (diff (ready))" );
+    "(homeSkgrepoMove (old pub) (new priv)) (diff (processed))" );
   assert_round_trip (
     change_viewnode ( ChangeViewnode::RelRepoMove {
       skgrepo_change : SkgrepoChange { old : SkgrepoName::from ("pub"),
                                        new : SkgrepoName::from ("a repo") } },
       ChangeFacts::default (), request_all () ),
-    "(relRepoMove (old pub) (new \"a repo\")) (editRequest (ready all))" ); }
+    "(relRepoMove (old pub) (new \"a repo\")) (editRequest (processed all))" ); }
 
 #[test]
 fn changeset_markers_round_trip () {
   for (kind, expected) in [
-    ( ChangesetMarkerKind::Content,   "(changesetMarker content) (diff (ready all))" ),
-    ( ChangesetMarkerKind::RelRepo,   "(changesetMarker relRepo) (diff (ready all))" ),
-    ( ChangesetMarkerKind::OrderOnly, "(changesetMarker orderOnly) (diff (ready all))" ), ] {
+    ( ChangesetMarkerKind::Content,   "(changesetMarker content) (diff (processed all))" ),
+    ( ChangesetMarkerKind::RelRepo,   "(changesetMarker relRepo) (diff (processed all))" ),
+    ( ChangesetMarkerKind::OrderOnly, "(changesetMarker orderOnly) (diff (processed all))" ), ] {
     assert_round_trip (
       change_viewnode ( ChangeViewnode::ChangesetMarker { kind }, processed (&[ DiffObject::All ]), None ),
       expected ); }}
@@ -109,13 +109,13 @@ fn ghost_warranted_aliases_and_ids_round_trip () {
                                               claimsMembership : false,
                                               warrant : Warrant::ByHead },
                       removed . clone (), None ),
-    "alias noClaim (view ghostWarrant) (diff (rel removed) (ready))" );
+    "alias noClaim (view ghostWarrant) (diff (rel removed) (processed))" );
   assert_round_trip (
     property_member ( PropertyMember::ID { gnid : ID::from ("old-id"),
                                            claimsMembership : false,
                                            warrant : Warrant::ByHead },
                       removed, request_all () ),
-    "id noClaim (editRequest (ready all)) (view ghostWarrant) (diff (rel removed) (ready))" ); }
+    "id noClaim (editRequest (processed all)) (view ghostWarrant) (diff (rel removed) (processed))" ); }
 
 #[test]
 fn a_ghost_round_trips () {
@@ -134,7 +134,7 @@ fn a_ghost_round_trips () {
         leaves   : None,
         .. ChangeFacts::default () },
       request_all () ),
-    "ghost (gnid gone) (skgRepos (nodeRepo main)) (editRequest (ready all)) (diff (node removed) (rel removed) (ready node))" ); }
+    "ghost (gnid gone) (skgRepos (nodeRepo main)) (editRequest (processed all)) (diff (node removed) (rel removed) (processed node))" ); }
 
 #[test]
 fn the_acquisition_folders_round_trip () {
@@ -164,7 +164,7 @@ fn malformed_diff_view_metadata_is_refused () {
     "(skg (homeSkgrepoMove (old a) (old b) (new c)))",      // old twice
     "(skg (relRepoMove a b))",                       // bare names
     "(skg (changesetMarker sideways))",
-    "(skg bodyDiff (diff (ready)))", ] {                    // a body diff is no leaf
+    "(skg bodyDiff (diff (processed)))", ] {                    // a body diff is no leaf
     assert! ( parse_metadata_to_viewnodemd (metadata) . is_err (),
               "should refuse {}", metadata ); }}
 

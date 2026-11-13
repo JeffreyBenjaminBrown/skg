@@ -189,7 +189,7 @@ pub(crate) fn kept_content_origins (
   kept . intersection (r) . cloned () . collect () }
 
 /// What a buffer of the diff view gets in the refresh's tail:
-/// its '(ready ...)' facts, and in the skgrepo-changes buffer each
+/// its '(processed ...)' facts, and in the skgrepo-changes buffer each
 /// moved vognode's home skgrepo move
 /// ('set_homeSkgrepoMove_facts_in_viewforest').
 pub fn set_diffView_facts_in_viewforest (

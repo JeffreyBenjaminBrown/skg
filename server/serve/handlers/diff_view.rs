@@ -83,7 +83,7 @@ pub fn handle_diffView_request (
   send_response_with_length_prefix (
     stream, &tag_sexp_response (TcpToClient::DiffView, &sexp) ); }
 
-/// ((content "ORG") (errors ()) (warnings ()) (readiness-summary ...)):
+/// ((content "ORG") (errors ()) (warnings ()) (processed-summary ...)):
 /// a view response, ending as a save's does
 /// when it saves a buffer of the diff view.
 fn diffView_buffer_response_sexp (

@@ -263,7 +263,7 @@ default before it; a bare atom with a 'true' child."
 
 (defun skg-metadata-fields--only-processed-requests-p (group child-level)
   "Whether GROUP, an editRequest at CHILD-LEVEL, holds nothing but a
-processed request, '(ready ...)' or '(unready ...)', which the
+processed request, '(processed ...)' or '(unprocessed ...)', which the
 processed commands set and the editor shows. Its fill-in then shows
 the other request at its default beside it."
   (let (( value-groups (car (skg-metadata-fields--group-children
@@ -271,7 +271,7 @@ the other request at its default beside it."
     (and value-groups
          (cl-every (lambda (value-group)
                      (member (skg-metadata-fields--group-name value-group)
-                             '("ready" "unready" "(ready)" "(unready)")))
+                             '("processed" "unprocessed" "(processed)" "(unprocessed)")))
                    value-groups))))
 
 ;;

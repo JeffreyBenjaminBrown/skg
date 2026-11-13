@@ -56,14 +56,14 @@ fn a_mark_shows_on_both_images_of_a_relationship (
     let marked : String = edit_line (
       &buffer, "*** (skg node (gnid s1)",
       |line| line . replace ( "(diff (rel removed) (leaves 1 rel))) s1",
-                              "(editRequest (ready rel)) (diff (rel removed) (leaves 1 rel))) s1" ));
+                              "(editRequest (processed rel)) (diff (rel removed) (leaves 1 rel))) s1" ));
     let saved : String = save_cleanly (f, &all_changes_view (), &marked) ? . saved_view;
     assert! ( without_viewnode_ids (&saved) . contains (
-      "*** (skg node (gnid s1) (skgRepos (nodeRepo public)) noClaim writeProtected (view ghostWarrant) (diff (rel removed) (leaves 1 rel) (ready rel))) s1" ),
+      "*** (skg node (gnid s1) (skgRepos (nodeRepo public)) noClaim writeProtected (view ghostWarrant) (diff (rel removed) (leaves 1 rel) (processed rel))) s1" ),
       "the image under sub is processed:\n{}", saved );
     assert! ( without_viewnode_ids (&saved) . lines () . any ( |line|
       without_viewnode_ids (line) . starts_with ("*** (skg node (gnid sub)")
-      && line . ends_with ("(diff (rel removed) (properties changed) (leaves 2 rel all) (ready rel))) sub") ),
+      && line . ends_with ("(diff (rel removed) (properties changed) (leaves 2 rel all) (processed rel))) sub") ),
       "the image under s1 is processed:\n{}", saved );
     assert! ( ! without_viewnode_ids (&saved) . contains ("(editRequest"),
               "the request was consumed:\n{}", saved );
@@ -73,7 +73,7 @@ fn a_mark_shows_on_both_images_of_a_relationship (
 /// member does: sub, in s1's subscriber folder, whose file records
 /// two leaves (its subscription to s1 removed, to s2 added), shows
 /// '(properties changed)' there, and one gesture on it, naming 'rel'
-/// and 'all', marks its file: its root shows '(ready all)', and its
+/// and 'all', marks its file: its root shows '(processed all)', and its
 /// image in s2's subscriber folder is processed on both objects too.
 #[test]
 fn a_gesture_on_a_modified_folder_member_marks_its_file (
@@ -88,7 +88,7 @@ fn a_gesture_on_a_modified_folder_member_marks_its_file (
                  "sub is shown once as removed:\n{}", buffer );
     let marked : String = buffer . replacen (
       removed_ending,
-      "(editRequest (ready rel all)) (diff (rel removed) (properties changed) (leaves 2 rel all))) sub",
+      "(editRequest (processed rel all)) (diff (rel removed) (properties changed) (leaves 2 rel all))) sub",
       1 );
     assert_ne! ( marked, buffer, "the member shows its properties:\n{}", buffer );
     let saved : String = without_viewnode_ids (
@@ -97,11 +97,11 @@ fn a_gesture_on_a_modified_folder_member_marks_its_file (
       . filter ( |line| line . contains ("node (gnid sub) ") ) . collect ();
     for (prefix, ending) in [
       ( member,
-        "(diff (rel removed) (properties changed) (leaves 2 rel all) (ready rel all))) sub" ),
+        "(diff (rel removed) (properties changed) (leaves 2 rel all) (processed rel all))) sub" ),
       ( "*** (skg node (gnid sub) (skgRepos (nodeRepo public)) writeProtected",
-        "(diff (rel added) (properties changed) (leaves 2 rel all) (ready rel all))) sub" ),
+        "(diff (rel added) (properties changed) (leaves 2 rel all) (processed rel all))) sub" ),
       ( "* (skg node (gnid sub)",
-        "(diff (properties changed) (leaves 2 all) (ready all))) sub" ) ] {
+        "(diff (properties changed) (leaves 2 all) (processed all))) sub" ) ] {
       assert! ( lines_of_sub . iter () . any ( |line|
                   without_viewnode_ids (line) . starts_with (prefix) && line . ends_with (ending) ),
                 "{:?} ... {:?} in:\n{}", prefix, ending, saved ); }
@@ -122,7 +122,7 @@ fn a_chain_node_carries_no_change_and_takes_no_gesture (
     let marked : String = edit_line (
       &buffer, chain_node,
       |line| { assert! ( ! line . contains ("(diff"), "{}", line );
-               format! ( "{} (editRequest (ready rel))) d", // beside the node's parts
+               format! ( "{} (editRequest (processed rel))) d", // beside the node's parts
                          line . strip_suffix (") d") . unwrap () ) } );
     assert_ne! ( marked, buffer, "the gesture was typed:\n{}", buffer );
     let saved : String = without_viewnode_ids (
@@ -147,10 +147,10 @@ fn marking_a_removed_entry_marks_its_leaf (
                             "*** (skg id (view ghostWarrant) (diff (rel removed) (leaves 1))) ali-old" ]
       . into_iter () . fold ( buffer, |marked, line|
         edit_line ( &marked, line, |line| line . replacen (
-          "(diff (rel removed) (leaves 1)))", "(editRequest (ready)) (diff (rel removed) (leaves 1)))", 1 )) );
+          "(diff (rel removed) (leaves 1)))", "(editRequest (processed)) (diff (rel removed) (leaves 1)))", 1 )) );
     let saved : String = save_cleanly (f, &all_changes_view (), &marked) ? . saved_view;
-    for line in [ "*** (skg alias noClaim (view ghostWarrant) (diff (rel removed) (leaves 1) (ready))) a1",
-                  "*** (skg id (view ghostWarrant) (diff (rel removed) (leaves 1) (ready))) ali-old" ] {
+    for line in [ "*** (skg alias noClaim (view ghostWarrant) (diff (rel removed) (leaves 1) (processed))) a1",
+                  "*** (skg id (view ghostWarrant) (diff (rel removed) (leaves 1) (processed))) ali-old" ] {
       assert! ( without_viewnode_ids (&saved) . lines () . any ( |l| l == line ),
                 "{:?} must be processed:\n{}", line, saved ); }
     assert! ( ! without_viewnode_ids (&saved) . contains ("(editRequest"),
@@ -176,12 +176,12 @@ fn a_processed_request_on_an_unknown_marks_its_leaf (
       let buffer : String = open_all_changes_buffer (f) ?;
       let unknown : &str = "unknown (gnid nowhere) (diff (rel added) (leaves 1)))";
       let marked : String = buffer . replacen (
-        unknown, "unknown (gnid nowhere) (editRequest (ready)) (diff (rel added) (leaves 1)))", 1 );
+        unknown, "unknown (gnid nowhere) (editRequest (processed)) (diff (rel added) (leaves 1)))", 1 );
       assert_ne! ( marked, buffer, "the unknown carries the change:\n{}", buffer );
       let saved : String = without_viewnode_ids (
         & save_cleanly (f, &all_changes_view (), &marked) ? . saved_view );
       assert! ( saved . lines () . any ( |line|
-                  line == "** (skg unknown (gnid nowhere) (diff (rel added) (leaves 1) (ready)))" ),
+                  line == "** (skg unknown (gnid nowhere) (diff (rel added) (leaves 1) (processed)))" ),
                 "the unknown is processed:\n{}", saved );
       assert! ( ! saved . contains ("(editRequest"),
                 "the request was consumed:\n{}", saved );
@@ -196,9 +196,9 @@ fn editing_a_node_lapses_its_mark (
     let buffer : String = open_all_changes_buffer (f) ?;
     let marked : String = edit_line (
       &buffer, "** (skg (oldText titleAndBody) (diff (leaves 1))) txt",
-      |_| "** (skg (oldText titleAndBody) (editRequest (ready)) (diff (leaves 1))) txt" . to_string () );
+      |_| "** (skg (oldText titleAndBody) (editRequest (processed)) (diff (leaves 1))) txt" . to_string () );
     let saved : String = save_cleanly (f, &all_changes_view (), &marked) ? . saved_view;
-    assert! ( without_viewnode_ids (&saved) . contains ("** (skg (oldText titleAndBody) (diff (leaves 1) (ready))) txt"),
+    assert! ( without_viewnode_ids (&saved) . contains ("** (skg (oldText titleAndBody) (diff (leaves 1) (processed))) txt"),
               "the old text is processed:\n{}", saved );
     let edited : String = edit_line (
       &saved, "* (skg node (gnid txt)",
@@ -225,7 +225,7 @@ fn the_save_reports_the_processed_summary (
     assert_eq! ( summary_of ( &save_cleanly (f, &all_changes_view (), &buffer) ? ), summary (0, 6, 0) );
     let marked : String = edit_line (
       &buffer, "** (skg (oldText title) (diff (leaves 1))) mc",
-      |_| "** (skg (oldText title) (editRequest (ready)) (diff (leaves 1))) mc" . to_string () );
+      |_| "** (skg (oldText title) (editRequest (processed)) (diff (leaves 1))) mc" . to_string () );
     let response : SaveResponse = save_cleanly (f, &all_changes_view (), &marked) ?;
     assert_eq! ( summary_of (&response), summary (1, 6, 0),
                  "mc's file records only its text change" );
@@ -266,7 +266,7 @@ fn the_summary_counts_the_changes_the_saved_buffer_does_not_show (
     let summary : BufferProcessedSummary = summary_of (&response);
     assert_eq! ( summary . changes_not_editable_here, 11, "{:?}", summary );
     assert_eq! ( sexp_to_client_string (&summary . to_sexp ()),
-                 format! ( "(readiness-summary (ready {}) (changed {}) (foreign 0) (order-only 1) (notEditable 11))",
+                 format! ( "(processed-summary (processed {}) (changed {}) (foreign 0) (order-only 1) (notEditable 11))",
                            summary . summary . processed_files,
                            summary . summary . changed_files ));
     Ok (( )) }) }
@@ -367,7 +367,7 @@ fn a_root_deleted_in_the_buffer_is_rerendered_as_removed (
 /// 'all', every leaf it records. cy2, retitled, stands as a root
 /// and, write-protected, in cy1's content, an unchanged
 /// relationship. One request naming 'all' on the write-protected
-/// image marks its file: both images then show '(ready all)', and
+/// image marks its file: both images then show '(processed all)', and
 /// its old text shows processed.
 #[test]
 fn a_modified_node_lists_all_and_one_mark_readies_its_file (
@@ -382,15 +382,15 @@ fn a_modified_node_lists_all_and_one_mark_readies_its_file (
     let marked : String = edit_line (
       &buffer, "*** (skg node (gnid cy2)",
       |line| line . replace ( "(diff (properties changed) (leaves 1 all)))",
-                              "(editRequest (ready all)) (diff (properties changed) (leaves 1 all)))" ));
+                              "(editRequest (processed all)) (diff (properties changed) (leaves 1 all)))" ));
     let saved : String = save_cleanly (f, &all_changes_view (), &marked) ? . saved_view;
     let processed : &str =
-      "(diff (properties changed) (leaves 1 all) (ready all))) cy2, retitled";
+      "(diff (properties changed) (leaves 1 all) (processed all))) cy2, retitled";
     for prefix in [ "* (skg node (gnid cy2)", "*** (skg node (gnid cy2)" ] {
       assert! ( without_viewnode_ids (&saved) . lines () . any ( |line|
         without_viewnode_ids (line) . starts_with (prefix) && line . ends_with (processed) ),
         "{:?} is processed:\n{}", prefix, saved ); }
-    assert! ( without_viewnode_ids (&saved) . contains ("** (skg (oldText title) (diff (leaves 1) (ready))) cy2"),
+    assert! ( without_viewnode_ids (&saved) . contains ("** (skg (oldText title) (diff (leaves 1) (processed))) cy2"),
               "cy2's old text is processed:\n{}", saved );
     Ok (( )) }) }
 

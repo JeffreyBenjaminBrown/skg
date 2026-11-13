@@ -18,7 +18,7 @@
 //!        [(overridesHere ID)]
 //!        [(editRequest [<delete | (merge ID) | (relRepo REPO)
 //!                       | (flag FLAG true|false) | restoreRel>]
-//!                      [(ready OBJECT...) | (unready OBJECT...)])]
+//!                      [(processed OBJECT...) | (unprocessed OBJECT...)])]
 //!        [(viewRequests REQUEST...)]
 //!     where OBJECT is node, rel or all. A headline naming no kind is
 //!     a node.
@@ -40,7 +40,7 @@
 //!   each of which may carry '(editRequest PROCESSED)';
 //!   bodyDiff, tombstone, forestRoot and the folders' bare atoms,
 //!   which carry nothing.
-//! PROCESSED is '(ready OBJECT...)' or '(unready OBJECT...)'.
+//! PROCESSED is '(processed OBJECT...)' or '(unprocessed OBJECT...)'.
 //! A node, a ghost, an alias, an id and a flag may carry '(view ...)';
 //! every kind that takes an editRequest may carry '(diff ...)'.
 //! 'restoreRel' asks to restore a removed membership; where it may
@@ -457,7 +457,7 @@ pub const METADATA_GRAMMAR : &str =
    KIND a bare atom (node, ghost, unknown, restricted, alias, id, tombstone, a folder, ...) \
    and every declared part beside it at the top level, among them (gnid X), \
    (skgRepos (nodeRepo R) [(relRepo R)]) and (editRequest ...), \
-   which holds the processed requests (ready OBJECT...) and (unready OBJECT...)";
+   which holds the processed requests (processed OBJECT...) and (unprocessed OBJECT...)";
 
 /// The refusal of a retired spelling.
 fn retired_spelling (
@@ -938,8 +938,8 @@ fn parse_skgRepos (
   Ok (( nodeRepo, relRepo )) }
 
 /// Parse the (editRequest ...) s-expression contents: at most one
-/// edit request, and at most one processed request, '(ready
-/// OBJECT...)' or '(unready OBJECT...)'.
+/// edit request, and at most one processed request, '(processed
+/// OBJECT...)' or '(unprocessed OBJECT...)'.
 fn parse_editrequest_sexp (
   items : &[Sexp],
 ) -> Result<(Option<WrittenEditRequest>, Option<ProcessedRequest>), String> {
@@ -960,19 +960,19 @@ fn parse_editrequest_sexp (
     edit_request = Some ( parse_one_edit_request (element) ? ); }
   Ok (( edit_request, processed_request )) }
 
-/// The processed request 'element' is, if it is '(ready OBJECT...)'
-/// or '(unready OBJECT...)'.
+/// The processed request 'element' is, if it is '(processed OBJECT...)'
+/// or '(unprocessed OBJECT...)'.
 fn processed_request_of (
   element : &Sexp,
 ) -> Result<Option<ProcessedRequest>, String> {
   let Sexp::List (items) = element else { return Ok (None); };
   let Some (head) : Option<&Sexp> = items . first () else { return Ok (None); };
   let head : String = atom_to_string (head) ?;
-  if head != "ready" && head != "unready" { return Ok (None); }
+  if head != "processed" && head != "unprocessed" { return Ok (None); }
   let atoms : Vec<String> =
     items [1..] . iter () . map (atom_to_string) . collect::<Result<_, _>> () ?;
   Ok ( Some ( ProcessedRequest {
-    processed : head == "ready",
+    processed : head == "processed",
     objects : processed_objects_from_atoms (&atoms) ?, } )) }
 
 /// Parse one edit request inside (editRequest ...).

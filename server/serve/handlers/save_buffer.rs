@@ -227,7 +227,7 @@ impl SaveResponse {
       changed_headlines         : None, } }
 
   /// Format: ((content "...") (errors (...)) (warnings (...))
-  /// POINT... (readiness-summary ...) (changed-headlines (V...))),
+  /// POINT... (processed-summary ...) (changed-headlines (V...))),
   /// where the point entries, the processed summary and the redraw
   /// delta are there when the save has them.
   fn to_sexp_string (&self) -> String {

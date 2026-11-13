@@ -20,13 +20,13 @@ use std::str::FromStr;
 /// '(diff ...)' form: the three kinds of change ('(node ...)',
 /// '(rel ...)', '(properties changed)'), which leaves a request on it
 /// may name ('(leaves ...)'), and which of its change-forest leaves
-/// are marked processed ('(ready ...)'). Derived facts: the refresh
+/// are marked processed ('(processed ...)'). Derived facts: the refresh
 /// derives them, and the parser skips them.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ChangeFacts {
   pub change   : DiffChange,
   /// None when nothing is processed. 'Some' of an empty set is the bare
-  /// '(ready)' of a leaf with a single object.
+  /// '(processed)' of a leaf with a single object.
   pub processed : Option<BTreeSet<DiffObject>>,
   /// None when the viewnode names no change-forest leaf.
   pub leaves   : Option<LeavesFact>,
@@ -90,7 +90,7 @@ pub enum Existence { Added, Removed }
 /// covers its text, and its content relationships) and 'newOutward'
 /// (the same along every relationship, in its recorded direction:
 /// every leaf each new node reached records). Only a processed request
-/// names the last two; no '(leaves ...)' or '(ready ...)' change fact
+/// names the last two; no '(leaves ...)' or '(processed ...)' change fact
 /// lists them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum DiffObject {
@@ -101,14 +101,14 @@ pub enum DiffObject {
   NewOutward,
 }
 
-/// '(editRequest (ready OBJECTS))' or '(editRequest (unready OBJECTS))':
+/// '(editRequest (processed OBJECTS))' or '(editRequest (unprocessed OBJECTS))':
 /// save intent that
 /// sets or clears the processed marks of the viewnode's
 /// leaves on those objects. No objects means the viewnode's only
 /// change-forest leaf.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProcessedRequest {
-  pub processed : bool, // true for (ready ...), false for (unready ...)
+  pub processed : bool, // true for (processed ...), false for (unprocessed ...)
   pub objects : BTreeSet<DiffObject>,
 }
 
@@ -548,7 +548,7 @@ pub enum PropertyMember {
 /// and save-inert: the validator ignores them, and the refresh draws
 /// them in the diff view and knows them by their kind. Each but
 /// BodyDiff is a change-forest leaf or processed aggregate, so
-/// its viewnode carries '(ready ...)' and a processed request.
+/// its viewnode carries '(processed ...)' and a processed request.
 #[derive( Debug, Clone, PartialEq )]
 pub enum ChangeViewnode {
   /// The node's text at HEAD, under a node whose text changed.
@@ -1133,7 +1133,7 @@ impl ProcessedRequest {
   pub fn form_head (
     &self,
   ) -> &'static str {
-    if self . processed { "ready" } else { "unready" } }
+    if self . processed { "processed" } else { "unprocessed" } }
 }
 
 impl ViewRequest {

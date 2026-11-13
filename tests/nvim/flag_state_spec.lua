@@ -84,14 +84,14 @@ describe('skg.flag_state staging', function ()
     local sent
     client.send_string = function (text) sent = text end
     buffer_with({
-      '* (skg node (gnid root) (skgRepos (nodeRepo main)) (editRequest (ready node))) root',
-      '** (skg node (gnid child) (skgRepos (nodeRepo main)) (editRequest (unready rel)) (diff (rel added))) child' })
+      '* (skg node (gnid root) (skgRepos (nodeRepo main)) (editRequest (processed node))) root',
+      '** (skg node (gnid child) (skgRepos (nodeRepo main)) (editRequest (unprocessed rel)) (diff (rel added))) child' })
     flag.set_flag_search_matching()
     assert.is_truthy(sent:find('(request . "flag state")', 1, true))
     flag._apply(1, true, true)
     assert.are.same({
-      '* (skg node (gnid root) (skgRepos (nodeRepo main)) (editRequest (flag noSearchMatching true) (ready node))) root',
-      '** (skg node (gnid child) (skgRepos (nodeRepo main)) (editRequest (flag noSearchMatching true) (unready rel)) (diff (rel added))) child' },
+      '* (skg node (gnid root) (skgRepos (nodeRepo main)) (editRequest (flag noSearchMatching true) (processed node))) root',
+      '** (skg node (gnid child) (skgRepos (nodeRepo main)) (editRequest (flag noSearchMatching true) (unprocessed rel)) (diff (rel added))) child' },
       vim.api.nvim_buf_get_lines(0, 0, -1, false))
   end)
 

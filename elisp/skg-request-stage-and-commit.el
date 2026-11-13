@@ -193,7 +193,7 @@ user types exactly \"yes\"."
               (format "%s%s. Type yes to commit anyway: "
                       (string-remove-suffix
                        "." (skg--processed-summary-message
-                            (assq 'readiness-summary response)))
+                            (assq 'processed-summary response)))
                       (skg--stage-and-commit-already-staged-message
                        already-staged))))))
 

@@ -1373,7 +1373,7 @@ folders' members carry none. On an alias, ID or flag member, '(rel
 
 A headline's *change facts* are the parts of its '(diff ...)' form
 that the server writes: the three kinds of change, the '(leaves
-...)' count of its change-forest leaves, the '(ready ...)' processed state
+...)' count of its change-forest leaves, the '(processed ...)' processed state
 (its processed marker), and in the skgrepo-changes buffer its
 home skgrepo move and its moved-like-ancestor fact ('ChangeFacts' in
 'server/types/viewnode.rs'). A
@@ -1389,7 +1389,7 @@ relationship to its viewparent ('rel'; in a partner folder, to the
 folder's viewparent). There are exactly these two.
 A change-forest leaf about a relationship has the relationship as its
 object, never the member. A request, a '(leaves ...)' change fact and
-a '(ready ...)' change fact may also say 'all', which names every leaf a
+a '(processed ...)' change fact may also say 'all', which names every leaf a
 modified node records (so one gesture on it marks its file), or every
 leaf of a processed aggregate one level down; 'all' is shorthand, not a third
 object. A request alone may also say 'newContent' or 'newOutward',
@@ -1460,13 +1460,13 @@ A *processed aggregate* is a thing with change-forest leaves
 under it: a folder, a changeset marker, a node, a file, the whole
 changeset. It is processed iff every leaf under it that can be processed is
 processed; that derived value is *its processed state*. A view shows it as
-'(ready ...)' in the '(diff ...)' form, which nothing reads at save;
+'(processed ...)' in the '(diff ...)' form, which nothing reads at save;
 a folder carries none, and each client computes whether a folder is processed
 from its members (see "changed folder").
 
 **** processed marker
 
-The '(ready ...)' part of a headline's '(diff ...)' form, and its
+The '(processed ...)' part of a headline's '(diff ...)' form, and its
 herald: the derived processed state of a processed aggregate or of
 the leaves of a headline with change facts. A changed folder's ✓,
 which the clients draw from its members, is one too. A folder's
@@ -1583,8 +1583,8 @@ as does the rerender of a clean buffer after a reload.
 
 **** processed request, processed gesture
 
-A *processed request* is a metadata form, '(ready OBJECTS)' or
-'(unready OBJECTS)' inside a headline's '(editRequest ...)', that the
+A *processed request* is a metadata form, '(processed OBJECTS)' or
+'(unprocessed OBJECTS)' inside a headline's '(editRequest ...)', that the
 save consumes, after its graph
 edits succeed, to set or clear the marks of a headline's leaves. A
 *processed gesture* is a gesture (C-c r r, C-c r h and their
@@ -1607,7 +1607,7 @@ and consumes them as it does every edit request
 **** headline with change facts
 
 A headline whose metadata carries a '(leaves ...)' change fact. It
-is processed when its '(ready ...)' names every object its '(leaves ...)' lists,
+is processed when its '(processed ...)' names every object its '(leaves ...)' lists,
 and otherwise unprocessed. The navigation commands (C-c r n c and its
 kin) move between headlines with change facts.
 
@@ -1812,7 +1812,7 @@ applying its rungs there (see "the refresh's rungs, unsayable"); its
 *tail* is what it does once, after the walk ('server/refresh/tail.rs'):
 the *stats pass*, which computes every occurrence's derived facts
 ('viewnodestats.rs', 'graphnodestats.rs' beside it); in the diff
-view, the '(ready ...)' change facts and the home skgrepo moves; the
+view, the '(processed ...)' change facts and the home skgrepo moves; the
 pruning of childless tombstones, and of folders the pruning empties;
 and a viewnode ID for each viewnode lacking one. The tail renders
 nothing: each caller renders the viewforest once, when it is done

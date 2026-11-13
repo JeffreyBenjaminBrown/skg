@@ -110,7 +110,7 @@ fn an_incomplete_summary_needs_confirmation_and_commits_nothing (
               "{:?}", summary );
     assert! ( already_staged . is_empty (), "{:?}", already_staged );
     let response : String = stage_and_commit_response_sexp (&answer);
-    assert! ( response . starts_with ( "((needs-confirmation . t) (readiness-summary (ready " ),
+    assert! ( response . starts_with ( "((needs-confirmation . t) (processed-summary (processed " ),
               "{}", response );
     for (i, skgrepo) in SKGREPOS . iter () . enumerate () {
       assert_eq! ( head_id (f, skgrepo) ?, heads [i], "skgrepo {}", skgrepo );
@@ -185,7 +185,7 @@ fn an_already_staged_entry_needs_confirmation_and_is_then_committed (
     assert_eq! ( paths, &vec! [ PathBuf::from ("notes.txt") ] );
     let response : String = stage_and_commit_response_sexp (&answer);
     assert! ( response . starts_with ( &format! (
-      "((needs-confirmation . t) (already-staged ((\"{}\" \"notes.txt\"))) (readiness-summary (ready ",
+      "((needs-confirmation . t) (already-staged ((\"{}\" \"notes.txt\"))) (processed-summary (processed ",
       public_root . display () )),
               "{}", response );
     for (i, skgrepo) in SKGREPOS . iter () . enumerate () {
@@ -292,7 +292,7 @@ fn a_confirmed_resend_commits_and_rerenders_the_open_buffers (
       . map ( |line| root_id (line) ) . collect ();
     assert_eq! ( roots_after, roots, "the roots remain:\n{}", content );
     for fact in [ "(diff ", "changed)", "changesetMarker", "oldText",
-                  " ghost (gnid ", "homeSkgrepoMove", "(ready" ] {
+                  " ghost (gnid ", "homeSkgrepoMove", "(processed" ] {
       assert! ( ! content . contains (fact),
                 "no change fact {:?} remains:\n{}", fact, content ); }
     assert! ( f . views_state . open_views . views

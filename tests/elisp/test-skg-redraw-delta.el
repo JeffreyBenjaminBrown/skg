@@ -63,7 +63,7 @@ a list (LINE STRIPPED-LINE)."
 (defconst test-skg-redraw-delta--b-marked
   (concat "* (skg (vnid a) node (gnid a)) a\n"
           "a body\n"
-          "** (skg (vnid b) folded focused node (gnid b) (diff (ready all))) bee title\n"
+          "** (skg (vnid b) folded focused node (gnid b) (diff (processed all))) bee title\n"
           "b body\n"
           "*** (skg (vnid c) node (gnid c)) c\n"
           "** (skg (vnid d) node (gnid d)) d\n")
@@ -127,7 +127,7 @@ buffer is unmodified with the new text as its baseline."
       (should (equal (buffer-substring-no-properties (point-min) (point-max))
                      (skg--stripped-text test-skg-redraw-delta--b-marked)))
       (should (looking-at "title$"))
-      (should (= (point) (+ point-before-title (length " (diff (ready all))")))))
+      (should (= (point) (+ point-before-title (length " (diff (processed all))")))))
     (test-skg-redraw-delta--goto-line-containing "(vnid b)")
     (should-not (invisible-p (point)))
     (should (invisible-p (save-excursion (search-forward "b body"))))
@@ -242,7 +242,7 @@ changed member processed, the folder's herald shows it processed too."
       (should (skg--patch-buffer-with-delta
                (concat root-and-folder
                        (replace-regexp-in-string
-                        "(leaves 1 rel)" "(leaves 1 rel) (ready rel)" member))
+                        "(leaves 1 rel)" "(leaves 1 rel) (processed rel)" member))
                '(d)))
       (should (equal (test-skg-redraw-delta--herald-display-on-line-containing
                       "(vnid f)")

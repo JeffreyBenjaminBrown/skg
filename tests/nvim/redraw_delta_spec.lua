@@ -81,7 +81,7 @@ local drawn = table.concat({
 local b_marked = table.concat({
   '* (skg (vnid a) node (gnid a)) a',
   'a body',
-  '** (skg (vnid b) folded focused node (gnid b) (diff (ready all))) bee title',
+  '** (skg (vnid b) folded focused node (gnid b) (diff (processed all))) bee title',
   'b body',
   'b body 2',
   '*** (skg (vnid c) node (gnid c)) c',
@@ -168,7 +168,7 @@ describe('skg.redraw_delta patch', function ()
     save.handle_save_sexp(buf, save_result(b_marked, { 'b' }))
     assert.are.equal(0, whole_redraws)
     assert.are.same(redraw_delta.stripped_lines(b_marked), buffer_lines(buf))
-    assert.are.same({ b_line, title_column + #' (diff (ready all))' },
+    assert.are.same({ b_line, title_column + #' (diff (processed all))' },
                     vim.api.nvim_win_get_cursor(0))
     assert.are.equal(b_line, vim.fn.foldclosed(b_line))
     assert.is_true(folds.line_invisible_p(line_containing(buf, 'b body')))
@@ -189,7 +189,7 @@ describe('skg.redraw_delta patch', function ()
     folds.close_fold_at(a_line)
     save.handle_save_sexp(buf, save_result(
       drawn:gsub('%(gnid c%)%) c', '(gnid c)) see')
-           :gsub('%(gnid b%)%)', '(gnid b) (diff (ready all)))'),
+           :gsub('%(gnid b%)%)', '(gnid b) (diff (processed all)))'),
       { 'b', 'c' }))
     assert.are.equal(0, whole_redraws)
     assert.are.equal(a_line, vim.fn.foldclosed(a_line))
@@ -271,7 +271,7 @@ describe('skg.redraw_delta patch', function ()
     assert.is_true(redraw_delta.patch_buffer_with_delta(
       buf,
       root_and_folder
-        .. member:gsub('%(leaves 1 rel%)', '(leaves 1 rel) (ready rel)'),
+        .. member:gsub('%(leaves 1 rel%)', '(leaves 1 rel) (processed rel)'),
       { 'd' }))
     assert.are.equal(changed .. '✓',
                      herald_display_on_line_containing(buf, '(vnid f)'))
@@ -292,7 +292,7 @@ describe('skg.redraw_delta patch', function ()
     assert.are.equal(table.concat(redraw_delta.stripped_lines(b_marked), '\n'),
                      vim.b[buf].skg_clean_baseline)
     save.handle_save_sexp(buf, save_result(
-      b_marked:gsub('%(ready all%)', '(ready none)'), { 'b' }))
+      b_marked:gsub('%(processed all%)', '(processed none)'), { 'b' }))
     assert.are.equal(0, whole_redraws)
     assert.are.equal(a_line, vim.fn.foldclosed(b_line))
   end)

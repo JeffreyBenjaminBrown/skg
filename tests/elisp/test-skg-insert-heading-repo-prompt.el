@@ -262,10 +262,10 @@ open the sexp-edit buffer (not prompt in minibuffer)."
   "The metadata editor shows a processed request in the headline's
 '(editRequest ...)', and applying keeps it, beside the other request
 or alone; deleting it there clears it."
-  (dolist (case '(("(skg node (gnid x) (skgRepos (nodeRepo public)) (editRequest delete (ready node)) (diff (node added) (leaves 1 node))) x"
-                   . "(skg node (gnid x) (skgRepos (nodeRepo public)) (editRequest delete (ready node)) (diff (node added) (leaves 1 node))) x")
-                  ("(skg alias (editRequest (unready)) (diff (rel added) (leaves 1)))"
-                   . "(skg alias (editRequest (unready)) (diff (rel added) (leaves 1)))")))
+  (dolist (case '(("(skg node (gnid x) (skgRepos (nodeRepo public)) (editRequest delete (processed node)) (diff (node added) (leaves 1 node))) x"
+                   . "(skg node (gnid x) (skgRepos (nodeRepo public)) (editRequest delete (processed node)) (diff (node added) (leaves 1 node))) x")
+                  ("(skg alias (editRequest (unprocessed)) (diff (rel added) (leaves 1)))"
+                   . "(skg alias (editRequest (unprocessed)) (diff (rel added) (leaves 1)))")))
     (test--with-skg-content-view
      (concat "* " (car case) "\n")
      test--config-public-and-private
@@ -280,7 +280,7 @@ or alone; deleting it there clears it."
            (should edit-buf)
            (with-current-buffer edit-buf
              (should (string-match-p
-                      "^\\*+ (?\\(un\\)?ready)?$"
+                      "^\\*+ (?\\(un\\)?processed)?$"
                       (buffer-substring-no-properties
                        (point-min) (point-max))))
              (skg-sexp-edit--apply)))
@@ -289,7 +289,7 @@ or alone; deleting it there clears it."
                            (point-min) (point-max))
                           (concat "* " (cdr case) "\n"))))))))
   (test--with-skg-content-view
-   "* (skg node (gnid x) (skgRepos (nodeRepo public)) (editRequest delete (ready node))) x\n"
+   "* (skg node (gnid x) (skgRepos (nodeRepo public)) (editRequest delete (processed node))) x\n"
    test--config-public-and-private
    (lambda ()
      (let ((source-buffer (current-buffer)))
@@ -299,7 +299,7 @@ or alone; deleting it there clears it."
                          (buffer-local-value 'skg-sexp-edit--source-buffer b))
                        (buffer-list))
          (goto-char (point-min))
-         (re-search-forward "^\\*\\*\\* ready$")
+         (re-search-forward "^\\*\\*\\* processed$")
          (delete-region (line-beginning-position)
                         (progn (forward-line 2) (point)))
          (skg-sexp-edit--apply))

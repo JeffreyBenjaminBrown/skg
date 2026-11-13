@@ -57,7 +57,7 @@ describe('the metadata editor', function ()
      function ()
     local headline = '** (skg (vnid 0b) focused folded node (gnid n)'
       .. ' (skgRepos (nodeRepo main) (relRepo pub)) noClaim writeProtected'
-      .. ' (overridesHere o) (editRequest (relRepo pub) (ready node))'
+      .. ' (overridesHere o) (editRequest (relRepo pub) (processed node))'
       .. ' (viewRequests editableView) (view cycle)'
       .. ' (diff (rel added) (leaves 1 rel))) a title'
     local source = vim.api.nvim_create_buf(true, false)

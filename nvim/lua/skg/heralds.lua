@@ -591,7 +591,7 @@ function M.changed_folder_chunks (folder, folder_change)
   table.insert(chunks,
                node_herald_chunk(M.changed_folder_label(folder), folder))
   if folder_change.processed then
-    table.insert(chunks, node_herald_chunk('✓', 'ready')) end
+    table.insert(chunks, node_herald_chunk('✓', 'processed')) end
   return chunks
 end
 

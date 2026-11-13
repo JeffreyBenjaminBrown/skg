@@ -1206,7 +1206,7 @@ Expected shape: ((content ...) (errors (...)) (warnings (...)))."
                   (skg--message-list-nonempty-p warnings-list))
           (skg-show-save-errors-and-warnings
            errors-list warnings-list content-value))
-        (let ((summary (assq 'readiness-summary response)))
+        (let ((summary (assq 'processed-summary response)))
           (when summary ;; the saved buffer is one of the diff view's
             (message "%s" (skg--processed-summary-message summary)))))
     (error (skg-log 'error 'save "parsing save response: %S" err)

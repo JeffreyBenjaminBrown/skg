@@ -268,7 +268,7 @@ So far there are these endpoints:
        sends one error, =NOTHING WAS SAVED=, whose validation errors
        follow as =** Error N= headlines.
        When the saved buffer is one of the diff view's, the point
-       entries are followed by =(readiness-summary (ready N) (changed M) (foreign F) (order-only O) (notEditable K))=:
+       entries are followed by =(processed-summary (processed N) (changed M) (foreign F) (order-only O) (notEditable K))=:
        of the M changed files of the owned skgrepos (O of them changed only
        in order, and so processed), N are processed; F files changed in
        foreign skgrepos; and K changes are not editable in the view: they
@@ -298,7 +298,7 @@ So far there are these endpoints:
        viewnode ID, a bare symbol; =(changed-headlines ())= means no
        headline changed. Without the entry, the client redraws the
        whole buffer. A failed save and every confirmation carry none.
-  - Processed requests (=(ready OBJECTS)= and =(unready OBJECTS)=
+  - Processed requests (=(processed OBJECTS)= and =(unprocessed OBJECTS)=
     inside a headline's =(editRequest ...)=; see "Metadata of the
     diff view") are
     consumed by a save of any buffer, not only one of the diff view's,
@@ -827,7 +827,7 @@ keeps them as text ('TODO/problems.org').
     ="order-only changes"=. The client sends one request per buffer, in
     that order, each after the previous answer.
   - Response: LP response-type "diff-view", one of:
-    - =((content "ORG") (errors ()) (warnings ()) (readiness-summary ...))=:
+    - =((content "ORG") (errors ()) (warnings ()) (processed-summary ...))=:
       the buffer, now registered under VIEW_ID as a buffer of the diff
       view, and its processed summary, in the form
       and with the counts a save of the buffer unchanged would report
@@ -880,7 +880,7 @@ keeps them as text ('TODO/problems.org').
   - Response: LP response-type "stage-and-commit", then a rerender
     stream (rerender-lock, rerender-view*, rerender-done). The
     response is one of:
-    - =((needs-confirmation . t) (already-staged (("GITREPO" "PATH" ...) ...)) (readiness-summary ...) (errors ()) (warnings ()))=
+    - =((needs-confirmation . t) (already-staged (("GITREPO" "PATH" ...) ...)) (processed-summary ...) (errors ()) (warnings ()))=
       when the request is not confirmed and either the processed
       summary (the save response's form, with =(notEditable 0)=) is
       incomplete or some owned gitrepo has entries already staged.
@@ -917,7 +917,7 @@ keeps them as text ('TODO/problems.org').
   - Response: LP response-type "extend-diff-view", then a rerender
     stream (rerender-lock, rerender-view*, rerender-done). The
     response is one of:
-    - =((readiness-summary ...) (errors ()) (warnings ()))=, the save
+    - =((processed-summary ...) (errors ()) (warnings ()))=, the save
       response's form, for the buffer as rerendered; the rerender
       stream carries that buffer.
     - =((errors ("REFUSAL")) (warnings ()))= when the
@@ -1552,7 +1552,7 @@ A ghost takes no view request; the parser refuses one there.
 the graph. A save that succeeds consumes every request in the buffer
 it saves, after its graph edits; a save that stops for a confirmation
 or fails leaves them in the buffer. A headline carries at most one,
-beside at most one processed request, =(ready ...)= or =(unready
+beside at most one processed request, =(processed ...)= or =(unprocessed
 ...)= (see "Metadata of the diff view"), written after it. The
 heralds are nonstandard. The five requests on a node, and the
 one on a ghost:
@@ -2146,7 +2146,7 @@ id [noClaim] [(editRequest PROCESSED)] [(view ...)] [(diff ...)]
 (changesetMarker KIND): [(editRequest PROCESSED)] [(diff ...)]
 bodyDiff, tombstone, forestRoot, a folder atom
 #+end_example
-where PROCESSED is =(ready OBJECT...)= or =(unready OBJECT...)= (see
+where PROCESSED is =(processed OBJECT...)= or =(unprocessed OBJECT...)= (see
 "Metadata of the diff view"). =(gnid ID)= names the node a node, a
 ghost, an unknown viewnode or a restricted viewnode (=restricted=, see
 "Restricted-skgrepo nodes") stands for, and =(skgRepos (nodeRepo REPO)
@@ -2264,7 +2264,7 @@ the diff view's implementation" define the vocabulary.
 A headline's change facts form one list, the last part of its
 metadata:
 #+begin_example
-(diff (node added) (rel removed) (properties changed) (leaves N OBJECT...) (ready OBJECT...) (homeSkgrepoMove (old OLD) (new NEW)) (movedLikeAncestor LETTER))
+(diff (node added) (rel removed) (properties changed) (leaves N OBJECT...) (processed OBJECT...) (homeSkgrepoMove (old OLD) (new NEW)) (movedLikeAncestor LETTER))
 #+end_example
 The first three parts are the three kinds of change, and say only
 what is true. The parts come in that order, and a part is absent when
@@ -2298,10 +2298,10 @@ leaf, or on a changeset marker; none where a bare request names them),
 and N, how many distinct leaves a request naming all of them touches.
 The clients read it to build their requests and to count the leaves
 an unmark touches.
-**** =(ready OBJECT...)= -- the diff objects whose change-forest leaves are all marked processed
+**** =(processed OBJECT...)= -- the diff objects whose change-forest leaves are all marked processed
 The objects are =node=, =rel=, and =all= on a headline whose =(leaves
-...)= lists it, so a processed changeset marker carries =(ready all)=. A
-bare =(ready)= marks a headline that lists no object (one naming a
+...)= lists it, so a processed changeset marker carries =(processed all)=. A
+bare =(processed)= marks a headline that lists no object (one naming a
 single leaf). Absent when nothing is processed.
 **** =(homeSkgrepoMove (old OLD) (new NEW))=, =(movedLikeAncestor LETTER)= -- a node's home skgrepo moved
 In the skgrepo-changes buffer, on a node whose home skgrepo moved
@@ -2310,8 +2310,8 @@ nearest vognode ancestor whose home skgrepo moved moved the same way,
 =(movedLikeAncestor LETTER)=, LETTER naming that ancestor as the
 relationship tokens do (a = the viewparent); herald "Δ⌂=LETTER".
 
-*** The processed requests: =(editRequest (ready ...))=
-=(ready OBJECT...)= and =(unready OBJECT...)= inside =(editRequest
+*** The processed requests: =(editRequest (processed ...))=
+=(processed OBJECT...)= and =(unprocessed OBJECT...)= inside =(editRequest
 ...)= ask the save to set or clear the processed marks of the
 leaves those objects name; the object =all= names every leaf a
 vognode's node records, or every leaf of a processed
@@ -2332,13 +2332,13 @@ object. Since which leaves they name only the change forest can tell,
 validation takes such a request to share a leaf with every request
 of the opposite kind in the same save, and refuses the save. At most one per headline, written after
 the headline's other edit request if it has one: =(editRequest
-delete (ready node))=. Any headline that may carry =(diff ...)= may
+delete (processed node))=. Any headline that may carry =(diff ...)= may
 carry one.
 
 *** Who writes each part, and who acts on it
 **** The server writes the change facts
 The server writes the =(diff ...)= form (=diff_form= in
-=server/org_to_text.rs=), and it sets =(ready ...)= and =(leaves
+=server/org_to_text.rs=), and it sets =(processed ...)= and =(leaves
 ...)= in the tail of the refresh (=set_processed_facts_in_viewforest=); see
 =docs/diff-view.org=, "Change facts on the wire". A rerender of a
 buffer of the diff view recomputes each kept viewnode's change facts
@@ -2348,7 +2348,7 @@ buffer; see "Diff view" and "Save buffer" above. The parser skips
 clients read =(leaves ...)= to build their requests and to count the
 leaves an unmark touches.
 **** The client's processed gestures write the processed requests
-A gesture writes =(ready ...)= or =(unready ...)= into the headline's
+A gesture writes =(processed ...)= or =(unprocessed ...)= into the headline's
 =(editRequest ...)=, creating the form if the headline lacks one, and
 saves; see =docs/diff-view.org=, "Processed requests and gestures".
 In Emacs the gestures are =C-c r r= (=skg-cycle-processed=), which
@@ -2422,22 +2422,22 @@ to the folder's viewparent: a =(rel ...)= part, or a =(relRepoMove
 ...)= under it. The clients compute that from the members, and label
 such a folder "its X changed (this file)" or "(other files)" (see the
 glossary's "in, out"), with ✓ when every changed membership is processed:
-a member's =(rel ...)= is processed when it carries =(ready ...)= naming
-=rel= if its =(leaves ...)= lists =rel=, and any =(ready ...)=
-otherwise; a relRepo move is processed when it carries =(ready ...)=.
+a member's =(rel ...)= is processed when it carries =(processed ...)= naming
+=rel= if its =(leaves ...)= lists =rel=, and any =(processed ...)=
+otherwise; a relRepo move is processed when it carries =(processed ...)=.
 A processed gesture on such a folder acts on each changed membership.
 
 *** Examples
 #+begin_example
-(skg node (gnid 7) (skgRepos (nodeRepo main)) (diff (node added) (rel added) (leaves 2 node rel) (ready node)))
-(skg node (gnid 8) (skgRepos (nodeRepo main)) writeProtected (diff (rel added) (properties changed) (leaves 3 rel all) (ready all)))
+(skg node (gnid 7) (skgRepos (nodeRepo main)) (diff (node added) (rel added) (leaves 2 node rel) (processed node)))
+(skg node (gnid 8) (skgRepos (nodeRepo main)) writeProtected (diff (rel added) (properties changed) (leaves 3 rel all) (processed all)))
 (skg node (gnid 9) (skgRepos (nodeRepo main)) noClaim writeProtected (view noWarrant) (diff (rel removed) (leaves 1 rel)))
-(skg alias (editRequest (ready)) (diff (rel added) (leaves 1)))
-(skg alias noClaim (view ghostWarrant) (diff (rel removed) (leaves 1) (ready)))
+(skg alias (editRequest (processed)) (diff (rel added) (leaves 1)))
+(skg alias noClaim (view ghostWarrant) (diff (rel removed) (leaves 1) (processed)))
 (skg ghost (gnid 4) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed) (leaves 2 node rel)))
-(skg (oldText title) (diff (leaves 1) (ready)))
-(skg (changesetMarker content) (diff (leaves 3 all) (ready all)))
-(skg (changesetMarker content) (editRequest (ready all)) (diff (leaves 3 all)))
+(skg (oldText title) (diff (leaves 1) (processed)))
+(skg (changesetMarker content) (diff (leaves 3 all) (processed all)))
+(skg (changesetMarker content) (editRequest (processed all)) (diff (leaves 3 all)))
 (skg node (gnid 5) (skgRepos (nodeRepo pub)) (diff (homeSkgrepoMove (old priv) (new pub)) (movedLikeAncestor a)))
 #+end_example
 

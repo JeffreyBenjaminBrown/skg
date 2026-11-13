@@ -32,7 +32,7 @@ The glossary ('docs/glossary.org') defines each kind.
 - facts: change facts, a viewnode's '(diff ...)' parts (the three
   kinds of change, the leaves, the processed mark).
 - marker: changeset marker (a property viewnode standing for a set
-  of changes) or processed marker (the '(ready ...)' part and
+  of changes) or processed marker (the '(processed ...)' part and
   its herald).
 * Do not ask the reader to learn a distinction that does not exist outside skg
 Two ordinary words that are near-synonyms outside skg must not be

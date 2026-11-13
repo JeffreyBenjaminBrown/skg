@@ -28,7 +28,7 @@
 #     changed;
 #   edit request and with the edit request (optional): the metadata
 #     after a command makes REQUEST its edit request;
-#   readiness request and with the readiness request (optional): the
+#   processed request and with the processed request (optional): the
 #     metadata after a gesture makes REQUEST its processed request.
 
 ==== occurrence: a member at every default, with its title
@@ -57,8 +57,8 @@
 ---- strip: (skg (vnid 0a) node (gnid x) (skgRepos (nodeRepo main)))
 ---- edit request: delete
 ---- with the edit request: (skg (vnid 0a) node (gnid x) (skgRepos (nodeRepo main)) (editRequest delete))
----- readiness request: (ready node)
----- with the readiness request: (skg (vnid 0a) node (gnid x) (skgRepos (nodeRepo main)) (editRequest (ready node)))
+---- processed request: (processed node)
+---- with the processed request: (skg (vnid 0a) node (gnid x) (skgRepos (nodeRepo main)) (editRequest (processed node)))
 
 ==== occurrence: every part the printer writes
 ---- metadata: (skg (vnid 0b) focused folded node (gnid n) (skgRepos (nodeRepo main) (relRepo pub)) noClaim writeProtected (overridesHere o) (editRequest (relRepo pub)) (viewRequests editableView) (view cycle) (diff (rel added) (leaves 1 rel)))
@@ -98,11 +98,11 @@
 ---- strip: (skg (vnid 0b) focused folded node (gnid n) (skgRepos (nodeRepo main) (relRepo pub)) noClaim writeProtected (overridesHere o) (editRequest (relRepo pub)) (viewRequests editableView) (view cycle) (diff (rel added) (leaves 1 rel)))
 ---- edit request: (merge m)
 ---- with the edit request: (skg (vnid 0b) focused folded node (gnid n) (skgRepos (nodeRepo main) (relRepo pub)) noClaim writeProtected (overridesHere o) (editRequest (merge m)) (viewRequests editableView) (view cycle) (diff (rel added) (leaves 1 rel)))
----- readiness request: (ready rel)
----- with the readiness request: (skg (vnid 0b) focused folded node (gnid n) (skgRepos (nodeRepo main) (relRepo pub)) noClaim writeProtected (overridesHere o) (editRequest (relRepo pub) (ready rel)) (viewRequests editableView) (view cycle) (diff (rel added) (leaves 1 rel)))
+---- processed request: (processed rel)
+---- with the processed request: (skg (vnid 0b) focused folded node (gnid n) (skgRepos (nodeRepo main) (relRepo pub)) noClaim writeProtected (overridesHere o) (editRequest (relRepo pub) (processed rel)) (viewRequests editableView) (view cycle) (diff (rel added) (leaves 1 rel)))
 
 ==== occurrence: a processed request alone
----- metadata: (skg node (gnid r) (skgRepos (nodeRepo main)) (editRequest (ready node rel)) (diff (node added) (leaves 2 node rel)))
+---- metadata: (skg node (gnid r) (skgRepos (nodeRepo main)) (editRequest (processed node rel)) (diff (node added) (leaves 2 node rel)))
 ---- fill-in:
 * skg
 ** node
@@ -117,7 +117,7 @@
 *** false (default)
 ** editRequest
 *** none (default)
-*** ready
+*** processed
 **** node
 **** rel
 ** viewRequests
@@ -129,11 +129,11 @@
 **** 2
 **** node
 **** rel
----- strip: (skg node (gnid r) (skgRepos (nodeRepo main)) (editRequest (ready node rel)) (diff (node added) (leaves 2 node rel)))
+---- strip: (skg node (gnid r) (skgRepos (nodeRepo main)) (editRequest (processed node rel)) (diff (node added) (leaves 2 node rel)))
 ---- edit request: delete
----- with the edit request: (skg node (gnid r) (skgRepos (nodeRepo main)) (editRequest delete (ready node rel)) (diff (node added) (leaves 2 node rel)))
----- readiness request: (unready node)
----- with the readiness request: (skg node (gnid r) (skgRepos (nodeRepo main)) (editRequest (unready node)) (diff (node added) (leaves 2 node rel)))
+---- with the edit request: (skg node (gnid r) (skgRepos (nodeRepo main)) (editRequest delete (processed node rel)) (diff (node added) (leaves 2 node rel)))
+---- processed request: (unprocessed node)
+---- with the processed request: (skg node (gnid r) (skgRepos (nodeRepo main)) (editRequest (unprocessed node)) (diff (node added) (leaves 2 node rel)))
 
 ==== ghost
 ---- metadata: (skg ghost (gnid g) (skgRepos (nodeRepo main)) (view noWarrant) (diff (node removed) (leaves 1 node)))
@@ -160,8 +160,8 @@
 ---- strip: (skg ghost (gnid g) (skgRepos (nodeRepo main)) (view noWarrant) (diff (node removed) (leaves 1 node)))
 ---- edit request: restoreNode
 ---- with the edit request: (skg ghost (gnid g) (skgRepos (nodeRepo main)) (editRequest restoreNode) (view noWarrant) (diff (node removed) (leaves 1 node)))
----- readiness request: (ready node)
----- with the readiness request: (skg ghost (gnid g) (skgRepos (nodeRepo main)) (editRequest (ready node)) (view noWarrant) (diff (node removed) (leaves 1 node)))
+---- processed request: (processed node)
+---- with the processed request: (skg ghost (gnid g) (skgRepos (nodeRepo main)) (editRequest (processed node)) (view noWarrant) (diff (node removed) (leaves 1 node)))
 
 ==== unknown
 ---- metadata: (skg unknown (gnid u) (skgRepos (relRepo pub)) noClaim)
@@ -180,8 +180,8 @@
 ---- strip: (skg unknown (gnid u) (skgRepos (relRepo pub)) noClaim)
 ---- edit request: (relRepo main)
 ---- with the edit request: (skg unknown (gnid u) (skgRepos (relRepo pub)) noClaim (editRequest (relRepo main)))
----- readiness request: (ready rel)
----- with the readiness request: (skg unknown (gnid u) (skgRepos (relRepo pub)) noClaim (editRequest (ready rel)))
+---- processed request: (processed rel)
+---- with the processed request: (skg unknown (gnid u) (skgRepos (relRepo pub)) noClaim (editRequest (processed rel)))
 
 ==== restricted
 ---- metadata: (skg (vnid 0r) restricted (gnid h) (skgRepos (relRepo pub)))
@@ -202,11 +202,11 @@
 ---- strip: (skg (vnid 0r) restricted (gnid h) (skgRepos (relRepo pub)))
 ---- edit request: (relRepo main)
 ---- with the edit request: (skg (vnid 0r) restricted (gnid h) (skgRepos (relRepo pub)) (editRequest (relRepo main)))
----- readiness request: (ready rel)
----- with the readiness request: (skg (vnid 0r) restricted (gnid h) (skgRepos (relRepo pub)) (editRequest (ready rel)))
+---- processed request: (processed rel)
+---- with the processed request: (skg (vnid 0r) restricted (gnid h) (skgRepos (relRepo pub)) (editRequest (processed rel)))
 
 ==== alias: a processed request naming no object
----- metadata: (skg alias (skgRepos (relRepo pub)) (editRequest (ready)) (view ghostWarrant) (diff (rel added) (leaves 1)))
+---- metadata: (skg alias (skgRepos (relRepo pub)) (editRequest (processed)) (view ghostWarrant) (diff (rel added) (leaves 1)))
 ---- fill-in:
 * skg
 ** alias
@@ -217,7 +217,7 @@
 *** false (default)
 ** editRequest
 *** none (default)
-*** (ready)
+*** (processed)
 ** view
 *** ghostWarrant
 ** diff
@@ -225,14 +225,14 @@
 **** added
 *** leaves
 **** 1
----- strip: (skg alias (skgRepos (relRepo pub)) (editRequest (ready)) (view ghostWarrant) (diff (rel added) (leaves 1)))
+---- strip: (skg alias (skgRepos (relRepo pub)) (editRequest (processed)) (view ghostWarrant) (diff (rel added) (leaves 1)))
 ---- edit request: (relRepo main)
----- with the edit request: (skg alias (skgRepos (relRepo pub)) (editRequest (relRepo main) (ready)) (view ghostWarrant) (diff (rel added) (leaves 1)))
----- readiness request: (unready)
----- with the readiness request: (skg alias (skgRepos (relRepo pub)) (editRequest (unready)) (view ghostWarrant) (diff (rel added) (leaves 1)))
+---- with the edit request: (skg alias (skgRepos (relRepo pub)) (editRequest (relRepo main) (processed)) (view ghostWarrant) (diff (rel added) (leaves 1)))
+---- processed request: (unprocessed)
+---- with the processed request: (skg alias (skgRepos (relRepo pub)) (editRequest (unprocessed)) (view ghostWarrant) (diff (rel added) (leaves 1)))
 
 ==== ID
----- metadata: (skg id noClaim (view noWarrant) (diff (rel removed) (leaves 1) (ready)))
+---- metadata: (skg id noClaim (view noWarrant) (diff (rel removed) (leaves 1) (processed)))
 ---- fill-in:
 * skg
 ** id
@@ -245,10 +245,10 @@
 **** removed
 *** leaves
 **** 1
-*** (ready)
----- strip: (skg id noClaim (view noWarrant) (diff (rel removed) (leaves 1) (ready)))
----- readiness request: (unready)
----- with the readiness request: (skg id noClaim (editRequest (unready)) (view noWarrant) (diff (rel removed) (leaves 1) (ready)))
+*** (processed)
+---- strip: (skg id noClaim (view noWarrant) (diff (rel removed) (leaves 1) (processed)))
+---- processed request: (unprocessed)
+---- with the processed request: (skg id noClaim (editRequest (unprocessed)) (view noWarrant) (diff (rel removed) (leaves 1) (processed)))
 
 ==== flag
 ---- metadata: (skg (flag noSearchMatching) (view noWarrant))
@@ -259,8 +259,8 @@
 ** view
 *** noWarrant
 ---- strip: (skg (flag noSearchMatching) (view noWarrant))
----- readiness request: (ready rel)
----- with the readiness request: (skg (flag noSearchMatching) (editRequest (ready rel)) (view noWarrant))
+---- processed request: (processed rel)
+---- with the processed request: (skg (flag noSearchMatching) (editRequest (processed rel)) (view noWarrant))
 
 ==== a change viewnode
 ---- metadata: (skg folded (relRepoMove (old main) (new pub)) (diff (leaves 1)))
@@ -276,8 +276,8 @@
 *** leaves
 **** 1
 ---- strip: (skg folded (relRepoMove (old main) (new pub)) (diff (leaves 1)))
----- readiness request: (ready)
----- with the readiness request: (skg folded (relRepoMove (old main) (new pub)) (editRequest (ready)) (diff (leaves 1)))
+---- processed request: (processed)
+---- with the processed request: (skg folded (relRepoMove (old main) (new pub)) (editRequest (processed)) (diff (leaves 1)))
 
 ==== folder
 ---- metadata: (skg containerFolder)

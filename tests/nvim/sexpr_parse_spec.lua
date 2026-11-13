@@ -124,7 +124,7 @@ describe('skg.sexpr.parse printing', function ()
                 .. '((3861db2c-aaaa . "title one") (deadbeef . "two"))))')
     round_trips('(skg node (gnid 7) (skgRepos (nodeRepo main)) (diff (node added) (rel added)))')
     round_trips('(skg node (gnid 9) (skgRepos (nodeRepo main)) writeProtected '
-                .. '(diff (rel removed) (ready rel)))')
+                .. '(diff (rel removed) (processed rel)))')
     round_trips('(skg alias (diff (rel added)))')
     round_trips('(skg (oldText title))')
     round_trips('(skg node (gnid x) (overridesHere 4) '

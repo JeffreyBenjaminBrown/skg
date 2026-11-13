@@ -93,7 +93,7 @@ fn a_commit_converts_what_the_diff_view_showed (
                 "* (skg tombstone)\n** (skg node (gnid hm) (skgRepos (nodeRepo main)) (view noWarrant)) hm\n" ),
               "h's tombstone keeps hm:\n{}", committed );
     for fact in [ "(diff ", "changed)", "changesetMarker", "oldText",
-                  " ghost (gnid ", "homeSkgrepoMove", "(ready" ] {
+                  " ghost (gnid ", "homeSkgrepoMove", "(processed" ] {
       assert! ( ! committed . contains (fact),
                 "no change fact {:?} remains:\n{}", fact, committed ); }
     let saved : String =

@@ -1,7 +1,7 @@
 //! The tail of a refresh, once, after the walk: compute the derived
 //! facts (the stats of each occurrence: its props, rels and birth,
 //! 'cycle', 'repoBoundary', 'omittedBody'; in the diff view the
-//! '(ready ...)' change facts and the home skgrepo moves), prune every childless
+//! '(processed ...)' change facts and the home skgrepo moves), prune every childless
 //! tombstone, roots included (so a buffer may end with no roots), and
 //! give a vnid to every viewnode that lacks one. The tail renders
 //! nothing: each caller renders the forest once, when it is done with

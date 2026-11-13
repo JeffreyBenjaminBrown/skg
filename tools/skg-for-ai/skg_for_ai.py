@@ -699,7 +699,7 @@ def command_extend (arguments):
         "editable. The server said: " + " " . join (
           response_field (terminal, "errors") or [ render_sexp (terminal) ] ))
     print ( "Before extending: " + processed_summary_text (
-      response_field (terminal, "readiness-summary") ))
+      response_field (terminal, "processed-summary") ))
     response, rerendered = connection . extend_diff_view (
       sidecar [ "view_id" ] )
     errors = response_field (response, "errors") or []
@@ -708,7 +708,7 @@ def command_extend (arguments):
     if errors or rerendered is None:
       raise SkgToolError (
         "Nothing was extended; the files are as they were." )
-    processed_summary = response_field (response, "readiness-summary")
+    processed_summary = response_field (response, "processed-summary")
     print ( "Extended: " + processed_summary_text (processed_summary) )
     connection . log_view_event (
       "extended", saved_view . directory, saved_view . base_name )
@@ -880,7 +880,7 @@ def command_commit (arguments):
     if response_field (response, "needs-confirmation") is not None:
       print ( "Not every change is processed: " +
               processed_summary_text (
-                response_field (response, "readiness-summary") ))
+                response_field (response, "processed-summary") ))
       already_staged = response_field (response, "already-staged")
       for gitrepo_and_paths in already_staged or []:
         print ( "Already staged in " + sexp_to_text ( gitrepo_and_paths [0] )
@@ -1252,7 +1252,7 @@ def fetch_diff_view_buffer (connection, buffer_name):
            "errors"      : [],
            "warnings"    : response_field (response, "warnings") or [],
            "processed_summary" : response_field (
-             response, "readiness-summary" ) }
+             response, "processed-summary" ) }
 
 def fetch_forest_view (connection, kind, node_id, show_overPrivateText = False):
   """The node's view with the folder KIND under its root, as the
@@ -2185,13 +2185,13 @@ def membership_change_processed (member, children):
     if metadata_form (child, "relRepoMove") is not None:
       changed = True
       processed = processed and metadata_form (
-        metadata_form (child, "diff"), "ready" ) is not None
+        metadata_form (child, "diff"), "processed" ) is not None
   return processed if changed else None
 
 def objects_processed (metadata, objects):
-  """Whether the headline's '(ready ...)' names every one of OBJECTS;
-  with none listed, whether it has a '(ready ...)'."""
-  processed = metadata_form ( metadata_form (metadata, "diff"), "ready" )
+  """Whether the headline's '(processed ...)' names every one of OBJECTS;
+  with none listed, whether it has a '(processed ...)'."""
+  processed = metadata_form ( metadata_form (metadata, "diff"), "processed" )
   if processed is None:
     return False
   return set (objects) <= { str (element) for element in processed [ 1 : ] }
@@ -2214,7 +2214,7 @@ def is_pending_detachment (metadata, parent, grandparent):
   return reads_claims (parent, grandparent)
 
 # ============================================================
-# Change facts: a headline's '(diff (leaves ...) (ready ...))', which
+# Change facts: a headline's '(diff (leaves ...) (processed ...))', which
 # the summary of a buffer of the diff view counts and a processed
 # request names ('docs/api-and-formats.org', "Metadata of the diff
 # view").
@@ -2231,10 +2231,10 @@ def leaves_fact (metadata):
              if not isinstance (element, int) ] )
 
 def headline_is_processed (metadata):
-  """Whether a headline that names leaves is processed: its '(ready ...)'
+  """Whether a headline that names leaves is processed: its '(processed ...)'
   names every object its '(leaves ...)' lists, or, listing none, is
   there."""
-  processed = metadata_form ( metadata_form (metadata, "diff"), "ready" )
+  processed = metadata_form ( metadata_form (metadata, "diff"), "processed" )
   if processed is None:
     return False
   processed_objects = { str (element) for element in processed [ 1 : ] }
@@ -2337,11 +2337,11 @@ def diff_summary_lines (parsed_view, view):
 
 def processed_summary_text (summary):
   """The sentence a client shows for the processed summary SUMMARY,
-  '((ready N) (changed M) (foreign F) (order-only O) (notEditable K))'
+  '((processed N) (changed M) (foreign F) (order-only O) (notEditable K))'
   ('skg--processed-summary-message' in 'elisp/skg-processed.el')."""
   counts = { str ( entry [0] ) : first_number ( [ None ] + entry [ 1 : ] )
              for entry in summary or [] }
-  processed = counts . get ("ready", 0)
+  processed = counts . get ("processed", 0)
   changed = counts . get ("changed", 0)
   not_editable = counts . get ("notEditable", 0)
   foreign = counts . get ("foreign", 0)
@@ -2381,11 +2381,9 @@ COMPACT_HANDLE_PATTERN = re . compile (
 # The handle tokens that ask for edit requests. The rebuild writes
 # them into the headline's '(editRequest ...)': one of the first three,
 # the request of that name, and after it one processed request,
-# '(ready OBJECT...)' or '(unready OBJECT...)'.
+# '(processed OBJECT...)' or '(unprocessed OBJECT...)'.
 EDIT_REQUEST_TOKENS = [ "delete", "restoreNode", "restoreRel" ]
 PROCESSED_TOKENS = [ "processed", "unprocessed" ]
-# The wire atom of each processed request, by its handle token.
-PROCESSED_REQUEST_ATOMS = { "processed" : "ready", "unprocessed" : "unready" }
 # With 'processed' or 'unprocessed': name only the object 'all'.
 ALL_TOKEN = "all"
 # The handle words that ask for the edit requests with a parameter,
@@ -3266,15 +3264,14 @@ def expand_search_matching_subtree (edited, root, word, headline_of_handle,
       + ", " . join (skipped) + "." )
 
 def processed_request_text (headline, view_line):
-  """'(ready OBJECT...)' or '(unready OBJECT...)' for HEADLINE's
+  """'(processed OBJECT...)' or '(unprocessed OBJECT...)' for HEADLINE's
   processed token, or None. Its objects are 'all' when the handle
   says 'all', and otherwise every object the headline's '(leaves ...)'
   lists, as a client's one-level gesture names them; a headline that
   lists none gets the bare request."""
   if not headline . processed_words ():
     return None
-  return "(" + " " . join ( [ PROCESSED_REQUEST_ATOMS [word]
-                              for word in headline . processed_words () ] +
+  return "(" + " " . join ( headline . processed_words () +
                             processed_objects (headline, view_line) ) + ")"
 
 def processed_objects (headline, view_line):
@@ -4436,7 +4433,7 @@ def rerendered_view_of_save (terminal, sidecar):
     print ( "Server error: " + error )
   for warning in warnings:
     print ( "Server warning: " + warning )
-  processed_summary = response_field (terminal, "readiness-summary")
+  processed_summary = response_field (terminal, "processed-summary")
   if saved and processed_summary:
     print ( "Processed: " + processed_summary_text (processed_summary) )
   if not saved:

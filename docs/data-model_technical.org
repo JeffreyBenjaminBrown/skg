@@ -510,7 +510,7 @@ After the walk, once (=server/refresh/tail.rs=): the derived facts are
 computed, the stats of each occurrence (its relationship facts,
 property counts and birth, =cycle=, =repoBoundary=, =omittedBody=, its
 relRepo where it differs from the default), and in the diff view the
-'(ready ...)' change facts, from the processed store, and the home
+'(processed ...)' change facts, from the processed store, and the home
 skgrepo moves; every
 childless tombstone is pruned, postorder and roots included, so a
 buffer may end with no roots, and so is a folder the pruning leaves

@@ -16,7 +16,7 @@ pub enum RefreshMode<'a> {
   /// The refresh of the buffer of kind 'buffer_kind' of the diff view,
   /// over 'straddle'. Its goals are the union of the straddle: the
   /// members of either graph, each tagged with the change of its node
-  /// and of its relationship. 'processed_store' gives the '(ready ...)'
+  /// and of its relationship. 'processed_store' gives the '(processed ...)'
   /// change facts.
   DiffView { straddle        : &'a GraphStraddle,
              buffer_kind     : DiffViewBufferKind,

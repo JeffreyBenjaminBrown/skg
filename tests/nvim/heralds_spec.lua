@@ -69,8 +69,8 @@ describe('skg.heralds', function ()
   it('renders the cases shared with Emacs', function ()
     local cases = shared_cases()
     assert.is_true(#cases > 40)
-    local folder_changes = { ['folderChange ready'] = { processed = true },
-                             ['folderChange unready'] = { processed = false } }
+    local folder_changes = { ['folderChange processed'] = { processed = true },
+                             ['folderChange unprocessed'] = { processed = false } }
     for _, case in ipairs(cases) do
       local chunks = heralds.chunks_from_metadata(
         case.metadata, folder_changes[case.context],
@@ -201,7 +201,7 @@ describe('skg.heralds', function ()
     local buf = helpers.buffer_with({
       '* (skg node (gnid p)) p',
       '** (skg containerFolder) its containers',
-      '*** (skg node (gnid r) (diff (rel added) (leaves 2 node rel) (ready rel))) r',
+      '*** (skg node (gnid r) (diff (rel added) (leaves 2 node rel) (processed rel))) r',
       '**** (skg node (gnid below)) below',
       '* (skg node (gnid after)) after' })
     heralds.enable(buf)
@@ -214,18 +214,18 @@ describe('skg.heralds', function ()
                      folder_herald())
     -- Editing a member, or a line below it, rerenders the folder.
     vim.api.nvim_buf_set_lines(buf, 2, 3, false, {
-      '*** (skg node (gnid r) (diff (rel added) (leaves 2 node rel) (ready node))) r' })
+      '*** (skg node (gnid r) (diff (rel added) (leaves 2 node rel) (processed node))) r' })
     vim.wait(200, function ()
       return folder_herald() == '☮ its other containers changed (other files)' end, 10)
     assert.are.equal('☮ its other containers changed (other files)',
                      folder_herald())
     vim.api.nvim_buf_set_lines(buf, 2, 3, false, {
-      '*** (skg node (gnid r) (diff (node added) (ready node))) r' })
+      '*** (skg node (gnid r) (diff (node added) (processed node))) r' })
     vim.wait(200, function ()
       return folder_herald() == '☮ These also contain it.' end, 10)
     assert.are.equal('☮ These also contain it.', folder_herald())
     vim.api.nvim_buf_set_lines(buf, 3, 4, false, {
-      '**** (skg (relRepoMove (old a) (new b)) (diff (leaves 1) (ready)))' })
+      '**** (skg (relRepoMove (old a) (new b)) (diff (leaves 1) (processed)))' })
     vim.wait(200, function ()
       return folder_herald() == '☮ its other containers changed (other files)✓' end, 10)
     assert.are.equal('☮ its other containers changed (other files)✓',

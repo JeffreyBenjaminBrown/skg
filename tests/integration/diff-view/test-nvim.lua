@@ -102,7 +102,7 @@ end
 for i = 1, #root_lines() do
   local lnum = root_lines()[i]
   local line = vim.api.nvim_buf_get_lines(all_changes, lnum - 1, lnum, false)[1]
-  if not line:find('(ready', 1, true) then
+  if not line:find('(processed', 1, true) then
     local before = #notified
     vim.api.nvim_win_set_cursor(0, { lnum, 0 })
     require('skg.processed').cycle_processed_recursive()

@@ -96,7 +96,7 @@ pub struct BufferProcessedSummary {
 }
 
 impl BufferProcessedSummary {
-  /// '(readiness-summary (ready N) (changed M) (foreign F)
+  /// '(processed-summary (processed N) (changed M) (foreign F)
   /// (order-only O) (notEditable K))'.
   pub fn to_sexp (
     &self,
@@ -105,8 +105,8 @@ impl BufferProcessedSummary {
       Sexp::List ( vec! [ Sexp::Atom ( Atom::S ( key . to_string () )),
                           Sexp::Atom ( Atom::I ( count as i64 )) ] ) };
     Sexp::List ( vec! [
-      Sexp::Atom ( Atom::S ( "readiness-summary" . to_string () )),
-      entry ( "ready",       self . summary . processed_files ),
+      Sexp::Atom ( Atom::S ( "processed-summary" . to_string () )),
+      entry ( "processed",       self . summary . processed_files ),
       entry ( "changed",     self . summary . changed_files ),
       entry ( "foreign",     self . summary . foreign_changed_files ),
       entry ( "order-only",  self . summary . order_only_files ),
@@ -114,7 +114,7 @@ impl BufferProcessedSummary {
 }
 
 /// The response of a request that can report a processed summary:
-///   (LEADING... (readiness-summary ...) (errors (...)) (warnings (...)))
+///   (LEADING... (processed-summary ...) (errors (...)) (warnings (...)))
 /// 'leading' are the request's own entries; the summary is there when
 /// one is given.
 pub fn processed_response_sexp (

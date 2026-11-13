@@ -366,7 +366,7 @@ label styled as its ordinary one, then ✓ when FOLDER-CHANGE is `processed'."
           (heralds--styled (heralds--changed-folder-label folder)
                            (heralds--node-herald-style folder))
           (when (eq folder-change 'processed)
-            (heralds--styled "✓" (heralds--node-herald-style 'ready)))))
+            (heralds--styled "✓" (heralds--node-herald-style 'processed)))))
 
 (defun heralds--splice-rel-spans (tokens rel-str)
   "Return TOKENS with the first sentinel token replaced by REL-STR and

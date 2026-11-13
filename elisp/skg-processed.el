@@ -2,14 +2,14 @@
 ;;;
 ;;; PURPOSE: The processed gestures of the diff view
 ;;; ('docs/diff-view.org', "Processed requests and gestures"). Each writes
-;;; processed requests, '(ready OBJECTS)' or '(unready OBJECTS)', into
+;;; processed requests, '(processed OBJECTS)' or '(unprocessed OBJECTS)', into
 ;;; the '(editRequest ...)' of headline metadata, then saves. The save
 ;;; consumes them, setting or clearing the marks, and answers with the
 ;;; buffer rerendered and the processed summary.
 ;;;
 ;;; The server says which leaves (single changes) a headline names:
 ;;; it writes '(leaves N OBJECT...)' in the headline's '(diff ...)'
-;;; form, beside '(ready ...)'. The OBJECTs
+;;; form, beside '(processed ...)'. The OBJECTs
 ;;; are those a request on the headline may name: 'node' (∃, its
 ;;; existence) and/or 'rel' (~, its relationship to its viewparent) on
 ;;; a vognode (a ghost among them), each worth one leaf; 'all' on a modified node
@@ -17,7 +17,7 @@
 ;;; leaf) and on a processed aggregate (a changeset marker); none
 ;;; on a headline that names one leaf. N is how many distinct leaves a
 ;;; request naming every listed object touches. A gesture names every
-;;; object the headline lists, and toggles by the headline's own '(ready
+;;; object the headline lists, and toggles by the headline's own '(processed
 ;;; ...)': it is processed when that names every listed object. A folder
 ;;; shown because of a change names no leaf itself; a gesture on it acts
 ;;; on its children. The server writes such a folder as its bare atom;
@@ -306,8 +306,8 @@ On refusal, write nothing and return nil."
 
 (defun skg--write-processed-request (processed objects)
   "Replace the processed request of the headline at point with one
-that marks (PROCESSED non-nil) or unmarks the leaves on OBJECTS: '(ready
-OBJECTS)' or '(unready OBJECTS)', the last part of the headline's
+that marks (PROCESSED non-nil) or unmarks the leaves on OBJECTS: '(processed
+OBJECTS)' or '(unprocessed OBJECTS)', the last part of the headline's
 '(editRequest ...)', which stands at the top level of its metadata,
 whatever its kind. The headline's other edit request stays. A
 headline without '(editRequest ...)' gets one where the server writes
@@ -316,11 +316,11 @@ it (`skg--metadata-with-processed-request')."
   (skg--rewrite-metadata-at-point
    (lambda (metadata-sexp)
      (skg--metadata-with-processed-request
-      metadata-sexp (cons (if processed 'ready 'unready) objects)))))
+      metadata-sexp (cons (if processed 'processed 'unprocessed) objects)))))
 
 ;;; Moving between headlines with change facts
 ;;; A headline with change facts is one whose metadata carries a
-;;; '(leaves ...)' fact. It is processed when its '(ready ...)' names every
+;;; '(leaves ...)' fact. It is processed when its '(processed ...)' names every
 ;;; object that fact lists, and otherwise unprocessed. Outside the diff view no
 ;;; headline carries one, so these commands report no change there.
 
@@ -407,11 +407,11 @@ the position of its metadata's opening paren; otherwise nil."
 (defun skg--processed-summary-message (summary)
   "The line shown after a save of a buffer of the diff view,
 from SUMMARY, the save response's
-'(readiness-summary (ready N) (changed M) (foreign F) (order-only O)
+'(processed-summary (processed N) (changed M) (foreign F) (order-only O)
 \(notEditable K))'."
   (let* ((count (lambda (key)
                   (or (cadr (assq key (cdr summary))) 0)))
-         (processed (funcall count 'ready))
+         (processed (funcall count 'processed))
          (changed (funcall count 'changed))
          (foreign (funcall count 'foreign))
          (not-editable (funcall count 'notEditable))

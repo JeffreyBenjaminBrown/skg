@@ -141,8 +141,8 @@ fn two_headlines_naming_one_leaf_processed_and_unprocessed_contradict () {
   assert_eq! (
     processed_contradictions_in ( indoc! {"
       * (skg (vnid p1) node (gnid p)) p
-      ** (skg (vnid x1) node (gnid x) (editRequest (ready node))) x
-      * (skg (vnid x2) node (gnid x) writeProtected (editRequest (unready node))) x
+      ** (skg (vnid x1) node (gnid x) (editRequest (processed node))) x
+      * (skg (vnid x2) node (gnid x) writeProtected (editRequest (unprocessed node))) x
       "} ),
     vec! [ ( "the existence of node x" . to_string (),
              vec! [ "x1" . to_string (), "x2" . to_string () ] ) ] ); }
@@ -151,8 +151,8 @@ fn two_headlines_naming_one_leaf_processed_and_unprocessed_contradict () {
 fn an_all_request_contradicts_an_opposite_request_on_a_leaf_its_node_records () {
   assert_eq! (
     processed_contradictions_in ( indoc! {"
-      * (skg (vnid x1) node (gnid x) (editRequest (unready all))) x
-      * (skg (vnid x2) node (gnid x) writeProtected (editRequest (ready node))) x
+      * (skg (vnid x1) node (gnid x) (editRequest (unprocessed all))) x
+      * (skg (vnid x2) node (gnid x) writeProtected (editRequest (processed node))) x
       "} ),
     vec! [ ( "the existence of node x" . to_string (),
              vec! [ "x1" . to_string (), "x2" . to_string () ] ) ] ); }
@@ -161,14 +161,14 @@ fn an_all_request_contradicts_an_opposite_request_on_a_leaf_its_node_records () 
 fn processed_requests_that_agree_or_name_different_leaves_pass () {
   assert! ( processed_contradictions_in ( indoc! {"
       * (skg (vnid p1) node (gnid p)) p
-      ** (skg (vnid x1) node (gnid x) (editRequest (ready node))) x
-      * (skg (vnid x2) node (gnid x) writeProtected (editRequest (ready))) x
+      ** (skg (vnid x1) node (gnid x) (editRequest (processed node))) x
+      * (skg (vnid x2) node (gnid x) writeProtected (editRequest (processed))) x
       "} ) . is_empty (),
     "two requests that agree" );
   assert! ( processed_contradictions_in ( indoc! {"
       * (skg (vnid p1) node (gnid p)) p
-      ** (skg (vnid x1) node (gnid x) (editRequest (ready node))) x
-      * (skg (vnid x2) node (gnid x) writeProtected (editRequest (unready rel))) x
+      ** (skg (vnid x1) node (gnid x) (editRequest (processed node))) x
+      * (skg (vnid x2) node (gnid x) writeProtected (editRequest (unprocessed rel))) x
       "} ) . is_empty (),
     "a node's existence and its relationship to its viewparent are \
      different leaves" ); }
@@ -176,8 +176,8 @@ fn processed_requests_that_agree_or_name_different_leaves_pass () {
 #[test]
 fn validation_refuses_contradictory_processed_requests () -> Result<(), Box<dyn Error>> {
   let viewforest : ViewForest = org_to_viewforest ( indoc! {"
-      * (skg (vnid x1) node (gnid x) (skgRepos (nodeRepo main)) (editRequest (ready node))) x
-      * (skg (vnid x2) node (gnid x) (skgRepos (nodeRepo main)) writeProtected (editRequest (unready node))) x
+      * (skg (vnid x1) node (gnid x) (skgRepos (nodeRepo main)) (editRequest (processed node))) x
+      * (skg (vnid x2) node (gnid x) (skgRepos (nodeRepo main)) writeProtected (editRequest (unprocessed node))) x
       "}, IdResolution::AsWritten ) . unwrap () . 0;
   let config : SkgConfig = SkgConfig::dummyFromSkgrepos ( HashMap::from ([
     ( SkgrepoName::from ("main"),

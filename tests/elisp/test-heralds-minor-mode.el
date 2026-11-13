@@ -57,8 +57,8 @@
       (let ((display (heralds-from-metadata
                       (nth 1 case)
                       (pcase (nth 4 case)
-                        ("folderChange ready" 'processed)
-                        ("folderChange unready" 'unprocessed))
+                        ("folderChange processed" 'processed)
+                        ("folderChange unprocessed" 'unprocessed))
                       (equal (nth 4 case) "pendingDetachment"))))
         (should (equal (list (car case)
                              (substring-no-properties display)
@@ -94,7 +94,7 @@ otherwise. Editing a member rerenders the folder's herald."
   (let ((ordinary (substring-no-properties
                    (heralds-from-metadata "(skg containerFolder)")))
         (changed "☮ its other containers changed (other files)")
-        (processed-member "*** (skg node (gnid c) (skgRepos (nodeRepo r)) noClaim writeProtected (diff (rel added) (leaves 1 rel) (ready rel))) c")
+        (processed-member "*** (skg node (gnid c) (skgRepos (nodeRepo r)) noClaim writeProtected (diff (rel added) (leaves 1 rel) (processed rel))) c")
         (unprocessed-member "*** (skg node (gnid d) (skgRepos (nodeRepo r)) noClaim writeProtected (diff (rel removed) (leaves 1 rel))) d"))
     (should (equal (test-heralds--folder-display
                     (list "* (skg node (gnid r) (skgRepos (nodeRepo r))) r"
@@ -116,7 +116,7 @@ otherwise. Editing a member rerenders the folder's herald."
     (should (equal (test-heralds--folder-display
                     '("** (skg containerFolder)"
                       "*** (skg node (gnid c) (skgRepos (nodeRepo r)) noClaim writeProtected) c"
-                      "**** (skg (relRepoMove (old a) (new b)) (diff (leaves 1) (ready)))"))
+                      "**** (skg (relRepoMove (old a) (new b)) (diff (leaves 1) (processed)))"))
                    (concat changed "✓")))
     ;; No member's relationship changed: the ordinary label. A
     ;; grandchild's '(rel ...)' is no member's.
@@ -131,7 +131,7 @@ otherwise. Editing a member rerenders the folder's herald."
                     (list "** (skg containerFolder)" unprocessed-member)
                     (lambda ()
                       (search-forward "(leaves 1 rel)")
-                      (insert " (ready rel)")))
+                      (insert " (processed rel)")))
                    (concat changed "✓")))))
 
 (defun test-heralds--last-line-display (lines)

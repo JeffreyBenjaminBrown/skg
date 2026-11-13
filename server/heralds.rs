@@ -268,9 +268,9 @@ fn diffView_property_rules (
 /// existence ('(node added)', '(node removed)') as ∃+ ∃-, its other
 /// properties ('(properties changed)') as M, and the existence of its
 /// relationship to its viewparent ('(rel added)', '(rel removed)') as
-/// ~+ ~-, each followed by a ✓ when '(ready ...)' names that diff
+/// ~+ ~-, each followed by a ✓ when '(processed ...)' names that diff
 /// object ('all' for M), then the processed request. '(leaves ...)'
-/// is for the clients' gestures and shows nothing. The ready part is
+/// is for the clients' gestures and shows nothing. The processed part is
 /// matched once per object, so each ✓ lands after its own object
 /// whatever the raw order.
 fn change_fact_rules_for_two_objects (
@@ -282,12 +282,12 @@ fn change_fact_rules_for_two_objects (
         leaf_styled_as ("existence", "removed", "∃-") ]),
       rule ("properties", vec! [
         leaf_styled_as ("properties", "changed", "M") ]),
-      rule ("ready", vec! [ leaf_abut_styled_as ("ready", "node", "✓"),
-                            leaf_abut_styled_as ("ready", "all",  "✓") ]),
+      rule ("processed", vec! [ leaf_abut_styled_as ("processed", "node", "✓"),
+                            leaf_abut_styled_as ("processed", "all",  "✓") ]),
       rule ("rel", vec! [
         leaf_styled_as ("existence", "added",   "~+"),
         leaf_styled_as ("existence", "removed", "~-") ]),
-      rule ("ready", vec! [ leaf_abut_styled_as ("ready", "rel", "✓") ]),
+      rule ("processed", vec! [ leaf_abut_styled_as ("processed", "rel", "✓") ]),
       vac ("leaves") ]) ] }
 
 /// The processed request inside '(editRequest ...)', rendered after
@@ -296,11 +296,11 @@ fn processed_request_rules (
 ) -> Vec<RuleChild> {
   vec! [
     rule ("editRequest", vec! [
-      processed_request_rule ("readyRequest",   "ready",   "request:ready"),
-      processed_request_rule ("unreadyRequest", "unready", "request:unready") ]) ] }
+      processed_request_rule ("processedRequest",   "processed",   "request:processed"),
+      processed_request_rule ("unprocessedRequest", "unprocessed", "request:unprocessed") ]) ] }
 
 /// The same for a leaf with a single diff object (a property member, an
-/// unknown viewnode, a restricted viewnode), whose '(ready)' names no object, or
+/// unknown viewnode, a restricted viewnode), whose '(processed)' names no object, or
 /// 'all' on a changeset marker. 'added' and 'removed' render its
 /// existence, whichever object it names.
 fn change_fact_rules_for_one_object (
@@ -315,10 +315,10 @@ fn change_fact_rules_for_one_object (
     rule ("diff", vec! [
       existence ("node"),
       existence ("rel"),
-      rule ("ready", vec! [ any_abut_styled_as ("ready", "✓") ]),
+      rule ("processed", vec! [ any_abut_styled_as ("processed", "✓") ]),
       vac ("leaves") ]) ] }
 
-/// "request:ready", then ":OBJECT" for each object the request names,
+/// "request:processed", then ":OBJECT" for each object the request names,
 /// styled under 'node_heralds_key'.
 fn processed_request_rule (
   node_heralds_key : &'static str,
@@ -849,7 +849,7 @@ pub fn emittable_metadata_atoms () -> std::collections::HashSet<&'static str> {
     "rels", "props", "birth",
     "editRequest", "viewRequests",
     // The processed requests inside '(editRequest ...)'.
-    "ready", "unready",
+    "processed", "unprocessed",
     // NodeEditRequest atoms. The flag form's name and desired value
     // are matched literally so its herald can describe the complete state
     // change rather than echoing two context-free arguments.
@@ -938,7 +938,7 @@ fn change_fact_atoms () -> Vec<&'static str> {
   fn guard ( facts : ChangeFacts, object : DiffObject ) {
     let ChangeFacts {
       change : _,   // -> node, rel, properties, with DiffChange::EMITTABLE_ATOMS
-      processed : _, // -> ready, with the objects
+      processed : _, // -> processed, with the objects
       leaves : _,   // -> leaves, with the objects
       home_skgrepo_move : _,   // -> the homeSkgrepoMove atom, below
       moved_like_ancestor : _, // -> the movedLikeAncestor atom, below
@@ -947,7 +947,7 @@ fn change_fact_atoms () -> Vec<&'static str> {
       DiffObject::Node | DiffObject::Rel | DiffObject::All
         | DiffObject::NewContent | DiffObject::NewOutward => () }}
   let _ = guard;
-  [ vec! [ "diff", "ready", "leaves",
+  [ vec! [ "diff", "processed", "leaves",
            "homeSkgrepoMove", "movedLikeAncestor" ],
     DiffChange::EMITTABLE_ATOMS . to_vec (),
     DiffObject::ALL . into_iter () . map (DiffObject::wire_name)

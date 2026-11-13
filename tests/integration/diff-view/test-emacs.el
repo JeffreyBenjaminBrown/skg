@@ -107,7 +107,7 @@
       ;; i-th root afresh. A root an earlier gesture already marked processed
       ;; is skipped: the gesture toggles, so it would mark it unprocessed.
       (goto-char (nth i (root-headline-positions)))
-      (unless (string-match-p "(ready"
+      (unless (string-match-p "(processed"
                               (buffer-substring (line-beginning-position)
                                                 (line-end-position)))
         (setq test-messages nil)

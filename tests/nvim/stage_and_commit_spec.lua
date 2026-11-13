@@ -9,7 +9,7 @@ local stage_and_commit = require('skg.stage_and_commit')
 
 local NEEDS_CONFIRMATION =
   '((response-type stage-and-commit) (needs-confirmation . t)'
-  .. ' (readiness-summary (ready 1) (changed 3) (foreign 0) (order-only 0) (notEditable 0))'
+  .. ' (processed-summary (processed 1) (changed 3) (foreign 0) (order-only 0) (notEditable 0))'
   .. ' (errors ()) (warnings ()))'
 
 describe('skg stage and commit', function ()
@@ -135,7 +135,7 @@ describe('skg stage and commit', function ()
       respond(helpers.framed(
         '((response-type stage-and-commit) (needs-confirmation . t)'
         .. ' (already-staged (("/data/public" "notes.txt" "a b.skg")))'
-        .. ' (readiness-summary (ready 3) (changed 3) (foreign 0) (order-only 0) (notEditable 0))'
+        .. ' (processed-summary (processed 3) (changed 3) (foreign 0) (order-only 0) (notEditable 0))'
         .. ' (errors ()) (warnings ()))'))
       respond(helpers.framed('((response-type rerender-lock) (lock-views ()))'))
       respond(helpers.framed(

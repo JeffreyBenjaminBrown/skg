@@ -66,7 +66,7 @@ the case says. The cases are shared with Neovim."
                                        case "strip"))))
             (dolist (writer `(("edit request" "with the edit request"
                                ,#'skg--metadata-with-edit-request)
-                              ("readiness request" "with the readiness request"
+                              ("processed request" "with the processed request"
                                ,#'skg--metadata-with-processed-request)))
               (let ((request (test-skg-metadata-editor--field
                               case (nth 0 writer))))

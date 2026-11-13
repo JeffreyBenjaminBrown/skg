@@ -4,7 +4,7 @@
 //! does not show adds ('docs/diff-view.org', "Extending the diff
 //! view"). Each is a refresh in diff-view mode
 //! ('refresh_viewforest', 'server/refresh/'), over the graph straddle,
-//! with the '(ready ...)' change facts read from the store: the first
+//! with the '(processed ...)' change facts read from the store: the first
 //! rendering refreshes a stub of the buffer's roots
 //! ('diffView_buffer_viewforest'); the rerender pass
 //! ('refresh_view' in 'server/rerender_pass.rs') brings the straddle
@@ -39,7 +39,7 @@ use std::error::Error;
 use std::sync::{Arc, MutexGuard};
 
 /// Refresh 'viewforest', a buffer of kind 'diffView_buffer_kind' of
-/// the diff view, over 'straddle', with the '(ready ...)' change facts from
+/// the diff view, over 'straddle', with the '(processed ...)' change facts from
 /// 'store'. The goal holds what HEAD alone warrants, the change
 /// viewnodes are recomputed in place, and the buffer's sets choose
 /// what may be editable ('drawn_occurrence_editability'). The diff view opens only

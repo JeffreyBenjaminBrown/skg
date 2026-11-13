@@ -37,7 +37,7 @@ Refuses while the buffer has unsaved changes."
   (condition-case err
       (let* ((response (read payload))
              (errors-line (skg--response-errors-line response))
-             (summary (assq 'readiness-summary response)))
+             (summary (assq 'processed-summary response)))
         (cond (errors-line
                (message "%s" errors-line))
               (summary

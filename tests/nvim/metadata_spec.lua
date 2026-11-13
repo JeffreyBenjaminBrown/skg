@@ -284,8 +284,8 @@ describe('skg.metadata commands', function ()
       { 'delete', '', metadata.delete, ' (editRequest delete)' },
       { 'delete over a merge', ' (editRequest (merge y))',
         metadata.delete, ' (editRequest delete)' },
-      { 'delete beside a processed request', ' (editRequest (merge y) (ready node))',
-        metadata.delete, ' (editRequest delete (ready node))' },
+      { 'delete beside a processed request', ' (editRequest (merge y) (processed node))',
+        metadata.delete, ' (editRequest delete (processed node))' },
       { 'delete_recursive over a merge', ' (editRequest (merge y))',
         metadata.delete_recursive, ' (editRequest delete)' },
       { 'merge', '', function () metadata.set_merge_request('z') end,
@@ -298,9 +298,9 @@ describe('skg.metadata commands', function ()
         ' (editRequest (merge z))' },
       { 'the flag stamp', '', function () flag._apply(2, false, false) end,
         ' (editRequest (flag noSearchMatching false))' },
-      { 'the flag stamp beside a processed request', ' (editRequest (ready node))',
+      { 'the flag stamp beside a processed request', ' (editRequest (processed node))',
         function () flag._apply(2, true, false) end,
-        ' (editRequest (flag noSearchMatching true) (ready node))' },
+        ' (editRequest (flag noSearchMatching true) (processed node))' },
       { 'detach', '', metadata.detach, ' noClaim' },
       { 'detach beside a merge', ' (editRequest (merge y))',
         metadata.detach, ' noClaim (editRequest (merge y))' } }
@@ -412,23 +412,23 @@ describe('skg.metadata commands', function ()
       end
       return nil
     end
-    assert.are.equal('(editRequest (merge b) (ready node))',
+    assert.are.equal('(editRequest (merge b) (processed node))',
       edit_request_after(
         '* (skg node (gnid a) (skgRepos (nodeRepo main))'
-        .. ' (editRequest delete (ready node))'
+        .. ' (editRequest delete (processed node))'
         .. ' (diff (node added) (leaves 1 node))) a',
         function () metadata.set_merge_request('b') end))
-    assert.are.equal('(editRequest restoreNode (unready node))',
+    assert.are.equal('(editRequest restoreNode (unprocessed node))',
       edit_request_after(
         '* (skg ghost (gnid g) (skgRepos (nodeRepo main))'
-        .. ' (editRequest (unready node)) (diff (node removed) (rel removed)'
-        .. ' (leaves 1 node) (ready node))) g',
+        .. ' (editRequest (unprocessed node)) (diff (node removed) (rel removed)'
+        .. ' (leaves 1 node) (processed node))) g',
         metadata.restore_deleted_node))
-    assert.are.equal('(editRequest restoreRel (ready rel))',
+    assert.are.equal('(editRequest restoreRel (processed rel))',
       edit_request_after(
         '* (skg node (gnid r) (skgRepos (nodeRepo main))) r\n'
         .. '** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim'
-        .. ' (editRequest (ready rel)) (view noWarrant)'
+        .. ' (editRequest (processed rel)) (view noWarrant)'
         .. ' (diff (rel removed) (leaves 1 rel))) x',
         metadata.restore_removed_membership))
   end)
@@ -802,23 +802,23 @@ describe('skg.metadata relRepo gesture', function ()
   end)
 
   it('keeps the processed request', function ()
-    buffer_with('* (skg node (gnid x) (skgRepos (nodeRepo public)) (editRequest (relRepo trusted) (ready rel))) x')
+    buffer_with('* (skg node (gnid x) (skgRepos (nodeRepo public)) (editRequest (relRepo trusted) (processed rel))) x')
     metadata.apply_relRepo_choice(1, 'private')
     assert.is_truthy(buffer_text():find(
-      '(editRequest (relRepo private) (ready rel)))', 1, true))
+      '(editRequest (relRepo private) (processed rel)))', 1, true))
     metadata.apply_relRepo_choice(1, metadata.relRepo_no_override)
-    assert.is_truthy(buffer_text():find('(editRequest (ready rel)))', 1, true))
+    assert.is_truthy(buffer_text():find('(editRequest (processed rel)))', 1, true))
   end)
 
   it('is not blocked by a processed request, but by a delete', function ()
     buffer_with({
-      '* (skg node (gnid x) (skgRepos (nodeRepo public)) (editRequest (ready rel))) x',
-      '* (skg node (gnid y) (skgRepos (nodeRepo public)) (editRequest (unready))) y',
-      '* (skg node (gnid z) (skgRepos (nodeRepo public)) (editRequest delete (ready))) z' })
+      '* (skg node (gnid x) (skgRepos (nodeRepo public)) (editRequest (processed rel))) x',
+      '* (skg node (gnid y) (skgRepos (nodeRepo public)) (editRequest (unprocessed))) y',
+      '* (skg node (gnid z) (skgRepos (nodeRepo public)) (editRequest delete (processed))) z' })
     assert.is_false(metadata.node_edit_request_at_line_p(1))
     metadata.apply_relRepo_choice(1, 'private')
     assert.is_truthy(metadata.line_text(1):find(
-      '(editRequest (relRepo private) (ready rel)))', 1, true))
+      '(editRequest (relRepo private) (processed rel)))', 1, true))
     assert.is_false(metadata.node_edit_request_at_line_p(2))
     assert.is_true(metadata.node_edit_request_at_line_p(3))
     refusal(metadata.apply_relRepo_choice, 3, 'private')

@@ -9,7 +9,7 @@
 (require 'skg-request-stage-and-commit)
 
 (defconst test--stage-and-commit-needs-confirmation
-  "((needs-confirmation . t) (readiness-summary (ready 1) (changed 3) (foreign 0) (order-only 0) (notEditable 0)) (errors ()) (warnings ()))")
+  "((needs-confirmation . t) (processed-summary (processed 1) (changed 3) (foreign 0) (order-only 0) (notEditable 0)) (errors ()) (warnings ()))")
 
 (defun test--stage-and-commit-run (typed body)
   "Run BODY with the network faked and every `read-string' answered
@@ -205,7 +205,7 @@ listed in a buffer of their own, even when every changed file is processed;
    (lambda (sent handlers prompts)
      (test--stage-and-commit-write-and-send "the message")
      (funcall (gethash 'stage-and-commit handlers) 'fake-proc
-              "((needs-confirmation . t) (already-staged ((\"/data/public\" \"notes.txt\" \"a b.skg\") (\"/data/private\" \"c.skg\"))) (readiness-summary (ready 3) (changed 3) (foreign 0) (order-only 0) (notEditable 0)) (errors ()) (warnings ()))")
+              "((needs-confirmation . t) (already-staged ((\"/data/public\" \"notes.txt\" \"a b.skg\") (\"/data/private\" \"c.skg\"))) (processed-summary (processed 3) (changed 3) (foreign 0) (order-only 0) (notEditable 0)) (errors ()) (warnings ()))")
      (funcall skg--rerender-after-empty-stream)
      (should (equal (car (funcall prompts))
                     "Commit ready. All 3 of 3 changed files are processed. Already staged, so committed too: /data/public: 2 paths, /data/private: 1 path (listed in *skg already staged*). Type yes to commit anyway: "))
@@ -262,7 +262,7 @@ and :handlers (the response types still registered)."
       (skg-lp-handle-generic-chunk
        'fake-proc
        (test--stage-and-commit-framed
-        "((response-type stage-and-commit) (needs-confirmation . t) (already-staged ((\"/data/public\" \"a.skg\" \"b.skg\") (\"/data/private\" \"c.skg\"))) (readiness-summary (ready 3) (changed 3) (foreign 0) (order-only 0) (notEditable 0)) (errors ()) (warnings ()))"
+        "((response-type stage-and-commit) (needs-confirmation . t) (already-staged ((\"/data/public\" \"a.skg\" \"b.skg\") (\"/data/private\" \"c.skg\"))) (processed-summary (processed 3) (changed 3) (foreign 0) (order-only 0) (notEditable 0)) (errors ()) (warnings ()))"
         "((response-type rerender-lock) (lock-views ()))"
         "((response-type rerender-done) (errors ()) (warnings ()))"))
       (let ((stream skg--stream-in-progress)

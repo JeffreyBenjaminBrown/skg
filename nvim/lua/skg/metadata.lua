@@ -475,11 +475,11 @@ function M.metadata_with_new_parts_at_their_ranks (host_sexp, edited_sexp)
 end
 
 ---@param request any a part of an '(editRequest ...)'
----@return boolean is it a processed request, '(ready OBJECT...)' or
----'(unready OBJECT...)'?
+---@return boolean is it a processed request, '(processed OBJECT...)' or
+---'(unprocessed OBJECT...)'?
 function M.processed_request_p (request)
   local head = head_name(request)
-  return head == 'ready' or head == 'unready'
+  return head == 'processed' or head == 'unprocessed'
 end
 
 ---METADATA_SEXP with its '(editRequest ...)' holding the requests
@@ -510,8 +510,8 @@ local function metadata_with_editRequest_parts (metadata_sexp, requests_from)
   return result
 end
 
----METADATA_SEXP with PROCESSED_REQUEST, '(ready OBJECT...)' or
----'(unready OBJECT...)', in its '(editRequest ...)' in place of any
+---METADATA_SEXP with PROCESSED_REQUEST, '(processed OBJECT...)' or
+---'(unprocessed OBJECT...)', in its '(editRequest ...)' in place of any
 ---processed request there, after the headline's other request if it
 ---has one. A headline without the form gets one, where the server
 ---writes it: before its '(viewRequests ...)', '(view ...)' and '(diff
@@ -1014,11 +1014,11 @@ end
 ---@param metadata_sexp any
 ---@param objects string[]
 ---@return boolean is every one of OBJECTS processed? It is when the
----headline carries a '(ready ...)' that names each of them. A
+---headline carries a '(processed ...)' that names each of them. A
 ---headline that lists no object (one naming a single leaf) is processed
----when it carries any '(ready ...)'.
+---when it carries any '(processed ...)'.
 function M.objects_processed_p (metadata_sexp, objects)
-  local processed = M.processed_form(metadata_sexp, 'ready')
+  local processed = M.processed_form(metadata_sexp, 'processed')
   if not processed then return false end
   local processed_objects = {}
   for _, object in ipairs(arguments(processed)) do
@@ -1036,10 +1036,10 @@ end
 ---child headlines. The member carries such a change when its
 ---'(diff ...)' has a '(rel ...)', or when one of its children is a
 ---'(relRepoMove ...)'. The change is processed when both of these hold:
----if the member has a '(rel ...)', its '(diff ...)' has a '(ready
+---if the member has a '(rel ...)', its '(diff ...)' has a '(processed
 ---...)' that, when its '(leaves ...)' lists 'rel', names 'rel'; if
 ---it has a '(relRepoMove ...)' child, that child's '(diff ...)' has
----a '(ready ...)'.
+---a '(processed ...)'.
 ---@param member_sexp any
 ---@param child_sexps any[]
 ---@return boolean|nil nil when the member carries no such change,
@@ -1057,7 +1057,7 @@ function M.membership_change_processed (member_sexp, child_sexps)
   for _, child in ipairs(child_sexps) do
     if child_with_head(child, 'relRepoMove') then
       changed = true
-      processed = processed and M.processed_form(child, 'ready') ~= nil end
+      processed = processed and M.processed_form(child, 'processed') ~= nil end
   end
   if not changed then return nil end
   return processed

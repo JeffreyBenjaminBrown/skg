@@ -17,7 +17,7 @@
 # A case may give, between its metadata and its text, a line
 # '---- context: ' saying what the headline's own metadata cannot,
 # which a client learns from the headlines around it:
-#   'folderChange ready' or 'folderChange unready': the headline is a
+#   'folderChange processed' or 'folderChange unprocessed': the headline is a
 #     folder a member of which carries a change of its relationship,
 #     every such change processed, or not;
 #   'pendingDetachment': the headline is 'noClaim', warranted, and
@@ -277,7 +277,7 @@
 ---- text: ᗣ☮ restore node ∃- ~-
 ---- styles: ghost*1 crucial*1 -*1 nonstandard*12 -*1 nonstandard*2 -*1 nonstandard*2
 ==== diff view: a new member whose node object is processed
-(skg node (gnid x) (diff (node added) (rel added) (ready node)))
+(skg node (gnid x) (diff (node added) (rel added) (processed node)))
 ---- text: ∃+✓ ~+
 ---- styles: nonstandard*2 go*1 -*1 nonstandard*2
 ==== diff view: a modified node
@@ -285,19 +285,19 @@
 ---- text: M
 ---- styles: nonstandard*1
 ==== diff view: a modified node in a new relationship, every leaf it records processed
-(skg node (gnid x) (diff (rel added) (properties changed) (leaves 3 rel all) (ready all)))
+(skg node (gnid x) (diff (rel added) (properties changed) (leaves 3 rel all) (processed all)))
 ---- text: M✓ ~+
 ---- styles: nonstandard*1 go*1 -*1 nonstandard*2
 ==== diff view: a modified folder member, every leaf it records processed
-(skg node (gnid x) writeProtected (diff (properties changed) (leaves 1 all) (ready all)))
+(skg node (gnid x) writeProtected (diff (properties changed) (leaves 1 all) (processed all)))
 ---- text: ☮ M✓
 ---- styles: crucial*1 -*1 nonstandard*1 go*1
 ==== diff view: each ✓ follows its own object, whatever the raw order of the parts
-(skg node (gnid x) (diff (ready rel node) (node added) (rel removed)))
+(skg node (gnid x) (diff (processed rel node) (node added) (rel removed)))
 ---- text: ∃+✓ ~-✓
 ---- styles: nonstandard*2 go*1 -*1 nonstandard*2 go*1
 ==== diff view: an added alias, processed
-(skg alias (diff (rel added) (ready)))
+(skg alias (diff (rel added) (processed)))
 ---- text: alias +✓
 ---- styles: message*5 -*1 nonstandard*1 go*1
 ==== diff view: an alias the worktree lost, which HEAD warrants
@@ -305,15 +305,15 @@
 ---- text: ᗣ alias -
 ---- styles: ghost*1 -*1 message*5 -*1 nonstandard*1
 ==== diff view: a ghost with a request to unmark its existence
-(skg ghost (gnid x) (skgRepos (nodeRepo main)) (editRequest (unready node)) (diff (node removed) (rel removed)))
----- text: ᗣ☮ ∃- ~- request:unready:node
----- styles: ghost*1 crucial*1 -*1 nonstandard*2 -*1 nonstandard*2 -*1 nonstandard*20
+(skg ghost (gnid x) (skgRepos (nodeRepo main)) (editRequest (unprocessed node)) (diff (node removed) (rel removed)))
+---- text: ᗣ☮ ∃- ~- request:unprocessed:node
+---- styles: ghost*1 crucial*1 -*1 nonstandard*2 -*1 nonstandard*2 -*1 nonstandard*24
 ==== diff view: a request to mark both objects of a member
-(skg node (gnid x) (editRequest (ready node rel)))
----- text: request:ready:node request:ready:rel
----- styles: nonstandard*18 -*1 nonstandard*17
+(skg node (gnid x) (editRequest (processed node rel)))
+---- text: request:processed:node request:processed:rel
+---- styles: nonstandard*22 -*1 nonstandard*21
 ==== diff view: old title and body, processed
-(skg (oldText titleAndBody) (diff (ready)))
+(skg (oldText titleAndBody) (diff (processed)))
 ---- text: old title and body✓
 ---- styles: message*18 go*1
 ==== diff view: old title
@@ -329,7 +329,7 @@
 ---- text: body diff
 ---- styles: message*9
 ==== diff view: a home skgrepo move, processed
-(skg (homeSkgrepoMove (old pub) (new priv)) (diff (ready)))
+(skg (homeSkgrepoMove (old pub) (new priv)) (diff (processed)))
 ---- text: ⌂ -pub +priv✓
 ---- styles: message*1 -*1 normal*4 -*1 normal*5 go*1
 ==== diff view: a relRepo move
@@ -337,7 +337,7 @@
 ---- text: relationship moved from pub to priv
 ---- styles: message*23 -*1 normal*3 -*1 message*2 -*1 normal*4
 ==== diff view: the content changeset marker, processed
-(skg (changesetMarker content) (diff (ready all)))
+(skg (changesetMarker content) (diff (processed all)))
 ---- text: its content changed✓
 ---- styles: message*19 go*1
 ==== diff view: the relRepo changeset marker
@@ -345,11 +345,11 @@
 ---- text: some content relationships changed skgrepo
 ---- styles: message*42
 ==== diff view: the order-only changeset marker
-(skg (changesetMarker orderOnly) (diff (ready all)))
+(skg (changesetMarker orderOnly) (diff (processed all)))
 ---- text: order-only change✓
 ---- styles: message*17 go*1
 ==== diff view: a ghost, its existence processed
-(skg ghost (gnid x) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed) (ready node)))
+(skg ghost (gnid x) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed) (processed node)))
 ---- text: ᗣ☮ ∃-✓ ~-
 ---- styles: ghost*1 crucial*1 -*1 nonstandard*2 go*1 -*1 nonstandard*2
 ==== diff view: the acquired-by folder
@@ -366,17 +366,17 @@
 ---- styles: crucial*1 -*1 message*28
 ==== diff view: a folder of recorders shown because of a change, processed
 (skg containerFolder)
----- context: folderChange ready
+---- context: folderChange processed
 ---- text: ☮ its other containers changed (other files)✓
 ---- styles: crucial*1 -*1 message*42 go*1
 ==== diff view: a folder of the node's own list shown because of a change
 (skg aliasFolder)
----- context: folderChange unready
+---- context: folderChange unprocessed
 ---- text: its aliases changed (this file)
 ---- styles: message*31
 ==== diff view: the node's subscribees changed
 (skg subscribeeFolder)
----- context: folderChange unready
+---- context: folderChange unprocessed
 ---- text: its subscribees changed (this file)
 ---- styles: message*35
 ==== diff view: a node in the skgrepo-changes buffer whose home moved

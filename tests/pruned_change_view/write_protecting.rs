@@ -105,14 +105,14 @@ fn write_protecting_the_only_editable_occurrence_of_a_node_of_u_saves (
       . expect ("c is shown");
     let marked : String = save ( f, &created . replacen (
       c_line, &c_line . replacen (
-        "(diff ", "(editRequest (ready all)) (diff ", 1 ), 1 )) ?
+        "(diff ", "(editRequest (processed all)) (diff ", 1 ), 1 )) ?
       . saved_view;
-    assert! ( node_lines (&marked, "c") [0] . contains ("(ready "), "{}", marked );
+    assert! ( node_lines (&marked, "c") [0] . contains ("(processed "), "{}", marked );
     let response : SaveResponse =
       save ( f, &write_protecting_at (&marked, "****", "c") ) ?;
     assert! ( response . errors . is_empty (), "{:?}", response . errors );
     assert! ( node_lines (&response . saved_view, "c") . iter ()
-                . all ( |line| line . contains ("(ready ") ),
+                . all ( |line| line . contains ("(processed ") ),
               "{}", response . saved_view );
     assert_eq! ( response . processed_summary . unwrap () . changes_not_editable_here, 1 );
     Ok (( )) }) }

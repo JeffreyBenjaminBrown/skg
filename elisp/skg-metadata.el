@@ -885,10 +885,10 @@ as (N . OBJECTS), or nil when it names no leaf."
 
 (defun skg--objects-processed-p (metadata-sexp objects)
   "Non-nil when every one of OBJECTS is processed on METADATA-SEXP's headline:
-when it carries a '(ready ...)' that names each of them. A headline
+when it carries a '(processed ...)' that names each of them. A headline
 that lists no object (one naming a single leaf) is processed when it
-carries any '(ready ...)'."
-  (let ((processed (skg--processed-form metadata-sexp 'ready)))
+carries any '(processed ...)'."
+  (let ((processed (skg--processed-form metadata-sexp 'processed)))
     (and processed
          (seq-every-p (lambda (object) (memq object (cdr processed)))
                       objects))))
@@ -918,9 +918,9 @@ the folder's viewparent, and whether that change is processed: nil when
 it carries none, else `processed' or `unprocessed'. It carries one when its
 '(diff ...)' has a '(rel ...)', or when a child is a
 '(relRepoMove ...)'. The change is processed when both hold: a '(rel ...)'
-comes with a '(ready ...)' that names 'rel' if the member's
+comes with a '(processed ...)' that names 'rel' if the member's
 '(leaves ...)' lists 'rel'; every '(relRepoMove ...)' child carries
-'(diff (ready ...))'."
+'(diff (processed ...))'."
   (let ((rel-change (skg--processed-form member-sexp 'rel))
         (relRepo-moves
          (seq-filter (lambda (child-sexp)
@@ -933,7 +933,7 @@ comes with a '(ready ...)' that names 'rel' if the member's
                     (and (memq 'rel (cdr (skg--processed-leaves member-sexp)))
                          '(rel))))
                (seq-every-p (lambda (relRepo-move)
-                              (skg--processed-form relRepo-move 'ready))
+                              (skg--processed-form relRepo-move 'processed))
                             relRepo-moves))
           'processed
         'unprocessed))))
@@ -1342,8 +1342,8 @@ checks\" entry in PITFALLs.org."
 
 (defun skg--processed-request-p (part)
   "Non-nil when PART, an element of an '(editRequest ...)', is a
-processed request, '(ready OBJECT...)' or '(unready OBJECT...)'."
-  (memq (car-safe part) '(ready unready)))
+processed request, '(processed OBJECT...)' or '(unprocessed OBJECT...)'."
+  (memq (car-safe part) '(processed unprocessed)))
 
 (defun skg--metadata-with-processed-request (metadata-sexp request)
   "METADATA-SEXP with REQUEST as the processed request of its

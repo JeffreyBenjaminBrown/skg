@@ -129,11 +129,11 @@ Tests position 1, position 17 (end of line 1), and one random in [2,16]."
 the other parts are kept, in their order."
   (should (equal
            (skg-strip-heralds-from-sexp
-            '(skg node (gnid x) (editRequest (ready rel))
+            '(skg node (gnid x) (editRequest (processed rel))
                   (view (rels (contains (in 1 (ancestors 1)) (out 3)))
                         (birth (contains in 1)) repoBoundary cycle)
                   (diff (rel added) (leaves 1 rel))))
-           '(skg node (gnid x) (editRequest (ready rel))))))
+           '(skg node (gnid x) (editRequest (processed rel))))))
 
 (ert-deftest test-strip-heralds-strips-every-kinds-derived-facts ()
   "Every kind's derived facts are stripped, not only a node's."

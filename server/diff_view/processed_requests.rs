@@ -1,4 +1,4 @@
-//! Processed requests, '(ready ...)' change facts and a buffer's processed
+//! Processed requests, '(processed ...)' change facts and a buffer's processed
 //! summary ('docs/diff-view.org', "Processed marks"), the places where the
 //! processed store meets a viewforest. The first two rest on one
 //! rule, 'leaves_named_at': which change-forest leaves a headline
@@ -6,7 +6,7 @@
 //!
 //! A save consumes the processed requests of the buffer it saves, in
 //! any buffer ('consume_processed_requests'): after the graph edits
-//! succeed, each '(editRequest (ready ...))' or '(editRequest (unready
+//! succeed, each '(editRequest (processed ...))' or '(editRequest (unprocessed
 //! ...))' sets or
 //! clears the marks of the leaves it names, at their fingerprints in
 //! the graph straddle brought up to date with the save. A request that
@@ -17,7 +17,7 @@
 //! 'NamedLeafSet').
 //!
 //! At the tail of the refresh of a buffer of the diff view, the
-//! '(ready ...)' change facts are set from the store, and the
+//! '(processed ...)' change facts are set from the store, and the
 //! '(leaves ...)' facts, which tell the clients what a request on a
 //! headline may name, from the same rule
 //! ('set_processed_facts_in_viewforest').
@@ -336,16 +336,16 @@ fn keys_in_forest (
     . flat_map ( |set| set . keys_in_forest (forest) )
     . collect () }
 
-/// Set the '(ready ...)' and '(leaves ...)' change facts of every
+/// Set the '(processed ...)' and '(leaves ...)' change facts of every
 /// viewnode that carries them. An object is processed when it names some
 /// leaf of 'forest' and every leaf it names is marked at its current
 /// fingerprint ('store'); the order-only changeset marker is always
 /// processed. The
 /// '(leaves ...)' fact is 'leaves_fact_at'. On an occurrence
-/// whose leaves fact lists 'all', '(ready ...)' names 'all' when every
-/// leaf its node records is marked. A processed changeset marker's '(ready
+/// whose leaves fact lists 'all', '(processed ...)' names 'all' when every
+/// leaf its node records is marked. A processed changeset marker's '(processed
 /// ...)' names 'all'; any other processed viewnode with a single object
-/// writes it bare, '(ready)'.
+/// writes it bare, '(processed)'.
 pub fn set_processed_facts_in_viewforest (
   viewforest : &mut ViewForest,
   forest     : &ChangeLeaves,

@@ -21,7 +21,7 @@
 --   sexp reader, but the edit-buffer pipeline never needs them to).
 -- - Childless non-root headlines become bare atoms, not lists, but
 --   for one whose text is '(ATOM)': a proper sub-sexp that wraps a
---   single atom in parens, such as the processed request '(ready)', is
+--   single atom in parens, such as the processed request '(processed)', is
 --   that headline.
 --
 -- ENTRY POINTS: sexp_to_org, org_to_sexp.

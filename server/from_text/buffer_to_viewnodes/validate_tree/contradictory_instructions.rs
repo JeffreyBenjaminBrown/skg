@@ -117,7 +117,7 @@ fn collect_instructions(
 /// PURPOSE:
 /// Find the change leaves that two headlines of a buffer the user
 /// asked to save name with contradictory processed requests, one
-/// '(ready ...)' and one '(unready ...)'. Each is returned as the set
+/// '(processed ...)' and one '(unprocessed ...)'. Each is returned as the set
 /// both name ('NamedLeafSet'), with the headlines that name it, in
 /// buffer order. Requests that agree contradict nothing.
 /// .

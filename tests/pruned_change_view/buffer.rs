@@ -218,11 +218,11 @@ fn marks_in_the_store_show_as_processed (
     let buffer : String = all_changes_buffer_with_marks ( f, &[
       LeafKey::Node { pid : ID::from ("txt"), aspect : NodeAspect::Text },
       alias ("a1") ] ) ? . unwrap ();
-    assert! ( without_viewnode_ids (&buffer) . contains ("** (skg (oldText titleAndBody) (diff (leaves 1) (ready))) txt"),
+    assert! ( without_viewnode_ids (&buffer) . contains ("** (skg (oldText titleAndBody) (diff (leaves 1) (processed))) txt"),
               "{}", buffer );
     assert_lines_in_order ( &buffer, &[
       "** (skg aliasFolder)", // a3 is not processed, so neither is the folder
-      "*** (skg alias noClaim (view ghostWarrant) (diff (rel removed) (leaves 1) (ready))) a1",
+      "*** (skg alias noClaim (view ghostWarrant) (diff (rel removed) (leaves 1) (processed))) a1",
       "*** (skg alias (diff (rel added) (leaves 1))) a3" ] );
     let buffer : String = all_changes_buffer_with_marks (
       f, &[ alias ("a1"), alias ("a3") ] ) ? . unwrap ();

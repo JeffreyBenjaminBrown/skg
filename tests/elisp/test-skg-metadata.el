@@ -148,11 +148,11 @@ the folder commands are the way to show a node's partners."
   "A folder is changed when a member carries a change of its
 relationship to the folder's viewparent, and processed when every such
 change is. The cases the server pinned when it computed this."
-  (let ((processed-member '(skg node (gnid m) (diff (rel added) (leaves 2 node rel) (ready rel))))
-        (unprocessed-member '(skg node (gnid m) (diff (rel added) (leaves 2 node rel) (ready node))))
-        (processed-unknown '(skg unknown (gnid u) (diff (rel added) (leaves 1) (ready))))
+  (let ((processed-member '(skg node (gnid m) (diff (rel added) (leaves 2 node rel) (processed rel))))
+        (unprocessed-member '(skg node (gnid m) (diff (rel added) (leaves 2 node rel) (processed node))))
+        (processed-unknown '(skg unknown (gnid u) (diff (rel added) (leaves 1) (processed))))
         (unprocessed-alias '(skg alias noClaim (view ghostWarrant) (diff (rel removed))))
-        (unchanged '(skg node (gnid n) (diff (node added) (ready node)))))
+        (unchanged '(skg node (gnid n) (diff (node added) (processed node)))))
     (cl-flet ((processed (&rest member-sexps)
                 (skg--folder-change-processed
                  (mapcar #'list member-sexps))))
@@ -169,7 +169,7 @@ change is. The cases the server pinned when it computed this."
   (let ((member '(skg node (gnid m))))
     (should (eq (skg--folder-change-processed
                  (list (list member '(skg (relRepoMove (old a) (new b))
-                                          (diff (leaves 1) (ready))))))
+                                          (diff (leaves 1) (processed))))))
                 'processed))
     (should (eq (skg--folder-change-processed
                  (list (list member '(skg (relRepoMove (old a) (new b))
@@ -177,7 +177,7 @@ change is. The cases the server pinned when it computed this."
                 'unprocessed))
     ;; Both must be processed.
     (should (eq (skg--folder-change-processed
-                 (list (list '(skg node (gnid m) (diff (rel added) (leaves 1 rel) (ready rel)))
+                 (list (list '(skg node (gnid m) (diff (rel added) (leaves 1 rel) (processed rel)))
                              '(skg (relRepoMove (old a) (new b))
                                    (diff (leaves 1))))))
                 'unprocessed))))
@@ -659,23 +659,23 @@ the request."
   "The merge and restore commands replace the edit request in
 '(editRequest ...)' and keep the processed request pending there."
   (should (equal (test-skg--metadata-after
-                  "* (skg node (gnid a) (skgRepos (nodeRepo main)) (editRequest delete (ready node)) (diff (node added) (leaves 1 node))) a"
+                  "* (skg node (gnid a) (skgRepos (nodeRepo main)) (editRequest delete (processed node)) (diff (node added) (leaves 1 node))) a"
                   (lambda () (skg-set-merge-request "b")))
                  '(skg node (gnid a) (skgRepos (nodeRepo main))
-                       (editRequest (merge b) (ready node))
+                       (editRequest (merge b) (processed node))
                        (diff (node added) (leaves 1 node)))))
   (should (equal (test-skg--metadata-after
-                  "* (skg ghost (gnid g) (skgRepos (nodeRepo main)) (editRequest (unready node)) (diff (node removed) (rel removed) (leaves 1 node) (ready node))) g"
+                  "* (skg ghost (gnid g) (skgRepos (nodeRepo main)) (editRequest (unprocessed node)) (diff (node removed) (rel removed) (leaves 1 node) (processed node))) g"
                   #'skg-restore-deleted-node)
                  '(skg ghost (gnid g) (skgRepos (nodeRepo main))
-                       (editRequest restoreNode (unready node))
-                       (diff (node removed) (rel removed) (leaves 1 node) (ready node)))))
+                       (editRequest restoreNode (unprocessed node))
+                       (diff (node removed) (rel removed) (leaves 1 node) (processed node)))))
   (should (equal (test-skg--metadata-after
                   "* (skg node (gnid r) (skgRepos (nodeRepo main))) r
-** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim (editRequest (ready rel)) (view noWarrant) (diff (rel removed) (leaves 1 rel))) x"
+** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim (editRequest (processed rel)) (view noWarrant) (diff (rel removed) (leaves 1 rel))) x"
                   #'skg-restore-removed-membership)
                  '(skg node (gnid x) (skgRepos (nodeRepo main)) noClaim
-                       (editRequest restoreRel (ready rel))
+                       (editRequest restoreRel (processed rel))
                        (view noWarrant) (diff (rel removed) (leaves 1 rel))))))
 
 (ert-deftest test-skg-restore-commands-refuse-the-wrong-kind ()
@@ -872,12 +872,12 @@ facts."
     (should (equal (write "* (skg node (gnid k) (viewRequests editableView) (view cycle) (diff (node added))) k"
                           'delete)
                    "* (skg node (gnid k) (editRequest delete) (viewRequests editableView) (view cycle) (diff (node added))) k"))
-    (should (equal (write "* (skg node (gnid k) (editRequest (ready node)) (view cycle)) k"
+    (should (equal (write "* (skg node (gnid k) (editRequest (processed node)) (view cycle)) k"
                           '(merge j))
-                   "* (skg node (gnid k) (editRequest (merge j) (ready node)) (view cycle)) k"))
-    (should (equal (write "* (skg node (gnid k) (editRequest (merge j) (ready node))) k"
+                   "* (skg node (gnid k) (editRequest (merge j) (processed node)) (view cycle)) k"))
+    (should (equal (write "* (skg node (gnid k) (editRequest (merge j) (processed node))) k"
                           nil)
-                   "* (skg node (gnid k) (editRequest (ready node))) k"))
+                   "* (skg node (gnid k) (editRequest (processed node))) k"))
     (should (equal (write "* k" 'delete 'node)
                    "* (skg node (editRequest delete)) k"))))
 

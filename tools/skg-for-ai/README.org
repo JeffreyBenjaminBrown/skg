@@ -1104,7 +1104,7 @@ The changes follow, in this order. 'Delete:', 'Restore node:',
 'Restore membership:', 'Merge:', 'relRepo:', 'Search matching:',
 'Repo:', 'Editable:', 'Write-protect:', 'Detach:', 'Attach:', 'Processed:'
 and 'Unprocessed:' are the requests the handles' words ask for, each with
-the form the save sends ('Processed: ⟨0j⟩ 'A new grandchild', as '(ready
+the form the save sends ('Processed: ⟨0j⟩ 'A new grandchild', as '(processed
 node rel)'.'); a 'subtree' gives a line to each headline it gives a
 word.
 When the 'unprocessed' requests would unmark more than one change, a
@@ -1406,7 +1406,7 @@ change unmarks it. Marking is a save: write a word in a handle, and
 'save' turns it into a processed request in the headline's
 '(editRequest ...)', as the clients' 'C-c r r' does.
 
-'processed' marks every change the headline names, as the request '(ready
+'processed' marks every change the headline names, as the request '(processed
 OBJECT...)' naming each object its change facts list: on a new node
 its existence and its membership, on a modified node ('M') every
 change its file records and its membership if that changed, on an old

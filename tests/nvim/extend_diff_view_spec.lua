@@ -50,7 +50,7 @@ describe('skg extend diff view', function ()
       table.insert(requests, line)
       respond(helpers.framed(
         '((response-type extend-diff-view)'
-        .. ' (readiness-summary (ready 1) (changed 3) (foreign 0) (order-only 0) (notEditable 0))'
+        .. ' (processed-summary (processed 1) (changed 3) (foreign 0) (order-only 0) (notEditable 0))'
         .. ' (errors ()) (warnings ()))'))
       respond(helpers.framed(
         '((response-type rerender-lock) (lock-views ("diff-view: all changes")))'))

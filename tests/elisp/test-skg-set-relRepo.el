@@ -261,15 +261,15 @@ the displayed relRepo fact; its message says the saved skgrepo survives
   "Setting a relRepo request, and removing one, keeps the processed
 request pending in '(editRequest ...)'."
   (test--with-skg-content-view
-   "* (skg node (gnid x) (skgRepos (nodeRepo public)) (editRequest (relRepo trusted) (ready rel))) x\n"
+   "* (skg node (gnid x) (skgRepos (nodeRepo public)) (editRequest (relRepo trusted) (processed rel))) x\n"
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
      (skg--apply-relRepo-choice "private")
-     (should (string-match-p "(editRequest (relRepo private) (ready rel)))"
+     (should (string-match-p "(editRequest (relRepo private) (processed rel)))"
                              (test--buffer-line 1)))
      (skg--apply-relRepo-choice skg--relRepo-no-override)
-     (should (string-match-p "(editRequest (ready rel)))"
+     (should (string-match-p "(editRequest (processed rel)))"
                              (test--buffer-line 1))))))
 
 (ert-deftest test-apply-relRepo-under-a-processed-request ()
@@ -277,15 +277,15 @@ request pending in '(editRequest ...)'."
 relRepo request, as a delete does."
   (test--with-skg-content-view
    (concat
-    "* (skg node (gnid x) (skgRepos (nodeRepo public)) (editRequest (ready rel))) x\n"
-    "* (skg node (gnid y) (skgRepos (nodeRepo public)) (editRequest (unready))) y\n"
-    "* (skg node (gnid z) (skgRepos (nodeRepo public)) (editRequest delete (ready))) z\n")
+    "* (skg node (gnid x) (skgRepos (nodeRepo public)) (editRequest (processed rel))) x\n"
+    "* (skg node (gnid y) (skgRepos (nodeRepo public)) (editRequest (unprocessed))) y\n"
+    "* (skg node (gnid z) (skgRepos (nodeRepo public)) (editRequest delete (processed))) z\n")
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
      (should-not (skg--node-edit-request-at-point-p))
      (skg--apply-relRepo-choice "private")
-     (should (string-match-p "(editRequest (relRepo private) (ready rel)))"
+     (should (string-match-p "(editRequest (relRepo private) (processed rel)))"
                              (test--buffer-line 1)))
      (forward-line 1)
      (should-not (skg--node-edit-request-at-point-p))

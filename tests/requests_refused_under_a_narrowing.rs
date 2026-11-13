@@ -58,7 +58,7 @@ fn deleting_the_references_to_an_absent_id_is_refused (
 #[test]
 fn a_save_carrying_a_processed_request_is_refused (
 ) -> Result<(), Box<dyn Error>> {
-  refused_with_the_root_carrying ("(editRequest (ready all))", "A processed request") }
+  refused_with_the_root_carrying ("(editRequest (processed all))", "A processed request") }
 
 /// Under "public" a save carrying a restore request, on a member
 /// shown as removed, is refused, before anything is written.

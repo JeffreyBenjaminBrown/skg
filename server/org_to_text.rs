@@ -334,7 +334,7 @@ fn relationshipEditRequest_element (
     RelationshipEditRequest::RestoreRel =>
       "restoreRel" . to_string (), } }
 
-/// '(editRequest [REQUEST] [(ready OBJECT...) | (unready OBJECT...)])':
+/// '(editRequest [REQUEST] [(processed OBJECT...) | (unprocessed OBJECT...)])':
 /// the headline's one edit request, if any, then its processed
 /// request, if any. None when it has neither.
 fn editRequest_form (
@@ -369,7 +369,7 @@ fn view_form (
 
 /// The diff view's change facts for a viewnode, '(diff (node
 /// added|removed) (rel added|removed) (properties changed) (leaves N
-/// OBJECT...) (ready OBJECT...) (homeSkgrepoMove (old R) (new R))
+/// OBJECT...) (processed OBJECT...) (homeSkgrepoMove (old R) (new R))
 /// (movedLikeAncestor X))', each part present only when it has
 /// something to say (the first three only when true). None outside
 /// the diff view, and wherever no part has: '(diff)' is never
@@ -386,7 +386,7 @@ fn diff_form (
       . chain ( leaves . objects . iter () . map ( |object| object . wire_name () ))
       . collect () )); }
   if let Some (objects) = &change_facts . processed {
-    parts . push ( sexp_form ( "ready",
+    parts . push ( sexp_form ( "processed",
       objects . iter () . map ( |object| object . wire_name () ) . collect () )); }
   if let Some (home_skgrepo_move) = &change_facts . home_skgrepo_move {
     parts . push ( format! (
