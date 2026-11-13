@@ -58,8 +58,9 @@ not count on it.
 When a piece of work is done, review and commit it. 'diff --out-dir
 DIR' writes the diff view: every change since the last git-commit,
 each handle carrying its change facts. Fix anything wrong by editing
-and saving, as above; write 'processed' in the handles of the changes you
-approve and save that buffer; then 'commit "MESSAGE" --yes' stages
+and saving, as above; write 'processed both' in the handles of the
+changes you approve ('processed node' or 'processed rel' for one of
+the two a headline shows) and save that buffer; then 'commit "MESSAGE" --yes' stages
 and git-commits every change in the owned skgrepos.
 
 The rest of this file is reference. "Running it" lists every command
@@ -812,9 +813,10 @@ new branch; and 'subtree' alone, 'relRepo:NAME' on a root and
 Then, on a fifth server over a fresh copy of the fixture whose owned
 skgrepo is first made a gitrepo with one commit, it saves a retitle, a
 new child and a deletion, compares the diff view's compact buffer
-with the text expected, marks the new child 'processed' and sees it processed
-in a fresh 'diff', checks the question before an 'unprocessed' of two
-changes, commits unconfirmed (nothing happens), restores the deleted
+with the text expected, marks the new child 'processed both outward' and
+sees it processed in a fresh 'diff', checks the question before an
+'unprocessed both' of two changes and its absence before an
+'unprocessed rel' of one, commits unconfirmed (nothing happens), restores the deleted
 node with 'restoreNode', commits with '--yes' and reads 'git log' and
 an empty diff view. Then it retitles the root, writes the diff view
 (the root's first child write-protected in it), retitles that child's
@@ -823,10 +825,11 @@ and checks its output, that the child and the grandchild are now
 editable there, and that a save of the buffer retitles the grandchild
 again. Last, it checks that a blank commit message is refused.
 
-The reviewing server's run ends with 'processed subtree' on the retitled
-root of a diff buffer, which marks its change and the old titles
-below it, all files then processed, and 'unprocessed subtree', which asks
-about three changes and unmarks them.
+The reviewing server's run ends with 'processed rel subtree' on the
+retitled root of a diff buffer, refused since no relationship there
+changed, then 'processed both subtree', which marks its change and the
+old titles below it, all files then processed, and 'unprocessed both
+subtree', which asks about four changes and unmarks them.
 
 Then, on a sixth server over a fresh copy of the fixture whose owned
 skgrepo is a gitrepo, it starts a daemon in a scratch folder and runs
@@ -886,7 +889,7 @@ relationship of a subtree. 'repo:main' on the private note asks the
 strandeds question, unanswered by '--yes' alone and answered by
 '--strandeds keep'; '⟨new repo:private⟩' makes a node in 'private';
 'repo:main subtree' moves the branch and its leaf. In the diff view,
-'processed subtree' on the branch's move marks it and its leaf's move,
+'processed node subtree' on the branch's move marks it and its leaf's move,
 not the private note's. Last, 'delete-references' sends nothing
 without '--yes', shows the server's warning with it, and with
 '--leave-links' removes the membership, leaves the link, and the
@@ -935,8 +938,9 @@ view's headline whose viewnode ID is ID; its level, title and
 position come from the edited compact view. The rest of the handle
 (the heralds, 'folded') is display only, and editing it changes
 nothing, except for the words that ask for something: 'delete' (see
-"A deleted node"), 'processed', 'unprocessed', 'all', 'restoreNode' and
-'restoreRel' (see "Reviewing and committing"), 'editable' and 'fork'
+"A deleted node"), 'processed' and 'unprocessed' with 'node', 'rel'
+or 'both' and perhaps 'outward', 'restoreNode' and 'restoreRel' (see
+"Reviewing and committing"), 'editable' and 'fork'
 (see "Forking"), and those of "Words in a handle": 'merge:ID',
 'relRepo:NAME', 'noSearchMatching', 'searchMatching',
 'write-protect', 'detach', 'attach', 'repo:NAME' and 'subtree'. No
@@ -1067,8 +1071,8 @@ NAME.
 'subtree' asks for the subtree form of the other words of its handle,
 as a prefix argument (C-u) does in the clients: 'delete subtree'
 deletes the node and every node occurrence below it
-('skg-delete-recursive', C-u C-c <backspace>); 'processed subtree' and
-'unprocessed subtree' mark or unmark every change in the subtree (see
+('skg-delete-recursive', C-u C-c <backspace>); 'processed both
+subtree' and the like mark or unmark the subtree's changes (see
 "Marking changes processed"); and 'write-protect', 'relRepo:NAME',
 'noSearchMatching', 'searchMatching' and 'repo:NAME' as above. The
 words it gives the headlines below show in the report as their own.
@@ -1086,7 +1090,8 @@ Bodies changed: 1 (⟨0a⟩).
 Not saved. Run again with '--yes' to save.
 #+end_example
 An 'Error:' line names a handle that names no headline of the full
-view, or whose request words make no one '(editRequest ...)' (two edit requests, both 'processed' and 'unprocessed', 'all' alone),
+view, or whose request words make no one '(editRequest ...)' (two edit requests, both 'processed' and 'unprocessed', 'processed' without one of 'node', 'rel' and 'both', one of those or 'outward' without 'processed' or 'unprocessed'),
+or whose processed words name nothing there (see "Marking changes processed"),
 or that carries a word its kind does not take ('editable', 'fork',
 'write-protect', 'repo:NAME', 'merge:ID' or a flag word on anything
 but a node, say), or a word that cannot stand where it is (see "Words
@@ -1381,7 +1386,7 @@ them all with one message:
 python3 tools/skg-for-ai/skg_for_ai.py diff --out-dir DIR
 # read DIR/diff_all-changes.compact.org, and any other DIR/diff_*.compact.org
 # fix a change by editing any view (this one too) and saving it
-# add 'processed' to the handles of the changes meant:
+# add 'processed both' (or 'processed node', 'processed rel') to the handles meant:
 python3 tools/skg-for-ai/skg_for_ai.py save DIR/diff_all-changes.view.json --yes
 python3 tools/skg-for-ai/skg_for_ai.py commit "MESSAGE"
 #+end_example
@@ -1402,27 +1407,36 @@ After any save, 'diff' again for a fresh rendering; a save of a diff
 buffer rewrites that buffer's files.
 ** Marking changes processed
 A mark says that one change is approved as it is now; editing a marked
-change unmarks it. Marking is a save: write a word in a handle, and
-'save' turns it into a processed request in the headline's
-'(editRequest ...)', as the clients' 'C-c r r' does.
+change unmarks it. Marking is a save: write words in a handle, and
+'save' turns them into a processed request in the headline's
+'(editRequest ...)', as the clients' 'C-c m' gestures do
+('docs/diff-view.org', "What a request names").
 
-'processed' marks every change the headline names, as the request '(processed
-OBJECT...)' naming each object its change facts list: on a new node
-its existence and its membership, on a modified node ('M') every
-change its file records and its membership if that changed, on an old
-text or a move the one change, on a changeset marker every change
-under it. 'unprocessed' unmarks the same. 'processed all' and 'unprocessed all'
-name only the object 'all': every change a modified node's file
-records, or every change of a changeset marker.
+'processed' or 'unprocessed' says which way, and one of 'node', 'rel'
+and 'both' what, as 'C-c m', then 'n', 'r' or 'b', then 'p' or 'u'
+does. A headline shows two things that can change: its node ('∃+',
+'∃-', 'M') and its relationship to its viewparent ('~+', '~-').
+'node' names the first (a new or deleted node's existence; a modified
+node's text, home skgrepo, aliases, extra IDs and flags), 'rel' the
+second, 'both' both; each among what the headline's change facts
+list, so that 'processed rel' on a headline whose relationship did not
+change is an error. A headline showing one change (an old text, an
+alias, a move) is marked by the letter of its kind: a relationship
+moved between skgrepos by 'rel' or 'both', any other by 'node' or
+'both'. On a changed folder the words mark its members one level down;
+on a changeset marker ('its content changed') 'rel' marks the changed
+relationships it gathers and 'node' its members' own changes.
 
-'processed subtree' marks every change in the headline's subtree, as the
-clients' 'C-u C-c r r' does: the headline's own (if it names any) and
-each headline below that names one, which names them without 'all'
-(a modified node below names its changes through its old text and
-markers, which are below it too). On a home skgrepo move ('⌂ -OLD
-+NEW'), 'processed subtree' instead marks every move between the same two
-skgrepos in the moved node's subtree, as 'C-u C-c r h' does.
-'unprocessed subtree' unmarks the same.
+'subtree' marks the same in the whole subtree, as the clients' C-u
+does: each headline that names some of what the letter names, but at
+a new node in content position the server walks the graph contentward
+from it, through new nodes only, whatever the view shows, and marks
+the letter's kinds of change there ('(processed node rel newContent)');
+the rest of that node's subtree is skipped. 'outward' does the same
+with the walk along every relationship each new node records
+('newOutward'), as C-u C-u does. On a home skgrepo move ('⌂ -OLD
++NEW'), 'processed node subtree' instead marks every move between the
+same two skgrepos in the moved node's subtree, as 'C-u C-c m h p' does.
 
 A save that unmarks more than one change prints the question a client
 asks first, and '--yes' answers it. The server applies the requests
@@ -1540,11 +1554,11 @@ round and its answer reads as it is.
 | C-c s n                    | skg-restore-deleted-node                         | 'restoreNode' in the handle                                                                                                                                   |
 | C-c s l                    | skg-restore-removed-membership                   | 'restoreRel' in the handle                                                                                                                                    |
 | C-c s r, C-c s R           | skg-set-relRepo(-recursive)                      | 'relRepo:NAME', 'relRepo:NAME subtree' in the handle                                                                                                          |
-| C-c r r                    | skg-cycle-processed                              | 'processed', 'unprocessed', 'all' in the handle; 'processed subtree', 'unprocessed subtree' for C-u                                                           |
-| C-c r h                    | skg-toggle-homeSkgrepo-move-processed            | 'processed' or 'unprocessed' on the move's headline; with 'subtree', every like move (C-u)                                                                    |
+| C-c m n/r/b p/u            | skg-mark-{node,rel,both}-{processed,unprocessed} | 'processed' or 'unprocessed', with 'node', 'rel' or 'both', in the handle; with 'subtree' for C-u, 'outward' for C-u C-u                                      |
+| C-c m h p/u                | skg-mark-homeSkgrepo-move-(un)processed          | 'processed node' or 'unprocessed node' on the move's headline; with 'subtree', every like move (C-u)                                                          |
 | C-c r u                    | skg-diffView-extend                              | 'extend SIDECAR'                                                                                                                                              |
 | C-c r c                    | skg-stage-and-commit                             | 'commit MESSAGE'                                                                                                                                              |
-| C-c r n, p (c, u, r)       | skg-diffView-goto-next/previous-*                | Emacs-only by nature; the change facts are in the handles                                                                                                     |
+| C-c r n, p (c, u, p)       | skg-diffView-goto-next/previous-*                | Emacs-only by nature; the change facts are in the handles                                                                                                     |
 | C-c m c                    | skg-replace-link-with-content                    | remove the leaf, write '⟨node:ID⟩' in its place                                                                                                               |
 | C-c m f                    | skg-fork-node                                    | 'fork' in the handle (see "Forking")                                                                                                                          |
 | C-c m l                    | skg-replace-content-with-link                    | remove the branch, type a headline titled '[[id:ID][title]]'                                                                                                  |

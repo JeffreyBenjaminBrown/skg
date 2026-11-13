@@ -55,7 +55,7 @@ In order, it:
   then confirmed with '--yes'), checking 'git log' and that the diff
   view is then empty; then extends a diff buffer to a change it does not
   make editable, and saves an edit of it; marks and unmarks a subtree's
-  changes with 'processed subtree' and 'unprocessed subtree'; a blank commit
+  changes with 'processed both subtree' and 'unprocessed both subtree'; a blank commit
   message is refused unsent;
 - on a sixth scratch server, also over a gitrepo, runs a daemon:
   commands through it write what they write on their own connections;
@@ -678,7 +678,7 @@ def check_deletion (context):
 def check_bad_handles (context):
   folder = fresh_root_view (context, "bad-handle")
   edit_compact ( folder, [ ( "⟨0a 1C2 L2 ⌂:main⟩",
-                             "⟨0a 1C2 L2 ⌂:main all delete restoreNode⟩" ),
+                             "⟨0a 1C2 L2 ⌂:main both delete restoreNode⟩" ),
                            ( "** First child, renamed ⟨0d⟩",
                              "** First child, renamed ⟨0s⟩" ),
                            ( "⟨0c ☮ Cb⟩", "⟨zz ☮ Cb⟩" ) ])
@@ -690,7 +690,7 @@ def check_bad_handles (context):
     REPORT_HEAD +
     "Error: ⟨0a⟩ on line 1 of the compact view carries 'delete' and "
     "'restoreNode'; a headline takes one edit request.\n"
-    "Error: ⟨0a⟩ on line 1 of the compact view carries 'all' without "
+    "Error: ⟨0a⟩ on line 1 of the compact view carries 'both' without "
     "'processed' or 'unprocessed'.\n"
     "Error: ⟨zz⟩ on line 7 of the compact view names no headline of the "
     "full view.\n"
@@ -1712,18 +1712,20 @@ def check_diff_shows_the_changes (context):
                   EXPECTED_DIFF_COMPACT )
 
 def check_marking_processed (context):
-  """'processed' on the new node marks its existence and its membership;
-  a fresh diff view shows both processed. 'unprocessed' there would unmark two
-  changes, so the report asks first."""
+  """'processed both outward' on the new node marks its existence and
+  its membership, and hands the outward walk to the server, as 'C-u
+  C-u C-c m b p' does; a fresh diff view shows both processed.
+  'unprocessed both' there would unmark two changes, so the report
+  asks first; 'unprocessed rel' unmarks one, and asks nothing."""
   folder = run_diff (context, "mark")
   edit_compact (
     folder, [ ( "**** A new grandchild ⟨0j ∃+ ~+⟩",
-                "**** A new grandchild ⟨0j ∃+ ~+ processed⟩" ) ],
+                "**** A new grandchild ⟨0j ∃+ ~+ processed both outward⟩" ) ],
     DIFF_BASE_NAME )
   require_output (
     run_tool ([ "save", sidecar_of_diff (folder), "--yes" ]),
     diff_report_head () +
-    "Processed: ⟨0j⟩ 'A new grandchild', as '(processed node rel)'.\n" +
+    "Processed: ⟨0j⟩ 'A new grandchild', as '(processed node rel newOutward)'.\n" +
     saved_line (0) +
     "Processed: 1 of 4 changed files are processed.\n" +
     diff_written_paths (folder),
@@ -1735,7 +1737,7 @@ def check_marking_processed (context):
     if expected not in compact:
       raise CaseFailure ( f"the fresh diff view lacks {expected!r}:\n{compact}" )
   edit_compact (
-    fresh, [ ( "⟨0j ∃+✓ ~+✓⟩", "⟨0j ∃+✓ ~+✓ unprocessed⟩" ) ], DIFF_BASE_NAME )
+    fresh, [ ( "⟨0j ∃+✓ ~+✓⟩", "⟨0j ∃+✓ ~+✓ unprocessed both⟩" ) ], DIFF_BASE_NAME )
   require_output (
     run_tool ([ "save", sidecar_of_diff (fresh) ]),
     diff_report_head () +
@@ -1743,6 +1745,15 @@ def check_marking_processed (context):
     "Question: this unmarks 2 changes. Unmarking this node processed "
     "will unmark every contributing decision. You might discard a lot of "
     "hard-won information. Continue? Saving with '--yes' answers yes.\n" +
+    NOT_SAVED,
+    ignoring_view_ids = True )
+  edit_compact (
+    fresh, [ ( "⟨0j ∃+✓ ~+✓ unprocessed both⟩", "⟨0j ∃+✓ ~+✓ unprocessed rel⟩" ) ],
+    DIFF_BASE_NAME )
+  require_output (
+    run_tool ([ "save", sidecar_of_diff (fresh) ]),
+    diff_report_head () +
+    "Unprocessed: ⟨0j⟩ 'A new grandchild', as '(unprocessed rel)'.\n" +
     NOT_SAVED,
     ignoring_view_ids = True )
 
@@ -1851,12 +1862,22 @@ def check_extending_the_diff_view (context):
                   "A grandchild, retitled twice" )
 
 def check_marking_a_subtree_processed (context):
-  """'processed subtree' marks every change in the headline's subtree, as
-  'C-u C-c r r' does; 'unprocessed subtree' unmarks them, asking first."""
+  """'processed both subtree' marks every change in the headline's
+  subtree, as 'C-u C-c m b p' does; 'unprocessed both subtree' unmarks
+  them, asking first. 'processed rel subtree', where no relationship
+  there changed, names nothing, and is refused, as the clients refuse it."""
   folder = run_diff (context, "subtree-processed")
   edit_compact ( folder, [ ( "** The fixture root, retitled ⟨0b aC2 L2 M⟩",
                              "** The fixture root, retitled ⟨0b aC2 L2 M processed "
-                             "subtree⟩" ) ], DIFF_BASE_NAME )
+                             "rel subtree⟩" ) ], DIFF_BASE_NAME )
+  require_output (
+    run_tool ([ "save", sidecar_of_diff (folder), "--yes" ]),
+    diff_report_head () +
+    "Error: ⟨0b⟩ on line 15 of the compact view carries 'processed rel', but "
+    "its relationship to its viewparent has no change to mark here.\n",
+    expected_returncode = 1, ignoring_view_ids = True )
+  edit_compact ( folder, [ ( "M processed rel subtree⟩", "M processed both subtree⟩" ) ],
+                 DIFF_BASE_NAME )
   require_output (
     run_tool ([ "save", sidecar_of_diff (folder), "--yes" ]),
     diff_report_head () +
@@ -1869,7 +1890,7 @@ def check_marking_a_subtree_processed (context):
     ignoring_view_ids = True )
   edit_compact ( folder, [ ( "** The fixture root, retitled ⟨0b aC2 L2 M✓⟩",
                              "** The fixture root, retitled ⟨0b aC2 L2 M✓ "
-                             "unprocessed subtree⟩" ) ], DIFF_BASE_NAME )
+                             "unprocessed both subtree⟩" ) ], DIFF_BASE_NAME )
   require_output (
     run_tool ([ "save", sidecar_of_diff (folder), "--yes" ]),
     diff_report_head () +
@@ -2679,16 +2700,16 @@ def check_moving_to_another_skgrepo (context):
     require_equal ( "a moved node's title at home", skg_title (context, node_id), title )
 
 def check_marking_like_moves_processed (context):
-  """In the diff view, 'processed subtree' on a home skgrepo move marks
-  every move between the same two skgrepos in the moved node's
-  subtree, as 'C-u C-c r h' does: the branch's and its leaf's, and
+  """In the diff view, 'processed node subtree' on a home skgrepo move
+  marks every move between the same two skgrepos in the moved node's
+  subtree, as 'C-u C-c m h p' does: the branch's and its leaf's, and
   not the move of the node above them."""
   folder = os . path . join ( context [ "scratch" ], "review", "like-moves" )
   require_tool_run ([ "diff", "--out-dir", folder ])
   require_in_diff_compact ( folder, "* A private branch ⟨0a C1 ⌂:main M⟩\n"
                                     "** ⟨0b ⌂ -private +main⟩\n" )
   edit_compact ( folder, [ ( "** ⟨0b ⌂ -private +main⟩",
-                             "** ⟨0b ⌂ -private +main processed subtree⟩" ) ],
+                             "** ⟨0b ⌂ -private +main processed node subtree⟩" ) ],
                  DIFF_BASE_NAME )
   require_output (
     run_tool ([ "save", sidecar_of_diff (folder), "--yes" ]),

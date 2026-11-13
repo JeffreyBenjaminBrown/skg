@@ -28,7 +28,8 @@ a new empty view does, and writes its view as 'view' would.
 'save SIDECAR' rebuilds the full buffer from an edited compact view,
 prints the changes it would make, and with '--yes' saves it and
 writes the server's re-rendered view over the three files. Words in a
-handle ask for edit requests: 'delete', 'processed', 'unprocessed', 'all',
+handle ask for edit requests: 'delete', 'processed' or 'unprocessed'
+with 'node', 'rel' or 'both' (and 'outward' for the clients' C-u C-u),
 'restoreNode', 'restoreRel', 'merge:ID', 'relRepo:NAME',
 'noSearchMatching', 'searchMatching'; for view requests: 'editable',
 'fork', 'write-protect'; 'detach' and 'attach' write or remove
@@ -2384,8 +2385,17 @@ COMPACT_HANDLE_PATTERN = re . compile (
 # '(processed OBJECT...)' or '(unprocessed OBJECT...)'.
 EDIT_REQUEST_TOKENS = [ "delete", "restoreNode", "restoreRel" ]
 PROCESSED_TOKENS = [ "processed", "unprocessed" ]
-# With 'processed' or 'unprocessed': name only the object 'all'.
-ALL_TOKEN = "all"
+# With 'processed' or 'unprocessed', one of these says what it marks,
+# as the clients' 'C-c m n', 'C-c m r' and 'C-c m b' do: each word with
+# the objects it names.
+PROCESSED_LETTER_TOKENS = { "node" : [ "node" ], "rel" : [ "rel" ],
+                            "both" : [ "node", "rel" ] }
+# With 'processed' or 'unprocessed': walk the subtree as 'subtree' does,
+# but at a new node name the outward walk, as the clients' C-u C-u does.
+OUTWARD_TOKEN = "outward"
+# The walk each word asks the server for at a new node in content
+# position.
+WALK_OBJECT_OF_TOKEN = { "subtree" : "newContent", "outward" : "newOutward" }
 # The handle words that ask for the edit requests with a parameter,
 # each a prefix and its parameter: 'merge:ID', the clients'
 # 'skg-set-merge-request' ('C-c s m'), whose node acquires ID by a
@@ -2504,9 +2514,10 @@ class OutlineHeadline:
     # the headline carrying that 'subtree' ('expand_subtree_words').
     self . subtree_words = []
     self . subtree_origin = {}
-    # Whether its processed request names its leaves as a headline
-    # below the gesture's does: without 'all'.
-    self . processed_below = False
+    # The objects its processed request names, as the processed word
+    # that reaches it decides ('resolve_processed_words'); None until
+    # then.
+    self . processed_objects = None
     # The words of its own handle a 'subtree' on it does not apply to
     # it: its relationship is not of the kind the gesture sets, say.
     self . dropped_words = set ()
@@ -2524,8 +2535,11 @@ class OutlineHeadline:
   def processed_words (self):
     return [ word for word in PROCESSED_TOKENS if word in self . words () ]
 
-  def names_only_all (self):
-    return ALL_TOKEN in self . tokens
+  def processed_letter_words (self):
+    return [ word for word in self . tokens if word in PROCESSED_LETTER_TOKENS ]
+
+  def asks_outward (self):
+    return OUTWARD_TOKEN in self . tokens
 
   def view_request_words (self):
     return [ word for word, _ in VIEW_REQUEST_TOKENS if word in self . words () ]
@@ -2548,7 +2562,8 @@ class OutlineHeadline:
 
   def has_requests (self):
     return bool ( self . edit_request_words () or self . processed_words ()
-                  or self . names_only_all () or self . view_request_words ()
+                  or self . processed_letter_words () or self . asks_outward ()
+                  or self . view_request_words ()
                   or self . claim_words () or self . repo_words ()
                   or self . asks_subtree () )
 
@@ -2742,9 +2757,18 @@ def request_token_problems (headline, view_line):
   if len ( headline . processed_words () ) > 1:
     problems . append ( "carries both 'processed' and 'unprocessed'"
                         + subtree_origin_text (headline, PROCESSED_TOKENS) + "." )
-  if headline . names_only_all () and not any (
-      word in headline . tokens for word in PROCESSED_TOKENS ):
-    problems . append ( "carries 'all' without 'processed' or 'unprocessed'." )
+  own_processed_words = [ word for word in headline . tokens if word in PROCESSED_TOKENS ]
+  marking_words = headline . processed_letter_words () + (
+    [ OUTWARD_TOKEN ] if headline . asks_outward () else [] )
+  if own_processed_words and len ( headline . processed_letter_words () ) != 1:
+    problems . append (
+      f"carries '{own_processed_words [0]}', which takes one of 'node', 'rel' "
+      "and 'both', saying what it marks"
+      + ( f", but carries {quoted_words ( headline . processed_letter_words () )}."
+          if headline . processed_letter_words () else "." ))
+  if marking_words and not own_processed_words:
+    problems . append (
+      f"carries {quoted_words (marking_words)} without 'processed' or 'unprocessed'." )
   only_on_a_node = (
     headline . view_request_words () + headline . repo_words () +
     [ word for word in headline . edit_request_words ()
@@ -3027,13 +3051,16 @@ def expand_subtree_words (edited, headline_of_handle, ownership, check):
   What is left out, and why, goes to CHECK's notes, and a word
   'subtree' cannot apply from where it stands to its errors."""
   for index, root in enumerate (edited):
-    if ( not root . asks_subtree () or root . handle is None
+    if ( root . handle is None
          or root . handle not in headline_of_handle
          or headline_of_handle [ root . handle ] . metadata is None ):
       continue
+    resolve_processed_words (edited, index, headline_of_handle, check)
+    if not root . asks_subtree ():
+      continue
     for word in words_with_a_subtree_form (root):
       if word in PROCESSED_TOKENS:
-        expand_processed_subtree (edited, index, word, headline_of_handle)
+        pass # 'resolve_processed_words'
       elif word == "delete":
         expand_delete_subtree (edited, index, headline_of_handle)
       elif word . startswith (REPO_WORD_PREFIX):
@@ -3083,33 +3110,155 @@ def home_skgrepo_move (metadata):
   return ( sexp_to_text ( ( metadata_form (move, "old") or [ None, "" ] ) [1] ),
            sexp_to_text ( ( metadata_form (move, "new") or [ None, "" ] ) [1] ))
 
-def expand_processed_subtree (edited, root, word, headline_of_handle):
-  """'processed subtree' or 'unprocessed subtree'. On a home skgrepo move, the
-  clients' 'C-u C-c r h': every move between the same two skgrepos in
-  the moved node's subtree. Elsewhere their 'C-u C-c r r': every
-  headline in the subtree that names leaves, those below naming them
-  without 'all' ('skg--processed-leaves-below'), and the headline
-  itself only when it names some."""
-  root_metadata = headline_of_handle [ edited [root] . handle ] . metadata
+def resolve_processed_words (edited, root, headline_of_handle, check):
+  """Decide what the 'processed' or 'unprocessed' of the handle at ROOT
+  marks, as the clients' 'C-c m' gestures do: which headlines get a
+  processed request, and the objects each names ('processed_objects').
+  The letter word ('node', 'rel', 'both') names objects; 'subtree'
+  ('C-u') and 'outward' ('C-u C-u') walk the subtree
+  ('processed_requests_of_gesture'). On a home skgrepo move, 'subtree'
+  or 'outward' is the clients' 'C-u C-c m h': every move between the
+  same two skgrepos in the moved node's subtree. A gesture that names
+  nothing is an error in CHECK, as the clients refuse it."""
+  headline = edited [root]
+  words = [ word for word in headline . tokens if word in PROCESSED_TOKENS ]
+  letters = headline . processed_letter_words ()
+  if len (words) != 1 or len (letters) != 1:
+    return # 'request_token_problems' reports it
+  word = words [0]
+  letter_objects = PROCESSED_LETTER_TOKENS [ letters [0] ]
+  walk_object = ( WALK_OBJECT_OF_TOKEN [OUTWARD_TOKEN] if headline . asks_outward ()
+                  else WALK_OBJECT_OF_TOKEN [SUBTREE_TOKEN] if headline . asks_subtree ()
+                  else None )
+  root_metadata = headline_of_handle [ headline . handle ] . metadata
   move = home_skgrepo_move (root_metadata)
-  if move is not None:
-    moved_node = edited [root] . parent
-    for target in ( [ root ] if moved_node is None else
-                    [ moved_node ] + descendant_indices (edited, moved_node) ):
-      metadata = handled_metadata (edited, target, headline_of_handle)
-      if metadata is not None and home_skgrepo_move (metadata) == move:
-        give_subtree_word (edited, target, word, root)
+  if move is not None and walk_object is not None:
+    requests = []
+    if "node" in letter_objects:
+      moved_node = headline . parent
+      for target in ( [ root ] if moved_node is None else
+                      [ moved_node ] + descendant_indices (edited, moved_node) ):
+        metadata = handled_metadata (edited, target, headline_of_handle)
+        if metadata is not None and home_skgrepo_move (metadata) == move:
+          requests . append ( ( target, [] ) )
+  else:
+    requests = processed_requests_of_gesture (
+      edited, root, letter_objects, walk_object, headline_of_handle )
+  if not requests:
+    check . error_lines . append (
+      f"Error: ⟨{headline . handle}⟩ on line {headline . compact_line_number} "
+      f"of the compact view carries '{word} {letters [0]}', but "
+      + nothing_to_mark_text (letter_objects) + "." )
     return
-  if leaves_fact (root_metadata) is None and not edited [root] . names_only_all ():
-    edited [root] . dropped_words . add (word)
-  for later in descendant_indices (edited, root):
-    metadata = handled_metadata (edited, later, headline_of_handle)
-    leaves = None if metadata is None else leaves_fact (metadata)
-    if leaves is None or ( leaves [1] and set ( leaves [1] ) == { ALL_TOKEN } ):
-      continue
-    if word not in edited [later] . tokens:
-      edited [later] . processed_below = True
-    give_subtree_word (edited, later, word, root)
+  if root not in [ target for target, _ in requests ]:
+    headline . dropped_words . add (word)
+  for target, objects in requests:
+    if target != root:
+      give_subtree_word (edited, target, word, root)
+      if any ( own in edited [target] . tokens for own in PROCESSED_TOKENS ):
+        continue # its own handle's word decides its objects
+    edited [target] . processed_objects = objects
+
+def nothing_to_mark_text (letter_objects):
+  """What a gesture naming LETTER_OBJECTS says when it names nothing."""
+  if letter_objects == [ "node" ]:
+    return "its node has no change to mark here"
+  if letter_objects == [ "rel" ]:
+    return "its relationship to its viewparent has no change to mark here"
+  return "neither its node nor its relationship has a change to mark here"
+
+def processed_requests_of_gesture (edited, root, letter_objects, walk_object,
+                                   headline_of_handle):
+  """( INDEX, OBJECTS ) for each headline the clients' gesture with
+  LETTER_OBJECTS on the headline at ROOT writes a processed request on
+  ('skg--processed-requests-at-point' and
+  'skg--processed-requests-for-subtree' in 'elisp/skg-processed.el').
+  Without WALK_OBJECT: the headline, naming what
+  'processed_objects_named_by_letters' says, or on a changed folder
+  each child that names some of them. With it, 'newContent' or
+  'newOutward': every headline in the subtree that names some of them,
+  but at a new node in content position the letters and WALK_OBJECT,
+  which the server expands from the graph, whatever the buffer shows;
+  the rest of that node's subtree is skipped."""
+  metadata_of = lambda index: handled_metadata (edited, index, headline_of_handle)
+  root_metadata = metadata_of (root)
+  if walk_object is None:
+    named = processed_objects_named_by_letters (root_metadata, letter_objects, True)
+    if named is not None:
+      return [ ( root, named ) ]
+    if leaves_fact (root_metadata) is not None or not folder_is_changed (
+        edited, root, headline_of_handle ):
+      return []
+    children = [ index for index in descendant_indices (edited, root)
+                 if edited [index] . parent == root ]
+    requests = []
+    for child in children:
+      metadata = metadata_of (child)
+      named = ( None if metadata is None else
+                processed_objects_named_by_letters (metadata, letter_objects) )
+      if named is not None:
+        requests . append ( ( child, named ) )
+    return requests
+  requests = []
+  def visit (index):
+    metadata = metadata_of (index)
+    if metadata is None:
+      return True
+    at_root = index == root
+    parent = edited [index] . parent
+    parent_metadata = None if parent is None else metadata_of (parent)
+    handed_over = node_added (metadata) and (
+      at_root or parent_metadata is None or folder_atom (parent_metadata) is None )
+    named = ( letter_objects + [ walk_object ] if handed_over else
+              processed_objects_named_by_letters (metadata, letter_objects, at_root) )
+    if named is not None:
+      requests . append ( ( index, named ) )
+    return not handed_over
+  if visit (root):
+    walk_below (edited, root, visit)
+  return requests
+
+def processed_objects_named_by_letters (metadata, letter_objects, at_gesture = False):
+  """What a gesture naming LETTER_OBJECTS names on a headline with
+  METADATA: None when nothing, else the request's objects, [] for a
+  bare request ('skg--processed-objects-named-by-letters'). On a
+  headline that lists objects, the letters among them. On one that
+  names a single leaf, the bare request when the leaf is of a kind a
+  letter names: a relRepo move is a relationship's, any other the
+  node's own. On a changeset marker AT_GESTURE, the letters themselves:
+  its 'node' names its members' own leaves, which its '(leaves ...)'
+  does not list."""
+  leaves = leaves_fact (metadata)
+  if leaves is None:
+    return None
+  if not leaves [1]:
+    kind = "rel" if metadata_form (metadata, "relRepoMove") is not None else "node"
+    return [] if kind in letter_objects else None
+  if at_gesture and metadata_form (metadata, "changesetMarker") is not None:
+    return list (letter_objects)
+  objects = [ obj for obj in letter_objects if obj in leaves [1] ]
+  return objects or None
+
+def node_added (metadata):
+  """Whether METADATA's headline is a new node: '(diff (node added))'."""
+  node = metadata_form ( metadata_form (metadata, "diff"), "node" )
+  return node is not None and len (node) == 2 and is_symbol_named ( node [1], "added" )
+
+def folder_is_changed (edited, folder, headline_of_handle):
+  """Whether the folder headline at FOLDER is shown because a member's
+  relationship to its viewparent changed ('folder_change_processed')."""
+  if folder_atom ( handled_metadata (edited, folder, headline_of_handle) or [ None ] ) is None:
+    return False
+  members = [] # each ( METADATA, [CHILD METADATA] )
+  for index in descendant_indices (edited, folder):
+    metadata = handled_metadata (edited, index, headline_of_handle)
+    if edited [index] . parent == folder:
+      members . append ( ( metadata, [] ) )
+    elif ( members and metadata is not None
+           and edited [ edited [index] . parent ] . parent == folder ):
+      members [-1] [1] . append (metadata)
+  return any ( membership_change_processed (member, children) is not None
+               for member, children in members if member is not None )
 
 def expand_repo_subtree (edited, root, word, headline_of_handle, check):
   """'repo:NAME subtree', the clients' 'skg-set-repo-recursive' ('C-c s
@@ -3265,27 +3414,12 @@ def expand_search_matching_subtree (edited, root, word, headline_of_handle,
 
 def processed_request_text (headline, view_line):
   """'(processed OBJECT...)' or '(unprocessed OBJECT...)' for HEADLINE's
-  processed token, or None. Its objects are 'all' when the handle
-  says 'all', and otherwise every object the headline's '(leaves ...)'
-  lists, as a client's one-level gesture names them; a headline that
-  lists none gets the bare request."""
-  if not headline . processed_words ():
+  processed word, naming the objects 'resolve_processed_words' gave it,
+  or None."""
+  if not headline . processed_words () or headline . processed_objects is None:
     return None
-  return "(" + " " . join ( headline . processed_words () +
-                            processed_objects (headline, view_line) ) + ")"
-
-def processed_objects (headline, view_line):
-  """The objects HEADLINE's processed request names: 'all' when its
-  handle says 'all'; else every object its '(leaves ...)' lists, but
-  'all' on a headline below a 'subtree' gesture's, as the clients'
-  recursive gesture names them ('skg--processed-leaves-below')."""
-  if headline . names_only_all ():
-    return [ ALL_TOKEN ]
-  leaves = leaves_fact (view_line . metadata)
-  objects = leaves [1] if leaves else []
-  if headline . processed_below:
-    return [ obj for obj in objects if obj != ALL_TOKEN ]
-  return objects
+  return "(" + " " . join ( headline . processed_words () [ : 1 ] +
+                            headline . processed_objects ) + ")"
 
 def edit_request_text (headline, view_line):
   """The '(editRequest ...)' HEADLINE's tokens ask for, or None."""
@@ -3298,15 +3432,35 @@ def edit_request_text (headline, view_line):
 
 def unmarked_leaf_count (headline, view_line):
   """How many leaves an 'unprocessed' on HEADLINE unmarks, counted as a
-  client counts them: N of '(leaves N ...)' when the request names
-  every object listed, else one per object (one for a bare request)."""
-  if headline . processed_words () != [ "unprocessed" ]:
+  client counts them ('leaves_touched')."""
+  if ( headline . processed_words () != [ "unprocessed" ]
+       or headline . processed_objects is None ):
     return 0
-  leaves = leaves_fact (view_line . metadata)
-  objects = processed_objects (headline, view_line)
-  if leaves and objects == leaves [1]:
-    return leaves [0]
-  return max ( 1, len (objects) )
+  return leaves_touched ( leaves_fact (view_line . metadata),
+                          headline . processed_objects )
+
+def leaves_touched (leaves, objects):
+  """How many leaves a request naming OBJECTS touches on a headline whose
+  '(leaves N OBJECT...)' is LEAVES, ( N, LISTED ), as the server counts
+  them ('skg--processed-leaves-touched'). Of the objects listed: N when
+  OBJECTS name them all; one for 'rel' alone; N less one for 'node'
+  alone. An object not listed ('node' on a changeset marker, a walk)
+  counts two, so that unmarking it always asks: the client cannot count
+  what the server will reach. No fact, or a bare request, counts one."""
+  listed = leaves [1] if leaves else []
+  named_listed = [ obj for obj in objects if obj in listed ]
+  unlisted = len ( [ obj for obj in objects if obj not in listed ] )
+  if not leaves or not objects:
+    count = 1
+  elif not named_listed:
+    count = 0
+  elif len (named_listed) == len (listed):
+    count = leaves [0]
+  elif named_listed == [ "rel" ]:
+    count = 1
+  else:
+    count = leaves [0] - 1
+  return 2 * unlisted + count
 
 # ------------------------------------------------------------
 # Rebuilding the full buffer
