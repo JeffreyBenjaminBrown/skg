@@ -14,24 +14,39 @@
 (defun test--stage-and-commit-run (typed body)
   "Run BODY with the network faked and every `read-string' answered
 from TYPED, a list of strings. BODY receives the sent requests (newest
-first, via a function), the handlers and the prompts."
+first, via a function), the handlers and the prompts. No commit-message
+buffer is left over from before or after."
   (let ((sent nil) (prompts nil) (handlers (make-hash-table :test 'eq))
         (skg--rerender-after-empty-stream nil))
-    (cl-letf (((symbol-function 'skg-tcp-connect-to-rust) (lambda () 'fake-proc))
-              ((symbol-function 'process-send-string)
-               (lambda (_proc text) (push text sent)))
-              ((symbol-function 'skg--begin-stream) #'ignore)
-              ((symbol-function 'skg--lock-all-skg-buffers) #'ignore)
-              ((symbol-function 'skg--register-rerender-stream-handlers) #'ignore)
-              ((symbol-function 'skg--wrap-rerender-done-with-after-empty-stream) #'ignore)
-              ((symbol-function 'skg-lp-reset) #'ignore)
-              ((symbol-function 'skg-register-response-handler)
-               (lambda (type handler _one-shot) (puthash type handler handlers)))
-              ((symbol-function 'read-string)
-               (lambda (prompt &rest _)
-                 (push prompt prompts)
-                 (pop typed))))
-      (funcall body (lambda () sent) handlers (lambda () prompts)))))
+    (test--stage-and-commit-kill-message-buffer)
+    (unwind-protect
+        (cl-letf (((symbol-function 'skg-tcp-connect-to-rust) (lambda () 'fake-proc))
+                  ((symbol-function 'process-send-string)
+                   (lambda (_proc text) (push text sent)))
+                  ((symbol-function 'skg--begin-stream) #'ignore)
+                  ((symbol-function 'skg--lock-all-skg-buffers) #'ignore)
+                  ((symbol-function 'skg--register-rerender-stream-handlers) #'ignore)
+                  ((symbol-function 'skg--wrap-rerender-done-with-after-empty-stream) #'ignore)
+                  ((symbol-function 'skg-lp-reset) #'ignore)
+                  ((symbol-function 'skg-register-response-handler)
+                   (lambda (type handler _one-shot) (puthash type handler handlers)))
+                  ((symbol-function 'read-string)
+                   (lambda (prompt &rest _)
+                     (push prompt prompts)
+                     (pop typed))))
+            (funcall body (lambda () sent) handlers (lambda () prompts)))
+      (test--stage-and-commit-kill-message-buffer))))
+
+(defun test--stage-and-commit-kill-message-buffer ()
+  (when (get-buffer skg--commit-message-buffer-name)
+    (kill-buffer skg--commit-message-buffer-name)))
+
+(defun test--stage-and-commit-write-and-send (text)
+  "Open the commit-message buffer, write TEXT in it, and press C-c C-c."
+  (skg-stage-and-commit)
+  (with-current-buffer skg--commit-message-buffer-name
+    (insert text)
+    (funcall (key-binding (kbd "C-c C-c")))))
 
 (ert-deftest test-stage-and-commit-requires-clean-views-and-a-message ()
   (with-temp-buffer
@@ -43,16 +58,103 @@ first, via a function), the handlers and the prompts."
       (should (string-match-p "Save or revert" (cadr err))))
     (set-buffer-modified-p nil)
     (test--stage-and-commit-run
-     '("  ")
+     nil
      (lambda (sent _handlers _prompts)
-       (should-error (skg-stage-and-commit) :type 'user-error)
-       (should (null (funcall sent)))))))
+       (should-error (test--stage-and-commit-write-and-send " \n\t\n")
+                     :type 'user-error)
+       (should (null (funcall sent)))
+       (should (get-buffer skg--commit-message-buffer-name))))))
+
+(ert-deftest test-stage-and-commit-takes-the-message-from-its-buffer ()
+  "C-c C-c sends the buffer's text less its trailing whitespace, and
+keeps the buffer; a message left there is kept for the next attempt."
+  (test--stage-and-commit-run
+   nil
+   (lambda (sent _handlers _prompts)
+     (skg-stage-and-commit)
+     (with-current-buffer skg--commit-message-buffer-name
+       (should (derived-mode-p 'skg-commit-message-mode))
+       (should (eq (key-binding (kbd "C-c C-k")) #'skg-commit-message-cancel))
+       (insert "kept"))
+     (skg-stage-and-commit)
+     (with-current-buffer skg--commit-message-buffer-name
+       (should (equal (buffer-string) "kept"))
+       (erase-buffer))
+     (test--stage-and-commit-write-and-send "  summary\n\nbody  \n\n \n")
+     (should (string-match-p
+              (regexp-quote "(message-lines \"  summary\" \"\" \"body\")")
+              (car (funcall sent))))
+     (should (equal (with-current-buffer skg--commit-message-buffer-name
+                      (buffer-string))
+                    "  summary\n\nbody  \n\n \n")))))
+
+(ert-deftest test-stage-and-commit-keeps-the-message-until-it-is-moot ()
+  "The commit-message buffer goes once something is committed, or once
+nothing needed committing and nothing failed; after a failure, a
+refusal or a declined confirmation it stays, and the line says so."
+  (dolist (case
+           '(("((commits ((public 5f135fea))) (errors ()) (warnings ()))"
+              nil "Committed in public (5f135fe).")
+             ("((commits ((public 5f135fea))) (errors (\"skgrepo private: no git author is configured\")) (warnings ()))"
+              nil "Committed in public (5f135fe). Errors: skgrepo private: no git author is configured")
+             ("((commits ()) (errors ()) (warnings ()))"
+              nil "Nothing was committed.")
+             ("((commits ()) (errors (\"skgrepo private: no git author is configured\")) (warnings ()))"
+              t "Nothing was committed. Errors: skgrepo private: no git author is configured Your message is kept in *skg commit message*.")
+             ("((errors (\"A commit message is required.\")) (warnings ()))"
+              t "Nothing was committed. Errors: A commit message is required. Your message is kept in *skg commit message*.")))
+    (test--stage-and-commit-run
+     nil
+     (lambda (_sent handlers _prompts)
+       (let ((messages nil))
+         (cl-letf (((symbol-function 'message)
+                    (lambda (format-string &rest args)
+                      (push (apply #'format format-string args) messages))))
+           (test--stage-and-commit-write-and-send "the message")
+           (funcall (gethash 'stage-and-commit handlers) 'fake-proc (car case)))
+         (should (equal (car messages) (nth 2 case)))
+         (should (eq (and (get-buffer skg--commit-message-buffer-name) t)
+                     (nth 1 case)))))))
+  (test--stage-and-commit-run
+   '("no")
+   (lambda (sent handlers _prompts)
+     (let ((messages nil))
+       (cl-letf (((symbol-function 'message)
+                  (lambda (format-string &rest args)
+                    (push (apply #'format format-string args) messages))))
+         (test--stage-and-commit-write-and-send "the message")
+         (funcall (gethash 'stage-and-commit handlers) 'fake-proc
+                  test--stage-and-commit-needs-confirmation)
+         (funcall skg--rerender-after-empty-stream))
+       (should (= 1 (length (funcall sent))))
+       (should (equal (car messages)
+                      "Not committed; your message is kept in *skg commit message*."))
+       (skg-stage-and-commit)
+       (should (equal (with-current-buffer skg--commit-message-buffer-name
+                        (buffer-string))
+                      "the message"))))))
+
+(ert-deftest test-stage-and-commit-cancel-sends-nothing-and-says-so ()
+  (test--stage-and-commit-run
+   nil
+   (lambda (sent _handlers _prompts)
+     (let ((messages nil))
+       (cl-letf (((symbol-function 'message)
+                  (lambda (format-string &rest args)
+                    (push (apply #'format format-string args) messages))))
+         (skg-stage-and-commit)
+         (with-current-buffer skg--commit-message-buffer-name
+           (insert "never sent")
+           (funcall (key-binding (kbd "C-c C-k")))))
+       (should (null (funcall sent)))
+       (should-not (get-buffer skg--commit-message-buffer-name))
+       (should (string-match-p "Commit canceled" (car messages)))))))
 
 (ert-deftest test-stage-and-commit-resends-confirmed-only-on-yes ()
   (test--stage-and-commit-run
-   '("the message" "yes")
+   '("yes")
    (lambda (sent handlers prompts)
-     (skg-stage-and-commit)
+     (test--stage-and-commit-write-and-send "the message")
      (should (string-match-p (regexp-quote "(request . \"stage and commit\")")
                              (car (funcall sent))))
      (should (string-match-p (regexp-quote "(message-lines \"the message\")")
@@ -60,7 +162,7 @@ first, via a function), the handlers and the prompts."
      (should-not (string-match-p "confirmed" (car (funcall sent))))
      (funcall (gethash 'stage-and-commit handlers) 'fake-proc
               test--stage-and-commit-needs-confirmation)
-     (should (= 1 (length (funcall prompts))))
+     (should (null (funcall prompts)))
      (should skg--rerender-after-empty-stream)
      (funcall skg--rerender-after-empty-stream)
      (should (string-match-p "1 of 3 changed files are ready"
@@ -71,9 +173,9 @@ first, via a function), the handlers and the prompts."
      (should (string-match-p (regexp-quote "(message-lines \"the message\")")
                              (car (funcall sent))))))
   (test--stage-and-commit-run
-   '("the message" "y")
+   '("y")
    (lambda (sent handlers _prompts)
-     (skg-stage-and-commit)
+     (test--stage-and-commit-write-and-send "the message")
      (funcall (gethash 'stage-and-commit handlers) 'fake-proc
               test--stage-and-commit-needs-confirmation)
      (funcall skg--rerender-after-empty-stream)
@@ -99,9 +201,9 @@ the server reads up to a newline, holds no newline but its last."
 listed in a buffer of their own, even when every changed file is ready;
 \"yes\" resends confirmed."
   (test--stage-and-commit-run
-   '("the message" "yes")
+   '("yes")
    (lambda (sent handlers prompts)
-     (skg-stage-and-commit)
+     (test--stage-and-commit-write-and-send "the message")
      (funcall (gethash 'stage-and-commit handlers) 'fake-proc
               "((needs-confirmation . t) (already-staged ((\"/data/public\" \"notes.txt\" \"a b.skg\") (\"/data/private\" \"c.skg\"))) (readiness-summary (ready 3) (changed 3) (foreign 0) (order-only 0) (notEditable 0)) (errors ()) (warnings ()))")
      (funcall skg--rerender-after-empty-stream)

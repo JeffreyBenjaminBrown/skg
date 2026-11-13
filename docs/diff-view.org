@@ -650,8 +650,8 @@ change view; what the buffer still holds of it is kept as "What the
 refresh keeps" describes.
 
 * Stage and commit
-C-c r c ('skg-stage-and-commit') prompts once for a message and sends
-"stage and commit". The server stages the changed '.skg' files of
+C-c r c ('skg-stage-and-commit') opens a buffer for the message, and
+C-c C-c there sends "stage and commit". The server stages the changed '.skg' files of
 every owned skgrepo, deletions included, and git-commits each gitrepo
 that has changes with that message, by the gitrepo's configured user.
 A gitrepo with changes but no configured user fails before anything

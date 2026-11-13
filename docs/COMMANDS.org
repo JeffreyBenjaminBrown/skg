@@ -890,9 +890,16 @@ with "Save the buffer first." while the buffer has unsaved changes.
 A clean buffer the server rerenders after reloading files changed on
 disk is extended the same way, with no key pressed.
 *** C-c r c : skg-stage-and-commit
-Prompts once for a commit message, then stages every change and
+Opens the buffer "*skg commit message*", in which you write the commit
+message, as in magit. There C-c C-c stages every change and
 git-commits it, in every owned skgrepo that has changes, with that
-message. It stages only '.skg' files (deletions included). If not
+message, and C-c C-k cancels and kills the buffer; either one restores
+its window. The message is sent as written, less its trailing
+whitespace; a blank one is refused. After C-c C-c the buffer keeps the message until it is moot: once something
+is committed, or nothing needed committing and nothing failed, the
+buffer is killed. When nothing is committed otherwise (a "yes"
+declined, a refusal, an error), the message stays there, and C-c r c
+reopens it. It stages only '.skg' files (deletions included). If not
 every changed file is ready, it first shows the readiness summary and
 proceeds only if you type the word "yes". Likewise, if some owned
 gitrepo already has entries staged before the command, it first says
@@ -900,7 +907,7 @@ how many paths each such gitrepo has staged, lists them in the buffer
 "*skg already staged*", and proceeds only on "yes"; the commit then
 includes those entries, since a git-commit records everything staged.
 Any other answer, or C-g, leaves everything as it was and says "Not
-committed.". Every
+committed; your message is kept in *skg commit message*". Every
 open view must be saved or reverted first. Afterward the open buffers
 of the diff view are rerendered: each keeps its roots, its
 folding and what it made editable, and what was committed no longer

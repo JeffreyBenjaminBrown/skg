@@ -129,9 +129,10 @@
 (defun phase-3-stage-and-commit ()
   (setq integration-test-phase "phase-3")
   (setq test-messages nil)
-  (cl-letf (((symbol-function 'read-string)
-             (lambda (&rest _) "integration commit")))
-    (skg-stage-and-commit))
+  (skg-stage-and-commit)
+  (with-current-buffer skg--commit-message-buffer-name
+    (insert "integration commit\n")
+    (skg-commit-message-send))
   (unless (skg-test-wait-for
            (lambda ()
              (cl-some (lambda (m) (string-match-p "^Committed in" m))
