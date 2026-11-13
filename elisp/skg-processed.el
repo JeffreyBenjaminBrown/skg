@@ -1,32 +1,32 @@
 ;;; -*- lexical-binding: t; -*-
 ;;;
 ;;; PURPOSE: The processed gestures of the diff view
-;;; ('docs/diff-view.org', "Processed requests and gestures"). Each writes
-;;; processed requests, '(processed OBJECTS)' or '(unprocessed OBJECTS)', into
-;;; the '(editRequest ...)' of headline metadata, then saves. The save
-;;; consumes them, setting or clearing the marks, and answers with the
-;;; buffer rerendered and the processed summary.
+;;; ('docs/diff-view.org', "Processed requests and gestures"). Each says
+;;; what it marks and which way: 'C-c m', then 'n' (the node), 'r' (its
+;;; relationship to its viewparent) or 'b' (both), then 'p' (processed)
+;;; or 'u' (unprocessed). It writes processed requests, '(processed
+;;; OBJECTS)' or '(unprocessed OBJECTS)', into the '(editRequest ...)'
+;;; of headline metadata, then saves. The save consumes them, setting
+;;; or clearing the marks, and answers with the buffer rerendered and
+;;; the processed summary.
 ;;;
 ;;; The server says which leaves (single changes) a headline names:
 ;;; it writes '(leaves N OBJECT...)' in the headline's '(diff ...)'
-;;; form, beside '(processed ...)'. The OBJECTs
-;;; are those a request on the headline may name: 'node' (∃, its
-;;; existence) and/or 'rel' (~, its relationship to its viewparent) on
-;;; a vognode (a ghost among them), each worth one leaf; 'all' on a modified node
-;;; (M, every leaf its file records, beside 'rel' when that names a
-;;; leaf) and on a processed aggregate (a changeset marker); none
-;;; on a headline that names one leaf. N is how many distinct leaves a
-;;; request naming every listed object touches. A gesture names every
-;;; object the headline lists, and toggles by the headline's own '(processed
-;;; ...)': it is processed when that names every listed object. A folder
-;;; shown because of a change names no leaf itself; a gesture on it acts
-;;; on its children. The server writes such a folder as its bare atom;
-;;; whether it is changed, and processed, follows from its members
+;;; form, beside '(processed ...)'. The OBJECTs are those of 'node'
+;;; and 'rel' that name some leaf there; N is how many distinct leaves
+;;; a request naming every listed object touches. A headline that
+;;; names exactly one leaf (a property member, an old text, a home
+;;; skgrepo or relRepo move) lists no object, and a bare request marks
+;;; it. A changeset marker lists only 'rel', though 'node' there names
+;;; its members' own leaves. A folder shown because of a change names
+;;; no leaf itself; a gesture on it acts on its children. The server
+;;; writes such a folder as its bare atom; whether it is changed, and
+;;; processed, follows from its members
 ;;; (`skg--folder-change-processed-at-point').
 ;;;
-;;; Below the headline a gesture acts on, it names no 'all': the leaves
-;;; of a modified node or a processed aggregate there are named
-;;; by the headlines under it, or are not shown there.
+;;; The letter's objects are what a gesture names on each headline,
+;;; filtered by what the headline lists
+;;; (`skg--processed-objects-named-by-letters').
 ;;;
 ;;; It also formats the processed summary, which the save, stage-and-
 ;;; commit and extend-diff-view show.
@@ -48,49 +48,99 @@
   "Asked before a gesture unmarks more than one leaf.
 `yes-or-no-p' appends the \"(yes or no)\".")
 
-(defun skg-cycle-processed (&optional recursive)
-  "Toggle whether the change at point is processed, then save.
-On a headline that names leaves, toggle every object it lists: on a
-new member its existence and its relationship (∃ and ~), on a
-modified node (M) every leaf its file records, beside its
-relationship when that changed. On a changed folder, toggle each
-leaf one level down. With a prefix argument RECURSIVE, mark (or, if
-the headline at point is processed, unmark) every leaf named in the
-subtree at point, except that at a new node the server walks the
-graph instead of the buffer: with one C-u, contentward, marking each
-new node's text and content; with two, along every relationship each
-new node records, marking everything it records
-\(`skg--processed-requests-for-subtree'). Before unmarking more than
-one leaf, ask. Works on write-protected occurrences too."
+(defun skg-mark-node-processed (&optional recursive)
+  "Mark the node at point processed, then save: every leaf of the node
+itself (its existence; on a modified node its text, home skgrepo,
+aliases, extra IDs and flags), not its relationship to its viewparent.
+With a prefix argument RECURSIVE, mark the node of every headline in
+the subtree (`skg--mark-processed')."
   (interactive "P")
+  (skg--mark-processed '(node) t recursive))
+
+(defun skg-mark-node-unprocessed (&optional recursive)
+  "As `skg-mark-node-processed', but unmark."
+  (interactive "P")
+  (skg--mark-processed '(node) nil recursive))
+
+(defun skg-mark-rel-processed (&optional recursive)
+  "Mark processed the relationship of the headline at point to its
+viewparent, then save. With a prefix argument RECURSIVE, mark the
+relationship of every headline in the subtree (`skg--mark-processed')."
+  (interactive "P")
+  (skg--mark-processed '(rel) t recursive))
+
+(defun skg-mark-rel-unprocessed (&optional recursive)
+  "As `skg-mark-rel-processed', but unmark."
+  (interactive "P")
+  (skg--mark-processed '(rel) nil recursive))
+
+(defun skg-mark-both-processed (&optional recursive)
+  "Mark processed both the node at point and its relationship to its
+viewparent, then save. With a prefix argument RECURSIVE, mark both on
+every headline in the subtree (`skg--mark-processed')."
+  (interactive "P")
+  (skg--mark-processed '(node rel) t recursive))
+
+(defun skg-mark-both-unprocessed (&optional recursive)
+  "As `skg-mark-both-processed', but unmark."
+  (interactive "P")
+  (skg--mark-processed '(node rel) nil recursive))
+
+(defun skg--mark-processed (letter-objects processed recursive)
+  "Mark (PROCESSED non-nil) or unmark what LETTER-OBJECTS, '(node),
+'(rel) or '(node rel), name on the headline at point, then save. On a
+changed folder, act on each headline one level down. With a prefix
+argument RECURSIVE, act on every headline in the subtree at point,
+except that at a new node in content position the server walks the
+graph instead of the buffer: with one C-u contentward, with two along
+every relationship each new node records, the letters filtering what
+the walk marks (`skg--processed-requests-for-subtree'). Before
+unmarking more than one leaf, ask. Works on write-protected
+occurrences too."
   (unless (org-at-heading-p)
     (user-error "Not on a headline"))
   (let ((requests (save-excursion
                     (if recursive
                         (skg--processed-requests-for-subtree
+                         letter-objects processed
                          (if (equal recursive '(16)) 'newOutward 'newContent))
-                      (skg--processed-requests-at-point)))))
+                      (skg--processed-requests-at-point
+                       letter-objects processed)))))
     (unless requests
-      (user-error "Nothing here can be marked processed"))
+      (user-error "%s" (skg--processed-nothing-to-mark-text letter-objects)))
     (when (skg--processed-write-requests-if-confirmed requests)
       (skg-request-save-buffer))))
 
-(defun skg-toggle-homeSkgrepo-move-processed (&optional recursive)
-  "Toggle whether the home-skgrepo move of the node at point is
-processed, then save: unmark it if it is processed, else mark it. With a
-prefix argument RECURSIVE, do the same to the move of every
-descendant that moved between the same two skgrepos. Before
-unmarking more than one move, ask. Point may be on the node or on
-its move. Works on write-protected occurrences too."
+(defun skg--processed-nothing-to-mark-text (letter-objects)
+  "What a gesture with LETTER-OBJECTS says when it names nothing."
+  (pcase letter-objects
+    ('(node) "Its node has no change to mark here")
+    ('(rel) "Its relationship to its viewparent has no change to mark here")
+    (_ "Neither its node nor its relationship has a change to mark here")))
+
+(defun skg-mark-homeSkgrepo-move-processed (&optional recursive)
+  "Mark the home-skgrepo move of the node at point processed, then save.
+With a prefix argument RECURSIVE, mark too the move of every
+descendant that moved between the same two skgrepos
+\(`skg--mark-homeSkgrepo-move')."
   (interactive "P")
+  (skg--mark-homeSkgrepo-move t recursive))
+
+(defun skg-mark-homeSkgrepo-move-unprocessed (&optional recursive)
+  "As `skg-mark-homeSkgrepo-move-processed', but unmark."
+  (interactive "P")
+  (skg--mark-homeSkgrepo-move nil recursive))
+
+(defun skg--mark-homeSkgrepo-move (processed recursive)
+  "Mark (PROCESSED non-nil) or unmark the home-skgrepo move of the node
+at point, then save. With RECURSIVE, do the same to the move of every
+descendant that moved between the same two skgrepos. Before unmarking
+more than one move, ask. Point may be on the node or on its move.
+Works on write-protected occurrences too."
   (unless (org-at-heading-p)
     (user-error "Not on a headline"))
   (let* ((move (or (skg--processed-homeSkgrepo-move-at-point)
                    (user-error "This node's home skgrepo did not change")))
-         (processed (save-excursion
-                  (goto-char (car move))
-                  (not (skg--processed-p
-                        (skg--current-headline-metadata-sexp)))))
          (requests
           (save-excursion
             (goto-char (car move))
@@ -110,16 +160,37 @@ its move. Works on write-protected occurrences too."
 
 ;;; Reading a headline's change facts
 
-(defun skg--processed-leaves-below (metadata-sexp)
-  "`skg--processed-leaves' of METADATA-SEXP, for a headline below the
-one a gesture acts on, without `all': nil when `all' was its only
-object."
+(defun skg--processed-objects-named-by-letters
+    (metadata-sexp letter-objects &optional at-gesture)
+  "What a gesture with LETTER-OBJECTS names on the headline with
+METADATA-SEXP, at point: nil when it names nothing there, else
+\(OBJECTS), OBJECTS the request's, nil for a bare request.
+On a headline that lists objects, the letters among them. On one that
+names a single leaf, the bare request, when the leaf is of a kind a
+letter names: a relRepo move is a relationship's, any other the
+node's own (`skg--processed-single-leaf-kind'). On a changeset marker
+AT-GESTURE (the headline the gesture acts on), the letters
+themselves: its 'node' names its members' own leaves, which its
+'(leaves ...)' does not list; below the gesture those members name
+them under their own headlines."
   (let ((leaves (skg--processed-leaves metadata-sexp)))
-    (if (not (memq 'all (cdr leaves)))
-        leaves
-      (let ((objects (remq 'all (cdr leaves))))
-        (when objects
-          (cons (length objects) objects))))))
+    (cond
+     ((null leaves) nil)
+     ((null (cdr leaves))
+      (when (memq (skg--processed-single-leaf-kind metadata-sexp)
+                  letter-objects)
+        (list nil)))
+     ((and at-gesture (assq 'changesetMarker (cdr metadata-sexp)))
+      (list letter-objects))
+     (t (let ((objects (seq-filter (lambda (object) (memq object (cdr leaves)))
+                                   letter-objects)))
+          (when objects (list objects)))))))
+
+(defun skg--processed-single-leaf-kind (metadata-sexp)
+  "The letter object naming the one leaf of a headline that names one:
+`rel' for a relRepo move, else `node' (an alias, extra ID or flag of
+its folder's viewparent, an old text, a home skgrepo move)."
+  (if (assq 'relRepoMove (cdr metadata-sexp)) 'rel 'node))
 
 (defun skg--processed-p (metadata-sexp)
   "Non-nil when the headline with METADATA-SEXP, at point, is processed: a
@@ -190,62 +261,59 @@ in buffer order."
 ;;; COUNT)' for the headline at MARKER, COUNT being how many leaves it
 ;;; touches, then writes them all or none.
 
-(defun skg--processed-requests-at-point ()
-  "The requests of the one-level gesture on the headline at point."
+(defun skg--processed-requests-at-point (letter-objects processed)
+  "The requests of the one-level gesture with LETTER-OBJECTS on the
+headline at point, marking (PROCESSED non-nil) or unmarking: on a
+headline that names leaves, one, naming what
+`skg--processed-objects-named-by-letters' says; on a changed folder,
+one on each child that names some of them."
   (let* ((metadata-sexp (skg--current-headline-metadata-sexp))
-         (leaves (skg--processed-leaves metadata-sexp)))
+         (named (skg--processed-objects-named-by-letters
+                 metadata-sexp letter-objects t)))
     (cond
-     (leaves
-      (list (skg--processed-request-at-point
-             (not (skg--objects-processed-p metadata-sexp (cdr leaves)))
-             (cdr leaves))))
-     ((skg--folder-change-processed-at-point)
-      (let ((processed (not (skg--processed-p metadata-sexp))))
-        (skg--processed-do-children
-         (lambda (child-sexp)
-           (let ((child-leaves (skg--processed-leaves-below child-sexp)))
-             (when child-leaves
-               (skg--processed-request-at-point processed (cdr child-leaves)))))))))))
+     (named
+      (list (skg--processed-request-at-point processed (car named))))
+     ((and (not (skg--processed-leaves metadata-sexp))
+           (skg--folder-change-processed-at-point))
+      (skg--processed-do-children
+       (lambda (child-sexp)
+         (let ((child-named (skg--processed-objects-named-by-letters
+                             child-sexp letter-objects)))
+           (when child-named
+             (skg--processed-request-at-point processed (car child-named))))))))))
 
-(defun skg--processed-requests-for-subtree (walk-object)
-  "The requests of the recursive gesture on the headline at point: one
-on every headline in the subtree that names leaves, marking them processed
-unless the headline at point is processed. At a new node in content
-position (`skg--processed-hands-to-the-server-p'), the request names
-WALK-OBJECT, `newContent' or `newOutward', which the server expands
-from the graph, through new nodes only, whatever the buffer shows or
-write-protects; so the walk skips the rest of that node's subtree.
-There the start names WALK-OBJECT alone, leaving the relationship to
-its viewparent, which is no part of what it reaches, and is processed
-when its existence is."
+(defun skg--processed-requests-for-subtree (letter-objects processed walk-object)
+  "The requests of the recursive gesture with LETTER-OBJECTS on the
+headline at point, marking (PROCESSED non-nil) or unmarking: one on
+every headline in the subtree that names some of them. At a new node
+in content position (`skg--processed-hands-to-the-server-p'), the
+request names LETTER-OBJECTS and WALK-OBJECT, `newContent' or
+`newOutward', which the server expands from the graph, through new
+nodes only, whatever the buffer shows or write-protects, the letters
+naming both the headline's own objects and the kinds of leaf the walk
+marks; so the walk skips the rest of that node's subtree. The letters
+are sent whole there even where the headline lists fewer, since
+without them the walk would name every kind."
   (org-back-to-heading t)
-  (let* ((metadata-sexp (skg--current-headline-metadata-sexp))
-         (root (point))
-         (end (save-excursion (org-end-of-subtree t t) (point)))
-         (root-is-handed-over (skg--processed-node-added-p metadata-sexp))
-         (processed (not (if root-is-handed-over
-                         (skg--objects-processed-p metadata-sexp '(node))
-                       (skg--processed-p metadata-sexp))))
-         (requests '()))
+  (let ((root (point))
+        (end (save-excursion (org-end-of-subtree t t) (point)))
+        (requests '()))
     (while (< (point) end)
       (let* ((headline-sexp (skg--metadata-sexp-at-point-or-nil))
              (at-root (= (point) root))
-             (handed-over (if at-root
-                              root-is-handed-over
-                            (and headline-sexp
+             (handed-over (and headline-sexp
+                               (if at-root
+                                   (skg--processed-node-added-p headline-sexp)
                                  (skg--processed-hands-to-the-server-p
                                   headline-sexp))))
-             (leaves
-              (and headline-sexp
-                   (not (and at-root handed-over)) ; the start names the walk alone
-                   (if at-root
-                       (skg--processed-leaves headline-sexp)
-                     (skg--processed-leaves-below headline-sexp)))))
-        (when (or leaves handed-over)
+             (named (cond (handed-over
+                           (list (append letter-objects (list walk-object))))
+                          (headline-sexp
+                           (skg--processed-objects-named-by-letters
+                            headline-sexp letter-objects at-root)))))
+        (when named
           (push (save-excursion
-                  (skg--processed-request-at-point
-                   processed (append (cdr leaves)
-                                 (and handed-over (list walk-object)))))
+                  (skg--processed-request-at-point processed (car named)))
                 requests))
         (if handed-over
             (org-end-of-subtree t t)
@@ -268,21 +336,34 @@ says '(node added)'."
   (eq (cadr (skg--processed-form metadata-sexp 'node)) 'added))
 
 (defun skg--processed-request-at-point (processed objects)
-  "A request that marks (PROCESSED non-nil) or unmarks the leaves on OBJECTS
-of the headline at point, with how many leaves it touches as the
-server counts them: N of the headline's '(leaves N OBJECT...)' when
-OBJECTS are the ones it lists, else one for each object, and two for
-`newContent' or `newOutward', so that unmarking new nodes always asks
-first: the client cannot count what the server will reach. A
-headline without the fact, which only the home skgrepo move gesture
-can reach, counts one."
-  (let ((leaves (skg--processed-leaves (skg--current-headline-metadata-sexp))))
-    (list (copy-marker (line-beginning-position)) processed objects
-          (if (equal objects (cdr leaves))
-              (or (car leaves) 1)
-            (+ (length objects)
-               (seq-count (lambda (object) (memq object '(newContent newOutward)))
-                          objects))))))
+  "A request that marks (PROCESSED non-nil) or unmarks the leaves on
+OBJECTS of the headline at point, with how many leaves it touches
+\(`skg--processed-leaves-touched')."
+  (list (copy-marker (line-beginning-position)) processed objects
+        (skg--processed-leaves-touched
+         (skg--processed-leaves (skg--current-headline-metadata-sexp))
+         objects)))
+
+(defun skg--processed-leaves-touched (leaves objects)
+  "How many leaves a request naming OBJECTS touches on a headline whose
+'(leaves N OBJECT...)' is LEAVES, (N . LISTED), as the server counts
+them. Of the objects listed there: N when OBJECTS name them all; one
+for 'rel' alone, since it names the one relationship to the viewparent;
+N less that one for 'node' alone. An object the headline does not list
+\('node' on a changeset marker, 'newContent', 'newOutward') counts two,
+so that unmarking it always asks first: the client cannot count what
+the server will reach. A headline without the fact, which only the
+home skgrepo move gesture can reach, and a bare request count one."
+  (let* ((listed (cdr leaves))
+         (named-listed (seq-filter (lambda (object) (memq object listed))
+                                   objects))
+         (unlisted (seq-difference objects listed)))
+    (+ (* 2 (length unlisted))
+       (cond ((or (null leaves) (null objects)) 1)
+             ((null named-listed) 0)
+             ((= (length named-listed) (length listed)) (car leaves))
+             ((equal named-listed '(rel)) 1)
+             (t (1- (car leaves)))))))
 
 (defun skg--processed-unmarks-several-leaves-p (requests)
   "Non-nil when the unmark requests among REQUESTS touch more than one

@@ -81,7 +81,9 @@ still the ordinary prefix."
     (should (eq (key-binding "*") #'skg-zippy-unbound-key))
     (should (eq (key-binding (kbd "C-c C-c")) #'org-ctrl-c-ctrl-c))
     (should (eq (key-binding (kbd "C-o")) #'skg-goto))
-    (should (eq (key-binding (kbd "v d")) #'skg-diffView-open))))
+    (should (eq (key-binding (kbd "v d")) #'skg-diffView-open))
+    ;; A mark is typed in zippy as Jeff wrote it.
+    (should (eq (key-binding (kbd "m n p")) #'skg-mark-node-processed))))
 
 (ert-deftest test-skg-zippy-is-one-state-for-every-skg-buffer ()
   "C-c z in one skg buffer turns zippy on in every skg buffer, the

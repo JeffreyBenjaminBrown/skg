@@ -2,9 +2,10 @@
 ;;; for the data.
 ;;;
 ;;; Phase 1: Open the diff view; its buffers open.
-;;; Phase 2: Mark every change processed, through the recursive
-;;;          gesture on each root of the "all changes" buffer, and see
-;;;          "Commit ready".
+;;; Phase 2: Mark and unmark with each letter and each prefix, and
+;;;          see what the server says is processed; then mark every
+;;;          change processed, through 'C-u C-c m b p' on each root of
+;;;          the "all changes" buffer, and see "Commit ready".
 ;;; Phase 3: Stage and commit; every owned skgrepo is committed, the
 ;;;          foreign one is not, and the buffers keep their roots,
 ;;;          which show no change any more.
@@ -96,35 +97,82 @@
         (push (line-beginning-position) positions))
       (nreverse positions))))
 
+(defun line-matching (regexp)
+  "The text of the first line of the current buffer matching REGEXP."
+  (save-excursion
+    (goto-char (point-min))
+    (unless (re-search-forward regexp nil t)
+      (test-fail "No line matches %S:\n%s" regexp (buffer-string)))
+    (buffer-substring (line-beginning-position) (line-end-position))))
+
+(defun mark-at (regexp command &optional prefix)
+  "Run COMMAND, with PREFIX, on the first headline matching REGEXP,
+answering yes if it asks, and wait for the processed summary of its
+save."
+  (goto-char (point-min))
+  (re-search-forward regexp)
+  (beginning-of-line)
+  (setq test-messages nil)
+  (cl-letf (((symbol-function 'yes-or-no-p) (lambda (&rest _) t)))
+    (funcall command prefix))
+  (unless (skg-test-wait-for
+           (lambda ()
+             (cl-some (lambda (m) (string-match-p "changed files are processed" m))
+                      test-messages))
+           20)
+    (test-fail "No processed summary after %s at %S" command regexp)))
+
+(defun expect-processed (regexp processed-regexp what)
+  "Fail unless the headline matching REGEXP matches PROCESSED-REGEXP,
+or, when that is nil, carries no '(processed ...)'."
+  (let ((line (line-matching regexp)))
+    (unless (if processed-regexp
+                (string-match-p processed-regexp line)
+              (not (string-match-p "(processed" line)))
+      (test-fail "After %s: %s" what line))
+    (test-pass "%s" what)))
+
 (defun phase-2-mark-everything ()
   (setq integration-test-phase "phase-2")
-  (let ((buf (all-changes-buffer))
-        (root-count nil))
-    (switch-to-buffer buf)
-    (setq root-count (length (root-headline-positions)))
-    (dotimes (i root-count)
-      ;; Each gesture saves, which rerenders the buffer, so find the
-      ;; i-th root afresh. A root an earlier gesture already marked processed
-      ;; is skipped: the gesture toggles, so it would mark it unprocessed.
-      (goto-char (nth i (root-headline-positions)))
-      (unless (string-match-p "(processed"
-                              (buffer-substring (line-beginning-position)
-                                                (line-end-position)))
-        (setq test-messages nil)
-        (skg-cycle-processed t)
-        (unless (skg-test-wait-for
-                 (lambda ()
-                   (cl-some (lambda (m) (string-match-p "changed files are processed" m))
-                            test-messages))
-                 20)
-          (test-fail "No processed summary after the gesture on root %d" i))))
-    (let ((summary (cl-find-if
-                    (lambda (m) (string-match-p "changed files are processed" m))
-                    test-messages)))
-      (unless (string-match-p "^Commit ready\\." summary)
-        (test-fail "Not all processed after marking every root: %s\n%s"
-                   summary (buffer-string)))
-      (test-pass "%s" summary))))
+  (switch-to-buffer (all-changes-buffer))
+  ;; Each letter, without a prefix, on the deleted node d.
+  (mark-at "ghost (gnid d)" #'skg-mark-node-processed)
+  (expect-processed "ghost (gnid d)" "(processed node))" "C-c m n p on d")
+  (mark-at "ghost (gnid d)" #'skg-mark-rel-processed)
+  (expect-processed "ghost (gnid d)" "(processed node rel))" "C-c m r p on d")
+  (mark-at "ghost (gnid d)" #'skg-mark-both-unprocessed)
+  (expect-processed "ghost (gnid d)" nil "C-c m b u on d")
+  ;; The walks, on the new node n: outward naming relationships, then
+  ;; contentward naming nodes; n3, three deep, follows both.
+  (mark-at "(gnid n)" #'skg-mark-rel-processed '(16))
+  (expect-processed "(gnid n)" "(processed rel))" "C-u C-u C-c m r p on n")
+  (expect-processed "(gnid n3)" "(processed rel))" "C-u C-u C-c m r p on n, at n3")
+  (mark-at "(gnid n)" #'skg-mark-node-processed '(4))
+  (expect-processed "(gnid n)" "(processed node rel))" "C-u C-c m n p on n")
+  (expect-processed "(gnid n3)" "(processed node rel))" "C-u C-c m n p on n, at n3")
+  ;; m's home skgrepo move.
+  (mark-at "(gnid m)" #'skg-mark-homeSkgrepo-move-processed)
+  (expect-processed "(homeSkgrepoMove (old alpha) (new beta))" "(processed)"
+                    "C-c m h p on m")
+  ;; Every root, recursively. Each gesture saves, which rerenders the
+  ;; buffer, so the i-th root is found afresh.
+  (dotimes (i (length (root-headline-positions)))
+    (goto-char (nth i (root-headline-positions)))
+    (setq test-messages nil)
+    (skg-mark-both-processed '(4))
+    (unless (skg-test-wait-for
+             (lambda ()
+               (cl-some (lambda (m) (string-match-p "changed files are processed" m))
+                        test-messages))
+             20)
+      (test-fail "No processed summary after the gesture on root %d" i)))
+  (let ((summary (cl-find-if
+                  (lambda (m) (string-match-p "changed files are processed" m))
+                  test-messages)))
+    (unless (string-match-p "^Commit ready\\." summary)
+      (test-fail "Not all processed after marking every root: %s\n%s"
+                 summary (buffer-string)))
+    (test-pass "%s" summary)))
 
 (defun phase-3-stage-and-commit ()
   (setq integration-test-phase "phase-3")
