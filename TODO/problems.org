@@ -913,3 +913,16 @@ gap too. Details, options and questions:
    accessors during traversal.  Retain insertion-time relationship gating as
    defence-in-depth, and add hidden-sibling-fork and mixed-visibility
    diamond regressions.
+* Requests holding a raw newline break the line-based protocol (2026-11-12)
+** Only the streaming sender guards against it
+   The server reads one request per line ('server/serve.rs'), and the
+   'sexp' crate reads '\n' in a string as a backslash and an 'n', not a
+   newline.  A request whose printed form holds a newline reaches the
+   server as several broken requests, each answered with an Error; a
+   client waiting on a stream then stays "in progress" until
+   'skg-connection-end'.  That is how a multi-line commit message wedged
+   stage-and-commit.  Stage-and-commit now sends '(message-lines ...)',
+   and 'skg--send-streaming-request' refuses such a request before
+   sending it.  Senders that call 'process-send-string' directly, such
+   as text search, have no guard; a pasted multi-line search query would
+   hit the same failure.
