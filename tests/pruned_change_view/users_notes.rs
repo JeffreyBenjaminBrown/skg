@@ -57,7 +57,7 @@ fn a_note_under_a_ghost_survives (
     assert_lines_in_order (&saved, &[ ghost, " a note under h\n", old_member ]);
     let env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
     let response : String = send_stage_and_commit_request ( f, &env,
-      "((request . \"stage and commit\") (message . \"commit\") (confirmed . t))\n" ) ?;
+      "((request . \"stage and commit\") (message-lines \"commit\") (confirmed . t))\n" ) ?;
     let committed : String = rerendered_view_content (&response);
     assert_eq! ( parent_line_of (&committed, "a note under h"), "** (skg tombstone)",
                  "{}", committed );
@@ -113,7 +113,7 @@ fn a_note_under_a_removed_member_survives_it_going_stale (
               "{}", saved );
     let env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
     let response : String = send_stage_and_commit_request ( f, &env,
-      "((request . \"stage and commit\") (message . \"commit\") (confirmed . t))\n" ) ?;
+      "((request . \"stage and commit\") (message-lines \"commit\") (confirmed . t))\n" ) ?;
     assert! ( response . contains ("(commits ((main "), "{}", response );
     let committed : String = rerendered_view_content (&response);
     let parent : String = parent_line_of (&committed, "a note under x");

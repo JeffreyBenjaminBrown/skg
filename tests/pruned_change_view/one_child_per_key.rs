@@ -140,7 +140,7 @@ fn a_requested_alias_folder_is_refreshed_and_kept (
     assert_saves_back_cleanly (f, &collateral) ?;
     let env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
     let response : String = send_stage_and_commit_request ( f, &env,
-      "((request . \"stage and commit\") (message . \"commit\") (confirmed . t))\n" ) ?;
+      "((request . \"stage and commit\") (message-lines \"commit\") (confirmed . t))\n" ) ?;
     let committed : String = rerendered_view_content (&response);
     assert_eq! ( children_of (&committed, ROOT_X),
                  vec! [ "** (skg aliasFolder)" . to_string () ], "{}", committed );

@@ -31,13 +31,24 @@ end
 function M.send (message, confirmed)
   local request = {
     sexpr.pair(sexpr.symbol('request'), 'stage and commit'),
-    sexpr.pair(sexpr.symbol('message'), message) }
+    M.message_lines(message) }
   if confirmed then
     table.insert(request, sexpr.pair(sexpr.symbol('confirmed'),
                                      sexpr.symbol('t'))) end
   rerender.send_streaming_request('stage and commit', 'stage-and-commit',
     request,
     function (_payload_text, response) M.handler(message, response) end)
+end
+
+---'(message-lines "LINE" ...)': MESSAGE one string per line, since
+---the server reads one request per line.
+---@param message string
+---@return table
+function M.message_lines (message)
+  local lines = { sexpr.symbol('message-lines') }
+  for _, line in ipairs(vim.split(message, '\n', { plain = true })) do
+    table.insert(lines, line) end
+  return lines
 end
 
 ---On a request for confirmation, ask for it, and on "yes" resend

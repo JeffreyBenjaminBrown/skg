@@ -34,6 +34,7 @@ use crate::sexp_string::quote_sexp_string;
 use crate::skgrepo_sets::{SkgrepoRestriction, require_unrestricted};
 use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::types::misc::SkgrepoName;
+use crate::types::sexp::extract_string_list_from_sexp;
 
 use sexp::{Atom, Sexp};
 use std::iter::once;
@@ -66,7 +67,7 @@ pub fn handle_stage_and_commit_request (
   skgrepo_restriction : &SkgrepoRestriction,
 ) {
   let answer : StageAndCommitAnswer =
-    match value_from_request_sexp ("message", request) {
+    match commit_message_from_request (request) {
       Err (e) => StageAndCommitAnswer::Refused (e),
       Ok (message) => stage_and_commit (
         env, views_state, skgrepo_restriction, &message,
@@ -83,6 +84,17 @@ pub fn handle_stage_and_commit_request (
       stream_rerender_diffView_views (
         stream, env, views_state, skgrepo_restriction ),
     _ => stream_empty_rerender (stream), }}
+
+/// The commit message, sent as '(message-lines "LINE" ...)' and
+/// joined here with newlines: the server reads one request per line,
+/// so a newline cannot be sent inside a string.
+fn commit_message_from_request (
+  request : &str,
+) -> Result<String, String> {
+  let parsed : Sexp = sexp::parse (request)
+    . map_err ( |e| format! ( "Failed to parse S-expression: {}", e )) ?;
+  Ok ( extract_string_list_from_sexp (&parsed, "message-lines") ?
+       . join ("\n") ) }
 
 /// After a git-commit: rerender each open buffer of the diff view as
 /// any rerender does, over the graph straddle the commit rebuilt. Its

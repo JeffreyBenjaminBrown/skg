@@ -55,7 +55,7 @@ first, via a function), the handlers and the prompts."
      (skg-stage-and-commit)
      (should (string-match-p (regexp-quote "(request . \"stage and commit\")")
                              (car (funcall sent))))
-     (should (string-match-p (regexp-quote "(message . \"the message\")")
+     (should (string-match-p (regexp-quote "(message-lines \"the message\")")
                              (car (funcall sent))))
      (should-not (string-match-p "confirmed" (car (funcall sent))))
      (funcall (gethash 'stage-and-commit handlers) 'fake-proc
@@ -67,7 +67,7 @@ first, via a function), the handlers and the prompts."
      (should (= 2 (length (funcall sent))))
      (should (string-match-p (regexp-quote "(confirmed . t)")
                              (car (funcall sent))))
-     (should (string-match-p (regexp-quote "(message . \"the message\")")
+     (should (string-match-p (regexp-quote "(message-lines \"the message\")")
                              (car (funcall sent))))))
   (test--stage-and-commit-run
    '("the message" "y")
@@ -77,6 +77,21 @@ first, via a function), the handlers and the prompts."
               test--stage-and-commit-needs-confirmation)
      (should-not skg--rerender-after-empty-stream)
      (should (= 1 (length (funcall sent)))))))
+
+(ert-deftest test-stage-and-commit-sends-a-message-of-several-lines-on-one-line ()
+  "Each line of the message is its own string, so the request, which
+the server reads up to a newline, holds no newline but its last."
+  (test--stage-and-commit-run
+   nil
+   (lambda (sent _handlers _prompts)
+     (skg--stage-and-commit-send "summary\n\n  indented \\n \"quoted\"" nil)
+     (let ((request (car (funcall sent))))
+       (should (string-match-p
+                (regexp-quote
+                 "(message-lines \"summary\" \"\" \"  indented \\\\n \\\"quoted\\\"\")")
+                request))
+       (should (= 1 (cl-count ?\n request)))
+       (should (string-suffix-p "\n" request))))))
 
 (ert-deftest test-stage-and-commit-prompt-names-already-staged-entries ()
   "Entries already staged are listed in the prompt, by gitrepo, even

@@ -32,12 +32,14 @@ the user types \"yes\"."
 
 (defun skg--stage-and-commit-send (commit-message confirmed)
   "Send the request with COMMIT-MESSAGE, and '(confirmed . t)' when
-CONFIRMED."
+CONFIRMED. The message goes one string per line, as
+'(message-lines \"LINE\" ...)', since the server reads one request
+per line."
   (skg--send-streaming-request
    "stage and commit"
    'stage-and-commit
    (append `((request . "stage and commit")
-             (message . ,commit-message))
+             (message-lines ,@(split-string commit-message "\n")))
            (when confirmed '((confirmed . t))))
    (lambda (_tcp payload)
      (skg--stage-and-commit-handler commit-message payload))

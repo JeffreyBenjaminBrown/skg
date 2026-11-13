@@ -267,7 +267,7 @@ fn a_confirmed_resend_commits_and_rerenders_the_open_buffers (
     let env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
     let buffer : String = open_all_changes_buffer (f) ?;
     let first : String = send_stage_and_commit_request ( f, &env,
-      "((request . \"stage and commit\") (message . \"one message\"))\n" ) ?;
+      "((request . \"stage and commit\") (message-lines \"one message\"))\n" ) ?;
     assert! ( first . contains ("stage-and-commit")
               && first . contains ("(needs-confirmation . t)")
               && first . contains ("(lock-views ())")
@@ -280,7 +280,7 @@ fn a_confirmed_resend_commits_and_rerenders_the_open_buffers (
       . map ( |root| if root == "acqd" { "acq" . to_string () } else { root } )
       . collect ();
     let second : String = send_stage_and_commit_request ( f, &env,
-      "((request . \"stage and commit\") (message . \"one message\") (confirmed . t))\n" ) ?;
+      "((request . \"stage and commit\") (message-lines \"one message\") (confirmed . t))\n" ) ?;
     assert! ( second . contains ("(commits ((public ")
               && second . contains ("(lock-views (\"diff-view: all changes\"))")
               && second . contains ("(view-id \"diff-view: all changes\") (content \"* "),
@@ -299,6 +299,21 @@ fn a_confirmed_resend_commits_and_rerenders_the_open_buffers (
               . get (&viewforest_id_of (DiffViewBufferKind::AllChanges))
               . is_some_and ( |state| ! state . pids . is_empty ()
                               && state . diffView_buffer_kind == Some (DiffViewBufferKind::AllChanges) ));
+    Ok (( )) }) }
+
+/// A message of several lines, sent one string per line, is
+/// git-committed with those lines joined by newlines. A backslash and
+/// an 'n' typed in a line stay those two characters.
+#[test]
+fn a_message_of_several_lines_is_committed_as_written (
+) -> Result<(), Box<dyn Error>> {
+  with_fixture ("buffers", &SKGREPOS, |f| {
+    let env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
+    let response : String = send_stage_and_commit_request ( f, &env,
+      "((request . \"stage and commit\") (message-lines \"summary\" \"\" \"  indented \\\"quoted\\\" back\\\\n slash\") (confirmed . t))\n" ) ?;
+    assert! ( response . contains ("(commits ((public "), "{}", response );
+    assert_everything_committed (
+      f, "summary\n\n  indented \"quoted\" back\\n slash" ) ?;
     Ok (( )) }) }
 
 /// The ID of a root line, whatever kind of vognode it is.

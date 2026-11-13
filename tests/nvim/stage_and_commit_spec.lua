@@ -72,7 +72,7 @@ describe('skg stage and commit', function ()
     end, 10)
     assert.are.equal(2, #requests, vim.inspect(requests))
     assert.is_truthy(requests[1]:find('(request . "stage and commit")', 1, true))
-    assert.is_truthy(requests[1]:find('(message . "one message")', 1, true))
+    assert.is_truthy(requests[1]:find('(message-lines "one message")', 1, true))
     assert.is_falsy(requests[1]:find('confirmed', 1, true))
     assert.is_truthy(requests[2]:find('(confirmed . t)', 1, true))
     assert.is_truthy(prompts[2]:find('1 of 3 changed files are ready', 1, true))
@@ -80,6 +80,18 @@ describe('skg stage and commit', function ()
       notices, 'Committed in public (5f135fe), private (bff3a57).'), vim.inspect(notices))
     assert.are.same({ '' }, vim.api.nvim_buf_get_lines(view, 0, -1, false))
     assert.is_true(vim.bo[view].modifiable)
+  end)
+
+  it('sends a message of several lines one string per line', function ()
+    local requests = {}
+    vim.fn.input = function () return 'n' end
+    server = serve(requests)
+    stage_and_commit.send('summary\n\n  indented', false)
+    vim.wait(3000, function ()
+      return #requests == 1 and lock.stream_in_progress == nil end, 10)
+    assert.are.equal(1, #requests, vim.inspect(requests))
+    assert.is_truthy(requests[1]:find(
+      '(message-lines "summary" "" "  indented")', 1, true), requests[1])
   end)
 
   it('does not resend unless the word typed is exactly "yes"', function ()

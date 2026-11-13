@@ -5256,10 +5256,14 @@ class SkgConnection:
   def stage_and_commit (self, message, confirmed):
     """Send "stage and commit" with MESSAGE, confirmed when CONFIRMED;
     return its response, parsed, after reading the rerender stream
-    that follows it up to its 'rerender-done'."""
+    that follows it up to its 'rerender-done'. The message goes one
+    string per line, as '(message-lines "LINE" ...)', since the server
+    reads one request per line."""
     self . send_line (
-      request_line ( "stage and commit", ( "message", message )) [ : -1 ] +
-      ( " (confirmed . t))" if confirmed else ")" ))
+      request_line ( "stage and commit" ) [ : -1 ] +
+      " (message-lines " +
+      " " . join ( quote_string (line) for line in message . split ("\n") ) +
+      ")" + ( " (confirmed . t))" if confirmed else ")" ))
     response = parse_sexp ( self . read_message (IMPORT_TIMEOUT_SECONDS) )
     require_response_type (response, "stage-and-commit")
     while response_type ( parse_sexp (

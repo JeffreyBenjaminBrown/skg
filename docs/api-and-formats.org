@@ -866,8 +866,11 @@ keeps them as text ('TODO/problems.org').
     (=pruned_change_view.rs=, =changes.rs=).
 
 ** Stage and commit
-  - Request: =((request . "stage and commit") (message . "MESSAGE"))=,
-    optionally with =(confirmed . t)=.
+  - Request: =((request . "stage and commit") (message-lines "LINE" ...))=,
+    optionally with =(confirmed . t)=. MESSAGE, the commit message, is
+    its lines joined by newlines; it is sent one string per line
+    because the server reads each request up to a newline, and its
+    reader does not read =\n= in a string as a newline.
   - Response: LP response-type "stage-and-commit", then a rerender
     stream (rerender-lock, rerender-view*, rerender-done). The
     response is one of:
