@@ -91,8 +91,14 @@ request when the server challenges it over private text; a challenge
 cancels the one-shot handler for RESPONSE-TYPE, which the challenged
 request no longer answers.
 Each handler is called as (HANDLER TCP-PROC PAYLOAD).
+A request whose printed form holds a newline is refused before
+anything begins: the server reads one request per line.
 If any step after the stream begins fails, the handlers registered
 here are removed, the stream ends and the buffers unlock."
+  (let ((request-line (prin1-to-string request)))
+    (when (string-match-p "\n" request-line)
+      (error "skg: %s: the request holds a newline, so it was not sent"
+             label)))
   (let ((tcp-proc (skg-tcp-connect-to-rust)))
     (skg--begin-stream label)
     (condition-case err

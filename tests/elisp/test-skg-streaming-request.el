@@ -88,6 +88,29 @@ count returns to where it was, the stream ends and the buffers unlock."
       (should (null skg--stream-in-progress))
       (should unlocked))))
 
+(ert-deftest test-skg-send-streaming-request-refuses-a-request-holding-a-newline ()
+  "The server reads one request per line, so a request that prints
+with a newline is refused before the stream begins or anything is
+sent."
+  (let ((skg-response-handler-map nil)
+        (skg-lp--pending-count 0)
+        (skg--stream-in-progress nil)
+        (sent nil))
+    (cl-letf (((symbol-function 'skg-tcp-connect-to-rust) (lambda () 'fake-proc))
+              ((symbol-function 'skg--lock-all-skg-buffers) #'ignore)
+              ((symbol-function 'process-send-string)
+               (lambda (_proc text) (push text sent))))
+      (let ((err (should-error
+                  (skg--send-streaming-request
+                   "the label" 'the-answer
+                   '((request . "a request") (text . "two\nlines"))
+                   #'ignore nil t))))
+        (should (string-match-p "holds a newline" (cadr err))))
+      (should (null sent))
+      (should (null skg--stream-in-progress))
+      (should (null skg-response-handler-map))
+      (should (= 0 skg-lp--pending-count)))))
+
 (ert-deftest test-skg-restrict-repo-set-confirmation-cancels-its-answer-and-retries ()
   "The repo-set switch goes through the prologue: an over-private-text
 challenge cancels its one-shot 'skgrepo-restriction' handler, and once
