@@ -312,6 +312,12 @@ So far there are these endpoints:
     =A restore request ...=), in the words of the diff view's refusal. A request that names no current change is dropped, with
     the warning =A readiness request names no current change; it was
     dropped.=, which names its headline as a subheadline.
+  - A =(folder containers)= request on an occurrence that the refresh
+    leaves with no =containerFolder=, since nothing but its
+    view-ancestors contains it, if anything does, adds the warning
+    =No other containers.=, which names each such headline as a
+    subheadline ('no_other_containers_warning' in
+    'server/rerender_pass.rs').
   - A save from a stale buffer is refused only if the buffer edited one
     of its stale graphnodes, before anything is written and before any
     confirmation is asked ('stale_write_errors' in

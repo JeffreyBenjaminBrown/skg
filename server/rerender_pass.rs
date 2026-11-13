@@ -29,7 +29,9 @@ use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::types::misc::ID;
 use crate::types::save::ForkSpec;
 use crate::types::tree::forest::ViewForest;
-use crate::types::viewnode::{Editability, ViewRequest, ViewnodeKind, Vognode};
+use crate::types::errors::{HeadlineName, with_org_subheadlines};
+use crate::types::viewnode::{
+  Editability, Folder, FolderRelation, ViewRequest, ViewnodeKind, Vognode};
 use crate::types::views_state::{
   DiffViewBufferKind, ViewState, ViewforestId, ViewnodeIdRecord, pids_from_viewforest};
 use crate::update_buffer::refresh_content_view;
@@ -182,6 +184,8 @@ pub fn update_views_after_save (
         saved_diffView_buffer_kind, &collateral_viewforest_ids,
         viewforest_id_from_request_result, views_state,
         &context . runtime . graph, skgrepo_restriction )); }}
+  let requesting_containers : Vec<NodeId> =
+    occurrences_requesting_containers (&saved_view_mut);
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "refresh_view (saved)" ). entered();
       refresh_view ( // saved view first; collateral ones later
@@ -189,6 +193,8 @@ pub fn update_views_after_save (
         &mut saved_viewnode_id_record,
         &mut context,
         RerenderMode::of_buffer (saved_diffView_buffer_kind, false) ) ?; }
+  context . warnings . extend ( no_other_containers_warning (
+    &saved_view_mut, &requesting_containers ));
   let saved_text : String = viewforest_to_string (&saved_view_mut) ?;
   let readiness_summary : Option<BufferReadinessSummary> =
     saved_diffView_buffer_kind . and ( context . graph_straddle . as_ref () )
@@ -227,6 +233,43 @@ pub fn update_views_after_save (
   Ok ( SaveResponse::saved (
     saved_buffer_text, saved_text, context . errors, context . warnings,
     readiness_summary )) }
+
+/// What a save says of a containers request that drew no folder.
+pub const NO_OTHER_CONTAINERS : &str = "No other containers.";
+
+/// The occurrences of 'viewforest' carrying a containers request,
+/// which the refresh fulfills and drops.
+fn occurrences_requesting_containers (
+  viewforest : &ViewForest,
+) -> Vec<NodeId> {
+  viewforest . nodes ()
+    . filter ( |node| matches! (
+      &node . value () . kind,
+      ViewnodeKind::Vognode (Vognode::Occurrence (occurrence))
+        if occurrence . view_requests . contains (
+             &ViewRequest::Folder (FolderRelation::Containers) )))
+    . map ( |node| node . id () )
+    . collect () }
+
+/// The warning 'NO_OTHER_CONTAINERS', naming each of 'requesting'
+/// that still stands in the refreshed 'viewforest' as an occurrence
+/// holding no containers folder: nothing contains it but the
+/// view-ancestors its folder leaves out ('Folder::omits_view_ancestors'),
+/// if anything. None when there is no such occurrence.
+fn no_other_containers_warning (
+  viewforest : &ViewForest,
+  requesting : &[NodeId],
+) -> Option<String> {
+  let unanswered : Vec<HeadlineName> = viewforest . nodes ()
+    . filter ( |node| requesting . contains (&node . id ())
+                      && node . value () . is_occurrence ()
+                      && ! node . children () . any ( |child| matches! (
+                           child . value () . kind,
+                           ViewnodeKind::Folder (Folder::Container) )) )
+    . map ( |node| node . value () . headline_name () )
+    . collect ();
+  ( ! unanswered . is_empty () )
+    . then ( || with_org_subheadlines (NO_OTHER_CONTAINERS, &unanswered) ) }
 
 /// Withhold a save's rerender over the text-release challenge
 /// 'decision'. The saved view is registered as this save left it,

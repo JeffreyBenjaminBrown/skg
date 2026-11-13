@@ -15,6 +15,7 @@ use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::metadata_canon::without_viewnode_ids;
+use skg::rerender_pass::NO_OTHER_CONTAINERS;
 use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::test_utils::{graph_handle_from_config, run_with_test_stores};
@@ -45,6 +46,8 @@ fn containers_folders_and_their_chains (
       a_folder_request_draws_the_chain_under_its_members (
         config, tantivy ) . await ?;
       a_request_on_a_chain_node_draws_a_containers_folder_under_it (
+        config, tantivy ) . await ?;
+      a_request_that_draws_no_folder_says_there_are_no_other_containers (
         config, tantivy ) . await ?;
       Ok (( )) } )) }
 
@@ -79,6 +82,19 @@ async fn save_view (
   views_state : &mut ViewsState,
   view_name   : &str,
 ) -> Result<String, Box<dyn Error>> {
+  Ok ( save_view_responding (
+    buffer, config, tantivy, graph, views_state, view_name ) . await ?
+       . saved_view ) }
+
+/// Save 'buffer' as the view 'view_name'. Returns the save's response.
+async fn save_view_responding (
+  buffer      : &str,
+  config      : &SkgConfig,
+  tantivy     : &TantivyIndex,
+  graph       : &InRustGraphHandle,
+  views_state : &mut ViewsState,
+  view_name   : &str,
+) -> Result<SaveResponse, Box<dyn Error>> {
   let (mut stream, _read_end) : (TcpStream, TcpStream) =
     mk_test_tcp_stream_pair ();
   let response : SaveResponse = update_from_and_rerender_buffer (
@@ -88,7 +104,7 @@ async fn save_view (
   assert! ( response . errors . is_empty (),
             "the buffer must save, got {:?}\n\nbuffer:\n{}",
             response . errors, buffer );
-  Ok (response . saved_view) }
+  Ok (response) }
 
 fn fresh_views_state () -> ViewsState {
   ViewsState { open_views     : OpenViews::new (),
@@ -250,4 +266,41 @@ async fn a_request_on_a_chain_node_draws_a_containers_folder_under_it (
     **** c writeProtected
     ***** d writeProtected
     "}, "{}", saved );
+  Ok (( )) }
+
+/// In the view of d, containers requests on b and on m. Only d, above
+/// b, contains b, so no folder is drawn there, and the save says "No
+/// other containers.", naming b. m's folder holds c, not b, and the
+/// warning does not name m.
+async fn a_request_that_draws_no_folder_says_there_are_no_other_containers (
+  config  : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
+  let mut views_state : ViewsState = fresh_views_state ();
+  let buffer : String = open_view (
+    config, tantivy, &graph, &mut views_state, "view of d, again", &["d"] ) ?;
+  let requested : String = requesting_at (
+    &requesting_at (&buffer, "** (skg node (gnid b) ", "(folder containers)"),
+    "*** (skg node (gnid m) (skgRepos (nodeRepo main)) (view (rels",
+    "(folder containers)" );
+  let response : SaveResponse = save_view_responding (
+    &requested, config, tantivy, &graph, &mut views_state, "view of d, again" ) . await ?;
+  assert_eq! ( outline (&response . saved_view), indoc! {"
+    * d
+    ** b
+    *** m
+    **** containerFolder
+    ***** c writeProtected
+    ****** d writeProtected
+    **** r
+    ** c
+    *** m writeProtected
+    "}, "{}", response . saved_view );
+  assert_eq! ( response . warnings . len (), 1, "{:?}", response . warnings );
+  let warning : &str = &response . warnings [0];
+  assert! ( warning . starts_with (NO_OTHER_CONTAINERS)
+            && warning . contains ("graphnode ID: b")
+            && ! warning . contains ("graphnode ID: m"),
+            "{}", warning );
   Ok (( )) }
