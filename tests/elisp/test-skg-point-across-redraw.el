@@ -118,3 +118,42 @@ same screen line, though the rerender adds lines above both."
           (should (looking-at "body 30 two"))
           (should (equal 5 (plist-get (skg--current-save-point-position other)
                                       :point-screen-lines-below-window-start))))))))
+
+(ert-deftest test-a-redraw-not-asked-for-leaves-point-of-an-unsaved-headline-on-the-focused-one ()
+  "Point under a headline with no viewnode ID (typed since the last
+save, as when a save is held back and its rerender follows) goes to
+the headline the server drew focused, not to a neighbour."
+  (test-skg-point-across-redraw--in-view
+      (concat (test-skg-point-across-redraw--headlines 3)
+              "* my new headline\nnew body\n"
+              (replace-regexp-in-string
+               "v\\([0-9]\\)" "x\\1"
+               (test-skg-point-across-redraw--headlines 2)))
+    (test-skg-point-across-redraw--goto "new body")
+    (test-skg-point-across-redraw--rerender
+     (concat (test-skg-point-across-redraw--headlines 3)
+             "* (skg (vnid n1) focused node (gnid new)) my new headline\nnew body\n"
+             (replace-regexp-in-string
+              "v\\([0-9]\\)" "x\\1"
+              (test-skg-point-across-redraw--headlines 2))))
+    (should (looking-at "\\* (skg (vnid n1) node (gnid new)) my new headline"))))
+
+(ert-deftest test-a-redraw-not-asked-for-restores-other-windows-when-point-precedes-every-headline ()
+  "A window keeps its place though the buffer's own point is before
+the first headline."
+  (save-window-excursion
+    (delete-other-windows)
+    (test-skg-point-across-redraw--in-view
+        (concat "a preamble line\n"
+                (test-skg-point-across-redraw--headlines 40))
+      (let ((other (split-window)))
+        (set-window-buffer (selected-window) (current-buffer))
+        (set-window-buffer other (current-buffer))
+        (goto-char (point-min))
+        (with-selected-window other
+          (test-skg-point-across-redraw--goto "body 30 two"))
+        (test-skg-point-across-redraw--rerender
+         (concat "a preamble line\n"
+                 (test-skg-point-across-redraw--changed-elsewhere 40)))
+        (with-selected-window other
+          (should (looking-at "body 30 two")))))))

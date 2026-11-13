@@ -105,16 +105,29 @@ begins with it, read in one pass over TEXT."
   "A table from each of VIEWNODE-IDS to where the headline line of the
 current buffer that begins with it starts, read in one pass."
   (let ((wanted (skg--string-set viewnode-ids))
-        (starts (make-hash-table :test 'equal))
-        (case-fold-search nil))
+        (starts (make-hash-table :test 'equal)))
+    (dolist (headline (skg--viewnode-id-headlines) starts)
+      (when (gethash (car headline) wanted)
+        (puthash (car headline) (cadr headline) starts)))))
+
+(defun skg--viewnode-id-headlines ()
+  "Each headline line of the current buffer that begins with a viewnode
+ID, as (ID START LINE), START where the line starts and LINE its line
+number, in buffer order."
+  (let ((case-fold-search nil)
+        (headlines nil)
+        (line 1)
+        (previous-start (point-min)))
     (save-excursion
       (goto-char (point-min))
       (while (re-search-forward skg--viewnode-id-at-headline-start-regexp
                                 nil t)
-        (let ((viewnode-id (match-string-no-properties 1)))
-          (when (gethash viewnode-id wanted)
-            (puthash viewnode-id (match-beginning 0) starts)))))
-    starts))
+        (let ((start (match-beginning 0)))
+          (setq line (+ line (count-lines previous-start start))
+                previous-start start)
+          (push (list (match-string-no-properties 1) start line)
+                headlines))))
+    (nreverse headlines)))
 
 (defun skg--string-set (strings)
   "A hash table holding each of STRINGS."
