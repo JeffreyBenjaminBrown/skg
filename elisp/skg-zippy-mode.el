@@ -25,6 +25,18 @@
 ;;; Keys none of these bind (C-c itself, C-x, M-x, motion, C-g) work
 ;;; as usual. Control keys bound under C-c are zippy keys too: C-o
 ;;; runs what C-c C-o runs.
+;;;
+;;; Cursor colour: while zippy is on and a frame's selected window
+;;; shows an skg buffer, that frame's cursor is 'skg-zippy-cursor-color'.
+;;; Emacs keeps the cursor colour per frame, not per buffer, so while
+;;; zippy is on, 'window-selection-change-functions' and
+;;; 'window-buffer-change-functions' re-decide it for the frame whose
+;;; selected window or its buffer changed. Before changing a frame's
+;;; colour, zippy keeps the colour it had in a frame parameter, and
+;;; restores exactly that when the frame no longer wants green. If
+;;; something else (a theme) changes the colour meanwhile, the new
+;;; colour becomes the one to restore. Frames that cannot show a cursor
+;;; colour (terminals) are left alone.
 
 (require 'skg-keymaps-and-aliases)
 
@@ -40,9 +52,12 @@ them is active is an skg buffer, for zippy's purposes.")
 zippy keymap; nil elsewhere. A member of `emulation-mode-map-alists',
 so MAP is active wherever this is set, while `skg-zippy-mode' is on.")
 
-(defvar-local skg-zippy--cursor-type-before-zippy nil
-  "When zippy has changed this buffer's cursor, (LOCAL-P . VALUE):
-whether `cursor-type' was buffer-local before, and its value then.")
+(defcustom skg-zippy-cursor-color "green"
+  "The cursor colour while zippy is on and the selected window shows
+an skg buffer. Elsewhere, and when zippy is off, the cursor keeps the
+colour it had before."
+  :type 'color
+  :group 'convenience)
 
 (defvar skg-zippy--own-keys-map
   (let ((map (make-sparse-keymap)))
@@ -77,7 +92,10 @@ unaffected. See skg-zippy-mode.el."
   :lighter (:eval (skg-zippy--lighter-for-this-buffer))
   (dolist (buffer (buffer-list))
     (with-current-buffer buffer
-      (skg-zippy--update-this-buffer)) ))
+      (skg-zippy--update-this-buffer)) )
+  (skg-zippy--install-or-remove-cursor-color-hooks)
+  (dolist (frame (frame-list))
+    (skg-zippy--refresh-cursor-color-of-frame frame)) )
 
 (defun skg-zippy-exit ()
   "Leave `skg-zippy-mode', in every skg buffer."
@@ -96,7 +114,7 @@ Zippy binds this instead of inserting a printable key."
   (if skg-zippy--emulation-alist " Zippy" ""))
 
 (defun skg-zippy--update-this-buffer ()
-  "Make this buffer's zippy keymap and cursor agree with
+  "Make this buffer's zippy keymap agree with
 `skg-zippy-mode' and with whether this is an skg buffer. Run when the
 mode toggles, and from the skg modes' hooks, so a buffer that becomes
 an skg buffer while zippy is on starts in zippy."
@@ -105,10 +123,11 @@ an skg buffer while zippy is on starts in zippy."
         (progn
           (setq skg-zippy--emulation-alist
                 (list (cons 'skg-zippy-mode
-                            (skg-zippy--keymap-composing Cc-maps)) ))
-          (skg-zippy--show-zippy-cursor))
-      (setq skg-zippy--emulation-alist nil)
-      (skg-zippy--restore-cursor)) ))
+                            (skg-zippy--keymap-composing Cc-maps)) )))
+      (setq skg-zippy--emulation-alist nil))
+    (dolist (window (get-buffer-window-list nil nil t))
+      (skg-zippy--refresh-cursor-color-of-frame
+       (window-frame window)) )))
 
 (defun skg-zippy--Cc-maps-of-this-buffer ()
   "The C-c keymaps of the skg mode maps active in this buffer, in order
@@ -143,20 +162,81 @@ show through."
            Cc-maps
            (list skg-zippy--printable-fallback-map)) ))
 
-(defun skg-zippy--show-zippy-cursor ()
-  "Show a hollow cursor in this buffer, remembering the one before."
-  (unless skg-zippy--cursor-type-before-zippy
-    (setq skg-zippy--cursor-type-before-zippy
-          (cons (local-variable-p 'cursor-type) cursor-type)))
-  (setq-local cursor-type 'hollow))
+(defun skg-zippy--install-or-remove-cursor-color-hooks ()
+  "While zippy is on, run the cursor colour refresh when a frame's
+selected window or the buffer of one of its windows changes, and when a
+theme is enabled or disabled (those that exist in this Emacs). Off,
+remove them all."
+  (dolist (hook '( window-selection-change-functions
+                   window-buffer-change-functions
+                   enable-theme-functions
+                   disable-theme-functions ))
+    (if skg-zippy-mode
+        (add-hook hook #'skg-zippy--refresh-cursor-color-after-change)
+      (remove-hook hook #'skg-zippy--refresh-cursor-color-after-change)) ))
 
-(defun skg-zippy--restore-cursor ()
-  "Restore the cursor this buffer had before zippy changed it, if it did."
-  (when skg-zippy--cursor-type-before-zippy
-    (if (car skg-zippy--cursor-type-before-zippy)
-        (setq-local cursor-type (cdr skg-zippy--cursor-type-before-zippy))
-      (kill-local-variable 'cursor-type))
-    (setq skg-zippy--cursor-type-before-zippy nil)) )
+(defun skg-zippy--refresh-cursor-color-after-change (&optional frame-or-theme)
+  "The hook function: refresh FRAME-OR-THEME's frame if it is one
+(the window hooks pass a frame), else (a theme was enabled or disabled)
+every frame."
+  (if (framep frame-or-theme)
+      (skg-zippy--refresh-cursor-color-of-frame frame-or-theme)
+    (dolist (frame (frame-list))
+      (skg-zippy--refresh-cursor-color-of-frame frame)) ))
+
+(defun skg-zippy--frame-wants-zippy-cursor-p (frame)
+  "Whether FRAME's cursor should be zippy's colour: zippy is on and
+FRAME's selected window shows an skg buffer (one with a zippy keymap).
+While the minibuffer is selected, it does not."
+  (and skg-zippy-mode
+       (buffer-local-value 'skg-zippy--emulation-alist
+                           (window-buffer (frame-selected-window frame)) )
+       t))
+
+(defun skg-zippy--refresh-cursor-color-of-frame (frame)
+  "Make FRAME's cursor colour agree with whether it wants zippy's.
+The colour before zippy's first change is kept in a frame parameter
+and restored exactly. The colour zippy last set is kept in another, so
+that a colour set by something else since (a theme) is noticed, and
+taken as the one to restore."
+  (when (and (frame-live-p frame)
+             (skg-zippy--frame-can-show-cursor-color-p frame))
+    (let* ((current-color (skg-zippy--cursor-color-of frame))
+           (applied-color (frame-parameter
+                           frame 'skg-zippy-applied-cursor-color))
+           (saved-original (frame-parameter
+                            frame 'skg-zippy-original-cursor-color)) )
+      (when (and saved-original applied-color
+                 (not (equal current-color applied-color)))
+        (setq saved-original (list current-color))
+        (set-frame-parameter frame 'skg-zippy-original-cursor-color
+                             saved-original))
+      (if (skg-zippy--frame-wants-zippy-cursor-p frame)
+          (progn
+            (unless saved-original
+              (set-frame-parameter frame 'skg-zippy-original-cursor-color
+                                   (list current-color)))
+            (unless (equal current-color skg-zippy-cursor-color)
+              (skg-zippy--set-cursor-color-of
+               frame skg-zippy-cursor-color))
+            (set-frame-parameter frame 'skg-zippy-applied-cursor-color
+                                 skg-zippy-cursor-color))
+        (when saved-original
+          (skg-zippy--set-cursor-color-of frame (car saved-original))
+          (set-frame-parameter frame 'skg-zippy-original-cursor-color nil)
+          (set-frame-parameter frame 'skg-zippy-applied-cursor-color nil)) )) ))
+
+(defun skg-zippy--frame-can-show-cursor-color-p (frame)
+  "Whether FRAME can show a cursor colour: only graphical frames can."
+  (display-graphic-p frame))
+
+(defun skg-zippy--cursor-color-of (frame)
+  "FRAME's cursor colour."
+  (frame-parameter frame 'cursor-color))
+
+(defun skg-zippy--set-cursor-color-of (frame color)
+  "Set FRAME's cursor colour to COLOR."
+  (set-frame-parameter frame 'cursor-color color))
 
 (dolist (hook '( skg-content-view-mode-hook
                  skg-report-mode-hook
@@ -165,7 +245,8 @@ show through."
 
 (defun skg-zippy-mode-unload-function ()
   "Leave zippy before `unload-feature' (as `skg-reload' does) removes it,
-so that no buffer keeps its keymap or its cursor."
+so that no buffer keeps its keymap, and no frame its cursor colour
+or its hooks."
   (skg-zippy-mode -1)
   (setq emulation-mode-map-alists
         (delq 'skg-zippy--emulation-alist emulation-mode-map-alists))
