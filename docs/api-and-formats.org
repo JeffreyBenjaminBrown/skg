@@ -886,7 +886,9 @@ keeps them as text ('TODO/problems.org').
       git-committed with MESSAGE, by the gitrepo's configured user. A
       git-commit records the whole git index, so the commit of a
       gitrepo with an already-staged entry includes it. A skgrepo without changes is in
-      neither list; one that failed is an error. When something was
+      neither list; one that failed is an error. A gitrepo with
+      changes but no configured user fails before anything in it is
+      staged, leaving its git index as it was. When something was
       committed, the rerender stream rerenders each open buffer of
       the diff view over the rebuilt graph straddle, as any
       rerender does: its roots and what it holds editable stay, and what

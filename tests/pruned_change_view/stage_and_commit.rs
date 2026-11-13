@@ -201,6 +201,40 @@ fn an_already_staged_entry_needs_confirmation_and_is_then_committed (
                 "the already-staged file is committed" ); }
     Ok (( )) }) }
 
+/// A gitrepo without a git author fails before anything is staged in
+/// it: its git index still equals its HEAD, and its HEAD stays. The
+/// other owned skgrepo is git-committed as usual. A user.name of ""
+/// in the gitrepo's own config hides any global one, so the test does
+/// not depend on the machine's git config.
+#[test]
+fn a_missing_git_author_leaves_the_git_index_untouched (
+) -> Result<(), Box<dyn Error>> {
+  with_fixture ("buffers", &SKGREPOS, |f| {
+    let env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
+    let all_skgrepos : SkgrepoRestriction = all (f) ?;
+    gitrepo (f, "public") ? . config () ? . set_str ("user.name", "") ?;
+    let public_head : Oid = head_id (f, "public") ?;
+    let public_changed : usize = changed_skg_files (f, "public") ?;
+    assert! ( public_changed > 0 );
+    let answer : StageAndCommitAnswer = stage_and_commit (
+      &env, &mut f . views_state, &all_skgrepos, "no author", true );
+    let StageAndCommitAnswer::Committed { outcomes, .. } = &answer
+      else { panic! ("expected commit outcomes, got {:?}", answer) };
+    for (skgrepo, outcome) in outcomes {
+      match skgrepo . to_string () . as_str () {
+        "public" => assert! ( matches! ( outcome, Err (e)
+                                         if e . starts_with ("no git author is configured") ),
+                              "{:?}", outcome ),
+        _ => assert! ( matches! (outcome, Ok (Some (_))), "{:?}", outcome ), }}
+    assert_eq! ( head_id (f, "public") ?, public_head );
+    assert_eq! ( changed_skg_files (f, "public") ?, public_changed );
+    { let public : Repository = gitrepo (f, "public") ?;
+      let head_tree : Tree = public . head () ? . peel_to_tree () ?;
+      let staged : usize = public
+        . diff_tree_to_index ( Some (&head_tree), None, None ) ? . deltas () . count ();
+      assert_eq! ( staged, 0, "nothing may be staged in public" ); }
+    Ok (( )) }) }
+
 #[test]
 fn a_request_without_changes_commits_nothing (
 ) -> Result<(), Box<dyn Error>> {

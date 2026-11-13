@@ -3,7 +3,8 @@
 //! ('docs/diff-view.org', "Stage and commit").
 //! A skgrepo whose staged tree equals its HEAD's has no changes and
 //! gets no commit. The author and committer are the gitrepo's
-//! configured user. Only '.skg' files are staged here, but a
+//! configured user; a skgrepo with changes but no such user is left
+//! with its git index as it was. Only '.skg' files are staged here, but a
 //! git-commit records the whole git index, so whatever was already
 //! staged is committed too; 'already_staged_entries_of_owned_gitrepos'
 //! finds it first, so that the user can be asked.
@@ -96,18 +97,26 @@ fn stage_and_commit_skgrepo (
   let gitrepo : Repository = open_gitrepo (skgrepo_path)
     . ok_or_else ( || "it is not in a git repository" . to_string () ) ?;
   let prefix : PathBuf = repo_prefix_in_gitrepo (&gitrepo, skgrepo_path) ?;
-  let tree_id : Oid = stage_skg_files (&gitrepo, &skg_pathspec (&prefix))
-    . map_err ( |e| format! ( "staging failed: {}", e . message () )) ?;
+  let staging_failed = |e : git2::Error| -> String {
+    format! ( "staging failed: {}", e . message () ) };
+  let mut index : Index = gitrepo . index () . map_err (staging_failed) ?;
+  let tree_id : Oid = // Staged in memory only; the git index is written below.
+    stage_skg_files (&mut index, &skg_pathspec (&prefix))
+    . map_err (staging_failed) ?;
   let head_commit : Commit = gitrepo . head ()
     . and_then ( |head| head . peel_to_commit () )
     . map_err ( |e| format! ( "it has no HEAD commit: {}", e . message () )) ?;
-  if head_commit . tree_id () == tree_id { return Ok (None); }
+  if head_commit . tree_id () == tree_id {
+    index . write () . map_err (staging_failed) ?;
+    return Ok (None); }
+  let signature : Signature = // Before the git index is written, so that without an author nothing is staged.
+    gitrepo . signature ()
+    . map_err ( |e| format! (
+      "no git author is configured: {}", e . message () )) ?;
+  index . write () . map_err (staging_failed) ?;
   let commit_id : Oid = {
     let tree : Tree = gitrepo . find_tree (tree_id)
       . map_err ( |e| e . message () . to_string () ) ?;
-    let signature : Signature = gitrepo . signature ()
-      . map_err ( |e| format! (
-        "no git author is configured: {}", e . message () )) ?;
     gitrepo . commit ( Some ("HEAD"), &signature, &signature, message,
                        &tree, &[ &head_commit ] )
       . map_err ( |e| format! ( "git-commit failed: {}", e . message () )) ? };
@@ -121,15 +130,14 @@ fn skg_pathspec (
   if prefix . as_os_str () . is_empty () { "*.skg" . to_string () }
   else { format! ( "{}/*.skg", prefix . display () ) }}
 
-/// Stage every file 'pathspec' matches, as 'git add --all' does, and
-/// return the git index's tree.
+/// Stage every file 'pathspec' matches into 'index', as 'git add
+/// --all' does, and return the index's tree. The git index on disk is
+/// unchanged until the caller writes 'index'.
 fn stage_skg_files (
-  gitrepo  : &Repository,
+  index    : &mut Index,
   pathspec : &str,
 ) -> Result<Oid, git2::Error> {
-  let mut index : Index = gitrepo . index () ?;
   index . add_all ( [pathspec], git2::IndexAddOption::DEFAULT, None ) ?;
   // 'add_all' does not stage the deletion of a file gone from the worktree.
   index . update_all ( [pathspec], None ) ?;
-  index . write () ?;
   index . write_tree () }
