@@ -260,11 +260,14 @@ space before it. Any other line is its own stripped form."
         (skg--without-fold-and-focus-atoms line form-start)
       line)))
 
-(defun skg--without-fold-and-focus-atoms (line form-start)
+(defun skg--without-fold-and-focus-atoms (line form-start &optional atoms)
   "LINE without each fold and focus atom, and the space before it, at
 depth 1 of the form starting at FORM-START. Depth counts the parentheses
-outside string literals. The text after the form is kept as it is."
-  (let ((line-length (length line))
+outside string literals. The text after the form is kept as it is.
+ATOMS, when given, names the atoms to remove instead
+\(default `skg--fold-and-focus-atoms')."
+  (let ((atoms (or atoms skg--fold-and-focus-atoms))
+        (line-length (length line))
         (kept-pieces nil)
         (copied-up-to 0)
         (depth 0)
@@ -286,7 +289,7 @@ outside string literals. The text after the form is kept as it is."
          ((and (eq char ?\s) (= depth 1))
           (let ((atom-end (skg--end-of-bare-atom line (1+ i))))
             (if (member (substring line (1+ i) atom-end)
-                        skg--fold-and-focus-atoms)
+                        atoms)
                 (progn (push (substring line copied-up-to i) kept-pieces)
                        (setq copied-up-to atom-end
                              i atom-end))

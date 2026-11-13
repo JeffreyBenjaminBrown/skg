@@ -178,6 +178,19 @@ already covered by the ancestor's subtree fold."
           (skg-edit-metadata-at-point '(skg bodyFolded)))))
       (forward-line 1))))
 
+(defun skg--fold-state-of-headline-at-point ()
+  "The fold state of the headline at point, which point is at the start
+of: `hidden' inside a folded ancestor; `collapsed', its children hidden
+by its own fold; `bodyHidden', only its body hidden; else `open'.
+A childless headline whose fold hides its body is `bodyHidden'. A
+hidden headline's own fold is not looked for, as a save does not."
+  (cond ((invisible-p (point)) 'hidden)
+        ((save-excursion (and (org-goto-first-child)
+                              (invisible-p (point))))
+         'collapsed)
+        ((skg-headline-body-hidden-p) 'bodyHidden)
+        (t 'open)))
+
 (defun skg-headline-body-hidden-p ()
   "Return t when point is at a visible headline whose body is hidden
 *by an entry fold* rather than by a subtree fold above it.

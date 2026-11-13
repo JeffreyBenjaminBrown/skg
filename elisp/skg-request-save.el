@@ -410,14 +410,21 @@ as it is, and named in the echo area."
                        (buffer-name buf))
             (with-current-buffer buf
               (skg--unlock-after-save)
-              (skg--replace-buffer-keeping-viewnode-points content)))))
+              (skg--replace-buffer-keeping-viewnode-points-and-folds
+               content)))))
     (error (skg-log 'error log-category
                     "%s handler error: %S" handler-name err))))
 
-(defun skg--replace-buffer-keeping-viewnode-points (new-content)
+(defun skg--replace-buffer-keeping-viewnode-points-and-folds (new-content)
   "Replace the current buffer with NEW-CONTENT, a redraw the user did
-not ask for, keeping point, and each window's point and scroll, where
-they were. A save marks the headline at point focused, and restores
+not ask for, keeping point, each window's point and scroll, and the
+folds, where they were.
+The server draws such a redraw with the folds of the view's last save,
+since folds reach it only in a save. So the fold state of each headline
+here is recorded by viewnode ID, and decides the fold atoms of
+NEW-CONTENT (`skg--content-with-fold-atoms'); what only a headline new
+in NEW-CONTENT decides keeps the server's.
+A save marks the headline at point focused, and restores
 point relative to it ('skg--restore-save-point-position'); here the
 server drew the view on its own, so its focused headline is the one
 the last save left. Instead each point is recorded as its headline's
@@ -428,6 +435,8 @@ headline that remains. A point whose headline has no viewnode ID (one
 typed since the last save, which a save held back marks focused) goes
 to the focused headline, as the server drew it."
   (let* ((old-headlines (skg--viewnode-id-headlines))
+         (fold-states-by-viewnode-id
+          (skg--fold-states-by-viewnode-id old-headlines))
          (buffer-point-position
           (skg--viewnode-point-position (point) nil old-headlines))
          (window-point-positions
@@ -436,7 +445,9 @@ to the focused headline, as the server drew it."
                           (skg--viewnode-point-position
                            (window-point window) window old-headlines)))
                   (get-buffer-window-list (current-buffer) nil t))))
-    (skg-replace-buffer-with-new-content nil new-content)
+    (skg-replace-buffer-with-new-content
+     nil (skg--content-with-fold-atoms new-content
+                                       fold-states-by-viewnode-id))
     (let ((focused-headline-start (point))
           (headline-starts
            (skg--headline-starts-by-viewnode-id
@@ -448,6 +459,110 @@ to the focused headline, as the server drew it."
           (skg--goto-viewnode-point-position
            (cdr window-and-position)
            headline-starts focused-headline-start))))))
+
+(defun skg--fold-states-by-viewnode-id (headlines)
+  "A table from the viewnode ID of each of HEADLINES
+\(`skg--viewnode-id-headlines' of the current buffer) to the fold state
+of its headline (`skg--fold-state-of-headline-at-point')."
+  (let ((fold-states (make-hash-table :test 'equal)))
+    (save-excursion
+      (dolist (headline headlines fold-states)
+        (goto-char (cadr headline))
+        (puthash (car headline)
+                 (skg--fold-state-of-headline-at-point)
+                 fold-states)))))
+
+(defun skg--content-with-fold-atoms (content fold-states-by-viewnode-id)
+  "CONTENT, a view's text, with the fold atoms that FOLD-STATES-BY-VIEWNODE-ID
+\(`skg--fold-states-by-viewnode-id' of the buffer it will replace)
+decides. A headline's 'folded' atom says its parent's fold hides it,
+so its parent's state decides it (`skg--folded-atom-decision'); its
+'bodyFolded' atom, its own (`skg--bodyFolded-atom-decision'). An atom
+whose deciding headline the table lacks, being new in CONTENT, is kept
+as the server drew it. Other lines, and the focus atom, are kept."
+  (let ((lines (vconcat (split-string content "\n")))
+        (ancestors nil)) ;; (LEVEL . VIEWNODE-ID), nearest first
+    (cl-loop
+     for (headline . later-headlines)
+     on (skg--headline-levels-and-viewnode-ids lines)
+     do (cl-destructuring-bind (index level viewnode-id) headline
+          (while (and ancestors (>= (caar ancestors) level))
+            (pop ancestors))
+          (when viewnode-id
+            (aset lines index
+                  (skg--line-with-fold-atoms
+                   (aref lines index)
+                   (delq nil
+                         (list
+                          (skg--folded-atom-decision
+                           ancestors
+                           (and ancestors
+                                (cdar ancestors)
+                                (gethash (cdar ancestors)
+                                         fold-states-by-viewnode-id)))
+                          (skg--bodyFolded-atom-decision
+                           (gethash viewnode-id fold-states-by-viewnode-id)
+                           (and later-headlines
+                                (> (nth 1 (car later-headlines))
+                                   level))))))))
+          (push (cons level viewnode-id) ancestors)))
+    (mapconcat #'identity lines "\n")))
+
+(defun skg--headline-levels-and-viewnode-ids (lines)
+  "Each headline among LINES, a vector of a view's lines, as
+\(INDEX LEVEL VIEWNODE-ID), in order; VIEWNODE-ID is nil for a
+headline without one."
+  (let ((case-fold-search nil)
+        (headlines nil))
+    (dotimes (index (length lines) (nreverse headlines))
+      (let ((line (aref lines index)))
+        (when (string-match "\\`\\(\\*+\\) " line)
+          (push (list index
+                      (length (match-string 1 line))
+                      (and (string-match
+                            skg--viewnode-id-at-headline-start-regexp line)
+                           (match-string 1 line)))
+                headlines))))))
+
+(defun skg--folded-atom-decision (has-parent parent-fold-state)
+  "Whether a headline is 'folded', as (\"folded\" . BOOLEAN), given
+whether it HAS-PARENT and the PARENT-FOLD-STATE that parent had
+\(`skg--fold-state-of-headline-at-point'): it is when its parent hid
+its children or was hidden, and is not when its parent showed them.
+Nil, leaving the server's atom, for a top-level headline or one whose
+parent had no state, being new."
+  (when has-parent
+    (pcase parent-fold-state
+      ((or 'hidden 'collapsed) '("folded" . t))
+      ((or 'open 'bodyHidden) '("folded" . nil)))))
+
+(defun skg--bodyFolded-atom-decision (fold-state has-children)
+  "Whether a headline is 'bodyFolded', as (\"bodyFolded\" . BOOLEAN),
+given the FOLD-STATE it had (`skg--fold-state-of-headline-at-point')
+and whether it HAS-CHILDREN now: it is when only its body was hidden,
+or when it was collapsed and its children are gone, so that the fold
+hides its body still. Nil, leaving the server's atom, when it had no
+state, being new."
+  (pcase fold-state
+    ('bodyHidden '("bodyFolded" . t))
+    ('collapsed (cons "bodyFolded" (not has-children)))
+    ((or 'hidden 'open) '("bodyFolded" . nil))))
+
+(defun skg--line-with-fold-atoms (line decisions)
+  "LINE, a headline line beginning with its viewnode ID, with each atom
+DECISIONS names, as (ATOM . BOOLEAN), removed, and those whose BOOLEAN
+is non-nil placed after the viewnode ID."
+  (if (null decisions)
+      line
+    (string-match skg--viewnode-id-at-headline-start-regexp line)
+    (let* ((viewnode-id-end (match-end 0))
+           (without-decided-atoms
+            (skg--without-fold-and-focus-atoms
+             line (string-search "(skg" line) (mapcar #'car decisions))))
+      (concat (substring without-decided-atoms 0 viewnode-id-end)
+              (mapconcat (lambda (decision) (concat " " (car decision)))
+                         (cl-remove-if-not #'cdr decisions) "")
+              (substring without-decided-atoms viewnode-id-end)))))
 
 (defun skg--viewnode-point-position (position window headlines)
   "Where POSITION in the current buffer stands, as a plist: the save's
