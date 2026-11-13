@@ -1,5 +1,6 @@
 ;;; -*- lexical-binding: t; -*-
 
+(require 'cl-lib)
 (require 'skg-keymaps-and-aliases) ; for skg-report-mode-map
 (require 'skg-log)
 (require 'skg-length-prefix)
@@ -409,9 +410,97 @@ as it is, and named in the echo area."
                        (buffer-name buf))
             (with-current-buffer buf
               (skg--unlock-after-save)
-              (skg-replace-buffer-with-new-content nil content)))))
+              (skg--replace-buffer-keeping-viewnode-points content)))))
     (error (skg-log 'error log-category
                     "%s handler error: %S" handler-name err))))
+
+(defun skg--replace-buffer-keeping-viewnode-points (new-content)
+  "Replace the current buffer with NEW-CONTENT, a redraw the user did
+not ask for, keeping point, and each window's point and scroll, where
+they were. A save marks the headline at point focused, and restores
+point relative to it ('skg--restore-save-point-position'); here the
+server drew the view on its own, so its focused headline is the one
+the last save left. Instead each point is recorded as its headline's
+viewnode ID, which a rerender keeps ('docs/api-and-formats.org',
+\"(vnid X)\"), with the offsets a save measures, and restored by them.
+A point whose viewnode is gone goes to the start of the nearest
+headline that remains."
+  (let* ((buffer-point-position
+          (skg--viewnode-point-position (point) nil))
+         (window-point-positions
+          (mapcar (lambda (window)
+                    (cons window
+                          (skg--viewnode-point-position
+                           (window-point window) window)))
+                  (get-buffer-window-list (current-buffer) nil t))))
+    (skg-replace-buffer-with-new-content nil new-content)
+    (let ((headline-starts
+           (skg--headline-starts-by-viewnode-id
+            (plist-get buffer-point-position :viewnode-ids))))
+      (skg--goto-viewnode-point-position
+       buffer-point-position headline-starts)
+      (dolist (window-and-position window-point-positions)
+        (with-selected-window (car window-and-position)
+          (when (skg--goto-viewnode-point-position
+                 (cdr window-and-position) headline-starts)
+            (recenter (plist-get (cdr window-and-position)
+                                 :point-screen-lines-below-window-start))))))))
+
+(defun skg--viewnode-point-position (position window)
+  "Where POSITION in the current buffer stands, as a plist: the save's
+measures (`skg--current-save-point-position', in WINDOW when non-nil),
+and :viewnode-ids, the viewnode IDs of the buffer's headlines, the one
+owning POSITION first and the rest by their distance from POSITION,
+nearest first, and :owner-viewnode-id, that first one's. Nil when
+POSITION precedes every headline."
+  (save-excursion
+    (goto-char position)
+    (unless (org-before-first-heading-p)
+      (let* ((owner-start (save-excursion (org-back-to-heading t)
+                                          (point)))
+             (ids-and-starts (skg--viewnode-ids-and-headline-starts))
+             (owner-id (car (rassoc owner-start ids-and-starts)))
+             (others-nearest-first
+              (sort (cl-remove owner-start ids-and-starts
+                               :key #'cdr)
+                    (lambda (a b)
+                      (< (abs (- (cdr a) position))
+                         (abs (- (cdr b) position)))))))
+        (append (list :viewnode-ids
+                      (append (when owner-id (list owner-id))
+                              (mapcar #'car others-nearest-first))
+                      :owner-viewnode-id owner-id)
+                (skg--current-save-point-position window))))))
+
+(defun skg--viewnode-ids-and-headline-starts ()
+  "Each headline of the current buffer that begins with a viewnode ID,
+as (ID . START), START where its line starts, in buffer order."
+  (let ((case-fold-search nil)
+        (ids-and-starts nil))
+    (save-excursion
+      (goto-char (point-min))
+      (while (re-search-forward skg--viewnode-id-at-headline-start-regexp
+                                nil t)
+        (push (cons (match-string-no-properties 1) (match-beginning 0))
+              ids-and-starts)))
+    (nreverse ids-and-starts)))
+
+(defun skg--goto-viewnode-point-position (point-position headline-starts)
+  "Move point to POINT-POSITION (`skg--viewnode-point-position'): to its
+offsets below its own headline if that is in HEADLINE-STARTS (a table
+from viewnode ID to headline start), else to the start of the first of
+its other headlines that is. Return non-nil if point moved."
+  (let ((surviving-id
+         (cl-find-if (lambda (id) (gethash id headline-starts))
+                     (plist-get point-position :viewnode-ids))))
+    (when surviving-id
+      (goto-char (gethash surviving-id headline-starts))
+      (when (equal surviving-id
+                   (plist-get point-position :owner-viewnode-id))
+        (skg--restore-point-below-focused-headline
+         (plist-get point-position :point-lines-below-focused-headline)
+         (plist-get point-position :point-column)))
+      t)))
 
 (defun skg--collateral-view-handler (payload)
   "Handle one streamed collateral-view update.
