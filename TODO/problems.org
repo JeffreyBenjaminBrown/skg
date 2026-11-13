@@ -6,6 +6,18 @@
   When a plan or a settled discussion decides how an entry will be
   fixed, prefix its headline with 'FIX PLANNED: ' and leave it here
   until the fix lands; then move it as above.
+* A redraw the user did not ask for undoes the folds changed since the last save (2026-11-13)
+  A view's fold state reaches the server only as the 'folded' and
+  'bodyFolded' atoms of a save. A rerender after another writer's
+  change ('rerender-view') or a save's collateral redraw of another
+  view draws the folds of that view's last save, so any headline the
+  user folded or unfolded since then reverts. Seen live on a scratch
+  server, Emacs client: a headline folded after opening the view was
+  unfolded by the redraw that followed a '.skg' change on disk.
+  Point and scroll survive such a redraw
+  ('skg--replace-buffer-keeping-viewnode-points'); folds could be kept
+  the same way, recorded by viewnode ID before the redraw and applied
+  after, in both clients.
 * An opened view keeps the server's fold atoms as text (2026-11-12)
   'skg-open-org-buffer-from-text' ('elisp/skg-buffer.el'), which
   both the content view and the diff view open through, inserts the
