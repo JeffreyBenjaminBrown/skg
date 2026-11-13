@@ -3,7 +3,7 @@
 // removed membership, '(editRequest restoreNode)' on a
 // ghost.
 //
-// In the 'removed_partners' fixture b, d and e drop x or c from their
+// In the 'removed_partners' fixture b, bb, d and e drop x or c from their
 // content and s drops its subscribee s2. Its "all changes" buffer holds
 // b with x as an editable removed member, d with c likewise, and under
 // x's container folder e as a '~-' container (b, above x, stands in no

@@ -250,10 +250,11 @@ fn the_kinds_buffer_saves_back_unchanged (
   saves_back_unchanged ("kinds", &["public", "private"], DiffViewBufferKind::AllChanges) }
 
 /// The 'removed_partners' fixture (one skgrepo, main): at HEAD a, b,
-/// c and e contain x, which contains xc; d contains c; s subscribes
-/// to s1, s2 and s3. Since then b and e stopped containing x, d
-/// stopped containing c, and s stopped subscribing to s2. So b, d and
-/// e are roots, and b's removed member x is x's first occurrence.
+/// bb, c and e contain x, which contains xc; d contains c; s
+/// subscribes to s1, s2 and s3. Since then b, bb and e stopped
+/// containing x, d stopped containing c, and s stopped subscribing to
+/// s2. So b, bb, d and e are roots, and b's removed member x is x's
+/// first occurrence.
 fn removed_partners_buffer (
 ) -> Result<String, Box<dyn Error>> {
   let mut buffer : String = String::new ();
@@ -263,13 +264,12 @@ fn removed_partners_buffer (
   Ok (buffer) }
 
 /// x, under b, the container it lost, has a container folder that
-/// leaves b out, since the view shows b above it, and shows e, the
-/// other container it lost, after the two it kept, as a removed
-/// member: noClaim, with '(diff (rel removed))', and, as a content
-/// member would, '(properties changed)', since e's file records the
-/// change.
+/// leaves b out, since the view shows b above it, and shows bb, another
+/// container it lost, between the two it kept, as a removed member:
+/// noClaim, with '(diff (rel removed))', and, as a content member
+/// would, '(properties changed)', since bb's file records the change.
 #[test]
-fn a_removed_container_not_above_the_node_stands_with_the_kept_ones (
+fn a_removed_container_not_above_the_node_stands_between_the_kept_ones (
 ) -> Result<(), Box<dyn Error>> {
   let buffer : String = removed_partners_buffer () ?;
   assert_lines_in_order ( &buffer, &[
@@ -277,9 +277,9 @@ fn a_removed_container_not_above_the_node_stands_with_the_kept_ones (
     "** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim (view (rels",
     "*** (skg containerFolder)",
     "**** (skg node (gnid a) (skgRepos (nodeRepo main)) writeProtected",
-    "**** (skg node (gnid c) (skgRepos (nodeRepo main)) writeProtected",
-    "**** (skg node (gnid e) (skgRepos (nodeRepo main)) writeProtected",
-    "(diff (rel removed) (properties changed) (leaves 1 rel all))) e" ] );
+    "**** (skg node (gnid bb) (skgRepos (nodeRepo main)) writeProtected",
+    "(diff (rel removed) (properties changed) (leaves 1 rel all))) bb",
+    "**** (skg node (gnid c) (skgRepos (nodeRepo main)) writeProtected" ] );
   assert! ( ! without_viewnode_ids (&buffer)
               . contains ("**** (skg node (gnid b)"),
             "b stands in no container folder:\n{}", buffer );
