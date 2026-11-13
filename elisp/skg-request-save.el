@@ -322,14 +322,17 @@ as (diff-view-buffer . NAME)."
    (when delete-from
      `((delete-from . ,delete-from)))))
 
-(defun skg--current-save-point-position ()
+(defun skg--current-save-point-position (&optional window)
   "WHAT IT DOES: Return point position data that should survive the save's rerender:
-- text-line offset: relative to the focused headline
+- text-line offset: relative to the headline owning point (the save
+  marks it focused)
 - column: the character offset of point within its line
-- screen-line offset: relative to the top *visible* line of the window
+- screen-line offset: the screen line of WINDOW (default: a window
+  showing the buffer) that point is on, counting the window's top
+  line as 0, as `recenter' takes it
 WHY: A character offset from buffer start is not stable enough: saving can make branches appear or disappear above point. The focused headline is already preserved by metadata, so record point relative to that headline and to the window top. The within-line column is stable regardless of what happens above, so it is recorded as a plain offset."
   (let ((point-line (line-number-at-pos (point) t))
-        (window (get-buffer-window (current-buffer) t)))
+        (window (or window (get-buffer-window (current-buffer) t))))
     (list :point-lines-below-focused-headline
           (save-excursion
             (org-back-to-heading t)
@@ -341,7 +344,10 @@ WHY: A character offset from buffer start is not stable enough: saving can make 
               (max 0
                    (count-screen-lines
                     (window-start window)
-                    (point)
+                    (save-excursion ;; the start of point's screen line,
+                      ;; so that the line point is on is not counted
+                      (vertical-motion 0 window)
+                      (point))
                     nil
                     window))
             0))))
