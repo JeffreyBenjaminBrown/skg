@@ -1722,6 +1722,12 @@ def check_marking_processed (context):
     folder, [ ( "**** A new grandchild ⟨0j ∃+ ~+⟩",
                 "**** A new grandchild ⟨0j ∃+ ~+ processed both outward⟩" ) ],
     DIFF_BASE_NAME )
+  # An unsaved processed word is an edit, which 'extend' refuses.
+  completed = run_tool ([ "extend", sidecar_of_diff (folder) ])
+  if ( completed . returncode != 1
+       or "the compact view has edits" not in completed . stderr ):
+    raise CaseFailure ( f"'extend' over an unsaved 'processed' printed "
+                        f"{completed . stdout!r}, {completed . stderr!r}" )
   require_output (
     run_tool ([ "save", sidecar_of_diff (folder), "--yes" ]),
     diff_report_head () +

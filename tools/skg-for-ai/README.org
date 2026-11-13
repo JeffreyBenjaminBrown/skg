@@ -1421,9 +1421,10 @@ node's text, home skgrepo, aliases, extra IDs and flags), 'rel' the
 second, 'both' both; each among what the headline's change facts
 list, so that 'processed rel' on a headline whose relationship did not
 change is an error. A headline showing one change (an old text, an
-alias, a move) is marked by the letter of its kind: a relationship
-moved between skgrepos by 'rel' or 'both', any other by 'node' or
-'both'. On a changed folder the words mark its members one level down;
+alias, a move, an unknown viewnode) is marked by the letter of its
+kind: a relationship moved between skgrepos and an unknown or
+restricted viewnode's membership by 'rel' or 'both', any other by
+'node' or 'both'. On a changed folder the words mark its members one level down;
 on a changeset marker ('its content changed') 'rel' marks the changed
 relationships it gathers and 'node' its members' own changes.
 

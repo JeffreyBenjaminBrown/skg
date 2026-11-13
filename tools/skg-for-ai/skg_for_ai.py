@@ -3224,15 +3224,19 @@ def processed_objects_named_by_letters (metadata, letter_objects, at_gesture = F
   bare request ('skg--processed-objects-named-by-letters'). On a
   headline that lists objects, the letters among them. On one that
   names a single leaf, the bare request when the leaf is of a kind a
-  letter names: a relRepo move is a relationship's, any other the
-  node's own. On a changeset marker AT_GESTURE, the letters themselves:
+  letter names: a relRepo move's and an unknown or restricted
+  viewnode's are a relationship's, any other the node's own. On a
+  changeset marker AT_GESTURE, the letters themselves:
   its 'node' names its members' own leaves, which its '(leaves ...)'
   does not list."""
   leaves = leaves_fact (metadata)
   if leaves is None:
     return None
   if not leaves [1]:
-    kind = "rel" if metadata_form (metadata, "relRepoMove") is not None else "node"
+    kind = ( "rel" if ( metadata_form (metadata, "relRepoMove") is not None
+                        or metadata_has_atom (metadata, "unknown")
+                        or metadata_has_atom (metadata, "restricted") )
+             else "node" )
     return [] if kind in letter_objects else None
   if at_gesture and metadata_form (metadata, "changesetMarker") is not None:
     return list (letter_objects)
@@ -3414,12 +3418,25 @@ def expand_search_matching_subtree (edited, root, word, headline_of_handle,
 
 def processed_request_text (headline, view_line):
   """'(processed OBJECT...)' or '(unprocessed OBJECT...)' for HEADLINE's
-  processed word, naming the objects 'resolve_processed_words' gave it,
-  or None."""
-  if not headline . processed_words () or headline . processed_objects is None:
+  processed word, naming the objects 'resolve_processed_words' gave it;
+  where that has not run (a dirty buffer's text, 'extend''s check), the
+  objects its own letter names on the headline alone. None when it
+  names none."""
+  objects = ( headline . processed_objects
+              if headline . processed_objects is not None
+              else own_processed_objects (headline, view_line) )
+  if not headline . processed_words () or objects is None:
     return None
-  return "(" + " " . join ( headline . processed_words () [ : 1 ] +
-                            headline . processed_objects ) + ")"
+  return "(" + " " . join ( headline . processed_words () [ : 1 ] + objects ) + ")"
+
+def own_processed_objects (headline, view_line):
+  """The objects the letter word of HEADLINE's own handle names on the
+  headline alone, as a one-level gesture there names them, or None."""
+  letters = headline . processed_letter_words ()
+  if len (letters) != 1 or view_line is None or view_line . metadata is None:
+    return None
+  return processed_objects_named_by_letters (
+    view_line . metadata, PROCESSED_LETTER_TOKENS [ letters [0] ], True )
 
 def edit_request_text (headline, view_line):
   """The '(editRequest ...)' HEADLINE's tokens ask for, or None."""
@@ -3770,11 +3787,14 @@ def request_report_lines (edited, headline_of_handle, described):
              parent_text (headline) + ": the save puts it in its parent's list."
              for headline in with_word ("attach") ]
   for word, label in [ ( "processed", "Processed" ), ( "unprocessed", "Unprocessed" ) ]:
-    lines += [ label + ": " + described (headline . handle) + ", as '" +
-               processed_request_text (
-                 headline, headline_of_handle [ headline . handle ] ) + "'."
-               for headline in handled_headlines
-               if headline . processed_words () == [ word ] ]
+    for headline in handled_headlines:
+      if headline . processed_words () != [ word ]:
+        continue
+      text = processed_request_text (
+        headline, headline_of_handle [ headline . handle ] )
+      lines . append ( label + ": " + described (headline . handle) +
+                       ( ", as '" + text + "'." if text else
+                         ", naming nothing on the headline itself." ))
   unmarked = sum ( unmarked_leaf_count (
                      headline, headline_of_handle [ headline . handle ] )
                    for headline in handled_headlines )
