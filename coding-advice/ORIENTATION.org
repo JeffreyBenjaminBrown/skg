@@ -15,16 +15,16 @@ deliverable; it does not authorize implementing the proposed changes.
 When asked to implement, continue through the agreed work and verification.
 The detailed execution and stop rules are in [[file:when-to-stop.org]].
 ** Edit conservatively
+If I ask for code changes and have not mentioned version control,
+ask if I want commits. When I want them, I want them granular
+(to make the history easy to spelunk) rather than one mega-commit.
+Use verbose, understandable names as described in [[file:names.org]].
+
 Do not alter Git configuration, credentials, index, branches, or commits
 unless explicitly asked. Do not gratuitously rename things or add legacy
 compatibility code. Preserve relevant comments and follow the existing local
 style when modifying code. The code is authoritative when documentation and
 code differ.
-
-Do not change or commit git state unless explicitly asked.
-If asked to commit, I probably meant to ask for granular commits
-that will make the history easy to spelunk, rather than one mega-commit.
-Use verbose, understandable names as described in [[file:names.org]].
 ** Push back when needed
 Call out requests that are vague, contradictory, inefficient, unnecessary, or
 overly complex rather than silently guessing at a bad interpretation.
