@@ -479,8 +479,8 @@ end
 ---'next') or before it (DIRECTION 'previous'), in buffer order,
 ---without wrapping: one that is PROCESSED ('processed' or
 ---'unprocessed'), or any headline with change facts when PROCESSED is nil. Point
----lands where id_next puts it on a headline, the opening paren of its
----metadata. When there is none, say so and leave point.
+---lands at the start of that headline's line, where it is easiest to
+---see. When there is none, say so and leave point.
 ---@param direction string
 ---@param processed string|nil
 function M.diffView_goto_change (direction, processed)
@@ -516,8 +516,7 @@ function M.diffView_change_position (direction, processed)
 end
 
 ---On a headline with change facts at LINE_NUMBER that is PROCESSED
----(any when nil), the 0-based column of its metadata's opening
----paren; otherwise nil.
+---(any when nil), column 0, the start of its line; otherwise nil.
 ---@param line_number integer
 ---@param processed string|nil
 ---@return integer|nil
@@ -530,7 +529,7 @@ function M.diffView_change_start_on_line (line_number, processed)
   if processed == 'processed' and not M.processed_p(metadata_sexp)
      or processed == 'unprocessed' and M.processed_p(metadata_sexp) then
     return nil end
-  return #stars
+  return 0
 end
 
 -- ── the processed summary ──────────────────────────────────────────

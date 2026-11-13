@@ -803,8 +803,8 @@ commit lapses the marks of everything it committed.
 *** <localleader>rnc : :SkgDiffViewGotoNextChange
 Moves the cursor to the next headline with change facts after it: a headline
 whose metadata carries a '(leaves ...)' change fact, the server's count of
-the changes it names. The cursor lands on the headline's metadata, as
-with <localleader>in. It does not wrap: past the last one it says "No
+the changes it names. The cursor lands at the start of the headline's
+line. It does not wrap: past the last one it says "No
 further change" and leaves the cursor. It works in any skg buffer;
 outside the diff view no headline names a change, so it finds none.
 *** <localleader>rnu : :SkgDiffViewGotoNextUnprocessedChange

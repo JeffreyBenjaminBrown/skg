@@ -863,8 +863,8 @@ commit lapses the marks of everything it committed.
 *** C-c r n c : skg-diffView-goto-next-change
 Moves point to the next headline with change facts after point: a headline whose
 metadata carries a '(leaves ...)' change fact, the server's count of the
-changes it names. Point lands on the headline's metadata, as with
-C-c i n. It does not wrap: past the last one it says "No further
+changes it names. Point lands at the start of the headline's line.
+It does not wrap: past the last one it says "No further
 change" and leaves point. It works in any skg buffer; outside the
 diff view no headline names a change, so it finds none.
 *** C-c r n u : skg-diffView-goto-next-unprocessed-change

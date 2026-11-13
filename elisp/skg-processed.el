@@ -444,9 +444,9 @@ it (`skg--metadata-with-processed-request')."
   "Move point to the nearest headline with change facts after point (DIRECTION
 'next) or before it (DIRECTION 'previous), in buffer order, without
 wrapping: one that is PROCESSED ('processed or 'unprocessed), or
-any headline with change facts when PROCESSED is nil. Point lands where
-`skg-id-next' puts it on a headline, the opening paren of its
-metadata. When there is none, say so and leave point."
+any headline with change facts when PROCESSED is nil. Point lands at
+the start of that headline's line, where it is easiest to see. When
+there is none, say so and leave point."
   (let ((target (skg--diffView-change-position direction processed)))
     (if target
         (goto-char target)
@@ -475,9 +475,9 @@ metadata. When there is none, say so and leave point."
 
 (defun skg--diffView-change-start-on-line (processed)
   "On a headline with change facts that is PROCESSED (any when nil),
-the position of its metadata's opening paren; otherwise nil."
+the position of the start of its line; otherwise nil."
   (when (looking-at "^\\*+ (skg")
-    (let ((metadata-start (- (match-end 0) 4))
+    (let ((line-start (match-beginning 0))
           (metadata-sexp (ignore-errors
                            (skg--metadata-sexp-at-point-or-nil))))
       (when (and metadata-sexp
@@ -486,7 +486,7 @@ the position of its metadata's opening paren; otherwise nil."
                    ('processed (skg--processed-p metadata-sexp))
                    ('unprocessed (not (skg--processed-p metadata-sexp)))
                    (_ t)))
-        metadata-start))))
+        line-start))))
 
 ;;; The processed summary
 

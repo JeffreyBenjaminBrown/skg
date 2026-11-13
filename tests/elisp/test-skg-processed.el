@@ -450,7 +450,7 @@ among headlines that carry no leaves fact, one of them a changed folder.")
   "Insert LINES, put point at the start of line FROM (or at the
 buffer's end when FROM is nil), and run COMMAND TIMES times. Return
 the line each run left point on, or the message of a run that did
-not move it. A run that moves leaves point on '(skg'."
+not move it. A run that moves leaves point at the start of a line."
   (with-temp-buffer
     (org-mode)
     (insert (mapconcat #'identity lines "\n") "\n")
@@ -467,7 +467,7 @@ not move it. A run that moves leaves point on '(skg'."
             (funcall command))
           (if (= before (point))
               (push shown results)
-            (should (looking-at-p "(skg"))
+            (should (bolp))
             (push (line-number-at-pos) results))))
       (nreverse results))))
 

@@ -554,7 +554,7 @@ describe('skg.processed moving between headlines with change facts', function ()
   ---Fill a buffer with LINES, put the cursor at the start of line
   ---FROM, and run COMMAND TIMES times. Return the line each run left
   ---the cursor on, or the message of a run that did not move it. A
-  ---run that moves leaves the cursor on '(skg'.
+  ---run that moves leaves the cursor in column 0.
   local function goto_changes (lines, from, command, times)
     local buf = vim.api.nvim_create_buf(true, false)
     vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
@@ -572,9 +572,7 @@ describe('skg.processed moving between headlines with change facts', function ()
         if before[1] == after[1] and before[2] == after[2] then
           table.insert(results, shown)
         else
-          local line = vim.api.nvim_buf_get_lines(
-            buf, after[1] - 1, after[1], false)[1]
-          assert.are.equal('(skg', line:sub(after[2] + 1, after[2] + 4))
+          assert.are.equal(0, after[2])
           table.insert(results, after[1])
         end
       end
