@@ -12,7 +12,7 @@
 # A specialist is a folder, 'data/claude/team/NAME/', holding its
 # skgrepo 'notes/', a config 'skgconfig.toml' that owns only that
 # skgrepo, and its views folder 'views/'. The config's folder is its
-# data root, so the server keeps its search index, readiness marks and
+# data root, so the server keeps its search index, processed marks and
 # run folder there too. Jeff's public skgrepo, Claude's public skgrepo
 # and every other specialist's skgrepo are foreign to it, so the
 # specialist can read them and can change them only by forking.

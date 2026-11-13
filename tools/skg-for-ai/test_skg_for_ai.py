@@ -51,11 +51,11 @@ In order, it:
 - on a fifth scratch server, whose owned skgrepo is a gitrepo with the
   fixture committed: saves a retitle, a new child and a deletion,
   checks the diff view's compact buffer exactly, marks the new child
-  ready, restores the deleted node, and commits (refused unconfirmed,
+  processed, restores the deleted node, and commits (refused unconfirmed,
   then confirmed with '--yes'), checking 'git log' and that the diff
   view is then empty; then extends a diff buffer to a change it does not
   make editable, and saves an edit of it; marks and unmarks a subtree's
-  changes with 'ready subtree' and 'unready subtree'; a blank commit
+  changes with 'processed subtree' and 'unprocessed subtree'; a blank commit
   message is refused unsent;
 - on a sixth scratch server, also over a gitrepo, runs a daemon:
   commands through it write what they write on their own connections;
@@ -77,7 +77,7 @@ In order, it:
   foreign skgrepos; then Hoists a telescope's title home, sets
   relRepos, moves nodes between the owned skgrepos (the strandeds
   question; '⟨new repo:NAME⟩'; 'repo:NAME subtree'), marks like moves
-  ready, and removes the references to an absent node.
+  processed, and removes the references to an absent node.
 '--update-expected' rewrites the expected files instead of comparing.
 """
 
@@ -691,7 +691,7 @@ def check_bad_handles (context):
     "Error: ⟨0a⟩ on line 1 of the compact view carries 'delete' and "
     "'restoreNode'; a headline takes one edit request.\n"
     "Error: ⟨0a⟩ on line 1 of the compact view carries 'all' without "
-    "'ready' or 'unready'.\n"
+    "'processed' or 'unprocessed'.\n"
     "Error: ⟨zz⟩ on line 7 of the compact view names no headline of the "
     "full view.\n"
     "Error: ⟨0s⟩ on line 8 of the compact view names no headline of the "
@@ -1630,7 +1630,7 @@ def check_misplaced_words (context):
     REPORT_HEAD +
     f"Error: ⟨{first_child [0]}⟩ on line {first_child [1]} of the compact view "
     "carries 'subtree' with no word it applies to; 'subtree' applies to "
-    "'delete', 'ready', 'unready', 'write-protect', 'repo:NAME', "
+    "'delete', 'processed', 'unprocessed', 'write-protect', 'repo:NAME', "
     "'relRepo:NAME', 'noSearchMatching' and 'searchMatching'.\n",
     expected_returncode = 1 )
   edit_compact ( folder, [ ( " subtree⟩", "⟩" ) ])
@@ -1663,7 +1663,7 @@ def fred_files (context):
 
 # ============================================================
 # Reviewing: on a fixture whose owned skgrepo is a gitrepo, edits are
-# saved, the diff view shows them, one is marked ready, a deleted node
+# saved, the diff view shows them, one is marked processed, a deleted node
 # is restored, and everything is committed. The cases run in order on
 # one server.
 # ============================================================
@@ -1672,8 +1672,8 @@ DIFF_BASE_NAME = "diff_all-changes"
 DIFF_VIEW_ID_PATTERN = re . compile (
   r'diff-view:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' )
 COMMIT_MESSAGE = "Review the fixture."
-NOT_ALL_READY = (
-  "Not every change is ready to commit: 1 of 4 changed files are ready.\n" )
+NOT_ALL_PROCESSED = (
+  "Not every change is processed: 1 of 4 changed files are processed.\n" )
 EMPTY_DIFF_VIEW = (
   "The diff view is empty: nothing changed since the last commits.\n" )
 
@@ -1681,9 +1681,9 @@ def failures_of_reviewing (scratch, data_root):
   main_repo = os . path . join (data_root, "me", "main")
   context = { "scratch" : scratch, "main_repo" : main_repo }
   for case in [ check_edits_to_review, check_diff_shows_the_changes,
-                check_marking_ready, check_unconfirmed_commit,
+                check_marking_processed, check_unconfirmed_commit,
                 check_restoring_a_deleted_node, check_confirmed_commit,
-                check_extending_the_diff_view, check_marking_a_subtree_ready,
+                check_extending_the_diff_view, check_marking_a_subtree_processed,
                 check_blank_commit_message ]:
     try:
       case (context)
@@ -1711,48 +1711,48 @@ def check_diff_shows_the_changes (context):
                     "diff-view:ID", read_diff_compact (folder) ),
                   EXPECTED_DIFF_COMPACT )
 
-def check_marking_ready (context):
-  """'ready' on the new node marks its existence and its membership;
-  a fresh diff view shows both ready. 'unready' there would unmark two
+def check_marking_processed (context):
+  """'processed' on the new node marks its existence and its membership;
+  a fresh diff view shows both processed. 'unprocessed' there would unmark two
   changes, so the report asks first."""
   folder = run_diff (context, "mark")
   edit_compact (
     folder, [ ( "**** A new grandchild ⟨0j ∃+ ~+⟩",
-                "**** A new grandchild ⟨0j ∃+ ~+ ready⟩" ) ],
+                "**** A new grandchild ⟨0j ∃+ ~+ processed⟩" ) ],
     DIFF_BASE_NAME )
   require_output (
     run_tool ([ "save", sidecar_of_diff (folder), "--yes" ]),
     diff_report_head () +
-    "Ready: ⟨0j⟩ 'A new grandchild', as '(ready node rel)'.\n" +
+    "Processed: ⟨0j⟩ 'A new grandchild', as '(ready node rel)'.\n" +
     saved_line (0) +
-    "Readiness: 1 of 4 changed files are ready.\n" +
+    "Processed: 1 of 4 changed files are processed.\n" +
     diff_written_paths (folder),
     ignoring_view_ids = True )
   fresh = run_diff (context, "marked")
   compact = read_diff_compact (fresh)
-  for expected in [ "# Readiness: 1 of 4 changed files are ready.\n",
+  for expected in [ "# Processed: 1 of 4 changed files are processed.\n",
                     "**** A new grandchild ⟨0j ∃+✓ ~+✓⟩\n" ]:
     if expected not in compact:
       raise CaseFailure ( f"the fresh diff view lacks {expected!r}:\n{compact}" )
   edit_compact (
-    fresh, [ ( "⟨0j ∃+✓ ~+✓⟩", "⟨0j ∃+✓ ~+✓ unready⟩" ) ], DIFF_BASE_NAME )
+    fresh, [ ( "⟨0j ∃+✓ ~+✓⟩", "⟨0j ∃+✓ ~+✓ unprocessed⟩" ) ], DIFF_BASE_NAME )
   require_output (
     run_tool ([ "save", sidecar_of_diff (fresh) ]),
     diff_report_head () +
-    "Unready: ⟨0j⟩ 'A new grandchild', as '(unready node rel)'.\n"
-    "Question: this unmarks 2 changes. Unmarking this node commit-ready "
+    "Unprocessed: ⟨0j⟩ 'A new grandchild', as '(unready node rel)'.\n"
+    "Question: this unmarks 2 changes. Unmarking this node processed "
     "will unmark every contributing decision. You might discard a lot of "
     "hard-won information. Continue? Saving with '--yes' answers yes.\n" +
     NOT_SAVED,
     ignoring_view_ids = True )
 
 def check_unconfirmed_commit (context):
-  """Not every change is ready, so the server asks; an answer other
+  """Not every change is processed, so the server asks; an answer other
   than 'yes' commits nothing."""
   graph_before = skg_files (context)
   require_output (
     run_tool ([ "commit", COMMIT_MESSAGE ], standard_input = "no\n"),
-    NOT_ALL_READY + "Type yes to commit anyway: \nNothing was committed.\n" )
+    NOT_ALL_PROCESSED + "Type yes to commit anyway: \nNothing was committed.\n" )
   require_equal ( "the git log after an unconfirmed commit",
                   git ( context [ "main_repo" ], [ "log", "--format=%s" ] ),
                   "The fixture\n" )
@@ -1772,7 +1772,7 @@ def check_restoring_a_deleted_node (context):
     diff_report_head () +
     "Restore node: ⟨0i⟩ 'Contained twice', as HEAD has it.\n" +
     saved_line (0) +
-    "Readiness: 1 of 2 changed files are ready.\n" +
+    "Processed: 1 of 2 changed files are processed.\n" +
     diff_written_paths (folder),
     ignoring_view_ids = True )
   require_equal ( "the restored node's title",
@@ -1791,7 +1791,7 @@ def check_confirmed_commit (context):
   head = git ( context [ "main_repo" ], [ "rev-parse", "HEAD" ] ) . strip ()
   require_output (
     completed,
-    "Not every change is ready to commit: 1 of 2 changed files are ready.\n"
+    "Not every change is processed: 1 of 2 changed files are processed.\n"
     f"Committed in main ({head}).\n" )
   require_equal ( "the git log after the commit",
                   git ( context [ "main_repo" ], [ "log", "--format=%s" ] ),
@@ -1826,9 +1826,9 @@ def check_extending_the_diff_view (context):
   require_save_succeeds (grandchild_view)
   require_output (
     run_tool ([ "extend", sidecar_of_diff (folder) ]),
-    "Before extending: 0 of 2 changed files are ready, 1 changes are "
+    "Before extending: 0 of 2 changed files are processed, 1 changes are "
     "not editable in this buffer.\n"
-    "Extended: 0 of 2 changed files are ready.\n" +
+    "Extended: 0 of 2 changed files are processed.\n" +
     diff_written_paths (folder) )
   require_in_diff_compact (
     folder, "*** First child, renamed ⟨0d aC2⟩\n"
@@ -1850,36 +1850,36 @@ def check_extending_the_diff_view (context):
                   skg_title (context, grandchild_id),
                   "A grandchild, retitled twice" )
 
-def check_marking_a_subtree_ready (context):
-  """'ready subtree' marks every change in the headline's subtree, as
-  'C-u C-c r r' does, those below it without 'all'; 'unready subtree'
+def check_marking_a_subtree_processed (context):
+  """'processed subtree' marks every change in the headline's subtree, as
+  'C-u C-c r r' does, those below it without 'all'; 'unprocessed subtree'
   unmarks them, asking first."""
-  folder = run_diff (context, "subtree-ready")
+  folder = run_diff (context, "subtree-processed")
   edit_compact ( folder, [ ( "** The fixture root, retitled ⟨0b aC2 L2 M⟩",
-                             "** The fixture root, retitled ⟨0b aC2 L2 M ready "
+                             "** The fixture root, retitled ⟨0b aC2 L2 M processed "
                              "subtree⟩" ) ], DIFF_BASE_NAME )
   require_output (
     run_tool ([ "save", sidecar_of_diff (folder), "--yes" ]),
     diff_report_head () +
-    "Ready: ⟨0b⟩ 'The fixture root, retitled', as '(ready all)'.\n"
-    "Ready: ⟨0c⟩ 'The fixture root', as '(ready)'.\n"
-    "Ready: ⟨0g⟩ 'A new grandchild', as '(ready)'.\n" +
-    saved_line (0) + "Readiness: Commit ready. All 2 of 2 changed files are ready.\n" +
+    "Processed: ⟨0b⟩ 'The fixture root, retitled', as '(ready all)'.\n"
+    "Processed: ⟨0c⟩ 'The fixture root', as '(ready)'.\n"
+    "Processed: ⟨0g⟩ 'A new grandchild', as '(ready)'.\n" +
+    saved_line (0) + "Processed: Commit ready. All 2 of 2 changed files are processed.\n" +
     diff_written_paths (folder),
     ignoring_view_ids = True )
   edit_compact ( folder, [ ( "** The fixture root, retitled ⟨0b aC2 L2 M✓⟩",
                              "** The fixture root, retitled ⟨0b aC2 L2 M✓ "
-                             "unready subtree⟩" ) ], DIFF_BASE_NAME )
+                             "unprocessed subtree⟩" ) ], DIFF_BASE_NAME )
   require_output (
     run_tool ([ "save", sidecar_of_diff (folder), "--yes" ]),
     diff_report_head () +
-    "Unready: ⟨0b⟩ 'The fixture root, retitled', as '(unready all)'.\n"
-    "Unready: ⟨0c⟩ 'The fixture root', as '(unready)'.\n"
-    "Unready: ⟨0g⟩ 'A new grandchild', as '(unready)'.\n"
-    "Question: this unmarks 3 changes. Unmarking this node commit-ready will "
+    "Unprocessed: ⟨0b⟩ 'The fixture root, retitled', as '(unready all)'.\n"
+    "Unprocessed: ⟨0c⟩ 'The fixture root', as '(unready)'.\n"
+    "Unprocessed: ⟨0g⟩ 'A new grandchild', as '(unready)'.\n"
+    "Question: this unmarks 3 changes. Unmarking this node processed will "
     "unmark every contributing decision. You might discard a lot of hard-won "
     "information. Continue? Saving with '--yes' answers yes.\n" +
-    saved_line (0) + "Readiness: 0 of 2 changed files are ready.\n" +
+    saved_line (0) + "Processed: 0 of 2 changed files are processed.\n" +
     diff_written_paths (folder),
     ignoring_view_ids = True )
 
@@ -1929,8 +1929,8 @@ def diff_written_paths (folder):
                      for suffix in ( ".full.org", ".compact.org", ".view.json" ))
 
 EXPECTED_DIFF_COMPACT = (
-  "# Readiness: 0 of 4 changed files are ready.\n"
-  "# Headlines with change facts 8, ready 0, not ready 8.\n"
+  "# Processed: 0 of 4 changed files are processed.\n"
+  "# Headlines with change facts 8, processed 0, unprocessed 8.\n"
   "# skg-for-ai compact view of diff_all-changes.full.org (view ID diff-view:ID)\n"
   "# Each headline ends in its handle ⟨ID HERALDS⟩: ID its viewnode ID,\n"
   "# the '(vnid ID)' of its metadata in the full view, and HERALDS what a\n"
@@ -2339,7 +2339,7 @@ def failures_of_two_owned_skgrepos (scratch, data_root):
                   check_deleting_under_a_restriction,
                   check_hiding_the_foreign_skgrepos, check_hoisting,
                   check_setting_relRepos, check_moving_to_another_skgrepo,
-                  check_marking_like_moves_ready, check_deleting_references ]:
+                  check_marking_like_moves_processed, check_deleting_references ]:
       try:
         case (context)
       except CaseFailure as failure:
@@ -2677,8 +2677,8 @@ def check_moving_to_another_skgrepo (context):
                           ( "leaf-id", "Its private leaf" ) ]:
     require_equal ( "a moved node's title at home", skg_title (context, node_id), title )
 
-def check_marking_like_moves_ready (context):
-  """In the diff view, 'ready subtree' on a home skgrepo move marks
+def check_marking_like_moves_processed (context):
+  """In the diff view, 'processed subtree' on a home skgrepo move marks
   every move between the same two skgrepos in the moved node's
   subtree, as 'C-u C-c r h' does: the branch's and its leaf's, and
   not the move of the node above them."""
@@ -2687,14 +2687,14 @@ def check_marking_like_moves_ready (context):
   require_in_diff_compact ( folder, "* A private branch ⟨0a C1 ⌂:main M⟩\n"
                                     "** ⟨0b ⌂ -private +main⟩\n" )
   edit_compact ( folder, [ ( "** ⟨0b ⌂ -private +main⟩",
-                             "** ⟨0b ⌂ -private +main ready subtree⟩" ) ],
+                             "** ⟨0b ⌂ -private +main processed subtree⟩" ) ],
                  DIFF_BASE_NAME )
   require_output (
     run_tool ([ "save", sidecar_of_diff (folder), "--yes" ]),
     diff_report_head () +
-    "Ready: ⟨0b⟩ (homeSkgrepoMove (old private) (new main)), as '(ready)'.\n"
-    "Ready: ⟨0e⟩ (homeSkgrepoMove (old private) (new main)), as '(ready)'.\n"
-    + saved_line (0) + "Readiness: 2 of 17 changed files are ready.\n" +
+    "Processed: ⟨0b⟩ (homeSkgrepoMove (old private) (new main)), as '(ready)'.\n"
+    "Processed: ⟨0e⟩ (homeSkgrepoMove (old private) (new main)), as '(ready)'.\n"
+    + saved_line (0) + "Processed: 2 of 17 changed files are processed.\n" +
     diff_written_paths (folder),
     ignoring_view_ids = True )
   require_in_diff_compact ( folder, "** ⟨0b ⌂ -private +main✓⟩\n" )

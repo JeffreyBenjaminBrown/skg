@@ -28,7 +28,7 @@ a new empty view does, and writes its view as 'view' would.
 'save SIDECAR' rebuilds the full buffer from an edited compact view,
 prints the changes it would make, and with '--yes' saves it and
 writes the server's re-rendered view over the three files. Words in a
-handle ask for edit requests: 'delete', 'ready', 'unready', 'all',
+handle ask for edit requests: 'delete', 'processed', 'unprocessed', 'all',
 'restoreNode', 'restoreRel', 'merge:ID', 'relRepo:NAME',
 'noSearchMatching', 'searchMatching'; for view requests: 'editable',
 'fork', 'write-protect'; 'detach' and 'attach' write or remove
@@ -47,7 +47,7 @@ question, answered by '--keep-ids' or '--all-new' or on the headline.
 does not make editable, as the clients' 'C-c r u' does, and writes the
 buffer again.
 'commit MESSAGE' stages and git-commits every change in the owned
-skgrepos, asking first when the server says not all is ready.
+skgrepos, asking first when the server says not all is processed.
 Other commands: 'close SIDECAR'; 'raw REQUEST', which sends one
 request line and prints every response; 'import INPUT_DIR REPO',
 which previews and applies a Markdown and Org import;
@@ -106,11 +106,11 @@ HEADLINE_PATTERN = re . compile (r'^(\*+) (.*)$')
 # The buffers of the diff view, in the order the clients request them.
 DIFF_VIEW_BUFFERS = [ "all changes", "merges", "skgrepo changes",
                       "order-only changes" ]
-# What a client asks before a readiness gesture that unmarks more
-# than one leaf ('skg--readiness-wide-unmark-question' in
-# 'elisp/skg-readiness.el').
+# What a client asks before a processed gesture that unmarks more
+# than one leaf ('skg--processed-wide-unmark-question' in
+# 'elisp/skg-processed.el').
 WIDE_UNMARK_QUESTION = (
-  "Unmarking this node commit-ready will unmark every contributing "
+  "Unmarking this node processed will unmark every contributing "
   "decision. You might discard a lot of hard-won information. Continue?" )
 # The folders a client can request from a node ('C-c l' in Emacs; the
 # 'skg-show-folderOf-*' commands in 'elisp/skg-request-views.el'), each
@@ -299,7 +299,7 @@ def parse_command_line (argv):
   commit_parser . add_argument (
     "--yes", action = "store_true",
     help = ( "answer yes when the server asks to confirm, because not "
-             "every change is ready or something is already staged" ))
+             "every change is processed or something is already staged" ))
   close_parser = commands . add_parser (
     "close", help = "send 'close view' for a sidecar's view ID" )
   close_parser . add_argument ( "sidecar" )
@@ -670,7 +670,7 @@ def command_extend (arguments):
   full view is first registered there: it is saved back unchanged,
   naming its buffer of the diff view, which writes nothing and leaves
   the server holding this buffer, its roots and what it makes
-  editable; its readiness summary is printed as the one before
+  editable; its processed summary is printed as the one before
   extending. The server refuses that save if a node the
   buffer shows changed since it was rendered; 'diff' then writes a
   fresh buffer, which makes every change editable."""
@@ -698,7 +698,7 @@ def command_extend (arguments):
         "stands; run 'diff' for a fresh one, which makes every change "
         "editable. The server said: " + " " . join (
           response_field (terminal, "errors") or [ render_sexp (terminal) ] ))
-    print ( "Before extending: " + readiness_summary_text (
+    print ( "Before extending: " + processed_summary_text (
       response_field (terminal, "readiness-summary") ))
     response, rerendered = connection . extend_diff_view (
       sidecar [ "view_id" ] )
@@ -708,8 +708,8 @@ def command_extend (arguments):
     if errors or rerendered is None:
       raise SkgToolError (
         "Nothing was extended; the files are as they were." )
-    readiness_summary = response_field (response, "readiness-summary")
-    print ( "Extended: " + readiness_summary_text (readiness_summary) )
+    processed_summary = response_field (response, "readiness-summary")
+    print ( "Extended: " + processed_summary_text (processed_summary) )
     connection . log_view_event (
       "extended", saved_view . directory, saved_view . base_name )
     view = { "view_id"     : sidecar [ "view_id" ],
@@ -718,7 +718,7 @@ def command_extend (arguments):
              "content"     : sexp_to_text ( response_field (rerendered, "content") ),
              "errors"      : [],
              "warnings"    : response_field (response, "warnings") or [],
-             "readiness_summary" : readiness_summary }
+             "processed_summary" : processed_summary }
     written_paths = write_view_files (
       connection, view, saved_view . directory, saved_view . base_name,
       sidecar [ "summary" ] )
@@ -839,7 +839,7 @@ def command_diff (arguments):
   """Request each buffer of the diff view in the clients' order, on
   one connection, and write each nonempty one as 'view' writes a view,
   named BASE_BUFFER ('diff_all-changes' and so on), its compact
-  summary opening with the readiness summary the server's answer
+  summary opening with the processed summary the server's answer
   carries. Each buffer is closed before the next is requested, unless
   a daemon holds it."""
   connection = connect_to_server (arguments . port)
@@ -864,7 +864,7 @@ def command_diff (arguments):
 
 def command_commit (arguments):
   """Send "stage and commit" with the message. When the server asks
-  for confirmation (not every changed file is ready, or some owned
+  for confirmation (not every changed file is processed, or some owned
   gitrepo has entries already staged), print why and ask for a typed
   "yes", which '--yes' gives; on yes, resend it confirmed. Print what
   was committed. The server rerenders the committing connection's
@@ -878,8 +878,8 @@ def command_commit (arguments):
   try:
     response = connection . stage_and_commit (arguments . message, False)
     if response_field (response, "needs-confirmation") is not None:
-      print ( "Not every change is ready to commit: " +
-              readiness_summary_text (
+      print ( "Not every change is processed: " +
+              processed_summary_text (
                 response_field (response, "readiness-summary") ))
       already_staged = response_field (response, "already-staged")
       for gitrepo_and_paths in already_staged or []:
@@ -1251,7 +1251,7 @@ def fetch_diff_view_buffer (connection, buffer_name):
            "content"     : content,
            "errors"      : [],
            "warnings"    : response_field (response, "warnings") or [],
-           "readiness_summary" : response_field (
+           "processed_summary" : response_field (
              response, "readiness-summary" ) }
 
 def fetch_forest_view (connection, kind, node_id, show_overPrivateText = False):
@@ -1846,7 +1846,7 @@ class HeraldContext:
   """What a headline's heralds need from the headlines around it.
   'folder_change' is None, or, for a folder a member of which carries
   a change of its relationship to the folder's viewparent, whether
-  every such change is ready; 'pending_detachment' whether the
+  every such change is processed; 'pending_detachment' whether the
   headline is a pending detachment."""
   def __init__ (self, folder_change = None, pending_detachment = False):
     self . folder_change = folder_change
@@ -1872,12 +1872,12 @@ def herald_text (metadata, herald_tables, context = HeraldContext (),
   return lens_tokens_as_text (
     lens_tokens (lensed, herald_tables . rules), relationship_text )
 
-def changed_folder_herald_text (folder, ready):
+def changed_folder_herald_text (folder, processed):
   """A changed folder's herald: its ☮ when it is write-protected, its
-  changed label, then ✓ when READY."""
+  changed label, then ✓ when PROCESSED."""
   return ( ( "☮ " if folder in FOLDER_HERALDS [ "write_protected" ] else "" )
            + FOLDER_HERALDS [ "changed_labels" ] [folder]
-           + ( "✓" if ready else "" ))
+           + ( "✓" if processed else "" ))
 
 def metadata_with_repoBoundary_label (metadata, skgrepo_labels):
   """METADATA with the atom 'repoBoundary' in its '(view ...)'
@@ -2110,7 +2110,7 @@ def is_list_headed_by (value, name):
 # ------------------------------------------------------------
 # What a headline's heralds need from the headlines around it, read
 # from the full view as a client reads it from its buffer
-# ('folder_change_readiness_in_lines' and
+# ('folder_change_processed_in_lines' and
 # 'pending_detachment_in_lines' in 'nvim/lua/skg/metadata.lua').
 # ------------------------------------------------------------
 
@@ -2128,7 +2128,7 @@ def herald_contexts (parsed_view):
       continue
     parent = parents [index]
     contexts [ line . line_number ] = HeraldContext (
-      folder_change_readiness (headlines, index),
+      folder_change_processed (headlines, index),
       is_pending_detachment (
         line . metadata, metadata_at (parent),
         metadata_at ( None if parent is None else parents [parent] )))
@@ -2146,10 +2146,10 @@ def parent_indices_by_level (levels):
     open_ancestors . append (index)
   return parents
 
-def folder_change_readiness (headlines, index):
+def folder_change_processed (headlines, index):
   """For a folder headline, None when none of its members (its child
   headlines) carries a change of its relationship to the folder's
-  viewparent, else whether every such change is ready; None for any
+  viewparent, else whether every such change is processed; None for any
   other headline."""
   if ( headlines [index] . metadata is None
        or folder_atom ( headlines [index] . metadata ) is None ):
@@ -2165,36 +2165,36 @@ def folder_change_readiness (headlines, index):
     elif ( later_level == level + 2 and members
            and later . metadata is not None ):
       members [-1] [1] . append ( later . metadata )
-  readinesses = [ membership_change_readiness (member, children)
+  processed_flags = [ membership_change_processed (member, children)
                   for member, children in members if member is not None ]
-  readinesses = [ ready for ready in readinesses if ready is not None ]
-  return all (readinesses) if readinesses else None
+  processed_flags = [ processed for processed in processed_flags if processed is not None ]
+  return all (processed_flags) if processed_flags else None
 
-def membership_change_readiness (member, children):
+def membership_change_processed (member, children):
   """None when the folder member MEMBER carries no change of its
   relationship to the folder's viewparent (a '(rel ...)' in its
-  '(diff ...)', or a 'relRepoMove' child), else whether it is ready."""
-  changed, ready = False, True
+  '(diff ...)', or a 'relRepoMove' child), else whether it is processed."""
+  changed, processed = False, True
   diff = metadata_form (member, "diff")
   if metadata_form (diff, "rel") is not None:
     changed = True
     leaves = leaves_fact (member)
-    ready = objects_ready (
+    processed = objects_processed (
       member, [ "rel" ] if leaves and "rel" in leaves [1] else [] )
   for child in children:
     if metadata_form (child, "relRepoMove") is not None:
       changed = True
-      ready = ready and metadata_form (
+      processed = processed and metadata_form (
         metadata_form (child, "diff"), "ready" ) is not None
-  return ready if changed else None
+  return processed if changed else None
 
-def objects_ready (metadata, objects):
+def objects_processed (metadata, objects):
   """Whether the headline's '(ready ...)' names every one of OBJECTS;
   with none listed, whether it has a '(ready ...)'."""
-  ready = metadata_form ( metadata_form (metadata, "diff"), "ready" )
-  if ready is None:
+  processed = metadata_form ( metadata_form (metadata, "diff"), "ready" )
+  if processed is None:
     return False
-  return set (objects) <= { str (element) for element in ready [ 1 : ] }
+  return set (objects) <= { str (element) for element in processed [ 1 : ] }
 
 def is_pending_detachment (metadata, parent, grandparent):
   """Whether a headline with METADATA, under a parent with PARENT
@@ -2215,7 +2215,7 @@ def is_pending_detachment (metadata, parent, grandparent):
 
 # ============================================================
 # Change facts: a headline's '(diff (leaves ...) (ready ...))', which
-# the summary of a buffer of the diff view counts and a readiness
+# the summary of a buffer of the diff view counts and a processed
 # request names ('docs/api-and-formats.org', "Metadata of the diff
 # view").
 # ============================================================
@@ -2230,15 +2230,15 @@ def leaves_fact (metadata):
            [ str (element) for element in leaves [ 1 : ]
              if not isinstance (element, int) ] )
 
-def headline_is_ready (metadata):
-  """Whether a headline that names leaves is ready: its '(ready ...)'
+def headline_is_processed (metadata):
+  """Whether a headline that names leaves is processed: its '(ready ...)'
   names every object its '(leaves ...)' lists, or, listing none, is
   there."""
-  ready = metadata_form ( metadata_form (metadata, "diff"), "ready" )
-  if ready is None:
+  processed = metadata_form ( metadata_form (metadata, "diff"), "ready" )
+  if processed is None:
     return False
-  ready_objects = { str (element) for element in ready [ 1 : ] }
-  return set ( leaves_fact (metadata) [1] ) <= ready_objects
+  processed_objects = { str (element) for element in processed [ 1 : ] }
+  return set ( leaves_fact (metadata) [1] ) <= processed_objects
 
 # ============================================================
 # The summary
@@ -2320,35 +2320,35 @@ def summary_lines (parsed_view, link_statuses, repo_ownership, view,
         if view [ "errors" ] or view [ "warnings" ] else "." ) ]
 
 def diff_summary_lines (parsed_view, view):
-  """The readiness summary the server sent with a buffer of the diff
-  view, and the count of its headlines with change facts, ready and
+  """The processed summary the server sent with a buffer of the diff
+  view, and the count of its headlines with change facts, processed and
   not."""
   changed_headlines = [ line . metadata for line in parsed_view
                         if line . is_headline and line . metadata is not None
                         and leaves_fact (line . metadata) is not None ]
-  ready_count = sum ( 1 for metadata in changed_headlines
-                      if headline_is_ready (metadata) )
-  summary = view . get ( "readiness_summary" )
+  processed_count = sum ( 1 for metadata in changed_headlines
+                      if headline_is_processed (metadata) )
+  summary = view . get ( "processed_summary" )
   return [
-    "# Readiness: " + ( readiness_summary_text (summary) if summary
-                        else "the server sent no readiness summary." ),
-    f"# Headlines with change facts {len (changed_headlines)}, ready "
-    f"{ready_count}, not ready {len (changed_headlines) - ready_count}." ]
+    "# Processed: " + ( processed_summary_text (summary) if summary
+                        else "the server sent no processed summary." ),
+    f"# Headlines with change facts {len (changed_headlines)}, processed "
+    f"{processed_count}, unprocessed {len (changed_headlines) - processed_count}." ]
 
-def readiness_summary_text (summary):
-  """The sentence a client shows for the readiness summary SUMMARY,
+def processed_summary_text (summary):
+  """The sentence a client shows for the processed summary SUMMARY,
   '((ready N) (changed M) (foreign F) (order-only O) (notEditable K))'
-  ('skg--readiness-summary-message' in 'elisp/skg-readiness.el')."""
+  ('skg--processed-summary-message' in 'elisp/skg-processed.el')."""
   counts = { str ( entry [0] ) : first_number ( [ None ] + entry [ 1 : ] )
              for entry in summary or [] }
-  ready = counts . get ("ready", 0)
+  processed = counts . get ("ready", 0)
   changed = counts . get ("changed", 0)
   not_editable = counts . get ("notEditable", 0)
   foreign = counts . get ("foreign", 0)
-  complete = ready == changed
+  complete = processed == changed
   return (
-    ( f"Commit ready. All {ready} of {changed} changed files are ready"
-      if complete else f"{ready} of {changed} changed files are ready" ) +
+    ( f"Commit ready. All {processed} of {changed} changed files are processed"
+      if complete else f"{processed} of {changed} changed files are processed" ) +
     ( f", {not_editable} changes are not editable in this buffer"
       if not_editable else "" ) +
     ( f", {foreign} files changed in foreign skgrepos" if foreign else "" ) +
@@ -2380,11 +2380,13 @@ COMPACT_HANDLE_PATTERN = re . compile (
   r'^(.*?) ?⟨([0-9a-z]+)((?: [^⟨⟩]*)?)⟩\s*$' )
 # The handle tokens that ask for edit requests. The rebuild writes
 # them into the headline's '(editRequest ...)': one of the first three,
-# the request of that name, and after it one readiness request,
+# the request of that name, and after it one processed request,
 # '(ready OBJECT...)' or '(unready OBJECT...)'.
 EDIT_REQUEST_TOKENS = [ "delete", "restoreNode", "restoreRel" ]
-READINESS_TOKENS = [ "ready", "unready" ]
-# With 'ready' or 'unready': name only the object 'all'.
+PROCESSED_TOKENS = [ "processed", "unprocessed" ]
+# The wire atom of each processed request, by its handle token.
+PROCESSED_REQUEST_ATOMS = { "processed" : "ready", "unprocessed" : "unready" }
+# With 'processed' or 'unprocessed': name only the object 'all'.
 ALL_TOKEN = "all"
 # The handle words that ask for the edit requests with a parameter,
 # each a prefix and its parameter: 'merge:ID', the clients'
@@ -2416,8 +2418,8 @@ CLAIM_TOKENS = [ "detach", "attach" ]
 # 'skg-set-repo' ('C-c s s') does.
 REPO_WORD_PREFIX = "repo:"
 # 'subtree' asks for the subtree form of the other words of its handle,
-# as a prefix argument (C-u) does in the clients: 'delete', 'ready',
-# 'unready', 'write-protect', 'repo:NAME', 'relRepo:NAME',
+# as a prefix argument (C-u) does in the clients: 'delete', 'processed',
+# 'unprocessed', 'write-protect', 'repo:NAME', 'relRepo:NAME',
 # 'noSearchMatching' and 'searchMatching'.
 SUBTREE_TOKEN = "subtree"
 # What a word may name: a skgrepo or an ID, written into metadata bare.
@@ -2504,9 +2506,9 @@ class OutlineHeadline:
     # the headline carrying that 'subtree' ('expand_subtree_words').
     self . subtree_words = []
     self . subtree_origin = {}
-    # Whether its readiness request names its leaves as a headline
+    # Whether its processed request names its leaves as a headline
     # below the gesture's does: without 'all'.
-    self . readiness_below = False
+    self . processed_below = False
     # The words of its own handle a 'subtree' on it does not apply to
     # it: its relationship is not of the kind the gesture sets, say.
     self . dropped_words = set ()
@@ -2521,8 +2523,8 @@ class OutlineHeadline:
   def edit_request_words (self):
     return [ word for word in self . words () if is_edit_request_word (word) ]
 
-  def readiness_words (self):
-    return [ word for word in READINESS_TOKENS if word in self . words () ]
+  def processed_words (self):
+    return [ word for word in PROCESSED_TOKENS if word in self . words () ]
 
   def names_only_all (self):
     return ALL_TOKEN in self . tokens
@@ -2547,7 +2549,7 @@ class OutlineHeadline:
                     if word . startswith (MERGE_WORD_PREFIX) ), None )
 
   def has_requests (self):
-    return bool ( self . edit_request_words () or self . readiness_words ()
+    return bool ( self . edit_request_words () or self . processed_words ()
                   or self . names_only_all () or self . view_request_words ()
                   or self . claim_words () or self . repo_words ()
                   or self . asks_subtree () )
@@ -2739,12 +2741,12 @@ def request_token_problems (headline, view_line):
       f"carries {quoted_words ( headline . edit_request_words () )}"
       + subtree_origin_text (headline, headline . edit_request_words ())
       + "; a headline takes one edit request." )
-  if len ( headline . readiness_words () ) > 1:
-    problems . append ( "carries both 'ready' and 'unready'"
-                        + subtree_origin_text (headline, READINESS_TOKENS) + "." )
+  if len ( headline . processed_words () ) > 1:
+    problems . append ( "carries both 'processed' and 'unprocessed'"
+                        + subtree_origin_text (headline, PROCESSED_TOKENS) + "." )
   if headline . names_only_all () and not any (
-      word in headline . tokens for word in READINESS_TOKENS ):
-    problems . append ( "carries 'all' without 'ready' or 'unready'." )
+      word in headline . tokens for word in PROCESSED_TOKENS ):
+    problems . append ( "carries 'all' without 'processed' or 'unprocessed'." )
   only_on_a_node = (
     headline . view_request_words () + headline . repo_words () +
     [ word for word in headline . edit_request_words ()
@@ -2782,7 +2784,7 @@ def request_token_problems (headline, view_line):
   if headline . asks_subtree () and not words_with_a_subtree_form (headline):
     problems . append (
       "carries 'subtree' with no word it applies to; 'subtree' applies to "
-      "'delete', 'ready', 'unready', 'write-protect', 'repo:NAME', "
+      "'delete', 'processed', 'unprocessed', 'write-protect', 'repo:NAME', "
       "'relRepo:NAME', 'noSearchMatching' and 'searchMatching'." )
   return problems
 
@@ -2797,7 +2799,7 @@ def subtree_origin_text (headline, words):
 def words_with_a_subtree_form (headline):
   """The words of HEADLINE's own handle that 'subtree' applies to."""
   return [ word for word in headline . tokens
-           if word in ( "delete", "ready", "unready", "write-protect" )
+           if word in ( "delete", "processed", "unprocessed", "write-protect" )
            or word in SEARCH_MATCHING_TOKENS
            or word . startswith (REPO_WORD_PREFIX)
            or word . startswith (RELREPO_WORD_PREFIX) ]
@@ -3032,8 +3034,8 @@ def expand_subtree_words (edited, headline_of_handle, ownership, check):
          or headline_of_handle [ root . handle ] . metadata is None ):
       continue
     for word in words_with_a_subtree_form (root):
-      if word in READINESS_TOKENS:
-        expand_readiness_subtree (edited, index, word, headline_of_handle)
+      if word in PROCESSED_TOKENS:
+        expand_processed_subtree (edited, index, word, headline_of_handle)
       elif word == "delete":
         expand_delete_subtree (edited, index, headline_of_handle)
       elif word . startswith (REPO_WORD_PREFIX):
@@ -3083,12 +3085,12 @@ def home_skgrepo_move (metadata):
   return ( sexp_to_text ( ( metadata_form (move, "old") or [ None, "" ] ) [1] ),
            sexp_to_text ( ( metadata_form (move, "new") or [ None, "" ] ) [1] ))
 
-def expand_readiness_subtree (edited, root, word, headline_of_handle):
-  """'ready subtree' or 'unready subtree'. On a home skgrepo move, the
+def expand_processed_subtree (edited, root, word, headline_of_handle):
+  """'processed subtree' or 'unprocessed subtree'. On a home skgrepo move, the
   clients' 'C-u C-c r h': every move between the same two skgrepos in
   the moved node's subtree. Elsewhere their 'C-u C-c r r': every
   headline in the subtree that names leaves, those below naming them
-  without 'all' ('skg--readiness-leaves-below'), and the headline
+  without 'all' ('skg--processed-leaves-below'), and the headline
   itself only when it names some."""
   root_metadata = headline_of_handle [ edited [root] . handle ] . metadata
   move = home_skgrepo_move (root_metadata)
@@ -3108,7 +3110,7 @@ def expand_readiness_subtree (edited, root, word, headline_of_handle):
     if leaves is None or ( leaves [1] and set ( leaves [1] ) == { ALL_TOKEN } ):
       continue
     if word not in edited [later] . tokens:
-      edited [later] . readiness_below = True
+      edited [later] . processed_below = True
     give_subtree_word (edited, later, word, root)
 
 def expand_repo_subtree (edited, root, word, headline_of_handle, check):
@@ -3263,27 +3265,28 @@ def expand_search_matching_subtree (edited, root, word, headline_of_handle,
       f"Skipped: '{word} subtree' on ⟨{edited [root] . handle}⟩ leaves "
       + ", " . join (skipped) + "." )
 
-def readiness_request_text (headline, view_line):
+def processed_request_text (headline, view_line):
   """'(ready OBJECT...)' or '(unready OBJECT...)' for HEADLINE's
-  readiness token, or None. Its objects are 'all' when the handle
+  processed token, or None. Its objects are 'all' when the handle
   says 'all', and otherwise every object the headline's '(leaves ...)'
   lists, as a client's one-level gesture names them; a headline that
   lists none gets the bare request."""
-  if not headline . readiness_words ():
+  if not headline . processed_words ():
     return None
-  return "(" + " " . join ( headline . readiness_words () +
-                            readiness_objects (headline, view_line) ) + ")"
+  return "(" + " " . join ( [ PROCESSED_REQUEST_ATOMS [word]
+                              for word in headline . processed_words () ] +
+                            processed_objects (headline, view_line) ) + ")"
 
-def readiness_objects (headline, view_line):
-  """The objects HEADLINE's readiness request names: 'all' when its
+def processed_objects (headline, view_line):
+  """The objects HEADLINE's processed request names: 'all' when its
   handle says 'all'; else every object its '(leaves ...)' lists, but
   'all' on a headline below a 'subtree' gesture's, as the clients'
-  recursive gesture names them ('skg--readiness-leaves-below')."""
+  recursive gesture names them ('skg--processed-leaves-below')."""
   if headline . names_only_all ():
     return [ ALL_TOKEN ]
   leaves = leaves_fact (view_line . metadata)
   objects = leaves [1] if leaves else []
-  if headline . readiness_below:
+  if headline . processed_below:
     return [ obj for obj in objects if obj != ALL_TOKEN ]
   return objects
 
@@ -3291,19 +3294,19 @@ def edit_request_text (headline, view_line):
   """The '(editRequest ...)' HEADLINE's tokens ask for, or None."""
   parts = [ edit_request_part_of_word (word)
             for word in headline . edit_request_words () ]
-  readiness = readiness_request_text (headline, view_line)
-  if readiness:
-    parts = parts + [ readiness ]
+  processed = processed_request_text (headline, view_line)
+  if processed:
+    parts = parts + [ processed ]
   return "(editRequest " + " " . join (parts) + ")" if parts else None
 
 def unmarked_leaf_count (headline, view_line):
-  """How many leaves an 'unready' on HEADLINE unmarks, counted as a
+  """How many leaves an 'unprocessed' on HEADLINE unmarks, counted as a
   client counts them: N of '(leaves N ...)' when the request names
   every object listed, else one per object (one for a bare request)."""
-  if headline . readiness_words () != [ "unready" ]:
+  if headline . processed_words () != [ "unprocessed" ]:
     return 0
   leaves = leaves_fact (view_line . metadata)
-  objects = readiness_objects (headline, view_line)
+  objects = processed_objects (headline, view_line)
   if leaves and objects == leaves [1]:
     return leaves [0]
   return max ( 1, len (objects) )
@@ -3545,7 +3548,7 @@ def described_handle (handle, headline_of_handle):
 
 def request_report_lines (edited, headline_of_handle, described):
   """The requests the handles' words ask for, by kind, each naming its
-  headline through DESCRIBED; then, when the 'unready' requests unmark
+  headline through DESCRIBED; then, when the 'unprocessed' requests unmark
   more than one leaf, the question a client asks before such a
   gesture."""
   handled_headlines = [ headline for headline in edited
@@ -3615,12 +3618,12 @@ def request_report_lines (edited, headline_of_handle, described):
   lines += [ "Attach: " + described (headline . handle) + ", to " +
              parent_text (headline) + ": the save puts it in its parent's list."
              for headline in with_word ("attach") ]
-  for word, label in [ ( "ready", "Ready" ), ( "unready", "Unready" ) ]:
+  for word, label in [ ( "processed", "Processed" ), ( "unprocessed", "Unprocessed" ) ]:
     lines += [ label + ": " + described (headline . handle) + ", as '" +
-               readiness_request_text (
+               processed_request_text (
                  headline, headline_of_handle [ headline . handle ] ) + "'."
                for headline in handled_headlines
-               if headline . readiness_words () == [ word ] ]
+               if headline . processed_words () == [ word ] ]
   unmarked = sum ( unmarked_leaf_count (
                      headline, headline_of_handle [ headline . handle ] )
                    for headline in handled_headlines )
@@ -4433,9 +4436,9 @@ def rerendered_view_of_save (terminal, sidecar):
     print ( "Server error: " + error )
   for warning in warnings:
     print ( "Server warning: " + warning )
-  readiness_summary = response_field (terminal, "readiness-summary")
-  if saved and readiness_summary:
-    print ( "Readiness: " + readiness_summary_text (readiness_summary) )
+  processed_summary = response_field (terminal, "readiness-summary")
+  if saved and processed_summary:
+    print ( "Processed: " + processed_summary_text (processed_summary) )
   if not saved:
     raise SkgToolError (
       "The server refused the save; the files are as they were." )
@@ -4445,7 +4448,7 @@ def rerendered_view_of_save (terminal, sidecar):
            "content"     : content,
            "errors"      : errors,
            "warnings"    : warnings,
-           "readiness_summary" : readiness_summary }
+           "processed_summary" : processed_summary }
 
 # ============================================================
 # The daemon: one long-lived connection, holding the views its
@@ -5236,7 +5239,7 @@ class SkgConnection:
     terminal one, parsed. DIFFVIEW_BUFFER names the buffer of the diff
     view it is ('all changes', say), if it is one: the server holds no
     view of this connection's, and re-renders the save as that buffer,
-    with its readiness summary, only when the request names it.
+    with its processed summary, only when the request names it.
     ANSWERS, a SaveAnswers, carries the answers to the questions
     earlier attempts of the same save asked, as the clients' retries
     carry them ('skg--save-request-sexp' in

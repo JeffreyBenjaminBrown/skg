@@ -58,7 +58,7 @@ not count on it.
 When a piece of work is done, review and commit it. 'diff --out-dir
 DIR' writes the diff view: every change since the last git-commit,
 each handle carrying its change facts. Fix anything wrong by editing
-and saving, as above; write 'ready' in the handles of the changes you
+and saving, as above; write 'processed' in the handles of the changes you
 approve and save that buffer; then 'commit "MESSAGE" --yes' stages
 and git-commits every change in the owned skgrepos.
 
@@ -69,7 +69,7 @@ daemon does and what its log means; "Writing" covers saving in
 detail, the report, the words a handle takes, "Retyped headlines",
 placing an existing node and forking; "The skgrepo restriction and
 overPrivateText" says what a restriction changes; "Reviewing and committing" covers the diff view,
-readiness and the commit; "What the tool covers of COMMANDS.org"
+processed marks and the commit; "What the tool covers of COMMANDS.org"
 says, command by command, what the tool does of what Emacs does. The
 protocol is in 'docs/api-and-formats.org', and the diff view in
 'docs/diff-view.org'.
@@ -88,7 +88,7 @@ whose metadata it stands for. An edited compact
 view can be saved back: the tool rebuilds the full buffer from it and
 saves that through the server (see "Writing"). The diff view, which
 shows every change since the last git-commit, is written the same way,
-and changes are marked ready and committed through it (see "Reviewing
+and changes are marked processed and committed through it (see "Reviewing
 and committing").
 
 The tool is written for anyone, human or agent, who wants to use the
@@ -173,7 +173,7 @@ the buffer again; see "Reviewing and committing".
 
 'commit MESSAGE' stages and git-commits every change in the owned
 skgrepos with MESSAGE, asking first when not everything is marked
-ready; see "Reviewing and committing".
+processed; see "Reviewing and committing".
 
 'new TITLE REPO' creates a root node titled TITLE whose home is the
 owned skgrepo REPO, and writes its view as 'view' does (named
@@ -365,15 +365,15 @@ has it, 'ᗣ☮'): '∃+' a new node, '∃-' a deleted one, 'M' a modified one
 membership in its parent (in a partner folder, its relationship of
 the folder's kind to the folder's parent), '~-' a removed one. On an
 alias, ID or flag in its folder, '+' or '-'; on an unknown viewnode,
-'~+' or '~-'. A '✓' right after a change says it is marked ready:
+'~+' or '~-'. A '✓' right after a change says it is marked processed:
 '∃+✓ ~+' is a new node, approved, in a membership that is not. The
 headlines the diff view adds to explain a change show their labels:
 'old title' (or 'old body', 'old title and body') and 'body diff',
 'its content changed' (a changeset marker), '⌂ -OLD +NEW' (a move to
 another skgrepo) and 'relationship moved from OLD to NEW'; each takes
-a '✓' when ready. A folder shown because a member's relationship to
+a '✓' when processed. A folder shown because a member's relationship to
 the folder's parent changed reads 'its other containers changed (other
-files)' and so on, with '✓' when every such change is ready. In the
+files)' and so on, with '✓' when every such change is processed. In the
 skgrepo-changes buffer a moved node adds '-OLD +NEW', and 'Δ⌂=a' when
 its nearest moved ancestor (here the parent) moved the same way.
 *** Folded headlines
@@ -429,10 +429,10 @@ to read its ancestry the same way. The folder is absent when nothing
 contains the root.
 
 A buffer of the diff view opens its summary with two more lines: the
-readiness summary the server sends ("1 of 4 changed files are ready",
+processed summary the server sends ("1 of 4 changed files are processed",
 with how many changes this buffer cannot edit and how many files
 changed in foreign skgrepos), and how many headlines show a change,
-ready and not.
+processed and not.
 ** The sidecar
 'BASE.view.json' records the view ID, the command and its request (for
 a buffer of the diff view, the buffer's name), the
@@ -453,7 +453,7 @@ buffer against the graph; the server does not hold its view, and
 keeps every handle the buffer carries (see "Handles across saves"). A
 save of a buffer of the diff view names its buffer
 ('(diff-view-buffer . "all changes")', say), so the server re-renders
-it as that buffer, with its readiness summary. The 'close' command
+it as that buffer, with its processed summary. The 'close' command
 matters only for a view that a longer-lived connection holds: a
 daemon's.
 
@@ -472,7 +472,7 @@ A connection starts with the skgrepo restriction the config's
 restriction a view, a search and a save show only what the skgrepos
 it shows hold (see 'docs/api-and-formats.org', "skgrepo-sets"), the
 diff view and a commit are refused, and so are 'delete-references'
-and the readiness and restore words. A daemon's connection keeps a
+and the processed and restore words. A daemon's connection keeps a
 restriction 'restrict NAME' sets, for every command run through it;
 without a daemon, each command has the config's.
 
@@ -593,7 +593,7 @@ The server rerenders a held view
   files reloaded' in 'docs/api-and-formats.org'), and the server
   extends each buffer of the diff view so rerendered to the changes
   it did not show, as 'extend' would.
-A rewritten buffer of the diff view has no readiness summary, since a
+A rewritten buffer of the diff view has no processed summary, since a
 rerender carries none; its next save, or 'diff', gives one.
 
 A compact view with unsaved edits (anything 'save' would report) is
@@ -723,7 +723,7 @@ tests share, 'tests/shared/herald-rendering-cases.txt', as their tests
 do: with the rule table and the skgrepo label table pinned beside it
 ('herald-rules.sexp', which a Rust test keeps equal to the served
 table, and 'herald-skgrepo-labels.sexp'), and with each case's
-context (a changed folder, ready or not, or a pending detachment) as
+context (a changed folder, processed or not, or a pending detachment) as
 a client reads it from the headlines around. It compares the text;
 the styles the tool drops. Then it copies 'test-fixture/' to a
 temporary data root, starts a server there on port 1793
@@ -812,8 +812,8 @@ new branch; and 'subtree' alone, 'relRepo:NAME' on a root and
 Then, on a fifth server over a fresh copy of the fixture whose owned
 skgrepo is first made a gitrepo with one commit, it saves a retitle, a
 new child and a deletion, compares the diff view's compact buffer
-with the text expected, marks the new child 'ready' and sees it ready
-in a fresh 'diff', checks the question before an 'unready' of two
+with the text expected, marks the new child 'processed' and sees it processed
+in a fresh 'diff', checks the question before an 'unprocessed' of two
 changes, commits unconfirmed (nothing happens), restores the deleted
 node with 'restoreNode', commits with '--yes' and reads 'git log' and
 an empty diff view. Then it retitles the root, writes the diff view
@@ -823,9 +823,9 @@ and checks its output, that the child and the grandchild are now
 editable there, and that a save of the buffer retitles the grandchild
 again. Last, it checks that a blank commit message is refused.
 
-The reviewing server's run ends with 'ready subtree' on the retitled
+The reviewing server's run ends with 'processed subtree' on the retitled
 root of a diff buffer, which marks its change and the old titles
-below it, all files then ready, and 'unready subtree', which asks
+below it, all files then processed, and 'unprocessed subtree', which asks
 about three changes and unmarks them.
 
 Then, on a sixth server over a fresh copy of the fixture whose owned
@@ -886,7 +886,7 @@ relationship of a subtree. 'repo:main' on the private note asks the
 strandeds question, unanswered by '--yes' alone and answered by
 '--strandeds keep'; '⟨new repo:private⟩' makes a node in 'private';
 'repo:main subtree' moves the branch and its leaf. In the diff view,
-'ready subtree' on the branch's move marks it and its leaf's move,
+'processed subtree' on the branch's move marks it and its leaf's move,
 not the private note's. Last, 'delete-references' sends nothing
 without '--yes', shows the server's warning with it, and with
 '--leave-links' removes the membership, leaves the link, and the
@@ -935,7 +935,7 @@ view's headline whose viewnode ID is ID; its level, title and
 position come from the edited compact view. The rest of the handle
 (the heralds, 'folded') is display only, and editing it changes
 nothing, except for the words that ask for something: 'delete' (see
-"A deleted node"), 'ready', 'unready', 'all', 'restoreNode' and
+"A deleted node"), 'processed', 'unprocessed', 'all', 'restoreNode' and
 'restoreRel' (see "Reviewing and committing"), 'editable' and 'fork'
 (see "Forking"), and those of "Words in a handle": 'merge:ID',
 'relRepo:NAME', 'noSearchMatching', 'searchMatching',
@@ -945,7 +945,7 @@ save consumes every request; so each such word in a handle was
 written there. The rebuild writes the edit requests into the
 headline's '(editRequest ...)', which holds one ('delete',
 'restoreNode', 'restoreRel', '(merge ID)', '(relRepo NAME)' or
-'(flag noSearchMatching true|false)') and one readiness request
+'(flag noSearchMatching true|false)') and one processed request
 after it; the view requests into its '(viewRequests ...)', as
 'editableView', 'fork', 'writeProtectedView' or
 'writeProtectedSubtreeView'; 'detach' and 'attach' as the atom
@@ -1067,9 +1067,9 @@ NAME.
 'subtree' asks for the subtree form of the other words of its handle,
 as a prefix argument (C-u) does in the clients: 'delete subtree'
 deletes the node and every node occurrence below it
-('skg-delete-recursive', C-u C-c <backspace>); 'ready subtree' and
-'unready subtree' mark or unmark every change in the subtree (see
-"Marking changes ready"); and 'write-protect', 'relRepo:NAME',
+('skg-delete-recursive', C-u C-c <backspace>); 'processed subtree' and
+'unprocessed subtree' mark or unmark every change in the subtree (see
+"Marking changes processed"); and 'write-protect', 'relRepo:NAME',
 'noSearchMatching', 'searchMatching' and 'repo:NAME' as above. The
 words it gives the headlines below show in the report as their own.
 Alone, it is refused.
@@ -1086,7 +1086,7 @@ Bodies changed: 1 (⟨0a⟩).
 Not saved. Run again with '--yes' to save.
 #+end_example
 An 'Error:' line names a handle that names no headline of the full
-view, or whose request words make no one '(editRequest ...)' (two edit requests, both 'ready' and 'unready', 'all' alone),
+view, or whose request words make no one '(editRequest ...)' (two edit requests, both 'processed' and 'unprocessed', 'all' alone),
 or that carries a word its kind does not take ('editable', 'fork',
 'write-protect', 'repo:NAME', 'merge:ID' or a flag word on anything
 but a node, say), or a word that cannot stand where it is (see "Words
@@ -1102,12 +1102,12 @@ answer says that.
 
 The changes follow, in this order. 'Delete:', 'Restore node:',
 'Restore membership:', 'Merge:', 'relRepo:', 'Search matching:',
-'Repo:', 'Editable:', 'Write-protect:', 'Detach:', 'Attach:', 'Ready:'
-and 'Unready:' are the requests the handles' words ask for, each with
-the form the save sends ('Ready: ⟨0j⟩ 'A new grandchild', as '(ready
+'Repo:', 'Editable:', 'Write-protect:', 'Detach:', 'Attach:', 'Processed:'
+and 'Unprocessed:' are the requests the handles' words ask for, each with
+the form the save sends ('Processed: ⟨0j⟩ 'A new grandchild', as '(ready
 node rel)'.'); a 'subtree' gives a line to each headline it gives a
 word.
-When the 'unready' requests would unmark more than one change, a
+When the 'unprocessed' requests would unmark more than one change, a
 'Question:' line asks what a client asks before such a gesture, and
 '--yes' answers it. 'Removed:' is a handle the edit no longer has,
 with how many headlines below it went with it; a child of a removed
@@ -1381,7 +1381,7 @@ them all with one message:
 python3 tools/skg-for-ai/skg_for_ai.py diff --out-dir DIR
 # read DIR/diff_all-changes.compact.org, and any other DIR/diff_*.compact.org
 # fix a change by editing any view (this one too) and saving it
-# add 'ready' to the handles of the changes meant:
+# add 'processed' to the handles of the changes meant:
 python3 tools/skg-for-ai/skg_for_ai.py save DIR/diff_all-changes.view.json --yes
 python3 tools/skg-for-ai/skg_for_ai.py commit "MESSAGE"
 #+end_example
@@ -1397,39 +1397,39 @@ change facts (see "Change facts, in the diff view"). There are up to
 four buffers, written in this order when not empty: all changes, the
 nodeMerges, the moves between skgrepos, and the nodes whose only
 change is the order of a list. Each is a view like any other: it can
-be edited and saved, and its save answers with the readiness summary.
+be edited and saved, and its save answers with the processed summary.
 After any save, 'diff' again for a fresh rendering; a save of a diff
 buffer rewrites that buffer's files.
-** Marking changes ready
+** Marking changes processed
 A mark says that one change is approved as it is now; editing a marked
 change unmarks it. Marking is a save: write a word in a handle, and
-'save' turns it into a readiness request in the headline's
+'save' turns it into a processed request in the headline's
 '(editRequest ...)', as the clients' 'C-c r r' does.
 
-'ready' marks every change the headline names, as the request '(ready
+'processed' marks every change the headline names, as the request '(ready
 OBJECT...)' naming each object its change facts list: on a new node
 its existence and its membership, on a modified node ('M') every
 change its file records and its membership if that changed, on an old
 text or a move the one change, on a changeset marker every change
-under it. 'unready' unmarks the same. 'ready all' and 'unready all'
+under it. 'unprocessed' unmarks the same. 'processed all' and 'unprocessed all'
 name only the object 'all': every change a modified node's file
 records, or every change of a changeset marker.
 
-'ready subtree' marks every change in the headline's subtree, as the
+'processed subtree' marks every change in the headline's subtree, as the
 clients' 'C-u C-c r r' does: the headline's own (if it names any) and
 each headline below that names one, which names them without 'all'
 (a modified node below names its changes through its old text and
 markers, which are below it too). On a home skgrepo move ('⌂ -OLD
-+NEW'), 'ready subtree' instead marks every move between the same two
++NEW'), 'processed subtree' instead marks every move between the same two
 skgrepos in the moved node's subtree, as 'C-u C-c r h' does.
-'unready subtree' unmarks the same.
+'unprocessed subtree' unmarks the same.
 
 A save that unmarks more than one change prints the question a client
 asks first, and '--yes' answers it. The server applies the requests
 after the save's edits succeed; it drops a request that names no
 current change, with a warning, and refuses a save in which two
 headlines mark and unmark one change. The save's answer ends with the
-readiness summary, "N of M changed files are ready", which counts
+processed summary, "N of M changed files are processed", which counts
 every change of the owned skgrepos, whatever the buffer shows.
 ** Restoring what a change removed
 Two more words undo a removal, the way the clients' 'C-c s n' and 'C-c
@@ -1443,7 +1443,7 @@ editable occurrence of the node that records it. A fresh buffer
 ('diff') makes every change editable, but a save makes nothing
 editable and adds no root, so a change made since (by another view's
 save, or by this save itself) may not be editable in the buffer the
-save writes. The readiness summary then says "N changes are not
+save writes. The processed summary then says "N changes are not
 editable in this buffer".
 
 'extend SIDECAR' extends the buffer to them, as the clients' 'C-c r u'
@@ -1451,7 +1451,7 @@ does: the server makes each changed node editable at its first
 occurrence in the buffer (drawing its body and content), and appends
 as roots the origins of changes the buffer shows nowhere. It refuses
 a compact view with edits (save them first, as a client refuses a
-buffer with unsaved changes), prints the readiness summary before and
+buffer with unsaved changes), prints the processed summary before and
 after, and writes the server's rerendered buffer over the three files.
 #+begin_example
 python3 tools/skg-for-ai/skg_for_ai.py extend DIR/diff_all-changes.view.json
@@ -1468,9 +1468,9 @@ changed '.skg' file of every owned skgrepo, deletions included, and
 git-commits each gitrepo that has changes, with MESSAGE, by that
 gitrepo's configured user. It commits everything, marked or not: the
 marks are a review, not a selection. When not every changed file is
-ready, or some owned gitrepo already has staged entries (which the
+processed, or some owned gitrepo already has staged entries (which the
 git-commit would include), the server asks first: the tool prints the
-readiness summary and the staged paths, and asks for a typed "yes" on
+processed summary and the staged paths, and asks for a typed "yes" on
 standard input; '--yes' answers yes. Any other answer, or no input,
 commits nothing. Then it prints 'Committed in SKGREPO (COMMIT ID)'
 per git-commit, or 'Nothing was committed.', and any error. A blank
@@ -1488,10 +1488,10 @@ owned repo 'first' can show changes or be committed.
 The server keeps the diff view's buffers, and the comparison behind
 them, per connection. 'diff' opens one connection (or runs through a daemon),
 requests the buffers in the clients' order, and writes each nonempty
-one, with the readiness summary the server's answer carries. A later
+one, with the processed summary the server's answer carries. A later
 'save' or 'extend' of a diff buffer names its buffer of the diff
 view in the save request, so that the server re-renders it as one,
-with the readiness summary, on a connection that never opened it; the
+with the processed summary, on a connection that never opened it; the
 save keeps every handle the buffer carries (see "Handles across
 saves"). Through a daemon the connection holds the buffer already, and
 naming it changes nothing.
@@ -1540,8 +1540,8 @@ round and its answer reads as it is.
 | C-c s n                    | skg-restore-deleted-node                         | 'restoreNode' in the handle                                                                                                                                   |
 | C-c s l                    | skg-restore-removed-membership                   | 'restoreRel' in the handle                                                                                                                                    |
 | C-c s r, C-c s R           | skg-set-relRepo(-recursive)                      | 'relRepo:NAME', 'relRepo:NAME subtree' in the handle                                                                                                          |
-| C-c r r                    | skg-cycle-commit-ready                           | 'ready', 'unready', 'all' in the handle; 'ready subtree', 'unready subtree' for C-u                                                                           |
-| C-c r h                    | skg-toggle-homeSkgrepo-move-commitReady          | 'ready' or 'unready' on the move's headline; with 'subtree', every like move (C-u)                                                                            |
+| C-c r r                    | skg-cycle-processed                              | 'processed', 'unprocessed', 'all' in the handle; 'processed subtree', 'unprocessed subtree' for C-u                                                           |
+| C-c r h                    | skg-toggle-homeSkgrepo-move-processed            | 'processed' or 'unprocessed' on the move's headline; with 'subtree', every like move (C-u)                                                                    |
 | C-c r u                    | skg-diffView-extend                              | 'extend SIDECAR'                                                                                                                                              |
 | C-c r c                    | skg-stage-and-commit                             | 'commit MESSAGE'                                                                                                                                              |
 | C-c r n, p (c, u, r)       | skg-diffView-goto-next/previous-*                | Emacs-only by nature; the change facts are in the handles                                                                                                     |
