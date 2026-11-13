@@ -70,6 +70,14 @@ node's own."
   (test-skg-processed--refused
    '("** (skg (relRepoMove (old pub) (new priv)) (diff (leaves 1)))")
    1 #'skg-mark-node-processed)
+  ;; An unknown viewnode shows no node, only its relationship.
+  (should (equal (test-skg-processed--run
+                  '("** (skg unknown (gnid k) (diff (rel added) (leaves 1))) k")
+                  1 #'skg-mark-rel-processed)
+                 '("** (skg unknown (gnid k) (editRequest (processed)) (diff (rel added) (leaves 1))) k")))
+  (test-skg-processed--refused
+   '("** (skg unknown (gnid k) (diff (rel added) (leaves 1))) k")
+   1 #'skg-mark-node-processed)
   (test-skg-processed--refused
    '("** (skg alias (diff (rel added) (leaves 1))) a")
    1 #'skg-mark-rel-processed)

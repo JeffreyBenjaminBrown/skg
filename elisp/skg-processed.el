@@ -16,8 +16,8 @@
 ;;; and 'rel' that name some leaf there; N is how many distinct leaves
 ;;; a request naming every listed object touches. A headline that
 ;;; names exactly one leaf (a property member, an old text, a home
-;;; skgrepo or relRepo move) lists no object, and a bare request marks
-;;; it. A changeset marker lists only 'rel', though 'node' there names
+;;; skgrepo or relRepo move, an unknown or restricted viewnode) lists
+;;; no object, and a bare request marks it. A changeset marker lists only 'rel', though 'node' there names
 ;;; its members' own leaves. A folder shown because of a change names
 ;;; no leaf itself; a gesture on it acts on its children. The server
 ;;; writes such a folder as its bare atom; whether it is changed, and
@@ -167,8 +167,7 @@ METADATA-SEXP, at point: nil when it names nothing there, else
 \(OBJECTS), OBJECTS the request's, nil for a bare request.
 On a headline that lists objects, the letters among them. On one that
 names a single leaf, the bare request, when the leaf is of a kind a
-letter names: a relRepo move is a relationship's, any other the
-node's own (`skg--processed-single-leaf-kind'). On a changeset marker
+letter names (`skg--processed-single-leaf-kind'). On a changeset marker
 AT-GESTURE (the headline the gesture acts on), the letters
 themselves: its 'node' names its members' own leaves, which its
 '(leaves ...)' does not list; below the gesture those members name
@@ -188,9 +187,15 @@ them under their own headlines."
 
 (defun skg--processed-single-leaf-kind (metadata-sexp)
   "The letter object naming the one leaf of a headline that names one:
-`rel' for a relRepo move, else `node' (an alias, extra ID or flag of
-its folder's viewparent, an old text, a home skgrepo move)."
-  (if (assq 'relRepoMove (cdr metadata-sexp)) 'rel 'node))
+`rel' for a relRepo move and for an unknown or restricted viewnode,
+which shows no node, only its relationship to its viewparent; else
+`node' (an alias, extra ID or flag of its folder's viewparent, an old
+text, a home skgrepo move)."
+  (if (or (assq 'relRepoMove (cdr metadata-sexp))
+          (memq 'unknown (cdr metadata-sexp))
+          (memq 'restricted (cdr metadata-sexp)))
+      'rel
+    'node))
 
 (defun skg--processed-p (metadata-sexp)
   "Non-nil when the headline with METADATA-SEXP, at point, is processed: a

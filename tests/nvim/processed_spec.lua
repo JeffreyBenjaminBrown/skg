@@ -79,6 +79,13 @@ describe('skg.processed', function ()
           processed.mark_rel_processed))
     refused({ '** (skg (relRepoMove (old pub) (new priv)) (diff (leaves 1)))' }, 1,
             processed.mark_node_processed)
+    -- An unknown viewnode shows no node, only its relationship.
+    assert.are.same(
+      { '** (skg unknown (gnid k) (editRequest (processed)) (diff (rel added) (leaves 1))) k' },
+      run({ '** (skg unknown (gnid k) (diff (rel added) (leaves 1))) k' }, 1,
+          processed.mark_rel_processed))
+    refused({ '** (skg unknown (gnid k) (diff (rel added) (leaves 1))) k' }, 1,
+            processed.mark_node_processed)
     refused({ '** (skg alias (diff (rel added) (leaves 1))) a' }, 1,
             processed.mark_rel_processed)
     -- Without the server's '(diff (leaves ...))' fact, nothing is named.

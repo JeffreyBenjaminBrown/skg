@@ -147,12 +147,30 @@ end
 
 -- ── reading a headline's change facts ──────────────────────────────
 
+---The letter object naming the one leaf of a headline that names one:
+---'rel' for a relRepo move and for an unknown or restricted viewnode,
+---which shows no node, only its relationship to its viewparent; else
+---'node'. (skg--processed-single-leaf-kind)
+---@param metadata_sexp any
+---@return string
+function M.single_leaf_kind (metadata_sexp)
+  if metadata.sexp_cdr_at_path(metadata_sexp, { 'skg', 'relRepoMove' }) then
+    return 'rel' end
+  for i = 2, #metadata_sexp do
+    local element = metadata_sexp[i]
+    if not sexpr.is_list(element) then
+      local text = sexpr.atom_text(element)
+      if text == 'unknown' or text == 'restricted' then return 'rel' end end
+  end
+  return 'node'
+end
+
 ---What a gesture with LETTER_OBJECTS names on the headline with
 ---METADATA_SEXP: nil when it names nothing there, else the request's
 ---objects ({} for a bare request). On a headline that lists objects,
 ---the letters among them. On one that names a single leaf, the bare
----request, when the leaf is of a kind a letter names: a relRepo move
----is a relationship's, any other the node's own. On a changeset marker
+---request, when the leaf is of a kind a letter names (single_leaf_kind).
+---On a changeset marker
 ---AT_GESTURE (the headline the gesture acts on), the letters
 ---themselves: its 'node' names its members' own leaves, which its
 ---'(leaves ...)' does not list; below the gesture those members name
@@ -165,8 +183,7 @@ function M.objects_named_by_letters (metadata_sexp, letter_objects, at_gesture)
   local leaves = metadata.processed_leaves(metadata_sexp)
   if not leaves then return nil end
   if #leaves.objects == 0 then
-    local kind = metadata.sexp_cdr_at_path(metadata_sexp, { 'skg', 'relRepoMove' })
-                 and 'rel' or 'node'
+    local kind = M.single_leaf_kind(metadata_sexp)
     if vim.tbl_contains(letter_objects, kind) then return {} end
     return nil end
   if at_gesture and metadata.sexp_cdr_at_path(
