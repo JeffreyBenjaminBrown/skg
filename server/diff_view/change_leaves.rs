@@ -106,7 +106,7 @@ impl BufferProcessedSummary {
                           Sexp::Atom ( Atom::I ( count as i64 )) ] ) };
     Sexp::List ( vec! [
       Sexp::Atom ( Atom::S ( "processed-summary" . to_string () )),
-      entry ( "processed",       self . summary . processed_files ),
+      entry ( "processed",   self . summary . processed_files ),
       entry ( "changed",     self . summary . changed_files ),
       entry ( "foreign",     self . summary . foreign_changed_files ),
       entry ( "order-only",  self . summary . order_only_files ),

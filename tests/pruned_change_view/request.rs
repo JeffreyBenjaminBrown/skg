@@ -156,7 +156,7 @@ fn a_save_of_a_diffView_buffer_not_held_keeps_its_viewnode_ids (
 /// '(processed)' where it carried the request, and mc's own headline,
 /// whose file the mark made processed; no other.
 #[test]
-fn a_processed_saves_delta_lists_the_requesting_headline (
+fn a_processed_requests_saves_delta_lists_the_requesting_headline (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("sets", &["main"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;

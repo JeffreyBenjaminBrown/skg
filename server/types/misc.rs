@@ -389,8 +389,7 @@ impl SkgConfig {
   /// TEMPORARY: once every data folder that held a
   /// 'readiness-marks-*.json' also holds its 'processed-marks-*.json'
   /// (one start of each server writes it), delete this, the fallback,
-  /// and the old files (Jeff's by Jeff, the team's by Top). Vic's plan
-  /// says so, at "The marks file is read from its old name".
+  /// and the old files (Jeff's by Jeff, the team's by Top).
   pub fn old_readiness_marks_path (
     &self,
   ) -> Option<PathBuf> {

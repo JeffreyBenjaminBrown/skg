@@ -370,7 +370,7 @@ fn a_root_deleted_in_the_buffer_is_rerendered_as_removed (
 /// image marks its file: both images then show '(processed all)', and
 /// its old text shows processed.
 #[test]
-fn a_modified_node_lists_all_and_one_mark_readies_its_file (
+fn a_modified_node_lists_all_and_one_mark_makes_its_file_processed (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("sets", &["main"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;

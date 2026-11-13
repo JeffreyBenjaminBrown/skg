@@ -283,7 +283,7 @@ fn change_fact_rules_for_two_objects (
       rule ("properties", vec! [
         leaf_styled_as ("properties", "changed", "M") ]),
       rule ("processed", vec! [ leaf_abut_styled_as ("processed", "node", "✓"),
-                            leaf_abut_styled_as ("processed", "all",  "✓") ]),
+                                leaf_abut_styled_as ("processed", "all",  "✓") ]),
       rule ("rel", vec! [
         leaf_styled_as ("existence", "added",   "~+"),
         leaf_styled_as ("existence", "removed", "~-") ]),
