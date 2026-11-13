@@ -400,8 +400,8 @@ function M.apply_streamed_view_update (_payload_text, response,
                    .. vim.api.nvim_buf_get_name(buf))
       else
         lock.unlock_after_save(buf)
-        M.replace_buffer_with_new_content(
-          buf, sexpr.atom_text(content), nil)
+        M.replace_buffer_keeping_viewnode_points(
+          buf, sexpr.atom_text(content))
       end
     end
   end)
@@ -409,6 +409,94 @@ function M.apply_streamed_view_update (_payload_text, response,
     log.log('error', log_category, '%s handler error: %s',
             handler_name, tostring(err))
   end
+end
+
+---Replace BUF with NEW_CONTENT, a redraw the user did not ask for,
+---keeping each window's cursor and scroll where they were. A save
+---marks the headline at the cursor focused, and restores the cursor
+---relative to it ('M.restore_save_point_position'); here the server
+---drew the view on its own, so its focused headline is the one the
+---last save left. Instead each window's cursor is recorded as its
+---headline's viewnode ID, which a rerender keeps
+---('docs/api-and-formats.org', "(vnid X)"), with the offsets a save
+---measures, and restored by them. A cursor whose viewnode is gone goes
+---to the start of the nearest headline that remains.
+---@param buf integer
+---@param new_content string
+function M.replace_buffer_keeping_viewnode_points (buf, new_content)
+  local positions_by_window = {}
+  for _, window in ipairs(vim.fn.win_findbuf(buf)) do
+    positions_by_window[window] =
+      vim.api.nvim_win_call(window, M.viewnode_point_position) end
+  M.replace_buffer_with_new_content(buf, new_content, nil)
+  local headline_lines = M.viewnode_id_headline_lines(buf)
+  for window, position in pairs(positions_by_window) do
+    vim.api.nvim_win_call(window, function ()
+      M.goto_viewnode_point_position(position, headline_lines) end) end
+end
+
+---Where the current window's cursor stands: the save's measures
+---('M.current_save_point_position'), with viewnode_ids, the viewnode
+---IDs of the buffer's headlines, the one owning the cursor first and
+---the rest by their distance from the cursor, nearest first, and
+---owner_viewnode_id, that first one's. Nil when the cursor precedes
+---every headline.
+---@return table|nil
+function M.viewnode_point_position ()
+  local owner_line = focus.owning_headline_line()
+  if not owner_line then return nil end
+  local cursor_line = vim.api.nvim_win_get_cursor(0)[1]
+  local owner_id = nil
+  local others = {}
+  for line_number, line in ipairs(
+        vim.api.nvim_buf_get_lines(0, 0, -1, false)) do
+    local id = redraw_delta.viewnode_id_at_headline_start(line)
+    if id then
+      if line_number == owner_line then owner_id = id
+      else table.insert(others, { id = id, line = line_number }) end end end
+  table.sort(others, function (a, b)
+    return math.abs(a.line - cursor_line) < math.abs(b.line - cursor_line) end)
+  local position = M.current_save_point_position()
+  position.owner_viewnode_id = owner_id
+  position.viewnode_ids = {}
+  if owner_id then table.insert(position.viewnode_ids, owner_id) end
+  for _, other in ipairs(others) do
+    table.insert(position.viewnode_ids, other.id) end
+  return position
+end
+
+---@param buf integer
+---@return table from each viewnode ID to its headline's line number
+function M.viewnode_id_headline_lines (buf)
+  local headline_lines = {}
+  for line_number, line in ipairs(
+        vim.api.nvim_buf_get_lines(buf, 0, -1, false)) do
+    local id = redraw_delta.viewnode_id_at_headline_start(line)
+    if id then headline_lines[id] = line_number end end
+  return headline_lines
+end
+
+---Move the current window's cursor to POSITION
+---('M.viewnode_point_position'): to its offsets below its own headline
+---if that is in HEADLINE_LINES, else to the start of the first of its
+---other headlines that is, keeping its screen line either way.
+---@param position table|nil
+---@param headline_lines table
+function M.goto_viewnode_point_position (position, headline_lines)
+  if not position then return end
+  for _, id in ipairs(position.viewnode_ids) do
+    local line = headline_lines[id]
+    if line then
+      vim.api.nvim_win_set_cursor(0, { line, 0 })
+      if id == position.owner_viewnode_id then
+        M.restore_save_point_position(position)
+      else
+        M.restore_save_point_position({
+          lines_below_focused_headline = 0,
+          column = 0,
+          screen_lines_below_window_start =
+            position.screen_lines_below_window_start }) end
+      return end end
 end
 
 ---Handle one streamed collateral-view update: unlock and replace the
