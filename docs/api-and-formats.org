@@ -254,7 +254,15 @@ So far there are these endpoints:
        No dirty view is among them. Each client unlocks and updates
        each buffer as it arrives, and keeps its text as the buffer's
        baseline; a client never replaces a buffer with unsaved edits,
-       but leaves it as it is and names it in a message.
+       but leaves it as it is and names it in a message. An update
+       keeps point, and the fold of every headline the buffer
+       already showed, by viewnode ID. The content's =folded= and
+       =bodyFolded= atoms are those of the view's last save, so the
+       client decides them anew: a headline is =folded= when the
+       parent it now has hid its children before the update, and
+       =bodyFolded= when it hid only its own body, or hid its
+       children and has none now. The content's atoms stand where
+       the deciding headline is new in it.
     4. Final save response:
        =Content-Length: N\r\n\r\n((response-type save-result) (content "...") (errors ("..." ...)) (warnings ("..." ...)) (point-lines-below-focused-headline N) (point-column C) (point-screen-lines-below-window-start M))=
        =content= is the re-rendered saved buffer (nil on failure).
@@ -1216,7 +1224,9 @@ one automatically.
     2. Zero or more per-view messages (one per view, streamed as each finishes):
        =Content-Length: N\r\n\r\n((response-type rerender-view) (view-id "VIEW_ID") (content "..."))=
        Emacs unlocks and updates each buffer as it arrives, and keeps
-       its text as the buffer's baseline.
+       its text as the buffer's baseline. As with a collateral view
+       ("Save buffer"), an update keeps point and the folds of the
+       headlines the buffer already showed.
     3. Done message:
        =Content-Length: N\r\n\r\n((response-type rerender-done) (errors ("..." ...)) (warnings ("..." ...)))=
        Emacs removes the rerender-view handler and unlocks any remaining buffers.
