@@ -300,6 +300,13 @@ function M.metadata_gnid (metadata_sexp)
 end
 
 ---@param metadata_sexp any
+---@return string|nil METADATA_SEXP's '(vnid X)' value, its viewnode
+---ID. Mirrors skg--metadata-vnid.
+function M.metadata_vnid (metadata_sexp)
+  return first_value_at_path(metadata_sexp, { 'skg', 'vnid' })
+end
+
+---@param metadata_sexp any
 ---@return string|nil the node's id, if METADATA_SEXP is a node's
 function M.node_id (metadata_sexp)
   if not M.occurrence_sexp_p(metadata_sexp) then return nil end

@@ -1225,6 +1225,13 @@ headline's kind, or nil."
     (when id-values
       (format "%s" (car id-values)))))
 
+(defun skg--metadata-vnid (metadata-sexp)
+  "Return METADATA-SEXP's '(vnid X)' value (its viewnode ID) as a
+string, or nil."
+  (let ((id-values (skg-sexp-cdr-at-path metadata-sexp '(skg vnid))))
+    (when id-values
+      (format "%s" (car id-values)))))
+
 (defun skg--node-id (metadata-sexp)
   "Return METADATA-SEXP's node ID as a string, or nil (also when
 METADATA-SEXP is not an occurrence's)."

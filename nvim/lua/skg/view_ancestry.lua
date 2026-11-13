@@ -22,11 +22,14 @@ function M.view_ancestry ()
     local level = metadata.outline_level(current)
     current = metadata.parent_headline_line(current, level)
   end
-  local title = metadata.split_as_stars_metadata_title(
-    metadata.line_text(line)).title
+  local headline = metadata.line_text(line)
+  local title = metadata.split_as_stars_metadata_title(headline).title
+  local metadata_sexp = metadata.metadata_on_line(headline)
+  local vnid = metadata_sexp and metadata.metadata_vnid(metadata_sexp)
   local with_heralds = heralds.enabled_p(vim.api.nvim_get_current_buf())
   local buf = vim.api.nvim_create_buf(true, true)
-  vim.api.nvim_buf_set_name(buf, 'skg://ancestry/' .. title)
+  vim.api.nvim_buf_set_name(buf, 'skg://ancestry/'
+    .. (vnid and ('(vnid ' .. vnid .. '): ') or '') .. title)
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, ancestry)
   vim.bo[buf].filetype = 'org'
   if with_heralds then heralds.enable(buf) end

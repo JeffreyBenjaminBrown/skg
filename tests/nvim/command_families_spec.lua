@@ -340,6 +340,27 @@ describe('skg.view_ancestry and view_new_empty', function ()
     assert(ok, err)
   end)
 
+  it('names the buffer by the vnid, if any, and the title', function ()
+    for _, case in ipairs({
+      { '** (skg node (vnid 0c) (gnid abc) (source main)) the title',
+        'skg://ancestry/(vnid 0c): the title' },
+      { '** (skg node (gnid abc)) no vnid here',
+        'skg://ancestry/no vnid here' },
+      { '** a plain org headline',
+        'skg://ancestry/a plain org headline' } }) do
+      local buf = buffer_with(
+        '* (skg node (vnid 01) (gnid p)) parent\n' .. case[1])
+      vim.bo[buf].filetype = 'org'
+      vim.api.nvim_win_set_cursor(0, { 2, 0 })
+      require('skg.view_ancestry').view_ancestry()
+      local ancestry_buf = vim.api.nvim_get_current_buf()
+      local name = vim.api.nvim_buf_get_name(ancestry_buf)
+      vim.api.nvim_buf_delete(ancestry_buf, { force = true })
+      vim.api.nvim_buf_delete(buf, { force = true })
+      assert.are.equal(case[2], name)
+    end
+  end)
+
   it('view_new_empty opens a blank skg content view', function ()
     local server = helpers.connect_to_fake_server(function () end)
     local before = vim.api.nvim_get_current_buf()

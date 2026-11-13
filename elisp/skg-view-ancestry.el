@@ -19,6 +19,21 @@
 (require 'org)
 (require 'skg-buffer)
 
+(defun skg-view-ancestry--buffer-name (headline-text)
+  "The name of the ancestry buffer of the headline HEADLINE-TEXT:
+'*Ancestry (vnid X): TITLE*' when its skg metadata carries (vnid X),
+else '*Ancestry: TITLE*'. TITLE excludes the metadata."
+  (let* ((parts (skg-split-as-stars-metadata-title headline-text))
+         (metadata-text (nth 1 parts))
+         (title (if parts (nth 2 parts) headline-text))
+         (vnid (and parts (not (string-empty-p metadata-text))
+                    (skg--metadata-vnid
+                     (ignore-errors
+                       (car (read-from-string metadata-text)))))))
+    (if vnid
+        (format "*Ancestry (vnid %s): %s*" vnid title)
+      (format "*Ancestry: %s*" title))))
+
 (defun skg-view-ancestry ()
   "Create a new buffer showing only the ancestry of the headline at point.
 The new buffer will contain the current headline and all its ancestors,
@@ -28,12 +43,15 @@ the buffer it was called from does."
   (unless (derived-mode-p 'org-mode)
     (user-error "Not in an org-mode buffer"))
   (let ((ancestry '())
+        (buffer-name nil)
         (heralds (bound-and-true-p heralds-minor-mode)))
     (save-excursion
       (condition-case nil
           (unless (org-at-heading-p)
             (org-back-to-heading t))
         (error (user-error "Not on a headline")))
+      (setq buffer-name (skg-view-ancestry--buffer-name
+                         (skg-get-current-headline-text)))
       ;; Collect current headline and all ancestors
       (while (progn
                (push (cons (org-current-level)
@@ -43,9 +61,7 @@ the buffer it was called from does."
                    (progn (outline-up-heading 1 t) t)
                  (error nil)))))
     ;; Create new buffer with ancestry
-    (let* ((current-headline (cdr (car (last ancestry))))
-           (buf (generate-new-buffer
-                 (format "*Ancestry: %s*" current-headline))))
+    (let ((buf (generate-new-buffer buffer-name)))
       (with-current-buffer buf
         (skg--org-mode-with-options)
         (dolist (item ancestry)
