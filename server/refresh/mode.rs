@@ -4,7 +4,7 @@
 //! refresh's diff-view mode ('server/refresh/diff_view.rs') says what
 //! it changes.
 
-use crate::diff_view::readiness_store::ReadinessStore;
+use crate::diff_view::processed_store::ProcessedStore;
 use crate::graph_straddle::types::GraphStraddle;
 use crate::types::views_state::DiffViewBufferKind;
 
@@ -16,9 +16,9 @@ pub enum RefreshMode<'a> {
   /// The refresh of the buffer of kind 'buffer_kind' of the diff view,
   /// over 'straddle'. Its goals are the union of the straddle: the
   /// members of either graph, each tagged with the change of its node
-  /// and of its relationship. 'readiness_store' gives the '(ready ...)'
+  /// and of its relationship. 'processed_store' gives the '(ready ...)'
   /// change facts.
   DiffView { straddle        : &'a GraphStraddle,
              buffer_kind     : DiffViewBufferKind,
-             readiness_store : &'a ReadinessStore },
+             processed_store : &'a ProcessedStore },
 }

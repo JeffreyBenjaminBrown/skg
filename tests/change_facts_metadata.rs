@@ -2,10 +2,10 @@
 //
 // The diff view's derived facts '(diff ...)' -- its parts '(node
 // ...)', '(rel ...)', '(properties changed)', '(leaves ...)' and
-// '(ready ...)' -- and the readiness requests '(editRequest (ready
+// '(ready ...)' -- and the processed requests '(editRequest (ready
 // ...))' and '(editRequest (unready ...))', on every viewnode that
 // carries them: each renders; the parser skips '(diff ...)' whole and
-// reads the readiness request back.
+// reads the processed request back.
 
 use crate::git_fixture_helpers::{assert_round_trip, with_facts};
 use skg::org_to_text::viewnode_to_string;
@@ -14,7 +14,7 @@ use skg::serve::parse_metadata_sexp::{
 use skg::types::misc::{ID, SkgrepoName};
 use skg::types::nodes::complete::Flag;
 use skg::types::viewnode::{
-  ChangeFacts, DiffChange, Existence, Ghost, GnidOnlyKind, GnidOnlyVognode, LeavesFact, PropertyMember, DiffObject, ReadinessRequest, Viewnode,
+  ChangeFacts, DiffChange, Existence, Ghost, GnidOnlyKind, GnidOnlyVognode, LeavesFact, PropertyMember, DiffObject, ProcessedRequest, Viewnode,
   ViewnodeKind, Vognode, Warrant, mk_editable_viewnode,
   mk_writeProtected_viewnode, viewnode_of};
 
@@ -31,32 +31,32 @@ fn objects (
 fn facts (
   node  : Option<Existence>,
   rel   : Option<Existence>,
-  ready : Option<&[DiffObject]>,
+  processed : Option<&[DiffObject]>,
 ) -> ChangeFacts {
   ChangeFacts { change : DiffChange { node, rel, properties : false },
-                ready  : ready . map (objects),
+                processed : processed . map (objects),
                 leaves : None,
                 .. ChangeFacts::default () } }
 
 /// The facts of a node in both graphs whose other properties changed.
 fn modified (
   rel   : Option<Existence>,
-  ready : Option<&[DiffObject]>,
+  processed : Option<&[DiffObject]>,
 ) -> ChangeFacts {
-  let mut change_facts : ChangeFacts = facts (None, rel, ready);
+  let mut change_facts : ChangeFacts = facts (None, rel, processed);
   change_facts . change . properties = true;
   change_facts }
 
 fn request (
-  ready : bool,
+  processed : bool,
   on    : &[DiffObject],
-) -> Option<ReadinessRequest> {
-  Some ( ReadinessRequest { ready, objects : objects (on) } ) }
+) -> Option<ProcessedRequest> {
+  Some ( ProcessedRequest { processed, objects : objects (on) } ) }
 
 
 
 #[test]
-fn a_vognode_renders_its_change_and_readiness_and_round_trips_its_request () {
+fn a_vognode_renders_its_change_and_processed_and_round_trips_its_request () {
   assert_round_trip (
     with_facts (
       mk_editable_viewnode (
@@ -65,7 +65,7 @@ fn a_vognode_renders_its_change_and_readiness_and_round_trips_its_request () {
               Some (&[DiffObject::Node, DiffObject::Rel]) ),
       request (true, &[DiffObject::All]) ),
     "node (gnid a) (skgRepos (nodeRepo main)) (editRequest (ready all)) (diff (node added) (rel removed) (ready node rel))" );
-  // A readiness request is allowed on a write-protected occurrence.
+  // A processed request is allowed on a write-protected occurrence.
   assert_round_trip (
     with_facts (
       mk_writeProtected_viewnode (
@@ -86,19 +86,19 @@ fn a_vognode_renders_its_change_and_readiness_and_round_trips_its_request () {
       request (false, &[DiffObject::Rel, DiffObject::All]) ),
     "node (gnid m) (skgRepos (nodeRepo main)) writeProtected (editRequest (unready rel all)) (diff (rel added) (properties changed) (ready rel all))" ); }
 
-/// A node's own edit request and its readiness request share one
-/// '(editRequest ...)', the readiness request last.
+/// A node's own edit request and its processed request share one
+/// '(editRequest ...)', the processed request last.
 #[test]
-fn an_edit_request_and_a_readiness_request_share_one_form () {
+fn an_edit_request_and_a_processed_request_share_one_form () {
   let metadata : ViewnodeMetadata = parse_metadata_to_viewnodemd (
     "(skg node (gnid a) (editRequest delete (ready node)))" ) . unwrap ();
-  assert_eq! ( metadata . readiness_request, request (true, &[DiffObject::Node]) );
+  assert_eq! ( metadata . processed_request, request (true, &[DiffObject::Node]) );
   assert! ( matches! ( metadata . kind,
                        MetadataKind::Occurrence ( OccurrenceMetadata {
                          edit_request : Some (_), .. } ))); }
 
 #[test]
-fn ghosts_and_unknowns_round_trip_their_readiness_requests () {
+fn ghosts_and_unknowns_round_trip_their_processed_requests () {
   assert_round_trip (
     with_facts (
       viewnode_of ( ViewnodeKind::Vognode ( Vognode::Ghost ( Ghost {
@@ -119,7 +119,7 @@ fn ghosts_and_unknowns_round_trip_their_readiness_requests () {
     "unknown (gnid u) (editRequest (ready)) (diff (rel added))" ); }
 
 #[test]
-fn property_leaves_round_trip_their_readiness_requests () {
+fn property_leaves_round_trip_their_processed_requests () {
   assert_round_trip (
     with_facts (
       viewnode_of ( ViewnodeKind::PropertyMember ( PropertyMember::alias (
@@ -173,7 +173,7 @@ fn the_leaves_fact_renders_and_the_parser_skips_it () {
   assert_eq! ( rendered,
                "node (gnid a) (skgRepos (nodeRepo main)) (diff (rel added) (leaves 2 node rel) (ready rel))" );
   let marker : &str = "(skg (changesetMarker content) (editRequest (ready all)) (diff (leaves 3 all)))";
-  assert_eq! ( parse_metadata_to_viewnodemd (marker) . unwrap () . readiness_request,
+  assert_eq! ( parse_metadata_to_viewnodemd (marker) . unwrap () . processed_request,
                request (true, &[DiffObject::All]) ); }
 
 /// Every part of '(diff ...)' together, in their order; a headline
@@ -206,11 +206,11 @@ fn each_part_of_the_diff_form_renders_together_and_alone () {
     with_facts ( alias (), ChangeFacts::default (), None ),
     "alias" ); }
 
-/// What the parser refuses about the derived facts and the readiness
+/// What the parser refuses about the derived facts and the processed
 /// requests. Inside '(diff ...)' and '(view ...)' it reads nothing, so
 /// it refuses nothing there.
 #[test]
-fn malformed_facts_and_readiness_requests_are_refused () {
+fn malformed_facts_and_processed_requests_are_refused () {
   for metadata in [
     "(skg tombstone (diff (rel added)))",             // a tombstone carries none
     "(skg aliasFolder (diff (ready)))",               // nor does a folder
@@ -220,7 +220,7 @@ fn malformed_facts_and_readiness_requests_are_refused () {
     "(skg node (gnid a) (editRequest (ready) (unready node)))", // two requests
     "(skg node (gnid a) (editRequest (ready sideways)))",
     "(skg node (gnid a) (editRequest delete (merge b)))",       // two edit requests
-    "(skg id (editRequest (relRepo main)))",          // an id takes only readiness
+    "(skg id (editRequest (relRepo main)))",          // an id takes only processed requests
     "(skg alias (ready))",                            // a request is in '(editRequest ...)'
     "(skg node (gnid a) (ready node))",
     "(skg node (gnid a) (diff (ready)) (diff (rel added)))", // two forms

@@ -53,9 +53,9 @@ fn set_derived_facts (
     viewforest . as_internal_tree_mut (), truth . graph,
     &container_to_contents, &content_to_containers,
     truth . config, truth . restriction, &mut relRepos );
-  if let RefreshMode::DiffView { straddle, buffer_kind, readiness_store } = walk . mode {
+  if let RefreshMode::DiffView { straddle, buffer_kind, processed_store } = walk . mode {
     set_diffView_facts_in_viewforest (
-      viewforest, straddle, buffer_kind, readiness_store, truth . graph ); }
+      viewforest, straddle, buffer_kind, processed_store, truth . graph ); }
   Ok (( )) }
 
 /// Remove every childless tombstone, a root included, postorder, so

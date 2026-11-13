@@ -95,7 +95,7 @@
     "changesetMarker":                 "message"
   },
   "folder_heralds": {
-    "comment": "What the clients need to draw two heralds that depend on a folder. 'write_protected' names the folders whose label carries ☮: the user cannot change their membership from here, so a member under one detaches nothing. 'changed_labels' gives the label of a folder the diff view shows because a member carries a change of its relationship to the folder's viewparent; the client draws it, styled as the folder's own label, in place of that label, after the folder's ☮ if it has one, and followed by ✓ (styled as node_heralds.ready) when every such change is ready. The server checks both against its rule table at startup.",
+    "comment": "What the clients need to draw two heralds that depend on a folder. 'write_protected' names the folders whose label carries ☮: the user cannot change their membership from here, so a member under one detaches nothing. 'changed_labels' gives the label of a folder the diff view shows because a member carries a change of its relationship to the folder's viewparent; the client draws it, styled as the folder's own label, in place of that label, after the folder's ☮ if it has one, and followed by ✓ (styled as node_heralds.ready) when every such change is processed. The server checks both against its rule table at startup.",
     "write_protected": [ "flagsFolder", "subscriberFolder", "overriderFolder",
                          "hiderFolder", "hiddenFolder", "hiddenInSubscribeeFolder",
                          "containerFolder", "mentionerFolder",

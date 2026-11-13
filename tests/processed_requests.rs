@@ -1,6 +1,6 @@
-// cargo nextest run --test grouped_repos -E 'test(readiness_requests::)'
+// cargo nextest run --test grouped_repos -E 'test(processed_requests::)'
 //
-// A save consumes the readiness requests of the buffer it saves, at
+// A save consumes the processed requests of the buffer it saves, at
 // the fingerprints of the fresh graph straddle, over a git fixture whose
 // HEAD and worktree differ: r is retitled and gains the member a, and
 // a gains the alias "ay".
@@ -9,7 +9,7 @@ use crate::git_fixture::{Fixture, OwnedSkgrepos, save_view, with_git_fixture};
 
 use skg::diff_view::change_leaves::{LeafKey, NodeAspect, RelationshipAspect};
 use skg::dbs::in_rust_graph::relation_accessors::{NodeRelation, RelationshipKey};
-use skg::diff_view::readiness_store::ReadinessStore;
+use skg::diff_view::processed_store::ProcessedStore;
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::types::misc::ID;
 use skg::types::views_state::ViewforestId;
@@ -18,19 +18,19 @@ use std::collections::HashSet;
 use std::error::Error;
 use std::path::Path;
 
-const FIXTURES : &str = "tests/readiness_requests/fixtures";
+const FIXTURES : &str = "tests/processed_requests/fixtures";
 
 /// Save 'buffer' as a content view.
 fn save (
   f      : &mut Fixture,
   buffer : &str,
 ) -> Result<SaveResponse, Box<dyn Error>> {
-  save_view ( f, &ViewforestId::ContentView ("readiness" . to_string ()), buffer ) }
+  save_view ( f, &ViewforestId::ContentView ("processed" . to_string ()), buffer ) }
 
 fn marked_keys (
   f : &Fixture,
 ) -> HashSet<LeafKey> {
-  ReadinessStore::load ( &f . config . readiness_marks_path () ) . marks
+  ProcessedStore::load ( &f . config . processed_marks_path () ) . marks
     . into_keys () . collect () }
 
 fn r_text () -> LeafKey {
@@ -68,9 +68,9 @@ fn a_save_marks_and_unmarks_the_leaves_its_requests_name (
       { // Each mark holds the fingerprint of the change it approved.
         let straddle = f . views_state . graph_straddle . clone ()
           . expect ("consuming requests built the graph straddle");
-        let store : ReadinessStore = ReadinessStore::load ( &f . config . readiness_marks_path () );
+        let store : ProcessedStore = ProcessedStore::load ( &f . config . processed_marks_path () );
         for key in [ r_contains_a (), a_alias () ] {
-          assert! ( store . is_ready (
+          assert! ( store . is_processed (
             &key, straddle . change_leaves () . leaf_fingerprint (&key) . unwrap () )); }} }
     { // 'all' on a node names every leaf it owns.
       save (f, "\
@@ -99,7 +99,7 @@ fn a_save_marks_and_unmarks_the_leaves_its_requests_name (
                    [ a_alias () ] . into_iter () . collect () );
       assert! ( response . warnings . iter ()
                 . any ( |w| w . starts_with (
-                  "A readiness request names no current change" )
+                  "A processed request names no current change" )
                   && w . ends_with (
                   "\n*** b\n- graphnode ID: b\n- viewnode ID: 0z. To find it: C-c g v 0z\n" )),
                 "the warning names the headline as a subheadline: {:?}",

@@ -11,7 +11,7 @@ use super::*;
 use crate::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewforest;
 use crate::org_to_text::viewforest_to_string;
 use crate::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
-use crate::diff_view::readiness_store::ReadinessStore;
+use crate::diff_view::processed_store::ProcessedStore;
 use crate::graph_straddle::types::GraphStraddle;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::test_utils::refresh_reaches_fixpoint;

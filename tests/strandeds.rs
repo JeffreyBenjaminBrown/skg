@@ -184,7 +184,7 @@ fn a_publicizing_move_asks_about_a_relationship_recorded_outside_the_view (
       assert_eq! ( stranded [0] . relRepo,     SkgrepoName::from ("private") );
       assert_eq! ( stranded [0] . new_default, SkgrepoName::from ("public") );
       assert_eq! ( home_of (&f, "n"), Some (SkgrepoName::from ("private")) );
-      assert! ( ! f . config . readiness_marks_path () . exists (),
+      assert! ( ! f . config . processed_marks_path () . exists (),
                 "a save that stops for confirmation consumes nothing" ); }
     { // The approving re-save resets the chosen relationship to default.
       let (response, _) : (SaveResponse, HashMap<String, String>) =

@@ -39,7 +39,7 @@ use skg::update_buffer::render_initial_view;
 use crate::git_fixture::{OwnedSkgrepos, git_fixture, graph_straddle};
 use skg::diff_view::buffer_rerender::refresh_diffView_viewforest;
 use skg::diff_view::buffer_rerender::RenderedDiffViewBuffer;
-use skg::diff_view::readiness_store::ReadinessStore;
+use skg::diff_view::processed_store::ProcessedStore;
 use skg::graph_straddle::types::GraphStraddle;
 use skg::serve::handlers::diff_view::diffView_buffer;
 use skg::test_utils::cleanup_test_tantivy;
@@ -216,7 +216,7 @@ fn fixture_config (
 // git fixture case (a folder whose owned skgrepos each hold a 'head'
 // and a 'worktree'), each buffer of the diff view that is not empty,
 // as first rendered, parsed and refreshed again over the same graph
-// straddle and readiness store, comes back as it was, and the second
+// straddle and processed store, comes back as it was, and the second
 // refresh corrects nothing. Where the case has several owned
 // skgrepos, that holds under each skgrepo restriction too: the diff view
 // opens only unrestricted, but a switch rerenders it, so the buffer as
@@ -230,7 +230,7 @@ const GIT_FIXTURE_CASES : [&str; 4] = [
   "tests/pruned_change_view/fixtures",
   "tests/graph_straddle/fixtures",
   "tests/diff_view/roundtrip",
-  "tests/readiness_requests", ];
+  "tests/processed_requests", ];
 
 #[test]
 fn every_diff_view_fixture_is_a_fixpoint_of_the_refresh (
@@ -256,7 +256,7 @@ fn every_diff_view_fixture_is_a_fixpoint_of_the_refresh (
         graph         : fixture . graph . load_full (),
         tantivy_index : empty_in_ram_tantivy_index () ?,
         generation    : 0, };
-      let store : ReadinessStore = ReadinessStore::default ();
+      let store : ProcessedStore = ProcessedStore::default ();
       for buffer_kind in DiffViewBufferKind::ALL {
         let rendered : Option<RenderedDiffViewBuffer> =
           match diffView_buffer (&runtime, &straddle, &store, buffer_kind) {
@@ -298,7 +298,7 @@ fn every_diff_view_fixture_is_a_fixpoint_of_the_refresh (
 fn diff_view_buffer_refreshes_unchanged (
   runtime     : &RuntimeGeneration,
   straddle    : &GraphStraddle,
-  store       : &ReadinessStore,
+  store       : &ProcessedStore,
   buffer_kind : DiffViewBufferKind,
   text        : &str,
   restriction : &SkgrepoRestriction,

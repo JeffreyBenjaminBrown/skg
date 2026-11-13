@@ -29,7 +29,7 @@
 #   edit request and with the edit request (optional): the metadata
 #     after a command makes REQUEST its edit request;
 #   readiness request and with the readiness request (optional): the
-#     metadata after a gesture makes REQUEST its readiness request.
+#     metadata after a gesture makes REQUEST its processed request.
 
 ==== occurrence: a member at every default, with its title
 ---- metadata: (skg (vnid 0a) node (gnid x) (skgRepos (nodeRepo main)))
@@ -101,7 +101,7 @@
 ---- readiness request: (ready rel)
 ---- with the readiness request: (skg (vnid 0b) focused folded node (gnid n) (skgRepos (nodeRepo main) (relRepo pub)) noClaim writeProtected (overridesHere o) (editRequest (relRepo pub) (ready rel)) (viewRequests editableView) (view cycle) (diff (rel added) (leaves 1 rel)))
 
-==== occurrence: a readiness request alone
+==== occurrence: a processed request alone
 ---- metadata: (skg node (gnid r) (skgRepos (nodeRepo main)) (editRequest (ready node rel)) (diff (node added) (leaves 2 node rel)))
 ---- fill-in:
 * skg
@@ -205,7 +205,7 @@
 ---- readiness request: (ready rel)
 ---- with the readiness request: (skg (vnid 0r) restricted (gnid h) (skgRepos (relRepo pub)) (editRequest (ready rel)))
 
-==== alias: a readiness request naming no object
+==== alias: a processed request naming no object
 ---- metadata: (skg alias (skgRepos (relRepo pub)) (editRequest (ready)) (view ghostWarrant) (diff (rel added) (leaves 1)))
 ---- fill-in:
 * skg

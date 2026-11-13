@@ -325,7 +325,7 @@ fn vognode_member (
 /// its siblings, and remove it. The result is folded only if both
 /// were, and so is its body; it is focused if either was, claims
 /// membership if either did, carries the requests of both
-/// ('merge_requests') and its own readiness request, else the merged
+/// ('merge_requests') and its own processed request, else the merged
 /// sibling's, and is editable if either was ('merge_editability'). It
 /// takes the merged sibling's children after its own; the claims rung
 /// of its own visit judges them, as it judges its own children.
@@ -341,9 +341,9 @@ fn merge_into (
     let result_viewnode : &mut Viewnode = result_mut . value ();
     merge_fold_and_focus ( &mut result_viewnode . foldAndFocus,
                            &sibling_viewnode . foldAndFocus );
-    if result_viewnode . readiness_request . is_none () {
-      result_viewnode . readiness_request =
-        sibling_viewnode . readiness_request . clone (); }
+    if result_viewnode . processed_request . is_none () {
+      result_viewnode . processed_request =
+        sibling_viewnode . processed_request . clone (); }
     merge_requests ( &mut result_viewnode . kind,
                      &sibling_viewnode . kind ); }
   if sibling_viewnode . claims () == Some (true) {

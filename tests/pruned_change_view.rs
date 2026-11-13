@@ -12,8 +12,8 @@ mod sets;
 mod buffer;
 #[path = "pruned_change_view/request.rs"]
 mod request;
-#[path = "pruned_change_view/readiness.rs"]
-mod readiness;
+#[path = "pruned_change_view/processed.rs"]
+mod processed;
 #[path = "pruned_change_view/other_buffers.rs"]
 mod other_buffers;
 #[path = "pruned_change_view/stage_and_commit.rs"]

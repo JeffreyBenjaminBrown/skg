@@ -1,7 +1,7 @@
 // The "diff view" request at the handler: it registers each
 // nonempty buffer as a view of the diff view, answers an empty
 // buffer with '(empty . t)', and the graph straddle is dropped when the
-// last such view closes. A buffer's answer carries the readiness
+// last such view closes. A buffer's answer carries the processed
 // summary its save would. A rerender-all writes back the straddle it
 // brought up to date.
 
@@ -79,11 +79,11 @@ fn a_request_registers_its_buffer_and_the_last_close_drops_the_straddle (
     assert! ( f . views_state . graph_straddle . is_none () );
     Ok (( )) }) }
 
-/// The answer to a buffer's request ends with the readiness summary
+/// The answer to a buffer's request ends with the processed summary
 /// that saving the buffer unchanged reports, so a client need not save
 /// to learn it.
 #[test]
-fn a_buffers_answer_carries_the_readiness_summary_of_its_save (
+fn a_buffers_answer_carries_the_processed_summary_of_its_save (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("sets", &["main"], |f| {
     let (response, _registered) : (String, bool) = request_all_changes (f) ?;
@@ -93,7 +93,7 @@ fn a_buffers_answer_carries_the_readiness_summary_of_its_save (
     let saved : SaveResponse = save_view (
       f, &ViewforestId::ContentView ("diff-view-1" . to_string ()), &content ) ?;
     let summary_of_the_save : String = sexp_to_client_string (
-      &saved . readiness_summary
+      &saved . processed_summary
         . expect ("a save of a buffer of the diff view reports its summary")
         . to_sexp () );
     assert! ( summary_of_the_save . starts_with ("(readiness-summary (ready 0)"),
@@ -106,7 +106,7 @@ fn a_buffers_answer_carries_the_readiness_summary_of_its_save (
 
 /// A save naming a buffer of the diff view its connection does not
 /// hold (a tool's connection ends with each command) re-renders it as
-/// that buffer, with its readiness summary, when the request names the
+/// that buffer, with its processed summary, when the request names the
 /// buffer; each headline keeps the viewnode ID it carries, even one no
 /// rendering gave it. Without the name it re-renders as a content view.
 #[test]
@@ -149,14 +149,14 @@ fn a_save_of_a_diffView_buffer_not_held_keeps_its_viewnode_ids (
       assert! ( refused . contains ("which the diff view does not have"), "{}", refused ); }
     Ok (( )) }) }
 
-/// A save of a buffer of the diff view whose one edit is a readiness
-/// request answers, after its readiness summary, with the redraw
+/// A save of a buffer of the diff view whose one edit is a processed
+/// request answers, after its processed summary, with the redraw
 /// delta ('docs/api-and-formats.org', "The redraw delta"). It lists
 /// the requesting headline, the old text of mc, which now shows
 /// '(ready)' where it carried the request, and mc's own headline,
-/// whose file the mark made ready; no other.
+/// whose file the mark made processed; no other.
 #[test]
-fn a_readiness_saves_delta_lists_the_requesting_headline (
+fn a_processed_saves_delta_lists_the_requesting_headline (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("sets", &["main"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
@@ -183,7 +183,7 @@ fn a_readiness_saves_delta_lists_the_requesting_headline (
               "the answer ends with {}:\n{}", delta_entry, answer );
     assert! ( answer . find ("(readiness-summary") . is_some_and ( |summary|
                 Some (summary) < answer . find ("(changed-headlines") ),
-              "the delta follows the readiness summary:\n{}", answer );
+              "the delta follows the processed summary:\n{}", answer );
     Ok (( )) }) }
 
 /// The viewnode ID atoms of 'text', in order.

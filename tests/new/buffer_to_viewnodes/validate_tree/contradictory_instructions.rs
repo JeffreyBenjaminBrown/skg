@@ -8,14 +8,14 @@ use skg::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewforest;
 use skg::from_text::buffer_to_viewnodes::validate_tree::find_buffer_errors_for_saving;
 use skg::from_text::buffer_to_viewnodes::validate_tree::contradictory_instructions::{
-  find_contradictory_readiness_requests, find_inconsistent_instructions};
+  find_contradictory_processed_requests, find_inconsistent_instructions};
 use skg::from_text::buffer_to_viewnodes::validate_tree::find_buffer_errors_for_saving_in_graph;
 use skg::dbs::in_rust_graph::InRustGraph;
 use skg::types::errors::HeadlineName;
 use skg::types::misc::{SkgConfig, Skgrepo, SkgrepoName};
 use skg::types::viewnode::ViewnodeId;
 use skg::diff_view::change_leaves::{LeafKey, NodeAspect};
-use skg::diff_view::readiness_requests::NamedLeafSet;
+use skg::diff_view::processed_requests::NamedLeafSet;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use skg::test_utils::run_with_test_stores;
@@ -117,15 +117,15 @@ fn test_multiple_defining_containers() -> Result<(), Box<dyn Error>> {
                    "Multiple_Defining_Viewnodes error should come from the duplicate ID"); }
       Ok(( )) } )) }
 
-/// The contradictions 'find_contradictory_readiness_requests' finds
+/// The contradictions 'find_contradictory_processed_requests' finds
 /// in 'buffer' over an empty graph (each ID resolves to itself): each
 /// leaf described, with the vnids of the headlines naming it.
-fn readiness_contradictions_in (
+fn processed_contradictions_in (
   buffer : &str,
 ) -> Vec<(String, Vec<String>)> {
   let viewforest : ViewForest =
     org_to_viewforest (buffer, IdResolution::AsWritten) . unwrap () . 0;
-  find_contradictory_readiness_requests (
+  find_contradictory_processed_requests (
     &viewforest, &InRustGraph::from_graphnodes (&[]) )
     . into_iter ()
     . map ( |(leaf, headlines)| (
@@ -137,9 +137,9 @@ fn readiness_contradictions_in (
     . collect () }
 
 #[test]
-fn two_headlines_naming_one_leaf_ready_and_unready_contradict () {
+fn two_headlines_naming_one_leaf_processed_and_unprocessed_contradict () {
   assert_eq! (
-    readiness_contradictions_in ( indoc! {"
+    processed_contradictions_in ( indoc! {"
       * (skg (vnid p1) node (gnid p)) p
       ** (skg (vnid x1) node (gnid x) (editRequest (ready node))) x
       * (skg (vnid x2) node (gnid x) writeProtected (editRequest (unready node))) x
@@ -150,7 +150,7 @@ fn two_headlines_naming_one_leaf_ready_and_unready_contradict () {
 #[test]
 fn an_all_request_contradicts_an_opposite_request_on_a_leaf_its_node_records () {
   assert_eq! (
-    readiness_contradictions_in ( indoc! {"
+    processed_contradictions_in ( indoc! {"
       * (skg (vnid x1) node (gnid x) (editRequest (unready all))) x
       * (skg (vnid x2) node (gnid x) writeProtected (editRequest (ready node))) x
       "} ),
@@ -158,14 +158,14 @@ fn an_all_request_contradicts_an_opposite_request_on_a_leaf_its_node_records () 
              vec! [ "x1" . to_string (), "x2" . to_string () ] ) ] ); }
 
 #[test]
-fn readiness_requests_that_agree_or_name_different_leaves_pass () {
-  assert! ( readiness_contradictions_in ( indoc! {"
+fn processed_requests_that_agree_or_name_different_leaves_pass () {
+  assert! ( processed_contradictions_in ( indoc! {"
       * (skg (vnid p1) node (gnid p)) p
       ** (skg (vnid x1) node (gnid x) (editRequest (ready node))) x
       * (skg (vnid x2) node (gnid x) writeProtected (editRequest (ready))) x
       "} ) . is_empty (),
     "two requests that agree" );
-  assert! ( readiness_contradictions_in ( indoc! {"
+  assert! ( processed_contradictions_in ( indoc! {"
       * (skg (vnid p1) node (gnid p)) p
       ** (skg (vnid x1) node (gnid x) (editRequest (ready node))) x
       * (skg (vnid x2) node (gnid x) writeProtected (editRequest (unready rel))) x
@@ -174,7 +174,7 @@ fn readiness_requests_that_agree_or_name_different_leaves_pass () {
      different leaves" ); }
 
 #[test]
-fn validation_refuses_contradictory_readiness_requests () -> Result<(), Box<dyn Error>> {
+fn validation_refuses_contradictory_processed_requests () -> Result<(), Box<dyn Error>> {
   let viewforest : ViewForest = org_to_viewforest ( indoc! {"
       * (skg (vnid x1) node (gnid x) (skgRepos (nodeRepo main)) (editRequest (ready node))) x
       * (skg (vnid x2) node (gnid x) (skgRepos (nodeRepo main)) writeProtected (editRequest (unready node))) x
@@ -186,12 +186,12 @@ fn validation_refuses_contradictory_readiness_requests () -> Result<(), Box<dyn 
   let errors : Vec<BufferValidationError> = find_buffer_errors_for_saving_in_graph (
     &viewforest, &InRustGraph::from_graphnodes (&[]), &config ) ?;
   let refusals : Vec<&BufferValidationError> = errors . iter ()
-    . filter ( |e| matches! ( e, BufferValidationError::ContradictoryReadinessRequests (..) ))
+    . filter ( |e| matches! ( e, BufferValidationError::ContradictoryProcessedRequests (..) ))
     . collect ();
   assert_eq! ( refusals . len (), 1, "errors: {:?}", errors );
   assert! ( matches! (
               refusals [0],
-              BufferValidationError::ContradictoryReadinessRequests (
+              BufferValidationError::ContradictoryProcessedRequests (
                 NamedLeafSet::Leaf ( LeafKey::Node { pid, aspect : NodeAspect::Existence } ), _ )
               if *pid == ID::from ("x") ),
             "the refusal keeps the set it found contradictory: {:?}", refusals [0] );

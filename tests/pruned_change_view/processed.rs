@@ -1,8 +1,8 @@
 // Saving a buffer of the diff view: the save consumes its
-// readiness requests, the buffer is refreshed over the fresh graph
-// straddle with its readiness read from the store, and the response
-// carries the readiness summary
-// ('docs/diff-view.org', "The readiness summary").
+// processed requests, the buffer is refreshed over the fresh graph
+// straddle with what is processed read from the store, and the response
+// carries the processed summary
+// ('docs/diff-view.org', "The processed summary").
 
 use skg::metadata_canon::without_viewnode_ids;
 use crate::git_fixture::{
@@ -13,7 +13,7 @@ use crate::pruned_change_view::common::{
   open_all_changes_buffer, open_buffer, save_buffer, with_fixture,
   with_fixture_and_foreign};
 
-use skg::diff_view::change_leaves::{BufferReadinessSummary, ReadinessSummary};
+use skg::diff_view::change_leaves::{BufferProcessedSummary, ProcessedSummary};
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::serve::util::sexp_to_client_string;
 use skg::types::views_state::DiffViewBufferKind;
@@ -46,7 +46,7 @@ fn a_headline_carries_the_leaves_it_names (
     Ok (( )) }) }
 
 /// The relationship by which sub no longer subscribes to s1 is one
-/// leaf. Marked on its image under sub, it shows ready on its image
+/// leaf. Marked on its image under sub, it shows processed on its image
 /// under s1 too.
 #[test]
 fn a_mark_shows_on_both_images_of_a_relationship (
@@ -60,11 +60,11 @@ fn a_mark_shows_on_both_images_of_a_relationship (
     let saved : String = save_cleanly (f, &all_changes_view (), &marked) ? . saved_view;
     assert! ( without_viewnode_ids (&saved) . contains (
       "*** (skg node (gnid s1) (skgRepos (nodeRepo public)) noClaim writeProtected (view ghostWarrant) (diff (rel removed) (leaves 1 rel) (ready rel))) s1" ),
-      "the image under sub is ready:\n{}", saved );
+      "the image under sub is processed:\n{}", saved );
     assert! ( without_viewnode_ids (&saved) . lines () . any ( |line|
       without_viewnode_ids (line) . starts_with ("*** (skg node (gnid sub)")
       && line . ends_with ("(diff (rel removed) (properties changed) (leaves 2 rel all) (ready rel))) sub") ),
-      "the image under s1 is ready:\n{}", saved );
+      "the image under s1 is processed:\n{}", saved );
     assert! ( ! without_viewnode_ids (&saved) . contains ("(editRequest"),
               "the request was consumed:\n{}", saved );
     Ok (( )) }) }
@@ -74,7 +74,7 @@ fn a_mark_shows_on_both_images_of_a_relationship (
 /// two leaves (its subscription to s1 removed, to s2 added), shows
 /// '(properties changed)' there, and one gesture on it, naming 'rel'
 /// and 'all', marks its file: its root shows '(ready all)', and its
-/// image in s2's subscriber folder is ready on both objects too.
+/// image in s2's subscriber folder is processed on both objects too.
 #[test]
 fn a_gesture_on_a_modified_folder_member_marks_its_file (
 ) -> Result<(), Box<dyn Error>> {
@@ -108,10 +108,10 @@ fn a_gesture_on_a_modified_folder_member_marks_its_file (
     Ok (( )) }) }
 
 /// A node of the containerward chain carries no change facts and
-/// takes no readiness gesture: d, which contained c at HEAD only,
+/// takes no processed gesture: d, which contained c at HEAD only,
 /// stands in the chain under c, in x's container folder, with no
 /// '(diff ...)' part. A gesture typed on it names nothing, so c, as
-/// d's removed member, stays unready.
+/// d's removed member, stays unprocessed.
 #[test]
 fn a_chain_node_carries_no_change_and_takes_no_gesture (
 ) -> Result<(), Box<dyn Error>> {
@@ -133,11 +133,11 @@ fn a_chain_node_carries_no_change_and_takes_no_gesture (
     assert! ( saved . lines () . any ( |line|
                 without_viewnode_ids (line) . starts_with ("** (skg node (gnid c) (skgRepos (nodeRepo main)) noClaim")
                 && line . ends_with ("(diff (rel removed) (leaves 1 rel))) c") ),
-              "c, as d's removed member, is not ready:\n{}", saved );
+              "c, as d's removed member, is not processed:\n{}", saved );
     Ok (( )) }) }
 
 /// Marking a removed alias or a removed ID marks its leaf: ali's lost
-/// alias a1 and lost extra ID ali-old show ready after the save.
+/// alias a1 and lost extra ID ali-old show processed after the save.
 #[test]
 fn marking_a_removed_entry_marks_its_leaf (
 ) -> Result<(), Box<dyn Error>> {
@@ -152,17 +152,17 @@ fn marking_a_removed_entry_marks_its_leaf (
     for line in [ "*** (skg alias noClaim (view ghostWarrant) (diff (rel removed) (leaves 1) (ready))) a1",
                   "*** (skg id (view ghostWarrant) (diff (rel removed) (leaves 1) (ready))) ali-old" ] {
       assert! ( without_viewnode_ids (&saved) . lines () . any ( |l| l == line ),
-                "{:?} must be ready:\n{}", line, saved ); }
+                "{:?} must be processed:\n{}", line, saved ); }
     assert! ( ! without_viewnode_ids (&saved) . contains ("(editRequest"),
               "the requests were consumed:\n{}", saved );
     Ok (( )) }) }
 
 /// The worktree's p contains nowhere, an ID that names no node, which
 /// HEAD's p did not: the diff view draws an unknown carrying the
-/// relationship's change. A readiness request on its line is applied
-/// by the save: the unknown shows ready, and the request is consumed.
+/// relationship's change. A processed request on its line is applied
+/// by the save: the unknown shows processed, and the request is consumed.
 #[test]
-fn a_readiness_request_on_an_unknown_marks_its_leaf (
+fn a_processed_request_on_an_unknown_marks_its_leaf (
 ) -> Result<(), Box<dyn Error>> {
   let case : tempfile::TempDir = tempfile::TempDir::new () ?;
   for (side, p) in [ ("head",     "pid: p\ntitle: p\n"),
@@ -182,7 +182,7 @@ fn a_readiness_request_on_an_unknown_marks_its_leaf (
         & save_cleanly (f, &all_changes_view (), &marked) ? . saved_view );
       assert! ( saved . lines () . any ( |line|
                   line == "** (skg unknown (gnid nowhere) (diff (rel added) (leaves 1) (ready)))" ),
-                "the unknown is ready:\n{}", saved );
+                "the unknown is processed:\n{}", saved );
       assert! ( ! saved . contains ("(editRequest"),
                 "the request was consumed:\n{}", saved );
       Ok (( )) }) }
@@ -199,7 +199,7 @@ fn editing_a_node_lapses_its_mark (
       |_| "** (skg (oldText titleAndBody) (editRequest (ready)) (diff (leaves 1))) txt" . to_string () );
     let saved : String = save_cleanly (f, &all_changes_view (), &marked) ? . saved_view;
     assert! ( without_viewnode_ids (&saved) . contains ("** (skg (oldText titleAndBody) (diff (leaves 1) (ready))) txt"),
-              "the old text is ready:\n{}", saved );
+              "the old text is processed:\n{}", saved );
     let edited : String = edit_line (
       &saved, "* (skg node (gnid txt)",
       |line| line . replace ( "txt, retitled", "txt, retitled again" ));
@@ -209,7 +209,7 @@ fn editing_a_node_lapses_its_mark (
     Ok (( )) }) }
 
 /// The summary counts the changed files of the owned skgrepos and
-/// the ready ones, and the leaves owned by nodes the saved buffer does
+/// the processed ones, and the leaves owned by nodes the saved buffer does
 /// not show. The "sets" fixture changes six files: cy2 and mc
 /// (retitled), del and delc (deleted), ln (gains lo) and r (loses
 /// del); their seven leaves are the two text changes, the two
@@ -218,7 +218,7 @@ fn editing_a_node_lapses_its_mark (
 /// save leaves them out and counts their changes as not editable, and the
 /// "extend diff view" request appends them again.
 #[test]
-fn the_save_reports_the_readiness_summary (
+fn the_save_reports_the_processed_summary (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("sets", &["main"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
@@ -263,11 +263,11 @@ fn the_summary_counts_the_changes_the_saved_buffer_does_not_show (
       . ok_or ("the merges buffer is empty") ?;
     let response : SaveResponse = save_buffer (f, DiffViewBufferKind::Merges, &text) ?;
     assert! ( response . errors . is_empty (), "{:?}", response . errors );
-    let summary : BufferReadinessSummary = summary_of (&response);
+    let summary : BufferProcessedSummary = summary_of (&response);
     assert_eq! ( summary . changes_not_editable_here, 11, "{:?}", summary );
     assert_eq! ( sexp_to_client_string (&summary . to_sexp ()),
                  format! ( "(readiness-summary (ready {}) (changed {}) (foreign 0) (order-only 1) (notEditable 11))",
-                           summary . summary . ready_files,
+                           summary . summary . processed_files,
                            summary . summary . changed_files ));
     Ok (( )) }) }
 
@@ -280,10 +280,10 @@ fn the_summary_counts_the_changed_files_of_the_foreign_skgrepos (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture_and_foreign ("foreign", &["main"], &["foreign"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
-    let summary : BufferReadinessSummary =
+    let summary : BufferProcessedSummary =
       summary_of ( &save_cleanly (f, &all_changes_view (), &buffer) ? );
-    assert_eq! ( summary . summary, ReadinessSummary {
-      ready_files : 0, changed_files : 1,
+    assert_eq! ( summary . summary, ProcessedSummary {
+      processed_files : 0, changed_files : 1,
       foreign_changed_files : 2, order_only_files : 0 } );
     assert! ( sexp_to_client_string (&summary . to_sexp ())
                 . contains ("(foreign 2)"),
@@ -292,18 +292,18 @@ fn the_summary_counts_the_changed_files_of_the_foreign_skgrepos (
 
 fn summary_of (
   response : &SaveResponse,
-) -> BufferReadinessSummary {
-  response . readiness_summary . clone ()
-    . expect ("a save of a diff-view buffer reports the readiness summary") }
+) -> BufferProcessedSummary {
+  response . processed_summary . clone ()
+    . expect ("a save of a diff-view buffer reports the processed summary") }
 
 fn summary (
-  ready_files     : usize,
+  processed_files     : usize,
   changed_files   : usize,
   changes_not_editable_here : usize,
-) -> BufferReadinessSummary {
-  BufferReadinessSummary {
-    summary : ReadinessSummary {
-      ready_files, changed_files,
+) -> BufferProcessedSummary {
+  BufferProcessedSummary {
+    summary : ProcessedSummary {
+      processed_files, changed_files,
       foreign_changed_files : 0, order_only_files : 0 },
     changes_not_editable_here } }
 
@@ -368,7 +368,7 @@ fn a_root_deleted_in_the_buffer_is_rerendered_as_removed (
 /// and, write-protected, in cy1's content, an unchanged
 /// relationship. One request naming 'all' on the write-protected
 /// image marks its file: both images then show '(ready all)', and
-/// its old text shows ready.
+/// its old text shows processed.
 #[test]
 fn a_modified_node_lists_all_and_one_mark_readies_its_file (
 ) -> Result<(), Box<dyn Error>> {
@@ -384,14 +384,14 @@ fn a_modified_node_lists_all_and_one_mark_readies_its_file (
       |line| line . replace ( "(diff (properties changed) (leaves 1 all)))",
                               "(editRequest (ready all)) (diff (properties changed) (leaves 1 all)))" ));
     let saved : String = save_cleanly (f, &all_changes_view (), &marked) ? . saved_view;
-    let ready : &str =
+    let processed : &str =
       "(diff (properties changed) (leaves 1 all) (ready all))) cy2, retitled";
     for prefix in [ "* (skg node (gnid cy2)", "*** (skg node (gnid cy2)" ] {
       assert! ( without_viewnode_ids (&saved) . lines () . any ( |line|
-        without_viewnode_ids (line) . starts_with (prefix) && line . ends_with (ready) ),
-        "{:?} is ready:\n{}", prefix, saved ); }
+        without_viewnode_ids (line) . starts_with (prefix) && line . ends_with (processed) ),
+        "{:?} is processed:\n{}", prefix, saved ); }
     assert! ( without_viewnode_ids (&saved) . contains ("** (skg (oldText title) (diff (leaves 1) (ready))) cy2"),
-              "cy2's old text is ready:\n{}", saved );
+              "cy2's old text is processed:\n{}", saved );
     Ok (( )) }) }
 
 /// A modified node in a new relationship lists 'rel' beside 'all',

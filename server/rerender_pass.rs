@@ -13,8 +13,8 @@
 //! view ('server/diff_view/buffer_rerender.rs').
 
 use crate::diff_view::buffer_rerender::refresh_diffView_buffer_over_current_straddle;
-use crate::diff_view::change_leaves::BufferReadinessSummary;
-use crate::diff_view::readiness_requests::buffer_readiness_summary_for;
+use crate::diff_view::change_leaves::BufferProcessedSummary;
+use crate::diff_view::processed_requests::buffer_processed_summary_for;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::graph_straddle::types::GraphStraddle;
 use crate::org_to_text::viewforest_to_string;
@@ -196,9 +196,9 @@ pub fn update_views_after_save (
   context . warnings . extend ( no_other_containers_warning (
     &saved_view_mut, &requesting_containers ));
   let saved_text : String = viewforest_to_string (&saved_view_mut) ?;
-  let readiness_summary : Option<BufferReadinessSummary> =
+  let processed_summary : Option<BufferProcessedSummary> =
     saved_diffView_buffer_kind . and ( context . graph_straddle . as_ref () )
-    . map ( |straddle| buffer_readiness_summary_for (
+    . map ( |straddle| buffer_processed_summary_for (
       env, straddle, &saved_view_mut ) );
   let collateral_views : Vec<RerenderedView> =
     rerender_open_views (&collateral_viewforest_ids, views_state, &mut context);
@@ -232,7 +232,7 @@ pub fn update_views_after_save (
       collateral_views, TcpToClient::CollateralView ); }
   Ok ( SaveResponse::saved (
     saved_buffer_text, saved_text, context . errors, context . warnings,
-    readiness_summary )) }
+    processed_summary )) }
 
 /// What a save says of a containers request that drew no folder.
 pub const NO_OTHER_CONTAINERS : &str = "No other containers.";

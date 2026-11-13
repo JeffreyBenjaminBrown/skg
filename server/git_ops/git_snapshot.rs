@@ -106,7 +106,7 @@ pub fn owned_head_identity (
 
 /// How many '.skg' files of the foreign skgrepos differ between HEAD
 /// and the worktree. The graph straddle reads foreign skgrepos at their
-/// worktrees, so their changes never reach it; the readiness summary
+/// worktrees, so their changes never reach it; the processed summary
 /// reports this count instead. A foreign skgrepo that is not in a
 /// gitrepo, or has no HEAD commit, counts nothing.
 pub fn foreign_changed_skg_file_count (

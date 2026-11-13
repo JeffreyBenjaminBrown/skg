@@ -16,7 +16,7 @@ use crate::types::errors::{BufferValidationError, HeadlineName, with_org_subhead
 use crate::nodeMerge::validate_nodeMerge::validate_nodeMerge_requests;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use contradictory_instructions::{
-  find_contradictory_readiness_requests, find_inconsistent_instructions};
+  find_contradictory_processed_requests, find_inconsistent_instructions};
 use super::local;
 use ego_tree::iter::Edge;
 use ego_tree::{NodeId, NodeRef};
@@ -55,7 +55,7 @@ pub fn find_buffer_errors_for_saving_in_graph (
   // which performs only local structural verifications:
   // each ID belongs to an idFolder, etc.
   let mut errors: Vec<BufferValidationError> = Vec::new();
-  { // inconsistent instructions (deletion, defining containers, readiness)
+  { // inconsistent instructions (deletion, defining containers, processed requests)
     let (ambiguous_deletion_gnids,
          problematic_defining_gnids) =
       find_inconsistent_instructions (viewforest);
@@ -67,9 +67,9 @@ pub fn find_buffer_errors_for_saving_in_graph (
         errors . push(
           BufferValidationError::Multiple_Defining_Viewnodes (gnid, headlines)); }}
     for (leaf, headlines) in
-      find_contradictory_readiness_requests (viewforest, graph)
+      find_contradictory_processed_requests (viewforest, graph)
     { errors . push (
-        BufferValidationError::ContradictoryReadinessRequests (leaf, headlines)); }}
+        BufferValidationError::ContradictoryProcessedRequests (leaf, headlines)); }}
   { // merge validation
     for error_msg in {
       let nodeMerge_errors: Vec<String> =

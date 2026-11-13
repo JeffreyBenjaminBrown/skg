@@ -23,24 +23,24 @@
 //!     where OBJECT is node, rel or all. A headline naming no kind is
 //!     a node.
 //!   ghost (gnid ID) [(skgRepos (nodeRepo REPO))] [noClaim]
-//!         [(editRequest [restoreNode] [READINESS])]
+//!         [(editRequest [restoreNode] [PROCESSED])]
 //!   unknown (gnid ID) [(skgRepos (relRepo REPO))] [noClaim]
-//!           [(editRequest [(relRepo REPO)] [READINESS])]
+//!           [(editRequest [(relRepo REPO)] [PROCESSED])]
 //!   restricted, the restricted viewnode, with the parts an
 //!     unknown viewnode takes
 //!   alias [(skgRepos (relRepo REPO))] [noClaim]
-//!         [(editRequest [(relRepo REPO)] [READINESS])]
-//!   id [noClaim] [(editRequest READINESS)],
-//!   (flag hadId | wasOverloaded | noSearchMatching) [(editRequest READINESS)],
+//!         [(editRequest [(relRepo REPO)] [PROCESSED])]
+//!   id [noClaim] [(editRequest PROCESSED)],
+//!   (flag hadId | wasOverloaded | noSearchMatching) [(editRequest PROCESSED)],
 //!   and the diff view's own viewnodes
 //!     (oldText titleAndBody | title | body)
 //!     (homeSkgrepoMove (old REPO) (new REPO))
 //!     (relRepoMove (old REPO) (new REPO))
 //!     (changesetMarker content | relRepo | orderOnly)
-//!   each of which may carry '(editRequest READINESS)';
+//!   each of which may carry '(editRequest PROCESSED)';
 //!   bodyDiff, tombstone, forestRoot and the folders' bare atoms,
 //!   which carry nothing.
-//! READINESS is '(ready OBJECT...)' or '(unready OBJECT...)'.
+//! PROCESSED is '(ready OBJECT...)' or '(unready OBJECT...)'.
 //! A node, a ghost, an alias, an id and a flag may carry '(view ...)';
 //! every kind that takes an editRequest may carry '(diff ...)'.
 //! 'restoreRel' asks to restore a removed membership; where it may
@@ -64,7 +64,7 @@ use crate::types::misc::{ID, SkgrepoChange, SkgrepoName};
 use crate::types::errors::{BufferValidationError, HeadlineName, with_org_subheadlines};
 use crate::types::nodes::complete::Flag;
 use crate::types::viewnode::{
-  ChangeFacts, DiffObject, FoldAndFocus, ReadinessRequest,
+  ChangeFacts, DiffObject, FoldAndFocus, ProcessedRequest,
   GraphnodeStats, ViewnodeStats, NodeEditRequest, ViewRequest, FolderRelation,
   ChangesetMarkerKind, PropertyMember, ChangeViewnode, Folder,
   Ghost, GnidOnlyKind, GnidOnlyVognode,
@@ -90,9 +90,9 @@ use uuid::Uuid;
 pub struct ViewnodeMetadata {
   pub foldAndFocus      : FoldAndFocus,
   pub viewnode_id       : Option<ViewnodeId>,
-  /// The readiness request inside '(editRequest ...)', on whichever
+  /// The processed request inside '(editRequest ...)', on whichever
   /// headline carries it.
-  pub readiness_request : Option<ReadinessRequest>,
+  pub processed_request : Option<ProcessedRequest>,
   // The derived facts. The parser skips '(view ...)' and '(diff ...)',
   // so all it reads of them is an occurrence's relRepo, from its
   // '(skgRepos ...)'.
@@ -232,7 +232,7 @@ pub fn default_metadata() -> ViewnodeMetadata {
   ViewnodeMetadata {
     foldAndFocus      : FoldAndFocus::default (),
     viewnode_id       : None,
-    readiness_request : None,
+    processed_request : None,
     graphStats        : GraphnodeStats::default (),
     viewStats         : ViewnodeStats::default (),
     kind              : MetadataKind::Occurrence (
@@ -345,7 +345,7 @@ pub fn viewnode_from_metadata (
                  kind,
                  // derived facts, which the parser skips
                  change_facts      : ChangeFacts::default (),
-                 readiness_request : metadata . readiness_request . clone (),
+                 processed_request : metadata . processed_request . clone (),
                  viewnode_id       : metadata . viewnode_id . clone () },
     error, warning ) }
 
@@ -457,7 +457,7 @@ pub const METADATA_GRAMMAR : &str =
    KIND a bare atom (node, ghost, unknown, restricted, alias, id, tombstone, a folder, ...) \
    and every declared part beside it at the top level, among them (gnid X), \
    (skgRepos (nodeRepo R) [(relRepo R)]) and (editRequest ...), \
-   which holds the readiness requests (ready OBJECT...) and (unready OBJECT...)";
+   which holds the processed requests (ready OBJECT...) and (unready OBJECT...)";
 
 /// The refusal of a retired spelling.
 fn retired_spelling (
@@ -491,8 +491,8 @@ impl NamedKind {
   /// The parts the kind takes that 'shared/metadata-fields.json' does
   /// not list for it, the table listing only what a user sets: those
   /// the server writes, and, on a kind whose only request is a
-  /// readiness request, the '(editRequest ...)' that holds it, which
-  /// the readiness commands write.
+  /// processed request, the '(editRequest ...)' that holds it, which
+  /// the processed commands write.
   fn parts_the_table_leaves_out (&self) -> &'static [&'static str] {
     match self {
       NamedKind::Occurrence =>
@@ -523,7 +523,7 @@ impl NamedKind {
     || self . parts_the_table_leaves_out () . contains (&name) }
 }
 
-/// The one edit request '(editRequest ...)' holds beside a readiness
+/// The one edit request '(editRequest ...)' holds beside a processed
 /// request, as written, before the kind's variant takes it.
 enum WrittenEditRequest {
   ForAnOccurrence (OccurrenceEditRequest),
@@ -703,7 +703,7 @@ fn classify_metadata_element (
                          element )), }}
 
 /// Read the part named 'name', 'element', into 'written', or, for a
-/// readiness request, into 'metadata'. The kind 'named' takes the part
+/// processed request, into 'metadata'. The kind 'named' takes the part
 /// ('NamedKind::takes_part'); an edit request the table does not list
 /// for it is refused here.
 fn read_metadata_part (
@@ -731,13 +731,13 @@ fn read_metadata_part (
       written . overridesHere = Some ( ID::from (
         single_argument (name, args) ? )),
     "editRequest" => {
-      let (request, readiness_request)
-        : (Option<WrittenEditRequest>, Option<ReadinessRequest>)
+      let (request, processed_request)
+        : (Option<WrittenEditRequest>, Option<ProcessedRequest>)
         = parse_editrequest_sexp (args) ?;
       if let Some (request) = &request {
         check_the_kind_takes_the_edit_request (named . atom (), request) ?; }
       written . edit_request = request;
-      metadata . readiness_request = readiness_request; },
+      metadata . processed_request = processed_request; },
     "viewRequests" =>
       parse_viewrequests_sexp ( args, &mut written . view_requests ) ?,
     other => return Err ( format! ( "Unknown metadata part: {}", other )), }
@@ -770,7 +770,7 @@ fn edit_request_refusal (
 ) -> String {
   let mut taken : Vec<String> =
     values_written_for_a_message (kind_atom, "editRequest");
-  taken . push ( "a readiness request" . to_string () );
+  taken . push ( "a processed request" . to_string () );
   format! ( "A headline of kind {} accepts no edit request but {}",
             kind_atom, taken . join (" and ") ) }
 
@@ -938,42 +938,42 @@ fn parse_skgRepos (
   Ok (( nodeRepo, relRepo )) }
 
 /// Parse the (editRequest ...) s-expression contents: at most one
-/// edit request, and at most one readiness request, '(ready
+/// edit request, and at most one processed request, '(ready
 /// OBJECT...)' or '(unready OBJECT...)'.
 fn parse_editrequest_sexp (
   items : &[Sexp],
-) -> Result<(Option<WrittenEditRequest>, Option<ReadinessRequest>), String> {
+) -> Result<(Option<WrittenEditRequest>, Option<ProcessedRequest>), String> {
   if items . is_empty () {
     return Err ( "editRequest requires a request" . to_string () ); }
   let mut edit_request : Option<WrittenEditRequest> = None;
-  let mut readiness_request : Option<ReadinessRequest> = None;
+  let mut processed_request : Option<ProcessedRequest> = None;
   for element in items {
-    if let Some (request) = readiness_request_of (element) ? {
-      if readiness_request . is_some () {
-        return Err ( "A viewnode may carry only one readiness request"
+    if let Some (request) = processed_request_of (element) ? {
+      if processed_request . is_some () {
+        return Err ( "A viewnode may carry only one processed request"
                      . to_string () ); }
-      readiness_request = Some (request);
+      processed_request = Some (request);
       continue; }
     if edit_request . is_some () {
-      return Err ( "editRequest holds at most one request beside a readiness request"
+      return Err ( "editRequest holds at most one request beside a processed request"
                    . to_string () ); }
     edit_request = Some ( parse_one_edit_request (element) ? ); }
-  Ok (( edit_request, readiness_request )) }
+  Ok (( edit_request, processed_request )) }
 
-/// The readiness request 'element' is, if it is '(ready OBJECT...)'
+/// The processed request 'element' is, if it is '(ready OBJECT...)'
 /// or '(unready OBJECT...)'.
-fn readiness_request_of (
+fn processed_request_of (
   element : &Sexp,
-) -> Result<Option<ReadinessRequest>, String> {
+) -> Result<Option<ProcessedRequest>, String> {
   let Sexp::List (items) = element else { return Ok (None); };
   let Some (head) : Option<&Sexp> = items . first () else { return Ok (None); };
   let head : String = atom_to_string (head) ?;
   if head != "ready" && head != "unready" { return Ok (None); }
   let atoms : Vec<String> =
     items [1..] . iter () . map (atom_to_string) . collect::<Result<_, _>> () ?;
-  Ok ( Some ( ReadinessRequest {
-    ready   : head == "ready",
-    objects : readiness_objects_from_atoms (&atoms) ?, } )) }
+  Ok ( Some ( ProcessedRequest {
+    processed : head == "ready",
+    objects : processed_objects_from_atoms (&atoms) ?, } )) }
 
 /// Parse one edit request inside (editRequest ...).
 fn parse_one_edit_request (
@@ -1069,7 +1069,7 @@ fn parse_viewrequests_sexp (
   Ok (( )) }
 
 
-fn readiness_objects_from_atoms (
+fn processed_objects_from_atoms (
   atoms : &[String],
 ) -> Result<BTreeSet<DiffObject>, String> {
   atoms . iter ()

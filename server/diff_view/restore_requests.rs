@@ -17,7 +17,7 @@
 //! one relationship the headline stands for
 //! ('relationship_to_viewparent'), as HEAD recorded it.
 
-use crate::diff_view::readiness_requests::{
+use crate::diff_view::processed_requests::{
   relationship_to_viewparent, vognode_leaf_pid};
 use crate::diff_view::change_leaves::{LeafKey, RelationshipAspect};
 use crate::dbs::in_rust_graph::{InRustGraph, RecorderwardRelmap};

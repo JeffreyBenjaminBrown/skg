@@ -11,7 +11,7 @@ use skg::diff_view::change_leaves::LeafKey;
 use skg::metadata_canon::without_viewnode_ids;
 use skg::graph_straddle::build::current_graph_straddle_in_slot;
 use skg::graph_straddle::types::GraphStraddle;
-use skg::diff_view::readiness_store::ReadinessStore;
+use skg::diff_view::processed_store::ProcessedStore;
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::serve::handlers::extend_diff_view::handle_extend_diff_view_request;
 use skg::serve::handlers::stage_and_commit::handle_stage_and_commit_request;
@@ -70,7 +70,7 @@ pub fn all_changes_buffer (
 ) -> Result<Option<String>, Box<dyn Error>> {
   all_changes_buffer_with_marks (f, &[]) }
 
-/// The same, with the leaves 'marked' marked ready at their current
+/// The same, with the leaves 'marked' marked processed at their current
 /// fingerprints.
 pub fn all_changes_buffer_with_marks (
   f      : &Fixture,
@@ -79,7 +79,7 @@ pub fn all_changes_buffer_with_marks (
   let env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
   let runtime : Arc<RuntimeGeneration> = env . runtime_snapshot ();
   let straddle : GraphStraddle = graph_straddle (f) ?;
-  let mut store : ReadinessStore = ReadinessStore::default ();
+  let mut store : ProcessedStore = ProcessedStore::default ();
   for key in marked {
     store . mark ( key . clone (),
                    straddle . change_leaves () . leaf_fingerprint (key)
@@ -115,8 +115,8 @@ pub fn open_buffer (
   let straddle : Arc<GraphStraddle> = current_graph_straddle_in_slot (
     &mut f . views_state . graph_straddle, &f . config, runtime . graph . clone () ) ?;
   let buffer : Option<RenderedDiffViewBuffer> = {
-    let store : MutexGuard<ReadinessStore> =
-      env . runtime . readiness_store . lock () . unwrap ();
+    let store : MutexGuard<ProcessedStore> =
+      env . runtime . processed_store . lock () . unwrap ();
     diffView_buffer (&runtime, &straddle, &store, diffView_buffer_kind) ? };
   Ok ( match buffer {
     None => None,
@@ -281,7 +281,7 @@ pub fn rerender_all_views_for_the_all_changes_buffer (
        . expect ("the streamed view has content") ) }
 
 /// The "all changes" buffer as the "extend diff view" request
-/// rerenders it, and the not-editable count of its readiness summary.
+/// rerenders it, and the not-editable count of its processed summary.
 pub fn extend_diff_view (
   f : &mut Fixture,
 ) -> Result<(String, usize), Box<dyn Error>> {

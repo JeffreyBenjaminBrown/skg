@@ -229,7 +229,7 @@ fn any_styled_as (
     node_heralds_key : Some (node_heralds_key), interc : None, when : vec! [],
     label : Some ("ANY"), abut : false, children } ) }
 
-/// The diff view's properties, each a label. A ready one's ✓
+/// The diff view's properties, each a label. A processed one's ✓
 /// comes from the property-leaf rules after them in the table.
 /// "⌂ -OLD +NEW" and "relationship moved from OLD to NEW" show the
 /// skgrepo names in their own style.
@@ -269,7 +269,7 @@ fn diffView_property_rules (
 /// properties ('(properties changed)') as M, and the existence of its
 /// relationship to its viewparent ('(rel added)', '(rel removed)') as
 /// ~+ ~-, each followed by a ✓ when '(ready ...)' names that diff
-/// object ('all' for M), then the readiness request. '(leaves ...)'
+/// object ('all' for M), then the processed request. '(leaves ...)'
 /// is for the clients' gestures and shows nothing. The ready part is
 /// matched once per object, so each ✓ lands after its own object
 /// whatever the raw order.
@@ -290,14 +290,14 @@ fn change_fact_rules_for_two_objects (
       rule ("ready", vec! [ leaf_abut_styled_as ("ready", "rel", "✓") ]),
       vac ("leaves") ]) ] }
 
-/// The readiness request inside '(editRequest ...)', rendered after
+/// The processed request inside '(editRequest ...)', rendered after
 /// the change facts it acts on.
-fn readiness_request_rules (
+fn processed_request_rules (
 ) -> Vec<RuleChild> {
   vec! [
     rule ("editRequest", vec! [
-      readiness_request_rule ("readyRequest",   "ready",   "request:ready"),
-      readiness_request_rule ("unreadyRequest", "unready", "request:unready") ]) ] }
+      processed_request_rule ("readyRequest",   "ready",   "request:ready"),
+      processed_request_rule ("unreadyRequest", "unready", "request:unready") ]) ] }
 
 /// The same for a leaf with a single diff object (a property member, an
 /// unknown viewnode, a restricted viewnode), whose '(ready)' names no object, or
@@ -320,7 +320,7 @@ fn change_fact_rules_for_one_object (
 
 /// "request:ready", then ":OBJECT" for each object the request names,
 /// styled under 'node_heralds_key'.
-fn readiness_request_rule (
+fn processed_request_rule (
   node_heralds_key : &'static str,
   label            : &'static str,
   prefix           : &'static str,
@@ -491,11 +491,11 @@ pub fn herald_rule_table () -> HeraldRule {
         . collect ()) ],
       diffView_property_rules (),
       // The diff view's facts on a property member: + and - for
-      // its existence in its folder, ✓ when ready, then its readiness
+      // its existence in its folder, ✓ when processed, then its processed
       // request.
       vec! [ when ( &kinds_whose_diff_has_one_object (),
                     [ change_fact_rules_for_one_object ("+", "-"),
-                      readiness_request_rules () ] . concat () ) ],
+                      processed_request_rules () ] . concat () ) ],
       vec! [
       // One kind of tombstone, which says only that something stood
       // here: a node a save deleted, or one the skgrepo restriction
@@ -518,7 +518,7 @@ pub fn herald_rule_table () -> HeraldRule {
             leaf ("restoreNode", "restore node") ]),
           view_request_rules () ],
         change_fact_rules_for_two_objects (),
-        readiness_request_rules () ] . concat () ),
+        processed_request_rules () ] . concat () ),
       when ( &[ "node" ], [ vec! [
         vac ("node"),
         vac ("gnid"),
@@ -597,7 +597,7 @@ pub fn herald_rule_table () -> HeraldRule {
             rule ("false", vec! [s ("request:search matching")]) ]) ]),
         view_request_rules () ],
         change_fact_rules_for_two_objects (),
-        readiness_request_rules () ] . concat ()) ] ] . concat (),
+        processed_request_rules () ] . concat ()) ] ] . concat (),
   }}
 
 /// The rules of a vognode that shows only a gnid, an unknown or a
@@ -621,7 +621,7 @@ fn gnid_only_vognode_rule (
         crule_styled_as ("editRequest_relRepo", "relRepo", vec! [
           any (vec! [ s ("request:~"), RuleChild::It ]) ]) ]) ],
     change_fact_rules_for_one_object ("~+", "~-"),
-    readiness_request_rules () ] . concat () ) }
+    processed_request_rules () ] . concat () ) }
 
 /// The kinds whose '(diff ...)' renders a single diff object: the
 /// property members and the diff view's change viewnodes but the body
@@ -848,7 +848,7 @@ pub fn emittable_metadata_atoms () -> std::collections::HashSet<&'static str> {
     // consumed by the client's renderer, so they are not match atoms.
     "rels", "props", "birth",
     "editRequest", "viewRequests",
-    // The readiness requests inside '(editRequest ...)'.
+    // The processed requests inside '(editRequest ...)'.
     "ready", "unready",
     // NodeEditRequest atoms. The flag form's name and desired value
     // are matched literally so its herald can describe the complete state
@@ -938,7 +938,7 @@ fn change_fact_atoms () -> Vec<&'static str> {
   fn guard ( facts : ChangeFacts, object : DiffObject ) {
     let ChangeFacts {
       change : _,   // -> node, rel, properties, with DiffChange::EMITTABLE_ATOMS
-      ready : _,    // -> ready, with the objects
+      processed : _, // -> ready, with the objects
       leaves : _,   // -> leaves, with the objects
       home_skgrepo_move : _,   // -> the homeSkgrepoMove atom, below
       moved_like_ancestor : _, // -> the movedLikeAncestor atom, below

@@ -3,7 +3,7 @@
 // Requests that rewrite or approve what a skgrepo narrowing may hide
 // are refused unless the connection is unrestricted: the cleanup of
 // the references to an absent ID, which scans and rewrites every owned
-// recorder, and the restore and readiness requests a save carries
+// recorder, and the restore and processed requests a save carries
 // ('docs/api-and-formats.org', "Restricted-skgrepo nodes"). The
 // refusal writes nothing. (The import's refusal of a restricted
 // destination is tested beside its handler.)
@@ -53,12 +53,12 @@ fn deleting_the_references_to_an_absent_id_is_refused (
       assert_eq! ( skg_files (f) ?, files_before, "no file changed" );
       Ok (( )) } ) }
 
-/// Under "public" a save carrying a readiness request is refused,
+/// Under "public" a save carrying a processed request is refused,
 /// before anything is written.
 #[test]
-fn a_save_carrying_a_readiness_request_is_refused (
+fn a_save_carrying_a_processed_request_is_refused (
 ) -> Result<(), Box<dyn Error>> {
-  refused_with_the_root_carrying ("(editRequest (ready all))", "A readiness request") }
+  refused_with_the_root_carrying ("(editRequest (ready all))", "A processed request") }
 
 /// Under "public" a save carrying a restore request, on a member
 /// shown as removed, is refused, before anything is written.

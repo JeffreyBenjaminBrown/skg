@@ -20,14 +20,14 @@ use std::str::FromStr;
 /// '(diff ...)' form: the three kinds of change ('(node ...)',
 /// '(rel ...)', '(properties changed)'), which leaves a request on it
 /// may name ('(leaves ...)'), and which of its change-forest leaves
-/// are marked commit-ready ('(ready ...)'). Derived facts: the refresh
+/// are marked processed ('(ready ...)'). Derived facts: the refresh
 /// derives them, and the parser skips them.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ChangeFacts {
   pub change   : DiffChange,
-  /// None when nothing is ready. 'Some' of an empty set is the bare
+  /// None when nothing is processed. 'Some' of an empty set is the bare
   /// '(ready)' of a leaf with a single object.
-  pub ready    : Option<BTreeSet<DiffObject>>,
+  pub processed : Option<BTreeSet<DiffObject>>,
   /// None when the viewnode names no change-forest leaf.
   pub leaves   : Option<LeavesFact>,
   /// Some(OLD to NEW) in the skgrepo-changes buffer of the diff
@@ -45,11 +45,11 @@ pub struct ChangeFacts {
   pub moved_like_ancestor : Option<String>,
 }
 
-/// '(leaves N OBJECT...)': the change-forest leaves a readiness
+/// '(leaves N OBJECT...)': the change-forest leaves a processed
 /// request on a viewnode may name ('docs/diff-view.org', "Change
 /// facts on the wire"). The OBJECTs are 'node' and/or 'rel' on a vognode or
 /// ghost, each worth one leaf; 'all' on a modified node
-/// (beside 'rel' when that names a leaf) and on a commit readiness
+/// (beside 'rel' when that names a leaf) and on a processed
 /// aggregate; none where a bare request names them all.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct LeavesFact {
@@ -83,13 +83,13 @@ pub enum Existence { Added, Removed }
 
 /// The diff objects of a viewnode's change-forest leaves: 'node' (the node's
 /// own existence), 'rel' (its relationship to its viewparent),
-/// 'all' (every leaf the node records, or every leaf of a commit
-/// readiness aggregate, one level down), 'newContent' (of each new node
+/// 'all' (every leaf the node records, or every leaf of a
+/// processed aggregate, one level down), 'newContent' (of each new node
 /// reached contentward from the node, through new nodes only, as the
 /// change forest says, whatever the buffer shows: its existence, which
 /// covers its text, and its content relationships) and 'newOutward'
 /// (the same along every relationship, in its recorded direction:
-/// every leaf each new node reached records). Only a readiness request
+/// every leaf each new node reached records). Only a processed request
 /// names the last two; no '(leaves ...)' or '(ready ...)' change fact
 /// lists them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -103,12 +103,12 @@ pub enum DiffObject {
 
 /// '(editRequest (ready OBJECTS))' or '(editRequest (unready OBJECTS))':
 /// save intent that
-/// sets or clears the commit-readiness marks of the viewnode's
+/// sets or clears the processed marks of the viewnode's
 /// leaves on those objects. No objects means the viewnode's only
 /// change-forest leaf.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ReadinessRequest {
-  pub ready   : bool, // true for (ready ...), false for (unready ...)
+pub struct ProcessedRequest {
+  pub processed : bool, // true for (ready ...), false for (unready ...)
   pub objects : BTreeSet<DiffObject>,
 }
 
@@ -128,7 +128,7 @@ pub struct Viewnode {
   /// Save intent, like 'relationshipEditRequest', but allowed on a
   /// write-protected occurrence, and beside an edit request.
   /// None on a kind that never carries a change.
-  pub readiness_request : Option<ReadinessRequest>,
+  pub processed_request : Option<ProcessedRequest>,
   /// The viewnode ID, printed '(vnid X)'. None until the view assigns
   /// one, at the refresh's tail ('ViewnodeIdRecord' in
   /// 'server/types/views_state.rs'); a parsed viewnode keeps the one
@@ -267,7 +267,7 @@ impl GnidOnlyKind {
 /// descendants still might, so extraction recurses through it. When it
 /// claims membership, the save keeps its gnid in its viewparent's
 /// list; deleting its line removes the record. It takes a relRepo
-/// request and a readiness request. Text on its line is refused. It
+/// request and a processed request. Text on its line is refused. It
 /// has no goal, so what stands under it is no member of it.
 ///
 /// DISTINCT INFO: the gnid and the record's relRepo, and nothing of a
@@ -547,8 +547,8 @@ pub enum PropertyMember {
 /// A headline the diff view adds to describe a change. Display-only
 /// and save-inert: the validator ignores them, and the refresh draws
 /// them in the diff view and knows them by their kind. Each but
-/// BodyDiff is a change-forest leaf or commit readiness aggregate, so
-/// its viewnode carries '(ready ...)' and a readiness request.
+/// BodyDiff is a change-forest leaf or processed aggregate, so
+/// its viewnode carries '(ready ...)' and a processed request.
 #[derive( Debug, Clone, PartialEq )]
 pub enum ChangeViewnode {
   /// The node's text at HEAD, under a node whose text changed.
@@ -568,7 +568,7 @@ pub enum ChangeViewnode {
   /// relationship's relRepo.
   RelRepoMove { skgrepo_change : SkgrepoChange },
   /// A childless stand-in for a set of changes recorded in its
-  /// parent's files, carrying their derived readiness.
+  /// parent's files, carrying whether they are processed (derived).
   ChangesetMarker { kind : ChangesetMarkerKind },
 }
 
@@ -577,7 +577,7 @@ pub enum ChangeViewnode {
 pub enum ChangesetMarkerKind {
   Content,   // "its content changed": the ~ change-forest leaves of its content
   RelRepo,   // "some content relationships changed skgrepo"
-  OrderOnly, // "order-only change", always ready
+  OrderOnly, // "order-only change", always processed
 }
 
 /// A viewnode grouping the children of one kind of relationship of
@@ -1129,11 +1129,11 @@ impl DiffObject {
       . find ( |object| object . wire_name () == s ) }
 }
 
-impl ReadinessRequest {
+impl ProcessedRequest {
   pub fn form_head (
     &self,
   ) -> &'static str {
-    if self . ready { "ready" } else { "unready" } }
+    if self . processed { "ready" } else { "unready" } }
 }
 
 impl ViewRequest {
@@ -1203,7 +1203,7 @@ impl AsMut<Viewnode> for Viewnode {
 
 impl Viewnode {
   /// Make this viewnode one of kind 'kind', keeping its focus, fold
-  /// state and viewnode ID. The diff view's facts and the readiness request
+  /// state and viewnode ID. The diff view's facts and the processed request
   /// describe the kind replaced, so they go with it.
   pub fn replace_kind (
     &mut self,
@@ -1211,7 +1211,7 @@ impl Viewnode {
   ) {
     self . kind              = kind;
     self . change_facts      = ChangeFacts::default ();
-    self . readiness_request = None; }
+    self . processed_request = None; }
 
   /// The node's ID, when this viewnode is an editable occurrence of
   /// it: an occurrence that is not write-protected.
@@ -1223,7 +1223,7 @@ impl Viewnode {
         if ! t . is_writeProtected () => Some (&t . gnid),
       _ => None, }}
 
-  /// Consume every save-only `(editRequest ...)`, and every readiness
+  /// Consume every save-only `(editRequest ...)`, and every processed
   /// request, carried by this occurrence.
   /// Call only after the save's skgsave-commit: failed saves and confirmation
   /// round-trips must leave requests in the user's buffer. `view_requests` are
@@ -1235,7 +1235,7 @@ impl Viewnode {
   pub fn consume_edit_request_after_save (
     &mut self,
   ) {
-    self . readiness_request = None;
+    self . processed_request = None;
     let restored = |request : &Option<RelationshipEditRequest>| -> bool {
       matches! ( request, Some (RelationshipEditRequest::RestoreRel) ) };
     match &mut self . kind {
@@ -1540,7 +1540,7 @@ pub fn viewforest_root_viewnode () -> Viewnode {
   viewnode_of (ViewnodeKind::BufferRoot) }
 
 /// A viewnode of the given kind, unfocused and not org-folded,
-/// carrying no change facts, no readiness request and no viewnode ID.
+/// carrying no change facts, no processed request and no viewnode ID.
 /// A literal that
 /// sets other fields can take the rest from it:
 /// 'Viewnode { foldAndFocus : FoldAndFocus { folded : true, .. FoldAndFocus::default () },
@@ -1551,7 +1551,7 @@ pub fn viewnode_of (
   Viewnode { foldAndFocus      : FoldAndFocus::default (),
              kind,
              change_facts      : ChangeFacts::default (),
-             readiness_request : None,
+             processed_request : None,
              viewnode_id       : None } }
 
 #[cfg(test)]

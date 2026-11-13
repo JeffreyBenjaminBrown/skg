@@ -210,7 +210,7 @@ fn a_node_merge_shows_both_acquisition_folders (
   Ok (( )) }
 
 #[test]
-fn marks_in_the_store_show_as_ready (
+fn marks_in_the_store_show_as_processed (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("kinds", &["public", "private"], |f| {
     let alias = |text : &str| LeafKey::Node {
@@ -221,7 +221,7 @@ fn marks_in_the_store_show_as_ready (
     assert! ( without_viewnode_ids (&buffer) . contains ("** (skg (oldText titleAndBody) (diff (leaves 1) (ready))) txt"),
               "{}", buffer );
     assert_lines_in_order ( &buffer, &[
-      "** (skg aliasFolder)", // a3 is not ready, so neither is the folder
+      "** (skg aliasFolder)", // a3 is not processed, so neither is the folder
       "*** (skg alias noClaim (view ghostWarrant) (diff (rel removed) (leaves 1) (ready))) a1",
       "*** (skg alias (diff (rel added) (leaves 1))) a3" ] );
     let buffer : String = all_changes_buffer_with_marks (

@@ -19,7 +19,7 @@
 # which a client learns from the headlines around it:
 #   'folderChange ready' or 'folderChange unready': the headline is a
 #     folder a member of which carries a change of its relationship,
-#     every such change ready, or not;
+#     every such change processed, or not;
 #   'pendingDetachment': the headline is 'noClaim', warranted, and
 #     under an editable parent.
 # A 'repoBoundary' renders with the skgrepo label table in
@@ -276,7 +276,7 @@
 (skg ghost (gnid g) (skgRepos (nodeRepo main)) (editRequest restoreNode) (diff (node removed) (rel removed)))
 ---- text: ᗣ☮ restore node ∃- ~-
 ---- styles: ghost*1 crucial*1 -*1 nonstandard*12 -*1 nonstandard*2 -*1 nonstandard*2
-==== diff view: a new member whose node object is ready
+==== diff view: a new member whose node object is processed
 (skg node (gnid x) (diff (node added) (rel added) (ready node)))
 ---- text: ∃+✓ ~+
 ---- styles: nonstandard*2 go*1 -*1 nonstandard*2
@@ -284,11 +284,11 @@
 (skg node (gnid x) (diff (properties changed) (leaves 2 all)))
 ---- text: M
 ---- styles: nonstandard*1
-==== diff view: a modified node in a new relationship, every leaf it records ready
+==== diff view: a modified node in a new relationship, every leaf it records processed
 (skg node (gnid x) (diff (rel added) (properties changed) (leaves 3 rel all) (ready all)))
 ---- text: M✓ ~+
 ---- styles: nonstandard*1 go*1 -*1 nonstandard*2
-==== diff view: a modified folder member, every leaf it records ready
+==== diff view: a modified folder member, every leaf it records processed
 (skg node (gnid x) writeProtected (diff (properties changed) (leaves 1 all) (ready all)))
 ---- text: ☮ M✓
 ---- styles: crucial*1 -*1 nonstandard*1 go*1
@@ -296,7 +296,7 @@
 (skg node (gnid x) (diff (ready rel node) (node added) (rel removed)))
 ---- text: ∃+✓ ~-✓
 ---- styles: nonstandard*2 go*1 -*1 nonstandard*2 go*1
-==== diff view: an added alias, ready
+==== diff view: an added alias, processed
 (skg alias (diff (rel added) (ready)))
 ---- text: alias +✓
 ---- styles: message*5 -*1 nonstandard*1 go*1
@@ -312,7 +312,7 @@
 (skg node (gnid x) (editRequest (ready node rel)))
 ---- text: request:ready:node request:ready:rel
 ---- styles: nonstandard*18 -*1 nonstandard*17
-==== diff view: old title and body, ready
+==== diff view: old title and body, processed
 (skg (oldText titleAndBody) (diff (ready)))
 ---- text: old title and body✓
 ---- styles: message*18 go*1
@@ -328,7 +328,7 @@
 (skg bodyDiff)
 ---- text: body diff
 ---- styles: message*9
-==== diff view: a home skgrepo move, ready
+==== diff view: a home skgrepo move, processed
 (skg (homeSkgrepoMove (old pub) (new priv)) (diff (ready)))
 ---- text: ⌂ -pub +priv✓
 ---- styles: message*1 -*1 normal*4 -*1 normal*5 go*1
@@ -336,7 +336,7 @@
 (skg (relRepoMove (old pub) (new priv)))
 ---- text: relationship moved from pub to priv
 ---- styles: message*23 -*1 normal*3 -*1 message*2 -*1 normal*4
-==== diff view: the content changeset marker, ready
+==== diff view: the content changeset marker, processed
 (skg (changesetMarker content) (diff (ready all)))
 ---- text: its content changed✓
 ---- styles: message*19 go*1
@@ -348,7 +348,7 @@
 (skg (changesetMarker orderOnly) (diff (ready all)))
 ---- text: order-only change✓
 ---- styles: message*17 go*1
-==== diff view: a ghost, its existence ready
+==== diff view: a ghost, its existence processed
 (skg ghost (gnid x) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed) (ready node)))
 ---- text: ᗣ☮ ∃-✓ ~-
 ---- styles: ghost*1 crucial*1 -*1 nonstandard*2 go*1 -*1 nonstandard*2
@@ -364,7 +364,7 @@
 (skg illegalEditFolder)
 ---- text: ☮ ILLEGAL EDIT TO FOREIGN NODE
 ---- styles: crucial*1 -*1 message*28
-==== diff view: a folder of recorders shown because of a change, ready
+==== diff view: a folder of recorders shown because of a change, processed
 (skg containerFolder)
 ---- context: folderChange ready
 ---- text: ☮ its other containers changed (other files)✓

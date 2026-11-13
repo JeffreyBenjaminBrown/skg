@@ -17,7 +17,7 @@ use skg::types::viewnode::{
   DiffChange, Existence, Folder, Viewnode, ViewnodeKind,
   Vognode, mk_editable_viewnode, viewforest_root_viewnode, viewnode_of};
 use skg::types::views_state::DiffViewBufferKind;
-use skg::diff_view::readiness_store::ReadinessStore;
+use skg::diff_view::processed_store::ProcessedStore;
 use skg::refresh::{Truth, refresh_viewforest};
 use skg::types::tree::forest::ViewForest;
 use skg::types::views_state::ViewnodeIdRecord;
@@ -107,7 +107,7 @@ fn a_container_folder_from_a_graph_straddle_holds_both_graphs_containers (
              restriction : &SkgrepoRestriction::unrestricted (&f . runtime . config) },
     RefreshMode::DiffView { straddle        : &f . straddle,
                             buffer_kind     : DiffViewBufferKind::AllChanges,
-                            readiness_store : &ReadinessStore::default () },
+                            processed_store : &ProcessedStore::default () },
     100 ) ?;
   let both : DiffChange = DiffChange::default ();
   assert_eq! ( children_with_change (forest . get (folder) . unwrap ()), vec! [
@@ -145,7 +145,7 @@ fn the_containerward_chain_walks_a_graph_straddles_union (
       &mut tree, &[r], &truth,
       RefreshMode::DiffView { straddle        : &f . straddle,
                               buffer_kind     : DiffViewBufferKind::AllChanges,
-                              readiness_store : &ReadinessStore::default () } ) ?;
+                              processed_store : &ProcessedStore::default () } ) ?;
     assert_eq! ( child_ids (&tree, r), vec! [ "c1", "c2", "c3" ] );
     assert! ( tree . get (r) . unwrap () . children () . any ( |child| matches! (
                 &child . value () . kind,

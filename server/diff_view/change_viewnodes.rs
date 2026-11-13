@@ -4,7 +4,7 @@
 //! moves, the changeset markers, the ghost of a node
 //! the after-graph lacks, and the two derived acquisition folders.
 //! Each is save-inert. The kinds of change they show are set here;
-//! readiness is read from the store where they are placed.
+//! whether each is processed is read from the store where they are placed.
 
 use crate::graph_straddle::types::{GraphStraddle, Partner};
 use crate::types::misc::{ID, SkgrepoChange};
@@ -98,7 +98,7 @@ pub fn mk_historical_viewnode (
     change_facts : ChangeFacts {
       change : DiffChange { node : Some (Existence::Removed), rel,
                             properties : false },
-      ready    : None,
+      processed : None,
       leaves   : None,
       .. ChangeFacts::default () },
     .. viewnode_of ( ViewnodeKind::Vognode ( Vognode::Ghost ( Ghost {

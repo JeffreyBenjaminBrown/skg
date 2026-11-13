@@ -1,7 +1,7 @@
 //! The "stage and commit" request ('docs/diff-view.org',
 //! "Stage and commit"): stage everything and git-commit it,
 //! in every owned skgrepo that has changes, with one message. When the
-//! readiness summary is incomplete, or some owned gitrepo has entries
+//! processed summary is incomplete, or some owned gitrepo has entries
 //! already staged, and the request lacks '(confirmed . t)', the answer
 //! asks for confirmation and nothing changes.
 //!
@@ -14,14 +14,14 @@
 
 use crate::rerender_pass::DiffViewBufferRerender;
 use crate::diff_view::change_leaves::{
-  BufferReadinessSummary, ReadinessSummary, readiness_response_sexp,
-  readiness_response_trailing_entries};
+  BufferProcessedSummary, ProcessedSummary, processed_response_sexp,
+  processed_response_trailing_entries};
 use crate::git_ops::stage_and_commit::{
   AlreadyStagedGitrepo, SkgrepoCommitOutcome,
   already_staged_entries_of_owned_gitrepos, stage_and_commit_owned_skgrepos};
 use crate::graph_straddle::build::current_graph_straddle_in_slot;
 use crate::graph_straddle::types::GraphStraddle;
-use crate::diff_view::readiness_store::ReadinessStore;
+use crate::diff_view::processed_store::ProcessedStore;
 use crate::serve::ViewsState;
 use crate::serve::rerender_stream::{
   PreparedRerenders, RerenderRequest, RerenderSelector, prepare_rerender_views,
@@ -47,10 +47,10 @@ use std::sync::{Arc, MutexGuard};
 pub enum StageAndCommitAnswer {
   /// Nothing was attempted.
   Refused (String),
-  /// The readiness summary is incomplete or 'already_staged' is not
+  /// The processed summary is incomplete or 'already_staged' is not
   /// empty, and the request was not confirmed. Nothing changed.
   NeedsConfirmation {
-    summary        : ReadinessSummary,
+    summary        : ProcessedSummary,
     already_staged : Vec<AlreadyStagedGitrepo>, },
   /// Each owned skgrepo's outcome, and any error met after the
   /// git-commits.
@@ -144,10 +144,10 @@ pub fn stage_and_commit (
     Err (e) => return StageAndCommitAnswer::Refused ( format! (
       "Cannot stage and commit: {}", e )), };
   if ! confirmed {
-    let summary : ReadinessSummary = {
-      let store : MutexGuard<ReadinessStore> =
-        env . runtime . lock_readiness_store ();
-      straddle . change_leaves () . readiness_summary (&store) };
+    let summary : ProcessedSummary = {
+      let store : MutexGuard<ProcessedStore> =
+        env . runtime . lock_processed_store ();
+      straddle . change_leaves () . processed_summary (&store) };
     let already_staged : Vec<AlreadyStagedGitrepo> =
       already_staged_entries_of_owned_gitrepos (&runtime . config);
     if ! summary . is_complete () || ! already_staged . is_empty () {
@@ -162,12 +162,12 @@ pub fn stage_and_commit (
     Err (e) => errors . push ( format! (
       "The graph straddle could not be rebuilt after the commits: {}", e )),
     Ok (rebuilt) => {
-      let mut store : MutexGuard<ReadinessStore> =
-        env . runtime . lock_readiness_store ();
+      let mut store : MutexGuard<ProcessedStore> =
+        env . runtime . lock_processed_store ();
       store . drop_marks_of_vanished_leaves (rebuilt . change_leaves ());
-      if let Err (e) = store . save ( &runtime . config . readiness_marks_path () ) {
+      if let Err (e) = store . save ( &runtime . config . processed_marks_path () ) {
         errors . push ( format! (
-          "The readiness marks were not written to disk: {}", e )); }}, }
+          "The processed marks were not written to disk: {}", e )); }}, }
   StageAndCommitAnswer::Committed { outcomes, errors } }
 
 /// Format, for each answer:
@@ -175,7 +175,7 @@ pub fn stage_and_commit (
 ///   ((needs-confirmation . t) [(already-staged (("GITREPO" "PATH"...) ...))]
 ///    (readiness-summary ...) (errors ()) (warnings ()))
 ///   ((commits (("SKGREPO" "COMMIT-ID") ...)) (errors (...)) (warnings ()))
-/// The readiness summary has the save response's form, with an
+/// The processed summary has the save response's form, with an
 /// not-editable count of 0. 'already-staged' is there only when some
 /// gitrepo had entries already staged. 'commits' lists the skgrepos git-committed; a
 /// skgrepo without changes is in neither list, a failed one is an
@@ -185,12 +185,12 @@ pub fn stage_and_commit_response_sexp (
 ) -> String {
   match answer {
     StageAndCommitAnswer::Refused (error) =>
-      sexp_to_client_string ( &readiness_response_sexp (
+      sexp_to_client_string ( &processed_response_sexp (
         Vec::new (), None, &[ error . clone () ], &[] )),
     StageAndCommitAnswer::NeedsConfirmation { summary, already_staged } => {
       let trailing_entries : Vec<Sexp> =
-        readiness_response_trailing_entries (
-          Some ( &BufferReadinessSummary {
+        processed_response_trailing_entries (
+          Some ( &BufferProcessedSummary {
             summary : summary . clone (), changes_not_editable_here : 0 } ),
           &[], &[] );
       let entries : Vec<String> =
@@ -215,7 +215,7 @@ pub fn stage_and_commit_response_sexp (
           Ok (_) => None, } )
         . chain ( errors . iter () . cloned () )
         . collect ();
-      sexp_to_client_string ( &readiness_response_sexp (
+      sexp_to_client_string ( &processed_response_sexp (
         vec! [ Sexp::List ( vec! [
           Sexp::Atom ( Atom::S ( "commits" . to_string () )),
           Sexp::List (commits) ] ) ],

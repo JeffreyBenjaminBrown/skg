@@ -430,7 +430,7 @@ fn value_held (
 /// for a kind is refused by the one rule, naming the kind and the
 /// field. ('nothing_the_table_does_not_offer_parses' refuses the
 /// values the table does not offer, among them every edit request on
-/// a kind whose '(editRequest ...)' holds only a readiness request.)
+/// a kind whose '(editRequest ...)' holds only a processed request.)
 #[test]
 fn each_variant_takes_its_tables_parts_and_no_other () {
   let table : Value = metadata_fields_table ();

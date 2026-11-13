@@ -144,10 +144,10 @@ fn in_the_diff_view_a_node_of_u_charges_the_budget () {
        node ("a"), node ("b") ] );
   let input : String = format! (
     "* {} p\n", occurrence_metadata ("p", "(viewRequests editableView)") );
-  let readiness_store : ReadinessStore = ReadinessStore::default ();
+  let processed_store : ProcessedStore = ProcessedStore::default ();
   let mode : RefreshMode = RefreshMode::DiffView {
     straddle : &straddle, buffer_kind : DiffViewBufferKind::AllChanges,
-    readiness_store : &readiness_store };
+    processed_store : &processed_store };
   let editable_members = |budget : usize| -> Vec<bool> {
     let run : Run = run_asserting_fixpoint_in (
       &input, &straddle . after, &unrestricted (), mode, budget );

@@ -1,19 +1,19 @@
-//! The change-forest: the tree of everything commit-readiness can be
+//! The change-forest: the tree of everything whose being processed can be
 //! asked about, built from the graph straddle, independent of any view
 //! ('docs/diff-view.org', "Change-forest leaves"). Its roots
 //! are the changed graphnodes that record a change; under each come its
 //! changed aspects; its leaves are the individual changes a user
 //! marks. A relationship's leaves live under its recorder.
 //!
-//! The readiness of a commit readiness aggregate (a set of leaves, a
-//! file, the whole changeset) is derived here from a 'ReadinessStore'.
+//! Whether a processed aggregate (a set of leaves, a
+//! file, the whole changeset) is processed is derived here from a 'ProcessedStore'.
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::{
   NodeRelation, RelationRole, RelationshipKey};
 use crate::graph_straddle::types::{GraphStraddle, NodeChanges, Partner};
 use crate::graph_straddle::union_walk::ROLES_OF_LISTED_MEMBERS;
-use crate::diff_view::readiness_store::ReadinessStore;
+use crate::diff_view::processed_store::ProcessedStore;
 use crate::serve::util::format_string_list_sexp;
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::nodes::complete::Flag;
@@ -25,7 +25,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
-/// One change a user can mark commit-ready.
+/// One change a user can mark processed.
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub enum LeafKey {
   Node {
@@ -75,27 +75,27 @@ pub struct ChangedFile {
 }
 
 /// What the client shows after a save of a diff-view buffer.
-/// Order-only files count as changed and ready. Foreign files are
-/// counted apart, and never ready.
+/// Order-only files count as changed and processed. Foreign files are
+/// counted apart, and never processed.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct ReadinessSummary {
-  pub ready_files           : usize,
+pub struct ProcessedSummary {
+  pub processed_files           : usize,
   pub changed_files         : usize,
   pub foreign_changed_files : usize,
   pub order_only_files      : usize,
 }
 
-/// The readiness summary a save of a diff-view buffer reports: that of the
+/// The processed summary a save of a diff-view buffer reports: that of the
 /// whole changeset, and how many of its leaves are not editable in
 /// the buffer (their recorder is not among the nodes
 /// 'nodes_editable_in_diffView' returns for it).
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct BufferReadinessSummary {
-  pub summary                   : ReadinessSummary,
+pub struct BufferProcessedSummary {
+  pub summary                   : ProcessedSummary,
   pub changes_not_editable_here : usize,
 }
 
-impl BufferReadinessSummary {
+impl BufferProcessedSummary {
   /// '(readiness-summary (ready N) (changed M) (foreign F)
   /// (order-only O) (notEditable K))'.
   pub fn to_sexp (
@@ -106,33 +106,33 @@ impl BufferReadinessSummary {
                           Sexp::Atom ( Atom::I ( count as i64 )) ] ) };
     Sexp::List ( vec! [
       Sexp::Atom ( Atom::S ( "readiness-summary" . to_string () )),
-      entry ( "ready",       self . summary . ready_files ),
+      entry ( "ready",       self . summary . processed_files ),
       entry ( "changed",     self . summary . changed_files ),
       entry ( "foreign",     self . summary . foreign_changed_files ),
       entry ( "order-only",  self . summary . order_only_files ),
       entry ( "notEditable", self . changes_not_editable_here ), ] ) }
 }
 
-/// The response of a request that can report a readiness summary:
+/// The response of a request that can report a processed summary:
 ///   (LEADING... (readiness-summary ...) (errors (...)) (warnings (...)))
 /// 'leading' are the request's own entries; the summary is there when
 /// one is given.
-pub fn readiness_response_sexp (
+pub fn processed_response_sexp (
   leading  : Vec<Sexp>,
-  summary  : Option<&BufferReadinessSummary>,
+  summary  : Option<&BufferProcessedSummary>,
   errors   : &[String],
   warnings : &[String],
 ) -> Sexp {
   Sexp::List (
     leading . into_iter ()
-      . chain ( readiness_response_trailing_entries (
+      . chain ( processed_response_trailing_entries (
         summary, errors, warnings ))
       . collect () ) }
 
-/// The entries of 'readiness_response_sexp' after the leading ones,
+/// The entries of 'processed_response_sexp' after the leading ones,
 /// for a response whose leading entries are printed by hand.
-pub fn readiness_response_trailing_entries (
-  summary  : Option<&BufferReadinessSummary>,
+pub fn processed_response_trailing_entries (
+  summary  : Option<&BufferProcessedSummary>,
   errors   : &[String],
   warnings : &[String],
 ) -> Vec<Sexp> {
@@ -378,64 +378,64 @@ impl ChangeLeaves {
     &self . order_only_pids }
 
   /// Whether every key among 'keys' that is a leaf of this forest is
-  /// marked ready with its current fingerprint. Keys that are not
+  /// marked processed with its current fingerprint. Keys that are not
   /// leaves (unchanged things) are never asked.
-  pub fn readiness_of_leaves<'a> (
+  pub fn processed_of_leaves<'a> (
     &self,
-    store         : &ReadinessStore,
+    store         : &ProcessedStore,
     keys  : impl IntoIterator<Item = &'a LeafKey>,
   ) -> bool {
     keys . into_iter ()
       . filter_map ( |key| self . leaf (key) )
-      . all ( |leaf| store . is_ready (&leaf . key, leaf . fingerprint) ) }
+      . all ( |leaf| store . is_processed (&leaf . key, leaf . fingerprint) ) }
 
-  /// A file is ready iff every leaf it records is. A file whose only
-  /// change is order has no leaf, and so is ready.
-  pub fn readiness_of_file (
+  /// A file is processed iff every leaf it records is. A file whose only
+  /// change is order has no leaf, and so is processed.
+  pub fn processed_of_file (
     &self,
-    store : &ReadinessStore,
+    store : &ProcessedStore,
     file  : &ChangedFile,
   ) -> bool {
-    self . readiness_of_leaves (
+    self . processed_of_leaves (
       store,
       self . leaves_in_file (file) . into_iter ()
         . map ( |leaf| &leaf . key )) }
 
-  pub fn readiness_summary (
+  pub fn processed_summary (
     &self,
-    store         : &ReadinessStore,
-  ) -> ReadinessSummary {
+    store         : &ProcessedStore,
+  ) -> ProcessedSummary {
     let files : BTreeSet<ChangedFile> = self . files_changed ();
-    ReadinessSummary {
-      ready_files : files . iter ()
-        . filter ( |file| self . readiness_of_file (store, file) )
+    ProcessedSummary {
+      processed_files : files . iter ()
+        . filter ( |file| self . processed_of_file (store, file) )
         . count (),
       changed_files         : files . len (),
       foreign_changed_files : self . foreign_changed_files,
       order_only_files      : self . order_only_files . len (), } }
 
-  /// The readiness summary, with the count of leaves whose recorder
+  /// The processed summary, with the count of leaves whose recorder
   /// is not among 'editable_here' (the nodes a buffer makes editable,
   /// 'nodes_editable_in_diffView').
-  pub fn buffer_readiness_summary (
+  pub fn buffer_processed_summary (
     &self,
-    store         : &ReadinessStore,
+    store         : &ProcessedStore,
     editable_here : &HashSet<ID>,
-  ) -> BufferReadinessSummary {
-    BufferReadinessSummary {
-      summary                   : self . readiness_summary (store),
+  ) -> BufferProcessedSummary {
+    BufferProcessedSummary {
+      summary                   : self . processed_summary (store),
       changes_not_editable_here : self . leaves_by_recorder . iter ()
         . filter ( |(recorder, _)| ! editable_here . contains (*recorder) )
         . map ( |(_, leaves)| leaves . len () )
         . sum (), } }
 }
 
-impl ReadinessSummary {
-  /// Every changed file of the owned skgrepos is ready.
+impl ProcessedSummary {
+  /// Every changed file of the owned skgrepos is processed.
   pub fn is_complete (
     &self,
   ) -> bool {
-    self . ready_files == self . changed_files }
+    self . processed_files == self . changed_files }
 }
 
 /// The nodes of either graph that the other lacks or holds unequal.

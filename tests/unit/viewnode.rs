@@ -55,10 +55,10 @@ fn consuming_edit_requests_covers_every_carrier_but_not_view_requests () {
     [ViewRequest::Editable] . into_iter () . collect () );
   if let ViewnodeKind::Vognode (Vognode::Occurrence (node)) = &mut viewnode . kind {
     node . relationshipEditRequest = Some ( RelationshipEditRequest::RelRepo ( SkgrepoName::from ("private") )); }
-  viewnode . readiness_request = Some (ReadinessRequest {
-    ready : true, objects : [DiffObject::All] . into_iter () . collect () });
+  viewnode . processed_request = Some (ProcessedRequest {
+    processed : true, objects : [DiffObject::All] . into_iter () . collect () });
   viewnode . consume_edit_request_after_save ();
-  assert_eq! (viewnode . readiness_request, None);
+  assert_eq! (viewnode . processed_request, None);
   let ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) = &viewnode . kind
   else { panic! ("expected an occurrence"); };
   assert_eq! (occurrence . relationshipEditRequest, None);
@@ -66,8 +66,8 @@ fn consuming_edit_requests_covers_every_carrier_but_not_view_requests () {
   assert! (occurrence . view_requests . contains (&ViewRequest::Editable));
 
   let mut unknown : Viewnode = Viewnode {
-    readiness_request : Some (ReadinessRequest {
-      ready : true, objects : BTreeSet::new () }),
+    processed_request : Some (ProcessedRequest {
+      processed : true, objects : BTreeSet::new () }),
     .. viewnode_of ( ViewnodeKind::Vognode (Vognode::GnidOnly (
       GnidOnlyVognode {
         relationshipEditRequest : Some (RelationshipEditRequest::RelRepo (SkgrepoName::from ("private"))),
@@ -75,17 +75,17 @@ fn consuming_edit_requests_covers_every_carrier_but_not_view_requests () {
           GnidOnlyKind::Unknown, ID::from ("unknown"), None, CLAIMS_MEMBERSHIP,
           Warrant::ByGraph ) }))) };
   unknown . consume_edit_request_after_save ();
-  assert_eq! (unknown . readiness_request, None);
+  assert_eq! (unknown . processed_request, None);
   let ViewnodeKind::Vognode (Vognode::GnidOnly (unknown)) = &unknown . kind
   else { panic! ("expected unknown node"); };
   assert_eq! (unknown . relationshipEditRequest, None);
 
   let mut alias : Viewnode = Viewnode {
-    readiness_request : Some (ReadinessRequest {
-      ready : false, objects : BTreeSet::new () }),
+    processed_request : Some (ProcessedRequest {
+      processed : false, objects : BTreeSet::new () }),
     .. viewnode_of ( ViewnodeKind::PropertyMember (PropertyMember::alias ( "alias" . into (), None, Some (RelationshipEditRequest::RelRepo (SkgrepoName::from ("private"))) ))) };
   alias . consume_edit_request_after_save ();
-  assert_eq! (alias . readiness_request, None);
+  assert_eq! (alias . processed_request, None);
   let ViewnodeKind::PropertyMember (PropertyMember::Alias { relationshipEditRequest, .. }) =
     &alias . kind
   else { panic! ("expected alias"); };

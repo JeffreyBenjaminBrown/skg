@@ -1,6 +1,6 @@
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::diff_view::readiness_requests::{
-  NamedLeafSet, RequestedReadiness, readiness_requests_in_viewforest};
+use crate::diff_view::processed_requests::{
+  NamedLeafSet, RequestedProcessed, processed_requests_in_viewforest};
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::NodeEditRequest;
 use crate::types::viewnode::{Viewnode, ViewnodeKind};
@@ -116,28 +116,28 @@ fn collect_instructions(
 
 /// PURPOSE:
 /// Find the change leaves that two headlines of a buffer the user
-/// asked to save name with contradictory readiness requests, one
+/// asked to save name with contradictory processed requests, one
 /// '(ready ...)' and one '(unready ...)'. Each is returned as the set
 /// both name ('NamedLeafSet'), with the headlines that name it, in
 /// buffer order. Requests that agree contradict nothing.
 /// .
 /// STRATEGY:
 /// Which leaves a request names is 'leaves_named_at'
-/// ('server/diff_view/readiness_requests.rs'), resolving IDs through
+/// ('server/diff_view/processed_requests.rs'), resolving IDs through
 /// 'graph'. Without the change forest, an 'all' request, or a
 /// changeset marker's, names a set of leaves that the forest fills
 /// in; two requests contradict where their sets can share a leaf
 /// ('NamedLeafSet::overlap'), and the shared part is what is named.
-pub fn find_contradictory_readiness_requests (
+pub fn find_contradictory_processed_requests (
   viewforest : &ViewForest,
   graph      : &InRustGraph,
 ) -> Vec<(NamedLeafSet, Vec<HeadlineName>)> {
-  let requests : Vec<RequestedReadiness> =
-    readiness_requests_in_viewforest (viewforest, graph);
+  let requests : Vec<RequestedProcessed> =
+    processed_requests_in_viewforest (viewforest, graph);
   let mut contradictions : Vec<(NamedLeafSet, Vec<HeadlineName>)> = Vec::new ();
   for (position, earlier) in requests . iter () . enumerate () {
     for later in &requests [position + 1 ..] {
-      if earlier . ready != later . ready {
+      if earlier . processed != later . processed {
         record_contradictions_between (earlier, later, &mut contradictions); }}}
   contradictions . into_iter ()
     . map ( |(set, mut headlines)| {
@@ -147,11 +147,11 @@ pub fn find_contradictory_readiness_requests (
     . collect () }
 
 /// Record in 'contradictions' each set of leaves that 'earlier' and
-/// 'later', two requests of opposite readiness, both name, with the
+/// 'later', two requests of opposite kinds, both name, with the
 /// headlines of both: a set already recorded gains them, once each.
 fn record_contradictions_between (
-  earlier        : &RequestedReadiness,
-  later          : &RequestedReadiness,
+  earlier        : &RequestedProcessed,
+  later          : &RequestedProcessed,
   contradictions : &mut Vec<(NamedLeafSet, Vec<HeadlineName>)>,
 ) {
   for earlier_set in &earlier . named {

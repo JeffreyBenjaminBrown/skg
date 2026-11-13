@@ -30,7 +30,7 @@ use skg::org_to_text::viewnode_to_string;
 use skg::serve::parse_metadata_sexp::{
   ViewnodeMetadata, parse_metadata_to_viewnodemd, viewnode_from_metadata};
 use skg::types::viewnode::{
-  ChangeFacts, PropertyMember, ReadinessRequest, Viewnode, ViewnodeKind, Vognode, Warrant};
+  ChangeFacts, PropertyMember, ProcessedRequest, Viewnode, ViewnodeKind, Vognode, Warrant};
 
 //
 // Git helpers
@@ -118,13 +118,13 @@ pub async fn save_and_read_collateral (
 // Viewnode helpers
 //
 
-/// 'node' with these change facts and this readiness request.
+/// 'node' with these change facts and this processed request.
 pub fn with_facts (
   node              : Viewnode,
   change_facts      : ChangeFacts,
-  readiness_request : Option<ReadinessRequest>,
+  processed_request : Option<ProcessedRequest>,
 ) -> Viewnode {
-  Viewnode { change_facts, readiness_request, .. node } }
+  Viewnode { change_facts, processed_request, .. node } }
 
 /// Render 'node''s metadata, assert it is 'expected', parse it back
 /// and assert that the parse refuses and warns of nothing and yields

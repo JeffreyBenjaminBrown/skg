@@ -3,7 +3,7 @@ use crate::serve::util::sexp_to_client_string;
 use crate::types::misc::SkgrepoName;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
-  ChangeFacts, FoldAndFocus, ReadinessRequest,
+  ChangeFacts, FoldAndFocus, ProcessedRequest,
   Viewnode, ViewnodeKind, Vognode, PropertyMember, ChangeViewnode, Occurrence,
   Ghost, GnidOnlyVognode, NodeEditRequest,
   RelationshipEditRequest,
@@ -183,7 +183,7 @@ fn viewnode_to_string_without_viewnode_id (
   claims_are_read : bool,
 ) -> Result < String, Box<dyn Error> > {
   let change_facts : &ChangeFacts = &viewnode . change_facts;
-  let request : &Option<ReadinessRequest> = &viewnode . readiness_request;
+  let request : &Option<ProcessedRequest> = &viewnode . processed_request;
   match &viewnode . kind {
     ViewnodeKind::Folder (folder) =>
       Ok ( non_vognode_atom_metadata_to_string (
@@ -235,7 +235,7 @@ fn propertyMember_metadata_to_string (
   member          : &PropertyMember,
   claims_are_read : bool,
   change_facts    : &ChangeFacts,
-  request         : &Option<ReadinessRequest>,
+  request         : &Option<ProcessedRequest>,
 ) -> String {
   let mut parts : Vec < String > = foldAndFocus_atoms (foldAndFocus);
   let warrant : Warrant = match member {
@@ -271,7 +271,7 @@ fn changeViewnode_metadata_to_string (
   foldAndFocus    : FoldAndFocus,
   change          : &ChangeViewnode,
   change_facts    : &ChangeFacts,
-  request         : &Option<ReadinessRequest>,
+  request         : &Option<ProcessedRequest>,
 ) -> String {
   let mut parts : Vec < String > = foldAndFocus_atoms (foldAndFocus);
   match change {
@@ -335,15 +335,15 @@ fn relationshipEditRequest_element (
       "restoreRel" . to_string (), } }
 
 /// '(editRequest [REQUEST] [(ready OBJECT...) | (unready OBJECT...)])':
-/// the headline's one edit request, if any, then its readiness
+/// the headline's one edit request, if any, then its processed
 /// request, if any. None when it has neither.
 fn editRequest_form (
   edit_request : Option<String>,
-  readiness    : &Option<ReadinessRequest>,
+  processed    : &Option<ProcessedRequest>,
 ) -> Option<String> {
   let elements : Vec<String> =
     edit_request . into_iter ()
-    . chain ( readiness . as_ref () . map ( |request| sexp_form (
+    . chain ( processed . as_ref () . map ( |request| sexp_form (
       request . form_head (),
       request . objects . iter () . map ( |object| object . wire_name () )
       . collect () )))
@@ -385,7 +385,7 @@ fn diff_form (
       once ( count . as_str () )
       . chain ( leaves . objects . iter () . map ( |object| object . wire_name () ))
       . collect () )); }
-  if let Some (objects) = &change_facts . ready {
+  if let Some (objects) = &change_facts . processed {
     parts . push ( sexp_form ( "ready",
       objects . iter () . map ( |object| object . wire_name () ) . collect () )); }
   if let Some (home_skgrepo_move) = &change_facts . home_skgrepo_move {
@@ -411,13 +411,13 @@ fn occurrence_metadata_to_string (
   occurrence : & Occurrence,
   claims_are_read     : bool,
   change_facts        : & ChangeFacts,
-  request             : & Option<ReadinessRequest>,
+  request             : & Option<ProcessedRequest>,
 ) -> String {
   fn node_parts (
     occurrence : & Occurrence,
     claims_are_read     : bool,
     change_facts : & ChangeFacts,
-    request   : & Option<ReadinessRequest>,
+    request   : & Option<ProcessedRequest>,
   ) -> Vec < String > {
     fn view_facts (
       occurrence : & Occurrence,
@@ -490,14 +490,14 @@ fn occurrence_metadata_to_string (
 /// Render metadata for a ghost:
 ///   [focused] [folded] [bodyFolded] ghost (gnid X)
 ///   (skgRepos (nodeRepo R)) [noClaim]
-///   [(editRequest [restoreNode] [READINESS])]
+///   [(editRequest [restoreNode] [PROCESSED])]
 ///   [(view noWarrant)] [(diff ...)]
 fn ghost_metadata_to_string (
   foldAndFocus    : FoldAndFocus,
   ghost           : &Ghost,
   claims_are_read : bool,
   change_facts    : &ChangeFacts,
-  request         : &Option<ReadinessRequest>,
+  request         : &Option<ProcessedRequest>,
 ) -> String {
   let mut parts : Vec < String > = foldAndFocus_atoms (foldAndFocus);
   parts . extend (
@@ -519,7 +519,7 @@ fn ghost_metadata_to_string (
 /// 'restricted':
 ///   [focused] [folded] [bodyFolded] KIND (gnid X)
 ///   [(skgRepos (relRepo R))] [noClaim]
-///   [(editRequest [(relRepo R)] [READINESS])] [(diff ...)]
+///   [(editRequest [(relRepo R)] [PROCESSED])] [(diff ...)]
 /// An unknown stands where a referenced ID resolved to nothing in any
 /// db; a restricted viewnode, where a visible record names a node the
 /// skgrepo restriction keeps out.
@@ -528,7 +528,7 @@ fn gnid_only_vognode_metadata_to_string (
   vognode         : &GnidOnlyVognode,
   claims_are_read : bool,
   change_facts    : &ChangeFacts,
-  request         : &Option<ReadinessRequest>,
+  request         : &Option<ProcessedRequest>,
 ) -> String {
   let mut parts : Vec < String > = foldAndFocus_atoms (foldAndFocus);
   parts . push ( vognode . kind . wire_atom () . to_string () );

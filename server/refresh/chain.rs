@@ -14,7 +14,7 @@
 //! reinstates a chain node once drawn; no request extends a chain,
 //! and a request on a chain node for its containers draws a
 //! containers folder under it like any other. A chain node carries no
-//! change facts and takes no commit-readiness marker
+//! change facts and takes no processed marker
 //! ('stands_in_containerward_chain').
 
 use crate::dbs::in_rust_graph::containerward_role_tree::{

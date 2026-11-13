@@ -331,7 +331,7 @@ fn the_retired_owned_folder_key_is_refused (
 /// A config in an owner's folder names the other owners' skgrepos by
 /// paths that leave it ('../claude/public'). Each resolves to a plain
 /// absolute path, with no '..' left in it; what the config's location
-/// gives (the search index, the readiness marks) stays in that folder.
+/// gives (the search index, the processed marks) stays in that folder.
 #[test]
 fn a_skgrepo_path_that_leaves_the_data_root_resolves_without_dot_dot (
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -361,7 +361,7 @@ fn a_skgrepo_path_that_leaves_the_data_root_resolves_without_dot_dot (
                data_parent_path . join ("claude/team/ed/notes") );
   assert_eq! ( config . tantivy_folder,
                data_parent_path . join ("jeff/.index.tantivy") );
-  assert_eq! ( config . readiness_marks_path (),
+  assert_eq! ( config . processed_marks_path (),
                data_parent_path . join (
                  "jeff/readiness-marks-skgconfig.json" ));
   Ok (( )) }

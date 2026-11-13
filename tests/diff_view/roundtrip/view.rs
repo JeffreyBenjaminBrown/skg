@@ -19,7 +19,7 @@ use skg::dbs::in_rust_graph::InRustGraph;
 use skg::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewforest;
 use skg::org_to_text::{viewforest_to_string, viewforest_tree_to_string};
-use skg::diff_view::readiness_store::ReadinessStore;
+use skg::diff_view::processed_store::ProcessedStore;
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::diff_view::change_viewnodes::{
   mk_acquired_folder_viewnode, mk_body_diff_viewnode, mk_changeset_marker_viewnode,
@@ -228,12 +228,12 @@ fn the_new_viewnodes_cross_the_wire (
               "a content view keeps no ghost:\n{}", response . saved_view );
     Ok (( )) }) }
 
-/// A readiness request on the old text names the node's text leaf;
+/// A processed request on the old text names the node's text leaf;
 /// on a ghost's node object, its existence; on the content
 /// changeset marker ('all'), the relationship leaves of its node's
 /// content.
 #[test]
-fn readiness_requests_on_the_new_viewnodes_name_their_leaves (
+fn processed_requests_on_the_new_viewnodes_name_their_leaves (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ( |f| {
     let buffer : String = buffer_with_every_new_viewnode (f) ?
@@ -249,7 +249,7 @@ fn readiness_requests_on_the_new_viewnodes_name_their_leaves (
         recorder : ID::from ("p"), member : ID::from ("gone") },
       aspect       : RelationshipAspect::Existence };
     assert_eq! (
-      ReadinessStore::load ( &f . config . readiness_marks_path () ) . marks
+      ProcessedStore::load ( &f . config . processed_marks_path () ) . marks
         . into_keys () . collect::<HashSet<LeafKey>> (),
       [ LeafKey::Node { pid : ID::from ("a"), aspect : NodeAspect::Text },
         LeafKey::Node { pid : ID::from ("gone"), aspect : NodeAspect::Existence } ]
@@ -263,7 +263,7 @@ fn readiness_requests_on_the_new_viewnodes_name_their_leaves (
         "(changesetMarker content))",
         "(changesetMarker content) (editRequest (ready all)))", 1 )) ?;
     assert! ( response . errors . is_empty (), "{:?}", response . errors );
-    assert! ( ReadinessStore::load ( &f . config . readiness_marks_path () ) . marks
+    assert! ( ProcessedStore::load ( &f . config . processed_marks_path () ) . marks
               . contains_key (&p_contains_gone) );
     Ok (( )) }) }
 

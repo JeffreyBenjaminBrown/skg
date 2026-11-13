@@ -30,8 +30,8 @@ mod move_skgrepo;
 #[path = "search_buffer.rs"]
 mod search_buffer;
 
-#[path = "readiness_requests.rs"]
-mod readiness_requests;
+#[path = "processed_requests.rs"]
+mod processed_requests;
 
 #[path = "redraw_delta.rs"]
 mod redraw_delta;

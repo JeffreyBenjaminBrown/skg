@@ -233,7 +233,7 @@ fn rekind_to_occurrence (
   let occurrence : Occurrence = Occurrence {
     relationshipEditRequest : relationship_edit_request_of (&other),
     .. occurrence };
-  set_vognode_keeping_readiness (tree, child, Vognode::Occurrence (occurrence));
+  set_vognode_keeping_processed (tree, child, Vognode::Occurrence (occurrence));
   if was_gnid_only {
     reset_the_claims_of_children (tree, child); }
   if editability == DrawnEditability::Editable {
@@ -262,12 +262,12 @@ fn rekind_to_ghost (
     claimsMembership : other . claims () && named_by_the_list,
     .. ghost_from_head (pid, walk)
        . ok_or ("rekind_vognode: HEAD lacks the node it has") ? };
-  set_vognode_keeping_readiness (tree, child, Vognode::Ghost (ghost));
+  set_vognode_keeping_processed (tree, child, Vognode::Ghost (ghost));
   Ok (( )) }
 
 /// Make the vognode 'other' at 'child' a gnid-only vognode of 'kind'
 /// for 'gnid', where it stands, keeping its claim, its relRepo request
-/// (an edit request of another kind it drops) and its readiness
+/// (an edit request of another kind it drops) and its processed
 /// request.
 fn rekind_to_gnid_only (
   tree        : &mut Tree<Viewnode>,
@@ -283,7 +283,7 @@ fn rekind_to_gnid_only (
     relationship_edit_request_of (&other)
     . filter ( |request| matches! ( request, RelationshipEditRequest::RelRepo (_) ));
   forget_editable_occurrence (&other, child, walk);
-  set_vognode_keeping_readiness (
+  set_vognode_keeping_processed (
     tree, child, Vognode::GnidOnly ( GnidOnlyVognode {
       relationshipEditRequest : relationship_edit_request,
       .. GnidOnlyVognode::new (
@@ -425,9 +425,9 @@ fn goal_relRepo (
     . and_then ( |item| item . relRepo . clone () ) }
 
 /// Set the vognode at 'treeid' to 'vognode', keeping its fold state,
-/// vnid and readiness request (an edit request every vognode has a
+/// vnid and processed request (an edit request every vognode has a
 /// slot for). Its change facts describe the kind replaced, so they go.
-fn set_vognode_keeping_readiness (
+fn set_vognode_keeping_processed (
   tree    : &mut Tree<Viewnode>,
   treeid  : NodeId,
   vognode : Vognode,

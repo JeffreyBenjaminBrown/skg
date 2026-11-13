@@ -3,8 +3,8 @@
 use super::*;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
-use crate::diff_view::readiness_requests::{
-  NamedLeafSet, RequestedReadiness, apply_readiness_requests};
+use crate::diff_view::processed_requests::{
+  NamedLeafSet, RequestedProcessed, apply_processed_requests};
 use crate::types::errors::HeadlineName;
 use crate::types::misc::{MSV, RelPartner};
 use crate::types::nodes::complete::{Graphnode, empty_graphnode};
@@ -113,10 +113,10 @@ fn a_reorder_has_no_leaf_but_its_file_changed () {
   assert! ( forest . leaves_under (&ID::from ("r")) . is_empty () );
   assert_eq! ( straddle . order_only_pids () . iter () . collect::<Vec<_>> (),
                vec! [ &ID::from ("r") ] );
-  let summary : ReadinessSummary =
-    forest . readiness_summary ( &ReadinessStore::default () );
-  assert_eq! ( summary, ReadinessSummary {
-    ready_files : 1, changed_files : 1,
+  let summary : ProcessedSummary =
+    forest . processed_summary ( &ProcessedStore::default () );
+  assert_eq! ( summary, ProcessedSummary {
+    processed_files : 1, changed_files : 1,
     foreign_changed_files : 0, order_only_files : 1 } );
   assert! ( summary . is_complete () ); }
 
@@ -128,14 +128,14 @@ fn a_mark_lapses_when_its_change_changes () {
   let edited : GraphStraddle =
     straddle ( before, vec! [ node ("a", "newer", &[]) ] );
   let key : LeafKey = node_key ("a", NodeAspect::Text);
-  let mut store : ReadinessStore = ReadinessStore::default ();
+  let mut store : ProcessedStore = ProcessedStore::default ();
   store . mark ( key . clone (),
                  first . change_leaves () . leaf_fingerprint (&key) . unwrap () );
-  assert! ( first  . change_leaves () . readiness_of_leaves (&store, [&key]) );
-  assert! ( ! edited . change_leaves () . readiness_of_leaves (&store, [&key]) ); }
+  assert! ( first  . change_leaves () . processed_of_leaves (&store, [&key]) );
+  assert! ( ! edited . change_leaves () . processed_of_leaves (&store, [&key]) ); }
 
 #[test]
-fn readiness_aggregates_over_the_leaves_that_exist () {
+fn processed_aggregates_over_the_leaves_that_exist () {
   let straddle : GraphStraddle = straddle (
     vec! [ node ("r", "r", &[]), node ("a", "a", &[]) ],
     vec! [ node ("r", "r, retitled", &["a"]), node ("a", "a", &[]) ] );
@@ -143,19 +143,19 @@ fn readiness_aggregates_over_the_leaves_that_exist () {
   let text   : LeafKey = node_key ("r", NodeAspect::Text);
   let member : LeafKey = contains_key ("r", "a", RelationshipAspect::Existence);
   let unchanged : LeafKey = node_key ("a", NodeAspect::Text);
-  let mut store : ReadinessStore = ReadinessStore::default ();
+  let mut store : ProcessedStore = ProcessedStore::default ();
   store . mark ( text . clone (), forest . leaf_fingerprint (&text) . unwrap () );
-  assert! ( forest . readiness_of_leaves (&store, [&text, &unchanged]),
+  assert! ( forest . processed_of_leaves (&store, [&text, &unchanged]),
             "a key that is no leaf is never asked" );
-  assert! ( ! forest . readiness_of_leaves (&store, [&text, &member]) );
+  assert! ( ! forest . processed_of_leaves (&store, [&text, &member]) );
   let file : ChangedFile = ChangedFile { skgrepo : SkgrepoName::from ("main"),
                                          pid     : ID::from ("r") };
-  assert! ( ! forest . readiness_of_file (&store, &file) );
-  assert_eq! ( forest . readiness_summary (&store) . ready_files, 0 );
+  assert! ( ! forest . processed_of_file (&store, &file) );
+  assert_eq! ( forest . processed_summary (&store) . processed_files, 0 );
   store . mark ( member . clone (), forest . leaf_fingerprint (&member) . unwrap () );
-  assert! ( forest . readiness_of_file (&store, &file) );
-  assert_eq! ( forest . readiness_summary (&store), ReadinessSummary {
-    ready_files : 1, changed_files : 1,
+  assert! ( forest . processed_of_file (&store, &file) );
+  assert_eq! ( forest . processed_summary (&store), ProcessedSummary {
+    processed_files : 1, changed_files : 1,
     foreign_changed_files : 0, order_only_files : 0 } ); }
 
 /// Before: r contains a. After: r also contains the new node n1, which
@@ -203,15 +203,15 @@ fn a_walk_through_new_nodes_follows_its_relations_only () {
   assert_eq! ( walk ("a", NewNodeWalk::Contentward), ids (&["n3"]) );
   assert_eq! ( walk ("n4", NewNodeWalk::Contentward), ids (&["n4"]) ); }
 
-/// The marks a ready request on 'set' leaves in an empty store.
+/// The marks a processed request on 'set' leaves in an empty store.
 fn marked_by (
   forest : &ChangeLeaves,
   set    : NamedLeafSet,
 ) -> HashSet<LeafKey> {
-  let mut store : ReadinessStore = ReadinessStore::default ();
-  let warnings : Vec<String> = apply_readiness_requests (
-    &[ RequestedReadiness {
-      ready    : true,
+  let mut store : ProcessedStore = ProcessedStore::default ();
+  let warnings : Vec<String> = apply_processed_requests (
+    &[ RequestedProcessed {
+      processed : true,
       named    : vec! [ set ],
       headline : HeadlineName { title        : String::new (),
                                 graphnode_id : None,

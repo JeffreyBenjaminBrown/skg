@@ -7,12 +7,12 @@
 //! follows a reload does it to each buffer the reload named
 //! ('DiffViewBufferRerender::ExtendingWhereAReloadAsked').
 //!
-//! The answer carries the readiness summary of the rerendered buffer,
+//! The answer carries the processed summary of the rerendered buffer,
 //! as a save's does, and is followed by a rerender stream: the one
 //! view, or nothing when the request was refused.
 
-use crate::diff_view::change_leaves::{BufferReadinessSummary, readiness_response_sexp};
-use crate::diff_view::readiness_requests::buffer_readiness_summary_for;
+use crate::diff_view::change_leaves::{BufferProcessedSummary, processed_response_sexp};
+use crate::diff_view::processed_requests::buffer_processed_summary_for;
 use crate::graph_straddle::types::GraphStraddle;
 use crate::serve::ViewsState;
 use crate::serve::rerender_stream::{
@@ -43,7 +43,7 @@ pub fn handle_extend_diff_view_request (
       send_response_with_length_prefix (
         stream, &tag_sexp_response (
           TcpToClient::ExtendDiffView,
-          &sexp_to_client_string ( &readiness_response_sexp (
+          &sexp_to_client_string ( &processed_response_sexp (
             Vec::new (), None, &[ error ], &[] )) ));
       stream_empty_rerender (stream); },
     Ok (( prepared, summary )) => {
@@ -53,14 +53,14 @@ pub fn handle_extend_diff_view_request (
       send_response_with_length_prefix (
         stream, &tag_sexp_response (
           TcpToClient::ExtendDiffView,
-          &sexp_to_client_string ( &readiness_response_sexp (
+          &sexp_to_client_string ( &processed_response_sexp (
             Vec::new (), Some (&summary), &[], &[] )) ));
       stream_prepared_rerenders (stream, views_state, prepared); }, }}
 
 /// The named buffer's registered viewforest, rerendered over the
 /// connection's graph straddle, brought up to date, and extended to
 /// the changes it does not show ('DiffViewBufferRerender::Extending'),
-/// and the readiness summary of the result. Nothing is registered or sent. Refused
+/// and the processed summary of the result. Nothing is registered or sent. Refused
 /// unless the connection is unrestricted, as the diff view
 /// is, and unless the view is a buffer of the diff view.
 fn extend_diff_view_buffer (
@@ -68,7 +68,7 @@ fn extend_diff_view_buffer (
   views_state         : &ViewsState,
   skgrepo_restriction : &SkgrepoRestriction,
   request             : &str,
-) -> Result<(PreparedRerenders, BufferReadinessSummary), String> {
+) -> Result<(PreparedRerenders, BufferProcessedSummary), String> {
   require_unrestricted (
     "Extending the diff view", skgrepo_restriction ) ?;
   let viewforest_id : ViewforestId = viewforest_id_from_request (request) ?;
@@ -86,6 +86,6 @@ fn extend_diff_view_buffer (
     (Option<&RerenderedView>, Option<&Arc<GraphStraddle>>) =
     (prepared . views . first (), prepared . graph_straddle . as_ref ())
     else { return Err ( prepared . errors . join ("\n") ); };
-  let summary : BufferReadinessSummary =
-    buffer_readiness_summary_for (env, straddle, &view . viewforest);
+  let summary : BufferProcessedSummary =
+    buffer_processed_summary_for (env, straddle, &view . viewforest);
   Ok (( prepared, summary )) }

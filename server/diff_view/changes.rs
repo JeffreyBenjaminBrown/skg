@@ -37,7 +37,7 @@ const OUT_FOLDERS : [Folder; 3] = [
 /// What the change leaves that mention a node say changed about it,
 /// grouped by aspect: what the diff view draws ahead of its content
 /// and as its changed partner folders. A new aspect of a leaf
-/// is added here once, and C, the extension and readiness follow.
+/// is added here once, and C, the extension and whether it is processed follow.
 #[derive(Debug, Default)]
 pub(crate) struct ChangedAspects {
   text         : bool,

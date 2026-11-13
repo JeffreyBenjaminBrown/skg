@@ -1,4 +1,4 @@
-use crate::diff_view::change_leaves::BufferReadinessSummary;
+use crate::diff_view::change_leaves::BufferProcessedSummary;
 use crate::dbs::in_rust_graph::{
   in_rust_graph_coherent_with_nodeInstructions_in, new_handle };
 use crate::dbs::in_rust_graph::relation_accessors::{NodeRelation, RelationshipKey};
@@ -27,8 +27,8 @@ use crate::serve::handlers::telescope_hoist::{
   needs_confirmation as hoist_needs_confirmation,
   repair_saves_for_unwritten_candidates,
 };
-use crate::diff_view::readiness_requests::{
-  consume_readiness_requests, viewforest_has_readiness_requests};
+use crate::diff_view::processed_requests::{
+  consume_processed_requests, viewforest_has_processed_requests};
 use crate::diff_view::restore_requests::{
   add_restore_instructions, viewforest_has_restore_requests};
 use crate::graph_straddle::build::current_graph_straddle_in_slot;
@@ -109,8 +109,8 @@ pub struct SaveResponse {
   /// such records. Checked before every other confirmation.
   pub delete_from_confirmation : Option<usize>,
   /// Some when the saved buffer is one of the diff view's: the
-  /// readiness summary the client shows after the save.
-  pub readiness_summary   : Option<BufferReadinessSummary>,
+  /// processed summary the client shows after the save.
+  pub processed_summary   : Option<BufferProcessedSummary>,
   /// The redraw delta from the saved buffer's text to 'saved_view'
   /// ('changed_headlines'): Some on a save-result whose texts differ
   /// only in headline lines, None otherwise.
@@ -149,11 +149,11 @@ impl SaveResponse {
     saved_view         : String,
     errors             : Vec<String>,
     warnings           : Vec<String>,
-    readiness_summary  : Option<BufferReadinessSummary>,
+    processed_summary  : Option<BufferProcessedSummary>,
   ) -> SaveResponse {
     let changed_headlines : Option<Vec<ViewnodeId>> =
       changed_headlines (saved_buffer_text, &saved_view);
-    SaveResponse { saved_view, errors, warnings, readiness_summary,
+    SaveResponse { saved_view, errors, warnings, processed_summary,
                    changed_headlines,
                    .. SaveResponse::empty () } }
 
@@ -223,20 +223,20 @@ impl SaveResponse {
       text_release_confirmation : None,
       strandeds_confirmation    : None,
       delete_from_confirmation  : None,
-      readiness_summary         : None,
+      processed_summary         : None,
       changed_headlines         : None, } }
 
   /// Format: ((content "...") (errors (...)) (warnings (...))
   /// POINT... (readiness-summary ...) (changed-headlines (V...))),
-  /// where the point entries, the readiness summary and the redraw
+  /// where the point entries, the processed summary and the redraw
   /// delta are there when the save has them.
   fn to_sexp_string (&self) -> String {
     let mut items : Vec<Sexp> = buffer_response_entries (
       & self . saved_view, & self . errors, & self . warnings );
     if let Some (point_position) = &self . save_point_position {
       push_save_point_position_to_sexp_items (&mut items, point_position); }
-    if let Some (readiness_summary) = &self . readiness_summary {
-      items . push (readiness_summary . to_sexp ()); }
+    if let Some (processed_summary) = &self . processed_summary {
+      items . push (processed_summary . to_sexp ()); }
     if let Some (changed_headlines) = &self . changed_headlines {
       items . push (changed_headlines_entry (changed_headlines)); }
     sexp_to_client_string (&Sexp::List (items)) }}
@@ -925,7 +925,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
     if ! stale_errors . is_empty () {
       return Err (Box::new (SaveError::BufferValidationErrors {
         errors : stale_errors, warnings : parse_warnings, })); }}
-  { // Restore and readiness requests write or approve what a skgrepo
+  { // Restore and processed requests write or approve what a skgrepo
     // restriction may hide: refused unless the connection is
     // unrestricted.
     let unrestricted = |what : &str| -> Result<(), Box<dyn Error>> {
@@ -935,8 +935,8 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
             warnings : parse_warnings . clone (), } ) as Box<dyn Error> ) };
     if viewforest_has_restore_requests (&viewforest) {
       unrestricted ("A restore request") ?; }
-    if viewforest_has_readiness_requests (&viewforest) {
-      unrestricted ("A readiness request") ?; }}
+    if viewforest_has_processed_requests (&viewforest) {
+      unrestricted ("A processed request") ?; }}
   let restore_warnings : Vec<String> =
     // The restore requests become more graph edits, written from the
     // before-graph of the graph straddle; built only when needed.
@@ -1138,9 +1138,9 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
 
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "update_views_after_save" ). entered();
-    let readiness_warnings : Vec<String> =
-      // The graph edits succeeded, so the readiness requests are consumed.
-      consume_readiness_requests (
+    let processed_warnings : Vec<String> =
+      // The graph edits succeeded, so the processed requests are consumed.
+      consume_processed_requests (
         &viewforest, env, &swapped_in, &mut views_state . graph_straddle );
     let mut response : SaveResponse =
       update_views_after_save (
@@ -1163,7 +1163,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
       warnings . extend ( unedited_stale_graphnodes . iter ()
                           . map (left_as_the_graph_has_it_warning) );
       warnings . extend ( restore_warnings );
-      warnings . extend ( readiness_warnings );
+      warnings . extend ( processed_warnings );
       warnings . extend (
         post_skgsave_commit_hiddenoutside_warnings (
           &swapped_in . graph, &post_skgsave_commit_notice_candidates ) );

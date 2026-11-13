@@ -2,16 +2,16 @@
 //! ('docs/diff-view.org', "The four buffers").
 //! The client sends one request per buffer, in order, and opens each
 //! one the server does not answer with '(empty . t)'. A buffer's answer
-//! carries its readiness summary, as a save's does.
+//! carries its processed summary, as a save's does.
 
-use crate::diff_view::change_leaves::{BufferReadinessSummary, readiness_response_sexp};
-use crate::diff_view::readiness_requests::buffer_readiness_summary_for;
+use crate::diff_view::change_leaves::{BufferProcessedSummary, processed_response_sexp};
+use crate::diff_view::processed_requests::buffer_processed_summary_for;
 use crate::graph_straddle::build::current_graph_straddle_in_slot;
 use crate::graph_straddle::types::GraphStraddle;
 use crate::diff_view::buffer_rerender::{
   RenderedDiffViewBuffer, diffView_buffer_viewforest};
 use crate::diff_view::pruned_change_view::prunedChangeView_sets_of_buffer;
-use crate::diff_view::readiness_store::ReadinessStore;
+use crate::diff_view::processed_store::ProcessedStore;
 use crate::serve::ViewsState;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{
@@ -27,12 +27,12 @@ use sexp::Sexp;
 use std::net::TcpStream;
 use std::sync::{Arc, MutexGuard};
 
-/// The named buffer, drawn, with its readiness summary.
+/// The named buffer, drawn, with its processed summary.
 type DiffViewBufferWithSummary =
-  (RenderedDiffViewBuffer, BufferReadinessSummary);
+  (RenderedDiffViewBuffer, BufferProcessedSummary);
 
 /// Answer a "diff view" request with the named buffer and its
-/// readiness summary, register it under the request's view-id, or
+/// processed summary, register it under the request's view-id, or
 /// answer '(empty . t)'. Refused
 /// unless the connection is unrestricted, and when the graph straddle
 /// cannot be built (an owned skgrepo outside git, or without a HEAD
@@ -58,21 +58,21 @@ pub fn handle_diffView_request (
         runtime . graph . clone () )
         . map_err ( |e| format! ( "Cannot open the diff view: {}", e )) ?;
       let buffer : Option<RenderedDiffViewBuffer> = {
-        let store : MutexGuard<ReadinessStore> =
-          env . runtime . lock_readiness_store ();
+        let store : MutexGuard<ProcessedStore> =
+          env . runtime . lock_processed_store ();
         diffView_buffer (&runtime, &straddle, &store, diffView_buffer_kind)
         . map_err ( |e| format! ( "Error generating the diff view: {}", e )) ? };
       let buffer_with_summary : Option<DiffViewBufferWithSummary> =
         buffer . map ( |buffer| {
-          let summary : BufferReadinessSummary = // locks the store itself
-            buffer_readiness_summary_for (env, &straddle, &buffer . viewforest);
+          let summary : BufferProcessedSummary = // locks the store itself
+            buffer_processed_summary_for (env, &straddle, &buffer . viewforest);
           (buffer, summary) } );
       Ok (( buffer_with_summary, diffView_buffer_kind, viewforest_id )) } ) ();
   let sexp : String = match response {
     Err (error) =>
       format_buffer_response_sexp ( "", &[ error ], &[] ),
     Ok (( None, _, _ )) =>
-      sexp_to_client_string ( &readiness_response_sexp (
+      sexp_to_client_string ( &processed_response_sexp (
         vec! [ true_entry_sexp ("empty") ], None, &[], &[] )),
     Ok (( Some (( RenderedDiffViewBuffer { text, pids, viewforest }, summary )),
           diffView_buffer_kind, viewforest_id )) => {
@@ -88,7 +88,7 @@ pub fn handle_diffView_request (
 /// when it saves a buffer of the diff view.
 fn diffView_buffer_response_sexp (
   text        : &str,
-  summary     : &BufferReadinessSummary,
+  summary     : &BufferProcessedSummary,
 ) -> String {
   let mut entries : Vec<Sexp> = buffer_response_entries (text, &[], &[]);
   entries . push ( summary . to_sexp () );
@@ -103,7 +103,7 @@ fn diffView_buffer_response_sexp (
 pub fn diffView_buffer (
   runtime              : &RuntimeGeneration,
   straddle             : &GraphStraddle,
-  store                : &ReadinessStore,
+  store                : &ProcessedStore,
   diffView_buffer_kind : DiffViewBufferKind,
 ) -> Result<Option<RenderedDiffViewBuffer>, Box<dyn std::error::Error>> {
   let roots : Vec<ID> = match diffView_buffer_kind {

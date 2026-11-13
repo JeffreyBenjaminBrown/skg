@@ -1,9 +1,9 @@
-//! The commit-readiness store: which change-forest leaves the user
-//! has marked commit-ready ('docs/diff-view.org',
+//! The processed store: which change-forest leaves the user
+//! has marked processed ('docs/diff-view.org',
 //! "Marks, fingerprints and the store"). Each mark keeps the fingerprint of the change it
 //! approved; a mark whose fingerprint no longer matches the current
 //! change counts as absent. The store lives server-side, in the file
-//! 'SkgConfig::readiness_marks_path' names, rewritten after every
+//! 'SkgConfig::processed_marks_path' names, rewritten after every
 //! change.
 
 use crate::diff_view::change_leaves::{ChangeLeaves, LeafKey};
@@ -16,13 +16,13 @@ use std::path::Path;
 
 /// See the module comment.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
-pub struct ReadinessStore {
+pub struct ProcessedStore {
   #[serde(with = "marks_as_list")]
   pub marks : HashMap<LeafKey, u64>, // the fingerprint each mark approved
 }
 
-impl ReadinessStore {
-  pub fn is_ready (
+impl ProcessedStore {
+  pub fn is_processed (
     &self,
     key         : &LeafKey,
     fingerprint : u64,
@@ -54,7 +54,7 @@ impl ReadinessStore {
   /// means an empty store.
   pub fn load (
     marks_file : &Path,
-  ) -> ReadinessStore {
+  ) -> ProcessedStore {
     fs::read_to_string (marks_file)
       . ok ()
       . and_then ( |text| serde_json::from_str (&text) . ok () )
@@ -108,5 +108,5 @@ mod marks_as_list {
 
 #[cfg(test)]
 #[allow(non_snake_case)]
-#[path = "../../tests/unit/readiness_store.rs"]
+#[path = "../../tests/unit/processed_store.rs"]
 mod tests;

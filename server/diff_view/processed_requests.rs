@@ -1,34 +1,34 @@
-//! Readiness requests, '(ready ...)' change facts and a buffer's readiness
-//! summary ('docs/diff-view.org', "Readiness"), the places where the
-//! readiness store meets a viewforest. The first two rest on one
+//! Processed requests, '(ready ...)' change facts and a buffer's processed
+//! summary ('docs/diff-view.org', "Processed marks"), the places where the
+//! processed store meets a viewforest. The first two rest on one
 //! rule, 'leaves_named_at': which change-forest leaves a headline
 //! names.
 //!
-//! A save consumes the readiness requests of the buffer it saves, in
-//! any buffer ('consume_readiness_requests'): after the graph edits
+//! A save consumes the processed requests of the buffer it saves, in
+//! any buffer ('consume_processed_requests'): after the graph edits
 //! succeed, each '(editRequest (ready ...))' or '(editRequest (unready
 //! ...))' sets or
 //! clears the marks of the leaves it names, at their fingerprints in
 //! the graph straddle brought up to date with the save. A request that
 //! names no current change is dropped with a warning. A save that stops
 //! for a confirmation consumes nothing. Validation has refused a save
-//! in which two headlines name one leaf, one ready and the other
-//! unready ('find_contradictory_readiness_requests', which reads
+//! in which two headlines name one leaf, one processed and the other
+//! unprocessed ('find_contradictory_processed_requests', which reads
 //! 'NamedLeafSet').
 //!
 //! At the tail of the refresh of a buffer of the diff view, the
 //! '(ready ...)' change facts are set from the store, and the
 //! '(leaves ...)' facts, which tell the clients what a request on a
 //! headline may name, from the same rule
-//! ('set_ready_facts_in_viewforest').
+//! ('set_processed_facts_in_viewforest').
 //!
 //! A save of a buffer of the diff view, and the "extend diff view"
-//! request, answer with the readiness summary of the buffer
-//! they rerendered ('buffer_readiness_summary_for').
+//! request, answer with the processed summary of the buffer
+//! they rerendered ('buffer_processed_summary_for').
 
 use crate::types::tree::forest::stands_in_containerward_chain;
 use crate::diff_view::change_leaves::{
-  BufferReadinessSummary, ChangeLeaves, LeafKey, NewNodeWalk, NodeAspect,
+  BufferProcessedSummary, ChangeLeaves, LeafKey, NewNodeWalk, NodeAspect,
   RelationshipAspect};
 use crate::diff_view::pruned_change_view::nodes_editable_in_diffView;
 use crate::dbs::in_rust_graph::InRustGraph;
@@ -36,80 +36,80 @@ use crate::dbs::in_rust_graph::relation_accessors::{
   NodeRelation, RelationRole, RelationshipKey};
 use crate::graph_straddle::build::current_graph_straddle_in_slot;
 use crate::graph_straddle::types::GraphStraddle;
-use crate::diff_view::readiness_store::ReadinessStore;
+use crate::diff_view::processed_store::ProcessedStore;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::types::errors::{HeadlineName, with_org_subheadlines};
 use crate::types::misc::ID;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
   ChangeFacts, ChangesetMarkerKind, LeavesFact, PropertyMember, ChangeViewnode, DiffObject,
-  ReadinessRequest, Viewnode, ViewnodeKind, Vognode};
+  ProcessedRequest, Viewnode, ViewnodeKind, Vognode};
 
 use ego_tree::{NodeId, NodeMut, NodeRef};
 use std::collections::{BTreeSet, HashSet};
 use std::sync::{Arc, MutexGuard};
 
 /// After a save's graph edits succeeded: apply the saved buffer's
-/// readiness requests to the store, against the graph straddle in
+/// processed requests to the store, against the graph straddle in
 /// 'graph_straddle_slot' brought up to date with 'runtime', and write the
 /// store back. Returns the warnings to show. Builds no straddle when the
 /// buffer carries no request.
-pub fn consume_readiness_requests (
+pub fn consume_processed_requests (
   viewforest          : &ViewForest,
   env                 : &SkgEnv,
   runtime             : &RuntimeGeneration,
   graph_straddle_slot : &mut Option<Arc<GraphStraddle>>,
 ) -> Vec<String> {
-  let requests : Vec<RequestedReadiness> =
-    readiness_requests_in_viewforest (viewforest, &runtime . graph);
+  let requests : Vec<RequestedProcessed> =
+    processed_requests_in_viewforest (viewforest, &runtime . graph);
   if requests . is_empty () { return Vec::new (); }
   let straddle : Arc<GraphStraddle> =
     match current_graph_straddle_in_slot (
       graph_straddle_slot, &runtime . config, runtime . graph . clone () ) {
       Ok (straddle) => straddle,
       Err (e) => return vec! [ format! (
-        "Readiness requests were not applied: {}", e ) ], };
-  let mut store : MutexGuard<ReadinessStore> =
-    env . runtime . lock_readiness_store ();
+        "Processed requests were not applied: {}", e ) ], };
+  let mut store : MutexGuard<ProcessedStore> =
+    env . runtime . lock_processed_store ();
   let mut warnings : Vec<String> =
-    apply_readiness_requests (&requests, straddle . change_leaves (), &mut store);
-  if let Err (e) = store . save ( &runtime . config . readiness_marks_path () ) {
+    apply_processed_requests (&requests, straddle . change_leaves (), &mut store);
+  if let Err (e) = store . save ( &runtime . config . processed_marks_path () ) {
     warnings . push ( format! (
-      "The readiness marks were applied but not written to disk: {}", e )); }
+      "The processed marks were applied but not written to disk: {}", e )); }
   warnings }
 
-/// Whether some headline of 'viewforest' carries a readiness request.
-pub fn viewforest_has_readiness_requests (
+/// Whether some headline of 'viewforest' carries a processed request.
+pub fn viewforest_has_processed_requests (
   viewforest : &ViewForest,
 ) -> bool {
   viewforest . root () . descendants ()
-    . any ( |node| node . value () . readiness_request . is_some () ) }
+    . any ( |node| node . value () . processed_request . is_some () ) }
 
-/// One readiness request, read from the saved buffer.
+/// One processed request, read from the saved buffer.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct RequestedReadiness {
-  pub ready    : bool,
+pub struct RequestedProcessed {
+  pub processed : bool,
   pub named    : NamedLeaves,
   /// The headline carrying the request, which a warning names.
   pub headline : HeadlineName,
 }
 
-/// Every readiness request in the saved buffer, with the leaves it
+/// Every processed request in the saved buffer, with the leaves it
 /// names. IDs resolve through 'graph' (the graph after the save),
 /// falling back to the ID as written, except a ghost's,
 /// which names a node of the before-graph.
-pub fn readiness_requests_in_viewforest (
+pub fn processed_requests_in_viewforest (
   viewforest : &ViewForest,
   graph      : &InRustGraph,
-) -> Vec<RequestedReadiness> {
+) -> Vec<RequestedProcessed> {
   let pid_of = |gnid : &ID| -> ID {
     graph . pid_else_raw_id (gnid) };
   viewforest . root () . descendants ()
     . filter_map ( |node| {
-      let request : &ReadinessRequest = node . value () . readiness_request . as_ref () ?;
+      let request : &ProcessedRequest = node . value () . processed_request . as_ref () ?;
       let named : NamedLeaves = leaves_named_at (node, &request . objects, &pid_of) ?;
-      Some ( RequestedReadiness {
-        ready    : request . ready,
+      Some ( RequestedProcessed {
+        processed : request . processed,
         named,
         headline : node . value () . headline_name (), } ) } )
     . collect () }
@@ -159,7 +159,7 @@ impl NamedLeafSet {
   /// The leaves both sets name, whatever the forest holds, as the
   /// narrower of the two; None when they can name no leaf in common.
   /// Every set might share a leaf with a 'NewNodesFrom' set, so
-  /// validation refuses any request of the opposite readiness beside
+  /// validation refuses any request of the opposite kind beside
   /// one.
   pub fn overlap (
     &self,
@@ -321,7 +321,7 @@ fn leaves_named_at (
           ChangesetMarkerKind::RelRepo =>
             named . push ( NamedLeafSet::ContentRelationshipsOf (
               parent_pid () ?, RelationshipAspect::RelRepo )),
-          ChangesetMarkerKind::OrderOnly => {}, }, // always ready
+          ChangesetMarkerKind::OrderOnly => {}, }, // always processed
         ChangeViewnode::BodyDiff { .. } =>
           return None, }},
     _ => return None, }
@@ -337,31 +337,31 @@ fn keys_in_forest (
     . collect () }
 
 /// Set the '(ready ...)' and '(leaves ...)' change facts of every
-/// viewnode that carries them. An object is ready when it names some
+/// viewnode that carries them. An object is processed when it names some
 /// leaf of 'forest' and every leaf it names is marked at its current
 /// fingerprint ('store'); the order-only changeset marker is always
-/// ready. The
+/// processed. The
 /// '(leaves ...)' fact is 'leaves_fact_at'. On an occurrence
 /// whose leaves fact lists 'all', '(ready ...)' names 'all' when every
-/// leaf its node records is marked. A ready changeset marker's '(ready
-/// ...)' names 'all'; any other ready viewnode with a single object
+/// leaf its node records is marked. A processed changeset marker's '(ready
+/// ...)' names 'all'; any other processed viewnode with a single object
 /// writes it bare, '(ready)'.
-pub fn set_ready_facts_in_viewforest (
+pub fn set_processed_facts_in_viewforest (
   viewforest : &mut ViewForest,
   forest     : &ChangeLeaves,
-  store      : &ReadinessStore,
+  store      : &ProcessedStore,
   graph      : &InRustGraph,
 ) {
   let pid_of = |gnid : &ID| -> ID {
     graph . pid_else_raw_id (gnid) };
-  let object_is_ready = |node : NodeRef<Viewnode>, objects : &[DiffObject]| -> bool {
+  let object_is_processed = |node : NodeRef<Viewnode>, objects : &[DiffObject]| -> bool {
     let keys : Vec<LeafKey> = keys_named_at (node, objects, forest, &pid_of);
-    ! keys . is_empty () && forest . readiness_of_leaves (store, &keys) };
+    ! keys . is_empty () && forest . processed_of_leaves (store, &keys) };
   let facts : Vec<(NodeId, Option<BTreeSet<DiffObject>>, Option<LeavesFact>)> =
     viewforest . root () . descendants ()
     . filter_map ( |node| {
       let leaves : Option<LeavesFact> = leaves_fact_at (node, forest, &pid_of);
-      let ready : Option<BTreeSet<DiffObject>> =
+      let processed : Option<BTreeSet<DiffObject>> =
         match &node . value () . kind {
           ViewnodeKind::Vognode (
             vognode @ ( Vognode::Occurrence (_)
@@ -372,30 +372,30 @@ pub fn set_ready_facts_in_viewforest (
                 leaves . objects . contains (&DiffObject::All) );
             let objects : BTreeSet<DiffObject> =
               [ DiffObject::Node, DiffObject::Rel ] . into_iter ()
-              . filter ( |object| object_is_ready (node, &[ *object ]) )
+              . filter ( |object| object_is_processed (node, &[ *object ]) )
               . chain ( ( all_is_listed
-                          && object_is_ready (node, &[ DiffObject::All ]) )
+                          && object_is_processed (node, &[ DiffObject::All ]) )
                         . then_some (DiffObject::All) )
               . collect ();
             ( ! objects . is_empty () ) . then_some (objects) },
           ViewnodeKind::Vognode (Vognode::GnidOnly (_)) =>
-            object_is_ready (node, &[]) . then (BTreeSet::new),
+            object_is_processed (node, &[]) . then (BTreeSet::new),
           ViewnodeKind::ChangeViewnode ( ChangeViewnode::ChangesetMarker { kind } ) =>
             ( *kind == ChangesetMarkerKind::OrderOnly
-              || object_is_ready (node, &[]) )
+              || object_is_processed (node, &[]) )
             . then ( || BTreeSet::from ([ DiffObject::All ]) ),
           ViewnodeKind::PropertyMember (_) =>
-            object_is_ready (node, &[]) . then (BTreeSet::new),
+            object_is_processed (node, &[]) . then (BTreeSet::new),
           ViewnodeKind::ChangeViewnode (change)
             if ! matches! (change, ChangeViewnode::BodyDiff { .. }) =>
-            object_is_ready (node, &[]) . then (BTreeSet::new),
+            object_is_processed (node, &[]) . then (BTreeSet::new),
           _ => return None, };
-      Some (( node . id (), ready, leaves )) } )
+      Some (( node . id (), processed, leaves )) } )
     . collect ();
-  for (treeid, ready, leaves) in facts {
+  for (treeid, processed, leaves) in facts {
     let mut node_mut : NodeMut<Viewnode> = viewforest . get_mut (treeid) . unwrap ();
     let change_facts : &mut ChangeFacts = &mut node_mut . value () . change_facts;
-    change_facts . ready  = ready;
+    change_facts . processed = processed;
     change_facts . leaves = leaves; }}
 
 /// The '(leaves N OBJECT...)' fact of 'node', from 'leaves_named_at':
@@ -403,8 +403,8 @@ pub fn set_ready_facts_in_viewforest (
 /// (modified), 'all', beside 'rel' when that names a leaf of 'forest'; on any
 /// other occurrence or a ghost, each of 'node'
 /// and 'rel' that names a leaf, or else 'all' if its node records any
-/// leaf; on anything else, 'all' when a bare request names a commit
-/// readiness aggregate (a changeset marker), else no object. N is how many
+/// leaf; on anything else, 'all' when a bare request names a
+/// processed aggregate (a changeset marker), else no object. N is how many
 /// distinct leaves of 'forest' a request naming those objects names.
 /// None when that is none.
 fn leaves_fact_at (
@@ -471,21 +471,21 @@ pub(crate) fn vognode_leaf_pid (
 /// Set or clear the marks the requests name, at their fingerprints
 /// in 'forest'. Returns a warning for each request that names no
 /// current change.
-pub fn apply_readiness_requests (
-  requests : &[RequestedReadiness],
+pub fn apply_processed_requests (
+  requests : &[RequestedProcessed],
   forest   : &ChangeLeaves,
-  store    : &mut ReadinessStore,
+  store    : &mut ProcessedStore,
 ) -> Vec<String> {
   let mut warnings : Vec<String> = Vec::new ();
   for request in requests {
     let keys : Vec<LeafKey> = keys_in_forest (&request . named, forest);
     if keys . is_empty () {
       warnings . push ( with_org_subheadlines (
-        "A readiness request names no current change; it was dropped.",
+        "A processed request names no current change; it was dropped.",
         &[ request . headline . clone () ] ));
       continue; }
     for key in keys {
-      if request . ready {
+      if request . processed {
         let fingerprint : u64 = forest . leaf_fingerprint (&key)
           . expect ("filtered to leaves of the forest");
         store . mark (key, fingerprint);
@@ -533,16 +533,16 @@ fn grandparent_pid (
     ViewnodeKind::Vognode (vognode) => Some ( vognode . gnid () . clone () ),
     _ => None, } }
 
-/// The readiness summary of a buffer of the diff view, from
+/// The processed summary of a buffer of the diff view, from
 /// 'straddle' and the marks in the store: the changeset's counts, and
 /// how many leaves are recorded by a node that 'viewforest' does not
 /// make editable ('nodes_editable_in_diffView').
-pub fn buffer_readiness_summary_for (
+pub fn buffer_processed_summary_for (
   env        : &SkgEnv,
   straddle   : &GraphStraddle,
   viewforest : &ViewForest,
-) -> BufferReadinessSummary {
-  let store : MutexGuard<ReadinessStore> =
-    env . runtime . lock_readiness_store ();
-  straddle . change_leaves () . buffer_readiness_summary (
+) -> BufferProcessedSummary {
+  let store : MutexGuard<ProcessedStore> =
+    env . runtime . lock_processed_store ();
+  straddle . change_leaves () . buffer_processed_summary (
     &store, &nodes_editable_in_diffView (viewforest) ) }

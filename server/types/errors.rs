@@ -1,5 +1,5 @@
 use super::misc::{ID, SkgrepoName};
-use crate::diff_view::readiness_requests::NamedLeafSet;
+use crate::diff_view::processed_requests::NamedLeafSet;
 use super::viewnode::ViewnodeId;
 use std::error::Error;
 use std::fmt;
@@ -74,7 +74,7 @@ pub enum BufferValidationError {
                                   HeadlineName),
   Multiple_Defining_Viewnodes     (ID, Vec<HeadlineName>), // For any given ID, at most one occurrence can be editable. (Its contents are intended to define those of the node.) The names are the editable occurrences'.
   AmbiguousDeletion              (ID, Vec<HeadlineName>), // The names are the editable occurrences', with and without the delete request.
-  ContradictoryReadinessRequests (NamedLeafSet, Vec<HeadlineName>), // The change leaves that one headline requests ready and another unready. The names are those headlines'.
+  ContradictoryProcessedRequests (NamedLeafSet, Vec<HeadlineName>), // The change leaves that one headline requests processed and another unprocessed. The names are those headlines'.
   DuplicatedContent              (ID), // A node has multiple Content children with the same ID
   ModifiedForeignNode            (ID, SkgrepoName), // Attempted to modify a node from a foreign skgrepo - (gnid, repo_name)
   CreatedForeignNode             (ID, SkgrepoName), // Attempted to create a node in a foreign skgrepo - (gnid, repo_name)
@@ -294,8 +294,8 @@ impl std::fmt::Display for BufferValidationError {
       BufferValidationError::AmbiguousDeletion (gnid, headlines) =>
         write!(f, "Ambiguous deletion request for ID {:?} ({})",
                gnid, name_headlines (headlines)),
-      BufferValidationError::ContradictoryReadinessRequests (leaf, headlines) =>
-        write!(f, "Contradictory readiness requests for {} ({})",
+      BufferValidationError::ContradictoryProcessedRequests (leaf, headlines) =>
+        write!(f, "Contradictory processed requests for {} ({})",
                leaf . describe (), name_headlines (headlines)),
       BufferValidationError::DuplicatedContent (gnid) =>
         write!(f, "Node has multiple Content children with the same ID {:?}", gnid),
@@ -392,7 +392,7 @@ impl BufferValidationError {
         vec! [ headline ],
       BufferValidationError::Multiple_Defining_Viewnodes (_, headlines)
         | BufferValidationError::AmbiguousDeletion (_, headlines)
-        | BufferValidationError::ContradictoryReadinessRequests (_, headlines)
+        | BufferValidationError::ContradictoryProcessedRequests (_, headlines)
         | BufferValidationError::ForkRequestMultiple (_, headlines)
         | BufferValidationError::MultipleEditableViewRequestsForSameId (_, headlines)
         | BufferValidationError::ChangedSinceRendered { headlines, .. } =>

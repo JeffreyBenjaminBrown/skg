@@ -8,23 +8,23 @@ use skg::serve::parse_metadata_sexp::{
   RESTORE_REL_WITHOUT_A_REMOVED_MEMBERSHIP, parse_metadata_to_viewnodemd};
 use skg::types::misc::{ID, SkgrepoChange, SkgrepoName};
 use skg::types::viewnode::{
-  ChangeFacts, ChangesetMarkerKind, DiffChange, Existence, Folder, Ghost, ChangeViewnode, PropertyMember, DiffObject, ReadinessRequest, RelationshipEditRequest, Viewnode,
+  ChangeFacts, ChangesetMarkerKind, DiffChange, Existence, Folder, Ghost, ChangeViewnode, PropertyMember, DiffObject, ProcessedRequest, RelationshipEditRequest, Viewnode,
   ViewnodeKind, Vognode, Warrant, mk_editable_viewnode,
   mk_writeProtected_viewnode, viewnode_of};
 
 use std::collections::BTreeSet;
 
-fn ready (
+fn processed (
   objects : &[DiffObject],
 ) -> ChangeFacts {
   ChangeFacts { change   : DiffChange::default (),
-                ready    : Some ( objects . iter () . copied () . collect () ),
+                processed : Some ( objects . iter () . copied () . collect () ),
                 leaves   : None,
                 .. ChangeFacts::default () } }
 
-fn request_all () -> Option<ReadinessRequest> {
-  Some ( ReadinessRequest {
-    ready   : true,
+fn request_all () -> Option<ProcessedRequest> {
+  Some ( ProcessedRequest {
+    processed : true,
     objects : [ DiffObject::All ] . into_iter () . collect::<BTreeSet<_>> () } ) }
 
 
@@ -32,18 +32,18 @@ fn request_all () -> Option<ReadinessRequest> {
 fn change_viewnode (
   change            : ChangeViewnode,
   change_facts      : ChangeFacts,
-  readiness_request : Option<ReadinessRequest>,
+  processed_request : Option<ProcessedRequest>,
 ) -> Viewnode {
   with_facts ( viewnode_of ( ViewnodeKind::ChangeViewnode (change) ),
-               change_facts, readiness_request ) }
+               change_facts, processed_request ) }
 
 fn property_member (
   member            : PropertyMember,
   change_facts      : ChangeFacts,
-  readiness_request : Option<ReadinessRequest>,
+  processed_request : Option<ProcessedRequest>,
 ) -> Viewnode {
   with_facts ( viewnode_of ( ViewnodeKind::PropertyMember (member) ),
-               change_facts, readiness_request ) }
+               change_facts, processed_request ) }
 
 #[test]
 fn old_text_round_trips_each_aspect () {
@@ -57,7 +57,7 @@ fn old_text_round_trips_each_aspect () {
       change_viewnode ( ChangeViewnode::OldText {
                    title : title . map (String::from),
                    body  : body  . map (String::from) },
-                 ready (&[]), None ),
+                 processed (&[]), None ),
       expected ); }}
 
 #[test]
@@ -73,7 +73,7 @@ fn skgrepo_moves_round_trip () {
     change_viewnode ( ChangeViewnode::HomeSkgrepoMove {
       skgrepo_change : SkgrepoChange { old : SkgrepoName::from ("pub"),
                                        new : SkgrepoName::from ("priv") } },
-      ready (&[]), None ),
+      processed (&[]), None ),
     "(homeSkgrepoMove (old pub) (new priv)) (diff (ready))" );
   assert_round_trip (
     change_viewnode ( ChangeViewnode::RelRepoMove {
@@ -89,7 +89,7 @@ fn changeset_markers_round_trip () {
     ( ChangesetMarkerKind::RelRepo,   "(changesetMarker relRepo) (diff (ready all))" ),
     ( ChangesetMarkerKind::OrderOnly, "(changesetMarker orderOnly) (diff (ready all))" ), ] {
     assert_round_trip (
-      change_viewnode ( ChangeViewnode::ChangesetMarker { kind }, ready (&[ DiffObject::All ]), None ),
+      change_viewnode ( ChangeViewnode::ChangesetMarker { kind }, processed (&[ DiffObject::All ]), None ),
       expected ); }}
 
 #[test]
@@ -99,7 +99,7 @@ fn changeset_markers_round_trip () {
 fn ghost_warranted_aliases_and_ids_round_trip () {
   let removed : ChangeFacts = ChangeFacts {
     change   : DiffChange { rel : Some (Existence::Removed), .. DiffChange::default () },
-    ready    : Some (BTreeSet::new ()),
+    processed : Some (BTreeSet::new ()),
     leaves   : None,
     .. ChangeFacts::default () };
   assert_round_trip (
@@ -130,7 +130,7 @@ fn a_ghost_round_trips () {
         change   : DiffChange { node : Some (Existence::Removed),
                                 rel  : Some (Existence::Removed),
                                 properties : false },
-        ready    : Some ( [ DiffObject::Node ] . into_iter () . collect () ),
+        processed : Some ( [ DiffObject::Node ] . into_iter () . collect () ),
         leaves   : None,
         .. ChangeFacts::default () },
       request_all () ),
@@ -181,7 +181,7 @@ fn a_ghost_round_trips_with_its_restore_request () {
         change : DiffChange { node : Some (Existence::Removed),
                               rel  : None,
                               properties : false },
-        ready  : None,
+        processed : None,
         leaves : None,
         .. ChangeFacts::default () },
       None ),
@@ -195,7 +195,7 @@ fn a_removed_membership_round_trips_with_its_restore_request () {
     change : DiffChange { node : None,
                           rel  : Some (Existence::Removed),
                           properties : false },
-    ready  : None,
+    processed : None,
     leaves : None,
     .. ChangeFacts::default () };
   let mut editable : Viewnode = mk_editable_viewnode (

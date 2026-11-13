@@ -67,7 +67,7 @@ pub enum GnidPresence {
 /// One relationship: 'recorder' lists 'member' (a primary ID, or the
 /// stored ID when it resolves to no node) under 'relation'. The save's
 /// strandeds computation and the change leaves both name relationships so.
-/// Serialized in readiness marks files.
+/// Serialized in processed marks files.
 #[derive(Clone, Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct RelationshipKey {
   pub relation : NodeRelation,

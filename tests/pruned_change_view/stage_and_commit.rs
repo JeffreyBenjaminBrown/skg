@@ -11,7 +11,7 @@ use crate::pruned_change_view::common::{
 use skg::diff_view::change_leaves::{ChangeLeaves, LeafKey};
 use skg::git_ops::stage_and_commit::AlreadyStagedGitrepo;
 use skg::graph_straddle::types::GraphStraddle;
-use skg::diff_view::readiness_store::ReadinessStore;
+use skg::diff_view::processed_store::ProcessedStore;
 use skg::serve::handlers::stage_and_commit::{
   StageAndCommitAnswer, stage_and_commit, stage_and_commit_response_sexp};
 use skg::skgrepo_sets::SkgrepoRestriction;
@@ -58,15 +58,15 @@ fn changed_skg_files (
                   && entry . path () . is_ok_and ( |p| p . ends_with (".skg") ))
        . count () ) }
 
-/// Mark every leaf of the change-forest ready, in the store 'env' holds.
+/// Mark every leaf of the change-forest processed, in the store 'env' holds.
 fn mark_every_leaf (
   f   : &Fixture,
   env : &SkgEnv,
 ) -> Result<(), Box<dyn Error>> {
   let straddle : GraphStraddle = graph_straddle (f) ?;
   let forest : &ChangeLeaves = straddle . change_leaves ();
-  let mut store : MutexGuard<ReadinessStore> =
-    env . runtime . readiness_store . lock () . unwrap ();
+  let mut store : MutexGuard<ProcessedStore> =
+    env . runtime . processed_store . lock () . unwrap ();
   let keys : Vec<LeafKey> = forest . recorders ()
     . flat_map ( |recorder| forest . leaves_under (recorder) . iter ()
                  . map ( |leaf| leaf . key . clone () ) )
@@ -106,7 +106,7 @@ fn an_incomplete_summary_needs_confirmation_and_commits_nothing (
       &env, &mut f . views_state, &all_skgrepos, "the message", false );
     let StageAndCommitAnswer::NeedsConfirmation { summary, already_staged } = &answer
       else { panic! ("expected a request for confirmation, got {:?}", answer) };
-    assert! ( summary . changed_files > 0 && summary . ready_files < summary . changed_files,
+    assert! ( summary . changed_files > 0 && summary . processed_files < summary . changed_files,
               "{:?}", summary );
     assert! ( already_staged . is_empty (), "{:?}", already_staged );
     let response : String = stage_and_commit_response_sexp (&answer);
@@ -138,7 +138,7 @@ fn a_confirmed_request_commits_every_owned_skgrepo_with_one_message (
               "{}", response );
     Ok (( )) }) }
 
-/// When every changed file is ready no confirmation is needed, and
+/// When every changed file is processed no confirmation is needed, and
 /// the commit lapses every mark.
 #[test]
 fn a_complete_summary_commits_without_confirmation_and_lapses_the_marks (
@@ -148,16 +148,16 @@ fn a_complete_summary_commits_without_confirmation_and_lapses_the_marks (
     let all_skgrepos : SkgrepoRestriction = all (f) ?;
     mark_every_leaf (f, &env) ?;
     let answer : StageAndCommitAnswer = stage_and_commit (
-      &env, &mut f . views_state, &all_skgrepos, "all ready", false );
+      &env, &mut f . views_state, &all_skgrepos, "all processed", false );
     assert! ( matches! (answer, StageAndCommitAnswer::Committed { .. }),
               "{:?}", answer );
-    assert_everything_committed (f, "all ready") ?;
-    assert! ( env . runtime . readiness_store . lock () . unwrap () . marks . is_empty () );
-    assert! ( ReadinessStore::load ( &f . config . readiness_marks_path () ) . marks . is_empty () );
+    assert_everything_committed (f, "all processed") ?;
+    assert! ( env . runtime . processed_store . lock () . unwrap () . marks . is_empty () );
+    assert! ( ProcessedStore::load ( &f . config . processed_marks_path () ) . marks . is_empty () );
     Ok (( )) }) }
 
 /// A file the user staged in one gitrepo before the request stops even
-/// a fully ready commit for confirmation, naming the gitrepo and the
+/// a fully processed commit for confirmation, naming the gitrepo and the
 /// file; the confirmed resend commits it with the '.skg' files.
 #[test]
 fn an_already_staged_entry_needs_confirmation_and_is_then_committed (

@@ -17,7 +17,7 @@ use crate::diff_view::pruned_change_view::{
   PrunedChangeViewSets, kept_content_origins, nodes_editable_in_diffView,
   prunedChangeView_sets_of_buffer, union_containers};
 use crate::diff_view::change_viewnodes::mk_historical_viewnode;
-use crate::diff_view::readiness_store::ReadinessStore;
+use crate::diff_view::processed_store::ProcessedStore;
 use crate::org_to_text::viewforest_to_string;
 use crate::graph_straddle::build::current_graph_straddle_in_slot;
 use crate::graph_straddle::types::GraphStraddle;
@@ -50,7 +50,7 @@ pub fn refresh_diffView_viewforest (
   runtime              : &RuntimeGeneration,
   straddle             : &GraphStraddle,
   diffView_buffer_kind : DiffViewBufferKind,
-  store                : &ReadinessStore,
+  store                : &ProcessedStore,
   restriction          : &SkgrepoRestriction,
   viewforest           : &mut ViewForest,
   viewnode_id_record   : &mut ViewnodeIdRecord,
@@ -59,7 +59,7 @@ pub fn refresh_diffView_viewforest (
     viewforest, viewnode_id_record, &Truth::of_runtime (runtime, restriction),
     RefreshMode::DiffView { straddle,
                             buffer_kind     : diffView_buffer_kind,
-                            readiness_store : store },
+                            processed_store : store },
     runtime . config . initial_node_limit ) }
 
 /// Bring an open buffer of the diff view up to date: bring the
@@ -94,7 +94,7 @@ pub fn refresh_diffView_buffer_over_current_straddle (
       &straddle, diffView_buffer_kind, viewforest, &standing_roots );
     append_contentOrigins_to_buffer (
       runtime, &straddle, diffView_buffer_kind, viewforest, &new_roots ) ?; }
-  let store : MutexGuard<ReadinessStore> = context . env . runtime . lock_readiness_store ();
+  let store : MutexGuard<ProcessedStore> = context . env . runtime . lock_processed_store ();
   refresh_diffView_viewforest (
     runtime, &straddle, diffView_buffer_kind, &store, restriction,
     viewforest, viewnode_id_record ) }
@@ -109,13 +109,13 @@ pub struct RenderedDiffViewBuffer {
 
 /// The buffer of kind 'diffView_buffer_kind' over 'straddle', with
 /// roots 'roots' (for a pruned change view, its D in order), and
-/// readiness from 'store': the refresh of a stub of its roots
+/// what is processed from 'store': the refresh of a stub of its roots
 /// ('stub_viewforest_of_roots').
 pub fn diffView_buffer_viewforest (
   runtime              : &RuntimeGeneration,
   straddle             : &GraphStraddle,
   diffView_buffer_kind : DiffViewBufferKind,
-  store                : &ReadinessStore,
+  store                : &ProcessedStore,
   roots                : &[ID],
 ) -> Result<RenderedDiffViewBuffer, Box<dyn Error>> {
   let mut viewforest : ViewForest =

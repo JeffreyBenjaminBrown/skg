@@ -265,7 +265,7 @@ pub struct SkgConfig {
   pub max_roleTree_depth : usize, // Max BFS depth for full containerward role tree.
 
   #[serde (default)]
-  pub readiness_marks_file : Option<PathBuf>, // The readiness store's file, as the config states it; see 'readiness_marks_path'.
+  pub processed_marks_file : Option<PathBuf>, // The processed store's file, as the config states it; see 'processed_marks_path'.
 
   #[serde(default = "default_repo_watch_quiet_ms")]
   pub repo_watch_quiet_ms : u64, // How long the skgrepo directories must be quiet before the files changed in them are reloaded; see 'server/repo_watch/watcher.rs'.
@@ -367,17 +367,17 @@ impl SkgConfig {
       . unwrap_or_else ( || run_folder_beside (&self . config_path) );
     run_folder . join ( server_process_start_as_file_name () ) }
 
-  /// The readiness store's file: 'readiness_marks_file' resolved
+  /// The processed store's file: 'processed_marks_file' resolved
   /// against the data root, or else 'readiness-marks-STEM.json' in the
   /// data root, STEM the config file's name without its extension, so
   /// that servers over one data root keep separate marks.
   /// 'config_path' is canonical, so a symlink to a config file shares
   /// that file's marks. A config read from no file (a test's) uses the
   /// stem of the default config file, 'skgconfig'.
-  pub fn readiness_marks_path (
+  pub fn processed_marks_path (
     &self,
   ) -> PathBuf {
-    match &self . readiness_marks_file {
+    match &self . processed_marks_file {
       Some (stated) => self . data_root . join (stated),
       None => {
         let stem : String =
@@ -605,7 +605,7 @@ impl SkgConfig {
       timing_log         : false,
       beep_when_server_becomes_available : false,
       max_roleTree_depth : default_max_roleTree_depth(),
-      readiness_marks_file : None,
+      processed_marks_file : None,
       repo_watch_quiet_ms : default_repo_watch_quiet_ms (), }}
 
   /// Creates a SkgConfig with a test-specific Tantivy folder.
@@ -628,7 +628,7 @@ impl SkgConfig {
       timing_log         : false,
       beep_when_server_becomes_available : false,
       max_roleTree_depth : default_max_roleTree_depth(),
-      readiness_marks_file : None,
+      processed_marks_file : None,
       repo_watch_quiet_ms : default_repo_watch_quiet_ms (), }}
 
   pub fn skgrepo_is_owned (

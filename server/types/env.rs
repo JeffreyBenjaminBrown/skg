@@ -4,7 +4,7 @@
 //!
 
 use crate::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle};
-use crate::diff_view::readiness_store::ReadinessStore;
+use crate::diff_view::processed_store::ProcessedStore;
 use crate::repo_watch::reload::RepoChangeNotice;
 use crate::types::misc::{SkgConfig, TantivyIndex};
 
@@ -45,9 +45,9 @@ pub struct SharedRuntime {
   pub mutation_gate : MutationGate,
   // Shared atomic swap-in state for coherent runtime generations.
   legacy_graph : InRustGraphHandle,
-  /// The commit-readiness marks, read from '<data_root>' at startup
+  /// The processed marks, read from '<data_root>' at startup
   /// and written back after every change.
-  pub readiness_store : SyncMutex<ReadinessStore>,
+  pub processed_store : SyncMutex<ProcessedStore>,
   /// What the server warned about as it started (unknown config
   /// keys, foreign manifests whose order the config contradicts),
   /// recorded once by 'main' and served by the "server warnings"
@@ -74,8 +74,8 @@ impl SharedRuntime {
     tantivy_index : TantivyIndex,
   ) -> Self {
     let graph : Arc<InRustGraph> = legacy_graph . load_full ();
-    let readiness_store : ReadinessStore =
-      ReadinessStore::load ( &config . readiness_marks_path () );
+    let processed_store : ProcessedStore =
+      ProcessedStore::load ( &config . processed_marks_path () );
     SharedRuntime {
       current : ArcSwap::from_pointee (RuntimeGeneration {
         config : Arc::new (config), graph, tantivy_index,
@@ -83,7 +83,7 @@ impl SharedRuntime {
       }),
       mutation_gate : new_mutation_gate (),
       legacy_graph,
-      readiness_store : SyncMutex::new (readiness_store),
+      processed_store : SyncMutex::new (processed_store),
       startup_warnings : OnceLock::new (),
       repo_change_notices : broadcast::channel (REPO_CHANGE_NOTICE_CAPACITY) . 0,
     }
@@ -126,13 +126,13 @@ impl SharedRuntime {
     self . current . load_full ()
   }
 
-  /// The readiness store, locked. A panic while another holder had it
+  /// The processed store, locked. A panic while another holder had it
   /// leaves the marks as they were, so a poisoned lock is taken
   /// anyway.
-  pub fn lock_readiness_store (
+  pub fn lock_processed_store (
     &self,
-  ) -> SyncMutexGuard<'_, ReadinessStore> {
-    self . readiness_store . lock ()
+  ) -> SyncMutexGuard<'_, ProcessedStore> {
+    self . processed_store . lock ()
       . unwrap_or_else ( |poisoned| poisoned . into_inner () ) }
 
   /// Swap in the next generation.

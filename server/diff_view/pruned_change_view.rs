@@ -22,8 +22,8 @@ use crate::graph_straddle::types::GraphStraddle;
 use crate::diff_view::change_leaves::{
   ChangeLeaves, LeafKey, NodeAspect, RelationshipAspect};
 use crate::prominence::climb_containerward_to_content_origins_via;
-use crate::diff_view::readiness_store::ReadinessStore;
-use crate::diff_view::readiness_requests::set_ready_facts_in_viewforest;
+use crate::diff_view::processed_store::ProcessedStore;
+use crate::diff_view::processed_requests::set_processed_facts_in_viewforest;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::misc::{ID, SkgrepoChange};
 use crate::types::tree::forest::{ViewForest, editable_gnids, in_content_position};
@@ -196,10 +196,10 @@ pub fn set_diffView_facts_in_viewforest (
   viewforest           : &mut ViewForest,
   straddle             : &GraphStraddle,
   diffView_buffer_kind : DiffViewBufferKind,
-  store                : &ReadinessStore,
+  store                : &ProcessedStore,
   graph                : &InRustGraph,
 ) {
-  set_ready_facts_in_viewforest (
+  set_processed_facts_in_viewforest (
     viewforest, straddle . change_leaves (), store, graph );
   if diffView_buffer_kind == DiffViewBufferKind::SkgrepoChanges {
     set_homeSkgrepoMove_facts_in_viewforest (viewforest, straddle ); }}

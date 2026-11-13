@@ -87,8 +87,8 @@ fn refusal_errors (
       response . errors, response . saved_view ), } }
 
 /// c, typed under a and so created, is a node of U whose creation is
-/// marked ready. Write-protecting its only editable occurrence saves,
-/// c keeps its readiness facts, and the summary counts its change
+/// marked processed. Write-protecting its only editable occurrence saves,
+/// c keeps its processed facts, and the summary counts its change
 /// as not editable.
 #[test]
 fn write_protecting_the_only_editable_occurrence_of_a_node_of_u_saves (
@@ -114,7 +114,7 @@ fn write_protecting_the_only_editable_occurrence_of_a_node_of_u_saves (
     assert! ( node_lines (&response . saved_view, "c") . iter ()
                 . all ( |line| line . contains ("(ready ") ),
               "{}", response . saved_view );
-    assert_eq! ( response . readiness_summary . unwrap () . changes_not_editable_here, 1 );
+    assert_eq! ( response . processed_summary . unwrap () . changes_not_editable_here, 1 );
     Ok (( )) }) }
 
 /// A child typed under n under y, a write-protected occurrence,

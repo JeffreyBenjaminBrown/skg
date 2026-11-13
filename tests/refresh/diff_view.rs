@@ -13,11 +13,11 @@ fn diff_run_asserting_fixpoint (
   text     : &str,
   straddle : &GraphStraddle,
 ) -> Run {
-  let readiness_store : ReadinessStore = ReadinessStore::default ();
+  let processed_store : ProcessedStore = ProcessedStore::default ();
   run_asserting_fixpoint_in ( text, &straddle . after, &unrestricted (),
            RefreshMode::DiffView { straddle,
                                    buffer_kind : DiffViewBufferKind::AllChanges,
-                                   readiness_store : &readiness_store },
+                                   processed_store : &processed_store },
            100 ) }
 
 #[test]
@@ -339,7 +339,7 @@ fn the_acquirer_keeps_its_editable_occurrence_beside_the_ghost_of_the_acquiree (
        node ("c"),
        Graphnode { contains : ids (&["a"]), .. node ("r1") },
        Graphnode { contains : ids (&["a"]), .. node ("r2") } ] );
-  let readiness_store : ReadinessStore = ReadinessStore::default ();
+  let processed_store : ProcessedStore = ProcessedStore::default ();
   let input : String = formatdoc! ("
     * {} b
     * {} a
@@ -348,7 +348,7 @@ fn the_acquirer_keeps_its_editable_occurrence_beside_the_ghost_of_the_acquiree (
     &input, &straddle . after,
     RefreshMode::DiffView { straddle        : &straddle,
                             buffer_kind     : DiffViewBufferKind::AllChanges,
-                            readiness_store : &readiness_store } );
+                            processed_store : &processed_store } );
   assert_eq! ( run . outline (), "\
 ghost b noClaim
   acquiredByFolder
@@ -441,10 +441,10 @@ fn diff_view_narrowed_by_a_switch (
 ) -> (String, String, ViewForest) {
   let config : SkgConfig = config ();
   let restriction : SkgrepoRestriction = main_only ();
-  let readiness_store : ReadinessStore = ReadinessStore::default ();
+  let processed_store : ProcessedStore = ProcessedStore::default ();
   let mode : RefreshMode = RefreshMode::DiffView {
     straddle, buffer_kind : DiffViewBufferKind::AllChanges,
-    readiness_store : &readiness_store };
+    processed_store : &processed_store };
   let graph : &InRustGraph = &straddle . after;
   let mut forest : ViewForest = parse (text, IdResolution::ThroughGraph (graph));
   let mut steps : Vec<(String, String)> = refresh_across_switches (
@@ -487,12 +487,12 @@ node p
   assert! ( ! narrowed . contains ("ghost")
             && ! narrowed . contains ("secret"), "{}", narrowed );
   let mut forest : ViewForest = forest;
-  let readiness_store : ReadinessStore = ReadinessStore::default ();
+  let processed_store : ProcessedStore = ProcessedStore::default ();
   let (widened, _) : (String, String) = refresh_across_switches (
     &mut forest, &straddle . after, &[ &unrestricted () ],
     RefreshMode::DiffView { straddle : &straddle,
                             buffer_kind : DiffViewBufferKind::AllChanges,
-                            readiness_store : &readiness_store } )
+                            processed_store : &processed_store } )
     . remove (0);
   assert_eq! ( widened, opened ); }
 
