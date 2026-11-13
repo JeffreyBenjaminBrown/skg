@@ -14,6 +14,8 @@ mod buffer;
 mod request;
 #[path = "pruned_change_view/processed.rs"]
 mod processed;
+#[path = "pruned_change_view/marks_by_letter.rs"]
+mod marks_by_letter;
 #[path = "pruned_change_view/other_buffers.rs"]
 mod other_buffers;
 #[path = "pruned_change_view/stage_and_commit.rs"]
