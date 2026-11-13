@@ -98,4 +98,30 @@ describe('a redraw the user did not ask for', function ()
       assert.are.equal('body 30 two', cursor_line_text())
       assert.are.equal(6, vim.fn.winline()) end)
   end)
+
+  it('leaves the cursor under an unsaved headline on the focused one',
+     function ()
+    local after = headlines(2):gsub('v(%d)', 'x%1')
+    open_view(headlines(3) .. '* my new headline\nnew body\n' .. after)
+    goto_line('new body')
+    rerender(headlines(3)
+      .. '* (skg (vnid n1) focused node (gnid new)) my new headline\n'
+      .. 'new body\n' .. after)
+    assert.are.equal('* (skg (vnid n1) node (gnid new)) my new headline',
+                     cursor_line_text())
+  end)
+
+  it('keeps the screen line when the redraw closes folds above the'
+     .. ' cursor', function ()
+    open_view(headlines(40))
+    goto_line('body 20 one')
+    vim.fn.winrestview({ topline = vim.fn.line('.') - 8 })
+    assert.are.equal(9, vim.fn.winline())
+    rerender((headlines(40)
+      :gsub('%(vnid v18%) ', '(vnid v18) bodyFolded ')
+      :gsub('%(vnid v19%) ', '(vnid v19) bodyFolded ')))
+    assert.are.equal('body 20 one', cursor_line_text())
+    assert.are_not.equal(-1, vim.fn.foldclosed(vim.fn.search('^body 19 one$', 'bnw')))
+    assert.are.equal(9, vim.fn.winline())
+  end)
 end)

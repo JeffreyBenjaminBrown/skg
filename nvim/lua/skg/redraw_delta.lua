@@ -95,12 +95,24 @@ function M.headline_indices_by_viewnode_id (lines, viewnode_ids)
   local wanted = {}
   for _, viewnode_id in ipairs(viewnode_ids) do wanted[viewnode_id] = true end
   local indices = {}
-  for index, line in ipairs(lines) do
-    local viewnode_id = M.viewnode_id_at_headline_start(line)
-    if viewnode_id and wanted[viewnode_id] then
-      indices[viewnode_id] = index end
+  for _, headline in ipairs(M.viewnode_id_headlines(lines)) do
+    if wanted[headline.id] then indices[headline.id] = headline.index end
   end
   return indices
+end
+
+---Each headline line of LINES that begins with a viewnode ID, as
+---{ id = ID, index = INDEX }, INDEX its 1-based index, in order.
+---@param lines string[]
+---@return table[]
+function M.viewnode_id_headlines (lines)
+  local headlines = {}
+  for index, line in ipairs(lines) do
+    local viewnode_id = M.viewnode_id_at_headline_start(line)
+    if viewnode_id then
+      table.insert(headlines, { id = viewnode_id, index = index }) end
+  end
+  return headlines
 end
 
 ---The X of LINE when it begins '^\*+ (skg (vnid X)', the renderer's

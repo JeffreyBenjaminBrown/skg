@@ -420,42 +420,65 @@ end
 ---headline's viewnode ID, which a rerender keeps
 ---('docs/api-and-formats.org', "(vnid X)"), with the offsets a save
 ---measures, and restored by them. A cursor whose viewnode is gone goes
----to the start of the nearest headline that remains.
+---to the start of the nearest headline that remains. A cursor whose
+---headline has no viewnode ID (one typed since the last save, which a
+---save held back marks focused) goes to the focused headline, as the
+---server drew it. A buffer shown in no window has no cursor to keep.
 ---@param buf integer
 ---@param new_content string
 function M.replace_buffer_keeping_viewnode_points (buf, new_content)
+  local old_headlines = redraw_delta.viewnode_id_headlines(
+    vim.api.nvim_buf_get_lines(buf, 0, -1, false))
   local positions_by_window = {}
   for _, window in ipairs(vim.fn.win_findbuf(buf)) do
-    positions_by_window[window] =
-      vim.api.nvim_win_call(window, M.viewnode_point_position) end
+    positions_by_window[window] = vim.api.nvim_win_call(window, function ()
+      return M.viewnode_point_position(old_headlines) end) end
   M.replace_buffer_with_new_content(buf, new_content, nil)
-  local headline_lines = M.viewnode_id_headline_lines(buf)
+  local focused_line = M.focused_line_after_redraw(buf)
+  local old_ids = {}
+  for _, headline in ipairs(old_headlines) do
+    table.insert(old_ids, headline.id) end
+  local headline_lines = redraw_delta.headline_indices_by_viewnode_id(
+    vim.api.nvim_buf_get_lines(buf, 0, -1, false), old_ids)
   for window, position in pairs(positions_by_window) do
     vim.api.nvim_win_call(window, function ()
-      M.goto_viewnode_point_position(position, headline_lines) end) end
+      M.goto_viewnode_point_position(position, headline_lines,
+                                     focused_line) end) end
+end
+
+---The line of BUF's focused headline once a whole redraw has acted on
+---its atoms: where that redraw left the cursor of the window it acted
+---in, the first window showing BUF ('buffer.act_on_fold_and_focus_atoms').
+---@param buf integer
+---@return integer|nil
+function M.focused_line_after_redraw (buf)
+  for _, window in ipairs(vim.api.nvim_list_wins()) do
+    if vim.api.nvim_win_get_buf(window) == buf then
+      return vim.api.nvim_win_get_cursor(window)[1] end end
+  return nil
 end
 
 ---Where the current window's cursor stands: the save's measures
 ---('M.current_save_point_position'), with viewnode_ids, the viewnode
----IDs of the buffer's headlines, the one owning the cursor first and
----the rest by their distance from the cursor, nearest first, and
----owner_viewnode_id, that first one's. Nil when the cursor precedes
----every headline.
+---IDs of OLD_HEADLINES ('redraw_delta.viewnode_id_headlines' of the
+---current buffer), the one owning the cursor first and the rest by
+---their distance in lines from the cursor, nearest first, and
+---owner_viewnode_id, the owning one's, nil when it has none. Nil when
+---the cursor precedes every headline.
+---@param old_headlines table[]
 ---@return table|nil
-function M.viewnode_point_position ()
+function M.viewnode_point_position (old_headlines)
   local owner_line = focus.owning_headline_line()
   if not owner_line then return nil end
   local cursor_line = vim.api.nvim_win_get_cursor(0)[1]
   local owner_id = nil
   local others = {}
-  for line_number, line in ipairs(
-        vim.api.nvim_buf_get_lines(0, 0, -1, false)) do
-    local id = redraw_delta.viewnode_id_at_headline_start(line)
-    if id then
-      if line_number == owner_line then owner_id = id
-      else table.insert(others, { id = id, line = line_number }) end end end
+  for _, headline in ipairs(old_headlines) do
+    if headline.index == owner_line then owner_id = headline.id
+    else table.insert(others, headline) end end
   table.sort(others, function (a, b)
-    return math.abs(a.line - cursor_line) < math.abs(b.line - cursor_line) end)
+    return math.abs(a.index - cursor_line)
+           < math.abs(b.index - cursor_line) end)
   local position = M.current_save_point_position()
   position.owner_viewnode_id = owner_id
   position.viewnode_ids = {}
@@ -465,38 +488,35 @@ function M.viewnode_point_position ()
   return position
 end
 
----@param buf integer
----@return table from each viewnode ID to its headline's line number
-function M.viewnode_id_headline_lines (buf)
-  local headline_lines = {}
-  for line_number, line in ipairs(
-        vim.api.nvim_buf_get_lines(buf, 0, -1, false)) do
-    local id = redraw_delta.viewnode_id_at_headline_start(line)
-    if id then headline_lines[id] = line_number end end
-  return headline_lines
-end
-
 ---Move the current window's cursor to POSITION
 ---('M.viewnode_point_position'): to its offsets below its own headline
----if that is in HEADLINE_LINES, else to the start of the first of its
----other headlines that is, keeping its screen line either way.
+---if HEADLINE_LINES (a table from viewnode ID to line) holds that,
+---else to the start of the first of its other headlines that it
+---holds, keeping its screen line either way. A position whose
+---headline had no viewnode ID, or none of whose headlines remain, goes
+---to FOCUSED_LINE.
 ---@param position table|nil
 ---@param headline_lines table
-function M.goto_viewnode_point_position (position, headline_lines)
-  if not position then return end
-  for _, id in ipairs(position.viewnode_ids) do
-    local line = headline_lines[id]
-    if line then
-      vim.api.nvim_win_set_cursor(0, { line, 0 })
-      if id == position.owner_viewnode_id then
-        M.restore_save_point_position(position)
-      else
-        M.restore_save_point_position({
-          lines_below_focused_headline = 0,
-          column = 0,
-          screen_lines_below_window_start =
-            position.screen_lines_below_window_start }) end
-      return end end
+---@param focused_line integer|nil
+function M.goto_viewnode_point_position (position, headline_lines,
+                                         focused_line)
+  local owner_id = position and position.owner_viewnode_id
+  if owner_id then
+    for _, id in ipairs(position.viewnode_ids) do
+      local line = headline_lines[id]
+      if line then
+        vim.api.nvim_win_set_cursor(0, { line, 0 })
+        if id == owner_id then
+          M.restore_save_point_position(position)
+        else
+          M.restore_save_point_position({
+            lines_below_focused_headline = 0,
+            column = 0,
+            screen_lines_below_window_start =
+              position.screen_lines_below_window_start }) end
+        return end end end
+  if focused_line then
+    vim.api.nvim_win_set_cursor(0, { focused_line, 0 }) end
 end
 
 ---Handle one streamed collateral-view update: unlock and replace the
@@ -636,12 +656,30 @@ function M.restore_save_point_position (save_point_position)
   local screen_lines =
     save_point_position.screen_lines_below_window_start
   if screen_lines then
-    -- Put the cursor's line SCREEN_LINES below the window top
-    -- (modulo wrapped lines, which winrestview counts as one).
-    local cursor_line = vim.api.nvim_win_get_cursor(0)[1]
-    vim.fn.winrestview({
-      topline = math.max(1, cursor_line - screen_lines) })
-  end
+    M.put_cursor_on_screen_line(screen_lines) end
+end
+
+---Scroll the current window so that the cursor's line is SCREEN_LINES
+---screen lines below its top (0 being the top), or as near as the
+---lines above it allow. The top line climbs from the cursor's line a
+---line at a time, a closed fold counting as one, until 'winline()'
+---reaches SCREEN_LINES, so closed folds and wrapped lines above the
+---cursor are counted as the measure ('winline()') counted them.
+---@param screen_lines integer
+function M.put_cursor_on_screen_line (screen_lines)
+  local topline = vim.api.nvim_win_get_cursor(0)[1]
+  local fold_start = vim.fn.foldclosed(topline)
+  if fold_start ~= -1 then topline = fold_start end
+  vim.fn.winrestview({ topline = topline })
+  while topline > 1 and vim.fn.winline() - 1 < screen_lines do
+    local above = topline - 1
+    fold_start = vim.fn.foldclosed(above)
+    if fold_start ~= -1 then above = fold_start end
+    vim.fn.winrestview({ topline = above })
+    if vim.fn.winline() - 1 > screen_lines then
+      vim.fn.winrestview({ topline = topline })
+      return end
+    topline = above end
 end
 
 ---Move LINE_OFFSET lines below the focused headline, then to COLUMN
