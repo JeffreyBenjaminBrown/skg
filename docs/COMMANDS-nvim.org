@@ -834,8 +834,10 @@ the server, in a file beside its config
 another). A headline whose
 change is processed shows ✓ after it; a processed aggregate (a
 folder of changes, a changeset marker) shows ✓ when all of its changes are. A node that
-existed at HEAD and whose file records a change shows M ("modified"),
-and M✓ once every change its file records is marked.
+existed at HEAD and has changes of its own (its text, home skgrepo,
+aliases, extra IDs, flags) shows M ("modified"), and M✓ once those are
+marked (<localleader>mnp); a node whose only change is which children it contains
+shows no M, its children's ~ showing those changes.
 
 After every save of one of the diff view's buffers, a
 notification shows the processed summary: "12 of 14 changed files are
@@ -866,8 +868,8 @@ it (~+, ~-). On a modified node, n marks the changes of the node
 itself: its text, home skgrepo, aliases, extra IDs and flags, not the
 containment of its children, which each child's own ~ shows and r
 marks. A headline that is one change (an old text, an alias, an ID, a
-flag, a home-skgrepo move) is marked by n or b; a relationship moved
-to another skgrepo by r or b. On a changeset marker ("its content
+flag, a home-skgrepo move) is marked by n or b; an unknown node's membership, or a
+relationship moved to another skgrepo, by r or b. On a changeset marker ("its content
 changed"), r marks the changed memberships it stands for and n the
 changes of those members themselves. On a folder of changes, the
 letter acts on each member, one level down. When the letter names

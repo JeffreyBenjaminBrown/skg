@@ -893,8 +893,10 @@ server, in a file beside its config ('<data_root>/processed-marks-CONFIGSTEM.jso
 unless the config names another). A headline whose
 change is processed shows ✓ after it; a processed aggregate (a
 folder of changes, a changeset marker) shows ✓ when all of its changes are. A node that
-existed at HEAD and whose file records a change shows M ("modified"),
-and M✓ once every change its file records is marked.
+existed at HEAD and has changes of its own (its text, home skgrepo,
+aliases, extra IDs, flags) shows M ("modified"), and M✓ once those are
+marked (C-c m n p); a node whose only change is which children it contains
+shows no M, its children's ~ showing those changes.
 
 After every save of one of the diff view's buffers, the
 minibuffer shows the processed summary: "12 of 14 changed files are
@@ -926,8 +928,8 @@ On a modified node, n marks the changes of the node itself: its text,
 home skgrepo, aliases, extra IDs and flags, not the containment of its
 children, which each child's own ~ shows and r marks. A headline that
 is one change (an old text, an alias, an ID, a flag, a home-skgrepo
-move) is marked by n or b; a relationship moved to another skgrepo by
-r or b. On a changeset marker ("its content changed"), r marks the
+move) is marked by n or b; an unknown node's membership, or a
+relationship moved to another skgrepo, by r or b. On a changeset marker ("its content changed"), r marks the
 changed memberships it stands for and n the changes of those members
 themselves. On a folder of changes, the letter acts on each member,
 one level down. When the letter names nothing on the headline, it
@@ -963,8 +965,10 @@ As C-c m r p, but unmarks.
 *** C-c m b p : skg-mark-both-processed
 Marks processed both the node at point and its relationship to the
 headline above it, then saves: everything the headline shows. With
-C-u (or C-u C-u), everything in the subtree, as above; C-u C-c m b p
-on each root of the "all changes" buffer marks every change there.
+C-u (or C-u C-u), everything in the subtree, as above. Below a new
+node only the server's walk marks, and it reaches new nodes alone: an
+existing node drawn there keeps its own changes unmarked until marked
+where it stands.
 *** C-c m b u : skg-mark-both-unprocessed
 As C-c m b p, but unmarks.
 *** C-c m h p : skg-mark-homeSkgrepo-move-processed

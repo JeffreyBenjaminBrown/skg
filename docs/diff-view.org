@@ -593,8 +593,9 @@ its five siblings ('elisp/skg-processed.el'). On the headline at point
 it names the letter's objects among those its '(leaves ...)' lists,
 and refuses when that is none. A headline that names one leaf, which
 lists no object, gets the bare request from the letter of the leaf's
-kind: 'r' for a relRepo move, 'n' for an alias, extra ID, flag, old
-text or home skgrepo move; 'b' for either. On a changeset marker at
+kind: 'r' for a relRepo move and an unknown or restricted viewnode
+(which shows no node, only its relationship), 'n' for an alias, extra
+ID, flag, old text or home skgrepo move; 'b' for either. On a changeset marker at
 point the letters go as they are, 'n' naming its members' own leaves
 (above, "What a request names"). On a changed folder the gesture acts
 on its children, one level down, each as above.
@@ -603,8 +604,9 @@ With a prefix argument it acts on every headline of the subtree that
 names some of the letter's objects, a changeset marker below the
 headline at point naming only what it lists, since its members name
 their own leaves under their own headlines. At a new node (=(node
-added)=) in content position (not in a folder), the headline at point
-among them, it names the letters and =newContent= (with two prefix
+added)=) in content position (not in a folder), and at the headline
+at point when it is a new node wherever it stands, it names the
+letters and =newContent= (with two prefix
 arguments, =newOutward=) and skips the rest of the node's subtree: the
 server then walks the graph from it through new nodes only, shown or
 not, write-protected or not, contentward or along every relationship
