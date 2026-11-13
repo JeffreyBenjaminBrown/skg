@@ -125,10 +125,12 @@ end
 -- PHASE 3: stage and commit.
 print('=== PHASE 3: Stage and commit ===')
 do
-  local original_input = vim.fn.input
-  vim.fn.input = function () return 'integration commit' end
-  require('skg.stage_and_commit').stage_and_commit()
-  vim.fn.input = original_input
+  local stage_and_commit = require('skg.stage_and_commit')
+  stage_and_commit.stage_and_commit()
+  local message_buf = stage_and_commit.commit_message_buffer()
+  vim.api.nvim_buf_set_lines(message_buf, 0, -1, false,
+                             { 'integration commit', '' })
+  vim.api.nvim_buf_call(message_buf, function () vim.cmd('write') end)
 end
 T.check(T.wait_for(function () return newest_notification('^Committed in') end, 20),
         'the commit was reported')
