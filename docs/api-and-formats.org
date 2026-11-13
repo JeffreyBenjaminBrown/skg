@@ -2394,18 +2394,20 @@ leaves an unmark touches.
 A gesture writes =(processed ...)= or =(unprocessed ...)= into the headline's
 =(editRequest ...)=, creating the form if the headline lacks one, and
 saves; see =docs/diff-view.org=, "Processed requests and gestures".
-In Emacs the gestures are =C-c r r= (=skg-cycle-processed=), which
-toggles whether the change at point is processed, and =C-c r h=
-(=skg-toggle-homeSkgrepo-move-processed=), which toggles whether the
-home-skgrepo move of the node at point is processed. Their
-recursive forms take a prefix argument: =C-u C-c r r= marks every
-change in the subtree at point, or unmarks them if the headline at
-point is processed, leaving each new node in content position to the
-server (=newContent=; with =C-u C-u=, =newOutward=), and =C-u C-c r h= does the same as =C-c r h= to every
-descendant whose home skgrepo moved between the same two skgrepos; see
-=docs/COMMANDS.org=, "C-c r : processed marks, in the diff view". The
-Neovim keys are in =docs/COMMANDS-nvim.org=. A gesture that would
-unmark more than one change first asks for a typed "yes".
+In Emacs a gesture is =C-c m=, then what (=n= the node, =r= its
+relationship to its viewparent, =b= both), then which way (=p=
+processed, =u= unprocessed): =C-c m n p= writes =(processed node)=,
+=C-c m b u= =(unprocessed node rel)=, each naming those objects the
+headline's =(leaves ...)= lists. Their recursive forms take a prefix
+argument: =C-u= writes the request on every headline in the subtree
+at point that names some of them, and on each new node in content
+position the letters and =newContent= (with =C-u C-u=, =newOutward=),
+leaving what the walk reaches to the server; =C-c m h p= and =C-c m h
+u= mark the home-skgrepo move of the node at point, with =C-u= every
+like move below it; see =docs/COMMANDS.org=, "C-c m : processed
+marks, in the diff view". The Neovim keys are in
+=docs/COMMANDS-nvim.org=. A gesture that would unmark more than one
+change first asks for a typed "yes".
 **** The save of any buffer consumes the requests
 A save of any buffer, not only one of the diff view's, consumes the
 processed requests after its graph edits succeed: each sets or clears

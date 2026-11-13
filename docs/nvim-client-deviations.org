@@ -68,9 +68,9 @@ refusal at error level without the Lua traceback and without the
   runs with 'C-u' is a command of its own, with its own key: delete's
   is ':SkgDeleteRecursive' on '<localleader>dR', the flag command's
   ':SkgSetFlagSearchMatchingRecursive' on '<localleader>sX', and the
-  processed gestures' are on '<localleader>rR' and
-  '<localleader>rH', and the one Emacs runs with 'C-u C-u C-c r r' on
-  '<localleader>rO'.
+  processed gestures' take a capital last letter ('<localleader>mnP'
+  for 'C-u C-c m n p', '<localleader>mhU' for 'C-u C-c m h u'), and
+  those Emacs runs with 'C-u C-u' a capital 'M' ('<localleader>Mnp').
 - Extra vim-idiomatic surfaces beyond the Emacs set: ']i' / '[i' as
   id-next/prev motions; '^' plays the C-a title toggle; '<Tab>'
   toggles the fold at point and '<S-Tab>' global visibility.

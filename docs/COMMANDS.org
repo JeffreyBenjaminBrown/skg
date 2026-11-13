@@ -821,66 +821,11 @@ moved to the new default.
 
 The command only edits metadata in the current buffer.
 Save the view afterward to apply the changes.
-** C-c r : processed marks, in the diff view
+** C-c r : the diff view: extending, committing, moving between changes
 *** preamble
-In a buffer of the diff view (C-c v d), each change can be
-marked processed. A mark approves the change as it is now: editing
-the changed thing again makes the mark lapse. Marks live on the
-server, in a file beside its config ('<data_root>/processed-marks-CONFIGSTEM.json',
-unless the config names another). A headline whose
-change is processed shows ✓ after it; a processed aggregate (a
-folder of changes, a changeset marker) shows ✓ when all of its changes are. A node that
-existed at HEAD and whose file records a change shows M ("modified"),
-and M✓ once every change its file records is marked.
-
-After every save of one of the diff view's buffers, the
-minibuffer shows the processed summary: "12 of 14 changed files are
-processed", or "Commit ready. All 14 of 14 changed files are processed.". A
-changed file counts as processed when every change it records is marked;
-a file whose only change is the order of a list counts as processed
-without marks. The summary
-adds how many changes are not editable in this view (C-c r u
-extends the diff view to them)
-and how many files changed in foreign skgrepos.
-
-A gesture that would unmark more than one change (a recursive one, one
-on a folder of changes, or one on a modified node, which unmarks every
-change the node records) first asks "Unmarking this node processed
-will unmark every contributing decision. You might discard a lot of
-hard-won information. Continue?", and does nothing unless you answer
-"yes". Unmarking a single change asks nothing. The
-server counts the changes: each headline that names changes says how
-many, in its metadata's '(leaves N ...)'.
-*** C-c r r : skg-cycle-processed
-Toggles whether the change at point is processed, then saves.
-On a headline that is one change (an old text, an alias, a move, a
-changeset marker), it toggles that one. On a headline that carries
-several, it toggles them all: on a new member its existence and its
-relationship to the headline above it (∃ and ~); on a modified node
-(M) every change its file records, and its relationship (~) when that
-changed too, so one gesture marks the whole file. A headline counts
-as processed when every one of its changes is. On a folder of changes, it
-toggles each change one level down.
-
-With a prefix argument (C-u C-c r r), it marks every change in the
-subtree at point, or unmarks them if the headline at point is processed.
-At a new node (∃+) that is not in a folder, it leaves the rest of
-that subtree to the server, which marks the new node, its text and
-its content, then the same for each new node the graph says it
-contains, and each new node those contain, and so on, whether or not
-the buffer shows them, write-protected or not. It does not mark the
-relationship of the node at point to its container, nor any
-subscription, hiding or override. With two prefix arguments (C-u C-u
-C-c r r), the server instead follows every relationship each new node
-records (contains, subscribes to, hides, overrides), and marks
-everything each records. Unmarking that way always asks first. Works
-on write-protected headlines too.
-*** C-c r h : skg-toggle-homeSkgrepo-move-processed
-Toggles whether the home-skgrepo move of the node at
-point (or the move at point) is processed, then saves: it unmarks the move if
-it is processed, else marks it. With a prefix argument (C-u C-c r h), it
-does the same to every descendant whose home skgrepo moved between the same
-two skgrepos. Works on write-protected headlines too.
+These act on the buffers of the diff view (C-c v d). Marking its
+changes processed is C-c m ("C-c m : processed marks, in the diff
+view").
 *** C-c r u : skg-diffView-extend
 Extends the buffer of the diff view to every change not editable in it.
 Each changed node with no editable occurrence becomes editable where
@@ -923,10 +868,11 @@ C-c i n. It does not wrap: past the last one it says "No further
 change" and leaves point. It works in any skg buffer; outside the
 diff view no headline names a change, so it finds none.
 *** C-c r n u : skg-diffView-goto-next-unprocessed-change
-The same, visiting only headlines with change facts that are not processed (see
-C-c r r for when a headline counts as processed). Past the last one it
+The same, visiting only headlines with change facts that are not
+processed: a headline counts as processed when every change it names
+is marked. Past the last one it
 says "No further unprocessed change".
-*** C-c r n r : skg-diffView-goto-next-processed-change
+*** C-c r n p : skg-diffView-goto-next-processed-change
 The same, visiting only processed headlines with change facts. Past the last one it
 says "No further processed change".
 *** C-c r p c : skg-diffView-goto-previous-change
@@ -935,9 +881,99 @@ before point. Before the first one it says "No earlier change".
 *** C-c r p u : skg-diffView-goto-previous-unprocessed-change
 Like C-c r n u, backward. Before the first one it says "No earlier
 unprocessed change".
-*** C-c r p r : skg-diffView-goto-previous-processed-change
-Like C-c r n r, backward. Before the first one it says "No earlier
+*** C-c r p p : skg-diffView-goto-previous-processed-change
+Like C-c r n p, backward. Before the first one it says "No earlier
 processed change".
+** C-c m : processed marks, in the diff view
+*** preamble
+In a buffer of the diff view (C-c v d), each change can be
+marked processed. A mark approves the change as it is now: editing
+the changed thing again makes the mark lapse. Marks live on the
+server, in a file beside its config ('<data_root>/processed-marks-CONFIGSTEM.json',
+unless the config names another). A headline whose
+change is processed shows ✓ after it; a processed aggregate (a
+folder of changes, a changeset marker) shows ✓ when all of its changes are. A node that
+existed at HEAD and whose file records a change shows M ("modified"),
+and M✓ once every change its file records is marked.
+
+After every save of one of the diff view's buffers, the
+minibuffer shows the processed summary: "12 of 14 changed files are
+processed", or "Commit ready. All 14 of 14 changed files are processed.". A
+changed file counts as processed when every change it records is marked;
+a file whose only change is the order of a list counts as processed
+without marks. The summary
+adds how many changes are not editable in this view (C-c r u
+extends the diff view to them)
+and how many files changed in foreign skgrepos.
+
+A gesture that would unmark more than one change (a recursive one, one
+on a folder of changes, or one on a modified node, which unmarks every
+change of the node itself) first asks "Unmarking this node processed
+will unmark every contributing decision. You might discard a lot of
+hard-won information. Continue?", and does nothing unless you answer
+"yes". Unmarking a single change asks nothing. The
+server counts the changes: each headline that names changes says how
+many, in its metadata's '(leaves N ...)'. Where the client cannot
+count them (what the server walks to, the changes a changeset marker's
+members make), unmarking always asks.
+
+Each mark is said directly: C-c m, then what (n the node, r its
+relationship to the headline above it, b both), then which way (p
+processed, u unprocessed). In zippy mode (C-c z) that is 'm n p'. A
+headline shows two things that can change: its node (∃+ new, ∃- deleted,
+M modified) and its relationship to the headline above it (~+, ~-).
+On a modified node, n marks the changes of the node itself: its text,
+home skgrepo, aliases, extra IDs and flags, not the containment of its
+children, which each child's own ~ shows and r marks. A headline that
+is one change (an old text, an alias, an ID, a flag, a home-skgrepo
+move) is marked by n or b; a relationship moved to another skgrepo by
+r or b. On a changeset marker ("its content changed"), r marks the
+changed memberships it stands for and n the changes of those members
+themselves. On a folder of changes, the letter acts on each member,
+one level down. When the letter names nothing on the headline, it
+says so and does nothing.
+
+With a prefix argument (C-u), a mark acts on every headline in the
+subtree at point the letter names something on. At a new node (∃+)
+that is not in a folder, it leaves the rest of that subtree to the
+server, which marks the new node and each new node the graph says it
+contains, and each new node those contain, and so on, whether or not
+the buffer shows them, write-protected or not: with n their
+existence, with r their content relationships (and the new node's own
+relationship to the headline above it), with b both. With two prefix
+arguments (C-u C-u), the server instead follows every relationship
+each new node records (contains, subscribes to, hides, overrides).
+Every mark works on write-protected headlines too.
+
+*** C-c m n p : skg-mark-node-processed
+Marks the node at point processed, then saves: the changes of the node
+itself, not its relationship to the headline above it. With C-u, the
+node of every headline in the subtree; with C-u C-u, the same, the
+server walking outward from new nodes (see the preamble).
+*** C-c m n u : skg-mark-node-unprocessed
+As C-c m n p, but unmarks.
+*** C-c m r p : skg-mark-rel-processed
+Marks processed the relationship of the headline at point to the
+headline above it (its ~), then saves. With C-u, that of every
+headline in the subtree, and the content relationships of the new
+nodes the server walks to; with C-u C-u, every relationship they
+record.
+*** C-c m r u : skg-mark-rel-unprocessed
+As C-c m r p, but unmarks.
+*** C-c m b p : skg-mark-both-processed
+Marks processed both the node at point and its relationship to the
+headline above it, then saves: everything the headline shows. With
+C-u (or C-u C-u), everything in the subtree, as above; C-u C-c m b p
+on each root of the "all changes" buffer marks every change there.
+*** C-c m b u : skg-mark-both-unprocessed
+As C-c m b p, but unmarks.
+*** C-c m h p : skg-mark-homeSkgrepo-move-processed
+Marks processed the home-skgrepo move of the node at point (or the
+move at point), then saves. With a prefix argument (C-u C-c m h p), it
+does the same to every descendant whose home skgrepo moved between the
+same two skgrepos.
+*** C-c m h u : skg-mark-homeSkgrepo-move-unprocessed
+As C-c m h p, but unmarks.
 ** C-c m : other graph modifications
 *** C-c m c : skg-replace-link-with-content
 Replace the leaf at point with a content relationship to the
@@ -1024,7 +1060,7 @@ a flag and its value, a folder's relation) prompts for it.
 A field left at its default is dropped when the edit is applied
 (C-c C-c).
 A processed request the diff view's gestures wrote
-(see C-c r) is shown in the edit request field, beside the other
+(see C-c m) is shown in the edit request field, beside the other
 request; deleting it there clears it.
 After each headline, in parentheses, is the herald that field or
 value gives a headline in a view, colored as there (once the server
@@ -1055,7 +1091,7 @@ changes" and "diff-view: order-only changes", skipping any that would
 be empty. It refuses unless the connection is unrestricted, and
 when an owned skgrepo is not in a git repository or has no HEAD
 commit (the refusal names the skgrepo). As each buffer opens, the
-minibuffer shows its processed summary, as after a save (see C-c r).
+minibuffer shows its processed summary, as after a save (see C-c m).
 
 Once the diff view's buffers are open, a switch of the
 skgrepo restriction ('skg-restrict-repo-set', C-c v l) rerenders them under
@@ -1090,7 +1126,7 @@ and not others leaves HEAD inconsistent: it can reference nodes it
 does not contain, record a relationship from one end only, or hold a
 moved node in two skgrepos at once. Such a HEAD cannot be reasoned
 about, and the next diff view against it reports changes that are
-only its own inconsistency. Review with the processed marks (C-c r)
+only its own inconsistency. Review with the processed marks (C-c m)
 instead, and commit everything at once with C-c r c.
 The merges buffer shows each nodeMerge since HEAD: the acquiree and
 its acquirer, in context. The acquiree's text preserver appears as a

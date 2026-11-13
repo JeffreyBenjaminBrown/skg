@@ -586,35 +586,49 @@ unprocessed, naming the leaf and both headlines
 ('find_contradictory_processed_requests'); requests that agree are
 consumed as usual.
 
-Every gesture toggles: it unmarks what is processed and marks what is
-not, and every headline is processed when its own '(processed ...)' names
-every object its '(leaves ...)' lists. C-c r r
-('skg-cycle-processed') acts on the headline at point, naming every
-object it lists: one leaf; on a new member, its existence and its
-relationship; on a modified node, what 'node' names there, and its
-relationship when that changed; on a
-changed folder, its leaves one level down; with a prefix argument,
-every leaf of the subtree, except that at a new node (=(node
-added)=) in content position (not in a folder) it names =newContent=
-(with two prefix arguments, =newOutward=) and skips the rest of the
-node's subtree: the server then walks the graph from it through new
-nodes only, shown or not, write-protected or not, contentward marking
-each new node's existence and content relationships, outward marking
-everything each records. At the headline it acts on, such a node
-names that object alone, not its relationship to its viewparent, and
-toggles by its existence. C-c r h
-('skg-toggle-homeSkgrepo-move-processed') acts on the home skgrepo
-move of the node at point, and with a prefix argument on every
-descendant whose home skgrepo moved between the same two skgrepos. Both work
-on write-protected occurrences. A gesture that would unmark more than
-one leaf, counting each request's leaves as '(leaves N ...)' does,
-first asks for a typed "yes".
+A gesture says what it marks and which way: C-c m, then 'n' (the
+node), 'r' (its relationship to its viewparent) or 'b' (both), then
+'p' (processed) or 'u' (unprocessed); 'skg-mark-node-processed' and
+its five siblings ('elisp/skg-processed.el'). On the headline at point
+it names the letter's objects among those its '(leaves ...)' lists,
+and refuses when that is none. A headline that names one leaf, which
+lists no object, gets the bare request from the letter of the leaf's
+kind: 'r' for a relRepo move, 'n' for an alias, extra ID, flag, old
+text or home skgrepo move; 'b' for either. On a changeset marker at
+point the letters go as they are, 'n' naming its members' own leaves
+(above, "What a request names"). On a changed folder the gesture acts
+on its children, one level down, each as above.
+
+With a prefix argument it acts on every headline of the subtree that
+names some of the letter's objects, a changeset marker below the
+headline at point naming only what it lists, since its members name
+their own leaves under their own headlines. At a new node (=(node
+added)=) in content position (not in a folder), the headline at point
+among them, it names the letters and =newContent= (with two prefix
+arguments, =newOutward=) and skips the rest of the node's subtree: the
+server then walks the graph from it through new nodes only, shown or
+not, write-protected or not, contentward or along every relationship
+each records, the letters naming the node's own objects and filtering
+what the walk marks. The letters go there whole, even where the
+headline lists fewer, since a walk without a letter names every kind.
+
+C-c m h p and C-c m h u ('skg-mark-homeSkgrepo-move-processed',
+'-unprocessed') act on the home skgrepo move of the node at point, and
+with a prefix argument on every descendant whose home skgrepo moved
+between the same two skgrepos. Every gesture works on write-protected
+occurrences. A gesture that would unmark more than one leaf first
+asks for a typed "yes". It counts as the server does where it can: N
+of '(leaves N ...)' for every listed object, one for 'rel' alone, N
+less one for 'node' alone; an object the headline does not list (a
+walk, 'node' on a changeset marker) counts two, so that unmarking it
+always asks, since the client cannot count what the server will
+reach.
 
 Six commands move point between headlines with change facts, the
 headlines whose metadata carries a '(leaves ...)' change fact: C-c r n c
 ('skg-diffView-goto-next-change') to the next, C-c r n u to the next
-unprocessed one and C-c r n r to the next processed one, and C-c r p c, C-c r
-p u and C-c r p r to the previous ones. A headline with change facts is processed
+unprocessed one and C-c r n p to the next processed one, and C-c r p c, C-c r
+p u and C-c r p p to the previous ones. A headline with change facts is processed
 when its '(processed ...)' names every object its '(leaves ...)' lists.
 They do not wrap: at the end they say "No further change" (or "No
 earlier change", with "unprocessed" or "processed" for the filtered forms).
