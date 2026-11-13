@@ -173,6 +173,25 @@ else
 fi
 ELAPSED_DOCTEST=$((SECONDS - T_DOCTEST))
 
+T_TEAM_TOOLS=$SECONDS
+echo -n "  Team tool tests ... "
+if (
+  cd "$PROJECT_ROOT"
+  # The scripts in tools/team/ that the AI team runs; each test makes
+  # its own data, and needs no server.
+  for test_script in tools/team/test_*.py; do
+    echo "== $test_script"
+    skg_low_priority python3 "$test_script" || exit 1
+  done
+) >"$RESULTS_DIR/team-tools.log" 2>&1; then
+  EXIT_TEAM_TOOLS=0
+  echo -e "${GREEN}PASS${NC} ${DIM}($((SECONDS - T_TEAM_TOOLS))s)${NC}"
+else
+  EXIT_TEAM_TOOLS=$?
+  echo -e "${RED}FAIL${NC} ${DIM}($((SECONDS - T_TEAM_TOOLS))s)${NC}"
+fi
+ELAPSED_TEAM_TOOLS=$((SECONDS - T_TEAM_TOOLS))
+
 INTEGRATION_DIR="$PROJECT_ROOT/tests/integration"
 INTEGRATION_NAMES=()   # each entry is "CLIENT/DIR-NAME"
 INTEGRATION_STARTED=()
@@ -293,6 +312,13 @@ else
   overall=1
 fi
 
+if [ $EXIT_TEAM_TOOLS -eq 0 ]; then
+  echo -e "  ${GREEN}PASS${NC}  Team tool tests"
+else
+  echo -e "  ${RED}FAIL${NC}  Team tool tests (see team-tools.log)"
+  overall=1
+fi
+
 n_total=${#INTEGRATION_NAMES[@]}
 n_failed=${#INTEGRATION_FAILED[@]}
 n_real=${#RETRY_STILL_FAILING[@]}
@@ -363,6 +389,13 @@ ORG="$RESULTS_DIR/ALL.org"
     echo "** PASS : Doctests (${ELAPSED_DOCTEST}s) [[file:doctest.log]]"
   else
     echo "** FAIL : Doctests (${ELAPSED_DOCTEST}s) [[file:doctest.log]]"
+  fi
+
+  # Team tools
+  if [ $EXIT_TEAM_TOOLS -eq 0 ]; then
+    echo "** PASS : Team tool tests (${ELAPSED_TEAM_TOOLS}s) [[file:team-tools.log]]"
+  else
+    echo "** FAIL : Team tool tests (${ELAPSED_TEAM_TOOLS}s) [[file:team-tools.log]]"
   fi
 
   # Integration
