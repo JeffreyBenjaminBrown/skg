@@ -292,12 +292,15 @@ rides out as (strandeds-reviewed . \"true\") and, unless it chose
 none, (reset-strandeds (RELATION RECORDER MEMBER) ...). DELETE-FROM,
 when non-nil, rides out as (delete-from . DELETE-FROM). A
 buffer of the diff view names itself, by `skg-diffView-buffer-kind',
-as (diff-view-buffer . NAME)."
+as (diff-view-buffer . NAME), and a view that follows your overrides
+says so, by `skg-overrides-followed', as (overrides-followed . \"user\")."
   (append
    `((request . "save buffer")
      (view-id . ,view-id))
    (when skg-diffView-buffer-kind
      `((diff-view-buffer . ,skg-diffView-buffer-kind)))
+   (when skg-overrides-followed
+     `((overrides-followed . ,skg-overrides-followed)))
    `((point-lines-below-focused-headline
       . ,(number-to-string
           (plist-get save-point-position
