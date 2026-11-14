@@ -83,8 +83,9 @@ pub fn refresh_content_viewforest (
 /// Refresh 'viewforest' against 'truth', in 'mode', drawing at most
 /// 'node_budget' extensions of new editable content
 /// ('editability.rs'), and substituting the overriders of the owner
-/// 'overrides_followed' names (the diff view substitutes none). 'viewnode_id_record' assigns the vnids of the
-/// viewnodes the refresh draws. Edit requests pass through, but for
+/// 'overrides_followed' names (the diff view substitutes none).
+/// 'viewnode_id_record' assigns the vnids of the viewnodes the refresh
+/// draws. Edit requests pass through, but for
 /// one a headline's new kind or new write-protection has no slot for,
 /// which is dropped; view requests are fulfilled and dropped, but for
 /// a fork request, which stays for the save.

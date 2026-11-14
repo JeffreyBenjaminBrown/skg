@@ -202,8 +202,8 @@ function M.open_org_buffer_from_text (org_text, buffer_name, view_id)
   vim.api.nvim_buf_set_lines(buf, 0, -1, false,
                              vim.split(org_text, '\n'))
   -- A fresh view follows its root authors' overrides, even in a buffer
-  -- reused by name from a view that followed the user's. (Emacs never
-  -- reuses a buffer for a fresh view, so it needs no such reset.)
+  -- reused by name from a view that followed the user's. (Emacs reuses
+  -- a buffer only for a search run again, and resets it there.)
   vim.b[buf].skg_overrides_followed = nil
   M.configure_view_buffer(buf, view_id)
   vim.api.nvim_set_current_buf(buf)

@@ -140,6 +140,19 @@ fn every_tree_follows_the_user_already (
       &runtime . config, &runtime . graph,
       OverridesFollowed::RootAuthors, root ) == SkgrepoOwner::User ) }
 
+/// The refusal: the answer carrying the view's unchanged choice and
+/// 'reason', then an empty rerender stream, which unlocks the
+/// client's buffers and clears its stream-in-progress guard.
+fn refuse_unwinding (
+  stream             : &mut TcpStream,
+  view_id            : &str,
+  overrides_followed : OverridesFollowed,
+  reason             : &str,
+) {
+  send_overrides_followed_response (
+    stream, view_id, overrides_followed, Some (reason) );
+  stream_empty_rerender (stream); }
+
 /// The 'overrides-followed' message: the view, whose overrides it
 /// follows, and, for a refusal, why.
 fn send_overrides_followed_response (
@@ -157,16 +170,3 @@ fn send_overrides_followed_response (
     quote_sexp_string (view_id),
     quote_sexp_string ( overrides_followed . wire_name () ),
     content )); }
-
-/// The refusal: the answer carrying the view's unchanged choice and
-/// 'reason', then an empty rerender stream, which unlocks the
-/// client's buffers and clears its stream-in-progress guard.
-fn refuse_unwinding (
-  stream             : &mut TcpStream,
-  view_id            : &str,
-  overrides_followed : OverridesFollowed,
-  reason             : &str,
-) {
-  send_overrides_followed_response (
-    stream, view_id, overrides_followed, Some (reason) );
-  stream_empty_rerender (stream); }

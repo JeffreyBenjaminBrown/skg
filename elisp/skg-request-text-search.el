@@ -165,6 +165,10 @@ kill-buffer-hook to send close-view to the server."
           (heralds-minor-mode)
           (goto-char (point-min)))
         (setq skg-view-id view-id)
+        ;; The server draws a search afresh, following its root
+        ;; authors' overrides, even into a buffer an earlier search of
+        ;; the same terms switched to the user's.
+        (setq skg-overrides-followed nil)
         (skg--capture-clean-baseline)
         (add-hook 'kill-buffer-hook #'skg-send-close-view nil t)
         (run-hooks 'skg--search-buffer-setup-hook)

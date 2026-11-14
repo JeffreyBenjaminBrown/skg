@@ -195,8 +195,9 @@ pub(crate) fn write_graph_straddle_back (
 /// refusal: each client locks every Skg buffer and sets its
 /// stream-in-progress guard (Emacs's 'skg--stream-in-progress',
 /// Neovim's 'stream_in_progress' in 'nvim/lua/skg/lock.lua') before
-/// sending a switch of the skgrepo restriction, and only the rerender
-/// stream unwinds them.  The empty lock list makes the client unlock
+/// sending a request a rerender stream answers (a switch of the
+/// skgrepo restriction, or of whose overrides a view follows), and only
+/// the rerender stream unwinds them.  The empty lock list makes the client unlock
 /// every buffer; the done message clears the guard.
 pub fn stream_empty_rerender (
   stream : &mut TcpStream,

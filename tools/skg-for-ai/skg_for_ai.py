@@ -861,8 +861,8 @@ def command_follow_overrides (arguments):
 
 def overrides_followed_of_sidecar (sidecar):
   """Whose overrides the view a SIDECAR records follows, by the
-  server's name: 'user', or 'root authors', as every fresh view (and a
-  sidecar written before the choice was recorded) does."""
+  server's name: 'user', or 'root authors', as every fresh view does,
+  and a sidecar that names neither."""
   return sidecar . get ( "overrides_followed", DEFAULT_OVERRIDES_FOLLOWED )
 
 def overrides_followed_phrase (overrides_followed):

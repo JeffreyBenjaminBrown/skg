@@ -57,7 +57,9 @@ use std::collections::{HashMap, HashSet};
 use std::io::BufReader;
 
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
-use skg::dbs::in_rust_graph::InRustGraphHandle;
+use skg::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle};
+use skg::types::viewnode::Viewnode;
+use ego_tree::Tree;
 
 #[test]
 fn all_tests
@@ -108,6 +110,9 @@ fn all_tests
         &s . config, &mut s . tantivy ) ?;
       s . reset ("a_save_following_the_users_overrides_shows_a_new_fork_in_place", foreign_root) ?;
       a_save_following_the_users_overrides_shows_a_new_fork_in_place (
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("a_held_view_follows_whatever_its_save_names", foreign_root) ?;
+      a_held_view_follows_whatever_its_save_names (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("the_tamper_check_follows_the_overrides_the_save_names", foreign_root) ?;
       the_tamper_check_follows_the_overrides_the_save_names (
@@ -676,7 +681,8 @@ fn connection_holding_a_view_of (
 ) -> Result<(ViewsState, SkgEnv, String), Box<dyn Error>> {
   let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
   let env : SkgEnv = skg_env_from_parts (config, tantivy, &graph);
-  let (view, pids, tree) = multi_root_view (config, Some (tantivy), root_gnids) ?;
+  let (view, pids, tree) : (String, Vec<ID>, Tree<Viewnode>) =
+    multi_root_view (config, Some (tantivy), root_gnids) ?;
   let mut views_state : ViewsState =
     ViewsState { open_views : OpenViews::new (), graph_straddle : None };
   views_state . open_views . register_view (
@@ -856,7 +862,7 @@ async fn a_save_following_the_users_overrides_shows_a_new_fork_in_place (
 fn the_tamper_check_follows_the_overrides_the_save_names (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
-  let graph = skg::dbs::in_rust_graph::InRustGraph::from_graphnodes (
+  let graph : InRustGraph = InRustGraph::from_graphnodes (
     &read_all_skg_files_from_skgrepos (config) ? );
   let buffer_showing = |carrier : &str, repo : &str| -> String { format! (
     "* (skg node (gnid R) (skgRepos (nodeRepo foreign))) R\n** (skg node (gnid {}) (skgRepos (nodeRepo {})) (overridesHere M)) {}\n",
@@ -875,4 +881,38 @@ fn the_tamper_check_follows_the_overrides_the_save_names (
   assert! ( mismatch (&u, OverridesFollowed::RootAuthors) );
   assert! ( ! mismatch (&a, OverridesFollowed::RootAuthors) );
   assert! ( mismatch (&a, OverridesFollowed::User) );
+  Ok (( )) }
+
+/// The client is the authority on whose overrides its buffer follows:
+/// a view the connection holds as following the user's, saved by a
+/// client whose buffer still follows the root authors' (drawn before
+/// the switch, as after a lost answer, or by a client that never
+/// switched), is checked and redrawn following the root authors', and
+/// the connection takes that choice for it.
+async fn a_held_view_follows_whatever_its_save_names (
+  config  : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  let (mut views_state, mut env, view) : (ViewsState, SkgEnv, String) =
+    connection_holding_a_view_of (config, tantivy, "R", &[ ID::from ("R") ]) ?;
+  messages_answering (
+    &switch_request ("R", OverridesFollowed::User),
+    &mut views_state, &env, config, handle_set_overrides_followed_request );
+  let view_id : ViewforestId = ViewforestId::from_client_string ("R" . to_string ());
+  assert_eq! ( views_state . open_views . overrides_followed_by_view (&view_id),
+               OverridesFollowed::User );
+  let (mut stream, _read_end) : (TcpStream, TcpStream) = mk_test_tcp_stream_pair ();
+  let response : SaveResponse =
+    update_from_and_rerender_buffer_with_approvals (
+      &mut stream, &view, &view, &mut env, &Ok ( view_id . clone () ),
+      &mut views_state, &SkgrepoRestriction::unrestricted (config),
+      true, &HashMap::new (), &HashSet::new (),
+      &StrandedsReview::NotReviewed, DeleteFrom::NotChosen, &[], None,
+      OverridesFollowed::RootAuthors ) . await ?;
+  assert! ( response . errors . is_empty (), "{:?}", response . errors );
+  assert! ( line_of_gnid (&response . saved_view, "A")
+            . is_some_and ( |l| l . contains ("(overridesHere M)") ),
+    "the save is redrawn following R's author:\n{}", response . saved_view );
+  assert_eq! ( views_state . open_views . overrides_followed_by_view (&view_id),
+               OverridesFollowed::RootAuthors );
   Ok (( )) }

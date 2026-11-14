@@ -480,8 +480,7 @@ the sidecar says "user",
 and renders the summary again when there was one. A save, a daemon's
 rewrite of the files and the daemon's stop keep 'overrides_followed';
 a view written afresh into the same files has the default. A sidecar
-without it, written before the tool recorded it, follows the root
-authors'.
+without it follows the root authors'.
 
 * Views and connections
 The server keeps a view's state per TCP connection, and forgets every
