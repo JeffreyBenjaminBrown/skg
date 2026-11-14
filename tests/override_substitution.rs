@@ -20,7 +20,8 @@
 // The foreign-root fixture (fixtures-foreign-root) gives a view the
 // overrides of its root's author to follow: R (skgrepo "foreign", not
 // owned) contains M and K; A, also foreign, and U, in "main", each
-// override M; P, in "main", contains M. A second foreign owner,
+// override M; P, in "main", contains M, and W, in "main", contains U.
+// A second foreign owner,
 // "third", overrides M with B and K with T. Foreign F2 contains M2,
 // which contains N2; U2, in "main", overrides M2, and T2, third's, N2.
 
@@ -125,6 +126,9 @@ fn all_tests
       s . reset ("a_perspective_replaces_the_root_and_the_root_authors_restore_it", foreign_root) ?;
       a_perspective_replaces_the_root_and_the_root_authors_restore_it (
         &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("a_replaced_root_shows_its_own_containers", foreign_root) ?;
+      a_replaced_root_shows_its_own_containers (
+        &s . config, &mut s . tantivy ) ?;
       s . reset ("a_save_following_the_users_overrides_shows_a_new_fork_in_place", foreign_root) ?;
       a_save_following_the_users_overrides_shows_a_new_fork_in_place (
         &s . config, &mut s . tantivy ) . await ?;
@@ -1053,6 +1057,59 @@ async fn a_perspective_replaces_the_root_and_the_root_authors_restore_it (
             && response . saved_view . contains ("U, retitled"),
     "the saved view is still shown from the user's perspective:\n{}", response . saved_view );
   Ok (( )) }
+
+/// A replaced root's containers folder is the replacement's: a view
+/// of M lists P and R, which contain M. From the user's perspective
+/// the root is U, and its folder lists W, which contains U, as a fresh
+/// view of U would, and nothing of M's; from foreign's it is A, which
+/// nothing contains, so there is no folder; and back at the root
+/// authors', M's folder is drawn as the fresh view drew it.
+fn a_replaced_root_shows_its_own_containers (
+  config  : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  let (mut views_state, env, view) : (ViewsState, SkgEnv, String) =
+    connection_holding_a_view_of (config, tantivy, "M", &[ ID::from ("M") ]) ?;
+  let (_, _, fresh_view_of_u) : (ViewsState, SkgEnv, String) =
+    connection_holding_a_view_of (config, tantivy, "U", &[ ID::from ("U") ]) ?;
+  assert! ( view . contains ("containerFolder")
+            && line_of_gnid (&view, "P") . is_some ()
+            && line_of_gnid (&view, "R") . is_some (),
+    "a fresh view of M lists its containers:\n{}", view );
+  let mut switch = |named : &str| -> Result<String, Box<dyn Error>> {
+    let messages : Vec<String> = messages_answering (
+      &switch_request_naming ("M", named),
+      &mut views_state, &env, config, handle_set_overrides_followed_request );
+    assert! ( refusal_of (&messages) . is_none (), "{:?}", messages );
+    Ok ( rerendered_text (&messages) . ok_or ("the switch rerenders") ? ) };
+  let users : String = switch ("user") ?;
+  assert! ( line_of_gnid (&users, "W") . is_some ()
+            && line_of_gnid (&users, "P") . is_none ()
+            && line_of_gnid (&users, "R") . is_none ()
+            && ! users . contains ("noWarrant"),
+    "from the user's, U's folder lists W, which contains U, and nothing of M's:\n{}", users );
+  assert_eq! ( without_vnids ( users . lines () . skip (1) ),
+               without_vnids ( fresh_view_of_u . lines () . skip (1) ),
+    "U's folder is drawn as a fresh view of U draws it" );
+  let foreigns : String = switch ("owner of foreign") ?;
+  assert! ( line_of_gnid (&foreigns, "A") . is_some ()
+            && ! foreigns . contains ("containerFolder"),
+    "from foreign's, A, which nothing contains, has no containers folder:\n{}", foreigns );
+  let back : String = switch ("root authors") ?;
+  assert_eq! ( without_vnids ( back . lines () ), without_vnids ( view . lines () ),
+    "back at the root authors', M's folder is drawn again as the fresh view drew it" );
+  Ok (( )) }
+
+/// The lines, each without its '(vnid ID)'.
+fn without_vnids<'a> (
+  lines : impl Iterator<Item = &'a str>,
+) -> Vec<String> {
+  lines . map ( |line| match line . find ("(vnid ") {
+      Some (start) => {
+        let end : usize = start + line [start ..] . find (')') . unwrap () + 1;
+        format! ( "{}{}", &line [.. start], &line [end ..] ) },
+      None => line . to_string (), } )
+    . collect () }
 
 /// In a view of foreign R that follows the user's overrides, editing
 /// R's child K forks it, and the save's rerender shows the clone, with

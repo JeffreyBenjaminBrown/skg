@@ -819,8 +819,10 @@ fn substitute_overriders (
 /// '(overridesHere N)', or, where the owner has none, the node raw.
 /// The occurrence is re-pointed where it stands, so it keeps its
 /// viewnode ID whichever way it switches, and its children follow
-/// from its own visit. A fork of a root re-roots the view at the
-/// clone, which stands for nothing ('replace_saved_view_fork_roots').
+/// from its own visit. A re-pointed root's containers folder is
+/// drawn afresh ('redraw_containers_folder'). A fork of a root
+/// re-roots the view at the clone, which stands for nothing
+/// ('replace_saved_view_fork_roots').
 fn substitute_roots (
   tree        : &mut Tree<Viewnode>,
   buffer_root : NodeId,
@@ -840,9 +842,30 @@ fn substitute_roots (
         walk . truth . config, walk . truth . graph, walk . truth . restriction,
         owner, &original ) . effective, };
     let marked : Option<ID> = ( shown != original ) . then ( || original . clone () );
-    if walk . truth . graph . pid_else_raw_id (&gnid) != shown
-       || overridesHere != marked
-    { show_overrider (tree, root, &shown, marked, walk) ?; }}
+    let repointed : bool = walk . truth . graph . pid_else_raw_id (&gnid) != shown;
+    if repointed || overridesHere != marked
+    { show_overrider (tree, root, &shown, marked, walk) ?; }
+    if repointed { redraw_containers_folder (tree, root, walk) ?; }}
+  Ok (( )) }
+
+/// The root at 'root' now shows another node, so the containers
+/// folder it holds lists what contains the node it showed before. That
+/// folder vanishes, and the root asks for a new one, which the
+/// requests rung draws as a fresh view of the node it now shows would
+/// ('stub_of_fresh_content_view'): what contains it, but its
+/// view-ancestors, or no folder where nothing does. A root that held
+/// none asks too: the view was drawn for another node.
+fn redraw_containers_folder (
+  tree : &mut Tree<Viewnode>,
+  root : NodeId,
+  walk : &mut Walk,
+) -> Result<(), Box<dyn Error>> {
+  if let Some (folder) = child_folder (tree, root, &Folder::Container) {
+    vanish (tree, folder, walk) ?; }
+  if let ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =
+    &mut tree . get_mut (root) . unwrap () . value () . kind
+  { occurrence . view_requests . insert (
+      ViewRequest::Folder (FolderRelation::Containers) ); }
   Ok (( )) }
 
 /// Make the occurrence at 'child' show 'shown', with 'overridesHere'
