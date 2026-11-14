@@ -60,8 +60,11 @@ DIR' writes the diff view: every change since the last git-commit,
 each handle carrying its change facts. Fix anything wrong by editing
 and saving, as above; write 'processed both' in the handles of the
 changes you approve ('processed node' or 'processed rel' for one of
-the two a headline shows) and save that buffer; then 'commit "MESSAGE" --yes' stages
-and git-commits every change in the owned skgrepos.
+the two a headline shows) and save that buffer; then 'commit "MESSAGE"'
+git-commits every node whose changes are all processed, except one
+that needs a node whose changes are not, and prints what it left and
+why. 'commit "MESSAGE" --all --yes' commits every change, marked or
+not.
 
 The rest of this file is reference. "Running it" lists every command
 and option; "The files it writes" explains the compact view, its
@@ -207,9 +210,12 @@ skgrepo restriction the server may ask before the switched view
 releases text from overPrivateText telescopes; '--show-overPrivateText'
 approves.
 
-'commit MESSAGE' stages and git-commits every change in the owned
-skgrepos with MESSAGE, asking first when not everything is marked
-processed; see "Reviewing and committing".
+'commit MESSAGE' git-commits, with MESSAGE, every node of the owned
+skgrepos whose changes are all processed, except one that needs a node
+whose changes are not; 'commit MESSAGE --all' commits every changed
+node, asking first when not everything is processed, and '--yes'
+(alone, or with '--all') commits everything without asking; see
+"Reviewing and committing".
 
 'new TITLE REPO' creates a root node titled TITLE whose home is the
 owned skgrepo REPO, and writes its view as 'view' does (named
@@ -469,10 +475,11 @@ to read its ancestry the same way. The folder is absent when nothing
 contains the root.
 
 A buffer of the diff view opens its summary with two more lines: the
-processed summary the server sends ("1 of 4 changed files are processed",
-with how many changes this buffer cannot edit and how many files
-changed in foreign skgrepos), and how many headlines show a change,
-processed and not.
+processed summary the server sends, in nodes, the unit 'commit'
+takes ("1 of 4 changed nodes are processed", with how many of those
+would wait, how many changes this buffer cannot edit and how many
+nodes changed in foreign skgrepos), and how many headlines show a
+change, processed and not.
 ** The sidecar
 'BASE.view.json' records the view ID, the command and its request (for
 a buffer of the diff view, the buffer's name), the view's perspective,
@@ -584,7 +591,7 @@ through it, whatever folder it writes into: a view command ('view',
 'search', 'forest', 'contains', 'links-here', 'diff', 'new'), and
 'save', 'extend', 'close' and 'override-perspective', whose port is their
 sidecar's, and
-'commit --yes'. A command's port is the one its '--port' or
+'commit', but for 'commit --all' without '--yes'. A command's port is the one its '--port' or
 'SKG_PORT' names, or the sidecar's. A command that names no port and
 has no sidecar runs through the daemon of its '--out-dir', if one
 runs there, on that daemon's server; otherwise through the daemon for
@@ -607,7 +614,7 @@ sets the restriction of the daemon's connection, which then holds for
 every command it runs. 'raw', 'import' and 'linkstack' always run on
 their own connection: 'raw' speaks the protocol directly, 'import'
 binds its approval to a connection of its own, and 'linkstack' keeps
-a file. So does a 'commit' without '--yes', since the
+a file. So does a 'commit --all' without '--yes', since the
 typed "yes" it may ask for cannot cross the socket; once it has
 committed, it asks the daemon for its port to rerender the buffers
 of the diff view it holds, which the server rerenders after a
@@ -631,9 +638,9 @@ The server rerenders a held view
   that changes a node the view shows: a collateral rerender, which
   arrives with the save's answer, and which the daemon writes before
   the command returns;
-- after a git-commit on the daemon's connection ('commit --yes'), and
-  of the buffers of the diff view after one on another ('commit'
-  without '--yes', which then asks the daemon);
+- after a git-commit on the daemon's connection ('commit', or
+  'commit --yes'), and of the buffers of the diff view after one on
+  another ('commit --all' without '--yes', which then asks the daemon);
 - after it reloads files that changed on disk, of which it tells
   the connection with a 'repo-files-reloaded' message naming the
   views that show a changed node (and every buffer of the diff view):
@@ -703,8 +710,9 @@ lines is joined into one with ' | '. The events:
   'override-perspective'.
 - 're-rendered BASE because CAUSE; CHANGES': the daemon rewrote a
   view's files. CAUSE is "of 'COMMAND' on the daemon's connection" for
-  a collateral rerender or one after 'commit --yes', "of a git-commit
-  on another connection" after a 'commit' without '--yes', or "files
+  a collateral rerender or one after a 'commit' through the daemon,
+  "of a git-commit on another connection" after a 'commit --all'
+  without '--yes', or "files
   changed on disk (COUNTS; WARNINGS)" with the server's notice. CHANGES compares the old full view with the new,
   node by node, by title: "new 'T'", "gone 'T'", "'T' changed: title,
   was 'OLD', body, metadata" (the metadata holds its relationships,
@@ -865,9 +873,11 @@ new child and a deletion, compares the diff view's compact buffer
 with the text expected, marks the new child 'processed both outward' and
 sees it processed in a fresh 'diff', checks the question before an
 'unprocessed both' of two changes and its absence before an
-'unprocessed rel' of one, commits unconfirmed (nothing happens), restores the deleted
-node with 'restoreNode', commits with '--yes' and reads 'git log' and
-an empty diff view. Then it retitles the root, writes the diff view
+'unprocessed rel' of one, commits the processed ('commit': the new
+child alone goes in, its container keeping its mark), finds nothing
+processed to commit, commits everything unconfirmed ('commit --all':
+nothing happens), restores the deleted node with 'restoreNode',
+commits with '--yes' and reads 'git log' and an empty diff view. Then it retitles the root, writes the diff view
 (the root's first child write-protected in it), retitles that child's
 new child through a content view, runs 'extend' on the diff buffer
 and checks its output, that the child and the grandchild are now
@@ -904,7 +914,7 @@ view: a save through the daemon of a node it shows rewrites it. A
 second daemon for the same port is refused, naming the first's
 process. A 'diff' through the daemon is held; 'commit --yes' runs
 through it, and the daemon rewrites the buffer, whose headlines then
-carry no change facts; after another save and 'diff', a 'commit'
+carry no change facts; after another save and 'diff', a 'commit --all'
 answered "yes" on standard input runs on its own connection and asks
 the daemon to rewrite the buffer again. 'close' releases a view;
 'daemon --stop' releases the rest, wherever their files are, every
@@ -1447,7 +1457,7 @@ viewed again.
 ** The loop
 Saving writes '.skg' files and nothing else. When a piece of work is
 done, review it in the diff view, mark the changes meant, and commit
-them all with one message:
+what is marked with one message:
 #+begin_example
 python3 tools/skg-for-ai/skg_for_ai.py diff --out-dir DIR
 # read DIR/diff_all-changes.compact.org, and any other DIR/diff_*.compact.org
@@ -1510,8 +1520,11 @@ asks first, and '--yes' answers it. The server applies the requests
 after the save's edits succeed; it drops a request that names no
 current change, with a warning, and refuses a save in which two
 headlines mark and unmark one change. The save's answer ends with the
-processed summary, "N of M changed files are processed", which counts
-every change of the owned skgrepos, whatever the buffer shows.
+processed summary, "N of M changed nodes are processed", which counts
+the changed nodes of the owned skgrepos, whatever the buffer shows,
+in the unit 'commit' takes; "(W of them wait)" counts the processed
+nodes 'commit' would hold back, and "Commit ready" means 'commit'
+would take every changed node.
 ** Restoring what a change removed
 Two more words undo a removal, the way the clients' 'C-c s n' and 'C-c
 s l' do. 'restoreNode' on a ghost writes the deleted node back as
@@ -1544,17 +1557,34 @@ server holding it as that buffer). The server refuses that
 save when a node the buffer shows has changed since it was written;
 'diff' then gives a fresh buffer, in which every change is editable.
 ** Committing
-'commit MESSAGE' sends "stage and commit". The server stages every
-changed '.skg' file of every owned skgrepo, deletions included, and
-git-commits each gitrepo that has changes, with MESSAGE, by that
-gitrepo's configured user. It commits everything, marked or not: the
-marks are a review, not a selection. When not every changed file is
-processed, or some owned gitrepo already has staged entries (which the
-git-commit would include), the server asks first: the tool prints the
-processed summary and the staged paths, and asks for a typed "yes" on
-standard input; '--yes' answers yes. Any other answer, or no input,
-commits nothing. Then it prints 'Committed in SKGREPO (COMMIT ID)'
-per git-commit, or 'Nothing was committed.', and any error. A blank
+'commit MESSAGE' sends "stage and commit" with '(processed-only . t)':
+it commits every node whose changes are all processed, except one that
+needs a node whose changes are not, and asks nothing. A node goes in
+whole, all its '.skg' files in every owned skgrepo, one git-commit per
+skgrepo with MESSAGE, by its gitrepo's configured user; foreign
+skgrepos are never committed. A processed node waits, uncommitted and
+still marked, when it names a new node that does not go in, when it
+is deleted and a node that does not go in still names it, or when it
+is part of a merge not all of which goes in ('docs/diff-view.org',
+"Which nodes go in"). The tool prints what went in and what is left,
+and why each processed node left waits:
+#+begin_example
+Committed 2 nodes, in public (9c1e40d2...), private (41aa07fe...). 2 changed nodes are left; 1 of them is processed but waits: 'Plans for spring' names 'Seed order', which is new and does not go in.
+#+end_example
+When nothing is processed it prints "Nothing is processed, so nothing
+was committed; 'commit --all' commits everything." A file that differs
+from HEAD only in bytes the parser does not read (another field
+order, say) goes in with any commit and is counted, so a commit can
+take more nodes than the summary counted changed.
+
+'commit MESSAGE --all' commits every changed node, by the same
+commit. When some is not processed the server asks first: the tool
+prints the processed summary and asks for a typed "yes" on standard
+input. Any other answer, or no input, commits nothing. '--yes' answers
+yes, and alone it commits everything too, as '--all --yes' does, so
+that a 'commit MESSAGE --yes' written before the commit of the
+processed existed still commits what it did. No commit takes what was
+staged in git by hand, and such an entry stays staged. A blank
 message is refused before anything is sent. With a daemon for the
 port, the buffers of the diff view it holds are rewritten after the
 git-commit (see "The daemon").
@@ -1625,6 +1655,7 @@ round and its answer reads as it is.
 | C-c m h p/u                | skg-mark-homeSkgrepo-move-(un)processed          | 'processed node' or 'unprocessed node' on the move's headline; with 'subtree', every like move (C-u)                                                          |
 | C-c r u                    | skg-diffView-extend                              | 'extend SIDECAR'                                                                                                                                              |
 | C-c r c                    | skg-stage-and-commit                             | 'commit MESSAGE'                                                                                                                                              |
+| C-c r C                    | skg-stage-and-commit-everything                  | 'commit MESSAGE --all'                                                                                                                                        |
 | C-c r n/p c,u,p,C,U,P      | skg-diffView-goto-next/previous-*                | Emacs-only by nature; the change facts are in the handles                                                                                                     |
 | C-c m c                    | skg-replace-link-with-content                    | remove the leaf, write '⟨node:ID⟩' in its place                                                                                                               |
 | C-c m f                    | skg-fork-node                                    | 'fork' in the handle (see "Forking")                                                                                                                          |

@@ -776,30 +776,53 @@ changes. A clean buffer the server rerenders after reloading files
 changed on disk is extended the same way, with no key pressed.
 (Emacs: C-c r u.)
 *** <localleader>rc : :SkgStageAndCommit
-Opens the buffer 'skg://commit-message' in a split, in which you write
-the commit message. There ':w' or '<localleader>cc' stages every
-change and git-commits it, in every owned skgrepo that has changes,
-with that message, and closes the split; '<localleader>ck' cancels and
-deletes the buffer. The message is sent as written, less its trailing
-whitespace; a blank one is refused. After sending, the buffer keeps
-the message until it is moot: once something is committed, or nothing
-needed committing and nothing failed, the buffer is deleted. When
-nothing is committed otherwise (a "yes" declined, a refusal, an
-error), the message stays there, and ':SkgStageAndCommit' reopens it.
-It stages only '.skg' files (deletions included). If not
-every changed file is processed, it first shows the processed summary and
-proceeds only if you type the word "yes". Likewise, if some owned
-gitrepo already has entries staged before the command, it first says
-how many paths each such gitrepo has staged, lists them in the buffer
-"*skg already staged*", and proceeds only on "yes"; the commit then
-includes those entries, since a git-commit records everything staged.
-Any other answer, or an interrupt, leaves everything as it was and says "Not
-committed; your message is kept in skg://commit-message". Every
-open view must be saved or reverted first. Afterward the open buffers
-of the diff view are rerendered: each keeps its roots, its
-folding and what it made editable, and what was committed no longer
-shows as a change. The
-commit lapses the marks of everything it committed.
+<localleader>rc commits every node whose changes are all processed,
+except one that needs a node whose changes are not. A node's changes
+are its own (its text, aliases, extra IDs, flags, home skgrepo, its
+existence) and those of its lists, so a child's ~ is its container's
+change. A node goes in whole, all its '.skg' files or none, in each
+owned skgrepo (one git-commit per skgrepo); foreign skgrepos are never
+committed. A processed node waits, uncommitted and still marked, while
+it needs a node that does not go in: it names a new node that does
+not, it is deleted and a node that does not go in still names it, or
+it is part of a merge whose other parts do not all go in.
+
+It opens the buffer 'skg://commit-message' in a split, in which you
+write the commit message. There ':w' or '<localleader>cc' commits
+with that message and closes the split; '<localleader>ck' cancels and
+deletes the buffer. The buffer remembers whether <localleader>rc or
+<localleader>rC opened it last, and the notification on opening says
+which commit it makes. The message is sent as written, less its
+trailing whitespace; a blank one is refused. Nothing is asked. The
+notification afterward says what went in and what is left, and names
+each processed node that waits and what it waits for: "Committed 2
+nodes, in public (9c1e40d), private (41aa07f). 2 changed nodes are
+left; 1 of them is processed but waits: 'Plans for spring' names 'Seed
+order', which is new and does not go in." When nothing is processed
+it says "Nothing is processed, so nothing was committed;
+<localleader>rC commits everything."
+
+After sending, the buffer keeps the message until it is moot: once
+something is committed, or nothing had changed and nothing failed,
+the buffer is deleted. When nothing is committed otherwise (nothing
+processed, everything processed waiting, a "yes" declined, a refusal,
+an error), the message stays there, and <localleader>rc or
+<localleader>rC reopens it. What was staged in git by hand never goes
+in, and stays staged: a commit is HEAD's tree plus the committed
+nodes' files. Every open view must be saved or reverted first.
+Afterward the open buffers of the diff view are rerendered: each
+keeps its roots, its folding and what it made editable, and what was
+committed no longer shows as a change. The commit lapses the marks of
+everything it committed; every other mark stays.
+(Emacs: C-c r c.)
+*** <localleader>rC : :SkgStageAndCommitEverything
+Commits every changed node of the owned skgrepos, processed or not,
+with a message written in the same buffer as <localleader>rc's, by
+the same commit, so nothing waits. If some changed node is not
+processed, it first shows the processed summary and proceeds only if
+you type the word "yes"; any other answer, or an interrupt, leaves
+everything as it was and says "Not committed; your message is kept in
+skg://commit-message". (Emacs: C-c r C.)
 *** <localleader>rnc : :SkgDiffViewGotoNextChange
 Moves the cursor to the next headline with change facts after it: a headline
 whose metadata carries a '(leaves ...)' change fact, the server's count of
@@ -867,13 +890,17 @@ marked (<localleader>mnp); a node whose only change is which children it contain
 shows no M, its children's ~ showing those changes.
 
 After every save of one of the diff view's buffers, a
-notification shows the processed summary: "12 of 14 changed files are
-processed", or "Commit ready. All 14 of 14 changed files are processed.". A
-changed file counts as processed when every change it records is marked;
-a file whose only change is the order of a list counts as processed
-without marks. The summary
+notification shows the processed summary, in nodes, the unit
+<localleader>rc commits: "12 of 14 changed nodes are processed (1 of
+them waits)", or "Commit ready. All 14 of 14 changed nodes are
+processed." "Commit ready" means <localleader>rc would commit every
+changed node. A changed node counts as processed when every change it
+records is marked; a node whose only change is the order of a list
+counts as processed without marks; a processed node waits when
+<localleader>rc would hold it back (see <localleader>rc). The summary
 adds how many changes are not editable in this view (<localleader>ru
-extends the diff view to them) and how many files changed in foreign skgrepos.
+extends the diff view to them) and how many nodes changed in foreign
+skgrepos.
 
 A gesture that would unmark more than one change (a recursive one, one
 on a folder of changes, or one on a modified node, which unmarks every
@@ -1080,16 +1107,19 @@ leading to them). Every node of U drawn editable counts toward it,
 as does every other extension in the buffer, but no node of U is
 ever refused, and nothing else in the buffer is bounded by that
 limit.
-Why the diff view commits whole skgrepos, and offers nothing
-smaller: in skg a partial commit is dangerous. The graph is one
-structure spread over many files, so committing some changed files
-and not others leaves HEAD inconsistent: it can reference nodes it
-does not contain, record a relationship from one end only, or hold a
-moved node in two skgrepos at once. Such a HEAD cannot be reasoned
-about, and the next diff view against it reports changes that are
-only its own inconsistency. Review with the processed marks
-(<localleader>m) instead, and commit everything at once with
-:SkgStageAndCommit.
+Why a commit takes whole nodes, and never a set of files: the graph
+is one structure spread over many files, so committing some changed
+files and not others can leave HEAD inconsistent: it can name nodes
+it does not contain, or hold a moved node in two skgrepos at once, or
+in none. Such a HEAD cannot be reasoned about, and the next diff view
+against it reports changes that are only its own inconsistency. So a
+commit takes whole nodes, all their files in every owned skgrepo,
+holds back a node that needs one that does not go in, and before
+committing anything checks that the commit would read back as a
+valid graph differing from the worktree by exactly the changes left
+out; otherwise nothing is committed. Review with the processed marks
+(<localleader>m), and commit what you have processed with
+<localleader>rc.
 The merges buffer shows each nodeMerge since HEAD: the acquiree and
 its acquirer, in context. The acquiree's text preserver appears as a
 new member of the acquirer's content. The skgrepo

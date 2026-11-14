@@ -1346,7 +1346,7 @@ Four buffers that show every change in the owned skgrepos since their
 last commits, with the context needed to understand them: "all
 changes", "merges", "skgrepo changes" and "order-only changes". Each is
 an ordinary editable view. Foreign skgrepos are excluded; the
-processed summary only counts their changed files.
+processed summary only counts their changed nodes.
 
 **** change viewnode
 
@@ -1571,20 +1571,24 @@ the node. Marking it marks the leaf of the removed alias or ID.
 **** processed summary
 
 The line a client shows after every save of a diff-view buffer, after the
-"extend the diff view" command (C-c r u), and before a
-stage-and-commit that would leave changes behind: "12 of 14 changed
-files are processed", or "Commit ready. All 14 of 14 changed files are
-processed." A changed file is processed when every change it records is
-marked; a file whose only change is order is processed without marks. The
-summary also counts the changed files of foreign skgrepos and the
+"extend the diff view" command (C-c r u), and before a commit of
+everything (C-c r C) that would take unprocessed changes: "12 of 14
+changed nodes are processed (1 of them waits)", or "Commit ready. All
+14 of 14 changed nodes are processed." It counts nodes, the unit a
+commit takes. A changed node is processed when every change it records
+is marked; a node whose only change is order is processed without
+marks; a processed node waits when the commit of the processed (C-c r
+c) would hold it back, because it needs a node that does not go in.
+"Commit ready" means C-c r c would commit every changed node. The
+summary also counts the changed nodes of foreign skgrepos and the
 changes not editable in the view.
 
 **** already-staged entry
 
-An entry git's index already holds when stage-and-commit runs, staged
-by a hand or another tool. Stage-and-commit asks for confirmation
-before committing a gitrepo that has one, and the git-commit then
-includes it.
+An entry git's index holds when stage-and-commit runs, staged by hand
+or by another tool. No commit takes it: a commit's tree is HEAD's
+plus the committed nodes' files, and afterward only those paths' index
+entries change, so the entry stays staged.
 
 **** editable in the diff view
 

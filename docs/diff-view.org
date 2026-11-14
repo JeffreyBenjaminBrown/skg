@@ -4,7 +4,8 @@ The diff view shows every change in the owned skgrepos since their
 last commits -- how each worktree differs from HEAD -- with the
 context needed to understand each change, in buffers that are
 ordinary editable views. It lets the user review the changes, mark
-each one processed, and commit everything at once. C-c v d
+each one processed, and commit what is processed (C-c r c) or
+everything (C-c r C). C-c v d
 ('skg-diffView-open'; Neovim '<localleader>vd') opens it.
 
 The vocabulary (graph straddle, the three kinds of change, C, R, U,
@@ -745,9 +746,9 @@ changed nodes of the owned skgrepos, never the foreign ones: with
 and asking nothing; without it every changed node, by the same
 commit, asking first when some is not processed. The rule a user
 holds: "C-c r c commits every node whose changes are all processed,
-except one that needs a node whose changes are not." Until the
-clients send '(processed-only . t)' (the second mission of the plan
-below, Cleo's), C-c r c sends the request without it. The decisions
+except one that needs a node whose changes are not." C-c r c sends
+'(processed-only . t)'; C-c r C (Neovim '<localleader>rC', the AI
+reader's 'commit --all') sends the request without it. The decisions
 behind it, and the alternatives rejected, are in Vic's plan "commit
 only the processed nodes, each whole" (node
 75da3bb2-881a-48cf-94bd-be487db9604c).
