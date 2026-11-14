@@ -6,6 +6,7 @@
 //! defined here.
 
 pub mod buffer_to_viewnodes;
+pub mod file_what_is_written_in;
 pub mod fork;
 pub mod write_protected_edits;
 pub mod local_fieldintent_collection;
@@ -104,7 +105,7 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
   baseline           : &WhatTheBaselineShows,
   overrides_followed : OverridesFollowed,
 ) -> Result<(ViewForest, SavePlan, Vec<String>), SaveError> {
-  let ( viewforest, parsing_errors, parsing_warnings, supplied )
+  let ( mut viewforest, parsing_errors, parsing_warnings, supplied )
     : ( ViewForest, Vec<BufferValidationError>, Vec<String>,
         WhatTheParseSupplied )
     = { let _span : tracing::span::EnteredSpan = tracing::info_span!(
@@ -120,7 +121,7 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
           "find_buffer_errors_for_saving" ). entered();
         crate::from_text::buffer_to_viewnodes::validate_tree
           ::find_buffer_errors_for_saving_in_graph (
-          & viewforest, graph, config, overrides_followed )
+          & viewforest, graph, config, overrides_followed . clone () )
  } . map_err (SaveError::DatabaseError) ?;
     validation_errors . extend (parsing_errors);
     if ! validation_errors . is_empty () {
@@ -233,7 +234,7 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
     explicit_child    : explicit_child_skgrepo,
     inferred_ancestor : owned_ancestor_skgrepo,
     default           : default_clone_skgrepo, };
-  let ( node_instructions, fork_specs )
+  let ( mut node_instructions, fork_specs )
     : ( Vec<NodeInstruction>, Vec<ForkSpec> ) =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "validate_and_filter_foreign_instructions" ). entered();
@@ -247,6 +248,18 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
         skgrepo_restriction )
  } . map_err ( |errors| SaveError::BufferValidationErrors {
         errors, warnings : parsing_warnings . clone () } ) ?;
+  // A reply typed in the unread list files the message it answers in
+  // the subscriber, now that the forks are known; before the checks
+  // below, which judge that write too. The saved view moves the
+  // message there too, so the rerender draws it where it now lives.
+  file_what_is_written_in::file_subscribee_members_written_in (
+    &mut viewforest, graph, config, skgrepo_restriction, &fork_specs,
+    & unedited_stale_graphnodes . iter ()
+      . map ( |node| node . pid . clone () ) . collect (),
+    &mut node_instructions )
+    . map_err ( |error| SaveError::BufferValidationErrors {
+        errors   : vec! [ BufferValidationError::Other (error) ],
+        warnings : parsing_warnings . clone () } ) ?;
   { // A record that would land where the skgrepo restriction keeps
     // it out of sight is refused, before anything is written.
     let errors : Vec<BufferValidationError> =
@@ -294,6 +307,9 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
     warnings . extend ( nonmerge_plan . warnings );
     warnings . extend (
       dead_link_warnings ( graph, &node_instructions, &fork_specs ) );
+    warnings . extend (
+      fork::forks_the_view_will_not_show (
+        &viewforest, graph, config, &overrides_followed, &fork_specs ) );
     warnings };
   Ok (( viewforest,
         SavePlan {

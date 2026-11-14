@@ -16,6 +16,7 @@ use std::net::TcpStream;
 use indoc::indoc;
 
 use std::collections::HashMap;
+use std::iter::once;
 
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use skg::dbs::in_rust_graph::{
@@ -216,7 +217,317 @@ fn all_tests
       s . reset ("explicit_fork_round_trip_and_monogamy", fixtures) ?;
       explicit_fork_round_trip_and_monogamy (
         &s . config, &mut s . tantivy ) . await ?;
+      let mail : &str = "tests/fork/fixtures-mail";
+      s . reset ("a_reply_under_an_unread_message_integrates_it", mail) ?;
+      a_reply_under_an_unread_message_integrates_it (
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("a_reply_deeper_in_an_unread_message_integrates_the_message", mail) ?;
+      a_reply_deeper_in_an_unread_message_integrates_the_message (
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("a_reply_under_ones_own_unfiled_fork_files_the_original", mail) ?;
+      a_reply_under_ones_own_unfiled_fork_files_the_original (
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("a_headline_typed_under_the_subscribee_itself_files_nothing", mail) ?;
+      a_headline_typed_under_the_subscribee_itself_files_nothing (
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("a_third_partys_reply_in_anothers_unread_list_warns",
+                 "tests/fork/fixtures-mail-third-party") ?;
+      a_third_partys_reply_in_anothers_unread_list_warns (
+        &s . config, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
+
+/// The buffer with a headline 'title' typed as the first child of the
+/// first line naming 'gnid'.
+fn with_child_typed_under (
+  buffer : &str,
+  gnid   : &str,
+  title  : &str,
+) -> String {
+  let needle : String = format! ("(gnid {})", gnid);
+  let mut typed : bool = false;
+  let mut lines : Vec<String> = Vec::new ();
+  for line in buffer . lines () {
+    lines . push (line . to_string ());
+    if line . contains (&needle) && ! typed {
+      typed = true;
+      let depth : usize = line . chars () . take_while ( |c| *c == '*' ) . count ();
+      lines . push ( format! ("{} {}", "*" . repeat (depth + 1), title )); }}
+  lines . join ("\n") + "\n" }
+
+/// The line of 'view' naming 'gnid', and the lines under it.
+fn subtree_of<'a> (
+  view : &'a str,
+  gnid : &str,
+) -> Vec<&'a str> {
+  let needle : String = format! ("(gnid {})", gnid);
+  let lines : Vec<&str> = view . lines () . collect ();
+  let Some (start) : Option<usize> =
+    lines . iter () . position ( |line| line . contains (&needle) )
+    else { return Vec::new (); };
+  let depth_of = |line : &str| -> usize {
+    line . chars () . take_while ( |c| *c == '*' ) . count () };
+  let depth : usize = depth_of (lines [start]);
+  once (lines [start])
+    . chain ( lines [start + 1 ..] . iter () . copied ()
+              . take_while ( |line| depth_of (line) == 0 || depth_of (line) > depth ))
+    . collect () }
+
+/// The reader's view of 'f', its fork of the sender's 't', with 't'
+/// made editable in the subscribee folder, as the reader's client
+/// shows the unread list: the saved view of a save asking for it.
+async fn reader_view_with_unread_list (
+  config      : &SkgConfig,
+  tantivy     : &mut TantivyIndex,
+  graph       : &InRustGraphHandle,
+  view_id     : &ViewforestId,
+  views_state : &mut ViewsState,
+) -> Result<String, Box<dyn Error>> {
+  let ( f_view, pids, f_tree ) = single_root_view (
+    config, Some (tantivy), &ID::from ("f") ) ?;
+  views_state . open_views . register_view (
+    &graph . load_full (), view_id . clone (), f_tree, &pids,
+    &SkgrepoRestriction::unrestricted (config) );
+  let editable : String = f_view . replace (
+    "(gnid t) (skgRepos (nodeRepo sender)) writeProtected",
+    "(gnid t) (skgRepos (nodeRepo sender)) writeProtected (viewRequests editableView)" );
+  assert_ne! ( editable, f_view, "the fresh view must draw t:\n{}", f_view );
+  let (mut stream, _read_end) : (TcpStream, TcpStream) =
+    mk_test_tcp_stream_pair ();
+  let response = update_from_and_rerender_buffer (
+    &mut stream, &editable, config, tantivy, graph,
+    &Ok (view_id . clone ()), views_state ) . await ?;
+  assert! ( response . errors . is_empty (), "{:?}", response . errors );
+  let unread : Vec<&str> = subtree_of (&response . saved_view, "t");
+  assert! ( unread . iter () . any ( |line| line . contains ("(gnid m1)") )
+            && unread . iter () . any ( |line|
+                 line . contains ("(gnid m2r)") && line . contains ("(overridesHere m2)") )
+            && first_says (&unread, "(unintegrated 2)"),
+    "t, made editable, must list both messages as unintegrated, m2 as \
+     the reader's earlier fork of it:\n{}",
+    response . saved_view );
+  Ok ( response . saved_view ) }
+
+/// Whether the first of 'lines' contains 'text'.
+fn first_says (
+  lines : &[&str],
+  text  : &str,
+) -> bool {
+  lines . first () . is_some_and ( |line| line . contains (text) ) }
+
+/// The headlines of depth 2 in 'view': the content and folders of
+/// its one root.
+fn second_level (
+  view : &str,
+) -> Vec<&str> {
+  view . lines () . filter ( |line| line . starts_with ("** ") ) . collect () }
+
+/// Mail between two skgrepos: the sender's note 't' holds messages
+/// 'm1' and 'm2'. The reader's 'f' forks 't' (subscribes to it,
+/// overrides it, contains only 'maybe done'), so 't' stands in f's
+/// subscribee folder listing the messages f has neither filed nor
+/// hidden: the reader's unread list. The reader types a reply under
+/// 'm1' there, which forks 'm1', and saves, approving the fork.
+/// The redrawn view must show the reply, under the reader's clone of
+/// 'm1', and 'm1' must no longer count as unread: the save files it
+/// in 'f', whose contains records the original, as every contains
+/// list does, and draws the clone in its place.
+async fn a_reply_under_an_unread_message_integrates_it (
+  config  : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
+  let view_id : ViewforestId = ViewforestId::ContentView ("content-view:f" . to_string ());
+  let mut views_state : ViewsState = ViewsState {
+    open_views     : OpenViews::new (),
+    graph_straddle : None };
+  let unread_shown : String = reader_view_with_unread_list (
+    config, tantivy, &graph, &view_id, &mut views_state ) . await ?;
+  let replied : String = with_child_typed_under (&unread_shown, "m1", "my reply");
+  { // The first round asks to approve the fork, and writes nothing.
+    let (mut stream, _read_end) : (TcpStream, TcpStream) =
+      mk_test_tcp_stream_pair ();
+    let asked = update_from_and_rerender_buffer_with_fork_approval_test (
+      &mut stream, &replied, config, tantivy, &graph,
+      &Ok (view_id . clone ()), &mut views_state,
+      /* approved_forks = */ false ) . await ?;
+    assert! ( asked . fork_confirmation . is_some (),
+      "the reply forks m1, which asks first: {:?}", asked . errors );
+    assert_eq! ( members_of (& node_from_disk (config, "f") ? . contains),
+                 vec! [ ID::from ("d") ], "an unapproved round files nothing" ); }
+  let (mut stream, _read_end) : (TcpStream, TcpStream) =
+    mk_test_tcp_stream_pair ();
+  let response = update_from_and_rerender_buffer (
+    &mut stream, &replied, config, tantivy, &graph,
+    &Ok (view_id . clone ()), &mut views_state ) . await ?;
+  assert! ( response . errors . is_empty (), "{:?}", response . errors );
+  assert! ( response . warnings . is_empty (),
+    "the reader's own view shows the fork, so nothing warns: {:?}", response . warnings );
+  let clone : Graphnode = clone_overriding_on_disk (config, "m1") ?;
+  assert_eq! ( clone . home_skgrepo, SkgrepoName::from ("reader") );
+  let f_disk : Graphnode = node_from_disk (config, "f") ?;
+  assert_eq! ( members_of (& f_disk . contains),
+               vec! [ ID::from ("d"), ID::from ("m1") ],
+    "the reply must file m1 in f, by its original's ID" );
+  assert! ( f_disk . hidesFromSubs . or_default () . is_empty (),
+    "filing m1 hides nothing: {:?}", f_disk . hidesFromSubs );
+  let redrawn : &str = &response . saved_view;
+  assert! ( second_level (redrawn) . last () . is_some_and ( |line|
+              line . contains (& format! ("(gnid {})", clone . pid . 0))
+              && line . contains ("(overridesHere m1)")
+              && ! line . contains ("writeProtected") ),
+    "the redrawn view must end f's content with the clone, editable, \
+     in m1's place:\n{}", redrawn );
+  assert! ( subtree_of (redrawn, & clone . pid . 0) . iter ()
+              . any ( |line| line . ends_with (" my reply") ),
+    "the redrawn view must show the reply under the clone:\n{}", redrawn );
+  let unread : Vec<&str> = subtree_of (redrawn, "t");
+  assert! ( first_says (&unread, "(unintegrated 1)")
+            && unread . iter () . any ( |line| line . contains ("(overridesHere m2)") )
+            && ! unread . iter () . any ( |line| line . contains ("m1") ),
+    "the redrawn view must count one message unread, m2, and draw no m1 there:\n{}",
+    redrawn );
+  // A fresh view draws t write-protected, without its children, so
+  // only its count can be read there.
+  let (fresh, _pids, _tree) = single_root_view (config, Some (tantivy), &ID::from ("f")) ?;
+  assert! ( subtree_of (&fresh, & clone . pid . 0) . iter ()
+              . any ( |line| line . ends_with (" my reply") )
+            && first_says (&subtree_of (&fresh, "t"), "(unintegrated 1)"),
+    "a fresh view must show the reply under the clone, and one message unread:\n{}",
+    fresh );
+  Ok (( )) }
+
+/// The reader had forked 'm2' before, into 'm2r', without filing it,
+/// so the unread list draws 'm2r' in m2's place. A reply typed under
+/// it forks nothing ('m2r' is the reader's own) and files 'm2'.
+async fn a_reply_under_ones_own_unfiled_fork_files_the_original (
+  config  : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
+  let view_id : ViewforestId = ViewforestId::ContentView ("content-view:f" . to_string ());
+  let mut views_state : ViewsState = ViewsState {
+    open_views     : OpenViews::new (),
+    graph_straddle : None };
+  let unread_shown : String = reader_view_with_unread_list (
+    config, tantivy, &graph, &view_id, &mut views_state ) . await ?;
+  let replied : String = with_child_typed_under (&unread_shown, "m2r", "a later reply");
+  let (mut stream, _read_end) : (TcpStream, TcpStream) =
+    mk_test_tcp_stream_pair ();
+  let response = update_from_and_rerender_buffer_with_fork_approval_test (
+    &mut stream, &replied, config, tantivy, &graph,
+    &Ok (view_id . clone ()), &mut views_state,
+    /* approved_forks = */ false ) . await ?;
+  assert! ( response . errors . is_empty () && response . fork_confirmation . is_none (),
+    "nothing forks, so nothing asks: {:?}", response . errors );
+  assert_eq! ( members_of (& node_from_disk (config, "f") ? . contains),
+               vec! [ ID::from ("d"), ID::from ("m2") ],
+    "the reply must file m2, the original m2r stands for" );
+  assert! ( second_level (&response . saved_view) . last () . is_some_and ( |line|
+              line . contains ("(gnid m2r)") && line . contains ("(overridesHere m2)") )
+            && subtree_of (&response . saved_view, "m2r") . iter ()
+                 . any ( |line| line . ends_with (" a later reply") )
+            && first_says (&subtree_of (&response . saved_view, "t"), "(unintegrated 1)"),
+    "the redrawn view must end f's content with m2r and the reply, one message unread:\n{}",
+    response . saved_view );
+  Ok (( )) }
+
+/// A headline typed straight under 't' in the unread list is no
+/// member of 't' (its list does not name it), so saving it files
+/// nothing in 'f'.
+async fn a_headline_typed_under_the_subscribee_itself_files_nothing (
+  config  : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
+  let view_id : ViewforestId = ViewforestId::ContentView ("content-view:f" . to_string ());
+  let mut views_state : ViewsState = ViewsState {
+    open_views     : OpenViews::new (),
+    graph_straddle : None };
+  let unread_shown : String = reader_view_with_unread_list (
+    config, tantivy, &graph, &view_id, &mut views_state ) . await ?;
+  let typed : String = with_child_typed_under (
+    &unread_shown, "t", "(skg node (skgRepos (nodeRepo reader))) not a message" );
+  let (mut stream, _read_end) : (TcpStream, TcpStream) =
+    mk_test_tcp_stream_pair ();
+  update_from_and_rerender_buffer (
+    &mut stream, &typed, config, tantivy, &graph,
+    &Ok (view_id . clone ()), &mut views_state ) . await ?;
+  assert_eq! ( members_of (& node_from_disk (config, "f") ? . contains),
+               vec! [ ID::from ("d") ],
+    "what t's list does not name is not filed" );
+  Ok (( )) }
+
+/// As above, but the reader answers 'q1', a question inside 'm1':
+/// the reply forks 'q1', and the message it stands in, 'm1', is the
+/// one filed.
+async fn a_reply_deeper_in_an_unread_message_integrates_the_message (
+  config  : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
+  let view_id : ViewforestId = ViewforestId::ContentView ("content-view:f" . to_string ());
+  let mut views_state : ViewsState = ViewsState {
+    open_views     : OpenViews::new (),
+    graph_straddle : None };
+  let unread_shown : String = reader_view_with_unread_list (
+    config, tantivy, &graph, &view_id, &mut views_state ) . await ?;
+  let replied : String = with_child_typed_under (&unread_shown, "q1", "my answer");
+  let (mut stream, _read_end) : (TcpStream, TcpStream) =
+    mk_test_tcp_stream_pair ();
+  let response = update_from_and_rerender_buffer (
+    &mut stream, &replied, config, tantivy, &graph,
+    &Ok (view_id . clone ()), &mut views_state ) . await ?;
+  assert! ( response . errors . is_empty (), "{:?}", response . errors );
+  let clone : Graphnode = clone_overriding_on_disk (config, "q1") ?;
+  assert_eq! ( members_of (& node_from_disk (config, "f") ? . contains),
+               vec! [ ID::from ("d"), ID::from ("m1") ],
+    "the answer must file m1, the message it is in, in f" );
+  let shown : Vec<&str> = subtree_of (&response . saved_view, "m1");
+  assert! ( shown . iter () . any ( |line| line . contains (& format! ("(gnid {})", clone . pid . 0)) )
+            && shown . iter () . any ( |line| line . ends_with (" my answer") ),
+    "the redrawn view must show m1, filed, with the clone of q1 and the answer in it:\n{}",
+    response . saved_view );
+  assert! ( first_says (&subtree_of (&response . saved_view, "t"), "(unintegrated 1)"),
+    "one message must remain unread:\n{}", response . saved_view );
+  Ok (( )) }
+
+/// The same mail, read by a third party, who owns neither 't' nor
+/// 'f': 'f' is foreign to it, so its view follows the reader's
+/// overrides. Its reply under 'm1' forks 'm1' into its own skgrepo;
+/// the view goes on drawing the original, without the reply, and
+/// 'f' cannot be written, so nothing is filed. The save says so, and
+/// how to see the fork.
+async fn a_third_partys_reply_in_anothers_unread_list_warns (
+  config  : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
+  let view_id : ViewforestId = ViewforestId::ContentView ("content-view:f" . to_string ());
+  let mut views_state : ViewsState = ViewsState {
+    open_views     : OpenViews::new (),
+    graph_straddle : None };
+  let unread_shown : String = reader_view_with_unread_list (
+    config, tantivy, &graph, &view_id, &mut views_state ) . await ?;
+  let replied : String = with_child_typed_under (&unread_shown, "m1", "a third party's reply");
+  let (mut stream, _read_end) : (TcpStream, TcpStream) =
+    mk_test_tcp_stream_pair ();
+  let response = update_from_and_rerender_buffer (
+    &mut stream, &replied, config, tantivy, &graph,
+    &Ok (view_id . clone ()), &mut views_state ) . await ?;
+  assert! ( response . errors . is_empty (), "{:?}", response . errors );
+  assert_eq! ( clone_overriding_on_disk (config, "m1") ? . home_skgrepo,
+               SkgrepoName::from ("third") );
+  assert_eq! ( members_of (& node_from_disk (config, "f") ? . contains),
+               vec! [ ID::from ("d") ], "f is foreign here: nothing is filed" );
+  assert! ( subtree_of (&response . saved_view, "m1") . len () == 2
+            && ! response . saved_view . contains ("a third party's reply"),
+    "the view follows the reader's overrides: it draws m1 raw, with its question only:\n{}",
+    response . saved_view );
+  assert! ( response . warnings . iter () . any ( |warning|
+              warning . contains ("'message one' forked it into your skgrepo 'third'")
+              && warning . contains ("the owner of 'reader'") ),
+    "the save must say where the reply went: {:?}", response . warnings );
+  Ok (( )) }
 
 /// The explicit fork of an owned node P: the SavePlan carries one
 /// ForkSpec whose clone copies P's disk snapshot (title/contains),

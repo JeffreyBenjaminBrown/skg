@@ -1,0 +1,6 @@
+pid: m2r
+title: message two, as the reader forked it
+subscribesTo:
+- m2
+overrides:
+- m2

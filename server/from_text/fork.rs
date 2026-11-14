@@ -11,18 +11,21 @@
 //! in the save handler.
 
 use crate::dbs::in_rust_graph::override_invariants::existing_owned_overrider_of;
+use crate::dbs::in_rust_graph::override_resolution::override_follower_of_tree_containing;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use crate::org_to_text::skgRepos_form;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::errors::BufferValidationError;
-use crate::types::misc::{ID, MSV, RelPartner, SkgConfig, SkgrepoName, members_of, rel_partners_at_relRepo};
+use crate::types::misc::{ID, MSV, RelPartner, SkgConfig, SkgrepoName, SkgrepoOwner, members_of, rel_partners_at_relRepo};
 use crate::types::nodes::complete::{
   Flag, Graphnode, flag_is_true};
 use crate::types::save::{ForkSpec, SaveNode};
 use crate::types::tree::forest::ViewForest;
-use crate::types::viewnode::{ViewnodeKind, Vognode};
+use crate::types::viewnode::{Viewnode, ViewnodeKind, Vognode};
+use crate::types::views_state::OverridesFollowed;
 
+use ego_tree::NodeRef;
 use std::collections::{HashMap, HashSet};
 use std::iter::once;
 
@@ -454,6 +457,43 @@ pub fn build_fork_clone (
     original_skgrepo : buffer_node . home_skgrepo . clone (),
     skgrepo_confirmed,
   }}
+
+/// One warning per fork the saved view will go on hiding: a fork of a
+/// node edited, below a root, in a tree that follows another owner's
+/// overrides ('override_follower_of_tree_containing'), as a view rooted
+/// at another's note does unless switched to the user's perspective.
+/// There the rerender draws the original, unedited, so without a word
+/// the edit would seem lost: the clone is in the user's skgrepo, and no
+/// note contains it. (A fork of a root re-roots the view at the clone,
+/// so it shows.)
+pub fn forks_the_view_will_not_show (
+  viewforest         : &ViewForest,
+  graph              : &InRustGraph,
+  config             : &SkgConfig,
+  overrides_followed : &OverridesFollowed,
+  fork_specs         : &[ForkSpec],
+) -> Vec<String> {
+  let mut warnings : Vec<String> = Vec::new ();
+  for spec in fork_specs {
+    let edited : Option<NodeRef<Viewnode>> =
+      viewforest . nodes () . find ( |node|
+        node . value () . editable_gnid () . is_some_and ( |gnid|
+          graph . pid_else_raw_id (gnid) == spec . original_gnid ));
+    let Some (edited) : Option<NodeRef<Viewnode>> = edited else { continue; };
+    let is_root : bool = edited . parent () . is_some_and ( |parent|
+      matches! ( parent . value () . kind, ViewnodeKind::BufferRoot ));
+    if is_root { continue; }
+    let SkgrepoOwner::Foreign (followed) : SkgrepoOwner =
+      override_follower_of_tree_containing (
+        config, graph, overrides_followed, edited )
+      else { continue; };
+    warnings . push ( format! (
+      "Your edit of '{}' forked it into your skgrepo '{}', but this view \
+       follows the overrides of the owner of '{}', so it goes on showing \
+       the original there, without your edit. To see your fork, switch \
+       the view to your own perspective (Emacs C-c v o).",
+      spec . original_title, spec . clone . 0 . home_skgrepo, followed )); }
+  warnings }
 
 #[cfg(test)]
 #[allow(non_snake_case)]

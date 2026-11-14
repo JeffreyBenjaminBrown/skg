@@ -1,0 +1,15 @@
+tantivy_folder = "/tmp/placeholder"
+
+[[repos]]
+name = "third"
+path = "third"
+
+[[repos]]
+name = "reader"
+path = "reader"
+foreign = true
+
+[[repos]]
+name = "sender"
+path = "sender"
+foreign = true
