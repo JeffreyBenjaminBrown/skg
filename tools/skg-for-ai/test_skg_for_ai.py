@@ -2830,6 +2830,7 @@ def failures_of_overrides_followed (scratch, data_root):
     for case in [ check_following_overrides_on_a_command_s_own_connection,
                   check_saving_a_view_that_follows_yours,
                   check_following_the_root_authors_again,
+                  check_the_root_too,
                   check_following_overrides_through_a_daemon ]:
       try:
         case (context)
@@ -2924,6 +2925,24 @@ def check_following_the_root_authors_again (context):
   require_equal ( "the sidecar's choice",
                   read_sidecar (folder, "view_R") [ "overrides_followed" ],
                   "root authors" )
+
+def check_the_root_too (context):
+  """A view of M, which U, the user's, overrides, shows U as its root
+  from the user's perspective, standing for M ('ĥ' after its 'O'),
+  and M again from the root authors'."""
+  folder = context [ "own_folder" ]
+  require_tool_run ([ "view", "M", "--out-dir", folder ])
+  root = lambda: read_compact (folder, "view_M") . split ("\n* ") [1] . split ("\n") [0]
+  fresh = root ()
+  require_equal ( "M's fresh root", ( fresh . startswith ("M ⟨0a "), "ĥ" in fresh ), ( True, False ) )
+  require_tool_run ([ "override-perspective", os . path . join (folder, "view_M.view.json"),
+                      "user" ])
+  switched = root ()
+  require_equal ( "M's root from your perspective",
+                  ( switched . startswith ("U ⟨0a O"), "ĥ" in switched ), ( True, True ) )
+  require_tool_run ([ "override-perspective", os . path . join (folder, "view_M.view.json"),
+                      "root-authors" ])
+  require_equal ( "M's root from the root authors' again", root (), fresh )
 
 def check_following_overrides_through_a_daemon (context):
   """Through a daemon, which holds the view, the switch needs no

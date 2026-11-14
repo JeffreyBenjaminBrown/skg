@@ -872,8 +872,11 @@ def command_override_perspective (arguments):
 def perspective_of_argument (argument):
   """The server's name ('docs/api-and-formats.org', "Set overrides
   followed") for the perspective ARGUMENT names on the command line:
-  'next', 'root-authors', 'user', or a foreign skgrepo's name, which
-  names its owner."""
+  'next', 'root-authors', 'user', a foreign skgrepo's name, which
+  names its owner, or the server's own name for a perspective, which
+  is taken as it is."""
+  if argument in PERSPECTIVE_OF_ARGUMENT . values () or argument . startswith ("owner of "):
+    return argument
   return PERSPECTIVE_OF_ARGUMENT . get ( argument, "owner of " + argument )
 
 def overrides_followed_of_sidecar (sidecar):
@@ -5594,9 +5597,10 @@ class SkgConnection:
     carry them ('skg--save-request-sexp' in
     'elisp/skg-request-save.el'). OVERRIDES_FOLLOWED, the perspective
     the buffer was drawn from, whose overrides it follows, is named
-    unless it is the root authors', as the clients name it: the server checks and rerenders the buffer
-    following it, and holds the view with it, which a save that names
-    none resets to the root authors'."""
+    unless it is the root authors', as the clients name it: the server
+    checks and rerenders the buffer following it, and holds the view
+    with it, which a save that names none resets to the root
+    authors'."""
     line = request_line (
       "save buffer", ( "view-id", view_id ),
       * ( [ ( "diff-view-buffer", diffView_buffer ) ]
