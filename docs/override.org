@@ -141,6 +141,16 @@ where the user's overrides are followed. Editing the foreign root
 itself forks it, and the saved buffer's root becomes the clone (see
 below), so that tree then follows the user's overrides.
 
+A view can be switched to follow the user's overrides in every tree,
+whoever wrote its root, and back (Emacs 'C-c v p', Neovim
+'<localleader>vp'; =docs/api-and-formats.org=, "Set overrides
+followed"). Switched, a view of a foreign node shows the user's
+overrider wherever the user has one, so a child forked there is shown,
+after the save, as its clone. The client keeps the choice for its
+buffer and names it in each save, so the overridesHere tamper check
+asks of the same owner the rerender followed. A fresh view follows its
+root authors'.
+
 Substitution is disabled in the diff view.  Every refresh of a content
 view substitutes, deciding from the buffer and the graph as they are
 now, so a raw content occurrence whose node gains a visible overrider

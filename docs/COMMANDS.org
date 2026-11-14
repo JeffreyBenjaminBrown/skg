@@ -1250,6 +1250,28 @@ the skgrepo-sets available, and =M-x skg-show-skgrepo-restriction=
 shows the skgrepo restriction alone, each marking the most private
 skgrepo " (no restriction)": "Skgrepo restriction: public; available:
 public, private (no restriction)".
+*** C-c v p : skg-switch-overrides-followed
+Switches whose overrides this view follows: its root authors' (the
+default) or yours, in every tree; redraws the buffer, and refuses
+while it has unsaved edits.
+
+Where a node stands as another's content and someone has overridden
+it, a view shows one overrider in its place. A fresh view follows its
+root authors' overrides: under a root of yours, yours; under a root
+someone else wrote, that author's, throughout the tree, so you see
+what they would see, and your own forks of their nodes do not show
+there. Switched, the view shows your override wherever you have one,
+whoever wrote its root, and the mode name reads "SKG:your overrides";
+a node of theirs you fork there is shown, after the save, as your
+clone. Switched again, it follows its root authors' again. The buffer
+keeps the choice through its saves and the redraws the server sends
+unasked. The switch is refused in a buffer of the diff view, which
+shows no overrider in place of what it overrides, and in a view whose
+every root is yours, which shows your overrides already. Roots
+themselves are never substituted, so a view of a node you forked shows
+that node, and its children as it holds them; to see your version,
+open your clone. See =docs/override.org=.
+
 *** C-c v r : skg-readable-ids-mode
 This changes how node IDs are displayed.
 The ID itself is a kind of special random gibberish called UUID v4.

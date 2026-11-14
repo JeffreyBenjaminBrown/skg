@@ -233,6 +233,18 @@ So far there are these endpoints:
       no buffer has refuses the save, and nothing is written. Both
       clients keep the name in each buffer of the diff view they open
       and send it on its saves, as skg-for-ai does.
+    - =(overrides-followed . "user")= is optional: it says the saved
+      buffer was drawn following the user's overrides rather than its
+      root authors' (see "Set overrides followed"). The save checks
+      the buffer's =(overridesHere N)= parts against, and rerenders it
+      following, the overrides it names, and the connection keeps the
+      choice for the view, for the rerenders it starts itself. Without
+      it, or with =(overrides-followed . "root authors")=, the buffer
+      follows its root authors'. A held view's earlier choice yields
+      to the one its save names, which is how a buffer the server
+      lost in a restart regains it. Any other value refuses the save,
+      and nothing is written. Each client keeps the choice in the
+      buffer and sends it only while it is the user's.
     - =point-lines-below-focused-headline= is global to the buffer save: the number of text lines from the focused headline to point before save.
     - =point-column= is global to the buffer save: the column of point within its line, echoed back so the client can restore the exact cursor position.
     - =point-screen-lines-below-window-start= is global to the buffer save: the number of screen lines from the window's top line to point before save. The server echoes all three point fields in the final save response so Emacs can restore point and scroll position after replacing the buffer text.
@@ -1281,6 +1293,45 @@ one automatically.
     =rerender-done=.
   - =server/serve/handlers/rerender_views.rs=.
 
+** Set overrides followed
+  - Request: =((request . "set overrides followed") (view-id .
+    "VIEW_ID") (overrides-followed . "user"|"root authors")
+    (approved-overPrivateText-pids "PID" ...))=. =view-id= and
+    =overrides-followed= are required; the approval is optional.
+  - Switches whose overrides the open view follows ("Override
+    substitution and the overridesHere part" below): its root
+    authors', as every fresh view does (each top-level tree follows
+    the author of its root), or the user's, in every tree, whoever
+    wrote its root. "The user" is every owned skgrepo together, as
+    under an owned root. Then the view is rerendered, from what the
+    connection holds for it, following the new choice.
+  - Response: =((response-type overrides-followed) (view-id
+    "VIEW_ID") (overrides-followed "user"|"root authors"))=, naming
+    the view and whose overrides it now follows, then a rerender
+    stream (see "Rerender all views") of that one view. Each client
+    records the choice for the buffer when the answer arrives, and
+    sends it on the buffer's saves ("Save buffer",
+    =overrides-followed=).
+  - Refusals carry the view's unchanged choice and the reason in
+    =(content "...")=, followed by an empty rerender stream, since the
+    clients lock their buffers before sending the request: a request
+    naming no view or no valid choice; a view the connection does not
+    hold (after a restart or a reconnection; a save of the buffer
+    registers it again); a buffer of the diff view, which substitutes
+    no overriders; and a switch to the user's overrides of a view
+    whose every tree is rooted at a node the user owns, which follows
+    the user's already. A switch back to the root authors' is never
+    refused for that reason.
+  - The rerender starts from what the server last drew or saved, so
+    each client refuses the switch while the buffer has unsaved edits,
+    before it sends the request.
+  - Under a restricted set, overPrivateText content without exact
+    approval returns LP =overPrivateText-telescope-confirmation= with
+    =(operation overrides-followed-switch)= and the exact PIDs,
+    followed by an empty rerender stream, in place of the answer; the
+    view keeps its choice. A retry with those PIDs is released.
+  - =server/serve/handlers/overrides_followed.rs=.
+
 ** skgrepo-sets
   - Skgrepo-sets are the prefixes of the config's privacy ladder, the
     owned skgrepos (see "skgconfig.toml > skgrepo-sets" below): each
@@ -1776,7 +1827,10 @@ author, throughout the tree, beneath a third author's nodes too
 ('override_follower_of_tree_containing' in
 =server/dbs/in_rust_graph/override_resolution.rs=). A view rooted at a
 foreign node shows what its author would see; the user's overriders
-are not shown there.
+are not shown there, until the view is switched to follow the user's
+overrides ("Set overrides followed"), after which every tree follows
+the user's, whoever wrote its root. Roots are never substituted, in
+either choice.
 
 The buffer whose approved save creates a fork is the post-save exception. A
 root named by one of that save's exact =ForkSpec=s is rewritten from original F
