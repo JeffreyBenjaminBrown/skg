@@ -512,9 +512,9 @@ read no claims, which 'docs/glossary.org' lists under "claims
 membership".
 The way out is to make the edit at the node's editable occurrence
 instead, or to undo it, make this occurrence editable
-(<localleader>sd on it), save, and edit it then.
+(<localleader>se on it), save, and edit it then.
 *** PITFALL: Don't make something 'editable' by directly editing its metadata.
-Instead, use 'SetEditable' (<localleader>sd), below.
+Instead, use 'SetEditable' (<localleader>se), below.
 That's because Skg has to make other occurrences of it
 (in this same buffer -- and maybe in the future other buffers too)
 write-protected. That's because a buffer can only be saved
@@ -525,7 +525,7 @@ Making a node write-protected is likewise a request
 ('RequestWriteProtected' (<localleader>sw), below), which the server
 performs: the children of the write-protected occurrence then claim
 nothing, since a write-protected occurrence has no content.
-*** <localleader>sd : :SkgSetEditable
+*** <localleader>se : :SkgSetEditable
 If you want to see the editable view of that node
 from a place where it is currently shown in a write-protected form,
 call this function. It will make the current editable view
@@ -550,7 +550,7 @@ so that edits to its title, body or children no longer affect it
   (although edits to its children still affect those children:
   they keep their own editability, and their own content).
 On an occurrence that is already write-protected, it does nothing.
-In one save with <localleader>sd on another occurrence of the same
+In one save with <localleader>se on another occurrence of the same
 node, it moves editability there.
 The two requests on the same occurrence contradict each other,
 and the save is refused.
@@ -1046,7 +1046,7 @@ buffer opened that it holds nowhere editable as not editable in this
 view. <localleader>ru extends the buffer to such changes.
 Nothing the buffer holds editable is write-protected again by the
 server. An editable-view
-request (<localleader>sd) works as in any view, except that
+request (<localleader>se) works as in any view, except that
 'initial_node_limit' refuses only the extension of a node outside U
 (the nodes the buffer extends anyway: those that changed and those
 leading to them). Every node of U drawn editable counts toward it,

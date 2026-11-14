@@ -1323,7 +1323,7 @@ after the save that places it. A write-protected occurrence ('☮')
 saves nothing of its own, so editing one forks nothing: the report
 stops with an error, and says how to go on. Write 'editable' in its
 handle and save, which makes it the view's editable occurrence of the
-node, as the clients' 'C-c s d' does; then edit it and save again.
+node, as the clients' 'C-c s e' does; then edit it and save again.
 Only an occurrence in content forks, a root of the view or a node's
 child: a member of a folder does not, and a subscribee as such, in a
 subscribee folder, takes no edit of its title or body, and a child
@@ -1611,7 +1611,7 @@ round and its answer reads as it is.
 | C-c g v                    | skg-goto-viewnode-id                             | needs nothing: the handle is the viewnode ID; 'grep' finds it                                                                                                 |
 | C-c t r                    | skg-investigate-unknown-node                     | 'raw' only: "investigate unknown node"                                                                                                                        |
 | C-c l a, o, h, s, p, c, m  | skg-show-folderOf-*                              | 'forest KIND ID'; 'contains ID', 'links-here ID'; in its editable folders '⟨node:ID⟩' subscribes or overrides, and a removal under a subscribee as such hides |
-| C-c s d                    | skg-set-editable                                 | 'editable' in the handle                                                                                                                                      |
+| C-c s e                    | skg-set-editable                                 | 'editable' in the handle                                                                                                                                      |
 | C-c s w, C-c s W           | skg-request-write-protected(-recursive)          | 'write-protect', 'write-protect subtree' in the handle                                                                                                        |
 | C-c s t                    | skg-detach                                       | 'detach' in the handle; removing the headline also takes it out of its parent                                                                                 |
 | C-c s a                    | skg-attach                                       | 'attach' in the handle                                                                                                                                        |

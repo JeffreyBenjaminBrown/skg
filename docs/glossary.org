@@ -222,7 +222,7 @@ unwarranted, since no save reads claims there, is saved as an
 orphan graphnode (see "claims membership"). A buffer may hold at
 most one editable occurrence of a node,
 so that two occurrences cannot contradict each other. Make one
-editable with =skg-set-editable= (=C-c s d=), which writes a
+editable with =skg-set-editable= (=C-c s e=), which writes a
 =editableView= view request; make one write-protected with
 =skg-request-write-protected= (=C-c s w=; =C-c s W= for its whole
 content subtree), which writes a =writeProtectedView= or
@@ -1198,7 +1198,7 @@ most one clone you own (override monogamy).
 
 Forking spans two gestures, foreign and owned:
 
-- /implicit/ (foreign N): make N editable (=C-c s d=), edit it, and
+- /implicit/ (foreign N): make N editable (=C-c s e=), edit it, and
   save; any real change to a foreign node is read as a fork request, and
   the save asks you to confirm. N is left untouched on disk.
 - /explicit/ (owned N): =skg-fork-node= (=C-c m f=), for a node you
@@ -1299,7 +1299,7 @@ applies the edit to the headline.
 How many editable occurrences' content a view draws at once
 ('initial_node_limit' in the config, 1000 by default). Once it is
 spent, the occurrences a view draws are write-protected, and
-'skg-set-editable' (=C-c s d=) makes one editable. See "extent,
+'skg-set-editable' (=C-c s e=) makes one editable. See "extent,
 extension, node budget" among the terms of the implementation.
 
 *** non-vognode

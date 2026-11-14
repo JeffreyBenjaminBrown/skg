@@ -123,7 +123,7 @@ async fn one_headline_at_validation (
             "an alias outside an alias folder: {:?}", errors );
   let org_form : String = org_form_of (&errors);
   assert! ( org_form . contains ( &format! (
-              "on another (C-c s d).\n{}", subheadline ("parent", "parent", "0e") )),
+              "on another (C-c s e).\n{}", subheadline ("parent", "parent", "0e") )),
             "{}", org_form );
   assert! ( org_form . contains (
               "*** a stray alias\n- viewnode ID: 0f. To find it: C-c g v 0f\n" ),

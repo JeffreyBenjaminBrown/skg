@@ -599,7 +599,7 @@ describe('skg.save pipeline', function ()
     vim.api.nvim_buf_delete(found, { force = true })
   end)
 
-  it('names the Neovim bindings where a save error names C-c s d and C-c s w',
+  it('names the Neovim bindings where a save error names C-c s e and C-c s w',
      function ()
     server = helpers.connect_to_fake_server(function (line, respond)
       if line:find('save buffer', 1, true) then
@@ -607,7 +607,7 @@ describe('skg.save pipeline', function ()
           '((response-type save-lock) (lock-views ()))'))
         respond(helpers.framed(
           '((response-type save-result) (content nil)'
-          .. ' (errors ("request another instance editable (C-c s d)'
+          .. ' (errors ("request another instance editable (C-c s e)'
           .. ' and this one write-protected (C-c s w)"))'
           .. ' (warnings ()))'))
       end
@@ -625,7 +625,7 @@ describe('skg.save pipeline', function ()
     local text = table.concat(
       vim.api.nvim_buf_get_lines(found, 0, -1, false), '\n')
     assert.is_truthy(text:find(
-      'request another instance editable (<localleader>sd)'
+      'request another instance editable (<localleader>se)'
       .. ' and this one write-protected (<localleader>sw)', 1, true))
     vim.api.nvim_buf_delete(found, { force = true })
   end)

@@ -334,7 +334,7 @@ M.content_view_bindings = {
   { 'lp', 'ShowFolderOfFlags' },         -- C-c l p
   { 'lc', 'ShowFolderOfContainers' },    -- C-c l c
   { 'lm', 'ShowFolderOfMentioners' },    -- C-c l m
-  { 'sd', 'SetEditable' },             -- C-c s d
+  { 'se', 'SetEditable' },             -- C-c s e
   { 'sw', 'RequestWriteProtected' },     -- C-c s w
   { 'sW', 'RequestWriteProtectedRecursive' }, -- C-c s W
   { 'sm', 'SetMergeRequest' },           -- C-c s m

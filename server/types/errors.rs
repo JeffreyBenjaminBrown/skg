@@ -333,7 +333,7 @@ impl std::fmt::Display for BufferValidationError {
       BufferValidationError::MultipleEditableViewRequestsForSameId (gnid, headlines) =>
         write!(f, "Multiple editable view requests for the same ID {:?} ({}). At most one request per ID is allowed.", gnid, name_headlines (headlines)),
       BufferValidationError::WriteProtectAndEditableViewRequestsOnOneOccurrence (gnid, headline) =>
-        write!(f, "An occurrence of node {:?} ({}) requests both write-protection and an editable view. Request one; to move editability, request write-protection on one occurrence (C-c s w) and an editable view on another (C-c s d).", gnid, headline),
+        write!(f, "An occurrence of node {:?} ({}) requests both write-protection and an editable view. Request one; to move editability, request write-protection on one occurrence (C-c s w) and an editable view on another (C-c s e).", gnid, headline),
       BufferValidationError::EmptyTitle(gnid) =>
         write!(f, "Node {:?} has an empty title. Every editable node must have a non-empty title.", gnid),
       BufferValidationError::LocalStructureViolation(msg, gnid, headline) =>
@@ -344,7 +344,7 @@ impl std::fmt::Display for BufferValidationError {
         write!(f, "Edit request on write-protected node {:?} ({}). Ghosts and unknown viewnodes are write-protected; write-protected nodes cannot carry write instructions. Visit an editable view of the node first (C-c g RET).", gnid, headline),
       BufferValidationError::EditedWriteProtectedOccurrence {
         gnid, title, changes, headline } =>
-        write!(f, "The write-protected occurrence of node {:?} ({:?}, {}) differs from the graph ({}). A write-protected occurrence saves nothing of its own; edit an editable occurrence instead, or request this one editable (C-c s d).",
+        write!(f, "The write-protected occurrence of node {:?} ({:?}, {}) differs from the graph ({}). A write-protected occurrence saves nothing of its own; edit an editable occurrence instead, or request this one editable (C-c s e).",
                gnid, title, headline, changes . join ("; ")),
       BufferValidationError::FlagsSurfaceEdited {
         recorder_gnid, recorder_title, changes, headline } =>

@@ -275,7 +275,7 @@ fn buffer_validation_error_text (
       format!("Multiple editable view requests for the same ID:\n- ID: {}\n- At most one editable view request per ID is allowed.\n",
               gnid . 0) },
     BufferValidationError::WriteProtectAndEditableViewRequestsOnOneOccurrence (gnid, _) => {
-      format!("Contradictory view requests on one occurrence:\n- ID: {}\n- It requests both write-protection and an editable view.\n- To move editability, request write-protection on one occurrence (C-c s w) and an editable view on another (C-c s d).\n",
+      format!("Contradictory view requests on one occurrence:\n- ID: {}\n- It requests both write-protection and an editable view.\n- To move editability, request write-protection on one occurrence (C-c s w) and an editable view on another (C-c s e).\n",
               gnid . 0) },
     BufferValidationError::EmptyTitle(gnid) => {
       format!("Node has an empty title:\n- ID: {}\n- Every editable node must have a non-empty title.\n",
@@ -288,7 +288,7 @@ fn buffer_validation_error_text (
               gnid . 0) },
     BufferValidationError::EditedWriteProtectedOccurrence {
       gnid, title, changes, .. } => {
-      format!("Write-protected occurrence differs from the graph:\n- ID: {}\n- Title: {}\n- Differences: {}\n- A write-protected occurrence saves nothing of its own; no changes were saved.\n- Edit an editable occurrence instead, or request this one editable (C-c s d).\n",
+      format!("Write-protected occurrence differs from the graph:\n- ID: {}\n- Title: {}\n- Differences: {}\n- A write-protected occurrence saves nothing of its own; no changes were saved.\n- Edit an editable occurrence instead, or request this one editable (C-c s e).\n",
               gnid . 0, title, changes . join ("; ")) },
     BufferValidationError::FlagsSurfaceEdited {
       recorder_gnid, recorder_title, changes, .. } => {

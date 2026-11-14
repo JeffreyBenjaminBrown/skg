@@ -16,7 +16,7 @@ end
 ---The Emacs chords of content views that server messages name, each
 ---with the name in skg.keymaps of the command it runs.
 local command_names_of_emacs_chords = {
-  ['C-c s d'] = 'SetEditable',
+  ['C-c s e'] = 'SetEditable',
   ['C-c s w'] = 'RequestWriteProtected',
   ['C-c s s'] = 'SetRepo',
   ['C-c s r'] = 'SetRelRepo',

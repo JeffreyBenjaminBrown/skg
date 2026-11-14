@@ -1239,7 +1239,7 @@ def check_write_protected_foreign_edit_refused (context):
 
 def check_making_a_foreign_node_editable (context):
   """'editable' in the handle of that write-protected occurrence asks
-  for an editable view, as the clients' 'C-c s d' does: the save
+  for an editable view, as the clients' 'C-c s e' does: the save
   writes nothing, and the re-rendered view shows it editable, and the
   occurrence that was editable write-protected."""
   folder = fresh_root_view (context, "editable")

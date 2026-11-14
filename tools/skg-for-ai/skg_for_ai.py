@@ -2584,7 +2584,7 @@ SEARCH_MATCHING_TOKENS = { "noSearchMatching" : "true",
                            "searchMatching"   : "false" }
 # The handle tokens that ask for view requests, each with the request
 # the rebuild writes into the headline's '(viewRequests ...)':
-# 'editable' the clients' 'skg-set-editable' ('C-c s d'), 'fork' their
+# 'editable' the clients' 'skg-set-editable' ('C-c s e'), 'fork' their
 # 'skg-fork-node' ('C-c m f'), 'write-protect' their
 # 'skg-request-write-protected' ('C-c s w'; with 'subtree', 'C-c s W'
 # and its request 'writeProtectedSubtreeView').

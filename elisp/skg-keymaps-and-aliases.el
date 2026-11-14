@@ -130,7 +130,7 @@ and hide INTERNAL from M-x completion."
     (define-key map (kbd "C-c l c") #'skg-show-folderOf-containers)
     (define-key map (kbd "C-c l m") #'skg-show-folderOf-mentioners))
   (progn;; properties
-    (define-key map (kbd "C-c s d") #'skg-set-editable)
+    (define-key map (kbd "C-c s e") #'skg-set-editable)
     (define-key map (kbd "C-c s w") #'skg-request-write-protected)
     (define-key map (kbd "C-c s W") #'skg-request-write-protected-recursive)
     (define-key map (kbd "C-c s m") #'skg-set-merge-request)
