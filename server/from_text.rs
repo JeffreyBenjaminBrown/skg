@@ -21,6 +21,7 @@ use crate::types::save::{NodeInstruction, SavePlan, SkgrepoMove, UneditedStaleGr
 use crate::serve::handlers::save_staleness::{
   WhatTheBaselineShows, without_unedited_stale_saves};
 use crate::types::tree::forest::ViewForest;
+use crate::types::views_state::OverridesFollowed;
 
 use buffer_to_viewnodes::uninterpreted::org_to_viewforest;
 use buffer_to_viewnodes::add_missing_info::IdResolution;
@@ -78,7 +79,7 @@ pub fn buffer_to_validated_saveplan_in_graph (
   // _with_fork_repos entry below. No baseline: nothing is stale.
   buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
     buffer_text, graph, config, skgrepo_restriction, &HashMap::new (),
-    &WhatTheBaselineShows::default () )
+    &WhatTheBaselineShows::default (), OverridesFollowed::RootAuthors )
     }
 
 /// As 'buffer_to_validated_saveplan', but with the per-fork clone
@@ -92,6 +93,8 @@ pub fn buffer_to_validated_saveplan_in_graph (
 /// rendered, the plan leaves out the ones the buffer did not edit; and
 /// the write-protected check excuses an occurrence that shows a title
 /// or home skgrepo as one of the baseline's occurrences does.
+/// 'overrides_followed' is whose overrides the buffer was drawn
+/// following, against which its '(overridesHere N)' parts are checked.
 pub fn buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
   buffer_text        : &str,
   graph              : &crate::dbs::in_rust_graph::InRustGraph,
@@ -99,6 +102,7 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
   skgrepo_restriction : &SkgrepoRestriction,
   fork_skgrepos      : &HashMap<ID, SkgrepoName>,
   baseline           : &WhatTheBaselineShows,
+  overrides_followed : OverridesFollowed,
 ) -> Result<(ViewForest, SavePlan, Vec<String>), SaveError> {
   let ( viewforest, parsing_errors, parsing_warnings, supplied )
     : ( ViewForest, Vec<BufferValidationError>, Vec<String>,
@@ -116,7 +120,7 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
           "find_buffer_errors_for_saving" ). entered();
         crate::from_text::buffer_to_viewnodes::validate_tree
           ::find_buffer_errors_for_saving_in_graph (
-          & viewforest, graph, config )
+          & viewforest, graph, config, overrides_followed )
  } . map_err (SaveError::DatabaseError) ?;
     validation_errors . extend (parsing_errors);
     if ! validation_errors . is_empty () {
@@ -328,7 +332,7 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos (
   let graph = crate::dbs::in_rust_graph::InRustGraph::from_graphnodes (&nodes);
   buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
     buffer_text, &graph, config, skgrepo_restriction, fork_skgrepos,
-    &WhatTheBaselineShows::default () ) }
+    &WhatTheBaselineShows::default (), OverridesFollowed::RootAuthors ) }
 
 /// One nonfatal warning per dangling link this save writes: a
 /// '[[id:X][label]]' in a saved title or body where X is neither in

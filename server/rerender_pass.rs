@@ -33,7 +33,8 @@ use crate::types::errors::{HeadlineName, with_org_subheadlines};
 use crate::types::viewnode::{
   Editability, Folder, FolderRelation, ViewRequest, ViewnodeKind, Vognode};
 use crate::types::views_state::{
-  DiffViewBufferKind, ViewState, ViewforestId, ViewnodeIdRecord, pids_from_viewforest};
+  DiffViewBufferKind, OverridesFollowed, ViewState, ViewforestId, ViewnodeIdRecord,
+  pids_from_viewforest};
 use crate::update_buffer::refresh_content_view;
 
 use ego_tree::NodeId;
@@ -142,6 +143,7 @@ pub fn update_views_after_save (
   skgrepo_restriction         : &SkgrepoRestriction,
   fork_specs                  : &[ForkSpec],
   named_diffView_buffer_kind  : Option<DiffViewBufferKind>, // what the request says the saved buffer is, for a view the connection does not hold
+  overrides_followed          : OverridesFollowed, // what the request says the saved buffer follows, which the connection keeps for the view
 ) -> Result<SaveResponse, Box<dyn Error>> {
   let mut context : RerenderPassContext = RerenderPassContext::new (
     env, runtime, skgrepo_restriction,
@@ -181,7 +183,7 @@ pub fn update_views_after_save (
     if matches! (release, TextReleaseDecision::Challenge { .. }) {
       return Ok ( withhold_save_rerender (
         &release, saved_view_mut, saved_viewnode_id_record,
-        saved_diffView_buffer_kind, &collateral_viewforest_ids,
+        saved_diffView_buffer_kind, overrides_followed, &collateral_viewforest_ids,
         viewforest_id_from_request_result, views_state,
         &context . runtime . graph, skgrepo_restriction )); }}
   let requesting_containers : Vec<NodeId> =
@@ -192,7 +194,7 @@ pub fn update_views_after_save (
         &mut saved_view_mut,
         &mut saved_viewnode_id_record,
         &mut context,
-        RerenderMode::of_buffer (saved_diffView_buffer_kind, false) ) ?; }
+        RerenderMode::of_buffer (saved_diffView_buffer_kind, false, overrides_followed) ) ?; }
   context . warnings . extend ( no_other_containers_warning (
     &saved_view_mut, &requesting_containers ));
   let saved_text : String = viewforest_to_string (&saved_view_mut) ?;
@@ -215,7 +217,7 @@ pub fn update_views_after_save (
       decision @ TextReleaseDecision::Challenge { .. } => {
         return Ok ( withhold_save_rerender (
           &decision, saved_view_mut, saved_viewnode_id_record,
-          saved_diffView_buffer_kind, &collateral_viewforest_ids,
+          saved_diffView_buffer_kind, overrides_followed, &collateral_viewforest_ids,
           viewforest_id_from_request_result, views_state,
           &context . runtime . graph, skgrepo_restriction )); }
       TextReleaseDecision::AllowWithWarning { warning } =>
@@ -226,7 +228,7 @@ pub fn update_views_after_save (
     register_saved_view (
       views_state, &context . runtime . graph, viewforest_id,
       saved_view_mut, saved_viewnode_id_record, saved_diffView_buffer_kind,
-      skgrepo_restriction );
+      overrides_followed, skgrepo_restriction );
     register_and_send_rerendered_views (
       stream, views_state, &context . runtime, skgrepo_restriction,
       collateral_views, TcpToClient::CollateralView ); }
@@ -284,6 +286,7 @@ fn withhold_save_rerender (
   saved_view                        : ViewForest,
   saved_viewnode_id_record          : ViewnodeIdRecord,
   saved_diffView_buffer_kind        : Option<DiffViewBufferKind>,
+  overrides_followed                : OverridesFollowed, // the save's, under which the saved view is registered
   collateral_viewforest_ids         : &[ViewforestId],
   viewforest_id_from_request_result : &Result<ViewforestId, String>,
   views_state                       : &mut ViewsState,
@@ -295,7 +298,7 @@ fn withhold_save_rerender (
     register_saved_view (
       views_state, graph, viewforest_id,
       saved_view, saved_viewnode_id_record, saved_diffView_buffer_kind,
-      skgrepo_restriction );
+      overrides_followed, skgrepo_restriction );
     withheld_viewforest_ids . push (viewforest_id . clone ()); }
   withheld_viewforest_ids . extend (
     collateral_viewforest_ids . iter () . cloned () );
@@ -303,8 +306,9 @@ fn withhold_save_rerender (
 
 /// Register the saved view 'viewforest_id' in place of what the
 /// connection held, as the buffer of the diff view
-/// 'saved_diffView_buffer_kind' if it is one, rendered under the
-/// save's 'skgrepo_restriction'.
+/// 'saved_diffView_buffer_kind' if it is one, following
+/// 'overrides_followed', rendered under the save's
+/// 'skgrepo_restriction'.
 fn register_saved_view (
   views_state                : &mut ViewsState,
   graph                      : &InRustGraph,
@@ -312,11 +316,14 @@ fn register_saved_view (
   saved_view                 : ViewForest,
   saved_viewnode_id_record   : ViewnodeIdRecord,
   saved_diffView_buffer_kind : Option<DiffViewBufferKind>,
+  overrides_followed         : OverridesFollowed,
   skgrepo_restriction        : &SkgrepoRestriction,
 ) {
   views_state . open_views . update_view (
     graph, viewforest_id, saved_view, saved_viewnode_id_record,
     skgrepo_restriction );
+  views_state . open_views . set_overrides_followed (
+    viewforest_id, overrides_followed );
   if let Some (buffer_kind) = saved_diffView_buffer_kind {
     views_state . open_views . mark_as_diffView_buffer (viewforest_id, buffer_kind); }}
 
@@ -375,8 +382,9 @@ pub(crate) fn rerender_open_views (
   rendered_views }
 
 /// Rerender the open view 'viewforest_id' in memory, in the mode its
-/// buffer kind in the diff view, if any, gives ('RerenderMode'); the
-/// registered view is untouched. An error names the view.
+/// buffer kind in the diff view, if any, gives, and following the
+/// overrides it follows ('RerenderMode'); the registered view is
+/// untouched. An error names the view.
 pub(crate) fn rerender_open_view (
   viewforest_id : &ViewforestId,
   views_state   : &ViewsState,
@@ -392,7 +400,8 @@ pub(crate) fn rerender_open_view (
   let mode : RerenderMode = RerenderMode::of_buffer (
     views_state . open_views . diffView_buffer_kind_of_view (viewforest_id),
     views_state . open_views . views . get (viewforest_id)
-      . is_some_and ( |state| context . diffView_buffer_rerender . extends (state) ));
+      . is_some_and ( |state| context . diffView_buffer_rerender . extends (state) ),
+    views_state . open_views . overrides_followed_by_view (viewforest_id) );
   let in_the_view : &dyn Fn (Box<dyn Error>) -> String = &|e : Box<dyn Error>| -> String {
     format! ( "View {}: {}", viewforest_id . repr_in_client (), e ) };
   refresh_view (
@@ -416,11 +425,12 @@ pub(crate) fn release_candidates<'v> (
     . collect () }
 
 /// The situation a rerender refreshes a view in, from the view
-/// itself: a content view, or a buffer of the diff view of this kind,
-/// extended to the changes it does not show or not.
+/// itself: a content view following someone's overrides, or a buffer
+/// of the diff view of this kind, extended to the changes it does not
+/// show or not.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum RerenderMode {
-  ContentView,
+  ContentView { overrides_followed : OverridesFollowed },
   DiffView { buffer_kind : DiffViewBufferKind,
              extend      : bool },
 }
@@ -428,12 +438,14 @@ pub enum RerenderMode {
 impl RerenderMode {
   /// The mode of a view whose buffer kind in the diff view, if it is
   /// one, is 'diffView_buffer'; such a buffer is extended if 'extend'.
+  /// Any other view follows 'overrides_followed'.
   pub fn of_buffer (
-    diffView_buffer : Option<DiffViewBufferKind>,
-    extend          : bool,
+    diffView_buffer    : Option<DiffViewBufferKind>,
+    extend             : bool,
+    overrides_followed : OverridesFollowed,
   ) -> RerenderMode {
     match diffView_buffer {
-      None => RerenderMode::ContentView,
+      None => RerenderMode::ContentView { overrides_followed },
       Some (buffer_kind) => RerenderMode::DiffView { buffer_kind, extend }, } }
 }
 
@@ -454,8 +466,8 @@ pub fn refresh_view (
   let _span : tracing::span::EnteredSpan = tracing::info_span!(
     "refresh_viewforest" ). entered();
   match mode {
-    RerenderMode::ContentView => refresh_content_view (
-      viewforest, viewnode_id_record, context ) ?,
+    RerenderMode::ContentView { overrides_followed } => refresh_content_view (
+      viewforest, viewnode_id_record, context, overrides_followed ) ?,
     RerenderMode::DiffView { buffer_kind, extend } => refresh_diffView_buffer_over_current_straddle (
       context, buffer_kind, extend, viewforest, viewnode_id_record ) ?, };
   tracing::debug!("refresh_view: done ({:.3}s)",

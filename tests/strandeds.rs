@@ -24,7 +24,7 @@ use skg::test_utils::multi_root_view;
 use skg::types::env::SkgEnv;
 use skg::types::misc::{ID, SkgConfig, SkgrepoName, TantivyIndex};
 use skg::types::nodes::complete::Graphnode;
-use skg::types::views_state::{OpenViews, ViewforestId};
+use skg::types::views_state::{OpenViews, OverridesFollowed, ViewforestId};
 use skg::types::viewnode::Viewnode;
 
 use ego_tree::Tree;
@@ -102,7 +102,8 @@ fn save (
       "", // the empty baseline: a hand-written buffer was drawn by no server
       &mut env,  &Ok (viewforest_id . clone ()),
       &mut f . views_state, &SkgrepoRestriction::unrestricted (&f . config), true, &HashMap::new (),
-      &HashSet::new (), review, DeleteFrom::NotChosen, &[], None )) ?;
+      &HashSet::new (), review, DeleteFrom::NotChosen, &[], None,
+      OverridesFollowed::RootAuthors )) ?;
   // The test helper's env holds its own graph handle: carry the
   // swapped-in graph back to the fixture.
   f . graph . store ( env . runtime_snapshot () . graph . clone () );

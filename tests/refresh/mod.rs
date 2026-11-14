@@ -119,7 +119,7 @@ pub(super) fn refresh_and_render (
   mode   : RefreshMode,
   budget : usize,
 ) -> Result<String, Box<dyn Error>> {
-  refresh_viewforest (forest, record, truth, mode, budget) ?;
+  refresh_viewforest (forest, record, truth, mode, budget, OverridesFollowed::RootAuthors) ?;
   viewforest_to_string (forest) }
 
 /// Refresh 'forest' under each of 'restrictions' in turn, as a view
@@ -207,7 +207,7 @@ fn run_parsed_asserting_fixpoint (
   if let Err (failure) = refresh_reaches_fixpoint (
     &text, graph,
     |again, again_record| refresh_viewforest (
-      again, again_record, &truth, mode, budget )) {
+      again, again_record, &truth, mode, budget, OverridesFollowed::RootAuthors )) {
     panic! ( "the refresh of a refresh's output is no fixpoint: {}", failure ); }
   Run { forest, text } }
 

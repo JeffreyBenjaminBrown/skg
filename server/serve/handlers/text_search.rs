@@ -18,6 +18,7 @@ use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::types::env::SkgEnv;
 use crate::org_to_text::viewforest_to_string;
 use crate::refresh::{Truth, refresh_content_viewforest};
+use crate::types::views_state::OverridesFollowed;
 use crate::refresh::prune_childless_tombstones;
 use crate::serve::ViewsState;
 use crate::serve::handlers::text_release::{
@@ -325,7 +326,8 @@ pub fn draw_search_buffer (
     stub_root_of_hit (viewforest, *hit, graph, restriction); }
   refresh_content_viewforest (
     viewforest, viewnode_id_record,
-    &Truth { graph, config, restriction } ) ?;
+    &Truth { graph, config, restriction },
+    OverridesFollowed::RootAuthors ) ?;
   for hit in &hits {
     fold_what_was_drawn_under_hit (viewforest, *hit); }
   if ! include_overPrivateText_telescopes {

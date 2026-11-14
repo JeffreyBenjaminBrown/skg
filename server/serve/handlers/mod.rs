@@ -27,3 +27,4 @@ pub mod text_search;
 pub mod titles_by_gnids;
 pub mod diff_view;
 pub mod link_statuses;
+pub mod overrides_followed;

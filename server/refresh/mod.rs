@@ -41,7 +41,7 @@ use crate::types::env::RuntimeGeneration;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::Viewnode;
-use crate::types::views_state::ViewnodeIdRecord;
+use crate::types::views_state::{OverridesFollowed, ViewnodeIdRecord};
 use crate::refresh::mode::RefreshMode;
 
 use ego_tree::{NodeId, Tree};
@@ -66,21 +66,24 @@ impl<'a> Truth<'a> {
     Truth { graph : &runtime . graph, config : &runtime . config, restriction } }
 }
 
-/// Refresh the content view 'viewforest' against 'truth', drawing at
-/// most the config's 'initial_node_limit' extensions of new editable
-/// content: what every content view's refresh shares.
+/// Refresh the content view 'viewforest' against 'truth', following
+/// 'overrides_followed', drawing at most the config's
+/// 'initial_node_limit' extensions of new editable content: what
+/// every content view's refresh shares.
 pub fn refresh_content_viewforest (
   viewforest         : &mut ViewForest,
   viewnode_id_record : &mut ViewnodeIdRecord,
   truth              : &Truth,
+  overrides_followed : OverridesFollowed,
 ) -> Result<(), Box<dyn Error>> {
   refresh_viewforest (
     viewforest, viewnode_id_record, truth, RefreshMode::ContentView,
-    truth . config . initial_node_limit ) }
+    truth . config . initial_node_limit, overrides_followed ) }
 
 /// Refresh 'viewforest' against 'truth', in 'mode', drawing at most
 /// 'node_budget' extensions of new editable content
-/// ('editability.rs'). 'viewnode_id_record' assigns the vnids of the
+/// ('editability.rs'), and substituting the overriders of the owner
+/// 'overrides_followed' names (the diff view substitutes none). 'viewnode_id_record' assigns the vnids of the
 /// viewnodes the refresh draws. Edit requests pass through, but for
 /// one a headline's new kind or new write-protection has no slot for,
 /// which is dropped; view requests are fulfilled and dropped, but for
@@ -91,8 +94,9 @@ pub fn refresh_viewforest (
   truth              : &Truth,
   mode               : RefreshMode,
   node_budget        : usize,
+  overrides_followed : OverridesFollowed,
 ) -> Result<(), Box<dyn Error>> {
-  let mut walk : Walk = Walk::new (truth, mode, node_budget);
+  let mut walk : Walk = Walk::new (truth, mode, node_budget, overrides_followed);
   { let tree : &mut Tree<Viewnode> = viewforest . as_internal_tree_mut ();
     editability::settle_before_the_walk (tree, &mut walk);
     walk_in_level_order (tree, &mut walk) ?; }
@@ -121,6 +125,9 @@ pub(crate) struct Walk<'a> {
   /// depend on the connection's ('carrier_on_override_chain_followed_by'). Built
   /// once per walk.
   pub unrestricted             : SkgrepoRestriction,
+  /// Whose overrides the view follows
+  /// ('override_follower_of_tree_containing').
+  pub overrides_followed       : OverridesFollowed,
 }
 
 impl<'a> Walk<'a> {
@@ -128,8 +135,9 @@ impl<'a> Walk<'a> {
     truth       : &'a Truth<'a>,
     mode        : RefreshMode<'a>,
     node_budget : usize,
+    overrides_followed : OverridesFollowed,
   ) -> Walk<'a> {
-    Walk { truth, mode, node_budget,
+    Walk { truth, mode, node_budget, overrides_followed,
            editable_occurrence_of : HashMap::new (),
            added_compound_folders : HashSet::new (),
            unrestricted : SkgrepoRestriction::unrestricted (truth . config), } }

@@ -11,6 +11,7 @@ use crate::types::viewnode::{RelationshipEditRequest, NodeEditRequest, Folder, P
 use crate::types::viewnode::{Viewnode, ViewnodeKind};
 use crate::types::viewnode::{Vognode, Occurrence};
 use crate::types::tree::forest::ViewForest;
+use crate::types::views_state::OverridesFollowed;
 use crate::types::tree::generic::do_everywhere_in_tree_dfs_readonly;
 use crate::types::errors::{BufferValidationError, HeadlineName, with_org_subheadlines};
 use crate::nodeMerge::validate_nodeMerge::validate_nodeMerge_requests;
@@ -44,6 +45,7 @@ pub fn find_buffer_errors_for_saving_in_graph (
   viewforest: &ViewForest,
   graph: &InRustGraph,
   config: &SkgConfig,
+  overrides_followed: OverridesFollowed, // whose overrides the buffer was drawn following
 ) -> Result<Vec<BufferValidationError>,
             Box<dyn std::error::Error>>
 { // Two kinds of check, in order: the global checks
@@ -84,7 +86,7 @@ pub fn find_buffer_errors_for_saving_in_graph (
   idFolder_membership_errors (
     viewforest, graph, config, &mut errors ) ?;
   overridesHere_part_errors (
-    viewforest, graph, config, &mut errors );
+    viewforest, graph, config, overrides_followed, &mut errors );
   validate_view_roots (
       viewforest, &mut errors);
   writeProtected_relRepo_request_errors (
@@ -113,7 +115,7 @@ pub fn find_buffer_errors_for_saving (
     ::read_all_skg_files_from_skgrepos (config)?;
   let graph = InRustGraph::from_graphnodes (&nodes);
   find_buffer_errors_for_saving_in_graph (
-    viewforest, &graph, config ) }
+    viewforest, &graph, config, OverridesFollowed::RootAuthors ) }
 
 /// Removing an ID from an idFolder aborts the save (see the
 /// glossary's "write-protected set"): for each present idFolder whose
@@ -178,7 +180,8 @@ fn idFolder_membership_errors (
 /// otherwise hand-edited (or yanked, or stale) metadata could
 /// rewrite arbitrary contains members. The check: the carrier's ID
 /// must be on N's chain of overriders of the owner whose overrides
-/// the occurrence's top-level tree follows, as the refresh rendered
+/// the occurrence's top-level tree follows in a buffer that follows
+/// 'overrides_followed', as the refresh rendered
 /// it ('override_follower_of_tree_containing';
 /// 'carrier_on_override_chain_followed_by', visibility-ungated so ownership
 /// still gates but a part honest when rendered does not start
@@ -190,10 +193,11 @@ fn idFolder_membership_errors (
 /// the same graph snapshot used by the rest of save planning.
 #[allow(non_snake_case)]
 fn overridesHere_part_errors (
-  viewforest : &ViewForest,
-  graph      : &InRustGraph,
-  config     : &SkgConfig,
-  errors     : &mut Vec<BufferValidationError>,
+  viewforest         : &ViewForest,
+  graph              : &InRustGraph,
+  config             : &SkgConfig,
+  overrides_followed : OverridesFollowed,
+  errors             : &mut Vec<BufferValidationError>,
 ) {
   let unrestricted : SkgrepoRestriction = SkgrepoRestriction::unrestricted (config);
   for edge in viewforest . root () . traverse () {
@@ -207,7 +211,7 @@ fn overridesHere_part_errors (
             None => continue },
         _ => continue };
     let follower : SkgrepoOwner =
-      override_follower_of_tree_containing (config, graph, node_ref);
+      override_follower_of_tree_containing (config, graph, overrides_followed, node_ref);
     let chain_ok : bool =
       carrier_on_override_chain_followed_by (
         config, graph, &unrestricted, &follower, &original, &carrier);

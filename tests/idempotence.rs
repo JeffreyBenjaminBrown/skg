@@ -43,7 +43,7 @@ use skg::diff_view::processed_store::ProcessedStore;
 use skg::graph_straddle::types::GraphStraddle;
 use skg::serve::handlers::diff_view::diffView_buffer;
 use skg::test_utils::cleanup_test_tantivy;
-use skg::types::views_state::{DiffViewBufferKind, ViewnodeIdRecord};
+use skg::types::views_state::{DiffViewBufferKind, OverridesFollowed, ViewnodeIdRecord};
 use skg::dbs::in_rust_graph::InRustGraph;
 use skg::dbs::in_rust_graph::relation_accessors::GnidPresence;
 use skg::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
@@ -153,7 +153,8 @@ fn refreshes_unchanged (
   refresh_reaches_fixpoint (
     &text, &runtime . graph,
     |forest, record| refresh_content_viewforest (
-      forest, record, &Truth::of_runtime (runtime, restriction) )) }
+      forest, record, &Truth::of_runtime (runtime, restriction),
+      OverridesFollowed::RootAuthors )) }
 
 /// No skgrepo restriction, then the skgrepo restriction through
 /// each owned skgrepo but the most private (through which it would be

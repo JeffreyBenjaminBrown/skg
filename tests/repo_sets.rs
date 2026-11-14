@@ -37,7 +37,7 @@ use skg::types::save::{NodeInstruction, SaveNode};
 use skg::types::viewnode::{
   Viewnode,
   viewforest_root_viewnode};
-use skg::types::views_state::{OpenViews, ViewState, ViewforestId, ViewnodeIdRecord};
+use skg::types::views_state::{OpenViews, OverridesFollowed, ViewState, ViewforestId, ViewnodeIdRecord};
 
 use std::collections::{BTreeSet, HashSet};
 use std::error::Error;
@@ -151,7 +151,8 @@ fn override_substitute_across_skgrepo_switch_anonymizes_and_keeps_original (
                     diffView_buffer_kind : None,
                     viewnode_id_record : ViewnodeIdRecord::default (),
                     extend_at_next_rerender_all : false,
-                    skgrepo_restriction_at_last_render : restriction . clone () });
+                    skgrepo_restriction_at_last_render : restriction . clone (),
+                    overrides_followed : OverridesFollowed::RootAuthors });
       let (mut server_stream, _client_stream) : (TcpStream, TcpStream) =
         mk_test_tcp_stream_pair ();
       std::thread::scope ( |scope| {
@@ -393,7 +394,8 @@ async fn skgrepo_set_switch_rerenders_views (
           diffView_buffer_kind : None,
           viewnode_id_record : ViewnodeIdRecord::default (),
           extend_at_next_rerender_all : false,
-          skgrepo_restriction_at_last_render : restriction . clone (), });
+          skgrepo_restriction_at_last_render : restriction . clone (),
+          overrides_followed : OverridesFollowed::RootAuthors, });
       let (mut server_stream, _client_stream) : (TcpStream, TcpStream) =
         mk_test_tcp_stream_pair ();
       std::thread::scope ( |scope| {

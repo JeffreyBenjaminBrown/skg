@@ -9,7 +9,9 @@
 //! author ('override_follower_of_tree_containing'): a view rooted at a
 //! foreign node shows what that node's author would see, throughout the
 //! tree, even under a third author's nodes; a view rooted at an owned
-//! node follows the user's overrides. Validation of the user's own data
+//! node follows the user's overrides. A view switched to follow the
+//! user's ('OverridesFollowed::User') follows the user's in every tree.
+//! Validation of the user's own data
 //! ([[./override_invariants.rs]]) always follows the user's.
 //!
 //! Two gates, applied per relationship:
@@ -40,6 +42,7 @@ use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::{ID, SkgConfig, SkgrepoName, SkgrepoOwner};
 use crate::types::viewnode::{Viewnode, ViewnodeKind, Vognode};
+use crate::types::views_state::OverridesFollowed;
 
 use ego_tree::NodeRef;
 use std::collections::HashSet;
@@ -120,16 +123,21 @@ pub fn resolve_override (
     current = next; }}
 
 /// The owner whose overrides the top-level tree containing 'position'
-/// follows: the owner ('SkgConfig::skgrepo_owner') of the home
-/// skgrepo, as 'graph' knows it, of that tree's root, the child of the
-/// buffer root. The user when that root is not an occurrence of a node
+/// follows, in a view that follows 'overrides_followed'. The user's,
+/// in a view that follows the user's. Otherwise the root author's:
+/// the owner ('SkgConfig::skgrepo_owner') of the home skgrepo, as
+/// 'graph' knows it, of that tree's root, the child of the buffer
+/// root; the user when that root is not an occurrence of a node
 /// 'graph' knows (a new node, a ghost, a tombstone), or when
 /// 'position' is the buffer root itself.
 pub fn override_follower_of_tree_containing (
-  config   : &SkgConfig,
-  graph    : &InRustGraph,
-  position : NodeRef<Viewnode>,
+  config             : &SkgConfig,
+  graph              : &InRustGraph,
+  overrides_followed : OverridesFollowed,
+  position           : NodeRef<Viewnode>,
 ) -> SkgrepoOwner {
+  if overrides_followed == OverridesFollowed::User {
+    return SkgrepoOwner::User; }
   let tree_root : Option<NodeRef<Viewnode>> =
     once (position) . chain ( position . ancestors () )
     . find ( |node| node . parent () . is_some_and ( |parent|

@@ -26,7 +26,7 @@ use skg::test_utils::multi_root_view_with_skgrepo_set;
 use skg::types::env::SkgEnv;
 use skg::types::misc::{ID, SkgConfig, Skgrepo, SkgrepoName, TantivyIndex};
 use skg::types::viewnode::Viewnode;
-use skg::types::views_state::{OpenViews, ViewforestId};
+use skg::types::views_state::{OpenViews, OverridesFollowed, ViewforestId};
 
 use ego_tree::Tree;
 use futures::executor::block_on;
@@ -282,7 +282,8 @@ pub fn save_under (
       &Ok ( ViewforestId::ContentView (view . into ()) ),
       &mut f . views_state, restriction,
       approved_forks, &HashMap::new (), &HashSet::new (),
-      &StrandedsReview::NotReviewed, delete_from, &[], None )) ? ) }
+      &StrandedsReview::NotReviewed, delete_from, &[], None,
+      OverridesFollowed::RootAuthors )) ? ) }
 
 /// The members 'field' lists in the file 'file' ("SKGREPO/PID.skg"),
 /// as written: the "- " lines that follow the line "FIELD:". Empty

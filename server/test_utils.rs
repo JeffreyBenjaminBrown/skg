@@ -31,7 +31,7 @@ use crate::serve::handlers::save_buffer::{
 };
 use crate::serve::parse_metadata_sexp::{MetadataKind, ViewnodeMetadata};
 use crate::types::tree::forest::ViewForest;
-use crate::types::views_state::{OpenViews, ViewforestId, ViewnodeIdRecord};
+use crate::types::views_state::{OpenViews, OverridesFollowed, ViewforestId, ViewnodeIdRecord};
 use crate::types::misc::{MSV, SkgConfig, Skgrepo, ID, TantivyIndex, SkgrepoName, rel_partners_at_relRepo, rel_partners_at_relRepo_msv, RelPartner};
 use crate::types::save::{NodeInstruction, SaveNode};
 use crate::types::nodes::complete::Graphnode;
@@ -522,7 +522,7 @@ pub async fn update_from_and_rerender_buffer_with_snapshots_test (
     &SkgrepoRestriction::unrestricted (config),
     true, &HashMap::new (), &std::collections::HashSet::new (),
     &StrandedsReview::NotReviewed,
-    DeleteFrom::NotChosen, other_views, None ) . await
+    DeleteFrom::NotChosen, other_views, None, OverridesFollowed::RootAuthors ) . await
 }
 
 /// As 'update_from_and_rerender_buffer_test', but lets the test choose
@@ -925,7 +925,7 @@ pub fn draw_containerward_chains_under_members (
   truth   : &Truth,
   mode    : RefreshMode,
 ) -> Result<(), Box<dyn Error>> {
-  let walk : Walk = Walk::new (truth, mode, 0);
+  let walk : Walk = Walk::new (truth, mode, 0, OverridesFollowed::RootAuthors);
   for member in members {
     draw_containerward_chain (tree, *member, &walk) ?; }
   Ok (( )) }

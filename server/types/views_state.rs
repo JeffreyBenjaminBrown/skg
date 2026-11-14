@@ -49,6 +49,26 @@ pub struct ViewState {
   pub viewnode_id_record : ViewnodeIdRecord,
   pub extend_at_next_rerender_all : bool, // for a buffer of the diff view a reload named: the next "rerender all views" that rerenders it extends it ('DiffViewBufferRerender::ExtendingWhereAReloadAsked')
   pub skgrepo_restriction_at_last_render : SkgrepoRestriction, // the skgrepo restriction the view was last rendered (or registered) under. A save of the view is refused while the connection's shows another set of skgrepos ('error_unless_view_was_rendered_under_current_restriction').
+  pub overrides_followed : OverridesFollowed, // whose overrides the view's rerenders substitute: set by the "set overrides followed" request and by each save, which names it
+}
+
+/// Whose overrides a view follows: where a node stands as content and
+/// an overrider of the followed owner's exists, the refresh shows the
+/// overrider ('substitute_overriders' in 'server/refresh/visit.rs').
+/// The client holds the choice for its buffer and names it in each
+/// save; the connection keeps it for the rerenders it starts
+/// ('ViewState::overrides_followed'). A fresh view follows its root
+/// authors'.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum OverridesFollowed {
+  /// Each top-level tree follows the overrides of its root's author:
+  /// the user's under an owned root, that author's under a foreign one
+  /// ('override_follower_of_tree_containing').
+  #[default]
+  RootAuthors,
+  /// Every tree follows the user's overrides, those of every owned
+  /// skgrepo, whoever wrote its root.
+  User,
 }
 
 /// The viewnode IDs of one buffer: the counter they are assigned from,
@@ -99,6 +119,23 @@ impl DiffViewBufferKind {
 //
 // Implementations
 //
+
+impl OverridesFollowed {
+  /// The '(overrides-followed . "...")' of a save or of a "set
+  /// overrides followed" request.
+  pub fn wire_name (
+    self,
+  ) -> &'static str {
+    match self {
+      OverridesFollowed::RootAuthors => "root authors",
+      OverridesFollowed::User        => "user", } }
+
+  pub fn from_wire_name (
+    name : &str,
+  ) -> Option<OverridesFollowed> {
+    [ OverridesFollowed::RootAuthors, OverridesFollowed::User ]
+      . into_iter () . find ( |followed| followed . wire_name () == name ) }
+}
 
 impl ViewforestId {
   /// Serialize to the client string format.
@@ -181,7 +218,8 @@ impl OpenViews {
         ViewState { viewforest, pids, diffView_buffer_kind : None,
                     viewnode_id_record,
                     extend_at_next_rerender_all : false,
-                    skgrepo_restriction_at_last_render : rendered_under . clone () };
+                    skgrepo_restriction_at_last_render : rendered_under . clone (),
+                    overrides_followed : OverridesFollowed::default () };
       self . views . insert ( viewforest_id, state ); }
 
   /// 'register_view' for a buffer of the diff view.
@@ -218,6 +256,25 @@ impl OpenViews {
     if let Some (state) = self . views . get_mut (viewforest_id) {
       state . extend_at_next_rerender_all =
         extend && state . diffView_buffer_kind . is_some (); }}
+
+  /// Record whose overrides the open view 'viewforest_id' follows.
+  pub fn set_overrides_followed (
+    &mut self,
+    viewforest_id      : &ViewforestId,
+    overrides_followed : OverridesFollowed,
+  ) {
+    if let Some (state) = self . views . get_mut (viewforest_id) {
+      state . overrides_followed = overrides_followed; }}
+
+  /// Whose overrides the open view 'viewforest_id' follows; a view
+  /// the connection does not hold follows its root authors'.
+  pub fn overrides_followed_by_view (
+    &self,
+    viewforest_id : &ViewforestId,
+  ) -> OverridesFollowed {
+    self . views . get (viewforest_id)
+      . map ( |state| state . overrides_followed )
+      . unwrap_or_default () }
 
   /// Whether any open view is a buffer of the diff view.
   pub fn has_diffView_views (
@@ -292,7 +349,8 @@ impl OpenViews {
                            pids, diffView_buffer_kind : None,
                            viewnode_id_record,
                            extend_at_next_rerender_all : false,
-                           skgrepo_restriction_at_last_render : rendered_under . clone () } ); }}
+                           skgrepo_restriction_at_last_render : rendered_under . clone (),
+                           overrides_followed : OverridesFollowed::default () } ); }}
 
   pub fn unregister_view (
     &mut self,

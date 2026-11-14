@@ -41,7 +41,20 @@ use skg::types::errors::{BufferValidationError, SaveError};
 use skg::types::misc::{ID, SkgConfig, SkgrepoName, TantivyIndex, members_of};
 use skg::types::nodes::complete::Graphnode;
 use skg::types::save::{NodeInstruction, SaveNode};
-use skg::types::views_state::OpenViews;
+use skg::types::views_state::{OpenViews, OverridesFollowed, ViewforestId};
+use skg::serve::handlers::overrides_followed::handle_set_overrides_followed_request;
+use skg::serve::handlers::rerender_views::handle_rerender_views_request;
+use skg::serve::handlers::save_buffer::{
+  SaveResponse, update_from_and_rerender_buffer_with_approvals};
+use skg::from_text::strandeds::StrandedsReview;
+use skg::save::DeleteFrom;
+use skg::from_text::buffer_to_validated_saveplan_with_fork_skgrepos_in_graph;
+use skg::serve::handlers::save_staleness::WhatTheBaselineShows;
+use skg::test_utils::{
+  extract_string_field_from_sexp, read_all_lp_messages, skg_env_from_parts};
+use skg::types::env::SkgEnv;
+use std::collections::{HashMap, HashSet};
+use std::io::BufReader;
 
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use skg::dbs::in_rust_graph::InRustGraphHandle;
@@ -87,6 +100,18 @@ fn all_tests
       s . reset ("a_forked_foreign_root_follows_the_users_overrides", foreign_root) ?;
       a_forked_foreign_root_follows_the_users_overrides (
         &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("a_switched_view_follows_the_users_overrides_until_switched_back", foreign_root) ?;
+      a_switched_view_follows_the_users_overrides_until_switched_back (
+        &s . config, &mut s . tantivy ) ?;
+      s . reset ("a_switch_to_the_users_overrides_is_refused_where_it_would_change_nothing", foreign_root) ?;
+      a_switch_to_the_users_overrides_is_refused_where_it_would_change_nothing (
+        &s . config, &mut s . tantivy ) ?;
+      s . reset ("a_save_following_the_users_overrides_shows_a_new_fork_in_place", foreign_root) ?;
+      a_save_following_the_users_overrides_shows_a_new_fork_in_place (
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("the_tamper_check_follows_the_overrides_the_save_names", foreign_root) ?;
+      the_tamper_check_follows_the_overrides_the_save_names (
+        &s . config ) ?;
       Ok (( )) } )) }
 
 fn marked_lines<'a> (
@@ -634,4 +659,220 @@ async fn a_forked_foreign_root_follows_the_users_overrides (
     "under the clone of R, the user's U is shown in M's place:\n{}", saved );
   assert! ( line_of_gnid (&saved, "A") . is_none (),
     "under the clone of R, A is not shown:\n{}", saved );
+  Ok (( )) }
+
+//
+// Switching whose overrides a view follows
+// ('docs/api-and-formats.org', "Set overrides followed").
+//
+
+/// A connection holding one view, of 'root_gnids', as a content-view
+/// request registers it, under the ID 'view_id'.
+fn connection_holding_a_view_of (
+  config     : &SkgConfig,
+  tantivy    : &TantivyIndex,
+  view_id    : &str,
+  root_gnids : &[ID],
+) -> Result<(ViewsState, SkgEnv, String), Box<dyn Error>> {
+  let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
+  let env : SkgEnv = skg_env_from_parts (config, tantivy, &graph);
+  let (view, pids, tree) = multi_root_view (config, Some (tantivy), root_gnids) ?;
+  let mut views_state : ViewsState =
+    ViewsState { open_views : OpenViews::new (), graph_straddle : None };
+  views_state . open_views . register_view (
+    & env . runtime_snapshot () . graph,
+    ViewforestId::from_client_string (view_id . to_string ()),
+    tree, &pids, &SkgrepoRestriction::unrestricted (config) );
+  Ok (( views_state, env, view )) }
+
+/// Send 'request' to 'handler' as the connection's thread would, and
+/// return every message it answered with.
+fn messages_answering (
+  request     : &str,
+  views_state : &mut ViewsState,
+  env         : &SkgEnv,
+  config      : &SkgConfig,
+  handler     : fn (&mut TcpStream, &str, &SkgEnv, &mut ViewsState, &SkgrepoRestriction),
+) -> Vec<String> {
+  let (mut server_stream, client_stream) : (TcpStream, TcpStream) =
+    mk_test_tcp_stream_pair ();
+  std::thread::scope ( |scope| {
+    // The handlers call block_on, so each runs on its own thread.
+    scope . spawn ( || handler (
+      &mut server_stream, request, env, views_state,
+      &SkgrepoRestriction::unrestricted (config) )); } );
+  drop (server_stream);
+  read_all_lp_messages ( &mut BufReader::new (client_stream) ) }
+
+fn switch_request (
+  view_id   : &str,
+  followed  : OverridesFollowed,
+) -> String {
+  format! (
+    "((request . \"set overrides followed\") (view-id . \"{}\") (overrides-followed . \"{}\"))",
+    view_id, followed . wire_name () ) }
+
+/// The one rerendered view's text among 'messages', if one was sent.
+fn rerendered_text (
+  messages : &[String],
+) -> Option<String> {
+  messages . iter ()
+    . find ( |message| message . contains ("(response-type rerender-view)") )
+    . and_then ( |message| extract_string_field_from_sexp (message, "content") ) }
+
+/// A view of foreign R shows A, R's author's, in M's place. Switched
+/// to the user's overrides, it is rerendered with U, the user's, there
+/// instead; the answer names the view and the choice; a foreign redraw
+/// (the "rerender views" a reload asks for) keeps it. Switched back,
+/// it shows A again.
+fn a_switched_view_follows_the_users_overrides_until_switched_back (
+  config  : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  let (mut views_state, env, view) : (ViewsState, SkgEnv, String) =
+    connection_holding_a_view_of (config, tantivy, "R", &[ ID::from ("R") ]) ?;
+  assert! ( line_of_gnid (&view, "A") . is_some_and ( |l| l . contains ("(overridesHere M)") ),
+    "a fresh view of R follows R's author:\n{}", view );
+  let messages : Vec<String> = messages_answering (
+    &switch_request ("R", OverridesFollowed::User),
+    &mut views_state, &env, config, handle_set_overrides_followed_request );
+  let answer : &String = messages . first () . unwrap ();
+  assert! ( answer . contains ("(response-type overrides-followed)")
+            && extract_string_field_from_sexp (answer, "view-id") . as_deref () == Some ("R")
+            && extract_string_field_from_sexp (answer, "overrides-followed") . as_deref () == Some ("user")
+            && extract_string_field_from_sexp (answer, "content") . is_none (),
+    "the answer names the view and the new choice: {:?}", messages );
+  let switched : String = rerendered_text (&messages)
+    . ok_or_else ( || format! ("the view is rerendered: {:?}", messages) ) ?;
+  assert! ( line_of_gnid (&switched, "U") . is_some_and ( |l| l . contains ("(overridesHere M)") )
+            && line_of_gnid (&switched, "A") . is_none (),
+    "switched, the user's U stands in M's place:\n{}", switched );
+  assert_eq! ( views_state . open_views . overrides_followed_by_view (
+                 &ViewforestId::from_client_string ("R" . to_string ()) ),
+               OverridesFollowed::User );
+  let redrawn : String = rerendered_text ( &messages_answering (
+    "((request . \"rerender views\") (view-ids \"R\"))",
+    &mut views_state, &env, config, handle_rerender_views_request ))
+    . ok_or ("the redraw rerenders the view") ?;
+  assert! ( line_of_gnid (&redrawn, "U") . is_some (),
+    "a redraw the user did not ask for keeps the choice:\n{}", redrawn );
+  let back : String = rerendered_text ( &messages_answering (
+    &switch_request ("R", OverridesFollowed::RootAuthors),
+    &mut views_state, &env, config, handle_set_overrides_followed_request ))
+    . ok_or ("switching back rerenders the view") ?;
+  assert! ( line_of_gnid (&back, "A") . is_some_and ( |l| l . contains ("(overridesHere M)") )
+            && line_of_gnid (&back, "U") . is_none (),
+    "switched back, R's author's A stands in M's place again:\n{}", back );
+  Ok (( )) }
+
+/// A view whose every root the user owns follows the user's overrides
+/// already, so a switch to them is refused, with the reason, the
+/// unchanged choice and an empty rerender stream; a switch back to the
+/// root authors' is not refused. A view the connection does not hold,
+/// and a request naming no choice, are refused too.
+fn a_switch_to_the_users_overrides_is_refused_where_it_would_change_nothing (
+  config  : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  let (mut views_state, env, _view) : (ViewsState, SkgEnv, String) =
+    connection_holding_a_view_of (config, tantivy, "P", &[ ID::from ("P") ]) ?;
+  let refusal_of = |messages : &[String]| -> Option<String> {
+    let answer : &String = messages . first () ?;
+    assert! ( answer . contains ("(response-type overrides-followed)"), "{:?}", messages );
+    assert! ( rerendered_text (messages) . is_none ()
+              && messages . iter () . any ( |m| m . contains ("(response-type rerender-done)") ),
+      "a refusal is followed by an empty rerender stream: {:?}", messages );
+    extract_string_field_from_sexp (answer, "content") };
+  let owned : Vec<String> = messages_answering (
+    &switch_request ("P", OverridesFollowed::User),
+    &mut views_state, &env, config, handle_set_overrides_followed_request );
+  assert! ( refusal_of (&owned) . is_some_and ( |reason| reason . contains ("shows your overrides already") ),
+    "{:?}", owned );
+  assert! ( extract_string_field_from_sexp (&owned [0], "overrides-followed")
+            . as_deref () == Some ("root authors"),
+    "the refusal carries the unchanged choice: {:?}", owned );
+  let back : Vec<String> = messages_answering (
+    &switch_request ("P", OverridesFollowed::RootAuthors),
+    &mut views_state, &env, config, handle_set_overrides_followed_request );
+  assert! ( extract_string_field_from_sexp (&back [0], "content") . is_none ()
+            && rerendered_text (&back) . is_some (),
+    "a switch to the root authors' is not refused: {:?}", back );
+  let unheld : Vec<String> = messages_answering (
+    &switch_request ("R", OverridesFollowed::User),
+    &mut views_state, &env, config, handle_set_overrides_followed_request );
+  assert! ( refusal_of (&unheld) . is_some_and ( |reason| reason . contains ("does not hold") ),
+    "{:?}", unheld );
+  let unnamed : Vec<String> = messages_answering (
+    "((request . \"set overrides followed\") (view-id . \"P\"))",
+    &mut views_state, &env, config, handle_set_overrides_followed_request );
+  assert! ( refusal_of (&unnamed) . is_some (), "{:?}", unnamed );
+  Ok (( )) }
+
+/// In a view of foreign R that follows the user's overrides, editing
+/// R's child K forks it, and the save's rerender shows the clone, with
+/// the edit, in K's place, as '(overridesHere K)'; U still stands in
+/// M's place. The connection keeps the choice the save named.
+async fn a_save_following_the_users_overrides_shows_a_new_fork_in_place (
+  config  : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  let (mut views_state, mut env, _view) : (ViewsState, SkgEnv, String) =
+    connection_holding_a_view_of (config, tantivy, "R", &[ ID::from ("R") ]) ?;
+  let switched : String = rerendered_text ( &messages_answering (
+    &switch_request ("R", OverridesFollowed::User),
+    &mut views_state, &env, config, handle_set_overrides_followed_request ))
+    . ok_or ("the switch rerenders the view") ?;
+  let k_line : &str = line_of_gnid (&switched, "K")
+    . ok_or_else ( || format! ("K is shown under R:\n{}", switched) ) ?;
+  let edited : String = switched . replace (
+    k_line, &k_line . replace (") K", ") K-edited") );
+  let (mut stream, _read_end) : (TcpStream, TcpStream) = mk_test_tcp_stream_pair ();
+  let response : SaveResponse =
+    update_from_and_rerender_buffer_with_approvals (
+      &mut stream, &edited, &switched, &mut env,
+      &Ok ( ViewforestId::from_client_string ("R" . to_string ()) ),
+      &mut views_state, &SkgrepoRestriction::unrestricted (config),
+      true, &HashMap::new (), &HashSet::new (),
+      &StrandedsReview::NotReviewed, DeleteFrom::NotChosen, &[], None,
+      OverridesFollowed::User ) . await ?;
+  assert! ( response . errors . is_empty (), "{:?}", response . errors );
+  let clone : Graphnode = overrider_on_disk (config, "K") ?;
+  let saved : &str = &response . saved_view;
+  assert! ( line_of_gnid (saved, &clone . pid . 0)
+            . is_some_and ( |l| l . contains ("(overridesHere K)") && l . ends_with (") K-edited") ),
+    "the clone, edited, stands in K's place:\n{}", saved );
+  assert! ( line_of_gnid (saved, "K") . is_none (), "{}", saved );
+  assert! ( line_of_gnid (saved, "U") . is_some_and ( |l| l . contains ("(overridesHere M)") ),
+    "U still stands in M's place:\n{}", saved );
+  assert_eq! ( views_state . open_views . overrides_followed_by_view (
+                 &ViewforestId::from_client_string ("R" . to_string ()) ),
+               OverridesFollowed::User );
+  Ok (( )) }
+
+/// Under foreign R, U, the user's, carrying '(overridesHere M)' is
+/// honest in a buffer that follows the user's overrides, and a
+/// tampered carrier in one that follows R's author's; A, R's author's,
+/// the reverse.
+fn the_tamper_check_follows_the_overrides_the_save_names (
+  config : &SkgConfig,
+) -> Result<(), Box<dyn Error>> {
+  let graph = skg::dbs::in_rust_graph::InRustGraph::from_graphnodes (
+    &read_all_skg_files_from_skgrepos (config) ? );
+  let buffer_showing = |carrier : &str, repo : &str| -> String { format! (
+    "* (skg node (gnid R) (skgRepos (nodeRepo foreign))) R\n** (skg node (gnid {}) (skgRepos (nodeRepo {})) (overridesHere M)) {}\n",
+    carrier, repo, carrier ) };
+  let mismatch = |buffer : &str, followed : OverridesFollowed| -> bool {
+    match buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
+      buffer, &graph, config, &SkgrepoRestriction::unrestricted (config),
+      &HashMap::new (), &WhatTheBaselineShows::default (), followed ) {
+      Err (SaveError::BufferValidationErrors { errors, .. }) =>
+        errors . iter () . any ( |e| matches! (
+          e, BufferValidationError::OverridesHere_Mismatch (..) )),
+      _ => false, } };
+  let u : String = buffer_showing ("U", "main");
+  let a : String = buffer_showing ("A", "foreign");
+  assert! ( ! mismatch (&u, OverridesFollowed::User) );
+  assert! ( mismatch (&u, OverridesFollowed::RootAuthors) );
+  assert! ( ! mismatch (&a, OverridesFollowed::RootAuthors) );
+  assert! ( mismatch (&a, OverridesFollowed::User) );
   Ok (( )) }

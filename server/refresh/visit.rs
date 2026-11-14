@@ -755,7 +755,8 @@ fn keep_hidden_outside_folder_last (
 /// the original N, which the save collects instead. The overriders
 /// followed are those of the author of the parent's top-level tree's
 /// root ('override_follower_of_tree_containing'): the user's under an
-/// owned root, that author's under a foreign one. Not where the
+/// owned root, that author's under a foreign one; or the user's
+/// throughout, in a view that follows the user's. Not where the
 /// parent is itself overridden (by those same overriders) and shown
 /// raw (a root, or a member of a folder other than the subscribee
 /// folder): there its children are raw too. When the override is
@@ -773,7 +774,8 @@ fn substitute_overriders (
      || tree . get (parent) . unwrap () . value () . editable_gnid () . is_none ()
   { return Ok (( )); }
   let follower : SkgrepoOwner = override_follower_of_tree_containing (
-    walk . truth . config, walk . truth . graph, tree . get (parent) . unwrap () );
+    walk . truth . config, walk . truth . graph, walk . overrides_followed,
+    tree . get (parent) . unwrap () );
   if is_overridden_and_shown_raw (tree, parent, &follower, walk)
   { return Ok (( )); }
   for child in children_of (tree, parent) {
