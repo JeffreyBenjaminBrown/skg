@@ -1271,15 +1271,19 @@ computed afresh at each switch, from what the buffer shows then. An
 author is named by a skgrepo of theirs: "tracy's overrides".
 
 Shown from yours, a node of another's you fork there is shown, after
-the save, as your clone. The mode name names any perspective but the
+the save, as your clone. Shown from another author's, a node you edit
+there is forked as anywhere, and the redraw shows that author's
+version again, unedited; your clone shows from yours. The mode name names any perspective but the
 root authors': "SKG:your overrides", "SKG:tracy's overrides". The
 buffer keeps its perspective through its saves and the redraws the
 server sends unasked. The switch is refused in a buffer of the diff
 view, which shows no overrider in place of what it overrides, and
-where no other perspective would show the buffer differently. Roots
-themselves are never substituted, so a view of a node you forked shows
-that node, and its children as it holds them; to see your version,
-open your clone. See =docs/override.org=.
+where no other perspective would show the buffer differently.
+The roots are replaced too: from an author's perspective, a root that
+author overrides shows the override, standing where the root stood,
+with the cursor still on it if it was; from the root authors', the
+node you opened, as it is. The buffer keeps its name. In a search
+buffer, the hits are its roots. See =docs/override.org=.
 
 *** C-c v r : skg-readable-ids-mode
 This changes how node IDs are displayed.

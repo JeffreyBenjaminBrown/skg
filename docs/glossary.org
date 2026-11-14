@@ -929,10 +929,25 @@ overridden nodes shown raw ('docs/api-and-formats.org', "Override
 substitution and the overridesHere part").
 A view opened on one node always shows the requested node itself,
 shown raw: it is the view's *raw root*, so that its immediate
-children are shown raw too. In the search buffer, each hit shows its override
+children are shown raw too. Switched to one owner's perspective, the
+view shows that owner's overrider of the root instead, standing for
+it ('OverridesFollowed'). In the search buffer, each hit shows its override
 folders, holding its visible direct override relatives in both
 directions. Override facts also appear in explicitly requested override
 folders.
+
+*** perspective
+
+A view's *perspective* is whose overrides it follows
+('OverridesFollowed'; on the wire "overrides followed"): its root
+authors', as every fresh view's is (each top-level tree follows the
+owner of the node its root stands for), or one owner's in every
+tree, the user's or a foreign owner's, so that the view shows what
+that owner would see, its roots included. 'C-c v o' (Neovim
+'<localleader>vo') cycles a view through the perspectives that would
+draw it differently ('docs/api-and-formats.org', "Set overrides
+followed"). A foreign owner is named by the first of its skgrepos the
+config declares: "tracy's overrides".
 
 *** skgrepo, home skgrepo, skgrepo-set, gitrepo
 
