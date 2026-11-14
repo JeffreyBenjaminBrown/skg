@@ -77,7 +77,13 @@ In order, it:
   foreign skgrepos; then Hoists a telescope's title home, sets
   relRepos, moves nodes between the owned skgrepos (the strandeds
   question; '⟨new repo:NAME⟩'; 'repo:NAME subtree'), marks like moves
-  processed, and removes the references to an absent node.
+  processed, and removes the references to an absent node;
+- on an eighth scratch server, over the data of the overrides-followed
+  integration test: switches a view of a foreign root to follow the
+  user's overrides and back, on a command's own connection and through
+  a daemon, refuses the switch for an edited view and for a view whose
+  roots are all owned, and checks that a save, a daemon's rewrite and
+  the daemon's stop keep the choice.
 '--update-expected' rewrites the expected files instead of comparing.
 """
 
@@ -337,8 +343,10 @@ def failures_against_scratch_servers (update_expected):
   checks on another, then the placing and forking checks on a third,
   then the other words' on a fourth, then the reviewing checks on a
   fifth, then the daemon's on a sixth, then those of two owned
-  skgrepos on a seventh, the last three with their owned skgrepos
-  gitrepos; each on its own copy of the fixture."""
+  skgrepos on a seventh, those three with their owned skgrepos
+  gitrepos; each on its own copy of the fixture. Last, the checks of
+  whose overrides a view follows, on an eighth, over a copy of the
+  overrides-followed integration test's data."""
   if not os . path . exists (SERVER_BINARY):
     return [ f"no server binary at {SERVER_BINARY}; run 'cargo build --bin skg'" ]
   return ( failures_on_a_scratch_server (
@@ -353,12 +361,17 @@ def failures_against_scratch_servers (update_expected):
                failures_of_daemon, owned_skgrepo_in_git = True )
            + failures_on_a_scratch_server (
                failures_of_two_owned_skgrepos, owned_skgrepo_in_git = True,
-               with_private_skgrepo = True ) )
+               with_private_skgrepo = True )
+           + failures_on_a_scratch_server (
+               failures_of_overrides_followed,
+               make_data_root = copy_overrides_followed_fixture ) )
 
 def failures_on_a_scratch_server (check, owned_skgrepo_in_git = False,
-                                  with_private_skgrepo = False):
+                                  with_private_skgrepo = False,
+                                  make_data_root = None):
   """CHECK (SCRATCH, DATA_ROOT)'s failures, run against a server on a
-  fresh copy of the fixture in the scratch folder SCRATCH. With
+  fresh copy of the fixture in the scratch folder SCRATCH, or on the
+  data root MAKE_DATA_ROOT (DATA_ROOT) writes. With
   WITH_PRIVATE_SKGREPO, the copy gains a second owned skgrepo
   ('add_private_skgrepo'). With OWNED_SKGREPO_IN_GIT, each owned
   skgrepo is first made a gitrepo whose HEAD commit holds its files,
@@ -367,7 +380,8 @@ def failures_on_a_scratch_server (check, owned_skgrepo_in_git = False,
     return [ f"port {PORT} is taken; set SKG_FOR_AI_TEST_PORT" ]
   scratch = tempfile . mkdtemp ( prefix = "skg-for-ai-test-" )
   data_root = os . path . join (scratch, "data")
-  shutil . copytree (FIXTURE_FOLDER, data_root)
+  ( make_data_root or ( lambda root : shutil . copytree (FIXTURE_FOLDER, root) )
+  ) (data_root)
   set_port_in_config ( os . path . join (data_root, "skgconfig.toml"), PORT )
   if with_private_skgrepo:
     add_private_skgrepo (data_root)
@@ -2767,6 +2781,171 @@ def check_deleting_references (context):
 # ------------------------------------------------------------
 # Helpers of the daemon cases
 # ------------------------------------------------------------
+
+# ============================================================
+# Whose overrides a view follows: the data of the overrides-followed
+# integration test, where foreign R contains M and K; A, foreign, and
+# U, owned, each override M; and P, owned, contains M. A view of R
+# follows its root author's overrides, showing A in M's place, or the
+# user's, showing U. The cases run in order.
+# ============================================================
+
+OVERRIDES_FOLLOWED_DATA = os . path . join (
+  REPO_ROOT, "tests", "integration", "overrides-followed", "data" )
+FOLLOWS_YOURS_LINE = "Overrides followed: yours, in every tree.\n"
+FOLLOWS_ROOT_AUTHORS_LINE = (
+  "Overrides followed: each tree's root author's (the default).\n" )
+FOLLOWS_YOURS_SUMMARY = (
+  "# Overrides followed: yours (the root authors' are the default).\n" )
+R_SHOWING_A = "* R ⟨0a C2 ⌂:foreign⟩\n** A ⟨0b Oĥ1⟩\n** K ⟨0c⟩\n"
+R_SHOWING_U = "* R ⟨0a C2 ⌂:foreign⟩\n** U ⟨0b Oĥ1 ⌂:main⟩\n** K ⟨0c⟩\n"
+
+def copy_overrides_followed_fixture (data_root):
+  """The overrides-followed data, with a config naming its foreign and
+  its owned skgrepo."""
+  for folder in ( "foreign", "owned" ):
+    shutil . copytree ( os . path . join (OVERRIDES_FOLLOWED_DATA, folder),
+                        os . path . join (data_root, folder) )
+  with open ( os . path . join (data_root, "skgconfig.toml"), "w",
+              encoding = "utf-8" ) as config_file:
+    config_file . write (
+      'tantivy_folder = ".index.tantivy"\nport = 0\ntiming_log = false\n'
+      'beep_when_server_becomes_available = false\n\n'
+      '[[repos]]\nname = "foreign"\npath = "foreign"\nforeign = true\n\n'
+      '[[repos]]\nname = "main"\npath = "owned/main"\n' )
+
+def failures_of_overrides_followed (scratch, data_root):
+  context = { "scratch"       : scratch,
+              "data_root"     : data_root,
+              "main_repo"     : os . path . join (data_root, "owned", "main"),
+              "daemon_folder" : os . path . join (scratch, "daemon"),
+              "processes"     : [] }
+  try:
+    for case in [ check_following_overrides_on_a_command_s_own_connection,
+                  check_saving_a_view_that_follows_yours,
+                  check_following_the_root_authors_again,
+                  check_following_overrides_through_a_daemon ]:
+      try:
+        case (context)
+      except CaseFailure as failure:
+        return [ case . __name__ + ": " + str (failure) +
+                 "\nThe daemon's log:\n" + daemon_log (context) ]
+    return []
+  finally:
+    for process in context [ "processes" ]:
+      if process . poll () is None:
+        process . kill ()
+        process . wait (timeout = 30)
+
+def r_tree (folder):
+  """The headlines of the view of R in FOLDER, and the summary's line
+  of whose overrides it follows, if it has one."""
+  return "" . join ( line + "\n" for line in read_compact (folder, "view_R") . split ("\n")
+                     if line . startswith ("*") or line . startswith ("# Overrides") )
+
+def check_following_overrides_on_a_command_s_own_connection (context):
+  """With no daemon, 'follow-overrides user' registers the view on its
+  own connection (by saving it back unchanged) and switches it: U
+  stands in M's place, the summary says so, and the sidecar records
+  it. A view whose every root is owned follows the user's already, and
+  the server refuses the switch."""
+  folder = os . path . join ( context [ "scratch" ], "own" )
+  context [ "own_folder" ] = folder
+  require_tool_run ([ "view", "R", "--out-dir", folder ])
+  require_equal ( "R's view", r_tree (folder), R_SHOWING_A )
+  require_equal ( "a fresh sidecar's choice",
+                  read_sidecar (folder, "view_R") [ "overrides_followed" ],
+                  "root authors" )
+  sidecar_path = os . path . join (folder, "view_R.view.json")
+  require_output (
+    run_tool ([ "follow-overrides", sidecar_path, "user" ]),
+    FOLLOWS_YOURS_LINE + "" . join (
+      os . path . join (folder, "view_R" + suffix) + "\n"
+      for suffix in ( ".full.org", ".compact.org", ".view.json" )))
+  require_equal ( "R's view, following yours", r_tree (folder),
+                  FOLLOWS_YOURS_SUMMARY + R_SHOWING_U )
+  require_equal ( "the sidecar's choice",
+                  read_sidecar (folder, "view_R") [ "overrides_followed" ], "user" )
+  require_tool_run ([ "view", "P", "--out-dir", folder ])
+  require_failure (
+    run_tool ([ "follow-overrides", os . path . join (folder, "view_P.view.json"),
+                "user" ]),
+    [], "The server refused: Every tree in this buffer is rooted at a node "
+        "you own, so it shows your overrides already." )
+
+def check_saving_a_view_that_follows_yours (context):
+  """An edited view is not switched. Its save names the choice: the
+  server checks U's '(overridesHere M)' against the user's overrides,
+  which would be refused against the root author's, and the rerendered
+  view still shows U, its sidecar still recording the choice."""
+  folder = context [ "own_folder" ]
+  edit_compact ( folder, [ ( "** U ⟨0b Oĥ1 ⌂:main⟩\n",
+                             "** U ⟨0b Oĥ1 ⌂:main⟩\nU's new body.\n" ) ], "view_R" )
+  require_failure (
+    run_tool ([ "follow-overrides", os . path . join (folder, "view_R.view.json"),
+                "root-authors" ]),
+    [], "Nothing was switched: the compact view has edits" )
+  require_save_succeeds ( os . path . join (folder, "view_R.view.json") )
+  require_equal ( "R's view, saved", r_tree (folder),
+                  FOLLOWS_YOURS_SUMMARY + R_SHOWING_U )
+  require_in_file ( folder, "view_R", "** U ⟨0b Oĥ1 ⌂:main⟩\nU's new body.\n" )
+  require_equal ( "U's body", skg_body (context, "U"), [ "U's new body." ] )
+  require_equal ( "the saved sidecar's choice",
+                  read_sidecar (folder, "view_R") [ "overrides_followed" ], "user" )
+
+def check_following_the_root_authors_again (context):
+  folder = context [ "own_folder" ]
+  completed = run_tool ([ "follow-overrides", os . path . join (folder, "view_R.view.json"),
+                          "root-authors" ])
+  if completed . returncode != 0 or not completed . stdout . startswith (
+      FOLLOWS_ROOT_AUTHORS_LINE ):
+    raise CaseFailure ( f"the switch printed {completed . stdout!r}, {completed . stderr!r}" )
+  require_equal ( "R's view, following its root author's", r_tree (folder), R_SHOWING_A )
+  require_equal ( "the sidecar's choice",
+                  read_sidecar (folder, "view_R") [ "overrides_followed" ],
+                  "root authors" )
+
+def check_following_overrides_through_a_daemon (context):
+  """Through a daemon, which holds the view, the switch needs no
+  registering save, and is logged. The daemon's rewrite of the view,
+  when another view's save retitles U, keeps the choice; so does
+  stopping the daemon, after which a save on the command's own
+  connection names it, and the switch back registers it again."""
+  folder = context [ "daemon_folder" ]
+  start_daemon (context)
+  require_routed_run ( context, [ "view", "R" ] )
+  sidecar_path = os . path . join (folder, "view_R.view.json")
+  completed = run_tool ( [ "follow-overrides", sidecar_path, "user" ], port = None )
+  if completed . returncode != 0 or not completed . stdout . startswith (FOLLOWS_YOURS_LINE):
+    raise CaseFailure ( f"the switch printed {completed . stdout!r}, {completed . stderr!r}" )
+  require_equal ( "R's view, following yours", r_tree (folder),
+                  FOLLOWS_YOURS_SUMMARY + R_SHOWING_U )
+  require_equal ( "the held sidecar", { key : read_sidecar (folder, "view_R") [key]
+                                        for key in ( "overrides_followed", "closed" ) },
+                  { "overrides_followed" : "user", "closed" : False } )
+  require_log_line ( context, "overrides followed by view_R: yours, in every tree" )
+  require_routed_run ( context, [ "view", "U" ] )
+  edit_compact ( folder, [ ( "* U ⟨0a ", "* U, retitled ⟨0a " ) ], "view_U" )
+  completed = run_tool ( [ "save", os . path . join (folder, "view_U.view.json"), "--yes" ],
+                         port = None )
+  if completed . returncode != 0 or "Server: saved," not in completed . stdout:
+    raise CaseFailure ( f"the save printed {completed . stdout!r}, {completed . stderr!r}" )
+  require_log_line ( context, "re-rendered view_R because of 'save view_U.view.json --yes'" )
+  require_equal ( "R's view, rewritten by the daemon", r_tree (folder),
+                  FOLLOWS_YOURS_SUMMARY + R_SHOWING_U . replace ("** U ", "** U, retitled ") )
+  require_equal ( "the rewritten sidecar's choice",
+                  read_sidecar (folder, "view_R") [ "overrides_followed" ], "user" )
+  require_tool_run ([ "daemon", "--stop", "--out-dir", folder ])
+  context [ "daemon" ] . wait (timeout = 30)
+  require_equal ( "the released sidecar", { key : read_sidecar (folder, "view_R") [key]
+                                            for key in ( "overrides_followed", "closed" ) },
+                  { "overrides_followed" : "user", "closed" : True } )
+  edit_compact ( folder, [ ( "** U, retitled ⟨", "** U, retitled again ⟨" ) ], "view_R" )
+  require_save_succeeds (sidecar_path)
+  require_equal ( "R's view, saved after the daemon stopped", r_tree (folder),
+                  FOLLOWS_YOURS_SUMMARY + R_SHOWING_U . replace ("** U ", "** U, retitled again ") )
+  require_tool_run ([ "follow-overrides", sidecar_path, "root-authors" ])
+  require_equal ( "R's view, following its root author's", r_tree (folder), R_SHOWING_A )
 
 def start_daemon (context):
   """Start a daemon for the daemon folder, on the scratch server, and

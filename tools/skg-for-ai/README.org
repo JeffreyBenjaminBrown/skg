@@ -172,6 +172,34 @@ committing".
 does not make editable, as the clients' 'C-c r u' does, and writes
 the buffer again; see "Reviewing and committing".
 
+'follow-overrides SIDECAR user' switches whose overrides a view
+follows, as the clients' 'skg-switch-overrides-followed' ('C-c v p'
+in Emacs) does, and writes the view again; 'follow-overrides SIDECAR
+root-authors' switches it back. Where a node stands as content and an
+override of it exists, the view shows the override in its place, the
+overriding node, marked 'ĥ' after its 'O' ('⟨0b Oĥ1⟩'). Whose overrides
+count is the choice: a fresh view follows each tree's root author's
+(under a root of yours, yours; under a teammate's root, that
+teammate's), and switched to 'user' it follows yours in every tree,
+whoever wrote the root. It prints 'Overrides followed: yours, in every
+tree.' or 'Overrides followed: each tree's root author's (the
+default).', then the paths; the sidecar records the choice
+('overrides_followed'), the compact view's summary says so while it is
+yours, and every later save of the view names it, as the server needs,
+whoever then rewrites the files. Like the clients, it refuses a
+compact view with edits, which the switch's rerender would replace:
+save them first. The server refuses a buffer of the diff view, and a
+switch to yours of a view whose every root is yours, which follows
+yours already; the tool prints its refusal and exits 1. The server
+switches a view it holds: through a daemon that holds the view the
+request goes on the daemon's connection; otherwise (no daemon, or one
+started since the view was written) the tool first saves the full view
+back unchanged, naming the choice it was drawn with, which writes
+nothing and leaves the server holding it, as 'extend' does. Under a
+skgrepo restriction the server may ask before the switched view
+releases text from overPrivateText telescopes; '--show-overPrivateText'
+approves.
+
 'commit MESSAGE' stages and git-commits every change in the owned
 skgrepos with MESSAGE, asking first when not everything is marked
 processed; see "Reviewing and committing".
@@ -253,16 +281,17 @@ same and remove the entry. The tool has no cursor, so pasting is
 writing what it prints into a compact view.
 
 Options, after the command: '--port N' for every command ('save',
-'extend' and 'close' require the sidecar's; a command run through
-a daemon's folder talks to the daemon's server unless it names one);
+'extend', 'close' and 'follow-overrides' require the sidecar's; a
+command run through a daemon's folder talks to the daemon's server
+unless it names one);
 '--yes' for
 'save', 'commit' and 'delete-references'; '--keep-ids' or '--all-new'
 for 'save' (see "Retyped headlines"); '--fork-into REPO' for 'save'
 (see "Forking"); '--hoist', '--delete-from visible|all' and
 '--strandeds reset|keep' for 'save', answering the server's questions
 (see "The server's answer"); '--show-overPrivateText' for the view
-commands, 'save' and 'restrict' (see "The skgrepo restriction and
-overPrivateText"); '--regex', '--body' and '--operators' for
+commands, 'save', 'restrict' and 'follow-overrides' (see "The skgrepo
+restriction and overPrivateText"); '--regex', '--body' and '--operators' for
 'search'; '--host-root PATH' for 'import'; '--leave-links' for
 'delete-references'; '--foreign shown|hidden' for 'restrict'; for the
 view commands also '--out-dir DIR', '--name BASE' to name the files
@@ -416,7 +445,10 @@ contained elsewhere too (a 'contains' in-side larger than its ancestor
 flags, so a container not above it in this view); those subscribed to
 and those subscribing; the links, their distinct targets, and how many
 of those resolve; and the server's errors and warnings, which the
-sidecar lists.
+sidecar lists. A view that follows your overrides ('follow-overrides')
+says so on the line after the first, '# Overrides followed: yours (the
+root authors' are the default).'; a view that follows the default has
+no such line.
 
 Whether a skgrepo is owned or foreign comes from the server's 'repos'
 request, which lists every configured skgrepo.
@@ -436,13 +468,20 @@ changed in foreign skgrepos), and how many headlines show a change,
 processed and not.
 ** The sidecar
 'BASE.view.json' records the view ID, the command and its request (for
-a buffer of the diff view, the buffer's name), the
+a buffer of the diff view, the buffer's name), whose overrides the
+view follows ('overrides_followed': "root authors", a fresh view's,
+or "user", after 'follow-overrides SIDECAR user'), the
 port, the two files' names, the server's errors and warnings, whether
 the compact view has a summary, and whether the view is closed: it
 is closed unless a daemon holds it (see "The daemon"). 'save' sends
 the edited view against this view ID, with the full view as its
-baseline, to this port,
-and renders the summary again when there was one.
+baseline, to this port, naming '(overrides-followed . "user")' when
+the sidecar says "user",
+and renders the summary again when there was one. A save, a daemon's
+rewrite of the files and the daemon's stop keep 'overrides_followed';
+a view written afresh into the same files has the default. A sidecar
+without it, written before the tool recorded it, follows the root
+authors'.
 
 * Views and connections
 The server keeps a view's state per TCP connection, and forgets every
@@ -480,8 +519,9 @@ without a daemon, each command has the config's.
 A telescope whose title or body sits below its home has
 overPrivateText ('docs/glossary.org'). Under a restriction the server
 asks before it releases such text: before a view ('view', 'forest'
-and the others), a save's re-rendered view, or the rerender of the
-held views a new restriction asks for, it names the telescopes and
+and the others), a save's re-rendered view, the rerender of the
+held views a new restriction asks for, or that of a view switched by
+'follow-overrides', it names the telescopes and
 withholds the text. '--show-overPrivateText' approves, and the tool
 sends the request again with their IDs (for a save, it asks for the
 withheld rerender instead; see "The server's answer"); without it, the tool prints
@@ -536,7 +576,8 @@ rebuilt) logs it and stops, since the server has forgotten its views.
 While a daemon runs for a port, every command for that port runs
 through it, whatever folder it writes into: a view command ('view',
 'search', 'forest', 'contains', 'links-here', 'diff', 'new'), and
-'save', 'extend' and 'close', whose port is their sidecar's, and
+'save', 'extend', 'close' and 'follow-overrides', whose port is their
+sidecar's, and
 'commit --yes'. A command's port is the one its '--port' or
 'SKG_PORT' names, or the sidecar's. A command that names no port and
 has no sidecar runs through the daemon of its '--out-dir', if one
@@ -651,7 +692,9 @@ lines is joined into one with ' | '. The events:
   is the files' base name in the daemon's folder, and their folder's
   real path joined to it elsewhere ('/home/me/notes/view_ID').
 - 'saved BASE', 'saved new root TITLE', 'extended BASE', for the
-  commands that write to the graph.
+  commands that write to the graph; 'overrides followed by BASE:
+  yours, in every tree' (or ': each tree's root author's (the
+  default)') for 'follow-overrides'.
 - 're-rendered BASE because CAUSE; CHANGES': the daemon rewrote a
   view's files. CAUSE is "of 'COMMAND' on the daemon's connection" for
   a collateral rerender or one after 'commit --yes', "of a git-commit
@@ -865,7 +908,7 @@ handles. Last, a daemon killed outright leaves its socket: a command
 then runs on its own connection, a new daemon replaces the socket and
 holds the next view, and SIGTERM stops it.
 
-Last, on a seventh server, the fixture gains a second owned skgrepo,
+Then, on a seventh server, the fixture gains a second owned skgrepo,
 'private', more private than 'main' (a telescope 'tele-id' whose title
 sits there, below its home in 'main'; a private note naming a public
 node; a private branch and its leaf; a node naming an ID nobody wrote,
@@ -894,6 +937,21 @@ not the private note's. Last, 'delete-references' sends nothing
 without '--yes', shows the server's warning with it, and with
 '--leave-links' removes the membership, leaves the link, and the
 daemon rewrites the view of the node that named it.
+
+Last, on an eighth server over a copy of the data of
+'tests/integration/overrides-followed/' (foreign R contains M and K;
+A, foreign, and U, owned, each override M; P, owned, contains M), it
+checks 'follow-overrides'. On a command's own connection, the view of
+R shows A in M's place; 'follow-overrides user' shows U, its summary
+line and its sidecar saying so; the switch is refused for P's view,
+whose root is owned, and for R's once its compact view has an edit to
+U's body; the save of that edit names the choice (without it the
+server would refuse U's '(overridesHere M)'), writing the body and
+still showing U; 'root-authors' shows A again. Through a daemon, the
+switch is logged; a save of U's own view retitles it, and the
+daemon's rewrite of R's view keeps the choice; after 'daemon --stop'
+the sidecar still has it, a save on the command's own connection
+names it, and the switch back on that connection shows A.
 
 It prints PASS or each failure, and keeps the scratch files when
 something fails. '--update-expected' rewrites the expected
@@ -1565,7 +1623,8 @@ round and its answer reads as it is.
 | C-c m l                    | skg-replace-content-with-link                    | remove the branch, type a headline titled '[[id:ID][title]]'                                                                                                  |
 | C-c v b                    | skg-org-body-toggle                              | Emacs-only by nature                                                                                                                                          |
 | C-c v m                    | skg-view-metadata                                | Emacs-only by nature: the full view shows the metadata; its requests are handle words                                                                         |
-| C-c v o                    | skg-view-ancestry                                | Emacs-only by nature: the compact view's nesting                                                                                                              |
+| C-c v a                    | skg-view-ancestry                                | Emacs-only by nature: the compact view's nesting                                                                                                              |
+| C-c v p                    | skg-switch-overrides-followed                    | 'follow-overrides SIDECAR user' or 'root-authors'; the sidecar keeps the choice, which each save names                                                        |
 | C-c v d                    | skg-diffView-open                                | 'diff'                                                                                                                                                        |
 | C-c v e                    | skg-view-new-empty                               | 'new TITLE REPO'                                                                                                                                              |
 | C-c v h                    | skg-view-heralds-mode                            | needs nothing: the compact view shows heralds, the full view metadata                                                                                         |
