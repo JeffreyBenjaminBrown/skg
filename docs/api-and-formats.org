@@ -291,10 +291,13 @@ So far there are these endpoints:
        sends one error, =NOTHING WAS SAVED=, whose validation errors
        follow as =** Error N= headlines.
        When the saved buffer is one of the diff view's, the point
-       entries are followed by =(processed-summary (processed N) (changed M) (foreign F) (order-only O) (notEditable K))=:
-       of the M changed files of the owned skgrepos (O of them changed only
-       in order, and so processed), N are processed; F files changed in
-       foreign skgrepos; and K changes are not editable in the view: they
+       entries are followed by =(processed-summary (processed N) (changed M) (foreign F) (order-only O) (waiting W) (notEditable K))=:
+       of the M changed nodes of the owned skgrepos (O of them changed only
+       in order, and so processed), N are processed, and W of those N are
+       held back by a commit of the processed, which would wait for a
+       node that does not go in (=docs/diff-view.org=, "Which nodes go
+       in"); F nodes changed in foreign skgrepos, counted by the stems
+       of their changed =.skg= files; and K changes are not editable in the view: they
        are recorded by nodes whose changes the buffer does not make editable. A
        buffer makes a node's changes editable where it has an editable
        occurrence of it, in content or in a partner folder, or a
@@ -896,41 +899,62 @@ keeps them as text ('TODO/problems.org').
 
 ** Stage and commit
   - Request: =((request . "stage and commit") (message-lines "LINE" ...))=,
-    optionally with =(confirmed . t)=. MESSAGE, the commit message, is
-    its lines joined by newlines; it is sent one string per line
-    because the server reads each request up to a newline, and its
-    reader does not read =\n= in a string as a newline.
+    optionally with =(processed-only . t)= or =(confirmed . t)=. MESSAGE,
+    the commit message, is its lines joined by newlines; it is sent one
+    string per line because the server reads each request up to a
+    newline, and its reader does not read =\n= in a string as a newline.
+    With =(processed-only . t)= the request commits the processed
+    changed nodes of the owned skgrepos, less those that wait for a node
+    that does not go in, and asks nothing: =(confirmed . t)= beside it is
+    ignored. Without it, it commits every changed node by the same
+    commit, asking first unless confirmed. See =docs/diff-view.org=,
+    "Stage and commit".
   - Response: LP response-type "stage-and-commit", then a rerender
     stream (rerender-lock, rerender-view*, rerender-done). The
     response is one of:
-    - =((needs-confirmation . t) (already-staged (("GITREPO" "PATH" ...) ...)) (processed-summary ...) (errors ()) (warnings ()))=
-      when the request is not confirmed and either the processed
-      summary (the save response's form, with =(notEditable 0)=) is
-      incomplete or some owned gitrepo has entries already staged.
-      =already-staged= is present only in the second case: each such
-      gitrepo's worktree path, then its staged paths relative to it,
-      read from the git index before anything is staged. Nothing
-      changes, and the rerender stream is empty. A resend with
-      =(confirmed . t)= covers both reasons.
-    - =((commits (("SKGREPO" "COMMIT-ID") ...)) (errors (...)) (warnings ()))=
-      otherwise: every owned skgrepo with changes had its =.skg= files
-      staged (deletions included; the command stages nothing else) and
-      git-committed with MESSAGE, by the gitrepo's configured user. A
-      git-commit records the whole git index, so the commit of a
-      gitrepo with an already-staged entry includes it. A skgrepo without changes is in
-      neither list; one that failed is an error. A gitrepo with
-      changes but no configured user fails before anything in it is
-      staged, leaving its git index as it was. When something was
-      committed, the rerender stream rerenders each open buffer of
-      the diff view over the rebuilt graph straddle, as any
-      rerender does: its roots and what it holds editable stay, and what
-      was committed loses its change facts. The marks of the changes committed are dropped
-      from the processed store.
-    - =((errors ("REFUSAL")) (warnings ()))= when the
-      connection has a skgrepo restriction, the message is blank, or the graph
-      straddle cannot be built. The rerender stream is empty.
+    - =((needs-confirmation . t) (processed-summary ...) (errors ()) (warnings ()))=
+      when the request has neither field and some changed node is not
+      processed. The summary has the save response's form, with
+      =(notEditable 0)=. Nothing changes, and the rerender stream is
+      empty.
+    - =((commits (("SKGREPO" "COMMIT-ID") ...)) (committed-nodes N) (left-nodes L) (waiting (("PID" "TITLE" REASON "PID" "TITLE") ...)) (errors (...)) (warnings ()))=
+      otherwise. =commits= lists each owned skgrepo git-committed, in
+      config order, one commit each, by its gitrepo's configured user,
+      with MESSAGE; a skgrepo with nothing to commit is not listed. N
+      counts the nodes that went in (a node whose file changed only in
+      bytes the parser does not read included); L the changed nodes that
+      did not (=docs/diff-view.org=, "The unit is the node"), a container
+      of a merge whose file is unchanged among them. Each =waiting= entry
+      is a processed node held back, its title, the reason
+      (=names-new=, =still-named= or =merge=), and the node it waits for,
+      with its title; titles are sent whole, since the connection is
+      unrestricted. For a commit of everything =waiting= is empty and L
+      is 0. When nothing is processed, or nothing changed, =commits= is
+      empty and N is 0 (unless some file changed only in bytes the
+      parser does not read: that goes in unmarked), e.g.
+      =((commits ()) (committed-nodes 0) (left-nodes 5) (waiting ()) (errors ()) (warnings ()))=.
+      A commit's tree is HEAD's with the committed nodes' =.skg= files
+      taken from the worktree, not the git index; afterwards only those
+      paths' git index entries change, to the commit's. An error here
+      is a git failure while committing, which stops the rest (N then
+      counts only the nodes each of whose files went in; when it is the
+      first commit, or some gitrepo's HEAD moved since the commits were
+      prepared, =commits= is empty), or a failure after the commits.
+      When something was
+      committed, the rerender stream rerenders each open buffer of the
+      diff view over the rebuilt graph straddle, as any rerender does:
+      its roots and what it holds editable stay, and what was committed
+      loses its change facts. The marks of the changes committed are
+      dropped from the processed store; every other mark stays.
+    - =((errors ("REFUSAL")) (warnings ()))= when nothing was
+      committed: the connection has a skgrepo restriction, the message
+      is blank, the graph straddle cannot be built, an owned gitrepo
+      with something to commit has no configured author, or the check
+      made before any commit fails ("Nothing was committed: ...").
+      The rerender stream is empty.
   - Logic: =server/serve/handlers/stage_and_commit.rs=,
-    =server/git_ops/stage_and_commit.rs=.
+    =server/git_ops/stage_and_commit.rs=, and the choice of nodes in
+    =server/diff_view/change_leaves.rs=.
 
 ** Extend diff view
   - Request: =((request . "extend diff view") (view-id . "VIEW_ID"))=,
@@ -951,7 +975,9 @@ keeps them as text ('TODO/problems.org').
     occurrence becomes editable at its first content occurrence in
     level order, its children claiming as the buffer read back would; a
     node shown only as a write-protected folder member counts as shown
-    nowhere, since a folder's members stay write-protected. The buffer
+    nowhere, since the extension makes no folder member editable (an
+    editable-view request, C-c s e, can, and its node then counts as
+    shown there). The buffer
     then gains, as roots at the end in ID order, the origins of D it
     makes editable nowhere; R is deduplicated with the buffer's roots
     pinned, so that a changed cycle that already has a root gains no
