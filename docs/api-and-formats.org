@@ -1332,8 +1332,16 @@ one automatically.
     authors': so a perspective that has left the cycle since (the
     graph changed, or a save named it) is followed by the next one
     still in it, and the root authors' are always reached. A named
-    PERSPECTIVE must be in the cycle ('perspectives_of_view' in
-    =server/serve/handlers/overrides_followed.rs=).
+    PERSPECTIVE must be in the cycle ('perspective_to_show' in
+    =server/serve/handlers/overrides_followed.rs=). The cycle is never
+    drawn whole: a request draws the root authors' view, then, for
+    ="next"=, the owners tried in rank order from the first ranked
+    after the view's perspective, stopping at the first that draws the
+    view otherwise; for a named owner, that owner alone. The drawing of
+    the perspective chosen is the rerender sent. So a press draws the
+    view once, and once more for each owner tried: twice where the
+    first owner ranked after the view's perspective is in the cycle,
+    once where none is ranked after it.
   - Response: =((response-type overrides-followed) (view-id
     "VIEW_ID") (overrides-followed PERSPECTIVE) (perspective-name
     "NAME"))=, naming the view, the perspective it now shows, and how
@@ -1875,7 +1883,11 @@ owner's perspective it shows that owner's overrider of the original,
 marked =(overridesHere N)=, where the owner has one
 ('substitute_roots' in =server/refresh/visit.rs=). The root is
 re-pointed where it stands, keeping its viewnode ID, so point on it
-stays there both ways; its children follow from its own visit. The
+stays there both ways; its children follow from its own visit. A
+re-pointed root's containers folder is drawn afresh, as a fresh view
+of the node it now shows would draw it: what contains that node, but
+its view-ancestors, or no folder where nothing does; so switching back
+draws the original's folder again. The
 view keeps its view ID, and the clients keep the buffer's name.
 
 The buffer whose approved save creates a fork is the post-save exception. A
