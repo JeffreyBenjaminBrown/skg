@@ -281,13 +281,18 @@ fn handle_emacs (
     }}
   tracing::info!(peer = %peer, "Emacs disconnected"); }
 
+/// The answer names, in '(supports (...))', the protocol features a
+/// client cannot otherwise tell an older server lacks, and must not
+/// use with one: "save preview", the '(preview . "true")' field of a
+/// save, which an older server ignores, saving for real.
 fn handle_verify_connection_request (
   stream: &mut std::net::TcpStream) {
   send_response_with_length_prefix (
     stream,
-    & tag_text_response (
+    & crate::serve::util::tag_sexp_response (
       TcpToClient::VerifyConnection,
-      "This is the skg server verifying the connection." )); }
+      & format! ( "((content \"{}\") (supports (\"save preview\")))",
+                  "This is the skg server verifying the connection." ))); }
 
 fn handle_shutdown_request (
   stream : &mut std::net::TcpStream,

@@ -8,6 +8,7 @@
 pub mod buffer_to_viewnodes;
 pub mod file_what_is_written_in;
 pub mod fork;
+pub mod hide_report;
 pub mod write_protected_edits;
 pub mod local_fieldintent_collection;
 pub mod strandeds;
@@ -311,6 +312,9 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
       fork::forks_the_view_will_not_show (
         &viewforest, graph, config, &overrides_followed, &fork_specs ) );
     warnings };
+  let hide_report : Vec<String> =
+    hide_report::hide_report_lines (
+      graph, config, skgrepo_restriction, &node_instructions, &fork_specs );
   Ok (( viewforest,
         SavePlan {
           node_instructions,
@@ -319,7 +323,8 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
           fork_specs,
           post_skgsave_commit_notice_candidates :
             nonmerge_plan . post_skgsave_commit_notice_candidates,
-          unedited_stale_graphnodes },
+          unedited_stale_graphnodes,
+          hide_report },
         warnings )) }
 
 /// Transitional compatibility for callers not yet carrying a generation.

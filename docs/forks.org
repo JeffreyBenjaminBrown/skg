@@ -262,6 +262,15 @@ save, remove it and save again. Containing =X'= does not integrate
 =X=, though: while =C= holds =X'=, =X= still shows as unintegrated, and
 placing =X'= drops no hide of =X=.
 
+Each save says what it hid and stopped hiding, since no edit shows a
+hide: "Hides 'X' from 'C', as content of 'N'." And a child that left
+a subscriber without hiding anything earns "Hides nothing:", with the
+rule that held, most often that the child is no content of =N= and
+overrides none of it. Emacs shows the lines in the echo area after the
+save, Neovim notifies them, and skg-for-ai prints them in the report
+before the save as well as after it ('docs/api-and-formats.org', "Save
+buffer").
+
 ** Once forked: monogamy
 
 A node may have at most one clone /you/ own. If you try to fork something

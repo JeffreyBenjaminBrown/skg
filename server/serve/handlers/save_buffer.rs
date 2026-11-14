@@ -42,6 +42,7 @@ use crate::serve::handlers::save_staleness::{
   WhatTheBaselineShows, left_as_the_graph_has_it_warning, stale_write_errors,
   what_the_baseline_shows};
 use crate::serve::util::{
+  format_string_list_sexp,
   viewforest_id_from_request,
   buffer_response_entries,
   format_fork_confirmation_response_sexp,
@@ -115,6 +116,14 @@ pub struct SaveResponse {
   /// ('changed_headlines'): Some on a save-result whose texts differ
   /// only in headline lines, None otherwise.
   pub changed_headlines   : Option<Vec<ViewnodeId>>,
+  /// What the save hid and stopped hiding, and each removal from a
+  /// subscriber that hid nothing ('hide_report_lines' in
+  /// 'server/from_text/hide_report.rs'). Sent as '(hides ...)' when
+  /// not empty.
+  pub hides               : Vec<String>,
+  /// True for the answer to a save sent with '(preview . "true")',
+  /// which wrote nothing: the handler sends it as 'save-preview'.
+  pub preview             : bool,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -199,6 +208,15 @@ impl SaveResponse {
                    fork_confirmation : Some (prompt),
                    .. SaveResponse::empty () } }
 
+  /// The answer to a save sent as a preview, which wrote nothing: what
+  /// the save would hide and stop hiding.
+  pub fn preview (
+    warnings : Vec<String>,
+    hides    : Vec<String>,
+  ) -> SaveResponse {
+    SaveResponse { warnings, hides, preview : true,
+                   .. SaveResponse::empty () } }
+
   /// A save whose rerender holds text the skgrepo restriction may not
   /// release without approval: the challenge, naming the views whose
   /// rerender is withheld, and no text.
@@ -224,12 +242,15 @@ impl SaveResponse {
       strandeds_confirmation    : None,
       delete_from_confirmation  : None,
       processed_summary         : None,
-      changed_headlines         : None, } }
+      changed_headlines         : None,
+      hides                     : Vec::new (),
+      preview                   : false, } }
 
   /// Format: ((content "...") (errors (...)) (warnings (...))
-  /// POINT... (processed-summary ...) (changed-headlines (V...))),
-  /// where the point entries, the processed summary and the redraw
-  /// delta are there when the save has them.
+  /// POINT... (processed-summary ...) (hides ("..." ...))
+  /// (changed-headlines (V...))), where the point entries, the
+  /// processed summary, the hides and the redraw delta are there when
+  /// the save has them.
   fn to_sexp_string (&self) -> String {
     let mut items : Vec<Sexp> = buffer_response_entries (
       & self . saved_view, & self . errors, & self . warnings );
@@ -237,9 +258,19 @@ impl SaveResponse {
       push_save_point_position_to_sexp_items (&mut items, point_position); }
     if let Some (processed_summary) = &self . processed_summary {
       items . push (processed_summary . to_sexp ()); }
+    if ! self . hides . is_empty () {
+      items . push ( format_string_list_sexp ("hides", & self . hides) ); }
     if let Some (changed_headlines) = &self . changed_headlines {
       items . push (changed_headlines_entry (changed_headlines)); }
-    sexp_to_client_string (&Sexp::List (items)) }}
+    sexp_to_client_string (&Sexp::List (items)) }
+
+  /// Format: ((hides ("..." ...)) (errors (...)) (warnings (...))):
+  /// the answer to a preview, whose hides are there even when empty.
+  fn to_preview_sexp_string (&self) -> String {
+    sexp_to_client_string ( &Sexp::List ( vec! [
+      format_string_list_sexp ("hides", & self . hides),
+      format_string_list_sexp ("errors", & self . errors),
+      format_string_list_sexp ("warnings", & self . warnings) ] )) }}
 
 /// Handles save buffer requests from Emacs.
 /// - Reads the buffer content (with length prefix).
@@ -275,6 +306,8 @@ pub fn handle_save_buffer_request (
     strandeds_review_from_request (request);
   let delete_from : DeleteFrom =
     delete_from_from_request (request);
+  let preview : bool = // only say what the save would hide; write nothing
+    preview_from_request (request);
   let named_diffView_buffer_kind_result : Result<Option<DiffViewBufferKind>, String> =
     named_diffView_buffer_kind_from_request (request);
   let overrides_followed_result : Result<OverridesFollowed, String> =
@@ -301,6 +334,8 @@ pub fn handle_save_buffer_request (
             . and_then ( |kind| overrides_followed_result
                          . map ( |followed| (kind, followed) )))
   {
+    (Ok (_envelope), Err (error_msg)) if preview =>
+      send_preview_refusal (stream, vec! [ error_msg ], Vec::new ()),
     (Ok (_envelope), Err (error_msg)) => {
       // The envelope was read, so the stream stays in step; the save is refused.
       send_response_with_length_prefix (
@@ -310,13 +345,14 @@ pub fn handle_save_buffer_request (
           & sexp_to_client_string ( &empty_response_sexp (
             &error_msg, &[], &save_point_position )) )); }
     (Ok (envelope), Ok ((named_diffView_buffer_kind, overrides_followed))) => {
-      if let Ok (viewforest_id) = &viewforest_id_from_request_result {
+      if let (Ok (viewforest_id), false) =
+        (&viewforest_id_from_request_result, preview) {
         crate::view_snapshots::record_received (
           viewforest_id, &envelope . saved_buffer ); }
       { let _span : tracing::span::EnteredSpan = tracing::info_span!(
           "update_from_and_rerender_buffer" ). entered();
         match block_on(
-          update_from_and_rerender_buffer_with_approvals (
+          update_from_and_rerender_buffer_with_approvals_or_preview (
             stream,
             & envelope . saved_buffer,
             & envelope . baseline,
@@ -331,10 +367,18 @@ pub fn handle_save_buffer_request (
             delete_from,
             &envelope . other_views,
             named_diffView_buffer_kind,
-            overrides_followed ))
+            overrides_followed,
+            preview ))
         { Ok (mut save_response) => {
             save_response . save_point_position =
               save_point_position . clone ();
+            if save_response . preview {
+              send_response_with_length_prefix (
+                stream,
+                & tag_sexp_response (
+                  TcpToClient::SavePreview,
+                  & save_response . to_preview_sexp_string () ));
+              return; }
             if let Some (count) = save_response . delete_from_confirmation {
               send_response_with_length_prefix (
                 stream,
@@ -376,6 +420,20 @@ pub fn handle_save_buffer_request (
                   & tag_sexp_response (
                     TcpToClient::SaveResult,
                     & save_response . to_sexp_string () )), }}
+          Err (err) if preview => {
+            // A preview the save would refuse: its errors, as a save's.
+            let (errors, warnings) : (Vec<String>, Vec<String>) =
+              match err . downcast_ref::<SaveError>() {
+                Some (save_error) => (
+                  vec! [ format_save_error_as_org (save_error) ],
+                  match save_error {
+                    SaveError::BufferValidationErrors { warnings, .. } =>
+                      warnings . clone (),
+                    _ => Vec::new (), } ),
+                None => ( vec! [ format! (
+                  "Error processing buffer content: {}", err ) ],
+                          Vec::new () ), };
+            send_preview_refusal (stream, errors, warnings); }
           Err (err) => { // Check if this is a SaveError that should be formatted for the client
             if let Some (save_error) = err . downcast_ref::<SaveError>() {
               // Warnings always accompany errors (decided 2026-06-12):
@@ -407,6 +465,11 @@ pub fn handle_save_buffer_request (
                 stream,
                 & tag_sexp_response (
                   TcpToClient::SaveResult, &response_sexp )); }} }}; }
+    (Err (err), _) if preview =>
+      send_preview_refusal (
+        stream,
+        vec! [ format! ( "NOTHING WAS SAVED\n\nError reading save payload: {}", err ) ],
+        Vec::new () ),
     (Err (err), _) => {
       let error_msg : String =
         format! ("NOTHING WAS SAVED\n\nError reading save payload: {}", err );
@@ -771,6 +834,31 @@ fn delete_from_confirmation_response (
 /// Whether this save request carries '(approved-forks . "true")', set by
 /// the client when the user approves a fork-confirmation. Absent or any
 /// other value means not approved.
+/// Answer a preview whose save would be refused: 'save-preview' with
+/// no hides and the refusal's errors and warnings.
+fn send_preview_refusal (
+  stream   : &mut TcpStream,
+  errors   : Vec<String>,
+  warnings : Vec<String>,
+) {
+  send_response_with_length_prefix (
+    stream,
+    & tag_sexp_response (
+      TcpToClient::SavePreview,
+      & SaveResponse { errors, warnings,
+                       .. SaveResponse::preview (Vec::new (), Vec::new ()) }
+        . to_preview_sexp_string () )); }
+
+/// Whether a save request carries '(preview . "true")': the client
+/// asks only what the save would hide and stop hiding, and the server
+/// answers 'save-preview' once the plan is built, writing nothing.
+fn preview_from_request (
+  request : &str,
+) -> bool {
+  value_from_request_sexp ("preview", request)
+    . map ( |v| v == "true" )
+    . unwrap_or (false) }
+
 fn fork_approved_from_request (
   request : &str,
 ) -> bool {
@@ -878,6 +966,34 @@ pub async fn update_from_and_rerender_buffer_with_hoist_approval (
 pub async fn update_from_and_rerender_buffer_with_approvals (
   stream                      : &mut TcpStream,
   org_buffer_text             : &str,
+  baseline                    : &str,
+  env                         : &mut SkgEnv,
+  viewforest_id_from_request_result : &Result<ViewforestId, String>,
+  views_state                  : &mut ViewsState,
+  skgrepo_restriction         : &SkgrepoRestriction,
+  approved_forks              : bool,
+  fork_skgrepos               : &HashMap<ID, SkgrepoName>,
+  approved_hoist_pids         : &HashSet<ID>,
+  strandeds_review          : &StrandedsReview,
+  delete_from               : DeleteFrom,
+  other_views               : &[ClientViewSnapshot],
+  named_diffView_buffer_kind : Option<DiffViewBufferKind>,
+  overrides_followed         : OverridesFollowed,
+) -> Result<SaveResponse, Box<dyn Error>> {
+  update_from_and_rerender_buffer_with_approvals_or_preview (
+    stream, org_buffer_text, baseline, env,
+    viewforest_id_from_request_result, views_state, skgrepo_restriction,
+    approved_forks, fork_skgrepos, approved_hoist_pids, strandeds_review,
+    delete_from, other_views, named_diffView_buffer_kind,
+    overrides_followed, false ) . await }
+
+/// As 'update_from_and_rerender_buffer_with_approvals', but when
+/// 'preview', stop once the plan is built and checked against the
+/// stale buffer, writing nothing and asking nothing, and answer what
+/// the save would hide and stop hiding ('SaveResponse::preview').
+pub async fn update_from_and_rerender_buffer_with_approvals_or_preview (
+  stream                      : &mut TcpStream,
+  org_buffer_text             : &str,
   baseline                    : &str, // the buffer's text as the server last drew it
   env                         : &mut SkgEnv,
   viewforest_id_from_request_result : &Result<ViewforestId, String>,
@@ -891,6 +1007,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
   other_views               : &[ClientViewSnapshot],
   named_diffView_buffer_kind : Option<DiffViewBufferKind>, // the request's '(diff-view-buffer . "...")': the buffer of the diff view it saves, for a view the connection does not hold
   overrides_followed         : OverridesFollowed, // the request's '(overrides-followed . "...")': whose overrides the buffer was drawn following
+  preview                    : bool, // the request's '(preview . "true")'
 ) -> Result<SaveResponse, Box<dyn Error>> {
   error_unless_view_was_rendered_under_current_restriction (
     viewforest_id_from_request_result, views_state, skgrepo_restriction,
@@ -939,7 +1056,8 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
     skgrepo_moves,
     fork_specs,
     post_skgsave_commit_notice_candidates,
-    unedited_stale_graphnodes }
+    unedited_stale_graphnodes,
+    hide_report }
     = save_plan;
   { // A node the buffer would write that changed after the buffer was
     // rendered refuses the whole save, before any confirmation is asked.
@@ -962,6 +1080,8 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
       unrestricted ("A restore request") ?; }
     if viewforest_has_processed_requests (&viewforest) {
       unrestricted ("A processed request") ?; }}
+  if preview { // nothing below has run, so nothing is written or held
+    return Ok ( SaveResponse::preview (parse_warnings, hide_report) ); }
   let restore_warnings : Vec<String> =
     // The restore requests become more graph edits, written from the
     // before-graph of the graph straddle; built only when needed.
@@ -1194,6 +1314,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
         post_skgsave_commit_hiddenoutside_warnings (
           &swapped_in . graph, &post_skgsave_commit_notice_candidates ) );
       response . warnings = warnings; }
+    response . hides = hide_report;
     Ok (response) } }
 
 /// Refuse a save of a view the connection holds that was last

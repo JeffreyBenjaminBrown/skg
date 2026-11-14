@@ -28,6 +28,7 @@ use crate::serve::handlers::save_buffer::{
   ClientViewSnapshot, SaveResponse,
   update_from_and_rerender_buffer,
   update_from_and_rerender_buffer_with_approvals,
+  update_from_and_rerender_buffer_with_approvals_or_preview,
 };
 use crate::serve::parse_metadata_sexp::{MetadataKind, ViewnodeMetadata};
 use crate::types::tree::forest::ViewForest;
@@ -524,6 +525,25 @@ pub async fn update_from_and_rerender_buffer_with_snapshots_test (
     &StrandedsReview::NotReviewed,
     DeleteFrom::NotChosen, other_views, None, OverridesFollowed::RootAuthors ) . await
 }
+
+/// Send 'org_buffer_text' as a save with '(preview . "true")': the
+/// answer says what the save would hide, and nothing is written.
+pub async fn save_preview_test (
+  stream                      : &mut std::net::TcpStream,
+  org_buffer_text             : &str,
+  config                      : &SkgConfig,
+  tantivy_index               : &TantivyIndex,
+  graph                       : &InRustGraphHandle,
+  views_state                 : &mut ViewsState,
+) -> Result<SaveResponse, Box<dyn Error>> {
+  let mut env : SkgEnv =
+    skg_env_from_parts (config, tantivy_index, graph);
+  update_from_and_rerender_buffer_with_approvals_or_preview (
+    stream, org_buffer_text, "", &mut env, &Err ( String::new () ),
+    views_state, &SkgrepoRestriction::unrestricted (config),
+    false, &HashMap::new (), &std::collections::HashSet::new (),
+    &StrandedsReview::NotReviewed, DeleteFrom::NotChosen, &[], None,
+    OverridesFollowed::RootAuthors, true ) . await }
 
 /// As 'update_from_and_rerender_buffer_test', but lets the test choose
 /// whether forks are approved -- pass false to exercise the

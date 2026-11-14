@@ -143,7 +143,7 @@ PERSPECTIVE_OF_ARGUMENT = { "next" : "next",
                             "root-authors" : "root authors" }
 DEFAULT_OVERRIDES_FOLLOWED = "root authors"
 SAVE_TERMINAL_RESPONSE_TYPES = {
-  "save-result", "delete-from-confirmation", "strandeds-confirmation",
+  "save-result", "save-preview", "delete-from-confirmation", "strandeds-confirmation",
   "telescope-hoist-confirmation", "fork-confirmation",
   "overPrivateText-telescope-confirmation", "error" }
 # The daemon's files, in the folder whose views it holds.
@@ -616,6 +616,9 @@ def command_save (arguments):
   the three files. The save carries the full view as its baseline,
   so the server refuses it if a node it would write changed since
   the view was drawn. A refused save leaves the files as they were.
+  Without '--yes', the report ends with what the server says the save
+  would hide and stop hiding, which it infers and no edit shows: the
+  save is sent as a preview, which writes nothing ('print_save_preview').
   A placed node ('⟨node:ID⟩') takes its title from the server. When
   the save forks, the report says so; the server then answers with a
   fork confirmation, which the save prints and approves, as the
@@ -685,11 +688,21 @@ def command_save (arguments):
           "Nothing was saved: the report asks whether new headlines reword "
           "removed ones; '--yes' does not answer that." )
       return
-    if not arguments . yes:
-      print ( "Not saved. Run again with '--yes' to save." )
-      return
     buffer_text = rebuilt_full_buffer (
       edited, saved_view . headline_of_handle, saved_view . full_text )
+    if not arguments . yes:
+      if server_supports (connection, "save preview"):
+        print_save_preview ( connection . save_buffer (
+          saved_view . sidecar [ "view_id" ], buffer_text,
+          saved_view . full_text,
+          saved_view . sidecar [ "request" ] . get ("buffer"), None,
+          overrides_followed_of_sidecar (saved_view . sidecar),
+          preview = True ) [-1] )
+      else:
+        print ( "The server is too old to say what the save would hide; "
+                "the save's answer will say what it hid." )
+      print ( "Not saved. Run again with '--yes' to save." )
+      return
     answers = SaveAnswers ()
     for attempt in range (SAVE_ATTEMPTS_LIMIT):
       messages = connection . save_buffer (
@@ -4849,6 +4862,33 @@ def release_withheld_save_rerender (connection, confirmation, view_id):
            [ Symbol ("errors"), response_field (done, "errors") or [] ],
            [ Symbol ("warnings"), response_field (done, "warnings") or [] ] ]
 
+def server_supports (connection, feature):
+  """Whether CONNECTION's server names FEATURE among those its answer
+  to "verify connection" says it supports. An older server names none,
+  and ignores a request field it does not know: a save sent with
+  '(preview . "true")' would be saved for real."""
+  response = connection . request ( request_line ( "verify connection" ))
+  require_response_type (response, "verify-connection")
+  return feature in ( response_field (response, "supports") or [] )
+
+def print_save_preview (terminal):
+  """Print what the server's answer to a preview of the save, TERMINAL,
+  says the save would hide and stop hiding, one line each, as the
+  server words them ('docs/api-and-formats.org', "Save buffer"); and,
+  when the server would refuse the save, its errors."""
+  if response_type (terminal) != "save-preview":
+    raise SkgToolError (
+      "The server answered the preview of the save with "
+      f"'{response_type (terminal)}', not 'save-preview': "
+      + render_sexp (terminal) )
+  for line in response_field (terminal, "hides") or []:
+    print (line)
+  errors = response_field (terminal, "errors") or []
+  if errors:
+    print ( "The server would refuse this save:" )
+    for error in errors:
+      print ( "Server error: " + error )
+
 def rerendered_view_of_save (terminal, sidecar):
   """Print the server's answer to the save. Return its re-rendered
   view, as the view commands describe one; raise if there is none."""
@@ -4876,6 +4916,8 @@ def rerendered_view_of_save (terminal, sidecar):
   processed_summary = response_field (terminal, "processed-summary")
   if saved and processed_summary:
     print ( "Processed: " + processed_summary_text (processed_summary) )
+  for line in response_field (terminal, "hides") or []:
+    print (line)
   if not saved:
     raise SkgToolError (
       "The server refused the save; the files are as they were." )
@@ -5695,7 +5737,8 @@ class SkgConnection:
 
   def save_buffer (self, view_id, buffer_text, baseline,
                    diffView_buffer = None, answers = None,
-                   overrides_followed = DEFAULT_OVERRIDES_FOLLOWED):
+                   overrides_followed = DEFAULT_OVERRIDES_FOLLOWED,
+                   preview = False):
     """Send a save of BUFFER_TEXT, whose baseline (the text the server
     last drew for it) is BASELINE; return every response up to and including the
     terminal one, parsed. DIFFVIEW_BUFFER names the buffer of the diff
@@ -5710,9 +5753,12 @@ class SkgConnection:
     unless it is the root authors', as the clients name it: the server
     checks and rerenders the buffer following it, and holds the view
     with it, which a save that names none resets to the root
-    authors'."""
+    authors'. With PREVIEW, the server writes nothing, holds nothing,
+    asks nothing, and answers 'save-preview': what the save would hide
+    and stop hiding, and the errors that would refuse it."""
     line = request_line (
       "save buffer", ( "view-id", view_id ),
+      * ( [ ( "preview", "true" ) ] if preview else [] ),
       * ( [ ( "diff-view-buffer", diffView_buffer ) ]
           if diffView_buffer is not None else [] ),
       * ( [ ( "overrides-followed", overrides_followed ) ]

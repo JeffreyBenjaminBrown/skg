@@ -720,6 +720,11 @@ function M.handle_save_sexp (save_buf, response)
   local summary = processed.processed_summary_from_response(response)
   if summary then -- the saved buffer is one of the diff view's
     vim.notify(processed.processed_summary_message(summary)) end
+  -- What the save hid and stopped hiding, and each removal from a
+  -- subscriber that hid nothing, as the server words them
+  -- ('docs/api-and-formats.org', "Save buffer"), one line each.
+  local hides = payload.string_list(payload.field(response, 'hides'))
+  if #hides > 0 then vim.notify(table.concat(hides, '\n')) end
 end
 
 ---Show NEW_CONTENT in BUF. When CHANGED_HEADLINES, the value of the

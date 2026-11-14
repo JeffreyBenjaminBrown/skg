@@ -16,6 +16,7 @@ use skg::test_utils::{
   graph_handle_from_config,
   read_all_lp_messages,
   run_with_shared_test_stores,
+  save_preview_test,
   update_from_and_rerender_buffer_test as update_from_and_rerender_buffer };
 use skg::test_utils::single_root_view;
 use skg::types::misc::{SkgConfig, ID, TantivyIndex, members_of};
@@ -315,6 +316,14 @@ fn all_tests
         "tests/hidden_from_subscriptions/fixtures-overrider-of-subscribee-content") ?;
       test_removing_an_overrider_of_subscribee_content_hides_what_it_overrides (
         &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("test_a_preview_and_a_save_say_what_they_hide",
+        "tests/hidden_from_subscriptions/fixtures-overrider-of-subscribee-content") ?;
+      test_a_preview_and_a_save_say_what_they_hide (
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("test_a_save_says_why_a_removal_hides_nothing",
+        "tests/hidden_from_subscriptions/fixtures-overrider-of-subscribee-content") ?;
+      test_a_save_says_why_a_removal_hides_nothing (
+        &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_placing_an_overrider_of_a_hidden_node_keeps_its_hide",
         "tests/hidden_from_subscriptions/fixtures-overrider-of-subscribee-content") ?;
       test_placing_an_overrider_of_a_hidden_node_keeps_its_hide (
@@ -580,6 +589,110 @@ async fn test_removing_an_overrider_of_subscribee_content_hides_what_it_override
       vec! [ ID::from ("m") ],
       "removing r, which overrides m, must hide m: {:?}",
       g_skg . hidesFromSubs );
+    Ok (( )) }
+
+async fn save_and_return_hides (
+  buffer      : &str,
+  config      : &SkgConfig,
+  tantivy     : &mut TantivyIndex,
+  graph       : &InRustGraphHandle,
+  views_state : &mut ViewsState,
+) -> Result<Vec<String>, Box<dyn Error>> {
+  let (mut stream, _read_end) : (TcpStream, TcpStream) =
+    mk_test_tcp_stream_pair ();
+  let response = update_from_and_rerender_buffer (
+    &mut stream, buffer, config, tantivy, graph,
+    &Err ( String::new () ), views_state ) . await ?;
+  assert! ( response . errors . is_empty (),
+    "the save must succeed: {:?}", response . errors );
+  Ok (response . hides) }
+
+/// Owned g subscribes to j and contains r, which overrides m, a
+/// member of j's content. A preview of the save that removes r says
+/// it hides m, and writes nothing; the save itself says the same.
+/// Then h, which hides m, takes m in, and the save says it stops
+/// hiding m.
+async fn test_a_preview_and_a_save_say_what_they_hide (
+  config : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+    let graph : InRustGraphHandle =
+      graph_handle_from_config (config) ?;
+    let mut views_state : ViewsState = ViewsState {
+      open_views        : OpenViews::new (),
+      graph_straddle    : None,};
+    let removed : &str = indoc! {"
+      * (skg node (gnid g) (skgRepos (nodeRepo owned))) g
+      "};
+    let expected : Vec<String> =
+      vec! [ "Hides 'm' from 'g', as content of 'j'." . to_string () ];
+    let preview = {
+      let (mut stream, _read_end) : (TcpStream, TcpStream) =
+        mk_test_tcp_stream_pair ();
+      save_preview_test (
+        &mut stream, removed, config, tantivy, &graph, &mut views_state
+      ) . await ? };
+    assert! ( preview . preview, "a preview is answered as one" );
+    assert_eq! ( preview . hides, expected, "the preview names the hide" );
+    assert_eq! (
+      members_of (& node_from_disk (&config, "g") ? . contains),
+      vec! [ ID::from ("r") ],
+      "a preview writes nothing" );
+    assert! ( views_state . open_views . views . is_empty (),
+      "a preview registers no view" );
+    assert_eq! (
+      save_and_return_hides (
+        removed, config, tantivy, &graph, &mut views_state ) . await ?,
+      expected, "the save names the hide it wrote" );
+    let placed : &str = indoc! {"
+      * (skg node (gnid h) (skgRepos (nodeRepo owned))) h
+      ** (skg node (gnid m) (skgRepos (nodeRepo owned))) m
+      "};
+    assert_eq! (
+      save_and_return_hides (
+        placed, config, tantivy, &graph, &mut views_state ) . await ?,
+      vec! [ "Stops hiding 'm' from 'h', as content of 'j'." . to_string () ],
+      "placing a hidden member in its subscriber unhides it" );
+    Ok (( )) }
+
+/// A child leaving a subscriber that subscribes to something, whose
+/// departure hides nothing, earns a line naming the rule that held:
+/// y, which j does not contain and which overrides nothing, placed in
+/// f and removed; and r, removed from g in the save that puts m, the
+/// member r stands for, in its place.
+async fn test_a_save_says_why_a_removal_hides_nothing (
+  config : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+    let graph : InRustGraphHandle =
+      graph_handle_from_config (config) ?;
+    let mut views_state : ViewsState = ViewsState {
+      open_views        : OpenViews::new (),
+      graph_straddle    : None,};
+    let placed : &str = indoc! {"
+      * (skg node (gnid f) (skgRepos (nodeRepo owned))) f
+      ** (skg node (gnid y) (skgRepos (nodeRepo foreign)) writeProtected) y
+      "};
+    assert! (
+      save_and_return_hides (
+        placed, config, tantivy, &graph, &mut views_state ) . await ?
+      . is_empty (),
+      "placing a child removes nothing" );
+    let removed : &str = indoc! {"
+      * (skg node (gnid f) (skgRepos (nodeRepo owned))) f
+      "};
+    assert_eq! (
+      save_and_return_hides (
+        removed, config, tantivy, &graph, &mut views_state ) . await ?,
+      vec! [ "Hides nothing: 'y' left 'f', but it is no content of 'j', nor overrides any." . to_string () ] );
+    let replaced : &str = indoc! {"
+      * (skg node (gnid g) (skgRepos (nodeRepo owned))) g
+      ** (skg node (gnid m) (skgRepos (nodeRepo owned))) m
+      "};
+    assert_eq! (
+      save_and_return_hides (
+        replaced, config, tantivy, &graph, &mut views_state ) . await ?,
+      vec! [ "Hides nothing: 'r' left 'g', but 'g' still contains 'm', which it stands for." . to_string () ] );
     Ok (( )) }
 
 /// Owned h subscribes to j and hides m. Placing r, which overrides

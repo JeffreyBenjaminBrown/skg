@@ -329,7 +329,7 @@ fn infer_hides_from_contains_removals (
 /// dismissing the fork dismisses it. The walk follows anyone's
 /// overrides, not one perspective's: which member a child stands for
 /// is a fact about the child, whichever view the user found it in.
-fn member_it_stands_for (
+pub(crate) fn member_it_stands_for (
   graph       : &InRustGraph,
   restriction : &SkgrepoRestriction,
   gnid        : &ID,

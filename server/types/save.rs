@@ -75,6 +75,12 @@ pub struct SavePlan {
   /// in 'server/serve/handlers/save_staleness.rs'). The save handler
   /// warns of each once the save succeeds.
   pub unedited_stale_graphnodes : Vec<UneditedStaleGraphnode>,
+  /// What the plan hides and stops hiding, and each removal from a
+  /// subscriber that hides nothing, worded for the user
+  /// ('hide_report_lines' in 'server/from_text/hide_report.rs'). The
+  /// save's answer carries them as '(hides ...)', and so does a
+  /// preview's, which writes nothing.
+  pub hide_report : Vec<String>,
 }
 
 /// A graphnode a save left as the graph has it: stale and unedited

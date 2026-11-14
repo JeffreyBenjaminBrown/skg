@@ -153,6 +153,7 @@ def main (argv):
   failures = []
   failures += failures_of_title_matching ()
   failures += failures_of_save_envelope ()
+  failures += failures_of_preview_support ()
   failures += failures_of_shared_herald_cases ()
   failures += failures_against_scratch_servers (update_expected)
   shutil . rmtree ( os . environ [ "XDG_RUNTIME_DIR" ], ignore_errors = True )
@@ -176,6 +177,26 @@ def failures_of_save_envelope ():
                '(baseline "* drawn \\"λ\\"\n") (other-views ()))' )
   return ( [] if envelope == expected
            else [ f"the save envelope is {envelope!r}, not {expected!r}" ] )
+
+def failures_of_preview_support ():
+  """A dry run previews a save only on a server whose answer to "verify
+  connection" names "save preview": an older one ignores the preview
+  field, and would save."""
+  class Answering:
+    def __init__ (self, answer):
+      self . answer = answer
+    def request (self, line):
+      return skg_for_ai . parse_sexp (self . answer)
+  old = Answering ( '((response-type verify-connection) (content "This is '
+                    'the skg server verifying the connection."))' )
+  new = Answering ( '((response-type verify-connection) (content "x") '
+                    '(supports ("save preview")))' )
+  failures = []
+  if skg_for_ai . server_supports (old, "save preview"):
+    failures . append ( "an older server was taken to support the preview" )
+  if not skg_for_ai . server_supports (new, "save preview"):
+    failures . append ( "a server naming the preview was taken not to support it" )
+  return failures
 
 # ============================================================
 # Retyped headlines: the title normalizer and the fuzzy match
@@ -659,8 +680,14 @@ def check_removal (context):
   report = ( REPORT_HEAD +
              "Removed: ⟨0k⟩ 'Contained twice', from under ⟨0f⟩ 'Second "
              "child, a subscriber'.\n" )
+  # Its container subscribes to Fred's note, which does not contain
+  # it, so the removal hides nothing, and the save says why.
+  hides_nothing = ( "Hides nothing: 'Contained twice' left 'Second child, a "
+                    "subscriber', but it is no content of 'Fred's note', nor "
+                    "overrides any.\n" )
   require_output ( run_save (folder, "--yes"),
-                   report + saved_line (0) + written_paths (folder) )
+                   report + saved_line (0) + hides_nothing +
+                   written_paths (folder) )
   require_equal ( "the container's content after the removal",
                   skg_list (context, "child-b-id", "contains"), [] )
   # The node still exists, and its other container still holds it.
@@ -1172,7 +1199,10 @@ def check_placing_a_node_twice (context):
     "child'.\n"
     "Placed: ⟨node:fred-detail-id⟩ 'A detail of Fred's', under ⟨0i⟩ 'Second "
     "child, a subscriber', write-protected, since the view already holds an "
-    "editable occurrence of it.\n" + saved_line (0) + written_paths (folder) )
+    "editable occurrence of it.\n" + saved_line (0) +
+    # The second child subscribes to Fred's note and hid the detail.
+    "Stops hiding 'A detail of Fred's' from 'Second child, a subscriber', as "
+    "content of 'Fred's note'.\n" + written_paths (folder) )
   require_equal ( "the first child's content after placing twice",
                   skg_list (context, "child-a-id", "contains"),
                   [ "fred-detail-id", "elsewhere-id", "fred-aside-id", "shared-id" ] )
@@ -1387,8 +1417,10 @@ def check_explicit_fork (context):
 def check_subscribing_and_hiding_by_placing (context):
   """In the editable subscribee folder 'forest subscribesTo' draws, a
   placed foreign node is subscribed to; its unintegrated child, then
-  removed from under it, is hidden from the subscription. Neither
-  forks."""
+  removed from under it, is hidden from the subscription, which the
+  report says before the save and the save says after. Neither forks.
+  Then the report says that removing a child the subscribee does not
+  contain hides nothing."""
   folder = os . path . join ( context [ "scratch" ], "write", "subscribe" )
   require_tool_run ([ "forest", "subscribesTo", "elsewhere-id", "--out-dir",
                       folder, "--no-summary" ])
@@ -1407,12 +1439,33 @@ def check_subscribing_and_hiding_by_placing (context):
   detail = next ( line for line in read_file (compact_path) . split ("\n")
                   if line . startswith ("**** A detail of Fred's ⟨") )
   edit_compact ( folder, [ ( detail + "\n", "" ) ], base_name )
+  hide_line = ( "Hides 'A detail of Fred's' from 'A second container, "
+                "outside the view', as content of 'Fred's note'.\n" )
+  reported = run_save (folder) . stdout
+  if hide_line not in reported:
+    raise CaseFailure ( f"the report before the hiding save printed {reported!r}" )
+  require_equal ( "what the node hides before the save",
+                  skg_list (context, "elsewhere-id", "hidesFromSubs"), [] )
   completed = run_save (folder, "--yes")
-  if "Fork:" in completed . stdout or "Server: saved," not in completed . stdout:
+  if ( "Fork:" in completed . stdout or "Server: saved," not in completed . stdout
+       or completed . stdout . count (hide_line) != 1 ):
     raise CaseFailure ( f"the hiding save printed {completed . stdout!r}" )
   require_equal ( "what the node hides from its subscriptions",
                   skg_list (context, "elsewhere-id", "hidesFromSubs"),
                   [ "fred-detail-id" ] )
+  lines = read_file (compact_path) . split ("\n")
+  start = next ( index for index, line in enumerate (lines)
+                 if line . startswith ("** Contained twice ⟨") )
+  end = next ( ( index for index in range (start + 1, len (lines))
+                 if re . match ( r'\*{1,2} ', lines [index] )),
+               len (lines) - 1 ) # the text ends in a newline
+  edit_compact ( folder, [ ( "\n" . join ( lines [start : end] ) + "\n", "" ) ],
+                 base_name )
+  reported = run_save (folder) . stdout
+  if ( "Hides nothing: 'Contained twice' left 'A second container, outside "
+       "the view', but it is no content of 'Fred's note', nor overrides "
+       "any.\n" ) not in reported:
+    raise CaseFailure ( f"the report of a removal that hides nothing printed {reported!r}" )
 
 # ============================================================
 # More words: each case views a node afresh, writes words in handles,

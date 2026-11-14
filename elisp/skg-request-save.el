@@ -1327,9 +1327,25 @@ Expected shape: ((content ...) (errors (...)) (warnings (...)))."
            errors-list warnings-list content-value))
         (let ((summary (assq 'processed-summary response)))
           (when summary ;; the saved buffer is one of the diff view's
-            (message "%s" (skg--processed-summary-message summary)))))
+            (message "%s" (skg--processed-summary-message summary))))
+        (let ((hides (cadr (assq 'hides response))))
+          (when (skg--message-list-nonempty-p hides)
+            (message "%s" (skg--save-hides-message
+                           hides (current-message))))))
     (error (skg-log 'error 'save "parsing save response: %S" err)
            (skg-log 'error 'save "sexp string was: %S" sexp-string))))
+
+(defun skg--save-hides-message (hides &optional shown)
+  "The echo-area text after a save whose answer's '(hides ...)' is
+HIDES: what the save hid and stopped hiding, and each removal from a
+subscriber that hid nothing, one line each, as the server words them
+\('docs/api-and-formats.org', \"Save buffer\"). SHOWN, the message the
+save already showed, if any, stays above them."
+  (mapconcat #'identity
+             (append (when (and shown (not (string-empty-p shown)))
+                       (list shown))
+                     hides)
+             "\n"))
 
 (defun skg--redraw-saved-buffer (new-content
                                   changed-headlines-entry

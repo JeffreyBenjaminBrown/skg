@@ -1211,8 +1211,34 @@ counts the changed bodies and names their handles. 'Fork:' is a node
 the save forks, and 'Fork into:' the skgrepo its clone goes to (see
 "Forking"). An edit with none of these prints 'No changes.' and saves
 nothing. A 'Question:' line asks whether a new headline is a removed
-one reworded (see "Retyped headlines"). Last, 'Not moved:' and
+one reworded (see "Retyped headlines"). Then 'Not moved:' and
 'Skipped:' name what a 'subtree' leaves out, and why.
+
+Last, without '--yes', come the hides, which no edit shows: the server
+infers them from what left a subscriber ('docs/forks.org', "Editing
+the clone: deletions become hides"). The tool sends the save as a
+preview, which writes nothing, and prints each line of the server's
+answer, as in
+#+begin_example
+Hides 'A detail of Fred's' from 'A second container, outside the view', as content of 'Fred's note'.
+Hides nothing: 'Contained twice' left 'Second child, a subscriber', but it is no content of 'Fred's note', nor overrides any.
+#+end_example
+'Hides' and 'Stops hiding' name what the save adds to or takes from
+the subscriber's hides, and the subscribee whose content holds it.
+'Hides nothing:' is a child that left a note that subscribes to
+something without hiding anything, and the rule that kept it from
+hiding: it is no content of the subscribee and overrides none of it,
+or what it stands for was hidden already, or is still contained, or
+the same save shows it in the subscribee folder. A removal from a note
+that subscribes to nothing prints no line. Every word is the
+server's ('docs/api-and-formats.org', "Save buffer"). When the server
+would refuse the save, the report says so, with its errors, and the
+hides are not printed; a question the save would ask (a fork, Hoist)
+is not asked by the preview. A server too old to preview (its answer
+to "verify connection" does not name it) is not asked, and the report
+says so in their place. The report printed with '--yes' has no such
+lines; the save's answer has them instead (see "The server's
+answer").
 ** Retyped headlines
 A headline's handle is what ties it to its node. Retyping a headline
 instead of moving its line loses that tie: the typed headline becomes
@@ -1417,8 +1443,10 @@ save. View again and redo the edit.
 ** The server's answer
 After the save the tool prints 'Server: saved' or 'Server: nothing was
 saved', with the counts of errors and warnings, then each error and
-warning as the server wrote it. When the server refuses, the three
-files stay as they were, so the edit can be fixed and saved again.
+warning as the server wrote it, then each line of what it hid and
+stopped hiding, as the report without '--yes' prints them (see "The
+report"). When the server refuses, the three files stay as they were,
+so the edit can be fixed and saved again.
 
 The server may answer a save with a question instead, having written
 nothing. The tool prints it, and answers it as the command line

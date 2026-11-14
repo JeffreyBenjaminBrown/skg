@@ -84,6 +84,7 @@ pub enum TcpToClient {
   SaveLock, // Sent before the expensive save pipeline. Acknowledges the clients' broad lock of all local views; its server-known view ID list does not authorize narrowing.
   SaveRelaxLock, // Sent after preparation and the dirty-view conflict check, before mutation. Lists collateral targets plus every dirty conflict-check input. The client also retains the saved view, and may unlock unrelated clean views.
   SaveResult,
+  SavePreview, // Terminal message of a save sent with (preview . "true"): what the save would hide and stop hiding, '(hides ("..." ...))', with its errors and warnings. Sent after SaveLock, in place of every other terminal message; nothing is written and no view is registered or rerendered.
   ForkConfirmation, // Terminal message of a save that found fork candidates and was not pre-approved: a write-protected buffer listing the foreign nodes about to be forked, for the user to approve (re-issue the save with (approved-forks . "true")) or decline. Sent after SaveLock, in place of SaveResult; nothing is committed.
   StrandedsConfirmation, // Terminal message of a save whose home skgrepo moves would strand relationships at their old, more private skgrepos, when the request carried no review of them. Lists each one; the client re-saves with (strandeds-reviewed . "true") and the chosen (reset-strandeds (RELATION RECORDER MEMBER) ...). Nothing is committed.
   DeleteFromConfirmation, // Terminal message of a save under a skgrepo restriction whose deletes would strip records the skgrepo restriction keeps out, when the request carried no (delete-from ...). Carries their count and a prompt; the client re-saves with (delete-from . "visible") or (delete-from . "all"). Nothing is committed.
@@ -133,6 +134,7 @@ impl TcpToClient {
       TcpToClient::SaveLock         => "save-lock",
       TcpToClient::SaveRelaxLock    => "save-relax-lock",
       TcpToClient::SaveResult       => "save-result",
+      TcpToClient::SavePreview      => "save-preview",
       TcpToClient::ForkConfirmation => "fork-confirmation",
       TcpToClient::StrandedsConfirmation =>
         "strandeds-confirmation",

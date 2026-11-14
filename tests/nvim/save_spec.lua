@@ -686,6 +686,33 @@ describe('skg.save pipeline', function ()
   end)
 end)
 
+describe('skg.save hides', function ()
+  -- Mirrors tests/elisp/test-skg-save-hides.el.
+  it('shows what a save hid, one line each, and nothing when it hid nothing', function ()
+    local shown = {}
+    local original_notify = vim.notify
+    vim.notify = function (message) table.insert(shown, message) end
+    local buf = vim.api.nvim_create_buf(true, false)
+    local ok, err = pcall(function ()
+      save.handle_save_sexp(buf, sexpr.read(
+        '((content "* (skg node (gnid g)) g\n") (errors ()) (warnings ())'
+        .. ' (hides ("Hides \'m\' from \'g\', as content of \'j\'."'
+        .. ' "Hides nothing: \'y\' left \'g\', but it is no content of \'j\', nor overrides any.")))'))
+      save.handle_save_sexp(buf, sexpr.read(
+        '((content "* (skg node (gnid g)) g\n") (errors ()) (warnings ()))'))
+    end)
+    vim.notify = original_notify
+    vim.api.nvim_buf_delete(buf, { force = true })
+    assert(ok, err)
+    assert.are.same({
+      "Hides 'm' from 'g', as content of 'j'.\n"
+        .. "Hides nothing: 'y' left 'g', but it is no content of 'j', nor overrides any." },
+      vim.tbl_filter(function (message)
+        return message:find('Hides', 1, true) ~= nil
+      end, shown))
+  end)
+end)
+
 describe('skg.save baseline', function ()
   local server
 
