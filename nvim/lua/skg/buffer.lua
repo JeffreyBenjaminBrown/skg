@@ -138,6 +138,32 @@ function M.text (buf)
     vim.api.nvim_buf_get_lines(buf, 0, -1, false), '\n')
 end
 
+-- ── whose overrides a view follows ─────────────────────────────────
+--
+-- 'vim.b.skg_overrides_followed': whose overrides this view follows:
+-- nil for its root authors' (a tree rooted at a node of yours follows
+-- yours, one rooted at another's node follows that author's), as every
+-- fresh view does; "user" for yours, in every tree.
+-- 'overrides_followed.switch_overrides_followed' sets it once the
+-- server has switched the view. A save sends "user" as
+-- (overrides-followed . "user"), so that the server checks and redraws
+-- the buffer as it was drawn, and keeps the choice for the redraws it
+-- starts itself, even after a restart. Like every 'vim.b' variable it
+-- survives filetype changes, as Emacs's permanent-local does.
+
+---The statusline's mark for a view that follows your overrides:
+---":your overrides" there, "" elsewhere. The client draws no
+---statusline of its own; put
+---'%{v:lua.require'skg.buffer'.overrides_followed_mode_line()}' in
+---yours (Emacs's mode name reads "SKG:your overrides").
+---@param buf integer|nil default the current buffer
+---@return string
+function M.overrides_followed_mode_line (buf)
+  if vim.b[buf or 0].skg_overrides_followed == 'user' then
+    return ':your overrides' end
+  return ''
+end
+
 ---Record the normalized text from a successful server replacement.
 ---@param buf integer
 function M.capture_clean_baseline (buf)
@@ -175,6 +201,10 @@ function M.open_org_buffer_from_text (org_text, buffer_name, view_id)
   vim.bo[buf].modifiable = true
   vim.api.nvim_buf_set_lines(buf, 0, -1, false,
                              vim.split(org_text, '\n'))
+  -- A fresh view follows its root authors' overrides, even in a buffer
+  -- reused by name from a view that followed the user's. (Emacs never
+  -- reuses a buffer for a fresh view, so it needs no such reset.)
+  vim.b[buf].skg_overrides_followed = nil
   M.configure_view_buffer(buf, view_id)
   vim.api.nvim_set_current_buf(buf)
   M.act_on_fold_and_focus_atoms(buf, nil)
