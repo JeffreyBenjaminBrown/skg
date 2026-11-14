@@ -905,8 +905,9 @@ chain's end. The resolver is 'resolve_override' in
 relative to the owner whose overrides the occurrence's top-level tree
 follows: the user, unless that tree's root is foreign, in which case
 it is the root's author ('override_follower_of_tree_containing'), or
-the user in every tree of a view switched to follow the user's
-overrides ('OverridesFollowed'; Emacs 'C-c v p'). Other
+one owner in every tree of a view switched to that owner's
+perspective, the user's or a foreign owner's ('OverridesFollowed';
+Emacs 'C-c v o'). Other
 override relationships are display-only facts and never substitute.
 
 The shown substitute carries the fact '(overridesHere N)'

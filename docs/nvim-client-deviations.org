@@ -178,14 +178,17 @@ refusal at error level without the Lua traceback and without the
   ("Fork the listed node(s)?"); later, '<localleader>cc' in the
   confirmation buffer approves and '<localleader>ck' declines, while
   ':w' there refuses and names those two keys.
-- A view that follows your overrides (<localleader>vp,
-  ':SkgSwitchOverridesFollowed') is not marked by default: Emacs's mode
-  name reads "SKG:your overrides" there, but the Neovim client draws no
-  statusline, and setting one would override the user's. The choice is
-  'b:skg_overrides_followed' ("user", or unset), and
-  =%{v:lua.require'skg.buffer'.overrides_followed_mode_line()}= in a
-  'statusline' or 'winbar' shows ":your overrides" there. The message
-  each switch shows says which overrides the buffer now follows.
+- A view shown from a perspective other than its root authors'
+  (<localleader>vo, ':SkgOverridePerspective') is not marked by
+  default: Emacs's mode name reads "SKG:your overrides", say, there,
+  but the Neovim client draws no statusline, and setting one would
+  override the user's. The perspective is 'b:skg_overrides_followed'
+  (its wire name, or unset) and its name
+  'b:skg_override_perspective_name', and
+  =%{v:lua.require'skg.buffer'.override_perspective_mode_line()}= in a
+  'statusline' or 'winbar' shows ":your overrides", say, there. The
+  message each switch shows names the perspective the buffer now
+  shows.
 - View buffers are named 'skg://TITLE' (search: 'skg://?TERMS');
   Emacs used '*TITLE*'. Message/report buffers live under
   'skg://messages/...', 'skg://unknown-node', 'skg://diff-view: ...',

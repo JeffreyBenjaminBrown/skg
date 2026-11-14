@@ -1250,24 +1250,33 @@ the skgrepo-sets available, and =M-x skg-show-skgrepo-restriction=
 shows the skgrepo restriction alone, each marking the most private
 skgrepo " (no restriction)": "Skgrepo restriction: public; available:
 public, private (no restriction)".
-*** C-c v p : skg-switch-overrides-followed
-Switches whose overrides this view follows: its root authors' (the
-default) or yours, in every tree; redraws the buffer, and refuses
-while it has unsaved edits.
+*** C-c v o : skg-override-perspective
+Shows this view from the next perspective: whose overrides it
+follows. Each switch names the perspective it shows; it redraws the
+buffer, and refuses while it has unsaved edits.
 
 Where a node stands as another's content and someone has overridden
-it, a view shows one overrider in its place. A fresh view follows its
+it, a view shows one overrider in its place. A fresh view shows its
 root authors' overrides: under a root of yours, yours; under a root
 someone else wrote, that author's, throughout the tree, so you see
 what they would see, and your own forks of their nodes do not show
-there. Switched, the view shows your override wherever you have one,
-whoever wrote its root, and the mode name reads "SKG:your overrides";
-a node of theirs you fork there is shown, after the save, as your
-clone. Switched again, it follows its root authors' again. The buffer
-keeps the choice through its saves and the redraws the server sends
-unasked. The switch is refused in a buffer of the diff view, which
-shows no overrider in place of what it overrides, and in a view whose
-every root is yours, which shows your overrides already. Roots
+there. That is the first perspective. The others are yours and each
+other author's whose overrides would show some node of the buffer
+differently, each followed in every tree, whoever wrote its root, so
+that you can read the buffer as that author would. Yours comes first,
+then the others in the order the config declares their skgrepos;
+after the last, the root authors' again. A perspective that would
+show the buffer as the root authors' do is skipped. The cycle is
+computed afresh at each switch, from what the buffer shows then. An
+author is named by a skgrepo of theirs: "tracy's overrides".
+
+Shown from yours, a node of another's you fork there is shown, after
+the save, as your clone. The mode name names any perspective but the
+root authors': "SKG:your overrides", "SKG:tracy's overrides". The
+buffer keeps its perspective through its saves and the redraws the
+server sends unasked. The switch is refused in a buffer of the diff
+view, which shows no overrider in place of what it overrides, and
+where no other perspective would show the buffer differently. Roots
 themselves are never substituted, so a view of a node you forked shows
 that node, and its children as it holds them; to see your version,
 open your clone. See =docs/override.org=.
