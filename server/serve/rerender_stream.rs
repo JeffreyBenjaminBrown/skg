@@ -42,6 +42,26 @@ pub(crate) struct PreparedRerenders {
   restriction : SkgrepoRestriction, // the one the views were rerendered under, which each records
 }
 
+impl PreparedRerenders {
+  /// The rerender of one content view that its request already drew
+  /// in memory, under 'restriction', exactly as 'prepare_rerender_views'
+  /// would ('rerender_open_view'), so it is not drawn twice. A content
+  /// view brings no graph straddle up to date.
+  pub(crate) fn of_one_content_view (
+    runtime     : Arc<RuntimeGeneration>,
+    restriction : &SkgrepoRestriction,
+    view        : RerenderedView,
+  ) -> PreparedRerenders {
+    PreparedRerenders {
+      runtime,
+      viewforest_ids : vec! [ view . viewforest_id . clone () ],
+      views          : vec! [ view ],
+      errors         : Vec::new (),
+      warnings       : Vec::new (),
+      graph_straddle : None,
+      restriction    : restriction . clone (), } }
+}
+
 /// What a request that rerenders open views asks of the pass: the
 /// skgrepo restriction to rerender under, which views, and what the
 /// rerender of a buffer of the diff view does beyond its refresh.
