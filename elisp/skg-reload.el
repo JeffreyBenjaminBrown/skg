@@ -3,6 +3,14 @@
 ;;; PURPOSE: Force-reload all skg modules.
 ;;; Evaluate this file to pick up code changes without restarting Emacs.
 
+(defconst skg--reload-preserved-vars
+  '( skg-port
+     skg-config-file-path
+     skg-config-dir
+     skg-linkstack )
+  "Variables from `skg-state' whose values `skg-reload' carries across
+the unload. See `skg-reload'.")
+
 (defun skg-reload ()
   "Unload *almost* all skg features and reload from disk.
 
@@ -44,13 +52,29 @@ toggle, even though the server is fine. `unwind-protect' restores
 the table whether or not the reload itself succeeds; the reload
 error still propagates so the user can fix it.
 
+The client settings `skg-client-init' makes (`skg-port',
+`skg-config-file-path', `skg-config-dir') and the user's navigation
+history (`skg-linkstack') are carried across the same way, inside
+the same `unwind-protect', since `unload-feature' on `skg-state'
+would otherwise wipe them. Without the first three, the next request
+after a reload could not reconnect (it has no port), and every
+request failed until the user ran `skg-client-init' again. Everything
+else in `skg-state' (the TCP process, the response handler maps, the
+length-prefix receiver state) is rebuilt, not carried: the connection
+is closed anyway, and the next request opens a fresh one.
+
 The open connection to the server is closed first
 \(`skg-connection-end'), so that the reloaded client does not leave
 the old one open beside the one it makes on its next request."
   (interactive)
   (when (fboundp 'skg-connection-end)
     (skg-connection-end))
-  (let* ((herald-rules (and (boundp 'heralds--transform-rules)
+  (let* ((client-settings
+          ;; Captured as (SYMBOL . VALUE); see the docstring.
+          (mapcar (lambda (sym)
+                    (cons sym (and (boundp sym) (symbol-value sym))))
+                  skg--reload-preserved-vars))
+         (herald-rules (and (boundp 'heralds--transform-rules)
                             heralds--transform-rules))
          (skgrepo-labels (and (boundp 'heralds--skgrepo-labels)
                               heralds--skgrepo-labels))
@@ -59,6 +83,8 @@ the old one open beside the one it makes on its next request."
            (symbol-file 'skg-reload 'defun))))
     (unwind-protect
         (skg--reload-modules elisp-dir)
+      (dolist (pair client-settings)
+        (set (car pair) (cdr pair)))
       (when herald-rules
         ;; A load error may have aborted the reload before
         ;; `heralds-minor-mode' was re-loaded, leaving
