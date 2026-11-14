@@ -216,7 +216,22 @@ def run_command (arguments):
   try:
     show = arguments . show_overPrivateText
     if arguments . command == "view":
-      view = fetch_single_root_view (connection, arguments . id, show)
+      try:
+        view = fetch_single_root_view (connection, arguments . id, show)
+      except SkgViewAlreadyOpen as already_open:
+        # As a client lands in the open view's buffer, print the files
+        # that show it, when the connection holds them.
+        files_stem = connection . files_stem_of_view (already_open . view_id)
+        if files_stem is None:
+          raise
+        print ( f"{already_open . node_id} is already a root of the view "
+                f"{already_open . view_id}, whose files these are. If that "
+                f"view's perspective put it there, switch it back with "
+                f"'override-perspective SIDECAR root-authors' to view "
+                f"{already_open . node_id} by itself.", file = sys . stderr )
+        for suffix in ( ".full.org", ".compact.org", ".view.json" ):
+          print (files_stem + suffix)
+        return
     elif arguments . command in FOREST_COMMAND_ALIASES:
       view = fetch_forest_view (
         connection, FOREST_COMMAND_ALIASES [ arguments . command ],
@@ -1411,6 +1426,9 @@ def fetch_single_root_view (connection, node_id, show_overPrivateText = False):
                    ( "id", node_id ), ( "view-id", view_id ) ),
     show_overPrivateText, "viewed" )
   require_response_type (response, "content-view")
+  open_view_id = response_field (response, "switch-to-view")
+  if open_view_id is not None:
+    raise SkgViewAlreadyOpen ( node_id, sexp_to_text (open_view_id) )
   return { "view_id"     : view_id,
            "request"     : { "id" : node_id },
            "content"     : response_field (response, "content"),
@@ -5566,6 +5584,22 @@ class SkgToolError (Exception):
 class SkgServerQuietError (SkgToolError):
   pass
 
+class SkgViewAlreadyOpen (SkgToolError):
+  """The server answered a view of NODE_ID by naming VIEW_ID, a view
+  the connection holds whose root it already is, as it lands a
+  client's link in that view's buffer. A view switched to another's
+  perspective has the overrider it shows as its root
+  ('docs/api-and-formats.org', "Set overrides followed")."""
+  def __init__ (self, node_id, view_id):
+    super () . __init__ (
+      f"{node_id} is already a root of the view {view_id}, which this "
+      f"connection holds, so the server sent no view of it. If that "
+      f"view's perspective put it there, switch the view back with "
+      f"'override-perspective SIDECAR root-authors' to view {node_id} "
+      f"by itself." )
+    self . node_id = node_id
+    self . view_id = view_id
+
 class SkgConnectionClosedError (SkgToolError):
   pass
 
@@ -5603,6 +5637,9 @@ class SkgConnection:
 
   def holds_view_for_other_files (self, view_id, directory, base_name):
     return False
+
+  def files_stem_of_view (self, view_id):
+    return None
 
   def note_view_written (self, view_id, out_dir, base_name):
     pass
@@ -5883,6 +5920,10 @@ class DaemonConnection (SkgConnection):
     held_files_stem = self . files_stem_of_held_view . get (view_id)
     return ( held_files_stem is not None
              and held_files_stem != view_files_stem (directory, base_name) )
+
+  def files_stem_of_view (self, view_id):
+    """The stem of the files that show the held view VIEW_ID, or None."""
+    return self . files_stem_of_held_view . get (view_id)
 
   def note_view_written (self, view_id, out_dir, base_name):
     """Hold VIEW_ID for the files BASE_NAME, written into OUT_DIR. A

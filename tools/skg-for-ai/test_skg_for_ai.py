@@ -2873,7 +2873,8 @@ def failures_of_overrides_followed (scratch, data_root):
                   check_saving_a_view_that_follows_yours,
                   check_following_the_root_authors_again,
                   check_the_root_too,
-                  check_following_overrides_through_a_daemon ]:
+                  check_following_overrides_through_a_daemon,
+                  check_viewing_a_root_a_perspective_put_in_place ]:
       try:
         case (context)
       except CaseFailure as failure:
@@ -3027,6 +3028,36 @@ def check_following_overrides_through_a_daemon (context):
                   FOLLOWS_YOURS_SUMMARY + R_SHOWING_U . replace ("** U ", "** U, retitled again ") )
   require_tool_run ([ "override-perspective", sidecar_path, "root-authors" ])
   require_equal ( "R's view, following its root author's", r_tree (folder), R_SHOWING_A )
+
+def check_viewing_a_root_a_perspective_put_in_place (context):
+  """Through a daemon, a view of M switched to the user's perspective
+  has U as its root, so the server answers a view of U on that
+  connection by naming M's view, as it lands a client there: 'view U'
+  prints the files of M's view and says why. Switched back, 'view U'
+  draws U by itself."""
+  folder = context [ "daemon_folder" ]
+  start_daemon (context)
+  require_routed_run ( context, [ "view", "M" ] )
+  sidecar_path = os . path . join (folder, "view_M.view.json")
+  for perspective in ( "user", "root-authors" ):
+    completed = run_tool ( [ "override-perspective", sidecar_path, perspective ],
+                           port = None )
+    if completed . returncode != 0:
+      raise CaseFailure ( f"the switch printed {completed . stdout!r}, {completed . stderr!r}" )
+    viewed = require_routed_run ( context, [ "view", "U" ] )
+    if perspective == "user":
+      require_equal ( "what 'view U' printed, U being the root of M's view",
+                      viewed . stdout . split (),
+                      [ os . path . join ( os . path . realpath (folder), "view_M" + suffix )
+                        for suffix in ( ".full.org", ".compact.org", ".view.json" ) ] )
+      if "U is already a root of the view content-view:M" not in viewed . stderr:
+        raise CaseFailure ( f"'view U' said {viewed . stderr!r}" )
+    else:
+      require_equal ( "what 'view U' wrote, M's view showing M again",
+                      [ os . path . basename (path) for path in viewed . stdout . split () ],
+                      [ "view_U.full.org", "view_U.compact.org", "view_U.view.json" ] )
+  require_tool_run ([ "daemon", "--stop", "--out-dir", folder ])
+  context [ "daemon" ] . wait (timeout = 30)
 
 def start_daemon (context):
   """Start a daemon for the daemon folder, on the scratch server, and

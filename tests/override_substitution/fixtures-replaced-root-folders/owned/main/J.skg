@@ -1,0 +1,12 @@
+pid: J
+title: answer
+aliases:
+  - reply
+contains:
+  - L1
+subscribesTo:
+  - L
+overrides:
+  - L
+hidesFromSubs:
+  - L2

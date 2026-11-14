@@ -819,8 +819,8 @@ fn substitute_overriders (
 /// '(overridesHere N)', or, where the owner has none, the node raw.
 /// The occurrence is re-pointed where it stands, so it keeps its
 /// viewnode ID whichever way it switches, and its children follow
-/// from its own visit. A re-pointed root's containers folder is
-/// drawn afresh ('redraw_containers_folder'). A fork of a root
+/// from its own visit. A re-pointed root's folders are drawn afresh,
+/// for the node it now shows ('redraw_folders'). A fork of a root
 /// re-roots the view at the clone, which stands for nothing
 /// ('replace_saved_view_fork_roots').
 fn substitute_roots (
@@ -843,30 +843,112 @@ fn substitute_roots (
         owner, &original ) . effective, };
     let marked : Option<ID> = ( shown != original ) . then ( || original . clone () );
     let repointed : bool = walk . truth . graph . pid_else_raw_id (&gnid) != shown;
+    let was_editable : bool =
+      tree . get (root) . unwrap () . value () . editable_gnid () . is_some ();
     if repointed || overridesHere != marked
     { show_overrider (tree, root, &shown, marked, walk) ?; }
-    if repointed { redraw_containers_folder (tree, root, walk) ?; }}
+    if repointed { redraw_folders (tree, root, was_editable, walk) ?; }}
   Ok (( )) }
 
-/// The root at 'root' now shows another node, so the containers
-/// folder it holds lists what contains the node it showed before. That
-/// folder vanishes, and the root asks for a new one, which the
-/// requests rung draws as a fresh view of the node it now shows would
-/// ('stub_of_fresh_content_view'): what contains it, but its
-/// view-ancestors, or no folder where nothing does. A root that held
-/// none asks too: the view was drawn for another node.
-fn redraw_containers_folder (
-  tree : &mut Tree<Viewnode>,
-  root : NodeId,
-  walk : &mut Walk,
+/// The root at 'root' now shows another node, so every folder it
+/// holds describes the node it showed before. Each vanishes, and in
+/// its place stand the folders of its kind (and of its relation's
+/// other side) for the node now shown ('kinds_redrawing'), empty, for
+/// their own visits to fill, each hidden in the root if the old one
+/// was (its members are drawn anew, unfolded): a write-protected one
+/// goes if it stays
+/// empty, and an editable one is drawn only where the node has members
+/// for it, since an empty one says the user asked for it. Then the
+/// root asks for what a fresh view of the node asks for
+/// ('stub_of_fresh_content_view'): its containers folder, which the
+/// requests rung draws (what contains it, but its view-ancestors, or
+/// no folder where nothing does); and, if the root was editable, to be
+/// extended as an editable root is, which at its own visit adds its
+/// default folders ('add_default_folders'): the subscribee folder,
+/// with its count, where it subscribes. A write-protected root, such as
+/// a search hit, asks for no more than it had. So a root that was
+/// write-protected only because another occurrence held the node it
+/// was re-pointed to ('point_occurrence_at') stays so when switched
+/// back: nothing remembers why it was write-protected. A root asks even if it
+/// held no folder: the view was drawn for another node.
+fn redraw_folders (
+  tree         : &mut Tree<Viewnode>,
+  root         : NodeId,
+  was_editable : bool,
+  walk         : &mut Walk,
 ) -> Result<(), Box<dyn Error>> {
-  if let Some (folder) = child_folder (tree, root, &Folder::Container) {
-    vanish (tree, folder, walk) ?; }
+  let Some (pid) : Option<ID> =
+    tree . get (root) . unwrap () . value () . occurrence_gnid () . cloned ()
+    else { return Ok (( )); };
+  let folders : Vec<(NodeId, Folder)> =
+    tree . get (root) . unwrap () . children ()
+    . filter_map ( |child| match &child . value () . kind {
+        ViewnodeKind::Folder (folder) => Some (( child . id (), folder . clone () )),
+        _ => None, } )
+    . collect ();
+  let mut drawn : Vec<Folder> = Vec::new ();
+  for (treeid, folder) in folders {
+    let folded : bool = tree . get (treeid) . unwrap () . value () . foldAndFocus . folded;
+    for kind in kinds_redrawing (&folder) {
+      if drawn . iter () . any ( |done| discriminant (done) == discriminant (&kind) )
+         || ( kind . is_editable () && ! has_members (&pid, &kind, walk) )
+      { continue; }
+      let mut empty : Viewnode = viewnode_of ( ViewnodeKind::Folder (kind . clone ()) );
+      empty . foldAndFocus . folded = folded;
+      let new : NodeId = tree . get_mut (treeid) . unwrap () . insert_before (empty) . id ();
+      if matches! ( kind, Folder::Subscribee ) {
+        add_hidden_outside_folder (tree, new, &pid, walk); }
+      drawn . push (kind); }
+    vanish (tree, treeid, walk) ?; }
   if let ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =
     &mut tree . get_mut (root) . unwrap () . value () . kind
   { occurrence . view_requests . insert (
-      ViewRequest::Folder (FolderRelation::Containers) ); }
+      ViewRequest::Folder (FolderRelation::Containers) );
+    if was_editable {
+      occurrence . view_requests . insert (ViewRequest::Editable); }}
   Ok (( )) }
+
+/// The folders that stand, for the node a re-pointed root now shows,
+/// where a folder of the kind of 'folder' stood: those a request for
+/// its relation draws, both sides of a partner relation ('(folder
+/// overrides)' draws the overridden and overrider folders), but for
+/// the subscribee folder alone, which a root shows by default where
+/// its node subscribes, and which the user's request would have drawn
+/// with a subscriber folder. None for the folders drawn inside others
+/// or only in the diff view, for the illegal-edit folder, which each
+/// visit draws, and for the ID folder, which no request draws.
+fn kinds_redrawing (
+  folder : &Folder,
+) -> Vec<Folder> {
+  match folder {
+    Folder::Subscribee             => vec! [ Folder::Subscribee ],
+    Folder::Subscriber             => folders_of_relation (FolderRelation::SubscribesTo),
+    Folder::Overridden | Folder::Overrider
+                                   => folders_of_relation (FolderRelation::Overrides),
+    Folder::Hider | Folder::Hidden => folders_of_relation (FolderRelation::HidesFromSubs),
+    Folder::Container              => folders_of_relation (FolderRelation::Containers),
+    Folder::Mentioner              => folders_of_relation (FolderRelation::Mentioners),
+    Folder::Alias                  => folders_of_relation (FolderRelation::Aliases),
+    Folder::Flags { .. }           => vec! [ Folder::flags () ],
+    Folder::HiddenInSubscribee | Folder::HiddenOutsideOfSubscribee
+      | Folder::AcquiredBy | Folder::Acquired
+      | Folder::ID | Folder::IllegalEdit { .. } => Vec::new (), } }
+
+/// Whether a folder of the kind of 'folder' under an occurrence of
+/// 'pid' would hold anything: the node's aliases, or its partners in
+/// the folder's relation, as the skgrepo restriction shows them.
+fn has_members (
+  pid    : &ID,
+  folder : &Folder,
+  walk   : &Walk,
+) -> bool {
+  match folder {
+    Folder::Alias => walk . truth . graph . get (pid) . is_some_and (
+      |node| ! node . aliases_with_relRepo_unless_home (walk . truth . restriction)
+               . is_empty () ),
+    _ => partnerFolder_members_in_graph (
+           walk . truth . graph, pid, folder, walk . truth . restriction )
+         . is_some_and ( |members| ! members . is_empty () ), } }
 
 /// Make the occurrence at 'child' show 'shown', with 'overridesHere'
 /// as given ('point_occurrence_at').
@@ -1055,20 +1137,32 @@ fn add_folders (
           . append ( viewnode_of ( ViewnodeKind::Folder (folder . clone ()) )) . id ();
         added . push (new);
         new }, };
-    let hides_outside_its_subscribees : &dyn Fn () -> bool = &|| -> bool {
-      tree . get (treeid) . unwrap () . value () . occurrence_gnid ()
-        . is_some_and ( |subscriber|
-          ! hidden_outside_of_subscribees (&subscriber, walk) . is_empty () ) };
-    if matches! ( folder, Folder::Subscribee )
-       && child_folder (tree, folder_treeid, &Folder::HiddenOutsideOfSubscribee) . is_none ()
-       && hides_outside_its_subscribees ()
-    { let hidden_outside : NodeId = tree . get_mut (folder_treeid) . unwrap ()
-        . append ( viewnode_of (
-          ViewnodeKind::Folder (Folder::HiddenOutsideOfSubscribee) )) . id ();
-      walk . added_compound_folders . insert (hidden_outside); }}
+    if matches! ( folder, Folder::Subscribee ) {
+      let subscriber : Option<ID> =
+        tree . get (treeid) . unwrap () . value () . occurrence_gnid () . cloned ();
+      if let Some (subscriber) = subscriber {
+        add_hidden_outside_folder (tree, folder_treeid, &subscriber, walk); }}}
   for folder_treeid in added . into_iter () . rev () {
     move_to_first_child (tree, treeid, folder_treeid)
       . expect ("add_folders: the folder was just added"); }}
+
+/// In the subscribee folder at 'subscribee_folder', of 'subscriber',
+/// the compound folder of what the subscriber hides outside its
+/// subscribees, when it hides something there and the folder lacks
+/// one; new, its members are drawn folded
+/// ('Walk::added_compound_folders').
+fn add_hidden_outside_folder (
+  tree              : &mut Tree<Viewnode>,
+  subscribee_folder : NodeId,
+  subscriber        : &ID,
+  walk              : &mut Walk,
+) {
+  if child_folder (tree, subscribee_folder, &Folder::HiddenOutsideOfSubscribee) . is_none ()
+     && ! hidden_outside_of_subscribees (subscriber, walk) . is_empty ()
+  { let hidden_outside : NodeId = tree . get_mut (subscribee_folder) . unwrap ()
+      . append ( viewnode_of (
+        ViewnodeKind::Folder (Folder::HiddenOutsideOfSubscribee) )) . id ();
+    walk . added_compound_folders . insert (hidden_outside); }}
 
 /// The child of 'under' that is a folder of the kind of 'folder' (a
 /// flags folder whatever its text), if any.

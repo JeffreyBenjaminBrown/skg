@@ -24,6 +24,14 @@
 // A second foreign owner,
 // "third", overrides M with B and K with T. Foreign F2 contains M2,
 // which contains N2; U2, in "main", overrides M2, and T2, third's, N2.
+//
+// The replaced-root-folders fixture (fixtures-replaced-root-folders)
+// gives a foreign root and the user's fork of it different folders:
+// foreign L, titled "missive", alias "letter", contains L1, L2 and L3;
+// foreign Q contains L, and foreign X links to it. J, in "main",
+// titled "answer", alias "reply",
+// subscribes to and overrides L, contains L1 and hides L2; V, in
+// "main", contains J, and Y, in "main", links to it.
 
 use skg::test_utils::save_and_rerender;
 use indoc::indoc;
@@ -47,6 +55,7 @@ use skg::types::save::{NodeInstruction, SaveNode};
 use skg::types::views_state::{OpenViews, OverridesFollowed, ViewforestId};
 use skg::serve::handlers::overrides_followed::handle_set_overrides_followed_request;
 use skg::serve::handlers::rerender_views::handle_rerender_views_request;
+use skg::serve::handlers::text_search::handle_text_search_request;
 use skg::serve::handlers::save_buffer::{
   SaveResponse, update_from_and_rerender_buffer_with_approvals};
 use skg::from_text::strandeds::StrandedsReview;
@@ -60,6 +69,8 @@ use std::collections::{HashMap, HashSet};
 use std::io::BufReader;
 
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
+use skg::dbs::tantivy::write::update_index_with_nodes;
+use skg::types::nodes::tantivy::GraphnodeInTantivy;
 use skg::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle};
 use skg::types::viewnode::Viewnode;
 use ego_tree::Tree;
@@ -128,6 +139,17 @@ fn all_tests
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("a_replaced_root_shows_its_own_containers", foreign_root) ?;
       a_replaced_root_shows_its_own_containers (
+        &s . config, &mut s . tantivy ) ?;
+      let replaced_root_folders : &str =
+        "tests/override_substitution/fixtures-replaced-root-folders";
+      s . reset ("a_replaced_root_shows_its_own_default_folders", replaced_root_folders) ?;
+      a_replaced_root_shows_its_own_default_folders (
+        &s . config, &mut s . tantivy ) ?;
+      s . reset ("a_replaced_root_redraws_the_folders_it_was_asked_for", replaced_root_folders) ?;
+      a_replaced_root_redraws_the_folders_it_was_asked_for (
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("a_replaced_search_hit_stays_a_hit", replaced_root_folders) ?;
+      a_replaced_search_hit_stays_a_hit (
         &s . config, &mut s . tantivy ) ?;
       s . reset ("a_save_following_the_users_overrides_shows_a_new_fork_in_place", foreign_root) ?;
       a_save_following_the_users_overrides_shows_a_new_fork_in_place (
@@ -1098,6 +1120,143 @@ fn a_replaced_root_shows_its_own_containers (
   let back : String = switch ("root authors") ?;
   assert_eq! ( without_vnids ( back . lines () ), without_vnids ( view . lines () ),
     "back at the root authors', M's folder is drawn again as the fresh view drew it" );
+  Ok (( )) }
+
+/// A replaced root's default folders are the replacement's: a view
+/// of foreign L shows no subscribee folder, since L subscribes to
+/// nothing. From the user's perspective the root is J, the user's fork
+/// of L, and it is drawn as a fresh view of J draws it: its containers
+/// folder, and its subscribee folder holding L, counting the one child
+/// of L that J neither contains nor hides. Back at the root authors',
+/// L is drawn again as the fresh view drew it.
+fn a_replaced_root_shows_its_own_default_folders (
+  config  : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  let (mut views_state, env, view) : (ViewsState, SkgEnv, String) =
+    connection_holding_a_view_of (config, tantivy, "L", &[ ID::from ("L") ]) ?;
+  let (_, _, fresh_view_of_j) : (ViewsState, SkgEnv, String) =
+    connection_holding_a_view_of (config, tantivy, "J", &[ ID::from ("J") ]) ?;
+  assert! ( ! view . contains ("subscribeeFolder"),
+    "a fresh view of L has no subscribee folder:\n{}", view );
+  let mut switch = |named : &str| -> Result<String, Box<dyn Error>> {
+    let messages : Vec<String> = messages_answering (
+      &switch_request_naming ("L", named),
+      &mut views_state, &env, config, handle_set_overrides_followed_request );
+    assert! ( refusal_of (&messages) . is_none (), "{:?}", messages );
+    Ok ( rerendered_text (&messages) . ok_or ("the switch rerenders") ? ) };
+  let users : String = switch ("user") ?;
+  assert! ( users . contains ("subscribeeFolder")
+            && line_of_gnid (&users, "L") . is_some_and (
+                 |line| line . contains ("(unintegrated 1)") )
+            && ! users . contains ("noWarrant"),
+    "from the user's, J shows its subscribee folder, L in it with its count:\n{}", users );
+  assert_eq! ( without_vnids ( users . lines () . skip (1) ),
+               without_vnids ( fresh_view_of_j . lines () . skip (1) ),
+    "J's folders are drawn as a fresh view of J draws them" );
+  let back : String = switch ("root authors") ?;
+  assert_eq! ( without_vnids ( back . lines () ), without_vnids ( view . lines () ),
+    "back at the root authors', L is drawn again as the fresh view drew it" );
+  Ok (( )) }
+
+/// A folder the user asked for on a root that a perspective replaces
+/// is drawn again for the replacement: L's view, given its mentioners
+/// and aliases folders, lists X, which links to L, and L's alias
+/// "letter". From the user's perspective the root is J, and those
+/// folders list Y, which links to J, and J's alias "reply", with
+/// nothing of L's; back at the root authors', L's again.
+async fn a_replaced_root_redraws_the_folders_it_was_asked_for (
+  config  : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  let (mut views_state, mut env, view) : (ViewsState, SkgEnv, String) =
+    connection_holding_a_view_of (config, tantivy, "L", &[ ID::from ("L") ]) ?;
+  let requesting : String = view . replacen (
+    "(skg (vnid 0a) node (gnid L)",
+    "(skg (vnid 0a) node (gnid L) (viewRequests (folder mentioners) (folder aliases))", 1 );
+  assert_ne! ( requesting, view, "{}", view );
+  let (mut stream, _read_end) : (TcpStream, TcpStream) = mk_test_tcp_stream_pair ();
+  let response : SaveResponse =
+    update_from_and_rerender_buffer_with_approvals (
+      &mut stream, &requesting, &view, &mut env,
+      &Ok ( ViewforestId::from_client_string ("L" . to_string ()) ),
+      &mut views_state, &SkgrepoRestriction::unrestricted (config),
+      true, &HashMap::new (), &HashSet::new (),
+      &StrandedsReview::NotReviewed, DeleteFrom::NotChosen, &[], None,
+      OverridesFollowed::RootAuthors ) . await ?;
+  assert! ( response . errors . is_empty (), "{:?}", response . errors );
+  let asked : String = response . saved_view;
+  let shows_ls = |text : &str| -> bool {
+    line_of_gnid (text, "X") . is_some () && text . contains (") letter") };
+  let shows_js = |text : &str| -> bool {
+    line_of_gnid (text, "Y") . is_some () && text . contains (") reply") };
+  assert! ( asked . contains ("mentionerFolder") && asked . contains ("aliasFolder")
+            && shows_ls (&asked) && ! shows_js (&asked),
+    "L's view, asked for them, lists X and \"letter\":\n{}", asked );
+  let mut switch = |named : &str| -> Result<String, Box<dyn Error>> {
+    let messages : Vec<String> = messages_answering (
+      &switch_request_naming ("L", named),
+      &mut views_state, &env, config, handle_set_overrides_followed_request );
+    assert! ( refusal_of (&messages) . is_none (), "{:?}", messages );
+    Ok ( rerendered_text (&messages) . ok_or ("the switch rerenders") ? ) };
+  let users : String = switch ("user") ?;
+  assert! ( users . contains ("mentionerFolder") && users . contains ("aliasFolder")
+            && shows_js (&users)
+            && line_of_gnid (&users, "X") . is_none ()
+            && ! users . contains (") letter")
+            && ! users . contains ("noWarrant"),
+    "from the user's, J's folders list Y and \"reply\", and nothing of L's:\n{}", users );
+  let back : String = switch ("root authors") ?;
+  assert_eq! ( without_vnids ( back . lines () ), without_vnids ( asked . lines () ),
+    "back at the root authors', L's folders are drawn again" );
+  Ok (( )) }
+
+/// A search hit is a write-protected root that shows only its
+/// folders. Switched to the user's perspective, the hit for foreign L
+/// ("missive") shows J, the user's fork, still write-protected, with
+/// what a search hit for J ("answer") shows: its containers folder and
+/// the overridden folder, folded, and no content or subscribee folder,
+/// which only an editable root draws. Back at the root authors', the
+/// hit shows L's folders again.
+fn a_replaced_search_hit_stays_a_hit (
+  config  : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  { // The session's search index starts empty.
+    let tantivy_nodes : Vec<GraphnodeInTantivy> =
+      read_all_skg_files_from_skgrepos (config) ?
+      . iter () . map (GraphnodeInTantivy::from) . collect ();
+    update_index_with_nodes (&tantivy_nodes, tantivy) ?; }
+  let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
+  let env : SkgEnv = skg_env_from_parts (config, tantivy, &graph);
+  let mut views_state : ViewsState =
+    ViewsState { open_views : OpenViews::new (), graph_straddle : None };
+  let mut search = |terms : &str| -> String {
+    let messages : Vec<String> = messages_answering (
+      &format! ( "((request . \"text search\") (terms . \"{}\") (regex . \"false\") (body . \"false\") (operators . \"false\"))",
+                 terms ),
+      &mut views_state, &env, config, handle_text_search_request );
+    extract_string_field_from_sexp (&messages [0], "content") . unwrap_or_default () };
+  let fresh_hit_j : String = search ("answer");
+  let hit_l : String = search ("missive");
+  let mut switch = |named : &str| -> Result<String, Box<dyn Error>> {
+    let messages : Vec<String> = messages_answering (
+      &switch_request_naming ("search:missive", named),
+      &mut views_state, &env, config, handle_set_overrides_followed_request );
+    assert! ( refusal_of (&messages) . is_none (), "{:?}", messages );
+    Ok ( rerendered_text (&messages) . ok_or ("the switch rerenders") ? ) };
+  let users : String = switch ("user") ?;
+  assert! ( users . lines () . next () . is_some_and (
+              |root| root . contains ("(gnid J)") && root . contains ("writeProtected") )
+            && ! users . contains ("subscribeeFolder")
+            && line_of_gnid (&users, "L1") . is_none (),
+    "from the user's, the hit is J, write-protected, without content:\n{}", users );
+  assert_eq! ( without_vnids ( users . lines () . skip (1) ),
+               without_vnids ( fresh_hit_j . lines () . skip (1) ),
+    "J's folders are drawn as a search hit for J draws them" );
+  let back : String = switch ("root authors") ?;
+  assert_eq! ( without_vnids ( back . lines () ), without_vnids ( hit_l . lines () ),
+    "back at the root authors', the hit shows L's folders again" );
   Ok (( )) }
 
 /// The lines, each without its '(vnid ID)'.

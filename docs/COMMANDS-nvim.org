@@ -1310,8 +1310,10 @@ diff view, which shows no overrider in place of what it overrides,
 and where no other perspective would show the buffer differently.
 The roots are replaced too: from an author's perspective, a root that
 author overrides shows the override, standing where the root stood,
-with the cursor still on it if it was; from the root authors', the
-node you opened, as it is. The buffer keeps its name. In a search
+with the cursor still on it if it was, and with its own folders, as
+a fresh view of it would draw them (its containers, its subscribee
+folder and count, and any other folder you had opened there); from the
+root authors', the node you opened, as it is. The buffer keeps its name. In a search
 buffer, the hits are its roots. See =docs/override.org=.
 
 Emacs names any perspective but the root authors' in the mode name:

@@ -116,7 +116,11 @@ Each view command ('view', 'search', 'forest', 'contains',
 (default: the current directory) and prints their paths, one per line.
 
 'python3 tools/skg-for-ai/skg_for_ai.py view ID' writes the recursive
-content view of the node ID, as a client opens it.
+content view of the node ID, as a client opens it. Through a daemon,
+where ID is already a root of another view the daemon holds (one
+switched to a perspective that put ID in its root's place, say), the
+server sends no view, as a client lands in that view's buffer: 'view'
+prints that view's paths instead, and says why on standard error.
 
 'search TERMS...' writes the search buffer for the terms: each hit at
 the top level, with the containers of each hit beneath it. Its
