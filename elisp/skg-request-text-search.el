@@ -167,8 +167,8 @@ kill-buffer-hook to send close-view to the server."
         (setq skg-view-id view-id)
         ;; The server draws a search afresh, following its root
         ;; authors' overrides, even into a buffer an earlier search of
-        ;; the same terms switched to the user's.
-        (setq skg-overrides-followed nil)
+        ;; the same terms switched to another perspective.
+        (skg--set-override-perspective nil nil)
         (skg--capture-clean-baseline)
         (add-hook 'kill-buffer-hook #'skg-send-close-view nil t)
         (run-hooks 'skg--search-buffer-setup-hook)

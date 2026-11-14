@@ -292,8 +292,9 @@ rides out as (strandeds-reviewed . \"true\") and, unless it chose
 none, (reset-strandeds (RELATION RECORDER MEMBER) ...). DELETE-FROM,
 when non-nil, rides out as (delete-from . DELETE-FROM). A
 buffer of the diff view names itself, by `skg-diffView-buffer-kind',
-as (diff-view-buffer . NAME), and a view that follows your overrides
-says so, by `skg-overrides-followed', as (overrides-followed . \"user\")."
+as (diff-view-buffer . NAME), and a view shown from a perspective
+other than its root authors' names it, by `skg-overrides-followed', as
+(overrides-followed . NAME)."
   (append
    `((request . "save buffer")
      (view-id . ,view-id))

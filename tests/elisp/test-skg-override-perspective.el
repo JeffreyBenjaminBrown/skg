@@ -1,4 +1,4 @@
-;;; test-skg-overrides-followed.el --- Switching whose overrides a view follows -*- lexical-binding: t; -*-
+;;; test-skg-override-perspective.el --- Cycling a view's perspective, whose overrides it follows -*- lexical-binding: t; -*-
 
 (load-file (expand-file-name "../../elisp/skg-test-utils.el"
                              (file-name-directory load-file-name)))
@@ -7,7 +7,7 @@
 (require 'org)
 (require 'skg-buffer)
 (require 'skg-request-save)
-(require 'skg-request-overrides-followed)
+(require 'skg-request-override-perspective)
 
 (defun test--overrides-followed-run (body)
   "Run BODY with the network faked. BODY receives a function giving
@@ -35,70 +35,83 @@ the sent requests (newest first) and the handlers."
      (set-buffer-modified-p nil)
      ,@body))
 
-(ert-deftest test-overrides-followed-refuses-a-buffer-with-unsaved-edits ()
+(ert-deftest test-override-perspective-refuses-a-buffer-with-unsaved-edits ()
   (test--in-view "r"
     (set-buffer-modified-p t)
     (test--overrides-followed-run
      (lambda (sent _handlers)
-       (let ((err (should-error (skg-switch-overrides-followed)
+       (let ((err (should-error (skg-override-perspective)
                                 :type 'user-error)))
          (should (string-match-p "unsaved edits" (cadr err))))
        (should (null (funcall sent)))))))
 
-(ert-deftest test-overrides-followed-asks-for-the-other-choice ()
-  "A fresh view asks to follow the user's; one that does, its root authors'."
+(ert-deftest test-override-perspective-asks-for-the-next-whatever-the-buffer-shows ()
+  "The server computes the cycle, so the client always asks for the next."
   (test--in-view "r"
     (test--overrides-followed-run
      (lambda (sent handlers)
-       (skg-switch-overrides-followed)
+       (skg-override-perspective)
        (should (string-match-p
-                (regexp-quote "(request . \"set overrides followed\") (view-id . \"r\") (overrides-followed . \"user\")")
+                (regexp-quote "(request . \"set overrides followed\") (view-id . \"r\") (overrides-followed . \"next\")")
                 (car (funcall sent))))
        (should (gethash 'overrides-followed handlers))
-       (setq skg-overrides-followed "user")
-       (skg-switch-overrides-followed)
+       (skg--set-override-perspective "owner of tracy" "tracy's overrides")
+       (skg-override-perspective)
        (should (string-match-p
-                (regexp-quote "(overrides-followed . \"root authors\")")
+                (regexp-quote "(overrides-followed . \"next\")")
                 (car (funcall sent))))))))
 
-(ert-deftest test-overrides-followed-answer-sets-the-buffer-and-the-mode-line ()
+(ert-deftest test-override-perspective-answer-sets-the-buffer-names-it-and-marks-the-mode-line ()
   "The mode line's process part is an :eval form, which a batch Emacs's
 'format-mode-line' never evaluates, so the form is evaluated here."
   (test--in-view "r"
-    (cl-letf (((symbol-function 'message) #'ignore))
-      (skg--overrides-followed-handler
-       nil "((response-type overrides-followed) (view-id \"r\") (overrides-followed \"user\"))")
-      (should (equal skg-overrides-followed "user"))
-      (should (equal (eval (cadr mode-line-process) t) ":your overrides"))
-      (skg--overrides-followed-handler
-       nil "((response-type overrides-followed) (view-id \"r\") (overrides-followed \"root authors\"))")
-      (should (null skg-overrides-followed))
-      (should (null (eval (cadr mode-line-process) t))))))
+    (let ((shown nil))
+      (cl-letf (((symbol-function 'message)
+                 (lambda (format-string &rest args)
+                   (setq shown (apply #'format format-string args)))))
+        (skg--override-perspective-handler
+         nil "((response-type overrides-followed) (view-id \"r\") (overrides-followed \"user\") (perspective-name \"your overrides\"))")
+        (should (equal skg-overrides-followed "user"))
+        (should (equal shown "Perspective: your overrides."))
+        (should (equal (eval (cadr mode-line-process) t) ":your overrides"))
+        (skg--override-perspective-handler
+         nil "((response-type overrides-followed) (view-id \"r\") (overrides-followed \"owner of tracy\") (perspective-name \"tracy's overrides\"))")
+        (should (equal skg-overrides-followed "owner of tracy"))
+        (should (equal shown "Perspective: tracy's overrides."))
+        (should (equal (eval (cadr mode-line-process) t) ":tracy's overrides"))
+        (skg--override-perspective-handler
+         nil "((response-type overrides-followed) (view-id \"r\") (overrides-followed \"root authors\") (perspective-name \"each root author's overrides (tracy's)\"))")
+        (should (null skg-overrides-followed))
+        (should (null skg-override-perspective-name))
+        (should (equal shown "Perspective: each root author's overrides (tracy's)."))
+        (should (null (eval (cadr mode-line-process) t)))))))
 
-(ert-deftest test-overrides-followed-refusal-changes-nothing-and-says-why ()
+(ert-deftest test-override-perspective-refusal-changes-nothing-and-says-why ()
   (test--in-view "p"
     (let ((shown nil))
       (cl-letf (((symbol-function 'message)
                  (lambda (format-string &rest args)
                    (setq shown (apply #'format format-string args)))))
-        (skg--overrides-followed-handler
-         nil "((response-type overrides-followed) (view-id \"p\") (overrides-followed \"root authors\") (content \"Every tree in this buffer is rooted at a node you own, so it shows your overrides already.\"))")
+        (skg--override-perspective-handler
+         nil "((response-type overrides-followed) (view-id \"p\") (overrides-followed \"root authors\") (perspective-name \"each root author's overrides (yours)\") (content \"No one's overrides would show this buffer differently from its root authors'.\"))")
         (should (null skg-overrides-followed))
-        (should (string-match-p "shows your overrides already" shown))))))
+        (should (string-match-p "No one's overrides" shown))))))
 
-(ert-deftest test-overrides-followed-rides-in-the-save-request-and-survives-a-mode-change ()
+(ert-deftest test-override-perspective-rides-in-the-save-request-and-survives-a-mode-change ()
   (test--in-view "r"
     (let ((position '(:point-lines-below-focused-headline 0 :point-column 0
                       :point-screen-lines-below-window-start 0)))
       (should-not (assq 'overrides-followed (skg--save-request-sexp "r" position)))
-      (setq skg-overrides-followed "user")
+      (skg--set-override-perspective "owner of tracy" "tracy's overrides")
       (skg-content-view-mode)
-      (should (equal skg-overrides-followed "user"))
+      (should (equal skg-overrides-followed "owner of tracy"))
+      (should (equal skg-override-perspective-name "tracy's overrides"))
       (should (equal (cdr (assq 'overrides-followed (skg--save-request-sexp "r" position)))
-                     "user")))))
+                     "owner of tracy")))))
 
-(ert-deftest test-overrides-followed-is-on-C-c-v-p ()
-  (should (eq (lookup-key skg-content-view-mode-map (kbd "C-c v p"))
-              #'skg-switch-overrides-followed)))
+(ert-deftest test-override-perspective-is-on-C-c-v-o-and-C-c-v-p-is-free ()
+  (should (eq (lookup-key skg-content-view-mode-map (kbd "C-c v o"))
+              #'skg-override-perspective))
+  (should-not (lookup-key skg-content-view-mode-map (kbd "C-c v p"))))
 
-(provide 'test-skg-overrides-followed)
+(provide 'test-skg-override-perspective)

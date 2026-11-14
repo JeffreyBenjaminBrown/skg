@@ -21,7 +21,7 @@
 Rebinds C-x C-s to save via the skg server,
 and provides C-c prefix keybindings for skg commands."
   (setq-local org-adapt-indentation nil)
-  (setq-local mode-line-process '(:eval (skg--overrides-followed-mode-line)))
+  (setq-local mode-line-process '(:eval (skg--override-perspective-mode-line)))
   (skg--dictate-view-faces)
   (add-hook 'first-change-hook
             #'skg--confirm-before-dirtying-another-view nil t))
@@ -141,21 +141,37 @@ that buffer of the diff view.")
 (put 'skg-diffView-buffer-kind 'permanent-local t)
 
 (defvar-local skg-overrides-followed nil
-  "Whose overrides this view follows: nil for its root authors' (a
-tree rooted at a node of yours follows yours, one rooted at another's
-node follows that author's), as every fresh view does; \"user\" for
-yours, in every tree. `skg-switch-overrides-followed' sets it once the
-server has switched the view. A save sends \"user\" as
-(overrides-followed . \"user\"), so that the server checks and redraws
-the buffer as it was drawn, and keeps the choice for the redraws it
-starts itself, even after a restart.")
+  "This view's perspective, whose overrides it follows, as the server
+names it on the wire: nil for its root authors' (a tree rooted at a
+node of yours follows yours, one rooted at another's node follows that
+author's), as every fresh view does; \"user\" for yours, or \"owner
+of NAME\" for another owner's, in every tree.
+`skg-override-perspective' sets it once the server has switched the
+view. A save sends it as (overrides-followed . NAME), so that the
+server checks and redraws the buffer as it was drawn, and keeps it for
+the redraws it starts itself, even after a restart.")
 (put 'skg-overrides-followed 'permanent-local t)
 
-(defun skg--overrides-followed-mode-line ()
-  "The mode line's mark for a view that follows your overrides: the
-mode name reads \"SKG:your overrides\" there, and \"SKG\" elsewhere."
-  (when (equal skg-overrides-followed "user")
-    ":your overrides"))
+(defvar-local skg-override-perspective-name nil
+  "How the server named this view's perspective, for the mode line:
+\"your overrides\", say, or \"tracy's overrides\". Nil while the
+view shows its root authors'.")
+(put 'skg-override-perspective-name 'permanent-local t)
+
+(defun skg--set-override-perspective (followed name)
+  "Record that this view shows the perspective FOLLOWED, the server's
+wire name, which the server calls NAME. The root authors' perspective
+is recorded as nil, so that it stays unmarked and unsaid."
+  (let ((default (or (null followed) (equal followed "root authors"))))
+    (setq skg-overrides-followed (unless default followed))
+    (setq skg-override-perspective-name (unless default name))))
+
+(defun skg--override-perspective-mode-line ()
+  "The mode line's mark for a view shown from a perspective other
+than its root authors': the mode name reads \"SKG:your overrides\",
+say, there, and \"SKG\" elsewhere."
+  (when skg-overrides-followed
+    (concat ":" (or skg-override-perspective-name skg-overrides-followed))))
 
 (defvar-local skg-clean-baseline nil
   "Exact normalized text received at the last clean view replacement.")
