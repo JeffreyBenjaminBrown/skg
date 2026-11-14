@@ -519,6 +519,230 @@ buffer order and reports the end without wrapping."
     (should (eq (lookup-key skg-content-view-mode-map (kbd (car pair)))
                 (cdr pair)))))
 
+;;; The plain motions skip a ☮ member of a folder of other files
+
+(defconst test-skg-processed--complete-diff-view
+  '("* (skg (vnid 0a) ghost (gnid m) (skgRepos (nodeRepo main)) (diff (node removed) (leaves 1 node))) m"
+    "** (skg (vnid 0b) node (gnid a) (skgRepos (nodeRepo main)) (view (rels (contains (in 2)) (linksTo (in 1 (substantive 1))) (subscribesTo (in 1))) ghostWarrant) (diff (rel removed) (leaves 1 rel))) a"
+    "*** (skg (vnid 0c) containerFolder)"
+    "**** (skg (vnid 0d) node (gnid r2) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 1 (ancestors 2)))) (birth (contains out 2))) (diff (rel added) (leaves 1 rel))) r2"
+    "**** (skg (vnid 0e) node (gnid x) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 1 (ancestors 2)))) (birth (contains out 2)))) x"
+    "*** (skg (vnid 0f) mentionerFolder)"
+    "**** (skg (vnid 0g) node (gnid y) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (linksTo (out 1 (ancestors 2)))) (birth (linksTo out 2))) (diff (rel added) (properties changed) (leaves 1 node))) y2"
+    "*** (skg (vnid 0h) subscriberFolder)"
+    "**** (skg (vnid 0i) node (gnid s) (skgRepos (nodeRepo main)) writeProtected (view (rels (subscribesTo (out 1 (ancestors 2)))) (birth (subscribesTo out 2))) (diff (rel added) (leaves 1 rel))) s"
+    "* (skg (vnid 0j) node (gnid r2) (skgRepos (nodeRepo main)) (view (rels (contains (out 1))))) r2"
+    "** (skg (vnid 0k) (changesetMarker content) (diff (leaves 1 rel)))"
+    "** (skg (vnid 0l) node (gnid a) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 2 (ancestors 1))) (linksTo (in 1 (substantive 1))) (subscribesTo (in 1))) (birth (contains in 1))) (diff (rel added) (leaves 1 rel))) a"
+    "* (skg (vnid 0m) node (gnid s) (skgRepos (nodeRepo main)) (view (rels (subscribesTo (out 1))))) s"
+    "** (skg (vnid 0n) subscribeeFolder)"
+    "*** (skg (vnid 0o) node (gnid a) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 2) (out 0 (unintegrated 0))) (linksTo (in 1 (substantive 1))) (subscribesTo (in 1 (ancestors 2)))) (birth (subscribesTo in 2))) (diff (rel added) (leaves 1 rel))) a"
+    "**** (skg (vnid 0p) ghost (gnid m) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed))) m"
+    "***** (skg (vnid 0q) node (gnid a) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 2)) (linksTo (in 1 (substantive 1))) (subscribesTo (in 1))) ghostWarrant cycle) (diff (rel removed) (leaves 1 rel))) a"
+    "**** (skg (vnid 0r) node (gnid r2) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 1 (ancestors 1)))))) r2"
+    "**** (skg (vnid 0s) node (gnid x) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 1 (ancestors 1)))))) x"
+    "* (skg (vnid 0t) node (gnid y) (skgRepos (nodeRepo main)) (view (rels (linksTo (out 1)))) (diff (properties changed) (leaves 1 node))) y2"
+    "see [[id:a][a]]"
+    "** (skg (vnid 0u) (oldText titleAndBody) (diff (leaves 1))) y"
+    "*** (skg (vnid 0v) bodyDiff)"
+    "+see [[id:a][a]]")
+  "A diff view the server drew, every change in it editable. At HEAD m
+contains a; in the worktree m is deleted, r2 contains a, s subscribes
+to a, and y, retitled, mentions a. So a's containers (line 4), mentioners
+\(7) and subscribers (9) changed, each member write-protected, while
+each member's change is drawn where its node stands editable: r2's
+at 11 and 12, y's at 20 and 22, s's at 15 and 17.")
+
+(defconst test-skg-processed--diff-view-with-an-editable-member
+  '("* (skg (vnid 0a) ghost (gnid m) (skgRepos (nodeRepo main)) (diff (node removed) (leaves 1 node))) m"
+    "** (skg (vnid 0b) node (gnid a) (skgRepos (nodeRepo main)) (view (rels (contains (in 2)) (linksTo (in 1 (substantive 1))) (subscribesTo (in 1))) ghostWarrant) (diff (rel removed) (leaves 1 rel))) a"
+    "*** (skg (vnid 0c) containerFolder)"
+    "**** (skg (vnid 0d) node (gnid r2) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 1 (ancestors 2)))) (birth (contains out 2))) (diff (rel added) (leaves 1 rel))) r2"
+    "**** (skg (vnid 0e) node (gnid x) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 1 (ancestors 2)))) (birth (contains out 2)))) x"
+    "*** (skg (vnid 0f) mentionerFolder)"
+    "**** (skg (vnid 0g) node (gnid y) (skgRepos (nodeRepo main)) (view (rels (linksTo (out 1 (ancestors 2)))) (birth (linksTo out 2))) (diff (rel added) (properties changed) (leaves 1 node))) y2"
+    "see [[id:a][a]]"
+    "***** (skg (vnid 0w) (oldText titleAndBody) (diff (leaves 1))) y"
+    "****** (skg (vnid 0x) bodyDiff)"
+    "+see [[id:a][a]]"
+    "*** (skg (vnid 0h) subscriberFolder)"
+    "**** (skg (vnid 0i) node (gnid s) (skgRepos (nodeRepo main)) writeProtected (view (rels (subscribesTo (out 1 (ancestors 2)))) (birth (subscribesTo out 2))) (diff (rel added) (leaves 1 rel))) s"
+    "* (skg (vnid 0j) node (gnid r2) (skgRepos (nodeRepo main)) (view (rels (contains (out 1))))) r2"
+    "** (skg (vnid 0k) (changesetMarker content) (diff (leaves 1 rel)))"
+    "** (skg (vnid 0l) node (gnid a) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 2 (ancestors 1))) (linksTo (in 1 (substantive 1))) (subscribesTo (in 1))) (birth (contains in 1))) (diff (rel added) (leaves 1 rel))) a"
+    "* (skg (vnid 0m) node (gnid s) (skgRepos (nodeRepo main)) (view (rels (subscribesTo (out 1))))) s"
+    "** (skg (vnid 0n) subscribeeFolder)"
+    "*** (skg (vnid 0o) node (gnid a) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 2) (out 0 (unintegrated 0))) (linksTo (in 1 (substantive 1))) (subscribesTo (in 1 (ancestors 2)))) (birth (subscribesTo in 2))) (diff (rel added) (leaves 1 rel))) a"
+    "**** (skg (vnid 0p) ghost (gnid m) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed))) m"
+    "***** (skg (vnid 0q) node (gnid a) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 2)) (linksTo (in 1 (substantive 1))) (subscribesTo (in 1))) ghostWarrant cycle) (diff (rel removed) (leaves 1 rel))) a"
+    "**** (skg (vnid 0r) node (gnid r2) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 1 (ancestors 1)))))) r2"
+    "**** (skg (vnid 0s) node (gnid x) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 1 (ancestors 1)))))) x"
+    "* (skg (vnid 0t) node (gnid y) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (linksTo (out 1)))) (diff (properties changed) (leaves 1 node))) y2")
+  "The same view after C-c s e on y in a's mentioners folder (line 7),
+as the server drew it: y's old text (line 9) now stands only there,
+inside the folder, and y's root (line 24) is write-protected.")
+
+(defun test-skg-processed--visited-lines (lines anywhere)
+  "The lines of LINES a motion between changes visits: every one, when
+ANYWHERE, a capital's, and otherwise a plain one's."
+  (with-temp-buffer
+    (org-mode)
+    (insert (mapconcat #'identity lines "\n") "\n")
+    (goto-char (point-min))
+    (let ((visited '()))
+      (while (not (eobp))
+        (when (skg--diffView-change-start-on-line nil anywhere)
+          (push (line-number-at-pos) visited))
+        (forward-line 1))
+      (nreverse visited))))
+
+(defun test-skg-processed--skipped-changes-are-drawn-editable-p (lines)
+  "Check, on the diff view LINES, the property the plain motions
+promise in a view extended to every change: each headline with change
+facts that C-c r n c skips is a ☮ member of a folder of other files'
+relationships, and its node stands editable elsewhere in the buffer,
+where the plain motion visits what it names: when it names 'node', a
+headline there or under it; when it names 'rel', a headline under it
+standing for the folder's viewparent, the relationship's other end.
+Returns the skipped lines."
+  (let* ((visited (test-skg-processed--visited-lines lines nil))
+         (skipped (seq-difference
+                   (test-skg-processed--visited-lines lines t) visited)))
+    (with-temp-buffer
+      (org-mode)
+      (insert (mapconcat #'identity lines "\n") "\n")
+      (dolist (line skipped)
+        (goto-char (point-min)) (forward-line (1- line))
+        (let* ((sexp (skg--metadata-sexp-at-point-or-nil))
+               (gnid (format "%s" (cadr (assq 'gnid (cdr sexp)))))
+               (objects (cdr (skg--processed-leaves sexp)))
+               (partner (save-excursion
+                          (org-up-heading-safe) (org-up-heading-safe)
+                          (format "%s" (cadr (assq 'gnid (cdr (skg--metadata-sexp-at-point-or-nil))))))))
+          (should (skg--diffView-change-of-other-files-p sexp))
+          (goto-char (point-min))
+          (should
+           (cl-loop
+            while (re-search-forward
+                   (format "^\\*+ (skg .*(gnid %s)" (regexp-quote gnid)) nil t)
+            thereis
+            (save-excursion
+              (beginning-of-line)
+              (let ((occurrence (skg--metadata-sexp-at-point-or-nil))
+                    (start (line-number-at-pos))
+                    (end (save-excursion (org-end-of-subtree t t)
+                                         (line-number-at-pos))))
+                (and (skg--occurrence-sexp-p occurrence)
+                     (not (skg--node-write-protected-p occurrence))
+                     (or (not (memq 'node objects))
+                         (seq-some (lambda (v) (and (>= v start) (< v end)))
+                                   visited))
+                     (or (not (memq 'rel objects))
+                         (seq-some
+                          (lambda (v)
+                            (and (> v start) (< v end)
+                                 (string-match-p
+                                  (format "(gnid %s)" (regexp-quote partner))
+                                  (nth (1- v) lines))))
+                          visited)))))))))
+      skipped)))
+
+(ert-deftest test-skg-diffView-plain-motions-skip-members-of-other-files-folders ()
+  "C-c r n c and C-c r p c skip the ☮ members of a's containers,
+mentioners and subscribers folders; the capitals visit them."
+  (let ((lines test-skg-processed--complete-diff-view))
+    (should (equal (test-skg-processed--goto-changes
+                    lines 1 #'skg-diffView-goto-next-change 8)
+                   '(2 11 12 15 17 20 22 "No further change")))
+    (should (equal (test-skg-processed--goto-changes
+                    lines 1 #'skg-diffView-goto-next-change-anywhere 11)
+                   '(2 4 7 9 11 12 15 17 20 22 "No further change")))
+    (should (equal (test-skg-processed--goto-changes
+                    lines nil #'skg-diffView-goto-previous-change 8)
+                   '(22 20 17 15 12 11 2 1)))
+    (should (equal (test-skg-processed--goto-changes
+                    lines nil #'skg-diffView-goto-previous-change-anywhere 4)
+                   '(22 20 17 15)))))
+
+(ert-deftest test-skg-diffView-plain-motions-reach-every-change-of-a-complete-view ()
+  "Jeff's requirement: in a view extended to every change, the plain
+motion reaches each change. Where a member stands write-protected in a
+folder of other files, its change is drawn where its node is editable;
+where a member was made editable there (C-c s e), it and its old text
+are visited inside the folder."
+  (should (equal (test-skg-processed--skipped-changes-are-drawn-editable-p
+                  test-skg-processed--complete-diff-view)
+                 '(4 7 9)))
+  (let ((lines test-skg-processed--diff-view-with-an-editable-member))
+    (should (equal (test-skg-processed--skipped-changes-are-drawn-editable-p
+                    lines)
+                   '(4 13)))
+    (should (equal (test-skg-processed--visited-lines lines nil)
+                   '(1 2 7 9 15 16 19 21 24)))))
+
+(ert-deftest test-skg-diffView-plain-motions-visit-ghosts-and-restricted-members ()
+  "Only a write-protected occurrence is skipped. A ghost in a folder of
+other files is visited: a deleted subscriber's subscription stands
+only there. A restricted member is visited: its relationship's
+recorder cannot be drawn editable. A member of a folder of the
+viewparent's own file (its subscribees) is visited."
+  (let ((lines
+         '("* (skg node (gnid x) (skgRepos (nodeRepo main))) x"
+           "** (skg subscriberFolder)"
+           "*** (skg ghost (gnid g) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed) (leaves 2 node rel))) g"
+           "** (skg containerFolder)"
+           "*** (skg restricted (gnid h) (diff (rel added) (leaves 1 rel)))"
+           "*** (skg node (gnid c) (skgRepos (nodeRepo main)) writeProtected (diff (rel added) (leaves 1 rel))) c"
+           "** (skg subscribeeFolder)"
+           "*** (skg node (gnid e) (skgRepos (nodeRepo main)) writeProtected (diff (rel added) (leaves 1 rel))) e")))
+    (should (equal (test-skg-processed--goto-changes
+                    lines 1 #'skg-diffView-goto-next-change 4)
+                   '(3 5 8 "No further change")))
+    (should (equal (test-skg-processed--goto-changes
+                    lines 1 #'skg-diffView-goto-next-change-anywhere 4)
+                   '(3 5 6 8)))))
+
+(ert-deftest test-skg-diffView-no-change-message-names-the-capital-key ()
+  "When a plain motion finds nothing but the capital would, it says so
+and names the capital's key."
+  (let ((lines (seq-take test-skg-processed--complete-diff-view 9)))
+    (should (equal (test-skg-processed--goto-changes
+                    lines 3 #'skg-diffView-goto-next-change 1)
+                   '("No further change but ☮ ones in \"(other files)\" folders; C-c r n C visits them")))
+    (should (equal (test-skg-processed--goto-changes
+                    lines 3 #'skg-diffView-goto-next-unprocessed-change 1)
+                   '("No further unprocessed change but ☮ ones in \"(other files)\" folders; C-c r n U visits them")))
+    (should (equal (test-skg-processed--goto-changes
+                    lines 3 #'skg-diffView-goto-next-processed-change 1)
+                   '("No further processed change")))
+    (should (equal (test-skg-processed--goto-changes
+                    (list (nth 2 lines) (nth 3 lines)) nil
+                    #'skg-diffView-goto-previous-change 1)
+                   '("No earlier change but ☮ ones in \"(other files)\" folders; C-c r p C visits them")))))
+
+(ert-deftest test-skg-diffView-other-files-folders-are-those-labelled-so ()
+  "'folder_heralds.other_files' names exactly the folders whose
+changed label says \"(other files)\"."
+  (let* ((folder-heralds (alist-get 'folder_heralds skg-shared-herald-styles))
+         (labelled (seq-filter
+                    (lambda (entry)
+                      (string-suffix-p "(other files)" (cdr entry)))
+                    (alist-get 'changed_labels folder-heralds))))
+    (should (equal (sort (mapcar (lambda (e) (symbol-name (car e))) labelled)
+                         #'string<)
+                   (sort (copy-sequence (alist-get 'other_files folder-heralds))
+                         #'string<)))))
+
+(ert-deftest test-skg-diffView-capital-motion-keybindings ()
+  (dolist (pair '(("C-c r n C" . skg-diffView-goto-next-change-anywhere)
+                  ("C-c r n U" . skg-diffView-goto-next-unprocessed-change-anywhere)
+                  ("C-c r n P" . skg-diffView-goto-next-processed-change-anywhere)
+                  ("C-c r p C" . skg-diffView-goto-previous-change-anywhere)
+                  ("C-c r p U" . skg-diffView-goto-previous-unprocessed-change-anywhere)
+                  ("C-c r p P" . skg-diffView-goto-previous-processed-change-anywhere)))
+    (should (eq (lookup-key skg-content-view-mode-map (kbd (car pair)))
+                (cdr pair)))))
+
 (ert-deftest test-skg-membership-change-processed-checks-every-relRepo-move ()
   "A folder member's change is processed only when every '(relRepoMove ...)'
 child is, not the first alone."

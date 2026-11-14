@@ -863,10 +863,21 @@ commit lapses the marks of everything it committed.
 *** C-c r n c : skg-diffView-goto-next-change
 Moves point to the next headline with change facts after point: a headline whose
 metadata carries a '(leaves ...)' change fact, the server's count of the
-changes it names. Point lands at the start of the headline's line.
+changes it names. It skips a ☮ occurrence (not a ghost) standing directly in a folder
+labelled "... (other files)" (its other containers, mentioners,
+subscribers, overriders or hiders changed): that member records the
+relationship in its own file, and its change is drawn, and visited,
+where its node stands editable. C-c r n C visits those too.
+Point lands at the start of the headline's line.
 It does not wrap: past the last one it says "No further
-change" and leaves point. It works in any skg buffer; outside the
+change" and leaves point, or, when only skipped ones are left, "No
+further change but ☮ ones in "(other files)" folders; C-c r n C visits
+them". It works in any skg buffer; outside the
 diff view no headline names a change, so it finds none.
+In a diff view extended to every change (C-c r u), it reaches every
+change. In one not extended, a node shown only as such a ☮ member has
+its change shown only there, and only C-c r n C reaches it; the
+processed summary counts such changes as not editable in this view.
 *** C-c r n u : skg-diffView-goto-next-unprocessed-change
 The same, visiting only headlines with change facts that are not
 processed: a headline counts as processed when every change it names
@@ -884,6 +895,21 @@ unprocessed change".
 *** C-c r p p : skg-diffView-goto-previous-processed-change
 Like C-c r n p, backward. Before the first one it says "No earlier
 processed change".
+*** C-c r n C : skg-diffView-goto-next-change-anywhere
+Like C-c r n c, visiting the headlines it skips too: every headline
+with change facts. Each of the six motions has such a twin, its last
+letter capital, ending in '-anywhere'; at the end each says what its
+plain twin says, naming no other key.
+*** C-c r n U : skg-diffView-goto-next-unprocessed-change-anywhere
+Like C-c r n u, skipping nothing.
+*** C-c r n P : skg-diffView-goto-next-processed-change-anywhere
+Like C-c r n p, skipping nothing.
+*** C-c r p C : skg-diffView-goto-previous-change-anywhere
+Like C-c r p c, skipping nothing.
+*** C-c r p U : skg-diffView-goto-previous-unprocessed-change-anywhere
+Like C-c r p u, skipping nothing.
+*** C-c r p P : skg-diffView-goto-previous-processed-change-anywhere
+Like C-c r p p, skipping nothing.
 ** C-c m : processed marks, in the diff view
 *** preamble
 In a buffer of the diff view (C-c v d), each change can be

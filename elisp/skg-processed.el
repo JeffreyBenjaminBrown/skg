@@ -409,62 +409,128 @@ it (`skg--metadata-with-processed-request')."
 ;;; '(leaves ...)' fact. It is processed when its '(processed ...)' names every
 ;;; object that fact lists, and otherwise unprocessed. Outside the diff view no
 ;;; headline carries one, so these commands report no change there.
+;;;
+;;; The plain commands skip a write-protected occurrence (☮, but not a ghost)
+;;; standing directly in a folder whose changed label says "(other files)"
+;;; ('other_files' in 'shared/herald-styles.json'): the member records that
+;;; relationship in its own file, and its change is drawn, and visited, at
+;;; its node's editable occurrence. The commands ending in '-anywhere'
+;;; (a capital last letter) visit every headline with change facts.
+;;; Only the headline and its parent are read: in a diff view extended to
+;;; every change, the plain commands reach each change at least once.
 
 (defun skg-diffView-goto-next-change ()
-  "Move point to the next headline with change facts after point."
+  "Move point to the next headline with change facts after point,
+skipping a write-protected member of a folder of other files'
+relationships."
   (interactive)
-  (skg--diffView-goto-change 'next nil))
+  (skg--diffView-goto-change 'next nil nil))
 
 (defun skg-diffView-goto-next-unprocessed-change ()
-  "Move point to the next unprocessed headline with change facts after point."
+  "Move point to the next unprocessed headline with change facts after
+point, skipping a write-protected member of a folder of other files'
+relationships."
   (interactive)
-  (skg--diffView-goto-change 'next 'unprocessed))
+  (skg--diffView-goto-change 'next 'unprocessed nil))
 
 (defun skg-diffView-goto-next-processed-change ()
-  "Move point to the next processed headline with change facts after point."
+  "Move point to the next processed headline with change facts after
+point, skipping a write-protected member of a folder of other files'
+relationships."
   (interactive)
-  (skg--diffView-goto-change 'next 'processed))
+  (skg--diffView-goto-change 'next 'processed nil))
 
 (defun skg-diffView-goto-previous-change ()
-  "Move point to the previous headline with change facts before point."
+  "Move point to the previous headline with change facts before point,
+skipping a write-protected member of a folder of other files'
+relationships."
   (interactive)
-  (skg--diffView-goto-change 'previous nil))
+  (skg--diffView-goto-change 'previous nil nil))
 
 (defun skg-diffView-goto-previous-unprocessed-change ()
-  "Move point to the previous unprocessed headline with change facts before point."
+  "Move point to the previous unprocessed headline with change facts
+before point, skipping a write-protected member of a folder of other
+files' relationships."
   (interactive)
-  (skg--diffView-goto-change 'previous 'unprocessed))
+  (skg--diffView-goto-change 'previous 'unprocessed nil))
 
 (defun skg-diffView-goto-previous-processed-change ()
+  "Move point to the previous processed headline with change facts
+before point, skipping a write-protected member of a folder of other
+files' relationships."
+  (interactive)
+  (skg--diffView-goto-change 'previous 'processed nil))
+
+(defun skg-diffView-goto-next-change-anywhere ()
+  "Move point to the next headline with change facts after point."
+  (interactive)
+  (skg--diffView-goto-change 'next nil t))
+
+(defun skg-diffView-goto-next-unprocessed-change-anywhere ()
+  "Move point to the next unprocessed headline with change facts after point."
+  (interactive)
+  (skg--diffView-goto-change 'next 'unprocessed t))
+
+(defun skg-diffView-goto-next-processed-change-anywhere ()
+  "Move point to the next processed headline with change facts after point."
+  (interactive)
+  (skg--diffView-goto-change 'next 'processed t))
+
+(defun skg-diffView-goto-previous-change-anywhere ()
+  "Move point to the previous headline with change facts before point."
+  (interactive)
+  (skg--diffView-goto-change 'previous nil t))
+
+(defun skg-diffView-goto-previous-unprocessed-change-anywhere ()
+  "Move point to the previous unprocessed headline with change facts before point."
+  (interactive)
+  (skg--diffView-goto-change 'previous 'unprocessed t))
+
+(defun skg-diffView-goto-previous-processed-change-anywhere ()
   "Move point to the previous processed headline with change facts before point."
   (interactive)
-  (skg--diffView-goto-change 'previous 'processed))
+  (skg--diffView-goto-change 'previous 'processed t))
 
-(defun skg--diffView-goto-change (direction processed)
+(defun skg--diffView-goto-change (direction processed anywhere)
   "Move point to the nearest headline with change facts after point (DIRECTION
 'next) or before it (DIRECTION 'previous), in buffer order, without
 wrapping: one that is PROCESSED ('processed or 'unprocessed), or
-any headline with change facts when PROCESSED is nil. Point lands at
-the start of that headline's line, where it is easiest to see. When
-there is none, say so and leave point."
-  (let ((target (skg--diffView-change-position direction processed)))
+any headline with change facts when PROCESSED is nil. Unless ANYWHERE,
+skip one that `skg--diffView-change-of-other-files-p' calls a change of
+other files. Point lands at the start of that headline's line, where
+it is easiest to see. When there is none, say so and leave point; if
+the command with ANYWHERE would find one, say which key that is."
+  (let ((target (skg--diffView-change-position direction processed anywhere)))
     (if target
         (goto-char target)
-      (message "%s"
-               (concat "No "
-                       (if (eq direction 'next) "further" "earlier")
-                       (when processed
-                         (concat " " (symbol-name processed)))
-                       " change")))))
+      (message "%s" (skg--diffView-no-change-message
+                     direction processed
+                     (and (not anywhere)
+                          (skg--diffView-change-position
+                           direction processed t)))))))
 
-(defun skg--diffView-change-position (direction processed)
+(defun skg--diffView-no-change-message (direction processed others-exist)
+  "What a motion between changes in DIRECTION, of kind PROCESSED, says
+when it finds none. OTHERS-EXIST non-nil when it skipped some that its
+'-anywhere' command, whose key it names, would visit."
+  (let ((kind (concat (if (eq direction 'next) "further" "earlier")
+                      (when processed (concat " " (symbol-name processed))))))
+    (if others-exist
+        (format "No %s change but ☮ ones in \"(other files)\" folders; C-c r %s %s visits them"
+                kind
+                (if (eq direction 'next) "n" "p")
+                (pcase processed
+                  ('processed "P") ('unprocessed "U") (_ "C")))
+      (format "No %s change" kind))))
+
+(defun skg--diffView-change-position (direction processed anywhere)
   "Where `skg--diffView-goto-change' would move point, or nil."
   (let ((start-pos (point))
         (step (if (eq direction 'next) 1 -1)))
     (save-excursion
       (beginning-of-line)
       (cl-loop for change-pos = (skg--diffView-change-start-on-line
-                                 processed)
+                                 processed anywhere)
                when (and change-pos
                          (if (eq direction 'next)
                              (> change-pos start-pos)
@@ -473,9 +539,11 @@ there is none, say so and leave point."
                while (and (zerop (forward-line step))
                           (not (eobp)))))))
 
-(defun skg--diffView-change-start-on-line (processed)
+(defun skg--diffView-change-start-on-line (processed anywhere)
   "On a headline with change facts that is PROCESSED (any when nil),
-the position of the start of its line; otherwise nil."
+and, unless ANYWHERE, is no change of other files
+\(`skg--diffView-change-of-other-files-p'), the position of the start
+of its line; otherwise nil."
   (when (looking-at "^\\*+ (skg")
     (let ((line-start (match-beginning 0))
           (metadata-sexp (ignore-errors
@@ -485,8 +553,30 @@ the position of the start of its line; otherwise nil."
                  (pcase processed
                    ('processed (skg--processed-p metadata-sexp))
                    ('unprocessed (not (skg--processed-p metadata-sexp)))
-                   (_ t)))
+                   (_ t))
+                 (or anywhere
+                     (not (skg--diffView-change-of-other-files-p
+                           metadata-sexp))))
         line-start))))
+
+(defun skg--diffView-change-of-other-files-p (metadata-sexp)
+  "Non-nil when the headline at point, with METADATA-SEXP, is a
+write-protected occurrence (☮, not a ghost) and its parent is a folder
+of other files: one listed by 'other_files', in 'folder_heralds' of
+'shared/herald-styles.json'. Its changes are drawn at its own node's
+editable occurrence, so the plain motions skip it. A ghost is visited:
+a deleted subscriber's subscription, say, is drawn nowhere else."
+  (and (skg--node-write-protected-p metadata-sexp)
+       (save-excursion
+         (and (org-up-heading-safe)
+              (let ((folder (skg--folder-atom
+                             (ignore-errors
+                               (skg--metadata-sexp-at-point-or-nil)))))
+                (and folder
+                     (member (symbol-name folder)
+                             (alist-get 'other_files
+                                        (alist-get 'folder_heralds
+                                                   skg-shared-herald-styles)))))))))
 
 ;;; The processed summary
 

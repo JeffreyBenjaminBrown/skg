@@ -634,6 +634,26 @@ p u and C-c r p p to the previous ones. A headline with change facts is processe
 when its '(processed ...)' names every object its '(leaves ...)' lists.
 They do not wrap: at the end they say "No further change" (or "No
 earlier change", with "unprocessed" or "processed" for the filtered forms).
+They skip a write-protected occurrence (☮; a ghost is not skipped)
+standing directly in a folder whose changed label says "(other
+files)", the folders 'folder_heralds.other_files' in
+'shared/herald-styles.json' lists: its other containers, mentioners,
+subscribers, overriders and hiders. Each such member records its
+relationship to the folder's viewparent in its own file, so every
+change it carries is a leaf it records, and in a buffer extended to
+every change its node has an editable occurrence, where the refresh
+draws every leaf the node records: its node changes on its headline
+or under it, its relationships among its content or in a folder of
+its own file. A ghost is visited because a deleted node's ghost
+draws no partner folders: a deleted subscriber's subscription stands
+only on its ghost in the subscribers folder. A member made editable
+inside such a folder (C-c s e) is not skipped, nor is anything under
+it, since its changes are then drawn there. So in a buffer extended
+to every change, the plain motions reach each change. Under a skipped
+member they still visit its relRepo move, a change of the member's
+file seen from the other side. The same six keys with a capital last
+letter (C-c r n C, ...) skip nothing. When a plain motion finds
+nothing but its capital would, it says so and names the capital's key.
 ** The processed summary
 The answer to each "diff view" request for a nonempty buffer, to each
 save of a buffer of the diff view, and to C-c r u carries the

@@ -23,6 +23,7 @@ local metadata = require('skg.metadata')
 local modify_graph = require('skg.modify_graph')
 local payload = require('skg.payload')
 local sexpr = require('skg.sexpr.parse')
+local shared = require('skg.shared')
 
 local M = {}
 
@@ -450,57 +451,115 @@ end
 -- fact. It is processed when its '(processed ...)' names every object that
 -- fact lists, and otherwise unprocessed. Outside the diff view no
 -- headline carries one, so these commands report no change there.
+--
+-- The plain commands skip a write-protected occurrence (☮, but not a ghost)
+-- standing directly in a folder whose changed label says "(other files)"
+-- ('other_files' in 'shared/herald-styles.json'): the member records that
+-- relationship in its own file, and its change is drawn, and visited, at
+-- its node's editable occurrence. The commands ending in '_anywhere' (a
+-- capital last letter) visit every headline with change facts. Only the
+-- headline and its parent are read: in a diff view extended to every
+-- change, the plain commands reach each change at least once.
 
 function M.diffView_goto_next_change ()
-  M.diffView_goto_change('next', nil)
+  M.diffView_goto_change('next', nil, false)
 end
 
 function M.diffView_goto_next_unprocessed_change ()
-  M.diffView_goto_change('next', 'unprocessed')
+  M.diffView_goto_change('next', 'unprocessed', false)
 end
 
 function M.diffView_goto_next_processed_change ()
-  M.diffView_goto_change('next', 'processed')
+  M.diffView_goto_change('next', 'processed', false)
 end
 
 function M.diffView_goto_previous_change ()
-  M.diffView_goto_change('previous', nil)
+  M.diffView_goto_change('previous', nil, false)
 end
 
 function M.diffView_goto_previous_unprocessed_change ()
-  M.diffView_goto_change('previous', 'unprocessed')
+  M.diffView_goto_change('previous', 'unprocessed', false)
 end
 
 function M.diffView_goto_previous_processed_change ()
-  M.diffView_goto_change('previous', 'processed')
+  M.diffView_goto_change('previous', 'processed', false)
+end
+
+function M.diffView_goto_next_change_anywhere ()
+  M.diffView_goto_change('next', nil, true)
+end
+
+function M.diffView_goto_next_unprocessed_change_anywhere ()
+  M.diffView_goto_change('next', 'unprocessed', true)
+end
+
+function M.diffView_goto_next_processed_change_anywhere ()
+  M.diffView_goto_change('next', 'processed', true)
+end
+
+function M.diffView_goto_previous_change_anywhere ()
+  M.diffView_goto_change('previous', nil, true)
+end
+
+function M.diffView_goto_previous_unprocessed_change_anywhere ()
+  M.diffView_goto_change('previous', 'unprocessed', true)
+end
+
+function M.diffView_goto_previous_processed_change_anywhere ()
+  M.diffView_goto_change('previous', 'processed', true)
 end
 
 ---Move point to the nearest headline with change facts after point (DIRECTION
 ---'next') or before it (DIRECTION 'previous'), in buffer order,
 ---without wrapping: one that is PROCESSED ('processed' or
----'unprocessed'), or any headline with change facts when PROCESSED is nil. Point
----lands at the start of that headline's line, where it is easiest to
----see. When there is none, say so and leave point.
+---'unprocessed'), or any headline with change facts when PROCESSED is nil.
+---Unless ANYWHERE, skip one M.diffView_change_of_other_files_p calls a
+---change of other files. Point lands at the start of that headline's
+---line, where it is easiest to see. When there is none, say so and
+---leave point; if the command with ANYWHERE would find one, say which
+---key that is.
 ---@param direction string
 ---@param processed string|nil
-function M.diffView_goto_change (direction, processed)
-  local target = M.diffView_change_position(direction, processed)
+---@param anywhere boolean
+function M.diffView_goto_change (direction, processed, anywhere)
+  local target = M.diffView_change_position(direction, processed, anywhere)
   if target then
     vim.api.nvim_win_set_cursor(0, target)
   else
-    vim.notify('No '
-               .. (direction == 'next' and 'further' or 'earlier')
+    vim.notify(M.diffView_no_change_message(
+      direction, processed,
+      not anywhere
+        and M.diffView_change_position(direction, processed, true) ~= nil))
+  end
+end
+
+---What a motion between changes in DIRECTION, of kind PROCESSED, says
+---when it finds none. OTHERS_EXIST when it skipped some that its
+---'_anywhere' command, whose key it names, would visit.
+---@param direction string
+---@param processed string|nil
+---@param others_exist boolean
+---@return string
+function M.diffView_no_change_message (direction, processed, others_exist)
+  local kind = (direction == 'next' and 'further' or 'earlier')
                .. (processed and (' ' .. processed) or '')
-               .. ' change') end
+  if not others_exist then return 'No ' .. kind .. ' change' end
+  local last_letter = processed == 'processed' and 'P'
+                      or processed == 'unprocessed' and 'U' or 'C'
+  return 'No ' .. kind
+         .. ' change but ☮ ones in "(other files)" folders; <localleader>r'
+         .. (direction == 'next' and 'n' or 'p') .. last_letter
+         .. ' visits them'
 end
 
 ---Where diffView_goto_change would move point, as {line, col}, or nil.
 ---@param direction string
 ---@param processed string|nil
+---@param anywhere boolean
 ---@return table|nil
-function M.diffView_change_position (direction, processed)
+function M.diffView_change_position (direction, processed, anywhere)
   local cursor = vim.api.nvim_win_get_cursor(0)
-  local col = M.diffView_change_start_on_line(cursor[1], processed)
+  local col = M.diffView_change_start_on_line(cursor[1], processed, anywhere)
   if col and (direction == 'next' and col > cursor[2]
               or direction == 'previous' and col < cursor[2]) then
     return { cursor[1], col } end
@@ -508,7 +567,7 @@ function M.diffView_change_position (direction, processed)
                                    or metadata.previous_headline_line
   local line_number = step(cursor[1])
   while line_number do
-    col = M.diffView_change_start_on_line(line_number, processed)
+    col = M.diffView_change_start_on_line(line_number, processed, anywhere)
     if col then return { line_number, col } end
     line_number = step(line_number)
   end
@@ -516,11 +575,14 @@ function M.diffView_change_position (direction, processed)
 end
 
 ---On a headline with change facts at LINE_NUMBER that is PROCESSED
----(any when nil), column 0, the start of its line; otherwise nil.
+---(any when nil), and, unless ANYWHERE, is no change of other files
+---(M.diffView_change_of_other_files_p), column 0, the start of its line;
+---otherwise nil.
 ---@param line_number integer
 ---@param processed string|nil
+---@param anywhere boolean
 ---@return integer|nil
-function M.diffView_change_start_on_line (line_number, processed)
+function M.diffView_change_start_on_line (line_number, processed, anywhere)
   local stars = metadata.line_text(line_number):match('^(%*+ )%(skg')
   if not stars then return nil end
   local metadata_sexp = metadata.metadata_sexp_at_line_or_nil(line_number)
@@ -529,7 +591,30 @@ function M.diffView_change_start_on_line (line_number, processed)
   if processed == 'processed' and not M.processed_p(metadata_sexp)
      or processed == 'unprocessed' and M.processed_p(metadata_sexp) then
     return nil end
+  if not anywhere
+     and M.diffView_change_of_other_files_p(line_number, metadata_sexp) then
+    return nil end
   return 0
+end
+
+---Is the headline at LINE_NUMBER, with METADATA_SEXP, a write-protected
+---occurrence (☮, not a ghost), its parent a folder
+---'shared/herald-styles.json' lists in 'folder_heralds.other_files'?
+---Its changes are drawn at its node's own editable occurrence, so the
+---plain motions skip it there. A ghost is visited: a deleted
+---subscriber's subscription, say, is drawn nowhere else.
+---@param line_number integer
+---@param metadata_sexp any
+---@return boolean
+function M.diffView_change_of_other_files_p (line_number, metadata_sexp)
+  if not (metadata.occurrence_sexp_p(metadata_sexp)
+          and metadata.node_write_protected_p(metadata_sexp)) then
+    return false end
+  local parent = metadata.parent_line(line_number)
+  local folder = parent and metadata.folder_atom(
+    metadata.metadata_sexp_at_line_or_nil(parent))
+  return folder ~= nil and vim.tbl_contains(
+    shared.herald_styles.folder_heralds.other_files, folder)
 end
 
 -- ── the processed summary ──────────────────────────────────────────

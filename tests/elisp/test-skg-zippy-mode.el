@@ -85,6 +85,28 @@ still the ordinary prefix."
     ;; A mark is typed in zippy as Jeff wrote it.
     (should (eq (key-binding (kbd "m n p")) #'skg-mark-node-processed))))
 
+(ert-deftest test-skg-zippy-a-capital-last-letter-is-its-own-motion ()
+  "In zippy, 'r n C' runs the motion that visits every change, and
+is not shift-translated to 'r n c', which skips a ☮ member of a folder
+of other files."
+  (test-skg-zippy--with-buffers
+      ((view (skg-content-view-mode)))
+    (with-current-buffer view
+      (insert "* (skg node (gnid x) (skgRepos (nodeRepo main))) x\n"
+              "** (skg mentionerFolder)\n"
+              "*** (skg node (gnid y) (skgRepos (nodeRepo main)) writeProtected (diff (properties changed) (leaves 1 node))) y\n"
+              "** (skg node (gnid z) (skgRepos (nodeRepo main)) (diff (properties changed) (leaves 1 node))) z\n"))
+    (switch-to-buffer view)
+    (skg-zippy-mode 1)
+    (should (eq (key-binding (kbd "r n C"))
+                #'skg-diffView-goto-next-change-anywhere))
+    (goto-char (point-min))
+    (test-skg-zippy--type-into view "r n c")
+    (should (= (line-number-at-pos) 4))
+    (goto-char (point-min))
+    (test-skg-zippy--type-into view "r n C")
+    (should (= (line-number-at-pos) 3))))
+
 (ert-deftest test-skg-zippy-is-one-state-for-every-skg-buffer ()
   "C-c z in one skg buffer turns zippy on in every skg buffer, the
 report buffer using its own C-c map, and in a view made later; a

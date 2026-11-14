@@ -644,6 +644,213 @@ describe('skg.processed moving between headlines with change facts', function ()
     end
   end)
 
+  -- The plain motions skip a ☮ member of a folder of other files.
+  -- Mirrors tests/elisp/test-skg-processed.el, whose two buffers
+  -- below the server drew; see the docstrings there.
+
+  local complete_diff_view = {
+    '* (skg (vnid 0a) ghost (gnid m) (skgRepos (nodeRepo main)) (diff (node removed) (leaves 1 node))) m',
+    '** (skg (vnid 0b) node (gnid a) (skgRepos (nodeRepo main)) (view (rels (contains (in 2)) (linksTo (in 1 (substantive 1))) (subscribesTo (in 1))) ghostWarrant) (diff (rel removed) (leaves 1 rel))) a',
+    '*** (skg (vnid 0c) containerFolder)',
+    '**** (skg (vnid 0d) node (gnid r2) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 1 (ancestors 2)))) (birth (contains out 2))) (diff (rel added) (leaves 1 rel))) r2',
+    '**** (skg (vnid 0e) node (gnid x) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 1 (ancestors 2)))) (birth (contains out 2)))) x',
+    '*** (skg (vnid 0f) mentionerFolder)',
+    '**** (skg (vnid 0g) node (gnid y) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (linksTo (out 1 (ancestors 2)))) (birth (linksTo out 2))) (diff (rel added) (properties changed) (leaves 1 node))) y2',
+    '*** (skg (vnid 0h) subscriberFolder)',
+    '**** (skg (vnid 0i) node (gnid s) (skgRepos (nodeRepo main)) writeProtected (view (rels (subscribesTo (out 1 (ancestors 2)))) (birth (subscribesTo out 2))) (diff (rel added) (leaves 1 rel))) s',
+    '* (skg (vnid 0j) node (gnid r2) (skgRepos (nodeRepo main)) (view (rels (contains (out 1))))) r2',
+    '** (skg (vnid 0k) (changesetMarker content) (diff (leaves 1 rel)))',
+    '** (skg (vnid 0l) node (gnid a) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 2 (ancestors 1))) (linksTo (in 1 (substantive 1))) (subscribesTo (in 1))) (birth (contains in 1))) (diff (rel added) (leaves 1 rel))) a',
+    '* (skg (vnid 0m) node (gnid s) (skgRepos (nodeRepo main)) (view (rels (subscribesTo (out 1))))) s',
+    '** (skg (vnid 0n) subscribeeFolder)',
+    '*** (skg (vnid 0o) node (gnid a) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 2) (out 0 (unintegrated 0))) (linksTo (in 1 (substantive 1))) (subscribesTo (in 1 (ancestors 2)))) (birth (subscribesTo in 2))) (diff (rel added) (leaves 1 rel))) a',
+    '**** (skg (vnid 0p) ghost (gnid m) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed))) m',
+    '***** (skg (vnid 0q) node (gnid a) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 2)) (linksTo (in 1 (substantive 1))) (subscribesTo (in 1))) ghostWarrant cycle) (diff (rel removed) (leaves 1 rel))) a',
+    '**** (skg (vnid 0r) node (gnid r2) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 1 (ancestors 1)))))) r2',
+    '**** (skg (vnid 0s) node (gnid x) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 1 (ancestors 1)))))) x',
+    '* (skg (vnid 0t) node (gnid y) (skgRepos (nodeRepo main)) (view (rels (linksTo (out 1)))) (diff (properties changed) (leaves 1 node))) y2',
+    'see [[id:a][a]]',
+    '** (skg (vnid 0u) (oldText titleAndBody) (diff (leaves 1))) y',
+    '*** (skg (vnid 0v) bodyDiff)',
+    '+see [[id:a][a]]',
+    '' }
+
+  local diff_view_with_an_editable_member = {
+    complete_diff_view[1], complete_diff_view[2], complete_diff_view[3],
+    complete_diff_view[4], complete_diff_view[5], complete_diff_view[6],
+    '**** (skg (vnid 0g) node (gnid y) (skgRepos (nodeRepo main)) (view (rels (linksTo (out 1 (ancestors 2)))) (birth (linksTo out 2))) (diff (rel added) (properties changed) (leaves 1 node))) y2',
+    'see [[id:a][a]]',
+    '***** (skg (vnid 0w) (oldText titleAndBody) (diff (leaves 1))) y',
+    '****** (skg (vnid 0x) bodyDiff)',
+    '+see [[id:a][a]]',
+    complete_diff_view[8], complete_diff_view[9], complete_diff_view[10],
+    complete_diff_view[11], complete_diff_view[12], complete_diff_view[13],
+    complete_diff_view[14], complete_diff_view[15], complete_diff_view[16],
+    complete_diff_view[17], complete_diff_view[18], complete_diff_view[19],
+    '* (skg (vnid 0t) node (gnid y) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (linksTo (out 1)))) (diff (properties changed) (leaves 1 node))) y2',
+    '' }
+
+  ---The lines of LINES a motion between changes visits: every one, when
+  ---ANYWHERE, a capital's, and otherwise a plain one's.
+  local function visited_lines (lines, anywhere)
+    local buf = vim.api.nvim_create_buf(true, false)
+    vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+    vim.api.nvim_set_current_buf(buf)
+    local visited = {}
+    for line_number = 1, #lines do
+      if processed.diffView_change_start_on_line(line_number, nil, anywhere) then
+        table.insert(visited, line_number) end
+    end
+    vim.api.nvim_buf_delete(buf, { force = true })
+    return visited
+  end
+
+  ---Check, on the diff view LINES, the property the plain motions promise
+  ---in a view extended to every change: each headline with change facts
+  ---that <localleader>rnc skips is a ☮ member of a folder of other files'
+  ---relationships, and its node stands editable elsewhere in the buffer,
+  ---where the plain motion visits what it names: when it names 'node', a
+  ---headline there or under it; when it names 'rel', a headline under it
+  ---standing for the folder's viewparent. Returns the skipped lines.
+  local function skipped_changes_are_drawn_editable (lines)
+    local visited = visited_lines(lines, false)
+    local is_visited = {}
+    for _, v in ipairs(visited) do is_visited[v] = true end
+    local skipped = {}
+    for _, line_number in ipairs(visited_lines(lines, true)) do
+      if not is_visited[line_number] then table.insert(skipped, line_number) end
+    end
+    local buf = vim.api.nvim_create_buf(true, false)
+    vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+    vim.api.nvim_set_current_buf(buf)
+    local ok, err = pcall(function ()
+      for _, line_number in ipairs(skipped) do
+        local sexp = metadata.metadata_sexp_at_line_or_nil(line_number)
+        assert.is_true(processed.diffView_change_of_other_files_p(line_number, sexp))
+        local gnid = lines[line_number]:match('%(gnid ([^)]+)%)')
+        local objects = metadata.processed_leaves(sexp).objects
+        local folder_line = metadata.parent_line(line_number)
+        local partner = lines[metadata.parent_line(folder_line)]:match('%(gnid ([^)]+)%)')
+        local found = false
+        for start = 1, #lines do
+          local occurrence = lines[start]:match('^%*+ %(skg') and
+                             lines[start]:match('%(gnid ([^)]+)%)') == gnid and
+                             metadata.metadata_sexp_at_line_or_nil(start)
+          if occurrence and metadata.occurrence_sexp_p(occurrence)
+             and not metadata.node_write_protected_p(occurrence) then
+            local level = #lines[start]:match('^(%*+)')
+            local stop = start + 1
+            while stop <= #lines do
+              local stars = lines[stop]:match('^(%*+) ')
+              if stars and #stars <= level then break end
+              stop = stop + 1
+            end
+            local node_drawn = not vim.tbl_contains(objects, 'node')
+            local rel_drawn = not vim.tbl_contains(objects, 'rel')
+            for _, v in ipairs(visited) do
+              if v >= start and v < stop then node_drawn = true end
+              if v > start and v < stop
+                 and lines[v]:match('%(gnid ([^)]+)%)') == partner then
+                rel_drawn = true end
+            end
+            if node_drawn and rel_drawn then found = true end
+          end
+        end
+        assert.is_true(found, 'line ' .. line_number)
+      end
+    end)
+    vim.api.nvim_buf_delete(buf, { force = true })
+    assert(ok, err)
+    return skipped
+  end
+
+  it('skips the ☮ members of folders of other files; the capitals visit them',
+     function ()
+    local lines = complete_diff_view
+    assert.are.same({ 2, 11, 12, 15, 17, 20, 22, 'No further change' },
+      goto_changes(lines, 1, processed.diffView_goto_next_change, 8))
+    assert.are.same({ 2, 4, 7, 9, 11, 12, 15, 17, 20, 22, 'No further change' },
+      goto_changes(lines, 1, processed.diffView_goto_next_change_anywhere, 11))
+    assert.are.same({ 22, 20, 17, 15, 12, 11, 2, 1 },
+      goto_changes(lines, 25, processed.diffView_goto_previous_change, 8))
+    assert.are.same({ 22, 20, 17, 15 },
+      goto_changes(lines, 25, processed.diffView_goto_previous_change_anywhere, 4))
+  end)
+
+  it('reaches every change of a view extended to every change (Jeff)',
+     function ()
+    assert.are.same({ 4, 7, 9 }, skipped_changes_are_drawn_editable(complete_diff_view))
+    assert.are.same({ 4, 13 },
+      skipped_changes_are_drawn_editable(diff_view_with_an_editable_member))
+    assert.are.same({ 1, 2, 7, 9, 15, 16, 19, 21, 24 },
+      visited_lines(diff_view_with_an_editable_member, false))
+  end)
+
+  it('skips only a write-protected occurrence: a ghost, a restricted member and an own-file folder are visited',
+     function ()
+    local lines = {
+      '* (skg node (gnid x) (skgRepos (nodeRepo main))) x',
+      '** (skg subscriberFolder)',
+      '*** (skg ghost (gnid g) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed) (leaves 2 node rel))) g',
+      '** (skg containerFolder)',
+      '*** (skg restricted (gnid h) (diff (rel added) (leaves 1 rel)))',
+      '*** (skg node (gnid c) (skgRepos (nodeRepo main)) writeProtected (diff (rel added) (leaves 1 rel))) c',
+      '** (skg subscribeeFolder)',
+      '*** (skg node (gnid e) (skgRepos (nodeRepo main)) writeProtected (diff (rel added) (leaves 1 rel))) e' }
+    assert.are.same({ 3, 5, 8, 'No further change' },
+      goto_changes(lines, 1, processed.diffView_goto_next_change, 4))
+    assert.are.same({ 3, 5, 6, 8 },
+      goto_changes(lines, 1, processed.diffView_goto_next_change_anywhere, 4))
+  end)
+
+  it('names the capital key when only skipped changes are left', function ()
+    local lines = { unpack(complete_diff_view, 1, 9) }
+    assert.are.same({ 'No further change but ☮ ones in "(other files)" folders; <localleader>rnC visits them' },
+      goto_changes(lines, 3, processed.diffView_goto_next_change, 1))
+    assert.are.same({ 'No further unprocessed change but ☮ ones in "(other files)" folders; <localleader>rnU visits them' },
+      goto_changes(lines, 3, processed.diffView_goto_next_unprocessed_change, 1))
+    assert.are.same({ 'No further processed change' },
+      goto_changes(lines, 3, processed.diffView_goto_next_processed_change, 1))
+    assert.are.same({ 'No earlier change but ☮ ones in "(other files)" folders; <localleader>rpC visits them' },
+      goto_changes({ lines[3], lines[4], '' }, 3,
+                   processed.diffView_goto_previous_change, 1))
+  end)
+
+  it("lists as other files' folders exactly those labelled so", function ()
+    local shared = require('skg.shared')
+    local folder_heralds = shared.herald_styles.folder_heralds
+    local labelled = {}
+    for atom, label in pairs(folder_heralds.changed_labels) do
+      if label:sub(-#'(other files)') == '(other files)' then
+        table.insert(labelled, atom) end
+    end
+    local listed = vim.deepcopy(folder_heralds.other_files)
+    table.sort(labelled)
+    table.sort(listed)
+    assert.are.same(labelled, listed)
+  end)
+
+  it('binds the six capitals under <localleader>rn and rp', function ()
+    local keymaps = require('skg.keymaps')
+    local by_lhs = {}
+    for _, binding in ipairs(keymaps.content_view_bindings) do
+      by_lhs[binding[1]] = binding[2] end
+    local expected = {
+      rnC = 'diffView_goto_next_change_anywhere',
+      rnU = 'diffView_goto_next_unprocessed_change_anywhere',
+      rnP = 'diffView_goto_next_processed_change_anywhere',
+      rpC = 'diffView_goto_previous_change_anywhere',
+      rpU = 'diffView_goto_previous_unprocessed_change_anywhere',
+      rpP = 'diffView_goto_previous_processed_change_anywhere' }
+    for lhs, fn in pairs(expected) do
+      local spec = keymaps.commands[by_lhs[lhs]]
+      assert.is_not_nil(spec, lhs)
+      assert.are.equal('skg.processed', spec.module, lhs)
+      assert.are.equal(fn, spec.fn, lhs)
+      assert.is_function(processed[spec.fn], lhs)
+    end
+  end)
+
   it("binds each mark as m, what, which way; capitals for the walks; no toggles", function ()
     -- '<localleader>m{n,r,b,h}{p,u}'; a capital last letter for
     -- contentward (Emacs's C-u), a capital 'M' for outward (C-u C-u).

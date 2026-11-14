@@ -151,7 +151,14 @@ and hide INTERNAL from M-x completion."
     (define-key map (kbd "C-c r n p") #'skg-diffView-goto-next-processed-change)
     (define-key map (kbd "C-c r p c") #'skg-diffView-goto-previous-change)
     (define-key map (kbd "C-c r p u") #'skg-diffView-goto-previous-unprocessed-change)
-    (define-key map (kbd "C-c r p p") #'skg-diffView-goto-previous-processed-change))
+    (define-key map (kbd "C-c r p p") #'skg-diffView-goto-previous-processed-change)
+    ;; a capital last letter: the same motion, folders of other files included
+    (define-key map (kbd "C-c r n C") #'skg-diffView-goto-next-change-anywhere)
+    (define-key map (kbd "C-c r n U") #'skg-diffView-goto-next-unprocessed-change-anywhere)
+    (define-key map (kbd "C-c r n P") #'skg-diffView-goto-next-processed-change-anywhere)
+    (define-key map (kbd "C-c r p C") #'skg-diffView-goto-previous-change-anywhere)
+    (define-key map (kbd "C-c r p U") #'skg-diffView-goto-previous-unprocessed-change-anywhere)
+    (define-key map (kbd "C-c r p P") #'skg-diffView-goto-previous-processed-change-anywhere))
   (progn;; processed marks, in the diff view: C-c m, what, which way
         ;; (prefix arg => recursive)
     (define-key map (kbd "C-c m n p") #'skg-mark-node-processed)
