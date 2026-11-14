@@ -8,3 +8,8 @@ foreign = true
 [[repos]]
 name = "main"
 path = "owned/main"
+
+[[repos]]
+name = "third"
+path = "third"
+foreign = true

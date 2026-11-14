@@ -1,0 +1,4 @@
+pid: other-child
+title: the other child
+overrides:
+  - child

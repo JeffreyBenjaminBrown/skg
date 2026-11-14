@@ -278,7 +278,8 @@ pub fn handle_save_buffer_request (
   let named_diffView_buffer_kind_result : Result<Option<DiffViewBufferKind>, String> =
     named_diffView_buffer_kind_from_request (request);
   let overrides_followed_result : Result<OverridesFollowed, String> =
-    overrides_followed_from_save_request (request);
+    overrides_followed_from_save_request (
+      request, & env . runtime_snapshot () . config );
   { // Send the early broad lock before reading the buffer, so the client's
     // one-shot save-lock handler always fires exactly once and balances its
     // pending-count -- even when the read below fails (otherwise only
@@ -643,10 +644,11 @@ fn named_diffView_buffer_kind_from_request (
 /// save.
 fn overrides_followed_from_save_request (
   request : &str,
+  config  : &SkgConfig,
 ) -> Result<OverridesFollowed, String> {
   match value_from_request_sexp ("overrides-followed", request) {
     Err (_) => Ok (OverridesFollowed::RootAuthors),
-    Ok (name) => OverridesFollowed::from_wire_name (&name)
+    Ok (name) => OverridesFollowed::from_wire_name (&name, config)
       . ok_or_else ( || format! (
         "The save request says the buffer follows the overrides of {:?}, which names no choice. Nothing was saved.",
         name )), }}
@@ -916,7 +918,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
           ) . entered();
         buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
           org_buffer_text, &runtime . graph, &runtime . config,
-          skgrepo_restriction, fork_skgrepos, &baseline, overrides_followed )
+          skgrepo_restriction, fork_skgrepos, &baseline, overrides_followed . clone () )
       } . map_err (
         |e| Box::new (e) as Box<dyn Error> ) ?;
   if viewforest . is_empty ()
@@ -1315,19 +1317,30 @@ fn viewforest_ids_of_views_to_lock (
 #[cfg(test)]
 mod overrides_followed_tests {
   use super::*;
+  use crate::types::misc::{Skgrepo, SkgrepoOwner};
+  use std::path::PathBuf;
 
   #[test]
   fn a_save_names_whose_overrides_its_buffer_follows_and_a_bad_name_refuses_it () {
-    assert_eq! ( overrides_followed_from_save_request (
-                   "((request . \"save buffer\") (view-id . \"v\"))" ),
+    let mut config : SkgConfig = SkgConfig::dummyFromSkgrepos (HashMap::new ());
+    for (name, owned) in [ ("main", true), ("tracy", false) ] {
+      config . skgrepos . insert (
+        SkgrepoName::from (name),
+        Skgrepo { name : SkgrepoName::from (name), abbreviation : None,
+                  path : PathBuf::from (name), owned } ); }
+    let named = |sexp : &str| overrides_followed_from_save_request (
+      &format! ("((request . \"save buffer\") (view-id . \"v\"){})", sexp), &config );
+    assert_eq! ( named (""), Ok (OverridesFollowed::RootAuthors) );
+    assert_eq! ( named (" (overrides-followed . \"user\")"),
+                 Ok (OverridesFollowed::user ()) );
+    assert_eq! ( named (" (overrides-followed . \"root authors\")"),
                  Ok (OverridesFollowed::RootAuthors) );
-    assert_eq! ( overrides_followed_from_save_request (
-                   "((request . \"save buffer\") (overrides-followed . \"user\"))" ),
-                 Ok (OverridesFollowed::User) );
-    assert_eq! ( overrides_followed_from_save_request (
-                   "((request . \"save buffer\") (overrides-followed . \"root authors\"))" ),
-                 Ok (OverridesFollowed::RootAuthors) );
-    assert! ( overrides_followed_from_save_request (
-                "((request . \"save buffer\") (overrides-followed . \"mine\"))" )
-              . is_err () ); }
+    assert_eq! ( named (" (overrides-followed . \"owner of tracy\")"),
+                 Ok ( OverridesFollowed::Owner (
+                   SkgrepoOwner::Foreign ( SkgrepoName::from ("tracy") )) ));
+    assert! ( named (" (overrides-followed . \"mine\")") . is_err () );
+    assert! ( named (" (overrides-followed . \"owner of main\")") . is_err (),
+              "an owned skgrepo names no foreign owner" );
+    assert! ( named (" (overrides-followed . \"owner of nobody\")") . is_err () ); }
 }
+

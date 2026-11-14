@@ -774,7 +774,7 @@ fn substitute_overriders (
      || tree . get (parent) . unwrap () . value () . editable_gnid () . is_none ()
   { return Ok (( )); }
   let follower : SkgrepoOwner = override_follower_of_tree_containing (
-    walk . truth . config, walk . truth . graph, walk . overrides_followed,
+    walk . truth . config, walk . truth . graph, &walk . overrides_followed,
     tree . get (parent) . unwrap () );
   if is_overridden_and_shown_raw (tree, parent, &follower, walk)
   { return Ok (( )); }

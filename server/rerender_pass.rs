@@ -183,7 +183,7 @@ pub fn update_views_after_save (
     if matches! (release, TextReleaseDecision::Challenge { .. }) {
       return Ok ( withhold_save_rerender (
         &release, saved_view_mut, saved_viewnode_id_record,
-        saved_diffView_buffer_kind, overrides_followed, &collateral_viewforest_ids,
+        saved_diffView_buffer_kind, overrides_followed . clone (), &collateral_viewforest_ids,
         viewforest_id_from_request_result, views_state,
         &context . runtime . graph, skgrepo_restriction )); }}
   let requesting_containers : Vec<NodeId> =
@@ -194,7 +194,7 @@ pub fn update_views_after_save (
         &mut saved_view_mut,
         &mut saved_viewnode_id_record,
         &mut context,
-        RerenderMode::of_buffer (saved_diffView_buffer_kind, false, overrides_followed) ) ?; }
+        RerenderMode::of_buffer (saved_diffView_buffer_kind, false, overrides_followed . clone ()) ) ?; }
   context . warnings . extend ( no_other_containers_warning (
     &saved_view_mut, &requesting_containers ));
   let saved_text : String = viewforest_to_string (&saved_view_mut) ?;
@@ -428,7 +428,7 @@ pub(crate) fn release_candidates<'v> (
 /// itself: a content view following someone's overrides, or a buffer
 /// of the diff view of this kind, extended to the changes it does not
 /// show or not.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum RerenderMode {
   ContentView { overrides_followed : OverridesFollowed },
   DiffView { buffer_kind : DiffViewBufferKind,

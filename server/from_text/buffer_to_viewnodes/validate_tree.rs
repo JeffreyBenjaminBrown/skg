@@ -211,7 +211,7 @@ fn overridesHere_part_errors (
             None => continue },
         _ => continue };
     let follower : SkgrepoOwner =
-      override_follower_of_tree_containing (config, graph, overrides_followed, node_ref);
+      override_follower_of_tree_containing (config, graph, &overrides_followed, node_ref);
     let chain_ok : bool =
       carrier_on_override_chain_followed_by (
         config, graph, &unrestricted, &follower, &original, &carrier);

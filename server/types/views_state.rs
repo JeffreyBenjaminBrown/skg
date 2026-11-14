@@ -3,7 +3,7 @@ use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::many_to_many::ManyToMany;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{ViewnodeId, Viewnode, ViewnodeKind, Vognode};
-use super::misc::ID;
+use super::misc::{ID, SkgConfig, SkgrepoName, SkgrepoOwner};
 
 use ego_tree::{NodeId, NodeMut, Tree};
 use std::collections::{HashMap, HashSet};
@@ -52,23 +52,24 @@ pub struct ViewState {
   pub overrides_followed : OverridesFollowed, // whose overrides the view's rerenders substitute: set by the "set overrides followed" request and by each save, which names it
 }
 
-/// Whose overrides a view follows: where a node stands as content and
-/// an overrider of the followed owner's exists, the refresh shows the
-/// overrider ('substitute_overriders' in 'server/refresh/visit.rs').
-/// The client holds the choice for its buffer and names it in each
-/// save; the connection keeps it for the rerenders it starts
-/// ('ViewState::overrides_followed'). A fresh view follows its root
-/// authors'.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+/// Whose overrides a view follows, its perspective: where a node
+/// stands as content and an overrider of the followed owner's exists,
+/// the refresh shows the overrider ('substitute_overriders' in
+/// 'server/refresh/visit.rs'). The client holds the choice for its
+/// buffer and names it in each save; the connection keeps it for the
+/// rerenders it starts ('ViewState::overrides_followed'). A fresh view
+/// follows its root authors'.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub enum OverridesFollowed {
   /// Each top-level tree follows the overrides of its root's author:
   /// the user's under an owned root, that author's under a foreign one
   /// ('override_follower_of_tree_containing').
   #[default]
   RootAuthors,
-  /// Every tree follows the user's overrides, those of every owned
-  /// skgrepo, whoever wrote its root.
-  User,
+  /// Every tree follows one owner's overrides, whoever wrote its root:
+  /// the user's (those of every owned skgrepo), or one foreign
+  /// owner's, as that owner, viewing, would see it.
+  Owner (SkgrepoOwner),
 }
 
 /// The viewnode IDs of one buffer: the counter they are assigned from,
@@ -121,20 +122,50 @@ impl DiffViewBufferKind {
 //
 
 impl OverridesFollowed {
-  /// The '(overrides-followed . "...")' of a save or of a "set
-  /// overrides followed" request.
-  pub fn wire_name (
-    self,
-  ) -> &'static str {
-    match self {
-      OverridesFollowed::RootAuthors => "root authors",
-      OverridesFollowed::User        => "user", } }
+  /// The user's overrides, in every tree.
+  pub fn user (
+  ) -> OverridesFollowed {
+    OverridesFollowed::Owner (SkgrepoOwner::User) }
 
+  /// The '(overrides-followed . "...")' of a save or of a "set
+  /// overrides followed" request: "root authors", "user", or "owner
+  /// of NAME" for a foreign owner, NAME the first of its skgrepos in
+  /// declaration order ('SkgConfig::skgrepo_owner').
+  pub fn wire_name (
+    &self,
+  ) -> String {
+    match self {
+      OverridesFollowed::RootAuthors => "root authors" . to_string (),
+      OverridesFollowed::Owner (SkgrepoOwner::User) => "user" . to_string (),
+      OverridesFollowed::Owner (SkgrepoOwner::Foreign (name)) =>
+        format! ("owner of {}", name . 0), } }
+
+  /// The choice 'name' gives ('wire_name'). "owner of NAME" may name
+  /// any foreign skgrepo of the owner; the result names the owner as
+  /// 'wire_name' does. None for any other name, an owned skgrepo
+  /// included.
   pub fn from_wire_name (
-    name : &str,
+    name   : &str,
+    config : &SkgConfig,
   ) -> Option<OverridesFollowed> {
-    [ OverridesFollowed::RootAuthors, OverridesFollowed::User ]
-      . into_iter () . find ( |followed| followed . wire_name () == name ) }
+    match name {
+      "root authors" => Some (OverridesFollowed::RootAuthors),
+      "user"         => Some (OverridesFollowed::user ()),
+      _ => {
+        let skgrepo : SkgrepoName =
+          SkgrepoName::from ( name . strip_prefix ("owner of ") ? );
+        if ! config . skgrepos . contains_key (&skgrepo)
+           || config . skgrepo_is_owned (&skgrepo) { return None; }
+        Some ( OverridesFollowed::Owner ( config . skgrepo_owner (&skgrepo) )) }} }
+
+  /// How a message to the user names an owner's overrides: "your
+  /// overrides", or "NAME's overrides".
+  pub fn name_of_owners_overrides (
+    owner : &SkgrepoOwner,
+  ) -> String {
+    match owner {
+      SkgrepoOwner::User => "your overrides" . to_string (),
+      SkgrepoOwner::Foreign (name) => format! ("{}'s overrides", name . 0), } }
 }
 
 impl ViewforestId {
@@ -273,7 +304,7 @@ impl OpenViews {
     viewforest_id : &ViewforestId,
   ) -> OverridesFollowed {
     self . views . get (viewforest_id)
-      . map ( |state| state . overrides_followed )
+      . map ( |state| state . overrides_followed . clone () )
       . unwrap_or_default () }
 
   /// Whether any open view is a buffer of the diff view.

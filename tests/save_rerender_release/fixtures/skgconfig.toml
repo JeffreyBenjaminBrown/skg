@@ -9,3 +9,8 @@ path = "main"
 [[repos]]
 name = "private"
 path = "private"
+
+[[repos]]
+name = "other"
+path = "other"
+foreign = true

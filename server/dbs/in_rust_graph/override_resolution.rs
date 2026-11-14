@@ -9,8 +9,9 @@
 //! author ('override_follower_of_tree_containing'): a view rooted at a
 //! foreign node shows what that node's author would see, throughout the
 //! tree, even under a third author's nodes; a view rooted at an owned
-//! node follows the user's overrides. A view switched to follow the
-//! user's ('OverridesFollowed::User') follows the user's in every tree.
+//! node follows the user's overrides. A view switched to follow one
+//! owner's ('OverridesFollowed::Owner': the user's, or a foreign
+//! owner's) follows that owner's in every tree.
 //! Validation of the user's own data
 //! ([[./override_invariants.rs]]) always follows the user's.
 //!
@@ -123,8 +124,8 @@ pub fn resolve_override (
     current = next; }}
 
 /// The owner whose overrides the top-level tree containing 'position'
-/// follows, in a view that follows 'overrides_followed'. The user's,
-/// in a view that follows the user's. Otherwise the root author's:
+/// follows, in a view that follows 'overrides_followed'. The owner's,
+/// in a view that follows one owner's. Otherwise the root author's:
 /// the owner ('SkgConfig::skgrepo_owner') of the home skgrepo, as
 /// 'graph' knows it, of that tree's root, the child of the buffer
 /// root; the user when that root is not an occurrence of a node
@@ -133,11 +134,11 @@ pub fn resolve_override (
 pub fn override_follower_of_tree_containing (
   config             : &SkgConfig,
   graph              : &InRustGraph,
-  overrides_followed : OverridesFollowed,
+  overrides_followed : &OverridesFollowed,
   position           : NodeRef<Viewnode>,
 ) -> SkgrepoOwner {
-  if overrides_followed == OverridesFollowed::User {
-    return SkgrepoOwner::User; }
+  if let OverridesFollowed::Owner (owner) = overrides_followed {
+    return owner . clone (); }
   let tree_root : Option<NodeRef<Viewnode>> =
     once (position) . chain ( position . ancestors () )
     . find ( |node| node . parent () . is_some_and ( |parent|
@@ -191,15 +192,31 @@ fn followable_overriders_of (
   follower : &SkgrepoOwner,
   pid      : &ID,
 ) -> Vec<ID> {
-  let mut result : Vec<ID> = Vec::new ();
+  visible_overriders_with_owners_of (config, graph, restriction, pid)
+    . into_iter ()
+    . filter ( |(_overrider, owner)| owner == follower )
+    . map ( |(overrider, _owner)| overrider )
+    . collect () }
+
+/// The overriders of 'pid' visible under 'restriction' (the
+/// relationship's relRepo unrestricted, and the overrider's home
+/// skgrepo too), each with its owner ('SkgConfig::skgrepo_owner' of
+/// its home skgrepo): whose overrides could put each in 'pid''s place.
+pub fn visible_overriders_with_owners_of (
+  config      : &SkgConfig,
+  graph       : &InRustGraph,
+  restriction : &SkgrepoRestriction,
+  pid         : &ID,
+) -> Vec<(ID, SkgrepoOwner)> {
+  let mut result : Vec<(ID, SkgrepoOwner)> = Vec::new ();
   for overrider in graph . other_member_pids_gated (
     pid, RelationRole::OVERRIDDEN, restriction ) {
     if let Some (overrider_node) = graph . nodes . get (&overrider) {
-      let is_the_followers : bool =
-        &config . skgrepo_owner (&overrider_node . home_skgrepo) == follower;
       let home_visible : bool =
         ! SkgrepoRestriction::node_is_restricted (
           restriction, &overrider_node . home_skgrepo );
-      if is_the_followers && home_visible {
-        result . push (overrider); }} }
+      if home_visible {
+        let owner : SkgrepoOwner =
+          config . skgrepo_owner (&overrider_node . home_skgrepo);
+        result . push (( overrider, owner )); }} }
   result }

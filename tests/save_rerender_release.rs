@@ -9,9 +9,12 @@
 //
 // Fixture: 'tele' is homed in 'main', which records its content; its
 // title sits only in 'private', more private than 'main', so it is an
-// overPrivateText telescope under the restriction "main".
+// overPrivateText telescope under the restriction "main". 'other-child',
+// in the foreign skgrepo 'other', overrides 'tele''s child, so the view
+// of 'tele' has a second perspective, other's.
 
 use skg::serve::ViewsState;
+use skg::serve::handlers::overrides_followed::handle_set_overrides_followed_request;
 use skg::serve::handlers::rerender_views::handle_rerender_views_request;
 use skg::serve::handlers::save_buffer::handle_save_buffer_request;
 use skg::serve::handlers::single_root_view::handle_single_root_view_request;
@@ -22,7 +25,7 @@ use skg::test_utils::{
 use skg::dbs::init::create_empty_tantivy_index;
 use skg::types::env::SkgEnv;
 use skg::types::misc::{SkgConfig, SkgrepoName, TantivyIndex};
-use skg::types::views_state::OpenViews;
+use skg::types::views_state::{OpenViews, OverridesFollowed, ViewforestId};
 
 use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use std::error::Error;
@@ -47,7 +50,8 @@ fn fixture (
     root . join ("skgconfig.toml") . to_str () . unwrap (),
     Some ("save-rerender-release"),
     &[ ("main", root . join ("main")),
-       ("private", root . join ("private")) ] ) ?;
+       ("private", root . join ("private")),
+       ("other", root . join ("other")) ] ) ?;
   let config : SkgConfig = SkgConfig {
     tantivy_folder : root . join ("tantivy"),
     data_root      : root . to_path_buf (),
@@ -202,3 +206,61 @@ fn a_withheld_save_rerender_is_released_by_rerendering_its_views
     assert_eq! ( main_files_titled (&f, "a renamed node") . len (), 1 );
     assert_eq! ( main_files_titled (&f, "a new node") . len (), 0 ); }
   Ok (()) }
+
+/// Send "set overrides followed" for "tele-view", asking for the next
+/// perspective, with 'extra_fields': every message of the answer.
+fn switch_tele_view (
+  f            : &Fixture,
+  views_state  : &mut ViewsState,
+  extra_fields : &str,
+) -> Vec<String> {
+  let (mut stream, read_end) : (TcpStream, TcpStream) = mk_test_tcp_stream_pair ();
+  handle_set_overrides_followed_request (
+    &mut stream,
+    &format! ( "((request . \"set overrides followed\") (view-id . \"tele-view\") (overrides-followed . \"next\"){})",
+               extra_fields ),
+    &f . env, views_state, &f . restriction );
+  drop (stream);
+  read_all_lp_messages (&mut BufReader::new (read_end)) }
+
+/// Under the restriction, switching the view of 'tele' to the next
+/// perspective, other's, would show the overPrivateText title, so the
+/// challenge and an empty rerender stream replace the answer, no text
+/// is sent, and the view keeps its perspective. Approved, the switch
+/// is made, and other's node stands in the child's place.
+#[test]
+fn a_privacy_challenge_stops_a_perspective_switch_until_approved
+  () -> Result<(), Box<dyn Error>> {
+  let f : Fixture = fixture () ?;
+  let mut connection : ViewsState =
+    ViewsState { open_views : OpenViews::new (), graph_straddle : None };
+  let view : String = open_tele_view (&f, &mut connection);
+  assert! ( view . contains ("(gnid child)"), "{}", view );
+  let view_id : ViewforestId = ViewforestId::from_client_string ("tele-view" . to_string ());
+  { let messages : Vec<String> = switch_tele_view (&f, &mut connection, "");
+    assert! ( messages [0] . starts_with (
+                "((response-type overPrivateText-telescope-confirmation) \
+                  (operation overrides-followed-switch) (pids (tele))" ),
+              "{:?}", messages );
+    assert! ( ! messages . iter () . any ( |message|
+                message . contains ("(response-type overrides-followed)")
+                || message . contains ("A title kept private") ),
+              "{:?}", messages );
+    assert! ( messages . last () . unwrap () . contains ("(response-type rerender-done)"),
+              "{:?}", messages );
+    assert_eq! ( connection . open_views . overrides_followed_by_view (&view_id),
+                 OverridesFollowed::RootAuthors ); }
+  { let messages : Vec<String> = switch_tele_view (
+      &f, &mut connection, " (approved-overPrivateText-pids \"tele\")" );
+    assert_eq! ( extract_string_field_from_sexp (&messages [0], "overrides-followed")
+                   . as_deref (), Some ("owner of other"), "{:?}", messages );
+    let switched : String = messages . iter ()
+      . find ( |message| message . contains ("(response-type rerender-view)") )
+      . and_then ( |message| extract_string_field_from_sexp (message, "content") )
+      . expect ("the switch rerenders the view");
+    assert! ( switched . contains ("(gnid other-child)")
+              && switched . contains ("(overridesHere child)"),
+              "{}", switched );
+    assert_ne! ( connection . open_views . overrides_followed_by_view (&view_id),
+                 OverridesFollowed::RootAuthors ); }
+  Ok (( )) }
