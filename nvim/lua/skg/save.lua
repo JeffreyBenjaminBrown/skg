@@ -268,9 +268,10 @@ end
 ---  the saved buffer is ('vim.b.skg_diffView_buffer_kind', "all
 ---  changes" say), sent as (diff-view-buffer . NAME); nil for any
 ---  other view
----@param overrides_followed string|nil whose overrides the saved view
----  follows ('vim.b.skg_overrides_followed'): "user", sent as
----  (overrides-followed . "user"); nil, the default, sends nothing
+---@param overrides_followed string|nil the saved view's perspective,
+---  whose overrides it follows ('vim.b.skg_overrides_followed'):
+---  "user" or "owner of NAME", sent as (overrides-followed . NAME);
+---  nil, the root authors', sends nothing
 ---@return string
 function M.save_request_sexp (view_id, position, approved_forks,
                                 fork_skgrepos, approved_hoist_pids,
