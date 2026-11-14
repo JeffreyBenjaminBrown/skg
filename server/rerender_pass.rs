@@ -360,7 +360,10 @@ fn replace_saved_view_fork_roots (
       if let Editability::Editable { body, .. } = &mut occurrence . editability
       { *body = clone . body . clone (); }
       occurrence . view_requests . remove (&ViewRequest::Fork);
-      occurrence . overridesHere = Some (original); }}
+      // The view is re-rooted at the clone, which stands for nothing:
+      // marked '(overridesHere F)', it would be read as a perspective's
+      // stand-in for F, which the root authors' show raw.
+      occurrence . overridesHere = None; }}
   Ok (())
 }
 

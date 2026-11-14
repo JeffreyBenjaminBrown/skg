@@ -236,8 +236,9 @@ async fn delete_preserves_foreign_referencer (
     &Err ( String::new () ), &mut views_state ) . await ?;
   let saved_root : &str = response . saved_view . lines () . next ()
     . ok_or ("the saved view must not be empty") ?;
-  assert! (saved_root . contains ("(overridesHere cheese)"),
-    "the buffer whose foreign root was forked must immediately show the fork: {}",
+  assert! ( ! saved_root . contains ("(gnid cheese)")
+            && saved_root . contains ("(overrides (out 1))"),
+    "the buffer whose foreign root was forked must immediately be rooted at the fork: {}",
     response . saved_view );
   assert_eq! ( fs::read (&foreign_path) ?, foreign_before,
     "deleting an owned target must not rewrite foreign data" );
@@ -277,8 +278,9 @@ async fn delete_in_foreign_subscribee_rerenders_as_unknown (
     "}, config, tantivy, &graph,
     &Err (String::new ()), &mut views_state ) . await ?;
   assert! (response . errors . is_empty (), "{:?}", response . errors);
-  assert! (response . saved_view . contains ("(overridesHere subscriber)"),
-    "the buffer whose foreign root was forked must immediately show the fork: {}",
+  assert! ( ! response . saved_view . lines () . next () . unwrap_or ("")
+              . contains ("(gnid subscriber)"),
+    "the buffer whose foreign root was forked must immediately be rooted at the fork: {}",
     response . saved_view);
   let (fresh, _, _) = single_root_view (
     config, Some (tantivy), &ID::from ("subscriber") ) ?;
@@ -306,8 +308,9 @@ async fn delete_in_foreign_overridden_rerenders_as_unknown (
     "}, config, tantivy, &graph,
     &Err (String::new ()), &mut views_state ) . await ?;
   assert! (response . errors . is_empty (), "{:?}", response . errors);
-  assert! (response . saved_view . contains ("(overridesHere overrider)"),
-    "the buffer whose foreign root was forked must immediately show the fork: {}",
+  assert! ( ! response . saved_view . lines () . next () . unwrap_or ("")
+              . contains ("(gnid overrider)"),
+    "the buffer whose foreign root was forked must immediately be rooted at the fork: {}",
     response . saved_view);
   let original : Graphnode = graphnode_from_pid_and_skgrepo (
     config, ID::from ("overrider"), &SkgrepoName::from ("foreign")) ?;

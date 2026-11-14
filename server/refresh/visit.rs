@@ -69,6 +69,7 @@ use crate::refresh::chain::draw_containerward_chain;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::{ID, SkgrepoOwner};
 use crate::types::tree::moves::{move_after, move_to_first_child, move_to_last_child};
+use crate::types::views_state::OverridesFollowed;
 use crate::types::viewnode::{
   FoldAndFocus, Folder, FolderRelation, PropertyMember, ViewRequest, Viewnode,
   ViewnodeKind, Vognode, Warrant, viewnode_of};
@@ -755,20 +756,27 @@ fn keep_hidden_outside_folder_last (
 /// the original N, which the save collects instead. The overriders
 /// followed are those of the author of the parent's top-level tree's
 /// root ('override_follower_of_tree_containing'): the user's under an
-/// owned root, that author's under a foreign one; or the user's
-/// throughout, in a view that follows the user's. Not where the
+/// owned root, that author's under a foreign one; or one owner's
+/// throughout, in a view switched to that owner's perspective. Not
+/// where the
 /// parent is itself overridden (by those same overriders) and shown
 /// raw (a root, or a member of a folder other than the subscribee
 /// folder): there its children are raw too. When the override is
 /// gone, the shown overrider loses 'overridesHere', is warranted only
 /// as itself (and so, unwarranted, vanishes), and the original is
-/// reinstated beside it. The diff view substitutes nothing.
+/// reinstated beside it. The diff view substitutes nothing. At the
+/// buffer root, the view's roots are substituted by their own rule
+/// ('substitute_roots').
 fn substitute_overriders (
   tree   : &mut Tree<Viewnode>,
   parent : NodeId,
   goal   : Option<&Goal>,
   walk   : &mut Walk,
 ) -> Result<(), Box<dyn Error>> {
+  if matches! ( tree . get (parent) . unwrap () . value () . kind,
+                ViewnodeKind::BufferRoot )
+     && ! walk . is_diff_view ()
+  { return substitute_roots (tree, parent, walk); }
   let Some (goal) : Option<&Goal> = goal else { return Ok (( )); };
   if walk . is_diff_view ()
      || tree . get (parent) . unwrap () . value () . editable_gnid () . is_none ()
@@ -802,6 +810,39 @@ fn substitute_overriders (
                       walk . truth . config, walk . truth . graph, &walk . unrestricted,
                       &follower, &original, &gnid ) {
           show_overrider (tree, child, &effective, Some (original), walk) ?; }}, }}
+  Ok (( )) }
+
+/// Each root of the view shows what the view's perspective makes of
+/// the node it stands for (its '(overridesHere N)', else itself): the
+/// root authors' show that node raw, as every fresh view does; one
+/// owner's perspective shows that owner's overrider of it, marked
+/// '(overridesHere N)', or, where the owner has none, the node raw.
+/// The occurrence is re-pointed where it stands, so it keeps its
+/// viewnode ID whichever way it switches, and its children follow
+/// from its own visit. A fork of a root re-roots the view at the
+/// clone, which stands for nothing ('replace_saved_view_fork_roots').
+fn substitute_roots (
+  tree        : &mut Tree<Viewnode>,
+  buffer_root : NodeId,
+  walk        : &mut Walk,
+) -> Result<(), Box<dyn Error>> {
+  for root in children_of (tree, buffer_root) {
+    let (gnid, overridesHere) : (ID, Option<ID>) =
+      match &tree . get (root) . unwrap () . value () . kind {
+        ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =>
+          ( occurrence . gnid . clone (), occurrence . overridesHere . clone () ),
+        _ => continue, };
+    let original : ID = overridesHere . clone ()
+      . unwrap_or_else ( || walk . truth . graph . pid_else_raw_id (&gnid) );
+    let shown : ID = match &walk . overrides_followed {
+      OverridesFollowed::RootAuthors => original . clone (),
+      OverridesFollowed::Owner (owner) => resolve_override (
+        walk . truth . config, walk . truth . graph, walk . truth . restriction,
+        owner, &original ) . effective, };
+    let marked : Option<ID> = ( shown != original ) . then ( || original . clone () );
+    if walk . truth . graph . pid_else_raw_id (&gnid) != shown
+       || overridesHere != marked
+    { show_overrider (tree, root, &shown, marked, walk) ?; }}
   Ok (( )) }
 
 /// Make the occurrence at 'child' show 'shown', with 'overridesHere'

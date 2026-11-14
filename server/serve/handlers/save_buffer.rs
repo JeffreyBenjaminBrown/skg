@@ -650,7 +650,7 @@ fn overrides_followed_from_save_request (
     Err (_) => Ok (OverridesFollowed::RootAuthors),
     Ok (name) => OverridesFollowed::from_wire_name (&name, config)
       . ok_or_else ( || format! (
-        "The save request says the buffer follows the overrides of {:?}, which names no choice. Nothing was saved.",
+        "The save request says the buffer was drawn from the perspective {:?}, which names none. Nothing was saved.",
         name )), }}
 
 fn save_point_position_from_request (
@@ -1343,4 +1343,3 @@ mod overrides_followed_tests {
               "an owned skgrepo names no foreign owner" );
     assert! ( named (" (overrides-followed . \"owner of nobody\")") . is_err () ); }
 }
-

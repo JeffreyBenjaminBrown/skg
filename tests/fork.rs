@@ -380,8 +380,9 @@ async fn fork_no_owned_ancestor_defaults (
   let root_line : &str = response . saved_view . lines () . next ()
     . ok_or ("the saved root view must not be empty") ?;
   assert! ( root_line . contains (&format! ("(gnid {})", c . pid . 0))
-            && root_line . contains ("(overridesHere N)"),
-    "the buffer that forked root N must immediately show its clone in N's place:\n{}",
+            && ! root_line . contains ("overridesHere"),
+    "the buffer that forked root N must immediately be rooted at its clone, \
+     which stands for nothing:\n{}",
     response . saved_view );
   assert! ( ! root_line . contains ("(gnid N)"),
     "the saved buffer must not leave the fork origin as its root:\n{}",

@@ -127,8 +127,10 @@ pub fn resolve_override (
 /// follows, in a view that follows 'overrides_followed'. The owner's,
 /// in a view that follows one owner's. Otherwise the root author's:
 /// the owner ('SkgConfig::skgrepo_owner') of the home skgrepo, as
-/// 'graph' knows it, of that tree's root, the child of the buffer
-/// root; the user when that root is not an occurrence of a node
+/// 'graph' knows it, of the node that tree's root, the child of the
+/// buffer root, stands for (its '(overridesHere N)', else itself: a
+/// root another perspective replaced still has its original's author);
+/// the user when that root is not an occurrence of a node
 /// 'graph' knows (a new node, a ghost, a tombstone), or when
 /// 'position' is the buffer root itself.
 pub fn override_follower_of_tree_containing (
@@ -146,7 +148,8 @@ pub fn override_follower_of_tree_containing (
   let root_home : Option<SkgrepoName> =
     tree_root . and_then ( |root| match &root . value () . kind {
       ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =>
-        graph . pid_and_skgrepo (&occurrence . gnid)
+        graph . pid_and_skgrepo (
+          occurrence . overridesHere . as_ref () . unwrap_or (&occurrence . gnid) )
         . map ( |(_pid, home)| home ),
       _ => None, } );
   match root_home {

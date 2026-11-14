@@ -21,7 +21,8 @@
 // overrides of its root's author to follow: R (skgrepo "foreign", not
 // owned) contains M and K; A, also foreign, and U, in "main", each
 // override M; P, in "main", contains M. A second foreign owner,
-// "third", overrides M with B and K with T.
+// "third", overrides M with B and K with T. Foreign F2 contains M2,
+// which contains N2; U2, in "main", overrides M2, and T2, third's, N2.
 
 use skg::test_utils::save_and_rerender;
 use indoc::indoc;
@@ -112,8 +113,17 @@ fn all_tests
       s . reset ("next_cycles_through_every_perspective_that_shows_the_view_differently", foreign_root) ?;
       next_cycles_through_every_perspective_that_shows_the_view_differently (
         &s . config, &mut s . tantivy ) ?;
+      s . reset ("a_perspective_stays_in_the_cycle_where_another_hides_what_it_overrides", foreign_root) ?;
+      a_perspective_stays_in_the_cycle_where_another_hides_what_it_overrides (
+        &s . config, &mut s . tantivy ) ?;
+      s . reset ("the_root_authors_are_named_in_the_order_of_their_first_roots", foreign_root) ?;
+      the_root_authors_are_named_in_the_order_of_their_first_roots (
+        &s . config, &mut s . tantivy ) ?;
       s . reset ("next_from_a_perspective_that_left_the_cycle_goes_back_to_the_root_authors", foreign_root) ?;
       next_from_a_perspective_that_left_the_cycle_goes_back_to_the_root_authors (
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("a_perspective_replaces_the_root_and_the_root_authors_restore_it", foreign_root) ?;
+      a_perspective_replaces_the_root_and_the_root_authors_restore_it (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("a_save_following_the_users_overrides_shows_a_new_fork_in_place", foreign_root) ?;
       a_save_following_the_users_overrides_shows_a_new_fork_in_place (
@@ -646,9 +656,11 @@ async fn under_a_foreign_root_a_forked_child_is_shown_as_the_original (
                         other . map ( |v| v . len () ) ), }}
   Ok (( )) }
 
-/// Editing foreign root R forks it; the saved view's root becomes the
-/// user's clone of R, and beneath it the user's overrides are
-/// followed: U, not A, is shown in M's place.
+/// Editing foreign root R forks it; the saved view is re-rooted at the
+/// user's clone of R, which stands for nothing (no '(overridesHere
+/// R)': the root authors' would show R raw in its place), and beneath
+/// it the user's overrides are followed: U, not A, is shown in M's
+/// place.
 async fn a_forked_foreign_root_follows_the_users_overrides (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
@@ -665,7 +677,7 @@ async fn a_forked_foreign_root_follows_the_users_overrides (
   let clone : Graphnode = overrider_on_disk (config, "R") ?;
   let root_line : &str = saved . lines () . next () . unwrap ();
   assert! ( root_line . contains (&format! ("(gnid {})", clone . pid . 0))
-            && root_line . contains ("(overridesHere R)"),
+            && ! root_line . contains ("overridesHere"),
     "the root is R's clone:\n{}", saved );
   let marked : Vec<&str> = marked_lines (&saved, "M");
   assert! ( marked . len () == 1 && marked [0] . contains ("(gnid U)"),
@@ -894,8 +906,61 @@ fn next_cycles_through_every_perspective_that_shows_the_view_differently (
   next ("user", "your overrides", "U") ?;
   Ok (( )) }
 
+/// The cycle does not depend on the path taken. In a view of F2, the
+/// user's U2 stands in M2's place and holds nothing, so N2, which
+/// third overrides, is not drawn from the user's perspective; third's
+/// is still the next after it, as found from the root authors'
+/// drawing, and a request naming it from there is not refused.
+fn a_perspective_stays_in_the_cycle_where_another_hides_what_it_overrides (
+  config  : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  let (mut views_state, env, _view) : (ViewsState, SkgEnv, String) =
+    connection_holding_a_view_of (config, tantivy, "F2", &[ ID::from ("F2") ]) ?;
+  let mut switch = |named : &str| -> Vec<String> { messages_answering (
+    &switch_request_naming ("F2", named),
+    &mut views_state, &env, config, handle_set_overrides_followed_request ) };
+  let to_user : Vec<String> = switch ("next");
+  assert! ( extract_string_field_from_sexp (&to_user [0], "overrides-followed")
+              . as_deref () == Some ("user")
+            && rerendered_text (&to_user) . is_some_and ( |text|
+                 line_of_gnid (&text, "U2") . is_some () && line_of_gnid (&text, "N2") . is_none () ),
+    "{:?}", to_user );
+  let named : Vec<String> = switch ("owner of third");
+  assert! ( refusal_of (&named) . is_none (), "{:?}", named );
+  let back_to_user : Vec<String> = switch ("user");
+  assert! ( refusal_of (&back_to_user) . is_none (), "{:?}", back_to_user );
+  let to_third : Vec<String> = switch ("next");
+  assert! ( extract_string_field_from_sexp (&to_third [0], "overrides-followed")
+              . as_deref () == Some ("owner of third")
+            && rerendered_text (&to_third) . is_some_and ( |text|
+                 line_of_gnid (&text, "T2") . is_some_and ( |l| l . contains ("(overridesHere N2)") )),
+    "from the user's, the next is third's, which shows T2 in N2's place: {:?}", to_third );
+  Ok (( )) }
+
+/// A view with several roots names its root authors' perspective by
+/// each author, once, in the order of their first roots: "yours" for
+/// the user.
+fn the_root_authors_are_named_in_the_order_of_their_first_roots (
+  config  : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  let (mut views_state, env, _view) : (ViewsState, SkgEnv, String) =
+    connection_holding_a_view_of (
+      config, tantivy, "RPK", &[ ID::from ("R"), ID::from ("P"), ID::from ("K") ] ) ?;
+  messages_answering (
+    &switch_request ("RPK", OverridesFollowed::user ()),
+    &mut views_state, &env, config, handle_set_overrides_followed_request );
+  let back : Vec<String> = messages_answering (
+    &switch_request ("RPK", OverridesFollowed::RootAuthors),
+    &mut views_state, &env, config, handle_set_overrides_followed_request );
+  assert_eq! ( extract_string_field_from_sexp (&back [0], "perspective-name") . as_deref (),
+               Some ("each root author's overrides (foreign's, yours)"), "{:?}", back );
+  Ok (( )) }
+
 /// A view in which no one's overrides would show anything
-/// differently has a cycle of one, so "next" is refused there. But a
+/// differently (one of A, which no one overrides and which holds
+/// nothing) has a cycle of one, so "next" is refused there. But a
 /// view whose perspective has left its cycle, as a save can leave it
 /// (a save names its buffer's perspective, and it is kept whatever the
 /// cycle is now), goes back to the root authors' on "next".
@@ -904,13 +969,13 @@ async fn next_from_a_perspective_that_left_the_cycle_goes_back_to_the_root_autho
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   let (mut views_state, mut env, view) : (ViewsState, SkgEnv, String) =
-    connection_holding_a_view_of (config, tantivy, "K", &[ ID::from ("K") ]) ?;
+    connection_holding_a_view_of (config, tantivy, "A", &[ ID::from ("A") ]) ?;
   let lonely : Vec<String> = messages_answering (
-    &switch_request_naming ("K", "next"),
+    &switch_request_naming ("A", "next"),
     &mut views_state, &env, config, handle_set_overrides_followed_request );
   assert! ( refusal_of (&lonely) . is_some_and ( |reason| reason . contains ("No one's overrides") ),
     "{:?}", lonely );
-  let view_id : ViewforestId = ViewforestId::from_client_string ("K" . to_string ());
+  let view_id : ViewforestId = ViewforestId::from_client_string ("A" . to_string ());
   let (mut stream, _read_end) : (TcpStream, TcpStream) = mk_test_tcp_stream_pair ();
   let response : SaveResponse =
     update_from_and_rerender_buffer_with_approvals (
@@ -923,12 +988,70 @@ async fn next_from_a_perspective_that_left_the_cycle_goes_back_to_the_root_autho
   assert_eq! ( views_state . open_views . overrides_followed_by_view (&view_id),
                owner_of ("third") );
   let back : Vec<String> = messages_answering (
-    &switch_request_naming ("K", "next"),
+    &switch_request_naming ("A", "next"),
     &mut views_state, &env, config, handle_set_overrides_followed_request );
   assert! ( refusal_of (&back) . is_none ()
             && extract_string_field_from_sexp (&back [0], "overrides-followed")
                . as_deref () == Some ("root authors"),
     "{:?}", back );
+  Ok (( )) }
+
+/// The root too: a view of M, which A (M's own author's), U (the
+/// user's) and B (third's) each override, shows M raw from the root
+/// authors' perspective, as a fresh view does, and each owner's
+/// override of it from that owner's, marked '(overridesHere M)'. The
+/// root is re-pointed where it stands, so it keeps its viewnode ID
+/// both ways, and the root authors' perspective shows M raw again. A
+/// save through the replaced root edits the overrider, not M.
+async fn a_perspective_replaces_the_root_and_the_root_authors_restore_it (
+  config  : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  let (mut views_state, mut env, view) : (ViewsState, SkgEnv, String) =
+    connection_holding_a_view_of (config, tantivy, "M", &[ ID::from ("M") ]) ?;
+  let root_line = |text : &str| -> String { text . lines () . next () . unwrap () . to_string () };
+  assert! ( root_line (&view) . contains ("(vnid 0a) node (gnid M)")
+            && ! view . contains ("overridesHere"),
+    "a fresh view shows its root raw:\n{}", view );
+  let mut next = |expected_wire : &str| -> Result<String, Box<dyn Error>> {
+    let messages : Vec<String> = messages_answering (
+      &switch_request_naming ("M", "next"),
+      &mut views_state, &env, config, handle_set_overrides_followed_request );
+    assert_eq! ( extract_string_field_from_sexp (&messages [0], "overrides-followed")
+                   . as_deref (), Some (expected_wire), "{:?}", messages );
+    Ok ( root_line ( &rerendered_text (&messages) . ok_or ("the switch rerenders") ? )) };
+  for (wire, shown) in [ ("user", "U"), ("owner of foreign", "A"), ("owner of third", "B") ] {
+    let root : String = next (wire) ?;
+    assert! ( root . contains ( &format! ("(vnid 0a) node (gnid {})", shown) )
+              && root . contains ("(overridesHere M)"),
+      "from {}, the root is {}, standing for M: {}", wire, shown, root ); }
+  let back : String = next ("root authors") ?;
+  assert! ( back . contains ("(vnid 0a) node (gnid M)") && ! back . contains ("overridesHere"),
+    "the root authors' show M raw again: {}", back );
+  let switched : String = { let messages : Vec<String> = messages_answering (
+      &switch_request ("M", OverridesFollowed::user ()),
+      &mut views_state, &env, config, handle_set_overrides_followed_request );
+    rerendered_text (&messages) . ok_or ("the switch rerenders") ? };
+  let edited : String = switched . replacen (") U\n", ") U, retitled\n", 1);
+  assert_ne! ( edited, switched, "{}", switched );
+  let (mut stream, _read_end) : (TcpStream, TcpStream) = mk_test_tcp_stream_pair ();
+  let response : SaveResponse =
+    update_from_and_rerender_buffer_with_approvals (
+      &mut stream, &edited, &switched, &mut env,
+      &Ok ( ViewforestId::from_client_string ("M" . to_string ()) ),
+      &mut views_state, &SkgrepoRestriction::unrestricted (config),
+      true, &HashMap::new (), &HashSet::new (),
+      &StrandedsReview::NotReviewed, DeleteFrom::NotChosen, &[], None,
+      OverridesFollowed::user () ) . await ?;
+  assert! ( response . errors . is_empty (), "{:?}", response . errors );
+  assert! ( read_skgrepo_file (config, "main", "U") . contains ("title: U, retitled"),
+    "the save edits U" );
+  assert! ( read_skgrepo_file (config, "foreign", "M") . contains ("title: M"),
+    "and leaves M" );
+  assert! ( root_line (&response . saved_view) . contains ("(gnid U)")
+            && root_line (&response . saved_view) . contains ("(overridesHere M)")
+            && response . saved_view . contains ("U, retitled"),
+    "the saved view is still shown from the user's perspective:\n{}", response . saved_view );
   Ok (( )) }
 
 /// In a view of foreign R that follows the user's overrides, editing
@@ -975,7 +1098,8 @@ async fn a_save_following_the_users_overrides_shows_a_new_fork_in_place (
 /// Under foreign R, U, the user's, carrying '(overridesHere M)' is
 /// honest in a buffer that follows the user's overrides, and a
 /// tampered carrier in one that follows R's author's; A, R's author's,
-/// the reverse.
+/// the reverse. A root standing for M has M's author as its root
+/// author.
 fn the_tamper_check_follows_the_overrides_the_save_names (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
@@ -998,6 +1122,14 @@ fn the_tamper_check_follows_the_overrides_the_save_names (
   assert! ( mismatch (&u, OverridesFollowed::RootAuthors) );
   assert! ( ! mismatch (&a, OverridesFollowed::RootAuthors) );
   assert! ( mismatch (&a, OverridesFollowed::user ()) );
+  { // A root standing for another node has that node's author: U
+    // standing for M at the root is the user's stand-in, honest from
+    // the user's perspective; from the root authors', whose author is
+    // M's (foreign), not U's, it is not.
+    let root_u_standing_for_m : &str =
+      "* (skg node (gnid U) (skgRepos (nodeRepo main)) (overridesHere M)) U\n";
+    assert! ( ! mismatch (root_u_standing_for_m, OverridesFollowed::user ()) );
+    assert! ( mismatch (root_u_standing_for_m, OverridesFollowed::RootAuthors) ); }
   Ok (( )) }
 
 /// The client is the authority on whose overrides its buffer follows:

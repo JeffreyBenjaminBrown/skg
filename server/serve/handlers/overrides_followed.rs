@@ -20,9 +20,10 @@
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::override_resolution::{
-  override_follower_of_tree_containing, resolve_override,
-  visible_overriders_with_owners_of};
-use crate::rerender_pass::DiffViewBufferRerender;
+  override_follower_of_tree_containing, visible_overriders_with_owners_of};
+use crate::org_to_text::viewforest_to_string;
+use crate::rerender_pass::{
+  DiffViewBufferRerender, RerenderMode, RerenderPassContext, refresh_view};
 use crate::serve::ViewsState;
 use crate::serve::handlers::text_release::approved_pids_from_request;
 use crate::serve::protocol::TcpToClient;
@@ -38,12 +39,18 @@ use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::types::misc::{ID, SkgConfig, SkgrepoOwner};
 use crate::types::viewnode::{Viewnode, ViewnodeKind, Vognode, Warrant};
-use crate::types::views_state::{OverridesFollowed, ViewState, ViewforestId};
+use crate::types::tree::forest::ViewForest;
+use crate::types::views_state::{OverridesFollowed, ViewState, ViewforestId, ViewnodeIdRecord};
 
 use ego_tree::NodeRef;
-use std::collections::HashSet;
+use std::iter::once;
 use std::net::TcpStream;
+use std::str::Chars;
 use std::sync::Arc;
+
+/// How a message names the root authors' perspective where its
+/// authors go unnamed ('perspective_name').
+const ROOT_AUTHORS_UNNAMED : &str = "each root author's overrides";
 
 /// What a "set overrides followed" request asks for.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -69,7 +76,7 @@ pub fn handle_set_overrides_followed_request (
       Err (_) => {
         refuse_unwinding (
           stream, "", &OverridesFollowed::default (),
-          "each root author's overrides",
+          ROOT_AUTHORS_UNNAMED,
           "The request names no view ('view-id')." );
         return; }};
   let current : OverridesFollowed =
@@ -77,14 +84,14 @@ pub fn handle_set_overrides_followed_request (
   let requested : OverridesFollowed =
     match requested_perspective (request, &runtime . config)
       . and_then ( |requested| perspective_to_show (
-        views_state, &runtime, skgrepo_restriction,
+        views_state, env, &runtime, skgrepo_restriction,
         &viewforest_id, &current, requested )) {
       Ok (requested) => requested,
       Err (reason) => {
         let current_name : String = views_state . open_views . views
           . get (&viewforest_id)
           . map ( |state| perspective_name (&current, state, &runtime) )
-          . unwrap_or_else ( || "each root author's overrides" . to_string () );
+          . unwrap_or_else ( || ROOT_AUTHORS_UNNAMED . to_string () );
         refuse_unwinding (
           stream, &viewforest_id . repr_in_client (), &current,
           &current_name, &reason );
@@ -151,7 +158,8 @@ pub fn requested_perspective (
 /// is always in the cycle, so the way back is never refused.
 fn perspective_to_show (
   views_state   : &ViewsState,
-  runtime       : &RuntimeGeneration,
+  env           : &SkgEnv,
+  runtime       : &Arc<RuntimeGeneration>,
   restriction   : &SkgrepoRestriction,
   viewforest_id : &ViewforestId,
   current       : &OverridesFollowed,
@@ -165,7 +173,7 @@ fn perspective_to_show (
   if state . diffView_buffer_kind . is_some () {
     return Err ( "The diff view shows no overriders in place of what they override, so it follows no one's overrides." . to_string () ); }
   let cycle : Vec<OverridesFollowed> =
-    perspectives_of_view (state, runtime, restriction);
+    perspectives_of_view (state, env, runtime, restriction) ?;
   match requested {
     RequestedPerspective::Next => {
       let next : OverridesFollowed =
@@ -180,77 +188,101 @@ fn perspective_to_show (
           capitalized ( &perspective_name (&named, state, runtime) ))); }
       Ok (named) }, }}
 
-/// The view's cycle of perspectives, computed from what it draws now:
-/// first the root authors', then each owner whose overrides would show
-/// some position of it differently ('owners_drawing_differently'), in
-/// the order 'perspective_rank' gives. A perspective that would show
-/// the view as the root authors' do is left out.
+/// The view's cycle of perspectives, computed afresh at each request:
+/// first the root authors', then each owner whose perspective draws
+/// the view otherwise than the root authors' do, in the order
+/// 'perspective_rank' gives. Each is judged by drawing the view from
+/// it, from what the connection holds, and comparing the text with
+/// the root authors' drawing ('view_text_from'), so a perspective that
+/// would change nothing is left out exactly. The owners tried are
+/// those 'candidate_owners' finds in the root authors' drawing and in
+/// the view's own, so that a member found from the root authors' is
+/// found from every perspective, whichever path led there.
 pub fn perspectives_of_view (
   state       : &ViewState,
-  runtime     : &RuntimeGeneration,
+  env         : &SkgEnv,
+  runtime     : &Arc<RuntimeGeneration>,
   restriction : &SkgrepoRestriction,
-) -> Vec<OverridesFollowed> {
-  let mut owners : Vec<OverridesFollowed> =
-    owners_drawing_differently (state, &runtime . config, &runtime . graph, restriction)
-    . into_iter () . map (OverridesFollowed::Owner) . collect ();
+) -> Result<Vec<OverridesFollowed>, String> {
+  let (root_authors_text, root_authors_forest) : (String, ViewForest) =
+    view_text_from (&OverridesFollowed::RootAuthors, state, env, runtime, restriction) ?;
+  let mut candidates : Vec<SkgrepoOwner> =
+    candidate_owners (&root_authors_forest, &runtime . config, &runtime . graph, restriction);
+  for owner in candidate_owners (&state . viewforest, &runtime . config, &runtime . graph, restriction) {
+    if ! candidates . contains (&owner) { candidates . push (owner); }}
+  let mut owners : Vec<OverridesFollowed> = Vec::new ();
+  for owner in candidates {
+    let perspective : OverridesFollowed = OverridesFollowed::Owner (owner);
+    let (text, _forest) : (String, ViewForest) =
+      view_text_from (&perspective, state, env, runtime, restriction) ?;
+    if text != root_authors_text { owners . push (perspective); }}
   owners . sort_by_key ( |perspective| perspective_rank (perspective, &runtime . config) );
-  std::iter::once (OverridesFollowed::RootAuthors) . chain (owners) . collect () }
+  Ok ( once (OverridesFollowed::RootAuthors) . chain (owners) . collect () ) }
 
-/// The owners whose overrides, followed in every tree, would show
-/// some position of the view other than its root authors' do. A
-/// position is where substitution acts ('substitute_overriders' in
-/// 'server/refresh/visit.rs'): a node standing as content of an
-/// editable occurrence, which stands for its original (its
-/// '(overridesHere N)', else itself). There the root authors' show
-/// what the tree's root's author's overriders make of the original;
-/// an owner, what that owner's make of it. The candidates are the
-/// user and the owners of the original's visible overriders; every
-/// other owner would show the original raw, as the user would where
-/// the user overrides nothing. Only positions the view draws now are
-/// read, so an owner whose overrides apply only beneath a node another
-/// perspective puts in place is found from that perspective.
-fn owners_drawing_differently (
+/// The view 'state' drawn from 'perspective', in memory, from what the
+/// connection holds for it, as its rerender would draw it: the text,
+/// and the forest. Nothing the connection holds changes.
+fn view_text_from (
+  perspective : &OverridesFollowed,
   state       : &ViewState,
+  env         : &SkgEnv,
+  runtime     : &Arc<RuntimeGeneration>,
+  restriction : &SkgrepoRestriction,
+) -> Result<(String, ViewForest), String> {
+  let mut forest : ViewForest = state . viewforest . clone ();
+  let mut record : ViewnodeIdRecord = state . viewnode_id_record . clone ();
+  let mut context : RerenderPassContext = RerenderPassContext::new (
+    env, runtime . clone (), restriction, None, DiffViewBufferRerender::RefreshOnly );
+  refresh_view (
+    &mut forest, &mut record, &mut context,
+    RerenderMode::ContentView { overrides_followed : perspective . clone () } )
+    . map_err ( |error| error . to_string () ) ?;
+  let text : String = viewforest_to_string (&forest)
+    . map_err ( |error| error . to_string () ) ?;
+  Ok (( text, forest )) }
+
+/// The owners whose perspective might draw 'forest' otherwise than
+/// the root authors' do: the user, and the owner of each visible
+/// overrider of each original 'forest' draws at a position where
+/// substitution acts ('substitute_overriders' and 'substitute_roots'
+/// in 'server/refresh/visit.rs'). Every other owner would show each
+/// original raw there, as some candidate (the user, where the user
+/// overrides nothing) already does. A position drawn only beneath a
+/// node another perspective puts in place is not read, so an owner
+/// whose overrides apply only there is found from that perspective.
+fn candidate_owners (
+  forest      : &ViewForest,
   config      : &SkgConfig,
   graph       : &InRustGraph,
   restriction : &SkgrepoRestriction,
-) -> HashSet<SkgrepoOwner> {
-  let mut differing : HashSet<SkgrepoOwner> = HashSet::new ();
-  for node in state . viewforest . nodes () {
-    let Some (original) : Option<ID> = original_at_substitution_position (node)
+) -> Vec<SkgrepoOwner> {
+  let mut owners : Vec<SkgrepoOwner> = vec! [ SkgrepoOwner::User ];
+  for node in forest . nodes () {
+    let Some (original) : Option<ID> = original_at_substitution_position (graph, node)
       else { continue; };
-    let parent : NodeRef<Viewnode> = node . parent () . expect ("a position has a parent");
-    let root_author : SkgrepoOwner = override_follower_of_tree_containing (
-      config, graph, &OverridesFollowed::RootAuthors, parent );
-    let shown_by = |owner : &SkgrepoOwner| -> ID {
-      resolve_override (config, graph, restriction, owner, &original) . effective };
-    let shown_by_root_author : ID = shown_by (&root_author);
-    let candidates : Vec<SkgrepoOwner> =
-      std::iter::once (SkgrepoOwner::User) . chain (
-        visible_overriders_with_owners_of (config, graph, restriction, &original)
-          . into_iter () . map ( |(_overrider, owner)| owner ))
-      . collect ();
-    for owner in candidates {
-      if owner != root_author
-         && ! differing . contains (&owner)
-         && shown_by (&owner) != shown_by_root_author {
-        differing . insert (owner); }} }
-  differing }
+    for (_overrider, owner) in visible_overriders_with_owners_of (
+      config, graph, restriction, &original ) {
+      if ! owners . contains (&owner) { owners . push (owner); }} }
+  owners }
 
 /// The original a substitution at 'node' would stand for, if 'node'
-/// is a position where substitution acts: an occurrence standing as
-/// content of an editable occurrence, which stands for its
-/// '(overridesHere N)', or, the graph relating it so, for itself.
+/// is a position where substitution acts: an occurrence that is a
+/// root of the view, or that stands as content of an editable
+/// occurrence, which stands for its '(overridesHere N)', or, a root
+/// or the graph relating it so, for itself.
 fn original_at_substitution_position (
-  node : NodeRef<Viewnode>,
+  graph : &InRustGraph,
+  node  : NodeRef<Viewnode>,
 ) -> Option<ID> {
-  node . parent () ? . value () . editable_gnid () ?;
+  let parent : NodeRef<Viewnode> = node . parent () ?;
+  let at_a_root : bool = matches! ( parent . value () . kind, ViewnodeKind::BufferRoot );
+  if ! at_a_root { parent . value () . editable_gnid () ?; }
   let ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) : &ViewnodeKind =
     &node . value () . kind else { return None; };
   match &occurrence . overridesHere {
     Some (original) => Some ( original . clone () ),
-    None => ( occurrence . viewStats . warrant == Warrant::ByGraph )
-      . then ( || occurrence . gnid . clone () ), }}
+    None => ( at_a_root || occurrence . viewStats . warrant == Warrant::ByGraph )
+      . then ( || graph . pid_else_raw_id (&occurrence . gnid) ), }}
 
 /// Where 'perspective' stands in every cycle: the root authors' first,
 /// then the user's, then each foreign owner's in the declaration order
@@ -309,13 +341,13 @@ pub fn perspective_name (
           SkgrepoOwner::User => "yours" . to_string (),
           SkgrepoOwner::Foreign (name) => format! ("{}'s", name . 0), } )
         . collect ();
-      if names . is_empty () { "each root author's overrides" . to_string () }
-      else { format! ( "each root author's overrides ({})", names . join (", ") ) }}, }}
+      if names . is_empty () { ROOT_AUTHORS_UNNAMED . to_string () }
+      else { format! ( "{} ({})", ROOT_AUTHORS_UNNAMED, names . join (", ") ) }}, }}
 
 fn capitalized (
   text : &str,
 ) -> String {
-  let mut characters : std::str::Chars = text . chars ();
+  let mut characters : Chars = text . chars ();
   match characters . next () {
     Some (first) => first . to_uppercase () . chain (characters) . collect (),
     None => String::new (), }}
