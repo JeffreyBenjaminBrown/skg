@@ -130,8 +130,9 @@
           (test-fail "Emacs displayed a save-error buffer:\n%s"
                      (with-current-buffer error-buf (buffer-string))))))
 
-    ;; 5. The exact buffer used for the gesture immediately replaces root F
-    ;; with K.  K contains N, and N contains O.
+    ;; 5. The exact buffer used for the gesture is immediately re-rooted at
+    ;; K, which stands for nothing (no overridesHere).  K contains N, and N
+    ;; contains O.
     (unless
         (skg-test-wait-for
          (lambda ()
@@ -139,11 +140,12 @@
                 (with-current-buffer fork-buffer
                   (save-excursion
                     (goto-char (point-min))
-                    (and (string-match-p "(overridesHere F)"
-                                         (buffer-substring-no-properties
-                                          (line-beginning-position)
-                                          (line-end-position)))
-                         (string-match-p "N-new" (buffer-string)))))))
+                    (let ((root-line (buffer-substring-no-properties
+                                      (line-beginning-position)
+                                      (line-end-position))))
+                      (and (not (string-match-p "(gnid F)" root-line))
+                           (string-match-p "(overrides (out 1))" root-line)
+                           (string-match-p "N-new" (buffer-string))))))))
          10)
       (test-fail "F's original buffer did not replace root F with K:\n%s"
                  (if (buffer-live-p fork-buffer)
@@ -155,7 +157,7 @@
                      (line-beginning-position) (line-end-position))))
           (unless (and k-line
                        (string-match "(gnid \\([^ )]+\\))" k-line)
-                       (string-match-p "(overridesHere F)" k-line)
+                       (not (string-match-p "overridesHere" k-line))
                        (string-match-p "(subscribesTo (out 1))" k-line)
                        (string-match-p "(overrides (out 1))" k-line))
             (test-fail "K lacks its expected F relationships:\n%s"

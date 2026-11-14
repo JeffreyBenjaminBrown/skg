@@ -98,8 +98,59 @@
       (when (eval (cadr mode-line-process) t)
         (test-fail "the root authors' perspective is marked in the mode line"))
       (message "✓ switched back to the root authors' overrides")))
+  (integration-test-the-root-too)
   (message "PASS: Integration test successful!")
   (kill-emacs 0))
+
+;; The root too: a view of M, which A (M's own author's), U (yours)
+;; and B (third's) each override, shows M as its root from the root
+;; authors' perspective and each override from its author's, re-pointed
+;; where the root stands, so point stays on it; the buffer keeps its name.
+(defun test--root-line ()
+  (save-excursion
+    (goto-char (point-min))
+    (buffer-substring-no-properties (line-beginning-position) (line-end-position))))
+
+(defun integration-test-the-root-too ()
+  (skg-request-single-root-content-view-from-id "M")
+  (let ((buf (skg-test-wait-for
+              (lambda ()
+                (seq-find (lambda (b)
+                            (with-current-buffer b
+                              (and (boundp 'skg-view-id) skg-view-id
+                                   (string-match-p "(gnid M)" (test--root-line)))))
+                          (buffer-list)))
+              10)))
+    (unless buf (test-fail "the view of M did not open"))
+    (switch-to-buffer buf)
+    (with-current-buffer buf
+      (let ((name (buffer-name)))
+        (dolist (step '(("user" "U" ":your overrides")
+                        ("owner of foreign" "A" ":foreign's overrides")
+                        ("owner of third" "B" ":third's overrides")
+                        (nil "M" nil)))
+          (goto-char (point-min))
+          (end-of-line)
+          (let ((followed (nth 0 step)) (shown (nth 1 step)))
+            (skg-override-perspective)
+            (unless (skg-test-wait-for
+                     (lambda () (and (equal skg-overrides-followed followed)
+                                     (string-match-p (format "(gnid %s)" shown)
+                                                     (test--root-line))
+                                     (not skg--stream-in-progress)))
+                     10)
+              (test-fail "the root is not %s from %s:\n%s" shown followed (test--text)))
+            (unless (eq (equal shown "M")
+                        (not (string-match-p "(overridesHere M)" (test--root-line))))
+              (test-fail "the root %s does not stand for M as it should:\n%s"
+                         shown (test--text)))
+            (unless (equal (line-number-at-pos) 1)
+              (test-fail "point left the root when it became %s" shown))
+            (unless (equal (eval (cadr mode-line-process) t) (nth 2 step))
+              (test-fail "the mode line is wrong for %s" followed))
+            (unless (equal (buffer-name) name)
+              (test-fail "the buffer was renamed: %s" (buffer-name)))
+            (message "✓ the root is %s" shown)))))))
 
 (run-at-time 60 nil (lambda ()
                       (message "TIMEOUT: Integration test timed out!")

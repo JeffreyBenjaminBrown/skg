@@ -108,4 +108,45 @@ check_eventually(function ()
 T.check(buffer.override_perspective_mode_line(buf) == '',
         'the statusline mark is gone')
 
+-- The root too: a view of M, which A (M's own author's), U (yours)
+-- and B (third's) each override, shows M as its root from the root
+-- authors' perspective and each override from its author's, re-pointed
+-- where the root stands, so the cursor stays on it; the buffer keeps
+-- its name.
+require('skg.single_root_content_view')
+  .request_single_root_content_view_from_id('M')
+buf = T.wait_for(function ()
+  for _, candidate in ipairs(vim.api.nvim_list_bufs()) do
+    if vim.api.nvim_buf_is_valid(candidate)
+       and vim.b[candidate].skg_view_id
+       and line_of_gnid(candidate, 'M') == 1 then
+      return candidate end
+  end
+  return nil
+end, 10)
+T.check(buf, 'the view of M opened')
+vim.api.nvim_set_current_buf(buf)
+local name = vim.api.nvim_buf_get_name(buf)
+for _, step in ipairs({ { 'user', 'U', ':your overrides' },
+                        { 'owner of foreign', 'A', ":foreign's overrides" },
+                        { 'owner of third', 'B', ":third's overrides" },
+                        { nil, 'M', '' } }) do
+  local followed, shown, mark = step[1], step[2], step[3]
+  vim.api.nvim_win_set_cursor(0, { 1, 0 })
+  override_perspective.override_perspective()
+  check_eventually(function ()
+      return vim.b[buf].skg_overrides_followed == followed
+             and line_of_gnid(buf, shown) == 1
+             and lock.stream_in_progress == nil
+    end, 10, 'the root is ' .. shown)
+  local root = vim.api.nvim_buf_get_lines(buf, 0, 1, false)[1]
+  T.check((shown == 'M') == (not root:find('(overridesHere M)', 1, true)),
+          'the root ' .. shown .. ' stands for M as it should')
+  T.check(vim.api.nvim_win_get_cursor(0)[1] == 1,
+          'the cursor stayed on the root, now ' .. shown)
+  T.check(buffer.override_perspective_mode_line(buf) == mark,
+          'the statusline mark for ' .. shown)
+  T.check(vim.api.nvim_buf_get_name(buf) == name, 'the buffer keeps its name')
+end
+
 T.pass('PASS: Integration test successful!')
