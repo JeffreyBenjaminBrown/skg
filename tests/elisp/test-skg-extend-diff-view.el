@@ -61,7 +61,7 @@ the sent requests (newest first) and the handlers."
                  (setq shown (apply #'format format-string args)))))
       (skg--extend-diff-view-handler
        "((processed-summary (processed 1) (changed 3) (foreign 0) (order-only 0) (notEditable 0)) (errors ()) (warnings ()))")
-      (should (equal shown "1 of 3 changed files are processed"))
+      (should (equal shown "1 of 3 changed nodes are processed"))
       (skg--extend-diff-view-handler
        "((errors (\"View x is not a buffer of the diff view.\")) (warnings ()))")
       (should (equal shown "View x is not a buffer of the diff view.")))))

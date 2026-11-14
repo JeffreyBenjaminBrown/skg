@@ -9,7 +9,7 @@ local stage_and_commit = require('skg.stage_and_commit')
 
 local NEEDS_CONFIRMATION =
   '((response-type stage-and-commit) (needs-confirmation . t)'
-  .. ' (processed-summary (processed 1) (changed 3) (foreign 0) (order-only 0) (notEditable 0))'
+  .. ' (processed-summary (processed 1) (changed 3) (foreign 0) (order-only 0) (waiting 0) (notEditable 0))'
   .. ' (errors ()) (warnings ()))'
 
 describe('skg stage and commit', function ()
@@ -21,10 +21,10 @@ describe('skg stage and commit', function ()
     if buf then vim.api.nvim_buf_delete(buf, { force = true }) end
   end
 
-  ---Open the commit-message buffer, write TEXT in it, and write it
-  ---(':w'), which sends.
-  local function write_and_send (text)
-    stage_and_commit.stage_and_commit()
+  ---Open the commit-message buffer by OPENER (stage_and_commit by
+  ---default), write TEXT in it, and write it (':w'), which sends.
+  local function write_and_send (text, opener)
+    (opener or stage_and_commit.stage_and_commit)()
     local buf = stage_and_commit.commit_message_buffer()
     vim.api.nvim_buf_set_lines(buf, 0, -1, false, vim.split(text, '\n'))
     vim.api.nvim_buf_call(buf, function () vim.cmd('write') end)
@@ -83,7 +83,7 @@ describe('skg stage and commit', function ()
     local view = buffer.open_org_buffer_from_text(
       '* (skg node (gnid a)) a', 'skg://diff-view: all changes',
       'diff-view: all changes')
-    write_and_send('one message')
+    write_and_send('one message', stage_and_commit.stage_and_commit_everything)
     vim.wait(3000, function ()
       return #requests == 2 and #notices > 0 and lock.stream_in_progress == nil
     end, 10)
@@ -91,8 +91,11 @@ describe('skg stage and commit', function ()
     assert.is_truthy(requests[1]:find('(request . "stage and commit")', 1, true))
     assert.is_truthy(requests[1]:find('(message-lines "one message")', 1, true))
     assert.is_falsy(requests[1]:find('confirmed', 1, true))
+    assert.is_falsy(requests[1]:find('processed-only', 1, true))
     assert.is_truthy(requests[2]:find('(confirmed . t)', 1, true))
-    assert.is_truthy(prompts[1]:find('1 of 3 changed files are processed', 1, true))
+    assert.is_falsy(requests[2]:find('processed-only', 1, true))
+    assert.are.equal('1 of 3 changed nodes are processed. Type yes to commit anyway: ',
+                     prompts[1])
     assert.is_nil(stage_and_commit.commit_message_buffer())
     assert.is_truthy(vim.tbl_contains(
       notices, 'Committed in public (5f135fe), private (bff3a57).'), vim.inspect(notices))
@@ -109,7 +112,38 @@ describe('skg stage and commit', function ()
       return #requests == 1 and lock.stream_in_progress == nil end, 10)
     assert.are.equal(1, #requests, vim.inspect(requests))
     assert.is_truthy(requests[1]:find(
-      '(message-lines "summary" "" "  indented")', 1, true), requests[1])
+      '(message-lines "summary" "" "  indented") (processed-only . t))', 1, true),
+      requests[1])
+  end)
+
+  it('commits the processed with rc and everything with rC, the buffer remembering which', function ()
+    local keymaps = require('skg.keymaps')
+    local by_lhs = {}
+    for _, binding in ipairs(keymaps.content_view_bindings) do
+      by_lhs[binding[1]] = binding[2] end
+    for lhs, fn in pairs({ rc = 'stage_and_commit',
+                           rC = 'stage_and_commit_everything' }) do
+      local spec = keymaps.commands[by_lhs[lhs]]
+      assert.is_not_nil(spec, lhs)
+      assert.are.equal('skg.stage_and_commit', spec.module, lhs)
+      assert.are.equal(fn, spec.fn, lhs)
+      assert.is_function(stage_and_commit[spec.fn], lhs)
+    end
+    local requests = {}
+    vim.fn.input = function () return 'n' end
+    server = serve(requests)
+    stage_and_commit.stage_and_commit_everything()
+    local buf = stage_and_commit.commit_message_buffer()
+    assert.is_false(vim.b[buf].skg_commit_processed_only)
+    write_and_send('kept')
+    vim.wait(3000, function ()
+      return #requests == 1 and lock.stream_in_progress == nil end, 10)
+    assert.is_truthy(requests[1]:find('(processed-only . t)', 1, true), requests[1])
+    write_and_send('kept', stage_and_commit.stage_and_commit_everything)
+    vim.wait(3000, function ()
+      return #requests == 2 and lock.stream_in_progress == nil end, 10)
+    assert.are.equal(2, #requests, vim.inspect(requests))
+    assert.is_falsy(requests[2]:find('processed-only', 1, true), requests[2])
   end)
 
   it('does not resend unless the word typed is exactly "yes"', function ()
@@ -117,42 +151,10 @@ describe('skg stage and commit', function ()
     local typed = { 'y' }
     vim.fn.input = function () return table.remove(typed, 1) end
     server = serve(requests)
-    write_and_send('one message')
+    write_and_send('one message', stage_and_commit.stage_and_commit_everything)
     vim.wait(3000, function ()
       return #requests == 1 and lock.stream_in_progress == nil end, 10)
     vim.wait(100, function () return #requests > 1 end, 10)
-    assert.are.equal(1, #requests, vim.inspect(requests))
-  end)
-
-  it('names the gitrepos with entries already staged in the prompt', function ()
-    local requests, prompts = {}, {}
-    local typed = { 'no' }
-    vim.fn.input = function (prompt)
-      table.insert(prompts, prompt)
-      return table.remove(typed, 1) end
-    server = helpers.connect_to_fake_server(function (line, respond)
-      table.insert(requests, line)
-      respond(helpers.framed(
-        '((response-type stage-and-commit) (needs-confirmation . t)'
-        .. ' (already-staged (("/data/public" "notes.txt" "a b.skg")))'
-        .. ' (processed-summary (processed 3) (changed 3) (foreign 0) (order-only 0) (notEditable 0))'
-        .. ' (errors ()) (warnings ()))'))
-      respond(helpers.framed('((response-type rerender-lock) (lock-views ()))'))
-      respond(helpers.framed(
-        '((response-type rerender-done) (errors ()) (warnings ()))'))
-    end)
-    write_and_send('one message')
-    vim.wait(3000, function ()
-      return #prompts == 1 and lock.stream_in_progress == nil end, 10)
-    assert.are.equal(
-      'Commit ready. All 3 of 3 changed files are processed.'
-      .. ' Already staged, so committed too: /data/public: 2 paths'
-      .. ' (listed in *skg already staged*).'
-      .. ' Type yes to commit anyway: ',
-      prompts[1])
-    assert.are.same({ '* /data/public', 'notes.txt', 'a b.skg' },
-      vim.api.nvim_buf_get_lines(
-        vim.fn.bufnr('*skg already staged*'), 0, -1, false))
     assert.are.equal(1, #requests, vim.inspect(requests))
   end)
 
@@ -168,7 +170,7 @@ describe('skg stage and commit', function ()
       vim.fn.input = case.answer
       vim.notify = function (text) table.insert(notices, text) end
       server = serve(requests)
-      write_and_send('summary\n\nbody')
+      write_and_send('summary\n\nbody', stage_and_commit.stage_and_commit_everything)
       vim.wait(3000, function ()
         return vim.tbl_contains(notices, not_committed) end, 10)
       assert.is_true(vim.tbl_contains(notices, not_committed),
@@ -185,8 +187,20 @@ describe('skg stage and commit', function ()
     for _, case in ipairs({
         { result = '((commits ((public 5f135fea))) (errors ()) (warnings ()))',
           kept = false, line = 'Committed in public (5f135fe).' },
+        { result = '((commits (("public" "5f135fea"))) (committed-nodes 1) (left-nodes 2) (waiting ()) (errors ()) (warnings ()))',
+          kept = false,
+          line = 'Committed 1 node, in public (5f135fe). 2 changed nodes are left.' },
         { result = '((commits ()) (errors ()) (warnings ()))',
-          kept = false, line = 'Nothing was committed.' },
+          kept = false, line = 'Nothing has changed, so nothing was committed.' },
+        { result = '((commits ()) (committed-nodes 0) (left-nodes 5) (waiting ()) (errors ()) (warnings ()))',
+          kept = true,
+          line = 'Nothing is processed, so nothing was committed; <localleader>rC'
+            .. ' commits everything. Your message is kept in skg://commit-message.' },
+        { result = '((commits ()) (committed-nodes 0) (left-nodes 2) (waiting (("a" "Plans" names-new "b" "Seeds"))) (errors ()) (warnings ()))',
+          kept = true,
+          line = "Nothing was committed. 2 changed nodes are left; 1 of them is"
+            .. " processed but waits: 'Plans' names 'Seeds', which is new and"
+            .. " does not go in. Your message is kept in skg://commit-message." },
         { result = '((commits ()) (errors ("skgrepo private: no git author is configured")) (warnings ()))',
           kept = true,
           line = 'Nothing was committed. Errors: skgrepo private: no git author'
@@ -246,5 +260,32 @@ describe('skg stage and commit', function ()
       'Nothing was committed. Errors: skgrepo private: no git author is configured',
       stage_and_commit.result_message(require('skg.sexpr.parse').read(
         '((commits ()) (errors ("skgrepo private: no git author is configured")) (warnings ()))')))
+  end)
+
+  it('says what went in, what is left, and what waits and why', function ()
+    local read = require('skg.sexpr.parse').read
+    assert.are.equal(
+      "Committed 2 nodes, in public (9c1e40d), private (41aa07f). 2 changed"
+      .. " nodes are left; 1 of them is processed but waits: 'Plans for spring'"
+      .. " names 'Seed order', which is new and does not go in.",
+      stage_and_commit.result_message(read(
+        '((commits (("public" "9c1e40d2") ("private" "41aa07fe"))) (committed-nodes 2)'
+        .. ' (left-nodes 2) (waiting (("PID-A" "Plans for spring" names-new "PID-B"'
+        .. ' "Seed order"))) (errors ()) (warnings ()))')))
+    assert.are.equal(
+      "Committed 1 node, in public (9c1e40d). 3 changed nodes are left; 3 of"
+      .. " them are processed but wait: 'X' is deleted, but 'Y', which does not"
+      .. " go in, still names it; 'M' is part of a merge with 'N', which does"
+      .. " not go in; 'P' waits for 'Q' (someday).",
+      stage_and_commit.result_message(read(
+        '((commits (("public" "9c1e40d2"))) (committed-nodes 1) (left-nodes 3)'
+        .. ' (waiting (("x" "X" still-named "y" "Y") ("m" "M" merge "n" "N")'
+        .. ' ("p" "P" someday "q" "Q"))) (errors ()) (warnings ()))')))
+    assert.are.equal(
+      'Committed 3 nodes, in public (9c1e40d). 1 changed node is left.'
+      .. ' Errors: skgrepo private: git commit failed',
+      stage_and_commit.result_message(read(
+        '((commits (("public" "9c1e40d2"))) (committed-nodes 3) (left-nodes 1)'
+        .. ' (waiting ()) (errors ("skgrepo private: git commit failed")) (warnings ()))')))
   end)
 end)

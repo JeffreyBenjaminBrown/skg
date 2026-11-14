@@ -160,7 +160,7 @@ viewparent. The skipped lines."
   (skg-request-save-buffer)
   (unless (skg-test-wait-for
            (lambda ()
-             (and (cl-some (lambda (m) (string-match-p "changed files are processed" m))
+             (and (cl-some (lambda (m) (string-match-p "changed nodes are processed" m))
                            test-messages)
                   (with-current-buffer (all-changes-buffer)
                     (save-excursion

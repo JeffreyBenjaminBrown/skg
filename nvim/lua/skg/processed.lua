@@ -620,8 +620,8 @@ end
 -- ── the processed summary ──────────────────────────────────────────
 
 ---The save response's '(processed-summary (processed N) (changed M)
----(foreign F) (order-only O) (notEditable K))' as a table of counts, or
----nil when it has none.
+---(foreign F) (order-only O) (waiting W) (notEditable K))' as a table
+---of counts, or nil when it has none.
 ---@param response any
 ---@return table|nil
 function M.processed_summary_from_response (response)
@@ -637,32 +637,41 @@ function M.processed_summary_from_response (response)
       return { processed = count('processed'), changed = count('changed'),
                foreign = count('foreign'),
                order_only = count('order-only'),
+               waiting = count('waiting'),
                not_editable = count('notEditable') } end
   end
   return nil
 end
 
----The line shown after a save of a buffer of the diff view.
+---The line shown after a save of a buffer of the diff view. It counts
+---nodes, the unit <localleader>rc commits; 'waiting' of the processed
+---would wait. "Commit ready" means <localleader>rc would commit every
+---changed node.
 ---@param summary table as processed_summary_from_response gives it
 ---@return string
 function M.processed_summary_message (summary)
-  local complete = summary.processed == summary.changed
+  local waiting = summary.waiting or 0
+  local complete = summary.processed == summary.changed and waiting == 0
   local parts = {}
   if complete then
     table.insert(parts, string.format(
-      'Commit ready. All %d of %d changed files are processed',
+      'Commit ready. All %d of %d changed nodes are processed',
       summary.processed, summary.changed))
   else
     table.insert(parts, string.format(
-      '%d of %d changed files are processed',
+      '%d of %d changed nodes are processed',
       summary.processed, summary.changed)) end
+  if waiting > 0 then
+    table.insert(parts, string.format(' (%d of them %s)', waiting,
+                                      waiting == 1 and 'waits' or 'wait')) end
   if summary.not_editable > 0 then
     table.insert(parts, string.format(
       ', %d changes are not editable in this view; <localleader>ru extends the diff view to them',
       summary.not_editable)) end
   if summary.foreign > 0 then
     table.insert(parts, string.format(
-      ', %d files changed in foreign skgrepos', summary.foreign)) end
+      ', %d %s changed in foreign skgrepos', summary.foreign,
+      summary.foreign == 1 and 'node' or 'nodes')) end
   if complete then table.insert(parts, '.') end
   return table.concat(parts)
 end

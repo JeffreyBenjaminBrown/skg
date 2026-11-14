@@ -211,7 +211,8 @@ born() { # NAME WHO [JEFFS_NOTE_ID]: 'up', then a home note of the standard shap
   } >> "$view.compact.org"
   python3 "$READER" save "$view.view.json" --yes --port "$port" | grep -E "^Server|Error" >&2
   set_home "$name" "$home"
-  python3 "$READER" commit "$title is born: a home note" --yes --port "$port" | tail -1 >&2
+  # Nothing of a new graph is marked processed, so the commit takes everything.
+  python3 "$READER" commit "$title is born: a home note" --all --yes --port "$port" | tail -1 >&2
   echo "home=$home"
 }
 

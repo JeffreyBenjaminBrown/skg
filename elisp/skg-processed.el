@@ -584,25 +584,33 @@ a deleted subscriber's subscription, say, is drawn nowhere else."
   "The line shown after a save of a buffer of the diff view,
 from SUMMARY, the save response's
 '(processed-summary (processed N) (changed M) (foreign F) (order-only O)
-\(notEditable K))'."
+\(waiting W) (notEditable K))'. It counts nodes, the unit C-c r c
+commits; W of the N processed would wait. \"Commit ready\" means C-c r
+c would commit every changed node."
   (let* ((count (lambda (key)
                   (or (cadr (assq key (cdr summary))) 0)))
          (processed (funcall count 'processed))
          (changed (funcall count 'changed))
+         (waiting (funcall count 'waiting))
          (foreign (funcall count 'foreign))
          (not-editable (funcall count 'notEditable))
-         (complete (= processed changed)))
+         (complete (and (= processed changed) (= waiting 0))))
     (concat
      (if complete
-         (format "Commit ready. All %d of %d changed files are processed"
+         (format "Commit ready. All %d of %d changed nodes are processed"
                  processed changed)
-       (format "%d of %d changed files are processed" processed changed))
+       (format "%d of %d changed nodes are processed" processed changed))
+     (if (> waiting 0)
+         (format " (%d of them %s)" waiting
+                 (if (= waiting 1) "waits" "wait"))
+       "")
      (if (> not-editable 0)
          (format ", %d changes are not editable in this view; C-c r u extends the diff view to them"
                  not-editable)
        "")
      (if (> foreign 0)
-         (format ", %d files changed in foreign skgrepos" foreign)
+         (format ", %d %s changed in foreign skgrepos" foreign
+                 (if (= foreign 1) "node" "nodes"))
        "")
      (if complete "." ""))))
 

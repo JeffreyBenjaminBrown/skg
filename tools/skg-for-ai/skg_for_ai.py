@@ -67,7 +67,7 @@ every view its commands write: when the server rerenders one (after
 a save or a git-commit on that connection, or when files changed on
 disk), it rewrites the view's three files, and it appends each event
 to 'DIR/skg-for-ai.log'. While it runs, every command for its port
-(but 'raw', 'import', and 'commit' without '--yes') is sent to it over
+(but 'raw', 'import', and 'commit --all' without '--yes') is sent to it over
 the Unix socket 'skg-for-ai-PORT.sock' in XDG_RUNTIME_DIR (else /tmp),
 whatever folder it writes into, and runs there; so is every command
 whose '--out-dir' (or whose sidecar's folder) is DIR and that names no
@@ -330,14 +330,20 @@ def parse_command_line (argv):
     help = ( "under a skgrepo restriction, approve releasing text from "
              "overPrivateText telescopes the switched view would show" ))
   commit_parser = commands . add_parser (
-    "commit", help = ( "stage and git-commit every change in the owned "
-                       "skgrepos, with MESSAGE" ),
+    "commit", help = ( "git-commit, with MESSAGE, every node whose changes "
+                       "are all processed, except one that needs a node "
+                       "whose changes are not; with '--all', every changed "
+                       "node of the owned skgrepos" ),
     parents = [ port_option ] )
   commit_parser . add_argument ( "message" )
   commit_parser . add_argument (
+    "--all", action = "store_true",
+    help = ( "commit every changed node, processed or not; the server "
+             "asks first when some is not processed" ))
+  commit_parser . add_argument (
     "--yes", action = "store_true",
-    help = ( "answer yes when the server asks to confirm, because not "
-             "every change is processed or something is already staged" ))
+    help = ( "commit every changed node, as '--all' does, answering yes "
+             "when the server asks because some is not processed" ))
   close_parser = commands . add_parser (
     "close", help = "send 'close view' for a sidecar's view ID" )
   close_parser . add_argument ( "sidecar" )
@@ -1026,31 +1032,37 @@ def command_diff (arguments):
   for path in written_paths:
     print (path)
 
+def commit_commits_everything (arguments):
+  """Whether 'commit' commits every changed node: with '--all', or
+  with '--yes', which only a commit of everything can need, so that
+  'commit "MSG" --yes' commits what it committed before the commit of
+  the processed existed."""
+  return arguments . all or arguments . yes
+
 def command_commit (arguments):
-  """Send "stage and commit" with the message. When the server asks
-  for confirmation (not every changed file is processed, or some owned
-  gitrepo has entries already staged), print why and ask for a typed
-  "yes", which '--yes' gives; on yes, resend it confirmed. Print what
-  was committed. The server rerenders the committing connection's
-  views afterward; a commit on a connection of its own (one asking
-  for a typed "yes", which cannot cross the daemon's socket) then asks
-  the daemon for its port, if one runs, to rerender its buffers of the
-  diff view."""
+  """Send "stage and commit" with the message. Without '--all' (or
+  '--yes'), it commits every node whose changes are all processed,
+  except one that needs a node whose changes are not, and asks nothing.
+  With '--all' it commits every changed node; when the server asks for
+  confirmation (some changed node is not processed), print why and ask
+  for a typed "yes", which '--yes' gives; on yes, resend it confirmed.
+  Print what went in, how many changed nodes are left, and why each
+  processed node left waits. The server rerenders the committing
+  connection's views afterward; a commit on a connection of its own
+  (one that may ask for a typed "yes", which cannot cross the daemon's
+  socket) then asks the daemon for its port, if one runs, to rerender
+  its buffers of the diff view."""
   if not arguments . message . strip ():
     raise SkgToolError ( "A commit message is required; nothing was sent." )
+  processed_only = not commit_commits_everything (arguments)
   connection = connect_to_server (arguments . port)
   try:
-    response = connection . stage_and_commit (arguments . message, False)
+    response = connection . stage_and_commit (
+      arguments . message, False, processed_only )
     if response_field (response, "needs-confirmation") is not None:
       print ( "Not every change is processed: " +
               processed_summary_text (
                 response_field (response, "processed-summary") ))
-      already_staged = response_field (response, "already-staged")
-      for gitrepo_and_paths in already_staged or []:
-        print ( "Already staged in " + sexp_to_text ( gitrepo_and_paths [0] )
-                + ", so committed too: " +
-                ", " . join ( sexp_to_text (path)
-                              for path in gitrepo_and_paths [ 1 : ] ))
       if not ( arguments . yes or typed_yes ( "Type yes to commit anyway: " )):
         print ( "Nothing was committed." )
         return
@@ -1059,10 +1071,7 @@ def command_commit (arguments):
     connection . close ()
   commits = response_field (response, "commits") or []
   errors = response_field (response, "errors") or []
-  print ( "Committed in " + ", " . join (
-            sexp_to_text ( commit [0] ) + " (" + sexp_to_text ( commit [1] ) + ")"
-            for commit in commits ) + "."
-          if commits else "Nothing was committed." )
+  print ( commit_result_text (response) )
   for error in errors:
     print ( "Server error: " + error )
   for warning in response_field (response, "warnings") or []:
@@ -1071,6 +1080,61 @@ def command_commit (arguments):
     ask_daemon_of_port_to_rerender_diffView_buffers (arguments . port)
   if errors:
     raise SkgToolError ( "The server reported errors; see above." )
+
+def commit_result_text (response):
+  """What a commit's RESPONSE says, as the clients say it
+  ('skg--stage-and-commit-result-message' in
+  'elisp/skg-request-stage-and-commit.el'): what went in, how many
+  changed nodes are left, and for each processed node that waits, what
+  it waits for. The commit IDs are whole. Errors are printed apart."""
+  commits = response_field (response, "commits") or []
+  committed_nodes = response_field (response, "committed-nodes")
+  left = response_field (response, "left-nodes") or 0
+  waiting = response_field (response, "waiting") or []
+  errors = response_field (response, "errors") or []
+  if commits:
+    text = ( "Committed " +
+             ( count_phrase (committed_nodes, "node") + ", "
+               if isinstance (committed_nodes, int) else "" ) +
+             "in " + ", " . join (
+               sexp_to_text ( commit [0] ) + " (" + sexp_to_text ( commit [1] ) + ")"
+               for commit in commits ) + "." )
+  elif errors or waiting:
+    text = "Nothing was committed."
+  elif left == 0:
+    text = "Nothing has changed, so nothing was committed."
+  else:
+    text = ( "Nothing is processed, so nothing was committed; "
+             "'commit --all' commits everything." )
+  if left > 0 and ( commits or waiting ):
+    text += ( " " + count_phrase (left, "changed node") +
+              ( " is left" if left == 1 else " are left" ) )
+    if waiting:
+      text += ( f"; {len (waiting)} of them " +
+                ( "is processed but waits" if len (waiting) == 1
+                  else "are processed but wait" ) + ": " +
+                "; " . join ( waiting_clause (entry) for entry in waiting ))
+    text += "."
+  return text
+
+def count_phrase (count, noun):
+  """COUNT and NOUN, made plural by an "s" unless COUNT is 1."""
+  return f"{count} {noun}" + ( "" if count == 1 else "s" )
+
+def waiting_clause (entry):
+  """What ENTRY, '(PID TITLE REASON PID TITLE)' from a commit's
+  'waiting', waits for, and why."""
+  title, reason, other_title = ( sexp_to_text ( entry [1] ),
+                                 sexp_to_text ( entry [2] ),
+                                 sexp_to_text ( entry [4] ) )
+  if reason == "names-new":
+    return f"'{title}' names '{other_title}', which is new and does not go in"
+  if reason == "still-named":
+    return ( f"'{title}' is deleted, but '{other_title}', which does not go "
+             "in, still names it" )
+  if reason == "merge":
+    return f"'{title}' is part of a merge with '{other_title}', which does not go in"
+  return f"'{title}' waits for '{other_title}' ({reason})"
 
 def command_delete_references (arguments):
   """Send "delete references to absent node" for an ID the graph lacks,
@@ -2515,21 +2579,28 @@ def diff_summary_lines (parsed_view, view):
 
 def processed_summary_text (summary):
   """The sentence a client shows for the processed summary SUMMARY,
-  '((processed N) (changed M) (foreign F) (order-only O) (notEditable K))'
-  ('skg--processed-summary-message' in 'elisp/skg-processed.el')."""
+  '((processed N) (changed M) (foreign F) (order-only O) (waiting W)
+  (notEditable K))' ('skg--processed-summary-message' in
+  'elisp/skg-processed.el'). It counts nodes, the unit 'commit' commits;
+  W of the N processed would wait. "Commit ready" means 'commit' would
+  commit every changed node."""
   counts = { str ( entry [0] ) : first_number ( [ None ] + entry [ 1 : ] )
              for entry in summary or [] }
   processed = counts . get ("processed", 0)
   changed = counts . get ("changed", 0)
+  waiting = counts . get ("waiting", 0)
   not_editable = counts . get ("notEditable", 0)
   foreign = counts . get ("foreign", 0)
-  complete = processed == changed
+  complete = processed == changed and waiting == 0
   return (
-    ( f"Commit ready. All {processed} of {changed} changed files are processed"
-      if complete else f"{processed} of {changed} changed files are processed" ) +
+    ( f"Commit ready. All {processed} of {changed} changed nodes are processed"
+      if complete else f"{processed} of {changed} changed nodes are processed" ) +
+    ( f" ({waiting} of them " + ( "waits)" if waiting == 1 else "wait)" )
+      if waiting else "" ) +
     ( f", {not_editable} changes are not editable in this buffer"
       if not_editable else "" ) +
-    ( f", {foreign} files changed in foreign skgrepos" if foreign else "" ) +
+    ( f", {count_phrase (foreign, 'node')} changed in foreign skgrepos"
+      if foreign else "" ) +
     "." )
 
 def ownership_word (owned):
@@ -4815,7 +4886,8 @@ SIDECAR_COMMANDS = ( "save", "extend", "close", "override-perspective" )
 # The commands that always run in their own process: 'raw' speaks the
 # protocol directly, 'import' binds its approval to a connection of
 # its own, and 'linkstack' keeps a file, asking the server at most for
-# a title. ('commit' runs here too unless '--yes' answers for it.)
+# a title. ('commit --all' runs here too unless '--yes' answers for
+# it: only a commit of everything can ask for a typed yes.)
 COMMANDS_NEVER_SENT_TO_A_DAEMON = ( "raw", "import", "linkstack" )
 
 def command_daemon (arguments):
@@ -4859,7 +4931,8 @@ def exit_code_of_command_sent_to_daemon (arguments, argv):
   server, and then to the one for the default port. A socket nobody
   answers on is one a daemon left when it died."""
   if ( arguments . command in COMMANDS_NEVER_SENT_TO_A_DAEMON
-       or ( arguments . command == "commit" and not arguments . yes )):
+       or ( arguments . command == "commit" and arguments . all
+            and not arguments . yes )):
     return None
   named_port = port_named_by_command (arguments, argv)
   port = ( named_port if named_port is not None
@@ -5615,17 +5688,19 @@ class SkgConnection:
     return [ parse_sexp (message)
              for message in self . raw_save (line, buffer_text, baseline, view_id) ]
 
-  def stage_and_commit (self, message, confirmed):
-    """Send "stage and commit" with MESSAGE, confirmed when CONFIRMED;
-    return its response, parsed, after reading the rerender stream
-    that follows it up to its 'rerender-done'. The message goes one
-    string per line, as '(message-lines "LINE" ...)', since the server
-    reads one request per line."""
+  def stage_and_commit (self, message, confirmed, processed_only = False):
+    """Send "stage and commit" with MESSAGE, confirmed when CONFIRMED,
+    asking for the processed nodes only when PROCESSED_ONLY; return its
+    response, parsed, after reading the rerender stream that follows
+    it up to its 'rerender-done'. The message goes one string per
+    line, as '(message-lines "LINE" ...)', since the server reads one
+    request per line."""
     self . send_line (
       request_line ( "stage and commit" ) [ : -1 ] +
       " (message-lines " +
       " " . join ( quote_string (line) for line in message . split ("\n") ) +
-      ")" + ( " (confirmed . t))" if confirmed else ")" ))
+      ")" + ( " (processed-only . t)" if processed_only else "" ) +
+      ( " (confirmed . t))" if confirmed else ")" ))
     response = parse_sexp ( self . read_message (IMPORT_TIMEOUT_SECONDS) )
     require_response_type (response, "stage-and-commit")
     while response_type ( parse_sexp (

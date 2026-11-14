@@ -417,21 +417,28 @@ siblings, or a child without metadata."
         (skg-handle-save-sexp
          (concat "((content \"* (skg node (gnid a)) a\n\") (errors ()) (warnings ())"
                  " (processed-summary (processed 12) (changed 14) (foreign 2)"
-                 " (order-only 1) (notEditable 3)))")))
+                 " (order-only 1) (waiting 1) (notEditable 3)))")))
       (should (equal (car shown)
-                     "12 of 14 changed files are processed, 3 changes are not editable in this view; C-c r u extends the diff view to them, 2 files changed in foreign skgrepos"))
+                     "12 of 14 changed nodes are processed (1 of them waits), 3 changes are not editable in this view; C-c r u extends the diff view to them, 2 nodes changed in foreign skgrepos"))
       (with-temp-buffer
         (skg-handle-save-sexp
          (concat "((content \"* (skg node (gnid a)) a\n\") (errors ()) (warnings ())"
-                 " (processed-summary (processed 14) (changed 14) (foreign 0)"
-                 " (order-only 0) (notEditable 0)))")))
+                 " (processed-summary (processed 14) (changed 14) (foreign 1)"
+                 " (order-only 0) (waiting 0) (notEditable 0)))")))
       (should (equal (car shown)
-                     "Commit ready. All 14 of 14 changed files are processed."))
+                     "Commit ready. All 14 of 14 changed nodes are processed, 1 node changed in foreign skgrepos."))
+      (with-temp-buffer
+        (skg-handle-save-sexp
+         (concat "((content \"* (skg node (gnid a)) a\n\") (errors ()) (warnings ())"
+                 " (processed-summary (processed 5) (changed 6) (foreign 0)"
+                 " (order-only 0) (waiting 2) (notEditable 0)))")))
+      (should (equal (car shown)
+                     "5 of 6 changed nodes are processed (2 of them wait)"))
       (setq shown '())
       (with-temp-buffer
         (skg-handle-save-sexp
          "((content \"* (skg node (gnid a)) a\n\") (errors ()) (warnings ()))"))
-      (should-not (seq-some (lambda (line) (string-match-p "changed files" line))
+      (should-not (seq-some (lambda (line) (string-match-p "changed nodes" line))
                             shown)))))
 
 ;;; Moving between headlines with change facts

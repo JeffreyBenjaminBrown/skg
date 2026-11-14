@@ -51,8 +51,10 @@ In order, it:
 - on a fifth scratch server, whose owned skgrepo is a gitrepo with the
   fixture committed: saves a retitle, a new child and a deletion,
   checks the diff view's compact buffer exactly, marks the new child
-  processed, restores the deleted node, and commits (refused unconfirmed,
-  then confirmed with '--yes'), checking 'git log' and that the diff
+  processed and commits it alone ('commit'), then finds nothing
+  processed to commit, restores the deleted node, and commits the rest
+  ('commit --all' refused unconfirmed, then confirmed with '--yes'),
+  checking 'git log' and that the diff
   view is then empty; then extends a diff buffer to a change it does not
   make editable, and saves an edit of it; marks and unmarks a subtree's
   changes with 'processed both subtree' and 'unprocessed both subtree'; a blank commit
@@ -66,7 +68,7 @@ In order, it:
   the watcher cannot read; a command for its port writing into another
   folder runs through it, and that view is rewritten after a save; a
   second daemon for the port is refused; 'commit --yes' through it, and
-  an interactive 'commit' beside it, each rewrite its held buffer of
+  an interactive 'commit --all' beside it, each rewrite its held buffer of
   the diff view; 'close' and 'daemon --stop' release its views; a
   socket a killed daemon left is replaced, and SIGTERM stops a daemon;
 - on a seventh scratch server, whose fixture gains a second owned
@@ -1687,7 +1689,7 @@ DIFF_VIEW_ID_PATTERN = re . compile (
   r'diff-view:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' )
 COMMIT_MESSAGE = "Review the fixture."
 NOT_ALL_PROCESSED = (
-  "Not every change is processed: 1 of 4 changed files are processed.\n" )
+  "Not every change is processed: 0 of 3 changed nodes are processed.\n" )
 EMPTY_DIFF_VIEW = (
   "The diff view is empty: nothing changed since the last commits.\n" )
 
@@ -1695,7 +1697,8 @@ def failures_of_reviewing (scratch, data_root):
   main_repo = os . path . join (data_root, "me", "main")
   context = { "scratch" : scratch, "main_repo" : main_repo }
   for case in [ check_edits_to_review, check_diff_shows_the_changes,
-                check_marking_processed, check_unconfirmed_commit,
+                check_marking_processed, check_commit_of_the_processed,
+                check_unconfirmed_commit,
                 check_restoring_a_deleted_node, check_confirmed_commit,
                 check_extending_the_diff_view, check_marking_a_subtree_processed,
                 check_blank_commit_message ]:
@@ -1747,12 +1750,12 @@ def check_marking_processed (context):
     diff_report_head () +
     "Processed: ⟨0j⟩ 'A new grandchild', as '(processed node rel newOutward)'.\n" +
     saved_line (0) +
-    "Processed: 1 of 4 changed files are processed.\n" +
+    "Processed: 1 of 4 changed nodes are processed.\n" +
     diff_written_paths (folder),
     ignoring_view_ids = True )
   fresh = run_diff (context, "marked")
   compact = read_diff_compact (fresh)
-  for expected in [ "# Processed: 1 of 4 changed files are processed.\n",
+  for expected in [ "# Processed: 1 of 4 changed nodes are processed.\n",
                     "**** A new grandchild ⟨0j ∃+✓ ~+✓⟩\n" ]:
     if expected not in compact:
       raise CaseFailure ( f"the fresh diff view lacks {expected!r}:\n{compact}" )
@@ -1777,16 +1780,50 @@ def check_marking_processed (context):
     NOT_SAVED,
     ignoring_view_ids = True )
 
+PROCESSED_COMMIT_MESSAGE = "Commit the new grandchild."
+
+def check_commit_of_the_processed (context):
+  """'commit' commits the processed nodes and asks nothing: the new
+  grandchild alone, whose container, not processed, is left with its
+  mark on the grandchild's membership. Run again, it finds nothing
+  processed, and says that 'commit --all' commits everything."""
+  completed = run_tool ([ "commit", PROCESSED_COMMIT_MESSAGE ], standard_input = "" )
+  head = git ( context [ "main_repo" ], [ "rev-parse", "HEAD" ] ) . strip ()
+  require_output (
+    completed,
+    f"Committed 1 node, in main ({head}). 3 changed nodes are left.\n" )
+  require_equal ( "the git log after the commit of the processed",
+                  git ( context [ "main_repo" ], [ "log", "--format=%s" ] ),
+                  PROCESSED_COMMIT_MESSAGE + "\nThe fixture\n" )
+  require_equal ( "the files that commit took",
+                  git ( context [ "main_repo" ],
+                        [ "show", "--name-status", "--format=", "HEAD" ] )
+                  . count ("\n"), 1 )
+  compact = read_diff_compact ( run_diff (context, "after-processed") )
+  for expected in [ "# Processed: 0 of 3 changed nodes are processed.\n",
+                    "A new grandchild ⟨0" ]:
+    if expected not in compact:
+      raise CaseFailure ( f"the diff view after the commit lacks {expected!r}:\n{compact}" )
+  if "~+✓" not in compact:
+    raise CaseFailure ( f"the container's mark on the grandchild was lost:\n{compact}" )
+  require_output (
+    run_tool ([ "commit", PROCESSED_COMMIT_MESSAGE ]),
+    "Nothing is processed, so nothing was committed; "
+    "'commit --all' commits everything.\n" )
+  require_equal ( "the git log after a commit with nothing processed",
+                  git ( context [ "main_repo" ], [ "log", "--format=%s" ] ),
+                  PROCESSED_COMMIT_MESSAGE + "\nThe fixture\n" )
+
 def check_unconfirmed_commit (context):
-  """Not every change is processed, so the server asks; an answer other
-  than 'yes' commits nothing."""
+  """'commit --all' while not every change is processed: the server
+  asks, and an answer other than 'yes' commits nothing."""
   graph_before = skg_files (context)
   require_output (
-    run_tool ([ "commit", COMMIT_MESSAGE ], standard_input = "no\n"),
+    run_tool ([ "commit", COMMIT_MESSAGE, "--all" ], standard_input = "no\n"),
     NOT_ALL_PROCESSED + "Type yes to commit anyway: \nNothing was committed.\n" )
   require_equal ( "the git log after an unconfirmed commit",
                   git ( context [ "main_repo" ], [ "log", "--format=%s" ] ),
-                  "The fixture\n" )
+                  PROCESSED_COMMIT_MESSAGE + "\nThe fixture\n" )
   require_equal ( "the graph after an unconfirmed commit",
                   skg_files (context), graph_before )
 
@@ -1803,7 +1840,7 @@ def check_restoring_a_deleted_node (context):
     diff_report_head () +
     "Restore node: ⟨0i⟩ 'Contained twice', as HEAD has it.\n" +
     saved_line (0) +
-    "Processed: 1 of 2 changed files are processed.\n" +
+    "Processed: 0 of 1 changed nodes are processed.\n" +
     diff_written_paths (folder),
     ignoring_view_ids = True )
   require_equal ( "the restored node's title",
@@ -1816,17 +1853,22 @@ def check_restoring_a_deleted_node (context):
                   [ "shared-id" ] )
 
 def check_confirmed_commit (context):
-  """'--yes' answers the server's question; the commit carries the
-  message, and leaves the diff view empty."""
+  """'--yes' alone commits everything, as '--all' does, and answers the
+  server's question; the commit carries the message, and leaves the
+  diff view empty. It takes 3 nodes where the summary counted 1
+  changed: the restore rewrote the two others' files in another field
+  order, which the parser does not read, and such files go in with
+  any commit, counted ('docs/diff-view.org', "The unit is the
+  node")."""
   completed = run_tool ([ "commit", COMMIT_MESSAGE, "--yes" ])
   head = git ( context [ "main_repo" ], [ "rev-parse", "HEAD" ] ) . strip ()
   require_output (
     completed,
-    "Not every change is processed: 1 of 2 changed files are processed.\n"
-    f"Committed in main ({head}).\n" )
+    "Not every change is processed: 0 of 1 changed nodes are processed.\n"
+    f"Committed 3 nodes, in main ({head}).\n" )
   require_equal ( "the git log after the commit",
                   git ( context [ "main_repo" ], [ "log", "--format=%s" ] ),
-                  COMMIT_MESSAGE + "\nThe fixture\n" )
+                  COMMIT_MESSAGE + "\n" + PROCESSED_COMMIT_MESSAGE + "\nThe fixture\n" )
   require_equal ( "the uncommitted '.skg' files",
                   [ line for line in git ( context [ "main_repo" ],
                                            [ "status", "--porcelain" ] )
@@ -1857,9 +1899,9 @@ def check_extending_the_diff_view (context):
   require_save_succeeds (grandchild_view)
   require_output (
     run_tool ([ "extend", sidecar_of_diff (folder) ]),
-    "Before extending: 0 of 2 changed files are processed, 1 changes are "
+    "Before extending: 0 of 2 changed nodes are processed, 1 changes are "
     "not editable in this buffer.\n"
-    "Extended: 0 of 2 changed files are processed.\n" +
+    "Extended: 0 of 2 changed nodes are processed.\n" +
     diff_written_paths (folder) )
   require_in_diff_compact (
     folder, "*** First child, renamed ⟨0d aC2⟩\n"
@@ -1905,7 +1947,7 @@ def check_marking_a_subtree_processed (context):
     "Processed: ⟨0c⟩ 'The fixture root', as '(processed)'.\n"
     "Processed: ⟨0f⟩ 'A grandchild, retitled twice', as '(processed node)'.\n"
     "Processed: ⟨0g⟩ 'A new grandchild', as '(processed)'.\n" +
-    saved_line (0) + "Processed: Commit ready. All 2 of 2 changed files are processed.\n" +
+    saved_line (0) + "Processed: Commit ready. All 2 of 2 changed nodes are processed.\n" +
     diff_written_paths (folder),
     ignoring_view_ids = True )
   edit_compact ( folder, [ ( "** The fixture root, retitled ⟨0b aC2 L2 M✓⟩",
@@ -1921,7 +1963,7 @@ def check_marking_a_subtree_processed (context):
     "Question: this unmarks 4 changes. Unmarking this node processed will "
     "unmark every contributing decision. You might discard a lot of hard-won "
     "information. Continue? Saving with '--yes' answers yes.\n" +
-    saved_line (0) + "Processed: 0 of 2 changed files are processed.\n" +
+    saved_line (0) + "Processed: 0 of 2 changed nodes are processed.\n" +
     diff_written_paths (folder),
     ignoring_view_ids = True )
 
@@ -1971,7 +2013,7 @@ def diff_written_paths (folder):
                      for suffix in ( ".full.org", ".compact.org", ".view.json" ))
 
 EXPECTED_DIFF_COMPACT = (
-  "# Processed: 0 of 4 changed files are processed.\n"
+  "# Processed: 0 of 4 changed nodes are processed.\n"
   "# Headlines with change facts 7, processed 0, unprocessed 7.\n"
   "# skg-for-ai compact view of diff_all-changes.full.org (view ID diff-view:ID)\n"
   "# Each headline ends in its handle ⟨ID HERALDS⟩: ID its viewnode ID,\n"
@@ -2252,7 +2294,7 @@ def check_daemon_commits_and_rewrites_a_diffView_buffer (context):
   require_equal ( "the held diff buffer's 'closed'",
                   read_sidecar (diff_folder, DIFF_BASE_NAME) [ "closed" ], False )
   completed = require_tool_run ([ "commit", "Commit through the daemon.", "--yes" ])
-  if "Committed in main (" not in completed . stdout:
+  if "Committed 3 nodes, in main (" not in completed . stdout:
     raise CaseFailure ( f"the commit printed {completed . stdout!r}" )
   require_equal ( "the git log after the commit through the daemon",
                   git ( context [ "main_repo" ], [ "log", "--format=%s" ] ),
@@ -2264,7 +2306,7 @@ def check_daemon_commits_and_rewrites_a_diffView_buffer (context):
   require_in_diff_compact ( diff_folder, NO_CHANGE_FACTS )
 
 def check_interactive_commit_tells_the_daemon (context):
-  """A 'commit' that waits for a typed "yes" runs on its own
+  """A 'commit --all' that waits for a typed "yes" runs on its own
   connection; when it has committed, it asks the daemon to rerender
   its buffers of the diff view, which the daemon rewrites. (The new
   'diff' writes over the held buffer's files, which closes the view
@@ -2281,9 +2323,9 @@ def check_interactive_commit_tells_the_daemon (context):
   require_tool_run ([ "diff", "--out-dir", diff_folder ])
   require_in_diff_compact ( diff_folder, "Contained twice, committed interactively" )
   require_not_in_diff_compact ( diff_folder, NO_CHANGE_FACTS )
-  completed = run_tool ( [ "commit", "Commit interactively." ],
+  completed = run_tool ( [ "commit", "Commit interactively.", "--all" ],
                          standard_input = "yes\n" )
-  if completed . returncode != 0 or "Committed in main (" not in completed . stdout:
+  if completed . returncode != 0 or "Committed 1 node, in main (" not in completed . stdout:
     raise CaseFailure ( f"the commit printed {completed . stdout!r}, {completed . stderr!r}" )
   require_log_line (
     context, f"re-rendered {os . path . join ( os . path . realpath (diff_folder), DIFF_BASE_NAME )} "
@@ -2736,7 +2778,7 @@ def check_marking_like_moves_processed (context):
     diff_report_head () +
     "Processed: ⟨0b⟩ (homeSkgrepoMove (old private) (new main)), as '(processed)'.\n"
     "Processed: ⟨0e⟩ (homeSkgrepoMove (old private) (new main)), as '(processed)'.\n"
-    + saved_line (0) + "Processed: 2 of 17 changed files are processed.\n" +
+    + saved_line (0) + "Processed: 1 of 12 changed nodes are processed.\n" +
     diff_written_paths (folder),
     ignoring_view_ids = True )
   require_in_diff_compact ( folder, "** ⟨0b ⌂ -private +main✓⟩\n" )

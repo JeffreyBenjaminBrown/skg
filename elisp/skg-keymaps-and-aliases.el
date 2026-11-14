@@ -146,6 +146,7 @@ and hide INTERNAL from M-x completion."
   (progn;; the diff view: extend, stage-and-commit, motions
     (define-key map (kbd "C-c r u") #'skg-diffView-extend)
     (define-key map (kbd "C-c r c") #'skg-stage-and-commit)
+    (define-key map (kbd "C-c r C") #'skg-stage-and-commit-everything)
     (define-key map (kbd "C-c r n c") #'skg-diffView-goto-next-change)
     (define-key map (kbd "C-c r n u") #'skg-diffView-goto-next-unprocessed-change)
     (define-key map (kbd "C-c r n p") #'skg-diffView-goto-next-processed-change)

@@ -6,6 +6,7 @@
 (require 'ert)
 (require 'org)
 (require 'skg-buffer)
+(require 'skg-keymaps-and-aliases)
 (require 'skg-request-stage-and-commit)
 
 (defconst test--stage-and-commit-needs-confirmation
@@ -41,9 +42,10 @@ buffer is left over from before or after."
   (when (get-buffer skg--commit-message-buffer-name)
     (kill-buffer skg--commit-message-buffer-name)))
 
-(defun test--stage-and-commit-write-and-send (text)
-  "Open the commit-message buffer, write TEXT in it, and press C-c C-c."
-  (skg-stage-and-commit)
+(defun test--stage-and-commit-write-and-send (text &optional opener)
+  "Open the commit-message buffer by OPENER (`skg-stage-and-commit' by
+default), write TEXT in it, and press C-c C-c."
+  (funcall (or opener #'skg-stage-and-commit))
   (with-current-buffer skg--commit-message-buffer-name
     (insert text)
     (funcall (key-binding (kbd "C-c C-c")))))
@@ -82,7 +84,7 @@ keeps the buffer; a message left there is kept for the next attempt."
        (erase-buffer))
      (test--stage-and-commit-write-and-send "  summary\n\nbody  \n\n \n")
      (should (string-match-p
-              (regexp-quote "(message-lines \"  summary\" \"\" \"body\")")
+              (regexp-quote "(message-lines \"  summary\" \"\" \"body\") (processed-only . t))")
               (car (funcall sent))))
      (should (equal (with-current-buffer skg--commit-message-buffer-name
                       (buffer-string))
@@ -90,15 +92,22 @@ keeps the buffer; a message left there is kept for the next attempt."
 
 (ert-deftest test-stage-and-commit-keeps-the-message-until-it-is-moot ()
   "The commit-message buffer goes once something is committed, or once
-nothing needed committing and nothing failed; after a failure, a
-refusal or a declined confirmation it stays, and the line says so."
+nothing had changed and nothing failed; when nothing was processed,
+everything processed waits, after a failure, a refusal or a declined
+confirmation it stays, and the line says so."
   (dolist (case
            '(("((commits ((public 5f135fea))) (errors ()) (warnings ()))"
               nil "Committed in public (5f135fe).")
+             ("((commits ((\"public\" \"5f135fea\"))) (committed-nodes 1) (left-nodes 2) (waiting ()) (errors ()) (warnings ()))"
+              nil "Committed 1 node, in public (5f135fe). 2 changed nodes are left.")
              ("((commits ((public 5f135fea))) (errors (\"skgrepo private: no git author is configured\")) (warnings ()))"
               nil "Committed in public (5f135fe). Errors: skgrepo private: no git author is configured")
              ("((commits ()) (errors ()) (warnings ()))"
-              nil "Nothing was committed.")
+              nil "Nothing has changed, so nothing was committed.")
+             ("((commits ()) (committed-nodes 0) (left-nodes 5) (waiting ()) (errors ()) (warnings ()))"
+              t "Nothing is processed, so nothing was committed; C-c r C commits everything. Your message is kept in *skg commit message*.")
+             ("((commits ()) (committed-nodes 0) (left-nodes 2) (waiting ((\"a\" \"Plans\" names-new \"b\" \"Seeds\"))) (errors ()) (warnings ()))"
+              t "Nothing was committed. 2 changed nodes are left; 1 of them is processed but waits: 'Plans' names 'Seeds', which is new and does not go in. Your message is kept in *skg commit message*.")
              ("((commits ()) (errors (\"skgrepo private: no git author is configured\")) (warnings ()))"
               t "Nothing was committed. Errors: skgrepo private: no git author is configured Your message is kept in *skg commit message*.")
              ("((errors (\"A commit message is required.\")) (warnings ()))"
@@ -122,7 +131,8 @@ refusal or a declined confirmation it stays, and the line says so."
        (cl-letf (((symbol-function 'message)
                   (lambda (format-string &rest args)
                     (push (apply #'format format-string args) messages))))
-         (test--stage-and-commit-write-and-send "the message")
+         (test--stage-and-commit-write-and-send
+          "the message" #'skg-stage-and-commit-everything)
          (funcall (gethash 'stage-and-commit handlers) 'fake-proc
                   test--stage-and-commit-needs-confirmation)
          (funcall skg--rerender-after-empty-stream))
@@ -150,32 +160,63 @@ refusal or a declined confirmation it stays, and the line says so."
        (should-not (get-buffer skg--commit-message-buffer-name))
        (should (string-match-p "Commit canceled" (car messages)))))))
 
+(ert-deftest test-stage-and-commit-the-plain-key-commits-the-processed-and-the-capital-everything ()
+  "C-c r c and C-c r C open one buffer; its C-c C-c commits the
+processed nodes or every changed node, whichever opened it last, and
+its header line says which."
+  (should (eq (lookup-key skg-content-view-mode-map (kbd "C-c r c"))
+              #'skg-stage-and-commit))
+  (should (eq (lookup-key skg-content-view-mode-map (kbd "C-c r C"))
+              #'skg-stage-and-commit-everything))
+  (test--stage-and-commit-run
+   nil
+   (lambda (sent _handlers _prompts)
+     (skg-stage-and-commit-everything)
+     (with-current-buffer skg--commit-message-buffer-name
+       (should (string-match-p "commits every changed node" header-line-format))
+       (insert "kept"))
+     (test--stage-and-commit-write-and-send "" #'skg-stage-and-commit)
+     (should (string-match-p (regexp-quote "(processed-only . t)")
+                             (car (funcall sent))))
+     (with-current-buffer skg--commit-message-buffer-name
+       (should (string-match-p "commits the processed nodes" header-line-format)))
+     (test--stage-and-commit-write-and-send "" #'skg-stage-and-commit-everything)
+     (should (= 2 (length (funcall sent))))
+     (should-not (string-match-p "processed-only" (car (funcall sent))))
+     (should (string-match-p (regexp-quote "(message-lines \"kept\")")
+                             (car (funcall sent)))))))
+
 (ert-deftest test-stage-and-commit-resends-confirmed-only-on-yes ()
+  "Only a commit of everything is asked about; \"yes\" resends it
+confirmed, still without '(processed-only . t)'."
   (test--stage-and-commit-run
    '("yes")
    (lambda (sent handlers prompts)
-     (test--stage-and-commit-write-and-send "the message")
+     (test--stage-and-commit-write-and-send
+      "the message" #'skg-stage-and-commit-everything)
      (should (string-match-p (regexp-quote "(request . \"stage and commit\")")
                              (car (funcall sent))))
      (should (string-match-p (regexp-quote "(message-lines \"the message\")")
                              (car (funcall sent))))
-     (should-not (string-match-p "confirmed" (car (funcall sent))))
+     (should-not (string-match-p "confirmed\\|processed-only" (car (funcall sent))))
      (funcall (gethash 'stage-and-commit handlers) 'fake-proc
               test--stage-and-commit-needs-confirmation)
      (should (null (funcall prompts)))
      (should skg--rerender-after-empty-stream)
      (funcall skg--rerender-after-empty-stream)
-     (should (string-match-p "1 of 3 changed files are processed"
-                             (car (funcall prompts))))
+     (should (equal (car (funcall prompts))
+                    "1 of 3 changed nodes are processed. Type yes to commit anyway: "))
      (should (= 2 (length (funcall sent))))
      (should (string-match-p (regexp-quote "(confirmed . t)")
                              (car (funcall sent))))
+     (should-not (string-match-p "processed-only" (car (funcall sent))))
      (should (string-match-p (regexp-quote "(message-lines \"the message\")")
                              (car (funcall sent))))))
   (test--stage-and-commit-run
    '("y")
    (lambda (sent handlers _prompts)
-     (test--stage-and-commit-write-and-send "the message")
+     (test--stage-and-commit-write-and-send
+      "the message" #'skg-stage-and-commit-everything)
      (funcall (gethash 'stage-and-commit handlers) 'fake-proc
               test--stage-and-commit-needs-confirmation)
      (funcall skg--rerender-after-empty-stream)
@@ -187,7 +228,7 @@ the server reads up to a newline, holds no newline but its last."
   (test--stage-and-commit-run
    nil
    (lambda (sent _handlers _prompts)
-     (skg--stage-and-commit-send "summary\n\n  indented \\n \"quoted\"" nil)
+     (skg--stage-and-commit-send "summary\n\n  indented \\n \"quoted\"" t nil)
      (let ((request (car (funcall sent))))
        (should (string-match-p
                 (regexp-quote
@@ -195,25 +236,6 @@ the server reads up to a newline, holds no newline but its last."
                 request))
        (should (= 1 (cl-count ?\n request)))
        (should (string-suffix-p "\n" request))))))
-
-(ert-deftest test-stage-and-commit-prompt-names-already-staged-entries ()
-  "Entries already staged are counted in the prompt, by gitrepo, and
-listed in a buffer of their own, even when every changed file is processed;
-\"yes\" resends confirmed."
-  (test--stage-and-commit-run
-   '("yes")
-   (lambda (sent handlers prompts)
-     (test--stage-and-commit-write-and-send "the message")
-     (funcall (gethash 'stage-and-commit handlers) 'fake-proc
-              "((needs-confirmation . t) (already-staged ((\"/data/public\" \"notes.txt\" \"a b.skg\") (\"/data/private\" \"c.skg\"))) (processed-summary (processed 3) (changed 3) (foreign 0) (order-only 0) (notEditable 0)) (errors ()) (warnings ()))")
-     (funcall skg--rerender-after-empty-stream)
-     (should (equal (car (funcall prompts))
-                    "Commit ready. All 3 of 3 changed files are processed. Already staged, so committed too: /data/public: 2 paths, /data/private: 1 path (listed in *skg already staged*). Type yes to commit anyway: "))
-     (should (equal (with-current-buffer "*skg already staged*"
-                      (buffer-substring-no-properties (point-min) (point-max)))
-                    "* /data/public\nnotes.txt\na b.skg\n* /data/private\nc.skg\n"))
-     (should (string-match-p (regexp-quote "(confirmed . t)")
-                             (car (funcall sent)))))))
 
 (defun test--stage-and-commit-framed (&rest payloads)
   "PAYLOADS, each length-prefixed as the server sends it, in one chunk."
@@ -258,11 +280,11 @@ and :handlers (the response types still registered)."
                (lambda (prompt &rest _)
                  (push prompt prompts)
                  (funcall answer prompt))))
-      (skg--stage-and-commit-send "the message" nil)
+      (skg--stage-and-commit-send "the message" nil nil)
       (skg-lp-handle-generic-chunk
        'fake-proc
        (test--stage-and-commit-framed
-        "((response-type stage-and-commit) (needs-confirmation . t) (already-staged ((\"/data/public\" \"a.skg\" \"b.skg\") (\"/data/private\" \"c.skg\"))) (processed-summary (processed 3) (changed 3) (foreign 0) (order-only 0) (notEditable 0)) (errors ()) (warnings ()))"
+        "((response-type stage-and-commit) (needs-confirmation . t) (processed-summary (processed 1) (changed 3) (foreign 0) (order-only 0) (waiting 0) (notEditable 0)) (errors ()) (warnings ()))"
         "((response-type rerender-lock) (lock-views ()))"
         "((response-type rerender-done) (errors ()) (warnings ()))"))
       (let ((stream skg--stream-in-progress)
@@ -304,7 +326,22 @@ stream in progress; either says nothing was committed."
                  "Committed in public (5f135fe), private (bff3a57)."))
   (should (equal (skg--stage-and-commit-result-message
                   (read "((commits ()) (errors (\"skgrepo private: no git author is configured\")) (warnings ()))"))
-                 "Nothing was committed. Errors: skgrepo private: no git author is configured")))
+                 "Nothing was committed. Errors: skgrepo private: no git author is configured"))
+  (should (equal (skg--stage-and-commit-result-message
+                  (read "((commits ()) (committed-nodes 0) (left-nodes 0) (waiting ()) (errors ()) (warnings ()))"))
+                 "Nothing has changed, so nothing was committed.")))
+
+(ert-deftest test-stage-and-commit-result-message-says-what-waits-and-why ()
+  "The wire's example answer, and each reason a processed node waits."
+  (should (equal (skg--stage-and-commit-result-message
+                  (read "((commits ((\"public\" \"9c1e40d2\") (\"private\" \"41aa07fe\"))) (committed-nodes 2) (left-nodes 2) (waiting ((\"PID-A\" \"Plans for spring\" names-new \"PID-B\" \"Seed order\"))) (errors ()) (warnings ()))"))
+                 "Committed 2 nodes, in public (9c1e40d), private (41aa07f). 2 changed nodes are left; 1 of them is processed but waits: 'Plans for spring' names 'Seed order', which is new and does not go in."))
+  (should (equal (skg--stage-and-commit-result-message
+                  (read "((commits ((\"public\" \"9c1e40d2\"))) (committed-nodes 1) (left-nodes 3) (waiting ((\"x\" \"X\" still-named \"y\" \"Y\") (\"m\" \"M\" merge \"n\" \"N\") (\"p\" \"P\" someday \"q\" \"Q\"))) (errors ()) (warnings ()))"))
+                 "Committed 1 node, in public (9c1e40d). 3 changed nodes are left; 3 of them are processed but wait: 'X' is deleted, but 'Y', which does not go in, still names it; 'M' is part of a merge with 'N', which does not go in; 'P' waits for 'Q' (someday)."))
+  (should (equal (skg--stage-and-commit-result-message
+                  (read "((commits ((\"public\" \"9c1e40d2\"))) (committed-nodes 3) (left-nodes 1) (waiting ()) (errors (\"skgrepo private: git commit failed\")) (warnings ()))"))
+                 "Committed 3 nodes, in public (9c1e40d). 1 changed node is left. Errors: skgrepo private: git commit failed")))
 
 (ert-deftest test-stage-and-commit-rerenders-an-emptied-view ()
   "The server writes an empty view as '(content \"\")'; it empties the buffer."

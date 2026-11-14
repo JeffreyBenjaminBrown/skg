@@ -3,13 +3,18 @@
 ;;;
 ;;; Phase 1: Open the diff view; its buffers open.
 ;;; Phase 2: Mark and unmark with each letter and each prefix, and
-;;;          see what the server says is processed; then mark every
-;;;          change processed, through 'C-u C-c m b p' on each root of
-;;;          the "all changes" buffer, and see "Commit ready".
-;;; Phase 3: Stage and commit; every owned skgrepo is committed, the
-;;;          foreign one is not, and the buffers keep their roots,
-;;;          which show no change any more.
-;;; Phase 4: With d referenced again by hand, rebuild, which
+;;;          see what the server says is processed: 4 of 9 changed
+;;;          nodes (m, n, n2 and n3).
+;;; Phase 3: Commit the processed (C-c r c): those 4 go in, in alpha
+;;;          and beta; the other 5 are left, and r keeps its mark on
+;;;          its new child n.
+;;; Phase 4: Mark every change processed, through 'C-u C-c m b p' on
+;;;          each root of the "all changes" buffer, and see "Commit
+;;;          ready"; then unmark t, so that not everything is.
+;;; Phase 5: Commit everything (C-c r C), typing "yes" when asked;
+;;;          alpha is committed, the foreign skgrepo is not, and the
+;;;          buffers keep their roots, which show no change any more.
+;;; Phase 6: With d referenced again by hand, rebuild, which
 ;;;          rerenders every view; open a view of r beside the
 ;;;          buffers of the diff view, one of which r is a root of,
 ;;;          and investigate the unknown node d.
@@ -117,7 +122,7 @@ save."
     (funcall command prefix))
   (unless (skg-test-wait-for
            (lambda ()
-             (cl-some (lambda (m) (string-match-p "changed files are processed" m))
+             (cl-some (lambda (m) (string-match-p "changed nodes are processed" m))
                       test-messages))
            20)
     (test-fail "No processed summary after %s at %S" command regexp)))
@@ -132,7 +137,7 @@ or, when that is nil, carries no '(processed ...)'."
       (test-fail "After %s: %s" what line))
     (test-pass "%s" what)))
 
-(defun phase-2-mark-everything ()
+(defun phase-2-mark-and-unmark ()
   (setq integration-test-phase "phase-2")
   (switch-to-buffer (all-changes-buffer))
   ;; Each letter, without a prefix, on the deleted node d.
@@ -154,6 +159,92 @@ or, when that is nil, carries no '(processed ...)'."
   (mark-at "(gnid m)" #'skg-mark-homeSkgrepo-move-processed)
   (expect-processed "(homeSkgrepoMove (old alpha) (new beta))" "(processed)"
                     "C-c m h p on m")
+  ;; r's membership of n, one of r's two changes (it also lost d).
+  (mark-at "^\\*\\* .*(gnid n)" #'skg-mark-rel-processed)
+  (expect-processed "^\\*\\* .*(gnid n)" "(processed node rel))" "C-c m r p on r's n")
+  (expect-summary "^4 of 9 changed nodes are processed, 1 node changed in foreign skgrepos$"
+                  "m, n, n2 and n3 are the processed nodes; r is not"))
+
+(defun expect-summary (regexp what)
+  "Fail unless the newest processed summary shown matches REGEXP."
+  (let ((summary (cl-find-if
+                  (lambda (m) (string-match-p "changed nodes are processed" m))
+                  test-messages)))
+    (unless (and summary (string-match-p regexp summary))
+      (test-fail "%s: the summary is %S" what summary))
+    (test-pass "%s: %s" what summary)))
+
+(defvar test-prompts nil
+  "Every prompt the last commit showed, newest first.")
+
+(defun commit-from-the-message-buffer (command commit-message)
+  "Open the commit-message buffer by COMMAND, send COMMIT-MESSAGE from
+it, answering \"yes\" if asked (each prompt goes in `test-prompts'),
+and return the line reporting what was committed."
+  (setq test-messages nil test-prompts nil)
+  (funcall command)
+  (with-current-buffer skg--commit-message-buffer-name
+    (erase-buffer)
+    (insert commit-message "\n")
+    (cl-letf (((symbol-function 'read-string)
+               (lambda (prompt &rest _) (push prompt test-prompts) "yes")))
+      (skg-commit-message-send)
+      (unless (skg-test-wait-for
+               (lambda ()
+                 (cl-some (lambda (m) (string-match-p "^Committed " m))
+                          test-messages))
+               20)
+        (test-fail "No commit reported. Messages: %S" test-messages))))
+  (skg-test-wait-for-response 20)
+  (cl-find-if (lambda (m) (string-match-p "^Committed " m)) test-messages))
+
+(defun git-modified-p (skgrepo file)
+  "Whether FILE of SKGREPO differs from its HEAD, by content. Not by
+'git status': the server's write of the git index after a commit loses
+git's check of a file changed in the same second as the index was
+last written, so a left-out file of unchanged size looks clean there."
+  (let ((default-directory (expand-file-name skgrepo test-data-dir)))
+    (not (string= (string-trim (shell-command-to-string
+                                (concat "git rev-parse -q --verify HEAD:" file)))
+                  (if (file-exists-p file)
+                      (string-trim (shell-command-to-string
+                                    (concat "git hash-object " file)))
+                    "")))))
+
+(defun phase-3-commit-the-processed ()
+  (setq integration-test-phase "phase-3")
+  (let ((line (commit-from-the-message-buffer
+               #'skg-stage-and-commit "integration commit of the processed")))
+    (unless (string-match-p
+             "^Committed 4 nodes, in alpha ([0-9a-f]+), beta ([0-9a-f]+)\\. 5 changed nodes are left\\.$"
+             line)
+      (test-fail "The commit of the processed reported %S" line))
+    (when test-prompts
+      (test-fail "The commit of the processed asked %S" test-prompts))
+    (test-pass "%s" line))
+  (dolist (skgrepo '("owned/alpha" "owned/beta"))
+    (unless (string= (git-head-summary skgrepo) "integration commit of the processed")
+      (test-fail "%s was not committed: HEAD is %S"
+                 skgrepo (git-head-summary skgrepo))))
+  (dolist (left '("t.skg" "r.skg" "x.skg"))
+    (unless (git-modified-p "owned/alpha" left)
+      (test-fail "%s, not processed, was committed" left)))
+  (when (git-modified-p "owned/alpha" "n3.skg")
+    (test-fail "n3, processed, was not committed"))
+  (with-current-buffer (all-changes-buffer)
+    (unless (skg-test-wait-for
+             (lambda ()
+               (not (string-match-p "homeSkgrepoMove" (buffer-string))))
+             10)
+      (test-fail "The buffer was not rerendered after the commit:\n%s"
+                 (buffer-string)))
+    (expect-processed "^\\*\\* .*(gnid n)" "(processed rel))"
+                      "r keeps its mark on its new child n after the commit"))
+  (test-pass "Committed the processed nodes; the rest are left, with their marks"))
+
+(defun phase-4-mark-everything-but-t ()
+  (setq integration-test-phase "phase-4")
+  (switch-to-buffer (all-changes-buffer))
   ;; Every root, recursively. Each gesture saves, which rerenders the
   ;; buffer, so the i-th root is found afresh.
   (dotimes (i (length (root-headline-positions)))
@@ -162,36 +253,35 @@ or, when that is nil, carries no '(processed ...)'."
     (skg-mark-both-processed '(4))
     (unless (skg-test-wait-for
              (lambda ()
-               (cl-some (lambda (m) (string-match-p "changed files are processed" m))
+               (cl-some (lambda (m) (string-match-p "changed nodes are processed" m))
                         test-messages))
              20)
       (test-fail "No processed summary after the gesture on root %d" i)))
   (let ((summary (cl-find-if
-                  (lambda (m) (string-match-p "changed files are processed" m))
+                  (lambda (m) (string-match-p "changed nodes are processed" m))
                   test-messages)))
     (unless (string-match-p "^Commit ready\\." summary)
       (test-fail "Not all processed after marking every root: %s\n%s"
                  summary (buffer-string)))
-    (test-pass "%s" summary)))
+    (test-pass "%s" summary))
+  (mark-at "(gnid t)" #'skg-mark-both-unprocessed)
+  (expect-summary "^4 of 5 changed nodes are processed, 1 node changed in foreign skgrepos$" "C-c m b u on t"))
 
-(defun phase-3-stage-and-commit ()
-  (setq integration-test-phase "phase-3")
-  (setq test-messages nil)
-  (skg-stage-and-commit)
-  (with-current-buffer skg--commit-message-buffer-name
-    (insert "integration commit\n")
-    (skg-commit-message-send))
-  (unless (skg-test-wait-for
-           (lambda ()
-             (cl-some (lambda (m) (string-match-p "^Committed in" m))
-                      test-messages))
-           20)
-    (test-fail "No commit reported. Messages: %S" test-messages))
-  (skg-test-wait-for-response 20)
-  (dolist (skgrepo '("owned/alpha" "owned/beta"))
-    (unless (string= (git-head-summary skgrepo) "integration commit")
-      (test-fail "%s was not committed: HEAD is %S"
-                 skgrepo (git-head-summary skgrepo))))
+(defun phase-5-commit-everything ()
+  (setq integration-test-phase "phase-5")
+  (let ((line (commit-from-the-message-buffer
+               #'skg-stage-and-commit-everything "integration commit of the rest")))
+    (unless (string-match-p "^Committed 5 nodes, in alpha ([0-9a-f]+)\\.$" line)
+      (test-fail "The commit of everything reported %S" line))
+    (unless (equal test-prompts
+                   '("4 of 5 changed nodes are processed, 1 node changed in foreign skgrepos. Type yes to commit anyway: "))
+      (test-fail "The commit of everything asked %S" test-prompts))
+    (test-pass "%s, after asking" line))
+  (unless (string= (git-head-summary "owned/alpha") "integration commit of the rest")
+    (test-fail "alpha was not committed: HEAD is %S" (git-head-summary "owned/alpha")))
+  (unless (string= (git-head-summary "owned/beta") "integration commit of the processed")
+    (test-fail "beta, with nothing left, was committed again: HEAD is %S"
+               (git-head-summary "owned/beta")))
   (unless (string= (git-head-summary "foreign/gamma") "Initial commit")
     (test-fail "The foreign skgrepo was committed"))
   (unless (skg-test-wait-for
@@ -208,7 +298,7 @@ or, when that is nil, carries no '(processed ...)'."
                (mapcar (lambda (b) (cons (buffer-name b)
                                          (with-current-buffer b (buffer-string))))
                        (diff-view-buffers))))
-  (test-pass "Committed alpha and beta, and the buffers keep their roots, unchanged"))
+  (test-pass "Committed the rest in alpha, and the buffers keep their roots, unchanged"))
 
 (defvar test-rerender-all-views-sent nil
   "Whether the rebuild's rerender of every view was asked for.")
@@ -216,8 +306,8 @@ or, when that is nil, carries no '(processed ...)'."
 (defun test-note-rerender-all-views-sent (&rest _)
   (setq test-rerender-all-views-sent t))
 
-(defun phase-4-investigate-the-deleted-node ()
-  (setq integration-test-phase "phase-4")
+(defun phase-6-investigate-the-deleted-node ()
+  (setq integration-test-phase "phase-6")
   ;; Reference d again, by hand, and have the server reread the files.
   (with-temp-file (expand-file-name "owned/alpha/r.skg" test-data-dir)
     (insert "pid: r\ntitle: the root\ncontains:\n- t\n- m\n- x\n- d\n"))
@@ -278,16 +368,18 @@ or, when that is nil, carries no '(processed ...)'."
 (defun run-all-tests ()
   (message "=== SKG Diff View Integration Test ===")
   (phase-1-open-the-diff-view)
-  (phase-2-mark-everything)
-  (phase-3-stage-and-commit)
-  (phase-4-investigate-the-deleted-node)
+  (phase-2-mark-and-unmark)
+  (phase-3-commit-the-processed)
+  (phase-4-mark-everything-but-t)
+  (phase-5-commit-everything)
+  (phase-6-investigate-the-deleted-node)
   (message "")
   (test-pass "All diff-view tests passed!")
   (kill-emacs 0))
 
 (progn
   (run-at-time
-   120 nil
+   180 nil
    (lambda ()
      (message "TIMEOUT: Integration test timed out!")
      (message "Last phase: %s" integration-test-phase)

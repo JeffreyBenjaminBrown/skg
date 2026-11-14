@@ -154,7 +154,7 @@ do
   local moved = T.wait_for(function ()
     local summary = false
     for j = before + 1, #notified do
-      if notified[j]:find('changed files are processed', 1, true) then summary = true end
+      if notified[j]:find('changed nodes are processed', 1, true) then summary = true end
     end
     if not summary then return nil end
     local text = T.buffer_text(all_changes)

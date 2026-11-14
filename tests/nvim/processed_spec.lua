@@ -515,11 +515,15 @@ describe('skg.save processed summary', function ()
       save.handle_save_sexp(buf, sexpr.read(
         '((content "* (skg node (gnid a)) a\n") (errors ()) (warnings ())'
         .. ' (processed-summary (processed 12) (changed 14) (foreign 2)'
-        .. ' (order-only 1) (notEditable 3)))'))
+        .. ' (order-only 1) (waiting 1) (notEditable 3)))'))
       save.handle_save_sexp(buf, sexpr.read(
         '((content "* (skg node (gnid a)) a\n") (errors ()) (warnings ())'
-        .. ' (processed-summary (processed 14) (changed 14) (foreign 0)'
-        .. ' (order-only 0) (notEditable 0)))'))
+        .. ' (processed-summary (processed 14) (changed 14) (foreign 1)'
+        .. ' (order-only 0) (waiting 0) (notEditable 0)))'))
+      save.handle_save_sexp(buf, sexpr.read(
+        '((content "* (skg node (gnid a)) a\n") (errors ()) (warnings ())'
+        .. ' (processed-summary (processed 5) (changed 6) (foreign 0)'
+        .. ' (order-only 0) (waiting 2) (notEditable 0)))'))
       save.handle_save_sexp(buf, sexpr.read(
         '((content "* (skg node (gnid a)) a\n") (errors ()) (warnings ()))'))
     end)
@@ -527,10 +531,11 @@ describe('skg.save processed summary', function ()
     vim.api.nvim_buf_delete(buf, { force = true })
     assert(ok, err)
     assert.are.same({
-      '12 of 14 changed files are processed, 3 changes are not editable in this view; <localleader>ru extends the diff view to them, 2 files changed in foreign skgrepos',
-      'Commit ready. All 14 of 14 changed files are processed.' },
+      '12 of 14 changed nodes are processed (1 of them waits), 3 changes are not editable in this view; <localleader>ru extends the diff view to them, 2 nodes changed in foreign skgrepos',
+      'Commit ready. All 14 of 14 changed nodes are processed, 1 node changed in foreign skgrepos.',
+      '5 of 6 changed nodes are processed (2 of them wait)' },
       vim.tbl_filter(function (message)
-        return message:find('changed files', 1, true) ~= nil
+        return message:find('changed nodes', 1, true) ~= nil
       end, shown))
   end)
 end)

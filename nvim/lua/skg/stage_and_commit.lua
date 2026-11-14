@@ -1,18 +1,21 @@
--- PURPOSE: Stage every change and git-commit it, in every owned
--- skgrepo that has changes, with one message
--- ('docs/diff-view.org', "Stage and commit").
--- When the processed summary is incomplete, or some owned gitrepo
--- has entries already staged, the server asks for confirmation
--- instead and changes nothing; only the typed word "yes" resends the
--- request confirmed. Every answer is followed by a rerender
+-- PURPOSE: Git-commit the changed nodes of the owned skgrepos, with
+-- one message ('docs/diff-view.org', "Stage and commit"):
+-- <localleader>rc commits every node whose changes are all processed,
+-- except one that needs a node whose changes are not;
+-- <localleader>rC commits every changed node.
+-- A commit of everything while some changed node is not processed
+-- makes the server ask for confirmation instead, changing nothing;
+-- only the typed word "yes" resends the request confirmed. A commit of
+-- the processed asks nothing. Every answer is followed by a rerender
 -- stream, which after a commit rerenders the open buffers of the
 -- diff view. The Lua port of elisp/skg-request-stage-and-commit.el.
 -- The message is written in a buffer of its own: ':w' or
--- <localleader>cc sends it, <localleader>ck cancels. The buffer keeps
--- the message until it is moot (M.report_result).
+-- <localleader>cc sends it, <localleader>ck cancels; the buffer
+-- remembers which of the two commits opened it last
+-- ('vim.b.skg_commit_processed_only'). It keeps the message until it
+-- is moot (M.report_result).
 
 local buffer = require('skg.buffer')
-local messages = require('skg.messages')
 local payload = require('skg.payload')
 local processed = require('skg.processed')
 local rerender = require('skg.rerender_all_views')
@@ -24,17 +27,48 @@ M.commit_message_buffer_name = 'skg://commit-message'
 
 M.commit_message_bindings = { send = 'cc', cancel = 'ck' }
 
----Open the commit-message buffer in a split, creating it if there is
----none; a message left there by an earlier attempt is kept.
+---The number under KEY in RESPONSE, or nil when it has none.
+---@param response any
+---@param key string
+---@return integer|nil
+local function count_field (response, key)
+  local text = payload.field_text(response, key)
+  return text and tonumber(text) or nil
+end
+
+---<localleader>rc commits every node whose changes are all processed,
+---except one that needs a node whose changes are not. Open the
+---commit-message buffer for it; nothing is asked, and the line shown
+---afterward says what went in, what is left, and what waits, and for
+---what.
 function M.stage_and_commit ()
+  M.open_commit_message_buffer(true)
+end
+
+---Commit every changed node of the owned skgrepos, processed or not,
+---asking first, for a typed "yes", when some is not processed. Open
+---the commit-message buffer for it.
+function M.stage_and_commit_everything ()
+  M.open_commit_message_buffer(false)
+end
+
+---Open the commit-message buffer in a split, creating it if there is
+---none (a message left there by an earlier attempt is kept), and make
+---its send commit the processed nodes when PROCESSED_ONLY, or every
+---changed node otherwise.
+---@param processed_only boolean
+function M.open_commit_message_buffer (processed_only)
   M.require_saved_views()
   local buf = M.commit_message_buffer()
   if buf == nil then buf = M.create_commit_message_buffer() end
+  vim.b[buf].skg_commit_processed_only = processed_only
   vim.cmd('split')
   vim.api.nvim_win_set_buf(vim.api.nvim_get_current_win(), buf)
   vim.notify(string.format(
-    'Write the commit message; :w or <localleader>%s commits, <localleader>%s cancels',
-    M.commit_message_bindings.send, M.commit_message_bindings.cancel))
+    'Write the commit message; :w or <localleader>%s commits %s, <localleader>%s cancels',
+    M.commit_message_bindings.send,
+    processed_only and 'the processed nodes' or 'every changed node',
+    M.commit_message_bindings.cancel))
 end
 
 ---Refuse while some skg view has unsaved edits: the rerender after a
@@ -78,10 +112,11 @@ function M.create_commit_message_buffer ()
   return buf
 end
 
----Stage and commit with the text of BUF, the commit-message buffer,
----less its trailing whitespace; then hide BUF, which keeps the text
----until the message is moot (M.report_result). A blank message is
----refused.
+---Commit with the text of BUF, the commit-message buffer, less its
+---trailing whitespace: the processed nodes, or every changed node,
+---whichever command opened BUF last. Then hide BUF, which keeps the
+---text until the message is moot (M.report_result). A blank message
+---is refused.
 ---@param buf integer
 function M.send_from_buffer (buf)
   local message = table.concat(
@@ -89,7 +124,7 @@ function M.send_from_buffer (buf)
   if message == '' then
     error('skg: a commit message is required') end
   M.require_saved_views()
-  M.send(message, false)
+  M.send(message, vim.b[buf].skg_commit_processed_only ~= false, false)
   vim.bo[buf].modified = false
   M.hide(buf)
 end
@@ -130,13 +165,18 @@ function M.commit_message_kept_sentence (first_word)
                        M.commit_message_buffer_name)
 end
 
----Send the request with MESSAGE, and '(confirmed . t)' when CONFIRMED.
+---Send the request with MESSAGE, with '(processed-only . t)' when
+---PROCESSED_ONLY, and '(confirmed . t)' when CONFIRMED.
 ---@param message string
+---@param processed_only boolean
 ---@param confirmed boolean
-function M.send (message, confirmed)
+function M.send (message, processed_only, confirmed)
   local request = {
     sexpr.pair(sexpr.symbol('request'), 'stage and commit'),
     M.message_lines(message) }
+  if processed_only then
+    table.insert(request, sexpr.pair(sexpr.symbol('processed-only'),
+                                     sexpr.symbol('t'))) end
   if confirmed then
     table.insert(request, sexpr.pair(sexpr.symbol('confirmed'),
                                      sexpr.symbol('t'))) end
@@ -171,15 +211,17 @@ function M.handler (message, response)
 end
 
 ---Show the line for RESPONSE, a result. Once something was committed,
----or nothing needed committing and nothing failed, the commit message
----is moot and its buffer is deleted; otherwise the buffer keeps it,
----and the line says so.
+---or nothing had changed and nothing failed, the commit message is
+---moot and its buffer is deleted; otherwise (nothing processed,
+---everything processed waiting, a refusal, an error) the buffer keeps
+---it, and the line says so.
 ---@param response any
 function M.report_result (response)
   local commits = payload.field(response, 'commits')
   local message_moot =
     (commits ~= nil and sexpr.is_list(commits) and #commits > 0)
-    or rerender.response_errors_line(response) == nil
+    or (rerender.response_errors_line(response) == nil
+        and (count_field(response, 'left-nodes') or 0) == 0)
   local line = M.result_message(response)
   if message_moot then
     local buf = M.commit_message_buffer()
@@ -190,85 +232,75 @@ function M.report_result (response)
   vim.notify(line)
 end
 
-M.already_staged_buffer_name = '*skg already staged*'
-
 ---Show the processed summary of RESPONSE, a request for confirmation,
----and how many entries it lists as already staged in each gitrepo,
----the entries themselves in the buffer M.already_staged_buffer_name.
----On "yes" resend MESSAGE confirmed; otherwise, an interrupt at the
+---which only a commit of everything gets. On "yes" resend MESSAGE as a
+---commit of everything, confirmed; otherwise, an interrupt at the
 ---prompt included, say that nothing was committed.
 ---@param message string
 ---@param response any
 function M.confirm_and_resend (message, response)
-  local already_staged = payload.field(response, 'already-staged')
-  local listing = M.already_staged_listing(already_staged)
-  if listing ~= '' then
-    messages.big_nonfatal_message(M.already_staged_buffer_name,
-      'Entries already staged are listed in ' .. M.already_staged_buffer_name,
-      listing) end
   local summary = processed.processed_summary_from_response(response)
   local ok, typed = pcall(vim.fn.input,
     processed.processed_summary_message(summary):gsub('%.$', '')
-    .. M.already_staged_message(already_staged)
     .. '. Type yes to commit anyway: ')
   if ok and typed == 'yes' then
-    M.send(message, true)
+    M.send(message, false, true)
   else
     local kept = M.commit_message_kept_sentence('your')
     vim.notify(kept == '' and 'Not committed.'
                or 'Not committed; ' .. kept) end
 end
 
----The gitrepos of ALREADY_STAGED, '((GITREPO PATH...) ...)', each with
----its paths, as strings; empty when there is none.
----@param already_staged any
----@return table
-function M.already_staged_gitrepos (already_staged)
-  local gitrepos = {}
-  if already_staged == nil or not sexpr.is_list(already_staged) then
-    return gitrepos end
-  for _, gitrepo_and_paths in ipairs(already_staged) do
-    local paths = {}
-    for i = 2, #gitrepo_and_paths do
-      table.insert(paths, sexpr.atom_text(gitrepo_and_paths[i])) end
-    table.insert(gitrepos, { gitrepo = sexpr.atom_text(gitrepo_and_paths[1]),
-                             paths = paths })
-  end
-  return gitrepos
-end
-
----The prompt's clause for ALREADY_STAGED, '((GITREPO PATH...) ...)':
----how many paths each gitrepo has staged, and where they are listed;
----or the empty string when there is none.
----@param already_staged any
+---COUNT and NOUN, made plural by an "s" unless COUNT is 1.
+---@param count integer
+---@param noun string
 ---@return string
-function M.already_staged_message (already_staged)
-  local gitrepos = M.already_staged_gitrepos(already_staged)
-  if #gitrepos == 0 then return '' end
-  local counts = {}
-  for _, gitrepo in ipairs(gitrepos) do
-    table.insert(counts, string.format('%s: %d %s', gitrepo.gitrepo,
-      #gitrepo.paths, #gitrepo.paths == 1 and 'path' or 'paths')) end
-  return '. Already staged, so committed too: '
-    .. table.concat(counts, ', ')
-    .. ' (listed in ' .. M.already_staged_buffer_name .. ')'
+function M.count_phrase (count, noun)
+  return string.format('%d %s%s', count, noun, count == 1 and '' or 's')
 end
 
----ALREADY_STAGED, '((GITREPO PATH...) ...)', as org text: a headline
----per gitrepo, then its paths, one per line; empty when there is none.
----@param already_staged any
----@return string
-function M.already_staged_listing (already_staged)
-  local lines = {}
-  for _, gitrepo in ipairs(M.already_staged_gitrepos(already_staged)) do
-    table.insert(lines, '* ' .. gitrepo.gitrepo)
-    for _, path in ipairs(gitrepo.paths) do table.insert(lines, path) end
+---The entries of RESPONSE's 'waiting', each '(PID TITLE REASON PID
+---TITLE)', as tables { title, reason, other_title }.
+---@param response any
+---@return table[]
+function M.waiting_entries (response)
+  local entries = {}
+  local waiting = payload.field(response, 'waiting')
+  if waiting == nil or not sexpr.is_list(waiting) then return entries end
+  for _, entry in ipairs(waiting) do
+    if sexpr.is_list(entry) and #entry >= 5 then
+      table.insert(entries, { title = sexpr.atom_text(entry[2]),
+                              reason = sexpr.atom_text(entry[3]),
+                              other_title = sexpr.atom_text(entry[5]) }) end
   end
-  return table.concat(lines, '\n')
+  return entries
 end
 
----The line shown for '((commits ((SKGREPO COMMIT-ID) ...)) (errors
----(...)) (warnings (...)))'.
+---What ENTRY, as M.waiting_entries gives it, waits for, and why.
+---@param entry table
+---@return string
+function M.waiting_clause (entry)
+  if entry.reason == 'names-new' then
+    return string.format("'%s' names '%s', which is new and does not go in",
+                         entry.title, entry.other_title)
+  elseif entry.reason == 'still-named' then
+    return string.format(
+      "'%s' is deleted, but '%s', which does not go in, still names it",
+      entry.title, entry.other_title)
+  elseif entry.reason == 'merge' then
+    return string.format(
+      "'%s' is part of a merge with '%s', which does not go in",
+      entry.title, entry.other_title)
+  end
+  return string.format("'%s' waits for '%s' (%s)",
+                       entry.title, entry.other_title, entry.reason)
+end
+
+---The line shown for a result, '((commits ((SKGREPO COMMIT-ID) ...))
+---(committed-nodes N) (left-nodes L) (waiting ((PID TITLE REASON PID
+---TITLE) ...)) (errors (...)) (warnings (...)))': what went in, how
+---many changed nodes are left, and for each processed node that waits,
+---what it waits for.
 ---@param response any
 ---@return string
 function M.result_message (response)
@@ -282,16 +314,35 @@ function M.result_message (response)
           sexpr.atom_text(commit[2]):sub(1, 7))) end
     end
   end
+  local committed_nodes = count_field(response, 'committed-nodes')
+  local left = count_field(response, 'left-nodes') or 0
+  local waiting = M.waiting_entries(response)
   local errors_line = rerender.response_errors_line(response)
   local parts = {}
   if #committed > 0 then
-    table.insert(parts, 'Committed in ' .. table.concat(committed, ', '))
+    table.insert(parts, 'Committed '
+      .. (committed_nodes and M.count_phrase(committed_nodes, 'node') .. ', ' or '')
+      .. 'in ' .. table.concat(committed, ', ') .. '.')
+  elseif errors_line or #waiting > 0 then
+    table.insert(parts, 'Nothing was committed.')
+  elseif left == 0 then
+    table.insert(parts, 'Nothing has changed, so nothing was committed.')
   else
-    table.insert(parts, 'Nothing was committed') end
-  if errors_line then
-    table.insert(parts, '. Errors: ' .. errors_line)
-  else
+    table.insert(parts, 'Nothing is processed, so nothing was committed;'
+      .. ' <localleader>rC commits everything.') end
+  if left > 0 and (#committed > 0 or #waiting > 0) then
+    table.insert(parts, ' ' .. M.count_phrase(left, 'changed node')
+      .. (left == 1 and ' is left' or ' are left'))
+    if #waiting > 0 then
+      local clauses = {}
+      for _, entry in ipairs(waiting) do
+        table.insert(clauses, M.waiting_clause(entry)) end
+      table.insert(parts, string.format('; %d of them %s: %s', #waiting,
+        #waiting == 1 and 'is processed but waits' or 'are processed but wait',
+        table.concat(clauses, '; '))) end
     table.insert(parts, '.') end
+  if errors_line then
+    table.insert(parts, ' Errors: ' .. errors_line) end
   return table.concat(parts)
 end
 

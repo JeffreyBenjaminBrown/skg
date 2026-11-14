@@ -205,7 +205,9 @@ M.commands = {
     fn = 'diffView_extend',
     desc = 'Extend this diff-view buffer to the changes it does not show, appending roots as needed' },
   StageAndCommit = { module = 'skg.stage_and_commit', fn = 'stage_and_commit',
-                     desc = 'Stage and git-commit every owned skgrepo with changes, with one message' },
+                     desc = 'Commit every node whose changes are all processed, except one that needs a node whose changes are not' },
+  StageAndCommitEverything = { module = 'skg.stage_and_commit', fn = 'stage_and_commit_everything',
+                     desc = 'Commit every changed node, processed or not, asking first when some is not processed' },
   DiffViewGotoNextChange = { module = 'skg.processed',
     fn = 'diffView_goto_next_change',
     desc = 'Move to the next headline with change facts, skipping a ☮ member of an (other files) folder' },
@@ -366,6 +368,7 @@ M.content_view_bindings = {
   { 'sa', 'Attach' },                    -- C-c s a
   { 'ru', 'DiffViewExtend' },            -- C-c r u
   { 'rc', 'StageAndCommit' },            -- C-c r c
+  { 'rC', 'StageAndCommitEverything' },  -- C-c r C
   { 'rnc', 'DiffViewGotoNextChange' },            -- C-c r n c
   { 'rnu', 'DiffViewGotoNextUnprocessedChange' },     -- C-c r n u
   { 'rnp', 'DiffViewGotoNextProcessedChange' },       -- C-c r n p
