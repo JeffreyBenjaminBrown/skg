@@ -2783,27 +2783,32 @@ def check_deleting_references (context):
 # ------------------------------------------------------------
 
 # ============================================================
-# Whose overrides a view follows: the data of the overrides-followed
-# integration test, where foreign R contains M and K; A, foreign, and
-# U, owned, each override M; and P, owned, contains M. A view of R
-# follows its root author's overrides, showing A in M's place, or the
-# user's, showing U. The cases run in order.
+# A view's perspective, whose overrides it follows: the data of the
+# overrides-followed integration test, where foreign R contains M and
+# K; A, foreign, U, owned, and B, of a second foreign owner, "third",
+# each override M; and P, owned, contains M. A view of R shows its
+# root author's overrides, A in M's place; the user's, U; or third's,
+# B. The cases run in order.
 # ============================================================
 
 OVERRIDES_FOLLOWED_DATA = os . path . join (
   REPO_ROOT, "tests", "integration", "overrides-followed", "data" )
-FOLLOWS_YOURS_LINE = "Overrides followed: yours, in every tree.\n"
+FOLLOWS_YOURS_LINE = "Perspective: your overrides.\n"
+FOLLOWS_THIRDS_LINE = "Perspective: third's overrides.\n"
 FOLLOWS_ROOT_AUTHORS_LINE = (
-  "Overrides followed: each tree's root author's (the default).\n" )
+  "Perspective: each root author's overrides (foreign's).\n" )
 FOLLOWS_YOURS_SUMMARY = (
-  "# Overrides followed: yours (the root authors' are the default).\n" )
+  "# Perspective: your overrides (each root author's overrides are the default).\n" )
+FOLLOWS_THIRDS_SUMMARY = (
+  "# Perspective: third's overrides (each root author's overrides are the default).\n" )
 R_SHOWING_A = "* R ⟨0a C2 ⌂:foreign⟩\n** A ⟨0b Oĥ1⟩\n** K ⟨0c⟩\n"
 R_SHOWING_U = "* R ⟨0a C2 ⌂:foreign⟩\n** U ⟨0b Oĥ1 ⌂:main⟩\n** K ⟨0c⟩\n"
+R_SHOWING_B = "* R ⟨0a C2 ⌂:foreign⟩\n** B ⟨0b Oĥ1 ⌂:third⟩\n** K ⟨0c⟩\n"
 
 def copy_overrides_followed_fixture (data_root):
-  """The overrides-followed data, with a config naming its foreign and
-  its owned skgrepo."""
-  for folder in ( "foreign", "owned" ):
+  """The overrides-followed data, with a config naming its two foreign
+  skgrepos and its owned one."""
+  for folder in ( "foreign", "owned", "third" ):
     shutil . copytree ( os . path . join (OVERRIDES_FOLLOWED_DATA, folder),
                         os . path . join (data_root, folder) )
   with open ( os . path . join (data_root, "skgconfig.toml"), "w",
@@ -2812,7 +2817,8 @@ def copy_overrides_followed_fixture (data_root):
       'tantivy_folder = ".index.tantivy"\nport = 0\ntiming_log = false\n'
       'beep_when_server_becomes_available = false\n\n'
       '[[repos]]\nname = "foreign"\npath = "foreign"\nforeign = true\n\n'
-      '[[repos]]\nname = "main"\npath = "owned/main"\n' )
+      '[[repos]]\nname = "main"\npath = "owned/main"\n\n'
+      '[[repos]]\nname = "third"\npath = "third"\nforeign = true\n' )
 
 def failures_of_overrides_followed (scratch, data_root):
   context = { "scratch"       : scratch,
@@ -2841,14 +2847,15 @@ def r_tree (folder):
   """The headlines of the view of R in FOLDER, and the summary's line
   of whose overrides it follows, if it has one."""
   return "" . join ( line + "\n" for line in read_compact (folder, "view_R") . split ("\n")
-                     if line . startswith ("*") or line . startswith ("# Overrides") )
+                     if line . startswith ("*") or line . startswith ("# Perspective") )
 
 def check_following_overrides_on_a_command_s_own_connection (context):
-  """With no daemon, 'follow-overrides user' registers the view on its
-  own connection (by saving it back unchanged) and switches it: U
-  stands in M's place, the summary says so, and the sidecar records
-  it. A view whose every root is owned follows the user's already, and
-  the server refuses the switch."""
+  """With no daemon, 'override-perspective' registers the view on its
+  own connection (by saving it back unchanged) and switches it to the
+  next perspective, the user's: U stands in M's place, the summary
+  says so, and the sidecar records it. A view whose every root is
+  owned shows the user's already, and the server refuses a switch
+  that names them."""
   folder = os . path . join ( context [ "scratch" ], "own" )
   context [ "own_folder" ] = folder
   require_tool_run ([ "view", "R", "--out-dir", folder ])
@@ -2858,7 +2865,7 @@ def check_following_overrides_on_a_command_s_own_connection (context):
                   "root authors" )
   sidecar_path = os . path . join (folder, "view_R.view.json")
   require_output (
-    run_tool ([ "follow-overrides", sidecar_path, "user" ]),
+    run_tool ([ "override-perspective", sidecar_path ]),
     FOLLOWS_YOURS_LINE + "" . join (
       os . path . join (folder, "view_R" + suffix) + "\n"
       for suffix in ( ".full.org", ".compact.org", ".view.json" )))
@@ -2868,10 +2875,10 @@ def check_following_overrides_on_a_command_s_own_connection (context):
                   read_sidecar (folder, "view_R") [ "overrides_followed" ], "user" )
   require_tool_run ([ "view", "P", "--out-dir", folder ])
   require_failure (
-    run_tool ([ "follow-overrides", os . path . join (folder, "view_P.view.json"),
+    run_tool ([ "override-perspective", os . path . join (folder, "view_P.view.json"),
                 "user" ]),
-    [], "The server refused: Every tree in this buffer is rooted at a node "
-        "you own, so it shows your overrides already." )
+    [], "The server refused: Your overrides would show this buffer as its "
+        "root authors' do, so it is not one of its perspectives." )
 
 def check_saving_a_view_that_follows_yours (context):
   """An edited view is not switched. Its save names the choice: the
@@ -2882,7 +2889,7 @@ def check_saving_a_view_that_follows_yours (context):
   edit_compact ( folder, [ ( "** U ⟨0b Oĥ1 ⌂:main⟩\n",
                              "** U ⟨0b Oĥ1 ⌂:main⟩\nU's new body.\n" ) ], "view_R" )
   require_failure (
-    run_tool ([ "follow-overrides", os . path . join (folder, "view_R.view.json"),
+    run_tool ([ "override-perspective", os . path . join (folder, "view_R.view.json"),
                 "root-authors" ]),
     [], "Nothing was switched: the compact view has edits" )
   require_save_succeeds ( os . path . join (folder, "view_R.view.json") )
@@ -2894,9 +2901,22 @@ def check_saving_a_view_that_follows_yours (context):
                   read_sidecar (folder, "view_R") [ "overrides_followed" ], "user" )
 
 def check_following_the_root_authors_again (context):
+  """Named by its skgrepo, third's perspective shows B in M's place;
+  the next after it, the last, is the root authors' again."""
   folder = context [ "own_folder" ]
-  completed = run_tool ([ "follow-overrides", os . path . join (folder, "view_R.view.json"),
-                          "root-authors" ])
+  completed = run_tool ([ "override-perspective", os . path . join (folder, "view_R.view.json"),
+                          "third" ])
+  if completed . returncode != 0 or not completed . stdout . startswith (
+      FOLLOWS_THIRDS_LINE ):
+    raise CaseFailure ( f"the switch printed {completed . stdout!r}, {completed . stderr!r}" )
+  require_equal ( "R's view, following third's", r_tree (folder),
+                  FOLLOWS_THIRDS_SUMMARY + R_SHOWING_B )
+  require_equal ( "the sidecar's perspective",
+                  { key : read_sidecar (folder, "view_R") [key]
+                    for key in ( "overrides_followed", "perspective_name" ) },
+                  { "overrides_followed" : "owner of third",
+                    "perspective_name" : "third's overrides" } )
+  completed = run_tool ([ "override-perspective", os . path . join (folder, "view_R.view.json") ])
   if completed . returncode != 0 or not completed . stdout . startswith (
       FOLLOWS_ROOT_AUTHORS_LINE ):
     raise CaseFailure ( f"the switch printed {completed . stdout!r}, {completed . stderr!r}" )
@@ -2915,7 +2935,7 @@ def check_following_overrides_through_a_daemon (context):
   start_daemon (context)
   require_routed_run ( context, [ "view", "R" ] )
   sidecar_path = os . path . join (folder, "view_R.view.json")
-  completed = run_tool ( [ "follow-overrides", sidecar_path, "user" ], port = None )
+  completed = run_tool ( [ "override-perspective", sidecar_path ], port = None )
   if completed . returncode != 0 or not completed . stdout . startswith (FOLLOWS_YOURS_LINE):
     raise CaseFailure ( f"the switch printed {completed . stdout!r}, {completed . stderr!r}" )
   require_equal ( "R's view, following yours", r_tree (folder),
@@ -2923,7 +2943,7 @@ def check_following_overrides_through_a_daemon (context):
   require_equal ( "the held sidecar", { key : read_sidecar (folder, "view_R") [key]
                                         for key in ( "overrides_followed", "closed" ) },
                   { "overrides_followed" : "user", "closed" : False } )
-  require_log_line ( context, "overrides followed by view_R: yours, in every tree" )
+  require_log_line ( context, "perspective of view_R: your overrides" )
   require_routed_run ( context, [ "view", "U" ] )
   edit_compact ( folder, [ ( "* U ⟨0a ", "* U, retitled ⟨0a " ) ], "view_U" )
   completed = run_tool ( [ "save", os . path . join (folder, "view_U.view.json"), "--yes" ],
@@ -2944,7 +2964,7 @@ def check_following_overrides_through_a_daemon (context):
   require_save_succeeds (sidecar_path)
   require_equal ( "R's view, saved after the daemon stopped", r_tree (folder),
                   FOLLOWS_YOURS_SUMMARY + R_SHOWING_U . replace ("** U ", "** U, retitled again ") )
-  require_tool_run ([ "follow-overrides", sidecar_path, "root-authors" ])
+  require_tool_run ([ "override-perspective", sidecar_path, "root-authors" ])
   require_equal ( "R's view, following its root author's", r_tree (folder), R_SHOWING_A )
 
 def start_daemon (context):

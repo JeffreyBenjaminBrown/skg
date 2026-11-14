@@ -47,9 +47,10 @@ question, answered by '--keep-ids' or '--all-new' or on the headline.
 'extend SIDECAR' extends a buffer of the diff view to every change it
 does not make editable, as the clients' 'C-c r u' does, and writes the
 buffer again.
-'follow-overrides SIDECAR user|root-authors' switches whose overrides
-a view follows, as the clients' 'C-c v p' does, and writes the view
-again; the sidecar records the choice, which every later save names.
+'override-perspective SIDECAR [PERSPECTIVE]' switches a view to the
+next perspective, whose overrides it follows, as the clients' 'C-c v o'
+does, or to the one named, and writes the view again; the sidecar
+records it, which every later save names.
 'commit MESSAGE' stages and git-commits every change in the owned
 skgrepos, asking first when the server says not all is processed.
 Other commands: 'close SIDECAR'; 'raw REQUEST', which sends one
@@ -132,12 +133,14 @@ FOREST_VIEW_REQUESTS = {
 # Commands that name one forest kind.
 FOREST_COMMAND_ALIASES = { "contains" : "containers",
                            "links-here" : "mentioners" }
-# Whose overrides a view follows ('docs/api-and-formats.org', "Set
-# overrides followed"): the command line's word for each choice, and
-# the server's. A fresh view follows its root authors'.
-OVERRIDES_FOLLOWED_OF_ARGUMENT = { "user" : "user",
-                                   "root-authors" : "root authors" }
-USER_OVERRIDES_FOLLOWED = "user"
+# A view's perspective, whose overrides it follows
+# ('docs/api-and-formats.org', "Set overrides followed"): the command
+# line's word for each, and the server's; any other word is a foreign
+# skgrepo, naming its owner ('perspective_of_argument'). A fresh view
+# follows its root authors'.
+PERSPECTIVE_OF_ARGUMENT = { "next" : "next",
+                            "user" : "user",
+                            "root-authors" : "root authors" }
 DEFAULT_OVERRIDES_FOLLOWED = "root authors"
 SAVE_TERMINAL_RESPONSE_TYPES = {
   "save-result", "delete-from-confirmation", "strandeds-confirmation",
@@ -197,8 +200,8 @@ def run_command (arguments):
   if arguments . command == "extend":
     command_extend (arguments)
     return
-  if arguments . command == "follow-overrides":
-    command_follow_overrides (arguments)
+  if arguments . command == "override-perspective":
+    command_override_perspective (arguments)
     return
   if arguments . command == "delete-references":
     command_delete_references (arguments)
@@ -305,20 +308,24 @@ def parse_command_line (argv):
   extend_parser . add_argument (
     "--port", type = int, default = None,
     help = "the server's port; it must be the one the sidecar records" )
-  follow_overrides_parser = commands . add_parser (
-    "follow-overrides",
-    help = ( "switch whose overrides a view follows: 'user' (yours, in "
-             "every tree) or 'root-authors' (each tree's root author's, "
-             "as a fresh view does), and write the view again" ))
-  follow_overrides_parser . add_argument (
+  override_perspective_parser = commands . add_parser (
+    "override-perspective",
+    help = ( "show a view from the next perspective, whose overrides it "
+             "follows, or from the one named, and write the view again" ))
+  override_perspective_parser . add_argument (
     "view_files",
     help = "the BASE.view.json of the view, or a directory holding only one" )
-  follow_overrides_parser . add_argument (
-    "whose", choices = list (OVERRIDES_FOLLOWED_OF_ARGUMENT) )
-  follow_overrides_parser . add_argument (
+  override_perspective_parser . add_argument (
+    "perspective", nargs = "?", default = "next",
+    help = ( "'next' (the default: the next in the view's cycle, as the "
+             "clients' 'C-c v o' does), 'root-authors' (each tree's root "
+             "author's, as a fresh view shows), 'user' (yours, in every "
+             "tree), or a foreign skgrepo's name (its owner's, in every "
+             "tree)" ))
+  override_perspective_parser . add_argument (
     "--port", type = int, default = None,
     help = "the server's port; it must be the one the sidecar records" )
-  follow_overrides_parser . add_argument (
+  override_perspective_parser . add_argument (
     "--show-overPrivateText", action = "store_true",
     help = ( "under a skgrepo restriction, approve releasing text from "
              "overPrivateText telescopes the switched view would show" ))
@@ -775,14 +782,15 @@ def register_view_by_saving_it_unchanged (connection, saved_view, refusal):
         response_field (terminal, "errors") or [ render_sexp (terminal) ] ))
   return terminal
 
-def command_follow_overrides (arguments):
-  """Switch whose overrides a view follows, as the clients'
-  'skg-switch-overrides-followed' ('C-c v p' in Emacs) does: 'user',
-  the user's in every tree, or 'root-authors', each tree's root
-  author's, as a fresh view does. The server switches the view it
-  holds and rerenders it; the rerendered view is written over the three
-  files, and its sidecar records the choice, which every later save of
-  the view names, as the server needs. A client refuses the switch for
+def command_override_perspective (arguments):
+  """Switch a view's perspective, whose overrides it follows: to the
+  next in the view's cycle, as the clients' 'skg-override-perspective'
+  ('C-c v o' in Emacs) does, which the server computes afresh; or to
+  the one named ('perspective_of_argument'). The server switches the
+  view it holds and rerenders it; the rerendered view is written over
+  the three files, its sidecar records the perspective, which every
+  later save of the view names, as the server needs, and the
+  perspective is printed by the server's name for it. A client refuses the switch for
   a buffer with unsaved edits, which the rerender would replace, and
   so this refuses an edited compact view. A daemon holding the view
   sends the request on its connection; otherwise the full view is
@@ -799,7 +807,7 @@ def command_follow_overrides (arguments):
     raise SkgToolError (
       "Nothing was switched: the compact view has edits, which the "
       "switch's rerender would replace; save them first, or undo them." )
-  requested = OVERRIDES_FOLLOWED_OF_ARGUMENT [ arguments . whose ]
+  requested = perspective_of_argument (arguments . perspective)
   connection = connection_for_saved_view (saved_view)
   registered = False
   try:
@@ -825,14 +833,15 @@ def command_follow_overrides (arguments):
     if refusal is not None:
       raise SkgToolError ( "The server refused: " + sexp_to_text (refusal) )
     followed = response_text_field (response, "overrides-followed")
+    name = response_text_field (response, "perspective-name")
     if rerendered is None:
       raise SkgToolError (
         "The server switched the view but sent no rerender of it; view the "
         "node again. " + " " . join (
           sexp_to_text (error) for error in response_field (done, "errors") or [] ))
     connection . log_view_event (
-      "overrides followed by", saved_view . directory, saved_view . base_name,
-      ": " + overrides_followed_phrase (followed) )
+      "perspective of", saved_view . directory, saved_view . base_name,
+      ": " + name )
     written_paths = write_view_files (
       connection,
       { "view_id"     : view_id,
@@ -843,7 +852,8 @@ def command_follow_overrides (arguments):
                           in response_field (done, "errors") or [] ],
         "warnings"    : [ sexp_to_text (warning) for warning
                           in response_field (done, "warnings") or [] ],
-        "overrides_followed" : followed },
+        "overrides_followed" : followed,
+        "perspective_name"   : name },
       saved_view . directory, saved_view . base_name, sidecar [ "summary" ] )
     release_view (connection, view_id)
   except SkgToolError:
@@ -855,21 +865,29 @@ def command_follow_overrides (arguments):
     raise
   finally:
     connection . close ()
-  print ( "Overrides followed: " + overrides_followed_phrase (followed) + "." )
+  print ( "Perspective: " + name + "." )
   for path in written_paths:
     print (path)
 
+def perspective_of_argument (argument):
+  """The server's name ('docs/api-and-formats.org', "Set overrides
+  followed") for the perspective ARGUMENT names on the command line:
+  'next', 'root-authors', 'user', or a foreign skgrepo's name, which
+  names its owner."""
+  return PERSPECTIVE_OF_ARGUMENT . get ( argument, "owner of " + argument )
+
 def overrides_followed_of_sidecar (sidecar):
-  """Whose overrides the view a SIDECAR records follows, by the
-  server's name: 'user', or 'root authors', as every fresh view does,
-  and a sidecar that names neither."""
+  """The perspective of the view a SIDECAR records, whose overrides
+  it follows, by the server's wire name: 'user', 'owner of NAME', or
+  'root authors', as every fresh view does, and a sidecar that names
+  none."""
   return sidecar . get ( "overrides_followed", DEFAULT_OVERRIDES_FOLLOWED )
 
-def overrides_followed_phrase (overrides_followed):
-  """How the tool says whose overrides a view follows."""
-  return ( "yours, in every tree"
-           if overrides_followed == USER_OVERRIDES_FOLLOWED
-           else "each tree's root author's (the default)" )
+def perspective_fields_of_sidecar (sidecar):
+  """The fields of a view dict ('write_view_files') that carry the
+  perspective a SIDECAR records into a rewrite of its view."""
+  return { "overrides_followed" : overrides_followed_of_sidecar (sidecar),
+           "perspective_name"   : sidecar . get ("perspective_name") }
 
 def require_port_of_sidecar (port, sidecar):
   """A command on a sidecar talks to the server the sidecar records;
@@ -1493,9 +1511,10 @@ def release_view (connection, view_id):
 def write_view_files (connection, view, out_dir, base_name, show_summary,
                       unless_compact_differs_from = None):
   """Write the view's three files; return their paths. The sidecar
-  records whose overrides the view follows: VIEW's
-  'overrides_followed', which a rewrite of a view carries from its
-  sidecar, or the root authors', a fresh view's. Given
+  records the view's perspective, whose overrides it follows: VIEW's
+  'overrides_followed' and 'perspective_name', which a rewrite of a
+  view carries from its sidecar ('perspective_fields_of_sidecar'), or
+  the root authors', a fresh view's. Given
   UNLESS_COMPACT_DIFFERS_FROM, write nothing, and return None, when
   the compact view on disk is no longer that text: it was edited
   since it was read."""
@@ -1529,6 +1548,7 @@ def write_view_files (connection, view, out_dir, base_name, show_summary,
         "request"      : view [ "request" ],
         "overrides_followed" : view . get (
           "overrides_followed", DEFAULT_OVERRIDES_FOLLOWED ),
+        "perspective_name"   : view . get ("perspective_name"),
         "port"         : connection . port,
         "full_view"    : os . path . basename (full_path),
         "compact_view" : os . path . basename (compact_path),
@@ -2428,8 +2448,11 @@ def summary_lines (parsed_view, link_statuses, repo_ownership, view,
            if view [ "command" ] == "diff" else [] ) + [
     "# skg-for-ai compact view of " + full_file_name +
       " (view ID " + view [ "view_id" ] + ")" ] + (
-    [ "# Overrides followed: yours (the root authors' are the default)." ]
-    if view . get ("overrides_followed") == USER_OVERRIDES_FOLLOWED else [] ) + [
+    [ "# Perspective: " + ( view . get ("perspective_name")
+                            or view . get ("overrides_followed") )
+      + " (each root author's overrides are the default)." ]
+    if view . get ( "overrides_followed", DEFAULT_OVERRIDES_FOLLOWED )
+       != DEFAULT_OVERRIDES_FOLLOWED else [] ) + [
     "# Each headline ends in its handle ⟨ID HERALDS⟩: ID its viewnode ID,",
     "# the '(vnid ID)' of its metadata in the full view, and HERALDS what a",
     "# client shows for it, but a bare 'aC' (only the parent contains it);",
@@ -4771,7 +4794,7 @@ def rerendered_view_of_save (terminal, sidecar):
            "errors"      : errors,
            "warnings"    : warnings,
            "processed_summary" : processed_summary,
-           "overrides_followed" : overrides_followed_of_sidecar (sidecar) }
+           ** perspective_fields_of_sidecar (sidecar) }
 
 # ============================================================
 # The daemon: one long-lived connection, holding the views its
@@ -4785,7 +4808,7 @@ RUNNING_DAEMON = None
 RERENDER_MESSAGE_TYPES = { "collateral-view", "rerender-view" }
 RESPONSE_TYPE_PATTERN = re . compile ( r'^\(\(response-type ([^\s()]+)\)' )
 # The commands that name a sidecar, whose port is the sidecar's.
-SIDECAR_COMMANDS = ( "save", "extend", "close", "follow-overrides" )
+SIDECAR_COMMANDS = ( "save", "extend", "close", "override-perspective" )
 # The commands that always run in their own process: 'raw' speaks the
 # protocol directly, 'import' binds its approval to a connection of
 # its own, and 'linkstack' keeps a file, asking the server at most for
@@ -4868,7 +4891,7 @@ def port_named_by_command (arguments, argv):
 
 def port_of_sidecar_of_command (arguments):
   """The port the sidecar of a 'save', 'extend', 'close' or
-  'follow-overrides' records; None for other commands, or when the
+  'override-perspective' records; None for other commands, or when the
   sidecar cannot be read (the command then says why, where it runs)."""
   if arguments . command not in SIDECAR_COMMANDS:
     return None
@@ -4885,7 +4908,7 @@ def daemon_sidecar_argument (arguments):
 
 def daemon_folder_of_command (arguments):
   """The folder whose daemon a command runs through: its '--out-dir',
-  or for 'save', 'extend', 'close' and 'follow-overrides' its
+  or for 'save', 'extend', 'close' and 'override-perspective' its
   sidecar's folder. None for the commands that write no view."""
   if arguments . command in SIDECAR_COMMANDS:
     path = daemon_sidecar_argument (arguments)
@@ -5106,7 +5129,7 @@ class SkgForAiDaemon:
   def use_own_port_unless_named (self, arguments, named_port):
     """A command the daemon runs talks to the port its sender named
     (NAMED_PORT, by '--port' or SKG_PORT), else to the daemon's
-    server; 'save', 'extend', 'close' and 'follow-overrides' talk to
+    server; 'save', 'extend', 'close' and 'override-perspective' talk to
     their sidecar's."""
     if named_port is not None:
       arguments . port = named_port
@@ -5221,7 +5244,7 @@ class SkgForAiDaemon:
         "content"     : content,
         "errors"      : [],
         "warnings"    : [],
-        "overrides_followed" : overrides_followed_of_sidecar (sidecar) },
+        ** perspective_fields_of_sidecar (sidecar) },
       saved_view . directory, saved_view . base_name, sidecar [ "summary" ],
       unless_compact_differs_from = saved_view . compact_text )
     if written_paths is None:
@@ -5569,9 +5592,9 @@ class SkgConnection:
     ANSWERS, a SaveAnswers, carries the answers to the questions
     earlier attempts of the same save asked, as the clients' retries
     carry them ('skg--save-request-sexp' in
-    'elisp/skg-request-save.el'). OVERRIDES_FOLLOWED, whose overrides
-    the buffer was drawn following, is named when it is the user's, as
-    the clients name it: the server checks and rerenders the buffer
+    'elisp/skg-request-save.el'). OVERRIDES_FOLLOWED, the perspective
+    the buffer was drawn from, whose overrides it follows, is named
+    unless it is the root authors', as the clients name it: the server checks and rerenders the buffer
     following it, and holds the view with it, which a save that names
     none resets to the root authors'."""
     line = request_line (
@@ -5579,7 +5602,7 @@ class SkgConnection:
       * ( [ ( "diff-view-buffer", diffView_buffer ) ]
           if diffView_buffer is not None else [] ),
       * ( [ ( "overrides-followed", overrides_followed ) ]
-          if overrides_followed == USER_OVERRIDES_FOLLOWED else [] ),
+          if overrides_followed != DEFAULT_OVERRIDES_FOLLOWED else [] ),
       ( "point-lines-below-focused-headline", "0" ),
       ( "point-column", "0" ),
       ( "point-screen-lines-below-window-start", "0" ))
