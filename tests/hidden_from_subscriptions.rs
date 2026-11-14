@@ -307,6 +307,22 @@ fn all_tests
         "tests/hidden_from_subscriptions/fixtures-clone-edit") ?;
       test_readding_subscribee_content_to_subscriber_contains_unhides (
         &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("test_placing_and_removing_an_overrider_of_subscribee_content_hides_what_it_overrides",
+        "tests/hidden_from_subscriptions/fixtures-overrider-of-subscribee-content") ?;
+      test_placing_and_removing_an_overrider_of_subscribee_content_hides_what_it_overrides (
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("test_removing_an_overrider_of_subscribee_content_hides_what_it_overrides",
+        "tests/hidden_from_subscriptions/fixtures-overrider-of-subscribee-content") ?;
+      test_removing_an_overrider_of_subscribee_content_hides_what_it_overrides (
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("test_placing_an_overrider_of_a_hidden_node_keeps_its_hide",
+        "tests/hidden_from_subscriptions/fixtures-overrider-of-subscribee-content") ?;
+      test_placing_an_overrider_of_a_hidden_node_keeps_its_hide (
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("test_replacing_an_overrider_with_its_original_hides_nothing",
+        "tests/hidden_from_subscriptions/fixtures-overrider-of-subscribee-content") ?;
+      test_replacing_an_overrider_with_its_original_hides_nothing (
+        &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_collateral_view_reflects_newly_hidden_subscribee_content",
         "tests/hidden_from_subscriptions/fixtures-subscribee-edit") ?;
       test_collateral_view_reflects_newly_hidden_subscribee_content (
@@ -494,6 +510,133 @@ async fn test_readding_subscribee_content_to_subscriber_contains_unhides (
     assert! (
       g_skg . hidesFromSubs . or_default () . is_empty (),
       "re-adding c to g's contains must drop g's stale hide of c: {:?}",
+      g_skg . hidesFromSubs );
+    Ok (( )) }
+
+/// Foreign j contains owned m and foreign k; foreign r overrides m,
+/// as one's fork of another's note does, and j's own contains, like
+/// any container's, still names m. Owned f forks j: it subscribes to
+/// and overrides j, and contains nothing. Placing r in f and saving,
+/// then removing it and saving, is the gesture that dismisses any
+/// other child of j; r stands for m wherever m appears as content,
+/// so it must hide m, the member of j's content r stands for.
+async fn test_placing_and_removing_an_overrider_of_subscribee_content_hides_what_it_overrides (
+  config : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+    let graph : InRustGraphHandle =
+      graph_handle_from_config (config) ?;
+    let mut views_state : ViewsState = ViewsState {
+      open_views        : OpenViews::new (),
+      graph_straddle    : None,};
+    let placed : &str = indoc! {"
+      * (skg node (gnid f) (skgRepos (nodeRepo owned))) f
+      ** (skg node (gnid r) (skgRepos (nodeRepo foreign)) writeProtected) r
+      "};
+    save_buffer_for_hidden_subscriptions_test (
+      placed, &config, tantivy, &graph, &mut views_state
+    ) . await ?;
+    let f_placed : Graphnode = node_from_disk (&config, "f") ?;
+    assert_eq! ( members_of (& f_placed . contains), vec! [ ID::from ("r") ],
+      "the first save places r in f: {:?}", f_placed . contains );
+    let removed : &str = indoc! {"
+      * (skg node (gnid f) (skgRepos (nodeRepo owned))) f
+      "};
+    save_buffer_for_hidden_subscriptions_test (
+      removed, &config, tantivy, &graph, &mut views_state
+    ) . await ?;
+    let f_skg : Graphnode = node_from_disk (&config, "f") ?;
+    assert! ( f_skg . contains . is_empty (),
+      "the second save removes r from f: {:?}", f_skg . contains );
+    assert_eq! (
+      members_of ( f_skg . hidesFromSubs . or_default () ),
+      vec! [ ID::from ("m") ],
+      "removing r, which overrides m, a member of j's content, must hide m: {:?}",
+      f_skg . hidesFromSubs );
+    Ok (( )) }
+
+/// Owned g subscribes to j and contains r, which overrides m, a
+/// member of j's content. Removing r from g hides m.
+async fn test_removing_an_overrider_of_subscribee_content_hides_what_it_overrides (
+  config : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+    let graph : InRustGraphHandle =
+      graph_handle_from_config (config) ?;
+    let mut views_state : ViewsState = ViewsState {
+      open_views        : OpenViews::new (),
+      graph_straddle    : None,};
+    let buffer : &str = indoc! {"
+      * (skg node (gnid g) (skgRepos (nodeRepo owned))) g
+      "};
+    save_buffer_for_hidden_subscriptions_test (
+      buffer, &config, tantivy, &graph, &mut views_state
+    ) . await ?;
+    let g_skg : Graphnode = node_from_disk (&config, "g") ?;
+    assert! ( g_skg . contains . is_empty (),
+      "g's contains must be emptied by the save: {:?}", g_skg . contains );
+    assert_eq! (
+      members_of ( g_skg . hidesFromSubs . or_default () ),
+      vec! [ ID::from ("m") ],
+      "removing r, which overrides m, must hide m: {:?}",
+      g_skg . hidesFromSubs );
+    Ok (( )) }
+
+/// Owned h subscribes to j and hides m. Placing r, which overrides
+/// m, in h keeps the hide of m: containing r does not integrate m
+/// (the unintegrated content compares IDs), so dropping the hide
+/// would bring m back as unintegrated.
+async fn test_placing_an_overrider_of_a_hidden_node_keeps_its_hide (
+  config : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+    let graph : InRustGraphHandle =
+      graph_handle_from_config (config) ?;
+    let mut views_state : ViewsState = ViewsState {
+      open_views        : OpenViews::new (),
+      graph_straddle    : None,};
+    let buffer : &str = indoc! {"
+      * (skg node (gnid h) (skgRepos (nodeRepo owned))) h
+      ** (skg node (gnid r) (skgRepos (nodeRepo foreign)) writeProtected) r
+      "};
+    save_buffer_for_hidden_subscriptions_test (
+      buffer, &config, tantivy, &graph, &mut views_state
+    ) . await ?;
+    let h_skg : Graphnode = node_from_disk (&config, "h") ?;
+    assert_eq! ( members_of (& h_skg . contains), vec! [ ID::from ("r") ],
+      "h's contains must now hold r: {:?}", h_skg . contains );
+    assert_eq! (
+      members_of ( h_skg . hidesFromSubs . or_default () ),
+      vec! [ ID::from ("m") ],
+      "placing r, which overrides m, must keep h's hide of m: {:?}",
+      h_skg . hidesFromSubs );
+    Ok (( )) }
+
+/// Owned g contains r, which overrides m, a member of j's content.
+/// A save that replaces r with m in g hides nothing: g still holds
+/// the member r stood for.
+async fn test_replacing_an_overrider_with_its_original_hides_nothing (
+  config : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+    let graph : InRustGraphHandle =
+      graph_handle_from_config (config) ?;
+    let mut views_state : ViewsState = ViewsState {
+      open_views        : OpenViews::new (),
+      graph_straddle    : None,};
+    let buffer : &str = indoc! {"
+      * (skg node (gnid g) (skgRepos (nodeRepo owned))) g
+      ** (skg node (gnid m) (skgRepos (nodeRepo owned))) m
+      "};
+    save_buffer_for_hidden_subscriptions_test (
+      buffer, &config, tantivy, &graph, &mut views_state
+    ) . await ?;
+    let g_skg : Graphnode = node_from_disk (&config, "g") ?;
+    assert_eq! ( members_of (& g_skg . contains), vec! [ ID::from ("m") ],
+      "g's contains must now hold m: {:?}", g_skg . contains );
+    assert! (
+      g_skg . hidesFromSubs . or_default () . is_empty (),
+      "g holds m, so removing r must not hide it: {:?}",
       g_skg . hidesFromSubs );
     Ok (( )) }
 

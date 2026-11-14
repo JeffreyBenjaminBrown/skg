@@ -1,0 +1,6 @@
+pid: g
+title: g
+contains:
+- r
+subscribesTo:
+- j

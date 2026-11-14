@@ -225,6 +225,17 @@ follows: children of =N= you deleted /while/ forking are born hidden.
 And it holds for any owned subscriber, not just clones — a fork is
 just subscribe + override.)
 
+A removed child stands for what it overrides. If =N= contains =X= and
+someone forked =X= into =X'= (=X'= overrides =X=), =N='s contents
+still name =X=, as every container's do; =X'= is shown in its place
+only where its author's overrides are followed. So removing =X'= from
+=C= hides =X=, just as removing =X= would, unless =C= still contains
+=X=. That is how you dismiss the author's reply under a note of yours:
+the reply is the author's fork of your note, so place it in =C=,
+save, remove it and save again. Containing =X'= does not integrate
+=X=, though: while =C= holds =X'=, =X= still shows as unintegrated, and
+placing =X'= drops no hide of =X=.
+
 ** Once forked: monogamy
 
 A node may have at most one clone /you/ own. If you try to fork something

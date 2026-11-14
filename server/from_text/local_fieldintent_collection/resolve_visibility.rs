@@ -31,6 +31,7 @@
 //! elsewhere in the same map.
 
 use crate::dbs::in_rust_graph::InRustGraph;
+use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::dbs::node_lookup::opt_graphnode_by_gnid;
 use crate::from_text::local_fieldintent_collection::lower::LoweredNodeIntents;
 use crate::from_text::local_fieldintent_collection::types::{
@@ -210,7 +211,13 @@ fn apply_hiddenoutside_edits (
 /// reappear under F as unintegrated subscribed content the user just
 /// dismissed (docs/sharing-model.org: branches deleted from a clone
 /// become hides). Symmetrically, re-adding such a child to F's
-/// contains drops a stale hide of it by F. Details:
+/// contains drops a stale hide of it by F. A removed child counts as
+/// the member it stands for ('member_it_stands_for'): removing an
+/// overrider of a subscribee's member hides that member, unless the
+/// same save leaves F containing the member. Placing an overrider
+/// drops no hide, as containing it does not integrate the member
+/// ('unintegrated_content_gnids' in 'server/refresh/goal.rs' compares
+/// IDs): an unhidden member would come back as unintegrated. Details:
 /// - Members whose records the skgrepo restriction keeps out were
 ///   omitted from the buffer, not removed, so they never count as
 ///   removals ('SkgrepoRestriction::record_is_visible'). A member
@@ -296,14 +303,50 @@ fn infer_hides_from_contains_removals (
                   & subscribee_from_disk . contains,
                   skgrepo_restriction )); }}
           content };
-        removed . into_iter ()
-          . filter ( |gnid| subscribee_content . contains (gnid) )
+        let new_contains_set : HashSet<&ID> = new_contains . iter () . collect ();
+        removed . iter ()
+          . filter_map ( |gnid| member_it_stands_for (
+            graph, skgrepo_restriction, gnid, &subscribee_content ))
+          . filter ( |member| ! new_contains_set . contains (member) )
           . collect () };
     if inferred_hides . is_empty () && inferred_unhides . is_empty ()
       { continue; }
     lowered . apply_hiderel_delta_to_subscriber (
       subscriber_from_disk, &inferred_hides, &inferred_unhides ); }
   Ok (( )) }
+
+/// The member of 'members' that 'gnid', a child removed from a
+/// subscriber, stands for: 'gnid' itself when it is one; otherwise
+/// the first member met walking the override records out of 'gnid'
+/// that the skgrepo restriction shows, overrider to overridden.
+/// Every contains list, a subscribee's included, records the
+/// original; an overrider is shown in its place only where its
+/// author's overrides are followed. So when the subscribee's author
+/// forks a member of its content (to answer under a note of the
+/// subscriber's, say), the content still names the original, which
+/// the subscriber's own view draws raw and the author's view draws as
+/// the fork. Either way the subscriber met the same member, so
+/// dismissing the fork dismisses it. The walk follows anyone's
+/// overrides, not one perspective's: which member a child stands for
+/// is a fact about the child, whichever view the user found it in.
+fn member_it_stands_for (
+  graph       : &InRustGraph,
+  restriction : &SkgrepoRestriction,
+  gnid        : &ID,
+  members     : &HashSet<ID>,
+) -> Option<ID> {
+  if members . contains (gnid) { return Some (gnid . clone ()); }
+  let mut seen : HashSet<ID> = HashSet::from ([ graph . pid_else_raw_id (gnid) ]);
+  let mut frontier : Vec<ID> = seen . iter () . cloned () . collect ();
+  while let Some (current) = frontier . pop () {
+    for overridden in graph . outbound_pids_for_relation_gated (
+      &current, NodeRelation::Overrides, restriction ) {
+      if ! seen . insert (overridden . clone ()) { continue; }
+      if let Some (member) = members . iter () . find ( |member|
+        graph . pid_else_raw_id (member) == overridden ) {
+        return Some (member . clone ()); }
+      frontier . push (overridden); }}
+  None }
 
 /// Checks one subscriber + content node
 /// against all subscribee branches under the subscriber.
