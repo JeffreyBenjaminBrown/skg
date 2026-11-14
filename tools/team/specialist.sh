@@ -97,8 +97,16 @@ add_to_readers_configs() { # NAME: Claude and Jeff each read every specialist's 
       printf '\n# The specialist %s. Added by tools/team/specialist.sh.\n' "$1"
       printf '[[repos]]\nname = "%s"\npath = "%s"\nforeign = true\n' "$1" "$path"
     } >> "$config"
+    [ "$config" = "$DATA/jeff/skgconfig.toml" ] && log_jeffs_config_written 5
     echo "Added '$1' to $config as foreign; its server must rebuild or restart to see it." >&2
   done
+}
+
+log_jeffs_config_written() { # LINES: one line in the check's log, so the check can place the write
+  # tools/team/check_jeffs_files.py reads these lines; keep their form.
+  local log="${PACER_DIR:-$DATA/claude/pacer}/jeff-check.log"
+  mkdir -p "$(dirname "$log")"
+  echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) $COMMAND: wrote $1 lines of data/jeff/skgconfig.toml" >> "$log"
 }
 
 port_is_bound() { (exec 3<>/dev/tcp/127.0.0.1/"$1") 2>/dev/null; }
@@ -158,9 +166,14 @@ rename_in_readers_config() { # CONFIG OLD NEW OLD_PATH NEW_PATH: one skgrepo's n
   # Jeff's config is the one file of his that this script writes.
   # The comment line that add_to_readers_configs put above the entry is kept true too.
   [ -f "$1" ] || return 0
+  local before changed; before="$(cat "$1")"
   sed -i -e "s|^name = \"$2\"\$|name = \"$3\"|" \
          -e "s|^path = \"$4\"\$|path = \"$5\"|" \
          -e "s|^# The specialist $2\\. Added by|# The specialist $3. Added by|" "$1"
+  if [ "$1" = "$DATA/jeff/skgconfig.toml" ]; then
+    changed="$(diff <(printf '%s\n' "$before") "$1" | grep -c '^>' || true)"
+    log_jeffs_config_written "$changed"
+  fi
 }
 
 rename() { # OLD NEW: the folder, the ports line, and the readers' configs; the rest is rebuilt by 'up'
@@ -253,6 +266,8 @@ When you finish, your final message should be one or two sentences. Everything e
 PROMPT
 }
 
+COMMAND="specialist.sh ${1:-} ${2:-}" # what the check's log names; not WHO, which may be long
+[ "${1:-}" = rename ] && COMMAND="$COMMAND ${3:-}"
 case "${1:-}" in
   up)   [ $# -eq 2 ] || usage; up "$2" ;;
   down) [ $# -eq 2 ] || usage; down "$2" ;;
