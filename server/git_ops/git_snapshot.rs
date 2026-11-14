@@ -1,5 +1,7 @@
 //! The before-graph of the straddle: owned skgrepos read at HEAD,
-//! cached by HEAD identity.
+//! cached by HEAD identity. Also the graph a commit would leave, read
+//! from trees no commit holds yet ('read_candidate_graph_snapshot'),
+//! uncached.
 
 use crate::dbs::filesystem::multiple_nodes::{
   read_skg_sections_from_folder};
@@ -9,15 +11,14 @@ use crate::telescope::types::{
 };
 use crate::git_ops::git_snapshot_types::{GraphSnapshot, GitSnapshotKind};
 use crate::git_ops::misc::path_relative_to_gitrepo;
-use crate::git_ops::read_gitrepo::{
-  get_staged_changed_skg_files, get_unstaged_changed_skg_files,
-  open_gitrepo};
+use crate::git_ops::stage_and_commit::skg_paths_differing_from_head;
+use crate::git_ops::read_gitrepo::open_gitrepo;
 use crate::types::misc::{
   ID, SkgConfig, Skgrepo, SkgrepoName};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::nodes::fs::GraphnodeOnDisk;
 
-use git2::{ObjectType, Repository, TreeWalkMode, TreeWalkResult};
+use git2::{ObjectType, Oid, Repository, TreeWalkMode, TreeWalkResult};
 use std::collections::{BTreeSet, HashMap};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -104,12 +105,15 @@ pub fn owned_head_identity (
   Ok (parts . join ("|"))
 }
 
-/// How many '.skg' files of the foreign skgrepos differ between HEAD
-/// and the worktree. The graph straddle reads foreign skgrepos at their
-/// worktrees, so their changes never reach it; the processed summary
-/// reports this count instead. A foreign skgrepo that is not in a
-/// gitrepo, or has no HEAD commit, counts nothing.
-pub fn foreign_changed_skg_file_count (
+/// How many nodes of the foreign skgrepos changed between HEAD and
+/// the worktree, found as the owned ones are
+/// ('skg_paths_differing_from_head'): the stems of their changed '.skg' files, each
+/// counted once, so that a node with sections in two foreign
+/// skgrepos counts once. The graph straddle reads foreign skgrepos at
+/// their worktrees, so their changes never reach it; the processed
+/// summary reports this count instead. A foreign skgrepo that is not
+/// in a gitrepo, or has no HEAD commit, counts nothing.
+pub fn foreign_changed_node_count (
   config : &SkgConfig,
 ) -> usize {
   config . ordered_skgrepos () . into_iter ()
@@ -120,10 +124,28 @@ pub fn foreign_changed_skg_file_count (
       let gitrepo : Repository = open_gitrepo (skgrepo_path) ?;
       let prefix : PathBuf =
         repo_prefix_in_gitrepo (&gitrepo, skgrepo_path) . ok () ?;
-      changed_paths_for_skgrepo (&gitrepo, &prefix)
-        . ok ()
-        . map ( |paths| paths . len () ) } )
-    . sum () }
+      skg_paths_differing_from_head (&gitrepo, &prefix) . ok () } )
+    . flatten ()
+    . filter_map ( |(path, _)| path . file_stem ()
+                   . map ( |stem| stem . to_string_lossy () . to_string () ))
+    . collect::<BTreeSet<String>> ()
+    . len () }
+
+/// The graph a commit would leave: each owned skgrepo read from the
+/// tree 'trees' gives it (one not there from HEAD), each foreign
+/// skgrepo from its worktree, as the before-graph of the straddle is
+/// read. Not cached: a tree no commit holds yet is read once.
+pub fn read_candidate_graph_snapshot (
+  config : &SkgConfig,
+  trees  : &HashMap<SkgrepoName, Oid>,
+) -> Result<GraphSnapshot, String> {
+  read_graph_snapshot_per_skgrepo (
+    config,
+    |skgrepo_name|
+    if ! config . skgrepo_is_owned (skgrepo_name) { GitSnapshotKind::Worktree }
+    else { match trees . get (skgrepo_name) {
+      Some (tree) => GitSnapshotKind::Tree (*tree),
+      None        => GitSnapshotKind::Head, }} ) }
 
 /// Sections arrive in fold order ('ordered_skgrepos') so each
 /// telescope composes with its home section first.
@@ -140,7 +162,9 @@ fn read_graph_snapshot_per_skgrepo (
     let mut skgrepo_sections : Vec<(SkgrepoName, GraphnodeOnDisk)> =
       profile_step_result (&label, || match kind {
         GitSnapshotKind::Head =>
-          read_skgrepo_from_head (config, &skgrepo_name),
+          read_skgrepo_from_tree (config, &skgrepo_name, None),
+        GitSnapshotKind::Tree (tree) =>
+          read_skgrepo_from_tree (config, &skgrepo_name, Some (tree)),
         GitSnapshotKind::Worktree =>
           read_skg_sections_from_folder (&skgrepo_name, config)
             . map_err ( |e| format! (
@@ -191,27 +215,6 @@ pub fn forget_cached_git_snapshots (
 fn git_snapshot_cache (
 ) -> &'static Mutex<GitSnapshotCache> {
   SNAPSHOT_CACHE . get_or_init ( || Mutex::new (GitSnapshotCache::default ()) )
-}
-
-/// The skgrepo's '.skg' files that differ between HEAD and the
-/// worktree, staged or not.
-fn changed_paths_for_skgrepo (
-  gitrepo : &Repository,
-  prefix  : &Path,
-) -> Result<BTreeSet<PathBuf>, String> {
-  let mut paths : BTreeSet<PathBuf> =
-    BTreeSet::new ();
-  for entry in get_staged_changed_skg_files (gitrepo)
-    . map_err ( |e| format! (
-      "Reading staged changed .skg files: {}", e )) ?
-    . into_iter ()
-    . chain (get_unstaged_changed_skg_files (gitrepo)
-      . map_err ( |e| format! (
-        "Reading unstaged changed .skg files: {}", e )) ?
-      . into_iter ()) {
-    if path_is_skgrepo_skg (&entry . path, prefix) {
-      paths . insert (entry . path); }}
-  Ok (paths)
 }
 
 fn profile_step<T, F> (
@@ -332,9 +335,12 @@ fn fold_telescope_tolerating_homelessness (
         . map_err ( |e| e . to_string () ) }}
 }
 
-fn read_skgrepo_from_head (
+/// The skgrepo's sections as the tree 'tree' of its gitrepo holds
+/// them, or as HEAD's tree does when 'tree' is None.
+fn read_skgrepo_from_tree (
   config       : &SkgConfig,
   skgrepo_name : &SkgrepoName,
+  tree         : Option<Oid>,
 ) -> Result<Vec<(SkgrepoName, GraphnodeOnDisk)>, String> {
   let skgrepo : &Skgrepo =
     config . skgrepos . get (skgrepo_name) . ok_or_else ( || format! (
@@ -346,11 +352,13 @@ fn read_skgrepo_from_head (
       "Could not open Git repo for Skg repo '{}'", skgrepo_name )) ?;
   let prefix : PathBuf =
     repo_prefix_in_gitrepo (&gitrepo, skgrepo_path) ?;
-  let tree : git2::Tree =
-    gitrepo . head ()
+  let tree : git2::Tree = match tree {
+    Some (tree) => gitrepo . find_tree (tree) . map_err ( |e| format! (
+      "Reading tree {} for repo '{}': {}", tree, skgrepo_name, e )) ?,
+    None => gitrepo . head ()
       . and_then ( |h| h . peel_to_tree () )
       . map_err ( |e| format! (
-        "Reading HEAD tree for repo '{}': {}", skgrepo_name, e )) ?;
+        "Reading HEAD tree for repo '{}': {}", skgrepo_name, e )) ?, };
   let mut sections : Vec<(SkgrepoName, GraphnodeOnDisk)> = Vec::new ();
   let mut parse_error : Option<String> = None;
   let walk_result : Result<(), git2::Error> =

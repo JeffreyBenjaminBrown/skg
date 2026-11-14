@@ -1,7 +1,7 @@
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::complete_validation::validated_graph;
 use crate::git_ops::git_snapshot::{
-  foreign_changed_skg_file_count, owned_head_identity,
+  foreign_changed_node_count, owned_head_identity,
   read_owned_head_graph_snapshot_maybe_cached};
 use crate::git_ops::git_snapshot_types::GraphSnapshot;
 use crate::graph_straddle::types::GraphStraddle;
@@ -39,7 +39,7 @@ impl GraphStraddle {
       . map_err ( |e| format! ("At HEAD: {}", e) ) ?;
     Ok ( GraphStraddle::new (
       Arc::new (before), live, head_identity,
-      foreign_changed_skg_file_count (config) )) }
+      foreign_changed_node_count (config) )) }
 
   /// The same before-graph, paired with a newer live graph.
   pub fn with_after (
@@ -48,7 +48,7 @@ impl GraphStraddle {
   ) -> GraphStraddle {
     GraphStraddle::new (
       self . before . clone (), live, self . head_identity . clone (),
-      self . foreign_changed_files ) }
+      self . foreign_changed_nodes ) }
 }
 
 /// The graph straddle held in 'slot' (a connection's

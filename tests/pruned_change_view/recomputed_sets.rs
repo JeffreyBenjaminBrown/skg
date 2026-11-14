@@ -490,7 +490,7 @@ fn after_a_commit_the_lingering_nodes_remain_editable (
     let buffer : String = open_all_changes_buffer (f) ?;
     let response : String = send_stage_and_commit_request ( f, &env,
       "((request . \"stage and commit\") (message-lines \"all\") (confirmed . t))\n" ) ?;
-    assert! ( response . contains ("(commits ((main "), "{}", response );
+    assert! ( response . contains ("(commits ((\"main\" "), "{}", response );
     let content : String = rerendered_view_content (&response);
     assert_eq! ( root_ids (&content), root_ids (&buffer) );
     for node in [ "a", "p", "q", "r" ] {

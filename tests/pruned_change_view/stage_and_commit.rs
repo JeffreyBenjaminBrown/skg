@@ -9,11 +9,11 @@ use crate::pruned_change_view::common::{
   send_stage_and_commit_request, viewforest_id_of, with_fixture};
 
 use skg::diff_view::change_leaves::{ChangeLeaves, LeafKey};
-use skg::git_ops::stage_and_commit::AlreadyStagedGitrepo;
 use skg::graph_straddle::types::GraphStraddle;
 use skg::diff_view::processed_store::ProcessedStore;
 use skg::serve::handlers::stage_and_commit::{
-  StageAndCommitAnswer, stage_and_commit, stage_and_commit_response_sexp};
+  CommitReport, CommitScope, StageAndCommitAnswer, stage_and_commit,
+  stage_and_commit_response_sexp};
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::test_utils::skg_env_from_parts;
 use skg::types::env::SkgEnv;
@@ -22,10 +22,13 @@ use skg::types::views_state::DiffViewBufferKind;
 use git2::{Index, Oid, Repository, Status, StatusOptions, Tree};
 use std::error::Error;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::MutexGuard;
 
 const SKGREPOS : [&str; 2] = [ "public", "private" ];
+
+const UNCONFIRMED : CommitScope = CommitScope::Everything { confirmed : false };
+const CONFIRMED   : CommitScope = CommitScope::Everything { confirmed : true };
 
 fn all (
   f : &Fixture,
@@ -103,12 +106,11 @@ fn an_incomplete_summary_needs_confirmation_and_commits_nothing (
       . map ( |skgrepo| changed_skg_files (f, skgrepo) )
       . collect::<Result<_, _>> () ?;
     let answer : StageAndCommitAnswer = stage_and_commit (
-      &env, &mut f . views_state, &all_skgrepos, "the message", false );
-    let StageAndCommitAnswer::NeedsConfirmation { summary, already_staged } = &answer
+      &env, &mut f . views_state, &all_skgrepos, "the message", UNCONFIRMED );
+    let StageAndCommitAnswer::NeedsConfirmation { summary } = &answer
       else { panic! ("expected a request for confirmation, got {:?}", answer) };
-    assert! ( summary . changed_files > 0 && summary . processed_files < summary . changed_files,
+    assert! ( summary . changed_nodes > 0 && summary . processed_nodes < summary . changed_nodes,
               "{:?}", summary );
-    assert! ( already_staged . is_empty (), "{:?}", already_staged );
     let response : String = stage_and_commit_response_sexp (&answer);
     assert! ( response . starts_with ( "((needs-confirmation . t) (processed-summary (processed " ),
               "{}", response );
@@ -125,16 +127,15 @@ fn a_confirmed_request_commits_every_owned_skgrepo_with_one_message (
     let env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
     let all_skgrepos : SkgrepoRestriction = all (f) ?;
     let answer : StageAndCommitAnswer = stage_and_commit (
-      &env, &mut f . views_state, &all_skgrepos, "both at once", true );
-    let StageAndCommitAnswer::Committed { outcomes, errors } = &answer
+      &env, &mut f . views_state, &all_skgrepos, "both at once", CONFIRMED );
+    let StageAndCommitAnswer::Committed (CommitReport { commits, errors, left_nodes, waiting, .. }) = &answer
       else { panic! ("expected commits, got {:?}", answer) };
     assert! ( errors . is_empty (), "{:?}", errors );
-    assert_eq! ( outcomes . len (), 2 );
-    assert! ( outcomes . iter () . all ( |(_, outcome)| matches! (outcome, Ok (Some (_))) ),
-              "{:?}", outcomes );
+    assert_eq! ( commits . len (), 2, "{:?}", commits );
+    assert_eq! ( (*left_nodes, waiting . len ()), (0, 0) );
     assert_everything_committed (f, "both at once") ?;
     let response : String = stage_and_commit_response_sexp (&answer);
-    assert! ( response . starts_with ( "((commits ((public " ),
+    assert! ( response . starts_with ( "((commits ((\"public\" " ),
               "{}", response );
     Ok (( )) }) }
 
@@ -148,91 +149,72 @@ fn a_complete_summary_commits_without_confirmation_and_lapses_the_marks (
     let all_skgrepos : SkgrepoRestriction = all (f) ?;
     mark_every_leaf (f, &env) ?;
     let answer : StageAndCommitAnswer = stage_and_commit (
-      &env, &mut f . views_state, &all_skgrepos, "all processed", false );
-    assert! ( matches! (answer, StageAndCommitAnswer::Committed { .. }),
+      &env, &mut f . views_state, &all_skgrepos, "all processed", UNCONFIRMED );
+    assert! ( matches! (answer, StageAndCommitAnswer::Committed (_)),
               "{:?}", answer );
     assert_everything_committed (f, "all processed") ?;
     assert! ( env . runtime . processed_store . lock () . unwrap () . marks . is_empty () );
     assert! ( ProcessedStore::load ( &f . config . processed_marks_path () ) . marks . is_empty () );
     Ok (( )) }) }
 
-/// A file the user staged in one gitrepo before the request stops even
-/// a fully processed commit for confirmation, naming the gitrepo and the
-/// file; the confirmed resend commits it with the '.skg' files.
+/// A file the user staged in one gitrepo before a confirmed commit of
+/// everything is neither committed nor unstaged: the commit's tree is
+/// HEAD's with the changed '.skg' files, not the git index.
 #[test]
-fn an_already_staged_entry_needs_confirmation_and_is_then_committed (
+fn an_entry_staged_by_hand_is_neither_committed_nor_unstaged (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("buffers", &SKGREPOS, |f| {
     let env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
     let all_skgrepos : SkgrepoRestriction = all (f) ?;
-    mark_every_leaf (f, &env) ?;
     { let public : Repository = gitrepo (f, "public") ?;
       fs::write ( f . root . path () . join ("public") . join ("notes.txt"),
                   "staged by hand\n" ) ?;
       let mut index : Index = public . index () ?;
       index . add_path ( Path::new ("notes.txt") ) ?;
       index . write () ?; }
-    let heads : Vec<Oid> = SKGREPOS . iter ()
-      . map ( |skgrepo| head_id (f, skgrepo) ) . collect::<Result<_, _>> () ?;
     let answer : StageAndCommitAnswer = stage_and_commit (
-      &env, &mut f . views_state, &all_skgrepos, "with notes", false );
-    let StageAndCommitAnswer::NeedsConfirmation { summary, already_staged } = &answer
-      else { panic! ("expected a request for confirmation, got {:?}", answer) };
-    assert! ( summary . is_complete (), "{:?}", summary );
-    let [ AlreadyStagedGitrepo { gitrepo : public_root, paths } ] = already_staged . as_slice ()
-      else { panic! ("expected one gitrepo, got {:?}", already_staged) };
-    assert! ( public_root . ends_with ("public"), "{:?}", public_root );
-    assert_eq! ( paths, &vec! [ PathBuf::from ("notes.txt") ] );
-    let response : String = stage_and_commit_response_sexp (&answer);
-    assert! ( response . starts_with ( &format! (
-      "((needs-confirmation . t) (already-staged ((\"{}\" \"notes.txt\"))) (processed-summary (processed ",
-      public_root . display () )),
-              "{}", response );
-    for (i, skgrepo) in SKGREPOS . iter () . enumerate () {
-      assert_eq! ( head_id (f, skgrepo) ?, heads [i], "skgrepo {}", skgrepo ); }
-    let confirmed : StageAndCommitAnswer = stage_and_commit (
-      &env, &mut f . views_state, &all_skgrepos, "with notes", true );
-    assert! ( matches! (confirmed, StageAndCommitAnswer::Committed { .. }),
-              "{:?}", confirmed );
+      &env, &mut f . views_state, &all_skgrepos, "with notes", CONFIRMED );
+    assert! ( matches! (answer, StageAndCommitAnswer::Committed (_)),
+              "{:?}", answer );
     assert_everything_committed (f, "with notes") ?;
     { let public : Repository = gitrepo (f, "public") ?;
       let committed_tree : Tree = public . head () ? . peel_to_tree () ?;
-      assert! ( committed_tree . get_path ( Path::new ("notes.txt") ) . is_ok (),
-                "the already-staged file is committed" ); }
+      assert! ( committed_tree . get_path ( Path::new ("notes.txt") ) . is_err (),
+                "the file staged by hand is not committed" );
+      assert! ( public . index () ? . get_path ( Path::new ("notes.txt"), 0 ) . is_some (),
+                "the file staged by hand stays staged" ); }
     Ok (( )) }) }
 
-/// A gitrepo without a git author fails before anything is staged in
-/// it: its git index still equals its HEAD, and its HEAD stays. The
-/// other owned skgrepo is git-committed as usual. A user.name of ""
-/// in the gitrepo's own config hides any global one, so the test does
-/// not depend on the machine's git config.
+/// A gitrepo without a git author refuses the commit before anything
+/// is committed in any skgrepo: every HEAD stays, and every git index
+/// still equals its HEAD. A user.name of "" in the gitrepo's own config
+/// hides any global one, so the test does not depend on the machine's
+/// git config.
 #[test]
-fn a_missing_git_author_leaves_the_git_index_untouched (
+fn a_missing_git_author_commits_nothing_anywhere (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("buffers", &SKGREPOS, |f| {
     let env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
     let all_skgrepos : SkgrepoRestriction = all (f) ?;
     gitrepo (f, "public") ? . config () ? . set_str ("user.name", "") ?;
-    let public_head : Oid = head_id (f, "public") ?;
-    let public_changed : usize = changed_skg_files (f, "public") ?;
-    assert! ( public_changed > 0 );
+    let heads : Vec<Oid> = SKGREPOS . iter ()
+      . map ( |skgrepo| head_id (f, skgrepo) ) . collect::<Result<_, _>> () ?;
+    let changed : Vec<usize> = SKGREPOS . iter ()
+      . map ( |skgrepo| changed_skg_files (f, skgrepo) )
+      . collect::<Result<_, _>> () ?;
     let answer : StageAndCommitAnswer = stage_and_commit (
-      &env, &mut f . views_state, &all_skgrepos, "no author", true );
-    let StageAndCommitAnswer::Committed { outcomes, .. } = &answer
-      else { panic! ("expected commit outcomes, got {:?}", answer) };
-    for (skgrepo, outcome) in outcomes {
-      match skgrepo . to_string () . as_str () {
-        "public" => assert! ( matches! ( outcome, Err (e)
-                                         if e . starts_with ("no git author is configured") ),
-                              "{:?}", outcome ),
-        _ => assert! ( matches! (outcome, Ok (Some (_))), "{:?}", outcome ), }}
-    assert_eq! ( head_id (f, "public") ?, public_head );
-    assert_eq! ( changed_skg_files (f, "public") ?, public_changed );
-    { let public : Repository = gitrepo (f, "public") ?;
-      let head_tree : Tree = public . head () ? . peel_to_tree () ?;
-      let staged : usize = public
+      &env, &mut f . views_state, &all_skgrepos, "no author", CONFIRMED );
+    assert! ( matches! ( &answer, StageAndCommitAnswer::Refused (e)
+                         if e . contains ("skgrepo public: no git author is configured") ),
+              "{:?}", answer );
+    for (i, skgrepo) in SKGREPOS . iter () . enumerate () {
+      assert_eq! ( head_id (f, skgrepo) ?, heads [i], "skgrepo {}", skgrepo );
+      assert_eq! ( changed_skg_files (f, skgrepo) ?, changed [i], "skgrepo {}", skgrepo );
+      let gitrepo : Repository = gitrepo (f, skgrepo) ?;
+      let head_tree : Tree = gitrepo . head () ? . peel_to_tree () ?;
+      let staged : usize = gitrepo
         . diff_tree_to_index ( Some (&head_tree), None, None ) ? . deltas () . count ();
-      assert_eq! ( staged, 0, "nothing may be staged in public" ); }
+      assert_eq! ( staged, 0, "nothing may be staged in {}", skgrepo ); }
     Ok (( )) }) }
 
 #[test]
@@ -241,15 +223,13 @@ fn a_request_without_changes_commits_nothing (
   with_fixture ("buffers", &SKGREPOS, |f| {
     let env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
     let all_skgrepos : SkgrepoRestriction = all (f) ?;
-    stage_and_commit ( &env, &mut f . views_state, &all_skgrepos, "first", true );
+    stage_and_commit ( &env, &mut f . views_state, &all_skgrepos, "first", CONFIRMED );
     let heads : Vec<Oid> = SKGREPOS . iter ()
       . map ( |skgrepo| head_id (f, skgrepo) ) . collect::<Result<_, _>> () ?;
     let answer : StageAndCommitAnswer = stage_and_commit (
-      &env, &mut f . views_state, &all_skgrepos, "second", false );
-    let StageAndCommitAnswer::Committed { outcomes, .. } = &answer
-      else { panic! ("expected no confirmation, got {:?}", answer) };
-    assert! ( outcomes . iter () . all ( |(_, outcome)| matches! (outcome, Ok (None)) ),
-              "{:?}", outcomes );
+      &env, &mut f . views_state, &all_skgrepos, "second", UNCONFIRMED );
+    assert_eq! ( stage_and_commit_response_sexp (&answer),
+                 "((commits ()) (committed-nodes 0) (left-nodes 0) (waiting ()) (errors ()) (warnings ()))" );
     for (i, skgrepo) in SKGREPOS . iter () . enumerate () {
       assert_eq! ( head_id (f, skgrepo) ?, heads [i], "skgrepo {}", skgrepo ); }
     Ok (( )) }) }
@@ -281,7 +261,7 @@ fn a_confirmed_resend_commits_and_rerenders_the_open_buffers (
       . collect ();
     let second : String = send_stage_and_commit_request ( f, &env,
       "((request . \"stage and commit\") (message-lines \"one message\") (confirmed . t))\n" ) ?;
-    assert! ( second . contains ("(commits ((public ")
+    assert! ( second . contains ("(commits ((\"public\" ")
               && second . contains ("(lock-views (\"diff-view: all changes\"))")
               && second . contains ("(view-id \"diff-view: all changes\") (content \"* "),
               "{}", second );
@@ -311,7 +291,7 @@ fn a_message_of_several_lines_is_committed_as_written (
     let env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
     let response : String = send_stage_and_commit_request ( f, &env,
       "((request . \"stage and commit\") (message-lines \"summary\" \"\" \"  indented \\\"quoted\\\" back\\\\n slash\") (confirmed . t))\n" ) ?;
-    assert! ( response . contains ("(commits ((public "), "{}", response );
+    assert! ( response . contains ("(commits ((\"public\" "), "{}", response );
     assert_everything_committed (
       f, "summary\n\n  indented \"quoted\" back\\n slash" ) ?;
     Ok (( )) }) }
@@ -332,7 +312,7 @@ fn a_request_is_refused_under_a_skgrepo_restriction (
       SkgrepoRestriction::named (&f . config, "public" . into ()) ?;
     let head : Oid = head_id (f, "public") ?;
     let answer : StageAndCommitAnswer = stage_and_commit (
-      &env, &mut f . views_state, &restriction, "message", true );
+      &env, &mut f . views_state, &restriction, "message", CONFIRMED );
     assert! ( matches! ( &answer, StageAndCommitAnswer::Refused (e)
                          if e . contains ("requires no skgrepo restriction") ),
               "{:?}", answer );

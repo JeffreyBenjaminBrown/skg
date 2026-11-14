@@ -468,7 +468,7 @@ fn marking_every_headline_on_its_listed_objects_marks_every_change (
       let summary : BufferProcessedSummary = response . processed_summary
         . expect ("a save of a diff-view buffer reports the processed summary");
       assert_eq! ( summary . changes_not_editable_here, 0, "{}: {:?}", fixture, summary );
-      assert_eq! ( summary . summary . processed_files, summary . summary . changed_files,
+      assert_eq! ( summary . summary . processed_nodes, summary . summary . changed_nodes,
                    "{}: {:?}\n{}", fixture, summary, response . saved_view );
       Ok (( )) }) ?; }
   Ok (( )) }

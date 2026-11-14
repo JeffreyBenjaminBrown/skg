@@ -6,7 +6,7 @@ use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::diff_view::processed_requests::{
   LeafKinds, NamedLeafSet, RequestedProcessed, apply_processed_requests};
 use crate::types::errors::HeadlineName;
-use crate::types::misc::{MSV, RelPartner};
+use crate::types::misc::{MSV, RelPartner, SkgConfig, Skgrepo};
 use crate::types::nodes::complete::{Graphnode, empty_graphnode};
 
 use std::sync::Arc;
@@ -24,6 +24,17 @@ fn node (
         SkgrepoName::from ("main"), ID::from (*member) ))
       . collect (),
     .. empty_graphnode () }}
+
+/// A config owning 'main' and 'private'; 'theirs' is foreign.
+fn owned_main () -> SkgConfig {
+  let skgrepo = |name : &str, owned : bool| -> (SkgrepoName, Skgrepo) {
+    ( SkgrepoName::from (name), Skgrepo {
+      name : SkgrepoName::from (name), abbreviation : None,
+      path : std::path::PathBuf::from (name), owned } ) };
+  SkgConfig::fromSkgreposAndTantivyFolder (
+    [ skgrepo ("main", true), skgrepo ("private", true), skgrepo ("theirs", false) ]
+      . into_iter () . collect (),
+    "unused" ) }
 
 fn straddle (
   before : Vec<Graphnode>,
@@ -114,10 +125,10 @@ fn a_reorder_has_no_leaf_but_its_file_changed () {
   assert_eq! ( straddle . order_only_pids () . iter () . collect::<Vec<_>> (),
                vec! [ &ID::from ("r") ] );
   let summary : ProcessedSummary =
-    forest . processed_summary ( &ProcessedStore::default () );
+    processed_summary ( &owned_main (), &straddle, &ProcessedStore::default () );
   assert_eq! ( summary, ProcessedSummary {
-    processed_files : 1, changed_files : 1,
-    foreign_changed_files : 0, order_only_files : 1 } );
+    processed_nodes : 1, changed_nodes : 1, foreign_changed_nodes : 0,
+    order_only_nodes : 1, waiting_nodes : 0 } );
   assert! ( summary . is_complete () ); }
 
 #[test]
@@ -148,15 +159,14 @@ fn processed_aggregates_over_the_leaves_that_exist () {
   assert! ( forest . processed_of_leaves (&store, [&text, &unchanged]),
             "a key that is no leaf is never asked" );
   assert! ( ! forest . processed_of_leaves (&store, [&text, &member]) );
-  let file : ChangedFile = ChangedFile { skgrepo : SkgrepoName::from ("main"),
-                                         pid     : ID::from ("r") };
-  assert! ( ! forest . processed_of_file (&store, &file) );
-  assert_eq! ( forest . processed_summary (&store) . processed_files, 0 );
+  let r : ID = ID::from ("r");
+  assert! ( ! forest . node_is_processed (&store, &r) );
+  assert_eq! ( processed_summary (&owned_main (), &straddle, &store) . processed_nodes, 0 );
   store . mark ( member . clone (), forest . leaf_fingerprint (&member) . unwrap () );
-  assert! ( forest . processed_of_file (&store, &file) );
-  assert_eq! ( forest . processed_summary (&store), ProcessedSummary {
-    processed_files : 1, changed_files : 1,
-    foreign_changed_files : 0, order_only_files : 0 } ); }
+  assert! ( forest . node_is_processed (&store, &r) );
+  assert_eq! ( processed_summary (&owned_main (), &straddle, &store), ProcessedSummary {
+    processed_nodes : 1, changed_nodes : 1, foreign_changed_nodes : 0,
+    order_only_nodes : 0, waiting_nodes : 0 } ); }
 
 /// Before: r contains a. After: r also contains the new node n1, which
 /// contains the new n2 and the existing a, and subscribes to the new
@@ -279,3 +289,107 @@ fn the_letters_beside_a_walk_filter_what_it_marks () {
       n1_subscribes_to_n5 (),
       contains_key ("n5", "n6", RelationshipAspect::Existence) ]
       . into_iter () . collect () ); }
+
+/// acq acquired acqd. c lists acqd in both graphs; r listed it at HEAD
+/// and no longer does; n, new, lists it in the worktree only.
+fn merge_straddle (
+  foreign_lister : bool,
+) -> GraphStraddle {
+  let acq_after : Graphnode = Graphnode {
+    extra_ids : vec! [ ID::from ("acqd") ], .. node ("acq", "acq", &[]) };
+  let mut f : Graphnode = node ("f", "f", &["acqd"]);
+  f . home_skgrepo = SkgrepoName::from ("theirs");
+  f . contains [0] . relRepo = SkgrepoName::from ("theirs");
+  let foreign : Vec<Graphnode> = if foreign_lister { vec! [f] } else { vec! [] };
+  straddle (
+    [ vec! [ node ("acq", "acq", &[]), node ("acqd", "acqd", &[]),
+             node ("c", "c", &["acqd"]), node ("r", "r", &["acqd"]) ],
+      foreign . clone () ] . concat (),
+    [ vec! [ acq_after, node ("c", "c", &["acqd"]), node ("r", "r", &[]),
+             node ("n", "n", &["acqd"]) ],
+      foreign ] . concat () ) }
+
+fn mark_all_of (
+  straddle : &GraphStraddle,
+  store    : &mut ProcessedStore,
+  pids     : &[&str],
+) {
+  for pid in pids {
+    for leaf in straddle . change_leaves () . leaves_under ( &ID::from (*pid) ) {
+      store . mark ( leaf . key . clone (), leaf . fingerprint ); }} }
+
+fn waiting_triples (
+  choice : &CommitChoice,
+) -> Vec<(String, WaitReason, String)> {
+  choice . waiting . iter ()
+    . map ( |w| ( w . pid . 0 . clone (), w . reason, w . waits_for . 0 . clone () ))
+    . collect () }
+
+#[test]
+fn a_node_that_dropped_the_acquirees_id_goes_in_without_the_merge () {
+  let straddle : GraphStraddle = merge_straddle (false);
+  let mut store : ProcessedStore = ProcessedStore::default ();
+  mark_all_of (&straddle, &mut store, &["r"]);
+  let choice : CommitChoice = processed_commit_choice (&owned_main (), &straddle, &store);
+  assert_eq! ( choice . going_in, BTreeSet::from ([ ID::from ("r") ]) );
+  assert! ( choice . waiting . is_empty () ); }
+
+#[test]
+fn the_merge_needs_its_listers_at_head_and_a_new_lister_needs_the_merge () {
+  let straddle : GraphStraddle = merge_straddle (false);
+  let mut store : ProcessedStore = ProcessedStore::default ();
+  mark_all_of (&straddle, &mut store, &["acq", "acqd", "c", "n"]);
+  let choice : CommitChoice = processed_commit_choice (&owned_main (), &straddle, &store);
+  assert_eq! ( waiting_triples (&choice), vec! [
+    ("acq"  . into (), WaitReason::Merge, "r"   . into ()),
+    ("acqd" . into (), WaitReason::StillNamed, "r" . into ()),
+    ("c"    . into (), WaitReason::Merge, "acq" . into ()),
+    ("n"    . into (), WaitReason::Merge, "acq" . into ()) ] );
+  mark_all_of (&straddle, &mut store, &["r"]);
+  let choice : CommitChoice = processed_commit_choice (&owned_main (), &straddle, &store);
+  assert_eq! ( choice . going_in . len (), 5 );
+  assert! ( choice . waiting . is_empty () ); }
+
+/// A merge part waiting names an unprocessed part before a processed
+/// one that waits for another reason.
+#[test]
+fn a_merge_part_waits_for_an_unprocessed_part_first () {
+  let straddle : GraphStraddle = merge_straddle (false);
+  let mut store : ProcessedStore = ProcessedStore::default ();
+  mark_all_of (&straddle, &mut store, &["acqd", "c", "r"]);
+  let choice : CommitChoice = processed_commit_choice (&owned_main (), &straddle, &store);
+  let acqd : Vec<(String, WaitReason, String)> = waiting_triples (&choice) . into_iter ()
+    . filter ( |(pid, _, _)| pid == "acqd" ) . collect ();
+  assert_eq! ( acqd, vec! [ ("acqd" . into (), WaitReason::Merge, "acq" . into ()) ] ); }
+
+/// A foreign node listing the acquiree's ID records leaves, but in a
+/// foreign skgrepo: it is no changed node, and holds nothing back.
+#[test]
+fn a_foreign_lister_of_a_merged_id_is_no_changed_node () {
+  let straddle : GraphStraddle = merge_straddle (true);
+  assert! ( ! straddle . change_leaves () . leaves_under ( &ID::from ("f") ) . is_empty () );
+  let config : SkgConfig = owned_main ();
+  assert! ( ! straddle . change_leaves () . changed_nodes (&config) . contains ( &ID::from ("f") ));
+  let mut store : ProcessedStore = ProcessedStore::default ();
+  mark_all_of (&straddle, &mut store, &["acq", "acqd", "c", "n", "r"]);
+  let choice : CommitChoice = processed_commit_choice (&config, &straddle, &store);
+  assert! ( choice . waiting . is_empty (), "{:?}", choice . waiting );
+  assert_eq! ( processed_summary (&config, &straddle, &store) . changed_nodes, 5 ); }
+
+/// The extra ID x moves from a to b, both of which remain: a commit of
+/// b alone would hold x on both, so b waits for a, and a for b.
+#[test]
+fn an_extra_id_moved_between_two_nodes_moves_with_both () {
+  let with_x = |pid : &str| -> Graphnode {
+    Graphnode { extra_ids : vec! [ ID::from ("x") ], .. node (pid, pid, &[]) } };
+  let straddle : GraphStraddle = straddle (
+    vec! [ with_x ("a"), node ("b", "b", &[]) ],
+    vec! [ node ("a", "a", &[]), with_x ("b") ] );
+  let mut store : ProcessedStore = ProcessedStore::default ();
+  mark_all_of (&straddle, &mut store, &["b"]);
+  let choice : CommitChoice = processed_commit_choice (&owned_main (), &straddle, &store);
+  assert_eq! ( waiting_triples (&choice),
+               vec! [ ("b" . into (), WaitReason::Merge, "a" . into ()) ] );
+  mark_all_of (&straddle, &mut store, &["a"]);
+  let choice : CommitChoice = processed_commit_choice (&owned_main (), &straddle, &store);
+  assert_eq! ( choice . going_in . len (), 2 ); }

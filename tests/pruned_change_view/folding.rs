@@ -253,7 +253,7 @@ fn folds_survive_a_commit (
     let env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
     let response : String = send_stage_and_commit_request ( f, &env,
       "((request . \"stage and commit\") (message-lines \"commit\") (confirmed . t))\n" ) ?;
-    assert! ( response . contains ("(commits ((public "), "{}", response );
+    assert! ( response . contains ("(commits ((\"public\" "), "{}", response );
     let committed : String = rerendered_view_content (&response);
     assert! ( ! committed . contains ("homeSkgrepoMove"),
               "the buffer shows no change after the commit:\n{}", committed );

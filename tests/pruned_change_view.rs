@@ -40,3 +40,5 @@ mod after_a_commit;
 mod restore;
 #[path = "pruned_change_view/one_child_per_key.rs"]
 mod one_child_per_key;
+#[path = "pruned_change_view/commit_processed.rs"]
+mod commit_processed;

@@ -114,7 +114,7 @@ fn a_note_under_a_removed_member_survives_it_going_stale (
     let env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
     let response : String = send_stage_and_commit_request ( f, &env,
       "((request . \"stage and commit\") (message-lines \"commit\") (confirmed . t))\n" ) ?;
-    assert! ( response . contains ("(commits ((main "), "{}", response );
+    assert! ( response . contains ("(commits ((\"main\" "), "{}", response );
     let committed : String = rerendered_view_content (&response);
     let parent : String = parent_line_of (&committed, "a note under x");
     assert! ( parent . starts_with (removed) && ! parent . contains ("(diff"),

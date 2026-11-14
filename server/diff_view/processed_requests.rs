@@ -29,7 +29,7 @@
 use crate::types::tree::forest::stands_in_containerward_chain;
 use crate::diff_view::change_leaves::{
   BufferProcessedSummary, ChangeLeaves, LeafKey, NewNodeWalk, NodeAspect,
-  RelationshipAspect};
+  RelationshipAspect, buffer_processed_summary};
 use crate::diff_view::pruned_change_view::nodes_editable_in_diffView;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::{
@@ -713,5 +713,6 @@ pub fn buffer_processed_summary_for (
 ) -> BufferProcessedSummary {
   let store : MutexGuard<ProcessedStore> =
     env . runtime . lock_processed_store ();
-  straddle . change_leaves () . buffer_processed_summary (
-    &store, &nodes_editable_in_diffView (viewforest) ) }
+  buffer_processed_summary (
+    &env . runtime_snapshot () . config, straddle, &store,
+    &nodes_editable_in_diffView (viewforest) ) }

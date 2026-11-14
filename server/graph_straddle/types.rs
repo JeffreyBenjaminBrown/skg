@@ -26,11 +26,11 @@ pub struct GraphStraddle {
   /// ('owned_head_identity'). When it differs from the current one,
   /// the straddle is stale.
   pub head_identity : String,
-  /// How many '.skg' files of the foreign skgrepos changed since
-  /// HEAD ('foreign_changed_skg_file_count'). Foreign skgrepos are
+  /// How many nodes of the foreign skgrepos changed since HEAD, by
+  /// their '.skg' files ('foreign_changed_node_count'). Foreign skgrepos are
   /// read at their worktrees in both halves, so the straddle shows none
   /// of those changes.
-  pub foreign_changed_files : usize,
+  pub foreign_changed_nodes : usize,
   /// Computed on first use; see 'GraphStraddle::changed_pids'.
   pub(super) changed_pids : OnceLock<ChangedPids>,
   /// Computed on first use; see 'GraphStraddle::change_leaves'.
@@ -83,9 +83,9 @@ impl GraphStraddle {
     before                : Arc<InRustGraph>,
     after                 : Arc<InRustGraph>,
     head_identity         : String,
-    foreign_changed_files : usize,
+    foreign_changed_nodes : usize,
   ) -> GraphStraddle {
-    GraphStraddle { before, after, head_identity, foreign_changed_files,
+    GraphStraddle { before, after, head_identity, foreign_changed_nodes,
                 changed_pids  : OnceLock::new (),
                 change_leaves : OnceLock::new (),
                 prunedChangeView_cache   : PrunedChangeViewCache::default () } }

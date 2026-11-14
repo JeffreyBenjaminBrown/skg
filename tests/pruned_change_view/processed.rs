@@ -209,9 +209,9 @@ fn editing_a_node_lapses_its_mark (
               "the edit lapsed the mark:\n{}", saved );
     Ok (( )) }) }
 
-/// The summary counts the changed files of the owned skgrepos and
+/// The summary counts the changed nodes of the owned skgrepos and
 /// the processed ones, and the leaves owned by nodes the saved buffer does
-/// not show. The "sets" fixture changes six files: cy2 and mc
+/// not show. The "sets" fixture changes six nodes, each in one file: cy2 and mc
 /// (retitled), del and delc (deleted), ln (gains lo) and r (loses
 /// del); their seven leaves are the two text changes, the two
 /// deletions, and the relationships ln-lo, r-del and del-delc. Roots
@@ -229,7 +229,7 @@ fn the_save_reports_the_processed_summary (
       |_| "** (skg (oldText title) (editRequest (processed)) (diff (leaves 1))) mc" . to_string () );
     let response : SaveResponse = save_cleanly (f, &all_changes_view (), &marked) ?;
     assert_eq! ( summary_of (&response), summary (1, 6, 0),
-                 "mc's file records only its text change" );
+                 "mc records only its text change" );
     let only_r : String = { // drop the roots cy2, ln and mc, which precede r
       let lines : Vec<&str> = response . saved_view . lines () . collect ();
       let start : usize = lines . iter ()
@@ -267,25 +267,25 @@ fn the_summary_counts_the_changes_the_saved_buffer_does_not_show (
     let summary : BufferProcessedSummary = summary_of (&response);
     assert_eq! ( summary . changes_not_editable_here, 11, "{:?}", summary );
     assert_eq! ( sexp_to_client_string (&summary . to_sexp ()),
-                 format! ( "(processed-summary (processed {}) (changed {}) (foreign 0) (order-only 1) (notEditable 11))",
-                           summary . summary . processed_files,
-                           summary . summary . changed_files ));
+                 format! ( "(processed-summary (processed {}) (changed {}) (foreign 0) (order-only 1) (waiting 0) (notEditable 11))",
+                           summary . summary . processed_nodes,
+                           summary . summary . changed_nodes ));
     Ok (( )) }) }
 
 /// The 'foreign' fixture has the owned skgrepo main, which retitles
 /// m, and the foreign skgrepo foreign, a gitrepo too, which retitles
-/// f and deletes g. The summary counts m's file as changed and the
-/// foreign skgrepo's two files apart, as foreign.
+/// f and deletes g. The summary counts m as a changed node and the
+/// foreign skgrepo's two nodes apart, as foreign.
 #[test]
-fn the_summary_counts_the_changed_files_of_the_foreign_skgrepos (
+fn the_summary_counts_the_changed_nodes_of_the_foreign_skgrepos (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture_and_foreign ("foreign", &["main"], &["foreign"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
     let summary : BufferProcessedSummary =
       summary_of ( &save_cleanly (f, &all_changes_view (), &buffer) ? );
     assert_eq! ( summary . summary, ProcessedSummary {
-      processed_files : 0, changed_files : 1,
-      foreign_changed_files : 2, order_only_files : 0 } );
+      processed_nodes : 0, changed_nodes : 1,
+      foreign_changed_nodes : 2, order_only_nodes : 0, waiting_nodes : 0 } );
     assert! ( sexp_to_client_string (&summary . to_sexp ())
                 . contains ("(foreign 2)"),
               "{:?}", summary );
@@ -298,14 +298,14 @@ fn summary_of (
     . expect ("a save of a diff-view buffer reports the processed summary") }
 
 fn summary (
-  processed_files     : usize,
-  changed_files   : usize,
+  processed_nodes     : usize,
+  changed_nodes   : usize,
   changes_not_editable_here : usize,
 ) -> BufferProcessedSummary {
   BufferProcessedSummary {
     summary : ProcessedSummary {
-      processed_files, changed_files,
-      foreign_changed_files : 0, order_only_files : 0 },
+      processed_nodes, changed_nodes,
+      foreign_changed_nodes : 0, order_only_nodes : 0, waiting_nodes : 0 },
     changes_not_editable_here } }
 
 /// Save 'buffer' with 'pid' (an editable occurrence on a line

@@ -7,6 +7,8 @@ use std::collections::HashMap;
 pub enum GitSnapshotKind {
   Head,
   Worktree,
+  /// A tree of the skgrepo's gitrepo, which no commit need hold.
+  Tree (git2::Oid),
 }
 
 #[derive(Clone, Debug, Default)]
