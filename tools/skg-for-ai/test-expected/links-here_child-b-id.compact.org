@@ -18,5 +18,5 @@
 **** Above the root ⟨0d ☮ Ca⟩
 ** ⟨0e It subscribes to these.⟩
 *** Fred's note ⟨0f ☮ C1 1/L bS ⌂:fred⟩
-*** ⟨0g The subscriber ancestor hides these, but subscribes to nothing that contains them.⟩
+*** ⟨0g b hides these, but subscribes to nothing that contains them.⟩
 **** An aside of Fred's ⟨0h ☮ cH ⌂:fred folded⟩

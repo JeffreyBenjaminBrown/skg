@@ -228,6 +228,14 @@
 (skg subscribeeFolder)
 ---- text: It subscribes to these.
 ---- styles: message*23
+==== folders: hidden in a subscribee, its subscriber the great-grandparent
+(skg hiddenInSubscribeeFolder)
+---- text: ☮ It contains these, but c hides them.
+---- styles: crucial*1 -*1 message*22 -*1 high*1 -*1 message*11
+==== folders: hidden outside of subscribees, its subscriber the grandparent
+(skg hiddenOutsideOfSubscribeeFolder)
+---- text: b hides these, but subscribes to nothing that contains them.
+---- styles: high*1 -*1 message*58
 ==== placeholders: unknown node
 (skg unknown (gnid gone))
 ---- text: Reference to unknown node.

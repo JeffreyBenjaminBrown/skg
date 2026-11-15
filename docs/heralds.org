@@ -67,6 +67,7 @@ assumes 'termguicolors', since the styles are given as RGB colors.
 | home skgrepo heralds | normal      | =⌂:LABEL=                                                                     |
 |                      | ugly        | =~NAME=, a relRepo more private than the default                              |
 | labels               | message     | folder labels, =alias=, =ID=, flag rows                                       |
+|                      | high        | the subscriber's ancestor letter in two folder labels; see below              |
 | requests             | nonstandard | =delete=, =merge:...=, =detach=, =restore node=, =restore membership=, =request:~NAME=, =request:...= flags, =req:...= views, =request:processed...= |
 | change facts         | nonstandard | =∃+ ∃- M ~+ ~-=, =+ -= on a leaf, ~Δ⌂=a~                                        |
 |                      | go          | =✓= processed                                                                 |
@@ -179,6 +180,14 @@ chain node that does not contain the node above. =☮= marks a
 write-protected position: a node, a ghost, a folder, or a flag row.
 On a node, =B= rides the ☮ when the node's body exists but is
 omitted from the buffer. =⟳= marks a cycle.
+
+The labels of the two folders of what a subscriber hides name the
+subscriber by its ancestor letter (see [[*Ancestor flags and floors][Ancestor flags and floors]]),
+shown high. Under a subscribee, the subscriber is the great-grandparent
+(subscriber, its subscribee folder, the subscribee, the folder):
+=☮ It contains these, but c hides them.= In the subscribee folder
+itself, it is the grandparent: =b hides these, but subscribes to
+nothing that contains them.=
 
 The bare atom =noClaim= (a child that does not affect its parent's
 membership on save) has no glyph of its own. Under an editable parent

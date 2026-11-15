@@ -444,11 +444,26 @@ pub fn herald_rule_table () -> HeraldRule {
       // The write-protected folders carry ☮ ("cannot be changed
       // from here"); the editable folders (subscribeeFolder, overriddenFolder,
       // aliasFolder) do not.
-      write_protected_leaves (Folder::HiddenInSubscribee . repr_in_client (),
-            "It contains these, but the subscribing ancestor hides them."),
+      // The two compound folders name the subscriber by its ancestor
+      // letter (docs/heralds.org, "Ancestor flags and floors"), styled
+      // apart from the words around it. It stands three generations up
+      // in subscriber > subscribeeFolder > subscribee >
+      // hiddenInSubscribeeFolder, so 'c', and two up in subscriber >
+      // subscribeeFolder > hiddenOutsideOfSubscribeeFolder, so 'b'
+      // (see 'CompoundFolderParties').
       vec! [
+      leaf_styled_as ("writeProtected",
+                      Folder::HiddenInSubscribee . repr_in_client (), "☮"),
+      leaf (Folder::HiddenInSubscribee . repr_in_client (),
+            "It contains these, but"),
+      leaf_styled_as ("hiddenInSubscribeeFolder_subscriber",
+                      Folder::HiddenInSubscribee . repr_in_client (), "c"),
+      leaf (Folder::HiddenInSubscribee . repr_in_client (),
+            "hides them."),
+      leaf_styled_as ("hiddenOutsideOfSubscribeeFolder_subscriber",
+                      Folder::HiddenOutsideOfSubscribee . repr_in_client (), "b"),
       leaf (Folder::HiddenOutsideOfSubscribee . repr_in_client (),
-            "The subscriber ancestor hides these, but subscribes to nothing that contains them."),
+            "hides these, but subscribes to nothing that contains them."),
       leaf (Folder::Subscribee . repr_in_client (),
             "It subscribes to these.") ],
       write_protected_leaves (Folder::Subscriber . repr_in_client (),

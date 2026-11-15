@@ -41,7 +41,7 @@
   ],
   "tier_order": [ "normal", "low", "medium", "high", "crucial" ],
   "node_heralds": {
-    "comment": "The style of each styled atom in the server's herald rule table (server/heralds.rs), keyed by atom name. Where one atom takes different styles in different places, a qualified key names the other place: editRequest_X is the atom X under editRequest; homeSkgrepoMove_skgrepo and relRepoMove_skgrepo are the skgrepo names those properties show, as is homeSkgrepoMove_skgrepo in a moved node's own heralds. The ☮ on a write-protected label or flag takes writeProtected's style. See docs/heralds.org.",
+    "comment": "The style of each styled atom in the server's herald rule table (server/heralds.rs), keyed by atom name. Where one atom takes different styles in different places, a qualified key names the other place: editRequest_X is the atom X under editRequest; homeSkgrepoMove_skgrepo and relRepoMove_skgrepo are the skgrepo names those properties show, as is homeSkgrepoMove_skgrepo in a moved node's own heralds; hiddenInSubscribeeFolder_subscriber and hiddenOutsideOfSubscribeeFolder_subscriber are the subscriber's ancestor letter in those folders' labels. The ☮ on a write-protected label or flag takes writeProtected's style. See docs/heralds.org.",
     "writeProtected":                  "crucial",
     "ghost":                           "ghost",
     "ghostWarrant":                    "ghost",
@@ -80,6 +80,8 @@
     "hiderFolder":                     "message",
     "hiddenInSubscribeeFolder":        "message",
     "hiddenOutsideOfSubscribeeFolder": "message",
+    "hiddenInSubscribeeFolder_subscriber":        "high",
+    "hiddenOutsideOfSubscribeeFolder_subscriber": "high",
     "containerFolder":                 "message",
     "mentionerFolder":                 "message",
     "acquiredByFolder":                "message",
