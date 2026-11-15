@@ -1,6 +1,7 @@
 #!/bin/bash
 
-# all-tests.sh — Run emacs, nextest, doctests, and integration tests politely.
+# all-tests.sh — Run emacs, nvim, nextest, doctests, team tool, AI reader
+# and integration tests politely.
 #
 # Results are written here:
 # - tests/results/ALL.org: a plain-text org-mode summary
@@ -23,10 +24,10 @@ usage () {
   cat <<EOF
 Usage: $0 [--no-sound]
 
-Runs Emacs, Neovim, nextest, doctests, and integration tests
-sequentially with conservative internal concurrency. Integration tests
-run once per client (emacs, then nvim), labeled CLIENT/DIRECTORY in the
-output.
+Runs Emacs, Neovim, nextest, doctests, team tool, AI reader
+(tools/skg-for-ai/) and integration tests sequentially with
+conservative internal concurrency. Integration tests run once per
+client (emacs, then nvim), labeled CLIENT/DIRECTORY in the output.
 
 Options:
   --no-sound   Do not play the completion sound.
@@ -42,6 +43,8 @@ Environment:
   SKG_NEXTEST_JOBS           Nextest jobs. Default: 1.
   SKG_TEST_NICE              nice level for test commands. Default: 15.
   SKG_TEST_IONICE=0          Disable idle I/O priority.
+  SKG_FOR_AI_TEST_PORT       Port of the AI reader's scratch servers.
+                             Default: 1793.
 EOF
 }
 
@@ -192,6 +195,25 @@ else
 fi
 ELAPSED_TEAM_TOOLS=$((SECONDS - T_TEAM_TOOLS))
 
+T_AI_READER=$SECONDS
+echo -n "  AI reader tests ... "
+if (
+  cd "$PROJECT_ROOT"
+  # tools/skg-for-ai/: it runs target/debug/skg (built in phase 1)
+  # on scratch servers at SKG_FOR_AI_TEST_PORT (default 1793). It runs
+  # alone, like every suite here, so nothing rebuilds the binary or
+  # takes that port under it; the integration tests' ports lie far
+  # from it ('find_available_port').
+  skg_low_priority python3 tools/skg-for-ai/test_skg_for_ai.py
+) >"$RESULTS_DIR/ai-reader.log" 2>&1; then
+  EXIT_AI_READER=0
+  echo -e "${GREEN}PASS${NC} ${DIM}($((SECONDS - T_AI_READER))s)${NC}"
+else
+  EXIT_AI_READER=$?
+  echo -e "${RED}FAIL${NC} ${DIM}($((SECONDS - T_AI_READER))s)${NC}"
+fi
+ELAPSED_AI_READER=$((SECONDS - T_AI_READER))
+
 INTEGRATION_DIR="$PROJECT_ROOT/tests/integration"
 INTEGRATION_NAMES=()   # each entry is "CLIENT/DIR-NAME"
 INTEGRATION_STARTED=()
@@ -319,6 +341,13 @@ else
   overall=1
 fi
 
+if [ $EXIT_AI_READER -eq 0 ]; then
+  echo -e "  ${GREEN}PASS${NC}  AI reader tests"
+else
+  echo -e "  ${RED}FAIL${NC}  AI reader tests (see ai-reader.log)"
+  overall=1
+fi
+
 n_total=${#INTEGRATION_NAMES[@]}
 n_failed=${#INTEGRATION_FAILED[@]}
 n_real=${#RETRY_STILL_FAILING[@]}
@@ -396,6 +425,13 @@ ORG="$RESULTS_DIR/ALL.org"
     echo "** PASS : Team tool tests (${ELAPSED_TEAM_TOOLS}s) [[file:team-tools.log]]"
   else
     echo "** FAIL : Team tool tests (${ELAPSED_TEAM_TOOLS}s) [[file:team-tools.log]]"
+  fi
+
+  # AI reader
+  if [ $EXIT_AI_READER -eq 0 ]; then
+    echo "** PASS : AI reader tests (${ELAPSED_AI_READER}s) [[file:ai-reader.log]]"
+  else
+    echo "** FAIL : AI reader tests (${ELAPSED_AI_READER}s) [[file:ai-reader.log]]"
   fi
 
   # Integration

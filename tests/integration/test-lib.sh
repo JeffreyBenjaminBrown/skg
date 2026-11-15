@@ -71,15 +71,21 @@ cleanup() {
   fi
 }
 
-# Function to find available port by trying random ports in range
+# Function to find available port by trying random ports in range.
+# The range lies well away from the ports of long-lived servers on
+# this machine (TypeDB on 1729 and 1730, skg servers on 1761 and 1770
+# to 1799): those are restarted often, and a test that took a port
+# while its server was down would keep that server from starting.
+# It also lies below Linux's default ephemeral range (32768 and up),
+# where the kernel hands out ports for outgoing connections.
 find_available_port() {
   local attempts=0
   local max_attempts=100
-  local min_port=1024
-  local max_port=9000
+  local min_port=20000
+  local max_port=32000
 
   while [ $attempts -lt $max_attempts ]; do
-    # Generate random port in the range 1000-9000
+    # Generate random port in the range min_port to max_port
     local port=$(( min_port + RANDOM % (max_port - min_port + 1) ))
 
     # Check if port is available using ss (socket statistics)
