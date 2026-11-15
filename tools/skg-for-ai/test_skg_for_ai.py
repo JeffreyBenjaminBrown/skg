@@ -16,18 +16,21 @@ In order, it:
   context, and compares the text;
 - copies 'test-fixture/' to a scratch data root, starts a server
   there on port SKG_FOR_AI_TEST_PORT (default 1793), and runs each
-  view command of the tool against it, 'forest' with every kind;
+  view command of the tool against it, 'forest' with every kind
+  ('forest' of an absent ID refused as 'view' of it is);
 - compares each compact view with its file in 'test-expected/', and
   checks that every handle is the viewnode ID of its headline in the
   full view;
 - sends a 'repos' and a 'herald rules' request through 'raw' (the
   served rule table is the pinned one), and imports a Markdown file
-  through 'import'; searches with each search option; pushes, pastes
+  through 'import'; searches with each search option, and for a word
+  with an apostrophe; pushes, pastes
   and pops the linkstack; prints the restriction, and refuses to set
   it without a daemon;
 - on a second scratch server, edits compact views and saves them:
   a title, a body, a new child, a move, a removal, a deletion, bad
-  handles, an edit the server refuses, a stale view the server
+  handles, titles given a handle's bracket, a view saved by naming its
+  compact or full view, an edit the server refuses, a stale view the server
   refuses, 'new', one view over several saves, whose handles stay,
   and retyped headlines (an exact retype refused, then saved marked
   '⟨new⟩'; a reworded one asked about, then answered '--keep-ids',
@@ -489,7 +492,7 @@ def failures_of_reading (scratch, data_root, update_expected):
     failures += failures_of_one_run (
       base_name, tool_arguments, view_id, output_folder, update_expected )
   failures += failures_of_raw_and_import (scratch)
-  for check in [ check_search_options, check_linkstack,
+  for check in [ check_search_options, check_missing_id, check_linkstack,
                  check_restriction_on_a_command_s_own_connection ]:
     try:
       check (scratch)
@@ -523,7 +526,13 @@ def check_search_options (scratch):
       ( [ '"Fred s note" OR aside', "--operators" ],
         "search_Fred-s-note-OR-aside", [ "Fred's note", "An aside of Fred's" ] ),
       ( [ '"Fred s note" OR aside' ], "search_Fred-s-note-OR-aside",
-        [ "An aside of Fred's", "Fred's note", "A detail of Fred's" ] ) ]:
+        [ "An aside of Fred's", "Fred's note", "A detail of Fred's" ] ),
+      # An apostrophe is a word break, as titles are indexed: "Fred's"
+      # finds the words "fred" "s" in order.
+      ( [ "Fred's note" ], "search_Fred-s-note",
+        [ "An aside of Fred's", "Fred's note", "A detail of Fred's" ] ),
+      ( [ "+Fred's +note", "--operators" ], "search_Fred-s-note",
+        [ "Fred's note" ] ) ]:
     require_tool_run ([ "search" ] + arguments + [ "--out-dir", folder ])
     # sorted: hits that rank alike come in no fixed order
     require_equal ( "the hits of 'search " + " " . join (arguments) + "'",
@@ -531,6 +540,22 @@ def check_search_options (scratch):
   require_equal ( "the sidecar's request of a search with options",
                   read_sidecar (folder, "search_fre.") [ "request" ],
                   { "terms" : "fre.*", "regex" : True } )
+
+def check_missing_id (scratch):
+  """'forest' of an ID no node has, of a kind that saves a folder
+  request, ends as 'view' of it does: a plain message, exit 1, nothing
+  written."""
+  folder = os . path . join (scratch, "missing-id")
+  viewed = run_tool ([ "view", "nobody-id", "--out-dir", folder ])
+  require_output ( viewed, "", expected_returncode = 1 )
+  for kind in [ "mentioners", "aliases", "flags" ]:
+    completed = run_tool (
+      [ "forest", kind, "nobody-id", "--out-dir", folder ])
+    require_output ( completed, "", expected_returncode = 1 )
+    require_equal ( "'forest " + kind + "' of an absent ID, on stderr",
+                    completed . stderr, viewed . stderr )
+  if not viewed . stderr . startswith ("skg_for_ai: The server returned "):
+    raise CaseFailure ( f"'view' of an absent ID said {viewed . stderr!r}" )
 
 def check_linkstack (scratch):
   """The linkstack, a file in '--out-dir': pushed IDs take the node's
@@ -651,7 +676,9 @@ def failures_of_writing (scratch, data_root):
   context = { "scratch" : scratch, "main_repo" : main_repo }
   for case in [ check_title_edit, check_body_edit, check_new_child,
                 check_move, check_removal, check_deletion,
-                check_bad_handles, check_server_refusal, check_stale_view,
+                check_bad_handles, check_handle_brackets_in_titles,
+                check_save_given_an_org_file,
+                check_server_refusal, check_stale_view,
                 check_new_root, check_handles_across_saves,
                 check_exact_retype, check_reworded_retype_asked,
                 check_reworded_retype_kept, check_reworded_retype_all_new ]:
@@ -802,6 +829,63 @@ def check_bad_handles (context):
   require_equal ( "the full view after a refused save",
                   read_file ( os . path . join (folder, ROOT_BASE_NAME + ".full.org") ),
                   full_before )
+
+def check_handle_brackets_in_titles (context):
+  """A title edited to hold a handle's bracket, and a new headline whose
+  title holds one, are refused before anything is sent, each named;
+  nothing is saved."""
+  folder = fresh_root_view (context, "handle-brackets")
+  edit_compact ( folder, [ ( "** First child, renamed ⟨0d⟩",
+                             "** First child ⟨renamed⟩ ⟨0d⟩" ),
+                           ( "A body line that stays unnumbered.\n",
+                             "A body line that stays unnumbered.\n"
+                             "*** A ⟨ new child\n" ) ])
+  graph_before = skg_files (context)
+  completed = run_save (folder, "--yes")
+  advice = ( " of a handle, and the compact view can misread a title "
+             "holding one. Write the title without '⟨' and '⟩' ('〈' and "
+             "'〉', or '<' and '>', look alike).\n" )
+  require_output (
+    completed,
+    REPORT_HEAD +
+    "Error: ⟨0d⟩ on line 8 of the compact view has its title edited to "
+    "'First child ⟨renamed⟩': '⟨' and '⟩' are the brackets" + advice +
+    "Error: the new headline on line 10 of the compact view has the title "
+    "'A ⟨ new child': '⟨' is a bracket" + advice,
+    expected_returncode = 1 )
+  if ( "Nothing was saved: some titles hold a handle's bracket"
+       not in completed . stderr ):
+    raise CaseFailure ( f"stderr was {completed . stderr!r}" )
+  require_equal ( "the graph after a refused save",
+                  skg_files (context), graph_before )
+
+def check_save_given_an_org_file (context):
+  """'save' given the compact or the full view saves the view whose
+  sidecar lies beside it; given an Org file with none beside it, it
+  says what it wants."""
+  folder = fresh_root_view (context, "org-file")
+  edit_compact ( folder, [ ( "** First child, renamed ⟨0d⟩",
+                             "** First child, retitled ⟨0d⟩" ) ])
+  report = ( REPORT_HEAD + "Title: ⟨0d⟩ 'First child, renamed' → "
+             "'First child, retitled'.\n" )
+  for suffix in ( ".compact.org", ".full.org" ):
+    require_output (
+      run_tool ([ "save", os . path . join (folder, ROOT_BASE_NAME + suffix) ]),
+      report + NOT_SAVED )
+  lonely = os . path . join (folder, "lonely.compact.org")
+  shutil . copyfile (
+    os . path . join (folder, ROOT_BASE_NAME + ".compact.org"), lonely )
+  completed = run_tool ([ "save", lonely ])
+  require_output ( completed, "", expected_returncode = 1 )
+  require_equal (
+    "saving an Org file with no sidecar beside it, on stderr",
+    completed . stderr,
+    f"skg_for_ai: {lonely} has no lonely.view.json beside it, which records "
+    "the view it shows; name a view's BASE.view.json (or its "
+    "BASE.compact.org or BASE.full.org), or a directory holding only one "
+    "view.\n" )
+  require_equal ( "the title after saves without '--yes'",
+                  skg_title (context, "child-a-id"), "First child, renamed" )
 
 def check_server_refusal (context):
   """A write-protected occurrence saves nothing, so the server refuses

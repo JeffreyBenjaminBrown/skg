@@ -23,8 +23,12 @@ a link is 'view' again on the link's ID; 'search WORDS' finds nodes.
 
 To change the graph, edit the compact file in place. Change a title
 or a body by editing its text. Add a node by writing a new headline,
-with no handle, where it belongs. Move a node by moving its line,
-handle and all, and its subtree with it. Remove a headline to take
+with no handle, where it belongs. A note that nothing contains is not
+made that way: a headline typed without a handle at the top level of
+a view, beside its root, is refused. Make it with 'new TITLE REPO',
+REPO an owned skgrepo, which writes the new note's view to go on in.
+Move a node by moving its line, handle and all, and its subtree with
+it. Remove a headline to take
 the node out of its parent; write 'delete' in its handle,
 '⟨0d aC1 delete⟩', to delete the node itself. To put a node that
 already exists here too, write a headline ending in '⟨node:ID⟩', ID
@@ -347,7 +351,11 @@ view's saves ('docs/api-and-formats.org', "The metadata headers").
 the pattern '⟨[0-9a-z]+' finds every handle. A headline that is moved
 keeps its handle, so a tool can tell a move from a deletion, and a
 headline without a handle is a new one. Body lines have no handle: a
-body line belongs to the nearest headline above it.
+body line belongs to the nearest headline above it. Since a handle's
+brackets end a headline, 'save' refuses, before sending anything, a
+new headline whose title holds '⟨' or '⟩', and a title edited to hold
+one, naming the headline; a title that already held one is left as
+it is.
 *** The heralds in the handle
 After ID come the headline's heralds: every herald a client shows,
 in the order it shows them, as plain text, without their styles. A
@@ -1006,7 +1014,9 @@ python3 tools/skg-for-ai/skg_for_ai.py save DIR/view_ID.view.json
 # read the report
 python3 tools/skg-for-ai/skg_for_ai.py save DIR/view_ID.view.json --yes
 #+end_example
-'save' takes the sidecar, or a directory holding only one. Without
+'save' takes the sidecar, the compact or full view beside it (it then
+uses the sidecar of the same name), or a directory holding only one
+sidecar. Without
 '--yes' it prints the report and stops; with it, it prints the report,
 sends the save, prints the server's answer, and writes the server's
 re-rendered view over the three files, so the next edit starts from

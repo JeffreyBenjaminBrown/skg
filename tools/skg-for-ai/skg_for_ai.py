@@ -390,8 +390,8 @@ def parse_command_line (argv):
                      "and with '--yes' send them" ))
   save_parser . add_argument (
     "view_files",
-    help = ( "the BASE.view.json of the view, or a directory holding "
-             "only one" ))
+    help = ( "the BASE.view.json of the view (or its BASE.compact.org "
+             "or BASE.full.org), or a directory holding only one" ))
   save_parser . add_argument (
     "--port", type = int, default = None,
     help = "the server's port; it must be the one the sidecar records" )
@@ -640,6 +640,20 @@ def command_save (arguments):
       "of a new node; view a smaller part of the graph." )
   edited = parse_edited_compact_view (saved_view . compact_text)
   original = outline_of_full_view (saved_view . parsed_view)
+  report_head = (
+    "Changes in " + os . path . basename (saved_view . compact_path) +
+    ", against " + os . path . basename (saved_view . full_path) +
+    " (view ID " + saved_view . sidecar [ "view_id" ] + "):" )
+  title_errors = handle_bracket_title_error_lines (
+    edited, saved_view . headline_of_handle )
+  if title_errors:
+    # Refused before connecting: such a title may already have been
+    # misread, so nothing else in the report could be trusted.
+    print (report_head)
+    for line in title_errors:
+      print (line)
+    raise SkgToolError (
+      "Nothing was saved: some titles hold a handle's bracket; see above." )
   connection = connection_for_saved_view (saved_view)
   try:
     ownership = fetch_repo_ownership (connection)
@@ -666,9 +680,7 @@ def command_save (arguments):
       arguments . fork_into, bool (changes) )
     errors = errors + forks . error_lines
     changes = [] if errors else changes + forks . lines + questions
-    print ( "Changes in " + os . path . basename (saved_view . compact_path) +
-            ", against " + os . path . basename (saved_view . full_path) +
-            " (view ID " + saved_view . sidecar [ "view_id" ] + "):" )
+    print (report_head)
     for line in errors + (
         changes + word_check . note_lines if changes
         else [] if errors else word_check . note_lines + [ "No changes." ] ):
@@ -1531,6 +1543,9 @@ def fetch_view_with_root_folder_request (connection, node_id, view_request,
   commands do. The save's re-rendered buffer is the view. Nothing in
   the buffer differs from the graph, so the save writes no file."""
   fresh_view = fetch_single_root_view (connection, node_id, show_overPrivateText)
+  # A view of an ID no node has is empty, with no headline to ask on:
+  # refused as 'view' refuses it.
+  require_view_has_headlines (fresh_view)
   requesting_buffer = buffer_with_view_request_on_first_headline (
     fresh_view [ "content" ], view_request )
   def send_save ():
@@ -2767,12 +2782,33 @@ def headlines_by_viewnode_id (parsed_view):
            and headline_viewnode_id ( line . metadata ) is not None }
 
 def load_saved_view (path):
-  """PATH is a sidecar, or a directory holding exactly one."""
+  """PATH is a sidecar, one of the other two files of its view, or a
+  directory holding exactly one sidecar."""
   return SavedView ( sidecar_path_of (path) )
 
+# The other two files of a view, each named as its sidecar is but for
+# its suffix.
+VIEW_ORG_FILE_SUFFIXES = ( ".compact.org", ".full.org" )
+
 def sidecar_path_of (path):
-  """PATH, a sidecar, or the one sidecar in the directory PATH."""
+  """PATH, a sidecar; or the sidecar beside PATH, the compact or the
+  full view of the same view; or the one sidecar in the directory
+  PATH. Any other path is refused, saying what is wanted."""
+  wanted = ( "name a view's BASE.view.json (or its BASE.compact.org or "
+             "BASE.full.org), or a directory holding only one view" )
   if not os . path . isdir (path):
+    for suffix in VIEW_ORG_FILE_SUFFIXES:
+      if path . endswith (suffix):
+        sidecar = path [ : - len (suffix) ] + ".view.json"
+        if not os . path . isfile (sidecar):
+          raise SkgToolError (
+            f"{path} has no {os . path . basename (sidecar)} beside it, "
+            "which records the view it shows; " + wanted + "." )
+        return sidecar
+    if not path . endswith (".view.json"):
+      raise SkgToolError ( f"{path} is not a view's file; " + wanted + "." )
+    if not os . path . isfile (path):
+      raise SkgToolError ( f"{path} does not exist; " + wanted + "." )
     return path
   sidecars = sorted ( name for name in os . listdir (path)
                       if name . endswith (".view.json") )
@@ -2976,6 +3012,42 @@ def handle_error_lines (edited, headline_of_handle):
     elif headline . has_requests ():
       errors += [ f"Error: {where} {problem}"
                   for problem in request_token_problems (headline, view_line) ]
+  return errors
+
+# A handle's brackets. A title may not gain them: the compact view
+# would read what follows as a handle (or a handle as part of the
+# title), so the save would not be what was typed.
+HANDLE_BRACKETS = ( "⟨", "⟩" )
+
+def handle_bracket_title_error_lines (edited, headline_of_handle):
+  """An error per new headline whose title holds a handle's bracket,
+  and per headline whose title is edited to hold one. A title the full
+  view already has is left as it is; a placed node takes its title
+  from the server. (A title's '⟦' and '⟧' are free: only the link
+  annotations write them, quoting a title's as look-alikes.)"""
+  errors = []
+  for headline in edited:
+    if headline . is_placed ():
+      continue
+    brackets = [ bracket for bracket in HANDLE_BRACKETS
+                 if bracket in headline . title ]
+    if not brackets:
+      continue
+    view_line = ( None if headline . handle is None
+                  else headline_of_handle . get ( headline . handle ) )
+    if view_line is not None and view_line . title == headline . title:
+      continue
+    where = (
+      f"the new headline on line {headline . compact_line_number} "
+      "of the compact view has the title" if view_line is None
+      else f"⟨{headline . handle}⟩ on line {headline . compact_line_number} "
+           "of the compact view has its title edited to" )
+    errors . append (
+      f"Error: {where} '{headline . title}': " + quoted_words (brackets)
+      + ( " are the brackets" if len (brackets) > 1 else " is a bracket" )
+      + " of a handle, and the compact view can misread a title holding "
+      "one. Write the title without '⟨' and '⟩' "
+      "('〈' and '〉', or '<' and '>', look alike)." )
   return errors
 
 def compact_handle_text (headline):
