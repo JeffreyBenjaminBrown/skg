@@ -446,11 +446,15 @@ folders are write-protected).
 Every '[[id:ID][label]]' link, in a title or a body, is followed by an
 annotation in a fixed form. A link whose target resolves gets '⟦→ TITLE
 ⌂:LABEL⟧', the target's title and its home skgrepo's label. A link
-whose target the graph lacks gets '⟦✗ missing⟧'; one whose target the
-skgrepo restriction hides gets '⟦✗ restricted⟧'. The tool asks the
-server's 'link statuses' request, which the clients' link annotations
-use, and then 'titles by ids' for the titles of the resolved targets.
-The annotation is the tool's; the link itself is unchanged. A '⟦' or
+whose target this server holds no node of gets '⟦not held here⟧': the
+node may have been deleted, may never have been written, or may be in
+a skgrepo this server does not load, so it need not be a broken link.
+A link whose target the skgrepo restriction hides gets
+'⟦✗ restricted⟧', and one whose status the server did not give back
+gets '⟦✗ lookup failed⟧'. The tool asks the server's 'link statuses'
+request, which the clients' link annotations use, and then 'titles by
+ids' for the titles of the resolved targets. The annotation is the
+tool's; the link itself is unchanged. A '⟦' or
 '⟧' in the title or label an annotation quotes is written '⦗' or '⦘',
 so that the annotation ends at its own '⟧' and a save removes exactly
 it; the annotation is never saved, so the node's title is unchanged.
@@ -1044,10 +1048,11 @@ owned skgrepo NAME. A headline ending in '⟨node:ID⟩' is written as the
 clients paste a node (see "Placing an existing node").
 
 Body lines are taken as edited, and belong to the headline above them.
-The link annotations the tool added ('⟦→ ... ⟧' or '⟦✗ ... ⟧' right
-after a link) are removed and the links kept, so a link typed anew
-needs no annotation. The summary's comment lines before the first
-headline are dropped.
+The link annotations the tool added ('⟦→ ... ⟧', '⟦✗ ... ⟧' or
+'⟦not held here⟧' right after a link; '⟦✗ ... ⟧' includes the
+'⟦✗ missing⟧' of views written before '⟦not held here⟧') are removed
+and the links kept, so a link typed anew needs no annotation. The
+summary's comment lines before the first headline are dropped.
 ** What each change does in skg
 *** A changed title or body
 The node's title or body changes, wherever else it appears. A

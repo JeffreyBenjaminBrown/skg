@@ -1987,9 +1987,18 @@ def annotate_links (text, link_statuses):
       link_statuses . get ( match . group (1) ))
   return LINK_PATTERN . sub (annotated, text)
 
+# What follows a link whose target this server holds no node of (the
+# server's status 'missing'): the node may be deleted, never written,
+# or in a skgrepo this server does not load, so no fault is claimed.
+NOT_HELD_ANNOTATION = "⟦not held here⟧"
+# What follows a link whose status the server did not give back.
+LOOKUP_FAILED_ANNOTATION = "⟦✗ lookup failed⟧"
+
 def link_annotation (entry):
-  if entry is None or entry [ "status" ] == "missing":
-    return "⟦✗ missing⟧"
+  if entry is None:
+    return LOOKUP_FAILED_ANNOTATION
+  if entry [ "status" ] == "missing":
+    return NOT_HELD_ANNOTATION
   if entry [ "status" ] != "resolved":
     return "⟦✗ " + annotation_safe ( entry [ "status" ] ) + "⟧"
   title = entry . get ( "title" ) or "(title not found)"
@@ -2725,9 +2734,12 @@ WORD_PARAMETER_PATTERN = re . compile ( r'[^\s()";⟨⟩]+' )
 PLACED_NODE_HANDLE_WORD = "node"
 PLACED_NODE_HANDLE_PATTERN = re . compile (
   r'^(.*?) ?⟨' + PLACED_NODE_HANDLE_WORD + r':([^\s⟨⟩]+)((?: [^⟨⟩]*)?)⟩\s*$' )
-# A link followed by the annotation 'annotate_links' appended to it.
+# A link followed by the annotation 'annotate_links' appended to it:
+# '⟦→ ...⟧', '⟦✗ ...⟧' (which also matches the '⟦✗ missing⟧' views
+# written before 'NOT_HELD_ANNOTATION' still hold), or that one.
 ANNOTATED_LINK_PATTERN = re . compile (
-  r'(\[\[id:[^\]\[]+\](?:\[[^\]]*\])?\])⟦[→✗][^⟧]*⟧' )
+  r'(\[\[id:[^\]\[]+\](?:\[[^\]]*\])?\])(?:⟦[→✗][^⟧]*⟧|' +
+  re . escape (NOT_HELD_ANNOTATION) + r')' )
 
 class SavedView:
   """The three files a view command wrote, read back."""

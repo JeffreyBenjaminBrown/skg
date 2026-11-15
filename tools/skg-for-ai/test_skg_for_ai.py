@@ -155,6 +155,7 @@ def main (argv):
   failures += failures_of_save_envelope ()
   failures += failures_of_preview_support ()
   failures += failures_of_link_annotation_round_trip ()
+  failures += failures_of_link_annotations ()
   failures += failures_of_shared_herald_cases ()
   failures += failures_against_scratch_servers (update_expected)
   shutil . rmtree ( os . environ [ "XDG_RUNTIME_DIR" ], ignore_errors = True )
@@ -218,6 +219,36 @@ def failures_of_link_annotation_round_trip ():
     if stripped != text:
       failures . append (
         f"annotating then stripping {text!r} gives {stripped!r}" )
+  return failures
+
+# (the server's entry for a link's target, the annotation it gets)
+LINK_ANNOTATION_CASES = [
+  ( { "status" : "resolved", "pid" : "t", "label" : "main",
+      "title" : "The target" }, "⟦→ The target ⌂:main⟧" ),
+  ( { "status" : "missing" }, "⟦not held here⟧" ),
+  ( { "status" : "restricted" }, "⟦✗ restricted⟧" ),
+  ( None, "⟦✗ lookup failed⟧" ) ]
+
+def failures_of_link_annotations ():
+  """Each status gets its annotation, and a save strips each of them,
+  and the '⟦✗ missing⟧' of views written before '⟦not held here⟧'."""
+  failures = []
+  link = "[[id:t][a label]]"
+  for entry, annotation in LINK_ANNOTATION_CASES:
+    if skg_for_ai . link_annotation (entry) != annotation:
+      failures . append (
+        f"the link annotation of {entry} is "
+        f"{skg_for_ai . link_annotation (entry)!r}, not {annotation!r}" )
+  for annotation in ( [ annotation for _, annotation in LINK_ANNOTATION_CASES ]
+                      + [ "⟦✗ missing⟧" ] ):
+    text = "see " + link + annotation + ", then more"
+    stripped = skg_for_ai . strip_link_annotations (text)
+    if stripped != "see " + link + ", then more":
+      failures . append ( f"{annotation!r} after a link strips to "
+                          f"{stripped!r}" )
+  if skg_for_ai . strip_link_annotations ("⟦not held here⟧ alone") \
+     != "⟦not held here⟧ alone":
+    failures . append ( "'⟦not held here⟧' after no link is stripped" )
   return failures
 
 # ============================================================
@@ -648,7 +679,9 @@ def check_title_edit (context):
 
 def check_body_edit (context):
   folder = fresh_root_view (context, "body")
-  edit_compact ( folder, [ ( "⟦✗ missing⟧.\n",
+  # The annotation becomes the one views written before
+  # '⟦not held here⟧' hold, which the save strips too.
+  edit_compact ( folder, [ ( "⟦not held here⟧.\n",
                              "⟦✗ missing⟧.\nA new last line.\n" ) ])
   report = REPORT_HEAD + "Bodies changed: 1 (⟨0a⟩).\n"
   require_output ( run_save (folder, "--yes"),
@@ -2112,7 +2145,7 @@ EXPECTED_DIFF_COMPACT = (
   "a subscriber ⌂:main⟧,\n"
   "to [[id:fred-note-id][Fred's note]]⟦→ Fred's note ⌂:fred⟧ in the "
   "foreign repo,\n"
-  "and to [[id:missing-id][a node nobody wrote]]⟦✗ missing⟧.\n"
+  "and to [[id:missing-id][a node nobody wrote]]⟦not held here⟧.\n"
   "*** First child, renamed ⟨0f aC1 M⟩\n"
   "A body line that stays unnumbered.\n"
   "**** First child ⟨0g old title⟩\n"

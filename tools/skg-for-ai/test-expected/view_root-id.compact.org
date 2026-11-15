@@ -12,7 +12,7 @@
 * The fixture root ⟨0a 1C2 L2 ⌂:main⟩
 The root links to [[id:child-b-id][its second child]]⟦→ Second child, a subscriber ⌂:main⟧,
 to [[id:fred-note-id][Fred's note]]⟦→ Fred's note ⌂:fred⟧ in the foreign repo,
-and to [[id:missing-id][a node nobody wrote]]⟦✗ missing⟧.
+and to [[id:missing-id][a node nobody wrote]]⟦not held here⟧.
 ** ⟨0b ☮ These also contain it.⟩
 *** Above the root ⟨0c ☮ Cb⟩
 ** First child ⟨0d aC1⟩
