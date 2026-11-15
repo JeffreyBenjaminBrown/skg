@@ -491,7 +491,7 @@ pub fn forks_the_view_will_not_show (
       "Your edit of '{}' forked it into your skgrepo '{}', but this view \
        follows the overrides of the owner of '{}', so it goes on showing \
        the original there, without your edit. To see your fork, switch \
-       the view to your own perspective (Emacs C-c v o).",
+       the view to your own perspective (C-c v o).",
       spec . original_title, spec . clone . 0 . home_skgrepo, followed )); }
   warnings }
 

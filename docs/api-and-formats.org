@@ -26,6 +26,17 @@ protected title or body. Except for search's include/exclude choice,
 approval is always the exact request-local list
 =(approved-overPrivateText-pids "P" ...)= and is never cached.
 
+A server ignores a request field it does not know, so a new field
+that means "write nothing", such as the save's =(preview . "true")=,
+would make an older server write for real. So shape a new field, first,
+so that a server ignoring it does the harmless thing, as "Import
+Markdown and Org" does: it writes only given =(action . "apply")= and
+an approval token, and without an action it previews. Where that cannot
+be done, as for a save, the client sends the field only to a server
+whose answer to "Verify connection" names the feature in its
+=(supports (...))= list; the AI reader's =server_supports=
+('tools/skg-for-ai/skg_for_ai.py') asks this for ="save preview"=.
+
 So far there are these endpoints:
 
 ** Verify connection

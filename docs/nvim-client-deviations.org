@@ -165,7 +165,7 @@ refusal at error level without the Lua traceback and without the
   the fork-confirmation buffer and the absent-reference warning
   ('with_neovim_bindings' in nvim/lua/skg/messages.lua, which reads
   the Neovim keys and Ex names from nvim/lua/skg/keymaps.lua): the chords
-  C-c s e, C-c s w, C-c s s, C-c s r, C-c g RET, C-c g v, and the
+  C-c s e, C-c s w, C-c s s, C-c s r, C-c g RET, C-c g v, C-c v o, and the
   fork-confirmation buffer's C-c C-c and C-c C-k, which are
   '<localleader>cc' and '<localleader>ck' there; and the commands
   skg-restore-deleted-node, skg-restore-removed-membership,

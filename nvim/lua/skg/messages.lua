@@ -22,6 +22,7 @@ local command_names_of_emacs_chords = {
   ['C-c s r'] = 'SetRelRepo',
   ['C-c g RET'] = 'Goto',
   ['C-c g v'] = 'GotoViewnodeId',
+  ['C-c v o'] = 'OverridePerspective',
 }
 
 ---The Emacs commands that server messages name. Each one's Neovim

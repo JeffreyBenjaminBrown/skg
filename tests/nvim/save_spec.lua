@@ -642,6 +642,17 @@ describe('skg.save pipeline', function ()
         .. ' (C-c g RET); move it with skg-set-relRepo (C-c s r)'))
   end)
 
+  it('names the Neovim binding of C-c v o, which a fork the view will'
+     .. ' not show names', function ()
+    local messages = require('skg.messages')
+    assert.are.equal(
+      'To see your fork, switch the view to your own perspective'
+      .. ' (<localleader>vo).',
+      messages.with_neovim_bindings(
+        'To see your fork, switch the view to your own perspective'
+        .. ' (C-c v o).'))
+  end)
+
   it('names the fork buffer\'s keys and the Neovim twins of the Emacs'
      .. ' commands server messages name', function ()
     local messages = require('skg.messages')
