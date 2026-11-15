@@ -42,6 +42,16 @@
 # ONE AT A TIME. Sessions the pacer starts run in the foreground of the
 # loop, so two of them never overlap.
 #
+# ONE PACER. So 'run' refuses, saying so in the log and on its output,
+# while this pacer folder's pacer lives (the pid file names it) or while
+# a session some pacer started still runs (data/claude/pacer/
+# running-session names it, by pid and start time). The second matters:
+# killing the pacer, or its process group, does not end its session,
+# which 'timeout' puts in a group of its own; it runs on unwatched. So
+# to start the pacer again, 'stop' it, which lets its session end, and
+# start the new one when the old pid is gone. A pid file or a
+# running-session file whose process is gone stops nothing.
+#
 # WHO HOLDS WHAT. Other sessions do overlap them: Jeff talks with a
 # Claude while the pacer runs. Two sessions writing Claude's graph
 # refuse each other's saves, and two building in the code's working
@@ -93,6 +103,7 @@ LISTINGS="$DIR/jeff-files"
 LISTINGS_KEPT_DAYS=7 # a listing is 1.4 MB gzipped (62k files, 2026-11-14)
 CHECK_TIMEOUT=600 # the check took a second over a day, 2026-11-14
 HOLDS="$DIR/holds"
+RUNNING_SESSION="$DIR/running-session" # "PID START STAMP" of the running session's process
 mkdir -p "$DIR"
 
 WAKE_PROMPT='You are Claude, waking with no memory of earlier sessions. Nobody is here: tools/team/pacer.sh started this session, and it will start another when the budget allows. What you know is in your skg graph. Your memory index names its entry point; follow that note to start your server if it is not running and to read your root note, then do what the root note says about waking up when nobody is here. When you stop, your final message should be two sentences saying what you did.'
@@ -158,10 +169,16 @@ session() { # REASON: one session, in the foreground
   began="$(utc_now)"
   list_jeffs_files "$stamp.start.gz"
   # PACER_SESSION reaches the session's shells, so 'hold' can say who holds.
-  ( cd "$ROOT" && PACER_SESSION="$stamp" timeout "$SESSION_TIMEOUT" claude -p "$WAKE_PROMPT" \
+  # The subshell names itself in RUNNING_SESSION, so a pacer started while
+  # it lives, this one killed, refuses (ONE PACER, above).
+  local status
+  ( echo "$BASHPID $(proc_field "$BASHPID" 20) $stamp" > "$RUNNING_SESSION"
+    cd "$ROOT" && PACER_SESSION="$stamp" timeout "$SESSION_TIMEOUT" claude -p "$WAKE_PROMPT" \
       --model "$MODEL" --dangerously-skip-permissions \
       > "$DIR/session.$stamp.out" 2>&1 )
-  log "session $stamp ended (exit $?): $(tail -c 600 "$DIR/session.$stamp.out" | tr '\n' ' ')"
+  status=$?
+  rm -f "$RUNNING_SESSION"
+  log "session $stamp ended (exit $status): $(tail -c 600 "$DIR/session.$stamp.out" | tr '\n' ' ')"
   list_jeffs_files "$stamp.end.gz"
   # The window ends a second late: times are to the second, and a write at 17:14:26.5 is in it.
   check_jeffs_files "session $stamp" "$began" "$(utc_now '+1 second')" "$stamp.start.gz" "$stamp.end.gz"
@@ -302,9 +319,46 @@ update_spending_account() { # logs only a failure
     || log "the spending account was not brought up to date (exit $status): $(printf '%s' "$output" | tail -c 600 | tr '\n' ' ')"
 }
 
+# --- One pacer at a time. See ONE PACER above.
+
+is_pacer() { # PID: succeeds if PID is a live 'pacer.sh run'
+  local args; args="$(tr '\0' ' ' < "/proc/$1/cmdline" 2>/dev/null)" || return 1
+  case "$args" in *pacer.sh\ run*) return 0 ;; *) return 1 ;; esac
+}
+
+started_at() { utc_now "$(ps -o lstart= -p "$1" 2>/dev/null)"; } # PID: when it started, in UTC
+
+other_pacer() { # prints what keeps a new pacer from starting, or nothing
+  local pid start stamp
+  if [ -f "$DIR/pid" ]; then
+    read -r pid < "$DIR/pid"
+    if [ "$pid" != "$$" ] && is_pacer "$pid"; then
+      echo "the pacer (pid $pid, started $(started_at "$pid"))"; return 0
+    fi
+  fi
+  if [ -f "$RUNNING_SESSION" ]; then
+    read -r pid start stamp < "$RUNNING_SESSION"
+    if [ -n "$start" ] && [ "$(proc_field "$pid" 20 2>/dev/null)" = "$start" ]; then
+      echo "session $stamp (pid $pid), which no living pacer watches,"; return 0
+    fi
+  fi
+}
+
 run() {
+  local other
+  # The lock makes the look and the claim one step, so two starting at once cannot both pass.
+  other="$( (
+    flock 9
+    other="$(other_pacer)"
+    [ -n "$other" ] || echo $$ > "$DIR/pid"
+    echo "$other"
+  ) 9> "$DIR/.run.lock" )"
+  if [ -n "$other" ]; then
+    log "a pacer (pid $$) refused to start: $other still runs"
+    echo "not starting: $other still runs. 'tools/team/pacer.sh stop' ends a pacer after its session." >&2
+    exit 1
+  fi
   log "pacer started (pid $$)"
-  echo $$ > "$DIR/pid"
   local mail_unreadable_logged=0
   while true; do
     [ -e "$MAIL_SEEN" ] || remember_mail # the first run: no session for mail already there
@@ -337,8 +391,12 @@ case "${1:-}" in
   stop)   touch "$DIR/STOP"; echo "the pacer will exit after the running session" ;;
   allow)  echo "$2" > "$DIR/ALLOW"; echo "sessions may start until the week is $2 used" ;;
   once)   session "asked for by hand" ;;
-  status) [ -e "$DIR/pid" ] && kill -0 "$(cat "$DIR/pid")" 2>/dev/null \
-            && echo "running (pid $(cat "$DIR/pid"))" || echo "not running"
+  status) other="$(other_pacer)"
+          case "$other" in
+            "") echo "not running" ;;
+            "the pacer "*) echo "running: $other" ;;
+            *) echo "not running, but $other still runs" ;;
+          esac
           [ -e "$DIR/PAUSE" ] && echo "paused"
           if [ -z "$(mail_fingerprint)" ]; then echo "mail file unreadable"
           elif [ ! -e "$MAIL_SEEN" ]; then echo "no mail baseline yet (the running pacer stores one)"
