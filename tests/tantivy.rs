@@ -381,6 +381,49 @@ fn test_search_finds_titles_with_special_chars (
                    query, expected_id ); }
   Ok (( )) }
 
+/// An apostrophe opens a phrase in Tantivy's query syntax, so a word
+/// holding one ("Jeff's") made the search a syntax error. Escaped, it
+/// finds the title, with operators or without.
+#[test]
+fn test_search_finds_titles_with_apostrophes (
+) -> Result<(), Box<dyn std::error::Error>> {
+  assert_eq! ( escape_tantivy_literal ("Jeff's taste"),
+               "\"Jeff's\" taste",
+               "an apostrophe forces phrase-wrap of its word" );
+  assert_eq! ( escape_tantivy_intra_word ("Jeff's taste"),
+               "Jeff\\'s taste",
+               "an apostrophe inside a word is escaped" );
+  let empty     : Graphnode = empty_graphnode ();
+  let mut taste : Graphnode = empty . clone ();
+  { taste . pid   = ID::new ("taste");
+    taste . title = "Jeff's taste" . to_string (); }
+  let mut decoy : Graphnode = empty . clone ();
+  { decoy . pid   = ID::new ("decoy");
+    decoy . title = "a matter of style" . to_string (); }
+  let index_folder : IndexFolderForThisProcess =
+    IndexFolderForThisProcess::new ("/tmp/tantivy-test-apostrophes");
+  let (tantivy_index, _indexed_count) : (TantivyIndex, usize) =
+    wipe_then_init_tantivy_db (
+      &vec! [taste, decoy], &index_folder . path ) ?;
+  for operators in [ false, true ] {
+    for query in [ "Jeff's taste", "Jeff's" ] {
+      let opts = SearchOptions { operators, ..SearchOptions::default () };
+      let (matches, searcher) :
+        (Vec<(f32, tantivy::DocAddress)>, tantivy::Searcher) =
+        search_index (&tantivy_index, query, &opts) ?;
+      assert! ( !matches . is_empty (),
+                "'{}' (operators {}) should find a result", query, operators );
+      let top_doc : TantivyDocument =
+        searcher . doc (matches[0] . 1) ?;
+      let top_id : &str =
+        top_doc
+        . get_first (tantivy_index . id_field) . unwrap ()
+        . as_str () . unwrap ();
+      assert_eq! ( top_id, "taste",
+                   "'{}' (operators {}) should find the taste node",
+                   query, operators ); }}
+  Ok (( )) }
+
 /// Body axis: body text is indexed when body=true, invisible when false.
 #[test]
 fn test_search_body_axis (

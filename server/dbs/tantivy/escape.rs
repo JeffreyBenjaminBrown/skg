@@ -97,9 +97,15 @@ fn has_word_neighbor (
     return c . is_alphanumeric () || c == '_'; }
   false }
 
+/// The characters Tantivy's query grammar gives a meaning. Among them
+/// '\'' opens a phrase, as '"' does, so an apostrophe inside a word
+/// ("Jeff's") must be escaped too; and '`' is reserved. Titles are
+/// tokenized at an apostrophe, so the phrase "Jeff's" finds the words
+/// "jeff" and "s" in order, as "Jeff's" in a title is indexed.
 fn is_tantivy_operator_char (
   ch : char,
 ) -> bool {
   matches! ( ch,
     '+' | '-' | '&' | '|' | '!' | '(' | ')' | '{' | '}' |
-    '[' | ']' | '^' | '"' | '~' | '*' | '?' | ':' | '\\' ) }
+    '[' | ']' | '^' | '"' | '~' | '*' | '?' | ':' | '\\' |
+    '\'' | '`' ) }
