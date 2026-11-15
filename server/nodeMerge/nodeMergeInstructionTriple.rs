@@ -29,7 +29,8 @@ pub fn nodeMerge_instructions_from_viewforest (
   config     : &SkgConfig,
 ) -> Result<Vec<NodeMerge>, Box<dyn Error>> {
   let collected : CollectedFieldIntents =
-    collect_instructions_locally (viewforest)
+    collect_instructions_locally (
+      viewforest, & |skgrepo| config . skgrepo_is_owned (skgrepo) )
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
   nodeMerge_instructions_from_pairs (
     &nodeMerge_pairs (&collected), graph, config ) }

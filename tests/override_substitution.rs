@@ -160,6 +160,12 @@ fn all_tests
       s . reset ("the_tamper_check_follows_the_overrides_the_save_names", foreign_root) ?;
       the_tamper_check_follows_the_overrides_the_save_names (
         &s . config ) ?;
+      s . reset ("deleting_the_users_fork_in_a_foreign_parent_leaves_the_parent_and_shows_the_original", foreign_root) ?;
+      deleting_the_users_fork_in_a_foreign_parent_leaves_the_parent_and_shows_the_original (
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("a_deleted_overrider_keeps_its_original_but_a_removed_one_does_not", foreign_root) ?;
+      a_deleted_overrider_keeps_its_original_but_a_removed_one_does_not (
+        &s . config ) ?;
       Ok (( )) } )) }
 
 fn marked_lines<'a> (
@@ -379,6 +385,31 @@ async fn extraction_honors_overridesHere (
             ! s_node . hidesFromSubs . or_default ()
               . iter () . any ( |m| &m . member == &ID::from ("N") ),
             "S must not hide N: the shown R stands for N" ); }}
+      { // Deleting R where it stands for N there deletes R and hides
+        // N from S, as removing R does: a deleted overrider keeps its
+        // original only in the content of a parent the user does not
+        // own ('content_members'), and a subscribee as such has no
+        // content the save writes, only S's hides. Nor is N filed in S.
+        let buffer = indoc! {"
+          * (skg node (gnid S) (skgRepos (nodeRepo main))) S
+          ** (skg subscribeeFolder)
+          *** (skg node (gnid E) (skgRepos (nodeRepo main))) E
+          **** (skg node (gnid R) (skgRepos (nodeRepo main)) (overridesHere N) (editRequest delete)) R
+        "};
+        let instructions : Vec<NodeInstruction> =
+          node_instructions_from (buffer, config) . await ?;
+        assert! ( instructions . iter () . any ( |i| matches! (
+                    i, NodeInstruction::Delete (d) if d . gnid == ID::from ("R") )),
+          "R is deleted" );
+        let s_node : &Graphnode = saved_node_by_gnid (&instructions, "S");
+        assert! (
+          s_node . hidesFromSubs . or_default ()
+            . iter () . any ( |m| &m . member == &ID::from ("N") ),
+          "S hides N" );
+        assert! (
+          ! s_node . contains
+            . iter () . any ( |m| &m . member == &ID::from ("N") ),
+          "S does not file N" ); }
       Ok (( )) }
 
 async fn ownership_and_visibility_gate_substitution (
@@ -1380,4 +1411,100 @@ async fn a_held_view_follows_whatever_its_save_names (
     "the save is redrawn following R's author:\n{}", response . saved_view );
   assert_eq! ( views_state . open_views . overrides_followed_by_view (&view_id),
                OverridesFollowed::RootAuthors );
+  Ok (( )) }
+
+/// The user takes back a fork where it stands in place of another's
+/// original: a view of foreign R, switched to the user's overrides,
+/// shows U in M's place, and 'delete' is written on U. The save
+/// deletes U and nothing else: it asks to fork nothing, R keeps M, and
+/// the redrawn view shows M again in U's place. (Before 2026-11-15
+/// U's deletion dropped M from R's content, an edit of foreign R, so
+/// the save asked to fork R.)
+async fn deleting_the_users_fork_in_a_foreign_parent_leaves_the_parent_and_shows_the_original (
+  config  : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  let (mut views_state, mut env, _view) : (ViewsState, SkgEnv, String) =
+    connection_holding_a_view_of (config, tantivy, "R", &[ ID::from ("R") ]) ?;
+  let switched : String = rerendered_text ( &messages_answering (
+    &switch_request ("R", OverridesFollowed::user ()),
+    &mut views_state, &env, config, handle_set_overrides_followed_request ))
+    . ok_or ("the switch rerenders the view") ?;
+  let u_line : &str = line_of_gnid (&switched, "U")
+    . filter ( |l| l . contains ("(overridesHere M)") )
+    . ok_or_else ( || format! ("U stands in M's place under R:\n{}", switched) ) ?;
+  let edited : String = switched . replace (
+    u_line, &u_line . replace ("(overridesHere M)",
+                               "(overridesHere M) (editRequest delete)") );
+  let r_before : String = read_skgrepo_file (config, "foreign", "R");
+  let (mut stream, _read_end) : (TcpStream, TcpStream) = mk_test_tcp_stream_pair ();
+  let response : SaveResponse =
+    update_from_and_rerender_buffer_with_approvals (
+      &mut stream, &edited, &switched, &mut env,
+      &Ok ( ViewforestId::from_client_string ("R" . to_string ()) ),
+      &mut views_state, &SkgrepoRestriction::unrestricted (config),
+      false, &HashMap::new (), &HashSet::new (),
+      &StrandedsReview::NotReviewed, DeleteFrom::NotChosen, &[], None,
+      OverridesFollowed::user () ) . await ?;
+  assert! ( response . errors . is_empty (), "{:?}", response . errors );
+  assert! ( response . fork_confirmation . is_none (),
+    "deleting one's own fork asks to fork nothing:\n{}", response . saved_view );
+  assert! ( read_all_skg_files_from_skgrepos (config) ?
+            . iter () . all ( |node| node . pid != ID::from ("U") ),
+    "U is deleted" );
+  assert_eq! ( read_skgrepo_file (config, "foreign", "R"), r_before,
+    "R is as its author wrote it" );
+  assert! ( overrider_on_disk (config, "R") . is_err (), "R was not forked" );
+  let saved : &str = &response . saved_view;
+  assert! ( line_of_gnid (saved, "M")
+            . is_some_and ( |l| l . starts_with ("** ")
+                                && ! l . contains ("overridesHere") ),
+    "M is shown again in U's place:\n{}", saved );
+  assert! ( line_of_gnid (saved, "U") . is_none (), "{}", saved );
+  Ok (( )) }
+
+/// At the plan: 'delete' on an overrider standing for M leaves M in
+/// its parent's list under a foreign parent, which is not forked;
+/// removing the overrider's headline instead removes M, which forks
+/// R. Under an owned parent, the deletion takes M out of the list too,
+/// as it did before.
+fn a_deleted_overrider_keeps_its_original_but_a_removed_one_does_not (
+  config : &SkgConfig,
+) -> Result<(), Box<dyn Error>> {
+  let graph : InRustGraph = InRustGraph::from_graphnodes (
+    &read_all_skg_files_from_skgrepos (config) ? );
+  let plan = |buffer : &str| -> Result<skg::types::save::SavePlan, SaveError> {
+    buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
+      buffer, &graph, config, &SkgrepoRestriction::unrestricted (config),
+      &HashMap::new (), &WhatTheBaselineShows::default (),
+      OverridesFollowed::user () ) . map ( |(_, plan, _)| plan ) };
+  let deletes_u = |instructions : &[NodeInstruction]| -> bool {
+    instructions . iter () . any ( |i| matches! (
+      i, NodeInstruction::Delete (d) if d . gnid == ID::from ("U") )) };
+  { // Under foreign R.
+    let deleted : skg::types::save::SavePlan = plan ( indoc! {"
+      * (skg node (gnid R) (skgRepos (nodeRepo foreign))) R
+      ** (skg node (gnid U) (skgRepos (nodeRepo main)) (overridesHere M) (editRequest delete)) U
+      ** (skg node (gnid K) (skgRepos (nodeRepo foreign))) K
+      "} ) ?;
+    assert! ( deletes_u (&deleted . node_instructions) );
+    assert! ( deleted . fork_specs . is_empty (),
+      "deleting U forks nothing: {:?}", deleted . fork_specs );
+    assert! ( opt_saved_node_by_gnid (&deleted . node_instructions, "R") . is_none () );
+    let removed : skg::types::save::SavePlan = plan ( indoc! {"
+      * (skg node (gnid R) (skgRepos (nodeRepo foreign))) R
+      ** (skg node (gnid K) (skgRepos (nodeRepo foreign))) K
+      "} ) ?;
+    assert! ( removed . fork_specs . iter ()
+              . any ( |spec| spec . original_gnid == ID::from ("R") ),
+      "removing U from R removes M, which forks R: {:?}", removed . fork_specs ); }
+  { // Under owned P, which contains M.
+    let deleted : skg::types::save::SavePlan = plan ( indoc! {"
+      * (skg node (gnid P) (skgRepos (nodeRepo main))) P
+      ** (skg node (gnid U) (skgRepos (nodeRepo main)) (overridesHere M) (editRequest delete)) U
+      "} ) ?;
+    assert! ( deletes_u (&deleted . node_instructions) );
+    assert! ( opt_saved_node_by_gnid (&deleted . node_instructions, "P")
+              . is_some_and ( |p| p . contains . is_empty () ),
+      "P loses M" ); }
   Ok (( )) }

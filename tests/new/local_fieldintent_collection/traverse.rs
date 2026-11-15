@@ -18,7 +18,7 @@ fn collected_from_org (
   input : &str,
 ) -> CollectedFieldIntents {
   collect_instructions_locally (
-    &viewforest_as_written (input) ) . unwrap() }
+    &viewforest_as_written (input), &|_| true ) . unwrap() }
 
 fn entry<'a> (
   collected : &'a CollectedFieldIntents,
@@ -214,7 +214,7 @@ fn editable_node_inside_ghost_subtree_emits () {
       "};
   let forest : ViewForest = viewforest_as_written (input);
   let collected : CollectedFieldIntents =
-    collect_instructions_locally (&forest) . unwrap();
+    collect_instructions_locally (&forest, &|_| true) . unwrap();
   assert!( collected . by_pid . get (&ID::from ("fading")) . is_none(),
            "the ghost itself emits nothing" );
   { let underneath : &FieldIntentsForOneId = entry (&collected, "underneath");
@@ -239,7 +239,7 @@ fn a_ghost_that_claims_keeps_its_gnid_in_its_parents_list () {
       "};
   let forest : ViewForest = viewforest_as_written (input);
   let collected : CollectedFieldIntents =
-    collect_instructions_locally (&forest) . unwrap();
+    collect_instructions_locally (&forest, &|_| true) . unwrap();
   assert!( collected . by_pid . get (&ID::from ("named")) . is_none(),
            "the ghost itself emits nothing" );
   assert_eq!( entry (&collected, "root") . contains,

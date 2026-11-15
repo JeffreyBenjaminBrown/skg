@@ -297,6 +297,16 @@ relationship lists of owned referencers, including
 absent-reference cleanup can remove an exact dangling override partner
 from owned data.
 
+A deleted overrider shown in its original's place, marked
+=(overridesHere N)=, under a container the user does not own, still
+collects =N= for that container's list
+('deleted_overrider_keeps_its_original' in
+=server/from_text/local_fieldintent_collection/predicates.rs=): the
+deletion takes the overrider out of the graph, not =N= out of the
+container, so the container is not forked, and the rerender draws =N=
+there again. Under an owned container the deletion removes =N= from
+its list too ([[file:./forks.org][forks.org]], "Taking back a fork").
+
 An override target that is an unknown graphnode can otherwise remain
 visible as an unknown viewnode, as a folder member.  It cannot substitute because there is no node to show.
 

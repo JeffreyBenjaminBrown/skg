@@ -66,7 +66,8 @@ pub fn extract_nonmergeSavePlan_locally_in_graph (
   let _span : tracing::span::EnteredSpan = tracing::info_span!(
     "extract_nonmergeSavePlan_locally" ). entered();
   let collected : CollectedFieldIntents =
-    collect_instructions_locally (viewforest)
+    collect_instructions_locally (
+      viewforest, & |skgrepo| config . skgrepo_is_owned (skgrepo) )
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
   validate_text_claims (&collected, graph, config) ?;
   let flag_targets : HashSet<ID> = collected . by_pid . iter ()

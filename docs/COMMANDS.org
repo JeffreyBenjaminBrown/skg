@@ -150,6 +150,11 @@ newer graph.
 Marks the node at point for deletion from the graph.
 Upon saving the view, it will vanish not just from this view,
 but from the graph itself.
+On a fork of yours drawn in place of its original (marked 'ĥ') as
+content of someone else's note, it deletes the fork and leaves their note as it
+was, unforked, drawing the original again where the fork stood. Under
+a note of yours it takes the original out of your note too
+('docs/forks.org', "Taking back a fork").
 Under a skgrepo restriction, when relationships recorded in skgrepos
 the skgrepo restriction keeps out name the deleted node (another node's
 private section contains it, say), the save writes nothing and asks

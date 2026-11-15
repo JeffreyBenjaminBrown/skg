@@ -43,6 +43,7 @@
 use crate::from_text::local_fieldintent_collection::predicates::{
   occurrence_child_counts_as_content,
   occurrence_child_counts_as_visible_content,
+  deleted_overrider_keeps_its_original,
   member_counts_for_partnerFolder };
 use crate::from_text::local_fieldintent_collection::types::{
   CollectedFieldIntents, DefiningFolderRecorder, LocalContext, FieldIntent,
@@ -57,23 +58,31 @@ use crate::types::viewnode::{RelationshipEditRequest,
 use ego_tree::NodeRef;
 use std::collections::HashSet;
 
+/// Whether the user owns a skgrepo ('SkgConfig::skgrepo_is_owned').
+/// The traversal asks it of one thing only: whether a parent's
+/// content list is another's, where a deleted overrider keeps its
+/// original ('deleted_overrider_keeps_its_original').
+pub type IsOwned<'a> = &'a dyn Fn (&SkgrepoName) -> bool;
+
 pub fn collect_instructions_locally (
   forest : &ViewForest,
+  owned  : IsOwned,
 ) -> Result<CollectedFieldIntents, String> {
   let mut collected : CollectedFieldIntents =
     CollectedFieldIntents::new();
   for root in forest . roots() {
-    visit (root, &LocalContext::TopLevel, &mut collected) ?; }
+    visit (root, &LocalContext::TopLevel, &mut collected, owned) ?; }
   Ok (collected) }
 
 fn visit (
   node_ref  : NodeRef<Viewnode>,
   context   : &LocalContext,
   collected : &mut CollectedFieldIntents,
+  owned     : IsOwned,
 ) -> Result<(), String> {
   match &node_ref . value() . kind {
     ViewnodeKind::Vognode (Vognode::Occurrence (t)) =>
-      visit_occurrence (node_ref, t, context, collected),
+      visit_occurrence (node_ref, t, context, collected, owned),
     ViewnodeKind::Vognode (vognode @ ( Vognode::Ghost (_) | Vognode::GnidOnly (_) )) =>
       recurse_under_vognode (
         node_ref,
@@ -88,31 +97,31 @@ fn visit (
           headline            : node_ref . value () . headline_name (),
           is_editable    : false,
           is_saveEligible : false } ),
-        None, collected),
+        None, collected, owned),
     ViewnodeKind::Tombstone =>
       // A tombstone emits nothing. Where it stands for a restricted
       // node, that node's membership is owned
       // by disk supplementation, not extraction. With no identity it
       // owns no defining folder, so any folder found under it stays
       // silent.
-      recurse_under_vognode (node_ref, None, None, collected),
+      recurse_under_vognode (node_ref, None, None, collected, owned),
     ViewnodeKind::BufferRoot =>
       // A BufferRoot is unreachable as a child, but the traversal
       // stays total anyway.
       recurse_with_uniform_context (
-        node_ref, &LocalContext::TopLevel, collected),
+        node_ref, &LocalContext::TopLevel, collected, owned),
     ViewnodeKind::Folder (Folder::Alias) =>
-      visit_aliasFolder (node_ref, context, collected),
+      visit_aliasFolder (node_ref, context, collected, owned),
     // The three arms below, with the alias folder's above, are exactly
     // the editable folders ('Folder::is_editable'): the
     // ones whose membership the save reads. The catch-all folder arm
     // after them covers the write-protected ones.
     ViewnodeKind::Folder (Folder::Subscribee) =>
-      visit_subscribee_folder (node_ref, context, collected),
+      visit_subscribee_folder (node_ref, context, collected, owned),
     ViewnodeKind::Folder (Folder::HiddenOutsideOfSubscribee) =>
-      visit_hiddenOutside_folder (node_ref, context, collected),
+      visit_hiddenOutside_folder (node_ref, context, collected, owned),
     ViewnodeKind::Folder (Folder::Overridden) =>
-      visit_overridden_folder (node_ref, context, collected),
+      visit_overridden_folder (node_ref, context, collected, owned),
     ViewnodeKind::Folder (Folder::ID)
       | ViewnodeKind::Folder (Folder::Flags { .. })
       | ViewnodeKind::PropertyMember (_)
@@ -122,13 +131,14 @@ fn visit (
       // found inside them are self-writers; their membership in the
       // folder is never read.
       recurse_with_uniform_context (
-        node_ref, &LocalContext::UnderWriteProtectedFolder, collected), }}
+        node_ref, &LocalContext::UnderWriteProtectedFolder, collected, owned), }}
 
 fn visit_occurrence (
   node_ref  : NodeRef<Viewnode>,
   t         : &Occurrence,
   context   : &LocalContext,
   collected : &mut CollectedFieldIntents,
+  owned     : IsOwned,
 ) -> Result<(), String> {
   let subscribee_as_such_context : Option<(&ID, bool)> =
     match context {
@@ -199,7 +209,8 @@ fn visit_occurrence (
             // This is always emitted, even if empty: an editable
             // node's content is always Specified.
             FieldIntent::SetContains (
-              content_members (node_ref) )) ?;
+              content_members (
+                node_ref, ! owned (& t . home_skgrepo) ) )) ?;
           if let Some (NodeEditRequest::NodeMerge (acquiree)) =
             t . edit_request()
           { collected . instructionMerge_fieldIntent (
@@ -222,7 +233,7 @@ fn visit_occurrence (
       is_editable,
       is_saveEligible } ),
     if is_saveEligible { Some (t . gnid . clone()) } else { None },
-    collected) }
+    collected, owned) }
 
 /// This recurses into a vognode's children. Vognode
 /// children get 'UnderVognode'; defining-folder children get
@@ -233,6 +244,7 @@ fn recurse_under_vognode (
   recorder            : Option<DefiningFolderRecorder>,
   parent_if_editable  : Option<ID>,
   collected           : &mut CollectedFieldIntents,
+  owned               : IsOwned,
 ) -> Result<(), String> {
   for child in node_ref . children() {
     let child_context : LocalContext =
@@ -260,22 +272,24 @@ fn recurse_under_vognode (
         _ =>
           LocalContext::UnderVognode {
             parent_if_editable : parent_if_editable . clone() } };
-    visit (child, &child_context, collected) ?; }
+    visit (child, &child_context, collected, owned) ?; }
   Ok (( )) }
 
 fn recurse_with_uniform_context (
   node_ref  : NodeRef<Viewnode>,
   context   : &LocalContext,
   collected : &mut CollectedFieldIntents,
+  owned     : IsOwned,
 ) -> Result<(), String> {
   for child in node_ref . children() {
-    visit (child, context, collected) ?; }
+    visit (child, context, collected, owned) ?; }
   Ok (( )) }
 
 fn visit_aliasFolder (
   node_ref  : NodeRef<Viewnode>,
   context   : &LocalContext,
   collected : &mut CollectedFieldIntents,
+  owned     : IsOwned,
 ) -> Result<(), String> {
   if let LocalContext::UnderDefiningFolder (recorder) = context {
     if recorder . is_saveEligible {
@@ -302,12 +316,13 @@ fn visit_aliasFolder (
         recorder . gnid . clone(),
         FieldIntent::SetAliases (aliases) ) ?; }}
   recurse_with_uniform_context (
-    node_ref, &LocalContext::UnderWriteProtectedFolder, collected) }
+    node_ref, &LocalContext::UnderWriteProtectedFolder, collected, owned) }
 
 fn visit_subscribee_folder (
   node_ref  : NodeRef<Viewnode>,
   context   : &LocalContext,
   collected : &mut CollectedFieldIntents,
+  owned     : IsOwned,
 ) -> Result<(), String> {
   match context {
     LocalContext::UnderDefiningFolder (recorder) => {
@@ -331,7 +346,7 @@ fn visit_subscribee_folder (
               LocalContext::SubscribeeAsSuchPosition {
                 subscriber               : recorder . gnid . clone(),
                 subscriber_is_editable : recorder . is_editable }, };
-        visit (child, &child_context, collected) ?; }
+        visit (child, &child_context, collected, owned) ?; }
       Ok (( )) },
     _ =>
       // The folder has no identifiable recorder. Validation precludes this
@@ -339,7 +354,7 @@ fn visit_subscribee_folder (
       recurse_with_uniform_context (
         node_ref,
         &LocalContext::UnderVognode { parent_if_editable : None },
-        collected), }}
+        collected, owned), }}
 
 /// Collect the explicitly submitted visible-outside subset.  This folder is a
 /// compound partner folder rather than a direct relationship set, so its meaning is
@@ -348,6 +363,7 @@ fn visit_hiddenOutside_folder (
   node_ref  : NodeRef<Viewnode>,
   context   : &LocalContext,
   collected : &mut CollectedFieldIntents,
+  owned     : IsOwned,
 ) -> Result<(), String> {
   if let LocalContext::HiddenOutsidePosition {
     subscriber, is_saveEligible } = context
@@ -371,13 +387,14 @@ fn visit_hiddenOutside_folder (
         subscriber . clone(),
         FieldIntent::HiddenOutsideEdit (HiddenOutsideEdit { members }) ) ?; }}
   recurse_with_uniform_context (
-    node_ref, &LocalContext::UnderWriteProtectedFolder, collected)
+    node_ref, &LocalContext::UnderWriteProtectedFolder, collected, owned)
 }
 
 fn visit_overridden_folder (
   node_ref  : NodeRef<Viewnode>,
   context   : &LocalContext,
   collected : &mut CollectedFieldIntents,
+  owned     : IsOwned,
 ) -> Result<(), String> {
   if let LocalContext::UnderDefiningFolder (recorder) = context {
     if recorder . is_saveEligible {
@@ -391,7 +408,7 @@ fn visit_overridden_folder (
     // The members are self-writers; their membership was read just
     // above, and they form no one's contains.
     &LocalContext::UnderVognode { parent_if_editable : None },
-    collected) }
+    collected, owned) }
 
 /// As 'dedup_vector', but dedups members carrying skgrepos by ID alone
 /// (first occurrence wins) rather than by the full (ID, skgrepo) pair: a
@@ -460,7 +477,9 @@ fn claiming_gnid_only_or_ghost_member (
     _ => None, } }
 
 /// This returns the content of an editable vognode: its occurrence
-/// children that pass the contains predicate. It does not dedup,
+/// children that pass the contains predicate, and, where the vognode
+/// is another's ('of_another'), the originals that deleted overriders
+/// stand for ('deleted_overrider_keeps_its_original'). It does not dedup,
 /// because validation ('claiming_children_have_distinct_gnids')
 /// already guarantees distinctness. Each member is paired with its
 /// headline's explicit '(editRequest (relRepo NAME))' request, if any (see
@@ -477,13 +496,15 @@ fn claiming_gnid_only_or_ghost_member (
 /// cannot resurrect a member that was authoritatively removed, nor
 /// move one.
 fn content_members (
-  node_ref : NodeRef<Viewnode>,
+  node_ref   : NodeRef<Viewnode>,
+  of_another : bool,
 ) -> Vec<(ID, Option<SkgrepoName>)> {
   let mut contents : Vec<(ID, Option<SkgrepoName>)> = Vec::new();
   for child in node_ref . children() {
     match &child . value() . kind {
       ViewnodeKind::Vognode (Vognode::Occurrence (t)) => {
-        if occurrence_child_counts_as_content (t) {
+        if occurrence_child_counts_as_content (t)
+           || ( of_another && deleted_overrider_keeps_its_original (t) ) {
           contents . push ((
             // collected_id, not id: a shown overrider stands for
             // the original member it is shown in place of.

@@ -33,6 +33,26 @@ pub fn occurrence_child_counts_as_content (
 ) -> bool {
   member_counts_for_partnerFolder (t) }
 
+/// This returns true iff the given occurrence, marked for deletion,
+/// is an overrider carrying '(overridesHere N)', which, under a parent
+/// the user does not own, still stands in that parent's list for N
+/// ('content_members' in 'traverse.rs' asks only there). Deleting it
+/// deletes the overrider, which the list never named; the list keeps N,
+/// so a fork deleted where it stands in place of another's original
+/// leaves that original's parent as its author wrote it, unforked, and
+/// N is drawn again there. Under a parent the user owns, the deletion
+/// still takes N out of the list too, as it did before 2026-11-15
+/// (and so, in a subscriber, hides N). Removing the headline removes N
+/// from any list, as removing any child does ('docs/forks.org',
+/// "Taking back a fork").
+pub fn deleted_overrider_keeps_its_original (
+  t : &Occurrence,
+) -> bool {
+  t . claimsMembership
+    && t . overridesHere . is_some ()
+    && matches!( t . edit_request (),
+                 Some (&NodeEditRequest::Delete)) }
+
 /// This returns true iff the given occurrence, a child of a
 /// editable subscribee-as-such, counts as visible content of the
 /// subscribee. That visible content is the signal from which the

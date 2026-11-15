@@ -26,7 +26,7 @@ fn collected_from_org (
   let forest : ViewForest =
     ViewForest::from_internal_tree (
       viewforest );
-  collect_instructions_locally (&forest) . unwrap() }
+  collect_instructions_locally (&forest, &|_| true) . unwrap() }
 
 #[test]
 fn lowering_produces_ordered_nodeInstructions_and_signals () {

@@ -60,7 +60,7 @@ fn nodeInstructions_from_tree (
     ViewForest::from_internal_tree (viewforest);
   let LoweringOutput { intents, .. } =
     lower_collected_fieldIntents (
-      collect_instructions_locally (&forest) ? ) ?;
+      collect_instructions_locally (&forest, &|_| true) ? ) ?;
   intents . into_ordered_intents()
     . into_iter()
     . map (NodeIntent::into_node_instruction)
@@ -75,7 +75,7 @@ fn visibility_pairs_from_tree (
     ViewForest::from_internal_tree (viewforest);
   let LoweringOutput { visibility, .. } =
     lower_collected_fieldIntents (
-      collect_instructions_locally (&forest) . unwrap() ) . unwrap();
+      collect_instructions_locally (&forest, &|_| true) . unwrap() ) . unwrap();
   visibility }
 
 fn visibility_pairs_from_org (
@@ -89,7 +89,7 @@ fn hiddenoutside_edits_from_tree (
 ) -> Vec<(ID, skg::from_text::local_fieldintent_collection::types::HiddenOutsideEdit)> {
   let forest : ViewForest = ViewForest::from_internal_tree (viewforest);
   lower_collected_fieldIntents (
-    collect_instructions_locally (&forest) . unwrap () ) . unwrap ()
+    collect_instructions_locally (&forest, &|_| true) . unwrap () ) . unwrap ()
     . hidden_outside
 }
 
