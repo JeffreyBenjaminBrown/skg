@@ -1991,9 +1991,18 @@ def link_annotation (entry):
   if entry is None or entry [ "status" ] == "missing":
     return "⟦✗ missing⟧"
   if entry [ "status" ] != "resolved":
-    return "⟦✗ " + entry [ "status" ] + "⟧"
+    return "⟦✗ " + annotation_safe ( entry [ "status" ] ) + "⟧"
   title = entry . get ( "title" ) or "(title not found)"
-  return "⟦→ " + title + " ⌂:" + entry [ "label" ] + "⟧"
+  return ( "⟦→ " + annotation_safe (title) + " ⌂:"
+           + annotation_safe ( entry [ "label" ] ) + "⟧" )
+
+# An annotation's brackets, and the look-alikes that replace them in
+# the text it quotes, so that 'ANNOTATED_LINK_PATTERN' ends it at its
+# own '⟧' and a save strips exactly what the view wrote.
+ANNOTATION_SAFE_BRACKETS = str . maketrans ({ "⟦" : "⦗", "⟧" : "⦘" })
+
+def annotation_safe (text):
+  return text . translate (ANNOTATION_SAFE_BRACKETS)
 
 # ============================================================
 # Repo ownership: whether each configured skgrepo is owned or foreign,

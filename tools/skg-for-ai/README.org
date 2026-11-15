@@ -450,7 +450,10 @@ whose target the graph lacks gets '⟦✗ missing⟧'; one whose target the
 skgrepo restriction hides gets '⟦✗ restricted⟧'. The tool asks the
 server's 'link statuses' request, which the clients' link annotations
 use, and then 'titles by ids' for the titles of the resolved targets.
-The annotation is the tool's; the link itself is unchanged.
+The annotation is the tool's; the link itself is unchanged. A '⟦' or
+'⟧' in the title or label an annotation quotes is written '⦗' or '⦘',
+so that the annotation ends at its own '⟧' and a save removes exactly
+it; the annotation is never saved, so the node's title is unchanged.
 *** The summary
 Unless '--no-summary' is given, the compact view starts with a few Org
 comment lines ('# ...') before the tree. They name the full view and

@@ -154,6 +154,7 @@ def main (argv):
   failures += failures_of_title_matching ()
   failures += failures_of_save_envelope ()
   failures += failures_of_preview_support ()
+  failures += failures_of_link_annotation_round_trip ()
   failures += failures_of_shared_herald_cases ()
   failures += failures_against_scratch_servers (update_expected)
   shutil . rmtree ( os . environ [ "XDG_RUNTIME_DIR" ], ignore_errors = True )
@@ -196,6 +197,27 @@ def failures_of_preview_support ():
     failures . append ( "an older server was taken to support the preview" )
   if not skg_for_ai . server_supports (new, "save preview"):
     failures . append ( "a server naming the preview was taken not to support it" )
+  return failures
+
+def failures_of_link_annotation_round_trip ():
+  """A save strips exactly the link annotations a view wrote, even one
+  quoting a target title that holds '⟦', '⟧', '→', '✗' and '⌂', so an
+  unedited body or title saves unchanged."""
+  title = ( 'The AI reader writes "⟦not held here⟧" where it now writes '
+            '"⟦✗ missing⟧", for a link whose target this server holds no '
+            'node of. ⟦→ x ⌂:y⟧' )
+  statuses = {
+    "odd-id"  : { "status" : "resolved", "pid" : "odd-id",
+                  "label" : "cl⟧eo", "title" : title },
+    "gone-id" : { "status" : "missing" } }
+  failures = []
+  for text in [ "See [[id:odd-id][the note]] and [[id:gone-id][gone]].",
+                "[[id:odd-id]] then [[id:odd-id][again ⟦→ typed⟧]]⟦→ typed⟧" ]:
+    annotated = skg_for_ai . annotate_links (text, statuses)
+    stripped = skg_for_ai . strip_link_annotations (annotated)
+    if stripped != text:
+      failures . append (
+        f"annotating then stripping {text!r} gives {stripped!r}" )
   return failures
 
 # ============================================================
