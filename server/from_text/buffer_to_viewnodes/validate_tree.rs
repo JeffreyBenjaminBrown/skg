@@ -3,8 +3,8 @@ pub mod contradictory_instructions;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::mirrors::{
   is_mirror_of, mirror_shown, perspective_owner_of_tree_containing};
-use crate::dbs::in_rust_graph::override_invariants::existing_owned_overrider_of;
 use crate::dbs::node_lookup::opt_graphnode_by_gnid;
+use crate::from_text::fork::existing_owned_fork_of;
 use crate::types::misc::{ID, SkgConfig, SkgrepoOwner};
 use crate::types::viewnode::{RelationshipEditRequest, NodeEditRequest, Folder, PropertyMember, ViewRequest};
 use crate::types::viewnode::{Viewnode, ViewnodeKind};
@@ -223,11 +223,10 @@ fn overridesHere_part_errors (
 /// - the id must exist in the graph -- you cannot fork an unsaved
 ///   headline ('ForkRequestOnUnknownNode'); a new headline got a fresh
 ///   pid from the parse, which is not in the graph;
-/// - if the node already has an owned overrider, fail early with
-///   'ForkAlreadyExists' (the helpful message) rather than a later
-///   monogamy abort at skgsave-commit.
-/// These checks use the explicit save-planning graph; the skgsave-commit-time
-/// invariant check remains a defense in depth.
+/// - if the user already owns a fork of the node, 'ForkAlreadyExists',
+///   naming it: the fork operation's guard ('validate_fork_specs_in_graph'
+///   says why).
+/// These checks use the explicit save-planning graph.
 #[allow(non_snake_case)]
 fn validate_fork_view_requests (
   viewforest : &ViewForest,
@@ -248,7 +247,7 @@ fn validate_fork_view_requests (
           gnid, headlines [0] . clone () ));
       continue; }
     if let Some (existing) =
-      existing_owned_overrider_of (config, graph, &gnid) {
+      existing_owned_fork_of (config, graph, &gnid) {
       errors . push (
         BufferValidationError::ForkAlreadyExists (
           gnid, existing )); }} }

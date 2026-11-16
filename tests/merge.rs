@@ -23,3 +23,6 @@ mod merge_hides_intersection;
 
 #[path = "merge/merge_keeps_the_saves_own_edits.rs"]
 mod merge_keeps_the_saves_own_edits;
+
+#[path = "merge/merge_with_a_note_it_forks.rs"]
+mod merge_with_a_note_it_forks;

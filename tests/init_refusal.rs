@@ -1,7 +1,7 @@
 // cargo nextest run --test grouped_unit -E 'test(init_refusal::)'
 //
 // The init/rebuild refusal wiring ('docs/data-model_technical.org', "Hard
-// validation constraints"): override invariants are
+// validation constraints"): the rules of forks, contents and hides are
 // validated not only at their own seam (tests/dbs/in_rust_graph/
 // override_invariants.rs) but actually block initialization. This
 // drives the graph validator shared by server start and rebuild.
@@ -16,7 +16,7 @@ use skg::types::misc::SkgConfig;
 use skg::types::nodes::complete::Graphnode;
 
 #[test]
-fn init_refuses_two_owned_overriders
+fn init_refuses_a_self_override
   () -> Result<(), Box<dyn Error>> {
   block_on ( async {
     let config : SkgConfig =
@@ -29,13 +29,10 @@ fn init_refuses_two_owned_overriders
     let result = validated_graph (&config, &nodes);
     let msg : String = match result {
       Ok (_)  => panic! (
-        "init must refuse a node with two owned overriders"),
+        "init must refuse a note that overrides itself"),
       Err (e) => e, };
     assert! (
-      msg . contains ("overridden by owned")
-        && msg . contains ("N")
-        && msg . contains ("R1")
-        && msg . contains ("R2"),
-      "the refusal must name the collision (node N, overriders R1/R2): {}",
+      msg . contains ("node R forks itself"),
+      "the refusal must name the self-fork of R: {}",
       msg );
     Ok (( )) } ) }

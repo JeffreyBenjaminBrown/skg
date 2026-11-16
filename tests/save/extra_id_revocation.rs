@@ -26,9 +26,9 @@ fn rejected_revocation_does_not_mutate_any_store () -> Result<(), Box<dyn Error>
         "tests/save/extra_id_revocation/fixtures") ?;
       exercise_rejected_revocation (&stores . config, &stores . tantivy) . await ?;
       stores . reset (
-        "rejected_merge_override_does_not_mutate_any_store",
-        "tests/save/override_collision/fixtures") ?;
-      exercise_rejected_merge_override (
+        "rejected_merge_does_not_mutate_any_store",
+        "tests/save/merge_forkee_contained/fixtures") ?;
+      exercise_rejected_merge (
         &stores . config, &stores . tantivy) . await ?;
       stores . reset (
         "second_phase_preflight_prevents_first_phase_write",
@@ -62,14 +62,17 @@ async fn exercise_second_phase_preflight (
   Ok (( ))
 }
 
-async fn exercise_rejected_merge_override (
+/// R contains N1 and overrides N2. Merging N2 into N1 would make R
+/// both fork and contain N1, so the merge is refused, and no store
+/// changes.
+async fn exercise_rejected_merge (
   config  : &SkgConfig,
   tantivy : &TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
   let before_graph : Arc<InRustGraph> = graph . load_full ();
   let skgrepo_path : &PathBuf = &config . skgrepos [&SkgrepoName::from ("main")] . path;
-  let paths : Vec<PathBuf> = ["N1.skg", "N2.skg", "R1.skg", "R2.skg"]
+  let paths : Vec<PathBuf> = ["N1.skg", "N2.skg", "R.skg"]
     . iter () . map (|name| skgrepo_path . join (name)) . collect ();
   let before_bytes : Vec<Vec<u8>> = paths . iter ()
     . map (fs::read) . collect::<Result<Vec<Vec<u8>>, _>> () ?;
@@ -91,11 +94,11 @@ async fn exercise_rejected_merge_override (
     &[merge], config . clone (), tantivy, &graph, &new_mutation_gate ()) . await;
   let error : Box<dyn Error> = match result {
     Err (error) => error,
-    Ok (_) => panic! ("merge-created override collision must be rejected"),
+    Ok (_) => panic! ("a merge making R fork and contain N1 must be rejected"),
   };
   let message : String = error . to_string ();
-  for expected in ["N1", "N2", "R1", "R2", "canonicalizing"] {
-    assert! (message . contains (expected), "missing {expected}: {message}"); }
+  assert! (message . contains ("node R both forks (subscribes to or overrides) and contains node N1"),
+           "{message}");
 
   wait_for_tantivy_writes_idle ();
   assert! (Arc::ptr_eq (&before_graph, &graph . load_full ()));

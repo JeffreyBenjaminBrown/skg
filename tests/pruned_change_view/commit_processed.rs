@@ -486,22 +486,23 @@ fn a_merge_wholly_processed_goes_in () -> TestResult {
     assert! ( marked_keys (env) . is_empty () );
     Ok (( )) }) }
 
-/// At HEAD r overrides n. In the worktree r no longer does, and the new
-/// s does. Only s is processed: committing it alone would leave two
-/// owned overriders of n, so validation refuses, and nothing goes in.
+/// At HEAD r overrides n. In the worktree r no longer does, and n
+/// contains r. Only n is processed: committing it alone would leave n
+/// containing a note that forks it, so validation refuses, and nothing
+/// goes in.
 #[test]
-fn a_commit_leaving_two_owned_overriders_is_refused () -> TestResult {
+fn a_commit_leaving_a_note_containing_its_forker_is_refused () -> TestResult {
   with_scratch ( MAIN, &[
-    ("main", "n", Some (&yaml ("n", "n", &[])), Some (&yaml ("n", "n", &[]))),
-    ("main", "r", Some ("pid: r\ntitle: r\noverrides:\n- n\n"), Some (&yaml ("r", "r", &[]))),
-    ("main", "s", None, Some ("pid: s\ntitle: s\noverrides:\n- n\n")), ],
+    ("main", "n", Some (&yaml ("n", "n", &[])), Some (&yaml ("n", "n", &["r"]))),
+    ("main", "r", Some ("pid: r\ntitle: r\noverrides:\n- n\n"), Some (&yaml ("r", "r", &[]))), ],
     |f, env| {
-      mark_nodes (f, env, &["s"]) ?;
+      mark_nodes (f, env, &["n"]) ?;
       let marks : HashSet<LeafKey> = marked_keys (env);
       let before = snapshot (f, &["main"]) ?;
       let answer : StageAndCommitAnswer = commit_processed (f, env);
       assert! ( matches! ( &answer, StageAndCommitAnswer::Refused (e)
-                           if e . starts_with ("Nothing was committed: the commit would not validate:") ),
+                           if e . starts_with ("Nothing was committed: the commit would not validate:")
+                              && e . contains ("node n contains node r, which forks it") ),
                 "{:?}", answer );
       assert_eq! ( stage_and_commit_response_sexp (&answer) . matches ("(errors (") . count (), 1 );
       assert_eq! ( snapshot (f, &["main"]) ?, before );

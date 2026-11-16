@@ -6,6 +6,7 @@ use crate::dbs::in_rust_graph::complete_validation::{
 };
 use crate::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle, new_handle};
 use crate::dbs::in_rust_graph::apply_nodeInstructions_to_inRustGraph;
+use crate::dbs::in_rust_graph::override_invariants::OverrideInvariantViolation;
 use crate::dbs::in_rust_graph::internal_index_validation::{
   LocalIndexValidation, validate_local_internal_indexes,
 };
@@ -375,38 +376,56 @@ fn local_index_check_work_does_not_grow_with_unrelated_nodes () {
 }
 
 #[test]
-fn merge_override_collision_names_participants_and_both_repairs () {
+fn a_nodeMerge_leaving_two_owned_overriders_of_one_note_is_prepared () {
+  // R1 overrides N1 and R2 overrides N2; N2 merges into N1, so both
+  // come to override N1. Several forks of one note are legal.
   let skgrepo : SkgrepoName = SkgrepoName::from ("main");
   let mut n1 : Graphnode = node ("N1");
-  n1 . title = "Acquirer title" . to_string ();
-  let mut n2 : Graphnode = node ("N2");
-  n2 . title = "Acquiree title" . to_string ();
   let mut r1 : Graphnode = node ("R1");
-  r1 . title = "Existing overrider title" . to_string ();
   r1 . overrides = MSV::Specified (rel_partners_at_relRepo (
     &skgrepo, vec![ID::from ("N1")]));
   let mut r2 : Graphnode = node ("R2");
-  r2 . title = "Redirected overrider title" . to_string ();
   r2 . overrides = MSV::Specified (rel_partners_at_relRepo (
     &skgrepo, vec![ID::from ("N2")]));
   let base : Arc<InRustGraph> = Arc::new (
-    InRustGraph::from_graphnodes (&[n1 . clone (), n2, r1, r2]));
+    InRustGraph::from_graphnodes (&[n1 . clone (), node ("N2"), r1, r2]));
   n1 . extra_ids = vec![ID::from ("N2")];
-  let error : GraphUpdatePreparationError = prepare_graph_update (
+  let prepared : PreparedGraphUpdate = prepare_graph_update (
     &config (), base, vec![
       NodeInstruction::Save (SaveNode (n1)),
       NodeInstruction::Delete (DeleteNode {
         gnid : ID::from ("N2"), home_skgrepo: skgrepo,
       }),
-    ]) . expect_err ("merge redirection must violate monogamy");
-  assert_eq! (error . merge_override_collisions . len (), 1);
-  let message : String = error . to_string ();
-  for expected in [
-    "N1", "N2", "R1", "R2", "Acquirer title", "Acquiree title",
-    "Existing overrider title", "Redirected overrider title",
-    "canonicalizing", "R2 -> R1 -> N1", "R1 -> R2 -> N1",
-  ] {
-    assert! (message . contains (expected), "missing {expected}: {message}"); }
+    ]) . expect ("two owned forks of one note are legal");
+  let mut overriders : Vec<ID> = prepared . candidate () . overriders_of
+    . get (&ID::from ("N1")) . expect ("N1 is overridden")
+    . iter () . cloned () . collect ();
+  overriders . sort ();
+  assert_eq! (overriders, vec![ID::from ("R1"), ID::from ("R2")]);
+}
+
+#[test]
+fn an_acquirer_left_overriding_its_acquiree_is_refused_as_a_self_fork () {
+  // The nodeMerge drops such a relationship ('three_nodeMerged_graphnodes');
+  // a save that keeps one is refused here.
+  let skgrepo : SkgrepoName = SkgrepoName::from ("main");
+  let mut a : Graphnode = node ("A");
+  a . overrides = MSV::Specified (rel_partners_at_relRepo (
+    &skgrepo, vec![ID::from ("B")]));
+  let base : Arc<InRustGraph> = Arc::new (
+    InRustGraph::from_graphnodes (&[a . clone (), node ("B")]));
+  a . extra_ids = vec![ID::from ("B")];
+  let error : GraphUpdatePreparationError = prepare_graph_update (
+    &config (), base, vec![
+      NodeInstruction::Save (SaveNode (a)),
+      NodeInstruction::Delete (DeleteNode {
+        gnid : ID::from ("B"), home_skgrepo: skgrepo,
+      }),
+    ]) . expect_err ("a note may not fork itself");
+  assert! (error . is_override_invariant_only ());
+  assert_eq! (error . complete_graph_errors, vec![
+    CompleteGraphError::Override (OverrideInvariantViolation::SelfFork {
+      node : ID::from ("A") }) ]);
 }
 
 proptest! {

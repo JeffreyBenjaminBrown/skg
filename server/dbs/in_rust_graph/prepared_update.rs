@@ -17,9 +17,8 @@ use crate::dbs::in_rust_graph::internal_index_validation::{
   validate_local_internal_indexes,
 };
 use crate::dbs::in_rust_graph::override_invariants::{
-  AffectedOverrideValidation, OverrideCheckScope, OverrideInvariantViolation,
-  derive_affected_override_scope,
-  validate_affected_override_invariants_with_counts,
+  OverrideInvariantViolation, derive_affected_override_scope,
+  validate_affected_override_invariants,
 };
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::save::{NodeInstruction, DeleteNode, SaveNode};
@@ -53,8 +52,7 @@ pub(crate) struct GraphChangeSet {
   pub(crate) canonicalization_changes : Vec<CanonicalizationChange>,
   pub(crate) identity_acquisitions    : Vec<IdentityAcquisition>,
   pub(crate) recorders_to_reindex         : HashSet<ID>,
-  pub(crate) override_skgrepos_to_check : HashSet<ID>,
-  pub(crate) override_targets_to_check : HashSet<ID>,
+  pub(crate) override_pids_to_check : HashSet<ID>,
   pub(crate) telescope_recorders_to_check : HashSet<ID>,
   #[cfg(test)]
   pub(crate) identity_base_lookup_bound : usize,
@@ -67,27 +65,11 @@ pub(crate) struct ExtraIdRevocation {
   pub(crate) dropped_gnids : Vec<ID>,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct OverrideParticipant {
-  pub(crate) gnid    : ID,
-  pub(crate) title : String,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct MergeOverrideCollision {
-  pub(crate) acquired_gnid       : ID,
-  pub(crate) acquirer             : OverrideParticipant,
-  pub(crate) acquiree             : OverrideParticipant,
-  pub(crate) existing_overriders  : Vec<OverrideParticipant>,
-  pub(crate) redirected_overriders : Vec<OverrideParticipant>,
-}
-
 #[derive(Debug)]
 pub(crate) struct GraphUpdatePreparationError {
   pub(crate) complete_graph_errors : Vec<CompleteGraphError>,
   pub(crate) extra_id_revocations  : Vec<ExtraIdRevocation>,
   pub(crate) internal_index_errors : Vec<InternalIndexMismatch>,
-  pub(crate) merge_override_collisions : Vec<MergeOverrideCollision>,
 }
 
 impl fmt::Display for GraphUpdatePreparationError {
@@ -111,8 +93,6 @@ impl fmt::Display for GraphUpdatePreparationError {
           . map ( |gnid| gnid . 0 . as_str () )
           . collect::<Vec<&str>> ()
           . join (", ") )); }
-    for collision in &self . merge_override_collisions {
-      sections . push (format_merge_override_collision (collision)); }
     write! (f, "{}", sections . join ("\n"))
   }
 }
@@ -129,7 +109,6 @@ impl GraphUpdatePreparationError {
         matches! (error, CompleteGraphError::Override (_)))
       && self . extra_id_revocations . is_empty ()
       && self . internal_index_errors . is_empty ()
-      && self . merge_override_collisions . is_empty ()
   }
 }
 
@@ -217,46 +196,36 @@ pub(crate) fn prepare_graph_update (
       complete_graph_errors : incremental_errors,
       extra_id_revocations  : revocations,
       internal_index_errors : Vec::new (),
-      merge_override_collisions : Vec::new (),
     }); }
   let mut candidate : InRustGraph = (*base) . clone ();
   { let _span : tracing::span::EnteredSpan =
       tracing::info_span! ("apply_nodeInstructions_to_inRustGraph") . entered ();
     apply_nodeInstructions_to_inRustGraph (
       &mut candidate, &batch . final_graph_nodeInstructions); }
-  let override_scope : OverrideCheckScope = {
+  changes . override_pids_to_check = {
     let _span : tracing::span::EnteredSpan =
       tracing::info_span! ("derive_affected_override_scope") . entered ();
     derive_affected_override_scope (
       &base, &candidate, &changes . touched_pids, &changes . affected_gnids) };
-  changes . override_skgrepos_to_check = override_scope . skgrepos . clone ();
-  changes . override_targets_to_check = override_scope . targets . clone ();
   changes . telescope_recorders_to_check = derive_affected_telescope_recorders (
     &base, &candidate, &changes . saved_pids, &changes . affected_gnids);
-  let affected_override_validation : AffectedOverrideValidation = {
+  let affected_override_errors : Vec<OverrideInvariantViolation> = {
     let _span : tracing::span::EnteredSpan =
       tracing::info_span! ("validate_affected_override_invariants") . entered ();
-    validate_affected_override_invariants_with_counts (
-      config, &candidate, &override_scope) };
-  let affected_override_errors : Vec<OverrideInvariantViolation> =
-    affected_override_validation . violations;
-  let merge_override_collisions : Vec<MergeOverrideCollision> =
-    derive_merge_override_collisions (
-      config, &base, &candidate, &changes, &affected_override_errors);
+    validate_affected_override_invariants (
+      config, &candidate, &changes . override_pids_to_check) };
   let local_index_validation : LocalIndexValidation = {
     let _span : tracing::span::EnteredSpan =
       tracing::info_span! ("validate_local_internal_indexes") . entered ();
     validate_local_internal_indexes (
       &base, &candidate, &batch . final_graph_nodeInstructions, &changes) };
   tracing::info! (
-    "incremental graph work: graph_nodes={} normalized_nodeInstructions={} affected_ids={} recorders_reindexed={} override_repos_checked={} override_targets_checked={} override_chain_steps={} local_index_keys_checked={} local_node_checks={} local_identity_checks={} local_relationship_checks={}",
+    "incremental graph work: graph_nodes={} normalized_nodeInstructions={} affected_ids={} recorders_reindexed={} override_pids_checked={} local_index_keys_checked={} local_node_checks={} local_identity_checks={} local_relationship_checks={}",
     base . nodes . len (),
     batch . final_graph_nodeInstructions . len (),
     changes . affected_gnids . len (),
     changes . recorders_to_reindex . len (),
-    changes . override_skgrepos_to_check . len (),
-    changes . override_targets_to_check . len (),
-    affected_override_validation . chain_steps,
+    changes . override_pids_to_check . len (),
     local_index_validation . node_checks
       + local_index_validation . identity_checks
       + local_index_validation . relationship_membership_checks,
@@ -269,23 +238,6 @@ pub(crate) fn prepare_graph_update (
       complete_graph_errors : Vec::new (),
       extra_id_revocations  : Vec::new (),
       internal_index_errors : local_index_validation . errors,
-      merge_override_collisions : Vec::new (),
-    }); }
-  if ! merge_override_collisions . is_empty () {
-    let merge_targets : HashSet<ID> = merge_override_collisions . iter ()
-      . map (|collision| collision . acquirer . gnid . clone ()) . collect ();
-    let remaining_errors : Vec<CompleteGraphError> = affected_override_errors
-      . into_iter () . filter (|violation| ! matches! (
-        violation,
-        OverrideInvariantViolation::MultipleOwnedOverriders {
-          overridden, .. } if merge_targets . contains (overridden)))
-      . map (CompleteGraphError::Override)
-      . collect ();
-    return Err (GraphUpdatePreparationError {
-      complete_graph_errors : remaining_errors,
-      extra_id_revocations  : Vec::new (),
-      internal_index_errors : Vec::new (),
-      merge_override_collisions,
     }); }
   if ! affected_override_errors . is_empty () {
     return Err (GraphUpdatePreparationError {
@@ -293,7 +245,6 @@ pub(crate) fn prepare_graph_update (
         . map (CompleteGraphError::Override) . collect (),
       extra_id_revocations  : Vec::new (),
       internal_index_errors : Vec::new (),
-      merge_override_collisions : Vec::new (),
     }); }
   Ok (PreparedGraphUpdate {
     base,
@@ -301,91 +252,6 @@ pub(crate) fn prepare_graph_update (
     nodeInstructions : batch . filesystem_nodeInstructions,
     changes,
   })
-}
-
-fn derive_merge_override_collisions (
-  config      : &SkgConfig,
-  base        : &InRustGraph,
-  candidate   : &InRustGraph,
-  changes     : &GraphChangeSet,
-  violations  : &[OverrideInvariantViolation],
-) -> Vec<MergeOverrideCollision> {
-  let collision_targets : HashSet<ID> = violations . iter ()
-    . filter_map (|violation| match violation {
-      OverrideInvariantViolation::MultipleOwnedOverriders {
-        overridden, ..
-      } => Some (overridden . clone ()),
-      _ => None,
-    }) . collect ();
-  let mut result : Vec<MergeOverrideCollision> = Vec::new ();
-  for acquisition in &changes . identity_acquisitions {
-    let Some (acquiree_gnid) = &acquisition . old_carrier else { continue; };
-    if acquiree_gnid == &acquisition . new_carrier
-      || ! collision_targets . contains (&acquisition . new_carrier)
-    { continue; }
-    let existing_gnids : Vec<ID> = owned_overriders_at (
-      config, base, &acquisition . new_carrier);
-    let redirected_gnids : Vec<ID> = owned_overriders_at (
-      config, base, acquiree_gnid);
-    if existing_gnids . is_empty () || redirected_gnids . is_empty () {
-      continue; }
-    result . push (MergeOverrideCollision {
-      acquired_gnid : acquisition . gnid . clone (),
-      acquirer : participant (candidate, base, &acquisition . new_carrier),
-      acquiree : participant (base, candidate, acquiree_gnid),
-      existing_overriders : existing_gnids . iter ()
-        . map (|gnid| participant (base, candidate, gnid)) . collect (),
-      redirected_overriders : redirected_gnids . iter ()
-        . map (|gnid| participant (base, candidate, gnid)) . collect (),
-    }); }
-  result . sort_by (|left, right|
-    left . acquired_gnid . cmp (&right . acquired_gnid)
-      . then_with (|| left . acquirer . gnid . cmp (&right . acquirer . gnid)));
-  result
-}
-
-fn owned_overriders_at (
-  config : &SkgConfig,
-  graph  : &InRustGraph,
-  target : &ID,
-) -> Vec<ID> {
-  let mut result : Vec<ID> = graph . overriders_of . get (target)
-    . into_iter () . flatten ()
-    . filter (|pid| graph . nodes . get (*pid) . is_some_and (|node|
-      config . skgrepos . get (&node . home_skgrepo)
-        . is_some_and (|skgrepo| skgrepo . owned)))
-    . cloned () . collect ();
-  result . sort ();
-  result
-}
-
-fn participant (
-  preferred : &InRustGraph,
-  fallback  : &InRustGraph,
-  gnid     : &ID,
-) -> OverrideParticipant {
-  let title : String = preferred . nodes . get (gnid)
-    . or_else (|| fallback . nodes . get (gnid))
-    . map (|node| node . title . clone ())
-    . unwrap_or_else (|| "<missing>" . to_string ());
-  OverrideParticipant { gnid : gnid . clone (), title }
-}
-
-fn format_merge_override_collision (
-  collision : &MergeOverrideCollision,
-) -> String {
-  let render = |participants : &[OverrideParticipant]| -> String {
-    participants . iter ()
-      . map (|participant| format! (
-        "{} ('{}')", participant . gnid, participant . title))
-      . collect::<Vec<String>> () . join (", ") };
-  format! (
-    "Node merge cannot acquire ID '{}' because canonicalizing it from {} ('{}') to {} ('{}') would make one node have multiple owned overriders.\nParticipants:\n  existing overrider(s): {}\n  redirected overrider(s): {}\nBefore the merge:\n  R1 -> N1\n  R2 -> N2\nThe merge would produce:\n  R1 -> N1\n  R2 -> N1\nRemove either relationship, or choose precedence:\n  R2 -> R1 -> N1\nor\n  R1 -> R2 -> N1",
-    collision . acquired_gnid,
-    collision . acquiree . gnid, collision . acquiree . title,
-    collision . acquirer . gnid, collision . acquirer . title,
-    render (&collision . existing_overriders),
-    render (&collision . redirected_overriders))
 }
 
 fn normalize_and_coalesce_nodeInstructions (
@@ -542,8 +408,7 @@ fn validate_identity_and_derive_changes (
     canonicalization_changes,
     identity_acquisitions,
     recorders_to_reindex,
-    override_skgrepos_to_check   : HashSet::new (),
-    override_targets_to_check : HashSet::new (),
+    override_pids_to_check       : HashSet::new (),
     telescope_recorders_to_check : HashSet::new (),
     #[cfg(test)]
     identity_base_lookup_bound,

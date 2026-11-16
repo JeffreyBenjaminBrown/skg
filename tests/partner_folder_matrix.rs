@@ -779,23 +779,19 @@ async fn omission_scenarios (
   Ok (( )) }
 
 //////////////////////////////////////////////////////////////
-// Function 2 (its own database, since it must observe a rejected
-// save): the buffer-level half of "two owned overriders rejected
-// at save". A save adds a second owned overrider for an
-// already-overridden target via an overriddenFolder; the save is
-// rejected with the monogamy error and disk is unchanged.
-//
-// The override-invariant check reads the save's own graph handle, and
-// the buffer is hand-written rather than rendered.
+// Function 2 (each its own database, since each must observe the
+// disk after a save): a save adding a second owned overrider of a note
+// saves; a save making a note override itself is refused, and disk is
+// unchanged. The buffers are hand-written rather than rendered.
 //////////////////////////////////////////////////////////////
 
 #[test]
-fn buffer_save_rejects_second_owned_overrider
+fn buffer_save_admits_a_second_owned_overrider
   () -> Result<(), Box<dyn Error>> {
   run_with_skgrepo_set_test_db (
-    "skg-test-partner-folder-matrix-monogamy",
+    "skg-test-partner-folder-matrix-second-overrider",
     "tests/partner_folder_matrix/fixtures-monogamy/skgconfig.toml",
-    "/tmp/tantivy-test-partner-folder-matrix-monogamy",
+    "/tmp/tantivy-test-partner-folder-matrix-second-overrider",
     |config, tantivy| Box::pin ( async move {
       let graph : InRustGraphHandle =
         graph_handle_from_config (config) ?;
@@ -806,11 +802,35 @@ fn buffer_save_rejects_second_owned_overrider
         ** (skg overriddenFolder)
         *** (skg node (gnid mono-target) (skgRepos (nodeRepo public)) writeProtected) mono-target
       "};
+      save (buffer, config, tantivy, &graph) . await ?;
+      let r2 : Graphnode =
+        graphnode_by_gnid (
+          &graph . load_full (), config, &ID::from ("mono-r2") ) ?;
+      assert_eq! ( members_msv (&r2 . overrides) . or_default (),
+                   &[ ID::from ("mono-target") ],
+                   "the save must write mono-r2's override" );
+      Ok (( )) } )) }
+
+#[test]
+fn buffer_save_refuses_a_self_override
+  () -> Result<(), Box<dyn Error>> {
+  run_with_skgrepo_set_test_db (
+    "skg-test-partner-folder-matrix-self-override",
+    "tests/partner_folder_matrix/fixtures-monogamy/skgconfig.toml",
+    "/tmp/tantivy-test-partner-folder-matrix-self-override",
+    |config, tantivy| Box::pin ( async move {
+      let graph : InRustGraphHandle =
+        graph_handle_from_config (config) ?;
+      let buffer : &str = indoc! {"
+        * (skg node (gnid mono-r2) (skgRepos (nodeRepo public))) mono-r2
+        ** (skg overriddenFolder)
+        *** (skg node (gnid mono-r2) (skgRepos (nodeRepo public)) writeProtected) mono-r2
+      "};
       let result : Result<SaveResponse, Box<dyn Error>> =
         save (buffer, config, tantivy, &graph) . await;
       let err : Box<dyn Error> = match result {
         Ok (_)  => panic! (
-          "save must be rejected by monogamy, but it succeeded"),
+          "a save making a note override itself must be refused"),
         Err (e) => e, };
       let save_error : &SaveError =
         err . downcast_ref::<SaveError> ()
@@ -821,10 +841,10 @@ fn buffer_save_rejects_second_owned_overrider
         SaveError::BufferValidationErrors { errors, .. }
           if errors . iter () . any (
             |e| matches! (
-              e, BufferValidationError::OverrideInvariantViolation (_) )) ),
-        "expected an override-invariant violation, got {:?}", save_error );
-      // Disk unchanged: the override-invariant check runs before the
-      // filesystem write, so mono-r2 still overrides nothing.
+              e, BufferValidationError::OverrideInvariantViolation (message)
+                if message . contains ("node mono-r2 forks itself") )) ),
+        "expected a self-fork violation, got {:?}", save_error );
+      // Disk unchanged: the check runs before the filesystem write.
       let r2 : Graphnode =
         graphnode_by_gnid (
           &skg::test_utils::graph_handle_from_config (config)? . load_full (),
@@ -833,6 +853,6 @@ fn buffer_save_rejects_second_owned_overrider
         MSV::Unspecified       => true,
         MSV::Specified (gnids)   => gnids . is_empty (), };
       assert! ( overrides_empty,
-        "a rejected save must not write mono-r2's override relationship: {:?}",
+        "a refused save must not write mono-r2's override relationship: {:?}",
         r2 . overrides );
       Ok (( )) } )) }

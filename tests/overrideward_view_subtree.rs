@@ -6,8 +6,9 @@
 // Fixture (tests/overrideward_view_subtree/fixtures): owned skgrepo
 // "main" holds U, which overrides foreign F, which overrides foreign
 // G; foreign M1 and M2 mutually override; foreign B overrides foreign
-// E; foreign D overrides "gone", which no file defines. The config
-// marks "foreign" with 'foreign = true'; "main" is owned.
+// E; foreign D overrides "gone", which no file defines; owned O1 and
+// O2 mutually override. The config marks "foreign" with
+// 'foreign = true'; "main" is owned.
 
 use std::collections::HashSet;
 use std::error::Error;
@@ -46,6 +47,8 @@ fn all_tests () -> Result<(), Box<dyn Error>> {
         SkgrepoRestriction::unrestricted (&s . config);
       let graph = graph_handle_from_config (&s . config) ? . load_full ();
       suppression_anchors_at_owned (
+        &graph, &s . config, &restriction ) ?;
+      an_owned_mutual_pair_both_matching_shows_one_hit (
         &graph, &s . config, &restriction ) ?;
       a_hit_shows_the_nodes_it_overrides_in_a_folder (
         &graph, &s . config, &restriction ) ?;
@@ -138,6 +141,24 @@ fn suppression_anchors_at_owned (
     "Only F and G (mirrors of owned U) should be suppressed; the \
      foreign mutual pair M1/M2 and E (forked only by the foreign B) \
      must survive at top level." );
+  Ok (( )) }
+
+/// Owned O1 and O2 override each other, and both match: one stands,
+/// the other is suppressed. They tie (one skgrepo, each forked by the
+/// other), and a tie among hits goes to the least pid, O1.
+fn an_owned_mutual_pair_both_matching_shows_one_hit (
+  graph  : &InRustGraph,
+  config : &SkgConfig,
+  restriction : &SkgrepoRestriction,
+) -> Result<(), Box<dyn Error>> {
+  let matches : MatchGroups = [
+    hit ("O1", "main", "owned mutual one"),
+    hit ("O2", "main", "owned mutual two"),
+  ] . into_iter () . collect ();
+  let suppressed : HashSet<ID> =
+    suppressed_result_gnids ( &matches, &graph, config, restriction );
+  assert_eq! ( suppressed, HashSet::from ([ ID::from ("O2") ]),
+               "one of the owned mutual pair is shown, O1" );
   Ok (( )) }
 
 /// U overrides F, which overrides G, and nothing overrides U. So

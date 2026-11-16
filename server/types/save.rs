@@ -105,7 +105,7 @@ pub enum PostSkgsaveCommitNoticeCandidate {
 /// title/body/contains, 'subscribesTo = [N]' and
 /// 'overrides = [N]', no hides. N itself is left untouched on
 /// disk (its foreign SaveNode is dropped). The 'original_*' fields name
-/// N, for the monogamy pre-check and the confirmation buffer's display.
+/// N, for the already-forked check and the confirmation buffer's display.
 #[derive(Debug, Clone)]
 pub struct ForkSpec {
   pub clone            : SaveNode,
@@ -255,7 +255,7 @@ fn buffer_validation_error_text (
       format!("Cannot fork a foreign node -- no owned repo for the clone:\n- Foreign node: {}\n- It has no owned ancestor in the view to inherit a repo from.\n- Set the clone's repo in the fork-confirmation buffer (C-c s s), then approve.\n",
               gnid . 0) },
     BufferValidationError::ForkAlreadyExists(original, existing) => {
-      format!("Cannot fork a node you have already forked:\n- Foreign node: {}\n- Your existing clone: {}\n- A node may have at most one owned override. Edit the existing clone instead.\n",
+      format!("Cannot fork a node you already fork:\n- Foreign node: {}\n- Your fork of it: {}\n- Edit that fork instead. To fork it a second time deliberately, make another note of yours fork it.\n",
               original . 0, existing . 0) },
     BufferValidationError::ForkSkgrepoRestricted(gnid, skgrepo) => {
       format!("Cannot fork into a restricted repo:\n- Foreign node: {}\n- Clone's resolved repo: {}\n- That repo is not in the skgrepo restriction. Activate it first; an invisible clone is never created silently.\n",

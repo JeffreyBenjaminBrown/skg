@@ -91,6 +91,12 @@ fn all_tests
       s . reset ("extraction_honors_overridesHere", fixtures) ?;
       extraction_honors_overridesHere (
         &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("a_second_owned_overrider_saves_and_q3s_mirror_stands", fixtures) ?;
+      a_second_owned_overrider_saves_and_q3s_mirror_stands (
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("an_owned_mutual_pair_saves_and_q3s_mirror_stands", fixtures) ?;
+      an_owned_mutual_pair_saves_and_q3s_mirror_stands (
+        &s . config, &mut s . tantivy ) . await ?;
       s . reset_from_config ("ownership_and_visibility_gate_substitution",
                              "tests/override_substitution/fixtures-multi/skgconfig.toml") ?;
       ownership_and_visibility_gate_substitution (
@@ -276,6 +282,59 @@ async fn save_roundtrips_to_original_and_is_a_fixpoint (
         "a second save is a noop (the fixpoint through the \
          collected-ID orderkey)" );
       Ok (( )) }
+
+/// M, in N's skgrepo, comes to override N beside R. N's three mirrors
+/// tie in that skgrepo, R and M both forked by none of the others, so
+/// N stands as itself (Q3, rule 3), where R stood before the save; and
+/// M, whose mirrors are the same three, stands as itself.
+async fn a_second_owned_overrider_saves_and_q3s_mirror_stands (
+  config  : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  let (before, _pids, _tree) =
+    multi_root_view ( config, Some (tantivy), &[ ID::from ("P") ] ) ?;
+  assert! ( marked_lines (&before, "N") . iter ()
+            . any ( |l| l . contains ("(gnid R)") ),
+            "before the save, R stands in N's place:\n{}", before );
+  save_and_rerender ( indoc! {"
+    * (skg node (gnid M) (skgRepos (nodeRepo main))) M
+    ** (skg overriddenFolder)
+    *** (skg node (gnid N) (skgRepos (nodeRepo main)) writeProtected) N
+  "}, config, tantivy ) . await ?;
+  assert! ( read_fixture_file (config, "M") . contains ("- N"),
+            "M overrides N on disk:\n{}", read_fixture_file (config, "M") );
+  let (after, _pids, _tree) =
+    multi_root_view ( config, Some (tantivy), &[ ID::from ("P") ] ) ?;
+  assert! ( marked_lines (&after, "N") . is_empty ()
+            && marked_lines (&after, "M") . is_empty (),
+            "nothing stands in N's or M's place:\n{}", after );
+  assert! ( line_of_gnid (&after, "N") . is_some ()
+            && line_of_gnid (&after, "M") . is_some ()
+            && line_of_gnid (&after, "R") . is_none (),
+            "N and M are shown as themselves, R not at all:\n{}", after );
+  Ok (( )) }
+
+/// N comes to override R, which overrides N: an owned mutual pair, in
+/// one skgrepo. Each is forked by the other, so N stands as itself
+/// (Q3, rule 3), where R stood before the save.
+async fn an_owned_mutual_pair_saves_and_q3s_mirror_stands (
+  config  : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  save_and_rerender ( indoc! {"
+    * (skg node (gnid N) (skgRepos (nodeRepo main))) N
+    ** (skg overriddenFolder)
+    *** (skg node (gnid R) (skgRepos (nodeRepo main)) writeProtected) R
+  "}, config, tantivy ) . await ?;
+  assert! ( read_fixture_file (config, "N") . contains ("- R"),
+            "N overrides R on disk:\n{}", read_fixture_file (config, "N") );
+  let (after, _pids, _tree) =
+    multi_root_view ( config, Some (tantivy), &[ ID::from ("P") ] ) ?;
+  assert! ( marked_lines (&after, "N") . is_empty ()
+            && line_of_gnid (&after, "N") . is_some ()
+            && line_of_gnid (&after, "R") . is_none (),
+            "N is shown as itself, R not at all:\n{}", after );
+  Ok (( )) }
 
 async fn extraction_honors_overridesHere (
   config : &SkgConfig,

@@ -538,9 +538,7 @@ def main() -> None:
         ("normalized_definitions", "normalized definitions"),
         ("affected_ids", "affected IDs"),
         ("owners_reindexed", "owners reindexed"),
-        ("override_sources_checked", "override sources checked"),
-        ("override_targets_checked", "override targets checked"),
-        ("override_chain_steps", "override-chain steps"),
+        ("override_pids_checked", "notes checked for the fork rules"),
         ("local_index_keys_checked", "local-index keys checked"),
     ]:
         values = [row[key] for row in graph_work if key in row]

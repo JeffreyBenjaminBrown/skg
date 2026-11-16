@@ -93,7 +93,7 @@ pub enum BufferValidationError {
   // overrides N). These are the ways that request can be refused.
   ForkSkgrepoUnresolved           (ID), // N's pid: no owned vognode ancestor in the view to inherit C's skgrepo from, and the user set none in the confirmation buffer.
   ForkAlreadyExists              (ID,   // N's pid
-                                  ID),  // the existing owned clone that already overrides N (monogamy: a node may have at most one owned overrider)
+                                  ID),  // a note the user owns that already forks N: the fork operation's guard ('validate_fork_specs_in_graph')
   ForkSkgrepoRestricted             (ID,           // N's pid
                                   SkgrepoName),  // C's resolved owned skgrepo, which is restricted under the skgrepo restriction
   ForkSkgrepoNotOwned             (ID,           // N's pid
@@ -315,7 +315,7 @@ impl std::fmt::Display for BufferValidationError {
       BufferValidationError::ForkSkgrepoUnresolved(gnid) =>
         write!(f, "Cannot fork node {:?}: no owned repo to put the clone in. It has no owned ancestor in the view to inherit a repo from; set the clone's repo in the confirmation buffer (C-c s s).", gnid),
       BufferValidationError::ForkAlreadyExists(original, existing) =>
-        write!(f, "Cannot fork node {:?}: you have already forked it. Your clone is {:?}. Edit that clone instead (a node may have at most one owned override).", original, existing),
+        write!(f, "Cannot fork node {:?}: you already fork it; your fork is {:?}. Edit that fork instead. To fork it a second time deliberately, make another note of yours fork it.", original, existing),
       BufferValidationError::ForkSkgrepoRestricted(gnid, skgrepo) =>
         write!(f, "Cannot fork node {:?}: the clone's repo '{}' is kept out by the skgrepo restriction. Activate it first; an invisible clone is never created silently.", gnid, skgrepo),
       BufferValidationError::RecordSkgrepoRestricted(recorder, relation, member, skgrepo) =>

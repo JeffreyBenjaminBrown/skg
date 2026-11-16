@@ -1165,7 +1165,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals_or_preview (
     // A save that found forks but was not pre-approved skgsave-commits nothing.
     // Return a write-protected fork-confirmation buffer; the client shows it,
     // and on approval re-issues the save with (approved-forks . "true").
-    // (Monogamy and skgrepo validation already ran in
+    // (The already-forked and skgrepo checks ran in
     // buffer_to_validated_saveplan, so every fork here is admissible.)
     return Ok ( SaveResponse::fork_confirmation (
       parse_warnings,

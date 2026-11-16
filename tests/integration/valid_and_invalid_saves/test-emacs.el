@@ -1,7 +1,7 @@
 ;;; Integration test for skg save error handling
 ;;; This script tests:
 ;;; 1. Invalid save (duplicate ID without write-protected) should show error buffer
-;;; 2. Valid save (with write-protected) should work normally
+;;; 2. Valid save (a new child in place of the duplicate) should work normally
 ;;;
 ;;; NOTE: File system operations (backup/cleanup) are handled by run-test.sh
 
@@ -78,14 +78,14 @@
 
 (defun test-valid-save ()
   "Test valid save after fixing the content."
-  (message "=== PHASE 2: Testing valid save (with writeProtected) ===")
+  (message "=== PHASE 2: Testing valid save (a new child in place of the duplicate) ===")
 
   ;; Switch back to content view buffer and fix the content
   (with-current-buffer "*skg-content-view*"
     (goto-char (point-min))
     (search-forward "** (skg node (gnid 1)) 1")
-    (replace-match "** (skg node (gnid 1) writeProtected) 1")
-    (message "✓ Amended previously invalid content to use writeProtected, so it is now valid"))
+    (replace-match "** two")
+    (message "✓ Replaced the duplicate with a new child, so the content is now valid"))
 
   ;; Switch to buffer to make it current
   (switch-to-buffer "*skg-content-view*")
@@ -102,15 +102,13 @@
     (let ((updated-content (buffer-substring-no-properties (point-min) (point-max))))
       (message "Updated buffer content: %s" updated-content)
 
-      ;; Should contain cycle and write-protected atoms
-      ;; Note: cycle sits in (view ...), write-protected beside the node atom
-      (if (and (string-match-p "cycle" updated-content)
-               (string-match-p "\\bwriteProtected\\b" updated-content))
+      ;; The new child comes back with the ID the save gave it.
+      (if (string-match-p "^\\*\\* (skg .*(gnid [^)]+).*) two$" updated-content)
           (progn
-            (message "✓ PASS: Valid save worked and showed cycle writeProtected"))
+            (message "✓ PASS: Valid save worked and gave the new child an ID"))
         (progn
-          (message "✗ FAIL: Expected cycle and writeProtected atoms not found")
-          (message "Expected to contain: 'cycle' and 'writeProtected'")
+          (message "✗ FAIL: The new child did not come back with an ID")
+          (message "Expected a line: '** (skg ... (gnid ID) ...) two'")
           (message "Got: %s" updated-content)
           (kill-emacs 1)))))
   ;; §20.2(c): an invalid save must not leak lock/stream state that wedges the

@@ -165,16 +165,17 @@ fn three_nodeMerged_graphnodes(
     combined . extend (
       members_of (& acquiree_from_disk . contains) );
     dedup_vector (combined) };
+  let own_gnids : Vec<ID> = // the merged note's IDs, the acquiree's among them: it may not contain, fork or hide any of them
+    updated_acquirer . all_gnids() . cloned() . collect::<Vec<_>>();
+  let not_own = |m : &RelPartner<ID>| -> bool {
+    ! own_gnids . contains ( &m . member ) };
   updated_acquirer . contains = {
     let mut combined : Vec<RelPartner<ID>> = combine_rel_partners (
       & [ & rel_partners_at_relRepo ( & updated_acquirer . home_skgrepo,
                             vec! [ acquiree_text_preserver . pid . clone() ] ),
           & acquirer_from_disk . contains,
           & acquiree_from_disk . contains ] );
-    let own_gnids : Vec<ID> =
-      updated_acquirer . all_gnids() . cloned() . collect::<Vec<_>>();
-    combined . retain ( // prevent acquirer from containing itself
-      |m| ! own_gnids . contains ( &m . member ));
+    combined . retain (not_own);
     combined };
   { // Union aliases (parallel to extra_ids): a merged node should
     // still be findable by the acquiree's old aliases.
@@ -195,10 +196,12 @@ fn three_nodeMerged_graphnodes(
     updated_acquirer . aliases =
       MSV::Specified (combined); }
   { // Combine subscribesTo
+    let mut combined : Vec<RelPartner<ID>> = combine_rel_partners (
+      & [ acquirer_from_disk . subscribesTo . or_default (),
+          acquiree_from_disk . subscribesTo . or_default () ] );
+    combined . retain (not_own);
     updated_acquirer . subscribesTo =
-      MSV::Specified ( combine_rel_partners (
-        & [ acquirer_from_disk . subscribesTo . or_default (),
-            acquiree_from_disk . subscribesTo . or_default () ] )); }
+      MSV::Specified (combined); }
   { // Combine hidesFromSubs, filtering to hide
     // nothing that the acquirer contains, and nothing either member
     // showed through its subscriptions pre-merge: if it was
@@ -216,13 +219,16 @@ fn three_nodeMerged_graphnodes(
       |m| ! new_contains . contains ( &m . member ));
     combined . retain (
       |m| ! shown_pre_merge . contains ( &m . member ));
+    combined . retain (not_own);
     updated_acquirer . hidesFromSubs =
       MSV::Specified (combined); }
   { // Combine overrides
+    let mut combined : Vec<RelPartner<ID>> = combine_rel_partners (
+      & [ acquirer_from_disk . overrides . or_default (),
+          acquiree_from_disk . overrides . or_default () ] );
+    combined . retain (not_own);
     updated_acquirer . overrides =
-      MSV::Specified ( combine_rel_partners (
-        & [ acquirer_from_disk . overrides . or_default (),
-            acquiree_from_disk . overrides . or_default () ] )); }
+      MSV::Specified (combined); }
   Ok (updated_acquirer) }
 
 /// The ids 'node' shows as unintegrated subscribed content: contained

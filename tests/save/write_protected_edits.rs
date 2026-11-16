@@ -105,22 +105,22 @@ async fn saving_an_edited_writeProtected_occurrence_impl (
     &mut stream, rendered, config, tantivy, &graph,
     &viewforest_id, &mut views_state ) . await ?;
 
-  // A newly inserted write-protected occurrence of node 1 that agrees
+  // A newly inserted write-protected occurrence of node 4 that agrees
   // with the graph is no edit. It may therefore express the root's new
-  // self-content relationship.
-  let with_new_self_occurrence : String = first . saved_view . replacen (
+  // content relationship.
+  let with_new_occurrence : String = first . saved_view . replacen (
     '\n',
-    "\n** (skg node (gnid 1) (skgRepos (nodeRepo main)) writeProtected) 1\n",
+    "\n** (skg node (gnid 4) (skgRepos (nodeRepo main)) writeProtected) 4\n",
     1);
   let second = update_from_and_rerender_buffer (
-    &mut stream, &with_new_self_occurrence, config, tantivy, &graph,
+    &mut stream, &with_new_occurrence, config, tantivy, &graph,
     &viewforest_id, &mut views_state ) . await ?;
   assert! (second . errors . is_empty (),
-    "the new self occurrence should be accepted: {:?}", second . errors);
+    "the new occurrence should be accepted: {:?}", second . errors);
   let saved_root : Graphnode =
     graphnode_from_gnid (config, &ID::from ("1"))?;
-  assert! (members_of (&saved_root . contains) . contains (&ID::from ("1")),
-    "the accepted new occurrence should make node 1 content of itself");
+  assert! (members_of (&saved_root . contains) . contains (&ID::from ("4")),
+    "the accepted new occurrence should make node 4 content of node 1");
 
   // Retitling the occurrence of node 2 makes it differ from the graph.
   let old_line : &str = second . saved_view . lines ()

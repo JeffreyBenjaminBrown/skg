@@ -117,7 +117,8 @@ fn configured_dangling_members_are_tolerated_without_warning () {
 }
 
 #[test]
-fn canonical_entry_includes_override_monogamy_and_telescope_orientation () {
+fn canonical_entry_includes_the_fork_rules_and_telescope_orientation () {
+  // a and b both override target (legal); a also contains it (not).
   let target = node ("target", "private");
   let mut a = node ("a", "public");
   let mut b = node ("b", "public");
@@ -126,12 +127,13 @@ fn canonical_entry_includes_override_monogamy_and_telescope_orientation () {
       RelPartner::at_relRepo (
         SkgrepoName::from ("public"), ID::from ("target")),
     ]); }
+  a . contains = vec![ RelPartner::at_relRepo (
+    SkgrepoName::from ("private"), ID::from ("target")) ];
   let report = validate_complete_graph (&config (), &[target, a, b]);
-  assert! (report . errors . iter () . any (|error| matches! (
-    error,
+  assert_eq! (report . errors, vec![
     CompleteGraphError::Override (
-      OverrideInvariantViolation::MultipleOwnedOverriders { overridden, .. })
-      if overridden == &ID::from ("target"))));
+      OverrideInvariantViolation::ForkeeContained {
+        forker : ID::from ("a"), forkee : ID::from ("target") }) ]);
   assert_eq! (report . warnings . iter () . filter (|(_, warning)| matches! (
     warning, TelescopeViolation::LeakShapedMembership {
       relation : "overrides", .. })) . count (), 2);

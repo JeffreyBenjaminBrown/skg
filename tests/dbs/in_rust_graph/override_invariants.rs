@@ -1,3 +1,11 @@
+// cargo nextest run --test grouped_unit -E 'test(in_rust_graph_override_invariants::)'
+//
+// The rules an owned note's forks, contents and hides keep
+// ('server/dbs/in_rust_graph/override_invariants.rs'): no self-fork,
+// self-containment or self-hide; no note both forking and containing
+// one note, nor containing a note that forks it. Several forks of one
+// note, and cycles of forks, are legal.
+
 use skg::dbs::in_rust_graph::{InRustGraph, apply_nodeInstructions_to_inRustGraph};
 use skg::dbs::in_rust_graph::override_invariants::{
   OverrideInvariantViolation,
@@ -5,7 +13,7 @@ use skg::dbs::in_rust_graph::override_invariants::{
   validate_affected_override_invariants,
   validate_override_invariants,
 };
-use skg::types::misc::{ID, MSV, SkgConfig, Skgrepo, SkgrepoName, rel_partners_at_relRepo};
+use skg::types::misc::{ID, MSV, RelPartner, SkgConfig, Skgrepo, SkgrepoName, rel_partners_at_relRepo};
 use skg::types::nodes::complete::{Graphnode, empty_graphnode};
 use skg::types::save::{NodeInstruction, DeleteNode, SaveNode};
 
@@ -31,6 +39,7 @@ fn config () -> SkgConfig {
       }),
   ])) }
 
+/// A note in 'skgrepo' that overrides 'overrides'.
 fn node (
   pid       : &str,
   skgrepo   : &str,
@@ -41,17 +50,43 @@ fn node (
   node . pid = ID::from (pid);
   node . title = pid . to_string ();
   node . home_skgrepo = SkgrepoName::from (skgrepo);
-  node . overrides =
-    if overrides . is_empty () {
-      MSV::Unspecified
-    } else {
-      MSV::Specified (
-        rel_partners_at_relRepo (
-          &node . home_skgrepo,
-          overrides . iter ()
-          . map ( |gnid| ID::from (*gnid) )
-          . collect () ) )
-    };
+  node . overrides = msv_of (&node . home_skgrepo, overrides);
+  node }
+
+fn msv_of (
+  skgrepo : &SkgrepoName,
+  gnids   : &[&str],
+) -> MSV<RelPartner<ID>> {
+  if gnids . is_empty () { MSV::Unspecified }
+  else { MSV::Specified ( partners_of (skgrepo, gnids) ) }}
+
+fn partners_of (
+  skgrepo : &SkgrepoName,
+  gnids   : &[&str],
+) -> Vec<RelPartner<ID>> {
+  rel_partners_at_relRepo (
+    skgrepo,
+    gnids . iter () . map ( |gnid| ID::from (*gnid) ) . collect () ) }
+
+fn with_contains (
+  mut node : Graphnode,
+  contains : &[&str],
+) -> Graphnode {
+  node . contains = partners_of (&node . home_skgrepo, contains);
+  node }
+
+fn with_subscribesTo (
+  mut node     : Graphnode,
+  subscribesTo : &[&str],
+) -> Graphnode {
+  node . subscribesTo = msv_of (&node . home_skgrepo, subscribesTo);
+  node }
+
+fn with_hides (
+  mut node : Graphnode,
+  hides    : &[&str],
+) -> Graphnode {
+  node . hidesFromSubs = msv_of (&node . home_skgrepo, hides);
   node }
 
 fn violations_for (
@@ -80,7 +115,7 @@ fn affected_and_full (
       affected_gnids . extend (old . extra_ids . iter () . cloned ()); }
     if let Some (final_node) = candidate . nodes . get (pid) {
       affected_gnids . extend (final_node . extra_ids . iter () . cloned ()); }}
-  let scope = derive_affected_override_scope (
+  let scope : HashSet<ID> = derive_affected_override_scope (
     &base, &candidate, &touched, &affected_gnids);
   (validate_affected_override_invariants (&config (), &candidate, &scope),
    validate_override_invariants (&config (), &candidate))
@@ -96,56 +131,20 @@ fn one_owned_overrider_is_valid () {
     vec![] ); }
 
 #[test]
-fn two_owned_overriders_of_same_target_are_invalid () {
-  let violations : Vec<OverrideInvariantViolation> =
-    violations_for (vec![
-      node ("target", "owned", &[]),
-      node ("one", "owned", &["target"]),
-      node ("two", "owned", &["target"]),
-    ]);
-  assert_eq! (violations . len (), 1);
-  assert! (matches!(
-    &violations[0],
-    OverrideInvariantViolation::MultipleOwnedOverriders {
-      overridden,
-      overriders,
-    } if overridden == &ID::from ("target")
-         && overriders == &vec![ID::from ("one"), ID::from ("two")]
-  )); }
-
-#[test]
-fn foreign_overriders_do_not_count_for_monogamy () {
-  assert_eq! (
-    violations_for (vec![
-      node ("target", "owned", &[]),
-      node ("owned-one", "owned", &["target"]),
-      node ("foreign-one", "foreign", &["target"]),
-      node ("foreign-two", "foreign", &["target"]),
-    ]),
-    vec![] ); }
-
-#[test]
-fn extra_id_targets_are_resolved_before_monogamy_check () {
-  let mut target : Graphnode =
-    node ("target", "owned", &[]);
+fn several_owned_forks_of_one_note_are_valid () {
+  let mut target : Graphnode = node ("target", "owned", &[]);
   target . extra_ids = vec![ID::from ("target-extra")];
-  let violations : Vec<OverrideInvariantViolation> =
+  assert_eq! (
     violations_for (vec![
       target,
       node ("one", "owned", &["target"]),
       node ("two", "owned", &["target-extra"]),
-    ]);
-  assert! (matches!(
-    &violations[0],
-    OverrideInvariantViolation::MultipleOwnedOverriders {
-      overridden,
-      ..
-    } if overridden == &ID::from ("target")
-  )); }
+      with_subscribesTo (node ("three", "owned", &[]), &["target"]),
+    ]),
+    vec![] ); }
 
 #[test]
 fn owned_override_chain_is_valid () {
-  // x overrides y overrides z, all owned -- a linear chain, now legal.
   assert_eq! (
     violations_for (vec![
       node ("z", "owned", &[]),
@@ -155,120 +154,181 @@ fn owned_override_chain_is_valid () {
     vec![] ); }
 
 #[test]
-fn one_overrider_two_targets_is_valid () {
-  // A single overrider may override several distinct targets; monogamy
-  // gates the overridden end, not the overrider's out-degree.
+fn owned_override_cycles_are_valid () {
   assert_eq! (
     violations_for (vec![
-      node ("t1", "owned", &[]),
-      node ("t2", "owned", &[]),
-      node ("overrider", "owned", &["t1", "t2"]),
+      node ("a", "owned", &["b"]),
+      node ("b", "owned", &["a"]),
     ]),
-    vec![] ); }
-
-/// True iff some violation is an owned cycle whose member set
-/// equals 'members'.
-fn has_cycle_over (
-  violations : &[OverrideInvariantViolation],
-  members    : &[&str],
-) -> bool {
-  let wanted : HashSet<ID> =
-    members . iter () . map ( |s| ID::from (*s) ) . collect ();
-  violations . iter () . any ( |v| match v {
-    OverrideInvariantViolation::OwnedOverrideCycle { cycle } =>
-      cycle . iter () . cloned () . collect::<HashSet<ID>> () == wanted,
-    _ => false } ) }
-
-#[test]
-fn two_node_owned_cycle_is_invalid () {
-  // a overrides b, b overrides a, both owned.
-  let nodes = vec![
-    node ("a", "owned", &["b"]),
-    node ("b", "owned", &["a"]),
-  ];
-  assert! ( has_cycle_over (
-    &violations_for (nodes . clone ()), &["a", "b"] ) );
-}
-
-#[test]
-fn three_node_owned_cycle_is_invalid () {
-  // a overrides b, b overrides c, c overrides a, all owned.
-  let nodes = vec![
-    node ("a", "owned", &["b"]),
-    node ("b", "owned", &["c"]),
-    node ("c", "owned", &["a"]),
-  ];
-  assert! ( has_cycle_over (
-    &violations_for (nodes . clone ()), &["a", "b", "c"] ) );
-}
-
-#[test]
-fn cycle_through_foreign_link_is_valid () {
-  // a(owned) overrides b(foreign) overrides c(owned) overrides a:
-  // the foreign link breaks the owned walk, so no owned
-  // cycle exists.
-  let nodes = vec![
-    node ("a", "owned",   &["b"]),
-    node ("b", "foreign", &["c"]),
-    node ("c", "owned",   &["a"]),
-  ];
-  assert_eq! ( violations_for (nodes . clone ()), vec![] );
-}
-
-#[test]
-fn chain_through_foreign_middle_is_valid () {
+    vec![] );
   assert_eq! (
     violations_for (vec![
-      node ("z", "owned", &[]),
-      node ("y", "foreign", &["z"]),
-      node ("x", "owned", &["y"]),
+      node ("a", "owned", &["b"]),
+      node ("b", "owned", &["c"]),
+      node ("c", "owned", &["a"]),
     ]),
     vec![] ); }
 
 #[test]
-fn chain_from_foreign_first_is_valid () {
+fn an_owned_self_override_or_self_subscription_is_a_self_fork () {
+  assert_eq! (
+    violations_for (vec![ node ("a", "owned", &["a"]) ]),
+    vec![ OverrideInvariantViolation::SelfFork { node : ID::from ("a") } ] );
   assert_eq! (
     violations_for (vec![
-      node ("z", "owned", &[]),
-      node ("y", "owned", &["z"]),
-      node ("x", "foreign", &["y"]),
+      with_subscribesTo (node ("a", "owned", &[]), &["a"]) ]),
+    vec![ OverrideInvariantViolation::SelfFork { node : ID::from ("a") } ] ); }
+
+#[test]
+fn a_self_fork_by_an_extra_id_is_a_self_fork () {
+  let mut a : Graphnode = node ("a", "owned", &["a-extra"]);
+  a . extra_ids = vec![ID::from ("a-extra")];
+  assert_eq! (
+    violations_for (vec![a]),
+    vec![ OverrideInvariantViolation::SelfFork { node : ID::from ("a") } ] ); }
+
+#[test]
+fn self_containment_and_self_hiding_are_refused () {
+  assert_eq! (
+    violations_for (vec![
+      with_contains (node ("a", "owned", &[]), &["a"]) ]),
+    vec![ OverrideInvariantViolation::SelfContains { node : ID::from ("a") } ] );
+  assert_eq! (
+    violations_for (vec![
+      with_hides (node ("a", "owned", &[]), &["a"]) ]),
+    vec![ OverrideInvariantViolation::SelfHides { node : ID::from ("a") } ] ); }
+
+#[test]
+fn a_foreign_note_breaking_the_rules_is_not_checked () {
+  assert_eq! (
+    violations_for (vec![
+      with_contains (node ("a", "foreign", &["a", "b"]), &["a", "b"]),
+      node ("b", "foreign", &[]),
     ]),
     vec![] ); }
 
 #[test]
-fn alias_redirection_that_closes_a_cycle_is_affected () {
-  let mut acquirer : Graphnode = node ("B", "owned", &["A"]);
-  acquirer . extra_ids = vec![ID::from ("future")];
+fn a_note_may_not_contain_a_note_it_forks () {
+  let expected : Vec<OverrideInvariantViolation> = vec![
+    OverrideInvariantViolation::ForkeeContained {
+      forker : ID::from ("r"), forkee : ID::from ("e") } ];
+  assert_eq! (
+    violations_for (vec![
+      node ("e", "foreign", &[]),
+      with_contains (node ("r", "owned", &["e"]), &["e"]),
+    ]),
+    expected );
+  assert_eq! (
+    violations_for (vec![
+      node ("e", "foreign", &[]),
+      with_contains (
+        with_subscribesTo (node ("r", "owned", &[]), &["e"]),
+        &["e"]),
+    ]),
+    expected ); }
+
+#[test]
+fn a_note_may_not_contain_a_note_that_forks_it () {
+  let expected : Vec<OverrideInvariantViolation> = vec![
+    OverrideInvariantViolation::ForkerContained {
+      forker : ID::from ("r"), forkee : ID::from ("e") } ];
+  // An owned container of its foreign forker.
+  assert_eq! (
+    violations_for (vec![
+      with_contains (node ("e", "owned", &[]), &["r"]),
+      node ("r", "foreign", &["e"]),
+    ]),
+    expected );
+  // An owned forker of its foreign container.
+  assert_eq! (
+    violations_for (vec![
+      with_contains (node ("e", "foreign", &[]), &["r"]),
+      node ("r", "owned", &["e"]),
+    ]),
+    expected );
+  // Both owned: one violation, seen from either side.
+  assert_eq! (
+    violations_for (vec![
+      with_contains (node ("e", "owned", &[]), &["r"]),
+      node ("r", "owned", &["e"]),
+    ]),
+    expected ); }
+
+#[test]
+fn a_link_to_itself_and_containing_a_fork_sibling_are_fine () {
+  // r and s both fork e; r contains s: siblings, not partners.
+  let mut linker : Graphnode = node ("l", "owned", &[]);
+  linker . body = Some ("see [[id:l][myself]]" . to_string ());
+  assert_eq! (
+    violations_for (vec![
+      linker,
+      node ("e", "foreign", &[]),
+      with_contains (node ("r", "owned", &["e"]), &["s"]),
+      node ("s", "owned", &["e"]),
+    ]),
+    vec![] ); }
+
+#[test]
+fn a_nodeMerge_that_makes_a_note_fork_and_contain_one_note_is_affected () {
+  // R forks A and contains B, untouched; the save merges B into A.
+  let mut acquirer : Graphnode = node ("A", "owned", &[]);
+  acquirer . extra_ids = vec![ID::from ("B")];
   let (affected, full) = affected_and_full (
     vec![
-      node ("A", "owned", &["future"]),
-      node ("B", "owned", &["A"]),
+      node ("A", "owned", &[]),
+      node ("B", "owned", &[]),
+      with_contains (node ("R", "owned", &["A"]), &["B"]),
     ],
-    vec![NodeInstruction::Save (SaveNode (acquirer))]);
+    vec![
+      NodeInstruction::Save (SaveNode (acquirer)),
+      NodeInstruction::Delete (DeleteNode {
+        gnid : ID::from ("B"), home_skgrepo : SkgrepoName::from ("owned") }),
+    ]);
   assert_eq! (affected, full);
-  assert! (has_cycle_over (&affected, &["A", "B"]));
-}
+  assert_eq! (affected, vec![
+    OverrideInvariantViolation::ForkeeContained {
+      forker : ID::from ("R"), forkee : ID::from ("A") } ]); }
 
 #[test]
-fn ownership_class_change_can_create_monogamy_violation () {
+fn a_dangling_id_forked_and_contained_breaks_no_rule_until_it_names_a_note () {
+  let r : Graphnode = with_contains (node ("R", "owned", &["E"]), &["E"]);
+  assert_eq! ( violations_for (vec![ r . clone () ]), vec![] );
+  let (affected, full) = affected_and_full (
+    vec![ r ],
+    vec![NodeInstruction::Save (SaveNode (node ("E", "owned", &[]))) ]);
+  assert_eq! (affected, full);
+  assert_eq! (affected, vec![
+    OverrideInvariantViolation::ForkeeContained {
+      forker : ID::from ("R"), forkee : ID::from ("E") } ]); }
+
+#[test]
+fn an_extra_id_that_closes_a_self_fork_is_affected () {
+  // A overrides 'future'; A acquires 'future' as an extra ID.
+  let mut acquirer : Graphnode = node ("A", "owned", &["future"]);
+  acquirer . extra_ids = vec![ID::from ("future")];
+  let (affected, full) = affected_and_full (
+    vec![ node ("A", "owned", &["future"]) ],
+    vec![NodeInstruction::Save (SaveNode (acquirer))]);
+  assert_eq! (affected, full);
+  assert_eq! (affected, vec![
+    OverrideInvariantViolation::SelfFork { node : ID::from ("A") } ]); }
+
+#[test]
+fn ownership_class_change_can_create_a_violation () {
   let (affected, full) = affected_and_full (
     vec![
       node ("target", "owned", &[]),
-      node ("changed", "foreign", &["target"]),
-      node ("existing", "owned", &["target"]),
+      with_contains (node ("changed", "foreign", &["target"]), &["target"]),
     ],
     vec![NodeInstruction::Save (SaveNode (
-      node ("changed", "owned", &["target"]))) ]);
+      with_contains (node ("changed", "owned", &["target"]), &["target"]))) ]);
   assert_eq! (affected, full);
-  assert! (matches! (
-    affected . first (),
-    Some (OverrideInvariantViolation::MultipleOwnedOverriders {
-      overridden, ..
-    }) if overridden == &ID::from ("target")));
-}
+  assert_eq! (affected, vec![
+    OverrideInvariantViolation::ForkeeContained {
+      forker : ID::from ("changed"), forkee : ID::from ("target") } ]); }
 
 #[test]
-fn relationship_and_target_deletions_do_not_create_override_errors () {
+fn relationship_and_target_deletions_do_not_create_violations () {
   let (relationship_affected, relationship_full) = affected_and_full (
     vec![
       node ("target", "owned", &[]),
@@ -291,45 +351,50 @@ fn relationship_and_target_deletions_do_not_create_override_errors () {
   assert! (delete_affected . is_empty ());
 }
 
-#[test]
-fn adding_a_linear_override_chain_remains_valid () {
-  let (affected, full) = affected_and_full (
-    vec![
-      node ("A", "owned", &[]),
-      node ("B", "owned", &["C"]),
-      node ("C", "owned", &[]),
-    ],
-    vec![NodeInstruction::Save (SaveNode (
-      node ("A", "owned", &["B"]))) ]);
-  assert_eq! (affected, full);
-  assert! (affected . is_empty ());
-}
-
 proptest! {
   #![proptest_config (ProptestConfig::with_cases (256))]
 
+  /// One note's overrides, subscriptions, contents and ownership
+  /// changed in a small graph: the save's check agrees with the whole
+  /// graph's.
   #[test]
-  fn affected_override_check_matches_full_for_one_node_edits (
-    changed_index in 0usize..4,
-    target_index in 0usize..5,
+  fn affected_check_matches_full_for_one_node_edits (
+    changed_index  in 0usize..4,
+    override_index in 0usize..5,
+    subscribe_index in 0usize..5,
+    contain_index  in 0usize..5,
     owned in any::<bool> (),
   ) {
     let gnids : [&str; 4] = ["A", "B", "C", "D"];
     let base : Vec<Graphnode> = vec![
       node ("A", "owned", &["B"]),
-      node ("B", "owned", &["C"]),
+      with_contains (node ("B", "owned", &["C"]), &["D"]),
       node ("C", "owned", &[]),
-      node ("D", "foreign", &["C"]),
+      with_contains (node ("D", "foreign", &["C"]), &["A"]),
     ];
-    let targets : Vec<&str> =
-      if target_index == 4 { Vec::new () }
-      else { vec![gnids [target_index]] };
-    let changed : Graphnode = node (
-      gnids [changed_index],
-      if owned { "owned" } else { "foreign" },
-      &targets);
-    let (affected, full) = affected_and_full (
-      base, vec![NodeInstruction::Save (SaveNode (changed))]);
-    prop_assert_eq! (affected, full);
+    let pick = |index : usize| -> Vec<&str> {
+      if index == 4 { Vec::new () } else { vec![gnids [index]] } };
+    let changed : Graphnode = with_subscribesTo (
+      with_contains (
+        node (
+          gnids [changed_index],
+          if owned { "owned" } else { "foreign" },
+          &pick (override_index)),
+        &pick (contain_index)),
+      &pick (subscribe_index));
+    let base_graph : InRustGraph = InRustGraph::from_graphnodes (&base);
+    let mut candidate : InRustGraph = base_graph . clone ();
+    apply_nodeInstructions_to_inRustGraph (
+      &mut candidate, &[NodeInstruction::Save (SaveNode (changed))]);
+    let touched : HashSet<ID> =
+      HashSet::from ([ ID::from (gnids [changed_index]) ]);
+    let scope : HashSet<ID> = derive_affected_override_scope (
+      &base_graph, &candidate, &touched, &touched);
+    let full_before : Vec<OverrideInvariantViolation> =
+      validate_override_invariants (&config (), &base_graph);
+    prop_assume! (full_before . is_empty ());
+    prop_assert_eq! (
+      validate_affected_override_invariants (&config (), &candidate, &scope),
+      validate_override_invariants (&config (), &candidate));
   }
 }

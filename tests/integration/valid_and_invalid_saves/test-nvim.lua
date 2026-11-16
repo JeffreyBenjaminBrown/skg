@@ -2,7 +2,8 @@
 -- The Lua mirror of test-emacs.el in this directory:
 -- 1. Invalid save (duplicate ID without write-protected) should show an
 --    error buffer.
--- 2. Valid save (with write-protected) should work normally, and must
+-- 2. Valid save (a new child in place of the duplicate) should work
+--    normally, and must
 --    not leave lock/stream state that wedges the next save.
 --
 -- NOTE: File system operations (backup/cleanup) are handled by
@@ -66,12 +67,13 @@ local function test_invalid_save ()
 end
 
 local function test_valid_save (content_buf)
-  print('=== PHASE 2: Testing valid save (with writeProtected) ===')
+  print('=== PHASE 2: Testing valid save (a new child in place of the'
+       .. ' duplicate) ===')
 
-  -- Fix up the previously-invalid child line: add 'writeProtected'. Mirrors
+  -- Replace the previously-invalid child line with a new child. Mirrors
   -- the elisp's search-forward + replace-match on the exact text.
   local old_child_line = '** (skg node (gnid 1)) 1'
-  local new_child_line = '** (skg node (gnid 1) writeProtected) 1'
+  local new_child_line = '** two'
   local lines = vim.api.nvim_buf_get_lines(content_buf, 0, -1, false)
   local found_line = nil
   for i, line in ipairs(lines) do
@@ -85,8 +87,8 @@ local function test_valid_save (content_buf)
   end
   vim.api.nvim_buf_set_lines(content_buf, found_line - 1, found_line,
                              false, { new_child_line })
-  print('Amended previously invalid content to use writeProtected, so'
-       .. ' it is now valid')
+  print('Replaced the duplicate with a new child, so the content is'
+       .. ' now valid')
 
   vim.api.nvim_set_current_buf(content_buf)
 
@@ -98,15 +100,19 @@ local function test_valid_save (content_buf)
   local updated_content = T.buffer_text(content_buf)
   print('Updated buffer content: ' .. updated_content)
 
-  -- Should contain cycle and write-protected atoms (inside (node ...)).
-  local has_cycle = updated_content:find('cycle', 1, true) ~= nil
-  local has_write_protected = updated_content:find('%f[%w]writeProtected%f[%W]') ~= nil
-  if has_cycle and has_write_protected then
-    print('Valid save worked and showed cycle writeProtected')
+  -- The new child comes back with the ID the save gave it.
+  local child_has_id = false
+  for line in (updated_content .. '\n'):gmatch('(.-)\n') do
+    if line:match('^%*%* %(skg .*%(gnid [^)]+%).*%) two$') then
+      child_has_id = true
+    end
+  end
+  if child_has_id then
+    print('Valid save worked and gave the new child an ID')
   else
-    print('Expected to contain: "cycle" and "writeProtected"')
+    print('Expected a line: "** (skg ... (gnid ID) ...) two"')
     print('Got: ' .. updated_content)
-    T.fail('Expected cycle and writeProtected atoms not found')
+    T.fail('The new child did not come back with an ID')
   end
 
   -- §20.2(c): an invalid save must not leak lock/stream state that

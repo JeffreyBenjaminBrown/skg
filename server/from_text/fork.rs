@@ -10,9 +10,9 @@
 //! and builds C's SaveNode. The confirmation-gating and the skgsave-commit live
 //! in the save handler.
 
-use crate::dbs::in_rust_graph::override_invariants::existing_owned_overrider_of;
 use crate::dbs::in_rust_graph::mirrors::{
-  Mirror, Mirrors, mirror_shown_among, mirrors_of, perspective_owner_of_tree_containing};
+  MIRROR_RELATION, Mirror, Mirrors, mirror_shown_among, mirrors_of,
+  perspective_owner_of_tree_containing};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use crate::org_to_text::skgRepos_form;
@@ -42,9 +42,9 @@ use std::iter::once;
 /// reached by skipping a foreign ancestor would be wrong -- a clone
 /// belongs in the skgrepo of the node that actually contains N here.
 /// A foreign node shown at several positions can have different nearest
-/// ancestors; the first owned one reached in preorder wins -- monogamy
-/// means at most one clone anyway, and the user can override the choice
-/// in the confirmation buffer.
+/// ancestors; the first owned one reached in preorder wins, since one
+/// fork makes one clone, and the user can override the choice in the
+/// confirmation buffer.
 /// A write-protected ancestor's skgrepo is read from its ID
 /// (WRITEPROTECTED_SKGREPOS_AFTER_SAVE): what it shows lags the move when
 /// the same buffer moved that node's editable occurrence.
@@ -316,15 +316,16 @@ fn forked_original_headline (
     . collect ();
   format! ( "** (skg {}) {}\n", parts . join (" "), title ) }
 
-/// Reject any fork that monogamy or the skgrepo restriction forbids. Run after
-/// the clones are built (their skgrepos resolved) but before the save
-/// skgsave-commits anything:
-/// - *monogamy*: a node may have at most one owned overrider, so
-///   forking an N the user has already forked would violate it. Detect
-///   the existing clone against the live graph and reject with
-///   'ForkAlreadyExists' (naming it) rather than letting the raw
-///   MultipleOwnedOverriders fire at skgsave-commit. A monogamy-blocked fork
-///   is not also reported for its skgrepo.
+/// Reject any fork the fork operation's guard or the skgrepo restriction
+/// forbids. Run after the clones are built (their skgrepos resolved) but
+/// before the save skgsave-commits anything:
+/// - *already forked*: if the user already owns a fork of N
+///   ('existing_owned_fork_of'), reject with 'ForkAlreadyExists',
+///   naming it. Editing a foreign note shown raw that silently made a
+///   second clone would more often be an accident than not; a
+///   deliberate second fork is made by having another owned note fork
+///   N, which nothing refuses. A fork refused so is not also reported
+///   for its skgrepo.
 /// - *owned*: the clone's resolved skgrepo must be one the user owns.
 ///   Inference and the default only ever yield owned skgrepos, but a
 ///   user-set skgrepo (typed, or hand-edited) might not be -- reject with
@@ -334,8 +335,7 @@ fn forked_original_headline (
 ///   touch restricted skgrepos, and an invisible clone is never created
 ///   silently; reject with 'ForkRepoRestricted'.
 ///
-/// The monogamy check uses the explicit save-planning graph; the
-/// skgsave-commit-time invariant check remains a defense in depth.
+/// The already-forked check reads the explicit save-planning graph.
 pub fn validate_fork_specs_in_graph (
   fork_specs             : &[ForkSpec],
   graph                  : &crate::dbs::in_rust_graph::InRustGraph,
@@ -344,7 +344,7 @@ pub fn validate_fork_specs_in_graph (
 ) -> Vec<BufferValidationError> {
   let mut errors : Vec<BufferValidationError> = Vec::new ();
   for spec in fork_specs {
-    if let Some (existing) = existing_owned_overrider_of (
+    if let Some (existing) = existing_owned_fork_of (
         config, graph, & spec . original_gnid )
       { errors . push (
           BufferValidationError::ForkAlreadyExists (
@@ -365,6 +365,19 @@ pub fn validate_fork_specs_in_graph (
           spec . original_gnid . clone (),
           clone_skgrepo . clone () )); }}
   errors }
+
+/// A note the user owns that forks the note 'original' names, if any
+/// (the least pid among several). 'original' may be a primary or an
+/// extra ID.
+pub fn existing_owned_fork_of (
+  config   : &SkgConfig,
+  graph    : &InRustGraph,
+  original : &ID,
+) -> Option<ID> {
+  let pid : ID = graph . pid_else_raw_id (original);
+  graph . inbound_pids_for_relation (&pid, MIRROR_RELATION) . into_iter ()
+    . find ( |forker| graph . nodes . get (forker) . is_some_and (
+      |node| config . skgrepo_is_owned (&node . home_skgrepo) )) }
 
 pub fn validate_fork_specs (
   fork_specs             : &[ForkSpec],

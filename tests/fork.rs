@@ -165,8 +165,8 @@ fn all_tests
       s . reset ("fork_collateral_rerender_substitutes_too", fixtures) ?;
       fork_collateral_rerender_substitutes_too (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("fork_monogamy", fixtures) ?;
-      fork_monogamy (
+      s . reset ("forking_a_note_one_already_forks_is_refused", fixtures) ?;
+      forking_a_note_one_already_forks_is_refused (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("fork_repo_restricted", fixtures) ?;
       fork_skgrepo_restricted (
@@ -214,8 +214,8 @@ fn all_tests
       s . reset ("explicit_fork_on_unknown_node_errors", fixtures) ?;
       explicit_fork_on_unknown_node_errors (
         &s . config ) . await ?;
-      s . reset ("explicit_fork_round_trip_and_monogamy", fixtures) ?;
-      explicit_fork_round_trip_and_monogamy (
+      s . reset ("explicit_fork_round_trip_and_refork_refusal", fixtures) ?;
+      explicit_fork_round_trip_and_refork_refusal (
         &s . config, &mut s . tantivy ) . await ?;
       let mail : &str = "tests/fork/fixtures-mail";
       s . reset ("a_reply_under_an_unread_message_integrates_it", mail) ?;
@@ -579,8 +579,8 @@ async fn explicit_fork_on_unknown_node_errors (
 
 /// The explicit fork skgsave-commits a clone overriding the owned P (override
 /// substitution then shows it in P's place), and a second explicit fork
-/// of the now-overridden P is rejected with 'ForkAlreadyExists'.
-async fn explicit_fork_round_trip_and_monogamy (
+/// of the now-forked P is rejected with 'ForkAlreadyExists'.
+async fn explicit_fork_round_trip_and_refork_refusal (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -607,7 +607,7 @@ async fn explicit_fork_round_trip_and_monogamy (
                vec! [ ID::from ("N") ],
     "P keeps its own contains; the explicit fork does not rewrite it" );
 
-  // Forking P again is rejected: it now has an owned overrider.
+  // Forking P again is rejected: the user already forks it.
   let result = buffer_to_validated_saveplan (
     EXPLICIT_FORK_BUFFER, config, &SkgrepoRestriction::unrestricted (config) ) ;
   match result {
@@ -963,11 +963,10 @@ async fn explicitly_foreign_new_child_still_rejected (
       other ), }
   Ok (( )) }
 
-/// Monogamy: a node may have at most one owned overrider. Forking
-/// N once creates a clone; forking it again is rejected with
-/// 'ForkAlreadyExists' naming the existing clone -- not the raw
-/// MultipleOwnedOverriders crash.
-async fn fork_monogamy (
+/// The fork operation's guard: forking N once creates a clone; forking
+/// it again is rejected with 'ForkAlreadyExists', naming the clone and
+/// saying how to fork it a second time deliberately.
+async fn forking_a_note_one_already_forks_is_refused (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -988,10 +987,17 @@ async fn fork_monogamy (
     FORK_BUFFER, config, &SkgrepoRestriction::unrestricted (config) ) ;
   match result {
     Err ( SaveError::BufferValidationErrors { errors, .. } ) => {
-      assert! ( errors . iter () . any ( |e| matches! ( e,
-        BufferValidationError::ForkAlreadyExists (orig, existing)
-          if *orig == ID::from ("N") && *existing == c1 )),
-        "expected ForkAlreadyExists(N, {}), got {:?}", c1 . 0, errors ); }
+      let refusal : &BufferValidationError = errors . iter ()
+        . find ( |e| matches! ( e,
+          BufferValidationError::ForkAlreadyExists (orig, existing)
+            if *orig == ID::from ("N") && *existing == c1 ))
+        . unwrap_or_else ( || panic! (
+          "expected ForkAlreadyExists(N, {}), got {:?}", c1 . 0, errors ));
+      let message : String = refusal . to_string ();
+      assert! ( message . contains ("you already fork it; your fork is")
+                && message . contains (&c1 . 0)
+                && message . contains ("make another note of yours fork it"),
+        "the refusal says what to do: {}", message ); }
     other => panic! (
       "expected ForkAlreadyExists rejecting the re-fork, got {:?}", other ), }
   Ok (( )) }

@@ -10,7 +10,7 @@ use crate::dbs::in_rust_graph::internal_index_validation::{
   InternalIndexMismatch, validate_internal_indexes,
 };
 use crate::dbs::in_rust_graph::override_invariants::{
-  OverrideInvariantViolation, format_override_invariant_violations,
+  OverrideInvariantViolation, describe_override_invariant_violation,
   validate_override_invariants,
 };
 use crate::telescope::invariants::{TelescopeViolation, validate_all_telescopes};
@@ -43,7 +43,8 @@ impl CompleteGraphValidation {
 }
 
 /// Validate all facts requiring the complete set: identity, configured homes,
-/// override topology, internal graph indexes, and telescope provenance/privacy.
+/// the rules of owned notes' forks, contents and hides
+/// ('override_invariants.rs'), internal graph indexes, and telescope provenance/privacy.
 /// Relationship roles themselves are represented by distinct typed fields;
 /// dangling member IDs are deliberately retained and are not errors.
 pub fn validate_complete_graph (
@@ -142,8 +143,7 @@ pub fn format_complete_graph_errors (errors : &[CompleteGraphError]) -> String {
       CompleteGraphError::UnconfiguredNodeHome { pid, skgrepo } => format! (
         "node '{}' has unconfigured home repo '{}'", pid, skgrepo),
       CompleteGraphError::Override (violation) =>
-        format_override_invariant_violations (&[violation . clone ()])
-          . lines () . skip (1) . collect::<Vec<&str>> () . join (" "),
+        describe_override_invariant_violation (violation),
       CompleteGraphError::InternalIndex (mismatch) => format! (
         "internal index '{}' key '{}' expected {:?}, actual {:?}",
         mismatch . index, mismatch . key, mismatch . expected, mismatch . actual),
