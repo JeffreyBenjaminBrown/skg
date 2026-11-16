@@ -127,6 +127,10 @@ fn all_tests
       s . reset ("a_switch_of_perspective_re_points_a_substituted_content_child", foreign_root) ?;
       a_switch_of_perspective_re_points_a_substituted_content_child (
         &s . config, &mut s . tantivy ) ?;
+      s . reset ("a_re_pointed_content_child_draws_its_forks_folder_afresh",
+                 "tests/mirror_substitution/fixtures-re-pointed-child") ?;
+      a_re_pointed_content_child_draws_its_forks_folder_afresh (
+        &s . config, &mut s . tantivy ) ?;
       s . reset ("a_third_authors_mirror_stands_where_the_user_has_none",
                  "tests/mirror_substitution/fixtures-third-author") ?;
       a_third_authors_mirror_stands_where_the_user_has_none (
@@ -959,6 +963,85 @@ fn a_switch_of_perspective_re_points_a_substituted_content_child (
     assert! ( marked . len () == 1 && marked [0] . contains ( &format! ("(gnid {})", shown) ),
       "from {:?}, {} stands in M's place, alone:\n{}", perspective, shown, switched ); }
   Ok (( )) }
+
+/// A content child re-pointed by a switch of perspective draws its
+/// folders afresh, for the note it now shows, since those it held
+/// describe the note it showed before. P, the user's, contains N,
+/// alice's; bob's F forks N, and the user's U forks F. A view of P
+/// shows U in N's place, its forks folder holding F, which U forks.
+/// From alice's perspective N stands raw, its forks folder holding F,
+/// which forks it; from bob's, F stands in N's place, its forks folder
+/// holding N, which it forks, and U, which forks it. No folder holds
+/// the note it describes or an unwarranted member, and U's forkee F
+/// claims (drawn claiming nothing, a client would read it as a pending
+/// detachment). Back at the root authors', the view is drawn as the
+/// fresh view drew it, and a second round of switches draws the same
+/// views again.
+fn a_re_pointed_content_child_draws_its_forks_folder_afresh (
+  config  : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  let (mut views_state, env, view) : (ViewsState, SkgEnv, String) =
+    connection_holding_a_view_of (config, tantivy, "P", &[ ID::from ("P") ]) ?;
+  assert_eq! ( forks_folder_members_under (&view, "U"), vec! [ "F" ],
+    "a fresh view of P shows U in N's place, its forks folder holding F:\n{}", view );
+  for _round in 0 .. 2 {
+    for (perspective, shown, members) in [
+      ( owner_of ("alice"),       "N", vec! [ "F" ] ),
+      ( owner_of ("bob"),         "F", vec! [ "N", "U" ] ),
+      ( owner_of ("alice"),       "N", vec! [ "F" ] ),
+      ( Perspective::RootAuthors, "U", vec! [ "F" ] ) ] {
+      let switched : String = rerendered_text ( &messages_answering (
+        &switch_request ("P", perspective . clone ()),
+        &mut views_state, &env, config, handle_set_perspective_request ))
+        . ok_or_else ( || format! ("the switch to {:?} rerenders the view", perspective) ) ?;
+      assert_eq! ( forks_folder_members_under (&switched, shown), members,
+        "from {:?}, {}'s forks folder holds its own fork partners:\n{}",
+        perspective, shown, switched );
+      assert! ( ! switched . contains ("noWarrant"),
+        "from {:?}, no member is unwarranted:\n{}", perspective, switched );
+      if perspective == Perspective::RootAuthors {
+        assert_eq! ( without_vnids ( switched . lines () ),
+                     without_vnids ( view . lines () ),
+          "back at the root authors', the view is drawn as the fresh view drew it" ); }}}
+  assert! ( line_of_gnid (&view, "F") . is_some_and ( |line| ! line . contains ("noClaim") ),
+    "U's forkee F claims, so is no pending detachment:\n{}", view );
+  Ok (( )) }
+
+/// The gnids of the members of the forks folder right under the
+/// occurrence of 'gnid' in 'view', in order.
+fn forks_folder_members_under (
+  view : &str,
+  gnid : &str,
+) -> Vec<String> {
+  let lines : Vec<&str> = view . lines () . collect ();
+  let fact : String = format! ("(gnid {})", gnid);
+  let Some (at) : Option<usize> =
+    lines . iter () . position ( |line| line . contains (&fact)
+                                        && ! line . contains ("forksFolder") )
+    else { return Vec::new (); };
+  let depth : usize = headline_depth (lines [at]);
+  let folder : Option<usize> =
+    lines . iter () . enumerate () . skip (at + 1)
+    . take_while ( |(_, line)| headline_depth (line) > depth )
+    . find ( |(_, line)| headline_depth (line) == depth + 1
+                         && line . contains ("forksFolder") )
+    . map ( |(index, _)| index );
+  let Some (folder) : Option<usize> = folder else { return Vec::new (); };
+  lines . iter () . skip (folder + 1)
+    . take_while ( |line| headline_depth (line) > depth + 1 )
+    . filter ( |line| headline_depth (line) == depth + 2 )
+    . filter_map ( |line| {
+        let start : usize = line . find ("(gnid ") ? + "(gnid " . len ();
+        let end : usize = start + line [start ..] . find (')') ?;
+        Some ( line [start .. end] . to_string () ) } )
+    . collect () }
+
+/// How many stars begin the headline 'line'.
+fn headline_depth (
+  line : &str,
+) -> usize {
+  line . chars () . take_while ( |c| *c == '*' ) . count () }
 
 /// Where the perspective's owner has no mirror of a note, the first
 /// mirror by declaration order stands, whoever wrote it: P, the

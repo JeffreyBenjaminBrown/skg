@@ -176,7 +176,10 @@ now, so a raw content occurrence whose node gains a mirror ranked
 before it shows that mirror at the next save or rerender, and an
 occurrence already shown in another's place is re-pointed whenever it
 is not the mirror shown (after a switch of perspective or of the
-skgrepo restriction, say).  When the original itself becomes the
+skgrepo restriction, say).  A re-pointed occurrence's folders are
+drawn afresh for the node it now shows, as a re-pointed root's are
+('redraw_folders'), since those it held describe the node it showed
+before.  When the original itself becomes the
 mirror shown, the refresh shows the carrier as itself, without the
 fact, unwarranted and so claiming nothing, and reinstates the
 original beside it.  The buffer whose save creates a fork has the post-save

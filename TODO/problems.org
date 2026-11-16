@@ -13,9 +13,14 @@ does not fork. If another view makes the note fork it (a mutual), and
 this buffer still shows it claiming nothing, the clients read it as a
 pending detachment, and saving this buffer stops the fork. Whether the
 collateral rerender reaches this buffer first in every case is not
-checked. Related: a forker that no longer forks the note stays in the
-folder, marked unwarranted, when a content node is re-pointed to
-another mirror and keeps its old forks folder.
+checked. The cause is in 'mark_claims' ('server/refresh/visit.rs'):
+under an editable parent a child that claims nothing stays, since that
+is how a detachment the user wrote survives a refresh; nothing tells a
+member drawn claiming nothing because it was forker-only from one the
+user detached. (A related case, a content occurrence re-pointed to
+another mirror keeping the forks folder of the note it showed before,
+was fixed by the review of every-mirror plan 1: a re-pointed
+occurrence's folders are drawn afresh, 'redraw_folders'.)
 * A headline typed under an editable subscribee as such is created, then lost (2026-11-16)
 Found while planning 'TODO/every-mirror/2_plan.org' (its Q2), by
 reading the code, not yet by a probe. Under a subscribee shown

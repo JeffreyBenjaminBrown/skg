@@ -822,7 +822,9 @@ fn keep_hidden_outside_folder_last (
 /// stand (a root, or a member of a folder that is no forkee as such):
 /// there its children are raw too. A member already shown in
 /// another's place is re-pointed whenever it is not the mirror shown,
-/// as after a switch of perspective. Where the mirror shown is the
+/// as after a switch of perspective. A re-pointed member's folders
+/// are drawn afresh, for the node it now shows ('redraw_folders'):
+/// those it held describe the node it showed before. Where the mirror shown is the
 /// original itself, the member shown in its place loses
 /// 'inPlaceOf', is warranted only as itself (and so, unwarranted,
 /// vanishes), and the original is reinstated beside it. The diff view
@@ -861,7 +863,8 @@ fn substitute_mirrors (
           walk . truth . config, walk . truth . graph, walk . truth . restriction,
           &owner, &gnid );
         if shown != pid {
-          show_mirror (tree, child, &shown, Some (gnid), walk) ?; }},
+          show_mirror (tree, child, &shown, Some (gnid), walk) ?;
+          redraw_folders (tree, child, walk) ?; }},
       Some (original) => {
         let shown : ID = mirror_shown (
           walk . truth . config, walk . truth . graph, walk . truth . restriction,
@@ -869,7 +872,8 @@ fn substitute_mirrors (
         if shown == walk . truth . graph . pid_else_raw_id (&original) {
           stop_substituting (tree, parent, child, &original, goal, walk) ?;
         } else if shown != pid {
-          show_mirror (tree, child, &shown, Some (original), walk) ?; }}, }}
+          show_mirror (tree, child, &shown, Some (original), walk) ?;
+          redraw_folders (tree, child, walk) ?; }}, }}
   Ok (( )) }
 
 /// Each root of the view shows what the view's perspective makes of
@@ -881,7 +885,8 @@ fn substitute_mirrors (
 /// The occurrence is re-pointed where it stands, so it keeps its
 /// viewnode ID whichever way it switches, and its children follow
 /// from its own visit. A re-pointed root's folders are drawn afresh,
-/// for the node it now shows ('redraw_folders'). A fork of a root
+/// for the node it now shows ('redraw_folders'), and it asks for what
+/// a fresh view of that node asks for ('ask_for_what_a_fresh_root_asks'). A fork of a root
 /// re-roots the view at the clone, which stands for nothing
 /// ('replace_saved_view_fork_roots').
 fn substitute_roots (
@@ -908,41 +913,30 @@ fn substitute_roots (
       tree . get (root) . unwrap () . value () . editable_gnid () . is_some ();
     if repointed || in_place_of != marked
     { show_mirror (tree, root, &shown, marked, walk) ?; }
-    if repointed { redraw_folders (tree, root, was_editable, walk) ?; }}
+    if repointed {
+      redraw_folders (tree, root, walk) ?;
+      ask_for_what_a_fresh_root_asks (tree, root, was_editable); }}
   Ok (( )) }
 
-/// The root at 'root' now shows another node, so every folder it
-/// holds describes the node it showed before. Each vanishes, and in
-/// its place stand the folders of its kind (and of its relation's
-/// other side) for the node now shown ('kinds_redrawing'), empty, for
-/// their own visits to fill, each hidden in the root if the old one
-/// was (its members are drawn anew, unfolded): a write-protected one
-/// goes if it stays
-/// empty, and an editable one is drawn only where the node has members
-/// for it, since an empty one says the user asked for it. Then the
-/// root asks for what a fresh view of the node asks for
-/// ('stub_of_fresh_content_view'): its containers folder, which the
-/// requests rung draws (what contains it, but its view-ancestors, or
-/// no folder where nothing does); and, if the root was editable, to be
-/// extended as an editable root is, which at its own visit adds its
-/// default folders ('add_default_folders'): the forks folder, where it
-/// has a fork partner. A write-protected root, such as
-/// a search hit, asks for no more than it had. So a root that was
-/// write-protected only because another occurrence held the node it
-/// was re-pointed to ('point_occurrence_at') stays so when switched
-/// back: nothing remembers why it was write-protected. A root asks even if it
-/// held no folder: the view was drawn for another node.
+/// The occurrence at 'occurrence' now shows another node, so every
+/// folder it holds describes the node it showed before. Each vanishes,
+/// and in its place stand the folders of its kind (and of its
+/// relation's other side) for the node now shown ('kinds_redrawing'),
+/// empty, for their own visits to fill, each hidden in the occurrence
+/// if the old one was (its members are drawn anew, unfolded): a
+/// write-protected one goes if it stays empty, and an editable one is
+/// drawn only where the node has members for it, since an empty one
+/// says the user asked for it.
 fn redraw_folders (
-  tree         : &mut Tree<Viewnode>,
-  root         : NodeId,
-  was_editable : bool,
-  walk         : &mut Walk,
+  tree       : &mut Tree<Viewnode>,
+  occurrence : NodeId,
+  walk       : &mut Walk,
 ) -> Result<(), Box<dyn Error>> {
   let Some (pid) : Option<ID> =
-    tree . get (root) . unwrap () . value () . occurrence_gnid () . cloned ()
+    tree . get (occurrence) . unwrap () . value () . occurrence_gnid () . cloned ()
     else { return Ok (( )); };
   let folders : Vec<(NodeId, Folder)> =
-    tree . get (root) . unwrap () . children ()
+    tree . get (occurrence) . unwrap () . children ()
     . filter_map ( |child| match &child . value () . kind {
         ViewnodeKind::Folder (folder) => Some (( child . id (), folder . clone () )),
         _ => None, } )
@@ -961,15 +955,33 @@ fn redraw_folders (
         add_hidden_outside_folder (tree, new, &pid, walk); }
       drawn . push (kind); }
     vanish (tree, treeid, walk) ?; }
+  Ok (( )) }
+
+/// A root re-pointed to another node asks for what a fresh view of
+/// that node asks for ('stub_of_fresh_content_view'): its containers
+/// folder, which the requests rung draws (what contains it, but its
+/// view-ancestors, or no folder where nothing does); and, if the root
+/// was editable, to be extended as an editable root is, which at its
+/// own visit adds its default folders ('add_default_folders'): the
+/// forks folder, where it has a fork partner. A write-protected root,
+/// such as a search hit, asks for no more than it had. So a root that
+/// was write-protected only because another occurrence held the node
+/// it was re-pointed to ('point_occurrence_at') stays so when switched
+/// back: nothing remembers why it was write-protected. A root asks
+/// even if it held no folder: the view was drawn for another node.
+fn ask_for_what_a_fresh_root_asks (
+  tree         : &mut Tree<Viewnode>,
+  root         : NodeId,
+  was_editable : bool,
+) {
   if let ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =
     &mut tree . get_mut (root) . unwrap () . value () . kind
   { occurrence . view_requests . insert (
       ViewRequest::Folder (FolderRelation::Containers) );
     if was_editable {
-      occurrence . view_requests . insert (ViewRequest::Editable); }}
-  Ok (( )) }
+      occurrence . view_requests . insert (ViewRequest::Editable); }}}
 
-/// The folders that stand, for the node a re-pointed root now shows,
+/// The folders that stand, for the node a re-pointed occurrence now shows,
 /// where a folder of the kind of 'folder' stood: those a request for
 /// its relation draws, both sides of a partner relation ('(folder
 /// hides)' draws the hider and hidden folders; '(folder
