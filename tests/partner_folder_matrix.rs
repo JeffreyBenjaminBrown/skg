@@ -151,6 +151,20 @@ async fn render_with_requested_relation_folders (
   Ok (response . saved_view)
 }
 
+/// 'buf' without the first headline carrying this metadata fragment
+/// and the lines under it: deleting a forkee as such, drawn editable
+/// with its own folders, deletes what it shows too.
+fn without_subtree_of ( buf : &str, fragment : &str ) -> String {
+  let depth = |line : &str| -> usize { line . chars () . take_while ( |c| *c == '*' ) . count () };
+  let lines : Vec<&str> = buf . lines () . collect ();
+  let at : usize = lines . iter () . position ( |l| l . contains (fragment) )
+    . unwrap_or_else ( || panic! ( "no line contains {:?} in:\n{}", fragment, buf ));
+  let below : usize = lines [at + 1 ..] . iter ()
+    . take_while ( |l| depth (l) == 0 || depth (l) > depth (lines [at]) )
+    . count ();
+  lines [.. at] . iter () . chain ( lines [at + 1 + below ..] . iter () )
+    . copied () . collect::<Vec<&str>> () . join ("\n") + "\n" }
+
 /// Swap the two whole lines that carry these metadata fragments.
 fn swap_lines ( buf : &str, a : &str, b : &str ) -> String {
   let a_line : String = line_containing (buf, a) . to_string ();
@@ -658,9 +672,7 @@ async fn editable_forksFolder (
       None => fails . record (s, "no SaveNode for wSub-owner" . into ()), } }
   { // delete one: remove b -> [a,c]
     let s : &str = "forksFolder/delete";
-    let b_line : String =
-      line_containing (&buf, "(gnid wSub-b)") . to_string ();
-    let edited : String = buf . replace (&format! ("{}\n", b_line), "");
+    let edited : String = without_subtree_of (&buf, "(gnid wSub-b)");
     let nodes  : Vec<NodeInstruction> =
       saveplan_nodes (&edited, config, &SkgrepoRestriction::unrestricted (config)) . await ?;
     match saved_node_by_gnid (&nodes, "wSub-owner") {
@@ -755,10 +767,7 @@ async fn omission_scenarios (
     // weave preserves the invisible omWsub-unseen (a restricted save
     // cannot delete what it cannot see), and the deleted unrestricted
     // member is removed.
-    let unrestricted_line : String =
-      line_containing (&buf, "(gnid omWsub-active)") . to_string ();
-    let edited : String =
-      buf . replace (&format! ("{}\n", unrestricted_line), "");
+    let edited : String = without_subtree_of (&buf, "(gnid omWsub-active)");
     let nodes : Vec<NodeInstruction> =
       saveplan_nodes (&edited, config, &restriction) . await ?;
     match saved_node_by_gnid (&nodes, "omWsub-owner") {

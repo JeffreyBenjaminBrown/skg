@@ -227,8 +227,8 @@ fn all_tests
       s . reset ("a_reply_under_ones_own_unfiled_fork_files_the_original", mail) ?;
       a_reply_under_ones_own_unfiled_fork_files_the_original (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("a_headline_typed_under_the_forkee_itself_files_nothing", mail) ?;
-      a_headline_typed_under_the_forkee_itself_files_nothing (
+      s . reset ("a_headline_typed_under_the_foreign_forkee_itself_is_refused", mail) ?;
+      a_headline_typed_under_the_foreign_forkee_itself_is_refused (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("a_third_partys_reply_in_anothers_unread_list_warns",
                  "tests/fork/fixtures-mail-third-party") ?;
@@ -273,8 +273,9 @@ fn subtree_of<'a> (
     . collect () }
 
 /// The reader's view of 'f', its fork of the sender's 't', with 't'
-/// made editable in the forks folder, as the reader's client
-/// shows the unread list: the saved view of a save asking for it.
+/// drawn editable in the forks folder, as a fresh view draws a forkee
+/// as such: the unread list. Returned as the saved view of an
+/// unchanged save of it.
 async fn reader_view_with_unread_list (
   config      : &SkgConfig,
   tantivy     : &mut TantivyIndex,
@@ -287,10 +288,10 @@ async fn reader_view_with_unread_list (
   views_state . open_views . register_view (
     &graph . load_full (), view_id . clone (), f_tree, &pids,
     &SkgrepoRestriction::unrestricted (config) );
-  let editable : String = f_view . replace (
-    "(gnid t) (skgRepos (nodeRepo sender)) writeProtected",
-    "(gnid t) (skgRepos (nodeRepo sender)) writeProtected (viewRequests editableView)" );
-  assert_ne! ( editable, f_view, "the fresh view must draw t:\n{}", f_view );
+  assert! ( f_view . lines () . any ( |line|
+              line . contains ("(gnid t) (skgRepos (nodeRepo sender)) (view") ),
+    "the fresh view must draw t editable:\n{}", f_view );
+  let editable : String = f_view . clone ();
   let (mut stream, _read_end) : (TcpStream, TcpStream) =
     mk_test_tcp_stream_pair ();
   let response = update_from_and_rerender_buffer (
@@ -302,7 +303,7 @@ async fn reader_view_with_unread_list (
             && unread . iter () . any ( |line|
                  line . contains ("(gnid m2r)") && line . contains ("(inPlaceOf m2)") )
             && first_says (&unread, "(unintegrated 2)"),
-    "t, made editable, must list both messages as unintegrated, m2 as \
+    "t, drawn editable, must list both messages as unintegrated, m2 as \
      the reader's earlier fork of it:\n{}",
     response . saved_view );
   Ok ( response . saved_view ) }
@@ -386,8 +387,8 @@ async fn a_reply_under_an_unread_message_integrates_it (
             && ! unread . iter () . any ( |line| line . contains ("m1") ),
     "the redrawn view must count one message unread, m2, and draw no m1 there:\n{}",
     redrawn );
-  // A fresh view draws t write-protected, without its children, so
-  // only its count can be read there.
+  // A fresh view draws t editable too, its count saying one message
+  // is unread.
   let (fresh, _pids, _tree) = single_root_view (config, Some (tantivy), &ID::from ("f")) ?;
   assert! ( subtree_of (&fresh, & clone . pid . 0) . iter ()
               . any ( |line| line . ends_with (" my reply") )
@@ -431,10 +432,11 @@ async fn a_reply_under_ones_own_unfiled_fork_files_the_original (
     response . saved_view );
   Ok (( )) }
 
-/// A headline typed straight under 't' in the unread list is no
-/// member of 't' (its list does not name it), so saving it files
-/// nothing in 'f'.
-async fn a_headline_typed_under_the_forkee_itself_files_nothing (
+/// A headline typed straight under 't' in the unread list would join
+/// t's content, but 't' is the sender's: the save is refused, saying
+/// to make the node one's own first, and nothing is written, nor filed
+/// in 'f'.
+async fn a_headline_typed_under_the_foreign_forkee_itself_is_refused (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -449,12 +451,20 @@ async fn a_headline_typed_under_the_forkee_itself_files_nothing (
     &unread_shown, "t", "(skg node (skgRepos (nodeRepo reader))) not a message" );
   let (mut stream, _read_end) : (TcpStream, TcpStream) =
     mk_test_tcp_stream_pair ();
-  update_from_and_rerender_buffer (
+  let refusal : String = match update_from_and_rerender_buffer (
     &mut stream, &typed, config, tantivy, &graph,
-    &Ok (view_id . clone ()), &mut views_state ) . await ?;
+    &Ok (view_id . clone ()), &mut views_state ) . await {
+    Ok (response) => format! ("{:?}", response . errors),
+    Err (error) => error . to_string (), };
+  assert! ( refusal . contains ("Cannot add a child under t")
+            && refusal . contains ("foreign node shown as a forkee"),
+    "the save must be refused: {}", refusal );
   assert_eq! ( members_of (& node_from_disk (config, "f") ? . contains),
                vec! [ ID::from ("d") ],
-    "what t's list does not name is not filed" );
+    "nothing is filed" );
+  assert_eq! ( members_of (& node_from_disk (config, "t") ? . contains),
+               vec! [ ID::from ("m1"), ID::from ("m2") ],
+    "t is as it was" );
   Ok (( )) }
 
 /// As above, but the reader answers 'q1', a question inside 'm1':

@@ -365,9 +365,12 @@ node s
   forksFolder" . to_string (), "\
 node s
   forksFolder
-    node e wp" . to_string () ],
+    node e
+      forksFolder
+        node s wp noClaim" . to_string () ],
     "the editable folder stays, empty, where a save would read it, and \
-     the skgrepo widening fills it again, claiming" ); }
+     the skgrepo widening fills it again, claiming, e drawn editable \
+     as a forkee as such is" ); }
 
 /// p, in 'main', lists f in its 'main' section; f is foreign, its
 /// home 'theirs', and lists g in its own section; g is foreign too.

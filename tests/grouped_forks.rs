@@ -41,6 +41,9 @@ mod extend_partner_folder_member;
 #[path = "forks_folder.rs"]
 mod forks_folder;
 
+#[path = "forkees_drawn_editable.rs"]
+mod forkees_drawn_editable;
+
 #[path = "children_of_a_raw_root_are_raw.rs"]
 mod children_of_a_raw_root_are_raw;
 

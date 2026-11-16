@@ -26,7 +26,8 @@ fn collected_from_org (
   let forest : ViewForest =
     ViewForest::from_internal_tree (
       viewforest );
-  collect_instructions_locally (&forest, &|_| true) . unwrap() }
+  collect_instructions_locally (
+    &forest, &|skgrepo| skgrepo . as_str () == "main" ) . unwrap() }
 
 #[test]
 fn lowering_produces_ordered_nodeInstructions_and_signals () {
@@ -38,7 +39,7 @@ fn lowering_produces_ordered_nodeInstructions_and_signals () {
       *** (skg alias) nickname
       ** (skg node (gnid child) (skgRepos (nodeRepo main))) child
       ** (skg forksFolder)
-      *** (skg node (gnid e) (skgRepos (nodeRepo main))) e
+      *** (skg node (gnid e) (skgRepos (nodeRepo theirs))) e
       **** (skg node (gnid visible) (skgRepos (nodeRepo main))) visible
       * (skg node (gnid doomed) (skgRepos (nodeRepo main)) (editRequest delete)) doomed
       "} );
@@ -55,7 +56,7 @@ fn lowering_produces_ordered_nodeInstructions_and_signals () {
     . into_iter()
     . map ( |intent| intent . into_node_instruction() . unwrap() )
     . collect();
-  // 'e' is a forkee-as-such, holding only signals, so it
+  // 'e' is a foreign forkee as such, holding only signals, so it
   // lowers to nothing.
   assert_eq!( nodeInstructions . len(), 4 );
   { let root : &Graphnode = match &nodeInstructions [0] {

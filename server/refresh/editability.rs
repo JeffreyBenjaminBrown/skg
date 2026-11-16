@@ -19,10 +19,12 @@
 //! U) is charged too.
 //!
 //! An occurrence the refresh draws, where its parent is editable
-//! content, is drawn write-protected carrying an editable-view
-//! request, and so is a write-protected child that claims membership
-//! under an occurrence carrying one: the request passes on to what it
-//! extends ('extend_requested_content'). At the occurrence's own
+//! content, or as a forkee as such in a content view (a claiming
+//! member of the forks folder of an editable occurrence), is drawn
+//! write-protected carrying an editable-view request, and so is a
+//! write-protected child that claims membership under an occurrence
+//! carrying one, or in its forks folder: the request passes on to
+//! what it extends ('extend_requested_content'). At the occurrence's own
 //! visit the request is consumed: the occurrence becomes editable if
 //! no other occurrence of its node is, and the budget allows, and
 //! stays write-protected otherwise ('consume_editableView_request').
@@ -35,18 +37,20 @@
 
 use crate::diff_view::pruned_change_view::prunedChangeView_sets_of_buffer;
 use crate::refresh::{Walk, id_rule};
+use crate::refresh::ancestry::parent_reads_claims;
 use crate::refresh::extent::children_are_editable_content;
 use crate::refresh::mode::RefreshMode;
 use crate::refresh::visit::children_of;
 use crate::types::misc::ID;
 use crate::types::nodes::rust::GraphnodeInRust;
 use crate::types::viewnode::{
-  Editability, ViewRequest, Viewnode, ViewnodeKind, Vognode, default_occurrence};
+  Editability, Folder, ViewRequest, Viewnode, ViewnodeKind, Vognode, default_occurrence};
 use crate::types::viewnode::Occurrence;
 
 use ego_tree::{NodeId, NodeMut, NodeRef, Tree};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::error::Error;
+use std::iter::once;
 
 impl<'a> Walk<'a> {
   /// The key of the editability of an occurrence written under
@@ -242,24 +246,28 @@ pub(crate) enum DrawnEditability {
   Editable,
 }
 
-/// How an occurrence of 'pid' the refresh draws under 'parent'
-/// stands. It may be editable when its parent's children are editable
-/// content, or it is a root of the view (one the ID rule makes an
-/// occurrence again), and no other occurrence of the node is editable;
-/// in the diff view, only when its node is in U, or the parent
-/// carries an editable-view request. It is then drawn carrying the
-/// request, but for a node of U under a parent that carries none,
-/// which is drawn editable.
+/// How an occurrence of 'pid' the refresh draws under 'parent',
+/// claiming membership there or not as 'claims' says, stands. It may
+/// be editable when its parent's children are editable content, or it
+/// is a root of the view (one the ID rule makes an occurrence again),
+/// or it is a forkee as such in a content view
+/// ('forkee_as_such_may_be_editable'), and no other occurrence of the
+/// node is editable; in the diff view, only when its node is in U, or
+/// the parent carries an editable-view request. It is then drawn
+/// carrying the request, but for a node of U under a parent that
+/// carries none, which is drawn editable.
 pub(crate) fn drawn_occurrence_editability (
   tree   : &Tree<Viewnode>,
   parent : NodeId,
   pid    : &ID,
+  claims : bool,
   walk   : &Walk,
 ) -> DrawnEditability {
   let may_be_editable : bool =
     ( children_are_editable_content (tree, parent, walk)
       || matches! ( tree . get (parent) . unwrap () . value () . kind,
-                    ViewnodeKind::BufferRoot ))
+                    ViewnodeKind::BufferRoot )
+      || forkee_as_such_may_be_editable (tree, parent, claims, walk) )
     && ! walk . editability_is_held (pid);
   if ! may_be_editable { return DrawnEditability::WriteProtected; }
   let requested : bool = carries_editableView_request (tree, parent);
@@ -269,6 +277,26 @@ pub(crate) fn drawn_occurrence_editability (
     RefreshMode::DiffView { .. } if in_the_diffViews_u (pid, walk) =>
       DrawnEditability::Editable,
     RefreshMode::DiffView { .. } => DrawnEditability::WriteProtected, } }
+
+/// Whether an occurrence claiming membership ('claims') of the folder
+/// at 'parent' may be editable as a forkee as such: in a content view,
+/// the folder is a forks folder whose members' claims the save reads,
+/// since the note it describes is editable ('parent_reads_claims').
+/// Its own children are not editable content: the folder's members are
+/// partners, and only a forkee as such is drawn as content is. Never
+/// in the diff view, which keeps every folder's members
+/// write-protected.
+fn forkee_as_such_may_be_editable (
+  tree   : &Tree<Viewnode>,
+  parent : NodeId,
+  claims : bool,
+  walk   : &Walk,
+) -> bool {
+  claims
+  && ! walk . is_diff_view ()
+  && matches! ( tree . get (parent) . unwrap () . value () . kind,
+                ViewnodeKind::Folder (Folder::Forks) )
+  && parent_reads_claims (tree, parent) }
 
 /// Whether the diff view's U holds 'pid'. Never in a content view.
 fn in_the_diffViews_u (
@@ -352,7 +380,11 @@ pub(crate) fn consume_editableView_request (
 /// membership, and that a drawn occurrence's rule would let be
 /// editable ('drawn_occurrence_editability'), gets the request too,
 /// which its own visit consumes, and which extends its content in
-/// turn.
+/// turn. It passes through the occurrence's forks folder to the
+/// forkees as such standing there, as to content: so a forkee drawn
+/// write-protected before (by an older server, or past the node
+/// budget) becomes editable when the user extends its forker. A
+/// rerender with no request leaves them as they are.
 pub(crate) fn extend_requested_content (
   tree   : &mut Tree<Viewnode>,
   parent : NodeId,
@@ -361,15 +393,21 @@ pub(crate) fn extend_requested_content (
   if ! carries_editableView_request (tree, parent)
      || tree . get (parent) . unwrap () . value () . editable_gnid () . is_none ()
   { return; }
-  for child in children_of (tree, parent) {
-    let gnid : ID = match &tree . get (child) . unwrap () . value () . kind {
-      ViewnodeKind::Vognode (Vognode::Occurrence (occurrence))
-        if occurrence . is_writeProtected () && occurrence . claimsMembership =>
-        occurrence . gnid . clone (),
-      _ => continue, };
-    if drawn_occurrence_editability (tree, parent, &gnid, walk)
-       != DrawnEditability::WriteProtected {
-      add_editableView_request (tree, child); }}}
+  let forks_folders : Vec<NodeId> =
+    children_of (tree, parent) . into_iter ()
+    . filter ( |child| matches! ( tree . get (*child) . unwrap () . value () . kind,
+                                  ViewnodeKind::Folder (Folder::Forks) ))
+    . collect ();
+  for under in once (parent) . chain (forks_folders) {
+    for child in children_of (tree, under) {
+      let gnid : ID = match &tree . get (child) . unwrap () . value () . kind {
+        ViewnodeKind::Vognode (Vognode::Occurrence (occurrence))
+          if occurrence . is_writeProtected () && occurrence . claimsMembership =>
+          occurrence . gnid . clone (),
+        _ => continue, };
+      if drawn_occurrence_editability (tree, under, &gnid, true, walk)
+         != DrawnEditability::WriteProtected {
+        add_editableView_request (tree, child); }}}}
 
 /// The visit of the occurrence at 'parent' is over: the editable-view
 /// request it carried, consumed, goes.

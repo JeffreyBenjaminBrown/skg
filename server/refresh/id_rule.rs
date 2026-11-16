@@ -28,12 +28,13 @@ use crate::refresh::editability::{
   DrawnEditability, EditabilityAndClaim, drawn_occurrence_editability,
   forget_editable_occurrence, occurrence_from_truth, write_protect_occurrence};
 use crate::refresh::diff_view::fold_body_of_drawn_occurrence;
-use crate::refresh::visit::{children_of, vanish};
+use crate::refresh::visit::{
+  add_containers_folder_under_forks_folder_member, children_of, vanish};
 use crate::refresh::goal::{Goal, GoalItem, GoalMember};
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::nodes::rust::GraphnodeInRust;
 use crate::types::viewnode::{
-  ChangeFacts, Editability, Ghost, GnidOnlyKind, GnidOnlyVognode,
+  ChangeFacts, Editability, Folder, Ghost, GnidOnlyKind, GnidOnlyVognode,
   RelationshipEditRequest, Occurrence, Viewnode, ViewnodeKind, ViewnodeStats, Vognode,
   Warrant, viewnode_of};
 use crate::refresh::mode::RefreshMode;
@@ -199,7 +200,7 @@ pub(crate) fn rekind_vognode (
         &mut tree . get_mut (child) . unwrap () . value () . kind
       { gnid_only_mut . relRepo = relRepo . or ( gnid_only . relRepo ); }},
     ( IdRuleAnswer::GnidOnly (kind), other ) =>
-      rekind_to_gnid_only (tree, child, &gnid, kind, other, parent_goal, walk),
+      rekind_to_gnid_only (tree, child, &gnid, kind, other, parent_goal, walk) ?,
     ( IdRuleAnswer::Tombstone, Vognode::Occurrence (_) ) if ! walk . is_diff_view () =>
       vanish (tree, child, walk) ?,
     ( IdRuleAnswer::Tombstone, other ) => {
@@ -213,7 +214,9 @@ pub(crate) fn rekind_vognode (
 /// occurrence drawn there would ('drawn_occurrence_editability'). It keeps its claim (a ghost's
 /// becomes a claim) and its relationship request; a restoreNode
 /// request it drops. Under what was a gnid-only vognode, every child
-/// claims again ('reset_the_claims_of_children').
+/// claims again ('reset_the_claims_of_children'). A member of a
+/// content view's forks folder gets its containers folder, as a member
+/// drawn there does.
 fn rekind_to_occurrence (
   tree   : &mut Tree<Viewnode>,
   parent : NodeId,
@@ -226,7 +229,7 @@ fn rekind_to_occurrence (
     Vognode::GnidOnly (gnid_only) => ( gnid_only . claimsMembership, true ),
     _ => (true, false), };
   let editability : DrawnEditability =
-    drawn_occurrence_editability (tree, parent, pid, walk);
+    drawn_occurrence_editability (tree, parent, pid, claims, walk);
   let occurrence : Occurrence =
     occurrence_from_truth (
       pid, EditabilityAndClaim { editability, claims }, walk) ?;
@@ -238,6 +241,9 @@ fn rekind_to_occurrence (
     reset_the_claims_of_children (tree, child); }
   if editability == DrawnEditability::Editable {
     walk . hold_editability (pid, child); }
+  if stands_in_a_content_views_forks_folder (tree, child, walk) {
+    // as a member drawn there is ('after_drawing')
+    add_containers_folder_under_forks_folder_member (tree, child, walk); }
   Ok (( )) }
 
 /// Make the occurrence or gnid-only vognode 'other' at 'child' the
@@ -268,7 +274,12 @@ fn rekind_to_ghost (
 /// Make the vognode 'other' at 'child' a gnid-only vognode of 'kind'
 /// for 'gnid', where it stands, keeping its claim, its relRepo request
 /// (an edit request of another kind it drops) and its processed
-/// request.
+/// request. An occurrence that stood as a member of a content view's
+/// forks folder loses the folders it showed as a member
+/// ('stands_in_a_content_views_forks_folder'): a gnid-only vognode
+/// there shows nothing, and the occurrence, back, draws them anew
+/// ('rekind_to_occurrence'). Elsewhere its folders stay, as tombstones
+/// ('is_unsayable').
 fn rekind_to_gnid_only (
   tree        : &mut Tree<Viewnode>,
   child       : NodeId,
@@ -277,19 +288,38 @@ fn rekind_to_gnid_only (
   other       : Vognode,
   parent_goal : Option<&Goal>,
   walk        : &mut Walk,
-) {
+) -> Result<(), Box<dyn Error>> {
   let relationship_edit_request : Option<RelationshipEditRequest> =
     // a relRepo request, the one request a gnid-only vognode takes
     relationship_edit_request_of (&other)
     . filter ( |request| matches! ( request, RelationshipEditRequest::RelRepo (_) ));
   forget_editable_occurrence (&other, child, walk);
+  if matches! ( other, Vognode::Occurrence (_) )
+     && stands_in_a_content_views_forks_folder (tree, child, walk) {
+    for folder in children_of (tree, child) {
+      if matches! ( tree . get (folder) . unwrap () . value () . kind,
+                    ViewnodeKind::Folder (_) ) {
+        vanish (tree, folder, walk) ?; }}}
   set_vognode_keeping_processed (
     tree, child, Vognode::GnidOnly ( GnidOnlyVognode {
       relationshipEditRequest : relationship_edit_request,
       .. GnidOnlyVognode::new (
         kind, gnid . clone (), goal_relRepo (parent_goal, gnid),
         other . claims (),
-        Warrant::ByGraph ) } )); } // the warrant rung sets it
+        Warrant::ByGraph ) } )); // the warrant rung sets it
+  Ok (( )) }
+
+/// Whether the headline at 'treeid' stands in a forks folder of a
+/// content view, as a member.
+fn stands_in_a_content_views_forks_folder (
+  tree   : &Tree<Viewnode>,
+  treeid : NodeId,
+  walk   : &Walk,
+) -> bool {
+  ! walk . is_diff_view ()
+  && tree . get (treeid) . unwrap () . parent () . is_some_and (
+       |parent| matches! ( parent . value () . kind,
+                           ViewnodeKind::Folder (Folder::Forks) )) }
 
 /// Each child of the headline at 'treeid', which stood as a gnid-only
 /// vognode and is now an occurrence, claims membership again. Under

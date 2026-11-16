@@ -97,9 +97,10 @@ fn a_restricted_fork_explains_no_hide (
       Ok (( )) } ) }
 
 /// r forks e publicly and hides h by a record in its private
-/// section; e contains h. Under "public" h is typed as r's content
-/// and saved: r's public file contains h, and the restricted hide
-/// stays.
+/// section; e contains h. Under "public" the view draws e, a forkee
+/// as such, editable, showing h (the hide that leaves h out is
+/// restricted); h is moved from there to r's content and saved: r's
+/// public file contains h, and the restricted hide stays.
 #[test]
 fn re_adding_a_member_drops_no_restricted_hide (
 ) -> Result<(), Box<dyn Error>> {
@@ -111,7 +112,9 @@ fn re_adding_a_member_drops_no_restricted_hide (
     &[ ("r", "pid: r\nhides:\n- h\n") ],
     |f, public| {
       let opened : String = open_content_view (f, "r", VIEW, public) ?;
-      let with_h : String = edit_line ( &opened, "** (skg node (gnid c)", |line|
+      let with_h : String = edit_line (
+        &without_line (&opened, "**** (skg node (gnid h)"),
+        "** (skg node (gnid c)", |line|
         format! ("{}\n** (skg node (gnid h)) h", line) );
       save_cleanly (f, &with_h, public) ?;
       assert_eq! ( list_in (f, "public/r.skg", "contains"), vec! ["c", "h"],

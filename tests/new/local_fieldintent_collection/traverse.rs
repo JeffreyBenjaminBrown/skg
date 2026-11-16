@@ -20,6 +20,14 @@ fn collected_from_org (
   collect_instructions_locally (
     &viewforest_as_written (input), &|_| true ) . unwrap() }
 
+/// As 'collected_from_org', where the user owns only 'main'.
+fn collected_from_org_owning_main (
+  input : &str,
+) -> CollectedFieldIntents {
+  collect_instructions_locally (
+    &viewforest_as_written (input),
+    &|skgrepo| *skgrepo == SkgrepoName::from ("main") ) . unwrap() }
+
 fn entry<'a> (
   collected : &'a CollectedFieldIntents,
   gnid        : &str,
@@ -101,16 +109,13 @@ fn forkee_as_such_emits_claim_and_visibility () {
       **** (skg node (gnid leaving) (skgRepos (nodeRepo main)) (editRequest delete)) leaving
       "} );
   { let e : &FieldIntentsForOneId = entry (&collected, "e");
-    // The forkee-as-such emits no Set* intents, only a text
-    // claim.
-    assert_eq!( e . title_and_body, None );
+    // An owned forkee as such saves its title and body, and no
+    // other Set* intent: its contains is not read from the buffer.
+    assert_eq!( e . title_and_body,
+                Some (( "e" . to_string (),
+                        Some ("Forkee body" . to_string ()) )) );
     assert_eq!( e . contains, None );
-    assert_eq!(
-      e . text_claims,
-      vec![ ForkeeTextClaim {
-        title    : "e" . to_string(),
-        body     : Some ("Forkee body" . to_string()),
-        headline : HeadlineName::of ( None, Some (&ID::from ("e")), "e" ) } ]); }
+    assert!( e . text_claims . is_empty () ); }
   { let forker : &FieldIntentsForOneId = entry (&collected, "forker");
     assert_eq!(
       forker . visibility,
@@ -123,6 +128,33 @@ fn forkee_as_such_emits_claim_and_visibility () {
     // emit their own instructions, but form no one's contains.
     let visible : &FieldIntentsForOneId = entry (&collected, "visible");
     assert!( visible . title_and_body . is_some() ); }}
+
+/// A foreign forkee as such emits no Set* intents, only a text
+/// claim, which validation checks against the disk.
+#[test]
+fn foreign_forkee_as_such_emits_a_text_claim () {
+  let collected : CollectedFieldIntents =
+    collected_from_org_owning_main ( indoc! {"
+      * (skg node (gnid forker) (skgRepos (nodeRepo main))) forker
+      ** (skg forksFolder)
+      *** (skg node (gnid e) (skgRepos (nodeRepo theirs))) e
+      Forkee body
+      **** (skg node (gnid visible) (skgRepos (nodeRepo theirs))) visible
+      "} );
+  let e : &FieldIntentsForOneId = entry (&collected, "e");
+  assert_eq!( e . title_and_body, None );
+  assert_eq!( e . contains, None );
+  assert_eq!(
+    e . text_claims,
+    vec![ ForkeeTextClaim {
+      title    : "e" . to_string(),
+      body     : Some ("Forkee body" . to_string()),
+      headline : HeadlineName::of ( None, Some (&ID::from ("e")), "e" ) } ]);
+  assert_eq!(
+    entry (&collected, "forker") . visibility,
+    vec![ ForkeeVisibility {
+      forkee     : ID::from ("e"),
+      visible    : vec![ID::from ("visible")] } ]); }
 
 #[test]
 fn aliasfolder_under_forkee_as_such_emits_nothing () {
@@ -253,11 +285,11 @@ fn writeProtected_forkee_as_such_emits_nothing () {
 #[test]
 fn editable_forkee_under_writeProtected_forker_claims_without_visibility () {
   let collected : CollectedFieldIntents =
-    collected_from_org ( indoc! {"
+    collected_from_org_owning_main ( indoc! {"
       * (skg node (gnid forker) (skgRepos (nodeRepo main)) writeProtected) forker
       ** (skg forksFolder)
-      *** (skg node (gnid e) (skgRepos (nodeRepo main))) e
-      **** (skg node (gnid visible) (skgRepos (nodeRepo main))) visible
+      *** (skg node (gnid e) (skgRepos (nodeRepo theirs))) e
+      **** (skg node (gnid visible) (skgRepos (nodeRepo theirs))) visible
       "} );
   assert_eq!(
     entry (&collected, "e") . text_claims,

@@ -671,6 +671,16 @@ fn line_of_gnid<'a> (
   let fact : String = format! ("(gnid {})", gnid);
   view . lines () . find ( |l| l . contains (&fact) ) }
 
+/// As 'line_of_gnid', passing over a line that claims nothing: a
+/// forker of a forkee as such, which that forkee, drawn editable, shows
+/// in its own forks folder.
+fn claiming_line_of_gnid<'a> (
+  view : &'a str,
+  gnid : &str,
+) -> Option<&'a str> {
+  let fact : String = format! ("(gnid {})", gnid);
+  view . lines () . find ( |l| l . contains (&fact) && ! l . contains ("noClaim") ) }
+
 /// R, foreign, contains M; A, of R's author, and U, the user's, each
 /// fork M; P, owned, contains M. A view of R shows A in M's
 /// place, a view of P shows U, and a view of both shows each under
@@ -821,8 +831,12 @@ async fn a_forked_foreign_root_follows_the_users_perspective (
   let marked : Vec<&str> = marked_lines (&saved, "M");
   assert! ( marked . len () == 1 && marked [0] . contains ("(gnid U)"),
     "under the clone of R, the user's U is shown in M's place:\n{}", saved );
-  assert! ( line_of_gnid (&saved, "A") . is_none (),
-    "under the clone of R, A is not shown:\n{}", saved );
+  assert! ( saved . lines ()
+              . filter ( |line| line . contains ("(gnid A)") )
+              . all ( |line| line . contains ("noClaim") ),
+    "under the clone of R, A is not shown in M's place, only as a forker \
+     of M in M's forks folder, M being drawn editable as U's forkee:\n{}",
+    saved );
   Ok (( )) }
 
 //
@@ -921,7 +935,7 @@ fn a_switched_view_follows_the_users_perspective_until_switched_back (
   let switched : String = rerendered_text (&messages)
     . ok_or_else ( || format! ("the view is rerendered: {:?}", messages) ) ?;
   assert! ( line_of_gnid (&switched, "U") . is_some_and ( |l| l . contains ("(inPlaceOf M)") )
-            && line_of_gnid (&switched, "A") . is_none (),
+            && claiming_line_of_gnid (&switched, "A") . is_none (),
     "switched, the user's U stands in M's place:\n{}", switched );
   assert_eq! ( views_state . open_views . perspective_of_view (
                  &ViewforestId::from_client_string ("R" . to_string ()) ),
@@ -937,7 +951,7 @@ fn a_switched_view_follows_the_users_perspective_until_switched_back (
     &mut views_state, &env, config, handle_set_perspective_request ))
     . ok_or ("switching back rerenders the view") ?;
   assert! ( line_of_gnid (&back, "A") . is_some_and ( |l| l . contains ("(inPlaceOf M)") )
-            && line_of_gnid (&back, "U") . is_none (),
+            && claiming_line_of_gnid (&back, "U") . is_none (),
     "switched back, R's author's A stands in M's place again:\n{}", back );
   Ok (( )) }
 
@@ -1187,10 +1201,11 @@ fn next_cycles_through_every_perspective_that_shows_the_view_differently (
   Ok (( )) }
 
 /// The cycle does not depend on the path taken. In a view of F2, the
-/// user's U2 stands in M2's place and holds nothing, so N2, which
-/// third forks, is not drawn from the user's perspective; third's
-/// is still the next after it, as found from the root authors'
-/// drawing, and a request naming it from there is not refused.
+/// user's U2 stands in M2's place and holds nothing; N2, which third
+/// forks, is drawn from the user's perspective only as content of M2,
+/// U2's forkee as such, where it stands raw; third's is the next
+/// after the user's, as found from the root authors' drawing, and a
+/// request naming it from there is not refused.
 fn a_perspective_stays_in_the_cycle_where_another_hides_what_it_forks (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
@@ -1204,7 +1219,8 @@ fn a_perspective_stays_in_the_cycle_where_another_hides_what_it_forks (
   assert! ( extract_string_field_from_sexp (&to_user [0], "perspective")
               . as_deref () == Some ("user")
             && rerendered_text (&to_user) . is_some_and ( |text|
-                 line_of_gnid (&text, "U2") . is_some () && line_of_gnid (&text, "N2") . is_none () ),
+                 line_of_gnid (&text, "U2") . is_some ()
+                 && line_of_gnid (&text, "N2") . is_some_and ( |l| ! l . contains ("inPlaceOf") ) ),
     "{:?}", to_user );
   let named : Vec<String> = switch ("owner of third");
   assert! ( refusal_of (&named) . is_none (), "{:?}", named );

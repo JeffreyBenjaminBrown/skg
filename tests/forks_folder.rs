@@ -103,20 +103,40 @@ fn line_of<'a> (
     . find ( |line| line . contains (&format! ("(gnid {})", gnid)) )
     . unwrap_or_else ( || panic! ( "no line shows {} in:\n{}", gnid, buf )) }
 
-/// 'buf' without the line showing 'gnid'.
+/// 'buf' without the first line showing 'gnid', and the lines under
+/// it: a forkee as such, drawn editable, shows its own folders.
 fn without_line_of (
   buf  : &str,
   gnid : &str,
 ) -> String {
-  buf . replace ( &format! ("{}\n", line_of (buf, gnid)), "" ) }
+  let depth : &dyn Fn (&str) -> usize = &|line : &str| -> usize {
+    line . chars () . take_while ( |c| *c == '*' ) . count () };
+  let lines : Vec<&str> = buf . lines () . collect ();
+  let at : usize = lines . iter ()
+    . position ( |line| line . contains (&format! ("(gnid {})", gnid)) )
+    . unwrap_or_else ( || panic! ( "no line shows {} in:\n{}", gnid, buf ));
+  let below : usize = lines [at + 1 ..] . iter ()
+    . take_while ( |line| depth (line) == 0 || depth (line) > depth (lines [at]) )
+    . count ();
+  lines [.. at] . iter () . chain ( lines [at + 1 + below ..] . iter () )
+    . map ( |line| format! ("{}\n", line) ) . collect () }
 
 /// The headline atoms (stars and the first words of the metadata) of
-/// each line of 'buf', to read the outline.
+/// each line of 'buf', to read the outline of N's forks folder: down
+/// to its members and the members of its hidden-outside folder, not
+/// what a member as such shows under it.
 fn outline (
   buf : &str,
 ) -> Vec<String> {
+  let depth : &dyn Fn (&str) -> usize = &|line : &str| -> usize {
+    line . chars () . take_while ( |c| *c == '*' ) . count () };
+  let mut under_hidden_outside : bool = false;
   buf . lines ()
     . filter ( |line| line . starts_with ('*') )
+    . filter ( |line| {
+      if depth (line) == 3 {
+        under_hidden_outside = line . contains ("hiddenOutsideOfForkPartnersFolder"); }
+      depth (line) <= 3 || ( depth (line) == 4 && under_hidden_outside ) } )
     . map ( |line| line . split (" (skgRepos") . next () . unwrap () . to_string () )
     . collect () }
 

@@ -860,8 +860,8 @@ def check_move (context):
   folder = fresh_root_view (context, "move")
   edit_compact ( folder, [
     ( "*** Contained twice ⟨0e 2aC⟩\n", "" ),
-    ( "***** An aside of Fred's ⟨0k ☮ cH ⌂:fred folded⟩\n",
-      "***** An aside of Fred's ⟨0k ☮ cH ⌂:fred folded⟩\n"
+    ( "***** An aside of Fred's ⟨0p ☮ cH ⌂:fred folded⟩\n",
+      "***** An aside of Fred's ⟨0p ☮ cH ⌂:fred folded⟩\n"
       "*** Contained twice ⟨0e 2aC⟩\n" ) ])
   report = ( REPORT_HEAD +
              "Moved: ⟨0e⟩ 'Contained twice', from under ⟨0d⟩ 'First child, "
@@ -877,9 +877,9 @@ def check_move (context):
 
 def check_removal (context):
   folder = fresh_root_view (context, "remove")
-  edit_compact ( folder, [ ( "*** Contained twice ⟨0k 2aC⟩\n", "" ) ])
+  edit_compact ( folder, [ ( "*** Contained twice ⟨0p 2aC⟩\n", "" ) ])
   report = ( REPORT_HEAD +
-             "Removed: ⟨0k⟩ 'Contained twice', from under ⟨0f⟩ 'Second "
+             "Removed: ⟨0p⟩ 'Contained twice', from under ⟨0f⟩ 'Second "
              "child, a forker'.\n" )
   # Its container forks Fred's note, which does not contain
   # it, so the removal hides nothing, and the save says why.
@@ -1297,8 +1297,8 @@ def check_reworded_retype_all_new (context):
   new_title = "The headline added at the top and retitled again"
   edit_compact ( folder, [
     ( compact_line_starting ( folder, "*** " + REWORDED_TITLE ) + "\n", "" ),
-    ( "** Second child, retitled ⟨",
-      "** " + new_title + "\n** Second child, retitled ⟨" ) ])
+    ( "\n** Second child, retitled ⟨",
+      "\n** " + new_title + "\n** Second child, retitled ⟨" ) ])
   question = (
     "Question: removed ⟨0e⟩ '" + REWORDED_TITLE + "' / new '" + new_title +
     "' (line 11): probably the same statement reworded; keep its ID?\n" )
@@ -1410,9 +1410,9 @@ def check_placing_nodes (context):
     folder,
     "** First child ⟨0d aC3⟩\n"
     "A body line that stays unnumbered.\n"
-    "*** A second container, outside the view ⟨0k aC1⟩\n"
-    "**** Contained twice ⟨0l ☮ 2aC⟩\n"
-    "*** An aside of Fred's ⟨0m 1H ⌂:fred⟩\n"
+    "*** A second container, outside the view ⟨0p aC1⟩\n"
+    "**** Contained twice ⟨0q ☮ 2aC⟩\n"
+    "*** An aside of Fred's ⟨0r 1H ⌂:fred⟩\n"
     "*** Contained twice ⟨0e 2aC⟩\n" )
   if "writeProtected (viewRequests" in read_file (
       os . path . join (folder, ROOT_BASE_NAME + ".full.org") ):
@@ -1434,7 +1434,7 @@ def check_placing_beside_an_editable_occurrence (context):
     "editable occurrence of it.\n" + saved_line (0) + written_paths (folder) )
   require_equal ( "the second container's content",
                   skg_list (context, "child-b-id", "contains"), [ "shared-id" ] )
-  if not read_compact (folder) . endswith ( "*** Contained twice ⟨0q ☮ 3aC⟩\n" ):
+  if not read_compact (folder) . endswith ( "*** Contained twice ⟨0v ☮ 3aC⟩\n" ):
     raise CaseFailure (
       f"the placed occurrence is not last and write-protected:\n{read_compact (folder)}" )
 
@@ -1511,14 +1511,14 @@ def check_write_protected_foreign_edit_refused (context):
   content, forks nothing, so it is refused before any save, saying how
   to fork it."""
   folder = fresh_root_view (context, "fork-write-protected")
-  detail = compact_line_starting (folder, "*** A detail of Fred's ⟨0s ")
+  detail = compact_line_starting (folder, "*** A detail of Fred's ⟨0u ")
   edit_compact ( folder, [ ( detail, detail . replace (
     "A detail of Fred's ⟨", "A detail of Fred's, mine ⟨" )) ])
   graph_before = skg_files (context)
   require_output (
     run_save (folder, "--yes"),
     REPORT_HEAD +
-    "Error: ⟨0s⟩ 'A detail of Fred's', of the foreign skgrepo 'fred', is "
+    "Error: ⟨0u⟩ 'A detail of Fred's', of the foreign skgrepo 'fred', is "
     "write-protected, and its title changed. A write-protected occurrence "
     "saves nothing of its own, so this would fork nothing. To fork it, undo "
     "the edit, write 'editable' in its handle and save; then edit it and "
@@ -1533,19 +1533,19 @@ def check_making_a_foreign_node_editable (context):
   writes nothing, and the re-rendered view shows it editable, and the
   occurrence that was editable write-protected."""
   folder = fresh_root_view (context, "editable")
-  detail = compact_line_starting (folder, "*** A detail of Fred's ⟨0s ")
+  detail = compact_line_starting (folder, "*** A detail of Fred's ⟨0u ")
   edit_compact ( folder, [ ( detail, detail [ : -1 ] + " editable⟩" ) ])
   graph_before = skg_files (context)
   fred_before = fred_files (context)
   require_output (
     run_save (folder, "--yes"),
     REPORT_HEAD +
-    "Editable: ⟨0s⟩ 'A detail of Fred's', as '(viewRequests editableView)': "
+    "Editable: ⟨0u⟩ 'A detail of Fred's', as '(viewRequests editableView)': "
     "the save makes it this view's editable occurrence of its node.\n"
     + saved_line (0) + written_paths (folder) )
   require_equal ( "the owned files after 'editable'", skg_files (context), graph_before )
   require_equal ( "the foreign files after 'editable'", fred_files (context), fred_before )
-  if "☮" in compact_line_starting (folder, "*** A detail of Fred's ⟨0s "):
+  if "☮" in compact_line_starting (folder, "*** A detail of Fred's ⟨0u "):
     raise CaseFailure ( f"the occurrence is still write-protected:\n{read_compact (folder)}" )
   if "☮" not in compact_line_starting (folder, "*** A detail of Fred's ⟨0e "):
     raise CaseFailure ( f"the other occurrence is still editable:\n{read_compact (folder)}" )
@@ -1621,14 +1621,14 @@ def check_implicit_fork_approved (context):
                   skg_list (context, "child-a-id", "contains"),
                   [ "fred-detail-id", "elsewhere-id", "fred-aside-id", "shared-id" ] )
   require_in_compact ( folder, "*** An aside of Fred's ⟨0h C1 Kĥ1⟩\n"
-                               "**** My note on it ⟨0t⟩\n" )
+                               "**** My note on it ⟨0v⟩\n" )
 
 def check_explicit_fork (context):
   """'fork' on an owned node, as the clients' 'skg-fork-node' marks
   it: refused beside other edits, then approved with '--yes', making a
   clone in 'main' that forks it."""
   folder = fresh_root_view (context, "fork-explicit")
-  shared = compact_line_starting (folder, "*** Contained twice ⟨0l ")
+  shared = compact_line_starting (folder, "*** Contained twice ⟨0n ")
   edit_compact ( folder, [ ( shared, shared [ : -1 ] + " fork⟩" ) ])
   first_child = compact_line_starting (folder, "** First child ⟨")
   edit_compact ( folder, [ ( first_child, first_child . replace (
@@ -1637,7 +1637,7 @@ def check_explicit_fork (context):
   require_output (
     run_save (folder, "--yes"),
     REPORT_HEAD +
-    "Error: ⟨0l⟩ 'Contained twice' carries 'fork', but the compact view has "
+    "Error: ⟨0n⟩ 'Contained twice' carries 'fork', but the compact view has "
     "other edits; save them first, as a client forks only from a saved "
     "buffer, so that the clone is the node as it is saved.\n",
     expected_returncode = 1 )
@@ -1650,7 +1650,7 @@ def check_explicit_fork (context):
   require_output (
     run_save (folder, "--yes"),
     REPORT_HEAD +
-    "Fork: ⟨0l⟩ 'Contained twice', by request: a new clone of it forks "
+    "Fork: ⟨0n⟩ 'Contained twice', by request: a new clone of it forks "
     "it.\n" + FORK_INTO_MAIN +
     "Server: fork confirmation: the save forks 1 node, and writes nothing "
     "until that is approved.\n"
@@ -1873,7 +1873,7 @@ def check_search_matching (context):
                     "Search matching: ⟨0f⟩ 'Second child, a forker', as "
                     "'(flag noSearchMatching true)': the node no longer matches "
                     "searches.",
-                    "Skipped: 'noSearchMatching subtree' on ⟨0a⟩ leaves ⟨0k⟩ "
+                    "Skipped: 'noSearchMatching subtree' on ⟨0a⟩ leaves ⟨0p⟩ "
                     "'Second child, a forker' (write-protected)." ] )
   for node_id in [ "root-id", "child-a-id", "shared-id", "child-b-id" ]:
     require_equal ( node_id + "'s flags after 'noSearchMatching subtree'",
@@ -2911,14 +2911,14 @@ def check_hiding_the_foreign_skgrepos (context):
   folder = context [ "daemon_folder" ]
   require_tool_run ([ "view", "child-b-id", "--out-dir", folder ])
   require_in_file ( folder, "view_child-b-id", "*** Fred's note ⟨" )
-  edit_compact ( folder, [ ( "* Second child, a forker ⟨",
-                             "* Second child, unsaved ⟨" ) ], "view_child-b-id" )
+  edit_compact ( folder, [ ( "* Second child, a forker ⟨0a ",
+                             "* Second child, unsaved ⟨0a " ) ], "view_child-b-id" )
   completed = run_tool ([ "restrict", "--foreign", "hidden" ])
   require_output ( completed, "", expected_returncode = 1 )
   if "view_child-b-id.compact.org has unsaved edits" not in completed . stderr:
     raise CaseFailure ( f"stderr was {completed . stderr!r}" )
-  edit_compact ( folder, [ ( "* Second child, unsaved ⟨",
-                             "* Second child, a forker ⟨" ) ], "view_child-b-id" )
+  edit_compact ( folder, [ ( "* Second child, unsaved ⟨0a ",
+                             "* Second child, a forker ⟨0a " ) ], "view_child-b-id" )
   require_failure (
     run_tool ([ "restrict", "--foreign", "hidden" ]), [],
     "skg_for_ai: The skgrepo restriction is as it was: run again with "
@@ -3152,9 +3152,14 @@ FOLLOWS_YOURS_SUMMARY = (
   "# Showing your perspective (each root author's perspective is the default).\n" )
 FOLLOWS_THIRDS_SUMMARY = (
   "# Showing third's perspective (each root author's perspective is the default).\n" )
-R_SHOWING_A = "* R ⟨0a C2 ⌂:foreign⟩\n** A ⟨0b Kĥ1⟩\n*** ⟨It forks these, or these fork it.⟩\n**** M ⟨☮ 2C 3bK⟩\n***** ⟨☮ These also contain it.⟩\n****** P ⟨☮ Cb ⌂:main folded⟩\n** K ⟨0g⟩\n"
-R_SHOWING_U = "* R ⟨0a C2 ⌂:foreign⟩\n** U ⟨0b Kĥ1 ⌂:main⟩\n*** ⟨It forks these, or these fork it.⟩\n**** M ⟨☮ 2C 3bK ⌂:foreign⟩\n***** ⟨☮ These also contain it.⟩\n****** P ⟨☮ Cb ⌂:main folded⟩\n** K ⟨0g⟩\n"
-R_SHOWING_B = "* R ⟨0a C2 ⌂:foreign⟩\n** B ⟨0b Kĥ1 ⌂:third⟩\n*** ⟨It forks these, or these fork it.⟩\n**** M ⟨☮ 2C 3bK ⌂:foreign⟩\n***** ⟨☮ These also contain it.⟩\n****** P ⟨☮ Cb ⌂:main folded⟩\n** K ⟨0g⟩\n"
+R_SHOWING_A = "* R ⟨0a C2 ⌂:foreign⟩\n** A ⟨0b Kĥ1⟩\n*** ⟨It forks these, or these fork it.⟩\n**** M ⟨2C 3bK⟩\n***** ⟨☮ These also contain it.⟩\n****** P ⟨☮ Cb ⌂:main folded⟩\n***** ⟨It forks these, or these fork it.⟩\n****** A ⟨☮ Kb ⟳⟩\n****** B ⟨☮ Kb ⌂:third⟩\n****** U ⟨☮ Kb ⌂:main⟩\n** K ⟨0k⟩\n"
+R_SHOWING_U = "* R ⟨0a C2 ⌂:foreign⟩\n** U ⟨0b Kĥ1 ⌂:main⟩\n*** ⟨It forks these, or these fork it.⟩\n**** M ⟨2C 3bK ⌂:foreign⟩\n***** ⟨☮ These also contain it.⟩\n****** P ⟨☮ Cb ⌂:main folded⟩\n***** ⟨It forks these, or these fork it.⟩\n****** A ⟨☮ Kb⟩\n****** B ⟨☮ Kb ⌂:third⟩\n****** U ⟨☮ Kb ⟳ ⌂:main⟩\n** K ⟨0k⟩\n"
+def once_u_has_a_body (view):
+  """VIEW as drawn once U has a body: U's write-protected occurrence,
+  as a forker of M in M's forks folder, says so ('B')."""
+  return view . replace ( "U ⟨☮ Kb", "U ⟨☮B Kb" )
+
+R_SHOWING_B = "* R ⟨0a C2 ⌂:foreign⟩\n** B ⟨0b Kĥ1 ⌂:third⟩\n*** ⟨It forks these, or these fork it.⟩\n**** M ⟨2C 3bK ⌂:foreign⟩\n***** ⟨☮ These also contain it.⟩\n****** P ⟨☮ Cb ⌂:main folded⟩\n***** ⟨It forks these, or these fork it.⟩\n****** A ⟨☮ Kb⟩\n****** B ⟨☮ Kb ⟳ ⌂:third⟩\n****** U ⟨☮ Kb ⌂:main⟩\n** K ⟨0k⟩\n"
 
 def copy_perspective_fixture (data_root):
   """The perspective data, with a config naming its two foreign
@@ -3259,7 +3264,7 @@ def check_saving_a_view_that_follows_yours (context):
     [], "Nothing was switched: the compact view has edits" )
   require_save_succeeds ( os . path . join (folder, "view_R.view.json") )
   require_equal ( "R's view, saved", r_tree (folder),
-                  FOLLOWS_YOURS_SUMMARY + R_SHOWING_U )
+                  FOLLOWS_YOURS_SUMMARY + once_u_has_a_body (R_SHOWING_U) )
   require_in_file ( folder, "view_R", "** U ⟨0b Kĥ1 ⌂:main⟩\nU's new body.\n" )
   require_equal ( "U's body", skg_body (context, "U"), [ "U's new body." ] )
   require_equal ( "the saved sidecar's choice",
@@ -3275,7 +3280,7 @@ def check_following_the_root_authors_again (context):
       FOLLOWS_THIRDS_LINE ):
     raise CaseFailure ( f"the switch printed {completed . stdout!r}, {completed . stderr!r}" )
   require_equal ( "R's view, following third's", r_tree (folder),
-                  FOLLOWS_THIRDS_SUMMARY + R_SHOWING_B )
+                  FOLLOWS_THIRDS_SUMMARY + once_u_has_a_body (R_SHOWING_B) )
   require_equal ( "the sidecar's perspective",
                   { key : read_sidecar (folder, "view_R") [key]
                     for key in ( "perspective", "perspective_name" ) },
@@ -3285,7 +3290,8 @@ def check_following_the_root_authors_again (context):
   if completed . returncode != 0 or not completed . stdout . startswith (
       FOLLOWS_ROOT_AUTHORS_LINE ):
     raise CaseFailure ( f"the switch printed {completed . stdout!r}, {completed . stderr!r}" )
-  require_equal ( "R's view, following its root author's", r_tree (folder), R_SHOWING_A )
+  require_equal ( "R's view, following its root author's", r_tree (folder),
+                  once_u_has_a_body (R_SHOWING_A) )
   require_equal ( "the sidecar's choice",
                   read_sidecar (folder, "view_R") [ "perspective" ],
                   "root authors" )
@@ -3322,7 +3328,7 @@ def check_switching_perspective_through_a_daemon (context):
   if completed . returncode != 0 or not completed . stdout . startswith (FOLLOWS_YOURS_LINE):
     raise CaseFailure ( f"the switch printed {completed . stdout!r}, {completed . stderr!r}" )
   require_equal ( "R's view, following yours", r_tree (folder),
-                  FOLLOWS_YOURS_SUMMARY + R_SHOWING_U )
+                  FOLLOWS_YOURS_SUMMARY + once_u_has_a_body (R_SHOWING_U) )
   require_equal ( "the held sidecar", { key : read_sidecar (folder, "view_R") [key]
                                         for key in ( "perspective", "closed" ) },
                   { "perspective" : "user", "closed" : False } )
@@ -3335,7 +3341,7 @@ def check_switching_perspective_through_a_daemon (context):
     raise CaseFailure ( f"the save printed {completed . stdout!r}, {completed . stderr!r}" )
   require_log_line ( context, "re-rendered view_R because of 'save view_U.view.json --yes'" )
   require_equal ( "R's view, rewritten by the daemon", r_tree (folder),
-                  FOLLOWS_YOURS_SUMMARY + R_SHOWING_U . replace ("** U ", "** U, retitled ") )
+                  FOLLOWS_YOURS_SUMMARY + once_u_has_a_body (R_SHOWING_U) . replace ("** U ", "** U, retitled ") )
   require_equal ( "the rewritten sidecar's choice",
                   read_sidecar (folder, "view_R") [ "perspective" ], "user" )
   require_tool_run ([ "daemon", "--stop", "--out-dir", folder ])
@@ -3343,12 +3349,14 @@ def check_switching_perspective_through_a_daemon (context):
   require_equal ( "the released sidecar", { key : read_sidecar (folder, "view_R") [key]
                                             for key in ( "perspective", "closed" ) },
                   { "perspective" : "user", "closed" : True } )
-  edit_compact ( folder, [ ( "** U, retitled ⟨", "** U, retitled again ⟨" ) ], "view_R" )
+  edit_compact ( folder, [ ( "\n** U, retitled ⟨", "\n** U, retitled again ⟨" ) ], "view_R" )
   require_save_succeeds (sidecar_path)
   require_equal ( "R's view, saved after the daemon stopped", r_tree (folder),
-                  FOLLOWS_YOURS_SUMMARY + R_SHOWING_U . replace ("** U ", "** U, retitled again ") )
+                  FOLLOWS_YOURS_SUMMARY + once_u_has_a_body (R_SHOWING_U) . replace ("** U ", "** U, retitled again ") )
   require_tool_run ([ "perspective", sidecar_path, "root-authors" ])
-  require_equal ( "R's view, following its root author's", r_tree (folder), R_SHOWING_A )
+  require_equal ( "R's view, following its root author's", r_tree (folder),
+                  once_u_has_a_body (R_SHOWING_A) . replace (
+                    "U ⟨☮B", "U, retitled again ⟨☮B" ) )
 
 def check_viewing_a_root_a_perspective_put_in_place (context):
   """Through a daemon, a view of M switched to the user's perspective

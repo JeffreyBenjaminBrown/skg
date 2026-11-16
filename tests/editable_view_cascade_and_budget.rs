@@ -837,8 +837,9 @@ async fn test_editable_view_request_moves_editability_back (
 // ===================================================
 // Test: an AliasFolder fills whole and is budget-neutral (§5.5).
 // ===================================================
-// Companion to initial_view_bfs::test_budget_content_beats_forkees (which
-// pins the same neutrality for the auto-rendered forks folder). An AliasFolder,
+// Companion to initial_view_bfs::test_budget_reaches_forkees_and_content_in_level_order
+// (which pins the same neutrality for the auto-rendered forks folder,
+// whose members as such charge the budget as content does). An AliasFolder,
 // unlike a forks folder, is not auto-rendered de-novo -- it appears only on an
 // explicit `aliases` view request -- so this exercises the request path through
 // the refresh (the folder request, and the alias folder's goal), neither of

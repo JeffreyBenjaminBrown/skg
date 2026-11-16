@@ -22,6 +22,19 @@ local function line_of_gnid (view, gnid)
   return nil
 end
 
+---The line number showing GNID in M's place (marked '(inPlaceOf M)')
+---in VIEW, or nil. M, drawn editable in the forks folder of the
+---mirror standing in its place, shows the other mirrors there too,
+---as forkers of M.
+local function line_in_ms_place (view, gnid)
+  local needle = '(gnid ' .. gnid .. ')'
+  for number, line in ipairs(vim.api.nvim_buf_get_lines(view, 0, -1, false)) do
+    if line:find(needle, 1, true) and line:find('(inPlaceOf M)', 1, true) then
+      return number end
+  end
+  return nil
+end
+
 ---Wait for PREDICATE; FAIL, showing BUF's text, unless it holds.
 local function check_eventually (predicate, timeout_secs, message)
   if not T.wait_for(predicate, timeout_secs) then
@@ -37,7 +50,7 @@ buf = T.wait_for(function ()
   for _, candidate in ipairs(vim.api.nvim_list_bufs()) do
     if vim.api.nvim_buf_is_valid(candidate)
        and vim.b[candidate].skg_view_id
-       and line_of_gnid(candidate, 'A') then
+       and line_in_ms_place(candidate, 'A') then
       return candidate end
   end
   return nil
@@ -49,16 +62,16 @@ T.check(vim.b[buf].skg_perspective == nil,
 
 -- The cursor on A's headline; the switch must leave it on U's, which
 -- stands in the same place.
-vim.api.nvim_win_set_cursor(0, { line_of_gnid(buf, 'A'), 0 })
+vim.api.nvim_win_set_cursor(0, { line_in_ms_place(buf, 'A'), 0 })
 perspective.cycle_perspective()
 check_eventually(function ()
     return vim.b[buf].skg_perspective == 'user'
-           and line_of_gnid(buf, 'U')
+           and line_in_ms_place(buf, 'U')
            and lock.stream_in_progress == nil
   end, 10, 'switched, the view shows U')
-T.check(not line_of_gnid(buf, 'A'),
+T.check(not line_in_ms_place(buf, 'A'),
         'switched, the view no longer shows A')
-T.check(vim.api.nvim_win_get_cursor(0)[1] == line_of_gnid(buf, 'U'),
+T.check(vim.api.nvim_win_get_cursor(0)[1] == line_in_ms_place(buf, 'U'),
         "the cursor stayed on the headline M's mirror stands on")
 T.check(buffer.perspective_mode_line(buf) == ':your perspective',
         'the statusline mark says the view shows your perspective')
@@ -66,7 +79,7 @@ T.check(buffer.perspective_mode_line(buf) == ':your perspective',
 -- Unsaved edits refuse the switch. The body line goes directly under
 -- U's headline: the end of the buffer is under foreign K, and an edit
 -- there would fork K.
-local u_line = line_of_gnid(buf, 'U')
+local u_line = line_in_ms_place(buf, 'U')
 vim.api.nvim_buf_set_lines(buf, u_line, u_line, false,
                            { 'a body line for U' })
 vim.api.nvim_win_set_cursor(0, { u_line, 0 })
@@ -84,7 +97,7 @@ check_eventually(function ()
            and T.state.lp_pending_count == 0
   end, 20, 'the save finished')
 check_eventually(function ()
-    return line_of_gnid(buf, 'U') and not line_of_gnid(buf, 'A')
+    return line_in_ms_place(buf, 'U') and not line_in_ms_place(buf, 'A')
            and vim.b[buf].skg_perspective == 'user'
   end, 1, 'after the save the view still shows your perspective')
 
@@ -92,7 +105,7 @@ check_eventually(function ()
 perspective.cycle_perspective()
 check_eventually(function ()
     return vim.b[buf].skg_perspective == 'owner of third'
-           and line_of_gnid(buf, 'B')
+           and line_in_ms_place(buf, 'B')
            and lock.stream_in_progress == nil
   end, 10, "the next perspective, third's, shows B")
 T.check(buffer.perspective_mode_line(buf) == ":third's perspective",
@@ -102,7 +115,7 @@ T.check(buffer.perspective_mode_line(buf) == ":third's perspective",
 perspective.cycle_perspective()
 check_eventually(function ()
     return vim.b[buf].skg_perspective == nil
-           and line_of_gnid(buf, 'A')
+           and line_in_ms_place(buf, 'A')
            and lock.stream_in_progress == nil
   end, 10, 'switched back, the view shows A again')
 T.check(buffer.perspective_mode_line(buf) == '',

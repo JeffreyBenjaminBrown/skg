@@ -1,14 +1,13 @@
 // cargo nextest run --test grouped_forks -E 'test(forkee_as_such_extension::)'
 //
-// Extending a forkee as such, on the R/E/G/H example: R
+// A forkee as such, drawn editable, on the R/E/G/H example: R
 // forks E, R hides H, E contains G and H.
 // Extended with X forking G, so substitution below the
-// forkee as such is observable: extending E under the
-// forksFolder applies R's hides (no H) and the general
+// forkee as such is observable: E, drawn editable under the
+// forksFolder, applies R's hides (no H) and the general
 // substitution rule (G is shown as X, marked). The folder member
 // itself (E) is shown raw: folders never substitute.
 
-use skg::test_utils::save_and_rerender;
 use std::error::Error;
 
 use skg::metadata_canon::without_viewnode_ids;
@@ -62,29 +61,20 @@ fn lines_by_enclosing_folder (
         { stack . push ((depth, "hiddenInForkPartnerFolder")); }}}
   result }
 
-/// Request an editable view of the E copy under 'folder' (by editing
-/// the de novo view's text), save, and return the rerendered view.
-async fn extend_e_under (
-  folder     : &str,
-  config : &SkgConfig,
+/// The de novo view of R, in which E, a forkee as such, is drawn
+/// editable.
+fn view_of_r (
+  config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<String, Box<dyn Error>> {
-  let (view_with_folder, _pids, _tree) =
+  let (view, _pids, _tree) =
     multi_root_view (
       config, Some (tantivy),
       &[ ID::from ("R") ] ) ?;
-  let edited : String =
-    { let mut out : Vec<String> = Vec::new ();
-      for (line_col, line) in lines_by_enclosing_folder (&view_with_folder) {
-        if line_col == folder && line . contains ("(gnid E)") {
-          out . push ( line . replace (
-            "writeProtected",
-            "writeProtected (viewRequests editableView)" )); }
-        else { out . push ( line . to_string () ); }}
-      out . join ("\n") + "\n" };
-  assert_ne! ( edited, view_with_folder,
-    "the {} copy of E was found and given a request", folder );
-  save_and_rerender (&edited, config, tantivy) . await }
+  assert! ( view . lines () . any ( |line|
+              line . contains ("(gnid E)") && ! line . contains ("writeProtected") ),
+    "E, a forkee as such, is drawn editable:\n{}", view );
+  Ok (view) }
 
 async fn forkee_as_such_extension_hides_and_substitutes (
   config : &SkgConfig,
@@ -92,9 +82,7 @@ async fn forkee_as_such_extension_hides_and_substitutes (
 ) -> Result<(), Box<dyn Error>> {
       (
         graph_handle_from_config (config) ? );
-      let view : String =
-        extend_e_under ("forksFolder", config, tantivy)
-        . await ?;
+      let view : String = view_of_r (config, tantivy) ?;
       let tagged : Vec<(&str, &str)> =
         lines_by_enclosing_folder (&view);
       assert! ( tagged . iter () . any ( |(c, l)|
@@ -131,7 +119,7 @@ async fn folder_members_never_substitute (
         view . lines ()
         . filter ( |l| l . contains ("(gnid E)") )
         . collect ();
-      assert_eq! ( e_lines . len (), 1,
+      assert! ( ! e_lines . is_empty (), // and under H, its chain, in the hidden-in folder
         "E appears under the forks folder:\n{}", view );
       assert! ( e_lines . iter () . all (
                   |l| ! l . contains ("inPlaceOf") ),

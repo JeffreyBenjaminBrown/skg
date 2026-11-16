@@ -72,6 +72,15 @@ contains to [], overwriting subee.skg on disk."
     (goto-nth-headline-with-title "11" 1)
     (skg-edit-metadata-at-point
      '(skg node (viewRequests (folder aliases))))
+    ;; subee stands in 11's forks folder editable, as a forkee as such
+    ;; is drawn. The root appended below takes its editability (a node
+    ;; has one editable occurrence in a buffer), so the folder's subee
+    ;; becomes write-protected, without what it showed.
+    (goto-nth-headline-with-title "subee" 1)
+    (skg-edit-metadata-at-point '(skg node writeProtected))
+    (let ((start (line-beginning-position 2)))
+      (org-end-of-subtree t t)
+      (delete-region start (point)))
     ;; Append standalone subee root with child.
     (goto-char (point-max))
     (unless (bolp) (insert "\n"))

@@ -16,7 +16,7 @@
 use std::error::Error;
 
 use crate::git_fixture_helpers::{
-  save_and_read_collateral, without_lines_containing};
+  save_and_read_collateral, without_subtrees_containing};
 
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::dbs::in_rust_graph::{
@@ -80,7 +80,7 @@ fn collateral_partner_folder_update_and_warning_scoping
 
       // Drop N from S's forksFolder (emptying it = explicit empty
       // set) and save S's view.
-      let edited_s : String = without_lines_containing (&s_view, "(gnid N)");
+      let edited_s : String = without_subtrees_containing (&s_view, "(gnid N)");
       let (response, collateral_views) =
         save_and_read_collateral (
           &edited_s, &s_viewforest_id, config, tantivy, &graph,

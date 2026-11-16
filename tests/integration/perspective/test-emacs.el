@@ -12,12 +12,22 @@
 (defun test--text ()
   (buffer-substring-no-properties (point-min) (point-max)))
 
-(defun test--line-of-gnid (gnid)
-  "The start of the line showing GNID in the current buffer, or nil."
+(defun test--line-in-ms-place (gnid)
+  "The start of the line showing GNID in M's place (marked
+'(inPlaceOf M)') in the current buffer, or nil. M, drawn editable in
+the forks folder of the mirror standing in its place, shows the other
+mirrors there too, as forkers of M."
   (save-excursion
     (goto-char (point-min))
-    (when (search-forward (format "(gnid %s)" gnid) nil t)
-      (line-beginning-position))))
+    (let ((found nil))
+      (while (and (not found)
+                  (search-forward (format "(gnid %s)" gnid) nil t))
+        (when (string-match-p
+               "(inPlaceOf M)"
+               (buffer-substring-no-properties
+                (line-beginning-position) (line-end-position)))
+          (setq found (line-beginning-position))))
+      found)))
 
 (defun integration-test-perspective ()
   (let ((test-port (getenv "SKG_TEST_PORT")))
@@ -28,7 +38,7 @@
                 (seq-find (lambda (b)
                             (with-current-buffer b
                               (and (boundp 'skg-view-id) skg-view-id
-                                   (test--line-of-gnid "A"))))
+                                   (test--line-in-ms-place "A"))))
                           (buffer-list)))
               10)))
     (unless buf (test-fail "the view of R, showing A, did not open"))
@@ -38,23 +48,23 @@
         (test-fail "a fresh view is not drawn from its root authors' perspective"))
       ;; Point on A's headline; the switch must leave it on U's, which
       ;; stands in the same place.
-      (goto-char (test--line-of-gnid "A"))
+      (goto-char (test--line-in-ms-place "A"))
       (skg-cycle-perspective)
       (unless (skg-test-wait-for
                (lambda () (and (equal skg-perspective "user")
-                               (test--line-of-gnid "U")
+                               (test--line-in-ms-place "U")
                                (not skg--stream-in-progress)))
                10)
         (test-fail "switched, the view does not show U:\n%s" (test--text)))
-      (when (test--line-of-gnid "A")
+      (when (test--line-in-ms-place "A")
         (test-fail "switched, the view still shows A:\n%s" (test--text)))
-      (unless (equal (line-beginning-position) (test--line-of-gnid "U"))
+      (unless (equal (line-beginning-position) (test--line-in-ms-place "U"))
         (test-fail "point left the headline M's mirror stands on"))
       (unless (equal (eval (cadr mode-line-process) t) ":your perspective")
         (test-fail "the mode line does not say the view shows your perspective"))
       (message "✓ switched to your perspective; U stands in M's place")
       ;; Unsaved edits refuse the switch.
-      (goto-char (test--line-of-gnid "U"))
+      (goto-char (test--line-in-ms-place "U"))
       (forward-line 1)
       (insert "a body line for U\n")
       (forward-line -1)
@@ -71,7 +81,7 @@
                                (not skg--stream-in-progress)))
                20)
         (test-fail "the save did not finish:\n%s" (test--text)))
-      (unless (and (test--line-of-gnid "U") (not (test--line-of-gnid "A"))
+      (unless (and (test--line-in-ms-place "U") (not (test--line-in-ms-place "A"))
                    (equal skg-perspective "user"))
         (test-fail "after the save the view no longer shows your perspective:\n%s"
                    (test--text)))
@@ -80,7 +90,7 @@
       (skg-cycle-perspective)
       (unless (skg-test-wait-for
                (lambda () (and (equal skg-perspective "owner of third")
-                               (test--line-of-gnid "B")
+                               (test--line-in-ms-place "B")
                                (not skg--stream-in-progress)))
                10)
         (test-fail "the next perspective does not show B:\n%s" (test--text)))
@@ -91,7 +101,7 @@
       (skg-cycle-perspective)
       (unless (skg-test-wait-for
                (lambda () (and (null skg-perspective)
-                               (test--line-of-gnid "A")
+                               (test--line-in-ms-place "A")
                                (not skg--stream-in-progress)))
                10)
         (test-fail "switched back, the view does not show A:\n%s" (test--text)))

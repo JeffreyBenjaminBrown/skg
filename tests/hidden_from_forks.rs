@@ -2,8 +2,10 @@
 //
 // Tests for hiddenOutsideOfForkPartnersFolder, hiddenInForkPartnerFolder, and the hides relation.
 // These test that:
-// 1. Initial view shows forkees as write-protected with hiddenOutsideOfForkPartnersFolder
-// 2. After saving with editable view requests, hiddenInForkPartnerFolder is shown
+// 1. Initial view draws each forkee as such editable, with its
+//    hiddenInForkPartnerFolder when nonempty, and the forks folder's
+//    hiddenOutsideOfForkPartnersFolder
+// 2. Cuts, pastes and hidden-folder edits under them save as hides
 
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::metadata_canon::without_viewnode_ids;
@@ -31,37 +33,6 @@ use skg::dbs::in_rust_graph::{
 use std::error::Error;
 use std::io::BufReader;
 use std::net::TcpStream;
-
-/// Add (viewRequests editableView) to all forkee nodes in org text.
-/// Modifies the node section of each forkee to request an editable view.
-/// Forkees are Occurrence children of forks folders.
-///
-/// KLUDGE: We identify forkees by matching on "forkee-" in the title.
-/// That's easier than navigating the org-tree's topoogy.
-fn add_editable_view_request_to_forkees (
-  org_text : &str,
-) -> String {
-  // Process line-by-line, inserting viewRequests after write-protected
-  // for lines containing "forkee-" in the title
-  org_text
-    . lines()
-    . map(|line| {
-      if line . contains ("forkee-") && line . contains ("writeProtected") {
-        // Insert viewRequests right after the `write-protected' atom. In the
-        // semantic-herald format `writeProtected' may be followed by `)'
-        // (no more atoms) or by `(view ...)'.
-        if line . contains ("writeProtected)") {
-          line . replace (
-            "writeProtected)", "writeProtected (viewRequests editableView))")
-        } else {
-          line . replace (
-            "writeProtected ", "writeProtected (viewRequests editableView) ") }
-      } else {
-        line . to_string()
-      }
-    })
-    . collect::<Vec<_>>()
-    . join ("\n") + "\n" }
 
 async fn save_buffer_for_hidden_from_forks_test (
   buffer      : &str,
@@ -404,7 +375,7 @@ async fn test_deleting_foreign_forkee_content_preserves_branch_edit (
           &ID ("r" . to_string()) )?;
     let extended : String =
       save_buffer_for_hidden_from_forks_test (
-        &add_editable_view_request_to_forkees (&initial_view),
+        &initial_view,
         &config, tantivy, &graph, &mut views_state
       ) . await?;
     let edited : String =
@@ -435,7 +406,7 @@ async fn test_deleting_foreign_forkee_content_infers_hide (
           &ID ("r" . to_string()) )?;
     let extended : String =
       save_buffer_for_hidden_from_forks_test (
-        &add_editable_view_request_to_forkees (&initial_view),
+        &initial_view,
         &config, tantivy, &graph, &mut views_state
       ) . await?;
     let edited : String =
@@ -779,7 +750,7 @@ async fn test_collateral_view_reflects_newly_hidden_forkee_content (
 
     let (extended, collateral_views) =
       save_buffer_and_read_collateral_views (
-        &add_editable_view_request_to_forkees (&initial_view),
+        &initial_view,
         &saved_viewforest_id, &config, tantivy, &graph,
         &mut views_state ) . await?;
     assert!(
@@ -843,7 +814,7 @@ async fn test_moving_foreign_forkee_content_to_forker_does_not_hide (
           &ID ("r" . to_string()) )?;
     let extended : String =
       save_buffer_for_hidden_from_forks_test (
-        &add_editable_view_request_to_forkees (&initial_view),
+        &initial_view,
         &config, tantivy, &graph, &mut views_state
       ) . await?;
     let edited : String =
@@ -885,7 +856,7 @@ async fn test_moving_foreign_forkee_content_elsewhere_still_hides (
           &ID ("r" . to_string()) )?;
     let extended : String =
       save_buffer_for_hidden_from_forks_test (
-        &add_editable_view_request_to_forkees (&initial_view),
+        &initial_view,
         &config, tantivy, &graph, &mut views_state
       ) . await?;
     let edited : String =
@@ -921,7 +892,7 @@ async fn test_extra_view_child_under_foreign_forkee_vanishes (
           &ID ("r" . to_string()) )?;
     let extended : String =
       save_buffer_for_hidden_from_forks_test (
-        &add_editable_view_request_to_forkees (&initial_view),
+        &initial_view,
         &config, tantivy, &graph, &mut views_state
       ) . await?;
     let edited : String =
@@ -1005,8 +976,8 @@ async fn test_extra_view_child_under_owned_forkee_vanishes (
 /// - hidden-for-no-reason is not in any forkee's content
 ///
 /// Tests two views:
-/// - Initial view from R: forkees are write-protected (bare leaves)
-/// - View from R with editable views extended at each forkee
+/// - Initial view from R: forkees as such drawn editable
+/// - The view after a save that asks to extend each forkee: the same, since each is editable already
 ///
 /// Also tests ordering rule: hiddenInForkPartnerFolder precedes content regardless of .skg order.
 /// E2's .skg has [E21, hidden-in-E2] but view shows hiddenInForkPartnerFolder before E21.
@@ -1022,40 +993,7 @@ async fn test_forkee_and_compound_partner_folders (
           &ID("R" . to_string()) )?;
     println!("Initial view from R:\n{}", initial_view);
 
-    let expected_initial = indoc! {
-      "* (skg node (gnid R) (skgRepos (nodeRepo main)) (view (rels (contains (out 1)) (forks (out 2)) (hides (out 3))))) R
-       ** (skg forksFolder)
-       *** (skg node (gnid E1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 2 (unintegrated 1))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) forkee-1
-       *** (skg node (gnid E2) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 2 (unintegrated 1))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) forkee-2
-       *** (skg hiddenOutsideOfForkPartnersFolder)
-       **** (skg folded node (gnid hidden-for-no-reason) (skgRepos (nodeRepo main)) writeProtected (view (rels (hides (in 1 (ancestors 3)))) (birth (hides in 3)))) hidden-for-no-reason
-       ** (skg node (gnid R1) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) R1
-       "};
-    assert_metadata_eq!(initial_view, expected_initial,
-      "Initial view from R: write-protected forkees are bare leaves; only hiddenOutsideOfForkPartnersFolder shown");
-
-    let extended = { // Request editable views, then save
-      let modified_view : String =
-        add_editable_view_request_to_forkees (&initial_view);
-      println!("Modified view (with editable requests):\n{}", modified_view);
-      let graph : InRustGraphHandle =
-        (
-          graph_handle_from_config (config) ?);
-      let mut views_state : ViewsState = ViewsState {
-        open_views            : OpenViews::new (),
-        graph_straddle        : None,};
-      let (mut stream, _read_end) : (TcpStream, TcpStream) =
-        mk_test_tcp_stream_pair ();
-      let response = update_from_and_rerender_buffer (
-          &mut stream,
-          &modified_view, &config, tantivy, &graph,
-
-          &Err ( String::new () ), &mut views_state
-        ) . await ?;
-      response . saved_view };
-    println!("View from R after save with editable view requests:\n{}", extended);
-
-    let expected_extended = indoc! {
+    let expected_view = indoc! {
       "* (skg node (gnid R) (skgRepos (nodeRepo main)) (view (rels (contains (out 1)) (forks (out 2)) (hides (out 3))))) R
        ** (skg forksFolder)
        *** (skg node (gnid E1) (skgRepos (nodeRepo main)) (view (rels (contains (out 2 (unintegrated 1))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) forkee-1
@@ -1076,48 +1014,13 @@ async fn test_forkee_and_compound_partner_folders (
        **** (skg folded node (gnid hidden-for-no-reason) (skgRepos (nodeRepo main)) writeProtected (view (rels (hides (in 1 (ancestors 3)))) (birth (hides in 3)))) hidden-for-no-reason
        ** (skg node (gnid R1) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) R1
        "};
-    // Under each member of a hiddenInForkPartnerFolder hangs its
-    // containerward chain: here the forkee, a cycle in the view. Each
-    // editable forkee as such shows its own forks folder, R forking it
-    // and claiming nothing there.
-    assert_metadata_eq!(extended, expected_extended,
-      "View with extended forkees: hiddenInForkPartnerFolder shown before content; hiddenOutsideOfForkPartnersFolder at end");
+    assert_metadata_eq!(initial_view, expected_view,
+      "Initial view from R: each forkee as such drawn editable, showing what it shows");
 
-    Ok (( )) }
-
-/// Hidden within but none hidden without:
-/// - R forks E1
-/// - R hides H
-/// - E1 contains [E11, H, E12] where H is hidden and E11, E12 are not
-///
-/// Tests two views:
-/// - Initial view from R: E1 is write-protected (bare leaf), H doesn't appear
-/// - View from R with editable views extended at each forkee: H appears in hiddenInForkPartnerFolder before E11 and E12
-///
-/// No hiddenOutsideOfForkPartnersFolder in either state (H is in E1's content).
-async fn test_hidden_within_but_none_without (
-  config : &SkgConfig,
-  tantivy : &mut TantivyIndex,
-) -> Result<(), Box<dyn Error>> {
-    let (initial_view, _pids, _)
-      : (String, Vec<ID>, _)
-      = single_root_view( &config, None,
-                          &ID("R" . to_string()) )?;
-    println!("Initial view from R:\n{}", initial_view);
-
-    let expected_initial = indoc! {
-      "* (skg node (gnid R) (skgRepos (nodeRepo main)) (view (rels (contains (out 1)) (forks (out 1)) (hides (out 1))))) R
-       ** (skg forksFolder)
-       *** (skg node (gnid E1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 3 (unintegrated 2))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) forkee-1
-       ** (skg node (gnid R1) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) R1
-       "};
-    assert_metadata_eq!(initial_view, expected_initial,
-      "Initial view from R: write-protected forkee is bare leaf; H doesn't appear");
-
-    let extended = { // request editable views, then save
+    let extended = { // save unchanged: each forkee as such is editable already
       let modified_view : String =
-        add_editable_view_request_to_forkees (&initial_view);
-      println!("Modified view (with editable requests):\n{}", modified_view);
+        initial_view . clone ();
+      println!("Saved unchanged:\n{}", modified_view);
       let graph : InRustGraphHandle =
         (
           graph_handle_from_config (config) ?);
@@ -1133,12 +1036,38 @@ async fn test_hidden_within_but_none_without (
           &Err ( String::new () ), &mut views_state
         ) . await ?;
       response . saved_view };
-    println!("View from R after save with editable view requests:\n{}", extended);
+    println!("View from R after an unchanged save:\n{}", extended);
 
-    // hiddenInForkPartnerFolder precedes content regardless of .skg order.
-    // E1.skg has [E11, H, E12] but view shows hiddenInForkPartnerFolder (with H) before E11 and E12;
-    // after it, E1's forks folder, R forking it.
-    let expected_extended = indoc! {
+    // Under each member of a hiddenInForkPartnerFolder hangs its
+    // containerward chain: here the forkee, a cycle in the view. Each
+    // editable forkee as such shows its own forks folder, R forking it
+    // and claiming nothing there.
+    assert_metadata_eq!(extended, expected_view,
+      "View with extended forkees: hiddenInForkPartnerFolder shown before content; hiddenOutsideOfForkPartnersFolder at end");
+
+    Ok (( )) }
+
+/// Hidden within but none hidden without:
+/// - R forks E1
+/// - R hides H
+/// - E1 contains [E11, H, E12] where H is hidden and E11, E12 are not
+///
+/// Tests two views:
+/// - Initial view from R: E1 drawn editable, H in hiddenInForkPartnerFolder before E11 and E12
+/// - The view after a save that asks to extend each forkee: the same, since each is editable already
+///
+/// No hiddenOutsideOfForkPartnersFolder in either state (H is in E1's content).
+async fn test_hidden_within_but_none_without (
+  config : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+    let (initial_view, _pids, _)
+      : (String, Vec<ID>, _)
+      = single_root_view( &config, None,
+                          &ID("R" . to_string()) )?;
+    println!("Initial view from R:\n{}", initial_view);
+
+    let expected_view = indoc! {
       "* (skg node (gnid R) (skgRepos (nodeRepo main)) (view (rels (contains (out 1)) (forks (out 1)) (hides (out 1))))) R
        ** (skg forksFolder)
        *** (skg node (gnid E1) (skgRepos (nodeRepo main)) (view (rels (contains (out 3 (unintegrated 2))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) forkee-1
@@ -1151,7 +1080,34 @@ async fn test_hidden_within_but_none_without (
        **** (skg node (gnid E12) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) E12
        ** (skg node (gnid R1) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) R1
        "};
-    assert_metadata_eq!(extended, expected_extended,
+    assert_metadata_eq!(initial_view, expected_view,
+      "Initial view from R: each forkee as such drawn editable, showing what it shows");
+
+    let extended = { // save unchanged: each forkee as such is editable already
+      let modified_view : String =
+        initial_view . clone ();
+      println!("Saved unchanged:\n{}", modified_view);
+      let graph : InRustGraphHandle =
+        (
+          graph_handle_from_config (config) ?);
+      let mut views_state : ViewsState = ViewsState {
+        open_views            : OpenViews::new (),
+        graph_straddle        : None,};
+      let (mut stream, _read_end) : (TcpStream, TcpStream) =
+        mk_test_tcp_stream_pair ();
+      let response = update_from_and_rerender_buffer (
+          &mut stream,
+          &modified_view, &config, tantivy, &graph,
+
+          &Err ( String::new () ), &mut views_state
+        ) . await ?;
+      response . saved_view };
+    println!("View from R after an unchanged save:\n{}", extended);
+
+    // hiddenInForkPartnerFolder precedes content regardless of .skg order.
+    // E1.skg has [E11, H, E12] but view shows hiddenInForkPartnerFolder (with H) before E11 and E12;
+    // after it, E1's forks folder, R forking it.
+    assert_metadata_eq!(extended, expected_view,
       "View with extended forkees: hiddenInForkPartnerFolder with H before E11 and E12");
 
     Ok (( )) }
@@ -1174,7 +1130,7 @@ async fn test_moving_hidden_forkee_content_to_visible_branch_infers_unhide (
           &ID ("R" . to_string()) )?;
     let extended : String =
       save_buffer_for_hidden_from_forks_test (
-        &add_editable_view_request_to_forkees (&initial_view),
+        &initial_view,
         &config, tantivy, &graph, &mut views_state
       ) . await?;
     let edited : String =
@@ -1231,7 +1187,7 @@ async fn test_collateral_view_reflects_newly_unhidden_forkee_content (
 
     let (extended, collateral_views) =
       save_buffer_and_read_collateral_views (
-        &add_editable_view_request_to_forkees (&initial_view),
+        &initial_view,
         &saved_viewforest_id, &config, tantivy, &graph,
         &mut views_state ) . await?;
     assert!(
@@ -1292,7 +1248,7 @@ async fn test_deleting_from_hiddenin_folder_does_not_unhide (
           &ID ("R" . to_string()) )?;
     let extended : String =
       save_buffer_for_hidden_from_forks_test (
-        &add_editable_view_request_to_forkees (&initial_view),
+        &initial_view,
         &config, tantivy, &graph, &mut views_state
       ) . await?;
     let edited : String =
@@ -1323,8 +1279,8 @@ async fn test_deleting_from_hiddenin_folder_does_not_unhide (
 /// - E2 has no content
 ///
 /// Tests two views:
-/// - Initial view from R: E1, E2 are write-protected (bare leaves), H in hiddenOutsideOfForkPartnersFolder
-/// - View from R with editable views extended at each forkee: E1 shows E11, E12 (E12 write-protected); E2 extended but empty; H still in hiddenOutsideOfForkPartnersFolder
+/// - Initial view from R: E1, E2 drawn editable, H in hiddenOutsideOfForkPartnersFolder
+/// - The view after a save that asks to extend each forkee: the same, since each is editable already
 ///
 /// No hiddenInForkPartnerFolder in either state (H is not in any forkee's content).
 async fn test_hidden_without_but_none_within (
@@ -1336,38 +1292,7 @@ async fn test_hidden_without_but_none_within (
       = single_root_view( &config, None,
                           &ID("R" . to_string()) )?;
     println!("Initial view from R:\n{}", initial_view);
-    let expected_initial = indoc! {
-      "* (skg node (gnid R) (skgRepos (nodeRepo main)) (view (rels (contains (out 1)) (forks (out 2)) (hides (out 1))))) R
-       ** (skg forksFolder)
-       *** (skg node (gnid E1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 2 (unintegrated 2))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) forkee-1
-       *** (skg node (gnid E2) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 0 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) forkee-2
-       *** (skg hiddenOutsideOfForkPartnersFolder)
-       **** (skg folded node (gnid H) (skgRepos (nodeRepo main)) writeProtected (view (rels (hides (in 1 (ancestors 3)))) (birth (hides in 3)))) H
-       ** (skg node (gnid R1) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) R1
-       "};
-    assert_metadata_eq!(initial_view, expected_initial,
-      "Initial view from R: H in hiddenOutsideOfForkPartnersFolder; E1 and E2 are writeProtected bare leaves");
-    let with_forkees_extended = {
-      let modified_view : String =
-        add_editable_view_request_to_forkees (&initial_view);
-      println!("Modified view (with editable requests):\n{}", modified_view);
-      let graph : InRustGraphHandle =
-        (
-          graph_handle_from_config (config) ?);
-      let mut views_state : ViewsState = ViewsState {
-        open_views            : OpenViews::new (),
-        graph_straddle        : None,};
-      let (mut stream, _read_end) : (TcpStream, TcpStream) =
-        mk_test_tcp_stream_pair ();
-      let response = update_from_and_rerender_buffer (
-        &mut stream,
-        &modified_view, &config, tantivy, &graph,
-
-        &Err ( String::new () ), &mut views_state ) . await ?;
-      response . saved_view };
-    println!("View from R after save with editable view requests:\n{}",
-             with_forkees_extended);
-    let expected_extended = indoc! {
+    let expected_view = indoc! {
       "* (skg node (gnid R) (skgRepos (nodeRepo main)) (view (rels (contains (out 1)) (forks (out 2)) (hides (out 1))))) R
        ** (skg forksFolder)
        *** (skg node (gnid E1) (skgRepos (nodeRepo main)) (view (rels (contains (out 2 (unintegrated 2))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) forkee-1
@@ -1383,7 +1308,29 @@ async fn test_hidden_without_but_none_within (
        **** (skg folded node (gnid H) (skgRepos (nodeRepo main)) writeProtected (view (rels (hides (in 1 (ancestors 3)))) (birth (hides in 3)))) H
        ** (skg node (gnid R1) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) R1
        "};
-    assert_metadata_eq!(with_forkees_extended, expected_extended,
+    assert_metadata_eq!(initial_view, expected_view,
+      "Initial view from R: each forkee as such drawn editable, showing what it shows");
+    let with_forkees_extended = {
+      let modified_view : String =
+        initial_view . clone ();
+      println!("Saved unchanged:\n{}", modified_view);
+      let graph : InRustGraphHandle =
+        (
+          graph_handle_from_config (config) ?);
+      let mut views_state : ViewsState = ViewsState {
+        open_views            : OpenViews::new (),
+        graph_straddle        : None,};
+      let (mut stream, _read_end) : (TcpStream, TcpStream) =
+        mk_test_tcp_stream_pair ();
+      let response = update_from_and_rerender_buffer (
+        &mut stream,
+        &modified_view, &config, tantivy, &graph,
+
+        &Err ( String::new () ), &mut views_state ) . await ?;
+      response . saved_view };
+    println!("View from R after an unchanged save:\n{}",
+             with_forkees_extended);
+    assert_metadata_eq!(with_forkees_extended, expected_view,
       "View with extended forkees: H still in hiddenOutsideOfForkPartnersFolder (at end); E1 extended with E11, E12; E2 extended, its content empty; each shows its forks folder, R forking it");
 
     Ok (( )) }
@@ -1418,11 +1365,15 @@ async fn test_adding_to_hiddenoutside_folder_hides_and_moves_inside (
         line . contains ("(gnid H)")),
       "Expected original hidden-outside viewnode H to remain:\n{}",
       rerendered );
-    assert! (
-      ! rerendered . contains ("(gnid E11)"),
-      "E11, now hidden inside a collapsed forkee, vanishes from \
-       where it was typed:\n{}",
-      rerendered );
+    { let e11_lines : Vec<&str> = rerendered . lines ()
+        . filter ( |line| line . contains ("(gnid E11)") ) . collect ();
+      assert! (
+        e11_lines . len () == 1
+        && e11_lines [0] . contains ("(hides (in 1 (ancestors 4)))"),
+        "E11, now hidden inside forkee E1, which is drawn editable, \
+         leaves the folder where it was typed and stands only in E1's \
+         hiddenInForkPartnerFolder:\n{}",
+        rerendered ); }
     let forker : Graphnode = node_from_disk (config, "R") ?;
     assert! (
       members_of (forker . hides . or_default ())
@@ -1436,7 +1387,7 @@ async fn test_adding_to_hiddenoutside_folder_hides_and_moves_inside (
       response . warnings );
     let extended : String =
       save_buffer_for_hidden_from_forks_test (
-        &add_editable_view_request_to_forkees (&rerendered),
+        &rerendered,
         &config, tantivy, &graph, &mut views_state
       ) . await ?;
     assert! (
@@ -1465,8 +1416,8 @@ async fn test_adding_to_hiddenoutside_folder_hides_and_moves_inside (
 /// - Both E1 and E2 contain H (and nothing else)
 ///
 /// Tests two views:
-/// - Initial view from R: E1, E2 are write-protected (bare leaves), H doesn't appear
-/// - View from R with editable views extended at each forkee: H appears in hiddenInForkPartnerFolder under both E1 and E2
+/// - Initial view from R: E1, E2 drawn editable, H in each one's hiddenInForkPartnerFolder
+/// - The view after a save that asks to extend each forkee: the same, since each is editable already
 ///
 /// No hiddenOutsideOfForkPartnersFolder in either state (H is in forkees' content).
 async fn test_overlapping_hidden_within (
@@ -1478,36 +1429,7 @@ async fn test_overlapping_hidden_within (
       = single_root_view( &config, None,
                           &ID("R" . to_string()) )?;
     println!("Initial view from R:\n{}", initial_view);
-    let expected_initial = indoc! {
-      "* (skg node (gnid R) (skgRepos (nodeRepo main)) (view (rels (contains (out 1)) (forks (out 2)) (hides (out 1))))) R
-       ** (skg forksFolder)
-       *** (skg node (gnid E1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 1 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) forkee-1
-       *** (skg node (gnid E2) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 1 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) forkee-2
-       ** (skg node (gnid R1) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) R1
-       "};
-    assert_metadata_eq!(initial_view, expected_initial,
-      "Initial view from R: write-protected forkees are bare leaves; H doesn't appear");
-    let extended = {
-      let modified_view : String =
-        add_editable_view_request_to_forkees (&initial_view);
-      println!("Modified view (with editable requests):\n{}",
-               modified_view);
-      let graph : InRustGraphHandle =
-        (
-          graph_handle_from_config (config) ?);
-      let mut views_state : ViewsState = ViewsState {
-        open_views            : OpenViews::new (),
-        graph_straddle        : None,};
-      let (mut stream, _read_end) : (TcpStream, TcpStream) =
-        mk_test_tcp_stream_pair ();
-      let response = update_from_and_rerender_buffer (
-        &mut stream,
-        &modified_view, &config, tantivy, &graph,
-
-        &Err ( String::new () ), &mut views_state ) . await ?;
-      response . saved_view };
-    println!("View from R after save with editable view requests:\n{}", extended);
-    let expected_extended = indoc! {
+    let expected_view = indoc! {
       "* (skg node (gnid R) (skgRepos (nodeRepo main)) (view (rels (contains (out 1)) (forks (out 2)) (hides (out 1))))) R
        ** (skg forksFolder)
        *** (skg node (gnid E1) (skgRepos (nodeRepo main)) (view (rels (contains (out 1 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) forkee-1
@@ -1526,6 +1448,28 @@ async fn test_overlapping_hidden_within (
        ***** (skg node (gnid R) (skgRepos (nodeRepo main)) noClaim writeProtected (view (rels (contains (out 1)) (forks (out 2 (ancestors 2))) (hides (out 1))) (birth (forks out 2)) cycle)) R
        ** (skg node (gnid R1) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) R1
        "};
-    assert_metadata_eq!(extended, expected_extended,
+    assert_metadata_eq!(initial_view, expected_view,
+      "Initial view from R: each forkee as such drawn editable, showing what it shows");
+    let extended = {
+      let modified_view : String =
+        initial_view . clone ();
+      println!("Saved unchanged:\n{}",
+               modified_view);
+      let graph : InRustGraphHandle =
+        (
+          graph_handle_from_config (config) ?);
+      let mut views_state : ViewsState = ViewsState {
+        open_views            : OpenViews::new (),
+        graph_straddle        : None,};
+      let (mut stream, _read_end) : (TcpStream, TcpStream) =
+        mk_test_tcp_stream_pair ();
+      let response = update_from_and_rerender_buffer (
+        &mut stream,
+        &modified_view, &config, tantivy, &graph,
+
+        &Err ( String::new () ), &mut views_state ) . await ?;
+      response . saved_view };
+    println!("View from R after an unchanged save:\n{}", extended);
+    assert_metadata_eq!(extended, expected_view,
       "View with extended forkees: H appears in hiddenInForkPartnerFolder under both E1 and E2, each showing its forks folder");
     Ok (( )) }

@@ -86,6 +86,25 @@ pub fn without_lines_containing(buffer: &str, substring: &str) -> String {
     . join ("\n") + "\n"
 }
 
+/// Remove each headline containing, viewnode IDs aside, the given
+/// substring, with the headlines and body lines under it: a forkee as
+/// such, say, drawn editable with its own folders and content.
+pub fn without_subtrees_containing(buffer: &str, substring: &str) -> String {
+  let depth = |line: &str| -> usize { line . chars() . take_while(|c| *c == '*') . count() };
+  let mut removing_below : Option<usize> = None;
+  let mut kept : Vec<&str> = Vec::new();
+  for line in buffer . lines() {
+    let line_depth : usize = depth (line);
+    if let Some (removed_depth) = removing_below {
+      if line_depth == 0 || line_depth > removed_depth { continue; }
+      removing_below = None; }
+    if line_depth > 0 && without_viewnode_ids (line) . contains (substring) {
+      removing_below = Some (line_depth);
+      continue; }
+    kept . push (line); }
+  kept . join ("\n") + "\n"
+}
+
 /// Save the buffer attributed to 'viewforest_id', returning the
 /// SaveResponse and the collateral views' rendered contents.
 pub async fn save_and_read_collateral (

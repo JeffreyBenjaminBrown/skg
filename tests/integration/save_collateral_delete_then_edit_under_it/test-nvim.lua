@@ -169,6 +169,25 @@ do
   metadata.edit_metadata_at_line(line_11,
     sexpr.read('(skg node (viewRequests (folder aliases)))'))
 end
+-- subee stands in 11's forks folder editable, as a forkee as such is
+-- drawn. The root appended below takes its editability (a node has
+-- one editable occurrence in a buffer), so the folder's subee becomes
+-- write-protected, without what it showed.
+do
+  local line_subee = nth_line_with_title(buf1, 'subee', 1)
+  T.check(line_subee, "phase 2: found node 'subee' in buffer 1")
+  metadata.edit_metadata_at_line(line_subee,
+    sexpr.read('(skg node writeProtected)'))
+  local depth = headline_depth_at(buf1, line_subee)
+  local lines = vim.api.nvim_buf_get_lines(buf1, 0, -1, false)
+  local last = line_subee
+  while lines[last + 1] do
+    local split = metadata.split_as_stars_metadata_title(lines[last + 1])
+    if split and #(split.stars:match('^%*+')) <= depth then break end
+    last = last + 1
+  end
+  vim.api.nvim_buf_set_lines(buf1, line_subee, last, false, {})
+end
 vim.api.nvim_buf_set_lines(buf1, -1, -1, false, {
   '* (skg node (gnid subee) (skgRepos (nodeRepo main))) subee',
   '** (skg node (gnid subee-1) (skgRepos (nodeRepo main))) subee-1' })

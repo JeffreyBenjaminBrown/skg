@@ -13,9 +13,13 @@
 //!   claimsMembership, and N is not graph-content of R after the
 //!   save, then N is hidden from R.
 //! - If N is a claimsMembership viewchild of E but is not
-//!   graph-content of E, then it is not a hiderel edit.
-//!   This does not touch it. The refresh of the save's rerender
-//!   makes it vanish.
+//!   graph-content of E, then it is not a hiderel edit. If the graph
+//!   lacks N (the user typed it there) it joins E's content, when the
+//!   user owns E, and the save is refused otherwise
+//!   ('add_children_typed_under_forkee'). Any other such N is not
+//!   touched: the refresh of the save's rerender makes it vanish.
+//! - A foreign R records no hides: a save that would hide or unhide
+//!   anything in R is refused ('cut_under_a_foreign_forker').
 //! .
 //! The skgrepo restriction limits what can be edited as well as what
 //! can be seen ('server/skgrepo_sets.rs'), so both E's content and R's
@@ -78,8 +82,9 @@ pub fn resolve_visibility (
       opt_graphnode_by_gnid (
         graph, config, forker ) ?
     else { continue; };
-    if ! config . skgrepo_is_owned (&forker_from_disk . home_skgrepo) {
-      continue; }
+    add_children_typed_under_forkee (
+      &mut lowered, &forkee_from_disk, &signal . visible,
+      graph, config, skgrepo_restriction ) ?;
     let forker_contains : HashSet<ID> =
       lowered . forker_contains_after_save (
         &forker_from_disk );
@@ -105,6 +110,9 @@ pub fn resolve_visibility (
       . cloned() . collect();
     if inferred_hides . is_empty() && inferred_unhides . is_empty()
       { continue; }
+    if ! config . skgrepo_is_owned (&forker_from_disk . home_skgrepo) {
+      return Err ( Box::new ( BufferValidationError::Other (
+        cut_under_a_foreign_forker (&forker_from_disk, &forkee_from_disk) ))); }
     lowered . apply_hiderel_delta_to_forker (
       forker_from_disk,
       &inferred_hides,
@@ -116,6 +124,67 @@ pub fn resolve_visibility (
     &mut lowered, hidden_outside, graph, config,
     skgrepo_restriction ) ?;
   Ok ((lowered, post_skgsave_commit_notice_candidates)) }
+
+/// The refusal of a save that cuts from, or shows again, the content
+/// of 'forkee' as such under 'forker', which the user does not own:
+/// what a cut means is that the forker hides it, and only a note of
+/// one's own can record that.
+fn cut_under_a_foreign_forker (
+  forker : &Graphnode,
+  forkee : &Graphnode,
+) -> String {
+  format! (
+    "Cannot change what {} ('{}') shows of {} ('{}'), its forkee: {} is foreign, and only a note of your own can fork another and hide what that one contains.",
+    forker . pid, forker . title, forkee . pid, forkee . title, forker . pid ) }
+
+/// Each child typed under a forkee E as such (a claiming child the
+/// buffer shows there, of a node the graph lacks, that E's list does
+/// not name) joins E's content, when the user owns E: inserted right
+/// after the sibling it follows in the buffer that E's list names (or
+/// another child typed there), first when none precedes it. E's
+/// contains is read by the records the skgrepo restriction shows, as
+/// the view drew them; disk supplementation keeps the rest where they
+/// stand. Under a foreign E the save is refused: only E's owner can
+/// change its content, and making it one's own (forking it) is done
+/// from a view of E as itself. A child the graph has, placed under E
+/// but not named by its list, is no member of E and joins nothing:
+/// the save's rerender leaves it out.
+fn add_children_typed_under_forkee (
+  lowered             : &mut LoweredNodeIntents,
+  forkee_from_disk    : &Graphnode,
+  shown               : &[ID],
+  graph               : &InRustGraph,
+  config              : &SkgConfig,
+  skgrepo_restriction : &SkgrepoRestriction,
+) -> Result<(), Box<dyn Error>> {
+  let key : &dyn Fn (&ID) -> ID =
+    &|gnid : &ID| -> ID { graph . pid_else_raw_id (gnid) };
+  let mut contains : Vec<ID> =
+    members_with_visible_records (
+      &forkee_from_disk . contains, skgrepo_restriction );
+  let named : HashSet<ID> =
+    members_of (&forkee_from_disk . contains) . iter () . map (key) . collect ();
+  let typed : HashSet<&ID> =
+    shown . iter ()
+    . filter ( |gnid| graph . pid_of (gnid) . is_none ()
+                      && ! named . contains (&key (gnid)) )
+    . collect ();
+  if typed . is_empty () { return Ok (( )); }
+  if ! config . skgrepo_is_owned (&forkee_from_disk . home_skgrepo) {
+    return Err ( Box::new ( BufferValidationError::Other ( format! (
+      "Cannot add a child under {} ('{}'), a foreign node shown as a forkee: only its owner can change its content. To add one, make the node your own first: view it as itself, where an edit forks it.",
+      forkee_from_disk . pid, forkee_from_disk . title )))); }
+  let mut follows : Option<usize> = None; // where the last sibling the list names, or the last typed child, stands
+  for gnid in shown {
+    if typed . contains (gnid) {
+      let at : usize = follows . map_or (0, |position| position + 1);
+      contains . insert (at, gnid . clone ());
+      follows = Some (at);
+    } else if let Some (position) =
+      contains . iter () . position ( |member| key (member) == key (gnid) )
+    { follows = Some (position); }}
+  lowered . set_contains_of_forkee (forkee_from_disk . clone (), contains);
+  Ok (( )) }
 
 /// A note N's forks folder shows a forker of N claiming nothing (a
 /// forker-only member, which N does not fork) and each mutual

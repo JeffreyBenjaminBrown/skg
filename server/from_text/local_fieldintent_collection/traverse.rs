@@ -33,6 +33,11 @@
 //! forkee-as-such position. (Its position may be anywhere else --
 //! including as a member of a write-protected folder, where it is
 //! save-eligible for itself but invisible to the folder's recorder.)
+//! An editable forkee as such is not save-eligible, since it shows its
+//! content in part; but when the user owns it, its title and body are
+//! saved, and a child typed under it joins its content
+//! ('resolve_visibility'). A foreign one's title and body are text
+//! claims, which must match the disk.
 //! .
 //! DEFINITION: a vognode is *in forkee-as-such position* (a forkee
 //! as such) iff it is a claiming occurrence direct child of a
@@ -93,8 +98,8 @@ fn visit (
           // (write-protected, not save-eligible) keeps a
           // forksFolder found under a ghost meaningful: its
           // children stay in forkee-as-such position, so their
-          // title edits bounce via text claims instead of silently
-          // becoming real edits.
+          // contents are never read as whole lists, and a foreign
+          // one's title edits bounce via text claims.
           gnid               : vognode . gnid() . clone(),
           headline            : node_ref . value () . headline_name (),
           is_editable    : false,
@@ -162,14 +167,28 @@ fn visit_occurrence (
     // write-protected vognode emits nothing.
     match forkee_as_such_context {
       Some (( forker, forker_is_editable )) => {
-        collected . instructionMerge_fieldIntent (
-          &headline,
-          t . gnid . clone(),
-          FieldIntent::ForkeeTextClaim (
-            ForkeeTextClaim {
-              title    : t . title . clone(),
-              body     : t . body() . cloned(),
-              headline : headline . clone () } )) ?;
+        if owned (& t . home_skgrepo) {
+          // An owned forkee as such saves its own title and body,
+          // and nothing else of itself: what it shows of its
+          // content is partial, so its list is not read here.
+          collected . instructionMerge_fieldIntent (
+            &headline,
+            t . gnid . clone(),
+            FieldIntent::SetTitleAndBody {
+              skgrepo : t . home_skgrepo . clone(),
+              title   : t . title . clone(),
+              body    : t . body() . cloned() } ) ?;
+        } else {
+          // A foreign one's title and body must be as on disk: an
+          // edit would otherwise be dropped silently.
+          collected . instructionMerge_fieldIntent (
+            &headline,
+            t . gnid . clone(),
+            FieldIntent::ForkeeTextClaim (
+              ForkeeTextClaim {
+                title    : t . title . clone(),
+                body     : t . body() . cloned(),
+                headline : headline . clone () } )) ?; }
         if forker_is_editable {
           // The at-most-one-writer-per-ID guard: only the
           // forksFolder under the editable instance of a
@@ -184,9 +203,11 @@ fn visit_occurrence (
               ForkeeVisibility {
                 forkee     : t . gnid . clone(),
                 visible    : visible_content_members (node_ref) } )) ?; }
-        // Delete and NodeMerge edit requests here are ignored: a
-        // forkee-as-such can affect only what its forker
-        // hides.
+        // Delete, NodeMerge and flag edit requests here are
+        // ignored: a forkee as such can affect only its own title
+        // and body (when owned), what its forker hides, and, by a
+        // child typed under it, its own content
+        // ('resolve_visibility').
       },
       None => {
         if has_delete_request {

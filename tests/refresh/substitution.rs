@@ -26,7 +26,9 @@ fn a_drawn_member_is_shown_as_its_mirror () {
 node p
   node o (inPlaceOf n)
     forksFolder
-      node n wp" ); }
+      node n
+        forksFolder
+          node o wp noClaim" ); }
 
 #[test]
 fn a_member_shown_raw_is_shown_as_its_mirror_in_place () {
@@ -147,9 +149,12 @@ fn under_a_foreign_root_its_authors_fork_is_shown_and_not_the_users () {
 node r
   node a (inPlaceOf m)
     forksFolder
-      node m wp
+      node m
         containerFolder
-          node p wp noClaim folded" ); }
+          node p wp noClaim folded
+        forksFolder
+          node a wp noClaim
+          node u wp noClaim" ); }
 
 #[test]
 fn under_an_owned_root_the_users_fork_is_shown () {
@@ -159,9 +164,12 @@ fn under_an_owned_root_the_users_fork_is_shown () {
 node p
   node u (inPlaceOf m)
     forksFolder
-      node m wp
+      node m
         containerFolder
-          node r wp noClaim folded" ); }
+          node r wp noClaim folded
+        forksFolder
+          node a wp noClaim
+          node u wp noClaim" ); }
 
 /// r, in 'theirs', contains e, in 'third', which contains c, in
 /// 'third'. c is forked by j, in 'theirs' (r's author), by d, in
@@ -183,7 +191,11 @@ node r
   node e
     node j (inPlaceOf c)
       forksFolder
-        node c wp" ); }
+        node c
+          forksFolder
+            node d wp noClaim
+            node j wp noClaim
+            node u wp noClaim" ); }
 
 /// A chain of forks stops where the next is not of the perspective:
 /// m is forked by a, in 'theirs', which u, in 'main', forks.
@@ -201,7 +213,9 @@ fn under_a_foreign_root_a_chain_stops_before_the_users_fork () {
 node r
   node a (inPlaceOf m)
     forksFolder
-      node m wp
+      node m
+        forksFolder
+          node a wp noClaim
       node u wp noClaim" ); }
 
 /// Whether a foreign root is forked and so shows its content raw

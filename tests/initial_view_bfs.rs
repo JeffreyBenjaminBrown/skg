@@ -26,9 +26,9 @@ fn all_tests
       s . reset ("test_bfs_limit_8_two_branches", fixtures) ?;
       test_bfs_limit_8_two_branches (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_budget_content_beats_forkees",
+      s . reset ("test_budget_reaches_forkees_and_content_in_level_order",
                  "tests/initial_view_bfs/fixtures-content-vs-forkees") ?;
-      test_budget_content_beats_forkees (
+      test_budget_reaches_forkees_and_content_in_level_order (
         &s . config, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
 
@@ -197,16 +197,15 @@ async fn test_bfs_limit_8_two_branches (
 
       Ok (( )) }
 
-// §5.5: content wins the budget race; a folder (here a forks folder) fills whole
-// and is budget-neutral. Fixture: root r -> content chain c1 -> c2, and r also
-// forks s1, s2. With budget = 3 (exactly the content chain r, c1, c2):
-// the chain fully extends (c2 is editable, body and all), and both forkees
-// are shown (the folder is whole), write-protected. If the folder had spent the budget,
-// s1 and s2 would have eaten two of the three units and c2 would be left
-// write-protected -- it is not, which is the guarantee this test pins. Forkees
-// also sit one level deeper than content (r -> forks folder -> forkee vs
-// r -> c1), so BFS-by-depth reaches content first regardless.
-async fn test_budget_content_beats_forkees (
+// §5.5: the forks folder itself is budget-neutral, but each forkee as
+// such drawn in it is an editable occurrence, which charges the budget
+// at its visit, in level order with content. Fixture: root r -> content
+// chain c1 -> c2, and r also forks s1, s2. With budget = 3: r, then, at
+// depth 2, c1 (the forks folder costs nothing), then, at depth 3, s1 (the
+// folder's first member, standing before c1's content) spend it; s2 and
+// c2 are drawn write-protected. s1, editable, shows its forks folder,
+// holding r, a repeat.
+async fn test_budget_reaches_forkees_and_content_in_level_order (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -222,12 +221,14 @@ async fn test_budget_content_beats_forkees (
 
       let expected = indoc! {"* (skg node (gnid r) (skgRepos (nodeRepo main)) (view (rels (contains (out 1)) (forks (out 2))))) r
                               ** (skg forksFolder)
-                              *** (skg node (gnid s1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 0 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) s1
+                              *** (skg node (gnid s1) (skgRepos (nodeRepo main)) (view (rels (contains (out 0 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) s1
+                              **** (skg forksFolder)
+                              ***** (skg node (gnid r) (skgRepos (nodeRepo main)) noClaim writeProtected (view (rels (contains (out 1)) (forks (out 2 (ancestors 2)))) (birth (forks out 2)) cycle)) r
                               *** (skg node (gnid s2) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 0 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) s2
                               ** (skg node (gnid c1) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)) (out 1))) (birth (contains in 1)))) c1
-                              *** (skg node (gnid c2) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) c2
+                              *** (skg node (gnid c2) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) c2
                               "};
       assert_metadata_eq!(result, expected,
-                 "budget 3 extends the whole content chain; the forks folder is whole + budget-neutral");
+                 "budget 3: r, c1 and s1, in level order; the forks folder itself costs nothing");
 
       Ok (( )) }

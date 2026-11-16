@@ -406,9 +406,10 @@ fn extraction_collects_forkees_without_hidden_branches (
     save_gnids (&instructions),
     // hidden-in and hidden-outside are editable members of
     // write-protected folders, so they are self-writers on the new recursion
-    // surface.
+    // surface. The owned forkee as such saves its title and body.
     vec![
       ID::from ("forker"),
+      ID::from ("forkee"),
       ID::from ("hidden-in"),
       ID::from ("forkee-content"),
       ID::from ("hidden-outside")]);
@@ -418,8 +419,9 @@ fn extraction_collects_forkees_without_hidden_branches (
   assert_eq!(
     saved_node_by_gnid (&instructions, "forker") . contains,
     vec![]);
-  assert!(
-    ! save_gnids (&instructions) . contains (&ID::from ("forkee"))); }
+  assert_eq!( // the owned forkee as such saves its title and body, no list
+    saved_node_by_gnid (&instructions, "forkee") . forks,
+    MSV::Unspecified); }
 
 #[test]
 fn write_protected_folder_members_save_themselves_but_not_their_recorder (
@@ -626,9 +628,10 @@ fn intent_layer_preserves_mixed_naive_instruction_shape (
 
   assert_eq!(
     save_gnids (&instructions),
-    vec![
+    vec![ // the owned forkee as such saves its title and body
       ID::from ("root"),
       ID::from ("child"),
+      ID::from ("forkee"),
       ID::from ("doomed")]);
   let root : &Graphnode =
     saved_node_by_gnid (&instructions, "root");
@@ -668,10 +671,11 @@ fn split_extraction_passes_preserve_mixed_instruction_shape (
 
   assert_eq!(
     save_gnids (&instructions),
-    vec![
+    vec![ // the owned forkee as such saves its title and body
       ID::from ("root"),
       ID::from ("independent"),
       ID::from ("content"),
+      ID::from ("forkee"),
       ID::from ("doomed")]);
   let root : &Graphnode =
     saved_node_by_gnid (&instructions, "root");
@@ -752,14 +756,14 @@ fn all_tests
       foreign_forkee_as_such_title_edit_is_rejected (
         &s . config ) . await ?;
       s . reset_from_config (
-        "owned_as_forkee_title_edit_is_rejected",
+        "owned_as_forkee_title_edit_is_saved",
         FORKEE_EDIT_CONFIG) ?;
-      owned_as_forkee_title_edit_is_rejected (
+      owned_as_forkee_title_edit_is_saved (
         &s . config ) . await ?;
       s . reset_from_config (
-        "owned_as_forkee_body_edit_is_rejected",
+        "owned_as_forkee_body_edit_is_saved",
         FORKEE_EDIT_CONFIG) ?;
-      owned_as_forkee_body_edit_is_rejected (
+      owned_as_forkee_body_edit_is_saved (
         &s . config ) . await ?;
       Ok (( )) } )) }
 
@@ -1066,7 +1070,10 @@ async fn foreign_forkee_as_such_title_edit_is_rejected (
         buffer_error);
       Ok (()) }
 
-async fn owned_as_forkee_title_edit_is_rejected (
+/// An owned forkee as such saves its title, and its contains stays as
+/// on disk ('r1' and 'r2', both shown): only the title and body of the
+/// node itself are read there.
+async fn owned_as_forkee_title_edit_is_saved (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
       let input : &str =
@@ -1075,27 +1082,21 @@ async fn owned_as_forkee_title_edit_is_rejected (
                 ** (skg forksFolder)
                 *** (skg node (gnid r) (skgRepos (nodeRepo owned))) changed title
                 **** (skg node (gnid r1) (skgRepos (nodeRepo owned))) r1
+                **** (skg node (gnid r2) (skgRepos (nodeRepo owned))) r2
                 "};
-      let result : Result<Vec<NodeInstruction>, Box<dyn Error>> =
+      let instructions : Vec<NodeInstruction> =
         nodeInstructions_from_org_with_disk (
-          input, config) . await;
-      let error : Box<dyn Error> =
-        result . unwrap_err();
-      let buffer_error : &BufferValidationError =
-        error . downcast_ref::<BufferValidationError>()
-        . expect ("expected BufferValidationError::Other");
-      assert!(
-        matches!(
-          buffer_error,
-          BufferValidationError::Other (msg)
-            if msg . contains ("Cannot edit title/body")
-               && msg . contains ("forkee-as-such")
-               && msg . contains ("r")),
-        "expected owned forkee-as-such title edit rejection, got {:?}",
-        buffer_error);
+          input, config) . await ?;
+      let r : &Graphnode = saved_node_by_gnid (&instructions, "r");
+      assert_eq! ( r . title, "changed title" );
+      assert_eq! ( members_of (&r . contains),
+                   vec! [ ID::from ("r1"), ID::from ("r2") ] );
+      assert_eq! ( members_msv (&r . forks),
+                   MSV::Specified (vec! [ ID::from ("e") ]) );
       Ok (()) }
 
-async fn owned_as_forkee_body_edit_is_rejected (
+/// As 'owned_as_forkee_title_edit_is_saved', for the body.
+async fn owned_as_forkee_body_edit_is_saved (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
       let input : &str =
@@ -1103,26 +1104,18 @@ async fn owned_as_forkee_body_edit_is_rejected (
                 * (skg node (gnid a) (skgRepos (nodeRepo owned))) a
                 ** (skg forksFolder)
                 *** (skg node (gnid r) (skgRepos (nodeRepo owned))) r
-                body text that should not be accepted here
+                a body typed under r as such
                 **** (skg node (gnid r1) (skgRepos (nodeRepo owned))) r1
+                **** (skg node (gnid r2) (skgRepos (nodeRepo owned))) r2
                 "};
-      let result : Result<Vec<NodeInstruction>, Box<dyn Error>> =
+      let instructions : Vec<NodeInstruction> =
         nodeInstructions_from_org_with_disk (
-          input, config) . await;
-      let error : Box<dyn Error> =
-        result . unwrap_err();
-      let buffer_error : &BufferValidationError =
-        error . downcast_ref::<BufferValidationError>()
-        . expect ("expected BufferValidationError::Other");
-      assert!(
-        matches!(
-          buffer_error,
-          BufferValidationError::Other (msg)
-            if msg . contains ("Cannot edit title/body")
-               && msg . contains ("forkee-as-such")
-               && msg . contains ("r")),
-        "expected owned forkee-as-such body edit rejection, got {:?}",
-        buffer_error);
+          input, config) . await ?;
+      let r : &Graphnode = saved_node_by_gnid (&instructions, "r");
+      assert_eq! ( r . body,
+                   Some ("a body typed under r as such" . to_string ()) );
+      assert_eq! ( members_of (&r . contains),
+                   vec! [ ID::from ("r1"), ID::from ("r2") ] );
       Ok (()) }
 
 #[test]

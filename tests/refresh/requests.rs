@@ -269,6 +269,8 @@ node g
   node a
     node b" ); }
 
+/// The forkee e is drawn editable, as a forkee as such under an
+/// editable note is, and shows its own forks folder, holding s.
 #[test]
 fn a_forks_request_adds_the_forks_folder () {
   let graph : InRustGraph = graph (&[
@@ -280,7 +282,9 @@ fn a_forks_request_adds_the_forks_folder () {
   assert_eq! ( run_asserting_fixpoint (&input, &graph) . outline (), "\
 node s
   forksFolder
-    node e wp
+    node e
+      forksFolder
+        node s wp noClaim
     hiddenOutsideOfForkPartnersFolder
       node o wp folded" ); }
 
@@ -405,6 +409,8 @@ node c wp
       node q wp noClaim
         node top wp noClaim" ); }
 
+/// e, standing write-protected, stays so: only an editable-view
+/// request on s extends what its forks folder already holds.
 #[test]
 fn a_forks_request_completes_a_forks_folder_already_there () {
   let graph : InRustGraph = graph (&[

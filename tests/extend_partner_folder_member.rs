@@ -67,12 +67,17 @@ fn subtree_for_node_in_folder (
       "hiddenInForkPartnerFolder", "hiddenOutsideOfForkPartnersFolder",
     ] . into_iter () . find ( |folder| line . contains (folder) )
     { folder_stack . push ((depth, folder)); }}
-  assert_eq! ( matches . len (), 1,
-    "expected one occurrence of {} directly within {} in:\n{}",
+  let depth_of : &dyn Fn (usize) -> usize = &|i : usize| -> usize {
+    lines [i] . chars () . take_while ( |c| *c == '*' ) . count () };
+  let shallowest : Vec<usize> = { // a member as such may show partners of its own, deeper
+    let least : usize = matches . iter () . map ( |i| depth_of (*i) ) . min ()
+      . unwrap_or (0);
+    matches . into_iter () . filter ( |i| depth_of (*i) == least ) . collect () };
+  assert_eq! ( shallowest . len (), 1,
+    "expected one shallowest occurrence of {} directly within {} in:\n{}",
     needle, enclosing_folder, buf );
-  let start : usize = matches [0];
-  let depth : usize = lines [start] . chars ()
-    . take_while ( |c| *c == '*' ) . count ();
+  let start : usize = shallowest [0];
+  let depth : usize = depth_of (start);
   lines [start ..] . iter ()
     . take (1)
     .chain ( lines [start + 1 ..] . iter () . take_while ( |line| {
@@ -132,7 +137,9 @@ fn a_forking_root_is_drawn_with_its_forks_folder
         multi_root_view (
           config, Some (tantivy), &[ID::from ("N")] ) ?;
       let outline : Vec<String> = without_viewnode_ids (&n_view) . lines ()
-        . filter ( |line| line . starts_with ('*') )
+        . filter ( |line| line . starts_with ('*')
+                          && ! line . starts_with ("****") // a forkee as such shows its own content
+                          || line . contains ("(gnid Hidden)") )
         . map ( |line| line . split (" (skgRepos") . next () . unwrap () . to_string () )
         . collect ();
       assert_eq! ( outline [.. 8], [

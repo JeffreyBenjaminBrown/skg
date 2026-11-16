@@ -1,11 +1,16 @@
 * Second child, a forker ⟨0a 1C 1/L K1 H2 ⌂:main⟩
-** ⟨0i ☮ These link to it.⟩
-*** The fixture root ⟨0j ☮B 1C2b L2b⟩
-**** Above the root ⟨0k ☮ Ca⟩
+** ⟨0n ☮ These link to it.⟩
+*** The fixture root ⟨0o ☮B 1C2b L2b⟩
+**** Above the root ⟨0p ☮ Ca⟩
 ** ⟨0b ☮ These also contain it.⟩
 *** The fixture root ⟨0c ☮B 1C2b L2b⟩
 **** Above the root ⟨0d ☮ Ca⟩
 ** ⟨0e It forks these, or these fork it.⟩
-*** Fred's note ⟨0f ☮ C1 1/L bK ⌂:fred⟩
-*** ⟨0g b hides these, but nothing it forks contains them.⟩
-**** An aside of Fred's ⟨0h ☮ cH ⌂:fred folded⟩
+*** Fred's note ⟨0f C1 1/L bK ⌂:fred⟩
+**** ⟨0g ☮ It contains these, but c hides them.⟩
+***** A detail of Fred's ⟨0h ☮ bC dH folded⟩
+****** Fred's note ⟨0i ☮ Ca 1/L 1K ⟳⟩
+**** ⟨0j It forks these, or these fork it.⟩
+***** Second child, a forker ⟨0k ☮ 1C 1/L Kb H2 ⟳ ⌂:main⟩
+*** ⟨0l b hides these, but nothing it forks contains them.⟩
+**** An aside of Fred's ⟨0m ☮ cH ⌂:fred folded⟩

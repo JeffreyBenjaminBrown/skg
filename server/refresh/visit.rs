@@ -725,7 +725,7 @@ fn after_drawing (
 /// drawn, so the folder is its only child: the folders an editable
 /// member's visit adds stand around it (the hidden-in folder first,
 /// the forks folder after it), and its content follows.
-fn add_containers_folder_under_forks_folder_member (
+pub(crate) fn add_containers_folder_under_forks_folder_member (
   tree   : &mut Tree<Viewnode>,
   member : NodeId,
   walk   : &mut Walk,
@@ -733,7 +733,9 @@ fn add_containers_folder_under_forks_folder_member (
   let Some (gnid) : Option<ID> =
     tree . get (member) . unwrap () . value () . occurrence_gnid () . cloned ()
     else { return; };
-  if walk . is_a_repeat (&gnid, member) { return; }
+  if walk . is_a_repeat (&gnid, member)
+     || child_folder (tree, member, &Folder::Container) . is_some ()
+  { return; }
   let folder : NodeId = tree . get_mut (member) . unwrap ()
     . prepend ( viewnode_of ( ViewnodeKind::Folder (Folder::Container) )) . id ();
   walk . folders_whose_drawn_members_are_folded . insert (folder); }
@@ -761,7 +763,7 @@ fn draw_item (
         id_rule (gnid, WhereTheHeadlineStands::Under (goal), walk);
       let editability : DrawnEditability = match &answer {
         IdRuleAnswer::Occurrence (pid) =>
-          drawn_occurrence_editability (tree, parent, pid, walk),
+          drawn_occurrence_editability (tree, parent, pid, claims, walk),
         _ => DrawnEditability::WriteProtected, };
       vognode_for_answer (
         answer, gnid, item, EditabilityAndClaim { editability, claims }, walk ) ? },
@@ -856,7 +858,7 @@ fn keep_hidden_outside_folder_last (
 /// those it held describe the node it showed before. Where the mirror shown is the
 /// original itself, the member shown in its place loses
 /// 'inPlaceOf', is warranted only as itself (and so, unwarranted,
-/// vanishes), and the original is reinstated beside it. The diff view
+/// vanishes), and the original is reinstated where it stood. The diff view
 /// substitutes nothing. At the buffer root, the view's roots are
 /// substituted by their own rule ('substitute_roots').
 fn substitute_mirrors (
@@ -892,6 +894,7 @@ fn substitute_mirrors (
           walk . truth . config, walk . truth . graph, walk . truth . restriction,
           &owner, &gnid );
         if shown != pid {
+          write_protect_what_its_folders_hold (tree, child, walk);
           show_mirror (tree, child, &shown, Some (gnid), walk) ?;
           redraw_folders (tree, child, walk) ?; }},
       Some (original) => {
@@ -901,6 +904,7 @@ fn substitute_mirrors (
         if shown == walk . truth . graph . pid_else_raw_id (&original) {
           stop_substituting (tree, parent, child, &original, goal, walk) ?;
         } else if shown != pid {
+          write_protect_what_its_folders_hold (tree, child, walk);
           show_mirror (tree, child, &shown, Some (original), walk) ?;
           redraw_folders (tree, child, walk) ?; }}, }}
   Ok (( )) }
@@ -940,12 +944,35 @@ fn substitute_roots (
     let repointed : bool = walk . truth . graph . pid_else_raw_id (&gnid) != shown;
     let was_editable : bool =
       tree . get (root) . unwrap () . value () . editable_gnid () . is_some ();
+    if repointed {
+      write_protect_what_its_folders_hold (tree, root, walk); }
     if repointed || in_place_of != marked
     { show_mirror (tree, root, &shown, marked, walk) ?; }
     if repointed {
       redraw_folders (tree, root, walk) ?;
       ask_for_what_a_fresh_root_asks (tree, root, was_editable); }}
   Ok (( )) }
+
+/// The occurrence at 'occurrence' is about to show another node, so
+/// every folder it holds describes the node it shows now, and will be
+/// drawn afresh ('redraw_folders'). Each occurrence in them is
+/// write-protected first, so that an editability one of them holds
+/// (a forkee as such there, drawn editable, may be the node the
+/// occurrence will show) is free for the occurrence to take.
+fn write_protect_what_its_folders_hold (
+  tree       : &mut Tree<Viewnode>,
+  occurrence : NodeId,
+  walk       : &mut Walk,
+) {
+  let held : Vec<NodeId> =
+    tree . get (occurrence) . unwrap () . children ()
+    . filter ( |child| matches! ( child . value () . kind, ViewnodeKind::Folder (_) ))
+    . flat_map ( |folder| folder . descendants () )
+    . filter ( |node| node . value () . editable_gnid () . is_some () )
+    . map ( |node| node . id () )
+    . collect ();
+  for treeid in held {
+    write_protect_occurrence (tree, treeid, walk); }}
 
 /// The occurrence at 'occurrence' now shows another node, so every
 /// folder it holds describes the node it showed before. Each vanishes,
@@ -1069,8 +1096,11 @@ fn show_mirror (
 /// The original that 'child' stood for now stands as itself: 'child'
 /// shows itself, is
 /// warranted only as itself (and so, unwarranted, vanishes, as the
-/// claims rung says), and the original is reinstated right after it,
-/// unless a sibling already stands for it.
+/// claims rung says), and the original is reinstated where it stood,
+/// unless a sibling already stands for it. A child that vanishes does
+/// so first, so that what it held is free for the original to take:
+/// the original's editability, say, held by a forkee as such drawn
+/// editable in the child's forks folder.
 fn stop_substituting (
   tree     : &mut Tree<Viewnode>,
   parent   : NodeId,
@@ -1086,15 +1116,25 @@ fn stop_substituting (
     Some (goal), tree . get (child) . unwrap () . value () )
     . unwrap_or (Warrant::No);
   tree . get_mut (child) . unwrap () . value () . set_warrant (warrant);
-  reinstate_original_after (tree, parent, child, original, goal, walk) ?;
-  vanish_if_unwarranted (tree, child, Some (warrant), walk) }
+  let vanishes : bool = // as 'vanish_if_unwarranted' would have it
+    tree . get (child) . unwrap () . value () . claims () == Some (true)
+    && warrant != Warrant::ByGraph;
+  let after : Option<NodeId> =
+    if vanishes {
+      let before : Option<NodeId> =
+        tree . get (child) . unwrap () . prev_sibling () . map ( |sibling| sibling . id () );
+      vanish (tree, child, walk) ?;
+      before
+    } else { Some (child) };
+  reinstate_original_after (tree, parent, after, original, goal, walk) }
 
-/// Draw 'original' right after 'child', unless a sibling already
-/// stands for it or the goal does not name it.
+/// Draw 'original' right after the child at 'after' (first, when
+/// None), unless a sibling already stands for it or the goal does not
+/// name it.
 fn reinstate_original_after (
   tree     : &mut Tree<Viewnode>,
   parent   : NodeId,
-  child    : NodeId,
+  after    : Option<NodeId>,
   original : &ID,
   goal     : &Goal,
   walk     : &mut Walk,
@@ -1107,7 +1147,9 @@ fn reinstate_original_after (
   let item : GoalItem = item . clone ();
   if let Some (drawn) = draw_item (tree, parent, &item, goal, walk) ? {
     let treeid : NodeId = tree . get_mut (parent) . unwrap () . append (drawn) . id ();
-    move_after (tree, child, treeid) ?;
+    match after {
+      Some (child) => move_after (tree, child, treeid) ?,
+      None => move_to_first_child (tree, parent, treeid) ?, }
     after_drawing (tree, parent, treeid, walk) ?; }
   Ok (( )) }
 

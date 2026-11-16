@@ -483,6 +483,30 @@ impl LoweredNodeIntents {
           forker_from_disk . hides . or_default () ),
     }}
 
+  /// This sets the contains of 'forkee', shown as such, to
+  /// 'contains': on its Save nodeIntent (an owned forkee as such
+  /// emits one for its title and body), or on one from its disk
+  /// state if it has none. A Delete nodeIntent is left untouched.
+  pub fn set_contains_of_forkee (
+    &mut self,
+    forkee   : Graphnode,
+    contains : Vec<ID>,
+  ) {
+    let contains : MSV<(ID, Option<SkgrepoName>)> =
+      MSV::Specified ( contains . into_iter ()
+                       . map ( |gnid| (gnid, None) ) . collect () );
+    match self . by_pid . get_mut (&forkee . pid) {
+      Some (NodeIntent::Save (intent)) => {
+        intent . contains = contains; },
+      Some (NodeIntent::Delete (_)) => {},
+      None => {
+        let mut intent : NodeIntent =
+          NodeIntent::graph_save_from_graphnode (forkee . clone ());
+        if let NodeIntent::Save (save) = &mut intent {
+          save . contains = contains; }
+        self . order . push (forkee . pid . clone ());
+        self . by_pid . insert (forkee . pid, intent); }, }}
+
   /// This applies inferred hides/unhides to the forker's
   /// nodeIntent, creating a Save nodeIntent from its disk state if it has
   /// none. A Delete nodeIntent is left untouched, because deleting wins.
