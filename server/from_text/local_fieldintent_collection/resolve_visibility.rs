@@ -19,7 +19,7 @@
 //!   ('add_children_typed_under_member_as_such'). Any other such N is not
 //!   touched: the refresh of the save's rerender makes it vanish.
 //! - A foreign R records no hides: a save that would hide or unhide
-//!   anything in R is refused ('cut_under_a_foreign_forker').
+//!   anything in R is refused ('cut_under_a_foreign_note').
 //! - An E the graph lacks (typed there) has no list to lose: what it
 //!   shows is its contains ('set_contains_of_new_member_as_such').
 //! .
@@ -27,7 +27,8 @@
 //! signal of its own ('ForkerVisibility'), read by the
 //! forker-visibility step ('resolve_forker_visibility'): F shows its
 //! content less what N contains or hides, so a child absent there is
-//! never removed from F.
+//! never removed from F. A child cut from F makes N fork F, and N
+//! hides it unless N contains it after the save.
 //! .
 //! The skgrepo restriction limits what can be edited as well as what
 //! can be seen ('server/skgrepo_sets.rs'), so both E's content and R's
@@ -126,7 +127,8 @@ pub fn resolve_visibility (
       { continue; }
     if ! config . skgrepo_is_owned (&forker_from_disk . home_skgrepo) {
       return Err ( Box::new ( BufferValidationError::Other (
-        cut_under_a_foreign_forker (&forker_from_disk, &forkee_from_disk) ))); }
+        cut_under_a_foreign_note (
+          &forker_from_disk, &forkee_from_disk, MemberAsSuch::Forkee ) ))); }
     lowered . apply_hiderel_delta_to_forker (
       forker_from_disk,
       &inferred_hides,
@@ -143,16 +145,19 @@ pub fn resolve_visibility (
   Ok ((lowered, post_skgsave_commit_notice_candidates)) }
 
 /// The refusal of a save that cuts from, or shows again, the content
-/// of 'forkee' as such under 'forker', which the user does not own:
-/// what a cut means is that the forker hides it, and only a note of
-/// one's own can record that.
-fn cut_under_a_foreign_forker (
-  forker : &Graphnode,
-  forkee : &Graphnode,
+/// of 'member', a member as such of the forks folder of 'note', which
+/// the user does not own: a cut there is for the note to hide what it
+/// cut (and, from a forker, to fork that forker), and only a note of
+/// one's own can record either.
+fn cut_under_a_foreign_note (
+  note           : &Graphnode,
+  member         : &Graphnode,
+  member_as_such : MemberAsSuch,
 ) -> String {
   format! (
-    "Cannot change what {} ('{}') shows of {} ('{}'), its forkee: {} is foreign, and only a note of your own can fork another and hide what that one contains.",
-    forker . pid, forker . title, forkee . pid, forkee . title, forker . pid ) }
+    "Cannot change what {} ('{}') shows of {} ('{}'), its {}: {} is foreign, and only a note of your own can fork another and hide what that one contains.",
+    note . pid, note . title, member . pid, member . title,
+    member_as_such . word (), note . pid ) }
 
 /// Which side of 'forks' a member as such of a note's forks folder
 /// stands on: a forkee as such (the note forks it) or a forker as
@@ -229,17 +234,23 @@ fn add_children_typed_under_member_as_such (
 ///   ('add_children_typed_under_member_as_such');
 /// - a child of F that N hides, shown claiming under F (moved out of
 ///   F's folder of what N hides in it), is unhidden in N, as under a
-///   forkee; a foreign N records no hides, so that save is refused;
+///   forkee;
 /// - a child F showed that the buffer no longer shows claiming under
-///   F was cut from it. A cut from a forker is to make N fork F;
-///   until that is built the save is refused
-///   ('cut_from_a_forker_is_not_yet_read'), so no cut is lost
-///   silently.
-/// A child F does not show (one N contains or hides) is absent from
-/// under F by design, and is never removed from F's list. A forker
-/// the graph lacks (typed there) has no list to lose: what it shows
-/// is its contains ('set_contains_of_new_member_as_such'), as for a
-/// forkee typed there.
+///   F was cut from it. A cut from a forker makes N fork F (so F, which
+///   forks N, becomes a mutual), and N hides each child cut that it
+///   does not contain after the save, as a cut from a forkee does. A
+///   forker N already forks (a mutual the user detached there, in the
+///   same save) is not forked again: the detachment stands, and the
+///   cut only hides. The saved view gives F its claim
+///   ('claim_forkers_the_save_makes_forkees').
+/// A foreign N can record neither a fork nor a hide, so a save that
+/// cuts from F or unhides under it is refused
+/// ('cut_under_a_foreign_note'). A child F does not show (one N
+/// contains or hides) is absent from under F by design, and is never
+/// removed from F's list. A forker the graph lacks (typed there) has
+/// no list to lose: what it shows is its contains
+/// ('set_contains_of_new_member_as_such'), as for a forkee typed
+/// there.
 fn resolve_forker_visibility (
   lowered             : &mut LoweredNodeIntents,
   signals             : &[(ID, ForkerVisibility)],
@@ -284,22 +295,36 @@ fn resolve_forker_visibility (
     let cut : Vec<ID> = shown_before . into_iter ()
       . filter ( |gnid| ! visible . contains (&key (gnid)) )
       . collect ();
-    if ! cut . is_empty () {
-      return Err ( Box::new ( BufferValidationError::Other (
-        cut_from_a_forker_is_not_yet_read (
-          &note_from_disk, &forker_from_disk, &cut ) ))); }
-    let forker_contains_keys : HashSet<ID> =
-      forker_contains . iter () . map (key) . collect ();
-    let inferred_unhides : Vec<ID> = note_hides . iter ()
-      . filter ( |gnid| visible . contains (&key (gnid))
-                        && forker_contains_keys . contains (&key (gnid)) )
-      . cloned () . collect ();
-    if inferred_unhides . is_empty () { continue; }
+    let inferred_unhides : Vec<ID> = {
+      let forker_contains_keys : HashSet<ID> =
+        forker_contains . iter () . map (key) . collect ();
+      note_hides . iter ()
+        . filter ( |gnid| visible . contains (&key (gnid))
+                          && forker_contains_keys . contains (&key (gnid)) )
+        . cloned () . collect () };
+    if cut . is_empty () && inferred_unhides . is_empty () { continue; }
     if ! config . skgrepo_is_owned (&note_from_disk . home_skgrepo) {
       return Err ( Box::new ( BufferValidationError::Other (
-        unhide_under_a_foreign_note (&note_from_disk, &forker_from_disk) ))); }
+        cut_under_a_foreign_note (
+          &note_from_disk, &forker_from_disk, MemberAsSuch::Forker ) ))); }
+    let inferred_hides : Vec<ID> =
+      if cut . is_empty () { Vec::new () }
+      else {
+        let note_forks_forker : bool = // by any record, a restricted one included
+          members_of ( note_from_disk . forks . or_default () ) . iter ()
+          . any ( |forkee| key (forkee) == forker_from_disk . pid );
+        if ! note_forks_forker {
+          lowered . add_forkee_to_note (
+            note_from_disk . clone (), &forker_from_disk . pid ); }
+        let note_contains : HashSet<ID> =
+          lowered . forker_contains_after_save (&note_from_disk) . iter ()
+          . map (key) . collect ();
+        cut . into_iter ()
+          . filter ( |gnid| ! note_contains . contains (&key (gnid)) )
+          . collect () };
+    if inferred_hides . is_empty () && inferred_unhides . is_empty () { continue; }
     lowered . apply_hiderel_delta_to_forker (
-      note_from_disk, &[], &inferred_unhides ); }
+      note_from_disk, &inferred_hides, &inferred_unhides ); }
   Ok (( )) }
 
 /// Whether 'a' and 'b' are fork partners, either way, by a record the
@@ -315,32 +340,6 @@ fn are_fork_partners (
     . iter () . any ( |forkee| graph . pid_else_raw_id (forkee) == b_pid )
   || graph . inbound_pids_for_relation_gated (a, NodeRelation::Forks, restriction)
     . contains (&b_pid) }
-
-/// The refusal of a save that cuts 'cut' from 'forker', shown as a
-/// forker in the forks folder of 'note'. Reading such a cut (the note
-/// comes to fork the forker, and hides what it cut unless it contains
-/// it) is not built yet.
-fn cut_from_a_forker_is_not_yet_read (
-  note   : &Graphnode,
-  forker : &Graphnode,
-  cut    : &[ID],
-) -> String {
-  format! (
-    "Cannot cut {} from {} ('{}'), shown as a forker in the forks folder of {} ('{}'): cutting from a forker, which is to make {} fork it, is coming but not yet supported. Put back what was cut (or reload the view) and save again.",
-    cut . iter () . map ( |gnid| gnid . 0 . as_str () ) . collect::<Vec<&str>> () . join (", "),
-    forker . pid, forker . title, note . pid, note . title, note . pid ) }
-
-/// The refusal of a save that shows again, under 'forker' shown as
-/// such, what 'note' hides of its content, where the user does not
-/// own the note: only a note of one's own can record a hide or its
-/// removal.
-fn unhide_under_a_foreign_note (
-  note   : &Graphnode,
-  forker : &Graphnode,
-) -> String {
-  format! (
-    "Cannot change what {} ('{}') hides of {} ('{}'), shown as a forker in its forks folder: {} is foreign, and only a note of your own can hide what another contains.",
-    note . pid, note . title, forker . pid, forker . title, note . pid ) }
 
 /// A note N's forks folder shows a forker of N claiming nothing (a
 /// forker-only member, which N does not fork) and each mutual

@@ -118,7 +118,8 @@ pub struct ForkeeVisibility {
 /// of the note it forks. That content is shown in part (less what the
 /// note contains or hides), so it is never read as the forker's whole
 /// list: a child typed there joins it, a child the note hides shown
-/// there is unhidden, and a child cut from it is refused, for now
+/// there is unhidden, and a child cut from it makes the note fork the
+/// forker, and hide the child unless the note contains it
 /// ('resolve_forker_visibility').
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ForkerVisibility {

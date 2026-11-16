@@ -45,6 +45,8 @@ mod forks_folder;
 mod forkees_drawn_editable;
 #[path = "forkers_drawn_editable.rs"]
 mod forkers_drawn_editable;
+#[path = "cuts_from_forkers.rs"]
+mod cuts_from_forkers;
 
 #[path = "hides_apply_to_every_fork_partner.rs"]
 mod hides_apply_to_every_fork_partner;

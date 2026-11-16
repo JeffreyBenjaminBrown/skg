@@ -532,6 +532,34 @@ impl LoweredNodeIntents {
       intent . contains = MSV::Specified (
         contains . iter () . map ( |gnid| (gnid . clone (), None) ) . collect () ); }}
 
+  /// This adds 'forkee' to the forks of 'note', at the relRepo the
+  /// save derives for a new record: on its Save nodeIntent, whose
+  /// forks, where the buffer left them unspecified, start from disk;
+  /// or on one from its disk state if it has none. A Delete nodeIntent
+  /// is left untouched, because deleting wins. A forkee the forks
+  /// already name is not added again.
+  pub fn add_forkee_to_note (
+    &mut self,
+    note   : Graphnode,
+    forkee : &ID,
+  ) {
+    if ! self . by_pid . contains_key (&note . pid) {
+      self . order . push (note . pid . clone ());
+      self . by_pid . insert (
+        note . pid . clone (),
+        NodeIntent::graph_save_from_graphnode (note . clone ()) ); }
+    let Some (NodeIntent::Save (intent)) = self . by_pid . get_mut (&note . pid)
+      else { return; };
+    let mut forks : Vec<(ID, Option<SkgrepoName>)> =
+      match &intent . forks {
+        MSV::Specified (forks) => forks . clone (),
+        MSV::Unspecified =>
+          members_of ( note . forks . or_default () ) . into_iter ()
+          . map ( |gnid| (gnid, None) ) . collect (), };
+    if ! forks . iter () . any ( |(gnid, _)| gnid == forkee ) {
+      forks . push (( forkee . clone (), None )); }
+    intent . forks = MSV::Specified (forks); }
+
   /// This applies inferred hides/unhides to the forker's
   /// nodeIntent, creating a Save nodeIntent from its disk state if it has
   /// none. A Delete nodeIntent is left untouched, because deleting wins.

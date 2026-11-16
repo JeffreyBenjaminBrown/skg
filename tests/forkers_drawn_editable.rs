@@ -12,8 +12,6 @@
 // and saves it:
 // - a buffer showing T editable, saved unchanged, writes nothing: T's
 //   partial list is never read as its whole contains;
-// - cutting Y from T there is refused (the cut is not read yet), and
-//   nothing is written;
 // - a fresh view of N draws K, its forkee, then its forkers FF, R and
 //   T, each editable, claiming nothing, showing what it adds;
 // - under T, the folder of what N hides in it (Z) comes first, then
@@ -33,6 +31,7 @@
 //   and an editable-view request on N extends T.
 // A separate test narrows the skgrepo restriction so that T's record
 // of Y is kept out: Y leaves the view, and the widening draws it again.
+// A cut from a forker as such is tested in 'tests/cuts_from_forkers.rs'.
 
 use std::error::Error;
 use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
@@ -84,8 +83,6 @@ fn all_tests
     |s| Box::pin ( async move {
       s . reset ("an_unchanged_save_of_an_editable_forker_writes_nothing", FIXTURES) ?;
       an_unchanged_save_of_an_editable_forker_writes_nothing (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("a_cut_from_an_editable_forker_is_refused", FIXTURES) ?;
-      a_cut_from_an_editable_forker_is_refused (&s . config, &mut s . tantivy) . await ?;
       s . reset ("a_fresh_view_draws_forkers_after_forkees_editable", FIXTURES) ?;
       a_fresh_view_draws_forkers_after_forkees_editable (&s . config, &mut s . tantivy) . await ?;
       s . reset ("a_forkers_folders_stand_in_order", FIXTURES) ?;
@@ -266,23 +263,6 @@ async fn an_unchanged_save_of_an_editable_forker_writes_nothing (
   let before : BTreeMap<String, String> = skg_files (config) ?;
   save_cleanly (N_WITH_T_EDITABLE, "N", config, tantivy) . await ?;
   assert_eq! ( skg_files (config) ?, before, "an unchanged save writes nothing" );
-  Ok (( )) }
-
-/// Cutting Y from T there would make N fork T, which the save does
-/// not read yet: it is refused, and nothing is written.
-async fn a_cut_from_an_editable_forker_is_refused (
-  config  : &SkgConfig,
-  tantivy : &mut TantivyIndex,
-) -> Result<(), Box<dyn Error>> {
-  let cut : String = N_WITH_T_EDITABLE . replacen (
-    "**** (skg node (gnid Y) (skgRepos (nodeRepo main))) Y\n", "", 1 );
-  assert_ne! ( cut, N_WITH_T_EDITABLE );
-  let before : BTreeMap<String, String> = skg_files (config) ?;
-  let refusal : String = refusal_of (&cut, "N", config, tantivy) . await ?;
-  assert! ( refusal . contains ("Cannot cut Y from T")
-            && refusal . contains ("not yet supported"),
-            "{}", refusal );
-  assert_eq! ( skg_files (config) ?, before, "nothing is written" );
   Ok (( )) }
 
 /// N's forks folder holds K, its forkee, claiming, then its forkers
