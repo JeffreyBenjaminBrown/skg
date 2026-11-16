@@ -205,8 +205,8 @@ viewparent contains and the note hides: =☮ It contains these, but c
 hides them.= Under a forker as such, the folder of what the forker,
 the viewparent, hides of the note's content reads =☮ a hides these,
 which c contains.= In the forks folder itself, the note is the
-grandparent: =b hides these, but nothing it forks or that forks it
-contains them.= (b's hides that no member of the forks folder, forkee
+grandparent: =b hides these, but no fork partner shown contains
+them.= (b's hides that no member of the forks folder, forkee
 or forker, contains.) The hider and hidden folders read =☮ These hide
 it from their forks.= and =☮ It hides these from its forks.=
 

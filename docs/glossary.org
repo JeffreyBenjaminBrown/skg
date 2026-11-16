@@ -546,8 +546,7 @@ editing, done in S's own view. Under a forkee as such it is not
 drawn, and one standing under a member that became a forkee holds
 nothing and goes. The *hidden-outside
 compound partner folder* (=hiddenOutsideOfForkPartnersFolder=, label
-"b hides these, but nothing it forks or that forks it contains
-them.") stands last in N's forks folder and holds N's hides that no
+"b hides these, but no fork partner shown contains them.") stands last in N's forks folder and holds N's hides that no
 fork partner of N contains, in the order of N's hides list. Its fork
 partners are the members its forks folder shows, forkees and
 forkers alike ('fork_partners_shown'), so a hide is there exactly

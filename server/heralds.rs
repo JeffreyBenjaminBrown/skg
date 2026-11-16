@@ -478,7 +478,7 @@ pub fn herald_rule_table () -> HeraldRule {
       leaf_styled_as ("hiddenOutsideOfForkPartnersFolder_hider",
                       Folder::HiddenOutsideOfForkPartners . repr_in_client (), "b"),
       leaf (Folder::HiddenOutsideOfForkPartners . repr_in_client (),
-            "hides these, but nothing it forks or that forks it contains them."),
+            "hides these, but no fork partner shown contains them."),
       leaf (Folder::Forks . repr_in_client (),
             "It forks these, or these fork it.") ],
       write_protected_leaves (Folder::Hidden . repr_in_client (),

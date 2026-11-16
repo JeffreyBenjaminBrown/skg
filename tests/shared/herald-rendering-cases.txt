@@ -234,8 +234,8 @@
 ---- styles: crucial*1 -*1 high*1 -*1 message*18 -*1 high*1 -*1 message*9
 ==== folders: hidden outside of its fork partners, the note the grandparent
 (skg hiddenOutsideOfForkPartnersFolder)
----- text: b hides these, but nothing it forks or that forks it contains them.
----- styles: high*1 -*1 message*65
+---- text: b hides these, but no fork partner shown contains them.
+---- styles: high*1 -*1 message*53
 ==== placeholders: unknown node
 (skg unknown (gnid gone))
 ---- text: Reference to unknown node.

@@ -30,7 +30,7 @@ If you type a new headline under E, it joins E's content, right after the child 
 
 Title and body edits to E made there are saved when you own E. A foreign E's are refused: make them from some view that does not present E as a forkee as such (C-c g RET from E will open such a view), where an edit forks E.
 
-Two generated folders show what R currently hides. Under E, the hidden-in folder (=hiddenInForkPartnerFolder=, "☮ It contains these, but c hides them.") lists what R hides that E contains; it is a write-protected display, and editing it is not how you hide or unhide forked content. To hide something, remove it from E's immediate visible graph-content in R's forks folder. To unhide it, put it back there. Last in R's forks folder, the hidden-outside folder (=hiddenOutsideOfForkPartnersFolder=, "b hides these, but nothing it forks or that forks it contains them.") lists what R hides that no fork partner shown in that folder contains (no forkee, and no forker R does not hide), a forker R hides among them; it is editable, and removing a member there unhides it (=glossary.org=, "compound partner folder").
+Two generated folders show what R currently hides. Under E, the hidden-in folder (=hiddenInForkPartnerFolder=, "☮ It contains these, but c hides them.") lists what R hides that E contains; it is a write-protected display, and editing it is not how you hide or unhide forked content. To hide something, remove it from E's immediate visible graph-content in R's forks folder. To unhide it, put it back there. Last in R's forks folder, the hidden-outside folder (=hiddenOutsideOfForkPartnersFolder=, "b hides these, but no fork partner shown contains them.") lists what R hides that no fork partner shown in that folder contains (no forkee, and no forker R does not hide), a forker R hides among them; it is editable, and removing a member there unhides it (=glossary.org=, "compound partner folder").
 
 ** Forking: seeing your version where the original would appear
 
@@ -56,7 +56,7 @@ A view of a note N shows, unasked wherever N has one, its =forksFolder= ("It for
 A member claims membership exactly when N forks it, and the save sets N's =forks= to the claiming members. So:
 - typing a note into the folder makes N fork it;
 - deleting a forkee stops N forking it;
-- deleting a forker-only member hides it in N: it leaves the forks folder for the folder of what N hides outside its fork partners ("b hides these, but nothing it forks or that forks it contains them."), the last thing in the forks folder; removing it from there unhides it, and it is drawn in the forks folder again;
+- deleting a forker-only member hides it in N: it leaves the forks folder for the folder of what N hides outside its fork partners ("b hides these, but no fork partner shown contains them."), the last thing in the forks folder; removing it from there unhides it, and it is drawn in the forks folder again;
 - deleting a mutual stops N forking it and hides it, likewise; detaching it (=C-c s t=) only stops the fork, and it stands on as a forker, claiming nothing;
 - attaching a forker-only member (=C-c s a=) makes N fork it: a mutual;
 - deleting a member shown as "restricted" (a note the skgrepo restriction keeps out) changes nothing: the save leaves the forks and hides involving it as they are, and the member is drawn again.

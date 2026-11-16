@@ -270,7 +270,7 @@ other properties, so a modified member shows ☮ M, and 'node' with
 'rel' there marks its file, and the existence of its relationship to
 the folder's viewparent, of the folder's kind. The compound partner
 folders ("It contains these, but c hides them", "a hides these, which
-c contains" and "b hides these, but nothing it forks or that forks it contains them";
+c contains" and "b hides these, but no fork partner shown contains them";
 the diff view draws none unasked) show no change and carry no '(rel ...)'. Under each
 member of a changed folder hangs its containerward chain directly, a
 forks folder's member's too (a content view puts that one in a
