@@ -327,8 +327,8 @@ fn register_saved_view (
   if let Some (buffer_kind) = saved_diffView_buffer_kind {
     views_state . open_views . mark_as_diffView_buffer (viewforest_id, buffer_kind); }}
 
-/// A root is intentionally rendered raw when the user ordinarily opens an
-/// overridden node.  The buffer which *created* a fork is the exception: once
+/// A root is intentionally rendered raw when the user ordinarily opens a
+/// forked node.  The buffer which *created* a fork is the exception: once
 /// the save's skgsave-commit happens, continuing to show its foreign root would make the next
 /// edit attempt another fork.  Replace only roots named by this save's exact
 /// ForkSpecs; content occurrences are substituted by the refresh.

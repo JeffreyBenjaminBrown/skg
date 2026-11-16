@@ -1176,7 +1176,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals_or_preview (
   // Forks detected this save (approved, or none): editing a foreign node
   // N is a request to clone it. The clone C is skgsave-committed with the rest of the
   // save -- its 'forks = [N]' relationship rides in the same
-  // NodeInstructions, so the touched-override-invariant check (which reads the
+  // NodeInstructions, so the fork rules' check of the touched notes (which reads the
   // simulated post-save graph) sees C before validating.
   let nonmerge_nodeInstructions : Vec<NodeInstruction> = {
     let mut nodes : Vec<NodeInstruction> = nonmerge_nodeInstructions;
@@ -1197,7 +1197,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals_or_preview (
       approved_hoist_pids,
       restricted_records_left )
     // Warnings always accompany errors: a post-parse validation
-    // failure (e.g. the override-invariant check) back-fills the
+    // failure (e.g. the fork rules' check) back-fills the
     // save's parse-time warnings, which the error itself did not see.
     . map_err ( |e| backfill_parse_warnings (e, &parse_warnings) ) ? };
   let node_instructions : Vec<NodeInstruction> = // includes the nodeMerges

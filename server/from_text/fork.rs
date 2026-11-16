@@ -43,7 +43,7 @@ use std::iter::once;
 /// belongs in the skgrepo of the node that actually contains N here.
 /// A foreign node shown at several positions can have different nearest
 /// ancestors; the first owned one reached in preorder wins, since one
-/// fork makes one clone, and the user can override the choice in the
+/// fork makes one clone, and the user can change the choice in the
 /// confirmation buffer.
 /// A write-protected ancestor's skgrepo is read from its ID
 /// (WRITEPROTECTED_SKGREPOS_AFTER_SAVE): what it shows lags the move when

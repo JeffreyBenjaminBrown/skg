@@ -281,7 +281,7 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
     // Explicit 'skg-fork-node' gesture: a node carrying ViewRequest::Fork
     // is an owned node the user asked to fork. Unlike the implicit
     // foreign fork (where N's own save is dropped), N keeps its own save
-    // (it is owned); we only add the clone C overriding N. C copies N's
+    // (it is owned); we only add the clone C, which forks N. C copies N's
     // saved state on disk -- the client refuses to fork a dirty buffer,
     // so disk == what the user sees. These specs join the implicit ones
     // for the shared confirmation / skgsave-commit pipeline below.

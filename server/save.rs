@@ -37,11 +37,11 @@ fn graph_preparation_save_error (
 ) -> Box<dyn Error> {
   if error . is_internal () {
     return Box::new (SaveError::DatabaseError (Box::new (error))); }
-  let is_override_invariant : bool =
-    error . is_override_invariant_only ();
+  let is_fork_rule_violation : bool =
+    error . is_fork_rule_violation_only ();
   let message : String = error . to_string ();
-  let buffer_error : BufferValidationError = if is_override_invariant {
-    BufferValidationError::OverrideInvariantViolation (message)
+  let buffer_error : BufferValidationError = if is_fork_rule_violation {
+    BufferValidationError::ForkRuleViolation (message)
   } else {
     BufferValidationError::Other (message)
   };

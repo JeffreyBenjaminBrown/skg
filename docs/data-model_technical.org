@@ -83,7 +83,7 @@ is a warning there, not an error, since only a hand edit of the owned
 note could otherwise mend what the foreign author did.  Startup and
 rebuild report it among the startup warnings, naming both notes and
 which is foreign ('foreign_note_taking_part' in
-'server/dbs/in_rust_graph/override_invariants.rs'), and proceed.  A save
+'server/dbs/in_rust_graph/fork_rules.rs'), and proceed.  A save
 that leaves such a pair is still refused, so a save of the owned note
 succeeds only once it ends the pair.
 

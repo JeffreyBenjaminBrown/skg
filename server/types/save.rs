@@ -274,7 +274,7 @@ fn buffer_validation_error_text (
     BufferValidationError::ForkRequestMultiple(gnid, _) => {
       format!("Multiple fork requests for the same node:\n- Node: {}\n- At most one fork request per node is allowed.\n",
               gnid . 0) },
-    BufferValidationError::OverrideInvariantViolation(msg) => {
+    BufferValidationError::ForkRuleViolation(msg) => {
       format!("{}\n", msg) },
     BufferValidationError::MultipleEditableViewRequestsForSameId (gnid, _) => {
       format!("Multiple editable view requests for the same ID:\n- ID: {}\n- At most one editable view request per ID is allowed.\n",

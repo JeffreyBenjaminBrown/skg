@@ -821,7 +821,7 @@ fn buffer_save_refuses_a_self_subscription
         SaveError::BufferValidationErrors { errors, .. }
           if errors . iter () . any (
             |e| matches! (
-              e, BufferValidationError::OverrideInvariantViolation (message)
+              e, BufferValidationError::ForkRuleViolation (message)
                 if message . contains ("node mono-r2 forks itself") )) ),
         "expected a self-fork violation, got {:?}", save_error );
       // Disk unchanged: the check runs before the filesystem write.
@@ -865,7 +865,7 @@ fn a_save_leaving_an_owned_note_containing_its_foreign_forker_is_refused
                   err . downcast_ref::<SaveError> (),
                   Some (SaveError::BufferValidationErrors { errors, .. })
                     if errors . iter () . any ( |e| matches! (
-                      e, BufferValidationError::OverrideInvariantViolation (message)
+                      e, BufferValidationError::ForkRuleViolation (message)
                         if message . contains ("node E contains node R, which forks it") ))),
                 "expected the pair named: {}", err );
       let dropping_r : &str = indoc! {"

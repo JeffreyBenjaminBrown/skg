@@ -10,10 +10,10 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::internal_index_validation::{
   InternalIndexMismatch, validate_internal_indexes,
 };
-use crate::dbs::in_rust_graph::override_invariants::{
-  OverrideInvariantViolation, describe_override_invariant_violation,
+use crate::dbs::in_rust_graph::fork_rules::{
+  ForkRuleViolation, describe_fork_rule_violation,
   describe_violation_a_foreign_note_takes_part_in, foreign_note_taking_part,
-  validate_override_invariants,
+  validate_fork_rules,
 };
 use crate::telescope::invariants::{TelescopeViolation, validate_all_telescopes};
 use crate::types::misc::{ID, SkgConfig, SkgrepoName};
@@ -29,7 +29,7 @@ pub enum CompleteGraphError {
   DuplicateExtraId { gnid : ID, carriers : Vec<ID> },
   PrimaryExtraCollision { gnid : ID, primary_carriers : Vec<ID>, extra_carriers : Vec<ID> },
   UnconfiguredNodeHome { pid : ID, skgrepo : SkgrepoName },
-  Override (OverrideInvariantViolation),
+  ForkRule (ForkRuleViolation),
   InternalIndex (InternalIndexMismatch),
 }
 
@@ -49,7 +49,7 @@ impl CompleteGraphValidation {
 
 /// Validate all facts requiring the complete set: identity, configured homes,
 /// the rules of owned notes' forks, contents and hides
-/// ('override_invariants.rs'; a violation a foreign note takes part in
+/// ('fork_rules.rs'; a violation a foreign note takes part in
 /// is a warning), internal graph indexes, and telescope provenance/privacy.
 /// Relationship roles themselves are represented by distinct typed fields;
 /// dangling member IDs are deliberately retained and are not errors.
@@ -106,12 +106,12 @@ pub fn validate_complete_graph (
     | CompleteGraphError::PrimaryExtraCollision { .. }));
   let mut fork_rule_warnings : Vec<String> = Vec::new ();
   if identity_is_unambiguous {
-    for violation in validate_override_invariants (config, &graph) {
+    for violation in validate_fork_rules (config, &graph) {
       match foreign_note_taking_part (config, &graph, &violation) {
         Some (foreign) => fork_rule_warnings . push (
           describe_violation_a_foreign_note_takes_part_in (
             &violation, &foreign )),
-        None => errors . push (CompleteGraphError::Override (violation)), }}
+        None => errors . push (CompleteGraphError::ForkRule (violation)), }}
     errors . extend (validate_internal_indexes (&graph)
       . into_iter () . map (CompleteGraphError::InternalIndex)); }
   errors . sort_by_key (error_sort_key);
@@ -132,7 +132,7 @@ fn error_sort_key (error : &CompleteGraphError) -> (u8, String, String) {
       (2, gnid . to_string (), String::new ()),
     CompleteGraphError::UnconfiguredNodeHome { pid, skgrepo } =>
       (3, pid . to_string (), skgrepo . to_string ()),
-    CompleteGraphError::Override (violation) =>
+    CompleteGraphError::ForkRule (violation) =>
       (4, format!("{:?}", violation), String::new ()),
     CompleteGraphError::InternalIndex (mismatch) =>
       (5, mismatch . index . to_string (), mismatch . key . to_string ()),
@@ -153,8 +153,8 @@ pub fn format_complete_graph_errors (errors : &[CompleteGraphError]) -> String {
           gnid, primary_carriers, extra_carriers),
       CompleteGraphError::UnconfiguredNodeHome { pid, skgrepo } => format! (
         "node '{}' has unconfigured home repo '{}'", pid, skgrepo),
-      CompleteGraphError::Override (violation) =>
-        describe_override_invariant_violation (violation),
+      CompleteGraphError::ForkRule (violation) =>
+        describe_fork_rule_violation (violation),
       CompleteGraphError::InternalIndex (mismatch) => format! (
         "internal index '{}' key '{}' expected {:?}, actual {:?}",
         mismatch . index, mismatch . key, mismatch . expected, mismatch . actual),

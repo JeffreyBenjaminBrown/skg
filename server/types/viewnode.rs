@@ -704,7 +704,7 @@ impl FolderRelation {
 /// - 'WriteProtectedSubtree' does that to the node and its whole
 ///   content subtree.
 /// - 'Fork' is the explicit 'skg-fork-node' gesture: clone this (owned)
-///   node into a private fork that overrides it. Consumed on the save
+///   node into a private clone that forks it. Consumed on the save
 ///   path (fork detection), not by the refresh.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ViewRequest {

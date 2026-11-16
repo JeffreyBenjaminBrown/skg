@@ -6,7 +6,7 @@ use crate::dbs::in_rust_graph::complete_validation::{
 };
 use crate::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle, new_handle};
 use crate::dbs::in_rust_graph::apply_nodeInstructions_to_inRustGraph;
-use crate::dbs::in_rust_graph::override_invariants::OverrideInvariantViolation;
+use crate::dbs::in_rust_graph::fork_rules::ForkRuleViolation;
 use crate::dbs::in_rust_graph::internal_index_validation::{
   LocalIndexValidation, validate_local_internal_indexes,
 };
@@ -422,9 +422,9 @@ fn an_acquirer_left_forking_its_acquiree_is_refused_as_a_self_fork () {
         gnid : ID::from ("B"), home_skgrepo: skgrepo,
       }),
     ]) . expect_err ("a note may not fork itself");
-  assert! (error . is_override_invariant_only ());
+  assert! (error . is_fork_rule_violation_only ());
   assert_eq! (error . complete_graph_errors, vec![
-    CompleteGraphError::Override (OverrideInvariantViolation::SelfFork {
+    CompleteGraphError::ForkRule (ForkRuleViolation::SelfFork {
       node : ID::from ("A") }) ]);
 }
 

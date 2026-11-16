@@ -3,7 +3,7 @@
 // The init/rebuild refusal wiring ('docs/data-model_technical.org', "Hard
 // validation constraints"): the rules of forks, contents and hides are
 // validated not only at their own seam (tests/dbs/in_rust_graph/
-// override_invariants.rs) but actually block initialization, unless a
+// fork_rules.rs) but actually block initialization, unless a
 // foreign note's record takes part in the violation, which only warns.
 // This drives the graph validator shared by server start and rebuild.
 

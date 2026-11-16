@@ -1,17 +1,17 @@
-// cargo nextest run --test grouped_unit -E 'test(in_rust_graph_override_invariants::)'
+// cargo nextest run --test grouped_unit -E 'test(in_rust_graph_fork_rules::)'
 //
 // The rules an owned note's forks, contents and hides keep
-// ('server/dbs/in_rust_graph/override_invariants.rs'): no self-fork,
+// ('server/dbs/in_rust_graph/fork_rules.rs'): no self-fork,
 // self-containment or self-hide; no note both forking and containing
 // one note, nor containing a note that forks it. Several forks of one
 // note, and cycles of forks, are legal.
 
 use skg::dbs::in_rust_graph::{InRustGraph, apply_nodeInstructions_to_inRustGraph};
-use skg::dbs::in_rust_graph::override_invariants::{
-  OverrideInvariantViolation,
-  derive_affected_override_scope,
-  validate_affected_override_invariants,
-  validate_override_invariants,
+use skg::dbs::in_rust_graph::fork_rules::{
+  ForkRuleViolation,
+  derive_fork_rule_scope,
+  validate_fork_rules_of_affected_notes,
+  validate_fork_rules,
 };
 use skg::types::misc::{ID, MSV, RelPartner, SkgConfig, Skgrepo, SkgrepoName, rel_partners_at_relRepo};
 use skg::types::nodes::complete::{Graphnode, empty_graphnode};
@@ -84,17 +84,17 @@ fn with_hides (
 
 fn violations_for (
   nodes : Vec<Graphnode>,
-) -> Vec<OverrideInvariantViolation> {
+) -> Vec<ForkRuleViolation> {
   let graph : InRustGraph =
     InRustGraph::from_graphnodes (&nodes);
-  validate_override_invariants (&config (), &graph) }
+  validate_fork_rules (&config (), &graph) }
 
 fn affected_and_full (
   base_nodes       : Vec<Graphnode>,
   nodeInstructions : Vec<NodeInstruction>,
-) -> (Vec<OverrideInvariantViolation>, Vec<OverrideInvariantViolation>) {
+) -> (Vec<ForkRuleViolation>, Vec<ForkRuleViolation>) {
   let base : InRustGraph = InRustGraph::from_graphnodes (&base_nodes);
-  assert_eq! (validate_override_invariants (&config (), &base), vec![]);
+  assert_eq! (validate_fork_rules (&config (), &base), vec![]);
   let mut candidate : InRustGraph = base . clone ();
   apply_nodeInstructions_to_inRustGraph (&mut candidate, &nodeInstructions);
   let touched : HashSet<ID> = nodeInstructions . iter () . map (|nodeInstruction|
@@ -108,10 +108,10 @@ fn affected_and_full (
       affected_gnids . extend (old . extra_ids . iter () . cloned ()); }
     if let Some (final_node) = candidate . nodes . get (pid) {
       affected_gnids . extend (final_node . extra_ids . iter () . cloned ()); }}
-  let scope : HashSet<ID> = derive_affected_override_scope (
+  let scope : HashSet<ID> = derive_fork_rule_scope (
     &base, &candidate, &touched, &affected_gnids);
-  (validate_affected_override_invariants (&config (), &candidate, &scope),
-   validate_override_invariants (&config (), &candidate))
+  (validate_fork_rules_of_affected_notes (&config (), &candidate, &scope),
+   validate_fork_rules (&config (), &candidate))
 }
 
 #[test]
@@ -165,7 +165,7 @@ fn owned_fork_cycles_are_valid () {
 fn an_owned_self_fork_is_a_self_fork () {
   assert_eq! (
     violations_for (vec![ node ("a", "owned", &["a"]) ]),
-    vec![ OverrideInvariantViolation::SelfFork { node : ID::from ("a") } ] ); }
+    vec![ ForkRuleViolation::SelfFork { node : ID::from ("a") } ] ); }
 
 #[test]
 fn a_self_fork_by_an_extra_id_is_a_self_fork () {
@@ -173,18 +173,18 @@ fn a_self_fork_by_an_extra_id_is_a_self_fork () {
   a . extra_ids = vec![ID::from ("a-extra")];
   assert_eq! (
     violations_for (vec![a]),
-    vec![ OverrideInvariantViolation::SelfFork { node : ID::from ("a") } ] ); }
+    vec![ ForkRuleViolation::SelfFork { node : ID::from ("a") } ] ); }
 
 #[test]
 fn self_containment_and_self_hiding_are_refused () {
   assert_eq! (
     violations_for (vec![
       with_contains (node ("a", "owned", &[]), &["a"]) ]),
-    vec![ OverrideInvariantViolation::SelfContains { node : ID::from ("a") } ] );
+    vec![ ForkRuleViolation::SelfContains { node : ID::from ("a") } ] );
   assert_eq! (
     violations_for (vec![
       with_hides (node ("a", "owned", &[]), &["a"]) ]),
-    vec![ OverrideInvariantViolation::SelfHides { node : ID::from ("a") } ] ); }
+    vec![ ForkRuleViolation::SelfHides { node : ID::from ("a") } ] ); }
 
 #[test]
 fn a_foreign_note_breaking_the_rules_is_not_checked () {
@@ -197,8 +197,8 @@ fn a_foreign_note_breaking_the_rules_is_not_checked () {
 
 #[test]
 fn a_note_may_not_contain_a_note_it_forks () {
-  let expected : Vec<OverrideInvariantViolation> = vec![
-    OverrideInvariantViolation::ForkeeContained {
+  let expected : Vec<ForkRuleViolation> = vec![
+    ForkRuleViolation::ForkeeContained {
       forker : ID::from ("r"), forkee : ID::from ("e") } ];
   assert_eq! (
     violations_for (vec![
@@ -209,8 +209,8 @@ fn a_note_may_not_contain_a_note_it_forks () {
 
 #[test]
 fn a_note_may_not_contain_a_note_that_forks_it () {
-  let expected : Vec<OverrideInvariantViolation> = vec![
-    OverrideInvariantViolation::ForkerContained {
+  let expected : Vec<ForkRuleViolation> = vec![
+    ForkRuleViolation::ForkerContained {
       forker : ID::from ("r"), forkee : ID::from ("e") } ];
   // An owned container of its foreign forker.
   assert_eq! (
@@ -266,7 +266,7 @@ fn a_nodeMerge_that_makes_a_note_fork_and_contain_one_note_is_affected () {
     ]);
   assert_eq! (affected, full);
   assert_eq! (affected, vec![
-    OverrideInvariantViolation::ForkeeContained {
+    ForkRuleViolation::ForkeeContained {
       forker : ID::from ("R"), forkee : ID::from ("A") } ]); }
 
 #[test]
@@ -278,7 +278,7 @@ fn a_dangling_id_forked_and_contained_breaks_no_rule_until_it_names_a_note () {
     vec![NodeInstruction::Save (SaveNode (node ("E", "owned", &[]))) ]);
   assert_eq! (affected, full);
   assert_eq! (affected, vec![
-    OverrideInvariantViolation::ForkeeContained {
+    ForkRuleViolation::ForkeeContained {
       forker : ID::from ("R"), forkee : ID::from ("E") } ]); }
 
 #[test]
@@ -291,7 +291,7 @@ fn an_extra_id_that_closes_a_self_fork_is_affected () {
     vec![NodeInstruction::Save (SaveNode (acquirer))]);
   assert_eq! (affected, full);
   assert_eq! (affected, vec![
-    OverrideInvariantViolation::SelfFork { node : ID::from ("A") } ]); }
+    ForkRuleViolation::SelfFork { node : ID::from ("A") } ]); }
 
 #[test]
 fn ownership_class_change_can_create_a_violation () {
@@ -304,7 +304,7 @@ fn ownership_class_change_can_create_a_violation () {
       with_contains (node ("changed", "owned", &["target"]), &["target"]))) ]);
   assert_eq! (affected, full);
   assert_eq! (affected, vec![
-    OverrideInvariantViolation::ForkeeContained {
+    ForkRuleViolation::ForkeeContained {
       forker : ID::from ("changed"), forkee : ID::from ("target") } ]); }
 
 #[test]
@@ -372,13 +372,13 @@ proptest! {
       &mut candidate, &[NodeInstruction::Save (SaveNode (changed))]);
     let touched : HashSet<ID> =
       HashSet::from ([ ID::from (gnids [changed_index]) ]);
-    let scope : HashSet<ID> = derive_affected_override_scope (
+    let scope : HashSet<ID> = derive_fork_rule_scope (
       &base_graph, &candidate, &touched, &touched);
-    let full_before : Vec<OverrideInvariantViolation> =
-      validate_override_invariants (&config (), &base_graph);
+    let full_before : Vec<ForkRuleViolation> =
+      validate_fork_rules (&config (), &base_graph);
     prop_assume! (full_before . is_empty ());
     prop_assert_eq! (
-      validate_affected_override_invariants (&config (), &candidate, &scope),
-      validate_override_invariants (&config (), &candidate));
+      validate_fork_rules_of_affected_notes (&config (), &candidate, &scope),
+      validate_fork_rules (&config (), &candidate));
   }
 }

@@ -12,7 +12,7 @@ pub mod containerward_role_tree;
 pub mod query;
 pub mod stats;
 pub mod internal_index_validation;
-pub mod override_invariants;
+pub mod fork_rules;
 pub mod mirrors;
 pub(crate) mod prepared_update;
 pub mod relation_accessors;

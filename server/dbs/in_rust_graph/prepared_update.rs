@@ -16,9 +16,9 @@ use crate::dbs::in_rust_graph::internal_index_validation::{
   InternalIndexMismatch, LocalIndexValidation, format_internal_index_mismatches,
   validate_local_internal_indexes,
 };
-use crate::dbs::in_rust_graph::override_invariants::{
-  OverrideInvariantViolation, derive_affected_override_scope,
-  validate_affected_override_invariants,
+use crate::dbs::in_rust_graph::fork_rules::{
+  ForkRuleViolation, derive_fork_rule_scope,
+  validate_fork_rules_of_affected_notes,
 };
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::save::{NodeInstruction, DeleteNode, SaveNode};
@@ -52,7 +52,7 @@ pub(crate) struct GraphChangeSet {
   pub(crate) canonicalization_changes : Vec<CanonicalizationChange>,
   pub(crate) identity_acquisitions    : Vec<IdentityAcquisition>,
   pub(crate) recorders_to_reindex         : HashSet<ID>,
-  pub(crate) override_pids_to_check : HashSet<ID>,
+  pub(crate) fork_rule_pids_to_check : HashSet<ID>,
   pub(crate) telescope_recorders_to_check : HashSet<ID>,
   #[cfg(test)]
   pub(crate) identity_base_lookup_bound : usize,
@@ -103,10 +103,10 @@ impl GraphUpdatePreparationError {
   pub(crate) fn is_internal (&self) -> bool {
     ! self . internal_index_errors . is_empty () }
 
-  pub(crate) fn is_override_invariant_only (&self) -> bool {
+  pub(crate) fn is_fork_rule_violation_only (&self) -> bool {
     ! self . complete_graph_errors . is_empty ()
       && self . complete_graph_errors . iter () . all (|error|
-        matches! (error, CompleteGraphError::Override (_)))
+        matches! (error, CompleteGraphError::ForkRule (_)))
       && self . extra_id_revocations . is_empty ()
       && self . internal_index_errors . is_empty ()
   }
@@ -202,30 +202,30 @@ pub(crate) fn prepare_graph_update (
       tracing::info_span! ("apply_nodeInstructions_to_inRustGraph") . entered ();
     apply_nodeInstructions_to_inRustGraph (
       &mut candidate, &batch . final_graph_nodeInstructions); }
-  changes . override_pids_to_check = {
+  changes . fork_rule_pids_to_check = {
     let _span : tracing::span::EnteredSpan =
-      tracing::info_span! ("derive_affected_override_scope") . entered ();
-    derive_affected_override_scope (
+      tracing::info_span! ("derive_fork_rule_scope") . entered ();
+    derive_fork_rule_scope (
       &base, &candidate, &changes . touched_pids, &changes . affected_gnids) };
   changes . telescope_recorders_to_check = derive_affected_telescope_recorders (
     &base, &candidate, &changes . saved_pids, &changes . affected_gnids);
-  let affected_override_errors : Vec<OverrideInvariantViolation> = {
+  let fork_rule_errors : Vec<ForkRuleViolation> = {
     let _span : tracing::span::EnteredSpan =
-      tracing::info_span! ("validate_affected_override_invariants") . entered ();
-    validate_affected_override_invariants (
-      config, &candidate, &changes . override_pids_to_check) };
+      tracing::info_span! ("validate_fork_rules_of_affected_notes") . entered ();
+    validate_fork_rules_of_affected_notes (
+      config, &candidate, &changes . fork_rule_pids_to_check) };
   let local_index_validation : LocalIndexValidation = {
     let _span : tracing::span::EnteredSpan =
       tracing::info_span! ("validate_local_internal_indexes") . entered ();
     validate_local_internal_indexes (
       &base, &candidate, &batch . final_graph_nodeInstructions, &changes) };
   tracing::info! (
-    "incremental graph work: graph_nodes={} normalized_nodeInstructions={} affected_ids={} recorders_reindexed={} override_pids_checked={} local_index_keys_checked={} local_node_checks={} local_identity_checks={} local_relationship_checks={}",
+    "incremental graph work: graph_nodes={} normalized_nodeInstructions={} affected_ids={} recorders_reindexed={} fork_rule_pids_checked={} local_index_keys_checked={} local_node_checks={} local_identity_checks={} local_relationship_checks={}",
     base . nodes . len (),
     batch . final_graph_nodeInstructions . len (),
     changes . affected_gnids . len (),
     changes . recorders_to_reindex . len (),
-    changes . override_pids_to_check . len (),
+    changes . fork_rule_pids_to_check . len (),
     local_index_validation . node_checks
       + local_index_validation . identity_checks
       + local_index_validation . relationship_membership_checks,
@@ -239,10 +239,10 @@ pub(crate) fn prepare_graph_update (
       extra_id_revocations  : Vec::new (),
       internal_index_errors : local_index_validation . errors,
     }); }
-  if ! affected_override_errors . is_empty () {
+  if ! fork_rule_errors . is_empty () {
     return Err (GraphUpdatePreparationError {
-      complete_graph_errors : affected_override_errors . into_iter ()
-        . map (CompleteGraphError::Override) . collect (),
+      complete_graph_errors : fork_rule_errors . into_iter ()
+        . map (CompleteGraphError::ForkRule) . collect (),
       extra_id_revocations  : Vec::new (),
       internal_index_errors : Vec::new (),
     }); }
@@ -408,7 +408,7 @@ fn validate_identity_and_derive_changes (
     canonicalization_changes,
     identity_acquisitions,
     recorders_to_reindex,
-    override_pids_to_check       : HashSet::new (),
+    fork_rule_pids_to_check      : HashSet::new (),
     telescope_recorders_to_check : HashSet::new (),
     #[cfg(test)]
     identity_base_lookup_bound,

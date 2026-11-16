@@ -100,10 +100,10 @@ affecting its parent. Does not auto-save."
      `(skg node (viewRequests writeProtectedSubtreeView)))))
 
 (defun skg-fork-node ()
-  "Fork the (owned) node at point: create a private clone that overrides it.
+  "Fork the (owned) node at point: create a private clone that forks it.
 This is the explicit counterpart to the implicit foreign fork: it forks a
-node you already own, deepening an override chain (e.g. E overrides D
-overrides C overrides N).
+node you already own, deepening a chain of forks (e.g. E forks D forks C
+forks N).
 
 Refuses if the buffer has unsaved changes (\"Save the buffer before
 forking.\"), so the clone's saved state matches what you see. Otherwise

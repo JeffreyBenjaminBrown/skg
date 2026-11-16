@@ -321,7 +321,7 @@ fn less_what_the_forker_integrates (
 
 /// What a forkee as such shows of its content: its content less
 /// what its forker hides or contains. Inputs preserve raw IDs; extra IDs are
-/// resolved before comparing membership, without replacing overridden nodes.
+/// resolved before comparing membership, without substituting mirrors.
 fn unintegrated_content_gnids (
   graph               : &InRustGraph,
   content_gnids      : &[ID],

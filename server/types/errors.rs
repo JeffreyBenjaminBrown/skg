@@ -89,8 +89,8 @@ pub enum BufferValidationError {
   }, // The buffer deletes the acquirer or the acquiree of one of its own merge requests.
   SkgrepoNotInConfig              (ID, SkgrepoName),
   // Fork errors. Editing a foreign node N is read as a request to
-  // clone it (the clone C lives in an owned skgrepo, forks and
-  // overrides N). These are the ways that request can be refused.
+  // clone it (the clone C lives in an owned skgrepo and forks N).
+  // These are the ways that request can be refused.
   ForkSkgrepoUnresolved           (ID), // N's pid: no owned vognode ancestor in the view to inherit C's skgrepo from, and the user set none in the confirmation buffer.
   ForkAlreadyExists              (ID,   // N's pid
                                   ID),  // a note the user owns that already forks N: the fork operation's guard ('validate_fork_specs_in_graph')
@@ -106,9 +106,9 @@ pub enum BufferValidationError {
                                   String,       // the relation, as the file names it ("contains")
                                   String,       // the member's ID
                                   SkgrepoName), // the relRepo the graph holds the record at, which the skgrepo restriction keeps out
-  ForkRequestOnUnknownNode       (ID, HeadlineName),  // An explicit 'skg-fork-node' request on a node whose id is not in the graph (an unsaved headline): nothing exists to override.
+  ForkRequestOnUnknownNode       (ID, HeadlineName),  // An explicit 'skg-fork-node' request on a node whose id is not in the graph (an unsaved headline): nothing exists to clone.
   ForkRequestMultiple            (ID, Vec<HeadlineName>),  // Two headlines for the same id both carry an explicit fork request; at most one is allowed.
-  OverrideInvariantViolation     (String),
+  ForkRuleViolation              (String),
   ChangedSinceRendered {
     gnid      : ID, // the node's pid
     change    : StaleGraphnodeReport, // how the graph's graphnode differs from the buffer's baseline copy of it
@@ -328,7 +328,7 @@ impl std::fmt::Display for BufferValidationError {
         write!(f, "Cannot fork node {:?} ({}): it is not in the graph. Only a saved node can be forked; save it first, then fork.", gnid, headline),
       BufferValidationError::ForkRequestMultiple(gnid, headlines) =>
         write!(f, "Multiple fork requests for the same node {:?} ({}). At most one fork request per node is allowed.", gnid, name_headlines (headlines)),
-      BufferValidationError::OverrideInvariantViolation(msg) =>
+      BufferValidationError::ForkRuleViolation(msg) =>
         write!(f, "{}", msg),
       BufferValidationError::MultipleEditableViewRequestsForSameId (gnid, headlines) =>
         write!(f, "Multiple editable view requests for the same ID {:?} ({}). At most one request per ID is allowed.", gnid, name_headlines (headlines)),
@@ -410,7 +410,7 @@ impl BufferValidationError {
         | BufferValidationError::RecordSkgrepoRestricted (..)
         | BufferValidationError::RecordMovedOutOfRestrictedSkgrepo (..)
         | BufferValidationError::ForkSkgrepoNotOwned (..)
-        | BufferValidationError::OverrideInvariantViolation (_)
+        | BufferValidationError::ForkRuleViolation (_)
         | BufferValidationError::EmptyTitle (_)
         | BufferValidationError::FlagEditOnForeignNode (..)
         | BufferValidationError::FlagEditOnUnknownNode (_)

@@ -3,7 +3,7 @@ use skg::dbs::in_rust_graph::complete_validation::{
   validate_complete_graph_candidate,
 };
 use skg::dbs::in_rust_graph::InRustGraph;
-use skg::dbs::in_rust_graph::override_invariants::OverrideInvariantViolation;
+use skg::dbs::in_rust_graph::fork_rules::ForkRuleViolation;
 use skg::telescope::invariants::TelescopeViolation;
 use skg::types::misc::{
   ID, MSV, RelPartner, SkgConfig, Skgrepo, SkgrepoName,
@@ -131,8 +131,8 @@ fn canonical_entry_includes_the_fork_rules_and_telescope_orientation () {
     SkgrepoName::from ("private"), ID::from ("target")) ];
   let report = validate_complete_graph (&config (), &[target, a, b]);
   assert_eq! (report . errors, vec![
-    CompleteGraphError::Override (
-      OverrideInvariantViolation::ForkeeContained {
+    CompleteGraphError::ForkRule (
+      ForkRuleViolation::ForkeeContained {
         forker : ID::from ("a"), forkee : ID::from ("target") }) ]);
   assert_eq! (report . warnings . iter () . filter (|(_, warning)| matches! (
     warning, TelescopeViolation::LeakShapedMembership {
@@ -190,8 +190,8 @@ fn an_owned_note_containing_its_owned_forker_is_an_error () {
     SkgrepoName::from ("public"), ID::from ("e")) ]);
   let report = validate_complete_graph (&config (), &[e, r]);
   assert_eq! (report . errors, vec![
-    CompleteGraphError::Override (
-      OverrideInvariantViolation::ForkerContained {
+    CompleteGraphError::ForkRule (
+      ForkRuleViolation::ForkerContained {
         forker : ID::from ("r"), forkee : ID::from ("e") }) ]);
   assert! (report . fork_rule_warnings . is_empty ());
 }

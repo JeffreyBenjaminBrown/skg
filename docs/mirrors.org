@@ -370,7 +370,7 @@ not perform interactive mirror substitution.
 
 - [[file:../server/serve/handlers/single_root_view.rs][exact direct visits]]
 - [[file:../server/dbs/in_rust_graph/mirrors.rs][mirrors, and which one stands]]
-- [[file:../server/dbs/in_rust_graph/override_invariants.rs][what an owned note may not fork, contain or hide]]
+- [[file:../server/dbs/in_rust_graph/fork_rules.rs][what an owned note may not fork, contain or hide]]
 - [[file:../server/refresh/visit.rs][substitution and raw positions ('substitute_mirrors')]]
 - [[file:../server/rerender_pass.rs][saved-view fork replacement and collateral rerendering]]
 - [[file:../server/types/views_state.rs][open-view root registration]]
