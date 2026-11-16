@@ -116,7 +116,8 @@ up() {
   port="$(port_of "$name")"
   views="$(views_of "$name")"; notes="$(notes_of "$name")"
   mkdir -p "$notes" "$views"
-  if [ ! -d "$notes/.git" ]; then
+  # '-e', not '-d': in a clone of data/claude/, a submodule's '.git' is a file.
+  if [ ! -e "$notes/.git" ]; then
     # skg's commit compares with HEAD, so a gitrepo needs a first commit.
     git -C "$notes" init -q -b main
     git -C "$notes" config user.name "Claude"
@@ -188,6 +189,8 @@ rename() { # OLD NEW: the folder, the ports line, and the readers' configs; the 
   done
   python3 "$READER" daemon --stop --out-dir "$(views_of "$old")" >/dev/null 2>&1 || true
   mv "$TEAM/$old" "$TEAM/$new"
+  # data/claude/ is a Git repo with each skgrepo a submodule; the push script registers the new path.
+  git -C "$DATA/claude" config -f .gitmodules --remove-section "submodule.team/$old/notes" 2>/dev/null || true
   # The search index and the run folders were made under the old name; 'up' rebuilds them.
   rm -rf "$TEAM/$new/.index.tantivy" "$TEAM/$new/skgconfig.toml.running"
   awk -v o="$old" -v n="$new" '$1==o {$1=n} {print}' "$PORTS" > "$PORTS.tmp"
