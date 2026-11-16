@@ -6,6 +6,18 @@
   When a plan or a settled discussion decides how an entry will be
   fixed, prefix its headline with 'FIX PLANNED: ' and leave it here
   until the fix lands; then move it as above.
+* A headline typed under an editable subscribee as such is created, then lost (2026-11-16)
+Found while planning 'TODO/every-mirror/2_plan.org' (its Q2), by
+reading the code, not yet by a probe. Under a subscribee shown
+editable as such, a new headline is an editable, save-eligible
+occurrence ('visit_occurrence',
+'server/from_text/local_fieldintent_collection/traverse.rs'), so its
+node is created on disk; but the subscribee as such is not
+save-eligible, so no 'SetContains' names it, 'resolve_visibility'
+leaves it alone, and 'is_created_as_an_orphan'
+('server/from_text/local_fieldintent_collection/mod.rs') exempts it
+from the orphan warning. The rerender then drops the headline: the
+user's text survives only as an orphan node nobody is told of.
 * An opened view keeps the server's fold atoms as text (2026-11-12)
   'skg-open-org-buffer-from-text' ('elisp/skg-buffer.el'), which
   both the content view and the diff view open through, inserts the
