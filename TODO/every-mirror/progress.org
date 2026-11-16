@@ -3403,3 +3403,186 @@ letters); the write-protected folders carry ☮:
 * Plan 3
 Started 2026-11-16 19:35 UTC; Jeff settled its two questions; one
 agent per slice.
+** Slice 1: the perspective is a skgrepo
+*** Commits
+- ef1f6762 every-mirror plan 3 slice 1: the perspective is a skgrepo
+  (server, both clients, skg-for-ai, tests and fixtures: one commit,
+  since the wire's names change in all three)
+- (the commit carrying this record) every-mirror plan 3 slice 1: docs,
+  record, DONE
+*** Suites
+- The slice's own tests: 'tests/dbs/in_rust_graph/mirrors.rs' 16 of 16;
+  'mirror_substitution::' (31 sub-tests) passed on its first run
+  after the adaptations below. The new tie order was checked against
+  the old: with "N itself" moved back after "the one no other forks",
+  'rule_two_the_note_itself_stands_among_a_tie',
+  'rule_three_the_one_no_other_there_forks_stands' and
+  'mirror_substitution::all_tests' fail.
+- 'bash/nextest.sh': first run 1255 of 1270, the 15 failures all
+  expected fixture adaptations (classified under "Fixtures
+  changed"); after them 1270 of 1270, and again 1270 of 1270 after the
+  fork warning's change.
+- Emacs 503 of 503, Neovim all pass, after the clients' perspective
+  tests took the new names.
+- The AI tool's tests (after 'cargo build --bin skg'): first run 2
+  failures, both expected adaptations (the perspective data's M moved
+  to "origin", which adds ⌂ marks; the explicit fork's new warning);
+  a third run caught my own slip in a new check (a reinstated M gets a
+  new viewnode ID); then PASS.
+- 'bash/integration-tests.sh' (the Emacs pass): first run 37 of 39,
+  'fork-chain' and 'fork-owned' failing, both expected adaptations
+  (below); then 39 of 39.
+- 'bash/all-tests.sh', first run: all pass: Emacs 503 of 503, Neovim
+  pass, nextest 1270 of 1270, doctests, team tools, AI reader,
+  integration 78 of 78 (both clients). The docs were written before
+  it; no code changed after it.
+- End to end, per '/verify': an isolated 'target/debug/skg' on port
+  27519, scratch data under '/tmp/claude-1000/every-mirror-p3-slice1/'
+  with owned "pub" and "priv" (declared in that order) and foreign
+  "theirs": N (theirs), Fpub (pub) and Fpriv (priv) each forking N, C
+  (pub) and T (theirs) each containing N. A fresh view of C (mine)
+  shows Fpub in N's place, of T (foreign) N itself. 'perspective'
+  (C-c v o's request) cycles C's view priv (Fpriv), theirs (N itself),
+  back to the root homes (Fpub, "pub" passed over); T's view pub
+  (Fpub), priv (Fpriv), back to N. Named, "skgrepo priv" and "skgrepo
+  pub" each show their fork; "user" and "owner of theirs" are refused
+  as unknown names. A search for "note" shows the public fork as the
+  one hit, the original in its forks folder. A second pass saved a
+  real edit under each perspective (Fpriv's body from priv, C's body
+  from theirs, Fpub's body from pub): each save wrote that one file
+  only, and each rerender kept its perspective. Both servers were
+  stopped by PID, the port checked free, the scratch data deleted;
+  transcripts in '/tmp/claude-1000/every-mirror-p3-slice1/transcript/'
+  and '.../transcript-saves/'.
+Logs: 'tests/results/every-mirror/slice1-plan3/' (nextest-first.log,
+nextest-second.log, nextest.log, emacs.log, nvim.log,
+ai-tool-first.log to ai-tool.log, integration.out, all-tests.out,
+all-tests-ALL.org and the full run's per-suite logs).
+'tests/results/every-mirror/' was copied out before 'bash/all-tests.sh'
+and put back after it.
+*** Deviations from the plan's "how"
+**** 'first_ranked_mirrors' returns the tie; the rules moved to its callers
+'FirstRanked' is gone: 'first_ranked_mirrors' returns the mirrors in
+the first-ranked skgrepo, and 'mirror_shown_among' applies Q1's four
+rules in order; 'hit_standing_among' (the search, which has no "N")
+applies "alone", then 'the_only_one_forked_by_none_of_the_others',
+then the least pid, as before. Q1's first rule needs the original,
+which only one caller has.
+**** The default perspective's fallback skgrepo
+Where a tree's root is no occurrence of a known node, the plan names
+"the config's first owned skgrepo in declaration order";
+'SkgConfig::default_perspective_skgrepo' gives that, else the first
+skgrepo declared, else the empty name (a config with no skgrepo).
+The search's own list starts from the same skgrepo.
+**** Message wording (provisional, decision E)
+The default is named "the perspective of each root's home skgrepo
+(S1, S2)", not the plan's "each root's home skgrepo (S1, S2)", so that
+"Showing ..." reads as a sentence and parallels "the perspective of
+S". The skg-for-ai summary line says "(each root's home skgrepo is the
+default)".
+**** The fork warning says when no perspective shows the fork
+Q1 makes a fork cloned into its original's own skgrepo (the explicit
+fork of an owned note, in a one-skgrepo config) never stand in the
+original's place: there the original stands as itself. The save's
+warning then said "switch the view's perspective", which would not
+help. 'forks_the_view_will_not_show' now asks whether the clone's own
+skgrepo's perspective shows it, and if not says "No perspective shows
+your fork there: its skgrepo holds another of the mirrors, which
+stands there. It stands in the forks folder of what is shown." A
+fork of a root under the root homes never warns (the re-rooted view
+stands in the clone's home); under a skgrepo perspective it is judged
+with the clone as the node the root stands for.
+**** The AI tool's 'perspective' takes several words
+'perspective SIDECAR skgrepo NAME' and 'perspective SIDECAR "skgrepo
+NAME"' both work (the words are joined), as do 'root homes' and
+'next'; none means 'next'.
+**** Test helpers
+'multi_root_view_from_perspective' ('server/test_utils.rs') draws a
+fresh view from a named perspective under a restriction, which the
+re-scoped tests need (a fresh view in production is always the root
+homes). 'tests/refresh/mod.rs' gained 'run_asserting_fixpoint_from'
+and shares 'node_in', 'occurrence_metadata_in' and
+'occurrence_metadata_in_with' (moved from 'substitution.rs').
+**** forks.org and sharing-model.org
+Slice 4 sweeps them; their perspective sentences were false now, so
+this slice rewrote those (the rest is slice 4's).
+**** telescopes.org
+The plan lists its "root authors"; it holds none (its one "owner of"
+is about foreign owners' sections), so it is unchanged.
+*** Fixtures changed
+Each because Q1 makes a note stand as itself in its own skgrepo, or
+decision D ranks the root's home first:
+- 'tests/mirror_substitution/fixtures-apart/' (new): the single-skgrepo
+  fixture with N homed apart, in "base", so a fresh view of P still
+  substitutes (de novo, round trip). The single-skgrepo fixture keeps
+  the extraction tests and the two "the original stands" tests, which
+  now pin rule 2 before and after the saves.
+- 'tests/mirror_substitution/fixtures-foreign-root/': M moved to a new
+  foreign skgrepo "origin" (declared last), so that A, in R's home,
+  stands for it under R. The cycles gained origin's step; the tamper
+  check's root case names M itself from the root homes.
+- 'tests/integration/perspective/data/': the same move of M to
+  "origin" (run-test.sh, both clients' scripts, and skg-for-ai's copy
+  of the data); the cycles gained origin's step.
+- 'tests/forkee_as_such_extension/fixtures/': split into owned "main"
+  (R, X) and "base" (E, G, H), so X stands for G and the folder member
+  E is raw where R would stand.
+- 'tests/pruned_change_view/fixtures/mirrors/': n moved to a new owned
+  skgrepo "base", so the precondition (an ordinary view substitutes)
+  holds.
+- 'tests/forks_under_search_hits/fixtures/': owned "private" added,
+  with Pub (main) and Priv (private, forks Pub), for the new search
+  test.
+- Re-scoped or re-pinned without data changes: 'tests/refresh/'
+  (substitution: forked notes homed apart; two "raw" tests drawn from
+  "private" under the main restriction; reinstate and viewnode_merge
+  outlines), 'tests/content_view.rs' (two pinned views: 3 now stands
+  as itself), 'tests/view_stats_sharing.rs' (P stands as itself),
+  'tests/repo_sets.rs' (the view drawn from "private"),
+  'mirror_substitution' multi and chain tests (perspective-drawn
+  views; the half-visible save with a hand-built bearer, since with N
+  and C in one skgrepo C never stands), 'tests/fork.rs' (the
+  warning's words), 'tests/save_rerender_release.rs' (the wire name),
+  integration 'fork-chain' (C, public, stands from P's home; the test
+  cycles to "private" to see D) and 'fork-owned' (the clone stands in
+  M's forks folder), skg-for-ai's explicit fork (the new warning).
+*** Unfinished
+- Jeff may want to know, beyond Q1's stated cost: in a one-skgrepo
+  config an explicit fork never stands in its original's place under
+  any perspective; it is reached through the original's forks folder,
+  and the save says so.
+- forks.org, sharing-model.org and the glossary are left for slice 4's
+  whole read; this slice changed only their perspective sentences.
+*** DONE
+The slice's headline in '3_plan.org' is DONE.
+*** Names coined or changed
+- 'Perspective::RootAuthors' is 'Perspective::RootHomes';
+  'Perspective::Owner (SkgrepoOwner)' is 'Perspective::Skgrepo
+  (SkgrepoName)'; 'Perspective::user' removed.
+- Wire: "root authors" is "root homes"; "user" and "owner of NAME"
+  are gone, "skgrepo NAME" names any configured skgrepo.
+- 'Perspective::name_of_owners_perspective' is
+  'Perspective::name_of_skgrepos_perspective' (takes the config).
+- 'perspective_owner_of_tree_containing' is
+  'perspective_skgrepo_of_tree_containing'.
+- 'SkgConfig::perspective_skgrepo_list' takes a skgrepo; new
+  'SkgConfig::default_perspective_skgrepo'.
+- 'FirstRanked' removed; 'first_ranked_mirrors' returns the tied
+  mirrors; new 'the_only_one_forked_by_none_of_the_others'.
+- 'candidate_owners' is 'candidate_skgrepos'; 'ROOT_AUTHORS_UNNAMED'
+  is 'ROOT_HOMES_UNNAMED'.
+- skg-for-ai: 'PERSPECTIVE_OF_ARGUMENT' removed; 'DEFAULT_PERSPECTIVE'
+  is "root homes"; 'perspective_of_argument' takes the words.
+- Tests: 'multi_root_view_from_perspective' (test utils);
+  'run_asserting_fixpoint_from', 'occurrence_metadata_in_with'
+  (refresh tests); renamed test functions in
+  'tests/mirror_substitution.rs' and 'tests/refresh/substitution.rs'
+  that named authors (e.g.
+  'a_view_follows_the_perspective_of_its_roots_home',
+  'a_root_is_shown_raw_only_where_the_views_perspective_would_show_another');
+  new 'among_owned_hits_the_more_public_stands',
+  'a_foreign_skgrepo_declared_first_outranks_the_users_fork',
+  'a_private_and_a_public_fork_each_chosen_in_turn',
+  'failures_of_perspective_names' (skg-for-ai).
+- Glossary: new entry "root homes"; "perspective", "a perspective's
+  skgrepo list" and "mirror substitution" rewritten.

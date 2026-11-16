@@ -178,15 +178,17 @@ refusal at error level without the Lua traceback and without the
   ("Fork the listed node(s)?"); later, '<localleader>cc' in the
   confirmation buffer approves and '<localleader>ck' declines, while
   ':w' there refuses and names those two keys.
-- A view shown from a perspective other than its root authors'
+- A view shown from a perspective other than its root homes
   (<localleader>vo, ':SkgCyclePerspective') is not marked by
-  default: Emacs's mode name reads "SKG:your perspective", say, there,
+  default: Emacs's mode name reads "SKG:the perspective of tracy",
+  say, there,
   but the Neovim client draws no statusline, and setting one would
   override the user's. The perspective is 'b:skg_perspective'
   (its wire name, or unset) and its name
   'b:skg_perspective_name', and
   =%{v:lua.require'skg.buffer'.perspective_mode_line()}= in a
-  'statusline' or 'winbar' shows ":your perspective", say, there. The
+  'statusline' or 'winbar' shows ":the perspective of tracy", say,
+  there. The
   message each switch shows names the perspective the buffer now
   shows.
 - View buffers are named 'skg://TITLE' (search: 'skg://?TERMS');

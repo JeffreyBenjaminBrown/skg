@@ -112,9 +112,12 @@ So far there are these endpoints:
       alias shows its folders, each collapsed except its alias
       folder, which shows all of the node's aliases, the matching one
       among them. Among hits that are mirrors of one another
-      (=docs/mirrors.org=, "Mirrors"), the one the user's skgrepo
-      list ranks first stands, ties going as that document's rules 1
-      and 2 say and then to the least pid; if it is owned, every other
+      (=docs/mirrors.org=, "Mirrors"), the one the user's own skgrepo
+      list ranks first stands: the list of the perspective of the
+      config's first owned skgrepo, the most public, then the others
+      in declaration order, so that among owned hits the most public
+      stands; several in one skgrepo tie, and the only one none of
+      the others forks stands, else the least pid. If it is owned, every other
       hit among them is suppressed at the top level, and one it
       forks or that forks it reappears in its
       forks folder ('suppressed_result_gnids'); a
@@ -260,21 +263,21 @@ So far there are these endpoints:
       no buffer has refuses the save, and nothing is written. Both
       clients keep the name in each buffer of the diff view they open
       and send it on its saves, as skg-for-ai does.
-    - =(perspective . "user"|"owner of SKGREPO")= is optional:
+    - =(perspective . "skgrepo SKGREPO")= is optional:
       it names the perspective the saved buffer was drawn from,
-      when that is not its root authors' (see
+      when that is not its root homes (see
       "Set perspective"). The save checks the buffer's
       =(inPlaceOf N)= parts against, and rerenders it from,
       the perspective it names, and the connection keeps the perspective
       for the view, for the rerenders it starts itself. Without it, or
-      with =(perspective . "root authors")=, the buffer is drawn from
-      its root authors'. A held view's earlier perspective yields to
+      with =(perspective . "root homes")=, the buffer is drawn from
+      its root homes. A held view's earlier perspective yields to
       the one its save names, which is how a buffer the server lost in
-      a restart regains it. Any other value, an owned or unknown
-      skgrepo after "owner of" included, refuses the save, and nothing
-      is written. A save need not name a perspective in the view's
-      cycle. Each client keeps the perspective in the buffer and sends
-      it only while it is not the root authors'.
+      a restart regains it. Any other value, a skgrepo the config
+      does not list after "skgrepo" included, refuses the save, and
+      nothing is written. A save need not name a perspective in the
+      view's cycle. Each client keeps the perspective in the buffer
+      and sends it only while it is not the root homes.
     - =(preview . "true")= is optional: it asks only what the save
       would hide and stop hiding, and writes nothing. The server builds
       the save's plan and checks it as for a save, up to the
@@ -1418,60 +1421,56 @@ one automatically.
     "VIEW_ID") (perspective . "next"|PERSPECTIVE)
     (approved-overPrivateText-pids "PID" ...))=. =view-id= and
     =perspective= are required; the approval is optional.
-  - Switches the open view's perspective: whose skgrepo list ranks the
-    mirrors it shows ("Mirror substitution and the inPlaceOf
-    part" below). A
-    PERSPECTIVE is ="root authors"=, as every fresh view shows (each
-    top-level tree is drawn from the author of its root's); ="user"=, the
-    user's in every tree, whoever wrote its root ("the user" is every
-    owned skgrepo together, as under an owned root); or ="owner of
-    SKGREPO"=, the owner of the foreign skgrepo SKGREPO
-    ('SkgConfig::skgrepo_owner': every foreign skgrepo a dependencies
-    manifest chains to it), in every tree. A foreign owner is named on
-    the wire by the first of its skgrepos the config declares, which
-    a request may name by any of them. Then the view is rerendered,
+  - Switches the open view's perspective: the skgrepo whose list
+    ranks the mirrors it shows ("Mirror substitution and the
+    inPlaceOf part" below). A PERSPECTIVE is ="root homes"=, as every
+    fresh view shows (each top-level tree is drawn from its root's
+    home skgrepo), or ="skgrepo SKGREPO"=, SKGREPO's in every tree,
+    whatever its root's home; SKGREPO is any skgrepo the config lists,
+    owned or foreign. Any other name ("root authors", "user", "owner
+    of SKGREPO" among them) is refused. Then the view is rerendered,
     from what the connection holds for it, from the new perspective.
   - The view's cycle of perspectives is computed afresh at each
     request, from what the connection holds for the view: the root
-    authors', then each owner whose perspective draws the view
-    otherwise than the root authors' do, judged by drawing the view
-    from each, in memory, and comparing the texts. The owners tried
-    are the user and the owners of the visible mirrors of each
-    original drawn where substitution acts (a root, or a node standing
-    as content of an editable occurrence; its original is its
-    =(inPlaceOf N)=, else itself), in the root authors' drawing
-    and in the view's own; so the cycle found from any perspective
-    holds every member found from the root authors'. An owner whose
-    mirrors stand only beneath a node another perspective puts in
-    place is found from that perspective. An owner with no mirror of
-    any such original is not tried. The cycle is ordered the
-    root authors', the user, then foreign owners in the config's
-    declaration order of the skgrepos that name them. ="next"= is the
-    first member ranked after the view's perspective, else the root
-    authors': so a perspective that has left the cycle since (the
-    graph changed, or a save named it) is followed by the next one
-    still in it, and the root authors' are always reached. A named
-    PERSPECTIVE must be in the cycle ('perspective_to_show' in
+    homes, then each skgrepo whose perspective draws the view
+    otherwise than the root homes do, judged by drawing the view
+    from each, in memory, and comparing the texts. The skgrepos tried
+    are the homes of the visible mirrors of each original drawn where
+    substitution acts (a root, or a node standing as content of an
+    editable occurrence; its original is its =(inPlaceOf N)=, else
+    itself), in the root homes' drawing and in the view's own; so the
+    cycle found from any perspective holds every member found from
+    the root homes. A skgrepo whose mirrors stand only beneath a node
+    another perspective puts in place is found from that perspective.
+    A skgrepo with no mirror of any such original is not tried, nor
+    is one whose drawing equals the root homes' (a root's own home,
+    say), so that no press changes nothing. The cycle is ordered the
+    root homes, then the skgrepos in the config's declaration order.
+    ="next"= is the first member ranked after the view's perspective,
+    else the root homes: so a perspective that has left the cycle
+    since (the graph changed, or a save named it) is followed by the
+    next one still in it, and the root homes are always reached. A
+    named PERSPECTIVE must be in the cycle ('perspective_to_show' in
     =server/serve/handlers/perspective.rs=). The cycle is never
-    drawn whole: a request draws the root authors' view, then, for
-    ="next"=, the owners tried in rank order from the first ranked
+    drawn whole: a request draws the root homes' view, then, for
+    ="next"=, the skgrepos tried in rank order from the first ranked
     after the view's perspective, stopping at the first that draws the
-    view otherwise; for a named owner, that owner alone. The drawing of
-    the perspective chosen is the rerender sent. So a press draws the
-    view once, and once more for each owner tried: twice where the
-    first owner ranked after the view's perspective is in the cycle,
-    once where none is ranked after it.
+    view otherwise; for a named skgrepo, that one alone. The drawing
+    of the perspective chosen is the rerender sent. So a press draws
+    the view once, and once more for each skgrepo tried: twice where
+    the first skgrepo ranked after the view's perspective is in the
+    cycle, once where none is ranked after it.
   - Response: =((response-type perspective) (view-id
     "VIEW_ID") (perspective PERSPECTIVE) (perspective-name
     "NAME"))=, naming the view, the perspective it now shows, and how
-    a message to the user names it: ="your perspective"=, ="tracy's
-    perspective"=, or ="each root author's perspective (tracy's,
-    yours)"=, the root authors named in the order of their first
-    roots. A rerender stream (see "Rerender all views") of that one
-    view follows. Each client records the perspective for the buffer
-    when the answer arrives, names it to the user, marks it unless it
-    is the root authors', and sends it on the buffer's saves ("Save
-    buffer", =perspective=).
+    a message to the user names it: ="the perspective of tracy"=, by
+    the skgrepo's herald label, or ="the perspective of each root's
+    home skgrepo (tracy, main)"=, the homes named in the order of
+    their first roots. A rerender stream (see "Rerender all views")
+    of that one view follows. Each client records the perspective for
+    the buffer when the answer arrives, names it to the user, marks it
+    unless it is the root homes, and sends it on the buffer's saves
+    ("Save buffer", =perspective=).
   - Refusals carry the view's unchanged perspective, its name, and the
     reason in =(content "...")=, followed by an empty rerender stream,
     since the clients lock their buffers before sending the request: a
@@ -1479,8 +1478,8 @@ one automatically.
     connection does not hold (after a restart or a reconnection; a
     save of the buffer registers it again); a buffer of the diff view,
     which substitutes nothing; ="next"= in a view whose cycle
-    holds only the root authors' and that shows them; and a named
-    perspective not in the cycle. The root authors' are always in it,
+    holds only the root homes and that shows them; and a named
+    perspective not in the cycle. The root homes are always in it,
     so a switch back to them is never refused for that reason.
   - The rerender starts from what the server last drew or saved, so
     each client refuses the switch while the buffer has unsaved edits,
@@ -2034,41 +2033,37 @@ perspective's skgrepo list ranks first, never in the diff view
 =docs/mirrors.org=, "Mirror substitution", says what N's mirrors are
 and how a tie is broken). The mirrors of N are N and the notes joined
 to it by =forks= relationships, followed either way, under the
-skgrepo restriction; the list of an owner's perspective is that
-owner's skgrepos most private first, then every other skgrepo in
-declaration order. An owned chain D forks C forks N, all in
-one skgrepo, shows D; where a mirror's skgrepo is restricted, the
-chain is cut there. The refresh
+skgrepo restriction; a perspective is a skgrepo S, and its list is S,
+then every other skgrepo in declaration order. In its own skgrepo N
+itself stands, however many of its forks are there; a chain D forks
+C forks N kept in one skgrepo other than N's shows D there; where a
+mirror's skgrepo is restricted, the chain is cut there. The refresh
 substitutes at every refresh, a member already shown raw included,
 and re-points a member shown in another's place whenever it is not
 the mirror shown, since it decides from the buffer and the graph as
-they are now. Only
-content substitutes, and, in a view switched to one owner's
-perspective, the view's roots: partner folder members, chain nodes
-and ghosts show the raw node, and so do view roots and search results
-from the root authors' perspective.
+they are now. Only content and the view's roots substitute: partner
+folder members, chain nodes and ghosts show the raw node.
 
 The perspective of a top-level tree of the view is, by default, its
-root author's: the user's, where the tree's root is a node the user
-owns (a fork included), and otherwise the root's author's, throughout
-the tree, beneath a third author's nodes too
-('perspective_owner_of_tree_containing' in
-=server/dbs/in_rust_graph/mirrors.rs=). A view rooted at a foreign
-node shows what its author would see; the user's mirrors stand there
-only where the author's list ranks them first, until the view is
-switched to the user's perspective ("Set perspective"), after
-which every tree is drawn from the user's, whoever wrote its root; or
-to a foreign owner's, after which every tree is drawn from that
-owner's. The owner need not own the mirror shown: where it has none
-of N, the first by declaration order stands, whoever wrote it.
+root's home skgrepo, throughout the tree, beneath notes homed
+elsewhere too ('perspective_skgrepo_of_tree_containing' in
+=server/dbs/in_rust_graph/mirrors.rs=): the root homes. A view of a
+foreign note is drawn from the note's skgrepo; the user's mirrors
+stand there only where that skgrepo holds none and the user's are
+declared first, until the view is switched to a skgrepo's
+perspective ("Set perspective"), after which every tree is drawn
+from that skgrepo's, whatever its root's home. Ownership plays no
+part: where the perspective's skgrepo holds no mirror of N, the first
+declared skgrepo holding one decides.
 
 A root stands for its original: the node its =(inPlaceOf N)=
-names, else itself. From the root authors' perspective it shows that
-original raw, so a fresh view, and a view switched back, shows the
-node asked for; and its author is the tree's root author. From one
-owner's perspective it shows the mirror of the original that owner's
-list ranks first, marked =(inPlaceOf N)= unless it is the
-original ('substitute_roots' in =server/refresh/visit.rs=). The root is
+names, else itself; and its home is the tree's root home. It shows
+the mirror of the original its perspective's list ranks first,
+marked =(inPlaceOf N)= unless it is the original
+('substitute_roots' in =server/refresh/visit.rs=). From the root homes
+that is the original itself, since it stands in its own home, so a
+fresh view, and a view switched back, shows the node asked for, and so
+does a search buffer each of its hits. The root is
 re-pointed where it stands, keeping its viewnode ID, so point on it
 stays there both ways; its children follow from its own visit. A
 re-pointed root's containers folder is drawn afresh, as a fresh view
@@ -2083,7 +2078,8 @@ to clone K, and an existing recursive-content occurrence in the saved viewforest
 may likewise be replaced by its newly visible substitute. The content
 occurrence carries =(inPlaceOf F)=; the root carries nothing, since the
 view is re-rooted at K, and a root marked =(inPlaceOf F)= would be read
-as a perspective's stand-in for F, which the root authors' show raw. The
+as a perspective's stand-in for F, which the root homes show as itself;
+from the root homes the clone stands in its own home, so shows. The
 refreshed viewforest remains under the same view ID, and the open-view root
 index is recomputed from it, so that buffer is thereafter registered as
 rooted at K. Collateral rerenders do not replace roots;
@@ -2092,8 +2088,8 @@ independent single-root request for F still opens raw F.
 
 Moreover, the immediate children of any node shown raw where another
 of its mirrors would stand -- a partner folder member other than a
-forkee as such (a claiming member of a forks folder), or a view
-root -- are also shown raw
+forkee as such (a claiming member of a forks folder), or a view root
+the skgrepo restriction keeps its mirror shown from -- are also shown raw
 ('is_raw_where_another_mirror_would_stand'): the user is looking at
 the original, so its children are the original's, not the mirror's.
 This is one level deep -- substitution resumes at the grandchildren --

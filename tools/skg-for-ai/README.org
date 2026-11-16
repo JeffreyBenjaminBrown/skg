@@ -191,30 +191,33 @@ the buffer again; see "Reviewing and committing".
 'perspective SIDECAR' shows a view from the next perspective,
 as the clients' 'skg-cycle-perspective'
 ('C-c v o' in Emacs) does, and writes the view again;
-'perspective SIDECAR PERSPECTIVE' switches to the one named:
-'root-authors', 'user', or a foreign skgrepo's name, for its owner.
+'perspective SIDECAR PERSPECTIVE' switches to the one named, by the
+server's name: 'root homes', or 'skgrepo NAME' for any configured
+skgrepo (the words may be given apart or quoted together).
 Where a node stands as content and it has mirrors (notes joined to
 it by forks, either way: 'docs/mirrors.org', "Mirrors"), the view may
 show one of its mirrors in its place, marked 'ĥ' after its 'K'
-('⟨0b Kĥ1⟩'). Whose skgrepo list ranks the mirrors is the perspective: a
-fresh view follows each tree's root author's (under a root of yours,
-yours; under a teammate's root, that teammate's); the others follow
-one author's in every tree, whoever wrote the root, so you read the
-view as that author would. The cycle holds the root authors', then
-yours and each other author's whose forks would show the view
-differently, in a fixed order; the server computes it afresh at each
-switch. It prints the server's name for the perspective,
-'Showing your perspective.' or 'Showing tracy's perspective.' or
-'Showing each root author's perspective (tracy's).', then the
-paths; the sidecar records the perspective ('perspective' and
-'perspective_name'), the compact view's summary names it unless it is
-the root authors', and every later save of the view names it, as the
-server needs, whoever then rewrites the files. Like the clients, it
-refuses a compact view with edits, which the switch's rerender would
-replace: save them first. The server refuses a buffer of the diff
-view, 'next' where no other perspective would show the view
-differently, and a named perspective that would show it as the root
-authors' do; the tool prints its refusal and exits 1. The server
+('⟨0b Kĥ1⟩'). The perspective is a skgrepo, whose skgrepo list (it,
+then the config's declaration order) ranks the mirrors: a fresh view
+follows each tree's root's home skgrepo, the root homes (a view of
+your note, your note's skgrepo; of a teammate's, theirs); the others
+follow one skgrepo's in every tree, owned or foreign, whatever the
+root's home, so you can choose, say, between a private and a public
+fork of one note. The cycle holds the root homes, then each skgrepo
+home to a mirror in the view whose perspective would show it
+differently, in declaration order; the server computes it afresh at
+each switch. It prints the server's name for the perspective,
+'Showing the perspective of tracy.' or 'Showing the perspective of
+each root's home skgrepo (tracy).', then the paths; the sidecar
+records the perspective ('perspective' and 'perspective_name'), the
+compact view's summary names it unless it is the root homes, and
+every later save of the view names it, as the server needs, whoever
+then rewrites the files. Like the clients, it refuses a compact view
+with edits, which the switch's rerender would replace: save them
+first. The server refuses a buffer of the diff view, 'next' where no
+other perspective would show the view differently, and a named
+perspective that would show it as the root homes do; the tool prints
+its refusal and exits 1. The server
 switches a view it holds: through a daemon that holds the view the
 request goes on the daemon's connection; otherwise (no daemon, or one
 started since the view was written) the tool first saves the full view
@@ -496,9 +499,9 @@ contained elsewhere too (a 'contains' in-side larger than its ancestor
 flags, so a container not above it in this view); those forked
 ("forked N") and those forking ("forking M"); the links, their distinct targets, and how many
 of those resolve; and the server's errors and warnings, which the
-sidecar lists. A view shown from a perspective other than its root authors'
+sidecar lists. A view shown from a perspective other than its root homes
 ('perspective') names it on the line after the first,
-'# Showing your perspective (each root author's perspective is the
+'# Showing the perspective of tracy (each root's home skgrepo is the
 default).'; a view shown from the default has no such line.
 
 Whether a skgrepo is owned or foreign comes from the server's 'repos'
@@ -521,18 +524,20 @@ change, processed and not.
 ** The sidecar
 'BASE.view.json' records the view ID, the command and its request (for
 a buffer of the diff view, the buffer's name), the view's perspective
-('perspective': "root authors", a
-fresh view's, "user" or "owner of NAME", after 'perspective';
-and 'perspective_name', the server's name for it), the port, the two files' names, the server's errors and warnings, whether
+('perspective': "root homes", a
+fresh view's, or "skgrepo NAME", after 'perspective'; a sidecar
+holding an older name, "user", "owner of NAME" or "root authors",
+is read as the root homes; and 'perspective_name', the server's
+name for it), the port, the two files' names, the server's errors and warnings, whether
 the compact view has a summary, and whether the view is closed: it
 is closed unless a daemon holds it (see "The daemon"). 'save' sends
 the edited view against this view ID, with the full view as its
-baseline, to this port, naming the perspective, '(perspective . "user")' say, when
-the sidecar's is not the root authors',
+baseline, to this port, naming the perspective, '(perspective . "skgrepo main")' say, when
+the sidecar's is not the root homes,
 and renders the summary again when there was one. A save, a daemon's
 rewrite of the files and the daemon's stop keep 'perspective';
 a view written afresh into the same files has the default. A sidecar
-without it follows the root authors'.
+without it follows the root homes.
 
 * Views and connections
 The server keeps a view's state per TCP connection, and forgets every
@@ -745,7 +750,7 @@ lines is joined into one with ' | '. The events:
   real path joined to it elsewhere ('/home/me/notes/view_ID').
 - 'saved BASE', 'saved new root TITLE', 'extended BASE', for the
   commands that write to the graph; 'perspective of BASE: NAME' (the
-  server's name for it, 'your perspective', say) for
+  server's name for it, 'the perspective of main', say) for
   'perspective'.
 - 're-rendered BASE because CAUSE; CHANGES': the daemon rewrote a
   view's files. CAUSE is "of 'COMMAND' on the daemon's connection" for
@@ -998,21 +1003,23 @@ without '--yes', shows the server's warning with it, and with
 daemon rewrites the view of the node that named it.
 
 Last, on an eighth server over a copy of the data of
-'tests/integration/perspective/' (foreign R contains M and K;
-A, foreign, U, owned, and B, of a second foreign owner "third", each
-fork M; P, owned, contains M), it checks 'perspective'.
-On a command's own connection, the view of R shows A in M's place;
-'perspective' (the next) shows U, its summary line and its
-sidecar saying so; a switch to 'user' is refused for P's view, whose
-root is owned, and any switch for R's once its compact view has an
-edit to U's body; the save of that edit names the perspective
-(without it the server would refuse U's '(inPlaceOf M)'), writing
-the body and still showing U; 'third' shows B; the next after it is
-the root authors' again, showing A. Through a daemon, the switch is
-logged; a save of U's own view retitles it, and the daemon's rewrite
-of R's view keeps the perspective; after 'daemon --stop' the sidecar
-still has it, a save on the command's own connection names it, and
-'root-authors' on that connection shows A.
+'tests/integration/perspective/' (R, in foreign "foreign", contains
+M, in foreign "origin", and K; A, in "foreign", U, in owned "main",
+and B, in foreign "third", each fork M; P, in "main", contains M), it
+checks 'perspective'. On a command's own connection, the view of R
+shows A in M's place; 'perspective' (the next) shows U, from main's,
+its summary line and its sidecar saying so; a switch to 'skgrepo
+main' is refused for P's view, already drawn from "main", and any
+switch for R's once its compact view has an edit to U's body; the
+save of that edit names the perspective, writing the body and still
+showing U; 'skgrepo third' shows B; the next after it, origin's,
+shows M itself; the next after that is the root homes again, showing
+A. Through a daemon, the switch is logged; a save of U's own view
+retitles it, and the daemon's rewrite of R's view keeps the
+perspective; after 'daemon --stop' the sidecar still has it, a save
+on the command's own connection names it, and 'root homes' on that
+connection shows A. Offline, it checks that a sidecar holding an
+older perspective name is read as the root homes.
 
 It prints PASS or each failure, and keeps the scratch files when
 something fails. '--update-expected' rewrites the expected

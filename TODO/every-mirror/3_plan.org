@@ -702,7 +702,7 @@ and birth facts); 'docs/data-model_technical.org'; 'docs/heralds.org';
 authors"); the AI tool's README.
 
 * Implementation sequence
-** TODO Slice 1: the perspective is a skgrepo
+** DONE Slice 1: the perspective is a skgrepo
 Questions: Q1. Decision D; behavior 1.
 - 'Perspective' as 'RootHomes' / 'Skgrepo (SkgrepoName)', its wire
   names, 'perspective_skgrepo_of_tree_containing', the skgrepo list,

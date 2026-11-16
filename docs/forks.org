@@ -86,13 +86,14 @@ you own. =C=:
 - *forks* =N=, recorded once, which does two things. =N='s later
   additions surface to you as unintegrated content (below). And =C=
   and =N= are mirrors, so /mirror substitution/ shows =C= wherever =N=
-  would otherwise appear as content, from your perspective, whose
-  list of skgrepos ranks yours first — you see and edit =C= in =N='s
-  place from then on, without =N='s containers being rewritten to point
-  at =C=. (Not in a view rooted at a foreign node: that shows what the
-  root's author would see, so =N= stays there, unedited, until you
-  switch the view to your perspective, =C-c v o=, as the save's
-  warning says; see
+  would otherwise appear as content, from the perspective of =C='s
+  skgrepo, whose list of skgrepos ranks it first — in a view of a note
+  of that skgrepo you see and edit =C= in =N='s place from then on,
+  without =N='s containers being rewritten to point at =C=. (Not in a
+  view of a note in =N='s skgrepo: that is drawn from =N='s skgrepo,
+  where =N= itself stands, so =N= stays there, unedited, until you
+  switch the view to =C='s skgrepo's perspective, =C-c v o=, as the
+  save's warning says; see
   [[file:./mirrors.org][mirrors.org]], "Mirror substitution");
 - *hides* any child of =N= that your forking edit /deleted/, so what
   you dismissed does not come straight back as unintegrated forked
@@ -139,12 +140,12 @@ Two differences from the implicit fork:
 The result is a *fork chain*: =D forks C forks N=. Chains
 of any length are legal, and so are cycles (see
 [[file:./sharing-model.org][the sharing model]]). When all skgrepos are unrestricted,
-viewing =N='s container shows the chain's end =D=, where =D= is in
-=C='s skgrepo or a more private one (your perspective ranks your
-skgrepos most private first; see [[file:./mirrors.org][mirrors.org]],
-"Which mirror stands"); restrict the
-skgrepo-set to hide =D='s skgrepo and the same view shows the middle =C=
-instead — either way =N= stays in the container's contents. If you point
+viewing =N='s container from the perspective of =D='s skgrepo shows
+the chain's end =D=, where =N= is not in that skgrepo (in its own
+skgrepo =N= itself stands; see [[file:./mirrors.org][mirrors.org]],
+"Which mirror stands"); restrict the skgrepo-set to hide =D='s
+skgrepo and the same view shows =C=, where =C='s skgrepo is declared
+before =N='s — either way =N= stays in the container's contents. If you point
 =skg-fork-node= at a node that is /itself/ a shown substitute (one
 carrying an =inPlaceOf= part), it forks the node on screen — the
 fork shown — deepening the chain, never re-forking the node it stands for.
@@ -233,7 +234,8 @@ forker's content, by the ID the original's list names, and moves
 its headline, with what you typed, to the end of the forker's
 content; the count of unintegrated children falls by one. Your fork
 of it, if the edit made one, is drawn in its place there, since a
-view of your own note is drawn from your perspective. Read as mail, with the
+view of your own note is drawn from its skgrepo, where your fork is
+homed. Read as mail, with the
 forks folder of your fork of someone's inbox note as the list of
 messages you have not touched, a reply files the message it answers.
 
@@ -244,9 +246,9 @@ forkee as such yourself), and nothing the forker already
 contains, hides, or holds a fork of. Where the forker is
 someone else's (you are reading another's fork of a note), nothing is
 filed, and if your edit forked something there, the view, drawn from
-that owner's perspective, goes on drawing the mirror that owner's
-skgrepo list ranks first, usually the original; the save warns that
-it does, and that switching the view to your own perspective
+that note's skgrepo, goes on drawing the mirror that skgrepo's list
+ranks first, usually the original; the save warns that it does, and
+that switching the view to your fork's skgrepo's perspective
 (=C-c v o=) shows the fork.
 
 *** Adding a child under a member as such
@@ -414,13 +416,13 @@ buffer").
 
 Where your clone =C= of =N= is drawn in =N='s place, the list it stands
 in still names =N=, not =C=. Under someone else's note, in a view
-switched to your perspective (=C-c v o=), that is how your reply to
+switched to your fork's skgrepo's perspective (=C-c v o=), that is how your reply to
 one of their messages looks: your fork of the message, with your reply
 under it, in the message's place. Deleting =C= there (=C-c <backspace>=
 in Emacs, =<localleader>dd= in Neovim, =delete= in its handle for
 skg-for-ai) deletes =C= and leaves their note as they wrote it: its
 list keeps =N=, the save asks to fork nothing, and the redrawn view
-shows in that place the mirror of =N= your perspective now ranks
+shows in that place the mirror of =N= that perspective now ranks
 first: =N= again, unless another fork of it ranks before =N=. (Not in a forkee's content in a
 forks folder, the list of what a note of yours has not integrated:
 there the deletion hides =N= from your note, as below.)

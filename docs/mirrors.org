@@ -67,9 +67,12 @@ suppressed hits, below).  Node
 visibility and the relationship's relRepo both gate them.
 
 Search also groups hits that are mirrors of one another (see "Mirror
-substitution").  Among them, the hit the user's skgrepo list ranks
-first stands, ties going as rules 1 and 2 of "Which mirror stands"
-say and then to the least pid; if it is owned, every other hit among
+substitution").  Among them, the hit the user's own skgrepo list
+ranks first stands: the list of the perspective of the config's first
+owned skgrepo (the most public), then the others in declaration
+order, so that among owned hits the most public stands.  Several in
+one skgrepo tie: the only one none of the others forks stands, else
+the least pid.  If the hit standing is owned, every other hit among
 them is suppressed at the top level, and one it forks or that
 forks it directly reappears in its forks folder.  A suppressed hit
 related to it only through other mirrors reappears deeper: each note
@@ -99,65 +102,74 @@ special case.
 *** Which mirror stands
 
 Where =N= stands as content of an editable occurrence in a content
-view, the refresh shows the mirror of =N= that the perspective's
-skgrepo list ranks first ('mirror_shown').  The list of the
-perspective of an owner =O= ('SkgConfig::perspective_skgrepo_list')
-is =O='s skgrepos, most private first, then every other skgrepo in
-the config's declaration order.  The mirror shown is the one whose
-home skgrepo comes first in that list; where several do, the tie is
-broken thus:
+view, or as a root of it, the refresh shows the mirror of =N= that
+the perspective's skgrepo list ranks first ('mirror_shown').  A
+perspective is a skgrepo =S= (see "Perspectives"), and its list
+('SkgConfig::perspective_skgrepo_list') is =S=, then every other
+skgrepo in the config's declaration order, whose owned entries run
+most public first.  The mirror shown is the one whose home skgrepo
+comes first in that list; where several do, the tie is broken thus:
 
 1. One mirror alone in that skgrepo stands.
-2. Otherwise, if exactly one of them is forked by none of the
-   others, it stands.  An owned chain =D forks C forks N=, all
-   in one skgrepo, shows =D=.
-3. Otherwise =N= itself stands, if it is one of them: two forks of =N=
-   in =N='s own skgrepo, or a mutual pair in one skgrepo, show =N= as
-   itself.
+2. Otherwise =N= itself stands, if it is one of them: two forks of =N=
+   in =N='s own skgrepo, an owned chain =D forks C forks N= kept
+   there, or a mutual pair in one skgrepo, show =N= as itself.
+3. Otherwise, if exactly one of them is forked by none of the
+   others, it stands.  A chain =D forks C forks N= kept in one
+   skgrepo other than =N='s shows =D= there.
 4. Otherwise the one nearest =N= along =forks= relationships, in
    either direction, and among equals the least pid.
 
-When the mirror shown is =N=, nothing substitutes.  The perspective's
-owner need not own the mirror shown: where =O= has no mirror of =N=,
-the first by declaration order stands, whoever wrote it.  So, for
+When the mirror shown is =N=, nothing substitutes.  Who owns a
+skgrepo plays no part: where =S= holds no mirror of =N=, the first
+declared skgrepo that holds one decides, owned or foreign.  So in a
+config that declares a foreign skgrepo first, from a perspective
+holding no mirror of a note the foreign original outranks the user's
+own fork; and of a public and a private fork of one note, each stands
+from its own skgrepo's perspective, and the public one, declared
+first, from any perspective holding neither.  For
 
 #+begin_example
 D forks C forks N
 #+end_example
 
-with =C= and =N= in the user's public skgrepo and =D= in the user's
-private one, an unrestricted view from the user's perspective shows
-=D= where =N= occurs; restricted to the public skgrepo, it shows =C=.
+with =N= in owned skgrepo =base=, =C= in =mid= and =D= in =top=, the
+config declaring =mid=, =base=, =top=, a view drawn from =top= shows
+=D= where =N= occurs; under a skgrepo restriction keeping =top= out,
+it shows =C=, =mid= being declared before =base=; from =base=, =N=
+itself.
 
 *** Perspectives
 
-The perspective of a top-level tree of the view is its root's
-author's ('perspective_owner_of_tree_containing'): the user, where
-the tree's root is a node the user owns (a fork included), and
-otherwise the root's author, throughout the tree, beneath a third
-author's nodes too. A view rooted at a foreign node shows what its
-author would see. So a child the user forks in such a view is shown
-there, after the save, as the mirror the author's list ranks first,
-usually the original (the save warns, naming it); the clone is shown
-where the user's perspective is followed. Editing the foreign root
-itself forks it, and the saved buffer's root becomes the clone (see
-below), so that tree then is drawn from the user's perspective.
+A view's perspective is a skgrepo.  Until the user chooses one, each
+top-level tree of the view is drawn from its root's home skgrepo, the
+/root homes/ ('perspective_skgrepo_of_tree_containing'): the home of
+the node the root stands for (its =(inPlaceOf N)=, else itself),
+throughout the tree, beneath notes homed elsewhere too.  So a view
+of your own note is drawn from your skgrepo, and one of someone
+else's from theirs.  A child the user forks in a view of a foreign
+note is shown there, after the save, as the mirror the root's home
+ranks first, usually the original (the save warns, naming it, and
+says whether a perspective would show the clone); the clone is shown
+from its own skgrepo's perspective.  Editing the foreign root itself
+forks it, and the saved buffer's root becomes the clone (see below),
+so that tree then is drawn from the clone's skgrepo.
 
 A view can be switched among perspectives (Emacs 'C-c v o', Neovim
 '<localleader>vo'; =docs/api-and-formats.org=, "Set
-perspective"): the root authors', a fresh view's, and the user's and
-each owner's of a mirror of some original the view draws where
+perspective"): the root homes, a fresh view's, and each skgrepo home
+to a visible mirror of some original the view draws where
 substitution acts, whose list would show some position of the view
-differently, each followed in every tree, whoever wrote its root.
-From the user's, a view of a foreign node shows the user's mirror
-wherever the user has one, so a child forked there is shown, after
-the save, as its clone; from a foreign owner's, the view shows what
-that owner would see. The client keeps the perspective for its
-buffer and names it in each save. From one owner's
-perspective the view's roots are substituted too: each root shows
-the mirror that owner's list ranks first of the node it stands for,
-re-pointed where it stands; from the root authors', it shows that node raw again
-('substitute_roots' in =server/refresh/visit.rs=). A re-pointed root's
+differently, each followed in every tree, whatever the root's home,
+in declaration order.  A skgrepo is offered whoever owns it: from a
+private fork's skgrepo the view shows the private fork, from a public
+one's the public fork.  The client keeps the perspective for its
+buffer and names it in each save.  The view's roots are substituted
+too, from every perspective: each root shows the mirror its
+perspective's list ranks first of the node it stands for, re-pointed
+where it stands; from the root homes that is the node itself, since
+it stands in its own home ('substitute_roots' in
+=server/refresh/visit.rs=). A re-pointed root's
 folders are drawn afresh for the node it now shows, as a fresh view of
 it draws them ('redraw_folders'): its containers folder; where the root
 is editable, its forks folder where it has a fork partner;
@@ -169,7 +181,7 @@ unless it would be empty and is one the user could type
 into, whose emptiness would say the user asked for it. A
 write-protected root, such as a search hit, stays so and gains no
 content. An ID folder is not redrawn, since no request draws one. So
-from the user's perspective a view of a foreign note the user forked
+from the fork's skgrepo's perspective a view of a foreign note the user forked
 shows the fork's forks folder, its original there counting what the user has
 neither filed nor hidden. Since the view's root is now the fork,
 asking to view that fork on the same connection lands in this
@@ -193,9 +205,6 @@ exception described below.
 The following positions show the raw node rather than an automatic
 substitute:
 
-- content-view roots and search-result roots, from the root authors'
-  perspective (from one owner's, each shows the mirror that owner's
-  list ranks first);
 - the members of a search result's folders;
 - partner folder members and the containerward chain;
 - ghosts.
@@ -211,9 +220,8 @@ children rather than another mirror's interpretation of them.
 Once an approved save creates fork =K= from original =F=, the buffer that made
 the edit must not continue to show editable =F=: editing it again would request
 another fork.  The post-save update therefore makes one saved-view-only
-exception to the rule that roots are shown raw from the root authors'
-perspective (a view switched to one owner's perspective shows the mirror of
-each root that owner's list ranks first; see "Mirror substitution"): a level-one =F= named by
+exception to the rule that a root stands for the node it shows (see
+"Mirror substitution"): a level-one =F= named by
 one of this save's exact =ForkSpec=s is rewritten to =K=
 ('replace_saved_view_fork_roots' in =server/rerender_pass.rs=).  A
 recursive-content occurrence of =F= is replaced by its newly visible
@@ -222,8 +230,10 @@ substitute =K= at any refresh, as substitution always does.
 The content occurrence carries =(inPlaceOf F)=; the root does not.  The
 root case is not ordinary recursive-content substitution; it is the one-time
 identity transition of the view which performed the fork, and a root marked
-=(inPlaceOf F)= stands for =F=, which the root authors' perspective shows
-raw.  After refreshing that viewforest, the server
+=(inPlaceOf F)= stands for =F=, which the root homes show as itself.  The
+re-rooted clone is substituted like any root: from the root homes, it stands
+in its own home, so shows; a view switched to another skgrepo shows the mirror
+that skgrepo ranks first, and the save warns of it.  After refreshing that viewforest, the server
 stores it under the same view ID and recomputes the open-view root index, so
 the buffer is thereafter registered as rooted at =K= rather than =F=.
 

@@ -1335,49 +1335,54 @@ with heralds if the view you called it from shows them.
 This actually works in org-mode outside of skg.
 (skg uses org-mode, but org-mode can be used without skg.)
 *** <localleader>vo : :SkgCyclePerspective
-Show this view from the next perspective: whose list of
+Show this view from the next perspective: the skgrepo whose list of
 skgrepos ranks the mirrors it shows. Each switch names the
 perspective it shows; it redraws the
 buffer, and refuses while it has unsaved edits.
 
 Where a node stands as another's content and it has mirrors (notes
 joined to it by forks, either way), a view may show one of its mirrors
-in its place. A fresh view is drawn from its
-root authors' perspective: under a root of yours, yours; under a root
-someone else wrote, that author's, throughout the tree, so you see
-what they would see, and your own forks of their nodes do not show
-there. That is the first perspective. The others are yours and each
-other author's whose perspective would show some node of the buffer
-differently, each followed in every tree, whoever wrote its root, so
-that you can read the buffer as that author would. Yours comes first,
-then the others in the order the config declares their skgrepos;
-after the last, the root authors' again. A perspective that would
-show the buffer as the root authors' do is skipped. The cycle is
-computed afresh at each switch, from what the buffer shows then. An
-author is named by a skgrepo of theirs: "tracy's perspective".
+in its place. A perspective is a skgrepo: from it, a node shows its
+mirror in that skgrepo, the node itself if it is homed there, else the
+mirror in the skgrepo the config declares first. A fresh view is drawn
+from its root homes: each tree from its root's home skgrepo,
+throughout the tree, so a view of your note shows your mirrors where
+your note's skgrepo holds them, and a view of someone else's note
+shows theirs. That is the first perspective. The others are the
+skgrepos home to a mirror of something the buffer shows whose
+perspective would show some node of the buffer differently, each
+followed in every tree, whatever its root's home, in the order the
+config declares them, owned or foreign: so you can choose between a
+private and a public fork of one note. After the last, the root homes
+again. A skgrepo that would show the buffer as the root homes do is
+skipped. The cycle is computed afresh at each switch, from what the
+buffer shows then. A skgrepo is named by its label: "the perspective
+of tracy".
 
-Shown from yours, a node of another's you fork there is shown, after
-the save, as your clone. Shown from another author's, a node you edit
-there is forked as anywhere, and the redraw shows that author's
-version again, unedited; your clone shows from yours. The redraw keeps the cursor and the folds.
+Shown from your fork's skgrepo, a node of another's you fork there is
+shown, after the save, as your clone. Shown from another skgrepo's,
+a node you edit there is forked as anywhere, and the redraw shows
+that skgrepo's version again, unedited, and the save says so; your
+clone shows from your clone's skgrepo, unless that skgrepo holds the
+original too, where the original stands. The redraw keeps the cursor and the folds.
 The buffer keeps its perspective through its saves and the redraws
 the server sends unasked. The switch is refused in a buffer of the
 diff view, which shows no fork in place of what it forks,
 and where no other perspective would show the buffer differently.
-The roots are replaced too: from an author's perspective, a root that
-author forks shows that author's fork, standing where the root stood,
-with the cursor still on it if it was, and with its own folders, as
-a fresh view of it would draw them (its containers, its forks
-folder and count, and any other folder you had opened there); from the
-root authors', the node you opened, as it is. The buffer keeps its name. In a search
+The roots are replaced too: from a skgrepo's perspective, a root with
+a mirror in that skgrepo shows that mirror, standing where the root
+stood, with the cursor still on it if it was, and with its own
+folders, as a fresh view of it would draw them (its containers, its
+forks folder and count, and any other folder you had opened there);
+from the root homes, the node you opened, as it is. The buffer keeps its name. In a search
 buffer, the hits are its roots. See =docs/mirrors.org=.
 
-Emacs names any perspective but the root authors' in the mode name:
-"SKG:your perspective". The Neovim client draws no statusline of its
+Emacs names any perspective but the root homes in the mode name:
+"SKG:the perspective of tracy". The Neovim client draws no statusline of its
 own; the buffer keeps the perspective in 'b:skg_perspective'
 and its name in 'b:skg_perspective_name', and
 =%{v:lua.require'skg.buffer'.perspective_mode_line()}= in
-your 'statusline' (or 'winbar') shows ":your perspective", say, in such
+your 'statusline' (or 'winbar') shows ":the perspective of tracy", say, in such
 a view and nothing elsewhere.
 *** <localleader>vr : :SkgReadableIdsToggle
 This changes how node IDs are displayed.

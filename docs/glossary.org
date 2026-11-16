@@ -1128,28 +1128,29 @@ mirrors of each other, and a cycle of forks is no special case. (Not
 function mirrors an Emacs one, a server mirror.)
 
 A *perspective's skgrepo list* is the order in which the perspective
-of an owner O ranks a note's mirrors: O's skgrepos most private first,
-then every other skgrepo in the config's declaration order
-('SkgConfig::perspective_skgrepo_list'). It is not a privacy rank, nor
-the fold or declaration order.
+of a skgrepo S ranks a note's mirrors: S first, then every other
+skgrepo in the config's declaration order, whose owned entries run
+most public first ('SkgConfig::perspective_skgrepo_list'). Who owns a
+skgrepo plays no part. It is not a privacy rank, nor the fold order.
 
 *** mirror substitution, and the vocabulary around it
 
 Where a node N stands as content of an editable occurrence in a
-content view, the refresh shows instead the *mirror shown* for N (see
-"mirror"): the mirror whose home skgrepo comes first in the skgrepo
-list of the perspective of the occurrence's top-level tree, ties
-broken as 'docs/mirrors.org', "Which mirror stands", says
-('mirror_shown' in 'server/dbs/in_rust_graph/mirrors.rs'). That
-perspective is the user's, unless the tree's root is foreign, in which
-case it is the root's author's ('perspective_owner_of_tree_containing'),
-or one owner's in every tree of a view switched to that owner's
-perspective, the user's or a foreign owner's ('Perspective';
-Emacs 'C-c v o'). The owner need not own the mirror shown: where the
-owner has no mirror of N, the first by declaration order stands. When
+content view, or as a root of it, the refresh shows instead the
+*mirror shown* for N (see "mirror"): the mirror whose home skgrepo
+comes first in the skgrepo list of the perspective of the
+occurrence's top-level tree, ties broken as 'docs/mirrors.org',
+"Which mirror stands", says ('mirror_shown' in
+'server/dbs/in_rust_graph/mirrors.rs'). That perspective is the root
+homes', the tree's root's home skgrepo
+('perspective_skgrepo_of_tree_containing'), or one skgrepo's in every
+tree of a view switched to it ('Perspective'; Emacs 'C-c v o'). The
+mirror shown may be in any skgrepo: where the perspective's holds no
+mirror of N, the first declared that holds one stands. In its own
+skgrepo N itself stands, however many of its forks are there; so when
 the mirror shown is N itself, nothing substitutes. An owned chain D
-forks C forks N, all in one skgrepo, shows D; visibility
-gating can cut the chain, so that a middle node shows.
+forks C forks N, kept in one skgrepo other than N's, shows D there;
+visibility gating can cut the chain, so that a middle node shows.
 
 The shown substitute carries the fact '(inPlaceOf N)'
 (the crucial herald =ĥ= after =K=; 'in_place_of' on the occurrence),
@@ -1166,31 +1167,42 @@ fact whose bearer is no mirror of the original it names
 fact is load-bearing text a hand edit could forge.
 
 A node is *shown raw* where it stands as itself, not replaced by the
-mirror shown for it. Only content substitutes, so a view root, a
-member of a partner folder, a search hit, a chain node and a ghost
-are shown raw, and so, one level down, are the children of most
-nodes shown raw where another mirror would stand
-('docs/api-and-formats.org', "Mirror substitution and the
-inPlaceOf part").
-A view opened on one node always shows the requested node itself,
-shown raw: it is the view's *raw root*, so that its immediate
-children are shown raw too. Switched to one owner's perspective, the
-view shows the mirror of the root that owner's skgrepo list ranks
-first instead, standing for it ('Perspective').
+mirror shown for it. Only content and roots substitute, so a member
+of a partner folder, a chain node and a ghost are shown raw, and so,
+one level down, are the children of a node shown raw where another
+mirror would stand ('docs/api-and-formats.org', "Mirror substitution
+and the inPlaceOf part").
+A view opened on one node always shows the requested node itself:
+drawn from the root homes, its root stands in its own home skgrepo,
+where it stands as itself; so does each hit of a search buffer.
+Switched to one skgrepo's perspective, the view shows the mirror of
+the root that skgrepo's list ranks first instead, standing for it
+('Perspective').
 
 *** perspective
 
-A view's *perspective* is whose skgrepo list ranks the mirrors it
-shows (see "mirror"; 'Perspective'; on the wire "perspective",
-the request "set perspective"): its root authors', as every fresh view's is (each
-top-level tree is drawn from the perspective of the owner of the node
-its root stands for), or one owner's in every tree, the user's or a
-foreign owner's, so that the view shows what that owner would see,
-its roots included. 'C-c v o' (Neovim
-'<localleader>vo') cycles a view through the perspectives that would
-draw it differently ('skg-cycle-perspective'; 'docs/api-and-formats.org',
-"Set perspective"). A foreign owner is named by the first of its skgrepos the
-config declares: "tracy's perspective".
+A view's *perspective* is a skgrepo, whose skgrepo list ranks the
+mirrors it shows (see "mirror"; 'Perspective'; on the wire
+"perspective", the request "set perspective"): its *root homes*, as
+every fresh view's is (each top-level tree is drawn from the
+perspective of the home skgrepo of the node its root stands for; on
+the wire "root homes"), or one skgrepo's in every tree, owned or
+foreign, its roots included (on the wire "skgrepo NAME"). So a
+private and a public fork of one note can each be chosen. 'C-c v o'
+(Neovim '<localleader>vo') cycles a view through the root homes and
+then each skgrepo home to a mirror in the view whose perspective
+would draw it differently, in declaration order
+('skg-cycle-perspective'; 'docs/api-and-formats.org', "Set
+perspective"). Messages name one "the perspective of tracy", by the
+skgrepo's herald label.
+
+*** root homes
+
+The default perspective ('Perspective::RootHomes', on the wire "root
+homes"): each top-level tree of a view is drawn from the perspective
+of its root's home skgrepo, the root standing for its '(inPlaceOf N)'
+else itself ('perspective_skgrepo_of_tree_containing'). See
+"perspective".
 
 *** the fork rules
 
@@ -1469,7 +1481,8 @@ To *fork* a node N is to turn it into an editable *clone* C in a
 skgrepo you own. C copies N's title, body, and child-list (the child IDs
 only — shallow), and =forks= N, once (so N's later additions surface
 to C as unintegrated forked content, and mirror substitution shows C
-wherever N would appear, from your perspective). Children of N
+wherever N would appear, from the perspective of C's skgrepo, or of
+one that holds no mirror of N where C's is declared first). Children of N
 that the forking edit deleted become C's
 =hides=, and thereafter any child removed from
 an owned note's contains that some fork partner its forks folder
