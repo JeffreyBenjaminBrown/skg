@@ -7,6 +7,9 @@ or the binary SKG_BINARY names.
 
 In order, it:
 - checks that a save's envelope carries the saved buffer's baseline;
+- checks that a command needing a server, given no port, no sidecar
+  and no daemon, is refused before it connects, there being no
+  default port, while 'linkstack show' runs without one;
 - checks the title normalizer and the fuzzy match of a new headline's
   title with a removed one's on pairs that must match, pairs that must
   not, and pairs at the thresholds;
@@ -157,6 +160,7 @@ def main (argv):
   failures += failures_of_title_matching ()
   failures += failures_of_save_envelope ()
   failures += failures_of_preview_support ()
+  failures += failures_of_no_default_port ()
   failures += failures_of_link_annotation_round_trip ()
   failures += failures_of_link_annotations ()
   failures += failures_of_shared_herald_cases ()
@@ -201,6 +205,68 @@ def failures_of_preview_support ():
     failures . append ( "an older server was taken to support the preview" )
   if not skg_for_ai . server_supports (new, "save preview"):
     failures . append ( "a server naming the preview was taken not to support it" )
+  return failures
+
+# Commands that need a server, each run with no port, no sidecar and
+# no daemon: 'commit --all --yes' wrote the user's unfinished changes
+# to his own server when a default port named it.
+PORTLESS_SERVER_COMMANDS = [
+  [ "commit", "A message", "--all", "--yes" ],
+  [ "view", "root-id" ],
+  [ "raw", "(repos)" ],
+  [ "daemon" ],
+  [ "linkstack", "push", "root-id" ] ]
+
+def failures_of_no_default_port ():
+  """There is no default port. A command that needs a server, given no
+  port by '--port' or SKG_PORT, no sidecar and no daemon in its
+  folder, is refused, exit 1, with one line on stderr, before it
+  connects to anything or writes anything; 'linkstack show', which
+  needs no server, still runs."""
+  failures = []
+  expected_stderr = "skg_for_ai: " + skg_for_ai . NO_PORT_MESSAGE + "\n"
+  connections = []
+  def refuse_to_connect (*arguments, **keywords):
+    connections . append (arguments)
+    raise ConnectionRefusedError ( "the test forbids connecting" )
+  original_create_connection = socket . create_connection
+  original_connect = socket . socket . connect
+  socket . create_connection = refuse_to_connect
+  socket . socket . connect = refuse_to_connect
+  folder = tempfile . mkdtemp ( prefix = "skg-for-ai-test-no-port-" )
+  try:
+    for command in PORTLESS_SERVER_COMMANDS:
+      argv = command + ( [] if command [0] in ( "commit", "raw" )
+                         else [ "--out-dir", folder ] )
+      described = "'" + " " . join (argv) + "'"
+      del connections [ : ]
+      try:
+        skg_for_ai . main (argv)
+        failures . append ( f"{described} without a port was not refused" )
+      except skg_for_ai . SkgToolError as error:
+        if str (error) != skg_for_ai . NO_PORT_MESSAGE:
+          failures . append ( f"{described} without a port said {error}" )
+      if connections:
+        failures . append ( f"{described} without a port tried to connect" )
+      completed = run_tool (argv, port = None, bypassing_daemons = True)
+      if ( completed . returncode != 1 or completed . stdout != ""
+           or completed . stderr != expected_stderr ):
+        failures . append (
+          f"{described} without a port: exit {completed . returncode}, "
+          f"stdout {completed . stdout!r}, stderr {completed . stderr!r}" )
+    if os . listdir (folder):
+      failures . append ( f"commands without a port wrote {os . listdir (folder)}" )
+    completed = run_tool ( [ "linkstack", "show", "--out-dir", folder ],
+                           port = None, bypassing_daemons = True )
+    if ( completed . returncode != 0
+         or completed . stdout != "The linkstack is empty.\n" ):
+      failures . append (
+        f"'linkstack show' without a port: exit {completed . returncode}, "
+        f"stdout {completed . stdout!r}, stderr {completed . stderr!r}" )
+  finally:
+    socket . create_connection = original_create_connection
+    socket . socket . connect = original_connect
+    shutil . rmtree (folder, ignore_errors = True)
   return failures
 
 def failures_of_link_annotation_round_trip ():

@@ -5,7 +5,8 @@ skg-for-ai lets you read and change a skg graph as plain Org files,
 without an editor client. Everything below this page is reference;
 this page is the whole working loop. Every command is
 'python3 tools/skg-for-ai/skg_for_ai.py COMMAND ...', run against the
-server whose port 'SKG_PORT' (or '--port') names.
+server whose port 'SKG_PORT' (or '--port') names. There is no default
+port: a command that needs a server and is given none is refused.
 
 First, start a daemon, and leave it running for the session:
 'daemon --out-dir DIR &'. It keeps one connection to the server, so
@@ -324,9 +325,22 @@ through).
 Every command that writes a view fetches the server's herald rule
 table once, with the 'herald rules' request.
 ** The port
-The tool connects to 127.0.0.1 on the port 'SKG_PORT' names, or 1730
-when it is unset; '--port' overrides both. The port of a server is the
-'port' of its 'skgconfig.toml'.
+The tool connects to 127.0.0.1 on the port '--port' names, else on the
+one 'SKG_PORT' names. The port of a server is the 'port' of its
+'skgconfig.toml'.
+
+There is no default port. There was one, 1730, and it was a live
+user's own server: a command whose shell had lost its 'SKG_PORT' (an
+agent's shell starts fresh on every call) wrote to that server, and
+'commit --all --yes' git-committed his unfinished changes. So a
+command that needs a server and is given no port, by '--port',
+'SKG_PORT', its sidecar ('save', 'extend', 'close',
+'override-perspective') or a daemon answering in its '--out-dir'
+folder, is refused before it connects to anything: it prints one line
+saying to name the server with '--port PORT' or 'SKG_PORT', and exits
+1. 'daemon' needs a port too. Commands that need no server run
+without one: 'linkstack' but 'push', 'daemon --stop', and
+'delete-references' without '--yes'.
 
 * The files it writes
 For a base name such as 'view_ID' the tool writes 'view_ID.full.org',
@@ -586,9 +600,10 @@ python3 tools/skg-for-ai/skg_for_ai.py daemon --out-dir DIR --port P &
 # ... view, edit, save with '--out-dir DIR' as usual ...
 python3 tools/skg-for-ai/skg_for_ai.py daemon --stop --out-dir DIR
 #+end_example
-The daemon connects to the server ('--port', else 'SKG_PORT', else
-1730), logs the server's startup warnings, listens on two Unix
-sockets, 'DIR/skg-for-ai.sock' and the port's,
+The daemon connects to the server ('--port', else 'SKG_PORT'; with
+neither it refuses to start, as there is no default port), logs the
+server's startup warnings, listens on two Unix sockets,
+'DIR/skg-for-ai.sock' and the port's,
 'skg-for-ai-PORT.sock' in 'XDG_RUNTIME_DIR' (or in '/tmp' when that
 is unset), and prints one line saying so; it runs in the foreground
 until stopped. DIR holds its log and its socket; the views it holds
@@ -613,9 +628,9 @@ sidecar's, and
 'commit', but for 'commit --all' without '--yes'. A command's port is the one its '--port' or
 'SKG_PORT' names, or the sidecar's. A command that names no port and
 has no sidecar runs through the daemon of its '--out-dir', if one
-runs there, on that daemon's server; otherwise through the daemon for
-the default port, 1730. The command sends its command line, its
-current directory and the port it named over the socket; the daemon
+runs there, on that daemon's server; otherwise it is refused, as
+there is no default port ("The port"). The command sends its command
+line, its current directory and the port it named over the socket; the daemon
 runs it exactly as the command would run, but on the daemon's
 connection, writing its files where the command asked, and answers
 with what it printed and its exit code, which the command prints and
@@ -795,7 +810,11 @@ server ('cargo build --bin skg'; 'SKG_BINARY' names another binary).
 First it checks the title normalizer of "Retyped headlines" on a few
 titles, and the fuzzy match on pairs that must match, pairs that must
 not, and pairs at each threshold, and that pairing is one to one,
-best first. Then it renders every case of the rendering cases both clients'
+best first. It checks that a command needing a server, given no port,
+no sidecar and no daemon, is refused before it connects to anything
+(it runs 'commit --all --yes', 'view', 'raw', 'daemon' and 'linkstack
+push' with every connection forbidden), while 'linkstack show' runs
+without a port. Then it renders every case of the rendering cases both clients'
 tests share, 'tests/shared/herald-rendering-cases.txt', as their tests
 do: with the rule table and the skgrepo label table pinned beside it
 ('herald-rules.sexp', which a Rust test keeps equal to the served

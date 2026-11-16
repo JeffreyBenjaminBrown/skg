@@ -83,8 +83,10 @@ Request: one sexp line + `\n`. Response: one or more
 `Content-Length: N\r\n\r\n<payload>` messages (save returns THREE:
 save-lock, save-relax-lock, save-result). The client to use is
 `tools/skg-for-ai/skg_for_ai.py` (its `README.org` documents it). Give
-every command `--port <scratch port>` (or set `SKG_PORT`; the tool's
-own default is 1730), from the repo root:
+every command `--port <scratch port>` (or set `SKG_PORT`; the tool has
+no default port, and refuses a command that needs a server and names
+none, since the old default, 1730, is Jeff's live server), from the
+repo root:
 - `python3 tools/skg-for-ai/skg_for_ai.py view 1 --port 1750 --out-dir <scratch>/out`
   writes `view_1.full.org` (the view as the server sent it, metadata
   and all), `view_1.compact.org` (the same lines, metadata replaced by

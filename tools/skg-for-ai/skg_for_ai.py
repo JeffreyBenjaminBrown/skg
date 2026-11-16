@@ -60,7 +60,9 @@ which previews and applies a Markdown and Org import;
 to an absent node; 'restrict [NAME]', which prints or (through a
 daemon) sets the skgrepo restriction; 'linkstack ACTION', the clients'
 linkstack kept in a file.
-The port is SKG_PORT (default 1730), or '--port'.
+The port is '--port', else SKG_PORT; there is no default. A command
+that needs a server and finds no port there, in its sidecar, or in a
+daemon of its folder is refused before it connects to anything.
 
 'daemon --out-dir DIR' keeps one connection open and holds there
 every view its commands write: when the server rerenders one (after
@@ -100,7 +102,12 @@ REPO_ROOT = os . path . dirname ( os . path . dirname (
   os . path . dirname ( os . path . abspath (__file__) )))
 SHARED_FOLDER = os . path . join (REPO_ROOT, "shared")
 HOST = "127.0.0.1"
-DEFAULT_PORT = 1730
+# There is no default port: the one there was belonged to a live
+# user's server, and a command whose shell had lost its SKG_PORT
+# wrote to it.
+NO_PORT_MESSAGE = (
+  "No server is named: name it with '--port PORT' or SKG_PORT; "
+  "there is no default port. Nothing was sent." )
 FIRST_MESSAGE_TIMEOUT_SECONDS = 120
 IMPORT_TIMEOUT_SECONDS = 600
 # How long 'raw' waits after a response for another before it stops.
@@ -171,8 +178,24 @@ def main (argv):
   daemon_exit_code = exit_code_of_command_sent_to_daemon (arguments, argv)
   if daemon_exit_code is not None:
     return daemon_exit_code
+  if arguments . port is None and command_needs_named_port (arguments):
+    raise SkgToolError (NO_PORT_MESSAGE)
   run_command (arguments)
   return 0
+
+def command_needs_named_port (arguments):
+  """Whether the command talks to a server whose port only the
+  command line or SKG_PORT can give: not 'save', 'extend', 'close' or
+  'override-perspective', which take it from their sidecar; not
+  'linkstack' but 'push', which keeps a file; not 'delete-references'
+  without '--yes', which sends nothing."""
+  if arguments . command in SIDECAR_COMMANDS:
+    return False
+  if arguments . command == "linkstack":
+    return arguments . action == "push"
+  if arguments . command == "delete-references":
+    return arguments . yes
+  return True
 
 def run_command (arguments):
   """Run the command ARGUMENTS names, in this process."""
@@ -259,8 +282,10 @@ def parse_command_line (argv):
   port_option = argparse . ArgumentParser ( add_help = False )
   port_option . add_argument (
     "--port", type = int,
-    default = int ( os . environ . get ( "SKG_PORT", str (DEFAULT_PORT) )),
-    help = "the server's port (default: SKG_PORT, else 1730)" )
+    default = ( int ( os . environ [ "SKG_PORT" ] )
+                if os . environ . get ("SKG_PORT") else None ),
+    help = ( "the server's port (default: SKG_PORT; there is no other, "
+             "and a command that needs a server refuses without one)" ))
   common_options = argparse . ArgumentParser (
     add_help = False, parents = [ port_option ] )
   common_options . add_argument (
@@ -5050,6 +5075,8 @@ def command_daemon (arguments):
   if arguments . stop:
     stop_daemon (folder)
     return
+  if arguments . port is None:
+    raise SkgToolError (NO_PORT_MESSAGE)
   os . makedirs (folder, exist_ok = True)
   SkgForAiDaemon (folder, arguments . port) . run ()
 
@@ -5080,8 +5107,8 @@ def exit_code_of_command_sent_to_daemon (arguments, argv):
   Otherwise None: the command runs here. The daemon for the command's
   port takes it, whatever folder it writes into. A command that names
   no port (by '--port' or SKG_PORT) and has no sidecar to take one
-  from goes first to the daemon in its folder, which talks to its own
-  server, and then to the one for the default port. A socket nobody
+  from goes to the daemon in its folder, which talks to its own
+  server; there is no default port to try after it. A socket nobody
   answers on is one a daemon left when it died."""
   if ( arguments . command in COMMANDS_NEVER_SENT_TO_A_DAEMON
        or ( arguments . command == "commit" and arguments . all
@@ -5094,11 +5121,8 @@ def exit_code_of_command_sent_to_daemon (arguments, argv):
     socket_paths = [ port_daemon_socket_path (port) ]
   else:
     folder = daemon_folder_of_command (arguments)
-    socket_paths = (
-      ( [ os . path . join (folder, DAEMON_SOCKET_NAME) ]
-        if folder is not None else [] ) +
-      ( [ port_daemon_socket_path (arguments . port) ]
-        if arguments . port is not None else [] ))
+    socket_paths = ( [ os . path . join (folder, DAEMON_SOCKET_NAME) ]
+                     if folder is not None else [] )
   for socket_path in socket_paths:
     reply = daemon_reply_if_one_answers (
       socket_path, { "argv" : argv, "cwd" : os . getcwd (),
@@ -5752,6 +5776,8 @@ class SkgConnection:
   holds none of the views the command writes."""
 
   def __init__ (self, port):
+    if port is None:
+      raise SkgToolError (NO_PORT_MESSAGE)
     self . port = port
     try:
       self . socket = socket . create_connection (( HOST, port ))
