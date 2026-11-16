@@ -1,0 +1,899 @@
+#+title: Plan 1 of every-mirror: subscribees editable, subscribers shown, their chains foldered
+#+startup: overview
+
+* Assignment and authority
+This plan is a unitary declaration: nothing in it is open for
+discussion, but for the questions listed under "Open questions for
+Jeff", each of which carries the answer the slices follow until Jeff
+gives another. Its behavior was agreed between Jeff and the
+orchestrating Claude on 2026-11-16, in conversation (there is no
+discussion document); nobody executing it needs more than this file.
+Earlier fork plans in 'TODO/forks/' are background nobody needs to
+read.
+
+Jeff's words, which the plan carries out: "Wherever an editable node
+is displayed, if it has nonempty subscribees, those should be shown
+editable too (that is, with their contentward forest) unless they are
+repeats (some other editable viewnode in the buffer has the same
+graphnode id). If an editable has nonempty subscribers, those are
+shown too [...]. (Why? This way if someone responds to your node by
+forking it and adding content to the fork, you'll see that, even
+though you don't subscribe.)"
+
+An agent executes one slice per launch ('coding-advice/orchestration.org').
+Read, before the first edit: 'coding-advice/names.org',
+'coding-advice/formatting.org', 'coding-advice/ai-agents.org',
+'coding-advice/no-legacy-support.org', 'coding-advice/common-gotchas.md',
+'coding-advice/when-to-stop.org', 'coding-advice/commit-messages.org'.
+
+* Open questions for Jeff
+Each question names the slice it affects and the answer the slice
+follows ("provisional") if Jeff has not answered before that slice
+launches. An answer that differs becomes a correction inserted under
+that slice's headline before its launch.
+** Q1. Which occurrence holds a node's editability when it is both a subscribee as such and ordinary content?
+Slice 2. Today the walk decides by level order: the first occurrence
+of a node whose visit consumes an editable-view request holds the
+node's editability ('consume_editableView_request',
+'Walk::hold_editability', 'server/refresh/editability.rs'), and every
+later one is a write-protected repeat. Once subscribees are drawn
+editable, a subscribee as such that is visited first will hold the
+editability, and the node's ordinary occurrence deeper in the view
+will be write-protected. A subscribee as such refuses title and body
+edits: the save refuses the whole buffer if one differs from disk
+('validate_text_claims',
+'server/from_text/local_fieldintent_collection/validate_text_claims.rs').
+So the user could no longer edit that node's title where it stands as
+content without a C-c s e first.
+Provisional: no new rule; level order decides, as for every other
+occurrence, and C-c s e moves editability.
+** Q2. Does a repeat member of the subscribee folder show a containers folder?
+Slice 1. Agreed behavior 2 says a subscriber that is a repeat shows
+nothing under it; agreed behavior 1 says a repeat subscribee "stays a
+write-protected repeat", which today carries its containerward chain
+('after_drawing', 'server/refresh/visit.rs'); agreed behavior 3 moves
+every member's chain into a containers folder.
+Provisional: a repeat member of either subscription folder shows
+nothing under it, no containers folder included.
+** Q3. Where does the containers folder under a member stand?
+Slice 1. "Drawn folded so the member's content reads first" can mean
+first among the member's children, collapsed to one line, or after
+the content.
+Provisional: it stands among the member's leading folders, after any
+compound partner folder, before the member's content; its members
+carry 'folded', so only its headline shows.
+** Q4. What happens to a line under a subscriber once the subscribee integrates or hides it?
+Slice 3. When N comes to contain, or hide, something its subscriber S
+adds, that node is no longer something S adds, and the goal of S
+drops it. Under a write-protected occurrence the refresh keeps an
+unwarranted child, marked ⊥ ('mark_claims', 'server/refresh/visit.rs').
+Provisional: it vanishes, when S still contains it by some record (it
+is now shown in N's content, or in the folder of what N hides of S's
+content); a child S no longer contains, or one the user typed there,
+stays, marked ⊥, as in any write-protected set.
+** Q5. Does what a subscriber adds charge the node budget?
+Slice 3. Today a folder fills its members without spending any budget
+('docs/glossary.org', "extent, extension, node budget"), and only an
+editable occurrence charges it ('consume_editableView_request').
+Provisional: no. A subscriber folder is unbounded in breadth, as every
+folder is; what each member adds is one level deep.
+** Q6. May C-c s e still make a member of the subscriber folder editable?
+Slice 3. Today any partner-folder member can be made editable by
+request ('fulfill_editableView_requests'), and then shows its whole
+content, which the save writes as its contains. Jeff's words say a
+subscriber member is "never editable".
+Provisional: the refresh never draws one editable, and an explicit
+request still makes it an ordinary editable member, with its whole
+content, as today; it is then no subscriber as such.
+** Q7. Members already standing in a subscribee folder
+Slice 2. The agreed behavior says a member "that the folder holds"
+should be drawn editable. The refresh keeps the editability an
+occurrence has in the buffer ('settle_before_the_walk'); it makes a
+held write-protected occurrence editable only through an editable-view
+request ('consume_editableView_request').
+Provisional: an editable-view request that extends the subscriber
+(its first extension, or C-c s e on it) passes through its subscribee
+folder to the write-protected members standing there, as it passes to
+write-protected content ('extend_requested_content'); a plain rerender
+leaves them as they are.
+
+* Commits
+Jeff has asked for commits. The orchestrator commits this plan before
+slice 1 launches. One code commit per slice (more where a slice
+touches disparate things), the first line naming the plan and the
+slice: "every-mirror plan 1 slice N: ...". The slice's last commit
+carries its docs and flips its headline here to DONE. Read
+'coding-advice/commit-messages.org': a title that gives an overview,
+then a detail only where it eases a reader. Stage only the files the
+slice touched, by path. These untracked files are Jeff's; never stage
+them: 'TODO/total-diff-view/since-main.org',
+'data/bash/trim-node-bodies.sh', 'docs/en-espanol.org',
+'the-social-algorithm.org', 'unsaved-edits.org'. Never stage a '.elc',
+nor anything under 'tests/results/'. If this plan or the glossary is
+dirty with Jeff's edits when a slice starts, commit only the slice's
+own hunks ('coding-advice/orchestration.org', "Files Jeff is editing
+during a run"). End every commit message with
+'Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>'.
+
+Each slice's record goes into 'TODO/every-mirror/progress.org' under
+a top-level headline "* Plan 1", one subheadline per slice, in the
+shape 'coding-advice/orchestration.org' gives ("The report shape").
+Deviations from this plan's "how" go there too, under the slice's
+record; this file stays as written but for DONE keywords and
+corrections the orchestrator inserts.
+
+* Scope
+In scope, in content views (a fresh content view, every rerender of
+one, the collateral views):
+- members of a subscribee folder under an editable subscriber drawn
+  editable, with their content as a subscribee as such shows it, and
+  their own default folders;
+- a subscriber folder drawn unasked wherever a subscribee folder is,
+  each of its members showing what it adds and the two new compound
+  partner folders;
+- the containerward chain of every member of a subscription folder
+  moved into a containers folder under the member, drawn folded;
+- the scenario of two forks of one note meeting, as a Rust test and
+  an integration test in both clients;
+- the docs, both clients' folder lists, the AI tool's folder lists,
+  the herald table and its pinned copies.
+
+Out of scope, decided: merging 'subscribesTo' and 'overrides' into one
+relation (later, separately); the diff view, which draws no default
+folders and keeps its chains as they are; the search buffer, which
+draws nothing unasked; default folders for chain nodes and for
+members of any folder but the two subscription folders.
+
+* Vocabulary
+Check each word against 'docs/glossary.org' and the code before the
+run ('coding-advice/names.org', "Check a plan's words before the run").
+** Existing words this plan uses as the glossary defines them
+"subscribee as such", "the subscribee-visibility step", "role tree",
+"foldering", "the containerward chain", "chain node", "override
+substitution", "perspective", "partner folder", "compound partner
+folder", "write-protected set", "editability rule", "extent", "node
+budget", "default folders" (the glossary's "Default presentation",
+'add_default_folders'), "warranted", "claims membership", "described
+node" ('described_node', 'server/refresh/ancestry.rs').
+** subscription folders
+Both folders of the 'subscribesTo' relation: the subscribee folder
+('Folder::Subscribee', 'subscribeeFolder') and the subscriber folder
+('Folder::Subscriber', 'subscriberFolder'). The plan's shorthand; the
+glossary gains it in slice 1.
+** repeat
+An occurrence of a node whose editability another occurrence in the
+buffer holds ('Walk::editability_is_held',
+'server/refresh/editability.rs', which keys by
+'Walk::editability_key', so an extra ID counts as its node). The
+glossary's "editability rule" uses the word ("a repeat is
+write-protected") without defining it; slice 1 adds the definition.
+Whether an occurrence is a repeat is asked where the refresh draws it
+and at its visit, so it depends on level order (see "Pitfalls").
+** subscriber as such (coined here)
+A write-protected occurrence standing in a subscriber folder that the
+folder's relation warrants: its node S subscribes to the folder's
+viewparent N. It mirrors the subscribee as such
+('subscriber_of_subscribee_as_such', 'server/refresh/goal.rs'). An
+editable member of a subscriber folder (made so by a request, Q6) is
+no subscriber as such.
+** what a subscriber adds (coined here)
+The goal of a subscriber as such S under N: S's content that N
+neither contains nor hides, by the records the skgrepo restriction
+shows, in S's order. It mirrors what a subscribee as such shows of its
+content ('less_what_the_subscriber_integrates', 'server/refresh/goal.rs'),
+with the roles reversed.
+** the two new compound partner folders (coined here)
+Under a subscriber as such S of N:
+- 'Folder::SubscribeeContentHiddenBySubscriber', atom
+  'subscribeeContentHiddenBySubscriberFolder': what S hides of N's
+  content, N.contains ∩ S.hidesFromSubs, in the order of S's hides
+  list. Label: "☮ c contains these, but a hides them."
+- 'Folder::SubscriberContentHiddenBySubscribee', atom
+  'subscriberContentHiddenBySubscribeeFolder': what N hides of S's
+  content, S.contains ∩ N.hidesFromSubs, in the order of N's hides
+  list. Label: "☮ a contains these, but c hides them." (Jeff's example:
+  "<a> contains these but <c> hides them"; the comma follows the
+  existing compound labels.)
+In prose: "the folder of what the subscriber hides of the subscribee"
+and "the folder of what the subscribee hides of the subscriber".
+** drawn folded
+A folder is drawn folded when each of its members carries 'folded':
+in both clients a folder's collapse lives on its members, since
+'folded' on a headline hides it in its parent (the comment on
+'Walk::added_compound_folders', 'server/refresh/mod.rs').
+
+* Agreed behavior
+** 1. Subscribees editable by default
+*** What decides it today
+A member of a subscribee folder is always drawn write-protected:
+'drawn_occurrence_editability' ('server/refresh/editability.rs') lets
+a drawn occurrence be editable only where
+'children_are_editable_content' ('server/refresh/extent.rs') holds of
+its parent, which is false for every folder, or at the buffer root.
+It shows its content only after C-c s e
+('fulfill_editableView_requests', 'consume_editableView_request').
+'tests/hidden_from_subscriptions.rs' asserts the bare leaf
+('test_hidden_within_but_none_without', "Initial view from R:
+write-protected subscribee is bare leaf"; also
+'test_subscribee_and_compound_partner_folders' and
+'test_overlapping_hidden_within').
+*** What it should be
+In a content view, an occurrence the refresh draws in a subscribee
+folder whose described node is an editable occurrence (the folder
+reads claims: 'parent_reads_claims', 'server/refresh/ancestry.rs')
+should be drawn as content is: write-protected carrying an
+editable-view request, which its visit consumes, so that it becomes
+editable when it is no repeat and the budget allows. Its content is
+then the content a subscribee as such shows, which 'content_goal'
+('server/refresh/goal.rs') already computes: what the subscriber
+neither contains nor hides. Its default folders follow
+('add_default_folders'): the hidden-in compound folder it already
+gets, and, being an occurrence an editable-view request extends, its
+own subscribee folder and (behavior 2) its subscriber folder. A member
+whose node's editability another occurrence holds stays a
+write-protected repeat. The editable-view request that extends the
+subscriber passes through its subscribee folder to the write-protected
+members standing there (Q7). A subscribee folder under a
+write-protected occurrence (a C-c l s on it) keeps its members
+write-protected: the folder reads no claims, and the save writes no
+hides from it.
+*** The save handles an editable subscribee as such: verified
+Read for this plan: 'visit_occurrence' and 'visit_subscribee_folder'
+('server/from_text/local_fieldintent_collection/traverse.rs') emit,
+for an editable occurrence in a subscribee folder that claims, a
+'SubscribeeTextClaim' (title and body must match disk,
+'validate_text_claims') and, when the folder's recorder is editable,
+a 'SubscribeeVisibility' signal naming the content it shows
+('visible_content_members'); it is not save-eligible, so its own
+title, body and contains are never written. 'resolve_visibility'
+('resolve_visibility.rs') then unhides content shown claiming and
+hides content not shown that the subscriber does not contain, by
+visible records, for an owned subscriber only. An unchanged buffer
+writes nothing: the hides it infers are those the subscriber has, and
+'filter_wouldbe_noop_nodeInstructions'
+('server/from_text/local_fieldintent_collection/mod.rs') drops a save
+identical to the graph, so 'file_subscribee_members_written_in'
+('server/from_text/file_what_is_written_in.rs') files nothing. Slice 2
+asserts this with a test rather than relying on this reading.
+
+Two consequences become reachable by default, and stay as the save
+has them:
+- Editing a subscribee as such's title or body refuses the whole save
+  (Q1).
+- An editable subscribee as such E gets its own subscribee folder,
+  whose members F are subscribees as such of E; 'visit_subscribee_folder'
+  passes 'subscriber_is_editable : recorder . is_editable', so F's
+  visibility signal rewrites E's hides when E is owned. E itself is
+  not save-eligible, so its subscribee folder's membership is never
+  read (a removed F comes back at the save's refresh).
+** 2. Subscribers drawn by default
+On every occurrence that today gets its subscribee folder unasked (an
+editable occurrence carrying an editable-view request, in a content
+view: 'add_default_folders'), the subscriber folder should be drawn
+too when the node has subscribers the skgrepo restriction shows
+('partnerFolder_members_in_graph' with 'Folder::Subscriber'), placed
+after the subscribee folder, or after the leading folders when there
+is none. The folder stays write-protected ('Folder::is_editable').
+Its members are drawn write-protected, as today
+('drawn_occurrence_editability' never allows a member of it), and are
+never drawn editable: a list shown in part cannot be saved.
+
+A member that is no repeat is a subscriber as such S, and shows:
+- what it adds, write-protected, claiming nothing, in S's order, shown
+  raw (no override substitution happens under a write-protected
+  occurrence: 'substitute_overriders');
+- the folder of what the subscriber hides of the subscribee, when
+  nonempty;
+- the folder of what the subscribee hides of the subscriber, when
+  nonempty;
+- its containers folder, drawn folded (behavior 3).
+The two compound folders are drawn folded, as the existing ones are
+when the refresh adds them ('Walk::added_compound_folders'). A member
+that is a repeat shows nothing under it.
+
+Why two new folder kinds, and not the existing compound ones: a
+folder's label is a fixed text per atom in the herald table
+('herald_rule_table', 'server/heralds.rs'), whose ancestor letters are
+fixed too ("It contains these, but c hides them." for
+'hiddenInSubscribeeFolder', where the subscribee is the viewparent and
+the subscriber three generations up, 'compound_folder_parties'). Under
+a subscriber as such the roles stand the other way round: the
+subscriber is the viewparent and the subscribee three generations up.
+The hidden-in kind would print a false label there, its ancestry row
+('ANC_HIDDEN_IN', 'required_ancestry', 'server/refresh/ancestry.rs')
+requires a subscribee folder above it, and the save's validation
+('validate_hiddenInSubscribee_folder', 'cannot_be_child_of_vognode',
+'server/from_text/buffer_to_viewnodes/local.rs') allows it only under
+a subscribee as such. The hidden-outside kind is editable and stands
+in a subscribee folder ('Folder::is_editable', 'ANC_HIDDEN_OUTSIDE').
+The goals, though, are the hidden-in kind's with the roles reversed,
+and both reuse 'hidden_in_subscribee' ('server/refresh/goal.rs'): the
+folder of what the subscriber hides of the subscribee is
+'hidden_in_subscribee (N, S)', and the folder of what the subscribee
+hides of the subscriber is 'hidden_in_subscribee (S, N)'.
+** 3. Containerward chains foldered under subscription-folder members
+Today every partner-folder member but a property, an acquisition or an
+illegal-edit member carries its containerward chain hung directly
+under it ('Folder::members_carry_containerward_chain',
+'server/types/viewnode.rs'; 'after_drawing', 'server/refresh/visit.rs';
+'draw_containerward_chain', 'server/refresh/chain.rs'), and a
+write-protected member's vognode children are known as chain nodes by
+where they stand ('holds_containerward_chain', 'stands_in_containerward_chain',
+'server/types/tree/forest.rs'). Jeff's complaint: under a subscribee,
+its containers looked like its children.
+
+In a content view, a member of either subscription folder should
+carry no chain directly. Where the refresh draws such a member, it
+should draw instead a containers folder under it ('Folder::Container',
+which omits view-ancestors, 'Folder::omits_view_ancestors'), drawn
+folded, placed as Q3 says; the folder's own visit fills it, and each
+of its members carries its chain as a containers folder's members
+always have. A member that is a repeat where it is drawn gets none
+(Q2). The vognode children of such a member are its content (for an
+editable subscribee), what it adds (for a subscriber as such), or
+nothing. Every other partner folder keeps today's unfoldered chain,
+the four compound ones included; the diff view keeps it for every
+folder.
+** 4. Forks of one note meet
+Fixture: N contains X1, X2, X3, X4. R and T are forks of N: each
+subscribes to N and overrides N. R contains X1, X2, X3. T contains
+X1, X3, Y, Z and hides X2. N hides Z. (X4 is what N gained after the
+forks; Y is what T added; X2 is what T deleted; Z is something N
+hides that T contains.)
+*** R's view
+R, the root, is editable. Its subscribee folder holds N, editable,
+whose content is X4 alone (N's content less what R contains or
+hides). N's subscriber folder holds R, a repeat (R's root holds R's
+editability), with nothing under it, and T, a subscriber as such,
+showing Y; the folder of what T hides of N, holding X2; and the folder
+of what N hides of T, holding Z.
+*** N's view
+N, the root, is editable, with X1 to X4. Its subscriber folder holds
+R, which adds nothing and hides nothing of N's (so nothing stands
+under it but its containers folder, where R has containers), and T,
+as above.
+*** Saves
+Saving R's view unchanged writes nothing and files nothing. Deleting
+X4 under N in R's view and saving makes R hide X4 (the
+subscribee-visibility step), and the redrawn view shows X4 in N's
+hidden-in folder.
+** 5. Out of scope
+As "Scope" says. In particular nothing changes in a buffer of the
+diff view, and no folder is drawn unasked in the search buffer.
+** 6. What stays as it is, and what changes, among the defaults a user sees
+*** Kept
+- Override substitution ('substitute_overriders',
+  'is_overridden_and_shown_raw', 'server/refresh/visit.rs'): a
+  member of a partner folder is shown raw; the content of a subscribee
+  as such is substituted, as today; a view root is raw, and its
+  children too where it is overridden.
+- The hidden-outside folder: drawn in a subscribee folder when its
+  subscriber hides something outside every subscribee, last there,
+  its members folded ('add_hidden_outside_folder',
+  'keep_hidden_outside_folder_last').
+- The hidden-in folder under an editable subscribee as such, its
+  members folded.
+- A fresh content view's containers folder on each root, unfolded,
+  first ('stub_of_fresh_content_view', 'server/update_buffer.rs').
+- The fold state of everything already in a buffer: the refresh keeps
+  it, and only what it draws is drawn folded.
+- The diff view: no default folders; every folder's members carry
+  their chain directly; editability by the pruned change view's U.
+- The search buffer: nothing drawn unasked.
+- Other partner folders (containers, mentioners, override, hider,
+  hidden, the four compound ones): their members carry the chain
+  directly.
+- The editability rule: one editable occurrence per node per buffer;
+  the node budget ('initial_node_limit').
+- C-c s e, C-c s w, C-c s W, and every C-c l command.
+- What the save does with each folder: the subscribee folder's
+  membership read for an editable, save-eligible subscriber; every
+  other new folder write-protected and save-inert.
+*** Changed
+- A member of a subscribee folder under an editable subscriber is
+  editable by default (behavior 1); it charges the node budget, so a
+  view with many subscriptions spends the budget sooner.
+- Every editable occurrence carrying an editable-view request shows
+  its nonempty subscriber folder by default (behavior 2).
+- Members of both subscription folders carry their chain in a folded
+  containers folder (behavior 3), in content views.
+- Two new compound partner folders with their labels.
+
+* How the editability rule and the node budget bound the recursion
+An editable subscribee as such is an editable occurrence carrying an
+editable-view request, so it gets its own default folders: its
+subscribee folder, whose members are drawn editable in turn, and its
+subscriber folder. Three things stop the recursion:
+- Each node is editable at most once per buffer: a member whose
+  node's editability is held is drawn write-protected
+  ('drawn_occurrence_editability' asks 'Walk::editability_is_held'),
+  and at its visit 'hold_editability' refuses a second holder; a
+  write-protected occurrence gets no default folders
+  ('add_default_folders' returns unless 'editable_gnid' is some). So
+  the subscription recursion visits each node reachable by
+  subscription at most once, and a cycle of subscriptions ends at its
+  first repeat.
+- Each editable occurrence charges the node budget once, at its visit
+  ('consume_editableView_request'); once it is spent, drawn members
+  stay write-protected and draw nothing further.
+- A subscriber as such is write-protected: it gets no default
+  folders, and what it adds is drawn write-protected, so nothing
+  recurses through a subscriber folder. Its breadth is bounded by the
+  graph alone, as any folder's is (Q5).
+
+* Pitfalls the slices must respect
+** Live servers and data
+Ports 1730 and 1761 are Jeff's live servers, running
+'target/release/skg' with 'data/jeff/skgconfig.toml' and
+'data/claude/skgconfig.toml', without hot reload. Never start, stop
+or connect to them, never pass those ports or configs to anything, and
+never build the release profile. Tests use 'target/debug' and pick
+their own ports; isolated instances only ('.claude/skills/verify/SKILL.md').
+Every commit must leave the tree green: a restart rebuilds from it.
+** The diff view shares every function this plan touches
+'drawn_occurrence_editability' has a diff-view arm that makes a node
+of U editable wherever its parent may hold editable members
+('in_the_diffViews_u'). Widening "may be editable" to subscribee
+folders without gating it on 'RefreshMode::ContentView' would make
+diff-view subscribee folders draw editable members. Every rule of
+this plan asks 'walk . is_diff_view ()' (or the mode) and does nothing
+there. Diff-view subscribee and subscriber folders appear in
+'tests/refresh/diff_view.rs' and 'tests/pruned_change_view/'.
+** Every reader of the chain predicates
+'Folder::members_carry_containerward_chain' is read by
+'holds_containerward_chain' ('server/types/tree/forest.rs') and by
+'after_drawing' ('server/refresh/visit.rs'), and named in comments
+only in 'server/refresh/chain.rs'. 'holds_containerward_chain' is read
+by 'stands_in_containerward_chain' (same file) and by 'is_chain_parent'
+('server/refresh/extent.rs'), whose readers are 'goal_of_parent'
+('server/refresh/goal.rs', which picks 'chain_goal' or 'content_goal')
+and 'tag_children' ('server/refresh/diff_view.rs', diff view only).
+'stands_in_containerward_chain' is read by 'leaves_named_at' and the
+check near line 685 of 'server/diff_view/processed_requests.rs' (diff
+view only), by 'restoreRel_stands_where_it_may'
+('server/from_text/buffer_to_viewnodes/local.rs'; 'restoreRel' is a
+diff-view request, so it takes the diff view's answer), and by
+'tests/refresh/chain.rs'. A content-view-only change to which members
+carry the chain must reach every one of these, by a parameter saying
+whether the view is the diff view; none of them may be left asking a
+mode-blind version.
+** A member's children change meaning with the chain
+Today the vognode children of a write-protected member of a
+subscription folder are chain nodes, and its goal is 'chain_goal'.
+Once those members carry no chain in a content view, the same
+children are content: 'goal_of_parent' gives 'content_goal', the
+extent of a write-protected occurrence is none ('extent_of_parent'),
+and the claims rung keeps an unwarranted child of a write-protected
+occurrence ('mark_claims'). A buffer drawn before this plan therefore
+keeps its old chain nodes under such members, marked ⊥; under a
+member that is (or is made) editable they claim nothing and so show
+the "detach" herald as pending detachments, which the subscribee as
+such's save ignores ('visit_occurrence' does not emit 'SetContains'
+for it). No migration ('coding-advice/no-legacy-support.org'):
+reopening a view redraws it. Say so in the docs' "what changes" note
+of slice 1, and in progress.org.
+** The refresh never makes a held write-protected occurrence editable
+'settle_before_the_walk' records the editable occurrences the buffer
+holds; a write-protected one becomes editable only through an
+editable-view request ('consume_editableView_request'). So a view
+drawn before slice 2 keeps its write-protected subscribees until the
+subscriber is extended (Q7). Tests that rerender an old buffer text
+expect that.
+** Repeats depend on level order
+The walk visits parents in level order ('walk_in_level_order',
+'server/refresh/mod.rs'), and folders stand before content among a
+node's children. Whether a member is a repeat is asked when it is
+drawn and at its visit, so an occurrence drawn editable later in the
+walk does not make an earlier-visited member a repeat in the same
+refresh. A subscriber as such that drew what it adds before its node
+became editable elsewhere keeps those children at the next refresh,
+where it is a repeat: the extent draws nothing new, and the claims
+rung removes nothing warranted. This is stable (a fixpoint), not a
+defect; do not add a rule removing them.
+** The editable-view request is consumed per visit
+'consume_editableView_request' and 'drop_editableView_request' bracket
+a visit; 'extend_requested_content' runs at the visit of the parent
+carrying the request, before the parent's default folders are added
+('visit_parent' order). A subscribee folder that 'add_default_folders'
+adds at that visit is empty then; its members are drawn at the
+folder's own visit, by 'reinstate' through 'draw_item' and
+'drawn_occurrence_editability', which is where a drawn member gets its
+request. Passing the request through a subscribee folder that already
+stands (Q7) belongs in 'extend_requested_content'.
+** 'add_default_folders' returns early for write-protected occurrences
+It reads 'editable_gnid' first. The folders under a subscriber as
+such (write-protected) need their own step in 'visit_parent', not a
+branch inside it.
+** The hidden-in folder moves itself first
+'add_default_folders' moves a new hidden-in folder to the first child
+('move_to_first_child'), and a new subscribee folder after the last
+leading folder. The subscriber folder and the containers folder must
+be placed relative to these, as Q3 and behavior 2 say, and a test
+must pin the order.
+** 'added_compound_folders' is the only fold mechanism for drawn folders
+'after_drawing' folds the members it draws into a folder in
+'Walk::added_compound_folders' (filled by 'add_default_folders' and
+'add_hidden_outside_folder'). The containers folder under a
+subscription-folder member and the two new compound folders need the
+same treatment. Rename the field, since it will hold more than
+compound folders: 'folders_whose_drawn_members_are_folded', with its
+comment updated; this is a rename with a reason ('names.org').
+** The save validates folder positions apart from the refresh
+The refresh's ancestry table ('required_ancestry') entombstones a
+misplaced folder; the parse validates positions itself
+('validate_hiddenInSubscribee_folder', 'cannot_be_child_of_vognode',
+'validate_vognode_identity_and_structure' in
+'server/from_text/buffer_to_viewnodes/local.rs'), and refuses a buffer
+it rejects. A new folder kind the server draws must be accepted there
+in the position it is drawn, or every saved view holding one is
+refused.
+** Exhaustive matches on 'Folder'
+'Folder::all' (with its 'guard'), 'goal_is_ordered', 'is_editable',
+'repr_in_client', 'required_ancestry', 'kinds_redrawing',
+'birth_facts_for_folder' ('server/refresh/viewnodestats.rs'),
+'folder_goal', the parse's dispatch in 'local.rs' and the traversal's
+catch-all ('traverse.rs', write-protected folders) all match on it.
+'members_carry_containerward_chain' and 'members_are_properties' do
+not match exhaustively: check them by hand.
+** The herald table has pinned copies
+'shared/herald-styles.json' ('node_heralds' styles of each styled
+atom, 'folder_heralds.write_protected', which the server checks against
+the table at startup: 'folder_heralds_inconsistencies',
+'server/heralds.rs'), 'tests/shared/herald-rules.sexp' (the served
+table, which both clients' tests read),
+'tests/shared/herald-rendering-cases.txt' (both clients render each
+case), and 'herald_rules_cover_the_emittable_vocabulary'. A new folder
+atom touches all of them. 'shared/metadata-fields.json' lists every
+folder atom (read by the AI tool's 'FOLDER_ATOMS' and by
+'tests/metadata_fields_table.rs').
+** Clients and the AI tool keep their own folder lists
+'skg--relRepo-unsupported-folder-atoms' ('elisp/skg-metadata.el'),
+'M.relRepo_unsupported_folder_atoms' ('nvim/lua/skg/metadata.lua')
+and 'RELREPO_UNSUPPORTED_FOLDERS' ('tools/skg-for-ai/skg_for_ai.py')
+name every write-protected partner folder; the new compound folders
+belong in all three.
+** Integration tests
+A slice that changes what the server writes into a buffer runs
+'bash/integration-tests.sh' (the Emacs pass of every directory under
+'tests/integration/') before it ends, and then 'bash/all-tests.sh',
+which runs every directory once per client. Every suite was green on
+2026-11-15 ('tests/results/ALL.org', 76 of 76 integration runs); a
+failure is the slice's to classify ('coding-advice/orchestration.org').
+Directories whose fixtures hold subscriptions, and so are likely to
+change: 'fork', 'fork-chain', 'fork-owned', 'fork-repo',
+'overridden-direct-visit', 'save_collateral_add_content_and_modify_text',
+'save_collateral_break_cycle', 'save_collateral_delete_then_edit_under_it'.
+** Suites
+Serialize full runs; two at once collide on fixed temp paths and the
+Tantivy writer.
+- Rust: 'bash/nextest.sh' (or 'cargo nextest run --test NAME'; test
+  files are grouped into binaries, 'tests/grouped_*.rs').
+- Emacs: 'bash/emacs-tests.sh'. Neovim: 'bash/nvim-tests.sh'.
+- AI tool: 'python3 tools/skg-for-ai/test_skg_for_ai.py' after 'cargo
+  build --bin skg'. It asserts the server's behavior, so it runs in
+  every slice.
+- Everything: 'bash/all-tests.sh' (several minutes; run it in the
+  background, with no timeout shorter than 15 minutes).
+Logs go under 'tests/results/every-mirror-1/sliceN/'; 'bash/all-tests.sh'
+wipes 'tests/results/' at its start, so copy what 'progress.org'
+cites before a full run.
+
+* Code map
+** The refresh
+- 'server/refresh/visit.rs': 'visit_parent' (the order of steps),
+  'add_default_folders', 'add_folders', 'add_hidden_outside_folder',
+  'child_folder', 'mark_claims', 'leaves_its_write_protected_folder',
+  'reinstate', 'after_drawing', 'draw_item', 'kinds_redrawing',
+  'redraw_folders', 'substitute_overriders', 'is_overridden_and_shown_raw'.
+- 'server/refresh/editability.rs': 'drawn_occurrence_editability',
+  'extend_requested_content', 'consume_editableView_request',
+  'Walk::hold_editability', 'Walk::editability_is_held'; the module
+  comment states the node budget.
+- 'server/refresh/extent.rs': 'extent_of_parent',
+  'children_are_editable_content', 'is_chain_parent'.
+- 'server/refresh/goal.rs': 'goal_of_parent', 'content_goal',
+  'content_goal_gnids', 'less_what_the_subscriber_integrates',
+  'subscriber_of_subscribee_as_such', 'folder_goal',
+  'hidden_in_subscribee', 'partnerFolder_members_in_graph'.
+- 'server/refresh/ancestry.rs': 'required_ancestry' and its rows,
+  'compound_folder_parties', 'CompoundFolderParties', 'described_node',
+  'parent_reads_claims'.
+- 'server/refresh/chain.rs': 'draw_containerward_chain'.
+- 'server/refresh/id_rule.rs': 'rekind_to_occurrence' (asks
+  'drawn_occurrence_editability' when a restricted viewnode becomes an
+  occurrence again).
+- 'server/refresh/viewnodestats.rs': 'stands_as_member',
+  'set_herald_strings_in_viewnode', 'birth_facts_for_folder',
+  'set_relRepo'.
+- 'server/refresh/mod.rs': 'Walk', 'walk_in_level_order'.
+- 'server/types/tree/forest.rs': 'holds_containerward_chain',
+  'stands_in_containerward_chain', 'in_content_position'.
+- 'server/types/viewnode.rs': 'Folder' and its methods.
+** The save
+- 'server/from_text/local_fieldintent_collection/traverse.rs':
+  'visit_occurrence', 'visit_subscribee_folder', 'recurse_under_vognode'.
+- 'server/from_text/local_fieldintent_collection/resolve_visibility.rs':
+  'resolve_visibility', 'infer_hides_from_contains_removals'.
+- 'server/from_text/local_fieldintent_collection/validate_text_claims.rs'.
+- 'server/from_text/local_fieldintent_collection/mod.rs':
+  'filter_wouldbe_noop_nodeInstructions'.
+- 'server/from_text/file_what_is_written_in.rs'.
+- 'server/from_text/buffer_to_viewnodes/local.rs': the dispatch on
+  kinds, 'validate_hiddenInSubscribee_folder',
+  'validate_vognode_identity_and_structure', 'cannot_be_child_of_vognode',
+  'restoreRel_stands_where_it_may'.
+- 'server/from_text/buffer_to_viewnodes/validate_tree.rs'.
+** Heralds and shared tables
+- 'server/heralds.rs': 'herald_rule_table' (the compound folder
+  labels), 'folder_heralds_inconsistencies'.
+- 'shared/herald-styles.json', 'shared/metadata-fields.json',
+  'tests/shared/herald-rules.sexp', 'tests/shared/herald-rendering-cases.txt'.
+** Clients and the AI tool
+- 'elisp/skg-metadata.el' ('skg--relRepo-unsupported-folder-atoms').
+- 'nvim/lua/skg/metadata.lua' ('M.relRepo_unsupported_folder_atoms').
+- 'tools/skg-for-ai/skg_for_ai.py' ('RELREPO_UNSUPPORTED_FOLDERS';
+  'FOLDER_ATOMS' reads 'shared/metadata-fields.json').
+** Tests most likely to change
+'tests/hidden_from_subscriptions.rs', 'tests/extend_partner_folder_member.rs',
+'tests/subscribee_folder.rs', 'tests/subscribee_folder_empty_persists.rs',
+'tests/subscribee_heralds.rs', 'tests/content_view.rs',
+'tests/initial_view_bfs.rs', 'tests/editable_view_cascade_and_budget.rs',
+'tests/containerward_chain.rs', 'tests/collateral_subscribee_staleness.rs',
+'tests/collateral_partner_folder.rs', 'tests/fork.rs',
+'tests/override_substitution.rs', 'tests/overridden_as_such.rs',
+'tests/partner_folder_matrix.rs', 'tests/partner_folder_order.rs',
+'tests/hidden_nodes.rs', 'tests/leak_battery.rs', 'tests/idempotence.rs',
+'tests/refresh/' ('chain.rs', 'reinstate.rs', 'requests.rs',
+'hide_folders.rs', 'ancestry.rs'), 'tests/unit/viewnode.rs',
+'tests/unit/heralds.rs'. A fixture adaptation is expected where a test
+pins today's default view; a test that pins a save's effect on the
+graph must not change.
+** Docs
+- 'docs/glossary.org': "editable, write-protected"; "partner folder"
+  (its "Default presentation" paragraph and the compound list);
+  "compound partner folder"; "subscribee as such"; "the
+  subscribee-visibility step"; "foldering, the containerward chain,
+  chain node"; "Folder, and its per-kind rules"; "the containerward
+  chain, as drawn"; "editability rule"; "write-protected set" (its
+  subscriber example).
+- 'docs/data-model_technical.org': "The goal", "The walk and the
+  refresh's rungs" (the default folders paragraph), "The ancestry
+  table", "The extent and the node budget".
+- 'docs/api-and-formats.org': the view-requests paragraph on folders
+  drawn unasked and on the chain (near its line 1677), the folder atom
+  list (near line 2459), the chain node paragraph (near line 1660),
+  the table of birth facts.
+- 'docs/COMMANDS.org' and 'docs/COMMANDS-nvim.org': "what a save does
+  to other views", the C-c l introduction (folders drawn unasked, the
+  chain), C-c l s, C-c l c, C-c s e.
+- 'docs/heralds.org': the labels of the compound folders and the
+  ancestor letters.
+- 'docs/sharing-model.org' ("Editing subscribed content in a view";
+  "The write-protected folders") and 'docs/forks.org' (forks meeting).
+
+* Implementation sequence
+** TODO Slice 1: the chain of a subscription-folder member goes into a folded containers folder
+- 'Folder::members_carry_containerward_chain' should take whether the
+  view is the diff view, and answer false for 'Folder::Subscribee' and
+  'Folder::Subscriber' outside it; every other answer stays.
+  'holds_containerward_chain' and 'stands_in_containerward_chain'
+  should take the same parameter, and every reader named in "Every
+  reader of the chain predicates" pass it ('walk . is_diff_view ()'
+  in the refresh; the diff view's answer in 'processed_requests.rs' and
+  'restoreRel_stands_where_it_may'; the fixture's mode in
+  'tests/refresh/chain.rs').
+- Rename 'Walk::added_compound_folders' to
+  'folders_whose_drawn_members_are_folded', comment and every use.
+- In 'after_drawing' (content view), for an occurrence drawn into a
+  subscription folder: when it is no repeat
+  ('Walk::editability_is_held' is false for its gnid), add a
+  'Folder::Container' child, placed among its leading folders as Q3
+  says, and register it in the renamed set, so that its visit draws its
+  members folded, each with its chain. A repeat gets nothing (Q2). The
+  chain is still drawn directly for every other folder kind, and for
+  every kind in the diff view.
+- Tests: a Rust test over a fixture where R subscribes to E and E has
+  two containers, one of them a view-ancestor: a fresh view of R shows
+  under E a containers folder whose members carry 'folded' and their
+  chains, omitting the view-ancestor; no chain node stands directly
+  under E; a subscriber folder requested on E (C-c l s) shows its
+  members with a folded containers folder too; a repeat member shows
+  nothing under it; the same request in a diff-view fixture still
+  hangs the chain directly ('tests/refresh/diff_view.rs' or
+  'tests/pruned_change_view/'); refreshing the output again changes
+  nothing ('tests/idempotence.rs' style). Adapt the tests that pin
+  chains under subscription-folder members.
+- Docs: glossary "foldering, the containerward chain, chain node",
+  "the containerward chain, as drawn", "Folder, and its per-kind
+  rules", and the new entries "subscription folders" and "repeat";
+  'docs/api-and-formats.org' chain paragraphs; COMMANDS.org and
+  COMMANDS-nvim.org (C-c l introduction, C-c l c), including the note
+  that a view drawn before this change keeps its old chain nodes
+  until reopened.
+- Run 'bash/nextest.sh', the AI tool's tests, then
+  'bash/integration-tests.sh' (this slice changes what the server
+  writes into a buffer), then 'bash/all-tests.sh'.
+
+** TODO Slice 2: subscribees are drawn editable
+- 'drawn_occurrence_editability' should, in a content view only, let
+  an occurrence drawn in a subscribee folder be editable when the
+  folder reads claims ('parent_reads_claims': its described node is an
+  editable occurrence) and no other occurrence holds its node's
+  editability, returning 'WriteProtectedRequested' as for content.
+  Leave 'children_are_editable_content' as it is (its name says
+  content); add a predicate named for the folder case.
+- 'extend_requested_content' should pass the request through a
+  subscribee folder child of the extended occurrence to each
+  write-protected claiming occurrence standing in it that the rule
+  above would let be editable (Q7).
+- Verify the save, with tests rather than by reading: over a fixture
+  with an owned subscriber R, an owned subscribee E and a foreign
+  subscribee F, a fresh view of R shows E and F editable, with their
+  unintegrated content editable under them and their hidden-in folders;
+  saving it unchanged writes no '.skg' file and files nothing; deleting
+  one of E's shown children hides it from R and the redrawn view shows
+  it in E's hidden-in folder; a title edit on E refuses the save
+  ('validate_text_claims'); a budget of 1 leaves E write-protected and
+  bare; a subscribee that also stands as R's content (or under it) is
+  editable in only one place (Q1); an old buffer text with E
+  write-protected rerenders unchanged, and a C-c s e request on R
+  makes E editable (Q7). If the unchanged save writes anything, stop
+  ('Stops and deviations').
+- Adapt 'tests/hidden_from_subscriptions.rs' (the bare-leaf
+  assertions become editable subscribees with content and hidden-in
+  folders; 'add_editable_view_request_to_subscribees' becomes
+  unnecessary where the initial view already extends them) and the
+  other tests that pin bare subscribees.
+- Docs: glossary "subscribee as such" (now editable by default, and
+  what that means for title edits), "partner folder" ("Default
+  presentation"), "editability rule", "the subscribee-visibility
+  step" (nested subscribees as such); data-model_technical "The walk
+  and the refresh's rungs" (default folders) and "The extent and the
+  node budget"; api-and-formats view-requests paragraph; COMMANDS.org
+  and COMMANDS-nvim.org ("what a save does to other views", C-c l
+  introduction, C-c s e); 'docs/sharing-model.org', "Editing
+  subscribed content in a view".
+- Run 'bash/nextest.sh', the AI tool's tests, then
+  'bash/integration-tests.sh', then 'bash/all-tests.sh'.
+
+** TODO Slice 3: subscriber folders drawn by default, each subscriber showing what it adds
+- 'add_default_folders' should add the subscriber folder, when the
+  node has subscribers the skgrepo restriction shows, wherever it
+  considers the subscribee folder (an editable occurrence carrying an
+  editable-view request, content view), placed after the subscribee
+  folder or, without one, after the leading folders.
+- 'subscribee_of_subscriber_as_such' (goal.rs, beside
+  'subscriber_of_subscribee_as_such'): for a write-protected occurrence
+  warranted in a subscriber folder, the folder's viewparent's gnid.
+- 'content_goal': for a subscriber as such S of N, S's content less
+  what N contains or hides. Generalize
+  'less_what_the_subscriber_integrates' (rename its parameter to the
+  node whose contains and hides are subtracted) rather than copy it.
+- 'extent_of_parent': all, in a content view, for a subscriber as
+  such that is no repeat; none otherwise, as today.
+- 'mark_claims': under a subscriber as such, an unwarranted child that
+  S contains by some record vanishes (Q4), beside
+  'leaves_its_write_protected_folder'; any other unwarranted child
+  stays, marked ⊥.
+- 'stands_as_member' ('viewnodestats.rs'): a warranted child of a
+  subscriber as such stands as a member, so that it shows its birth
+  (contains in 1), as a folder's warranted member does.
+- Tests: over the fixture of behavior 4 without N's hides (the
+  compound folders come in slice 4): N's view shows its subscriber
+  folder after its subscribee folder; T shows Y alone, write-protected,
+  claiming nothing, raw; R, a repeat in R's own view, shows nothing;
+  making N contain Y and saving makes Y vanish from under T in the
+  other open view (a collateral view); a narrowing that keeps out T's
+  record of Y removes Y, and the widening draws it again; C-c s e on T
+  makes it editable with its whole content (Q6); a refresh of the
+  output changes nothing.
+- Docs: glossary new entries "subscriber as such" and "what a
+  subscriber adds", "partner folder" ("Default presentation"),
+  "write-protected set" (the subscriber example); data-model_technical
+  "The goal", "The extent and the node budget", the default-folders
+  paragraph, and the claims rung; api-and-formats view-requests
+  paragraph; COMMANDS.org and COMMANDS-nvim.org (C-c l introduction,
+  C-c l s); 'docs/sharing-model.org', "The write-protected folders".
+- Run 'bash/nextest.sh', the AI tool's tests, then
+  'bash/integration-tests.sh', then 'bash/all-tests.sh'.
+
+** TODO Slice 4: the two new compound partner folders under a subscriber as such
+- 'Folder::SubscribeeContentHiddenBySubscriber' and
+  'Folder::SubscriberContentHiddenBySubscribee', with the atoms of
+  "Vocabulary", in every match "Exhaustive matches on 'Folder'" names:
+  write-protected, goal unordered, members carry the chain, no
+  relation member role, no view-ancestor omission, drawn by no
+  request ('kinds_redrawing' gives none), going when empty.
+- Ancestry: one row for both, nearest first: an occurrence, a
+  subscriber folder, an occurrence. 'compound_folder_parties' gives
+  their parties (the subscriber is the viewparent, the subscribee three
+  generations up); 'described_node' gives their viewparent.
+- Goals in 'folder_goal': 'hidden_in_subscribee (N, S)' and
+  'hidden_in_subscribee (S, N)', as behavior 2 says.
+- A step in 'visit_parent', after 'add_default_folders', for a
+  subscriber as such that is no repeat, in a content view: add each of
+  the two folders it lacks whose goal is nonempty, ahead of its
+  containers folder, and register each in the renamed set so its
+  members are drawn folded.
+- Stats: 'birth_facts_for_folder' gives a member of the first folder
+  'hidesFromSubs' in from the subscriber (generation 2) and 'contains'
+  in from the subscribee (generation 4), and a member of the second
+  'contains' in from the subscriber (2) and 'hidesFromSubs' in from the
+  subscribee (4).
+- The save: the parse's dispatch in 'local.rs' validates each as
+  'validate_hiddenInSubscribee_folder' does, but requiring an
+  occurrence parent that stands in a subscriber folder, and
+  'cannot_be_child_of_vognode' allows them only under such a parent.
+  The traversal reads nothing there ('traverse.rs', the write-protected
+  folders' arm).
+- Heralds: rules in 'herald_rule_table' for both labels, the ☮ styled
+  as 'writeProtected', each letter styled apart under the qualified
+  keys '<atom>_subscriber' and '<atom>_subscribee' (style 'high'), in
+  'shared/herald-styles.json' with its comment; both atoms in
+  'folder_heralds.write_protected'; 'shared/metadata-fields.json';
+  'tests/shared/herald-rules.sexp'; a case per folder in
+  'tests/shared/herald-rendering-cases.txt'.
+- Clients and the AI tool: both atoms in
+  'skg--relRepo-unsupported-folder-atoms', 'M.relRepo_unsupported_folder_atoms'
+  and 'RELREPO_UNSUPPORTED_FOLDERS'.
+- Tests: the full fixture of behavior 4: T shows the first folder
+  holding X2 and the second holding Z, both folded, both pruned when
+  empty (R under N's view has neither); a buffer holding either folder
+  saves without refusal and writes nothing; a save of either folder
+  typed under a subscribee as such, or under a content occurrence, is
+  refused by the parse; the ancestry table makes either unsayable
+  there ('tests/refresh/ancestry.rs'); the herald conformance
+  tests; 'bash/emacs-tests.sh' and 'bash/nvim-tests.sh' (the rendering
+  cases).
+- Docs: glossary "partner folder" (the compound list) and "compound
+  partner folder" (four, with both new ones); data-model_technical
+  "The ancestry table" and "The goal"; api-and-formats folder atom list
+  and birth-facts table; 'docs/heralds.org' (the labels and their
+  letters, the table row on the subscriber's letter); COMMANDS.org and
+  COMMANDS-nvim.org (C-c l s).
+- Run 'bash/nextest.sh', the AI tool's tests, then
+  'bash/integration-tests.sh', then 'bash/all-tests.sh'.
+
+** TODO Slice 5: forks of one note meet, end to end
+- A Rust test file 'tests/forks_meet.rs', registered in
+  'tests/grouped_views.rs', with fixtures under 'tests/forks_meet/'
+  holding the graph of behavior 4 (one owned skgrepo is enough; a
+  second test puts N in a foreign skgrepo). It asserts R's view and
+  N's view as behavior 4 says, whole, the saves of behavior 4, and the
+  fixpoint.
+- An integration test 'tests/integration/forks-meet/' (both
+  'test-emacs.el' and 'test-nvim.lua', with 'run-test.sh' and data
+  modeled on 'tests/integration/fork/'): open R's view, check that N
+  is editable under R's subscribee folder, that N's subscriber folder
+  holds T with Y and the two compound folders (by their atoms), that
+  each label renders as "Vocabulary" gives it, and that the
+  containers folders' members are folded; then delete X4 under N,
+  save, and check X4 in N's hidden-in folder.
+- Docs: 'docs/forks.org', a section on forks meeting (what R's view
+  and N's view show); a last pass over every doc of the code map for
+  sentences slices 1 to 4 left stale (grep "bare leaf", "only its
+  nonempty subscribeeFolder", "Under each member of a partner folder
+  hangs").
+- Run 'bash/integration-tests.sh', then 'bash/all-tests.sh'.
+
+* Verification and completion
+Each slice ends with its suites green but for failures it classifies
+as pre-existing or flaky, its docs, its record in
+'TODO/every-mirror/progress.org', and its headline DONE. After slice
+5, the orchestrator runs the review of 'coding-advice/plans.org',
+"After each plan": one agent on the terms the plan's code coined or
+reused and any citation of 'TODO/' in code, and one probe agent
+driving each behavior of "Agreed behavior" (1 to 4) against an
+isolated server (the verify skill says how), recording what was sent
+and received.
+
+* Stops and deviations
+Stop only for the conditions in 'coding-advice/when-to-stop.org'. The
+one stop this plan expects as possible: in slice 2, if a save of an
+unchanged view whose subscribees are editable writes or files
+anything, or a save that changes nothing under a subscribee is
+refused, the subscribee-visibility step does not handle the default
+it is about to receive; record what was written and why in
+'progress.org' and stop. Otherwise, deviations from the "how" go
+into 'progress.org' under the slice's record, and the run goes on.
+No entry of 'TODO/problems.org' is fixed by this plan.
