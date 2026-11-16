@@ -469,7 +469,8 @@ In a content view, each node a forksFolder holds that the node forks
 unless it is editable elsewhere in the buffer or the node budget is
 spent: it shows its content less what the node contains or hides,
 and its own folders. Its title and body save when you own it; a
-foreign one's edits are refused (view it as itself to fork it).
+foreign one's edits are refused (view it as itself, where an edit
+starts the fork operation).
 Deleting one of its children hides it in the forking node; a headline
 typed under it, or a node moved there from elsewhere, joins its
 content, after the child it follows, when you own it, and is refused

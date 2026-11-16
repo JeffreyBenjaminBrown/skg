@@ -26,9 +26,9 @@ This rule only applies to the forkee's children. Edits to deeper descendants hav
 
 Only an R you own records hides: where R is foreign, a save that would hide or unhide anything in R is refused, naming R.
 
-If you type a new headline under E, it joins E's content, right after the child it follows, when you own E; under a foreign E the save is refused, since only E's owner can change its content (fork E first, from a view of E as itself). If you place there a node E does not contain, it has no effect on E or R, and the save's rerender leaves it out.
+If you type a new headline under E, or move there a node E does not contain, it joins E's content, right after the child it follows, when you own E; under a foreign E the save is refused, since only E's owner can change its content (make E your own first, from a view of E as itself, where an edit starts the fork operation).
 
-Title and body edits to E made there are saved when you own E. A foreign E's are refused: make them from some view that does not present E as a forkee as such (C-c g RET from E will open such a view), where an edit forks E.
+Title and body edits to E made there are saved when you own E. A foreign E's are refused: make them from some view that does not present E as a forkee as such (C-c g RET from E will open such a view), where an edit starts the fork operation.
 
 Two generated folders show what R currently hides. Under E, the hidden-in folder (=hiddenInForkPartnerFolder=, "☮ It contains these, but c hides them.") lists what R hides that E contains; it is a write-protected display, and editing it is not how you hide or unhide forked content. To hide something, remove it from E's immediate visible graph-content in R's forks folder. To unhide it, put it back there. Last in R's forks folder, the hidden-outside folder (=hiddenOutsideOfForkPartnersFolder=, "b hides these, but no fork partner shown contains them.") lists what R hides that no fork partner shown in that folder contains (no forkee, and no forker R does not hide), a forker R hides among them; it is editable, and removing a member there unhides it (=glossary.org=, "compound partner folder").
 

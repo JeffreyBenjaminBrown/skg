@@ -31,6 +31,6 @@ pub fn validate_text_claims (
       if claim . title != from_disk . title
         || claim . body != from_disk . body
       { return Err (Box::new (BufferValidationError::Other (
-          format!( "Cannot edit title/body for node {} ({}), a foreign node shown as a member of a forks folder. View the node as itself to edit title/body (an edit there forks it).",
+          format!( "Cannot edit title/body for node {} ({}), a foreign node shown as a member of a forks folder. View the node as itself to edit title/body (an edit there starts the fork operation).",
                     pid, claim . headline )) )); }}}
   Ok (( )) }

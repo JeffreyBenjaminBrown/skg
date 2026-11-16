@@ -213,7 +213,7 @@ fn add_children_placed_under_member_as_such (
   if placed . is_empty () { return Ok (( )); }
   if ! config . skgrepo_is_owned (&member_from_disk . home_skgrepo) {
     return Err ( Box::new ( BufferValidationError::Other ( format! (
-      "Cannot add a child under {} ('{}'), a foreign node shown as a {}: only its owner can change its content. To add one, make the node your own first: view it as itself, where an edit forks it.",
+      "Cannot add a child under {} ('{}'), a foreign node shown as a {}: only its owner can change its content. To add one, make the node your own first: view it as itself, where an edit starts the fork operation.",
       member_from_disk . pid, member_from_disk . title, member_as_such . word () )))); }
   let mut follows : Option<usize> = None; // where the last sibling the list names, or the last child placed there, stands
   for gnid in shown {
