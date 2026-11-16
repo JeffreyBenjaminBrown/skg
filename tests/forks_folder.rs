@@ -265,7 +265,7 @@ async fn deleting_a_mutual_ends_the_fork_and_hides_it (
     "*** (skg node (gnid F)",
     "*** (skg hiddenOutsideOfForkPartnersFolder)",
     "**** (skg folded node (gnid H)",
-    "**** (skg node (gnid M)" ], "{}", response . saved_view ); // a folder already drawn draws a new member unfolded
+    "**** (skg folded node (gnid M)" ], "{}", response . saved_view ); // a folder that stood folded draws a new member folded
   Ok (( )) }
 
 async fn detaching_a_mutual_ends_the_fork_only (
@@ -301,7 +301,7 @@ async fn deleting_a_forker_hides_it_until_the_hide_is_removed (
     "*** (skg node (gnid M)",
     "*** (skg hiddenOutsideOfForkPartnersFolder)",
     "**** (skg folded node (gnid H)",
-    "**** (skg node (gnid F)" ], "{}", hidden_view );
+    "**** (skg folded node (gnid F)" ], "{}", hidden_view );
   let unhidden : SaveResponse =
     save (&without_line_of (&hidden_view, "F"), config, tantivy) . await ?;
   assert_eq! ( hides_of (config, "N") ?, ids (&["H"]) );

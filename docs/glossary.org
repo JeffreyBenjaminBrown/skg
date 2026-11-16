@@ -2069,7 +2069,9 @@ folder atom. The editable folders carry none.
 A folder left with no child is entombstoned, and so pruned, unless the
 save reads its membership, so that the user could add to it, or it is
 the flags folder, which stays to show that the node has no true flag
-('folder_goes_when_empty' in 'server/refresh/visit.rs').
+('folder_goes_when_empty' in 'server/refresh/visit.rs'). The folder of
+what a note hides outside its fork partners is read by the save, but
+goes when emptied, as it is drawn only when it holds something.
 
 *** the containerward chain, as drawn
 
@@ -2085,7 +2087,13 @@ own visit draws are drawn folded ('after_drawing' and
 Since the member was just drawn, the folder is its first child: an
 editable member's hidden-in folder, added at its visit, goes before
 it, and so does a forker's hidden-by folder, after the hidden-in
-folder; its forks folder and content go after it. The chain is drawn
+folder; its forks folder and content go after it. A member that stood
+in the buffer before, extended at its visit by an editable-view
+request (=C-c s e= on its note), gets the same folder there
+('add_containers_folder_to_an_extended_member'). A member drawn into
+a compound folder or a containers folder that already stood, all its
+members folded, is drawn folded too, so that the folder stays
+collapsed ('stands_drawn_folded'). The chain is drawn
 walking the member's
 containers breadth-first over the live graph or, in the diff view,
 over the union of the straddle. The extent of a chain is none, so a

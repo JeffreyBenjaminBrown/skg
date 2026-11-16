@@ -109,9 +109,11 @@ fn a_restricted_hide_of_restricted_forkee_content_stands_nowhere_and_saves_keep_
 /// r hides hpub by a record in its public file and hpriv by one in
 /// its private section; e contains neither. Under "public" the folder
 /// of what r hides outside its fork partners shows hpub alone. Saved
-/// unchanged, then with hpub's line deleted, then with a hide of n
-/// added, the folder's edits reach r's public file alone, and the
-/// private section keeps its hide of hpriv.
+/// unchanged, then with hpub's line deleted (the folder, emptied,
+/// goes from the redraw, as a fresh view draws none), then with a
+/// hide of n added (in the folder typed again), the folder's edits
+/// reach r's public file alone, and the private section keeps its
+/// hide of hpriv.
 #[test]
 fn edits_of_the_hidden_outside_folder_leave_a_restricted_hide_alone (
 ) -> Result<(), Box<dyn Error>> {
@@ -131,6 +133,8 @@ fn edits_of_the_hidden_outside_folder_leave_a_restricted_hide_alone (
       assert_eq! ( skg_files (f) ?, files_before, "saved unchanged, no file changed" );
       let without_hpub : String = save (
         f, &without_member_line (&unchanged, "hpub"), public) ?;
+      assert! ( ! without_hpub . contains ("hiddenOutsideOfForkPartnersFolder"),
+                "the emptied folder goes:\n{}", without_hpub );
       assert_eq! ( list_in (f, "public/r.skg", "hides"), Vec::<String>::new (),
                    "hpub's hide goes from r's public file" );
       assert_eq! ( list_in (f, "private/r.skg", "hides"), vec! ["hpriv"],
@@ -314,9 +318,16 @@ fn without_restricted_line (
     . filter ( |line| ! is_restricted_line_of (line, gnid) )
     . map ( |line| format! ("{}\n", line) ) . collect () }
 
-/// 'view' with a new member, n, first in the hidden-outside folder.
+/// 'view' with a new member, n, first in the hidden-outside folder;
+/// where 'view' has none (a view drawn when it would hold nothing has
+/// none), with that folder typed last in the forks folder, which
+/// 'view' ends in, holding n.
 fn with_member_n (
   view : &str,
 ) -> String {
-  edit_line ( view, "*** (skg hiddenOutsideOfForkPartnersFolder)", |line|
-    format! ("{}\n**** (skg node (gnid n)) n", line) ) }
+  if view . contains ("*** (skg hiddenOutsideOfForkPartnersFolder)") {
+    edit_line ( view, "*** (skg hiddenOutsideOfForkPartnersFolder)", |line|
+      format! ("{}\n**** (skg node (gnid n)) n", line) )
+  } else {
+    format! ( "{}*** (skg hiddenOutsideOfForkPartnersFolder)\n**** (skg node (gnid n)) n\n",
+              view ) }}

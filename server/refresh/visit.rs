@@ -89,6 +89,7 @@ pub(crate) fn visit_parent (
 ) -> Result<(), Box<dyn Error>> {
   consume_editableView_request (tree, parent, walk);
   extend_requested_content (tree, parent, walk);
+  add_containers_folder_to_an_extended_member (tree, parent, walk);
   add_default_folders (tree, parent, walk);
   add_illegal_edit_folder (tree, parent, walk);
   add_hidden_outside_folder_to_forks_folder (tree, parent, walk);
@@ -767,7 +768,9 @@ fn reinstate (
 /// carries its chain, but for a member of a forks folder in a content
 /// view, which carries it in a containers folder
 /// ('add_containers_folder_under_forks_folder_member'); under a folder
-/// the refresh added to be drawn folded, it is drawn folded.
+/// the refresh added to be drawn folded, it is drawn folded, and so it
+/// is under one of those kinds that already stood drawn folded
+/// ('stands_drawn_folded').
 fn after_drawing (
   tree   : &mut Tree<Viewnode>,
   parent : NodeId,
@@ -787,10 +790,33 @@ fn after_drawing (
     draw_containerward_chain (tree, treeid, walk) ?; }
   if in_a_content_views_forks_folder {
     add_containers_folder_under_forks_folder_member (tree, treeid, walk); }
-  if walk . folders_whose_drawn_members_are_folded . contains (&parent) {
+  if walk . folders_whose_drawn_members_are_folded . contains (&parent)
+     || stands_drawn_folded (tree, parent, treeid) {
     // A folder's collapse lives on its members.
     tree . get_mut (treeid) . unwrap () . value () . foldAndFocus . folded = true; }
   Ok (( )) }
+
+/// Whether the folder at 'parent', into which 'drawn' was just drawn,
+/// is of a kind the refresh draws folded (a compound folder, or a
+/// containers folder) and stands drawn folded: it holds another
+/// member, and every member but 'drawn' is folded. A member drawn
+/// into it then joins its siblings, folded, so that the folder stays
+/// collapsed, as the refresh would draw it afresh.
+fn stands_drawn_folded (
+  tree   : &Tree<Viewnode>,
+  parent : NodeId,
+  drawn  : NodeId,
+) -> bool {
+  let folder : NodeRef<Viewnode> = tree . get (parent) . unwrap ();
+  if ! matches! ( folder . value () . kind,
+                  ViewnodeKind::Folder ( Folder::HiddenInForkPartner
+                                         | Folder::HiddenByForker
+                                         | Folder::HiddenOutsideOfForkPartners
+                                         | Folder::Container )) { return false; }
+  let others : Vec<NodeRef<Viewnode>> =
+    folder . children () . filter ( |child| child . id () != drawn ) . collect ();
+  ! others . is_empty ()
+  && others . iter () . all ( |child| child . value () . foldAndFocus . folded ) }
 
 /// Under the occurrence at 'member', just drawn into a forks folder of
 /// a content view, a containers folder, drawn folded
@@ -816,6 +842,26 @@ pub(crate) fn add_containers_folder_under_forks_folder_member (
   let folder : NodeId = tree . get_mut (member) . unwrap ()
     . prepend ( viewnode_of ( ViewnodeKind::Folder (Folder::Container) )) . id ();
   walk . folders_whose_drawn_members_are_folded . insert (folder); }
+
+/// A member of a content view's forks folder that an editable-view
+/// request extends at its visit, having stood in the buffer before
+/// (as one an older server drew write-protected and bare, extended
+/// by C-c s e on its note), gets the containers folder a freshly drawn
+/// member gets ('add_containers_folder_under_forks_folder_member'),
+/// so that the extended view is the one a fresh view draws. Before the
+/// default folders, which place themselves around it.
+fn add_containers_folder_to_an_extended_member (
+  tree   : &mut Tree<Viewnode>,
+  member : NodeId,
+  walk   : &mut Walk,
+) {
+  if walk . is_diff_view () || ! carries_editableView_request (tree, member) { return; }
+  let in_a_forks_folder : bool =
+    tree . get (member) . unwrap () . parent ()
+    . is_some_and ( |folder| matches! ( folder . value () . kind,
+                                        ViewnodeKind::Folder (Folder::Forks) ));
+  if in_a_forks_folder {
+    add_containers_folder_under_forks_folder_member (tree, member, walk); }}
 
 /// The viewnode that stands for 'item' under 'parent': for a gnid,
 /// what the ID rule says (None if a tombstone, which there is no
@@ -1437,12 +1483,18 @@ fn entombstone_if_an_empty_folder (
 /// any but one whose membership the save reads, where the user could
 /// add something, a flags folder, which shows that the node has no
 /// true flag, or an illegal-edit folder, whose text says something.
+/// The folder of what a note hides outside its fork partners is read
+/// by the save, but goes too: it is drawn only when it holds
+/// something ('add_hidden_outside_folder'), so a view whose save
+/// emptied it is drawn as a fresh one is.
 pub(crate) fn folder_goes_when_empty (
   viewnode : &Viewnode,
 ) -> bool {
   matches! ( &viewnode . kind,
              ViewnodeKind::Folder (folder)
-               if ! folder . is_editable () && ! folder . is_flags ()
+               if ( ! folder . is_editable ()
+                    || matches! ( folder, Folder::HiddenOutsideOfForkPartners ))
+                  && ! folder . is_flags ()
                   && ! matches! ( folder, Folder::IllegalEdit { .. } )) }
 
 /// The children of 'parent', in order.

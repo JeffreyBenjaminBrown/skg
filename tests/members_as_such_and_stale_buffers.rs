@@ -16,19 +16,23 @@
 //   content ('docs/forks.org', "Adding a child under a member as
 //   such"), but a stale buffer showing a child another view removed
 //   does not put it back.
+// - A member standing write-protected and bare, extended by an
+//   editable-view request on its note, is drawn as a fresh view draws
+//   it, its containers folder included.
 // The fixture ('tests/members_as_such_and_stale_buffers/fixtures/'),
 // all owned but for byx, bw1 and bw2:
 // - V forks W; W forks U and contains u1 and w1; U contains u1, u2.
 // - P contains pa, pb, forks Pe and hides pw, ph2; Pe contains pe1;
 //   Pf forks P and contains pa, pw, pf1.
 // - Box contains bx; byx (foreign) forks bx and contains bw1, bw2.
-// - A forks E and contains a1; E contains e1, e2.
+// - A forks E and contains a1; E contains e1, e2; Shelf contains E.
 
 use crate::save_handler_helpers::{
   Fixture, collateral_view, fixture_from, left_as_the_graph_has_it,
   new_connection, open_view, save, save_with_other_views, saved, saved_view,
   warnings_of};
 use crate::view_and_save_helpers::{line_of, under, without_subtree_of};
+use skg::metadata_canon::without_viewnode_ids;
 use skg::serve::ViewsState;
 
 use std::collections::BTreeMap;
@@ -279,4 +283,43 @@ fn a_stale_buffer_does_not_put_back_a_child_removed_from_a_member_as_such
             && e_edited . contains ("changed after the buffer was rendered"),
             "{}", e_edited );
   assert_eq! ( list_in (&file_text (&f, "main", "E"), "contains"), vec! ["e1"] );
+  Ok (()) }
+
+//
+// A member extended by an editable-view request
+//
+
+#[test]
+fn a_member_extended_on_request_gets_its_containers_folder
+  () -> Result<(), Box<dyn Error>> {
+  // A's view, with E standing write-protected and bare in A's forks
+  // folder (as an older server drew it), rerenders so. With an
+  // editable-view request on A (C-c s e), E is extended: editable,
+  // with its content, its forks folder, and its containers folder
+  // holding Shelf, folded, as in a fresh view of A.
+  let mut f : Fixture = fixture () ?;
+  let mut connection : ViewsState = new_connection ();
+  let fresh : String = open_view (&mut f, &mut connection, "A", "A");
+  assert! ( under (&fresh, "E") . iter () . any ( |line| line . contains ("containerFolder") ),
+            "a fresh view draws E's containers folder:\n{}", fresh );
+  let e_line : &str = line_of (&fresh, "E");
+  let bare : String = without_subtree_of (&fresh, "E") . replacen (
+    &format! ( "{}\n", line_of (&fresh, "a1") ),
+    &format! ( "{}\n{}\n",
+               e_line . replace ( "(gnid E) (skgRepos (nodeRepo main))",
+                                  "(gnid E) (skgRepos (nodeRepo main)) writeProtected" ),
+               line_of (&fresh, "a1") ),
+    1 );
+  let rerendered : String = saved_view ( &save (
+    &mut f, &mut connection, "A", &bare, Some (&fresh) ));
+  assert! ( line_of (&rerendered, "E") . contains ("writeProtected")
+            && under (&rerendered, "E") . is_empty (),
+            "a plain rerender leaves E bare:\n{}", rerendered );
+  let requested : String = rerendered . replacen (
+    "node (gnid A)", "node (viewRequests editableView) (gnid A)", 1 );
+  assert_ne! ( requested, rerendered );
+  let extended : String = saved_view ( &save (
+    &mut f, &mut connection, "A", &requested, Some (&rerendered) ));
+  assert_eq! ( without_viewnode_ids (&extended), without_viewnode_ids (&fresh),
+               "the extended view is the fresh view" );
   Ok (()) }

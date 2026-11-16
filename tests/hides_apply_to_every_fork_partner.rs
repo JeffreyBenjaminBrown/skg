@@ -16,7 +16,10 @@
 // - W moved out of F's folder to stand under F is unhidden, though the
 //   buffer keeps the hidden-outside folder (which does not list W);
 // - X1, removed from N's content, is hidden in N, since F still
-//   contains it: otherwise it would come back under F.
+//   contains it: otherwise it would come back under F; it is drawn
+//   folded, as W beside it is;
+// - H2 removed from the hidden-outside folder, its only member, is
+//   unhidden, and the emptied folder goes, as in a fresh view.
 // The floors and the skgrepo narrowings of the same inference are in
 // 'tests/hide_inference_under_a_narrowing.rs'.
 
@@ -52,6 +55,8 @@ fn all_tests
       an_unhide_under_a_forker_survives_the_hidden_outside_folder (&s . config, &mut s . tantivy) . await ?;
       s . reset ("removing_a_child_a_forker_contains_hides_it", FIXTURES) ?;
       removing_a_child_a_forker_contains_hides_it (&s . config, &mut s . tantivy) . await ?;
+      s . reset ("emptying_the_hidden_outside_folder_lets_it_go", FIXTURES) ?;
+      emptying_the_hidden_outside_folder_lets_it_go (&s . config, &mut s . tantivy) . await ?;
       Ok (( )) } )) }
 
 //
@@ -225,7 +230,8 @@ async fn an_unhide_under_a_forker_survives_the_hidden_outside_folder (
 
 /// X1, which F contains, removed from N's content, is hidden in N:
 /// otherwise it would come back as content F adds to N. The redrawn
-/// view draws it in F's folder of what N hides in it.
+/// view draws it in F's folder of what N hides in it, folded, as W
+/// beside it is: the folder stays collapsed.
 async fn removing_a_child_a_forker_contains_hides_it (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
@@ -244,4 +250,24 @@ async fn removing_a_child_a_forker_contains_hides_it (
   let under_f : String = subtree_at (&saved, "(gnid F)") . join ("\n") + "\n";
   assert_eq! ( gnids_under (&under_f, "hiddenInForkPartnerFolder"), vec! ["W", "X1"],
                "X1 joins W in F's folder of what N hides in it:\n{}", saved );
+  assert! ( line_of (&under_f, "W") . contains ("(skg folded node")
+            && line_of (&under_f, "X1") . contains ("(skg folded node"),
+            "X1 is drawn folded, as W is:\n{}", saved );
+  Ok (( )) }
+
+/// H2, the one member of the folder of what N hides outside its fork
+/// partners, removed there, is unhidden, and the emptied folder goes
+/// from the redrawn view, as a fresh view draws none.
+async fn emptying_the_hidden_outside_folder_lets_it_go (
+  config  : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  let view : String = view_of_n (config, tantivy) ?;
+  let response : SaveResponse =
+    save_cleanly (&without_lines (&view, &[line_of (&view, "H2")]), config, tantivy) . await ?;
+  assert_eq! ( hides_of (config, "N") ?, ids (&["W"]), "H2 is unhidden" );
+  let saved : String = without_viewnode_ids (&response . saved_view);
+  assert! ( ! saved . contains ("hiddenOutsideOfForkPartnersFolder"),
+            "the emptied folder goes:\n{}", saved );
+  assert_eq! ( saved, view_of_n (config, tantivy) ?, "the redrawn view is the fresh view" );
   Ok (( )) }

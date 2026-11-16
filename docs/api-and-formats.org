@@ -1728,7 +1728,8 @@ nonempty =hiddenInForkPartnerFolder=, first; an editable forker as
 such its nonempty =hiddenByForkerFolder= (what it hides of the
 note's content), after that;
 =hiddenOutsideOfForkPartnersFolder=, when nonempty, stands last in
-every =forksFolder= of a content view. Use a
+every =forksFolder= of a content view; emptied by a save, it goes
+from the redrawn view, as from a fresh one. Use a
 folder request for the other relation folders; their potential
 contents remain advertised by the node's heralds. The diff view draws
 no folder unasked but where something changed.
