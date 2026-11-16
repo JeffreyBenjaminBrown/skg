@@ -155,12 +155,12 @@ already-forked node.
 
 Because =C= forks =N=, a generated *forksFolder* ("It forks these, or
 these fork it.") appears under =C= listing =N=, claiming, as a
-/subscribee-as-such/ (a forkee as such). The same folder lists, after
+/forkee as such/. The same folder lists, after
 the forkees, the notes that fork =C= (claiming nothing; deleting one
 hides it, attaching it makes =C= fork it: [[file:./sharing-model.org][sharing-model.org]], "The
 forks folder"). A forkee's content is exactly
-what you have *not* yet integrated: a subscribee-as-such shows only the
-children the subscriber (=C=) neither hides nor already contains. A fresh
+what you have *not* yet integrated: a forkee as such shows only the
+children its forker (=C=) neither hides nor already contains. A fresh
 clone has ~C.contains == N.contains~, so this starts *empty* — every
 child you copied is excluded as already-contained. As the original gains
 new children you have not pulled in, they appear here.
@@ -190,7 +190,7 @@ instead, marked as standing in for the original:
 ,*** eggy mysticism      «Kĥ» (shown in place of Egg Man's "mystical")
 ,**** Which came first, the chicken or the egg?
 ,*** forksFolder
-,**** mystical           (the subscribee-as-such; empty so far)
+,**** mystical           (the forkee as such; empty so far)
 #+end_example
 
 When Egg Man later extends =mystical=:
@@ -204,7 +204,7 @@ When Egg Man later extends =mystical=:
 #+end_example
 
 his two new children — which you have not integrated — show up under the
-subscribee-as-such:
+forkee as such:
 
 #+begin_example
 ,*** eggy mysticism      «Kĥ»
@@ -218,28 +218,28 @@ subscribee-as-such:
 Since [[file:./tree-folding-is-powerful.org][branches can be folded]], even
 hundreds of new originals' children need not clutter your view. To
 integrate one, move it into your clone's own content; it then drops out
-of the subscribee-as-such (it is now contained). You can also hide
+of the forkee as such (it is now contained). You can also hide
 individual children.
 
 *** Writing in an unintegrated child integrates it
 
 Writing anything within an unintegrated child, where the
-subscribee-as-such draws it, integrates that child for you: typing
+forkee as such draws it, integrates that child for you: typing
 a reply under it (which forks it, if it is foreign), editing it, or
 editing anything below it. The save appends the child to the
-subscriber's content, by the ID the original's list names, and moves
-its headline, with what you typed, to the end of the subscriber's
+forker's content, by the ID the original's list names, and moves
+its headline, with what you typed, to the end of the forker's
 content; the count of unintegrated children falls by one. Your fork
 of it, if the edit made one, is drawn in its place there, since a
-view of your own note follows your forks. Read as mail, with the
+view of your own note is drawn from your perspective. Read as mail, with the
 forks folder of your fork of someone's inbox note as the list of
 messages you have not touched, a reply files the message it answers.
 
-This happens only where the save writes the subscriber's content: an
-editable subscriber in a skgrepo you own. It files only a child the
+This happens only where the save writes the forker's content: an
+editable forker in a skgrepo you own. It files only a child the
 original's list names (not a node you placed under the
-subscribee-as-such yourself), and nothing the subscriber already
-contains, hides, or holds a fork of. Where the subscriber is
+forkee as such yourself), and nothing the forker already
+contains, hides, or holds a fork of. Where the forker is
 someone else's (you are reading another's fork of a note), nothing is
 filed, and if your edit forked something there, the view, drawn from
 that owner's perspective, goes on drawing the mirror that owner's
@@ -274,7 +274,7 @@ placing =X'= drops no hide of =X=.
 
 Each save says what it hid and stopped hiding, since no edit shows a
 hide: "Hides 'X' from 'C', as content of 'N'." And a child that left
-a subscriber without hiding anything earns "Hides nothing:", with the
+a forker without hiding anything earns "Hides nothing:", with the
 rule that held, most often that the child is no content of =N= and
 a mirror of none of it. Emacs shows the lines in the echo area after the
 save, Neovim notifies them, and skg-for-ai prints them in the report

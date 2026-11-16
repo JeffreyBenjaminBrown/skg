@@ -2143,7 +2143,7 @@ What a save turns the buffer into, in order:
 - a *nodeInstruction* ('NodeInstruction': 'Save' or 'Delete') is a
   nodeIntent after disk supplementation: complete, ready to write.
 - the *savePlan* ('SavePlan') is everything one save applies: its
-  nodeInstructions, plus forks and nodeMerges.
+  nodeInstructions, plus fork operations and nodeMerges.
 
 *** the nodeInstructions phase, the nodeMerge phase
 
@@ -2269,7 +2269,7 @@ someday let the second member record one; 'RecorderwardRelmap' in
 
 A /git-commit/ is git's. A /skgsave-commit/ is the step of a save that
 writes the .skg files and swaps in the new graph; a save that stops to
-ask for confirmation (forks, Hoist, strandeds, delete-from)
+ask for confirmation (fork operations, Hoist, strandeds, delete-from)
 skgsave-commits nothing. A
 /tantivy-commit/ makes search-index writes visible; a save's happens
 later, on a background worker. Where context leaves no doubt (HEAD, a

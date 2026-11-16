@@ -1668,7 +1668,7 @@ Questions: Q8 (the part, the perspective, the command), Q4.
 - This slice changes what the server writes into buffers: run the
   suites as slice 2 does.
 
-** TODO Slice 9: the last sweep, and the handoff
+** DONE Slice 9: the last sweep, and the handoff
 - 'git grep -n -i -E "subscri|overrid"' over 'server', 'shared',
   'elisp', 'nvim', 'tools/skg-for-ai', 'tests', 'bash' and 'docs' (not
   '-old' docs, 'TODO/', or the false friends of "Vocabulary"): each

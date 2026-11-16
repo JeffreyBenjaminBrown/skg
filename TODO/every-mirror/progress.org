@@ -1522,3 +1522,253 @@ to 'tests/integration/perspective/'.
   in the code commit and moved to 'TODO/DONE/problems.org' in the last.
 *** DONE
 The slice's headline in '1_plan.org' is DONE.
+** Slice 9: the last sweep, and the handoff
+*** Commits
+- 47202822 every-mirror plan 1 slice 9: the fork rules' module and names
+- dc90bfd5 every-mirror plan 1 slice 9: the tests speak of forks and mirrors
+- (the commit carrying this record) every-mirror plan 1 slice 9: docs, handoff, record, DONE
+*** Suites
+All green; no failure to classify.
+- Before 47202822: the tests of the renamed module ('fork_rules',
+  'init_refusal', 'complete_validation', 'prepared_graph_update',
+  'partner_folder_matrix'): 33 of 33.
+- During the test sweep, per binary, each on the final files of its
+  part: 'grouped_forks' 30 of 30; 'grouped_views' and 'grouped_repos'
+  319 of 319; 'grouped_saves', 'grouped_unit' and the lib 894 of 894
+  (the marks test 'a_marks_file_loads_whole_once_the_forks_migration_has_run'
+  among them); the AI tool's tests PASS; 'bash/emacs-tests.sh' 503 of
+  503; 'bash/nvim-tests.sh' no failure; the integration tests
+  'forked-direct-visit', 'fork-chain', 'fork-owned' and 'fork' with
+  each client. After the shared 'hidden_from_forks' fixtures were
+  renamed: 'hidden_from_forks' and the extraction tests, 58 of 58.
+- 'bash/integration-tests.sh': 38 of 38 (the Emacs pass), first run.
+- 'bash/all-tests.sh', first run, on dc90bfd5's tree: all pass: build,
+  Emacs 503 of 503, Neovim (no failure), nextest 1243 of 1243,
+  doctests, team tools, AI reader, integration 76 of 76 (both
+  clients).
+Logs: 'tests/results/every-mirror/slice9-plan1/' (A-grouped_forks.log,
+B-views-repos.log, C-saves-unit-lib.log, D-ai-tool.log, D-emacs.log,
+D-nvim.log, D-integration-*.log, integration.log, all-tests.out,
+all-tests-ALL.org).
+*** Names, for the slices after
+- 'server/dbs/in_rust_graph/override_invariants.rs' is 'fork_rules.rs'
+  ("the fork rules", as 'fork_rule_warnings' already said);
+  'OverrideInvariantViolation' is 'ForkRuleViolation';
+  'validate_override_invariants' is 'validate_fork_rules';
+  'derive_affected_override_scope' is 'derive_fork_rule_scope';
+  'validate_affected_override_invariants' is
+  'validate_fork_rules_of_affected_notes';
+  'describe_override_invariant_violation' is 'describe_fork_rule_violation';
+  'CompleteGraphError::Override' is 'CompleteGraphError::ForkRule';
+  'BufferValidationError::OverrideInvariantViolation' is
+  'ForkRuleViolation'; 'is_override_invariant_only' is
+  'is_fork_rule_violation_only'; 'GraphChangeSet::override_pids_to_check'
+  is 'fork_rule_pids_to_check' (trace counter 'fork_rule_pids_checked',
+  'tools/introspect/profile-with-org-report/' following). No message a
+  user sees changed. The tests: 'tests/dbs/in_rust_graph/fork_rules.rs'
+  (module 'in_rust_graph_fork_rules').
+- 'tests/extend_raw_overridden_children.rs' is
+  'tests/children_of_a_raw_root_are_raw.rs'; the integration test
+  'overridden-direct-visit' is 'forked-direct-visit'.
+- Fixtures (file, pid, title and every reference together):
+  'tests/extend_partner_folder_member/fixtures' ('Subscribee*' as
+  'Forkee*', 'Overridden*' as 'SecondForkee*', 'Overrider*' as
+  'Forker*', 'SubscriberLeaf' as 'SLeaf'); 'tests/merge/merge_nodes/fixtures'
+  ('1-subscribes-to' as '1-forks', 'overridden-by-1' as '1-forks-too',
+  'subscribes-to-1' as 'forks-1', 'overrider-of-1' as 'forks-1-too',
+  'hides-1-from-subscriptions' as 'hides-1',
+  'hidden-from-1s-subscriptions' as '1-hides',
+  'hidden-from-subscriptions-of-1-but-in-content-of-2' as
+  '1-hides-but-2-contains'); 'tests/delete_strips_references_from_neighbors'
+  ('subscriber', 'hide-subscriber', 'hide-subscribee', 'overrider' as
+  'forker', 'hide-forker', 'hide-forkee', 'second-forker');
+  'tests/save/none_node_fields_are_noops' ('sub_*_on_disk' and
+  'override_*_on_disk' as 'fork_1' to 'fork_5_on_disk');
+  'tests/repo_sets' ('ovr-sub-overrider' as 'ovr-sub-mirror'); the AI
+  tool's 'overridden-id' and 'overrider-id' as 'forkee-id' and
+  'forker-id' (and the expected files named for them), its title
+  "Second child, a subscriber" as "Second child, a forker".
+- Fixture folders: 'tests/hidden_from_forks/fixtures-{subscribee-edit,
+  overlapping-subscribees, overrider-of-subscribee-content}' as
+  'fixtures-{forkee-edit, overlapping-forkees, fork-of-forkee-content}'
+  (titles 'subscribee-1', 'subscribee-2', 'subscribee-e' as
+  'forkee-...', the title-matching helper with them);
+  'tests/initial_view_bfs/fixtures-content-vs-subscribers' as
+  'fixtures-content-vs-forkees'; 'tests/pruned_change_view/fixtures/{subscribee_member,
+  overrides}' as '{forker_member, mirrors}'.
+- About 110 test functions and 20 helpers, and every temporary folder
+  named for the old relations, renamed; none is cited outside the
+  tests.
+*** Every remaining hit of 'git grep -n -i -E "subscri|overrid"'
+Over 'server', 'shared', 'elisp', 'nvim', 'tools/skg-for-ai', 'tests',
+'bash' and 'docs' (not '-old' docs): 90 lines after the false friends
+the plan names ('tracing_subscriber', 'subscribe_to_repo_change_notices',
+'override_body', 'load_config_with_overrides', the relRepo "no
+override"). 'shared/' has none. They stay, grouped:
+**** The retired keys, and the migration (on purpose)
+- 'server/dbs/filesystem/retired_keys.rs' ('RETIRED_SKG_KEYS', its
+  doc comment) and 'tests/unit/retired_keys.rs'.
+- 'server/types/nodes/fs.rs:63': the serde alias
+  'hides_from_its_subscriptions', the October 2026 key, which the plan
+  keeps (behavior 2, "The format").
+- 'tests/init_refusal.rs' (the retired-keys case, its fixture text and
+  expected messages); 'tests/graph_straddle.rs:147' and
+  'tests/graph_straddle/fixtures/retired_keys_at_head/head/N.skg' (a
+  HEAD in the old format refused); 'tests/investigate_unknown_node.rs:180,189'
+  (a vanished blob in the old format still found);
+  'tests/unit/processed_store.rs:101' and
+  'tests/unit/processed_store/marks_before_the_forks_migration.json'
+  (a 'SubscribesTo' mark the tool drops); 'tests/unit/telescope.rs:510,515'
+  (the retired keys named; the kept October alias).
+- 'docs/api-and-formats.org' ("The .skg file format": the retired
+  keys and the October alias; "Processed marks file": the marks the
+  tool rewrites).
+**** Old names that must be refused (on purpose)
+- 'tests/dbs/in_rust_graph/relation_accessors.rs:372,378': the panic
+  on a stale "subscribesTo" triple ('find_related_nodes').
+- 'tests/unit/relRepo_info.rs:134': the relation string "subscribesTo"
+  refused.
+- 'tests/partner_folder_matrix.rs:568-571': the request '(folder
+  overrides)' refused.
+**** The relRepo "override" (a relRepo request, not the relation)
+- The clients' messages "Override removed ...", "No override present
+  ..." ('elisp/skg-metadata.el', 'nvim/lua/skg/metadata.lua'), their
+  tests ('tests/elisp/test-skg-set-relRepo.el', 'tests/nvim/metadata_spec.lua',
+  'tests/nvim/relRepo_info_spec.lua', the 'set-relRepo' integration
+  test), 'server/refresh/viewnodestats.rs:592,640,649' (no relRepo
+  "override herald" for a default relRepo), 'tests/forks_folder_by_default.rs:50',
+  'docs/glossary.org:1228' ("overrides sticky").
+**** Plain English "override" and "subscription"
+- A setting or style that overrides another: 'bash/nextest.sh',
+  'bash/run-plan-slices.sh', 'bash/test-runner-lib.sh',
+  'tests/integration/run-all-tests.sh' ("Override with SKG_..."),
+  'elisp/skg-request-save.el:1185' (buffer-local key overrides),
+  'elisp/skg-id-search.el:637', 'elisp/skg-sexpr/skg-lens.el:92',
+  'tests/elisp/test-skg-lens.el', 'tests/nvim/lens_spec.lua',
+  'tests/elisp/test-skg-fork-confirmation.el:225',
+  'server/test_utils.rs' (the doc of 'load_config_with_overrides'),
+  'tests/file_io.rs:63,122' and its fixture config, 'tests/tantivy.rs:811'
+  and 'docs/COMMANDS.org:318' (parens override precedence),
+  'docs/heralds.org:51' (a face), 'docs/nvim-client-deviations.org:185'
+  (a statusline).
+- 'bash/claude-usage.sh:2': a Claude subscription.
+**** Essays and importer input
+- 'docs/skg-enables-deep-sharing.org' ("Subscribe granularly") and
+  'docs/networking-and-scale.org': Jeff's essays on following other
+  people's notes, in the everyday sense, outside the code map. The
+  second also says "mirrors" for copies of a popular user's server: a
+  word plan 1 coined for a note's mirrors (see "Unfinished").
+- 'tests/import_md_and_org_samples/docs/': frozen importer input.
+*** Deviations from the plan's "how"
+**** Logs under 'tests/results/every-mirror/slice9-plan1/'
+As the launch brief said.
+**** "Fork rules", not a name with "invariant"
+The module now holds only the rules of an owned note's forks,
+contents and hides, which the startup warnings and 'complete_validation.rs'
+already called "the fork rules" ('fork_rule_warnings'); the names
+follow them.
+**** The test sweep was delegated in four parts
+To four forks of this agent, each over one disjoint set of test
+binaries or client tests, each running only its own binaries; their
+reports were checked against the diff, and the fixtures two parts
+shared (the 'hidden_from_forks' titles and folders the extraction
+tests read) were renamed afterwards, in one step.
+**** Two vacuous assertions now check the current token
+'tests/view_stats_sharing.rs' asserted that a view root's line lacks
+"overridesParent", and 'tests/save_stale_buffers.rs' that no file
+holds "overrides" after an unedited stale foreign node is saved. Since
+slice 5 neither string can appear, so neither could fail. They now
+check "(forks (out" with "(ancestors 1)" (the positive twin's
+condition, in the same file) and "forks:". Both pass; both are the
+fixture adaptations slices 5 and 8 missed.
+**** Wording fixed beyond the grep
+- 'docs/sharing-model.org': "A view follows one author's forks"
+  said that only the root author's forks substitute; under Q1 the
+  author's skgrepo list ranks every mirror, a third author's
+  included, so the bullet now says that. Its paragraph on the
+  "hidden from this subscription" folders named labels that no folder
+  has and called both folders write-protected; it now names the two
+  compound folders by their atoms and labels, the hidden-outside one
+  editable (removing a member unhides it), as slice 6 made it.
+- 'docs/mirrors.org': its reference to "merge collision diagnostics"
+  (removed in slice 3) is the graph validation of a save or a
+  nodeMerge.
+- 'docs/forks.org': "a view of your own note follows your forks" is
+  "is drawn from your perspective".
+- 'server/types/errors.rs', 'server/rerender_pass.rs',
+  'server/refresh/goal.rs', 'server/from_text.rs',
+  'server/types/viewnode.rs', 'elisp/skg-request-views.el',
+  'nvim/lua/skg/views.lua': comments and a docstring that spoke of a
+  clone overriding its original, or of an override chain.
+**** The processed marks file, in the API doc
+"Processed marks file" now says that a marks file of the old relations
+is unreadable whole, and that the tool rewrites it.
+**** 'TODO/problems.org'
+Every entry this plan fixed was already moved by slices 3, 5 and 8,
+but one: "glossary.md's read-only-set example mislabels the
+subscriberFolder" (slice 6 rewrote the example with the hider folder),
+moved to 'TODO/DONE/problems.org'. Left open, since this plan did not
+fix them: "An explicit fork of a private node names it in the clone's
+home" (one 'forks' record now, the same leak), "The moved-hide warning
+names restricted subscribees", "A headline typed under an editable
+subscribee as such is created, then lost" (plan 2), and the partial
+"The unreadable-files report names the REPO FOLDER" (slice 5). Their
+words are older than the forks relation; 'TODO/' is outside the
+sweep.
+*** The handoff
+'tools/migrate-forks-2026-11/README.org' now gives each owner's exact
+commands, run from the repository's root, and the transition's order.
+Checked read-only against the code as it is:
+- 'data/jeff/skgconfig.toml' owns 'public', 'personal-ish',
+  'deciduous', 'personal-proc', 'personal-deprecated' and
+  'personal-most' (its 21 other entries are foreign: Claude's two and
+  the 19 team skgrepos). 'data/claude/skgconfig.toml' owns 'public',
+  'private' and 19 'team/*/notes', exactly the directories under
+  'data/claude/team'; Jeff's five there are foreign. Each skgrepo is
+  its own gitrepo.
+- Neither config states 'processed_marks_file', so the marks files are
+  'data/jeff/processed-marks-skgconfig.json' and
+  'data/claude/processed-marks-skgconfig.json' (17 bytes each, no
+  marks); the older 'readiness-marks-skgconfig.json' beside each is
+  not read while those exist.
+- The tool renames 'HidesFromSubs' marks to 'Hides', the serialized
+  name of 'NodeRelation::Hides'; the lib test that loads such a file
+  whole passed in this slice's runs.
+- The README's order: both servers stay on their old binaries until
+  both owners have migrated and committed; Jeff migrates, then Claude
+  in a session Jeff asks for; then the release binary is rebuilt and
+  both restart; then the AI tool's saved views are fetched again.
+  Added: from the first run of the tool until the restart, no save,
+  processed mark or stage-and-commit through either old server
+  (stopping both first is safer). An old binary does not know 'forks'
+  or 'hides': its repo watcher would reload a migrated file without
+  them, and a save of that note would write it back without its forks
+  and hides; its marks file, rewritten from memory, would bring back
+  the dropped marks. Also added: commit unrelated work in a skgrepo
+  before 'git -C SKGREPO commit -am'.
+- The README's counts (08:20 UTC) were not recounted: that would mean
+  running the tool on 'data/'.
+No agent migrated data, built a release binary, or touched the live
+servers.
+*** Fixtures changed
+Only renamed, as listed under "Names" (contents changed only where an
+ID or title moved). No fixture's graph changed.
+*** Unfinished, and notes for Jeff
+- The transition itself, as the plan says: Jeff's to run, with the
+  README. Its step 2 (no writes through an old server once the tool
+  has run) is new to the plan's order; whether to stop both servers
+  for the window is Jeff's call.
+- 'docs/networking-and-scale.org' uses "mirrors" for copies of a
+  popular user's server, and 'docs/skg-enables-deep-sharing.org'
+  "subscribe" for following: Jeff's essays, left as he wrote them.
+  The first now collides with the coined "mirror" (a synonym report,
+  per 'coding-advice/names.org').
+- Slice 7's note that "a fork" can mean the note or the relationship:
+  the sweep wrote "fork" where the sentence is about the relationship
+  and the reading is clear, and "'forks' relationship" where it is not;
+  no further pass.
+- Fixture IDs in 'tests/partner_folder_matrix.rs' ('wSub-*', 'wOvr-*',
+  'omSub-*', 'omWsub-*') keep their abbreviations; they hold no
+  searchable old word.
+*** DONE
+The slice's headline in '1_plan.org' is DONE.

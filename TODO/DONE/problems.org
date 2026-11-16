@@ -1,3 +1,19 @@
+* glossary.md's read-only-set example mislabels the subscriberFolder (noted 2026-07-11; fixed 2026-11-16)
+  Fixed in every-mirror plan 1, slice 6: the subscriber folder is gone,
+  and the glossary's "write-protected set" example uses the hider
+  folder; slice 9 found no 'subsribee' typo left. The entry as it stood:
+    Found while researching TODO/DONE/privacy-telescope/2_discussion.org.
+    Both are documentation defects, not code bugs.
+  ** glossary.md's read-only-set example mislabels the subscriberFolder
+     In the "read-only set" entry, the example view shows R and T (the
+     subscribers of N) under a =subscriberFolder=, but the prose then says
+     'The subscriberFolder ("collection of subscribees") is a read-only
+     set' -- it is a collection of SUBSCRIBERS -- and continues "the
+     user could flip the order of R and T in the subscribeeFolder", naming
+     the wrong folder. Two-word fix ("subscribers", "subscriberFolder").
+     Adjacent cosmetic typos in the same region: "if nodes R and T
+     subscribe to nodes N" (should be "node N"), and "subsribee1" /
+     "subsribee2" in the earlier "subscribee as such" diagram.
 * Architecture note: "drawn in place of another node" is override-specific data (noted 2026-06-10; fixed 2026-11-16)
   Fixed in every-mirror plan 1, slice 8: the part is '(inPlaceOf N)',
   the field 'in_place_of' on the occurrence, named for what it says (a

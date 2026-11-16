@@ -26,7 +26,47 @@ git -C SKGREPO commit -am 'Migrate to forks'
 #+end_src
 The tool prints that line for each changed directory that is in a
 gitrepo. Until the commit, the diff view and stage-and-commit refuse,
-since HEAD is still in the old format.
+since HEAD is still in the old format. '-am' commits every tracked
+change in the gitrepo, so commit any unrelated work there first.
+
+The commands below are run from the root of the skg repository. Each
+owner passes exactly the skgrepos their own config owns, and their
+own marks file: 'processed-marks-skgconfig.json' beside the config,
+which states no 'processed_marks_file' (the server's
+'SkgConfig::processed_marks_path'). The older
+'readiness-marks-skgconfig.json' beside each is not read while the
+new file exists, so it is not passed. Each skgrepo below is its own
+gitrepo.
+** Jeff's
+'data/jeff/skgconfig.toml' owns six skgrepos; the rest of its
+entries, Claude's and the team's, are foreign there.
+#+begin_src sh
+python3 tools/migrate-forks-2026-11/migrate.py --dry-run \
+  --marks data/jeff/processed-marks-skgconfig.json \
+  data/jeff/public data/jeff/personal-ish data/jeff/deciduous \
+  data/jeff/personal-proc data/jeff/personal-deprecated \
+  data/jeff/personal-most
+#+end_src
+Then the same without '--dry-run', then, for each directory the tool
+names (only 'data/jeff/public' held any key on 2026-11-16):
+#+begin_src sh
+git -C data/jeff/public commit -am 'Migrate to forks'
+#+end_src
+** Claude's
+'data/claude/skgconfig.toml' owns 'public', 'private' and the 19
+team skgrepos 'team/*/notes' (every directory under 'data/claude/team'
+on 2026-11-16, each named in the config); Jeff's five there are
+foreign.
+#+begin_src sh
+python3 tools/migrate-forks-2026-11/migrate.py --dry-run \
+  --marks data/claude/processed-marks-skgconfig.json \
+  data/claude/public data/claude/private data/claude/team/*/notes
+#+end_src
+Then the same without '--dry-run', then, for each directory the tool
+names (only 'data/claude/public' held any key on 2026-11-16):
+#+begin_src sh
+git -C data/claude/public commit -am 'Migrate to forks'
+#+end_src
 
 * What it does to each file
 ** The relations
@@ -108,17 +148,29 @@ self-forks, no marks to drop (both marks files were empty), no file
 refused. A second run changed nothing.
 
 * The order of the transition
-1. The running servers keep running on their old binaries. Neither is
-   restarted on the new code before both owners have migrated, since
-   each reads the other's skgrepos as foreign, and a server refuses an
-   unmigrated skgrepo, foreign or owned.
-2. Jeff runs the tool, with '--dry-run' and then without, over his
-   skgrepos and marks file, compares the counts, and commits each
-   gitrepo.
-3. Claude does the same over its own, in a session where Jeff asks
-   for it.
-4. Both servers restart, on the new code.
-5. The AI tool's saved views are fetched again: they hold the old
+1. Both servers stay on their old binaries until both owners have
+   migrated and committed: neither is rebuilt or restarted on the new
+   code before then, since each reads the other's skgrepos as
+   foreign, and a new server refuses an unmigrated skgrepo, foreign
+   or owned.
+2. From the first run of the tool until the restart in step 4, make
+   no save, processed mark or stage-and-commit through either old
+   server; stopping both (and the loops that rerun them) before the
+   first run is safer still. An old binary does not know the keys
+   'forks' and 'hides': its repo watcher reloads each migrated file
+   without them, and a save of that note would write it back without
+   its forks and hides. Its marks file, written from memory after any
+   change of marks, would bring back the marks the tool dropped, and
+   one such mark makes the file unreadable to the new server.
+3. Jeff runs the tool over his skgrepos and marks file ("Jeff's",
+   above), with '--dry-run' and then without, compares the counts,
+   and commits each changed gitrepo.
+4. Claude does the same over its own ("Claude's", above), in a
+   session where Jeff asks for it.
+5. The release binary is rebuilt on the new code, and both servers
+   restart on it. The new code reads the 'Hides' marks the tool
+   writes.
+6. The AI tool's saved views are fetched again: they hold the old
    folder atoms and parts.
 
 * Tests

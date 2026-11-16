@@ -2327,7 +2327,12 @@ the relation is named by its 'NodeRelation' variant (="Contains"=,
 or ="RelRepo"=. N is the fingerprint
 of the change the mark approved, a hash of the leaf's before and after
 values; a mark whose fingerprint no longer matches the current change
-counts as absent.
+counts as absent. A marks file written before the relations retired in
+November 2026 (see "The .skg file format") may name ="SubscribesTo"=,
+="Overrides"= or ="HidesFromSubs"=; one such mark makes the whole file
+unreadable, so the migration tool rewrites it
+(=tools/migrate-forks-2026-11/migrate.py --marks FILE=): it drops the
+marks of the first two and renames the third ="Hides"=.
 
 ** Example
 

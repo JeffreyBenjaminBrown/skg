@@ -832,19 +832,6 @@ gap too. Details, options and questions:
    recorder could remove most non-content dangling relationships. These
    paths need raw-ID-aware enumeration and a true Unknown case if the
    deletion policy covers all four structured outbound fields.
-* Problems noted while writing the autofork discussion (2026-07-11)
-  Found while researching TODO/DONE/privacy-telescope/2_discussion.org.
-  Both are documentation defects, not code bugs.
-** glossary.md's read-only-set example mislabels the subscriberFolder
-   In the "read-only set" entry, the example view shows R and T (the
-   subscribers of N) under a =subscriberFolder=, but the prose then says
-   'The subscriberFolder ("collection of subscribees") is a read-only
-   set' -- it is a collection of SUBSCRIBERS -- and continues "the
-   user could flip the order of R and T in the subscribeeFolder", naming
-   the wrong folder. Two-word fix ("subscribers", "subscriberFolder").
-   Adjacent cosmetic typos in the same region: "if nodes R and T
-   subscribe to nodes N" (should be "node N"), and "subsribee1" /
-   "subsribee2" in the earlier "subscribee as such" diagram.
 * Herald-system drift found while designing override-ancestry-in-search-results (2026-07-21)
   Context: the uniform-herald refactor (server/herald_tokens.rs) folded
   the old per-atom graphStats counts and the per-relation viewStats

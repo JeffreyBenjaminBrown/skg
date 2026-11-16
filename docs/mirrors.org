@@ -70,8 +70,7 @@ substitution").  Among them, the hit the user's skgrepo list ranks
 first stands, ties going as rules 1 and 2 of "Which mirror stands"
 say and then to the least pid; if it is owned, every other hit among
 them is suppressed at the top level, and one it forks or that
-forks it directly reappears in its subscribee or subscriber
-folder.  A suppressed hit related to it only through other mirrors
+forks it directly reappears in its forks folder.  A suppressed hit related to it only through other mirrors
 reappears in neither.
 A foreign hit never suppresses another top-level result, although
 visible foreign relatives can occur in the folders: a
@@ -347,7 +346,7 @@ The other relationship-driven presentation paths do not have the same
 problem:
 
 - =contains= memberships are relRepo-gated before the refresh computes a
-  content goal, including the contains-minus-hides treatment of a subscribee;
+  content goal, including the contains-minus-hides treatment of a forkee as such;
 - =hides= and the containment memberships used to
   derive the hidden-in and hidden-outside folders are gated in the
   refresh's goals;
@@ -380,10 +379,10 @@ not perform interactive mirror substitution.
 - [[file:../server/serve/handlers/text_search.rs][the search results' folders ('draw_search_buffer')]]
 - [[file:../server/from_text/fork.rs][implicit and explicit fork construction]]
 - [[file:../server/nodeMerge/nodeMergeInstructionTriple.rs][merge list combination]]
-- [[file:../server/dbs/in_rust_graph/prepared_update.rs][merge collision diagnostics]]
+- [[file:../server/dbs/in_rust_graph/prepared_update.rs][the graph validation of a save or a nodeMerge]]
 - [[file:../server/save.rs][delete propagation]]
 - [[file:../server/export_org.rs][raw contains-based Org export]]
 - [[file:../server/dbs/in_rust_graph/relation_accessors.rs][relRepo-gated relationship access]]
 - [[file:../server/dbs/in_rust_graph/stats.rs][repo-set-gated herald counts]]
 - [[file:../tests/forks_under_search_hits.rs][search folder regression coverage]]
-- [[file:../tests/integration/overridden-direct-visit/][exact-visit integration coverage]]
+- [[file:../tests/integration/forked-direct-visit/][exact-visit integration coverage]]
