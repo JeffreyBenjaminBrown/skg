@@ -1711,8 +1711,16 @@ buffer already shows write-protected stays so at a plain rerender;
 forkee as such saves its title and body when the user owns it (a
 foreign one's must match the disk), and a headline typed under it
 joins its content when the user owns it (the save is refused under a
-foreign one). An editable forkee as such
-additionally includes its nonempty =hiddenInForkPartnerFolder=;
+foreign one). Each forker as such (a member of that =forksFolder=
+claiming nothing, which forks the occurrence's note and is not
+forked by it) is drawn the same way, showing what it adds to the
+note's content; its title and body, and a headline typed under it,
+are read as a forkee as such's, never its content as its whole
+list, and a save that cuts one of its children is refused, for now.
+An editable member as such of either kind additionally includes its
+nonempty =hiddenInForkPartnerFolder=, first; an editable forker as
+such its nonempty =hiddenByForkPartnerFolder= (what it hides of the
+note's content), after that;
 =hiddenOutsideOfForkPartnersFolder=, when nonempty, stands last in
 every =forksFolder= of a content view. Use a
 folder request for the other relation folders; their potential
@@ -1751,8 +1759,9 @@ no folder unasked but where something changed.
   no chain hangs directly under it. Where the refresh draws one that
   is no repeat (an occurrence of a node another occurrence holds the
   editability of), it draws a =containerFolder= under it, as its
-  first child (after a =hiddenInForkPartnerFolder=, if one is added
-  later, before every other child), its members marked =folded=, so
+  first child (after a =hiddenInForkPartnerFolder= and a
+  =hiddenByForkPartnerFolder=, if they are added later, before every
+  other child), its members marked =folded=, so
   that only the folder's headline shows; each of its members carries
   the chain as above, and the folder, like any, lists no
   view-ancestor and is pruned when empty. A repeat gets nothing. A
@@ -1919,18 +1928,18 @@ incoming side adds =(substantive COUNT (ancestors GEN...))= for the
 subset whose skgrepo has a nonempty body, visible direct content, or
 more than one distinct visible resolved target. Its outgoing side
 counts distinct visible resolved targets. An applicable
-forkee-as-such =contains= outgoing side adds =(unintegrated COUNT
-(ancestors GEN...))=, including when both counts are zero; absence of
-that subform means the role does not apply. The numerator counts
-members not already directly contained or hidden by that
-occurrence's forker. Subset counts cannot exceed their side's
+member-as-such =contains= outgoing side (a forkee or forker as such)
+adds =(unintegrated COUNT (ancestors GEN...))=, including when both
+counts are zero; absence of that subform means the role does not
+apply. The numerator counts members not already directly contained
+or hidden by the note whose forks folder holds the occurrence. Subset counts cannot exceed their side's
 total. The ancestors counted are the viewparent, or, for a folder
 member, the vognodes of the folder's required ancestry. A child
-claiming nothing under a forkee-as-such -- content its forker
-hides, which the refresh keeps there, unwarranted, while it holds a
-subtree or the user keeps it -- also counts the forker, three
-generations up, on its =hides= incoming side, as a
-=hiddenInForkPartnerFolder= member does.
+claiming nothing under a member as such -- content the note hides,
+which the refresh keeps there, unwarranted, while it holds a subtree
+or the user keeps it -- also counts the note, three generations up,
+on its =hides= incoming side, as a =hiddenInForkPartnerFolder=
+member does.
 
 =(props (aliases K) (extraIds K) (flags K))= holds the property
 counts, each present only when nonzero; =(props ...)= is absent when
@@ -1965,6 +1974,7 @@ neither, and carries none.
 | container-folder member          | =(contains out 2)=                            |
 | mentioner-folder member          | =(linksTo out 2)=                             |
 | hidden-in-fork-partner member    | =(hides in 4) (contains in 2)=                |
+| hidden-by-fork-partner member    | =(hides in 2) (contains in 4)=                |
 | hidden-outside member            | =(hides in 3)=                                |
 | mirror shown (inPlaceOf)     | =(forks out)= or =(forks in)=                                |
 A member of an acquisition folder carries none: a nodeMerge is no
@@ -2575,6 +2585,7 @@ Partner folders are represented in Rust as
 remains the established bare non-vognode atom:
 =forksFolder=,
 =hiderFolder=, =hiddenFolder=, =hiddenInForkPartnerFolder=,
+=hiddenByForkPartnerFolder=,
 =hiddenOutsideOfForkPartnersFolder=, =containerFolder=, =mentionerFolder=,
 or, in the diff view only, =acquiredByFolder= or =acquiredFolder=;
 and, outside the diff view, =illegalEditFolder=.
@@ -2638,7 +2649,7 @@ member, a removed member, a folder member, a root, and a ghost.
 The relationship that HEAD lacks (=added=) or the worktree lacks
 (=removed=). Under a vognode it is the viewparent's content; in a partner
 folder it is the relationship, of the folder's kind, between the
-member and the folder's viewparent (the two compound partner folders
+member and the folder's viewparent (the three compound partner folders
 carry none). On an alias, id or flag member, the single diff object
 is written =(rel added)= or =(rel removed)=: the member's existence
 in its list. A removed alias or ID (below) carries =(rel removed)=.

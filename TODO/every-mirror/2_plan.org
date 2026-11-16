@@ -824,7 +824,7 @@ Questions: Q2, Q3, Q4, Q5, Q8.
   api-and-formats; both COMMANDS docs; 'docs/sharing-model.org'.
 - Run the suites as slice 1 does.
 
-** TODO Slice 3: each forker as such drawn like a forkee as such
+** DONE Slice 3: each forker as such drawn like a forkee as such
 Questions: Q2, Q4, Q5, Q8, Q9.
 - The traversal first (pitfall "A forker as such would be
   save-eligible"): a context for a member of the forks folder claiming

@@ -2387,3 +2387,252 @@ For Jeff, not blocking: a node pasted (not typed) under a forkee joins
 nothing; save refusals reach the client labelled "Database error"; a
 note with many forks spends its node budget on them in level order,
 before deeper content.
+** Slice 3: each forker as such drawn like a forkee as such
+*** Commits
+- d22c3acf every-mirror plan 2 slice 3: the save reads a forker as such's content as what it shows
+- 908c9f81 every-mirror plan 2 slice 3: forkers as such drawn editable, with the folders of what each side hides
+- (the commit carrying this record) every-mirror plan 2 slice 3: docs, record, DONE
+*** Suites
+- The save first, alone (d22c3acf): 'bash/nextest.sh' first run 785
+  of 786 with fail-fast; the one failure,
+  'delete_strips_references_from_neighbors' (its
+  'delete_in_foreign_forkee_rerenders_as_unknown' deleted a node by a
+  delete request on a forks-folder member claiming nothing, which a
+  member as such now ignores, as the plan says: "delete and nodeMerge
+  requests stay unsaved there"), an expected adaptation: the victim is
+  now deleted as a root of its own. Then 1253 of 1253. The unit test
+  'editable_member_of_write_protected_folder_emits_for_itself_only'
+  ('tests/new/local_fieldintent_collection/traverse.rs') pinned the
+  very danger the slice closes (an editable forker-only member
+  emitting its shown children as its whole contains); it is replaced
+  by 'forker_as_such_emits_its_text_and_visibility_but_no_contains'
+  and 'foreign_forker_as_such_emits_a_text_claim'. Two message checks
+  adapted: the text claim's message now says "a foreign node shown as
+  a member of a forks folder" ('extraction.rs'), and the pipeline
+  test's new intruder joins nothing changed (comment only). Emacs 503
+  of 503, Neovim no failure, the AI tool PASS, first runs. The pins
+  were checked against the old reading: restoring
+  'UnderWriteProtectedFolder' for a member claiming nothing made
+  'an_unchanged_save_of_an_editable_forker_writes_nothing' fail, T's
+  file losing X1, X3 and Z and gaining hides of X1 and X3.
+- The refresh (908c9f81): 'bash/nextest.sh' first run (no fail-fast)
+  1239 of 1254 after one compile fix ('tests/refresh/ancestry.rs'
+  read 'CompoundFolderParties::forkee', now 'container'). All 15
+  failures expected fixture adaptations, each pinning a forker-only
+  member drawn write-protected and bare, or the absence of the
+  unintegrated count on one:
+  'refresh::tests::claims::in_a_forks_folder_a_member_claims_only_what_its_viewparent_forks',
+  'refresh::tests::chain::a_forks_folder_member_carries_its_chain_in_a_folded_containers_folder',
+  five 'refresh::tests::substitution' tests (a freshly drawn forker is
+  editable, with its own forks folder holding its note, a repeat),
+  'forks_folder_by_default::test_forks_folder_appears_for_forkers',
+  'hidden_nodes' (two), 'initial_view_bfs', 'hidden_from_forks' (a
+  repeat forker now carries '(unintegrated N)' on its contains
+  out-side, as a forkee as such does), 'content_view' (forker 3 in
+  4's forks folder is now drawn editable first in level order, so the
+  mutual 3 in 5's forks folder is the write-protected one: the plan's
+  "Repeats depend on level order"; plus the counts), and
+  'partner_folder_matrix::relationship_matrix' (its forker-only
+  scenarios swapped, inserted after and deleted single lines; a
+  forker now carries a subtree, so they move whole subtrees:
+  'subtree_of', 'swap_subtrees'). Then 1254 of 1254.
+- The AI tool's tests (after 'cargo build --bin skg'): first run 3
+  failures, then each fixed in turn (its checks share one graph), all
+  expected adaptations: the compact views
+  'forest-forks_fred-note-id' (the forker "Second child, a forker"
+  drawn editable, with "☮ a hides these, which c contains." holding
+  the detail of Fred's it hides, and its own forks folder) and
+  'forest-aliases_forkee-id' (rewritten with '--update-expected');
+  'R_SHOWING_A', 'R_SHOWING_U', 'R_SHOWING_B' (M's forkers A, B and U
+  editable where no repeat, each with its forks folder; K's viewnode
+  ID 0k is 0o), and the daemon check's retitled U, editable now, so
+  without the '☮B' 'once_u_has_a_body' adds to a write-protected U.
+  Then PASS.
+- 'bash/emacs-tests.sh' 503 of 503; 'bash/nvim-tests.sh' no failure
+  (both read the new rendering case); first runs.
+- 'bash/integration-tests.sh' (the Emacs pass): 38 of 38, first run.
+- 'bash/all-tests.sh', first run: all pass: build, Emacs 503 of 503,
+  Neovim (no failure), nextest 1254 of 1254, doctests, team tools, AI
+  reader, integration 76 of 76 (both clients). The docs were written
+  before it; no code changed after it.
+- End to end, per '/verify', twice, each an isolated
+  'target/debug/skg' on port 24863 with this slice's fixture as
+  scratch data. After the save change alone: a hand-built buffer
+  showing T editable with only Y, saved unchanged, wrote no file; the
+  same without Y was refused ("Cannot cut Y from T ('T'), shown as a
+  forker in the forks folder of N ('N'): cutting from a forker, which
+  is to make N fork it, is coming but not yet supported. ..."), no
+  file written. After the refresh change: a fresh view of N drew K,
+  then FF (f1), R (nothing but its forks folder) and T (Y), each
+  editable; under T "☮ It contains these, but c hides them." (Z),
+  then "☮ a hides these, which c contains." (X2), then its forks
+  folder, then Y. That view saved unchanged: no file changed (md5 of
+  every file). A headline typed under T after Y: a new node, and
+  T.skg contains [X1, X3, Y, new, Z]; only T.skg and the new file
+  changed. Each server stopped by its PID, the port checked free, the
+  scratch data deleted; transcripts in
+  '/tmp/claude-1000/every-mirror-p2s3/verify/transcript/'.
+Logs: 'tests/results/every-mirror/slice3-plan2/' (nextest-commit1.log,
+emacs-commit1.log, nvim-commit1.log, ai-tool-commit1.log,
+nextest-first.log, nextest.log, ai-tool-first.log, ai-update.log,
+ai-tool.log, emacs.log, nvim.log, integration.out, all-tests.out,
+all-tests-ALL.org, all-tests-nextest.log). 'tests/results/every-mirror/'
+was copied out before 'bash/all-tests.sh' and put back after it.
+*** Every reader of 'Folder::Forks' in 'server/from_text/'
+The pitfall "A forker as such would be save-eligible" asks for this
+list; each now asks "member as such" of both kinds.
+- 'traverse.rs' ('visit', 'recurse_under_vognode',
+  'visit_forks_folder'): a claiming member is visited in
+  'ForkeeAsSuchPosition', one claiming nothing in the new
+  'ForkerAsSuchPosition'; neither is save-eligible
+  ('MemberAsSuchContext' in 'visit_occurrence'). Owned, either saves
+  its title and body; foreign, a text claim; under an editable note,
+  a forkee gives the note the forkee-visibility signal and a forker
+  the new forker-visibility signal ('FieldIntent::ForkerVisibility').
+  Its delete, nodeMerge and flag requests are ignored.
+- 'mod.rs' ('is_created_as_an_orphan'): unchanged; a child typed under
+  an editable member of either kind has a parent that reads claims,
+  so no orphan warning, and it joins or is refused.
+- 'validate_tree.rs' ('is_saveEligible_occurrence'): false for any
+  member of a forks folder, claiming or not, so a relRepo request on a
+  write-protected child of a forker as such is refused, as under a
+  forkee; 'is_forks_folder_member_claiming_nothing' and
+  'relRepo_request_is_collected' unchanged.
+- 'file_what_is_written_in.rs' ('saves_its_contains'): false for any
+  member; 'forkee_members_written_in' still files only what a forkee
+  shows (see "Unfinished").
+- 'buffer_to_viewnodes/local.rs' ('validate_forks_folder',
+  'validate_vognode_identity_and_structure', 'cannot_be_child_of_vognode'):
+  the hidden-in folder was already admitted under any forks-folder
+  member; the hidden-by folder is admitted there too, and both are
+  checked by 'validate_folder_under_a_member_as_such'.
+- Outside 'server/from_text/', the three clients' relRepo walks
+  ('skg--member-as-such-at-point-p', 'M.member_as_such_at_line_p',
+  the AI tool's 'member_as_such') prune below, and refuse a content
+  relRepo under, a member of either kind.
+*** Deviations from the plan's "how"
+**** The save landed in a commit of its own, before any forker is drawn editable
+As the plan's first bullet asks. Its pins use hand-built buffers
+('N_WITH_T_EDITABLE' in 'tests/forkers_drawn_editable.rs'), so they
+hold whatever the refresh draws.
+**** A signal of its own for forkers
+'FieldIntent::ForkerVisibility' ('types.rs'), lowered beside the
+forkee signal ('LoweringOutput::forker_visibility') and resolved by
+'resolve_forker_visibility' ('resolve_visibility.rs'), after the
+forkee loop and before the forks folder's removal step. A cut is read
+against what the view drew before the save: F's content less N's
+contains and hides on disk, by visible records, where F and N are
+fork partners either way ('are_fork_partners'), all of F's content
+otherwise. Reading against N's contains after the save would have
+refused an ordinary removal from N of a child a forker shares.
+**** A child N hides, shown under a forker, is unhidden now
+The plan puts this in slice 5's bullet. With the hidden-in folder
+drawn under forkers in this slice, a user moving a child out of it
+would otherwise see the gesture dropped silently; the forkee step's
+rule applies (refused under a foreign N, 'unhide_under_a_foreign_note'),
+and the conflict check counts a forker's shown children as "show it"
+('validate_no_overlapping_forkee_hiderel_conflicts'). Until slice 4
+the hidden-outside folder still lists N's hides that only a forker
+contains, and its own edit runs last, so a save that keeps that
+folder in the buffer hides such a child again; the test
+('a_hide_moved_out_under_a_forker_is_unhidden') leaves that folder
+out.
+**** A member as such the graph lacks contains what it shows
+A headline typed into a forks folder claiming nothing (a new node)
+was a save-eligible self-writer, so a child typed under it joined
+its contains ('pipeline_write_protected_folder_member_edits'). As a
+forker as such it no longer emits contains; with no list on disk
+there is nothing to lose, so resolution sets its contains to what it
+shows ('set_contains_of_new_member_as_such', 'lower.rs'). The same
+now holds of a new claiming member (a forkee typed there), whose
+typed children were silently dropped before.
+**** 'drawn_occurrence_editability' takes no claim again
+Slice 2 gave it a 'claims' parameter only to keep forker-only members
+write-protected; 'member_as_such_may_be_editable' (was
+'forkee_as_such_may_be_editable') no longer asks it, so it went.
+'extend_requested_content' passes the request to every
+write-protected member of the forks folder, claiming or not (Q8).
+**** Q9's folder: 'Folder::HiddenByForkPartner'
+The plan's name, atom 'hiddenByForkPartnerFolder', label "☮ a hides
+these, which c contains." (Jeff's letters; 'a' the viewparent, the
+forker, 'c' three up, the note: checked against 'docs/heralds.org',
+"Ancestor flags and floors"), both letters high (style keys
+'hiddenByForkPartnerFolder_hider' and
+'hiddenByForkPartnerFolder_container'). Goal: the forker's hides that
+the note contains, in the forker's hides order
+('hidden_by_fork_partner'); empty, so the folder goes, where its
+viewparent is no forker as such. It stands after the hidden-in
+folder, before the containers folder; members drawn folded; birth
+facts '(hides in 2) (contains in 4)'. 'CompoundFolderParties' has
+'hider' and 'container' (was 'forkee'); its ancestry row, shared with
+the hidden-in folder, is 'ANC_UNDER_A_MEMBER_AS_SUCH' (was
+'ANC_HIDDEN_IN').
+**** The unintegrated count on a forker as such
+'note_of_member_as_such' feeds the stats pass too, so every forker as
+such, a repeat included, now carries '(unintegrated N)' on its
+contains out-side, as a forkee as such does: what it adds to its
+note. Several expected views changed for it alone.
+**** Mirror substitution under a forker as such
+'is_raw_where_another_mirror_would_stand' asks 'note_of_member_as_such',
+so a forker as such's content is substituted as a forkee as such's
+is (the plan's "Kept": "the content of a member as such
+substituted").
+**** Docs beyond the plan's list
+'docs/api-and-formats.org' (default folders, birth facts, folder
+atoms), 'docs/diff-view.org' (the compound folders' labels).
+*** Fixtures changed
+- New: 'tests/forkers_drawn_editable/fixtures/' (N, K, R, T, X1 to
+  X4, Y, Z, k1 owned; FF, f1 foreign); the narrowing test writes its
+  own.
+- 'tools/skg-for-ai/test-expected/': 'forest-forks_fred-note-id' and
+  'forest-aliases_forkee-id', the forker drawn editable.
+- No other fixture's data changed; expectations as under "Suites".
+*** Unfinished
+Nothing of this slice. For Jeff, not blocking:
+- Writing in a forker as such's content files nothing into N (the
+  filing of members written in reads forkees only, as before); the
+  plan says nothing of it.
+- The hidden-outside folder still lists N's hides that only a forker
+  contains (slice 4, decision 8), so such a hide stands both there and
+  in that forker's hidden-in folder.
+- A cut from a forker as such is refused until slice 5.
+*** DONE
+The slice's headline in '2_plan.org' is DONE.
+*** Names coined or changed
+- New: 'LocalContext::ForkerAsSuchPosition' (fields 'forkee',
+  'forkee_is_editable'), 'FieldIntent::ForkerVisibility' and
+  'ForkerVisibility' (fields 'forker', 'visible'),
+  'FieldIntentsForOneId::forker_visibility',
+  'LoweringOutput::forker_visibility', 'MemberAsSuchContext'
+  ('traverse.rs'); 'resolve_forker_visibility', 'are_fork_partners',
+  'cut_from_a_forker_is_not_yet_read', 'unhide_under_a_foreign_note',
+  'MemberAsSuch' ('resolve_visibility.rs');
+  'LoweredNodeIntents::set_contains_of_new_member_as_such';
+  'note_of_member_as_such', 'note_of_forker_as_such',
+  'hidden_by_fork_partner' ('goal.rs');
+  'validate_folder_under_a_member_as_such' ('local.rs');
+  'Folder::HiddenByForkPartner' ('hiddenByForkPartnerFolder').
+- Renamed: 'ForkeeTextClaim' and 'FieldIntent::ForkeeTextClaim' are
+  'MemberAsSuchTextClaim'; 'add_children_typed_under_forkee' is
+  'add_children_typed_under_member_as_such';
+  'LoweredNodeIntents::set_contains_of_forkee' is
+  'set_contains_of_member_as_such'; 'forker_of_forkee_as_such' is
+  'note_of_member_as_such' (no claim check); 'hidden_in_forkee' is
+  'hidden_in_fork_partner'; 'forkee_as_such_may_be_editable' is
+  'member_as_such_may_be_editable'; 'CompoundFolderParties::forkee'
+  is 'container'; 'ANC_HIDDEN_IN' is 'ANC_UNDER_A_MEMBER_AS_SUCH';
+  the clients' 'skg--forkee-as-such-at-point-p',
+  'M.forkee_as_such_at_line_p' and the AI tool's 'forkee_as_such'
+  are 'skg--member-as-such-at-point-p', 'M.member_as_such_at_line_p'
+  and 'member_as_such', true of a member claiming nothing too.
+  'drawn_occurrence_editability' takes no 'claims'.
+- Kept, now meaning either kind: 'less_what_the_forker_integrates'
+  (its parameter is 'note'), 'content_goal_gnids'.
+- Tests: 'tests/forkers_drawn_editable.rs' (in 'grouped_forks');
+  'subtree_of', 'swap_subtrees' ('tests/partner_folder_matrix.rs');
+  the traversal tests named above.
+- Glossary: new entries "forker as such", member as such, what a
+  member shows" and "the forker-visibility step".
+- The text claim's message: "a foreign node shown as a member of a
+  forks folder"; a typed child under a foreign forker: "... a foreign
+  node shown as a forker ...".

@@ -191,15 +191,21 @@ On a node, =B= rides the ☮ when the node's body exists but is
 omitted from the buffer. =⟳= marks a cycle.
 
 The forks folder reads =It forks these, or these fork it.=, with no ☮:
-it is editable. The labels of the two folders of what a note hides
-name that note by its ancestor letter (see [[*Ancestor flags and floors][Ancestor flags and floors]]),
-shown high (the style keys 'hiddenInForkPartnerFolder_hider' and
-'hiddenOutsideOfForkPartnersFolder_hider' in
-'shared/herald-styles.json'). Under a forkee as such, the note
-forking it is the great-grandparent (the note, its forks folder, the
-forkee, the folder): =☮ It contains these, but c hides them.= In the
-forks folder itself, it is the grandparent: =b hides these, but
-nothing it forks contains them.= (Its membership counts only what b's
+it is editable. The labels of the three folders of what a note hides
+name the notes they relate by their ancestor letters (see [[*Ancestor flags and floors][Ancestor flags and floors]]),
+shown high (the style keys 'hiddenInForkPartnerFolder_hider',
+'hiddenOutsideOfForkPartnersFolder_hider',
+'hiddenByForkPartnerFolder_hider' and
+'hiddenByForkPartnerFolder_container' in
+'shared/herald-styles.json'). Under a member as such of a forks
+folder, a forkee or forker as such, the note whose folder holds it is
+the great-grandparent (the note, its forks folder, the member, the
+folder), and the label is the same in both positions, since the
+viewparent contains and the note hides: =☮ It contains these, but c
+hides them.= Under a forker as such, the folder of what the forker,
+the viewparent, hides of the note's content reads =☮ a hides these,
+which c contains.= In the forks folder itself, the note is the
+grandparent: =b hides these, but nothing it forks contains them.= (Its membership counts only what b's
 forkees contain; plan 2 widens it, and the label, to its forkers,
 'TODO/every-mirror/2_plan.org', decision 8.) The hider and hidden
 folders read =☮ These hide it from what they fork.= and =☮ It hides
