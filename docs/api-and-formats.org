@@ -2967,19 +2967,22 @@ principle as follows.
     silently."): a member typed or pasted whose default floor, the
     more private of the two homes, is restricted; a hide inferred from
     a removal, or typed into the folder of what a note hides
-    outside its fork partners, that its explanation floors in a
-    restricted section; an explicit relRepo request to a restricted
+    outside its fork partners, whose floor (its most public partner on
+    record) lands in a restricted section; an explicit relRepo request to a restricted
     skgrepo. A record the graph already holds there is not refused.
     Nor may a record leave such a section: a headline pasted for a
     member whose record is restricted, carrying an explicit relRepo
     request, is refused ("Cannot move a record out of a restricted
     repo ...").
-  - A new hide's relRepo is at least as private as each record that
-    explains it: the =forks= record between the hider and a fork
-    partner, either way (the hider's for a forkee, the forker's for a
-    forker), and that partner's contains record, the more private of
-    the two, the most public such explanation winning; and at least
-    the more private of the two homes. Removals infer hides only from
+  - A new hide's relRepo is at least as private as some partner on
+    record for it ('docs/glossary.org', "hides"): the =forks= record
+    between the hider and a fork partner, either way (the hider's for
+    a forkee, the forker's for a forker), and that partner's contains
+    record, the more private of the two, the most public such partner
+    winning; and at least the more private of the two homes. A partner
+    on record is any fork partner the graph has, whatever the skgrepo
+    restriction, a forker the hider hides included: the floor asks
+    who can read the hide, not what a view draws. Removals infer hides only from
     what the set shows: the note's visible forks and forkers (less
     the forkers it hides), their contents by visible records, and its
     visible hides, so that re-adding a member drops no restricted

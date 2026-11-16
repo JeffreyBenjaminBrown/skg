@@ -1,9 +1,10 @@
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::dbs::node_lookup::{graphnode_by_gnid, opt_graphnode_by_gnid};
 use crate::from_text::local_fieldintent_collection::lower::nodeMerge_pairs;
 use crate::from_text::local_fieldintent_collection::traverse::collect_instructions_locally;
 use crate::from_text::local_fieldintent_collection::types::CollectedFieldIntents;
+use crate::refresh::goal::fork_partners_shown;
+use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::save::{NodeMerge, SaveNode, DeleteNode};
 use crate::types::misc::{MSV, RelPartner, SkgConfig, SkgrepoName, ID, members_of, rel_partners_at_relRepo};
 use crate::types::nodes::complete::{
@@ -226,11 +227,12 @@ fn three_nodeMerged_graphnodes(
   Ok (updated_acquirer) }
 
 /// The ids 'node' shows as unintegrated content of its fork
-/// partners: contained by some node it forks or some node forking it
-/// that it does not hide (the members its forks folder shows), and
-/// neither hidden by it nor among its own contents (the
-/// member-as-such display rule, docs/sharing-model.org). A partner
-/// with no disk entry contributes nothing.
+/// partners: contained by some fork partner its forks folder shows
+/// ('fork_partners_shown': a node it forks, or one forking it that it
+/// does not hide), and neither hidden by it nor among its own
+/// contents ('docs/glossary.org', "what a member shows"). Every record
+/// counts, since a nodeMerge is built from the graph, not from what a
+/// view drew. A partner with no disk entry contributes nothing.
 fn gnids_shown_through_fork_partners (
   node   : &Graphnode,
   graph  : &InRustGraph,
@@ -241,14 +243,9 @@ fn gnids_shown_through_fork_partners (
     members_of ( node . hides . or_default () );
   let contains : Vec<ID> =
     members_of ( & node . contains );
-  let forkers_shown : Vec<ID> =
-    graph . inbound_pids_for_relation (&node . pid, NodeRelation::Forks)
-    . into_iter ()
-    . filter ( |forker| ! hides . iter ()
-               . any ( |hidden| graph . pid_else_raw_id (hidden) == *forker ))
-    . collect ();
-  for partner_gnid in members_of ( node . forks . or_default () )
-    . into_iter () . chain (forkers_shown)
+  for partner_gnid in fork_partners_shown (
+    graph, &SkgrepoRestriction::unrestricted (config), &node . pid,
+    &members_of ( node . forks . or_default () ))
   { let Some (partner) = opt_graphnode_by_gnid (
       graph, config, &partner_gnid ) ?
     else { continue; };

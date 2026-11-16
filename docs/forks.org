@@ -385,7 +385,9 @@ yours. If =F= forks =C= and contains =X=, =C='s forks folder shows
 hides =X= there too ("Hides 'X' from 'C', as content of 'F'."), and
 =X= then stands under =F=, in its folder of what =C= hides in it,
 not in the folder of what =C= hides outside its fork partners. A
-forker =C= hides is drawn nowhere, so it explains no hide.
+forker =C= hides is drawn nowhere, so it explains no hide; the floor
+of a hide's privacy still counts its records, since a reader of the
+hide sees them all the same ('docs/glossary.org', "hides").
 
 A removed child stands for the member of =N='s contents that is its
 mirror (=docs/mirrors.org=, "Mirrors"). If =N= contains =X= and

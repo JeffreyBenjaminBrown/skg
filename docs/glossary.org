@@ -242,7 +242,19 @@ forks or one forking it that it does not hide ('fork_partners_shown'
 in 'server/refresh/goal.rs'). A fork partner that contains the hidden
 node *explains* the hide: the view draws it there, under that
 partner, and a hide no partner explains stands in the hidden-outside
-folder (see "compound partner folder"). A *relationship* is one instance of a relation: this
+folder (see "compound partner folder"). The save's inference of hides
+from removals, the edits of the hidden-outside folder, a nodeMerge
+and the hide report all read the same partners. The floor of a new
+hide's relRepo ('hide_skgrepo' in
+'server/from_text/supplement_from_disk.rs') asks another question,
+of records rather than of a view: whose readers can see why the
+hider hides the node. So it counts a wider set, the *partners on
+record*: every fork partner the graph has, either way, whatever the
+skgrepo restriction, a forker the hider hides included, that
+contains the hidden node; the hide is no more public than the most
+public such pair of records (the =forks= record and the =contains=
+record). A forker the hider hides explains no hide, but is a partner
+on record. A *relationship* is one instance of a relation: this
 node contains that one. (Graph theory would call it an edge; we don't,
 because the word is opaque to newcomers.)
 
@@ -1407,8 +1419,9 @@ relationship from an owned recorder to a foreign member defaults to the recorder
 home, deliberately making the foreign ID and relationship visible at
 that owned skgrepo without proposing a foreign write. Every relRepo is
 clamped to be no more public than the recorder's home. Hides have
-a higher floor (at least the most public forks relationship explaining
-them; see "floor" below). A
+a higher floor (at least the most public partner on record for them;
+see "hides" under "relation, relationship, member, membership,
+partner", and "floor" below). A
 =(relRepo NAME)= atom (the =skg-set-relRepo= gesture)
 overrides sticky with any skgrepo at least as private as the relationship's
 default — raising privacy, or moving a stuck skgrepo back to the

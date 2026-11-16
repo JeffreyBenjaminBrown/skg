@@ -419,9 +419,11 @@ holds it there (=refuse_records_landing_restricted= in
 =server/from_text/validate.rs=, after the suppression of writes to
 restricted nodes, which keys on the graph's home as well as the
 buffer's). A new hide's relRepo is at least as private as the
-records of some fork partner that explains it, the forks relationship
-(in the hider's file for a forkee, in the forker's for a forker) and
-the partner's contains record (=hide_skgrepo=), so that a public hide
+records of some partner on record for it (a fork partner in the graph
+that contains the hidden node, whatever the skgrepo restriction and
+whether or not the hider hides it): the forks relationship (in the
+hider's file for a forkee, in the forker's for a forker) and the
+partner's contains record (=hide_skgrepo=), so that a public hide
 never names a private membership. The writes built from the graph rather than the buffer
 obey the rule apart: a fork's clone copies only the visible records
 (=build_fork_clone=); a nodeMerge, like a delete, is refused when
