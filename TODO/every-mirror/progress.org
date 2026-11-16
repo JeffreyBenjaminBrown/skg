@@ -3586,3 +3586,230 @@ The slice's headline in '3_plan.org' is DONE.
   'failures_of_perspective_names' (skg-for-ai).
 - Glossary: new entry "root homes"; "perspective", "a perspective's
   skgrepo list" and "mirror substitution" rewritten.
+** Slice 2: flat forks folders
+*** Commits
+- 112b7cc0 every-mirror plan 3 slice 2: flat forks folders (server,
+  tests, skg-for-ai's tests and expected views, the forks-meet
+  integration test: one commit, since the goal, the claims, the
+  removal and the cut land together, as the plan asks)
+- (the commit carrying this record) every-mirror plan 3 slice 2: docs,
+  record, DONE
+*** Suites
+- The slice's own tests: the new 'tests/flat_forks_folders.rs' (five
+  sub-tests in one 'all_tests') passed on its first run once one
+  herald assertion was corrected (B is forked by three, so its
+  herald reads '(forks (in 3 (ancestors 2))', not 'in 1'); the new
+  'refresh::tests::requests::a_forks_request_on_a_member_draws_its_forks_folder'
+  passed once its expected order was corrected (s and f, both
+  forker-only in one skgrepo, go by pid: f, s).
+- 'bash/nextest.sh': first run 1240 of 1270, the 30 failures all
+  expected fixture adaptations but one, which was new and is fixed in
+  the code commit ('pruned_change_view::buffer::a_member_of_a_changed_forks_folder_holds_its_chain':
+  the diff view's forks folder holds direct partners only, and the
+  save read the absent indirect member as deleted and hid it; see
+  "Deviations", "The save is told when its buffer is the diff
+  view's"). After the adaptations 1271 of 1271, and 1272 of 1272
+  with the new test file.
+- Emacs 503 of 503; Neovim all pass. No client code changed.
+- The AI tool's tests (after 'cargo build --bin skg'): six runs. The
+  failures were the expected views (the nested forks folders gone,
+  viewnode IDs shifted), the perspective constants ('R_SHOWING_A',
+  'R_SHOWING_U', 'R_SHOWING_B': R's child's folder is flat now), and
+  hard-coded viewnode IDs, each masking the next; and one behavior
+  change, expected: in 'check_forking_and_hiding_by_placing' the
+  second child, which forks Fred's note, is now an indirect member of
+  the forest-forks view's folder and shows the detail too, so removing
+  the detail under Fred's note alone is refused as conflicting (the
+  same refusal a forker-only member showing it gives). The check now
+  removes it under both, and asserts the cut from the indirect member
+  makes the node fork it. Last run: PASS.
+- 'bash/integration-tests.sh' (the Emacs pass): first run 38 of 39,
+  'forks-meet' failing, an expected adaptation (R's view is flat);
+  after it, 'forks-meet' passes in both clients run alone. The plan's
+  'search-enrichment' integration test no longer exists (its folder
+  holds only stale logs, untracked); 'search-buffer' passed
+  unchanged.
+- 'bash/all-tests.sh', first run: all pass: Emacs 503 of 503, Neovim
+  pass, nextest 1272 of 1272, doctests, team tools, AI reader,
+  integration 78 of 78 (both clients). The docs were written before
+  it; after it only 'docs/forks.org''s example note changed (one
+  word of a herald), and this record.
+- End to end, per '/verify': an isolated 'target/debug/skg' on port
+  27631, scratch data under '/tmp/claude-1000/every-mirror-p3-slice2/'
+  with owned "main" and foreign "theirs": note (main) contains n1 and
+  forks forkee (theirs: f1, f2); forker (main: r1) forks note;
+  sibling (main: g1, g2) and cousin (main: c1) fork forkee, each an
+  indirect mirror of note. A fresh view of note: one forks folder,
+  flat, forkee (bK), forker (Kb), then cousin and sibling (K1, no b,
+  claiming nothing), nothing nested; saved unchanged, no file
+  changed. '(viewRequests (folder forks))' on sibling (C-c l f's
+  request) drew sibling's folder (forkee, then cousin, note and
+  forker, its indirect members, nearest first), writing nothing.
+  Cutting g1 from sibling: note forks [forkee, sibling] and hides g1,
+  sibling's file untouched, the redrawn view shows sibling claiming
+  ('(birth (forks in 2))') with g1 in its folder of what note hides
+  in it. Deleting cousin: note hides cousin, which stands in the
+  hidden-outside folder, its file untouched. A search for "lantern"
+  showed one hit, note (sibling and forkee suppressed), with one flat
+  forks folder, cousin in its hidden-outside folder; after cousin was
+  unhidden (its line removed from that folder), cousin stood in the
+  hit's flat folder, an indirect member (K1). The server was stopped
+  by PID, the port checked free, the scratch data deleted;
+  transcripts in '/tmp/claude-1000/every-mirror-p3-slice2/transcript/'.
+Logs: 'tests/results/every-mirror/slice2-plan3/' (nextest-first.log,
+nextest-second.log, emacs.log, nvim.log, ai-tool-first.log to
+ai-tool-fourth.log and ai-tool.log, integration.out, and the full
+run's all-tests.out, all-tests-ALL.org and all-tests-*.log).
+'tests/results/every-mirror/' was copied out before 'bash/all-tests.sh'
+and put back after it.
+*** Deviations from the plan's "how"
+**** Deleting a member: what the folder drew, and what it would show after the save
+The plan reads every mirror of N the folder no longer shows. That
+would hide a forkee whose deletion merely ends N's fork of it (it is
+still a mirror by the graph before the save), and the family of a
+forkee the same save adds (never drawn). 'resolve_forks_folder_removals'
+hides a member the view drew ('fork_partners_shown' with N's forkees
+on disk) that would stand in the folder claiming nothing after the
+save (the same, with N's forks as the save leaves them, less those),
+that the buffer no longer shows and N does not hide already. So a
+deleted forkee is hidden only where another mirror still joins it to
+N, and a member only that forkee joined to N is not. This needs the
+mirrors of N "were it to fork these" ('mirrors_of_note_forking'), by
+which 'indirect_members' and 'fork_partners_shown' take N's forkees
+as the caller reads them, as they did for direct partners.
+**** The save is told when its buffer is the diff view's
+The diff view's forks folder keeps the direct partners (out of scope
+here), so an indirect member absent from it was never drawn. Without
+knowing that, an unchanged save of a diff-view buffer hid every
+indirect member (a new failure the first run caught). The save
+handler now computes whether the buffer is one of the diff view's
+(named in the request, or held as such) and passes 'is_diff_view'
+through 'buffer_to_validated_saveplan_with_fork_skgrepos_in_graph',
+'what_the_baseline_shows', 'extract_nonmergeSavePlan_locally_in_graph'
+and 'resolve_visibility' to 'resolve_forks_folder_removals', which
+there reads the drawn members as N's forkees and forker-only members.
+The test-only wrappers pass false.
+**** An indirect member counts what it shows
+It stands in no fork role, so the stats pass drew no
+'(unintegrated COUNT)' for it ('stands_as_member_here' false, as for a
+detached forkee). The plan says the count counts what a member shows;
+the stats now count it for any occurrence in a forks folder
+('fork_roles' present), 'note_of_member_as_such' still asking the
+warrant. Birth facts and relRepo stay none, as the plan says.
+**** The hidden-by folder's test is a new function
+Rather than change 'note_of_forker_as_such' (the claim-based "forker
+as such", read by the stats and the goal too), the three readers the
+plan names ('folder_goal', 'add_default_folders',
+'is_hiddenByForkerFolder_under_no_forker_as_such') ask the new
+'note_forked_by_forker_as_such', which adds "and it forks the note"
+by a visible record.
+**** Message wording (provisional, decision E)
+The refusal under a foreign note calls a member claiming nothing "a
+member of its forks folder claiming nothing" ('MemberAsSuch::as_the_notes';
+the forkee keeps "its forkee"), and the refusal of a child placed
+under a foreign one says "shown as a member claiming nothing"
+('MemberAsSuch::word'). The relRepo refusal on a member claiming
+nothing now says it either forks the note or is a mirror of it only
+through others.
+**** The ordered goal
+The forks folder's content-view goal is 'Goal::ordered' over all three
+parts (each tail sorted as Q2 says, forker-only ties by pid), so the
+reorder rung restores the order; 'Goal::ordered_then_unordered'
+remains for the diff view's forks folder. 'SkgConfig::declaration_rank'
+(beside 'perspective_skgrepo_list', the "comparison chokepoint" the
+config's comments name) gives each home's place.
+**** Tests placed
+The plan's tests are in a new 'tests/flat_forks_folders.rs' (in
+'grouped_forks'), but for two: "C-c l f on a member draws one" is
+also a refresh unit test ('a_forks_request_on_a_member_draws_its_forks_folder'),
+and "the search: an owned hit standing over a mirror two forks away"
+is 'forks_under_search_hits::end_to_end_render_shows_a_suppressed_node_in_a_folder_with_heralds',
+adapted (U forks F forks G: G now stands in U's one folder, after F,
+born of nothing, nothing nested). The indirect-member cut is also
+pinned in 'members_as_such_and_stale_buffers', whose "forkee nested
+under an owned member" scenario no fresh view draws any more.
+**** Docs
+'docs/forks.org' gained a section, "Every mirror, flat", which the
+glossary, 'mirrors.org', 'api-and-formats.org', 'heralds.org' and the
+code cite; its "Forks of one note meet" example shows both views,
+flat. 'docs/sharing-model.org' ("The forks folder") was rewritten
+where it described the folder's membership, since it was false now
+(the rest is slice 4's). 'docs/nvim-client-deviations.org' holds
+nothing on the forks folder, so it is unchanged.
+*** Fixtures changed
+- 'tests/flat_forks_folders/fixtures/' (new): A forks B forks C, D
+  and AA fork B ("main" owned, declared before foreign "theirs").
+- No other fixture data changed. Expected views and assertions were
+  adapted, each because members no longer draw a forks folder
+  unasked, indirect members now stand in the folder, or the tails take
+  the graph's and the config's order: 'tests/refresh/{chain,
+  diff_view, requests, restricted, substitution}.rs',
+  'tests/content_view.rs', 'tests/initial_view_bfs.rs',
+  'tests/forks_folder_by_default.rs', 'tests/hidden_nodes.rs'
+  (viewnode IDs), 'tests/extend_partner_folder_member.rs',
+  'tests/cuts_from_forkers.rs' (M, which forks F, is an indirect
+  member of N's folder), 'tests/forkers_drawn_editable.rs' (forkers by
+  home: R, T, FF; R's own view flat; the refusal's words),
+  'tests/forks_meet.rs' (R's view flat), 'tests/mirror_substitution.rs',
+  'tests/partner_folder_order.rs' and 'tests/partner_folder_matrix.rs'
+  (a reordering of forker-only members no longer lasts: Q2),
+  'tests/hidden_from_forks.rs' (pinned views; g, which forks j and
+  contains r, is an indirect member of f's folder, so removing r from
+  f hides r, not m; the hide report names g and h too),
+  'tests/members_as_such_and_stale_buffers.rs',
+  'tests/forks_under_search_hits.rs', 'tests/search_buffer.rs' (the
+  signature), skg-for-ai's six expected views and its checks, and the
+  integration test 'forks-meet' (both clients, and its run-test.sh
+  header).
+*** Unfinished
+- A buffer drawn before this slice keeps its nested forks folders
+  until the view is reopened (behavior 2, by design).
+- A member claiming nothing that stops being a mirror while a view
+  holds it (its forkee's fork was ended, say) stands on, unwarranted
+  (⊥), until the view is reopened, as a forker-only member that stops
+  forking does today; nothing is written for it.
+- An indirect member raises no floor for a hide's relRepo (the plan
+  keeps 'hide_skgrepo' to partners on record); 'docs/sharing-model.org'
+  says so.
+- The goal and 'fork_partners_shown' walk the note's mirrors at each
+  call; cheap for small families, not measured on large ones.
+*** DONE
+The slice's headline in '3_plan.org' is DONE.
+*** Names coined or changed
+- 'fork_partners_shown' in 'server/dbs/in_rust_graph/mirrors.rs' (a
+  note's visible direct partners, for the walk) is
+  'visible_fork_relationships_of'; the one in 'server/refresh/goal.rs'
+  keeps its name and means the folder's members, indirect ones
+  included.
+- New: 'mirrors_of_note_forking' (and its walk 'mirrors_reached') in
+  'mirrors.rs'; 'indirect_members' and 'note_forked_by_forker_as_such'
+  in 'goal.rs'; 'SkgConfig::declaration_rank';
+  'MemberAsSuch::as_the_notes'.
+- Removed: 'request_forks_folders_toward_suppressed_hits',
+  'fork_path_parents', 'fork_partner_it_stands_among',
+  'fold_nested_forks_folders' ('text_search.rs'); 'are_fork_partners'
+  ('resolve_visibility.rs'). 'draw_search_buffer' lost its
+  'suppressed' parameter.
+- New parameter 'is_diff_view' on 'resolve_visibility',
+  'resolve_forks_folder_removals', 'extract_nonmergeSavePlan_locally_in_graph',
+  'buffer_to_validated_saveplan_with_fork_skgrepos_in_graph' and
+  'what_the_baseline_shows'.
+- Terms: "direct member", "indirect member" (as the plan coined them),
+  "flat" of a forks folder; the glossary entry "the forks folder, fork
+  partner, forker-only member, mutual" is now "..., direct member,
+  indirect member". "member claiming nothing" in messages, as the plan
+  says.
+- Tests renamed: 'partner_folder_order::write_protected_folder_order_is_preserved'
+  is 'a_forks_folders_forkers_keep_the_graphs_order';
+  'forkers_drawn_editable::a_repeat_forker_shows_nothing' is
+  'a_forkers_own_view_lists_every_mirror_flat';
+  'members_as_such_and_stale_buffers::a_view_of_a_forkee_nested_under_an_owned_member_saves_unchanged'
+  is 'a_view_with_an_indirect_member_saves_unchanged',
+  '...::an_owned_member_holding_a_forkee_as_such_is_retitled' is
+  'an_owned_member_as_such_is_retitled',
+  '...::a_cut_from_a_forkee_nested_under_an_owned_member_hides_it_there'
+  is 'a_cut_from_an_indirect_member_makes_the_note_fork_it_and_hide_the_cut'.
+  New: 'flat_forks_folders::*', 'refresh::tests::requests::a_forks_request_on_a_member_draws_its_forks_folder'.
+- The atoms of the compound folders ('hiddenInForkPartnerFolder' now
+  also under an indirect member, no fork partner) are kept, knowingly,
+  as the plan says; for the next terms review.

@@ -2,7 +2,7 @@
 //
 // The order of a forks folder's members that its note does not fork
 // is the graph's and the config's, not the user's ('docs/forks.org',
-// "The forks folder"): the refresh puts them back in it after a save
+// "Every mirror, flat"): the refresh puts them back in it after a save
 // that moved them, and the order survives a further unchanged save.
 // A child the folder's goal does not name rides after the sibling it
 // followed ('docs/diff-view.org', "What the refresh keeps").

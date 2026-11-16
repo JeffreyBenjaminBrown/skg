@@ -159,9 +159,10 @@ already-forked node.
 Because =C= forks =N=, a generated *forksFolder* ("It forks these, or
 these fork it.") appears under =C= listing =N=, claiming, as a
 /forkee as such/. The same folder lists, after
-the forkees, the notes that fork =C= (claiming nothing; deleting one
-hides it, attaching it makes =C= fork it: [[file:./sharing-model.org][sharing-model.org]], "The
-forks folder"). A forkee's content is exactly
+the forkees, the notes that fork =C=, and then =C='s other mirrors,
+each claiming nothing (deleting one hides it, attaching it makes =C=
+fork it: [[file:./sharing-model.org][sharing-model.org]], "The
+forks folder"; see "Every mirror, flat", below). A forkee's content is exactly
 what you have *not* yet integrated: a forkee as such shows only the
 children its forker (=C=) neither hides nor already contains. A fresh
 clone has ~C.contains == N.contains~, so this starts *empty* — every
@@ -224,6 +225,39 @@ integrate one, move it into your clone's own content; it then drops out
 of the forkee as such (it is now contained). You can also hide
 individual children.
 
+*** Every mirror, flat
+
+A note's forks folder lists every mirror of it, each once: what it
+forks, what forks it, and the rest of the family, each note joined to
+it only through others (a fork of what it forks, say), an /indirect
+member/ ('docs/glossary.org', "the forks folder"). Since forking is
+transitive in this sense, no member of the folder draws a forks
+folder of its own, which would only restate the family: if =a= forks
+=b=, =b= stands in =a='s folder and =a= in =b='s, and neither again
+under the other. Asked for one (=C-c l f= on the member), a member
+draws it.
+
+The order: first what the note forks, in its list's order, which you
+edit there; then what forks it, by the declaration order of their
+home skgrepos in your config, then pid; then the indirect members,
+nearest first, then by the declaration order of their homes, then
+pid. Only the first part's order is yours: the refresh puts a member
+of the other two that you moved back where the graph and the config
+put it.
+
+An indirect member is treated as a forker-only member is: it claims
+nothing; it shows what your note neither contains nor hides of its
+content; deleting it from the folder hides it in your note, and it
+stands then in the folder of what your note hides outside its fork
+partners, where removing it unhides it; cutting a child from it makes
+your note fork it and hide the child (see "Cutting from a forker");
+and its heralds have no =b= flag toward your note, since it neither
+forks your note nor is forked by it. Every member explains a hide
+alike: a hide of something only an indirect member contains stands
+under that member, in its folder of what your note hides in it. Its
+own hides of your note's content are not drawn under it: they apply
+to what it forks, not to your note.
+
 *** Writing in an unintegrated child integrates it
 
 Writing anything within an unintegrated child, where the
@@ -276,7 +310,8 @@ save is refused ('server/serve/handlers/save_staleness.rs').
 
 A note that forks yours stands in your note's forks folder too, as a
 /forker as such/, claiming nothing, showing what it adds to your
-note: its content less what yours contains or hides. Cutting a child
+note: its content less what yours contains or hides; so does an
+indirect member (see "Every mirror, flat"). Cutting a child
 from it (deleting the child's headline there, whether or not you
 paste it elsewhere) makes your note fork it: a forker as such that a
 cut is made from becomes a forkee too. Your note hides
@@ -314,29 +349,43 @@ view").
 
 Two notes R and T, both yours, fork one note N. N contains X1 to X4
 and hides Z; R contains X1, X2, X3; T contains X1, X3, Y, Z and hides
-X2. Each view shows the others, through the forks folders:
+X2. Each view shows the others, through its flat forks folder:
 
 #+begin_example
 ,* R                    (editable)
 ,** forksFolder
 ,*** N                  (2bK: R and T fork it; editable)
-,**** forksFolder
-,***** R                (Kb: a repeat, write-protected, showing nothing)
-,***** T                (Kb: editable)
-,****** hiddenInForkPartnerFolder     (Z, folded: N hides it)
-,****** hiddenByForkerFolder     (X2, folded: T hides it)
-,****** Y
 ,**** X4                -- what N adds to R
+,*** T                  (no b: an indirect member, editable)
+,**** Y
+,**** Z
 ,** X1
 ,** X2
 ,** X3
 #+end_example
 
-N shows only X4, what R neither contains nor hides; T shows Y, what
-it adds to N. In N's own view both are forkers as such: R shows
-nothing of its own, and T shows Y as above. Each member of a forks
-folder that is no repeat also carries its containers folder, folded
-(here none, as nothing contains R, N or T).
+N shows only X4, what R neither contains nor hides; T, which R does
+not fork and which does not fork R, stands there too, an indirect
+member, showing Y and Z, what R neither contains nor hides. In N's
+own view R and T are forkers as such:
+
+#+begin_example
+,* N                    (editable)
+,** forksFolder
+,*** R                  (Kb: editable, showing nothing of its own)
+,*** T                  (Kb: editable)
+,**** hiddenInForkPartnerFolder     (Z, folded: N hides it)
+,**** hiddenByForkerFolder     (X2, folded: T hides it)
+,**** Y
+,** X1
+,** X2
+,** X3
+,** X4
+#+end_example
+
+Each member of a forks folder that is no repeat also carries its
+containers folder, folded (here none, as nothing contains R, N or
+T).
 
 Cutting X4 from N in R's view hides X4 in R; the redrawn view shows
 X4 in N's folder of what R hides in it. In N's view, cutting Y from T

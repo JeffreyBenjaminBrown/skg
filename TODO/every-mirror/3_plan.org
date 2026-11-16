@@ -741,7 +741,7 @@ Questions: Q1. Decision D; behavior 1.
   'bash/nextest.sh', the AI tool's tests, 'bash/integration-tests.sh',
   then 'bash/all-tests.sh'.
 
-** TODO Slice 2: flat forks folders
+** DONE Slice 2: flat forks folders
 Questions: Q2. Decisions A and B; behavior 2.
 - The goal with every mirror (Q2's order), indirect members claiming
   nothing; 'fork_partners_shown' as the folder's members, the private

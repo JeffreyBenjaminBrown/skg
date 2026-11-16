@@ -103,10 +103,12 @@ So far there are these endpoints:
       fills the folders and draws each containers folder member's
       containerward chain.
     - Under each hit hang its containers folder, whose members carry
-      the containerward chain; and its forks folder, the visible
-      nodes it forks and then those that fork it (those it hides
-      aside), each member's chain in a containers folder under it
-      (see "View requests"). A folder with no member is not drawn. The
+      the containerward chain; and its forks folder, flat, as every
+      forks folder is: the visible nodes it forks, then those that
+      fork it, then its other mirrors (those it hides aside), each
+      member's chain in a containers folder under it, and no member
+      showing a forks folder of its own (see "View requests"). A
+      folder with no member is not drawn. The
       members are write-protected. Everything under a hit is folded,
       so that the hit shows collapsed; but a hit found through an
       alias shows its folders, each collapsed except its alias
@@ -118,16 +120,13 @@ So far there are these endpoints:
       in declaration order, so that among owned hits the most public
       stands; several in one skgrepo tie, and the only one none of
       the others forks stands, else the least pid. If it is owned, every other
-      hit among them is suppressed at the top level, and one it
-      forks or that forks it reappears in its
-      forks folder ('suppressed_result_gnids'); a
-      suppressed hit that is its mirror only through other notes (a
-      sibling fork, say) reappears deeper: each note on a shortest
-      path of forks from the standing hit to it shows its own forks
-      folder, collapsed, so that the suppressed hit stands in the last
-      ('request_forks_folders_toward_suppressed_hits'). Every
-      suppressed hit thus stands somewhere under the hit that
-      suppressed it. A foreign hit suppresses nothing.
+      hit among them is suppressed at the top level
+      ('suppressed_result_gnids'), and reappears in the one forks
+      folder of the hit standing, which lists every mirror of it, one
+      it forks or that forks it and one joined to it only through
+      other notes (a sibling fork, say) alike; one the standing hit
+      hides stands in that folder's folder of what it hides outside
+      its fork partners. A foreign hit suppresses nothing.
     - The search draws the enrichment under the same
       skgrepo restriction as it searches under. The containerward
       chain stops before restricted containers.
@@ -1670,7 +1669,7 @@ meaningful only where the save reads the claims of the viewparent's
 children: under an editable occurrence, and under an editable folder
 (forks, hidden-outside, alias) of one. In the forks folder a member
 claims exactly when the folder's viewparent forks it: a forker-only
-member, drawn there by the refresh, carries =noClaim=. Under any
+or an indirect member, drawn there by the refresh, carries =noClaim=. Under any
 other viewparent ('docs/glossary.org', "claims membership", lists
 them) no child claims, whatever it carries, and the server writes no
 =noClaim= there.
@@ -1703,7 +1702,10 @@ extends -- a fresh view's roots, and the editable content the request
 draws or shows under them -- shows its =forksFolder= where it has a
 fork partner, either way, but no other top-level relation folder,
 unasked. This applies both to ordinary positions and to nodes
-extended as members of relation folders. Each forkee as such (a
+extended as members of relation folders, but for a member as such of
+a =forksFolder=, which shows one only when asked ='(folder forks)'=:
+the folder it stands in lists every mirror of its note already
+(=docs/forks.org=, "Every mirror, flat"). Each forkee as such (a
 claiming member of the =forksFolder= of an editable occurrence) is
 drawn as content is: editable, carrying an editable-view request its
 own visit consumes, unless another occurrence holds its node's
@@ -1716,18 +1718,21 @@ its list does not name (typed there, or moved from elsewhere) joins
 its content when the user owns it (the save is refused under a
 foreign one). Each forker as such (a member of that =forksFolder=
 claiming nothing; in a view the server draws, a note that forks the
-occurrence's note and is not forked by it) is drawn the same way, showing what it adds to the
+occurrence's note and is not forked by it, or an indirect member, a
+mirror of the note joined to it only through others, after them) is
+drawn the same way, showing what it adds to the
 note's content; its title and body, and a child placed under it,
 are read as a forkee as such's, never its content as its whole
 list. A save that cuts one of its children makes the note fork it,
 and hides the child in the note unless the note contains it after the
-save; the saved view gives the forker its claim, so it is redrawn a
-mutual among the forkees, without a =hiddenByForkerFolder=. Under
-a foreign note such a save is refused.
+save; the saved view gives the forker its claim, so it is redrawn
+among the forkees (a mutual, where it forks the note), without a
+=hiddenByForkerFolder=. Deleting a forker as such hides it in the
+note. Under a foreign note such a save is refused.
 An editable member as such of either kind additionally includes its
 nonempty =hiddenInForkPartnerFolder=, first; an editable forker as
-such its nonempty =hiddenByForkerFolder= (what it hides of the
-note's content), after that;
+such that forks the note its nonempty =hiddenByForkerFolder= (what
+it hides of the note's content), after that;
 =hiddenOutsideOfForkPartnersFolder=, when nonempty, stands last in
 every =forksFolder= of a content view; emptied by a save, it goes
 from the redrawn view, as from a fresh one. Use a
@@ -1968,8 +1973,9 @@ member of a forks folder stands in each role of 'forks' it plays
 folder reads no claims, where the graph says the folder's viewparent
 forks it), and as a forker where the graph's warrant and a visible
 record say it forks the viewparent, whatever it claims. A mutual
-stands in both, and carries both facts; a detached forkee in
-neither, and carries none.
+stands in both, and carries both facts; a detached forkee and an
+indirect member (a mirror of the viewparent joined to it only
+through others) in neither, and carry none.
 
 | Birth                            | Facts                                                        |
 |----------------------------------+--------------------------------------------------------------|
@@ -1977,6 +1983,7 @@ neither, and carries none.
 | forks-folder forkee (claiming)   | =(forks in 2)=                                               |
 | forks-folder forker              | =(forks out 2)=                                              |
 | forks-folder mutual              | =(forks in 2) (forks out 2)=                                 |
+| forks-folder indirect member     | none                                                         |
 | hidden-folder member             | =(hides in 2)=                                |
 | hider-folder member              | =(hides out 2)=                               |
 | container-folder member          | =(contains out 2)=                            |
@@ -1988,7 +1995,8 @@ neither, and carries none.
 A member of an acquisition folder carries none: a nodeMerge is no
 relation. In a forks folder the relationship heralds tell the sides
 apart: a forkee shows =bK= (its viewparent's viewparent, 'b', forks
-it), a forker =Kb=, a mutual =bKb= ('docs/heralds.org').
+it), a forker =Kb=, a mutual =bKb=, an indirect member neither 'b'
+flag ('docs/heralds.org').
 See [[file:./heralds.org][heralds.org]] for the rendered notation and styles.
 
 The graph counts fold into these forms (=forks= / =hides=

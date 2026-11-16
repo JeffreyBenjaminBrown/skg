@@ -1,6 +1,6 @@
 // cargo nextest run --test grouped_forks -E 'test(flat_forks_folders::)'
 //
-// Flat forks folders ('docs/forks.org', "The forks folder"): a note's
+// Flat forks folders ('docs/forks.org', "Every mirror, flat"): a note's
 // forks folder lists every mirror of it, each once, its direct fork
 // partners first, then its indirect members ('docs/glossary.org',
 // "direct member, indirect member"), which claim nothing; no member

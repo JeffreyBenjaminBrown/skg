@@ -237,14 +237,15 @@ forkee, hider hides hidden. A forks B says two things: A shows
 B's content that A neither contains nor hides (see "forkee as
 such"), and A and B are mirrors (see "mirror"). =hides= means
 "hides from its forks": the hider keeps the hidden node out of what
-it shows of every fork partner its forks folder shows, a note it
-forks or one forking it that it does not hide ('fork_partners_shown'
-in 'server/refresh/goal.rs'). A fork partner that contains the hidden
-node *explains* the hide: the view draws it there, under that
-partner, and a hide no partner explains stands in the hidden-outside
-folder (see "compound partner folder"). The save's inference of hides
-from removals, the edits of the hidden-outside folder, a nodeMerge
-and the hide report all read the same partners. The floor of a new
+it shows of every member its forks folder shows, a note it forks, one
+forking it, or an indirect member, that it does not hide
+('fork_partners_shown' in 'server/refresh/goal.rs'; see "the forks
+folder"). A member that contains the hidden node *explains* the hide:
+the view draws it there, under that member, and a hide no member
+explains stands in the hidden-outside folder (see "compound partner
+folder"). The save's inference of hides from removals, the edits of
+the hidden-outside folder, a nodeMerge and the hide report all read
+the same members. The floor of a new
 hide's relRepo ('hide_skgrepo' in
 'server/from_text/supplement_from_disk.rs') asks another question,
 of records rather than of a view: whose readers can see why the
@@ -284,8 +285,8 @@ under an editable occurrence, and under an editable folder
 (forks, hidden-outside, alias) of one
 ('parent_reads_claims' in 'server/refresh/ancestry.rs'). In the
 forks folder a claim says "the folder's viewparent forks it", so a
-forker-only member, drawn there by the refresh, claims nothing (see
-"the forks folder").
+forker-only or an indirect member, drawn there by the refresh,
+claims nothing (see "the forks folder").
 
 Every other viewparent *reads no claims*. This is the one list of
 them, which the user docs cite: a write-protected occurrence; a
@@ -326,7 +327,8 @@ detach it: a *pending detachment*, herald "detach", which the next
 save takes out of the list. In the forks folder a member claiming
 nothing is a pending detachment only where the folder's viewparent
 still forks it on disk (its '(rels (forks (in ...)))' names ancestor
-generation 2): a detached forkee or mutual, not a forker-only member.
+generation 2): a detached forkee or mutual, not a forker-only or an
+indirect member.
 Every view the server draws gives each member there the claim the
 graph gives it, so only the user's own unsaved gesture makes one
 ('docs/forks.org', "Claims in a redrawn view").
@@ -498,43 +500,55 @@ herald counts say they would be nonempty. The same rule applies when
 a member of any partner folder is extended as editable. In a content
 view each member as such under an editable occurrence -- a forkee as
 such or a forker as such -- is drawn as content is (see "forkee as
-such" and "forker as such"), so it is extended, and gets its own
-forks folder where it has a fork partner. An editable member as such
-also gets its nonempty =hiddenInForkPartnerFolder=, the hidden-in
-compound partner folder specific to how the note sees that member;
-and an editable forker as such its nonempty
-=hiddenByForkerFolder=, of what it hides of the note's content.
+such" and "forker as such"), so it is extended, but it gets no forks
+folder unasked: the folder it stands in lists every mirror already.
+A forks request on it (=C-c l f=, '(folder forks)') draws one there.
+An editable member as such gets its nonempty
+=hiddenInForkPartnerFolder=, the hidden-in compound partner folder
+specific to how the note sees that member; and an editable forker as
+such that forks the note its nonempty =hiddenByForkerFolder=, of
+what it hides of the note's content.
 The diff view draws no default folder. Under each member of a partner folder hangs its
 containerward chain, under a member of the forks folder in a
 containers folder of its own (see "foldering, the containerward
 chain, chain node").
 
-*** the forks folder, fork partner, forker-only member, mutual
+*** the forks folder, fork partner, forker-only member, mutual, direct member, indirect member
 
 The *forks folder* ('Folder::Forks', atom =forksFolder=, label "It
 forks these, or these fork it.") is the one partner folder of the
-relation 'forks'. Under an occurrence of a note N it holds N's *fork
-partners*: each note N forks, and each that forks N, by records the
-skgrepo restriction shows, each once. A *mutual* forks N and is
-forked by it; a *forker-only member* forks N and is not forked by it.
-In a content view a forkee or mutual stands there as a forkee as
-such, a forker-only member as a forker as such (see "forkee as such"
-and "forker as such").
+relation 'forks'. Under an occurrence of a note N it holds every
+mirror of N (see "mirror") but N, each once, by records the skgrepo
+restriction shows: it is *flat*. Its *direct members* are N's *fork
+partners*: each note N forks, and each that forks N. A *mutual* forks
+N and is forked by it; a *forker-only member* forks N and is not
+forked by it. Its *indirect members* are N's other mirrors, joined to
+N only through other mirrors (a fork of N's forkee, say). In a
+content view a forkee or mutual stands there as a forkee as such, a
+forker-only or an indirect member as a forker as such (see "forkee
+as such" and "forker as such"). No member of a forks folder shows a
+forks folder of its own unless asked (=C-c l f= on it).
 
 Its goal ('forks_folder_goal' in 'server/refresh/goal.rs') is N's
 forkees in the order of N's 'forks' list (mutuals among them where
-the list puts them), then its forker-only members less those N hides,
-which keep the order the view has them in, always after the last
-forkee ('Goal::ordered_then_unordered'). A forker N hides stands in
-the hidden-outside folder instead, which the forks folder holds last.
+the list puts them), then its forker-only members, by the
+declaration order of their home skgrepos, then pid, then its
+indirect members ('indirect_members'), nearest first, then by the
+declaration order of their homes, then pid; each tail less what N
+hides. The order of the tails is the graph's and the config's: the
+refresh puts a member moved there back in it. A forker or an
+indirect member N hides stands in the hidden-outside folder instead,
+which the forks folder holds last. A mirror reached only through a
+note N hides is still a member: the hide leaves out that note alone.
 
 The folder is editable, and a member's claim there says "N forks
-it": a forkee or a mutual claims, a forker-only member claims
-nothing ('GoalItem::claimable'), and the save reads the claiming
-members as N's 'forks'. The heralds tell the sides apart: a forkee
-shows =bK=, a forker-only member =Kb=, a mutual =bKb=. What deleting,
-detaching or attaching a member does is in
-'docs/data-model_technical.org', "The forks folder".
+it": a forkee or a mutual claims, a forker-only or an indirect member
+claims nothing ('GoalItem::claimable'), and the save reads the
+claiming members as N's 'forks'. The heralds tell the sides apart: a
+forkee shows =bK=, a forker-only member =Kb=, a mutual =bKb=, an
+indirect member neither 'b' flag, since it has no fork relationship
+with N. What deleting, detaching, attaching or cutting from a member
+does is in 'docs/data-model_technical.org', "The forks folder".
 
 *** compound partner folder
 
@@ -551,21 +565,23 @@ hides list. The label is the same in both positions: the viewparent
 S contains, and N, three generations up, hides. The *hidden-by
 compound partner folder* (=hiddenByForkerFolder=, label "☮ a
 hides these, which c contains.") stands under S where S is a forker
-as such, after the hidden-in folder, and holds S's hides that N
+as such that forks N, after the hidden-in folder, and holds S's hides that N
 contains, in the order of S's hides list: what the forker deleted
 from N's content. It is write-protected: S's hides are its owner's
 editing, done in S's own view. Under a forkee as such it is not
-drawn, and one standing under a member that became a forkee holds
+drawn, nor under an indirect member, whose hides do not apply to
+N's content; one standing under a member that became a forkee holds
 nothing and goes. The *hidden-outside
 compound partner folder* (=hiddenOutsideOfForkPartnersFolder=, label
 "b hides these, but no fork partner shown contains them.") stands last in N's forks folder and holds N's hides that no
-fork partner of N contains, in the order of N's hides list. Its fork
-partners are the members its forks folder shows, forkees and
-forkers alike ('fork_partners_shown'), so a hide is there exactly
-when no member of the same folder explains it: a hide of something
-only a forker contains stands in that forker's hidden-in folder
-instead. A forker N hides stands there, since the forks folder does
-not draw it (nor, so, count it as a partner), and removing it there
+member of N's forks folder contains, in the order of N's hides
+list. The members are those its forks folder shows, forkees,
+forkers and indirect members alike ('fork_partners_shown'), so a
+hide is there exactly when no member of the same folder explains it:
+a hide of something only a forker or an indirect member contains
+stands in that member's hidden-in folder instead. A forker or an
+indirect member N hides stands there, since the forks folder does
+not draw it (nor, so, count it as a member), and removing it there
 unhides it. The note whose hides a compound folder shows is its
 *hider* ('CompoundFolderParties::hider'), and, for the two folders
 under a member as such, the note whose content holds what is hidden
@@ -666,8 +682,9 @@ refused, saying to make the node one's own first
 'server/from_text/local_fieldintent_collection/resolve_visibility.rs';
 'docs/forks.org', "Adding a child under a member as such").
 Its delete, nodeMerge and flag requests are ignored. A member of the
-folder claiming nothing -- a forker-only member, or a forkee the user
-detached -- is no forkee as such but a forker as such.
+folder claiming nothing -- a forker-only or an indirect member, or a
+forkee the user detached -- is no forkee as such but a forker as
+such.
 
 *** "forker as such", member as such, what a member shows
 
@@ -677,7 +694,9 @@ since the claim is all the save can read of a member (it reads the
 buffer alone): in a view the server draws, every member claims as the
 graph says ('docs/forks.org', "Claims in a redrawn view"), so a forker
 as such there is a forker-only member, a note that forks N and that N
-does not fork; in a buffer the user has edited, it may also be a
+does not fork, or an indirect member, a mirror of N joined to it only
+through others (see "the forks folder"); the messages call either "a
+member claiming nothing". In a buffer the user has edited, it may also be a
 forkee the user detached (a pending detachment), until the save ends
 that fork. (A mutual claims, so it stands as a forkee as such.) A
 *member as such* is either a forkee as such or a forker as such: an
@@ -688,16 +707,17 @@ claim alone, as it cannot know a warrant.
 its content less what N contains or hides, by the records the skgrepo
 restriction shows, in the member's order
 ('less_what_the_note_integrates' in 'server/refresh/goal.rs';
-'note_of_member_as_such'); the '(unintegrated COUNT ...)' part of its
-view stats counts it. For a forker that is what it adds to N; one that
-adds nothing shows nothing but its folders.
+note_of_member_as_such'); the '(unintegrated COUNT ...)' part of its
+view stats counts it, an indirect member's too. For a forker that is
+what it adds to N; one that adds nothing shows nothing but its
+folders.
 
 A forker as such is drawn as a forkee as such is: in a content view,
 under an editable N, editable unless it is a repeat or the budget is
 spent, with its own default folders, and an editable-view request on
 N passes to one standing write-protected. Under it stand the folder
-of what N hides in it and the folder of what it hides of N's content
-(see "compound partner folder"). The save reads it as it reads a
+of what N hides in it and, where it forks N, the folder of what it
+hides of N's content (see "compound partner folder"). The save reads it as it reads a
 forkee as such, never as its whole list: an absent child is one N
 contains or hides, never removed from the forker. Its title and body
 are saved when the user owns it, and refused when it is foreign; a
@@ -705,7 +725,8 @@ child placed under it (typed, or moved there) joins its content when
 the user owns it, and is refused otherwise; its delete, nodeMerge and flag requests are
 ignored. What the buffer shows under it is the forker-visibility
 signal (see "the forker-visibility step"): cutting a child from it
-makes N fork it, so that it stands as a mutual.
+makes N fork it, so that it stands as a forkee as such (a mutual,
+where it forks N).
 
 *** the forker-visibility step
 
@@ -718,7 +739,7 @@ a child typed there joins F's content (refused under a foreign F); a
 child of F that N hides, shown claiming under F, is unhidden in N, as
 under a forkee; and a child F showed that the buffer no longer shows
 claiming under F was cut from it (see "cut"). A cut from a forker
-makes N fork F, so that F, which forks N, becomes a mutual, and N
+makes N fork F, so that F, if it forks N, becomes a mutual, and N
 hides each child cut that it does not contain after the save (one
 pasted into N's content is not hidden). The view the save redraws
 gives F's headline its claim, so that it stands among the forkees,
@@ -734,8 +755,11 @@ naming N ('refusal_to_change_what_a_foreign_note_hides'), in the words the
 forkee-visibility step uses. The fork rules still bind: a save that
 would make N fork F while N contains F is refused. The step reads F's
 content and N's hides and content by the records the skgrepo
-restriction shows, as the view drew them. A forker the graph lacks
-(typed there) has no list to lose: what it shows is its contains.
+restriction shows, as the view drew them: F shows its content less
+what N contains or hides wherever it is a mirror of N under the
+restriction ('is_mirror_of'), as an indirect member is. A forker the
+graph lacks (typed there) has no list to lose: what it shows is its
+contains.
 
 *** cut
 
@@ -2046,7 +2070,8 @@ acquire inconsistent treatment in different layers:
 - =is_editable=: the save reads the folder's membership, so a member
   typed or removed there edits the graph. These are
   =forksFolder= (whose claiming members are the note's 'forks'; its
-  forker-only members claim nothing, and deleting one hides it),
+  forker-only and indirect members claim nothing, and deleting one
+  hides it),
   =aliasFolder= and =hiddenOutsideOfForkPartnersFolder= (whose
   visible member set is an explicit edit of that subset of the hides;
   the hides' relRepos stay derived). An absent folder means "no opinion" (its field lowers to
@@ -2056,9 +2081,11 @@ acquire inconsistent treatment in different layers:
   refresh redraws it from the graph (see [[*write-protected set][write-protected set]]).
 - =goal_is_ordered=: the viewparent's own file records the members'
   order, which the warranted members take: the editable folders and
-  =hiddenFolder=. In the forks folder only the forkees take it; its
-  forker-only members follow them in the order the view has
-  ('Goal::ordered_then_unordered'). In every other folder the refresh
+  =hiddenFolder=. In the forks folder the forkees take it, and its
+  forker-only and indirect members follow them in the graph's and the
+  config's order (see "the forks folder"); in the diff view's forks
+  folder its forker-only members follow them in the order the view
+  has ('Goal::ordered_then_unordered'). In every other folder the refresh
   moves no child: the inbound folders
   =hiderFolder=, =containerFolder= and =mentionerFolder= (the folders
   of =C-c l c= and =C-c l m=; the other side of each is the node's

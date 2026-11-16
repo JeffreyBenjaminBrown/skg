@@ -141,12 +141,14 @@ as the clients' 'C-c l' commands draw it ('docs/COMMANDS.org', "C-c
 l"), named 'forest-KIND_ID'. Under each member of a partner folder
 hangs its containerward chain: its containers, theirs, and so on up
 to the roots; under a member of the forks folder, in a containers
-folder of its own, folded (but the view-ancestors). The kinds:
+folder of its own, folded (but the view-ancestors). The forks folder
+is flat: no member of it shows a forks folder of its own unless one
+is asked for there. The kinds:
 | KIND          | Emacs   | what it draws                                                                    |
 |---------------+---------+----------------------------------------------------------------------------------|
 | containers    | C-c l c | the containers folder: what contains the node                                    |
 | mentioners    | C-c l m | the mentioners folder: what links to it                                          |
-| forks         | C-c l f | the forks folder: what it forks, and what forks it                               |
+| forks         | C-c l f | the forks folder: every mirror, what it forks, what forks it, then the rest      |
 | hides         | C-c l h | the hidden folder (what it hides from its forks) and the hiders folder           |
 | aliases       | C-c l a | the aliases folder                                                               |
 | flags         | C-c l p | the flags folder: its true flags                                                 |
@@ -899,8 +901,10 @@ forks the original, which is unchanged. Then
 'fork' on an owned node is refused beside another edit, and alone is
 approved, making a clone that forks it. Last, a
 foreign node placed in the forks folder 'forest forks' draws is
-forked, and its unintegrated child, removed, is
-hidden, neither save forking.
+forked, and its unintegrated child, removed from under it and from
+under an indirect member that also contains it, is hidden, the cut
+from the indirect member making the node fork it too, and neither
+save forking a clone.
 
 Then, on a fourth server over a fresh copy of the fixture, it writes the
 words of "Words in a handle": 'detach' (the child leaves its parent's
@@ -1275,8 +1279,8 @@ Hides 'A detail of Fred's' from 'A second container, outside the view', as conte
 Hides nothing: 'Contained twice' left 'Second child, a forker', but it is no content of 'Fred's note', nor a mirror of any.
 #+end_example
 'Hides' and 'Stops hiding' name what the save adds to or takes from
-a note's hides, and the fork partner (a note it forks, or a forker it
-does not hide) whose content holds it. 'Hides nothing:' is a child
+a note's hides, and the member of its forks folder (a note it forks,
+or a forker or other mirror it does not hide) whose content holds it. 'Hides nothing:' is a child
 that left a note with such a fork partner without hiding anything,
 and the rule that kept it from hiding: it is no content of the
 partners and a mirror of none of it,
@@ -1392,9 +1396,12 @@ in that folder, stand its children the forker has not integrated;
 removing one there hides it from the forker, as in the clients. A
 note that forks the folder's node, and that it does not fork, stands
 there claiming nothing; removing it hides it in the folder's node.
-Under it, a forker as such, stands what it adds to the folder's
-node's content; removing one of those makes the folder's node fork
-it, and hides the child unless the node contains it after the save.
+So does each other mirror of the folder's node, joined to it only
+through others (an indirect member): claiming nothing, and removing
+it hides it there too. Under either, a forker as such, stands what it
+adds to the folder's node's content; removing one of those makes the
+folder's node fork it, and hides the child unless the node contains
+it after the save.
 A node placed under a forkee or forker as such joins that member's
 content, after the child it follows, when you own the member; under
 a foreign one the save is refused.

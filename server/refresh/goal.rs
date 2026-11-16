@@ -484,7 +484,7 @@ fn partnerFolder_goal (
 
 /// The goal of the forks folder describing 'described', over the
 /// straddle in the diff view, else in the graph: every mirror of it,
-/// each once ('docs/forks.org', "The forks folder"). First the notes
+/// each once ('docs/forks.org', "Every mirror, flat"). First the notes
 /// it forks, in its list's order, each claimable, with the relRepo of
 /// each unknown or restricted one; then its forker-only members
 /// ('forker_only_members'), by the declaration order of their home

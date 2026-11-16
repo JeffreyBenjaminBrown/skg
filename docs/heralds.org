@@ -163,9 +163,12 @@ because of b's floor; a forker-only member shows =Kb= (it forks b),
 with any other forkees counted before the 'b' too (=K2b=: it forks b
 and one more; on either side the numeral precedes the ancestor flags,
 as in =C9a=); a mutual shows =bKb= (=bK2b= when it forks one more).
-The birth letter follows the side that stands as a member: =(forks
-in 2)= on a member that claims, =(forks out 2)= on one that forks b,
-both on a mutual.
+An indirect member, a mirror of b joined to it only through others
+(=docs/forks.org=, "Every mirror, flat"), shows neither 'b' flag,
+since it neither forks b nor is forked by it: =K1= for one that
+forks one note, say. The birth letter follows the side that stands
+as a member: =(forks in 2)= on a member that claims, =(forks out 2)=
+on one that forks b, both on a mutual, none on an indirect member.
 
 Immediately after =K=, a crucial =ĥ= (precomposed h with circumflex)
 means this occurrence stands in the place of one of its mirrors. =2Kĥ3= is an
@@ -202,12 +205,12 @@ folder, a forkee or forker as such, the note whose folder holds it is
 the great-grandparent (the note, its forks folder, the member, the
 folder), and the label is the same in both positions, since the
 viewparent contains and the note hides: =☮ It contains these, but c
-hides them.= Under a forker as such, the folder of what the forker,
-the viewparent, hides of the note's content reads =☮ a hides these,
-which c contains.= In the forks folder itself, the note is the
-grandparent: =b hides these, but no fork partner shown contains
-them.= (b's hides that no member of the forks folder, forkee
-or forker, contains.) The hider and hidden folders read =☮ These hide
+hides them.= Under a forker as such that forks the note, the folder
+of what the forker, the viewparent, hides of the note's content reads
+=☮ a hides these, which c contains.= In the forks folder itself, the
+note is the grandparent: =b hides these, but no fork partner shown
+contains them.= (b's hides that no member of the forks folder,
+forkee, forker or indirect member, contains.) The hider and hidden folders read =☮ These hide
 it from their forks.= and =☮ It hides these from its forks.=
 
 The bare atom =noClaim= (a child that does not affect its parent's
@@ -216,7 +219,7 @@ a child the graph warrants and that claims nothing is one the user
 marked =noClaim= to detach it: it shows =detach= until the next save
 takes it out of its parent's list. The client sees that from the
 parent, since the child's own metadata cannot say it. In a forks
-folder a forker-only member claims nothing too; there a pending
+folder a forker-only or an indirect member claims nothing too; there a pending
 detachment is only a member whose =(rels (forks (in ...)))= names
 ancestor generation 2, which its grandparent still forks. =detach= is
 styled as a request, and listed with them above, but it is none:
