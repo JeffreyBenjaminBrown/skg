@@ -53,7 +53,7 @@ use crate::refresh::extent::{Extent, extent_of_parent};
 use crate::refresh::goal::{
   Goal, GoalItem, GoalMember, goal_of_parent, has_a_fork_partner,
   hidden_by_forker, hidden_in_fork_partner, hidden_outside_of_fork_partners,
-  member_of_child, note_of_forker_as_such, note_of_member_as_such,
+  member_of_child, note_forked_by_forker_as_such, note_of_member_as_such,
   visible_illegal_edits};
 use crate::refresh::goal::partnerFolder_members_in_graph;
 use crate::telescope::types::IllegalEdit;
@@ -116,15 +116,19 @@ pub(crate) fn visit_parent (
 /// The folders a content view shows without being asked: an
 /// occurrence that an editable-view request extends (a fresh view's
 /// roots, and every occurrence the refresh draws editable, among them)
-/// shows its forks folder when it has a fork partner, either way, by a
-/// record the skgrepo restriction shows ('has_a_fork_partner'; with
-/// the folder of what it hides outside its fork partners, when that
-/// holds anything); an editable member as such of a forks folder (a
-/// forkee or forker as such) shows the folder of what the note whose
-/// folder holds it hides in it, when that holds anything; and an
-/// editable forker as such shows, after that, the folder of what it
-/// hides of that note's content, when that holds anything. Not in the
-/// diff view.
+/// and that is no member as such of a forks folder
+/// ('note_of_member_as_such') shows its forks folder when it has a
+/// fork partner, either way, by a record the skgrepo restriction shows
+/// ('has_a_fork_partner'; with the folder of what it hides outside its
+/// fork partners, when that holds anything); a member as such shows
+/// one only when asked ('(folder forks)'), since the folder it stands
+/// in lists every mirror already. An editable member as such of a
+/// forks folder (a forkee or forker as such) shows the folder of what
+/// the note whose folder holds it hides in it, when that holds
+/// anything; and an editable forker as such that forks that note
+/// ('note_forked_by_forker_as_such') shows, after that, the folder of
+/// what it hides of the note's content, when that holds anything. Not
+/// in the diff view.
 fn add_default_folders (
   tree   : &mut Tree<Viewnode>,
   parent : NodeId,
@@ -135,6 +139,7 @@ fn add_default_folders (
     tree . get (parent) . unwrap () . value () . editable_gnid () . cloned ()
     else { return; };
   if carries_editableView_request (tree, parent)
+     && note_of_member_as_such (tree, parent) . is_none ()
      && has_a_fork_partner (walk . truth . graph, walk . truth . restriction, &pid)
   { let had_one : bool = child_folder (tree, parent, &Folder::Forks) . is_some ();
     add_folders (tree, parent, &[ Folder::Forks ], walk);
@@ -165,7 +170,7 @@ fn add_default_folders (
         walk . folders_whose_drawn_members_are_folded . insert (folder);
         Some (folder)
       } else { child_folder (tree, parent, &Folder::HiddenInForkPartner) };
-    if note_of_forker_as_such (tree, parent) . is_some ()
+    if note_forked_by_forker_as_such (tree, parent, walk) . is_some ()
        && child_folder (tree, parent, &Folder::HiddenByForker) . is_none ()
        && ! hidden_by_forker (&pid, &note, walk) . is_empty ()
     { let folder : NodeId = tree . get_mut (parent) . unwrap ()
@@ -440,7 +445,7 @@ fn merge_requests (
 /// names it, 'ByHead' when only HEAD's does, 'No' otherwise; under a
 /// parent with no goal, whose position implies no relationship,
 /// 'ByGraph'. A child claiming an item no child may claim (a forks
-/// folder's forker-only member: 'GoalItem::claimable') is warranted
+/// folder's forker-only or indirect member: 'GoalItem::claimable') is warranted
 /// 'No': its viewparent records no such relationship. None for a child
 /// that carries no warrant.
 pub(crate) fn warrant_of_child (
@@ -500,8 +505,8 @@ fn orphan_under_a_tombstone (
 
 /// In a content view's forks folder whose claims the save reads, each
 /// member the goal names takes the claim the graph gives it: a note
-/// the folder's viewparent forks claims, and a forker-only member
-/// claims nothing ('GoalItem::claimable'). A refresh draws a view from
+/// the folder's viewparent forks claims, and a forker-only or an
+/// indirect member claims nothing ('GoalItem::claimable'). A refresh draws a view from
 /// the graph, and a buffer it draws holds no gesture the user has yet
 /// to save: it is one the server drew, or one a save just consumed. So
 /// a member drawn claiming nothing before another view, another
@@ -591,30 +596,32 @@ fn leaves_its_write_protected_folder (
   unhidden_in_the_hides_folder (tree, parent, child, walk)
   || view_ancestor_in_its_folder (tree, parent, child)
   || is_hidden_by_the_forks_folders_viewparent (tree, parent, child, walk)
-  || is_hiddenByForkerFolder_under_no_forker_as_such (tree, parent) }
+  || is_hiddenByForkerFolder_under_no_forker_as_such (tree, parent, walk) }
 
 /// Whether 'parent' is a folder of what a forker hides of the
 /// note's content ('Folder::HiddenByForker') whose viewparent is
-/// no forker as such. That folder is drawn under a forker as such
-/// only; under a forker a cut made a forkee (now claiming) it holds
-/// nothing, so its members vanish and it goes, as a fresh view would
-/// not draw it.
+/// no forker as such that forks the note ('note_forked_by_forker_as_such').
+/// That folder is drawn under such a forker only; under a forker a cut
+/// made a forkee (now claiming) it holds nothing, so its members
+/// vanish and it goes, as a fresh view would not draw it; under an
+/// indirect member, whose hides do not apply to the note, likewise.
 fn is_hiddenByForkerFolder_under_no_forker_as_such (
   tree   : &Tree<Viewnode>,
   parent : NodeId,
+  walk   : &Walk,
 ) -> bool {
   let folder : NodeRef<Viewnode> = tree . get (parent) . unwrap ();
   matches! ( folder . value () . kind,
              ViewnodeKind::Folder (Folder::HiddenByForker) )
   && folder . parent () . map_or (
-       true, |member| note_of_forker_as_such (tree, member . id ()) . is_none () ) }
+       true, |member| note_forked_by_forker_as_such (tree, member . id (), walk) . is_none () ) }
 
 /// Whether 'child' stands in the forks folder at 'parent' for a note
 /// the folder's viewparent hides, by a record the skgrepo restriction
-/// shows: a forker it hides is no member of the folder
-/// ('forker_only_members') but of the folder of what it hides outside
-/// its fork partners, as a save that deleted the forker from another
-/// view leaves it.
+/// shows: a forker or an indirect member it hides is no member of the
+/// folder ('forker_only_members', 'indirect_members') but of the
+/// folder of what it hides outside its fork partners, as a save that
+/// deleted it from another view leaves it.
 fn is_hidden_by_the_forks_folders_viewparent (
   tree   : &Tree<Viewnode>,
   parent : NodeId,
@@ -867,8 +874,8 @@ fn add_containers_folder_to_an_extended_member (
 /// point in drawing); for a property value, its member. It claims
 /// membership only where the save reads claims, and not when only
 /// HEAD warrants it, nor for an item no child may claim (a forker-only
-/// member of a forks folder: were it to claim, the next save would
-/// make the folder's viewparent fork it).
+/// or an indirect member of a forks folder: were it to claim, the next
+/// save would make the folder's viewparent fork it).
 fn draw_item (
   tree   : &Tree<Viewnode>,
   parent : NodeId,

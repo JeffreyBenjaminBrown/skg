@@ -1,7 +1,5 @@
 * A forker, outside the view ⟨0a K1 F1 ⌂:main⟩
-** ⟨0f ☮ flags⟩
-*** ⟨0g ☮ had ID before import⟩
+** ⟨0d ☮ flags⟩
+*** ⟨0e ☮ had ID before import⟩
 ** ⟨0b It forks these, or these fork it.⟩
 *** A forkee, outside the view ⟨0c bK A1⟩
-**** ⟨0d It forks these, or these fork it.⟩
-***** A forker, outside the view ⟨0e ☮ Kb F1 ⟳⟩

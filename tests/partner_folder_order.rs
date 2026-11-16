@@ -1,19 +1,18 @@
 // cargo nextest run --test grouped_forks -E 'test(partner_folder_order::)'
 //
-// A folder whose goal is not ordered (here a forks folder) respects the
-// user's view-local member order across save and rerender
-// ('docs/sharing-model.org', "The write-protected folders: who
-// hides this node"): present members
-// keep their buffer order, and the order survives a further
-// unchanged save. The order never reaches disk; it is view-local.
+// The order of a forks folder's members that its note does not fork
+// is the graph's and the config's, not the user's ('docs/forks.org',
+// "The forks folder"): the refresh puts them back in it after a save
+// that moved them, and the order survives a further unchanged save.
+// A child the folder's goal does not name rides after the sibling it
+// followed ('docs/diff-view.org', "What the refresh keeps").
 //
-// Fixture: r and t both fork n; u forks nothing.  The
-// first test explicitly requests n's forks folder, whose initial
-// member order is sorted by ID (r, t), then swaps them in the buffer and
-// saves.  The second also places a note in the folder, then makes u
-// fork n from a view of u: n's view, rerendered collaterally,
-// keeps every child where it stood and shows u after the kept members
-// ('docs/diff-view.org', "What the refresh keeps").
+// Fixture: r and t both fork n, in one skgrepo; u forks nothing. The
+// first test explicitly requests n's forks folder, whose member order
+// is by pid (r, t), then swaps them in the buffer and saves. The
+// second also places a note in the folder, after t, then makes u fork
+// n from a view of u: n's view, rerendered collaterally, shows u in
+// its place by pid, after t and the note riding after t.
 
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::test_utils::save_and_rerender;
@@ -35,14 +34,14 @@ use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 
 #[test]
-fn write_protected_folder_order_is_preserved
+fn a_forks_folders_forkers_keep_the_graphs_order
   () -> Result<(), Box<dyn Error>> {
   run_with_test_stores (
     "skg-test-partner-folder-order",
     "tests/partner_folder_order/fixtures",
     "/tmp/tantivy-test-partner-folder-order",
     |config, tantivy| Box::pin ( async move {
-      write_protected_folder_order_is_preserved_impl (
+      a_forks_folders_forkers_keep_the_graphs_order_impl (
         config, tantivy ) . await
     } )) }
 
@@ -69,7 +68,7 @@ fn assert_member_order (
   assert! ( i < j,
     "{}: expected {:?} before {:?} in:\n{}", label, first, second, buf ); }
 
-async fn write_protected_folder_order_is_preserved_impl (
+async fn a_forks_folders_forkers_keep_the_graphs_order_impl (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -96,13 +95,11 @@ async fn write_protected_folder_order_is_preserved_impl (
   let first_save : String =
     save_and_rerender (&swapped, config, tantivy) . await ?;
   assert_member_order (
-    &first_save, "(gnid t)", "(gnid r)", "after reorder + save" );
+    &first_save, "(gnid r)", "(gnid t)", "after reorder + save, the graph's order again" );
   let second_save : String =
     save_and_rerender (&first_save, config, tantivy) . await ?;
-  assert_member_order (
-    &second_save, "(gnid t)", "(gnid r)", "after second (unchanged) save" );
   assert_eq! ( first_save, second_save,
-    "the reordered view must be a fixpoint of the refresh" );
+    "the redrawn view must be a fixpoint of the refresh" );
   Ok (( )) }
 
 #[test]
@@ -174,18 +171,14 @@ async fn a_member_added_elsewhere_follows_the_kept_ones_impl (
       "node ",
       "node (viewRequests (folder forks))", 1 ),
     &n_viewforest_id, config, tantivy, &graph, &mut views_state ) . await ?;
-  let reordered : String = { // t above r, and a note placed after them
-    let r_line : &str = line_containing (&n_view, "(gnid r)");
+  let placed : String = { // a note placed after t
     let t_line : &str = line_containing (&n_view, "(gnid t)");
-    n_view
-      . replace ( r_line, "SWAP_PLACEHOLDER" )
-      . replace ( t_line, &format! (
-        "{}\n*** (skg node noClaim) a placed note", r_line ))
-      . replace ( "SWAP_PLACEHOLDER", t_line ) };
+    n_view . replace ( t_line, &format! (
+      "{}\n*** (skg node noClaim) a placed note", t_line )) };
   let (n_view, _) : (String, Vec<String>) = save_view_and_read_collateral (
-    &reordered, &n_viewforest_id, config, tantivy, &graph, &mut views_state ) . await ?;
+    &placed, &n_viewforest_id, config, tantivy, &graph, &mut views_state ) . await ?;
   assert_lines_in_order (
-    &n_view, &[ "(gnid t)", "(gnid r)", "a placed note" ],
+    &n_view, &[ "(gnid r)", "(gnid t)", "a placed note" ],
     "the note stays below the members" );
   let (u_view, u_pids, u_viewforest) =
     single_root_view (config, Some (tantivy), &ID::from ("u")) ?;
@@ -203,6 +196,6 @@ async fn a_member_added_elsewhere_follows_the_kept_ones_impl (
     . find ( |view| view . contains ("forksFolder") )
     . unwrap_or_else ( || panic! ( "n's view is rerendered: {:?}", collateral_views ));
   assert_lines_in_order (
-    collateral_n, &[ "(gnid t)", "(gnid r)", "(gnid u)", "a placed note" ],
-    "u follows the kept members, and nothing kept moves" );
+    collateral_n, &[ "(gnid r)", "(gnid t)", "a placed note", "(gnid u)" ],
+    "u takes its place by pid, after t and the note riding after t" );
   Ok (( )) }

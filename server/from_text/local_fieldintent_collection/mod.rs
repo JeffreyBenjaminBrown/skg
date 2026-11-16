@@ -56,12 +56,15 @@ pub struct NonmergeSavePlan {
 /// This is the whole non-nodeMerge half of save extraction, done via
 /// local fieldIntent collection. It returns the plan, plus the
 /// (acquirer, acquiree) pairs that the nodeMerge half consumes.
+/// 'is_diff_view' says whether 'viewforest' is a buffer of the diff
+/// view ('resolve_visibility').
 #[allow(non_snake_case)]
 pub fn extract_nonmergeSavePlan_locally_in_graph (
   viewforest             : &ViewForest,
   graph                  : &InRustGraph,
   config                 : &SkgConfig,
   skgrepo_restriction    : &SkgrepoRestriction,
+  is_diff_view           : bool,
 ) -> Result<(NonmergeSavePlan, Vec<(ID, ID)>), Box<dyn Error>> {
   let _span : tracing::span::EnteredSpan = tracing::info_span!(
     "extract_nonmergeSavePlan_locally" ). entered();
@@ -85,7 +88,7 @@ pub fn extract_nonmergeSavePlan_locally_in_graph (
     resolve_visibility (
       intents, &forkee_visibility, &forker_visibility,
       &hidden_outside, &forks_folder_members,
-      graph, config, skgrepo_restriction ) ? };
+      graph, config, skgrepo_restriction, is_diff_view ) ? };
   let with_disk : NodeInstructions_with_Repomoves =
     build_diskSupplemented_nodeInstructions (
       resolved . into_ordered_intents(),
@@ -196,7 +199,7 @@ pub fn extract_nonmergeSavePlan_locally (
     ::read_all_skg_files_from_skgrepos (config)?;
   let graph = InRustGraph::from_graphnodes (&nodes);
   extract_nonmergeSavePlan_locally_in_graph (
-    viewforest, &graph, config, skgrepo_restriction ) }
+    viewforest, &graph, config, skgrepo_restriction, false ) }
 
 /// Filters out Save instructions that would be no-ops,
 /// because they match the pre-save in-Rust graph entry

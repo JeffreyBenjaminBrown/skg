@@ -125,8 +125,10 @@ pub fn what_the_baseline_shows (
   config              : &SkgConfig,
   skgrepo_restriction : &SkgrepoRestriction,
   baseline            : &str,
+  is_diff_view        : bool, // whether the saved buffer is one of the diff view's
 ) -> Result<WhatTheBaselineShows, BufferValidationError> {
-  what_the_baseline_shows_else_why_not (graph, config, skgrepo_restriction, baseline)
+  what_the_baseline_shows_else_why_not (
+    graph, config, skgrepo_restriction, baseline, is_diff_view )
     . map_err ( |message| BufferValidationError::Other ( format! (
       "The saved buffer's baseline, the text the server last drew for it, could not be read: {}. Nothing was saved. Archive your edits (M-x skg-show-unsaved-changes in Emacs, :SkgShowUnsavedChanges in Neovim), reopen a fresh view, and reapply them there.",
       message )) ) }
@@ -136,6 +138,7 @@ fn what_the_baseline_shows_else_why_not (
   config              : &SkgConfig,
   skgrepo_restriction : &SkgrepoRestriction,
   baseline            : &str,
+  is_diff_view        : bool,
 ) -> Result<WhatTheBaselineShows, String> {
   let (viewforest, parsing_errors, _warnings, _supplied)
     : (ViewForest, Vec<BufferValidationError>, Vec<String>, WhatTheParseSupplied) =
@@ -145,7 +148,7 @@ fn what_the_baseline_shows_else_why_not (
                  . collect::<Vec<String>> () . join ("; ") ); }
   let (nonmerge_plan, _nodeMerge_pairs) : (NonmergeSavePlan, Vec<(ID, ID)>) =
     extract_nonmergeSavePlan_locally_in_graph (
-      &viewforest, graph, config, skgrepo_restriction )
+      &viewforest, graph, config, skgrepo_restriction, is_diff_view )
     . map_err ( |error| error . to_string () ) ?;
   let writes : BTreeMap<ID, Graphnode> =
     nonmerge_plan . node_instructions . into_iter ()

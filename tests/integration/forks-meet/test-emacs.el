@@ -1,10 +1,11 @@
 ;;; Integration test: forks of one note meet, in Emacs
 ;;; ('docs/forks.org', "Forks of one note meet"; run-test.sh gives the
 ;;; data). The user's own gestures, and what the user then sees:
-;;; 1. R's view. N stands editable in R's forks folder, its herald bK
-;;;    (a forkee); in N's forks folder R is a repeat, showing nothing,
-;;;    and T (herald Kb, a forker) shows Y, with Z folded in its folder
-;;;    of what N hides in it; each containers folder's member (Shelf)
+;;; 1. R's view. R's forks folder is flat. N stands editable in it,
+;;;    its herald bK (a forkee); T, which forks N, stands there too,
+;;;    an indirect member, editable, its herald with neither bK nor Kb,
+;;;    showing Y and Z, what R neither contains nor hides; no member
+;;;    shows a forks folder; each containers folder's member (Shelf)
 ;;;    is folded.
 ;;; 2. X4, which N shows there, is cut (org-cut-subtree) and the view
 ;;;    saved: X4 stands in N's folder of what R hides in it.
@@ -97,34 +98,30 @@ and acts on the atoms only when a save redraws the buffer."
                 (string-match-p "Kb" herald))
         (test-fail "N should stand editable in R's forks folder, a forkee (bK); herald %S"
                    herald)))
-    (forks-meet-goto-line-showing "R" 1)
-    (let ((repeat-depth (forks-meet-depth)))
-      (unless (string-match-p "writeProtected" (forks-meet-line))
-        (test-fail "R in N's forks folder should be a write-protected repeat"))
-      (forks-meet-next-line)
-      (unless (<= (forks-meet-depth) repeat-depth)
-        (test-fail "the repeat R should show nothing")))
+    (goto-char (point-min))
+    (let ((forks-folders 0))
+      (while (re-search-forward "^\\*+ (skg .*forksFolder" nil t)
+        (setq forks-folders (1+ forks-folders)))
+      (unless (= forks-folders 1)
+        (test-fail "R's view should hold one forks folder; found %d" forks-folders)))
     (forks-meet-goto-line-showing "T")
     (let ((t-depth (forks-meet-depth)) (herald (forks-meet-herald)))
-      (message "T's herald in N's forks folder: %s" herald)
+      (message "T's herald in R's forks folder: %s" herald)
       (when (or (string-match-p "writeProtected" (forks-meet-line))
+                (not (string-match-p "noClaim" (forks-meet-line)))
                 (not herald)
-                (not (string-match-p "Kb" herald))
+                (string-match-p "Kb" herald)
                 (string-match-p "bK" herald))
-        (test-fail "T should stand editable in N's forks folder, a forker (Kb); herald %S"
+        (test-fail "T should stand editable in R's forks folder, an indirect member (no b); herald %S"
                    herald))
-      (forks-meet-next-line)
-      (unless (and (string-match-p "hiddenInForkPartnerFolder" (forks-meet-line))
-                   (= (forks-meet-depth) (1+ t-depth)))
-        (test-fail "T's first child should be its folder of what N hides in it"))
-      (forks-meet-next-line)
-      (unless (and (string-match-p "(gnid Z)" (forks-meet-line))
-                   (forks-meet-drawn-folded-p))
-        (test-fail "that folder should hold Z, folded"))
       (forks-meet-goto-line-showing "Y")
       (unless (and (= (forks-meet-depth) (1+ t-depth))
                    (not (invisible-p (point))))
-        (test-fail "T should show Y")))
+        (test-fail "T should show Y"))
+      (forks-meet-goto-line-showing "Z")
+      (unless (and (= (forks-meet-depth) (1+ t-depth))
+                   (not (invisible-p (point))))
+        (test-fail "T should show Z, which R does not hide")))
     (goto-char (point-min))
     (let ((containers-folders 0))
       (while (re-search-forward "^\\*+ (skg .*containerFolder" nil t)

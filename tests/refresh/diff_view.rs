@@ -233,7 +233,8 @@ node p
 /// What a content view adds unasked, the diff view does not: s's
 /// forks folder, though an editable-view request extends s, and
 /// the folder of what s hides in e, though e is an editable forkee
-/// as such.
+/// as such. (The content view's forks folders hold every mirror, u in
+/// s's and s in u's, each an indirect member: both fork e.)
 #[test]
 fn the_diff_view_adds_no_default_folders () {
   let graph_nodes : Vec<Graphnode> = vec! [
@@ -262,9 +263,11 @@ node s
       hiddenInForkPartnerFolder
         node h wp noClaim folded
           node e wp noClaim
+    node u wp noClaim
 node u
   forksFolder
-    node e wp",
+    node e wp
+    node s wp noClaim",
     "a content view adds both" ); }
 
 #[test]

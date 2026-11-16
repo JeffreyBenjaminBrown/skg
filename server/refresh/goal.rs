@@ -5,8 +5,9 @@
 //! contains); for a node of the containerward chain under a folder's
 //! member, its containers; for a folder, its partners in the folder's
 //! relation (for the containers folder, those the view does not
-//! already show above the node; for the forks folder, the notes it
-//! forks, then those forking it that it neither forks nor hides), or
+//! already show above the node; for the forks folder, every mirror
+//! of it: the notes it forks, then those forking it that it neither
+//! forks nor hides, then its other mirrors that it does not hide), or
 //! the compound folders' derived lists; for a property
 //! folder, the node's aliases, IDs or true flags. In the diff view the
 //! goal also holds what HEAD alone warrants ('diff_view.rs'). Each
@@ -26,6 +27,7 @@
 //! too.
 
 use crate::dbs::in_rust_graph::InRustGraph;
+use crate::dbs::in_rust_graph::mirrors::{Mirror, mirrors_of_note_forking};
 use crate::dbs::in_rust_graph::relation_accessors::{GnidPresence, NodeRelation, RelationRole};
 use crate::graph_straddle::types::Partner;
 use crate::refresh::Walk;
@@ -36,7 +38,7 @@ use crate::refresh::diff_view;
 use crate::refresh::extent::is_chain_parent;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::telescope::types::IllegalEdit;
-use crate::types::misc::{ID, RelPartner, RelationshipMemberKey, SkgrepoName};
+use crate::types::misc::{ID, RelPartner, RelationshipMemberKey, SkgConfig, SkgrepoName};
 use crate::types::nodes::complete::Flag;
 use crate::types::nodes::rust::GraphnodeInRust;
 use crate::types::tree::forest::in_content_position;
@@ -46,6 +48,7 @@ use crate::util::setlike_vector_subtraction;
 
 use ego_tree::{NodeId, NodeRef, Tree};
 use std::collections::{HashMap, HashSet};
+use std::iter::once;
 
 /// What one goal item names.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -74,8 +77,10 @@ pub(crate) struct GoalItem {
   /// In the diff view, the partner the item is, over the straddle.
   pub partner : Option<Partner>,
   /// Whether a child standing for it may claim membership: false for
-  /// a forker-only member of a forks folder, whose relationship the
-  /// member records, not the folder's viewparent. A child claiming
+  /// a member of a forks folder that the folder's viewparent does not
+  /// fork (a forker-only member, whose relationship the member
+  /// records, or an indirect member, joined to the viewparent only
+  /// through other mirrors). A child claiming
   /// such an item is unwarranted ('warrant_of_child'), and one drawn
   /// for it claims nothing ('draw_item').
   pub claimable : bool,
@@ -90,8 +95,8 @@ pub(crate) struct Goal {
   /// Where an ordered goal's order ends: the children standing for
   /// items from here on all follow those standing for earlier ones,
   /// and keep, among themselves, the order the view has. The length of
-  /// the items, but for a forks folder's goal, whose forker-only
-  /// members no list orders ('Goal::ordered_then_unordered').
+  /// the items, but for the diff view's forks folder goal, whose
+  /// forker-only members no list orders ('Goal::ordered_then_unordered').
   unordered_from : usize,
 }
 
@@ -338,10 +343,10 @@ fn unintegrated_content_gnids (
     setlike_vector_subtraction (contents, &hidden), &contained) }
 
 /// When the occurrence at 'treeid' is a member as such of a forks
-/// folder (a member the folder's relation warrants: a forkee as such,
+/// folder (a member the folder's goal warrants: a forkee as such,
 /// which claims, its viewparent forking it, or a forker as such,
-/// which claims nothing: in a view the refresh draws, one that forks
-/// its viewparent and that the viewparent does not fork),
+/// which claims nothing: in a view the refresh draws, a forker-only
+/// or an indirect member, which the viewparent does not fork),
 /// the note whose folder holds it, the folder's viewparent. Either
 /// shows its content less what that note contains or hides.
 pub(crate) fn note_of_member_as_such (
@@ -359,8 +364,8 @@ pub(crate) fn note_of_member_as_such (
   folder . parent () ? . value () . occurrence_gnid () . cloned () }
 
 /// When the occurrence at 'treeid' is a forker as such (a member as
-/// such claiming nothing, 'note_of_member_as_such'), the note whose
-/// forks folder holds it.
+/// such claiming nothing, 'note_of_member_as_such': a forker-only or
+/// an indirect member), the note whose forks folder holds it.
 pub(crate) fn note_of_forker_as_such (
   tree   : &Tree<Viewnode>,
   treeid : NodeId,
@@ -369,6 +374,26 @@ pub(crate) fn note_of_forker_as_such (
     &tree . get (treeid) ? . value () . kind else { return None; };
   if occurrence . claimsMembership { return None; }
   note_of_member_as_such (tree, treeid) }
+
+/// When the occurrence at 'treeid' is a forker as such that forks the
+/// note whose forks folder holds it, by a record the skgrepo
+/// restriction shows, that note: where the folder of what it hides of
+/// the note's content ('Folder::HiddenByForker') may stand. An
+/// indirect member claims nothing too, but forks no such note, and
+/// its hides do not apply to the note's content.
+pub(crate) fn note_forked_by_forker_as_such (
+  tree   : &Tree<Viewnode>,
+  treeid : NodeId,
+  walk   : &Walk,
+) -> Option<ID> {
+  let note : ID = note_of_forker_as_such (tree, treeid) ?;
+  let forker : ID = tree . get (treeid) ? . value () . occurrence_gnid () ? . clone ();
+  let graph : &InRustGraph = walk . truth . graph;
+  let note_pid : ID = graph . pid_else_raw_id (&note);
+  graph . outbound_gnids_for_relation_gated (
+    &forker, NodeRelation::Forks, walk . truth . restriction )
+    . iter () . any ( |forkee| graph . pid_else_raw_id (forkee) == note_pid )
+    . then_some (note) }
 
 /// A folder's goal, by kind.
 fn folder_goal (
@@ -405,11 +430,12 @@ fn folder_goal (
           &occurrence_pid_of (parties . hider) ?, walk ),
         &HashMap::new ()))) },
     Folder::HiddenByForker => {
-      // Under a forker as such only: under a forkee as such (a forker
-      // the user made a forkee) it holds nothing, and goes.
+      // Under a forker as such that forks the note only: under a
+      // forkee as such (a forker the user made a forkee) or an
+      // indirect member it holds nothing, and goes.
       let parties : CompoundFolderParties = compound_folder_parties (tree, folder) ?;
       Some ( Goal::unordered ( gnid_items (
-        if note_of_forker_as_such (tree, parties . hider) . is_some () {
+        if note_forked_by_forker_as_such (tree, parties . hider, walk) . is_some () {
           hidden_by_forker (
             &occurrence_pid_of (parties . hider) ?,
             &occurrence_pid_of (parties . container ?) ?, walk )
@@ -457,11 +483,15 @@ fn partnerFolder_goal (
                             kind . goal_is_ordered () )) }
 
 /// The goal of the forks folder describing 'described', over the
-/// straddle in the diff view, else in the graph: the notes it forks,
-/// in its list's order, each claimable, with the relRepo of each
-/// unknown or restricted one; then its forker-only members
-/// ('forker_only_members'), claiming nothing, after them all in the
-/// order the view has them.
+/// straddle in the diff view, else in the graph: every mirror of it,
+/// each once ('docs/forks.org', "The forks folder"). First the notes
+/// it forks, in its list's order, each claimable, with the relRepo of
+/// each unknown or restricted one; then its forker-only members
+/// ('forker_only_members'), by the declaration order of their home
+/// skgrepos, then pid; then its indirect members ('indirect_members'),
+/// nearest first, then by the declaration order of their homes, then
+/// pid. None but the forkees is claimable. The whole is ordered: the
+/// tails' order is the graph's and the config's, not the user's.
 fn forks_folder_goal (
   described : &ID,
   walk      : &Walk,
@@ -469,6 +499,7 @@ fn forks_folder_goal (
   if let Some (goal) = diff_view::forks_folder_goal (described, walk) {
     return goal; }
   let graph : &InRustGraph = walk . truth . graph;
+  let config : &SkgConfig = walk . truth . config;
   let restriction : &SkgrepoRestriction = walk . truth . restriction;
   let forkee_keys : Vec<RelPartner<RelationshipMemberKey>> =
     graph . outbound_member_keys_for_relation_gated (
@@ -478,13 +509,26 @@ fn forks_folder_goal (
   let forkees : Vec<ID> = forkee_keys . into_iter ()
     . map ( |member| member . member . into_id () )
     . collect ();
-  let forker_only : Vec<ID> =
+  let declaration_rank_of : &dyn Fn (&ID) -> usize = &|pid : &ID| -> usize {
+    graph . nodes . get (pid)
+      . map_or ( usize::MAX, |node| config . declaration_rank (&node . home_skgrepo) ) };
+  let mut forker_only : Vec<ID> =
     forker_only_members (graph, restriction, described, &forkees);
-  Goal::ordered_then_unordered (
-    gnid_items (forkees, &relRepos),
-    forker_only . into_iter ()
-      . map ( |gnid| GoalItem { claimable : false,
-                                .. GoalItem::by_graph ( GoalMember::Gnid (gnid) ) } )
+  forker_only . sort_by ( |a, b|
+    ( declaration_rank_of (a), a ) . cmp (&( declaration_rank_of (b), b )) );
+  let mut indirect : Vec<Mirror> =
+    indirect_members (graph, restriction, described, &forkees);
+  indirect . sort_by ( |a, b|
+    ( a . distance, config . declaration_rank (&a . home), &a . pid )
+    . cmp (&( b . distance, config . declaration_rank (&b . home), &b . pid )) );
+  let claiming_nothing : &dyn Fn (ID) -> GoalItem = &|gnid : ID| -> GoalItem {
+    GoalItem { claimable : false,
+               .. GoalItem::by_graph ( GoalMember::Gnid (gnid) ) } };
+  Goal::ordered (
+    gnid_items (forkees, &relRepos) . into_iter ()
+      . chain ( forker_only . into_iter () . map (claiming_nothing) )
+      . chain ( indirect . into_iter ()
+                . map ( |mirror| claiming_nothing (mirror . pid) ))
       . collect () ) }
 
 /// The forker-only members of the forks folder describing 'described':
@@ -510,14 +554,45 @@ pub(crate) fn forker_only_members (
     . filter ( |forker| ! left_out . contains (forker) )
     . collect () }
 
-/// The fork partners of 'note' that its forks folder shows, by the
-/// records the skgrepo restriction shows: the notes it forks
-/// ('forkees', which the caller reads as the view drew them or as a
-/// save leaves them), each resolved to its pid, then its forker-only
-/// members ('forker_only_members'). These are the partners that
-/// explain a hide of the note's ('docs/glossary.org', "hides"): what
-/// one of them contains, the view draws under it, and the note's
-/// hide of it stands there.
+/// The indirect members of the forks folder describing 'described'
+/// ('docs/glossary.org', "direct member, indirect member"): its
+/// mirrors under the skgrepo restriction, were the notes it forks
+/// those 'forkees' names ('mirrors_of_note_forking'), less itself,
+/// its fork partners (those 'forkees' names and those forking it) and
+/// those it hides by records the skgrepo restriction shows, nearest
+/// first. A mirror reached only through a note it hides is still one:
+/// the hide leaves out that note alone.
+pub(crate) fn indirect_members (
+  graph       : &InRustGraph,
+  restriction : &SkgrepoRestriction,
+  described   : &ID,
+  forkees     : &[ID],
+) -> Vec<Mirror> {
+  let described_pid : ID = graph . pid_else_raw_id (described);
+  let left_out : HashSet<ID> =
+    resolve_all (forkees, graph) . into_iter ()
+    . chain ( graph . inbound_pids_for_relation_gated (
+      described, NodeRelation::Forks, restriction ))
+    . chain ( resolve_all (
+      &graph . outbound_gnids_for_relation_gated (
+        described, NodeRelation::Hides, restriction ),
+      graph ))
+    . chain ( once (described_pid) )
+    . collect ();
+  mirrors_of_note_forking (graph, restriction, described, forkees)
+    . members . into_iter ()
+    . filter ( |mirror| ! left_out . contains (&mirror . pid) )
+    . collect () }
+
+/// The members of the forks folder of 'note', by the records the
+/// skgrepo restriction shows: the notes it forks ('forkees', which
+/// the caller reads as the view drew them or as a save leaves them),
+/// each resolved to its pid, then its forker-only members
+/// ('forker_only_members'), then its indirect members
+/// ('indirect_members'). These are the partners that explain a hide
+/// of the note's ('docs/glossary.org', "hides"): what one of them
+/// contains, the view draws under it, and the note's hide of it
+/// stands there.
 pub(crate) fn fork_partners_shown (
   graph       : &InRustGraph,
   restriction : &SkgrepoRestriction,
@@ -526,8 +601,13 @@ pub(crate) fn fork_partners_shown (
 ) -> Vec<ID> {
   let forker_only : Vec<ID> =
     forker_only_members (graph, restriction, note, forkees);
+  let indirect : Vec<ID> =
+    indirect_members (graph, restriction, note, forkees) . into_iter ()
+    . map ( |mirror| mirror . pid )
+    . collect ();
   resolve_all (forkees, graph) . into_iter ()
     . chain (forker_only)
+    . chain (indirect)
     . collect () }
 
 /// Whether 'pid' has a fork partner, either way, by a record the
@@ -548,8 +628,9 @@ pub(crate) fn has_a_fork_partner (
 /// from 'graph': its partners in the folder's relation whose records
 /// the skgrepo restriction shows, each extra ID resolved to its node's
 /// pid (an unresolved ID kept as it is). In graph order; for the forks
-/// folder, its forkees and then its forker-only members, as its goal
-/// has them ('forks_folder_goal'). None if the kind has no relation
+/// folder, every member its goal holds ('forks_folder_goal'): its
+/// forkees, its forker-only members, then its indirect members, the
+/// tails not in the goal's order. None if the kind has no relation
 /// member role. The goal of such a folder in a content view
 /// ('folder_goal').
 pub(crate) fn partnerFolder_members_in_graph (
@@ -565,9 +646,8 @@ pub(crate) fn partnerFolder_members_in_graph (
       . into_iter ()
       . map ( |member| member . member . into_id () )
       . collect ();
-    let forker_only : Vec<ID> = forker_only_members (
-      graph, skgrepo_restriction, viewparent_pid, &forkees );
-    return Some ( forkees . into_iter () . chain (forker_only) . collect () ); }
+    return Some ( fork_partners_shown (
+      graph, skgrepo_restriction, viewparent_pid, &forkees )); }
   let member_role : RelationRole = kind . relation_member_role () ?;
   let recorder_role : RelationRole =
     member_role . opposite_role ();
@@ -635,7 +715,8 @@ fn goal_list_for_hiddenInForkPartner_folder (
 /// records the skgrepo restriction shows: the goal of its compound
 /// folder 'HiddenOutsideOfForkPartners', in the order of its hides
 /// list. Its fork partners are the members its forks folder shows,
-/// forkees and forkers alike ('fork_partners_shown'): a hide one of
+/// forkees, forkers and indirect members alike
+/// ('fork_partners_shown'): a hide one of
 /// them contains stands under that member instead, in its folder of
 /// what the note hides in it. A partner's content is read by the same
 /// records, so a hide of something a partner contains only by a

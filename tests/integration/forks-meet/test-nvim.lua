@@ -2,11 +2,12 @@
 -- ('docs/forks.org', "Forks of one note meet"; run-test.sh gives the
 -- data). The Lua mirror of test-emacs.el in this directory, through
 -- the user's own gestures ('dd', 'p', ':s', ':w'):
--- 1. R's view. N stands editable in R's forks folder, its herald bK
---    (a forkee); in N's forks folder R is a repeat, showing nothing,
---    and T (herald Kb, a forker) shows Y, with Z folded in its folder
---    of what N hides in it; each containers folder's member (Shelf)
---    is folded.
+-- 1. R's view. R's forks folder is flat. N stands editable in it, its
+--    herald bK (a forkee); T, which forks N, stands there too, an
+--    indirect member, editable, its herald with neither bK nor Kb,
+--    showing Y and Z, what R neither contains nor hides; no member
+--    shows a forks folder; each containers folder's member (Shelf) is
+--    folded.
 -- 2. X4, which N shows there, is deleted ('dd') and the view saved
 --    (':w'): X4 stands in N's folder of what R hides in it.
 -- 3. N's view. Y is deleted from under T, put after N's last child
@@ -128,30 +129,32 @@ do
           "N stands editable in R's forks folder, a forkee (bK)")
 end
 do
-  local repeat_line = line_showing(r_buf, 'R', 1)
-  T.check(line_at(r_buf, repeat_line):find('writeProtected', 1, true),
-          "R in N's forks folder is a write-protected repeat")
-  T.check(depth_at(r_buf, repeat_line + 1) <= depth_at(r_buf, repeat_line),
-          'the repeat R shows nothing')
+  local forks_folders = 0
+  local at = folder_line(r_buf, 'forksFolder')
+  while at do
+    forks_folders = forks_folders + 1
+    at = folder_line(r_buf, 'forksFolder', at + 1)
+  end
+  T.check(forks_folders == 1,
+          "R's view holds one forks folder; found " .. forks_folders)
 end
 do
   local t_line = line_showing(r_buf, 'T')
   local herald = herald_at(r_buf, t_line)
-  print("T's herald in N's forks folder: " .. tostring(herald))
+  print("T's herald in R's forks folder: " .. tostring(herald))
   T.check(not line_at(r_buf, t_line):find('writeProtected', 1, true)
-          and herald and herald:find('Kb', 1, true)
+          and line_at(r_buf, t_line):find('noClaim', 1, true)
+          and herald and not herald:find('Kb', 1, true)
           and not herald:find('bK', 1, true),
-          "T stands editable in N's forks folder, a forker (Kb)")
-  T.check(line_at(r_buf, t_line + 1):find('hiddenInForkPartnerFolder', 1, true)
-          and depth_at(r_buf, t_line + 1) == depth_at(r_buf, t_line) + 1,
-          "T's first child is its folder of what N hides in it")
-  T.check(line_at(r_buf, t_line + 2):find('(gnid Z)', 1, true)
-          and folds.line_invisible_p(t_line + 2),
-          'that folder holds Z, folded')
+          "T stands editable in R's forks folder, an indirect member (no b)")
   local y_line = line_showing(r_buf, 'Y')
   T.check(depth_at(r_buf, y_line) == depth_at(r_buf, t_line) + 1
           and not folds.line_invisible_p(y_line),
           'T shows Y')
+  local z_line = line_showing(r_buf, 'Z')
+  T.check(depth_at(r_buf, z_line) == depth_at(r_buf, t_line) + 1
+          and not folds.line_invisible_p(z_line),
+          'T shows Z, which R does not hide')
 end
 do
   local containers_folders = 0

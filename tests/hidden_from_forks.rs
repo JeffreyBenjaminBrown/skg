@@ -498,8 +498,13 @@ async fn test_readding_forkee_content_to_forker_contains_unhides (
 /// any container's, still names m. Owned f forks j and contains
 /// nothing. Placing r in f and saving,
 /// then removing it and saving, is the gesture that dismisses any
-/// other child of j; r stands for m wherever m appears as content,
-/// so it must hide m, the member of j's content r stands for.
+/// other child of j. But owned g, which forks j too, contains r
+/// itself: g is an indirect member of f's forks folder, and every
+/// member explains a hide alike, so r would show again under g. The
+/// removal hides r, the member of g's content it is, rather than m,
+/// the member of j's content r stands for (as removing r from g does,
+/// where no member contains r itself:
+/// 'test_removing_a_fork_of_forkee_content_hides_what_it_forks').
 async fn test_placing_and_removing_a_fork_of_forkee_content_hides_what_it_forks (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
@@ -530,8 +535,8 @@ async fn test_placing_and_removing_a_fork_of_forkee_content_hides_what_it_forks 
       "the second save removes r from f: {:?}", f_skg . contains );
     assert_eq! (
       members_of ( f_skg . hides . or_default () ),
-      vec! [ ID::from ("m") ],
-      "removing r, which forks m, a member of j's content, must hide m: {:?}",
+      vec! [ ID::from ("r") ],
+      "removing r, a member of the content of g, an indirect member, must hide r: {:?}",
       f_skg . hides );
     Ok (( )) }
 
@@ -628,8 +633,9 @@ async fn test_a_preview_and_a_save_say_what_they_hide (
 
 /// A child leaving a forker that forks something, whose
 /// departure hides nothing, earns a line naming the rule that held:
-/// y, which j does not contain and which forks nothing, placed in
-/// f and removed; and r, removed from g in the save that puts m, the
+/// y, which j does not contain (nor g or h, which fork j too, the
+/// indirect members of f's forks folder) and which forks nothing,
+/// placed in f and removed; and r, removed from g in the save that puts m, the
 /// member r stands for, in its place.
 async fn test_a_save_says_why_a_removal_hides_nothing (
   config : &SkgConfig,
@@ -655,7 +661,7 @@ async fn test_a_save_says_why_a_removal_hides_nothing (
     assert_eq! (
       save_and_return_hides (
         removed, config, tantivy, &graph, &mut views_state ) . await ?,
-      vec! [ "Hides nothing: 'y' left 'f', but it is no content of 'j', nor a mirror of any." . to_string () ] );
+      vec! [ "Hides nothing: 'y' left 'f', but it is no content of 'j' or 'g' or 'h', nor a mirror of any." . to_string () ] );
     let replaced : &str = indoc! {"
       * (skg node (gnid g) (skgRepos (nodeRepo owned))) g
       ** (skg node (gnid m) (skgRepos (nodeRepo owned))) m
@@ -975,7 +981,9 @@ async fn test_a_node_placed_under_an_owned_forkee_joins_it (
 /// - hidden-for-no-reason is not in any forkee's content
 ///
 /// Tests two views:
-/// - Initial view from R: forkees as such drawn editable
+/// - Initial view from R: forkees as such drawn editable, neither
+///   showing a forks folder of its own (a member as such shows one
+///   only when asked)
 /// - The view after a save that asks to extend each forkee: the same, since each is editable already
 ///
 /// Also tests ordering rule: hiddenInForkPartnerFolder precedes content regardless of .skg order.
@@ -999,15 +1007,11 @@ async fn test_forkee_and_compound_partner_folders (
        **** (skg hiddenInForkPartnerFolder)
        ***** (skg folded node (gnid hidden-in-E1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 1 (ancestors 2))) (hides (in 1 (ancestors 4)))) (birth (contains in 2) (hides in 4)))) hidden-in-E1
        ****** (skg node (gnid E1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 2 (ancestors 1))) (forks (in 1))) cycle)) forkee-1
-       **** (skg forksFolder)
-       ***** (skg node (gnid R) (skgRepos (nodeRepo main)) noClaim writeProtected (view (rels (contains (out 1 (unintegrated 1))) (forks (out 2 (ancestors 2))) (hides (out 3))) (birth (forks out 2)) cycle)) R
        **** (skg node (gnid E11) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) E11
        *** (skg node (gnid E2) (skgRepos (nodeRepo main)) (view (rels (contains (out 2 (unintegrated 1))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) forkee-2
        **** (skg hiddenInForkPartnerFolder)
        ***** (skg folded node (gnid hidden-in-E2) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 1 (ancestors 2))) (hides (in 1 (ancestors 4)))) (birth (contains in 2) (hides in 4)))) hidden-in-E2
        ****** (skg node (gnid E2) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 2 (ancestors 1))) (forks (in 1))) cycle)) forkee-2
-       **** (skg forksFolder)
-       ***** (skg node (gnid R) (skgRepos (nodeRepo main)) noClaim writeProtected (view (rels (contains (out 1 (unintegrated 1))) (forks (out 2 (ancestors 2))) (hides (out 3))) (birth (forks out 2)) cycle)) R
        **** (skg node (gnid E21) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) E21
        *** (skg hiddenOutsideOfForkPartnersFolder)
        **** (skg folded node (gnid hidden-for-no-reason) (skgRepos (nodeRepo main)) writeProtected (view (rels (hides (in 1 (ancestors 3)))) (birth (hides in 3)))) hidden-for-no-reason
@@ -1073,8 +1077,6 @@ async fn test_hidden_within_but_none_without (
        **** (skg hiddenInForkPartnerFolder)
        ***** (skg folded node (gnid H) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 1 (ancestors 2))) (hides (in 1 (ancestors 4)))) (birth (contains in 2) (hides in 4)))) H
        ****** (skg node (gnid E1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 3 (ancestors 1))) (forks (in 1))) cycle)) forkee-1
-       **** (skg forksFolder)
-       ***** (skg node (gnid R) (skgRepos (nodeRepo main)) noClaim writeProtected (view (rels (contains (out 1 (unintegrated 1))) (forks (out 1 (ancestors 2))) (hides (out 1))) (birth (forks out 2)) cycle)) R
        **** (skg node (gnid E11) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) E11
        **** (skg node (gnid E12) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) E12
        ** (skg node (gnid R1) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) R1
@@ -1295,14 +1297,10 @@ async fn test_hidden_without_but_none_within (
       "* (skg node (gnid R) (skgRepos (nodeRepo main)) (view (rels (contains (out 1)) (forks (out 2)) (hides (out 1))))) R
        ** (skg forksFolder)
        *** (skg node (gnid E1) (skgRepos (nodeRepo main)) (view (rels (contains (out 2 (unintegrated 2))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) forkee-1
-       **** (skg forksFolder)
-       ***** (skg node (gnid R) (skgRepos (nodeRepo main)) noClaim writeProtected (view (rels (contains (out 1 (unintegrated 1))) (forks (out 2 (ancestors 2))) (hides (out 1))) (birth (forks out 2)) cycle)) R
        **** (skg node (gnid E11) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) E11
        **** (skg node (gnid E12) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)) (out 1))) (birth (contains in 1)))) E12
        ***** (skg node (gnid E121) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) E121
        *** (skg node (gnid E2) (skgRepos (nodeRepo main)) (view (rels (contains (out 0 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) forkee-2
-       **** (skg forksFolder)
-       ***** (skg node (gnid R) (skgRepos (nodeRepo main)) noClaim writeProtected (view (rels (contains (out 1 (unintegrated 1))) (forks (out 2 (ancestors 2))) (hides (out 1))) (birth (forks out 2)) cycle)) R
        *** (skg hiddenOutsideOfForkPartnersFolder)
        **** (skg folded node (gnid H) (skgRepos (nodeRepo main)) writeProtected (view (rels (hides (in 1 (ancestors 3)))) (birth (hides in 3)))) H
        ** (skg node (gnid R1) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) R1
@@ -1436,15 +1434,11 @@ async fn test_overlapping_hidden_within (
        ***** (skg folded node (gnid H) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 2 (ancestors 2))) (hides (in 1 (ancestors 4)))) (birth (contains in 2) (hides in 4)))) H
        ****** (skg node (gnid E1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 1 (ancestors 1))) (forks (in 1))) cycle)) forkee-1
        ****** (skg node (gnid E2) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 1 (ancestors 1))) (forks (in 1))))) forkee-2
-       **** (skg forksFolder)
-       ***** (skg node (gnid R) (skgRepos (nodeRepo main)) noClaim writeProtected (view (rels (contains (out 1 (unintegrated 1))) (forks (out 2 (ancestors 2))) (hides (out 1))) (birth (forks out 2)) cycle)) R
        *** (skg node (gnid E2) (skgRepos (nodeRepo main)) (view (rels (contains (out 1 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) forkee-2
        **** (skg hiddenInForkPartnerFolder)
        ***** (skg folded node (gnid H) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 2 (ancestors 2))) (hides (in 1 (ancestors 4)))) (birth (contains in 2) (hides in 4)))) H
        ****** (skg node (gnid E1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 1 (ancestors 1))) (forks (in 1))))) forkee-1
        ****** (skg node (gnid E2) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 1 (ancestors 1))) (forks (in 1))) cycle)) forkee-2
-       **** (skg forksFolder)
-       ***** (skg node (gnid R) (skgRepos (nodeRepo main)) noClaim writeProtected (view (rels (contains (out 1 (unintegrated 1))) (forks (out 2 (ancestors 2))) (hides (out 1))) (birth (forks out 2)) cycle)) R
        ** (skg node (gnid R1) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) R1
        "};
     assert_metadata_eq!(initial_view, expected_view,

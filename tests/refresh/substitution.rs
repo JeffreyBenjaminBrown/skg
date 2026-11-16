@@ -8,7 +8,8 @@
 // it. A shown mirror that
 // forks the original draws the original in its forks folder, as any
 // editable fork does; and an editable node that a note forks draws that
-// forker there, claiming nothing.
+// forker there, claiming nothing. A forks folder lists every mirror,
+// and none of its members shows one of its own unasked.
 
 use super::*;
 use indoc::formatdoc;
@@ -27,9 +28,7 @@ fn a_drawn_member_is_shown_as_its_mirror () {
 node p
   node o (inPlaceOf n)
     forksFolder
-      node n
-        forksFolder
-          node o wp noClaim" ); }
+      node n" ); }
 
 #[test]
 fn a_member_shown_raw_is_shown_as_its_mirror_in_place () {
@@ -98,9 +97,7 @@ fn the_content_of_a_forked_node_shown_raw_is_shown_raw () {
 node r
   node n
     forksFolder
-      node o noClaim
-        forksFolder
-          node n wp" ); }
+      node o noClaim" ); }
 
 // A mirror shown in place of an editable occurrence of the node
 // it forks, while another occurrence holds the mirror's one
@@ -148,11 +145,7 @@ node r
       node m
         containerFolder
           node p wp noClaim folded
-        forksFolder
-          node a wp noClaim
-          node u noClaim
-            forksFolder
-              node m wp" ); }
+      node u noClaim" ); }
 
 #[test]
 fn under_an_owned_root_the_users_fork_is_shown () {
@@ -165,16 +158,14 @@ node p
       node m
         containerFolder
           node r wp noClaim folded
-        forksFolder
-          node a noClaim
-            forksFolder
-              node m wp
-          node u wp noClaim" ); }
+      node a noClaim" ); }
 
 /// r, in 'theirs', contains e, in 'third', which contains c, in
 /// 'third'. c is forked by j, in 'theirs' (r's home), by d, in
 /// 'third' (e's home), and by u, in 'main'. Under r, only the
-/// perspective of r's home is followed, even beneath e.
+/// perspective of r's home is followed, even beneath e. j's forks
+/// folder lists c, then u and d, indirect members, by the declaration
+/// order of their homes.
 #[test]
 fn under_a_foreign_root_its_homes_perspective_holds_beneath_a_node_homed_elsewhere () {
   let graph : InRustGraph = graph (&[
@@ -192,14 +183,8 @@ node r
     node j (inPlaceOf c)
       forksFolder
         node c
-          forksFolder
-            node d noClaim
-              forksFolder
-                node c wp
-            node j wp noClaim
-            node u noClaim
-              forksFolder
-                node c wp" ); }
+        node u noClaim
+        node d noClaim" ); }
 
 /// A chain of forks stops where the next is not in the perspective's
 /// skgrepo: m, in 'third', is forked by a, in 'theirs', which u, in
@@ -218,11 +203,7 @@ node r
   node a (inPlaceOf m)
     forksFolder
       node m
-        forksFolder
-          node a wp noClaim
-      node u noClaim
-        forksFolder
-          node a wp" ); }
+      node u noClaim" ); }
 
 /// Whether a root is shown raw where another mirror would stand, and
 /// so shows its content raw, asks of the view's perspective: from the

@@ -46,7 +46,8 @@
 //! *in forkee-as-such position* (a forkee as such): the note forks it.
 //! One claiming nothing is *in forker-as-such position* (a forker as
 //! such): a forker-only member, which forks the note and records so in
-//! its own file, or a detached forkee.
+//! its own file, an indirect member, a mirror of the note joined to it
+//! only through others, or a detached forkee.
 
 use crate::from_text::local_fieldintent_collection::predicates::{
   occurrence_child_counts_as_content,

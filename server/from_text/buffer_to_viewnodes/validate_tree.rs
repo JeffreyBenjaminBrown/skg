@@ -351,7 +351,7 @@ fn writeProtected_relRepo_request_errors (
        && is_forks_folder_member_claiming_nothing (node_ref, t)
     { errors . push ( BufferValidationError::Other ( with_org_subheadlines (
         &format! (
-          "relRepo request on {}, a member of a forks folder that claims nothing:\n- Its view-parent's note does not fork it; it forks that note, and records so in its own file.\n- Set that relationship's skgrepo where it is recorded, or attach the member first to make the view-parent's note fork it.\n",
+          "relRepo request on {}, a member of a forks folder that claims nothing:\n- Its view-parent's note does not fork it: either it forks that note, and records so in its own file, or it is a mirror of that note only through others.\n- Set that relationship's skgrepo where it is recorded, or attach the member first to make the view-parent's note fork it.\n",
           t . gnid . 0 ),
         &[ node_ref . value () . headline_name () ] )));
       continue; }
@@ -367,7 +367,8 @@ fn writeProtected_relRepo_request_errors (
 
 /// Whether the occurrence is a member of a forks folder that claims
 /// nothing: one its view-parent's note does not fork (a forker-only
-/// member, or a detached one), whose relRepo the save never reads.
+/// or an indirect member, or a detached one), whose relRepo the save
+/// never reads.
 fn is_forks_folder_member_claiming_nothing (
   node_ref : NodeRef<Viewnode>,
   t        : &Occurrence,

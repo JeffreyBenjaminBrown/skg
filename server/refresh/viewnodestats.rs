@@ -138,7 +138,9 @@ fn stands_as_member (
 /// record the skgrepo restriction shows say so), and as a forker, when
 /// the graph's warrant and such a record say that it forks the
 /// viewparent, whatever it claims. A mutual stands in both; a forkee
-/// the user detached, in neither.
+/// the user detached, and an indirect member, in neither: no birth
+/// fact and no relRepo, though an indirect member counts what it shows
+/// of its content as any member as such does.
 struct ForksFolderMemberRoles {
   as_forkee : bool,
   as_forker : bool,
@@ -230,8 +232,10 @@ fn set_herald_strings_in_viewnode (
   let unintegrated : Option<usize> =
     // A member as such counts the nodes its content goal draws as
     // occurrences: nodes the skgrepo restriction shows, as the count of its
-    // contents is ('RelationCounts').
-    if stands_as_member_here {
+    // contents is ('RelationCounts'). An indirect member stands in
+    // neither fork role ('fork_roles'), but shows its content as any
+    // member as such does, and counts it too.
+    if stands_as_member_here || fork_roles . is_some () {
       note_of_member_as_such (tree, treeid) . map ( |note| {
         let members : HashSet<ID> = content_goal_gnids (
           graph, restriction,

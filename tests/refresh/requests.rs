@@ -270,7 +270,8 @@ node g
     node b" ); }
 
 /// The forkee e is drawn editable, as a forkee as such under an
-/// editable note is, and shows its own forks folder, holding s.
+/// editable note is, and shows no forks folder of its own: a member as
+/// such shows one only when asked ('a_forks_request_on_a_member_draws_its_forks_folder').
 #[test]
 fn a_forks_request_adds_the_forks_folder () {
   let graph : InRustGraph = graph (&[
@@ -283,10 +284,33 @@ fn a_forks_request_adds_the_forks_folder () {
 node s
   forksFolder
     node e
-      forksFolder
-        node s wp noClaim
     hiddenOutsideOfForkPartnersFolder
       node o wp folded" ); }
+
+/// A member as such asked for its forks folder ('(folder forks)',
+/// C-c l f there) draws one: e, which s and f fork, shows both in it,
+/// forker-only members in one skgrepo, so by pid (s write-protected,
+/// a repeat of the root); f is in s's folder too, an indirect member.
+#[test]
+fn a_forks_request_on_a_member_draws_its_forks_folder () {
+  let graph : InRustGraph = graph (&[
+    Graphnode { forks : msv_ids (&["e"]), .. node ("s") },
+    node ("e"),
+    Graphnode { forks : msv_ids (&["e"]), .. node ("f") }, ]);
+  let input : String = formatdoc! ("
+    * {} s
+    ** (skg forksFolder)
+    *** {} e
+    ", occurrence_metadata ("s", "(viewRequests (folder forks))"),
+       occurrence_metadata ("e", "(viewRequests (folder forks))") );
+  assert_eq! ( run_asserting_fixpoint (&input, &graph) . outline (), "\
+node s
+  forksFolder
+    node e
+      forksFolder
+        node f wp noClaim
+        node s wp noClaim
+    node f noClaim" ); }
 
 #[test]
 fn a_flags_request_adds_the_flags_folder_even_when_no_flag_is_true () {

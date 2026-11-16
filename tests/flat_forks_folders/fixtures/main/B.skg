@@ -1,0 +1,6 @@
+pid: B
+title: B
+contains:
+- b1
+forks:
+- C

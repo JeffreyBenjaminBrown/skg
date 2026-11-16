@@ -8,7 +8,7 @@
 // and -- after explicit folder requests, per folder -- save after
 // reorder, insertion of a child claiming nothing, deletion of a member;
 // the same three for the forks folder's forker-only members, which
-// claim nothing; plus the forks folder's membership edits and the
+// claim nothing and keep the graph's order; plus the forks folder's membership edits and the
 // restricted-set omission.
 // Scenario failures accumulate: every mismatch is collected and the
 // test fails once at the end, so one broken folder does not mask the
@@ -355,9 +355,10 @@ async fn write_protected_delete (
 //////////////////////////////////////////////////////////////
 // The forks folder's forker-only members: roSub-a and roSub-b fork
 // roSub-owner, which forks nothing. Its forks folder, drawn unasked,
-// holds them claiming nothing, each drawn editable with its own forks
-// folder (forkers as such). Reordering them keeps the order the view
-// has; a note placed there claiming nothing stays, unwarranted; and
+// holds them claiming nothing, each drawn editable (forkers as such).
+// Reordering them does not last: the refresh puts them back in the
+// graph's and the config's order (here, by pid); a note placed there
+// claiming nothing stays, unwarranted; and
 // deleting one hides it in roSub-owner, so that it leaves the folder
 // for the folder of what roSub-owner hides outside its fork partners.
 // They run in that order: the deletion writes the hide.
@@ -379,7 +380,7 @@ async fn forker_only_members (
     let resp : SaveResponse = save (&swapped, config, tantivy, graph) . await ?;
     if ! resp . errors . is_empty () {
       fails . record (s, format! ("save reported errors: {:?}", resp . errors)); }
-    fails . want_before (s, &resp . saved_view, "(gnid roSub-b)", "(gnid roSub-a)"); }
+    fails . want_before (s, &resp . saved_view, "(gnid roSub-a)", "(gnid roSub-b)"); }
   { let s : &str = "forksFolder/forker-only/insert";
     let b_line : String = line_containing (&buf, "(gnid roSub-b)") . to_string ();
     let b_tree : String = subtree_of (&buf, "(gnid roSub-b)");

@@ -754,6 +754,18 @@ impl SkgConfig {
                 . filter ( |name| name != skgrepo ) )
       . collect () }
 
+  /// Where 'skgrepo' stands in declaration order
+  /// ('skgrepos_in_declaration_order'): 0 for the first declared, and
+  /// after every declared one for a skgrepo the config lacks. A forks
+  /// folder orders the members it does not fork by it.
+  pub fn declaration_rank (
+    &self,
+    skgrepo : &SkgrepoName,
+  ) -> usize {
+    let declared : Vec<SkgrepoName> = self . skgrepos_in_declaration_order ();
+    declared . iter () . position ( |name| name == skgrepo )
+      . unwrap_or ( declared . len () ) }
+
   /// The skgrepo whose perspective stands where nothing names one: the
   /// first owned skgrepo in declaration order (the most public), else
   /// the first skgrepo declared, else none (an empty name, holding

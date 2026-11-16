@@ -203,8 +203,8 @@ async fn test_bfs_limit_8_two_branches (
 // chain c1 -> c2, and r also forks s1, s2. With budget = 3: r, then, at
 // depth 2, c1 (the forks folder costs nothing), then, at depth 3, s1 (the
 // folder's first member, standing before c1's content) spend it; s2 and
-// c2 are drawn write-protected. s1, editable, shows its forks folder,
-// holding r, a repeat.
+// c2 are drawn write-protected. s1, editable, shows no forks folder of
+// its own: a member as such shows one only when asked.
 async fn test_budget_reaches_forkees_and_content_in_level_order (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
@@ -222,8 +222,6 @@ async fn test_budget_reaches_forkees_and_content_in_level_order (
       let expected = indoc! {"* (skg node (gnid r) (skgRepos (nodeRepo main)) (view (rels (contains (out 1)) (forks (out 2))))) r
                               ** (skg forksFolder)
                               *** (skg node (gnid s1) (skgRepos (nodeRepo main)) (view (rels (contains (out 0 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) s1
-                              **** (skg forksFolder)
-                              ***** (skg node (gnid r) (skgRepos (nodeRepo main)) noClaim writeProtected (view (rels (contains (out 1 (unintegrated 1))) (forks (out 2 (ancestors 2)))) (birth (forks out 2)) cycle)) r
                               *** (skg node (gnid s2) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 0 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) s2
                               ** (skg node (gnid c1) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)) (out 1))) (birth (contains in 1)))) c1
                               *** (skg node (gnid c2) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) c2

@@ -1020,12 +1020,19 @@ pub async fn update_from_and_rerender_buffer_with_approvals_or_preview (
   let runtime = env . runtime_snapshot ();
   let working_graph = new_handle ((*runtime . graph) . clone ());
   let mut working_tantivy = runtime . tantivy_index . clone ();
+  let is_diff_view : bool = // the saved buffer is one of the diff view's, held or named
+    named_diffView_buffer_kind . is_some ()
+    || viewforest_id_from_request_result . as_ref () . ok ()
+       . and_then ( |viewforest_id| views_state . open_views
+                    . diffView_buffer_kind_of_view (viewforest_id) )
+       . is_some ();
   let baseline : WhatTheBaselineShows =
     // Its writes are its copies of the graphnodes changed since the
     // buffer was rendered. The plan builder leaves out the ones the
     // buffer did not edit; the stale check refuses the rest.
     what_the_baseline_shows (
-      &runtime . graph, &runtime . config, skgrepo_restriction, baseline )
+      &runtime . graph, &runtime . config, skgrepo_restriction, baseline,
+      is_diff_view )
     . map_err ( |error| Box::new ( SaveError::BufferValidationErrors {
         errors : vec! [error], warnings : Vec::new (), } ) as Box<dyn Error> ) ?;
   let ( viewforest, save_plan, parse_warnings )
@@ -1035,7 +1042,8 @@ pub async fn update_from_and_rerender_buffer_with_approvals_or_preview (
           ) . entered();
         buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
           org_buffer_text, &runtime . graph, &runtime . config,
-          skgrepo_restriction, fork_skgrepos, &baseline, perspective . clone () )
+          skgrepo_restriction, fork_skgrepos, &baseline, perspective . clone (),
+          is_diff_view )
       } . map_err (
         |e| Box::new (e) as Box<dyn Error> ) ?;
   if viewforest . is_empty ()

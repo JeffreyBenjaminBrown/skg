@@ -591,11 +591,13 @@ pub enum ChangesetMarkerKind {
 /// flags.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Folder {
-  /// Collects its parent's fork partners, each once: the notes its
+  /// Collects every mirror of its parent, each once: the notes its
   /// parent forks (the forkees, in its list's order, each claiming),
   /// then the notes that fork its parent and that it neither forks
-  /// nor hides (the forker-only members, claiming nothing). Editable:
-  /// the save reads its claiming members as the parent's 'forks'.
+  /// nor hides (the forker-only members), then its other mirrors that
+  /// it does not hide (the indirect members), each claiming nothing.
+  /// Editable: the save reads its claiming members as the parent's
+  /// 'forks'.
   Forks,
   Hider, // Collects nodes that hide its parent. Write-protected (editable from the other side of the relationship).
   // This folder is not itself hidden. Its children represent the nodes hidden
@@ -782,8 +784,8 @@ impl Folder {
   /// Whether the folder's goal has an order the view follows: the
   /// viewparent's own file records the members in order (the
   /// hidden and alias folders, and the forkees that lead the forks
-  /// folder, whose forker-only members follow them in the order the
-  /// view already has: 'Goal::ordered_then_unordered'), or the folder
+  /// folder, whose other members follow them in the order the graph
+  /// and the config give: 'forks_folder_goal'), or the folder
   /// is the compound partner folder of what a note hides outside its
   /// fork partners, in the order of its hides list. False when other
   /// nodes' files record the members, or they are derived or
@@ -807,7 +809,8 @@ impl Folder {
   /// folder is write-protected: its members are edited from the other
   /// side of the relationship, or derived. (In the forks folder only a
   /// claiming member is the note's record: a forker-only member, which
-  /// records its own fork, claims nothing.)
+  /// records its own fork, and an indirect member, which records none
+  /// with the note, claim nothing.)
   pub fn is_editable (&self) -> bool {
     match self {
       Folder::Forks

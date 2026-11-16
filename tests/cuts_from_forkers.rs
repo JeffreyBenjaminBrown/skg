@@ -5,7 +5,8 @@
 // nothing; F,
 // foreign ("you"), forks N and contains y and z. E, owned, forks N
 // too, and contains e1; M, owned, already forks F (monogamy is gone,
-// so N may fork F as well). G, foreign, is forked by H, foreign,
+// so N may fork F as well), and so stands in N's forks folder, an
+// indirect member, after E and F. G, foreign, is forked by H, foreign,
 // which contains h. Each sub-test edits a view and saves it:
 // - in N's view, y cut from F and pasted under N.
 //   N comes to fork F, contains y and hides nothing; the redrawn view
@@ -55,13 +56,14 @@ fn all_tests
 //
 
 /// A fresh view of N, checked: its forks folder holds E then F, both
-/// forkers as such (claiming nothing), editable, and F shows y and z.
+/// forkers as such (claiming nothing), editable, and F shows y and z;
+/// then M, which forks F, an indirect member.
 fn view_of_n_before_any_cut (
   config  : &SkgConfig,
   tantivy : &TantivyIndex,
 ) -> Result<String, Box<dyn Error>> {
   let view : String = view_of (config, tantivy, "N") ?;
-  assert_eq! ( first_forks_folders_members (&view), vec! ["E", "F"], "{}", view );
+  assert_eq! ( first_forks_folders_members (&view), vec! ["E", "F", "M"], "{}", view );
   let f_line : &str = line_of (&view, "F");
   assert! ( f_line . contains ("noClaim") && ! f_line . contains ("writeProtected"),
             "F is a forker as such, editable:\n{}", view );
@@ -81,7 +83,7 @@ fn view_of_n_before_any_cut (
 /// too: monogamy is gone), N contains y, and N hides nothing, since it
 /// contains what it cut. F's file is untouched. The redrawn view is
 /// that section's "after": F stands first in N's forks folder, a mutual,
-/// claiming, editable, showing z; then E; and y as N's content. Saved
+/// claiming, editable, showing z; then E, then M; and y as N's content. Saved
 /// again unchanged, it writes nothing and draws itself again.
 async fn a_child_cut_from_a_forker_and_pasted_makes_it_a_mutual (
   config  : &SkgConfig,
@@ -108,7 +110,7 @@ async fn a_child_cut_from_a_forker_and_pasted_makes_it_a_mutual (
                "F's file is untouched" );
   assert_eq! ( members_of ( node (config, "M") ? . forks . or_default () ), ids (&["F"]),
                "M still forks F" );
-  assert_eq! ( first_forks_folders_members (&saved), vec! ["F", "E"],
+  assert_eq! ( first_forks_folders_members (&saved), vec! ["F", "E", "M"],
                "F, now a forkee, leads:\n{}", saved );
   let f_line : &str = line_of (&saved, "F");
   assert! ( ! f_line . contains ("noClaim") && ! f_line . contains ("writeProtected"),
@@ -168,7 +170,7 @@ async fn a_cut_under_a_foreign_note_is_refused (
   let before : BTreeMap<String, String> = skg_files (config) ?;
   let refusal : String =
     refusal_of (&without_subtree_of (&view, "h"), "G", config, tantivy) . await ?;
-  assert! ( refusal . contains ("Cannot change what G ('G') shows of H ('H'), its forker: G is foreign"),
+  assert! ( refusal . contains ("Cannot change what G ('G') shows of H ('H'), a member of its forks folder claiming nothing: G is foreign"),
             "{}", refusal );
   assert_eq! ( skg_files (config) ?, before, "nothing is written" );
   Ok (( )) }

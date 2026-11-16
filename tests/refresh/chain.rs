@@ -108,12 +108,12 @@ fn n_and_its_fork_partners () -> InRustGraph {
 
 /// In a content view a member of the forks folder carries its chain
 /// in a containers folder, drawn folded, which leaves out the
-/// member's view-ancestors: under e, the forkee (drawn editable, so
-/// its own forks folder follows, holding n, a repeat), and under f, a
-/// forker claiming nothing (editable too, its forks folder holding n),
-/// the folder holds q (folded, with its own
+/// member's view-ancestors: under e, the forkee (drawn editable), and
+/// under f, a forker claiming nothing (editable too), the folder
+/// holds q (folded, with its own
 /// chain), not p, which stands above them. Nothing of the chain
-/// stands directly under either member. (p is write-protected, so
+/// stands directly under either member, and neither, a member as
+/// such, shows a forks folder unasked. (p is write-protected, so
 /// its content does not draw e or f, whose occurrences there would
 /// hold their nodes' editability.)
 #[test]
@@ -132,20 +132,17 @@ node p wp
         containerFolder
           node q wp noClaim folded
             node top wp noClaim
-        forksFolder
-          node n wp noClaim
       node f noClaim
         containerFolder
           node q wp noClaim folded
-            node top wp noClaim
-        forksFolder
-          node n wp" ); }
+            node top wp noClaim" ); }
 
 /// A repeat (an occurrence of a node another occurrence holds the
 /// editability of) in the forks folder shows nothing, not even its
 /// containers folder: e, a root of the view too. g, which n also
 /// forks, is no repeat: it is drawn editable, and shows its
-/// containers folder and its own forks folder (n there is a repeat).
+/// containers folder (and no forks folder: a member as such shows one
+/// only when asked).
 #[test]
 fn a_repeat_in_the_forks_folder_shows_nothing () {
   let graph : InRustGraph = graph (&[
@@ -164,14 +161,12 @@ node n
     node g
       containerFolder
         node q wp noClaim folded
-      forksFolder
-        node n wp noClaim
 node e" ); }
 
 /// The diff view hangs the chain directly under a member of the forks
 /// folder, as under every partner folder's member, and draws it
 /// write-protected; a content view puts it in a containers folder, and
-/// draws a forkee as such editable.
+/// draws a forkee as such editable, with no forks folder of its own.
 #[test]
 fn the_diff_view_hangs_a_forks_folder_members_chain_directly () {
   let graph_nodes : Vec<Graphnode> = vec! [
@@ -199,7 +194,5 @@ node s
   forksFolder
     node e
       containerFolder
-        node q wp noClaim folded
-      forksFolder
-        node s wp noClaim",
+        node q wp noClaim folded",
     "a content view puts the chain in a containers folder" ); }

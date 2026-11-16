@@ -170,17 +170,55 @@ pub fn mirrors_of (
   restriction : &SkgrepoRestriction,
   gnid        : &ID,
 ) -> Mirrors {
+  mirrors_reached (graph, restriction, gnid, None) }
+
+/// The mirrors of the note 'note' names, under 'restriction', were
+/// the notes it forks those 'forkees' names (visible records, as a
+/// view drew them or a save leaves them) rather than those its list
+/// names. Every other note's relationships are the graph's.
+pub fn mirrors_of_note_forking (
+  graph       : &InRustGraph,
+  restriction : &SkgrepoRestriction,
+  note        : &ID,
+  forkees     : &[ID],
+) -> Mirrors {
+  mirrors_reached (graph, restriction, note, Some (forkees)) }
+
+/// The breadth-first walk of 'mirrors_of' from the note 'gnid' names,
+/// its own forkees 'start_forkees' where given, else its list's.
+fn mirrors_reached (
+  graph         : &InRustGraph,
+  restriction   : &SkgrepoRestriction,
+  gnid          : &ID,
+  start_forkees : Option<&[ID]>,
+) -> Mirrors {
   let start : ID = graph . pid_else_raw_id (gnid);
   let Some (start_home) : Option<SkgrepoName> =
     graph . nodes . get (&start) . map ( |node| node . home_skgrepo . clone () )
     else { return Mirrors::default (); };
+  let start_forkees : Option<HashSet<ID>> =
+    start_forkees . map ( |forkees| forkees . iter ()
+      . map ( |forkee| graph . pid_else_raw_id (forkee) )
+      . filter ( |forkee| graph . node_is_shown (forkee, restriction) )
+      . collect () );
+  let relationship_stands : &dyn Fn (&(ID, ID)) -> bool =
+    &|(forker, forkee) : &(ID, ID)| -> bool {
+      forker != &start
+      || start_forkees . as_ref () . is_none_or ( |forkees| forkees . contains (forkee) ) };
   let mut mirrors : Mirrors = Mirrors {
     members : vec! [ Mirror { pid : start . clone (), home : start_home, distance : 0 } ],
     forks   : HashSet::new (), };
   let mut seen : HashSet<ID> = HashSet::from ([ start . clone () ]);
-  let mut frontier : VecDeque<(ID, usize)> = VecDeque::from ([ ( start, 0 ) ]);
+  let mut frontier : VecDeque<(ID, usize)> = VecDeque::from ([ ( start . clone (), 0 ) ]);
   while let Some ((pid, distance)) = frontier . pop_front () {
-    for (partner, fork) in fork_partners_shown (graph, restriction, &pid) {
+    let relationships : Vec<(ID, (ID, ID))> =
+      visible_fork_relationships_of (graph, restriction, &pid) . into_iter ()
+      . filter ( |(_partner, fork)| relationship_stands (fork) )
+      . chain ( start_forkees . iter () . flatten ()
+                . filter ( |_| pid == start )
+                . map ( |forkee| ( forkee . clone (), ( start . clone (), forkee . clone () )) ))
+      . collect ();
+    for (partner, fork) in relationships {
       mirrors . forks . insert (fork);
       if ! seen . insert ( partner . clone () ) { continue; }
       let home : SkgrepoName = graph . nodes . get (&partner)
@@ -194,8 +232,10 @@ pub fn mirrors_of (
 /// The notes one fork relationship from 'pid', either way, that the
 /// skgrepo restriction shows, each with that relationship as
 /// '(forker, forkee)': the relationship's relRepo and the partner's
-/// home skgrepo are both visible.
-fn fork_partners_shown (
+/// home skgrepo are both visible. A note's direct partners, as the
+/// walk of 'mirrors_of' follows them; the members of a note's forks
+/// folder are 'fork_partners_shown' ('server/refresh/goal.rs').
+fn visible_fork_relationships_of (
   graph       : &InRustGraph,
   restriction : &SkgrepoRestriction,
   pid         : &ID,

@@ -297,7 +297,7 @@ async fn save_roundtrips_to_original_and_is_a_fixpoint (
 /// through the save's graph update); N's three mirrors tie there, and
 /// N still stands as itself, and M, whose mirrors are the same three,
 /// as itself. R and M stand in N's forks folder, forkers claiming
-/// nothing.
+/// nothing; R stands in M's too, an indirect member, born of nothing.
 async fn a_second_owned_fork_saves_and_the_original_stands (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
@@ -321,9 +321,10 @@ async fn a_second_owned_fork_saves_and_the_original_stands (
     . filter ( |line| line . contains ("(gnid R)") ) . collect ();
   assert! ( line_of_gnid (&after, "N") . is_some ()
             && line_of_gnid (&after, "M") . is_some ()
-            && ! r_lines . is_empty ()
-            && r_lines . iter () . all ( |line| line . contains ("(birth (forks out 2))") ),
-            "N and M are shown as themselves, R only as a forker in N's forks folder:\n{}", after );
+            && r_lines . len () == 2
+            && r_lines [0] . contains ("(birth (forks out 2))")
+            && ! r_lines [1] . contains ("birth"),
+            "N and M are shown as themselves, R only as a forker in N's forks folder and an indirect member in M's:\n{}", after );
   Ok (( )) }
 
 /// N comes to fork R, which forks N: an owned mutual pair, in
@@ -806,7 +807,7 @@ async fn under_a_foreign_root_a_forked_child_is_shown_as_the_original (
       &read_all_skg_files_from_skgrepos (config) ? );
     let (_, _, warnings) = buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
       &edited, &graph, config, &SkgrepoRestriction::unrestricted (config),
-      &HashMap::new (), &WhatTheBaselineShows::default (), Perspective::RootHomes ) ?;
+      &HashMap::new (), &WhatTheBaselineShows::default (), Perspective::RootHomes, false ) ?;
     assert! ( warnings . iter () . any ( |w|
                 w . contains ("Your edit of 'K'")
                 && w . contains ("from the perspective of foreign")
@@ -869,7 +870,7 @@ async fn a_forked_foreign_root_follows_its_clones_home (
       -> Result<Vec<String>, Box<dyn Error>> {
       let (_, _, warnings) = buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
         &edited, &graph, config, &SkgrepoRestriction::unrestricted (config),
-        &HashMap::new (), &WhatTheBaselineShows::default (), perspective ) ?;
+        &HashMap::new (), &WhatTheBaselineShows::default (), perspective, false ) ?;
       Ok ( warnings . into_iter ()
            . filter ( |w| w . contains ("Your edit of 'R'") ) . collect () ) };
     assert! ( warnings_from (Perspective::RootHomes) ? . is_empty () );
@@ -1040,9 +1041,10 @@ fn a_switch_of_perspective_re_points_a_substituted_content_child (
 /// folders afresh, for the note it now shows, since those it held
 /// describe the note it showed before. P, the user's, contains N,
 /// alice's; bob's F forks N, and the user's U forks F. A view of P
-/// shows U in N's place, its forks folder holding F, which U forks.
-/// From alice's perspective N stands raw, its forks folder holding F,
-/// which forks it; from bob's, F stands in N's place, its forks folder
+/// shows U in N's place, its forks folder holding F, which U forks,
+/// then N, an indirect member. From alice's perspective N stands raw,
+/// its forks folder holding F, which forks it, then U, an indirect
+/// member; from bob's, F stands in N's place, its forks folder
 /// holding N, which it forks, and U, which forks it. No folder holds
 /// the note it describes or an unwarranted member, and U's forkee F
 /// claims (drawn claiming nothing, a client would read it as a pending
@@ -1055,20 +1057,20 @@ fn a_re_pointed_content_child_draws_its_forks_folder_afresh (
 ) -> Result<(), Box<dyn Error>> {
   let (mut views_state, env, view) : (ViewsState, SkgEnv, String) =
     connection_holding_a_view_of (config, tantivy, "P", &[ ID::from ("P") ]) ?;
-  assert_eq! ( forks_folder_members_under (&view, "U"), vec! [ "F" ],
-    "a fresh view of P shows U in N's place, its forks folder holding F:\n{}", view );
+  assert_eq! ( forks_folder_members_under (&view, "U"), vec! [ "F", "N" ],
+    "a fresh view of P shows U in N's place, its forks folder holding F, then N:\n{}", view );
   for _round in 0 .. 2 {
     for (perspective, shown, members) in [
-      ( skgrepo ("alice"),       "N", vec! [ "F" ] ),
+      ( skgrepo ("alice"),       "N", vec! [ "F", "U" ] ),
       ( skgrepo ("bob"),         "F", vec! [ "N", "U" ] ),
-      ( skgrepo ("alice"),       "N", vec! [ "F" ] ),
-      ( Perspective::RootHomes, "U", vec! [ "F" ] ) ] {
+      ( skgrepo ("alice"),       "N", vec! [ "F", "U" ] ),
+      ( Perspective::RootHomes, "U", vec! [ "F", "N" ] ) ] {
       let switched : String = rerendered_text ( &messages_answering (
         &switch_request ("P", perspective . clone ()),
         &mut views_state, &env, config, handle_set_perspective_request ))
         . ok_or_else ( || format! ("the switch to {:?} rerenders the view", perspective) ) ?;
       assert_eq! ( forks_folder_members_under (&switched, shown), members,
-        "from {:?}, {}'s forks folder holds its own fork partners:\n{}",
+        "from {:?}, {}'s forks folder holds its own mirrors:\n{}",
         perspective, shown, switched );
       assert! ( ! switched . contains ("noWarrant"),
         "from {:?}, no member is unwarranted:\n{}", perspective, switched );
@@ -1680,7 +1682,7 @@ fn the_tamper_check_accepts_a_mirror_whatever_perspective_the_save_names (
   let mismatch_naming = |buffer : &str, followed : Perspective| -> Option<ID> {
     match buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
       buffer, &graph, config, &SkgrepoRestriction::unrestricted (config),
-      &HashMap::new (), &WhatTheBaselineShows::default (), followed ) {
+      &HashMap::new (), &WhatTheBaselineShows::default (), followed, false ) {
       Err (SaveError::BufferValidationErrors { errors, .. }) =>
         errors . iter () . find_map ( |e| match e {
           BufferValidationError::InPlaceOf_Mismatch (_, _, shown, _) =>
@@ -1804,7 +1806,7 @@ fn a_deleted_mirror_keeps_its_original_but_a_removed_one_does_not (
     buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
       buffer, &graph, config, &SkgrepoRestriction::unrestricted (config),
       &HashMap::new (), &WhatTheBaselineShows::default (),
-      skgrepo ("main") ) . map ( |(_, plan, _)| plan ) };
+      skgrepo ("main"), false ) . map ( |(_, plan, _)| plan ) };
   let deletes_u = |instructions : &[NodeInstruction]| -> bool {
     instructions . iter () . any ( |i| matches! (
       i, NodeInstruction::Delete (d) if d . gnid == ID::from ("U") )) };

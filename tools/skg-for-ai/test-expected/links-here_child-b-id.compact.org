@@ -3,16 +3,16 @@
 # the '(vnid ID)' of its metadata in the full view, and HERALDS what a
 # client shows for it, but a bare 'aC' (only the parent contains it);
 # 'folded' marks a headline a client shows collapsed.
-# Headlines 16, node occurrences 10, distinct nodes 6, folders 6.
-# Skgrepos: fred (foreign) 4, main (owned) 6.
-# Foreign 4, write-protected 8, folded 2.
-# Contained elsewhere too 4, forked 2, forking 2.
+# Headlines 14, node occurrences 9, distinct nodes 6, folders 5.
+# Skgrepos: fred (foreign) 4, main (owned) 5.
+# Foreign 4, write-protected 7, folded 2.
+# Contained elsewhere too 3, forked 2, forking 1.
 # Links 0, distinct targets 0, resolved 0, unresolved 0.
 # Server errors 0, warnings 0.
 * Second child, a forker ⟨0a 1C 1/L K1 H2 ⌂:main⟩
-** ⟨0n ☮ These link to it.⟩
-*** The fixture root ⟨0o ☮B 1C2b L2b⟩
-**** Above the root ⟨0p ☮ Ca⟩
+** ⟨0l ☮ These link to it.⟩
+*** The fixture root ⟨0m ☮B 1C2b L2b⟩
+**** Above the root ⟨0n ☮ Ca⟩
 ** ⟨0b ☮ These also contain it.⟩
 *** The fixture root ⟨0c ☮B 1C2b L2b⟩
 **** Above the root ⟨0d ☮ Ca⟩
@@ -21,7 +21,5 @@
 **** ⟨0g ☮ It contains these, but c hides them.⟩
 ***** A detail of Fred's ⟨0h ☮ bC dH folded⟩
 ****** Fred's note ⟨0i ☮ Ca 1/L 1K ⟳⟩
-**** ⟨0j It forks these, or these fork it.⟩
-***** Second child, a forker ⟨0k ☮ 1C 1/L Kb H2 ⟳ ⌂:main⟩
-*** ⟨0l b hides these, but no fork partner shown contains them.⟩
-**** An aside of Fred's ⟨0m ☮ cH ⌂:fred folded⟩
+*** ⟨0j b hides these, but no fork partner shown contains them.⟩
+**** An aside of Fred's ⟨0k ☮ cH ⌂:fred folded⟩

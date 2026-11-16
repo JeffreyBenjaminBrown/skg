@@ -4,9 +4,11 @@
 // such") in views saved with their baselines, as a client saves
 // them, so that the stale-buffer check
 // ('server/serve/handlers/save_staleness.rs') judges each save:
-// - A forkee as such nested under an owned, editable member as such
-//   reads that member's content as on disk: a fresh view saves
-//   unchanged with no warning, and edits of the member save.
+// - An indirect member ('docs/glossary.org', "direct member, indirect
+//   member") stands in the note's flat forks folder, editable,
+//   claiming nothing: a fresh view saves unchanged with no warning,
+//   edits of a direct member save, and a cut from the indirect member
+//   makes the note fork it and hide what was cut.
 // - Every view the server draws after a save gives each member of a
 //   forks folder the claim the graph gives it ('docs/forks.org',
 //   "Claims in a redrawn view"): one the note now forks claims, in a
@@ -108,27 +110,28 @@ fn saves_unchanged_writing_nothing (
   saved_view (&result) }
 
 //
-// A forkee as such nested under an owned member as such
+// An indirect member beside an owned member as such
 //
 
 #[test]
-fn a_view_of_a_forkee_nested_under_an_owned_member_saves_unchanged
+fn a_view_with_an_indirect_member_saves_unchanged
   () -> Result<(), Box<dyn Error>> {
-  // V's view shows W, V's forkee as such, editable; under W, its
-  // forkee U, editable, showing u2 (W contains u1). W's title is
-  // saved, so W has a Save of its own; its contains is still the one
-  // on disk, so nothing under U was cut.
+  // V's view shows W, V's forkee as such, editable; then U, which W
+  // forks, an indirect member, editable, claiming nothing, showing u1
+  // and u2 (V contains and hides nothing); W shows no forks folder.
   let mut f : Fixture = fixture () ?;
   let mut connection : ViewsState = new_connection ();
   let v : String = open_view (&mut f, &mut connection, "V", "V");
   assert! ( ! line_of (&v, "U") . contains ("writeProtected")
+            && line_of (&v, "U") . contains ("noClaim")
             && under (&v, "U") . iter () . any ( |line| line . contains ("(gnid u2)") ),
-            "U stands editable under W, showing u2:\n{}", v );
+            "U stands editable in V's forks folder, claiming nothing, showing u2:\n{}", v );
+  assert_eq! ( v . matches ("forksFolder") . count (), 1, "{}", v );
   saves_unchanged_writing_nothing (&mut f, &mut connection, "V", &v);
   Ok (()) }
 
 #[test]
-fn an_owned_member_holding_a_forkee_as_such_is_retitled
+fn an_owned_member_as_such_is_retitled
   () -> Result<(), Box<dyn Error>> {
   let mut f : Fixture = fixture () ?;
   let mut connection : ViewsState = new_connection ();
@@ -142,20 +145,30 @@ fn an_owned_member_holding_a_forkee_as_such_is_retitled
   Ok (()) }
 
 #[test]
-fn a_cut_from_a_forkee_nested_under_an_owned_member_hides_it_there
+fn a_cut_from_an_indirect_member_makes_the_note_fork_it_and_hide_the_cut
   () -> Result<(), Box<dyn Error>> {
-  // u2 cut from U, which stands under W: W hides u2, and nothing
-  // else.
+  // u2 cut from U, an indirect member of V's forks folder: V forks U
+  // now, after W, and hides u2; W and U are untouched. The redrawn
+  // view shows U claiming, u2 in its folder of what V hides in it.
   let mut f : Fixture = fixture () ?;
   let mut connection : ViewsState = new_connection ();
   let v : String = open_view (&mut f, &mut connection, "V", "V");
+  let w_before : String = file_text (&f, "main", "W");
+  let u_before : String = file_text (&f, "main", "U");
   let result : String = save (
     &mut f, &mut connection, "V", &without_subtree_of (&v, "u2"), Some (&v) );
   assert! ( saved (&result), "{}", result );
-  let w : String = file_text (&f, "main", "W");
-  assert! ( list_in (&w, "hides") == vec! ["u2"]
-            && list_in (&w, "contains") == vec! ["u1", "w1"],
-            "W hides u2 alone:\n{}", w );
+  let v_file : String = file_text (&f, "main", "V");
+  assert! ( list_in (&v_file, "forks") == vec! ["W", "U"]
+            && list_in (&v_file, "hides") == vec! ["u2"],
+            "V forks U and hides u2:\n{}", v_file );
+  assert_eq! ( file_text (&f, "main", "W"), w_before, "W is untouched" );
+  assert_eq! ( file_text (&f, "main", "U"), u_before, "U is untouched" );
+  let redrawn : String = saved_view (&result);
+  assert! ( ! line_of (&redrawn, "U") . contains ("noClaim")
+            && under (&redrawn, "U") . iter () . any ( |line|
+                 line . contains ("hiddenInForkPartnerFolder") ),
+            "U claims now, u2 in its folder of what V hides in it:\n{}", redrawn );
   Ok (()) }
 
 //

@@ -3,10 +3,10 @@
 # the '(vnid ID)' of its metadata in the full view, and HERALDS what a
 # client shows for it, but a bare 'aC' (only the parent contains it);
 # 'folded' marks a headline a client shows collapsed.
-# Headlines 15, node occurrences 10, distinct nodes 8, folders 5.
-# Skgrepos: fred (foreign) 4, main (owned) 6.
-# Foreign 4, write-protected 5, folded 2.
-# Contained elsewhere too 3, forked 2, forking 2.
+# Headlines 13, node occurrences 9, distinct nodes 8, folders 4.
+# Skgrepos: fred (foreign) 4, main (owned) 5.
+# Foreign 4, write-protected 4, folded 2.
+# Contained elsewhere too 2, forked 2, forking 1.
 # Links 3, distinct targets 3, resolved 2, unresolved 1 (missing 1).
 # Server errors 0, warnings 0.
 * The fixture root ⟨0a 1C2 L2 ⌂:main⟩
@@ -24,7 +24,5 @@ A body line that stays unnumbered.
 ***** ⟨0i ☮ It contains these, but c hides them.⟩
 ****** A detail of Fred's ⟨0j ☮ bC dH folded⟩
 ******* Fred's note ⟨0k ☮ Ca 1/L 1K ⟳⟩
-***** ⟨0l It forks these, or these fork it.⟩
-****** Second child, a forker ⟨0m ☮ 1C 1/L Kb H2 ⟳ ⌂:main⟩
-**** ⟨0n b hides these, but no fork partner shown contains them.⟩
-***** An aside of Fred's ⟨0o ☮ cH ⌂:fred folded⟩
+**** ⟨0l b hides these, but no fork partner shown contains them.⟩
+***** An aside of Fred's ⟨0m ☮ cH ⌂:fred folded⟩

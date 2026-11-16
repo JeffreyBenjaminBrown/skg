@@ -8,19 +8,20 @@
 // R contains X1, X2, X3; T contains X1, X3, Y, Z and hides X2. Beside
 // the doc's picture, N forks K (which contains k1), and FF, foreign,
 // forks N and contains X1 and f1; they stand in N's forks folder too.
-// - R's view: N stands editable in R's forks folder, a forkee (its
-//   birth '(forks in 2)', herald bK), showing X4, what R neither
-//   contains nor hides; in N's forks folder R is a repeat, showing
-//   nothing, and T a forker (birth '(forks out 2)', herald Kb),
-//   editable, showing Y, with Z in its folder of what N hides in it.
-//   Saved unchanged, it writes nothing and draws itself again.
+// - R's view: R's forks folder is flat. N stands editable in it, a
+//   forkee (its birth '(forks in 2)', herald bK), showing X4, what R
+//   neither contains nor hides; then K, T and FF, the other mirrors
+//   of N, indirect members, claiming nothing, born of nothing; T
+//   editable, showing Y and Z, what R neither contains nor hides. No
+//   member shows a forks folder. Saved unchanged, it writes nothing
+//   and draws itself again.
 // - Cutting X4 from N there hides X4 in R, and nothing else changes;
 //   the redrawn view shows X4 in N's folder of what R hides in it.
 // - In N's view, cutting Y from T and pasting it under N makes N fork
 //   T and contain Y, hiding nothing new. The redrawn view shows T
 //   among N's forkees, a mutual (both births, herald bKb), claiming,
 //   editable, showing nothing; its folder of what it hides of N's
-//   content goes, since T is no forker as such now; R follows, and Y
+//   content goes, since T is no forker as such now; R and FF follow, and Y
 //   stands in N's content. It is the fresh view of N, and saved
 //   unchanged it writes nothing and draws itself again.
 
@@ -89,17 +90,6 @@ fn folder_members_under<'a> (
     . filter ( |line| depth (line) == member_depth + 2 )
     . collect () }
 
-/// The line showing 'gnid' as the 'nth' (from 0) occurrence in 'buf'.
-fn nth_line_of<'a> (
-  buf  : &'a str,
-  gnid : &str,
-  nth  : usize,
-) -> &'a str {
-  buf . lines ()
-    . filter ( |line| line . contains (&format! ("(gnid {})", gnid)) )
-    . nth (nth)
-    . unwrap_or_else ( || panic! ( "no occurrence {} of {} in:\n{}", nth, gnid, buf )) }
-
 /// Save 'view' unchanged as a view of 'root': no file is written, and
 /// the saved view is 'view' again.
 async fn is_a_fixpoint (
@@ -118,21 +108,26 @@ async fn is_a_fixpoint (
 // The sub-tests
 //
 
-/// R's view. R, the root, is editable. Its forks folder holds N,
+/// R's view. R, the root, is editable. Its forks folder is flat: N,
 /// editable, a forkee ('(birth (forks in 2))', herald bK), showing X4
-/// alone (N's content less what R contains). N's forks folder holds
-/// K, its forkee, then its forkers FF, R and T: R a repeat,
-/// write-protected, showing nothing; T editable, claiming nothing
-/// ('(birth (forks out 2))', herald Kb), showing Y, with Z (which N
-/// hides) in its folder of what N hides in it. Saved unchanged, the
-/// view writes nothing and draws itself again.
+/// alone (N's content less what R contains); then K, T and FF, the
+/// other mirrors of N, each two forks from R, an indirect member
+/// claiming nothing, with no birth fact and no fork toward R, by the
+/// declaration order of their homes, then pid. T, editable, shows Y
+/// and Z, what R neither contains nor hides, and neither folder of
+/// hides: those are N's hides and T's hides of N's content, which do
+/// not apply to R. No member shows a forks folder. Saved unchanged,
+/// the view writes nothing and draws itself again.
 async fn rs_view_shows_n_and_its_forks (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   let view : String = view_of (config, tantivy, "R") ?;
   assert! ( ! line_of (&view, "R") . contains ("writeProtected"), "{}", view );
-  assert_eq! ( forks_folder_members_of (&view, "R"), vec! ["N"], "{}", view );
+  assert_eq! ( forks_folder_members_of (&view, "R"), vec! ["N", "K", "T", "FF"],
+               "{}", view );
+  assert_eq! ( view . matches ("forksFolder") . count (), 1,
+               "one forks folder, nothing nested:\n{}", view );
   let n_line : &str = line_of (&view, "N");
   assert! ( ! n_line . contains ("writeProtected") && ! n_line . contains ("noClaim")
             && n_line . contains ("(birth (forks in 2))"),
@@ -141,27 +136,18 @@ async fn rs_view_shows_n_and_its_forks (
   assert! ( n_content . len () == 1 && n_content [0] . contains ("(gnid X4)")
             && ! n_content [0] . contains ("writeProtected"),
             "N shows X4 alone, editable:\n{}", view );
-  assert_eq! ( forks_folder_members_of (&view, "N"), vec! ["K", "FF", "R", "T"],
-               "{}", view );
-  let repeat : &str = nth_line_of (&view, "R", 1);
-  assert! ( repeat . contains ("writeProtected") && repeat . contains ("noClaim")
-            && repeat . contains ("(birth (forks out 2))"),
-            "R stands in N's forks folder, a write-protected forker:\n{}", view );
-  let after_repeat : &str = view . lines ()
-    . skip_while ( |line| *line != repeat ) . nth (1) . unwrap ();
-  assert! ( depth (after_repeat) <= depth (repeat), "the repeat shows nothing:\n{}", view );
   let t_line : &str = line_of (&view, "T");
   assert! ( ! t_line . contains ("writeProtected") && t_line . contains ("noClaim")
-            && t_line . contains ("(birth (forks out 2))"),
-            "T stands in N's forks folder, an editable forker:\n{}", view );
+            && ! t_line . contains ("birth") && ! t_line . contains ("ancestors 2"),
+            "T stands in R's forks folder, an editable indirect member:\n{}", view );
   let t_content : Vec<&str> = content_of (&view, "T");
-  assert! ( t_content . len () == 1 && t_content [0] . contains ("(gnid Y)"),
-            "T shows Y alone:\n{}", view );
-  let hidden_in_t : Vec<&str> =
-    folder_members_under (&view, "T", "hiddenInForkPartnerFolder");
-  assert! ( hidden_in_t . len () == 1 && hidden_in_t [0] . contains ("(gnid Z)")
-            && hidden_in_t [0] . contains ("folded"),
-            "T's folder of what N hides in it holds Z, folded:\n{}", view );
+  assert! ( t_content . len () == 2 && t_content [0] . contains ("(gnid Y)")
+            && t_content [1] . contains ("(gnid Z)"),
+            "T shows Y and Z:\n{}", view );
+  assert! ( ! under (&view, "T") . iter () . any ( |line|
+              line . contains ("hiddenInForkPartnerFolder")
+              || line . contains ("hiddenByForkerFolder") ),
+            "T has no folder of hides:\n{}", view );
   is_a_fixpoint (&view, "R", config, tantivy) . await ?;
   Ok (( )) }
 
@@ -199,7 +185,7 @@ async fn cutting_x4_from_n_in_rs_view_hides_it_in_r (
 /// own content, after X4. N comes to fork T, after K, and contains Y;
 /// it hides Z alone, as before, since it contains what it cut. T's
 /// file is untouched. The redrawn view shows N's forks folder holding
-/// K and T, its forkees, then FF and R, its forkers; T a mutual
+/// K and T, its forkees, then R and FF, its forkers; T a mutual
 /// (births '(forks in 2)' and '(forks out 2)', herald bKb), claiming,
 /// editable, showing nothing, with Z in its folder of what N hides in
 /// it and no folder of what it hides of N's content (X2 there is
@@ -211,7 +197,7 @@ async fn moving_y_from_t_into_n_makes_n_fork_t (
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   let view : String = view_of (config, tantivy, "N") ?;
-  assert_eq! ( forks_folder_members_of (&view, "N"), vec! ["K", "FF", "R", "T"],
+  assert_eq! ( forks_folder_members_of (&view, "N"), vec! ["K", "R", "T", "FF"],
                "{}", view );
   assert! ( content_of (&view, "R") . is_empty (), "R adds nothing:\n{}", view );
   assert! ( ! folder_members_under (&view, "T", "hiddenByForkerFolder") . is_empty (),
@@ -231,7 +217,7 @@ async fn moving_y_from_t_into_n_makes_n_fork_t (
   assert_eq! ( members_of (n . hides . or_default ()), ids (&["Z"]),
                "N hides nothing new" );
   assert_eq! ( skg_files (config) ? ["main/T.skg"], t_before, "T's file is untouched" );
-  assert_eq! ( forks_folder_members_of (&saved, "N"), vec! ["K", "T", "FF", "R"],
+  assert_eq! ( forks_folder_members_of (&saved, "N"), vec! ["K", "T", "R", "FF"],
                "T stands among the forkees:\n{}", saved );
   let t_line : &str = line_of (&saved, "T");
   assert! ( ! t_line . contains ("noClaim") && ! t_line . contains ("writeProtected")
@@ -252,9 +238,9 @@ async fn moving_y_from_t_into_n_makes_n_fork_t (
   assert_eq! ( saved, view_of (config, tantivy, "N") ?,
                "the redrawn view is the fresh view of N" );
   is_a_fixpoint (&saved, "N", config, tantivy) . await ?;
-  { // R's view now shows T, N's mutual, under N, and under T what it
-    // shows of its own forkee N. N's contains there is the one on
-    // disk, so nothing under T was cut: saved unchanged, it writes
+  { // R's view now shows T, N's mutual, in R's flat forks folder, an
+    // indirect member, showing what R neither contains nor hides of
+    // its content. Nothing under T was cut: saved unchanged, it writes
     // nothing.
     let rs_view : String = view_of (config, tantivy, "R") ?;
     is_a_fixpoint (&rs_view, "R", config, tantivy) . await ?; }

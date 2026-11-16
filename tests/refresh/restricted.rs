@@ -365,9 +365,7 @@ node s
   forksFolder" . to_string (), "\
 node s
   forksFolder
-    node e
-      forksFolder
-        node s wp noClaim" . to_string () ],
+    node e" . to_string () ],
     "the editable folder stays, empty, where a save would read it, and \
      the skgrepo widening fills it again, claiming, e drawn editable \
      as a forkee as such is" ); }

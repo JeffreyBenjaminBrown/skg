@@ -7,8 +7,4 @@
 **** ⟨0g ☮ These also contain it.⟩
 ***** The fixture root ⟨0h ☮B 1C2b L2b folded⟩
 ****** Above the root ⟨0i ☮ Ca⟩
-**** ⟨0j It forks these, or these fork it.⟩
-***** Fred's note ⟨0k ☮ C1 1/L bK ⟳ ⌂:fred⟩
-***** ⟨0l b hides these, but no fork partner shown contains them.⟩
-****** An aside of Fred's ⟨0m ☮ cH ⌂:fred folded⟩
-** A detail of Fred's ⟨0n 1H⟩
+** A detail of Fred's ⟨0j 1H⟩

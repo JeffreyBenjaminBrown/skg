@@ -5,8 +5,9 @@
 // forksFolder, where the node has a fork partner.  The other relation
 // folders require explicit requests; after one of their members is
 // extended as editable, that member gets the same default forksFolder.
-// A forkee as such additionally gets its nonempty
-// hiddenInForkPartnerFolder.
+// A member of a forks folder (a member as such) gets none: the folder
+// it stands in lists every mirror already. A forkee as such gets its
+// nonempty hiddenInForkPartnerFolder.
 
 use std::error::Error;
 use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
@@ -121,9 +122,10 @@ fn add_editable_view_requests_to_folder_members (
 
 /// A forking root of a fresh view is drawn with its forks folder: N
 /// forks Forkee and SecondForkee, claiming them, and Forker and S
-/// fork N, claiming nothing; last, the folder of what it hides outside
-/// them, whose members are drawn folded: N hides Hidden, which no
-/// forkee contains.
+/// fork N, claiming nothing; then the notes each of those forks, the
+/// indirect members, claiming nothing, by pid; last, the folder of
+/// what it hides outside them, whose members are drawn folded: N
+/// hides Hidden, which no member contains.
 #[test]
 fn a_forking_root_is_drawn_with_its_forks_folder
   () -> Result<(), Box<dyn Error>> {
@@ -142,13 +144,17 @@ fn a_forking_root_is_drawn_with_its_forks_folder
                           || line . contains ("(gnid Hidden)") )
         . map ( |line| line . split (" (skgRepos") . next () . unwrap () . to_string () )
         . collect ();
-      assert_eq! ( outline [.. 8], [
+      assert_eq! ( outline [.. 12], [
         "* (skg node (gnid N)",
         "** (skg forksFolder)",
         "*** (skg node (gnid Forkee)",
         "*** (skg node (gnid SecondForkee)",
         "*** (skg node (gnid Forker)",
         "*** (skg node (gnid S)",
+        "*** (skg node (gnid ForkeeLeaf)",
+        "*** (skg node (gnid ForkerLeaf)",
+        "*** (skg node (gnid SLeaf)",
+        "*** (skg node (gnid SecondForkeeLeaf)",
         "*** (skg hiddenOutsideOfForkPartnersFolder)",
         "**** (skg folded node (gnid Hidden)" ],
         "{}", n_view );
@@ -202,9 +208,10 @@ fn initial_and_as_such_editable_nodes_get_only_the_default_folders
       for (gnid, folder) in members {
         let subtree : String =
           subtree_for_node_in_folder (&saved, gnid, folder);
-        assert! ( subtree . contains ("forksFolder"),
+        let is_a_member_as_such : bool = folder == "forksFolder";
+        assert_eq! ( subtree . contains ("forksFolder"), ! is_a_member_as_such,
           "editable partner folder member {} should get its nonempty \
-           forksFolder:\n{}", gnid, saved );
+           forksFolder unless it is a member of a forks folder:\n{}", gnid, saved );
         for exotic in [ "hiderFolder", "hiddenFolder" ] {
           assert! ( ! subtree . contains (exotic),
             "editable partner folder member {} should not get {} by \

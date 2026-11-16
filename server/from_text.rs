@@ -81,7 +81,7 @@ pub fn buffer_to_validated_saveplan_in_graph (
   // _with_fork_repos entry below. No baseline: nothing is stale.
   buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
     buffer_text, graph, config, skgrepo_restriction, &HashMap::new (),
-    &WhatTheBaselineShows::default (), Perspective::RootHomes )
+    &WhatTheBaselineShows::default (), Perspective::RootHomes, false )
     }
 
 /// As 'buffer_to_validated_saveplan', but with the per-fork clone
@@ -97,6 +97,8 @@ pub fn buffer_to_validated_saveplan_in_graph (
 /// or home skgrepo as one of the baseline's occurrences does.
 /// 'perspective' is the perspective the buffer was drawn
 /// from, against which its '(inPlaceOf N)' parts are checked.
+/// 'is_diff_view' says whether the buffer is one of the diff view's
+/// ('resolve_visibility').
 pub fn buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
   buffer_text        : &str,
   graph              : &crate::dbs::in_rust_graph::InRustGraph,
@@ -105,6 +107,7 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
   fork_skgrepos      : &HashMap<ID, SkgrepoName>,
   baseline           : &WhatTheBaselineShows,
   perspective        : Perspective,
+  is_diff_view       : bool,
 ) -> Result<(ViewForest, SavePlan, Vec<String>), SaveError> {
   let ( mut viewforest, parsing_errors, parsing_warnings, supplied )
     : ( ViewForest, Vec<BufferValidationError>, Vec<String>,
@@ -142,7 +145,7 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
     : ( NonmergeSavePlan, Vec<(ID, ID)> )
     = crate::from_text::local_fieldintent_collection
       ::extract_nonmergeSavePlan_locally_in_graph (
-        &viewforest, graph, config, skgrepo_restriction )
+        &viewforest, graph, config, skgrepo_restriction, is_diff_view )
  . map_err (SaveError::DatabaseError) ?;
   let ( nonmerge_plan, unedited_stale_graphnodes )
     : ( NonmergeSavePlan, Vec<UneditedStaleGraphnode> ) =
@@ -354,7 +357,7 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos (
   let graph = crate::dbs::in_rust_graph::InRustGraph::from_graphnodes (&nodes);
   buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
     buffer_text, &graph, config, skgrepo_restriction, fork_skgrepos,
-    &WhatTheBaselineShows::default (), Perspective::RootHomes ) }
+    &WhatTheBaselineShows::default (), Perspective::RootHomes, false ) }
 
 /// One nonfatal warning per dangling link this save writes: a
 /// '[[id:X][label]]' in a saved title or body where X is neither in

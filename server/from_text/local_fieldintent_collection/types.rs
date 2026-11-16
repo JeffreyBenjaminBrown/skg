@@ -92,11 +92,11 @@ pub enum FieldIntent {
 
 /// This is an unresolved signal: the buffer presents 'members' as
 /// every member of the forks folder of a save-eligible note, claiming
-/// or not. A note that forks it, by a record the skgrepo restriction
-/// shows, that is not among them and that it does not fork after the
-/// save was deleted from the folder, and joins the note's hides
-/// ('resolve_forks_folder_removals'): a forker-only member, or a
-/// mutual, whose fork the same save ends.
+/// or not. A member of the folder the view drew, not among them, that
+/// would stand in it claiming nothing after the save, was deleted from
+/// the folder, and joins the note's hides
+/// ('resolve_forks_folder_removals'): a forker-only or an indirect
+/// member, or a mutual, whose fork the same save ends.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ForksFolderMembers {
   pub members : Vec<ID>,

@@ -12,13 +12,15 @@
 // and saves it:
 // - a buffer showing T editable, saved unchanged, writes nothing: T's
 //   partial list is never read as its whole contains;
-// - a fresh view of N draws K, its forkee, then its forkers FF, R and
-//   T, each editable, claiming nothing, showing what it adds;
+// - a fresh view of N draws K, its forkee, then its forkers R and T
+//   (in "main") and FF (in "theirs", declared after it), each
+//   editable, claiming nothing, showing what it adds;
 // - under T, the folder of what N hides in it (Z) comes first, then
-//   the folder of what T hides of N's content (X2), then its forks
+//   the folder of what T hides of N's content (X2), and no forks
 //   folder; K, a forkee, has no such folder;
-// - in R's own view, R, standing in N's forks folder, is a repeat:
-//   write-protected, showing nothing;
+// - in R's own view, R's forks folder is flat: N, its forkee, then
+//   the other mirrors of N, indirect members claiming nothing, and no
+//   forks folder under any of them;
 // - the fresh view of N, saved unchanged, writes nothing and draws
 //   itself again;
 // - T's title, edited there, is saved; FF's is refused;
@@ -42,7 +44,7 @@ use crate::git_fixture::{
   Fixture, OwnedSkgrepos, open_content_view, switch_skgrepo_set, with_git_fixture,
   write_unchanged_skgrepos};
 use crate::view_and_save_helpers::{
-  children_of, content_of, depth, ids, line_of, moved_after, node, refusal_of,
+  children_of, content_of, depth, first_forks_folders_members, ids, line_of, moved_after, node, refusal_of,
   save_cleanly, skg_files, under, view_of, with_line_after_subtree_of};
 use skg::metadata_canon::without_viewnode_ids;
 use skg::skgrepo_sets::SkgrepoRestriction;
@@ -80,8 +82,8 @@ fn all_tests
       a_fresh_view_draws_forkers_after_forkees_editable (&s . config, &mut s . tantivy) . await ?;
       s . reset ("a_forkers_folders_stand_in_order", FIXTURES) ?;
       a_forkers_folders_stand_in_order (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("a_repeat_forker_shows_nothing", FIXTURES) ?;
-      a_repeat_forker_shows_nothing (&s . config, &mut s . tantivy) . await ?;
+      s . reset ("a_forkers_own_view_lists_every_mirror_flat", FIXTURES) ?;
+      a_forkers_own_view_lists_every_mirror_flat (&s . config, &mut s . tantivy) . await ?;
       s . reset ("an_unchanged_fresh_view_writes_nothing", FIXTURES) ?;
       an_unchanged_fresh_view_writes_nothing (&s . config, &mut s . tantivy) . await ?;
       s . reset ("an_owned_forkers_title_is_saved", FIXTURES) ?;
@@ -119,7 +121,8 @@ async fn an_unchanged_save_of_an_editable_forker_writes_nothing (
   Ok (( )) }
 
 /// N's forks folder holds K, its forkee, claiming, then its forkers
-/// FF, R and T, claiming nothing; each is drawn editable. Each forker
+/// R, T and FF, claiming nothing, by the declaration order of their
+/// homes, then pid; each is drawn editable. Each forker
 /// shows what it adds to N's content: FF f1, R nothing, T Y.
 async fn a_fresh_view_draws_forkers_after_forkees_editable (
   config  : &SkgConfig,
@@ -134,7 +137,7 @@ async fn a_fresh_view_draws_forkers_after_forkees_editable (
     . map ( |line| line . split ("(gnid ") . nth (1) . unwrap ()
                        . split (')') . next () . unwrap () . to_string () )
     . collect ();
-  assert_eq! ( order, vec! ["K", "FF", "R", "T"],
+  assert_eq! ( order, vec! ["K", "R", "T", "FF"],
                "the forkee leads, the forkers follow:\n{}", view );
   assert! ( ! line_of (&view, "K") . contains ("noClaim"), "{}", view );
   for (member, shown) in [ ("K", vec! ["k1"]), ("FF", vec! ["f1"]),
@@ -153,8 +156,9 @@ async fn a_fresh_view_draws_forkers_after_forkees_editable (
   Ok (( )) }
 
 /// Under T, the folder of what N hides in it (Z) comes first, then the
-/// folder of what T hides of N's content (X2), then T's forks folder,
-/// then its content (Y); each folder's members are folded. K, a
+/// folder of what T hides of N's content (X2), then its content (Y),
+/// and no forks folder (a member as such shows one only when asked);
+/// each folder's members are folded. K, a
 /// forkee, has neither folder. The second folder's label names T as
 /// 'a' and N as 'c' (its heralds, pinned with the clients').
 async fn a_forkers_folders_stand_in_order (
@@ -170,7 +174,7 @@ async fn a_forkers_folders_stand_in_order (
                    else if line . contains ("(gnid Y)") { "Y" }
                    else { "other" } )
     . collect ();
-  assert_eq! ( kinds, vec! ["hiddenIn", "hiddenBy", "forks", "Y"], "{}", view );
+  assert_eq! ( kinds, vec! ["hiddenIn", "hiddenBy", "Y"], "{}", view );
   let hidden_by_at : usize = view . lines ()
     . position ( |line| line . contains ("hiddenByForkerFolder") ) . unwrap ();
   let first_member : &str = view . lines () . nth (hidden_by_at + 1) . unwrap ();
@@ -185,25 +189,34 @@ async fn a_forkers_folders_stand_in_order (
             "K has neither folder:\n{}", view );
   Ok (( )) }
 
-/// In R's own view, N stands editable in R's forks folder, and R
-/// stands in N's forks folder as a repeat: write-protected, showing
-/// nothing. T stands there editable, showing Y.
-async fn a_repeat_forker_shows_nothing (
+/// In R's own view, R's forks folder is flat: N, which R forks,
+/// editable and claiming; then K, T and FF, the other mirrors of N,
+/// each an indirect member (two forks from R), claiming nothing, by
+/// the declaration order of their homes, then pid, with no birth
+/// fact. R stands nowhere in it, and no member shows a forks folder.
+/// T, editable, shows what R neither contains nor hides of its
+/// content: Y and Z.
+async fn a_forkers_own_view_lists_every_mirror_flat (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   let view : String = view_of (config, tantivy, "R") ?;
-  assert! ( ! line_of (&view, "N") . contains ("writeProtected"), "{}", view );
-  let repeat : &str = view . lines ()
-    . filter ( |line| line . contains ("(gnid R)") ) . nth (1)
-    . unwrap_or_else ( || panic! ("R stands in N's forks folder:\n{}", view ));
-  assert! ( repeat . contains ("writeProtected") && repeat . contains ("noClaim"),
-            "{}", view );
-  let at : usize = view . lines () . position ( |line| line == repeat ) . unwrap ();
-  let next : &str = view . lines () . nth (at + 1) . unwrap ();
-  assert! ( depth (next) <= depth (repeat), "the repeat shows nothing:\n{}", view );
-  assert! ( content_of (&view, "T") . iter () . any ( |line| line . contains ("(gnid Y)") ),
-            "{}", view );
+  assert_eq! ( first_forks_folders_members (&view), vec! ["N", "K", "T", "FF"],
+               "{}", view );
+  assert_eq! ( view . matches ("forksFolder") . count (), 1,
+               "one forks folder, nothing nested:\n{}", view );
+  assert! ( ! line_of (&view, "N") . contains ("writeProtected")
+            && ! line_of (&view, "N") . contains ("noClaim"), "{}", view );
+  for indirect in ["K", "T", "FF"] {
+    let line : &str = line_of (&view, indirect);
+    assert! ( line . contains ("noClaim") && ! line . contains ("birth")
+              && ! line . contains ("ancestors 2"),
+              "{} claims nothing, born of nothing, no fork toward R:\n{}", indirect, view ); }
+  let t_shows : Vec<&str> = content_of (&view, "T");
+  assert! ( t_shows . len () == 2
+            && t_shows [0] . contains ("(gnid Y)") && t_shows [1] . contains ("(gnid Z)")
+            && ! t_shows [0] . contains ("writeProtected"),
+            "T shows Y and Z, editable:\n{}", view );
   Ok (( )) }
 
 /// The fresh view of N, saved unchanged, writes no file and draws
@@ -299,7 +312,7 @@ async fn a_child_typed_under_a_foreign_forker_is_refused (
   let before : BTreeMap<String, String> = skg_files (config) ?;
   let refusal : String = refusal_of (&typed, "N", config, tantivy) . await ?;
   assert! ( refusal . contains ("Cannot add a child under FF")
-            && refusal . contains ("shown as a forker")
+            && refusal . contains ("shown as a member claiming nothing")
             && refusal . contains ("make the node your own first"),
             "{}", refusal );
   assert_eq! ( skg_files (config) ?, before, "nothing is written" );
@@ -340,7 +353,7 @@ async fn a_node_moved_under_a_foreign_forker_is_refused (
   let before : BTreeMap<String, String> = skg_files (config) ?;
   let refusal : String = refusal_of (&moved, "N", config, tantivy) . await ?;
   assert! ( refusal . contains ("Cannot add a child under FF")
-            && refusal . contains ("shown as a forker"),
+            && refusal . contains ("shown as a member claiming nothing"),
             "{}", refusal );
   assert_eq! ( skg_files (config) ?, before, "nothing is written" );
   Ok (( )) }
