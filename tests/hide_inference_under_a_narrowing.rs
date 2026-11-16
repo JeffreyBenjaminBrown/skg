@@ -12,7 +12,7 @@
 // member drops no hide the skgrepo restriction keeps out.
 //
 // A forker of the hider explains a hide as a forkee does
-// ('TODO/every-mirror/2_plan.org', Q12): deleting a member's line
+// ('docs/glossary.org', "hides"): deleting a member's line
 // that a forker still contains hides it, by the same visible records
 // and at the same floor, the 'forks' relationship read in the
 // forker's file.

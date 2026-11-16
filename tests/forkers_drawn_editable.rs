@@ -1,8 +1,8 @@
 // cargo nextest run --test grouped_forks -E 'test(forkers_drawn_editable::)'
 //
-// Forkers as such ('TODO/every-mirror/2_plan.org', slice 3;
-// 'docs/glossary.org', "forker as such"). The fixture is the plan's
-// "forks of one note meet", with a forkee and a foreign forker added.
+// Forkers as such ('docs/glossary.org', "forker as such"). The
+// fixture is 'docs/forks.org''s "Forks of one note meet", with a
+// forkee and a foreign forker added.
 // N, owned, contains X1 to X4, forks K and hides Z. R and T, owned,
 // fork N: R contains X1, X2, X3; T contains X1, X3, Y, Z and hides X2.
 // K contains k1. FF, foreign, forks N and contains X1 and f1. So in

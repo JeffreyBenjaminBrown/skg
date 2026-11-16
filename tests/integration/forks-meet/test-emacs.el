@@ -57,9 +57,9 @@ GNID. Fail if there is none."
 
 (defun forks-meet-drawn-folded-p ()
   "Whether the headline at point is drawn folded: hidden, or, in a view
-just opened, still carrying the server's 'folded' atom, which the
-Emacs client acts on only at a save's redraw (see TODO/problems.org,
-the entry on 'skg-open-org-buffer-from-text')."
+just opened, still carrying the server's 'folded' atom: the Emacs
+client opens a view's text as the server sent it, folding nothing,
+and acts on the atoms only when a save redraws the buffer."
   (or (invisible-p (point))
       (string-match-p "^\\*+ (skg \\((vnid [^)]*) \\)?folded " (forks-meet-line))))
 

@@ -1,13 +1,13 @@
 // cargo nextest run --test grouped_forks -E 'test(cuts_from_forkers::)'
 //
-// A cut from a forker as such ('TODO/every-mirror/2_plan.org', slice
-// 5; 'docs/forks.org', "Cutting from a forker"). The fixture is
-// Jeff's example, "forking a forker": N, owned, contains nothing; F,
+// A cut from a forker as such ('docs/forks.org', "Cutting from a
+// forker"). The fixture is that section's example: N, owned, contains
+// nothing; F,
 // foreign ("you"), forks N and contains y and z. E, owned, forks N
 // too, and contains e1; M, owned, already forks F (monogamy is gone,
 // so N may fork F as well). G, foreign, is forked by H, foreign,
 // which contains h. Each sub-test edits a view and saves it:
-// - Jeff's example: in N's view, y cut from F and pasted under N.
+// - in N's view, y cut from F and pasted under N.
 //   N comes to fork F, contains y and hides nothing; the redrawn view
 //   shows F first in N's forks folder, claiming, editable, showing z,
 //   then E, and y as N's content. Saved again unchanged, it writes
@@ -38,8 +38,8 @@ fn all_tests
   run_with_shared_test_stores (
     "skg-test-cuts-from-forkers",
     |s| Box::pin ( async move {
-      s . reset ("jeffs_example_forking_a_forker", FIXTURES) ?;
-      jeffs_example_forking_a_forker (&s . config, &mut s . tantivy) . await ?;
+      s . reset ("a_child_cut_from_a_forker_and_pasted_makes_it_a_mutual", FIXTURES) ?;
+      a_child_cut_from_a_forker_and_pasted_makes_it_a_mutual (&s . config, &mut s . tantivy) . await ?;
       s . reset ("a_cut_without_a_paste_hides_what_was_cut", FIXTURES) ?;
       a_cut_without_a_paste_hides_what_was_cut (&s . config, &mut s . tantivy) . await ?;
       s . reset ("a_cut_under_a_foreign_note_is_refused", FIXTURES) ?;
@@ -75,14 +75,15 @@ fn view_of_n_before_any_cut (
 // The sub-tests
 //
 
-/// Jeff's example, "forking a forker". In N's view, y is cut from F
-/// and pasted under N. After the save N forks F (which M forks too:
-/// monogamy is gone), N contains y, and N hides nothing, since it
+/// A child cut from a forker and pasted makes it a mutual
+/// ('docs/forks.org', "Cutting from a forker"). In N's view, y is cut
+/// from F and pasted under N. After the save N forks F (which M forks
+/// too: monogamy is gone), N contains y, and N hides nothing, since it
 /// contains what it cut. F's file is untouched. The redrawn view is
-/// Jeff's "after": F stands first in N's forks folder, a mutual,
+/// that section's "after": F stands first in N's forks folder, a mutual,
 /// claiming, editable, showing z; then E; and y as N's content. Saved
 /// again unchanged, it writes nothing and draws itself again.
-async fn jeffs_example_forking_a_forker (
+async fn a_child_cut_from_a_forker_and_pasted_makes_it_a_mutual (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {

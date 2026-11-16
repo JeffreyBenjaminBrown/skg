@@ -1,12 +1,12 @@
 // cargo nextest run --test grouped_forks -E 'test(forks_meet::)'
 //
-// Forks of one note meet ('TODO/every-mirror/2_plan.org', behavior
-// 5; 'docs/forks.org', "Forks of one note meet"), end to end: both
+// Forks of one note meet ('docs/forks.org', "Forks of one note
+// meet"), end to end: both
 // views and every save, each saved view saved again unchanged (the
 // fixpoint). The fixture is the one of 'tests/forkers_drawn_editable.rs':
 // N, owned, contains X1 to X4 and hides Z; R and T, owned, fork N;
 // R contains X1, X2, X3; T contains X1, X3, Y, Z and hides X2. Beside
-// the plan's picture, N forks K (which contains k1), and FF, foreign,
+// the doc's picture, N forks K (which contains k1), and FF, foreign,
 // forks N and contains X1 and f1; they stand in N's forks folder too.
 // - R's view: N stands editable in R's forks folder, a forkee (its
 //   birth '(forks in 2)', herald bK), showing X4, what R neither

@@ -1,7 +1,7 @@
 // cargo nextest run --test grouped_forks -E 'test(forkees_drawn_editable::)'
 //
-// Forkees as such drawn editable ('TODO/every-mirror/2_plan.org', slice
-// 2; 'docs/glossary.org', "forkee as such"). N, owned, contains n1,
+// Forkees as such drawn editable ('docs/glossary.org', "forkee as
+// such"). N, owned, contains n1,
 // forks E, owned, and F, foreign, and hides H, which E contains, and
 // G, which F contains. E contains e1, H, e2; F contains f1, G. FN,
 // foreign, forks E. Each sub-test edits a view and saves it:
