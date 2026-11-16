@@ -51,13 +51,14 @@ done
 # Each config's [[repos]] entries, as 'NAME<tab>PATH<tab>FOREIGN', and its tantivy_folder.
 repos_of() {
   awk '
-    function flush() { if (name != "") print name "\t" path "\t" foreign; name = ""; path = ""; foreign = "false" }
-    function value(line) { sub(/^[^=]*=[ \t]*/, "", line); sub(/[ \t]*#.*$/, "", line); gsub(/"/, "", line); return line }
-    /^\[\[repos\]\]/ { flush(); next }
-    /^\[/            { flush(); next }
-    /^name[ \t]*=/    { name = value($0) }
-    /^path[ \t]*=/    { path = value($0) }
-    /^foreign[ \t]*=/ { foreign = value($0) }
+    # skg names an entry without a name by its path.
+    function flush() { if (path != "") print (name != "" ? name : path) "\t" path "\t" foreign; name = ""; path = ""; foreign = "false" }
+    function value(line) { sub(/^[^=]*=[ \t]*/, "", line); sub(/[ \t]*#.*$/, "", line); gsub(/["\047]/, "", line); return line }
+    /^[ \t]*\[\[repos\]\]/ { flush(); next }
+    /^[ \t]*\[/            { flush(); next }
+    /^[ \t]*name[ \t]*=/    { name = value($0) }
+    /^[ \t]*path[ \t]*=/    { path = value($0) }
+    /^[ \t]*foreign[ \t]*=/ { foreign = value($0) }
     END { flush() }' "$1"
 }
 TANTIVY=".index.tantivy"
@@ -71,9 +72,10 @@ SUBS=(); NOTES=()
 for c in "${CONFIGS[@]}"; do
   while IFS=$'\t' read -r name path foreign; do
     [ "$foreign" = true ] && continue
-    abs="$(realpath -m "$F/$(dirname "$c")/$path")"
+    case "$path" in /*) abs="$(realpath -m "$path")" ;; *) abs="$(realpath -m "$F/$(dirname "$c")/$path")" ;; esac
     rel="${abs#"$F"/}"
     case "$abs" in "$F"/*) ;; *) NOTES+=("'$name' ($c) is outside $F, so it is not a submodule here."); continue ;; esac
+    case "$rel" in *[[:space:]]*) echo "'$rel' has a space in it, which this script does not handle. Nothing done." >&2; exit 1 ;; esac
     printf '%s\n' "${SUBS[@]}" | grep -q "^$rel " && continue
     if ! git -C "$abs" rev-parse -q --verify HEAD >/dev/null 2>&1 \
        || [ "$(git -C "$abs" rev-parse --show-toplevel)" != "$abs" ]; then
@@ -143,8 +145,10 @@ for s in "${SUBS[@]}"; do
 done
 git -C "$F" add .gitignore .gitmodules "${CONFIGS[@]}"
 git -C "$F" commit -q -m "The configs, and each skgrepo as a submodule (tools/team/make-config-repo.sh)"
-# 'init' writes only the outer repo's .git/config. (Not 'git submodule sync':
-# it would set each skgrepo's own 'origin'.) Its stderr only warns that
-# a relative URL has nothing to be relative to until the outer repo has a remote.
+# 'init' writes only the outer repo's .git/config. Until the outer repo
+# has a remote, it resolves a relative URL against FOLDER itself, to a
+# path that does not exist; only 'git submodule update' would read it,
+# and its stderr says so. Never 'git submodule sync': it would set each
+# skgrepo's own 'origin'.
 git -C "$F" submodule init -q 2>/dev/null
 echo "Done: $(git -C "$F" log --oneline -1)"
