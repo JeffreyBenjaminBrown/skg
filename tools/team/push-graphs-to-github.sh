@@ -46,8 +46,41 @@ for folder in data/claude/team/*/notes; do
 team-$name  $folder"
 done
 
+# Each folder must be a gitrepo of its own: in one that is not, every
+# git command below would act on claude-config instead.
+[ -e "$CONFIGS/.git" ] || { echo "$CONFIGS is not a Git repo; make it with tools/team/make-config-repo.sh. Nothing done."; exit 1; }
+echo "$REPOS" | while read -r name folder; do
+  [ -z "$name" ] && continue
+  [ "$(git -C "$folder" rev-parse --show-toplevel 2>/dev/null)" = "$(cd "$folder" && pwd -P)" ] \
+    || { echo "$folder is not a gitrepo of its own. Nothing done."; exit 1; }
+done
+
 echo "Checking that nothing about to be public mentions a private node ..."
 tools/team/public-leak-check.sh
+
+echo "== recording in $CONFIGS the commit each graph is at"
+# A submodule pins one commit of its skgrepo, and every commit to a graph
+# moves past its pin. So the pins are recorded here and nowhere else:
+# before the graphs are pushed, so that every pin is in what is pushed.
+# Each submodule's URL is its GitHub repo, relative to claude-config's
+# own: the name its 'origin' has, if it has one (a renamed specialist
+# keeps its old repo), else the name it is about to be created with.
+# A newly born specialist's skgrepo is added here too.
+echo "$REPOS" | while read -r name folder; do
+  [ -z "$name" ] && continue
+  path="${folder#$CONFIGS/}"
+  if origin="$(git -C "$folder" remote get-url origin 2>/dev/null)"; then
+    name="$(basename "$origin" .git)"
+  fi
+  git -C "$CONFIGS" config -f .gitmodules "submodule.$path.path" "$path"
+  git -C "$CONFIGS" config -f .gitmodules "submodule.$path.url" "../$name.git"
+  git -C "$CONFIGS" add --no-warn-embedded-repo "$path"   # as 'git submodule add' does
+done
+( cd "$CONFIGS"
+  git add -u   # changed configs, and anything tracked that is gone
+  git add .gitmodules skgconfig.toml team/*/skgconfig.toml
+  git commit -q -m "The configs, and the commit each graph is at, as pushed" \
+    || echo "   (nothing had changed since the last push)" )
 
 echo "$REPOS" | while read -r name folder; do
   [ -z "$name" ] && continue
@@ -67,23 +100,6 @@ echo "$REPOS" | while read -r name folder; do
 done
 
 echo "== $OWNER/claude-config  <-  $CONFIGS"
-# A submodule pins one commit of its skgrepo, and every commit to a graph
-# moves past its pin. So the pins are recorded here, just before the
-# push, and nowhere else. Each submodule's URL is its GitHub repo, relative
-# to claude-config's own; a new specialist's skgrepo is added here too.
-echo "$REPOS" | while read -r name folder; do
-  [ -z "$name" ] && continue
-  path="${folder#$CONFIGS/}"
-  git -C "$CONFIGS" config -f .gitmodules "submodule.$path.path" "$path"
-  git -C "$CONFIGS" config -f .gitmodules "submodule.$path.url" "../$name.git"
-  git -C "$CONFIGS" add --no-warn-embedded-repo "$path"   # as 'git submodule add' does
-done
-( cd "$CONFIGS"
-  git add -u   # changed configs, and anything tracked that is gone
-  git add .gitmodules skgconfig.toml team/*/skgconfig.toml
-  git commit -q -m "The configs, and the commit each graph is at, as pushed" \
-    || echo "   (nothing had changed since the last push)" )
-
 if git -C "$CONFIGS" remote | grep -q '^origin$'; then
   git -C "$CONFIGS" push origin main
 else
