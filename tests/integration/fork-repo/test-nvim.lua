@@ -126,8 +126,8 @@ T.check(#owned_files == 1 and owned_files[1] == 'P.skg', string.format(
 
 local clone_full_path = vim.fn.glob('data/owned/owned2/*.skg', false, true)[1]
 local clone_content = table.concat(vim.fn.readfile(clone_full_path), '\n')
-T.check(clone_content:find('overrides', 1, true),
-        'the clone in owned2 should override N')
-print('the clone landed in the rotated repo owned2 and overrides N')
+T.check(clone_content:find('\nforks:', 1, true),
+        'the clone in owned2 should fork N')
+print('the clone landed in the rotated repo owned2 and forks N')
 
 T.pass('PASS: Fork repo-rotation integration test successful!')
