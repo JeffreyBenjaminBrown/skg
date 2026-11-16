@@ -1701,7 +1701,17 @@ extends -- a fresh view's roots, and the editable content the request
 draws or shows under them -- shows its =forksFolder= where it has a
 fork partner, either way, but no other top-level relation folder,
 unasked. This applies both to ordinary positions and to nodes
-extended as members of relation folders. An editable forkee as such
+extended as members of relation folders. Each forkee as such (a
+claiming member of the =forksFolder= of an editable occurrence) is
+drawn as content is: editable, carrying an editable-view request its
+own visit consumes, unless another occurrence holds its node's
+editability or the node budget is spent; a foreign one too. One the
+buffer already shows write-protected stays so at a plain rerender;
+=(viewRequests editableView)= on its forker extends it. An editable
+forkee as such saves its title and body when the user owns it (a
+foreign one's must match the disk), and a headline typed under it
+joins its content when the user owns it (the save is refused under a
+foreign one). An editable forkee as such
 additionally includes its nonempty =hiddenInForkPartnerFolder=;
 =hiddenOutsideOfForkPartnersFolder=, when nonempty, stands last in
 every =forksFolder= of a content view. Use a

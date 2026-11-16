@@ -504,7 +504,16 @@ roots and every occurrence the refresh draws editable among them,
 shows its forks folder when it has a fork partner, either way, by a
 record the skgrepo restriction shows (=has_a_fork_partner=); an
 editable forkee shown as such shows the folder of what its forker
-hides in it, when that holds anything. And every forks folder of a
+hides in it, when that holds anything. A forkee as such the refresh
+draws under an editable occurrence is itself such an occurrence: it
+is drawn editable, as content is (see "The extent and the node
+budget"), so it shows its own forks folder and its content less what
+its forker contains or hides. A forkee as such that becomes a
+Restricted vognode (a skgrepo narrowing keeps its node out) loses the
+folders it showed, and draws them anew once it is an occurrence again
+('rekind_to_gnid_only', 'rekind_to_occurrence' in
+'server/refresh/id_rule.rs'); elsewhere an occurrence re-kinded so
+keeps its folders, as tombstones. And every forks folder of a
 content view holds, last, the folder of what its viewparent hides
 outside its fork partners, when it hides something there
 (=add_hidden_outside_folder_to_forks_folder=), so that a forker a
@@ -551,6 +560,9 @@ forker N hides is not drawn in it: it stands in the folder of what N
 hides outside its fork partners, which the forks folder holds last.
 
 **** What each member shows
+A forkee as such shows its content less what N contains or hides,
+and, drawn editable, its own folders; a forker-only member shows
+nothing but its containers folder (plan 2 draws it like a forkee).
 The birth facts follow the roles in which the member stands
 (=forks_folder_member_roles= in =server/refresh/viewnodestats.rs=):
 =(forks in 2)= where it claims (where the folder reads no claims,
@@ -585,6 +597,13 @@ the edits of the hidden-outside folder, which run last. So:
 - detaching a mutual ends N's fork of it only: it stands as a
   forker, claiming nothing;
 - attaching a forker-only member makes N fork it: a mutual;
+- in a forkee as such E, drawn editable: E's title and body are saved
+  when the user owns E, and refused (a text claim) when it is foreign;
+  cutting one of E's children hides it in N, and a child N hides,
+  shown claiming under E, is unhidden (the forkee-visibility step), a
+  save that would hide or unhide anything in a foreign N being
+  refused; a headline typed under E joins E's content, after the
+  sibling it follows, when the user owns E, and is refused otherwise;
 - deleting a restricted viewnode (a member whose node the skgrepo
   restriction keeps out), from the forks folder or the hidden-outside
   folder, changes no relationship to the note it stands for: the
@@ -604,9 +623,15 @@ content where content stands; none of it, beyond what the buffer
 already shows, for a write-protected occurrence's content and for the
 containerward chain. An occurrence the refresh draws where its
 parent's children are editable content is drawn write-protected,
-carrying an editable-view request; so is a write-protected child that
-claims membership under an occurrence carrying one: the request
-passes on to the content it extends, showing or drawing. At the
+carrying an editable-view request, and so is a forkee as such it
+draws in a content view (a claiming member of the forks folder of an
+editable occurrence, 'drawn_occurrence_editability' in
+'server/refresh/editability.rs'); so is a write-protected child that
+claims membership under an occurrence carrying one, or in that
+occurrence's forks folder: the request passes on to the content it
+extends, showing or drawing, and to the forkees as such its forks
+folder holds. A plain rerender, which carries no request, leaves a
+forkee as such standing write-protected as it is. At the
 occurrence's own visit the request is consumed: the occurrence
 becomes editable when no other occurrence of its node is and the
 budget allows, and stays write-protected otherwise; the request goes

@@ -462,6 +462,16 @@ Without such a request, an editable node shows only its forksFolder,
 where it has a fork partner, either way (plus the nonempty
 hiddenInForkPartnerFolder on an editable forkee as such); the heralds
 advertise other nonempty relations.
+
+In a content view, each node a forksFolder holds that the node forks
+(a forkee as such, =bK= or =bKb=) is drawn editable, as content is,
+unless it is editable elsewhere in the buffer or the node budget is
+spent: it shows its content less what the node contains or hides,
+and its own folders. Its title and body save when you own it; a
+foreign one's edits are refused (view it as itself to fork it).
+Deleting one of its children hides it in the forking node; a headline
+typed under it joins its content, after the child it follows, when
+you own it, and is refused under a foreign one.
 *** C-c l a : skg-show-folderOf-aliases
 The aliasFolder -- other text you could search for to find this node
 (you can always search for its title; most nodes have none). Writable:
@@ -570,7 +580,9 @@ Moving editability back to that occurrence later
 makes those children its content again.
 Called on a node that is already editable,
 it extends the node's content editable,
-up to 'initial_node_limit' extensions.
+up to 'initial_node_limit' extensions,
+and the forkees as such in its forksFolder too
+(one an earlier server drew write-protected, say).
 A buffer may carry only one such request per node.
 It does not save; the request takes effect at the next save.
 *** C-c s w : skg-request-write-protected

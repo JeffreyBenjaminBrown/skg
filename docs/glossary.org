@@ -470,7 +470,10 @@ stub asks for ('stub_of_fresh_content_view' in
 'server/update_buffer.rs'). The other relation folders require an
 explicit folder request (the =C-c l= commands), even when their
 herald counts say they would be nonempty. The same rule applies when
-a member of any partner folder is extended as editable. An editable
+a member of any partner folder is extended as editable. In a content
+view each forkee as such under an editable occurrence is drawn as
+content is (see "forkee as such"), so it is extended, and gets its
+own forks folder where it has a fork partner. An editable
 forkee as such also gets its nonempty =hiddenInForkPartnerFolder=;
 this is the hidden-in compound partner folder specific to how that
 forker sees the forkee. The diff view draws no default
@@ -588,12 +591,33 @@ underneath the relevant forker, claiming, in its 'forksFolder':
 In the above view, forkee1 and forkee2 are both "forkees as
 such": a member of a forks folder that claims (and,
 in the refresh, that the graph warrants). They are not just forkees,
-but they are being shown /as/ forkees. This changes the way edits are
-interpreted: edits to a forkee as such can only affect what the
-relevant forker hides, nothing else. A member of the folder claiming
-nothing -- a forker-only member, or a forkee the user detached -- is
-no forkee as such: it is an ordinary node standing there, as under a
-write-protected folder.
+but they are being shown /as/ forkees. A forkee as such shows its
+content less what the forker contains or hides
+('less_what_the_forker_integrates' in 'server/refresh/goal.rs').
+
+In a content view, under an editable forker, the refresh draws a
+forkee as such as it draws content: write-protected, carrying an
+editable-view request, which its visit consumes, so that it is
+editable unless another occurrence holds its node's editability or the
+node budget is spent (see "editability rule"). A foreign one is drawn
+editable too. A forkee as such the buffer already shows
+write-protected stays so at a plain rerender; an editable-view request
+on its forker (=C-c s e=) passes through the forks folder to it.
+
+Showing a node as a forkee changes the way edits are interpreted. Its
+own list is never read there, since it shows its content in part. Its
+title and body are saved when the user owns it, and refused when it
+is foreign (a text claim: they must stay as on disk). Cutting one of
+its children, or showing again one the forker hides, edits what the
+forker hides (see "the forkee-visibility step"). A headline typed
+under it joins its content, after the sibling it follows, when the
+user owns it; under a foreign one the save is refused, saying to make
+the node one's own first ('add_children_typed_under_forkee' in
+'server/from_text/local_fieldintent_collection/resolve_visibility.rs').
+Its delete, nodeMerge and flag requests are ignored. A member of the
+folder claiming nothing -- a forker-only member, or a forkee the user
+detached -- is no forkee as such: it is an ordinary node standing
+there, as under a write-protected folder.
 
 *** the forkee-visibility step
 
@@ -608,7 +632,9 @@ It reads the forkee's content and the forker's hides by the
 records the skgrepo restriction shows, as the view drew them, so a
 hide recorded in a restricted section is neither removed nor moved,
 and no hide is written of a member that only a restricted record
-explains.
+explains. Only a forker the user owns records hides: a save whose
+step would hide or unhide anything in a foreign forker is refused,
+naming the forker ('cut_under_a_foreign_forker').
 
 *** role tree, and the -ward adjectives
 
@@ -2096,7 +2122,9 @@ content drawn whole; the *node budget* ('initial_node_limit') counts
 them, each charging it once at its visit, and once it is spent the
 occurrences the refresh draws are write-protected (they carry an
 editable-view request their visit consumes,
-'consume_editableView_request'). A folder fills its members without spending any. The
+'consume_editableView_request'). A folder fills its members without spending any, but a forkee as
+such it draws is an editable occurrence, which spends one at its
+visit, in level order with content. The
 module comment of 'server/refresh/extent.rs' states the extent, and
 that of 'server/refresh/editability.rs' the node budget. The
 server *renders* a viewforest when it produces its org text
@@ -2108,10 +2136,14 @@ Which occurrence of a node is editable: at most one per node in a
 buffer. One the buffer holds keeps its editability; an editable-view
 request moves it, write-protecting the node's other occurrence; among
 the occurrences the refresh draws, the first of a node is editable
-when its parent's children are editable content, no other occurrence
-of the node is, and the budget allows at its visit
-('drawn_occurrence_editability', 'consume_editableView_request'), and
-a repeat is write-protected. The editable occurrence *holds* its
+when its parent's children are editable content, or it is a forkee as
+such in a content view (a claiming member of the forks folder of an
+editable occurrence), no other occurrence of the node is, and the
+budget allows at its visit ('drawn_occurrence_editability',
+'consume_editableView_request'), and a repeat is write-protected.
+Level order decides which occurrence of a node that is both a
+forkee as such and content elsewhere in the view is editable; =C-c s
+e= moves it. The editable occurrence *holds* its
 node's editability: the walk keeps where it stands, and an occurrence
 write-protected, re-kinded or merged away releases it
 ('Walk::hold_editability', 'server/refresh/editability.rs').

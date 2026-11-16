@@ -1409,10 +1409,12 @@ stops with an error, and says how to go on. Write 'editable' in its
 handle and save, which makes it the view's editable occurrence of the
 node, as the clients' 'C-c s e' does; then edit it and save again.
 Only an occurrence in content forks, a root of the view or a node's
-child: a member of a folder does not, and a forkee as such, in a
-forks folder, takes no edit of its title or body, and a child
+child: a member of a folder does not. A forkee as such, in a forks
+folder, is drawn editable under an editable node; its title and body
+save when you own it, and a foreign one's are refused; a child
 removed from under it is hidden instead (see "Placing an existing
-node").
+node"); a headline typed under it joins its content when you own it,
+and is refused under a foreign one.
 
 The report says what forks, and where the clone goes:
 #+begin_example

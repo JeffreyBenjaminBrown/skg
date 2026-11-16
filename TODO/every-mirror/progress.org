@@ -2171,3 +2171,214 @@ Nothing of this slice.
   parameter 'in_the_diff_view' of the four chain predicates.
 - Glossary: the new entry "repeat", under "editability rule".
 *** DONE
+** Slice 2: forkees as such drawn editable; an owned one saves its title and body
+*** Commits
+- 0b589250 every-mirror plan 2 slice 2: forkees as such drawn editable; an owned one saves its title and body
+- (the commit carrying this record) every-mirror plan 2 slice 2: docs, record, DONE
+*** Suites
+- 'bash/nextest.sh', first run with the refresh and save changed:
+  1215 of 1249; the 34 failures were classified one by one, and all
+  but the two noted below are expected fixture adaptations (each
+  pinned a forkee as such write-protected and bare, the old
+  title-claim on an owned forkee, a budget spent on content alone,
+  a line deleted or swapped without the subtree a forkee as such now
+  shows, or the exact viewnode IDs these shift). Two were new
+  failures the change caused, fixed in the refresh (see "Deviations"):
+  'mirror_substitution' ('a_re_pointed_content_child_draws_its_forks_folder_afresh':
+  N re-pointed in place drawn write-protected, its editability held
+  by its occurrence as a forkee as such deeper in the old folders) and
+  'hidden_nodes' ('a_narrowing_and_a_widening_give_the_view_back': a
+  restricted forkee as such left its forks folder as a tombstone).
+  After the adaptations, the fixes and the new test: 1251 of 1251.
+- The AI tool's tests (after 'cargo build --bin skg'): first run 9
+  failures; since its checks share one scratch graph, later checks
+  failed in the next runs as the earlier were fixed, 17 in all, every
+  one an expected adaptation: four expected compact views
+  ('view_root-id', 'links-here_child-b-id',
+  'forest-mentioners_child-b-id', 'forest-flags_forker-id', rewritten
+  with '--update-expected') now draw Fred's note editable, with its
+  hidden-in and forks folders; viewnode IDs shifted in 'check_move',
+  'check_removal', 'check_placing_nodes',
+  'check_placing_beside_an_editable_occurrence', 'check_search_matching',
+  'check_implicit_fork_approved', 'check_explicit_fork' and
+  'check_write_protected_foreign_edit_refused' (and, unfailed, the
+  same IDs in 'check_making_a_foreign_node_editable'); a headline's
+  text now occurring twice, once as a forker in its forkee's forks
+  folder, in 'check_reworded_retype_all_new',
+  'check_hiding_the_foreign_skgrepos' and
+  'check_switching_perspective_through_a_daemon'; 'R_SHOWING_*', where
+  M, a forkee as such, now shows its forkers A, B and U, U with its
+  body herald once a check gave it a body ('once_u_has_a_body';
+  'check_switching_perspective_on_a_command_s_own_connection',
+  'check_saving_a_view_that_follows_yours'). Then PASS.
+- 'bash/emacs-tests.sh' 503 of 503; 'bash/nvim-tests.sh' no failure;
+  first runs.
+- 'bash/integration-tests.sh' (the Emacs pass): 36 of 38. Two
+  expected adaptations: 'perspective' (M, drawn editable under the
+  mirror in its place, lists A, B and U as its forkers, so "the view
+  shows A" now asks for A in M's place, '(inPlaceOf M)') and
+  'save_collateral_delete_then_edit_under_it' (its phase 2 appends a
+  second editable root subee, which now meets subee editable in 11's
+  forks folder: the save was refused for two editable occurrences; the
+  phase write-protects the folder's subee first, without its subtree).
+  Both then passed with each client, run alone.
+- 'bash/all-tests.sh', first run: all pass: build, Emacs 503 of 503,
+  Neovim (no failure), nextest 1251 of 1251, doctests, team tools, AI
+  reader, integration 76 of 76 (both clients). A comment was then
+  reworded in 'visit.rs' and 'std::iter::once' moved to the use
+  block; 'cargo nextest run' again: 1251 of 1251.
+- End to end, per '/verify': an isolated 'target/debug/skg' on port
+  24862, scratch data as the new test's fixture (N owned, forking E
+  owned and F foreign, hiding H and G). A fresh view of N drew E and F
+  editable, each with its hidden-in folder (H; G) and its forks
+  folder, E showing e1 and e2, F showing f1. Saved unchanged: no file
+  written. e2 cut from under E: N.skg hides e2 ("Hides 'e2' from 'N',
+  as content of 'E'."), and the rerender drew e2 in E's hidden-in
+  folder. E retitled there: E.skg saved with the new title. F
+  retitled there: NOTHING WAS SAVED, "Cannot edit title/body for node
+  F ..., a foreign node in forkee-as-such position", no file written.
+  A headline typed under E after e1: a new node, and E.skg contains
+  [e1, new, H, e2], the rerender showing it under E. One typed under
+  F: NOTHING WAS SAVED, "Cannot add a child under F ...". A buffer
+  drawing E write-protected and bare saved as it was, writing nothing;
+  the same with an editable-view request on N drew E editable with
+  its folders. The server was stopped by its PID, the port checked
+  free, the scratch data deleted; transcripts outside 'tests/results/',
+  in '/tmp/claude-1000/every-mirror-p2s2/verify/transcript/'.
+Logs: 'tests/results/every-mirror/slice2-plan2/' (nextest-first.log,
+run3.log, nextest.log, ai-tool-first.log, ai-update.log, ai-tool.log,
+emacs.log, nvim.log, integration.out, int-*.log, all-tests.out,
+all-tests-ALL.org, all-tests-nextest.log). 'tests/results/every-mirror/'
+was copied out before 'bash/all-tests.sh' and put back after it.
+*** Deviations from the plan's "how"
+**** The plan's 'tests/hidden_from_subscriptions.rs' is 'tests/hidden_from_forks.rs'
+Plan 1's slice 7 renamed it. Its four bare-leaf tests now pin the
+fresh view as their old "extended" view, and an unchanged save as
+drawing it again; the helper that added editable-view requests to the
+forkees' lines went (it now found only their chain occurrences in the
+hidden-in folders, and would have moved editability there).
+**** 'drawn_occurrence_editability' takes the claim
+The plan asks for "a separate predicate, leaving
+'children_are_editable_content' as it is": that is
+'forkee_as_such_may_be_editable' ('editability.rs'). It needs to know
+whether the drawn occurrence claims (a forker-only member must stay
+write-protected until slice 3), so 'drawn_occurrence_editability'
+gained a 'claims' parameter, passed by 'draw_item', 'rekind_to_occurrence'
+and 'extend_requested_content'.
+**** Q2: only a node the graph lacks joins
+"A new child typed" is read as a headline whose gnid the graph lacks
+and the forkee's list does not name. An existing node placed claiming
+under a forkee as such joins nothing, as before
+('test_extra_view_child_under_owned_forkee_vanishes' still pins it):
+joining it would let a stale buffer put back a member another view
+removed. The new child goes into the forkee's contains as the
+records the skgrepo restriction shows, after the shown sibling it
+follows; disk supplementation keeps the rest. It is done in
+'resolve_visibility' from the forkee-visibility signal
+('add_children_typed_under_forkee', 'LoweredNodeIntents::set_contains_of_forkee').
+**** Q3 for forkees: the refusal sits where the silent skip was
+The forkee-visibility step refuses when it would hide or unhide
+anything in a foreign forker ('cut_under_a_foreign_forker'); an
+unchanged view of a foreign forker saves. The forks folder's own
+removal step and the hidden-outside folder's edits still skip a
+foreign note silently, as the plan leaves them (slice 5 owns cuts from
+forkers).
+**** The refresh needed two fixes the plan did not foresee
+A forkee as such, drawn editable, can hold the editability of a node
+the view then wants elsewhere.
+- Re-pointing an occurrence to another mirror, or stopping a
+  substitution: the folders the occurrence held are about to be
+  redrawn, but an occurrence in them (a forkee as such) could hold
+  the editability of the node it now shows, leaving it write-protected
+  and bare. Now 'write_protect_what_its_folders_hold' runs before
+  'show_mirror' re-points it, and 'stop_substituting' vanishes the
+  substitute before reinstating the original where it stood (it used to
+  reinstate first). Pinned by the existing
+  'a_re_pointed_content_child_draws_its_forks_folder_afresh'.
+- A forkee as such that a skgrepo narrowing makes a Restricted vognode
+  kept its folders as tombstones (the rule for any occurrence re-kinded
+  so), and the widening drew a second forks folder beside them. Now a
+  member of a content view's forks folder re-kinded to a gnid-only
+  vognode loses its folders, and one re-kinded back to an occurrence
+  gets its containers folder as a drawn member does
+  ('rekind_to_gnid_only', 'rekind_to_occurrence', 'id_rule.rs'); its
+  visit draws its default folders. Elsewhere the documented tombstone
+  rule is unchanged (the view of h in 'hidden_nodes' still keeps its
+  containers folder's tombstone). The narrowing round trip now gives
+  r's view back but for the viewnode IDs of hs's redrawn folders.
+**** The text-claim message names the node foreign
+"Cannot edit title/body for node X (...), a foreign node in
+forkee-as-such position. View the node as itself to edit title/body
+(an edit there forks it)." Its refusal still reaches the client as
+"Database error ..." (as every extraction error does,
+'from_text.rs'), not as a validation error; so do the two new
+refusals. Unchanged here.
+**** The test file is 'tests/forkees_drawn_editable.rs'
+In 'grouped_forks', fixture 'tests/forkees_drawn_editable/fixtures/'
+(N, E, e1, e2, H, n1 owned; F, f1, G, FN foreign). It covers the
+plan's list and adds Q3 (FN, foreign, forks E: a cut there is
+refused). Budget 1 is a config field set in the test.
+**** Docs beyond the plan's list
+The AI tool's README ("Editing a foreign node forks it").
+'TODO/problems.org''s "A headline typed under an editable subscribee
+as such is created, then lost" moved to 'TODO/DONE/problems.org'.
+*** Every reader of 'Folder::Forks' in 'server/from_text/'
+The pitfall "A forker as such would be save-eligible" asks slice 3 for
+this list; what each does for a forkee as such now:
+- 'traverse.rs' ('visit', 'recurse_under_vognode',
+  'visit_forks_folder'): a claiming member is visited in
+  'ForkeeAsSuchPosition': owned, 'SetTitleAndBody' and no text claim;
+  foreign, the text claim; either way the visibility signal when the
+  forker is editable; one claiming nothing as under a write-protected
+  folder.
+- 'mod.rs' ('is_created_as_an_orphan'): a claiming member is not
+  created there; a child typed under an editable forkee as such has a
+  parent that reads claims, so no orphan warning, and it joins or is
+  refused.
+- 'validate_tree.rs' ('is_saveEligible_occurrence',
+  'relRepo_request_is_collected', 'is_forks_folder_member_claiming_nothing'):
+  a forkee as such is not save-eligible, so a relRepo request on a
+  write-protected child of it is still refused.
+- 'file_what_is_written_in.rs' ('forkee_members_written_in',
+  'saves_its_contains'): a forkee as such is no forker whose contains
+  the save writes, so nothing is filed into it.
+- 'buffer_to_viewnodes/local.rs' (the parse's folder checks):
+  unchanged.
+*** Fixtures changed
+- New: 'tests/forkees_drawn_editable/fixtures/'.
+- 'tools/skg-for-ai/test-expected/': four compact views
+  ('view_root-id', 'links-here_child-b-id',
+  'forest-mentioners_child-b-id', 'forest-flags_forker-id'), the
+  forkee as such drawn editable.
+- No other fixture's data changed; test expectations as listed under
+  "Suites".
+*** Unfinished
+Nothing of this slice. For Jeff, not blocking:
+- An existing node placed claiming under a forkee as such still joins
+  nothing, and the rerender leaves it out (see "Q2" above).
+- The forkee-as-such refusals arrive as "Database error" in the
+  clients' save-error buffer, as text claims always did.
+- A popular forker now spends the node budget on its forkees as such
+  in level order before deeper content ('initial_view_bfs', whose
+  budget test was renamed 'test_budget_reaches_forkees_and_content_in_level_order').
+*** DONE
+The slice's headline in '2_plan.org' is DONE.
+*** Names coined or changed
+- New: 'forkee_as_such_may_be_editable' ('editability.rs');
+  'write_protect_what_its_folders_hold' ('visit.rs');
+  'stands_in_a_content_views_forks_folder' ('id_rule.rs');
+  'cut_under_a_foreign_forker', 'add_children_typed_under_forkee'
+  ('resolve_visibility.rs'); 'LoweredNodeIntents::set_contains_of_forkee'
+  ('lower.rs').
+- 'drawn_occurrence_editability' takes 'claims'; 'reinstate_original_after'
+  takes 'after : Option<NodeId>'; 'rekind_to_gnid_only' returns a
+  Result; 'add_containers_folder_under_forks_folder_member' is
+  'pub(crate)'.
+- Tests: 'without_subtrees_containing' ('tests/shared/git_fixture_helpers.rs');
+  'claiming_line_of_gnid' ('tests/mirror_substitution.rs');
+  'once_u_has_a_body' (the AI tool's tests); the extraction tests
+  'owned_as_forkee_title_edit_is_rejected' and '..._body_...' are
+  '..._is_saved'; 'a_headline_typed_under_the_forkee_itself_files_nothing'
+  is 'a_headline_typed_under_the_foreign_forkee_itself_is_refused';
+  'initial_view_bfs''s 'test_budget_content_beats_forkees' is
+  'test_budget_reaches_forkees_and_content_in_level_order'.

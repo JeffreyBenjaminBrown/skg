@@ -800,7 +800,7 @@ Questions: Q6, Q7.
 - Run 'bash/nextest.sh', the AI tool's tests, 'bash/integration-tests.sh',
   then 'bash/all-tests.sh'.
 
-** TODO Slice 2: forkees as such drawn editable; an owned one saves its title and body
+** DONE Slice 2: forkees as such drawn editable; an owned one saves its title and body
 Questions: Q2, Q3, Q4, Q5, Q8.
 - 'drawn_occurrence_editability', content view only: a claiming member
   of the forks folder whose described node is editable may be editable,
