@@ -468,7 +468,10 @@ text calls them the ladder):
 5. reinstate: each goal item no child stands for is drawn, as far as
    the extent allows (below); what it draws is what the ID rule makes
    of the item, and a member of a folder whose members carry the
-   containerward chain gets its chain;
+   containerward chain gets its chain; in a content view a member of
+   the forks folder gets, unless it is a repeat, a containers folder
+   instead, whose members are drawn folded and carry their chains
+   ('after_drawing');
 6. reorder: where the goal is ordered, the children it names take its
    order, and every other child rides right after the sibling it
    followed; where it is not, nothing moves, and a drawn item follows

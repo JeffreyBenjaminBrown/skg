@@ -140,7 +140,8 @@ search with no match writes nothing and says so.
 as the clients' 'C-c l' commands draw it ('docs/COMMANDS.org', "C-c
 l"), named 'forest-KIND_ID'. Under each member of a partner folder
 hangs its containerward chain: its containers, theirs, and so on up
-to the roots. The kinds:
+to the roots; under a member of the forks folder, in a containers
+folder of its own, folded (but the view-ancestors). The kinds:
 | KIND          | Emacs   | what it draws                                                                    |
 |---------------+---------+----------------------------------------------------------------------------------|
 | containers    | C-c l c | the containers folder: what contains the node                                    |

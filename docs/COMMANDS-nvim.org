@@ -225,8 +225,8 @@ without a prompt and the result carries a warning.
 The hits come best first, each a write-protected headline showing
 its node's title. Under each hang, folded, its containers folder,
 whose members carry their own containers up to the roots, and,
-when there are any, a folder of the nodes it forks and one
-of the nodes that fork it. A hit found through an alias shows those
+when there are any, its forks folder, the nodes it forks and those
+that fork it, each with its own containers folder. A hit found through an alias shows those
 folders collapsed and its alias folder open, holding all of the
 node's aliases, the matching one among them. The search buffer
 arrives whole, in one answer, and is an ordinary view.
@@ -442,8 +442,9 @@ metadata of the node at point that, on save, causes the server to
 render the relation's folder viewnodes into the view, populated from
 the graph. Each builds both folders of its relation (but containers and
 mentioners build one, as do aliases and flags, which are no relation).
-Under each member of a partner folder hangs its containerward chain
-(see <localleader>lc). The write-protected folder ☮
+Under each member of a partner folder hangs its containerward chain,
+under a member of the forksFolder in a folded containers folder of its
+own (see <localleader>lc). The write-protected folder ☮
 marks a folder you cannot change from here. Every command auto-saves.
 Without such a request, an editable node shows only its forksFolder,
 where it has a fork partner, either way (plus the nonempty
@@ -490,7 +491,15 @@ claiming nothing, theirs under them, up to the roots or
 'max_roleTree_depth', a container met again on the way shown once
 more as a leaf. A request on a chain node draws that node's own
 containers folder. A fresh content view shows its root's containers
-folder this way.
+folder this way. Under a member of a forksFolder the chain stands in a
+containerFolder instead, drawn folded (only its headline shows; open
+it to see the member's containers, but those the view shows above
+it), so that a fork partner's containers do not look like its
+content; the diff view hangs the chain directly. A member that
+repeats a node shown editable elsewhere in the buffer gets nothing.
+A view drawn before this rule shows the old chain directly under such
+a member, as content it cannot account for; reopen the view to
+redraw it.
 *** <localleader>lm : :SkgShowFolderOfMentioners
 The mentionerFolder -- the nodes that link to this one. Write-protected
 (☮): a link lives in the linking node's text. On a node nothing links to,

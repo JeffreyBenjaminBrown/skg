@@ -776,7 +776,7 @@ folder atoms, birth facts); 'docs/COMMANDS.org' and
 'docs/forks.org'.
 
 * Implementation sequence
-** TODO Slice 1: the chain of a forks-folder member goes into a folded containers folder
+** DONE Slice 1: the chain of a forks-folder member goes into a folded containers folder
 Questions: Q6, Q7.
 - 'Folder::members_carry_containerward_chain' takes whether the view
   is the diff view and answers false for the forks folder outside it;

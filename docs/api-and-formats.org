@@ -105,7 +105,8 @@ So far there are these endpoints:
     - Under each hit hang its containers folder, whose members carry
       the containerward chain; and its forks folder, the visible
       nodes it forks and then those that fork it (those it hides
-      aside). A folder with no member is not drawn. The
+      aside), each member's chain in a containers folder under it
+      (see "View requests"). A folder with no member is not drawn. The
       members are write-protected. Everything under a hit is folded,
       so that the hit shows collapsed; but a hit found through an
       alias shows its folders, each collapsed except its alias
@@ -1678,8 +1679,9 @@ hides. Herald "B", hugging the ☮. A derived fact: the parser skips
 it; the view regenerates it.
 
 A chain node -- a node of the containerward chain under a member of a
-partner folder, a container of its viewparent (see "View requests"
-below) -- carries =writeProtected=, no =noClaim= (it stands under a
+partner folder (in a content view, under a member of a containers
+folder that stands under a forks folder's member), a container of its
+viewparent (see "View requests" below) -- carries =writeProtected=, no =noClaim= (it stands under a
 write-protected occurrence, where nothing claims), and, being no
 member, no =(birth ...)= in its =(view ...)= (see "Stats metadata"
 below). It is known by where it stands, so it is still one after a
@@ -1735,6 +1737,19 @@ no folder unasked but where something changed.
   extends a chain; a =(folder containers)= request on a chain node
   draws a containers folder under it. A fresh content view puts the
   =containers= request on each root. Emitted by the =C-c l= commands.
+  A member of a =forksFolder= is the exception outside the diff view:
+  no chain hangs directly under it. Where the refresh draws one that
+  is no repeat (an occurrence of a node another occurrence holds the
+  editability of), it draws a =containerFolder= under it, as its
+  first child (after a =hiddenInForkPartnerFolder=, if one is added
+  later, before every other child), its members marked =folded=, so
+  that only the folder's headline shows; each of its members carries
+  the chain as above, and the folder, like any, lists no
+  view-ancestor and is pruned when empty. A repeat gets nothing. A
+  buffer drawn before this rule may hold chain nodes directly under
+  such a member; the refresh reads them as its content (unwarranted,
+  =noWarrant=, under a write-protected member). Reopening the view
+  redraws it.
 - =editableView= — on a write-protected occurrence, make it the node's
   editable one (the occurrence that was editable is write-protected,
   keeping its shown content, whose children claim nothing there); on

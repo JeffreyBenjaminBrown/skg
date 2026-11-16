@@ -2050,3 +2050,124 @@ made reachable but did not change.
 
 * Plan 2
 Started after plan 1's review fixes; one agent per slice.
+** Slice 1: the chain of a forks-folder member goes into a folded containers folder
+*** Commits
+- 4649cf6f every-mirror plan 2 slice 1: a forks-folder member's chain goes into a folded containers folder
+- (the commit carrying this record) every-mirror plan 2 slice 1: docs, record, DONE
+*** Suites
+- 'bash/nextest.sh', first run with the code changed: 1236 of 1246;
+  the 10 failures all expected fixture adaptations (each pinned a
+  chain directly under a forks-folder member, or the absence of any
+  containers folder in a view): 'refresh::tests::substitution' (6
+  tests), 'refresh::tests::reinstate::a_buffer_of_many_kinds_is_a_fixpoint',
+  'collateral_partner_folder::a_member_added_at_a_later_visit_gets_its_chain',
+  'mirror_substitution::all_tests', 'partner_folder_matrix::relationship_matrix'.
+  After the adaptations and the 3 new tests: 1249 of 1249.
+- The AI tool's tests (after 'cargo build --bin skg'): first run 4
+  failures, all expected adaptations: the expected files
+  'search_Fred.compact.org' and 'forest-forks_fred-note-id.compact.org'
+  (a containers folder under forks-folder members), 'check_explicit_fork'
+  (viewnode IDs shifted: the fresh root view drew a chain under a
+  forks-folder member whose container is the root, now an empty
+  containers folder, pruned), and the 'R_SHOWING_*' strings of the
+  perspective test. Then PASS.
+- 'bash/integration-tests.sh' (the Emacs pass): 38 of 38, first run.
+- 'bash/all-tests.sh', first run: all pass: build, Emacs 503 of 503,
+  Neovim (no failure), nextest 1249 of 1249, doctests, team tools, AI
+  reader, integration 76 of 76 (both clients).
+- End to end, per '/verify': an isolated 'target/debug/skg' on port
+  24861 with scratch data (p contains n, e, f; q contains e, f; top
+  contains q; n forks e; f forks n). A fresh view of n drew, in its
+  forks folder, e (=bK=) and f (=Kb=), each with a containers folder
+  whose members p and q are folded, q carrying its chain (top); no
+  chain node stands directly under either. Saving it unchanged wrote
+  no file. A buffer with an editable root e before a write-protected
+  n with an empty forks folder redrew e there as a repeat, showing
+  nothing, and f with its folded containers folder; no file written.
+  A buffer in the old shape (q directly under e and under f) kept q
+  there, marked noWarrant, and wrote nothing. A first, careless probe
+  buffer that left e and f out of an editable n's forks folder ended
+  the fork and hid f, as plan 1 decided; the scratch data was restored
+  and the server restarted before the probes above. The server was
+  stopped by its PID, the port checked free, the scratch data deleted;
+  transcripts kept outside 'tests/results/', in
+  '/tmp/claude-1000/every-mirror-p2s1/transcript/'.
+Logs: 'tests/results/every-mirror/slice1-plan2/' (nextest-first.log,
+nextest.log, ai-tool-first.log, ai-tool.log, integration.out,
+all-tests.out, all-tests-ALL.org, all-tests-nextest.log, emacs.log,
+nvim.log, ai-reader.log). 'tests/results/every-mirror/' was copied out
+before 'bash/all-tests.sh' and put back after it, so plan 1's logs
+there survive.
+*** Every reader of the chain predicates
+The pitfall of that name asks for this list. 'members_carry_containerward_chain',
+'holds_containerward_chain', 'stands_in_containerward_chain' and
+'is_chain_parent' each take 'in_the_diff_view'.
+- 'after_drawing' ('visit.rs'): 'walk . is_diff_view ()'.
+- 'holds_containerward_chain' passes it on to itself, and
+  'stands_in_containerward_chain' and 'is_chain_parent' to it.
+- 'goal_of_parent' ('goal.rs'): 'walk . is_diff_view ()'.
+- 'tag_children' ('server/refresh/diff_view.rs', diff view only): true.
+- 'leaves_named_at' and 'relationship_keys_to_viewparent'
+  ('server/diff_view/processed_requests.rs', diff view only; the
+  latter also serves 'restore_requests.rs'): true.
+- 'restoreRel_stands_where_it_may' ('local.rs', a diff-view request):
+  true.
+- 'tests/refresh/chain.rs': false (a content view).
+- The clients' own predicates ('skg--containerward-chain-node-at-point-p',
+  'M.containerward_chain_node_at_line_p') serve only the restoreRel
+  check, so they keep the diff view's answer; their docstrings now
+  say so.
+*** Deviations from the plan's "how"
+**** The tests' view-ancestor container stands above a write-protected root
+The plan asks for "a fresh view of a node forking E, where E has two
+containers one of which is a view-ancestor". In a fresh view a
+view-ancestor that contains E shows E as its own content, editable,
+drawn a level above the forks folder, so E in the forks folder is a
+repeat and shows nothing. The view-ancestor case arises where that
+content is shown otherwise: as a mirror (the adapted
+'refresh::tests::substitution' tests, where r's m is shown as a) or
+under a write-protected ancestor. The new test
+('a_forks_folder_member_carries_its_chain_in_a_folded_containers_folder',
+'tests/refresh/chain.rs') uses the latter: a write-protected root p,
+with n under it carrying an editable-view request. The other new
+tests are 'a_repeat_in_the_forks_folder_shows_nothing' (e is also a
+root) and 'the_diff_view_hangs_a_forks_folder_members_chain_directly';
+each asserts the fixpoint, the second refresh changing nothing. A
+fresh view (through 'render') saved back unchanged is pinned by the
+adapted forks rows of the matrix's chain scenario.
+**** Where the containers folder stands
+It is prepended under the member when the member is drawn, so it is
+the member's only child then. The folders the member's own visit adds
+place themselves around it (the hidden-in and illegal-edit folders
+first, the default forks folder after the last leading folder), and
+its content follows: Q7's order. A folder the user requests later
+on the member ('C-c l ...') goes first, as 'add_folders' places every
+requested folder, so it stands before the containers folder.
+**** An empty containers folder is added and then pruned
+Where the member has no container but its view-ancestors, the folder
+is added anyway and its own visit entombstones it
+('entombstone_if_an_empty_folder'), the tail pruning it, rather than
+computing its goal twice.
+**** The search buffer follows the content view
+The search draws its buffer by a content-view refresh, so the members
+of a hit's forks folder carry their chain in a containers folder too
+(the AI tool's 'search_Fred' expectation). The plan's "the search
+buffer, which draws nothing unasked" concerns default folders; this
+slice draws no new kind of folder there, only moves the chain it
+already drew.
+**** Docs beyond the plan's list
+'docs/data-model_technical.org' (the reinstate rung), 'docs/diff-view.org'
+(the chain under a changed folder's member), the AI tool's README
+(the 'forest' kinds), and both COMMANDS docs' paragraph on what a
+search hit shows, which still spoke of two fork folders.
+*** Fixtures changed
+None: only expected outputs (above) changed.
+*** Unfinished
+Nothing of this slice.
+*** Names coined or changed
+- 'Walk::added_compound_folders' is 'Walk::folders_whose_drawn_members_are_folded'.
+- New: 'Walk::is_a_repeat' ('editability.rs');
+  'add_containers_folder_under_forks_folder_member' ('visit.rs'); the
+  parameter 'in_the_diff_view' of the four chain predicates.
+- Glossary: the new entry "repeat", under "editability rule".
+*** DONE

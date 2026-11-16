@@ -475,8 +475,9 @@ forkee as such also gets its nonempty =hiddenInForkPartnerFolder=;
 this is the hidden-in compound partner folder specific to how that
 forker sees the forkee. The diff view draws no default
 folder. Under each member of a partner folder hangs its
-containerward chain (see "foldering, the containerward chain, chain
-node").
+containerward chain, under a member of the forks folder in a
+containers folder of its own (see "foldering, the containerward
+chain, chain node").
 
 *** the forks folder, fork partner, forker-only member, mutual
 
@@ -643,7 +644,16 @@ as write-protected occurrences claiming nothing; under each of
 those, its containers;
 and so on to the roots, or to the config's 'max_roleTree_depth'. A
 container met again on the way is drawn once more, as a leaf. The
-nodes of a chain are *chain nodes*. Nothing hangs under a ghost
+nodes of a chain are *chain nodes*. A member of the forks folder is
+the exception, outside the diff view: its chain is itself foldered.
+Under it the refresh draws a containers folder, drawn folded (only
+its headline shows), which leaves out the member's view-ancestors,
+and each member of that folder carries its chain; a repeat (see
+"editability rule") gets none, and shows nothing. So a fork
+partner's containers never look like its content. A buffer drawn
+before this rule holds chain nodes directly under such a member,
+which the refresh reads as its content (unwarranted under a
+write-protected member); reopening the view redraws it. Nothing hangs under a ghost
 member, nor under a property member, and the member's
 partners in the folder's own role are not drawn below it: a folder
 request on the member draws them. No request extends a chain; a
@@ -1885,8 +1895,11 @@ acquire inconsistent treatment in different layers:
   view's =acquiredByFolder= and =acquiredFolder= (derived from the
   graph straddle, and save-inert), and =idFolder= and =flagsFolder=.
 - =members_are_properties=: the alias, ID and flags folders.
-- =members_carry_containerward_chain=: every folder but the property
-  folders and the two acquisition folders.
+- =members_carry_containerward_chain= (asked with whether the view is
+  the diff view): every folder but the property folders and the two
+  acquisition folders, and outside the diff view but the forks
+  folder, whose members carry their chain in a containers folder
+  instead.
 
 The ☮ herald on a write-protected folder's headline is a
 herald-table fact only (=server/heralds.rs=), with no wire atom of
@@ -1903,7 +1916,16 @@ the flags folder, which stays to show that the node has no true flag
 When the refresh draws a member of a folder whose members carry the
 chain, it hangs the member's chain under it
 ('draw_containerward_chain' in
-'server/refresh/chain.rs'), walking the member's
+'server/refresh/chain.rs'); when it draws a member of a content
+view's forks folder that is no repeat, it puts a containers folder
+under it instead, and registers the folder so that the members its
+own visit draws are drawn folded ('after_drawing' and
+'add_containers_folder_under_forks_folder_member' in
+'server/refresh/visit.rs', 'Walk::folders_whose_drawn_members_are_folded').
+Since the member was just drawn, the folder is its first child: an
+editable member's hidden-in folder, added at its visit, goes before
+it, and its forks folder and content after it. The chain is drawn
+walking the member's
 containers breadth-first over the live graph or, in the diff view,
 over the union of the straddle. The extent of a chain is none, so a
 chain node is never reinstated: a chain that stays keeps its
@@ -1912,7 +1934,11 @@ one. A chain node is known by where it stands:
 'holds_containerward_chain' says whether a viewnode's vognode
 children are chain nodes (it is a write-protected member of such a
 folder, or itself a chain node), and 'stands_in_containerward_chain'
-whether a viewnode is one ('server/types/tree/forest.rs'). Its goal
+whether a viewnode is one ('server/types/tree/forest.rs'). Both take
+whether the view is the diff view, since a forks folder's member
+holds a chain there and nowhere else; the readers that serve only
+the diff view (its change tags, its processed and restore leaves,
+the parse's check of a restoreRel request) pass true. Its goal
 is its containers, so a chain node that no longer contains the node
 above it is unwarranted (⊥).
 
@@ -2089,6 +2115,14 @@ a repeat is write-protected. The editable occurrence *holds* its
 node's editability: the walk keeps where it stands, and an occurrence
 write-protected, re-kinded or merged away releases it
 ('Walk::hold_editability', 'server/refresh/editability.rs').
+
+A *repeat* is an occurrence of a node whose editability another
+occurrence in the buffer holds ('Walk::is_a_repeat', keyed as
+'Walk::editability_key' keys it). Whether a drawn occurrence is one
+is judged where it is drawn, in level order, so an occurrence made
+editable later in the same refresh does not make an earlier-drawn one
+a repeat. A repeat in the forks folder shows nothing, not even its
+containers folder.
 The diff view's deviations are in 'docs/diff-view.org', "Editability
 in the diff view".
 
