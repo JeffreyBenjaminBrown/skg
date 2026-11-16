@@ -232,7 +232,7 @@ pub(crate) fn goal_of_parent (
   match &node . value () . kind {
     ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) => {
       let pid : &ID = &occurrence . gnid;
-      Some ( if is_chain_parent (tree, parent) {
+      Some ( if is_chain_parent (tree, parent, walk . is_diff_view ()) {
                chain_goal (pid, walk)
              } else { content_goal (tree, parent, pid, walk) } ) },
     ViewnodeKind::Vognode (Vognode::Ghost (ghost))

@@ -827,14 +827,21 @@ impl Folder {
     matches! ( self, Folder::Container ) }
 
   /// Whether each member of a folder of this kind carries its
-  /// containerward chain: every kind whose members are live nodes,
-  /// partners in a role or members of a compound partner folder. The
-  /// diff view's two acquisition folders, which record a nodeMerge, do
-  /// not, nor do the property folders.
-  pub fn members_carry_containerward_chain (&self) -> bool {
+  /// containerward chain directly under it: every kind whose members
+  /// are live nodes, partners in a role or members of a compound
+  /// partner folder. The diff view's two acquisition folders, which
+  /// record a nodeMerge, do not, nor do the property folders; nor,
+  /// outside the diff view ('in_the_diff_view'), does the forks
+  /// folder, whose members carry the chain in a containers folder
+  /// instead ('after_drawing' in 'server/refresh/visit.rs').
+  pub fn members_carry_containerward_chain (
+    &self,
+    in_the_diff_view : bool,
+  ) -> bool {
     ! ( self . members_are_properties ()
         || matches! ( self, Folder::AcquiredBy | Folder::Acquired
-                            | Folder::IllegalEdit { .. } )) }
+                            | Folder::IllegalEdit { .. } )
+        || ( matches! ( self, Folder::Forks ) && ! in_the_diff_view )) }
 
   pub fn repr_in_client (&self) -> &'static str {
     match self {

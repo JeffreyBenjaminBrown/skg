@@ -95,6 +95,16 @@ impl<'a> Walk<'a> {
   ) -> bool {
     self . editable_occurrence_of . contains_key (
       &self . editability_key (gnid) ) }
+
+  /// Whether the occurrence of 'gnid' at 'treeid' is a repeat: another
+  /// occurrence holds its node's editability.
+  pub fn is_a_repeat (
+    &self,
+    gnid   : &ID,
+    treeid : NodeId,
+  ) -> bool {
+    self . editable_occurrence_of . get ( &self . editability_key (gnid) )
+      . is_some_and ( |holder| *holder != treeid ) }
 }
 
 /// Before the walk: an editable-view request in the text takes its

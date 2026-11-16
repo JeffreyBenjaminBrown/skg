@@ -446,6 +446,8 @@ fn relationship_matrix
 // the owner's folder is contained by chain-c, which chain-cc contains.
 // Under m hang chain-c and, under it, chain-cc, each
 // write-protected, claiming nothing, and the view saves back unchanged.
+// A member of the forks folder holds them in a containers folder,
+// chain-c folded.
 //////////////////////////////////////////////////////////////
 
 struct ChainFolderSpec {
@@ -453,21 +455,28 @@ struct ChainFolderSpec {
   owner    : &'static str,
   member   : &'static str,
   relation : Option<&'static str>, // None: drawn by default
+  in_a_containers_folder : bool,
 }
 
 const CHAIN_FOLDERS : [ChainFolderSpec; 6] = [
   ChainFolderSpec { atom : "forksFolder", owner : "chSubr-owner",
-                    member : "chSubr-m", relation : None },
+                    member : "chSubr-m", relation : None,
+                    in_a_containers_folder : true },
   ChainFolderSpec { atom : "forksFolder", owner : "chSube-owner",
-                    member : "chSube-m", relation : None },
+                    member : "chSube-m", relation : None,
+                    in_a_containers_folder : true },
   ChainFolderSpec { atom : "hiderFolder", owner : "chHider-owner",
-                    member : "chHider-m", relation : Some ("hides") },
+                    member : "chHider-m", relation : Some ("hides"),
+                    in_a_containers_folder : false },
   ChainFolderSpec { atom : "hiddenFolder", owner : "chHidden-owner",
-                    member : "chHidden-m", relation : Some ("hides") },
+                    member : "chHidden-m", relation : Some ("hides"),
+                    in_a_containers_folder : false },
   ChainFolderSpec { atom : "containerFolder", owner : "chCont-owner",
-                    member : "chCont-m", relation : Some ("containers") },
+                    member : "chCont-m", relation : Some ("containers"),
+                    in_a_containers_folder : false },
   ChainFolderSpec { atom : "mentionerFolder", owner : "chMent-owner",
-                    member : "chMent-m", relation : Some ("mentioners") },
+                    member : "chMent-m", relation : Some ("mentioners"),
+                    in_a_containers_folder : false },
 ];
 
 async fn member_carries_its_chain (
@@ -493,16 +502,25 @@ async fn member_carries_its_chain (
     . map ( |offset| folder_index + offset )
     else { fails . record (&scenario, format! ("no member {} in:\n{}", spec . member, buf));
            return Ok (( )); };
+  let shift : usize = if spec . in_a_containers_folder { 1 } else { 0 };
   let chain_line = |offset : usize, gnid : &str| -> bool {
-    lines . get (member_index + offset) . is_some_and ( |line|
-      line . starts_with (&format! ("{} ", "*" . repeat (folder_stars + 1 + offset)))
+    lines . get (member_index + shift + offset) . is_some_and ( |line|
+      line . starts_with (&format! ("{} ", "*" . repeat (folder_stars + 1 + shift + offset)))
       && line . contains (&format! ("(gnid {})", gnid))
-      && ! line . contains ("noClaim") && line . contains ("writeProtected") ) };
+      && ! line . contains ("noClaim") && line . contains ("writeProtected")
+      && ( line . contains ("folded") == ( spec . in_a_containers_folder && offset == 1 )) ) };
+  let containers_folder_line : bool = ! spec . in_a_containers_folder
+    || lines . get (member_index + 1) . is_some_and ( |line|
+         line . starts_with (&format! ("{} (skg containerFolder)",
+                                       "*" . repeat (folder_stars + 2) )) );
   if ! ( lines [member_index] . starts_with (&format! ("{} ", "*" . repeat (folder_stars + 1)))
+         && containers_folder_line
          && chain_line (1, "chain-c") && chain_line (2, "chain-cc") ) {
     fails . record (&scenario, format! (
-      "{} should hold its chain, chain-c holding chain-cc, each write-protected, with no claim atom:\n{}",
-      spec . member, buf )); }
+      "{} should hold its chain{}, chain-c holding chain-cc, each write-protected, with no claim atom:\n{}",
+      spec . member,
+      if spec . in_a_containers_folder { " in a containers folder, chain-c folded" } else { "" },
+      buf )); }
   let resp : SaveResponse = save (&buf, config, tantivy, graph) . await ?;
   if ! resp . errors . is_empty () || ! resp . warnings . is_empty () {
     fails . record (&scenario, format! (

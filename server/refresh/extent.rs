@@ -24,12 +24,15 @@ pub(crate) enum Extent {
 }
 
 /// Whether the vognode children of the occurrence at 'treeid' are the
-/// containerward chain ('holds_containerward_chain').
+/// containerward chain ('holds_containerward_chain'), in the diff view
+/// or not as 'in_the_diff_view' says.
 pub(crate) fn is_chain_parent (
-  tree   : &Tree<Viewnode>,
-  treeid : NodeId,
+  tree             : &Tree<Viewnode>,
+  treeid           : NodeId,
+  in_the_diff_view : bool,
 ) -> bool {
-  holds_containerward_chain ( tree . get (treeid) . unwrap () ) }
+  holds_containerward_chain ( tree . get (treeid) . unwrap (),
+                              in_the_diff_view ) }
 
 /// Whether the children of 'parent' are editable content: those of
 /// an editable occurrence, and in the diff view the old content of a

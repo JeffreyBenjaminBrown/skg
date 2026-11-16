@@ -117,10 +117,13 @@ pub(crate) struct Walk<'a> {
   /// editable-view request through its own visit
   /// ('consume_editableView_request').
   pub editable_occurrence_of   : HashMap<ID, NodeId>,
-  /// The compound folders this refresh added. Their members are drawn
-  /// folded: in the clients' encoding a folder's collapse lives on its
-  /// members, since 'folded' on a headline hides it in its parent.
-  pub added_compound_folders   : HashSet<NodeId>,
+  /// The folders this refresh added to be drawn folded: the compound
+  /// folders, and the containers folder under a member of a forks
+  /// folder ('after_drawing' in 'visit.rs'). The members drawn into
+  /// them are drawn folded: in the clients' encoding a folder's
+  /// collapse lives on its members, since 'folded' on a headline
+  /// hides it in its parent.
+  pub folders_whose_drawn_members_are_folded : HashSet<NodeId>,
   /// The skgrepo restriction that keeps nothing out, of the truth's
   /// config: what mirror substitution asks under when it must not
   /// depend on the connection's ('is_raw_where_another_mirror_would_stand'
@@ -140,7 +143,7 @@ impl<'a> Walk<'a> {
   ) -> Walk<'a> {
     Walk { truth, mode, node_budget, perspective,
            editable_occurrence_of : HashMap::new (),
-           added_compound_folders : HashSet::new (),
+           folders_whose_drawn_members_are_folded : HashSet::new (),
            unrestricted : SkgrepoRestriction::unrestricted (truth . config), } }
 
   pub fn is_diff_view (

@@ -389,7 +389,7 @@ fn leaves_named_at (
 ) -> Option<NamedLeaves> {
   let mut named : NamedLeaves = Vec::new ();
   match &node . value () . kind {
-    ViewnodeKind::Vognode (_) if stands_in_containerward_chain (node) =>
+    ViewnodeKind::Vognode (_) if stands_in_containerward_chain (node, true) =>
       return None,
     ViewnodeKind::Vognode (vognode) => {
       let pid : ID = vognode_leaf_pid (node . value (), pid_of) ?;
@@ -698,7 +698,7 @@ fn relationship_keys_to_viewparent (
       relationship : RelationshipKey { relation : role . relation, recorder, member },
       aspect } };
   match &parent . value () . kind {
-    ViewnodeKind::Vognode (_) if stands_in_containerward_chain (node) => None,
+    ViewnodeKind::Vognode (_) if stands_in_containerward_chain (node, true) => None,
     ViewnodeKind::Vognode (_) => {
       let viewparent : ID = vognode_leaf_pid (parent . value (), pid_of) ?;
       Some ( vec! [ key_for_role (RelationRole::CONTENT, viewparent) ] ) },

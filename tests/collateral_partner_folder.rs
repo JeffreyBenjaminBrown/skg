@@ -114,7 +114,9 @@ fn collateral_partner_folder_update_and_warning_scoping
 /// containerward chain. N's view shows S in its forksFolder; C
 /// contains T. A save of T's view that makes T fork N
 /// rerenders N's view collaterally, its refresh adding T to the folder,
-/// under which hangs T's chain: C, write-protected and claiming nothing.
+/// under which hangs T's chain, in a containers folder drawn folded (a
+/// member of a forks folder's chain stands in one): C, write-protected,
+/// claiming nothing, folded.
 #[test]
 fn a_member_added_at_a_later_visit_gets_its_chain
   () -> Result<(), Box<dyn Error>> {
@@ -162,9 +164,13 @@ fn a_member_added_at_a_later_visit_gets_its_chain
         . position ( |line| line . starts_with ("*** ") && line . contains ("(gnid T)") )
         . unwrap_or_else ( || panic! (
           "T should be a member of N's forksFolder:\n{}", n_collateral ));
-      let chain_node : &str = lines . get (t_index + 1) . copied () . unwrap_or ("");
-      assert! ( chain_node . starts_with ("**** ") && chain_node . contains ("(gnid C)")
+      let containers_folder : &str = lines . get (t_index + 1) . copied () . unwrap_or ("");
+      let chain_node : &str = lines . get (t_index + 2) . copied () . unwrap_or ("");
+      assert! ( containers_folder . starts_with ("**** ")
+                && containers_folder . contains ("containerFolder")
+                && chain_node . starts_with ("***** ") && chain_node . contains ("(gnid C)")
                 && ! chain_node . contains ("noClaim") // under a write-protected parent
-                && chain_node . contains ("writeProtected"),
-        "T should hold its chain, C:\n{}", n_collateral );
+                && chain_node . contains ("writeProtected")
+                && chain_node . contains ("folded"),
+        "T should hold its chain, C, in a folded containers folder:\n{}", n_collateral );
       Ok (( )) } )) }

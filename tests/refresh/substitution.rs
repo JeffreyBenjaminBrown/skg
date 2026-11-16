@@ -26,8 +26,7 @@ fn a_drawn_member_is_shown_as_its_mirror () {
 node p
   node o (inPlaceOf n)
     forksFolder
-      node n wp
-        node p wp noClaim" ); }
+      node n wp" ); }
 
 #[test]
 fn a_member_shown_raw_is_shown_as_its_mirror_in_place () {
@@ -149,8 +148,8 @@ node r
   node a (inPlaceOf m)
     forksFolder
       node m wp
-        node p wp noClaim
-        node r wp noClaim" ); }
+        containerFolder
+          node p wp noClaim folded" ); }
 
 #[test]
 fn under_an_owned_root_the_users_fork_is_shown () {
@@ -161,8 +160,8 @@ node p
   node u (inPlaceOf m)
     forksFolder
       node m wp
-        node p wp noClaim
-        node r wp noClaim" ); }
+        containerFolder
+          node r wp noClaim folded" ); }
 
 /// r, in 'theirs', contains e, in 'third', which contains c, in
 /// 'third'. c is forked by j, in 'theirs' (r's author), by d, in
@@ -184,9 +183,7 @@ node r
   node e
     node j (inPlaceOf c)
       forksFolder
-        node c wp
-          node e wp noClaim
-            node r wp noClaim" ); }
+        node c wp" ); }
 
 /// A chain of forks stops where the next is not of the perspective:
 /// m is forked by a, in 'theirs', which u, in 'main', forks.
@@ -205,13 +202,13 @@ node r
   node a (inPlaceOf m)
     forksFolder
       node m wp
-        node r wp noClaim
       node u wp noClaim" ); }
 
 /// Whether a foreign root is forked and so shows its content raw
 /// asks of its author's perspective, not the user's: the user's k
 /// forks r, yet r's author's fork of m is shown; r's
-/// author's s forks q, so q's content is raw.
+/// author's s forks q, so q's content is raw. m in r's forks folder
+/// is a repeat (q's m holds its editability), so it shows nothing.
 #[test]
 fn a_foreign_root_is_shown_raw_only_when_its_author_forks_it () {
   let graph : InRustGraph = graph (&[
@@ -230,8 +227,6 @@ node r
   node a (inPlaceOf m)
     forksFolder
       node m wp
-        node q wp noClaim
-        node r wp noClaim
 node q
   node m
     forksFolder

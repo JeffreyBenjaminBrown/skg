@@ -151,7 +151,7 @@ fn add_default_folders (
         . id ();
       move_to_first_child (tree, parent, folder)
         . expect ("add_default_folders: the folder was just added");
-      walk . added_compound_folders . insert (folder); }}}
+      walk . folders_whose_drawn_members_are_folded . insert (folder); }}}
 
 /// In a forks folder of a content view, the compound folder of what
 /// its viewparent hides outside its fork partners, when it hides
@@ -687,8 +687,10 @@ fn reinstate (
 
 /// Book what a drawn child is: an editable occurrence holds its
 /// node's editability ('Walk::hold_editability'); a folder member
-/// carries its chain; under a compound folder the refresh added, it
-/// is drawn folded.
+/// carries its chain, but for a member of a forks folder in a content
+/// view, which carries it in a containers folder
+/// ('add_containers_folder_under_forks_folder_member'); under a folder
+/// the refresh added to be drawn folded, it is drawn folded.
 fn after_drawing (
   tree   : &mut Tree<Viewnode>,
   parent : NodeId,
@@ -697,17 +699,44 @@ fn after_drawing (
 ) -> Result<(), Box<dyn Error>> {
   if let Some (gnid) = tree . get (treeid) . unwrap () . value () . editable_gnid () . cloned () {
     walk . hold_editability (&gnid, treeid); }
-  let carries_chain : bool =
-    matches! ( &tree . get (parent) . unwrap () . value () . kind,
-               ViewnodeKind::Folder (folder)
-                 if folder . members_carry_containerward_chain () )
-    && tree . get (treeid) . unwrap () . value () . is_occurrence ();
+  let (carries_chain, in_a_content_views_forks_folder) : (bool, bool) =
+    if ! tree . get (treeid) . unwrap () . value () . is_occurrence () { (false, false) }
+    else { match &tree . get (parent) . unwrap () . value () . kind {
+      ViewnodeKind::Folder (folder) =>
+        ( folder . members_carry_containerward_chain (walk . is_diff_view ()),
+          matches! ( folder, Folder::Forks ) && ! walk . is_diff_view () ),
+      _ => (false, false), }};
   if carries_chain {
     draw_containerward_chain (tree, treeid, walk) ?; }
-  if walk . added_compound_folders . contains (&parent) {
+  if in_a_content_views_forks_folder {
+    add_containers_folder_under_forks_folder_member (tree, treeid, walk); }
+  if walk . folders_whose_drawn_members_are_folded . contains (&parent) {
     // A folder's collapse lives on its members.
     tree . get_mut (treeid) . unwrap () . value () . foldAndFocus . folded = true; }
   Ok (( )) }
+
+/// Under the occurrence at 'member', just drawn into a forks folder of
+/// a content view, a containers folder, drawn folded
+/// ('Walk::folders_whose_drawn_members_are_folded'), whose members
+/// carry their chains: the member's containers but its view-ancestors
+/// ('Folder::omits_view_ancestors'). Where it would hold nothing its
+/// own visit entombstones it. None under a repeat
+/// ('Walk::is_a_repeat'), which shows nothing. The member was just
+/// drawn, so the folder is its only child: the folders an editable
+/// member's visit adds stand around it (the hidden-in folder first,
+/// the forks folder after it), and its content follows.
+fn add_containers_folder_under_forks_folder_member (
+  tree   : &mut Tree<Viewnode>,
+  member : NodeId,
+  walk   : &mut Walk,
+) {
+  let Some (gnid) : Option<ID> =
+    tree . get (member) . unwrap () . value () . occurrence_gnid () . cloned ()
+    else { return; };
+  if walk . is_a_repeat (&gnid, member) { return; }
+  let folder : NodeId = tree . get_mut (member) . unwrap ()
+    . prepend ( viewnode_of ( ViewnodeKind::Folder (Folder::Container) )) . id ();
+  walk . folders_whose_drawn_members_are_folded . insert (folder); }
 
 /// The viewnode that stands for 'item' under 'parent': for a gnid,
 /// what the ID rule says (None if a tombstone, which there is no
@@ -1194,7 +1223,7 @@ fn folders_of_relation (
 /// its other children, in the order given. A forks folder holds the
 /// compound folder of what its viewparent hides outside its fork
 /// partners, when it hides something there; new, its members are drawn
-/// folded ('Walk::added_compound_folders').
+/// folded ('Walk::folders_whose_drawn_members_are_folded').
 fn add_folders (
   tree    : &mut Tree<Viewnode>,
   treeid  : NodeId,
@@ -1222,7 +1251,7 @@ fn add_folders (
 /// In the forks folder at 'forks_folder', of 'forker', the
 /// compound folder of what it hides outside its fork partners, when it
 /// hides something there and the folder lacks one; new, its members
-/// are drawn folded ('Walk::added_compound_folders').
+/// are drawn folded ('Walk::folders_whose_drawn_members_are_folded').
 fn add_hidden_outside_folder (
   tree              : &mut Tree<Viewnode>,
   forks_folder      : NodeId,
@@ -1234,7 +1263,7 @@ fn add_hidden_outside_folder (
   { let hidden_outside : NodeId = tree . get_mut (forks_folder) . unwrap ()
       . append ( viewnode_of (
         ViewnodeKind::Folder (Folder::HiddenOutsideOfForkPartners) )) . id ();
-    walk . added_compound_folders . insert (hidden_outside); }}
+    walk . folders_whose_drawn_members_are_folded . insert (hidden_outside); }}
 
 /// The child of 'under' that is a folder of the kind of 'folder' (a
 /// flags folder whatever its text), if any.

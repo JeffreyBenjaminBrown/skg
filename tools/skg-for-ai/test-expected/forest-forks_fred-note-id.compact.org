@@ -1,6 +1,7 @@
 * Fred's note ⟨0a C1 1/L 1K ⌂:fred⟩
 ** ⟨0b It forks these, or these fork it.⟩
 *** Second child, a forker ⟨0c ☮ 1C 1/L Kb H2 ⌂:main⟩
-**** The fixture root ⟨0d ☮B 1C2a L2a⟩
-***** Above the root ⟨0e ☮ Ca⟩
-** A detail of Fred's ⟨0f 1H⟩
+**** ⟨0d ☮ These also contain it.⟩
+***** The fixture root ⟨0e ☮B 1C2b L2b folded⟩
+****** Above the root ⟨0f ☮ Ca⟩
+** A detail of Fred's ⟨0g 1H⟩

@@ -1628,7 +1628,7 @@ def check_explicit_fork (context):
   it: refused beside other edits, then approved with '--yes', making a
   clone in 'main' that forks it."""
   folder = fresh_root_view (context, "fork-explicit")
-  shared = compact_line_starting (folder, "*** Contained twice ⟨0o ")
+  shared = compact_line_starting (folder, "*** Contained twice ⟨0l ")
   edit_compact ( folder, [ ( shared, shared [ : -1 ] + " fork⟩" ) ])
   first_child = compact_line_starting (folder, "** First child ⟨")
   edit_compact ( folder, [ ( first_child, first_child . replace (
@@ -1637,7 +1637,7 @@ def check_explicit_fork (context):
   require_output (
     run_save (folder, "--yes"),
     REPORT_HEAD +
-    "Error: ⟨0o⟩ 'Contained twice' carries 'fork', but the compact view has "
+    "Error: ⟨0l⟩ 'Contained twice' carries 'fork', but the compact view has "
     "other edits; save them first, as a client forks only from a saved "
     "buffer, so that the clone is the node as it is saved.\n",
     expected_returncode = 1 )
@@ -1650,7 +1650,7 @@ def check_explicit_fork (context):
   require_output (
     run_save (folder, "--yes"),
     REPORT_HEAD +
-    "Fork: ⟨0o⟩ 'Contained twice', by request: a new clone of it forks "
+    "Fork: ⟨0l⟩ 'Contained twice', by request: a new clone of it forks "
     "it.\n" + FORK_INTO_MAIN +
     "Server: fork confirmation: the save forks 1 node, and writes nothing "
     "until that is approved.\n"
@@ -3152,9 +3152,9 @@ FOLLOWS_YOURS_SUMMARY = (
   "# Showing your perspective (each root author's perspective is the default).\n" )
 FOLLOWS_THIRDS_SUMMARY = (
   "# Showing third's perspective (each root author's perspective is the default).\n" )
-R_SHOWING_A = "* R ⟨0a C2 ⌂:foreign⟩\n** A ⟨0b Kĥ1⟩\n*** ⟨It forks these, or these fork it.⟩\n**** M ⟨☮ 2C 3bK⟩\n***** P ⟨☮ Ca ⌂:main⟩\n***** R ⟨☮ C2a ⟳⟩\n** K ⟨0g⟩\n"
-R_SHOWING_U = "* R ⟨0a C2 ⌂:foreign⟩\n** U ⟨0b Kĥ1 ⌂:main⟩\n*** ⟨It forks these, or these fork it.⟩\n**** M ⟨☮ 2C 3bK ⌂:foreign⟩\n***** P ⟨☮ Ca ⌂:main⟩\n***** R ⟨☮ C2a ⟳⟩\n** K ⟨0g⟩\n"
-R_SHOWING_B = "* R ⟨0a C2 ⌂:foreign⟩\n** B ⟨0b Kĥ1 ⌂:third⟩\n*** ⟨It forks these, or these fork it.⟩\n**** M ⟨☮ 2C 3bK ⌂:foreign⟩\n***** P ⟨☮ Ca ⌂:main⟩\n***** R ⟨☮ C2a ⟳⟩\n** K ⟨0g⟩\n"
+R_SHOWING_A = "* R ⟨0a C2 ⌂:foreign⟩\n** A ⟨0b Kĥ1⟩\n*** ⟨It forks these, or these fork it.⟩\n**** M ⟨☮ 2C 3bK⟩\n***** ⟨☮ These also contain it.⟩\n****** P ⟨☮ Cb ⌂:main folded⟩\n** K ⟨0g⟩\n"
+R_SHOWING_U = "* R ⟨0a C2 ⌂:foreign⟩\n** U ⟨0b Kĥ1 ⌂:main⟩\n*** ⟨It forks these, or these fork it.⟩\n**** M ⟨☮ 2C 3bK ⌂:foreign⟩\n***** ⟨☮ These also contain it.⟩\n****** P ⟨☮ Cb ⌂:main folded⟩\n** K ⟨0g⟩\n"
+R_SHOWING_B = "* R ⟨0a C2 ⌂:foreign⟩\n** B ⟨0b Kĥ1 ⌂:third⟩\n*** ⟨It forks these, or these fork it.⟩\n**** M ⟨☮ 2C 3bK ⌂:foreign⟩\n***** ⟨☮ These also contain it.⟩\n****** P ⟨☮ Cb ⌂:main folded⟩\n** K ⟨0g⟩\n"
 
 def copy_perspective_fixture (data_root):
   """The perspective data, with a config naming its two foreign

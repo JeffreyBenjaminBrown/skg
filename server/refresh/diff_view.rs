@@ -468,7 +468,7 @@ pub(crate) fn tag_children (
     diff_view_of (walk) else { return Ok (( )); };
   let is_root : bool = matches! ( tree . get (parent) . unwrap () . value () . kind,
                                   ViewnodeKind::BufferRoot );
-  let chain : bool = is_chain_parent (tree, parent);
+  let chain : bool = is_chain_parent (tree, parent, true);
   for child in children_of (tree, parent) {
     let item : Option<GoalItem> =
       member_of_child (tree . get (child) . unwrap () . value ())

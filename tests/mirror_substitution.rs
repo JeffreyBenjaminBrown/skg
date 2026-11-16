@@ -1374,8 +1374,10 @@ fn a_replaced_root_shows_its_own_containers (
     "U's folder is drawn as a fresh view of U draws it" );
   let foreigns : String = switch ("owner of foreign") ?;
   assert! ( line_of_gnid (&foreigns, "A") . is_some ()
-            && ! foreigns . contains ("containerFolder"),
-    "from foreign's, A, which nothing contains, has no containers folder:\n{}", foreigns );
+            && ! foreigns . lines () . any ( |l| l . starts_with ("** ")
+                                                && l . contains ("containerFolder") ),
+    "from foreign's, A, which nothing contains, has no containers folder \
+     (M, in its forks folder, has its own):\n{}", foreigns );
   let back : String = switch ("root authors") ?;
   assert_eq! ( without_vnids ( back . lines () ), without_vnids ( view . lines () ),
     "back at the root authors', M's folder is drawn again as the fresh view drew it" );

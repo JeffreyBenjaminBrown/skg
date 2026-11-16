@@ -597,8 +597,9 @@ fn validate_occurrence (
 /// Whether a restoreRel request stands where it may: on a member of a
 /// partner folder (whose removed members claim nothing), or on a
 /// removed member, a child claiming no membership under a vognode
-/// that is no node of the containerward chain
-/// ('stands_in_containerward_chain'). Under a parent that does not
+/// that is no node of the containerward chain as the diff view, whose
+/// request restoreRel is, draws it ('stands_in_containerward_chain').
+/// Under a parent that does not
 /// read its children's claims no child claims, whatever it carries.
 /// A chain node stands for no relationship the diff view tracks.
 fn restoreRel_stands_where_it_may (
@@ -614,7 +615,7 @@ fn restoreRel_stands_where_it_may (
     kind if kind . is_partner_folder () => true,
     ViewnodeKind::Vognode (_) =>
       ( ! t . claimsMembership || ! parent_reads_claims (tree, parent . id ()) )
-      && ! stands_in_containerward_chain (node),
+      && ! stands_in_containerward_chain (node, true),
     _ => false, }}
 
 fn cannot_be_child_of_vognode (

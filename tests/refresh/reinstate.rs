@@ -227,9 +227,6 @@ node p
   node o (inPlaceOf n)
     forksFolder
       node n wp
-        node p wp noClaim
-          node q wp noClaim
-            node top wp noClaim
   unknown x
   node s
     forksFolder

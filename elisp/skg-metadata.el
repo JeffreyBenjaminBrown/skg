@@ -826,9 +826,10 @@ buffer_to_viewnodes/local.rs)."
 
 (defun skg--containerward-chain-node-at-point-p ()
   "Non-nil iff the headline at point is a node of the containerward
-chain: a vognode claiming nothing under a member of a partner folder whose
-members carry the chain (every one but the two acquisition folders and
-the illegal-edit folder),
+chain as the diff view, whose request restoreRel is, draws it: a
+vognode claiming nothing under a member of a partner folder whose
+members carry the chain there (every one but the two acquisition
+folders and the illegal-edit folder),
 or under another such node ('stands_in_containerward_chain',
 server/types/tree/forest.rs)."
   (save-excursion

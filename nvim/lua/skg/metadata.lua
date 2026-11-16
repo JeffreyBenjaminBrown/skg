@@ -1311,9 +1311,10 @@ function M.parent_line (line_number)
   return M.parent_headline_line(line_number, level)
 end
 
----Is the headline at LINE_NUMBER a node of the containerward chain: a
----vognode claiming nothing under a member of a partner folder whose members
----carry the chain (every one but the two acquisition folders), or under
+---Is the headline at LINE_NUMBER a node of the containerward chain as
+---the diff view, whose request restoreRel is, draws it: a vognode
+---claiming nothing under a member of a partner folder whose members
+---carry the chain there (every one but the two acquisition folders), or under
 ---another such node ('stands_in_containerward_chain',
 ---server/types/tree/forest.rs)?
 ---@param line_number integer
