@@ -231,3 +231,10 @@ were reworded; the glossary's "clone, and the fork operation" got
   roles, the folder relations.
 *** DONE
 The slice's headline in '1_plan.org' is DONE.
+** Orchestrator's notes after slice 2 (2026-11-16 08:50 UTC)
+For Jeff, in the morning summary, not blocking: a search hit
+suppressed by a mirror two forks away (a sibling of the hit that
+stands) appears in none of that hit's folders, since the enrichment
+draws direct relatives only, and so will slice 6's forks folder. Does
+that matter? Unpinned so far: an owned hit suppressing a foreign hit
+that forks it.
