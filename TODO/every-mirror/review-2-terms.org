@@ -1,0 +1,316 @@
+#+title: Review of plan 2 (every-mirror): its terms, and plan citations in code
+#+date: 2026-11-16
+
+A read-only review of 'git diff 79d3d6b0..HEAD' (plan 2's sixteen
+commits) and of the tree at HEAD. It follows 'coding-advice/plans.org'
+("After each plan, before the next") and 'coding-advice/names.org'.
+Plan 1's findings ('review-1-terms.org') are repeated only where one
+came back. Findings run from most to least important, and each gives
+file:line and a one-line proposed fix.
+
+* Question 1: terms coined or reused
+** 1. "Forker as such" is defined two ways, and a detached forkee falls between them
+The glossary defines a forker as such by the relation: "a forker-only
+member, a note that forks N and that N does not fork"
+('docs/glossary.org:657-659'). So do 'docs/api-and-formats.org:1715-1717'
+and 'docs/COMMANDS.org' ("forks the node and that the node does not
+fork"). Twelve lines earlier the same glossary says "a forkee the user
+detached -- is no forkee as such but a forker as such"
+('docs/glossary.org:651-653'). The code agrees with that second
+reading: it defines the term by the claim alone.
+- 'server/from_text/local_fieldintent_collection/traverse.rs:47-49':
+  "One claiming nothing is *in forker-as-such position* ... or a
+  detached forkee."
+- 'note_of_forker_as_such' ('server/refresh/goal.rs:360-370') tests
+  only '! claimsMembership'.
+- 'resolve_forker_visibility' ('resolve_visibility.rs:225-227'): "it
+  forks N, or N forked it and the user detached it there".
+- 'elisp/skg-metadata.el' ('skg--member-as-such-at-point-p') and
+  'nvim/lua/skg/metadata.lua' ('member_as_such_at_line_p'): "a forker as
+  such if it claims nothing".
+
+Three names follow from the claim reading and lie for a detached
+forkee, which is no forker of N:
+- 'ForkerVisibility::forker' ('server/from_text/local_fieldintent_collection/types.rs:126').
+- 'MemberAsSuch::Forker' ('resolve_visibility.rs:166'). Its word goes
+  into user messages: "a foreign node shown as a forker".
+- 'MemberAsSuchContext::note_forks_it', set 'false' for every
+  non-claiming member ('traverse.rs:150,175'). N does fork a detached
+  forkee.
+
+A further pair names N "forkee": 'LocalContext::ForkerAsSuchPosition
+{ forkee, forkee_is_editable }' ('types.rs:30-32').
+
+The same position also goes by "pending detachment"
+('server/from_text/forkers_made_forkees.rs:5-9', 'docs/glossary.org:700-701').
+
+The glossary even documents the lie: "'note' is ... the forkee of a
+forker as such" ('docs/glossary.org:665-666').
+- Fix: define the term by the claim ("a member claiming nothing: a
+  forker-only member, or, until the save, a forkee the user
+  detached") at 'docs/glossary.org:657' and its copies. Rename
+  'note_forks_it' to 'member_claims' and 'ForkerAsSuchPosition::forkee'
+  to 'note'.
+
+** 2. "Forker" names now hold the note whose forks folder it is, which may be a forkee
+Plan 2 made forkers' content shown and hides symmetric. Several
+functions named for the forker now receive N, the hider, which may
+fork nothing:
+- 'less_what_the_forker_integrates' ('server/refresh/goal.rs:310'). Its
+  parameter is now 'note', "the forkee of a forker as such"
+  ('goal.rs:305-308'), and it is cited under this name in
+  'docs/glossary.org:630,664', 'resolve_visibility.rs:229' and
+  'file_what_is_written_in.rs:5'.
+- 'apply_hiderel_delta_to_forker', 'forker_contains_after_save' and
+  'forker_forks_after_save' ('server/from_text/local_fieldintent_collection/lower.rs:449,466,566')
+  are called with 'note_from_disk' ('resolve_visibility.rs:320,326,375,390').
+- In 'infer_hides_from_contains_removals', 'forker_pid',
+  'forker_from_disk' and 'forker_contains' name any owned note with a
+  fork partner shown ('resolve_visibility.rs:544-554'). The same holds
+  in 'apply_hiddenoutside_edits' ('resolve_visibility.rs:453').
+- 'HiddenOutsidePosition { forker }' ('types.rs:33-34') and
+  'add_hidden_outside_folder (.., forker, ..)'
+  ('server/refresh/visit.rs:1340') name the hider. Since plan 2, a
+  note with forkers only has that folder too.
+- 'hidden_by_fork_partner' passes N as 'member' to
+  'hidden_in_fork_partner (member, note, ..)' ('goal.rs:591-613').
+- Fix: rename them 'less_what_the_note_integrates',
+  'apply_hiderel_delta_to_hider', 'note_contains_after_save',
+  'note_forks_after_save', 'hider' / 'hider_from_disk', and make
+  'hidden_in_fork_partner''s parameters 'container' and 'hider'.
+
+** 3. "Explains" a hide counts three different sets of partners
+The glossary defines "explains" over the partners the forks folder
+shows ('docs/glossary.org:238-245'), which 'fork_partners_shown'
+computes ('server/refresh/goal.rs:512-530'): gated by the skgrepo
+restriction, with the forkers N hides left out. 'docs/forks.org:347-348'
+says: "A forker =C= hides is drawn nowhere, so it explains no hide."
+Two other readers of the same concept compute their own set:
+- The hide floor 'hide_skgrepo' counts every forker of the hider, by
+  the ungated graph, hidden ones included
+  ('server/from_text/supplement_from_disk.rs:527-539,579-583'). Its
+  docs also call that "explains": 'docs/data-model_technical.org:413'
+  and 'docs/api-and-formats.org:2976-2980'. So a forker N hides
+  explains nothing in the view, yet can set a hide's floor.
+- 'gnids_shown_through_fork_partners'
+  ('server/nodeMerge/nodeMergeInstructionTriple.rs:234-250') reads
+  forkers ungated, though it leaves out hidden ones.
+- Fix: make both call 'fork_partners_shown'. If the floor's wider set
+  is deliberate, call it something other than "explains", and say why
+  at 'supplement_from_disk.rs:527'.
+
+** 4. Two folder labels under one member name the same node "It" and "a", and the hidden-outside label lies
+Under a forker as such, two folders stand side by side. Each names
+the folder's viewparent, but one says "It" and the other "a":
+- "☮ It contains these, but c hides them."
+- "☮ a hides these, which c contains."
+- Sources: 'server/heralds.rs:458-477', 'docs/heralds.org:204-207',
+  'tests/shared/herald-rules.sexp:1'.
+
+Plan 2 rewrote the hidden-outside label: "b hides these, but nothing
+it forks or that forks it contains them."
+- Sources: 'server/heralds.rs:480-481', 'docs/glossary.org:546-547',
+  'docs/heralds.org:208-209', 'docs/sharing-model.org:33,59',
+  'docs/diff-view.org:273', 'tools/skg-for-ai/test-expected/*.compact.org'.
+- It uses "it" twice, though Jeff's settled Q9 says labels name
+  viewnodes by letters only.
+- It is false when b hides a forker that contains one of the hidden
+  nodes. 'fork_partners_shown' leaves that forker out, so the hide
+  stands in this folder even though a forker of b contains it
+  ('docs/glossary.org:552-554').
+- Fix (Jeff's call): "☮ a contains these, but c hides them." and "b
+  hides these, and no fork partner b shows contains them."
+
+** 5. 'HiddenByForkPartner' promises a fork partner but is drawn under forkers only
+The folder kind, its atom 'hiddenByForkPartnerFolder' and its style
+keys ('shared/herald-styles.json:80-84') say "fork partner". But its
+goal is empty unless the member is a forker as such
+('server/refresh/goal.rs:406-416'), it is added only then
+('visit.rs:165'), and its own glossary entry says "Under a forkee as
+such it is not drawn" ('docs/glossary.org:542-543'). This is the
+pattern of review 1's finding 3 ('hiddenInForkPartnerFolder' before
+plan 2), back in a new folder. Its sibling 'HiddenInForkPartner' does
+stand under both roles, so the two names suggest a symmetry the code
+lacks.
+- Fix: rename it 'Folder::HiddenByForker' / 'hiddenByForkerFolder' (and
+  the 'hiddenByForkPartnerFolder_*' style keys), or draw it under
+  forkees as such too, as decision 8's symmetry suggests (Q9).
+
+** 6. 'is_hidden_by_folder_of_no_forker_as_such' reads as a verb phrase
+'server/refresh/visit.rs:564' names a test of whether a folder is the
+hidden-by folder standing under no forker as such. Read as words, it
+says a child "is hidden by a folder". Its neighbour
+'is_hidden_by_the_forks_folders_viewparent' ('visit.rs:580') uses "is
+hidden by" as exactly that verb. The glossary cites the name at
+'docs/glossary.org:367' and 'docs/data-model_technical.org'.
+- Fix: 'is_hiddenByForkPartnerFolder_under_no_forker_as_such'
+  (names.org: camel-case a compound noun into one token).
+
+** 7. "What a member shows" is coined in the glossary and used nowhere else; the concept has four names
+- The glossary coins *what a member shows* at 'docs/glossary.org:655,662'.
+- The code says "unintegrated": 'unintegrated_content_gnids'
+  ('goal.rs:325-336'), and the wire subform '(unintegrated COUNT ...)'
+  ('viewnodestats.rs:230-245', 'docs/api-and-formats.org'). That word has
+  no glossary entry.
+- The code also says "member-as-such display rule"
+  ('server/nodeMerge/nodeMergeInstructionTriple.rs:232').
+- User docs say "what it adds to N": 'docs/forks.org:255,314',
+  'docs/sharing-model.org:65', 'docs/COMMANDS.org:480',
+  'docs/COMMANDS-nvim.org:468', 'docs/api-and-formats.org:1717',
+  'tools/skg-for-ai/README.org:1388'.
+- Fix: make the glossary entry "what a member shows, its unintegrated
+  content (for a forker, what it adds to N)", and cite it from
+  'nodeMergeInstructionTriple.rs:232' instead of "display rule".
+
+** 8. "Fork" as the gesture is back, in user-facing messages (review 1, finding 12)
+- 'server/from_text/local_fieldintent_collection/validate_text_claims.rs:34':
+  "(an edit there forks it)"
+- 'resolve_visibility.rs:211': "view it as itself, where an edit forks it"
+- 'docs/COMMANDS.org:472' and 'docs/COMMANDS-nvim.org:460': "(view it as
+  itself to fork it)"
+- 'docs/sharing-model.org:29' ("fork E first") and ':31' ("where an edit
+  forks E")
+
+The glossary keeps "fork" alone for the relation and says "the fork
+operation" for the gesture. Read as the relation, "an edit forks it"
+is false: the clone forks it.
+- Fix: "where an edit starts the fork operation" (or "clones it").
+
+** 9. 'cut_under_a_foreign_note' also refuses unhides, and tells a forkee's note about forking
+'resolve_visibility.rs:152-160' builds the refusal both for a cut and
+for a child shown again ('resolve_visibility.rs:128-131'; the glossary
+says so at 'docs/glossary.org:705-706,737-739'). Its text, "only a note
+of your own can fork another and hide what that one contains", is
+also given for a forkee as such, where no fork is at stake.
+- Fix: rename it 'refusal_to_change_what_a_foreign_note_hides', and
+  word the fork clause only for 'MemberAsSuch::Forker'.
+
+** 10. "Side" for a member's role is back (review 1, finding 13)
+'resolve_visibility.rs:162': "Which side of 'forks' a member as such
+... stands on". Plan 1's fix renamed 'ForksFolderMemberSides' to
+'ForksFolderMemberRoles' and kept "side" for herald sides.
+- Fix: "Which role in 'forks' ...".
+
+** 11. The forkee signals keep the bare name 'visibility' beside 'forker_visibility'
+- 'LoweringOutput::visibility' ('lower.rs:281')
+- 'FieldIntentsForOneId::visibility' ('types.rs:166')
+- the 'visibility' parameters ('resolve_visibility.rs:74,538,658')
+
+Each now has a 'forker_visibility' sibling. The bare name reads as
+covering both.
+- Fix: rename them 'forkee_visibility'.
+
+** 12. A member as such is "warranted" in the glossary and the refresh, but not in the save or the clients
+- The glossary says "standing, warranted" ('docs/glossary.org:657'),
+  and the refresh requires 'Warrant::ByGraph' ('goal.rs:353').
+- The save's definition takes any occurrence child of a forks folder
+  ('traverse.rs:44-45'), as do both clients' predicates and the AI tool
+  ('tools/skg-for-ai/skg_for_ai.py', 'member_as_such').
+
+The save cannot know a warrant, so the two may need to differ.
+- Fix: say in the glossary that the save reads position alone.
+
+** 13. The containers folder under a forks-folder member keeps the label "These also contain it."
+'server/heralds.rs:489'. "Also" presumes a container shown above the
+member. Above a forks-folder member stands N, which forks it or is
+forked by it, and need not contain it. Plan 2 put this folder under
+every such member ('add_containers_folder_under_forks_folder_member',
+'visit.rs:756-779').
+- Fix (Jeff's call): accept it as "also, beside what the view shows",
+  or use "These contain it." in this position.
+
+** 14. "Repeat" has a second sense in the chain
+The glossary's *repeat* is an occurrence whose node's editability
+another occurrence holds ('docs/glossary.org:2257', 'Walk::is_a_repeat',
+'server/refresh/editability.rs:104-112'). The chain's
+'ContainerwardRoleTree::Repeated' is a container met again on the walk
+('server/dbs/in_rust_graph/containerward_role_tree.rs:15,21';
+'server/refresh/chain.rs:7').
+- Fix: add "(not the chain's 'Repeated', a container met again)" to the
+  glossary entry.
+
+** 15. The test name 'hides_apply_to_every_fork_partner' overstates
+'tests/hides_apply_to_every_fork_partner.rs' tests the partners the
+forks folder shows. A forker the note hides is not among them
+('fork_partners_shown').
+- Fix: rename it 'hides_apply_to_every_fork_partner_shown', or leave
+  it and let the header comment say so.
+
+** Terms that checked out
+- "member as such" and "forkee as such": used alike in the server,
+  both clients ('skg--member-as-such-at-point-p',
+  'member_as_such_at_line_p'), the AI tool ('member_as_such') and the
+  docs. The one exception is the forker half (finding 1).
+- 'MemberAsSuchContext' and 'MemberAsSuchTextClaim': the old
+  'ForkeeTextClaim' and 'forkee_as_such' predicates are gone
+  everywhere, with no stragglers.
+- "cut": defined once ('docs/glossary.org:714-723'). The code's 'cut'
+  sets ('resolve_forker_visibility'), "(a cut)" in 'docs/COMMANDS.org'
+  and the AI README agree.
+- "The forker-visibility step" and "the forker-visibility signal":
+  both are defined ('docs/glossary.org:681-707'), and
+  'resolve_forker_visibility' / 'ForkerVisibility' match the
+  forkee-visibility pair.
+- 'fork_partners_shown': one function, used by the refresh, the save's
+  inference, the hidden-outside edits and the hide report
+  ('server/from_text/hide_report.rs'). Finding 3 covers the two readers
+  that bypass it.
+- 'CompoundFolderParties::container' (renamed from 'forkee'): true in
+  both positions, and documented at 'server/refresh/ancestry.rs:141-153'.
+- "Drawn folded" ('Walk::folders_whose_drawn_members_are_folded'): the
+  old name 'added_compound_folders' is gone, and the new one says what
+  it does.
+- "Hides from its forks" in the hidden and hider folder labels
+  ('server/heralds.rs:485-487'): now true under the glossary's "its
+  forks" = fork partners ('docs/glossary.org:1088-1091'), since plan 2
+  made hides apply to forkers. Review 1's finding 1 is resolved, not
+  repeated.
+
+* Question 2: code that cites anything under 'TODO/'
+** Code
+No server, client, 'shared/' or 'tools/' code cites 'TODO/', a plan, a
+slice, a question or 'progress.org'. The earlier citations review 1
+listed ("plan 04.1" in 'editability.rs', "Decision 4 of the plan" in
+'stage_and_commit.rs') are gone.
+
+** Tests citing the plan
+Each one names 'TODO/every-mirror/2_plan.org':
+- 'tests/forkees_drawn_editable.rs:3-4' ("slice 2")
+- 'tests/forkers_drawn_editable.rs:3-5' ("slice 3"; "the plan's 'forks
+  of one note meet'")
+- 'tests/forks_meet.rs:3-4' ("behavior 5") and ':9' ("the plan's
+  picture")
+- 'tests/hides_apply_to_every_fork_partner.rs:4-5' ("slice 4"; "Jeff's
+  picture")
+- 'tests/cuts_from_forkers.rs:3-4' ("slice 5")
+- 'tests/hide_inference_under_a_narrowing.rs:15' ("Q12")
+- Fix: cite the doc each already names beside it, such as
+  'docs/forks.org' "Forks of one note meet" / "Cutting from a forker",
+  or the glossary entry. Drop the plan path.
+
+** Tests citing a conversation rather than a rule (as review 1 found in plan 1)
+- 'tests/cuts_from_forkers.rs:5,10,78,82' ("Jeff's example", "Jeff's
+  'after'")
+- the test 'jeffs_example_forking_a_forker' ('tests/cuts_from_forkers.rs:41-42,85')
+- Fix: rename it 'a_child_cut_from_a_forker_and_pasted_makes_it_a_mutual'
+  and state the rule.
+
+** A test citing 'TODO/problems.org'
+'tests/integration/forks-meet/test-emacs.el:61' ("see
+TODO/problems.org, the entry on 'skg-open-org-buffer-from-text'"). The
+entry will move to 'TODO/DONE/problems.org' when it is fixed.
+- Fix: state the client behaviour it works around, with no path.
+
+** Docs linking to 'TODO/every-mirror/*.org'
+None. Review 1's four links (glossary, heralds, data-model_technical,
+sharing-model) were replaced, and plan 2 added none. Two user docs
+do quote the plan's "Jeff's notes, verbatim", in the plan's hyphenated
+spelling "forker-as-such", which the glossary does not use:
+- 'docs/forks.org:258-259'
+- 'docs/sharing-model.org:65'
+- Fix: paraphrase: "a forker as such that a cut is made from becomes
+  a forkee too".
+
+Older 'TODO/' links in docs, not from plan 2:
+'docs/api-and-formats.org:139,829', 'docs/nvim-client-deviations.org:6',
+'docs/glossary.org:857', 'docs/README.org:59'.

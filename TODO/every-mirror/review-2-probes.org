@@ -1,0 +1,594 @@
+#+title: every-mirror plan 2: the probe pass
+#+startup: overview
+
+* How this was run
+On 2026-11-16, after slice 6 (HEAD '1b6a4b89'), with 'target/debug/skg'
+('cargo build --bin skg', already current) and isolated servers on
+ports 24901 to 24904, each on scratch data under
+'/tmp/claude-1000/every-mirror-probes-plan2/'. No full test suite was
+running. The live servers on 1730 and 1761 were never touched. Every
+scratch server was stopped by its PID and its port confirmed free
+afterwards; the scratch data has been deleted. Each server was driven
+over one connection per client, through 'tools/skg-for-ai/skg_for_ai.py'
+used as a library ('SkgConnection', 'save_buffer' with the view's real
+baseline). What stays is under
+'/tmp/claude-1000/every-mirror-probes-plan2/transcripts/':
+- 'fixtures/': the scripts that wrote each scratch data root.
+- 'bin/': the probe library ('probe.py'), the start and stop scripts,
+  and one script per probe ('pN.py').
+- 'pN-.../': one folder per probe, with 'log.txt' (every request, the
+  answer's errors, warnings and hide report, the files changed, and the
+  '.skg' files read back), and per step the view drawn
+  ('view_ID.full.org', 'view_ID.compact.org'), the buffer sent
+  ('sent.full.org') and the view the save drew ('saved.full.org',
+  'saved.compact.org').
+- 'sN-server.log': each server's log.
+
+The fixtures:
+- s1 (port 24901): owned 'main', foreign 'theirs'. Behavior 5 (N
+  contains X1 to X4 and hides Z; R and T fork N; R contains X1 to X3; T
+  contains X1, X3, Y, Z and hides X2; Shelf contains N and T). A forks
+  owned E (contains e1, e2, H; contained by C1 and C2) and foreign F
+  (contains f1, G; contained by Cf), and hides H and G. Jeff's picture:
+  P ("my x") contains pa, pb, forks Pe, hides pw and ph2; Pf forks P and
+  contains pa, pw, pf1. Jeff's example: mx ("my x") empty; foreign yx
+  ("your x") forks it and contains y, z; owned M2 forks yx already.
+  mx2 and yx2 likewise. A foreign G1 forks foreign F2 (contains f2) and
+  is forked by foreign H1 (contains h1). Nodes added while it ran, the
+  server reloading them: Box, bx, byx (and Box2, Box3 likewise), Q
+  (contains RF and NF; RF forks NF), V, W, U (V forks W, W forks U, W
+  and U both contain u1), Pp, Nn, Ee, Qq, and mx4 with yx4.
+- s2 (port 24902): the perspective fixture of
+  'tests/integration/perspective/data/', with content added (A contains
+  a1 and m1, M contains m1 and m2, U contains u1 and m2, B contains b1).
+- s3 (port 24903): owned 'pub' and 'priv'. Np (pub) contains q1, q2,
+  q3 and hides qh; Tp (priv) forks Np and contains q1, qh, t1; Rp (pub)
+  forks Np and contains q2, rp1, and a 'priv' file of Rp contains rq.
+- s4 (port 24904): B0 contains b01, b02; 200 notes F000 to F199 each
+  fork B0 and contain b01 and two children of their own. Run with the
+  default budget, then with 'initial_node_limit = 5'.
+
+* Summary
+41 behaviors probed: 37 matched, 4 did not.
+- Not matched, a real bug: a forkee as such nested under an editable,
+  owned member as such (V forks W, W forks U) makes the save read U's
+  content that W contains as cut, so W "hides" it. In a fresh,
+  unedited view the save warns that W changed after the buffer was
+  rendered, and any edit of W there (its title, a cut from U) is
+  refused as stale (39). Cause: 'forker_contains_after_save'
+  ('server/from_text/local_fieldintent_collection/lower.rs').
+- Not matched: the collateral rerender of another view on the same
+  connection draws the forker that a cut just made a mutual with a
+  'detach' herald, and an edit of the note in that freshly drawn view is
+  refused as stale (37).
+- Not matched, the open 'TODO/problems.org' entry: a second client's
+  stale view of the note, saved, keeps the new mutual drawn as a pending
+  detachment, indefinitely (36).
+- Not matched, not foreseen: an existing node moved (not typed) under
+  an owned forkee as such joins nothing and leaves its old container,
+  so it is orphaned without a warning (11). This is slice 2's recorded
+  reading of Q2.
+- Observations, not counted: a child newly hidden into an existing
+  compound folder is drawn unfolded by the save's redraw (8); an
+  emptied hidden-outside folder stays in the save's redraw (19); a
+  member made editable by an editable-view request gets no containers
+  folder (41); a stale-buffer warning names the note when a partner
+  changed (35).
+
+* 1. A folded containers folder under a forks-folder member
+** Sent
+'single root content view' of R and of N on s1 ('p1-forks-meet'); of
+A ('p2-forkees', step 01).
+** Received
+In R's view, N (in R's forks folder) and T (in N's) each carry
+"☮ These also contain it." holding Shelf, marked 'folded', before
+their forks folder and content. Under A, E's holds C1 and C2, F's Cf,
+all folded. No chain node stands directly under any member.
+** Verdict
+MATCH.
+
+* 2. A repeat in the forks folder shows nothing
+** Sent
+The same views.
+** Received
+R in N's forks folder within R's view: '***** R ⟨0g ☮ C3 Kb ⟳⟩', a leaf;
+N in R's, T's and E's forks folders likewise, no containers folder.
+** Verdict
+MATCH.
+
+* 3. The containers folder omits a view-ancestor
+** Sent
+s1: Pp contains Nn and Ee; Nn forks Ee; Qq contains Ee. A fresh view of
+Pp, and a hand-built buffer, Pp write-protected with Nn under it
+carrying '(viewRequests editableView)', saved, then saved again
+('p13-view-ancestor-omitted').
+** Received
+Both draw Ee editable in Nn's forks folder with a containers folder
+holding Qq alone (folded); Pp, its view-ancestor, is omitted. No file
+written; the second save draws the same view.
+** Verdict
+MATCH.
+
+* 4. Forkees as such drawn editable, owned or foreign
+** Sent
+A's view ('p2-forkees', 01).
+** Received
+E (owned) and F (foreign) editable, =bK=, each with its hidden-in
+folder ("☮ It contains these, but c hides them.": H; G), its
+containers folder, its own forks folder (A, a repeat) and what it
+shows (e1, e2; f1).
+** Verdict
+MATCH.
+
+* 5. An unchanged save of a view with editable members writes nothing
+** Sent
+Each fresh view saved back with its own baseline: R, N
+('p1-forks-meet'), A ('p2-forkees'), P ('p3-forkers-and-hides'), Q
+('p7-repeat-forker'), Np under a restriction ('p11-restriction'), B0
+('p12-budget-*'), each view after a perspective switch
+('p10-perspective').
+** Received
+'(changed-headlines ())', no warning, no '.skg' file changed (md5 of
+every file), the view drawn again identical but for viewnode IDs.
+** Verdict
+MATCH. (Exception: views holding a nested forkee as such, 39.)
+
+* 6. An owned forkee as such saves its title and body
+** Sent
+E retitled "E retitled" and a body line added, in A's view ('p2-forkees', 03).
+** Received
+Only 'E.skg' written: the new title, the body 'E body, edited' above
+the old line.
+** Verdict
+MATCH.
+
+* 7. A foreign forkee as such refuses a title edit
+** Sent
+F retitled in A's view ('p2-forkees', 05).
+** Received
+"NOTHING WAS SAVED ... Database error ... Cannot edit title/body for
+node F (viewnode ID 0p), a foreign node shown as a member of a forks
+folder. View the node as itself to edit title/body (an edit there
+forks it)." No file written.
+** Verdict
+MATCH (the "Database error" label is slice 2's known caveat).
+
+* 8. A cut from a forkee as such hides
+** Sent
+e2 deleted from under E in A's view ('p2-forkees', 06).
+** Received
+"Hides 'e2' from 'A', as content of 'E retitled'."; only 'A.skg'
+written, its hides [H, G, e2]; the redraw shows e2 in E's hidden-in
+folder.
+** Verdict
+MATCH. Observation: e2, newly drawn into the hidden-in folder that
+already stood, has no 'folded' atom in the save's redraw (H beside it
+has); a fresh view folds it. The same holds for pa (20), pf1 (36)
+and the collateral view (37). A new hidden-in folder's members are
+folded (X4 in 27).
+
+* 9. A child typed under an owned forkee as such joins it
+** Sent
+"typed under E" after e1 under E in A's view ('p2b-forkees', 08).
+** Received
+A new node; 'E.skg' contains [e1, NEW, e2, H]; the redraw shows it
+under E.
+** Verdict
+MATCH.
+
+* 10. A child typed under a foreign forkee as such is refused
+** Sent
+"typed under F" after f1 ('p2b-forkees', 10).
+** Received
+"Cannot add a child under F ('F'), a foreign node shown as a forkee:
+only its owner can change its content. To add one, make the node your
+own first: view it as itself, where an edit forks it." No file
+written.
+** Verdict
+MATCH.
+
+* 11. Not foreseen: an existing node moved under an owned forkee as such
+** Sent
+a1 cut from A's content and pasted under E after e1, in A's view
+('p2c-paste-existing-under-forkee').
+** Received
+Saved with no warning; the hide report says "Hides nothing: 'a1' left
+'A', but it is no content of 'E retitled' or 'F', nor a mirror of
+any." 'A.skg' lost a1; 'E.skg' unchanged; the redraw shows a1 nowhere.
+a1 is now contained by nothing.
+** Verdict
+NOT MATCHED (not foreseen by the plan's Q2, which speaks of a typed
+child). It is slice 2's recorded reading ("Q2: only a node the graph
+lacks joins"), but the user's move loses the node from view without a
+word, which is what Q2 set out to end for typed children.
+
+* 12. Forkers as such drawn like forkees as such
+** Sent
+N's view ('p1-forks-meet', 03); P's ('p3-forkers-and-hides', 01).
+** Received
+R and T in N's forks folder, Pf in P's, each editable, =Kb=, with its
+own default folders, after the forkees (Pe =bK= before Pf).
+** Verdict
+MATCH.
+
+* 13. A forker as such shows only what it adds
+** Sent
+The same views.
+** Received
+R shows nothing but its forks folder (all its content is N's); T
+shows Y; Pf shows pf1 (pa is P's content, pw is P's hide).
+** Verdict
+MATCH.
+
+* 14. The hidden-in folder under a forker as such
+** Sent
+The same views.
+** Received
+Under T, "☮ It contains these, but c hides them." holding Z; under
+Pf, holding pw.
+** Verdict
+MATCH.
+
+* 15. The folder of what a forker hides of my node
+** Sent
+N's view ('p1-forks-meet', 03); R's view after R hid X4
+('p1b-forks-meet-saves', 04); the view after T became a mutual (05).
+** Received
+Under T, "☮ a hides these, which c contains." holding X2; under R,
+the same label holding X4. Once T is a mutual, T has no such folder.
+** Verdict
+MATCH.
+
+* 16. An owned forker as such: title edit and typed child saved
+** Sent
+Pf retitled and "typed under Pf" after pf1, one save
+('p3-forkers-and-hides', 06).
+** Received
+'Pf.skg': the new title, contains [pa, pw, pf1, NEW]; and the new
+node's file. No other file.
+** Verdict
+MATCH.
+
+* 17. A foreign forker as such: title edit and typed child refused
+** Sent
+yx4 (foreign, forks owned mx4) retitled; then a child typed under it
+('p15-foreign-forker').
+** Received
+"Cannot edit title/body for node yx4 ..., a foreign node shown as a
+member of a forks folder." and "Cannot add a child under yx4 ('your
+x4'), a foreign node shown as a forker: only its owner can change its
+content. ..." No file written.
+** Verdict
+MATCH.
+
+* 18. Hides apply to every fork partner: Jeff's picture
+** Sent
+P's view ('p3-forkers-and-hides', 01). P hides pw and ph2; its forker
+Pf contains pw; its forkee Pe does not.
+** Received
+pw stands in Pf's hidden-in folder, folded; the hidden-outside folder
+("b hides these, but nothing it forks or that forks it contains
+them.") holds ph2 alone.
+** Verdict
+MATCH.
+
+* 19. Editing hides through the forker's and the hidden-outside folder
+** Sent
+pw moved out of Pf's hidden-in folder to stand under Pf (step 08);
+then ph2 deleted from the hidden-outside folder (step 10).
+** Received
+"Stops hiding 'pw' from 'my x', as content of 'forker of x,
+retitled'."; then "Stops hiding 'ph2' from 'my x'."; 'P.skg' hides
+[pa] at the end; pw drawn under Pf.
+** Verdict
+MATCH. Observation: after step 10 the save's redraw keeps the emptied
+hidden-outside folder headline; a fresh view of P draws none
+('p3b-empty-hidden-outside').
+
+* 20. A removal of a child a forker contains is inferred as a hide
+** Sent
+pa deleted from P's content ('p3-forkers-and-hides', 03), then the
+redrawn view saved again.
+** Received
+"Hides 'pa' from 'my x', as content of 'forker of x'."; 'P.skg'
+contains [pb], hides [pw, ph2, pa]; pa drawn in Pf's hidden-in
+folder. The second save wrote nothing.
+** Verdict
+MATCH.
+
+* 21. Jeff's example: a cut from a forker makes my node fork it
+** Sent
+mx's view: y cut from under yx ("your x", foreign, a forker as such)
+and pasted as mx's last child ('p4-cut-from-forker', 02); the redrawn
+view saved again (03); a fresh view (04).
+** Received
+Only 'mx.skg' written: contains [y], forks [yx], no hides; 'yx.skg'
+untouched. The redraw: yx claiming (no 'noClaim'), editable, =2bKb=,
+showing z, and y as mx's content. The second save: '(changed-headlines
+())', no file changed, drawn identical; it equals the fresh view but
+for viewnode IDs.
+** Verdict
+MATCH.
+
+* 22. A plain cut from a forker: fork and hide
+** Sent
+y2 deleted from under yx2 in mx2's view, then the redraw saved again
+('p4-cut-from-forker', 06, 07).
+** Received
+"Hides 'y2' from 'my x2', as content of 'your x2'."; 'mx2.skg' forks
+[yx2], hides [y2]; yx2 drawn =bKb= with y2 in its hidden-in folder.
+Second save: nothing.
+** Verdict
+MATCH.
+
+* 23. Monogamy gone
+** Sent
+In 21, yx was already forked by owned M2.
+** Received
+The save made mx fork yx too, with no refusal; M2 still stands in
+yx's forks folder.
+** Verdict
+MATCH.
+
+* 24. A cut under a foreign note is refused
+** Sent
+G1 (foreign): f2 cut from its forkee F2, then h1 from its forker H1
+('p2b-forkees', 13, 14). On s2, in the user's perspective, b1 cut from
+B, a forker of foreign M ('p10b-perspective-cuts', 02).
+** Received
+"Cannot change what G1 ('G1') shows of F2 ('F2'), its forkee: G1 is
+foreign, and only a note of your own can fork another and hide what
+that one contains."; the same with "H1 ('H1'), its forker"; the same
+of M and B. No file written.
+** Verdict
+MATCH.
+
+* 25. Forks of one note meet: R's view
+** Sent
+'p1-forks-meet', 01.
+** Received
+R editable; N in its forks folder editable, =2bK=, showing X4 alone;
+in N's forks folder R a repeat (=Kb=, nothing under it) and T, =Kb=,
+editable, showing Y, with Z in its hidden-in folder and X2 in its
+hidden-by folder.
+** Verdict
+MATCH.
+
+* 26. Forks of one note meet: N's view
+** Sent
+'p1-forks-meet', 03.
+** Received
+N with X1 to X4; R and T both =Kb=; R showing nothing it adds; T as in
+R's view.
+** Verdict
+MATCH.
+
+* 27. Forks of one note meet: the saves
+** Sent
+'p1b-forks-meet-saves': X4 cut from N in R's view, the redraw saved
+again; in N's view Y cut from T and pasted after N's last child, the
+redraw saved again, then a fresh view of N.
+** Received
+"Hides 'X4' from 'R', as content of 'N'."; only 'R.skg' (hides [X4]);
+X4 in N's hidden-in folder; second save nothing. Then only 'N.skg':
+contains X1 to X4 and Y, forks [T], hides [Z]; 'T.skg' untouched; T
+first in N's forks folder, =bKb=, claiming, editable, showing nothing
+new, its hidden-by folder gone; then R; Y in N's content. Second save
+nothing; equal to the fresh view.
+** Verdict
+MATCH.
+
+* 28. Forks of one note meet: seen from T, and from R again
+** Sent
+Views of T and R after 27 ('p1b-forks-meet-saves', 08, 09).
+** Received
+T's view: N a mutual (=bKb=), editable, showing X4, with X2 in its
+hidden-in folder; in N's forks folder T a repeat and R =Kb= with X4 in
+its hidden-by folder. R's view: in N's forks folder T first, =bKb=,
+then R, a repeat.
+** Verdict
+MATCH.
+
+* 29. Under a skgrepo restriction: a forker outside it is left out
+** Sent
+s3: Np's view with no restriction, then 'set skgrepo restriction'
+'pub' on the connection, Np's view, saved unchanged ('p11-restriction',
+01 to 04).
+** Received
+Unrestricted: Rp (showing rq and rp1) and Tp (showing t1, qh in its
+hidden-in folder). Restricted: Rp showing rp1 alone; no Tp; qh now in
+the hidden-outside folder (no visible partner explains it). The
+unchanged save wrote nothing.
+** Verdict
+MATCH.
+
+* 30. Under a restriction: a removal only a hidden forker explains
+** Sent
+q1 deleted from Np's content under 'pub' (05).
+** Received
+"Hides nothing: 'q1' left 'Np', but it is no content of 'Rp', nor a
+mirror of any."; 'pub/Np.skg' contains [q2, q3], hides [qh]. After the
+widening q1 shows under Tp.
+** Verdict
+MATCH.
+
+* 31. Under a restriction: a cut from a visible forker
+** Sent
+rp1 cut from Rp under 'pub', the redraw saved again, then the
+restriction widened to 'priv' and Np viewed (07 to 10).
+** Received
+"Hides 'rp1' from 'Np', as content of 'Rp'."; 'pub/Np.skg' forks [Rp],
+hides [qh, rp1]; no 'priv/Np.skg'; 'priv/Rp.skg' (rq) untouched. Second
+save nothing. Widened: Rp =bKb= showing rq, rp1 in its hidden-in
+folder; Tp back.
+** Verdict
+MATCH.
+
+* 32. A perspective switch while forkers are drawn editable
+** Sent
+s2: R's view, then 'set perspective' to 'user', saved unchanged naming
+the perspective; to 'owner of third', saved unchanged; back to 'root
+authors' ('p10-perspective').
+** Received
+Root authors: A in M's place; M =3bK= editable with B and U editable
+forkers, A a repeat. User: U in M's place; M's forks folder now holds A
+and B editable, U a repeat. Third: B in M's place, likewise. No stale
+member, no file changed by either save, and the round trip draws the
+first view again but for viewnode IDs.
+** Verdict
+MATCH (plan 1's probe 12, stale forks-folder members on a re-pointed
+occurrence, does not recur).
+
+* 33. A cut in another perspective
+** Sent
+In the user's perspective, m1 cut from M (U's forkee as such)
+('p10b-perspective-cuts', 03).
+** Received
+"Hides 'm1' from 'U', as content of 'M'."; 'U.skg' hides [m1]; the
+view stays in the user's perspective.
+** Verdict
+MATCH.
+
+* 34. A forker that is also a repeat
+** Sent
+s1: Q contains RF and NF; RF forks NF. Q's view saved unchanged; rf2
+deleted from RF's own content; a child typed under RF's content
+occurrence ('p7-repeat-forker'). (A child typed under the repeat
+itself was not tried: mirror substitution showed RF in NF's place, and
+the repeat stands at level 6 with no children.)
+** Received
+RF in NF's forks folder is a repeat showing nothing. Unchanged: no
+file. The removal: only 'RF.skg', "Hides nothing: 'rf2' left 'RF',
+...". The typed child: 'RF.skg' and the new file only. 'NF.skg' never
+gained a fork or a hide.
+** Verdict
+MATCH.
+
+* 35. Stale buffers: a forker's content changed in another client's view
+** Sent
+Two connections. A: N's view. B: R's view, a child typed under R and
+saved. Then A's view saved unchanged ('p5-stale', 01 to 04).
+** Received
+B's save wrote 'R.skg' and the new node. A's save wrote nothing, with
+"Left as the graph has it: N (N), which changed after this buffer was
+rendered and which this buffer did not edit."; its redraw shows the
+new child under R.
+** Verdict
+MATCH: nothing was lost or made up. Observation: the warning names N,
+which did not change; A's baseline, parsed against the new graph,
+reads R's new child as cut from R (so N would fork R and hide it), and
+N is judged stale for it. An edit of N in that buffer would be refused
+with that reason.
+
+* 36. Stale buffers: a fork made by another client's view
+** Sent
+Two connections, each on P's view. B cut pf1 from Pf (P now forks
+Pf). Then A's view saved unchanged, and its redraw saved again
+('p5-stale', 05 to 08; 'A2', 10).
+** Received
+B: 'P.skg' forks [Pe, Pf], hides [pa, pf1]. A: no file changed, "Left
+as the graph has it: my x (P) ..."; but A's redraw draws Pf
+'⟨0g C2/4 bKb detach⟩', a pending detachment. Saving that redraw
+again: the same warning, no file changed, still 'detach'.
+** Verdict
+NOT MATCHED: the open entry of 'TODO/problems.org', "A buffer that
+shows a forker as claiming nothing can undo a fork another view made".
+The stale check keeps the fork, but the buffer shows a detachment the
+user never wrote, for as long as it stays open, and any edit of P there
+is refused as stale.
+
+* 37. The collateral rerender after a cut from a forker
+** Sent
+One connection holding Box3's view (Box3 contains bx3; foreign byx3
+forks bx3) and bx3's view. bw1 cut from byx3 in bx3's view, the save
+naming Box3 as a clean other view; then Box3's collateral view saved
+unchanged; then bx3 retitled in it ('p6c-...', 'p6d-...').
+** Received
+bx3's save: forks [byx3], hides [bw1], its redraw right. The
+'collateral-view' of Box3: byx3 '⟨0d C1/2 bKb ⌂:theirs detach⟩'. Saved
+unchanged: "Left as the graph has it: bx3 (bx3), which changed after
+this buffer was rendered ...". Retitled there: "NOTHING WAS SAVED ... A
+node this save would write changed after the buffer was rendered ...
+Changed since this buffer was rendered: the forks." A fresh view of
+Box3 draws byx3 claiming.
+** Verdict
+NOT MATCHED. The pitfall "The save must write the claim of a forker it
+makes a forkee" was met in the saved view only
+('claim_forkers_the_save_makes_forkees' edits that view); the
+collateral view, drawn by the server after the save, is born stale: it
+shows a detachment, and refuses edits of the note until reopened. The
+problems.org entry left open "Whether the collateral rerender reaches
+this buffer first"; it does, and does not fix it.
+
+* 38. The node budget with many forkers
+** Sent
+s4: B0's view and an unchanged save, with the default budget (1000)
+and with 'initial_node_limit = 5' ('p12-budget-default200',
+'p12-budget-limit5').
+** Received
+Default: 200 forkers, all editable, each showing its two children,
+1005 lines, drawn in 0.4 s, saved in 1.5 s, nothing written. Budget 5:
+B0, b01, b02 (level 2), F000 and F001 editable; F000's and F001's
+children write-protected; F002 to F199 write-protected and bare; 213
+lines; nothing written.
+** Verdict
+MATCH.
+
+* 39. A forkee as such nested under an editable member as such
+** Sent
+s1, added: V forks W; W forks U; W contains u1, w1; U contains u1, u2.
+V's view previewed ('(preview . "true")') with an empty baseline, saved
+unchanged with its baseline, W retitled there, and u2 cut from U there
+('p9-nested-forkee', 'p9b-nested-forkee-cut'). Found first in R's view
+of behavior 5 once T was N's mutual ('p8-*'); Shelf's view, which shows
+R in N's place, has it too ('p8d-*').
+** Received
+- The preview with no baseline: "Hides 'u1' from 'W', as content of
+  'U'." (R's view: "Hides 'X1' / 'X3' / 'Y' from 'N', as content of
+  'T' ...").
+- Unchanged, with its baseline: no file written, but "Left as the
+  graph has it: W (W), which changed after this buffer was rendered and
+  which this buffer did not edit."
+- W retitled: "NOTHING WAS SAVED ... A node this save would write
+  changed after the buffer was rendered: ... W ... Changed since this
+  buffer was rendered: the hides."
+- u2 cut from U: the same refusal. In W's own view the same cut
+  previews as "Hides 'u2' from 'W', as content of 'U'.", as it should.
+** Verdict
+NOT MATCHED, a bug. W is an owned member as such, so the traversal
+emits its title and body (behavior 2, "Title and body"), which gives W
+a Save intent whose 'contains' is unspecified.
+'forker_contains_after_save' ('lower.rs') returns 'intent . contains .
+or_default ()' for any Save intent, so W's contains "after the save" is
+empty, and the forkee-visibility step ('resolve_visibility.rs', its
+'forker_contains' and 'inferred_hides') reads every child of U that W
+contains, and so does not show under U, as cut from U. Its neighbor
+'forker_forks_after_save' already guards with 'is_unspecified'. Today
+the stale check masks it: the baseline parse makes the same mistake, so
+W is "stale" and left out. Effects: a false warning on every save of
+such a view, no edit of W possible there (title, body, a cut from its
+forkee, a typed child), and the wrong hides written by any save whose
+baseline does not show W (a buffer with no copy of W in its baseline).
+
+* 40. Q8: members already standing in the forks folder
+** Sent
+A's view with E made write-protected and bare, saved; then the same
+redraw with '(viewRequests editableView)' on A ('p14-q8-old-buffer').
+** Received
+First: E stays write-protected and bare, no file written. Second: E
+editable with its hidden-in folder, forks folder and content; no file
+written.
+** Verdict
+MATCH.
+
+* 41. The extended member and its containers folder
+** Sent
+As in 40.
+** Received
+E, made editable by the request, has no containers folder (a fresh
+view of A draws C1 and C2 folded under it).
+** Verdict
+MATCH to the letter: behavior 1 draws the folder "where the refresh
+draws" a member, and E stood already. Observation: C-c s e on the note
+gives its members a view other than a fresh one, without their
+containers folders.
