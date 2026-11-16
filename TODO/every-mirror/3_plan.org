@@ -1,0 +1,843 @@
+#+title: Plan 3 of every-mirror: a skgrepo's perspective, flat forks folders, hides by integration
+#+startup: overview
+
+* Status: approved; to be executed
+Jeff gave this plan's decisions on 2026-11-16 (quoted under "Agreed
+behavior"). The two questions below are the only ones the code forced;
+each slice follows the provisional answer unless Jeff gives another,
+which then becomes a correction under that slice's headline before
+its launch.
+
+* Open questions for Jeff
+** Q1. Several mirrors in the skgrepo that decides
+Slice 1. Decision D says which skgrepo decides: the perspective's, or
+else the first the config lists that holds a mirror. It does not say
+which mirror stands when that skgrepo holds several (two forks of one
+note in one skgrepo, which plan 1 made legal, or an owned chain D forks
+C forks N kept in one skgrepo). Today 'first_ranked_mirrors' and
+'mirror_shown_among' ('server/dbs/in_rust_graph/mirrors.rs') break such
+a tie by plan 1's rules: one mirror alone there; else the only one
+none of the others forks (so the chain shows D in N's place); else N
+itself; else the nearest, then the least pid.
+*** Provisional
+N itself, when N is homed in that skgrepo; else the only one there
+that none of the others forks; else the nearest to N along forks, then
+the least pid. Rule 2 and rule 3 trade places: a fresh view of N,
+whose perspective is N's home skgrepo (decision D), must show N itself
+('docs/glossary.org', "override substitution" now "mirror
+substitution": "A view opened on one node always shows the requested
+node itself"), and roots now substitute under every perspective
+(behavior 1). The cost: an owned chain kept in one skgrepo shows N,
+not D, wherever the perspective is that skgrepo; D stands where N's
+skgrepo is not the perspective's and D's is first.
+** Q2. The order within a flat forks folder
+Slice 2. Decision A orders the folder "first what it forks, then what
+forks it, then the rest of the family, nearest first"; decision D puts
+"the other mirrors ... in its forks folder in config order". The first
+group is the note's own 'forks' list, whose order the user edits there
+today ('Goal::ordered_then_unordered' in 'server/refresh/goal.rs': an
+ordered head the save writes back, an unordered tail kept as the view
+has it).
+*** Provisional
+The notes it forks in its list's order (editable, as today); then the
+forker-only members, by the declaration order of their home skgrepos;
+then the indirect members, nearest first, and among equals by the
+declaration order of their homes, then pid. Both tails are ordered
+now (the refresh moves a member there), since the order is the
+graph's and the config's, not the user's.
+
+* Assignment and authority
+This plan is a unitary declaration, but for the open questions above.
+Its decisions are Jeff's, given to the orchestrating Claude on
+2026-11-16 in conversation, after plans 1 and 2
+('TODO/every-mirror/1_plan.org', '2_plan.org') were executed and
+reviewed; those plans and their records are background nobody needs to
+read but where a pitfall below cites them.
+
+An agent executes one slice per launch ('coding-advice/orchestration.org').
+Read, before the first edit: 'coding-advice/names.org',
+'coding-advice/formatting.org', 'coding-advice/ai-agents.org',
+'coding-advice/no-legacy-support.org', 'coding-advice/common-gotchas.md',
+'coding-advice/when-to-stop.org', 'coding-advice/commit-messages.org'.
+Every name cited in the present tense is the code's at 0d2d650e (the
+last commit of plan 2's review); a slice that renames something
+records the mapping in its record, and each later slice maps a cited
+name through those records before relying on it.
+
+No slice reads or writes anything under 'data/', or starts, stops or
+connects to a server on ports 1730 or 1761: those are Jeff's live
+servers, running the old binary on old-format data. The migration of
+real data and the switch of those servers are out of scope (decision
+E).
+
+* Commits
+On main. One code commit per slice, more where a slice touches
+disparate things, each leaving the tree green; where a wire change
+cannot be split so (the server and both clients must agree on a name),
+one commit carries it, and the record says so. The first line names
+the plan and the slice: "every-mirror plan 3 slice N: ...". The slice's
+last commit carries its docs and flips its headline here to DONE. Read
+'coding-advice/commit-messages.org'. Stage only the files the slice
+touched, by path; never stage Jeff's untracked files (as of
+2026-11-16: 'TODO/total-diff-view/since-main.org',
+'data/bash/trim-node-bodies.sh', 'docs/en-espanol.org',
+'the-social-algorithm.org', 'unsaved-edits.org',
+'tests/hidden_from_subscriptions.rs~'), a '.elc', or anything under
+'tests/results/'. If this plan or the glossary is dirty with Jeff's
+edits, commit only the slice's own hunks
+('coding-advice/orchestration.org', "Files Jeff is editing during a
+run"). End every commit message with
+'Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>'.
+
+Each slice's record goes into 'TODO/every-mirror/progress.org' under a
+top-level headline "* Plan 3", one subheadline per slice, in the shape
+'coding-advice/orchestration.org' gives ("The report shape"), with a
+"Names coined or changed" list. Deviations from this plan's "how" go
+there too, with their reasons.
+
+* Scope
+** In scope
+- A perspective is a skgrepo (decision D): the view's, chosen by C-c v
+  o, defaulting to each tree's root's home skgrepo; mirror
+  substitution, the perspective cycle, the wire, both clients and the
+  AI tool follow.
+- Flat forks folders (decisions A and B): a note's forks folder holds
+  every mirror of it, each once; no member draws a forks folder unless
+  asked; indirect mirrors are members claiming nothing; the search
+  buffer draws one flat forks folder under a hit.
+- Hides by integration (decision C): a member as such shows what no
+  owned note contains and the note does not hide; the folder of what is
+  integrated; cuts record a hide only where no owned note contains the
+  child after the save.
+- The docs, the glossary, the herald table and its pinned copies, both
+  clients' folder lists and the AI tool's.
+** Out of scope, decided
+- The wording of labels and messages (decision E): each slice gives a
+  plain provisional wording, which Jeff may reword later.
+- The migration of real data, and the switch of the live servers.
+- 'TODO/problems.org' entries this plan does not name.
+- The diff view, beyond what the names below force: its forks folder
+  goal ('diff_view::forks_folder_goal') keeps the direct partners,
+  since an indirect mirror has no relationship to the note for a change
+  to be one of; the diff view has no perspective.
+- Renaming the atoms of the compound folders ('hiddenInForkPartnerFolder'
+  now also stands under an indirect member, which is no fork partner):
+  kept, knowingly; the record notes it for the next terms review.
+
+* Vocabulary
+Checked against 'docs/glossary.org' and the code at 0d2d650e
+('coding-advice/names.org', "Check a plan's words before the run").
+** perspective (redefined)
+A view's perspective is a skgrepo, the view's own once the user
+chooses one (C-c v o), or, until then, each top-level tree's root's
+home skgrepo ("root homes"). It decides which mirror stands in a note's
+place. Today it is an owner ('Perspective::Owner (SkgrepoOwner)') or
+each tree's root's author ('Perspective::RootAuthors').
+** a perspective's skgrepo list (redefined)
+The perspective's skgrepo first, then every skgrepo in the config's
+declaration order ('SkgConfig::skgrepos_in_declaration_order'), whose
+owned entries run most public first. Today
+'SkgConfig::perspective_skgrepo_list' puts an owner's skgrepos first,
+most private first.
+** root homes (coined)
+The default perspective: each top-level tree from its root's home
+skgrepo, the root standing for its '(inPlaceOf N)' else itself (as
+'perspective_owner_of_tree_containing' finds the root today). The
+wire's name for it: "root homes".
+** flat forks folder
+The forks folder ('Folder::Forks', atom 'forksFolder') as decision A
+makes it: every mirror of its note under the skgrepo restriction, each
+once, the note itself and those it hides excepted.
+** direct member, indirect member (coined)
+A *direct member* of N's forks folder is a fork partner of N (N forks
+it, or it forks N; a mutual both). An *indirect member* is a mirror of
+N joined to N only through other mirrors. An indirect member claims
+nothing, as a forker-only member does (decision B).
+** member as such, forker as such
+Unchanged: a member as such is a warranted member of a forks folder; a
+forkee as such claims, a forker as such claims nothing
+('docs/glossary.org'). Since an indirect member claims nothing too, the
+code's claim-based "forker as such" ('note_of_forker_as_such',
+'LocalContext::ForkerAsSuchPosition', 'MemberAsSuch::Forker') holds of
+it. Where the difference matters (the hidden-by folder, messages), the
+code asks the graph; the glossary's entry says a forker as such is a
+forker-only or an indirect member, and the messages say "a member that
+claims nothing" where either may be meant.
+** integrated, integrated elsewhere (redefined, coined)
+A note's content is *integrated* by the user when an owned note
+contains it, by a record the skgrepo restriction shows (decision C:
+"my graph" is every note in the user's owned skgrepos), or when the
+note whose forks folder shows the member contains it. Today
+"integrates" means "the note contains or hides"
+('less_what_the_note_integrates', 'server/refresh/goal.rs'). The
+folder of what a member's content holds that the user integrated
+elsewhere: 'Folder::IntegratedElsewhere' (atom
+'integratedElsewhereFolder', coined).
+** what a member shows (redefined)
+A member as such M of N's forks folder shows M's content less what N
+hides, less what N contains, less what any owned note contains
+(decision C). '(unintegrated COUNT)' counts it, as today.
+
+* Agreed behavior
+** Jeff's decisions (2026-11-16)
+*** A. Flat forks folders
+"if a forks b, then b will show under a's forks, and then a will show
+under b's forks. That's silly. Since forking is now transitive, we
+don't need to restate them like that. Nothing in a forks folder should
+itself contain a forks folder, unless the user specifically requests
+one there."
+*** B. Indirect mirrors
+A mirror joined to the note only through others is treated as a
+member claiming nothing, as a forker-only member is: deleting it hides
+it; cutting from it makes the note fork it; its content shows what the
+note neither contains nor hides; no K herald toward the note. Every
+member of the forks folder explains a hide alike ('fork_partners_shown'
+should mean the folder's members).
+*** C. Hides by integration
+"If I move your a to my x or under my y, there is no need to create a
+hide relationship. Skg can determine that it should hide my view of a
+under my view of your x by recognizing that a is integrated into my
+graph: it is contained by some node in my graph. The hide relationship
+is only needed if I delete your a from under your x, without making
+one of mine contain it. Under your x I should see up to [two] kinds of
+hide-related folders now: Things I have hidden, and things I have
+integrated into my graph." "My graph" is every note in the user's
+owned skgrepos, as the skgrepo restriction shows them. The folder of
+what is integrated is write-protected, each member carrying a
+containers folder showing where the user keeps it, and stands before
+the hidden folder.
+*** D. Perspective is a skgrepo
+"it has to be skgrepos, not authors, because what if I have two forks
+of something, one private and one public? I have to be able to choose
+either. The forks-as-such can be ordered and deduplicated according to
+their order in my skgconfig, but the chosen perspective is special."
+"Every buffer should have a 'user perspective', which is some skgrepo.
+Usually you see things from your own POV because you open buffers from
+your own graph. But if you open a buffer from someone else's, you
+should see it from theirs, until you request a different POV." With
+perspective S, a note's mirror in S stands in its place; with none in
+S, the mirror in the skgrepo the config lists first; the other mirrors
+are in its forks folder. A fresh view's perspective is its root note's
+home skgrepo. C-c v o cycles through the skgrepos that hold a mirror of
+something in the view. The config's own order stands, so after the
+chosen skgrepo a public fork outranks a private one.
+*** E. Out of scope
+Label wording, the migration and the server switch, 'TODO/problems.org'
+entries not named here.
+
+** 1. The perspective is a skgrepo (decision D)
+*** What decides it today
+'Perspective' ('server/types/views_state.rs') is 'RootAuthors' or
+'Owner (SkgrepoOwner)'; 'perspective_owner_of_tree_containing'
+('mirrors.rs') gives the owner a tree is drawn from: the view's owner,
+or the owner of the tree's root's original's home skgrepo.
+'mirror_shown' ranks a note's mirrors by
+'SkgConfig::perspective_skgrepo_list' ('server/types/misc.rs': the
+owner's skgrepos most private first, then the rest in declaration
+order) and breaks ties by 'first_ranked_mirrors'. 'substitute_roots'
+('server/refresh/visit.rs') shows a root raw under 'RootAuthors' and
+substitutes it under an owner's perspective; 'substitute_mirrors'
+substitutes content children of an editable occurrence under either.
+*** What it should be
+- 'Perspective' should be 'RootHomes' or 'Skgrepo (SkgrepoName)'.
+  'perspective_owner_of_tree_containing' becomes
+  'perspective_skgrepo_of_tree_containing': the view's skgrepo, or the
+  home skgrepo of the tree's root's original (its '(inPlaceOf N)',
+  else itself); where that root is no occurrence of a node the graph
+  knows, the config's first owned skgrepo in declaration order.
+- The skgrepo list of a perspective S: S, then every other skgrepo in
+  declaration order ("Vocabulary"). 'SkgConfig::perspective_skgrepo_list'
+  takes a skgrepo, not an owner.
+- The mirror shown for N: the first skgrepo of that list holding a
+  mirror of N decides, its tie broken as Q1 says. The owner of the
+  skgrepo plays no part; so 'SkgrepoOwner' leaves the substitution.
+- Roots: 'substitute_roots' treats a root as any substitution position
+  under both perspectives. Under 'RootHomes' a single-root view shows
+  its root itself (by Q1's first rule), as every fresh view does; a
+  search buffer's hits each stand in their own home skgrepo, so each
+  shows as itself, as today.
+- The cycle (C-c v o, 'perspective_to_show' in
+  'server/serve/handlers/perspective.rs'): 'RootHomes' first, then the
+  skgrepos home to a visible mirror of an original at a substitution
+  position ('candidate_owners' becomes 'candidate_skgrepos';
+  'original_at_substitution_position' unchanged), in declaration order
+  ('perspective_rank'); a skgrepo whose drawing equals the root homes'
+  is passed over, as today an owner's is ('in_the_cycle'), so that no
+  press changes nothing. "Something in the view" is read as an original
+  where substitution acts: a mirror of anything else draws nothing
+  differently.
+- The wire: '(perspective . NAME)' in "set perspective", its answer and
+  the save, where NAME is "root homes" or "skgrepo S" (S any configured
+  skgrepo, owned or foreign; 'Perspective::wire_name' and
+  'from_wire_name'). "root authors", "user" and "owner of NAME" are
+  refused as unknown names (no legacy reading). A save with no
+  '(perspective ...)' means "root homes", as it means "root authors"
+  today ('perspective_from_save_request', 'save_buffer.rs').
+- Messages ('perspective_name', 'name_of_owners_perspective'): "the
+  perspective of S" (S's skgrepo label, 'herald_label'), and for the
+  default "each root's home skgrepo (S1, S2)". Wording provisional
+  (decision E).
+- Everything that asks an owner of a tree today asks its skgrepo:
+  'inPlaceOf_part_errors' ('validate_tree.rs', its refusal naming the
+  mirror shown), 'forks_the_view_will_not_show' ('fork.rs', which also
+  warns for a fork of a root in a view switched to a skgrepo where the
+  clone is not shown: today it skips roots, since a root fork re-roots
+  the view, but under a skgrepo perspective the re-rooted clone is
+  substituted like any root), the fork confirmation's perspective
+  words, 'perspective_name', 'candidate_skgrepos'.
+- The search's suppression ('suppressed_result_gnids', 'text_search.rs')
+  ranks the hits that are mirrors of one another by the user's own
+  list: the config's first owned skgrepo, then declaration order
+  ('hit_standing_among' through 'first_ranked_mirrors' with that
+  skgrepo); it suppresses the others only when the one standing is
+  owned, as today. So among owned hits a public one stands over a
+  private one, where today the private one does.
+- The search buffer is drawn under 'RootHomes' ('draw_search_buffer'),
+  where it is drawn under 'RootAuthors' today.
+*** The clients and the AI tool
+- Emacs: 'skg-perspective' holds nil (root homes) or "skgrepo S";
+  'skg--set-perspective' treats "root homes" as nil; the mode line
+  shows the server's name once switched; 'skg-cycle-perspective' (C-c
+  v o) and its handler unchanged but for their docstrings
+  ('elisp/skg-buffer.el', 'elisp/skg-request-perspective.el',
+  'elisp/skg-request-save.el', 'elisp/skg-request-text-search.el').
+- Neovim: the same in 'nvim/lua/skg/buffer.lua',
+  'nvim/lua/skg/perspective.lua', 'nvim/lua/skg/save.lua'.
+- The AI tool ('tools/skg-for-ai/skg_for_ai.py'): 'DEFAULT_PERSPECTIVE'
+  is "root homes"; the 'perspective' command takes "next", "root
+  homes" or "skgrepo S"; the sidecar key 'perspective' keeps its name
+  and holds the new names; a sidecar with an old value ("user", "owner
+  of NAME") is read as the default, as one without the key is
+  ('perspective_of_sidecar'). On 2026-11-16, 1133 of the saved
+  sidecars under 'data/claude/views/' held the older key
+  'overrides_followed' and none held 'perspective'; all read as the
+  default.
+
+** 2. Flat forks folders (decisions A and B)
+*** What decides it today
+'forks_folder_goal' ('server/refresh/goal.rs') holds N's forkees (its
+list, ordered, claimable) then its forker-only members
+('forker_only_members': the notes forking N that N neither forks nor
+hides), unordered. 'add_default_folders' ('visit.rs') gives every
+editable occurrence carrying an editable-view request its forks
+folder, a member as such included, so each editable member shows its
+own forks folder, N in it. The search buffer ('draw_search_buffer',
+'text_search.rs') draws each hit's forks folder, then asks notes on a
+shortest fork path for their own forks folders until every suppressed
+mirror of the hit stands ('request_forks_folders_toward_suppressed_hits',
+'fork_path_parents', 'fork_partner_it_stands_among',
+'fold_nested_forks_folders').
+*** What it should be
+- The goal: N's forkees in list order (claimable); then its
+  forker-only members; then its indirect members, every other mirror
+  of N ('mirrors_of', 'mirrors.rs') that N does not hide; each tail
+  ordered as Q2 says. None claimable but the forkees. A mirror reached
+  only through a note N hides is still a member: the hide leaves out
+  that note alone.
+- An indirect member, as decision B says: drawn as a forker-only
+  member is (claiming nothing, warranted by the goal, a member as such
+  with its containers folder, editable under an editable N as the
+  budget allows); no birth facts (its roles toward N are none:
+  'birth_facts_of_fork_roles'); its relationship heralds name no
+  ancestor 2 on the 'forks' sides, so no =K= toward the note (they come
+  from the graph); its relRepo fact none, a relRepo request on it
+  refused as on any member claiming nothing
+  ('is_forks_folder_member_claiming_nothing'). Its content shows what a
+  member shows. The folder of what a forker hides of the note
+  ('Folder::HiddenByForker', 'hidden_by_forker') is drawn under a
+  member claiming nothing only when it forks N: an indirect member's
+  hides do not apply to N's content.
+- No member of a forks folder draws a forks folder unasked:
+  'add_default_folders' adds 'Folder::Forks' to an occurrence only when
+  it is no member as such ('note_of_member_as_such'). A request (C-c l
+  f, '(folder forks)') still draws one there. A forks folder already
+  standing under a member in a buffer stays, as the refresh keeps what
+  a buffer holds (a view request's folder cannot be told from an
+  unasked one once drawn).
+- 'fork_partners_shown' ('goal.rs') means the folder's members: the
+  forkees, the forker-only and the indirect members. So their content
+  explains a hide alike: the hidden-outside folder
+  ('hidden_outside_of_fork_partners'), the hide inference from
+  removals ('infer_hides_from_contains_removals'), the hidden-outside
+  edits ('apply_hiddenoutside_edits'), the nodeMerge
+  ('gnids_shown_through_fork_partners') and the hide report
+  ('hide_report_lines') read it. The private function of the same name
+  in 'mirrors.rs' (a note's visible direct partners, for the walk) is
+  renamed 'visible_fork_relationships_of', so that one name means one
+  thing. The hide floor ('hide_skgrepo', its "partners on record")
+  keeps its wider set, as plan 2 decided.
+- Deleting an indirect member hides it, as deleting a forker-only
+  member does: 'resolve_forks_folder_removals' ('resolve_visibility.rs')
+  reads every mirror of N the folder no longer shows, not only N's
+  forkers.
+- A cut from an indirect member makes N fork it and hides the child
+  as a cut from a forker as such does ('resolve_forker_visibility'),
+  which reads what the view drew under the member by
+  'are_fork_partners' today: for an indirect member that answer is
+  false, and it would read all of the member's content as shown, so a
+  child the view never drew would count as cut. It asks instead
+  whether the member is a mirror of N under the restriction
+  ('is_mirror_of').
+- The search buffer: one forks folder under a hit, flat as any, holding
+  every suppressed mirror of the hit; the nesting machinery goes
+  ('request_forks_folders_toward_suppressed_hits', 'fork_path_parents',
+  'fork_partner_it_stands_among', 'fold_nested_forks_folders'), and
+  'draw_search_buffer' refreshes once.
+- Heralds: none new. A forkee shows =bK=, a forker-only member =Kb=, a
+  mutual =bKb=, an indirect member neither 'b' flag ('docs/heralds.org',
+  "Ancestor flags and floors").
+
+** 3. Hides by integration (decision C)
+*** What decides it today
+What a member as such shows is its content less what N contains or
+hides ('less_what_the_note_integrates' and 'unintegrated_content_gnids',
+'goal.rs', through 'content_goal_gnids', which the stats pass counts
+from too). A cut from a forkee as such hides each content child the
+buffer no longer shows unless N contains it after the save (the
+forkee-visibility step in 'resolve_visibility'); a cut from a forker
+as such reads what the view drew, then hides the cut unless N contains
+it after the save ('resolve_forker_visibility'); a child removed from
+N's contains that a fork partner contains is hidden unless N contains
+it after the save ('infer_hides_from_contains_removals').
+*** What it should be
+- What a member shows ("Vocabulary"): less N's hides, less N's
+  contains, less what any owned note contains, each by records the
+  skgrepo restriction shows. The owned containers are read from the
+  graph's containment relmap ('inbound_pids_for_relation_gated' with
+  'NodeRelation::Contains'), each container's home owned
+  ('SkgConfig::skgrepo_is_owned'). N's own contains is subtracted even
+  when N is foreign: what N already holds is integrated into N.
+- The integrated-elsewhere folder, under an editable member as such
+  ('add_default_folders'), first among the member's folders, before
+  the hidden-in folder: M's content (visible records) that an owned
+  note or N contains, less N's hides, in M's list order. Write-protected,
+  drawn when nonempty, its members folded
+  ('Walk::folders_whose_drawn_members_are_folded'), each member
+  carrying a containers folder (folded, omitting view-ancestors, as a
+  forks-folder member's does: 'add_containers_folder_under_forks_folder_member'),
+  which shows where the user keeps it among its containers. Its members
+  carry no chain directly. Birth facts '(contains in 2)'. Label
+  provisional: "☮ It contains these, and you keep them elsewhere."
+- A child both hidden by N and integrated stands in the hidden-in
+  folder only: the hide is the explicit record, and that folder is
+  where moving it out removes it.
+- Existing hides that integration makes redundant are kept, harmless:
+  each still stands in the hidden-in folder under the member that
+  contains it, and nowhere else; moving it out unhides it, and it then
+  stands in the integrated-elsewhere folder. No save removes such a
+  hide by itself.
+- Cuts: the forkee-visibility step reads a child as cut only if the
+  view drew it (a content child of the forkee that N neither hid nor
+  integrated before the save, by the graph), and hides a cut child
+  only if no owned note contains it after the save; the
+  forker-visibility step likewise (it already reads what the view
+  drew; its "integrated" set gains the owned containers), and still
+  makes N fork the forker or indirect member; the inference from
+  removals hides only what no owned note contains after the save.
+  "After the save": a note this save writes, by its contains as the
+  save leaves it ('note_contains_after_save' and its kin in
+  'lower.rs'); any other, by the graph.
+- The hidden-outside folder is unchanged: N's hides that no member of
+  its forks folder contains.
+- The hide report ('hide_report.rs') says, for a child removed and not
+  hidden because another owned note keeps it, which one ("but 'Y'
+  keeps it", as it says today "but this save places it under 'E'").
+- nodeMerge ('gnids_shown_through_fork_partners') reads what a member
+  shows by the new rule (unrestricted, as now).
+
+** 4. What stays as it is, and what changes, among the defaults a user sees
+*** Kept
+- Where substitution acts (roots, content of an editable occurrence;
+  never in the diff view or a member of any folder).
+- A fresh view shows its root itself; a search buffer shows each hit
+  as itself.
+- The forks folder drawn unasked on an occurrence an editable-view
+  request extends, when it has a fork partner either way
+  ('has_a_fork_partner'); its hidden-outside folder last; the forkees'
+  editable order; claims by the graph in a redrawn view
+  ('claim_forks_folder_members_as_the_graph_does').
+- The hidden-in folder, the hidden-by folder under a forker, the
+  containers folder under each forks-folder member, all folded.
+- The hidden-outside folder's membership rule.
+- The fold state of everything already in a buffer.
+- C-c v o's key, its refusal while the buffer has unsaved edits, its
+  answer and rerender stream.
+*** Changed
+- A perspective is a skgrepo; the default is each root's home
+  skgrepo; under a chosen skgrepo the roots substitute too.
+- Among the user's own mirrors the more public one stands where the
+  perspective's skgrepo holds none.
+- A member of a forks folder shows no forks folder unasked; a forks
+  folder lists every mirror, indirect ones claiming nothing.
+- The search buffer shows one flat forks folder under a hit.
+- A member as such shows no content the user keeps in an owned note;
+  that content stands in the integrated-elsewhere folder.
+- A move of a child into an owned note records no hide.
+
+* Pitfalls the slices must respect
+** Live servers and data
+Ports 1730 and 1761 are Jeff's live servers ('target/release/skg' with
+'data/jeff/skgconfig.toml' and 'data/claude/skgconfig.toml'), running
+the old binary on old-format data. Never start, stop or connect to
+them, never pass those ports or configs to anything, never build the
+release profile, never read or write 'data/' (but read-only counts).
+Isolated instances only ('.claude/skills/verify/SKILL.md'). Every
+commit leaves the tree green.
+** End-to-end checks keep their files outside 'tests/results/'
+'bash/all-tests.sh' wipes 'tests/results/'; plan 1's review lost its
+probes' transcripts so ('progress.org', "Orchestrator's notes after the
+review fixes"). Each slice's check uses a scratch data root and
+transcripts under '/tmp/claude-1000/every-mirror-p3-sliceN/', stops its
+server by its PID, confirms the port free, and deletes the scratch data
+but the transcripts the record cites.
+** Two functions named 'fork_partners_shown'
+'server/refresh/goal.rs' (the folder's members, read by the save's
+hide rules, the nodeMerge and the hide report) and a private one in
+'server/dbs/in_rust_graph/mirrors.rs' (a note's visible direct
+partners, read by 'mirrors_of'). Decision B widens the first; the
+second must stay direct, or 'mirrors_of' would loop through hides.
+Slice 2 renames the second.
+** Every reader of the perspective's owner
+'perspective_owner_of_tree_containing' is read by 'substitute_mirrors'
+('visit.rs'), 'inPlaceOf_part_errors' ('validate_tree.rs'),
+'forks_the_view_will_not_show' ('fork.rs') and 'perspective_name'
+('perspective.rs'); 'first_ranked_mirrors' by 'mirror_shown_among' and
+'hit_standing_among' ('text_search.rs'); 'mirror_shown_among' by
+'mirror_shown' and 'mirror_shown_once_cloned' ('fork.rs');
+'Perspective::RootAuthors' by 'buffer_rerender.rs', 'from_text.rs',
+'validate_tree.rs', 'visit.rs', 'perspective.rs', 'save_buffer.rs',
+'text_search.rs', 'test_utils.rs', 'views_state.rs', 'update_buffer.rs';
+'Perspective::Owner' by 'mirrors.rs', 'visit.rs', 'perspective.rs',
+'save_buffer.rs', 'views_state.rs'. The wire's names "root authors",
+"user" and "owner of" are read by the clients
+('elisp/skg-buffer.el', 'skg-request-perspective.el',
+'skg-request-save.el', 'skg-request-text-search.el';
+'nvim/lua/skg/buffer.lua', 'perspective.lua', 'save.lua'), the AI tool
+and its README, and the tests: 'tests/mirror_substitution.rs',
+'tests/fork.rs', 'tests/save_rerender_release.rs', 'tests/repo_sets.rs',
+'tests/idempotence.rs', 'tests/strandeds.rs', 'tests/graph_straddle_engines.rs',
+'tests/refresh/{chain, diff_view, mod}.rs', 'tests/shared/git_fixture.rs',
+'tests/new/buffer_to_viewnodes/validate_tree/contradictory_instructions.rs',
+'tests/elisp/test-skg-perspective.el', 'tests/elisp/test-skg-search-results.el',
+'tests/nvim/perspective_spec.lua', the integration test 'perspective'.
+Slice 1 regreps them and lists each in its record.
+** A config may list foreign skgrepos before owned ones
+'data/claude/skgconfig.toml' declares Jeff's five skgrepos first. Under
+decision D, with a perspective that holds no mirror of a note, the
+first declared skgrepo holding one decides: in such a config a foreign
+original outranks the user's own forks. That is the decision ("the
+config's own order stands"); tests whose fixtures declare foreign
+skgrepos first ('tests/mirror_substitution/fixtures-third-author/',
+'tests/fork/fixtures-mail-third-party/' and kin) change their answers,
+and each record lists them. The search's suppression keeps the user's
+own skgrepo first (behavior 1), so it is unaffected by that order.
+** Roots substitute under every perspective
+Under 'RootHomes' a root stands in its own home skgrepo, so Q1's first
+rule shows it. A root re-pointed under a skgrepo perspective keeps its
+'(inPlaceOf N)' and is re-pointed back by the same rule
+('substitute_roots', 'redraw_folders', 'ask_for_what_a_fresh_root_asks').
+A fork of a root re-roots the saved view at the clone
+('replace_saved_view_fork_roots'), which a skgrepo perspective then
+substitutes like any root: the warning of behavior 1 covers it.
+** The forkee-visibility step reads every undrawn child as cut
+Today it hides each content child of the forkee the buffer does not
+show, unless N contains it after the save ('resolve_visibility'): it
+never asks what the view drew, since what a forkee as such showed was
+its content less what N held. Once integrated children are left out
+of what it shows, a child an owned note held before the save, which
+the view never drew, would read as cut whenever the same save takes
+it out of that owned note. Slice 3 gives the step what the view drew
+(the graph before the save), as 'resolve_forker_visibility' already
+computes it.
+** "Contained by an owned note after the save" needs the whole save
+A note the save writes has its contains in the lowered intents
+('note_contains_after_save'); any other note's, in the graph. A child
+moved in this save from an owned note to another is contained after
+it; one moved out of every owned note is not. Read both, by visible
+records; the graph's containment relmap gives the candidates.
+** 'note_of_forker_as_such' keys on the claim
+It holds of an indirect member too. The hidden-by folder's goal
+('folder_goal'), 'add_default_folders' and
+'is_hiddenByForkerFolder_under_no_forker_as_such' must also ask that
+the member forks the note (the graph), or an indirect member would
+show its own hides of N's content, which do not apply to N.
+** The compound folders' tables
+A new folder kind ('Folder::IntegratedElsewhere') touches 'Folder::all'
+(with its 'guard'), 'goal_is_ordered', 'is_editable', 'repr_in_client',
+'required_ancestry' (its row beside 'ANC_UNDER_A_MEMBER_AS_SUCH'),
+'compound_folder_parties', 'kinds_redrawing', 'birth_facts_for_folder',
+'folder_goal', 'members_carry_containerward_chain' (false: its members
+carry a containers folder), 'folder_goes_when_empty', the parse's
+checks ('validate_folder_under_a_member_as_such',
+'cannot_be_child_of_vognode', 'validate_vognode_identity_and_structure'
+in 'server/from_text/buffer_to_viewnodes/local.rs'), the traversal's
+catch-all for write-protected folders ('traverse.rs'), and the herald
+table with its pinned copies: 'herald_rule_table' ('server/heralds.rs'),
+'shared/herald-styles.json' ('node_heralds',
+'folder_heralds.write_protected', checked at startup by
+'folder_heralds_inconsistencies'), 'tests/shared/herald-rules.sexp',
+'tests/shared/herald-rendering-cases.txt' (both clients, their style
+runs pinning label lengths), 'herald_rules_cover_the_emittable_vocabulary',
+'shared/metadata-fields.json' (the AI tool's 'FOLDER_ATOMS'), and the
+lists naming every write-protected partner folder
+('skg--relRepo-unsupported-folder-atoms', 'M.relRepo_unsupported_folder_atoms',
+'RELREPO_UNSUPPORTED_FOLDERS'), and the AI tool's
+'HERALD_PHRASES_HOLDING_HANDLE_WORDS' if its label holds a handle word.
+** The diff view shares these functions
+'forks_folder_goal' defers to 'diff_view::forks_folder_goal';
+'content_goal' to 'diff_view::content_goal'; 'add_default_folders' and
+'substitute_mirrors' return in the diff view. Every rule here asks
+'walk . is_diff_view ()' and does nothing there.
+** Old buffers
+A buffer drawn before slice 2 holds nested forks folders under
+members; they stay until the view is reopened (behavior 2). One drawn
+before slice 3 holds integrated children under a member as such, as
+content claiming under it; at the next refresh they are no goal
+member, so under an editable member they vanish if they claim (the
+claims rung, 'mark_claims'), as an unwarranted claiming child does. A
+save of such a buffer before its redraw reads them as shown, which
+hides nothing. No migration ('coding-advice/no-legacy-support.org').
+** Integration tests
+A slice that changes what the server writes into a buffer runs
+'bash/integration-tests.sh' before it ends, then 'bash/all-tests.sh'.
+Every suite was green at 24e84697 (plan 2's review record: integration
+78 of 78). Likeliest to change: 'perspective', 'fork', 'fork-chain',
+'fork-owned', 'fork-repo', 'forked-direct-visit', 'forks-meet',
+'search-enrichment', 'search-buffer'.
+** Suites
+Serialize full runs. Rust: 'bash/nextest.sh'. Emacs:
+'bash/emacs-tests.sh'. Neovim: 'bash/nvim-tests.sh'. AI tool: 'python3
+tools/skg-for-ai/test_skg_for_ai.py' after 'cargo build --bin skg'
+(every slice: it asserts the server's behavior). Everything:
+'bash/all-tests.sh' (in the background, no timeout under 15 minutes).
+Logs under 'tests/results/every-mirror/sliceN-plan3/'; copy
+'tests/results/every-mirror/' out before a full run and back after it.
+
+* Code map
+** Perspective
+- 'server/types/views_state.rs' ('Perspective', 'wire_name',
+  'from_wire_name', 'name_of_owners_perspective').
+- 'server/types/misc.rs' ('perspective_skgrepo_list',
+  'skgrepos_in_declaration_order', 'skgrepo_is_owned').
+- 'server/dbs/in_rust_graph/mirrors.rs' ('mirror_shown',
+  'mirror_shown_among', 'first_ranked_mirrors', 'FirstRanked',
+  'perspective_owner_of_tree_containing').
+- 'server/refresh/visit.rs' ('substitute_mirrors', 'substitute_roots',
+  'is_raw_where_another_mirror_would_stand'), 'server/refresh/mod.rs'
+  ('Walk::perspective').
+- 'server/serve/handlers/perspective.rs' ('perspective_to_show',
+  'candidate_owners', 'original_at_substitution_position',
+  'perspective_rank', 'first_ranked_after', 'perspective_name').
+- 'server/serve/handlers/save_buffer.rs' ('perspective_from_save_request'),
+  'server/update_buffer.rs', 'server/rerender_pass.rs', 'server/from_text.rs',
+  'server/diff_view/buffer_rerender.rs', 'server/test_utils.rs'.
+- 'server/from_text/fork.rs' ('forks_the_view_will_not_show',
+  'mirror_shown_once_cloned'), 'server/from_text/buffer_to_viewnodes/validate_tree.rs'
+  ('inPlaceOf_part_errors').
+- 'server/serve/handlers/text_search.rs' ('suppressed_result_gnids',
+  'hit_standing_among', 'draw_search_buffer').
+- Clients and the AI tool as behavior 1 lists.
+** Flat forks folders
+- 'server/refresh/goal.rs' ('forks_folder_goal', 'forker_only_members',
+  'fork_partners_shown', 'partnerFolder_members_in_graph',
+  'note_of_member_as_such', 'note_of_forker_as_such', 'folder_goal').
+- 'server/refresh/visit.rs' ('add_default_folders',
+  'is_hiddenByForkerFolder_under_no_forker_as_such',
+  'is_hidden_by_the_forks_folders_viewparent').
+- 'server/refresh/viewnodestats.rs' ('birth_facts_of_fork_roles').
+- 'server/from_text/local_fieldintent_collection/resolve_visibility.rs'
+  ('resolve_forks_folder_removals', 'resolve_forker_visibility',
+  'are_fork_partners', 'infer_hides_from_contains_removals',
+  'apply_hiddenoutside_edits').
+- 'server/from_text/hide_report.rs', 'server/nodeMerge/nodeMergeInstructionTriple.rs'.
+- 'server/serve/handlers/text_search.rs' ('stub_root_of_hit',
+  'request_forks_folders_toward_suppressed_hits', 'fork_path_parents',
+  'fork_partner_it_stands_among', 'fold_nested_forks_folders',
+  'fold_what_was_drawn_under_hit').
+** Hides by integration
+- 'server/refresh/goal.rs' ('content_goal', 'content_goal_gnids',
+  'less_what_the_note_integrates', 'unintegrated_content_gnids',
+  'hidden_in_fork_partner').
+- 'server/refresh/visit.rs' ('add_default_folders',
+  'add_containers_folder_under_forks_folder_member', 'after_drawing',
+  'stands_drawn_folded').
+- 'server/refresh/ancestry.rs' ('required_ancestry',
+  'compound_folder_parties', 'ANC_UNDER_A_MEMBER_AS_SUCH').
+- 'resolve_visibility.rs' (the forkee-visibility loop in
+  'resolve_visibility', 'resolve_forker_visibility',
+  'infer_hides_from_contains_removals'); 'lower.rs'
+  ('note_contains_after_save').
+- 'server/types/viewnode.rs' ('Folder'), 'server/heralds.rs',
+  the shared tables and pinned copies of "The compound folders' tables".
+** Tests most likely to change
+'tests/mirror_substitution.rs', 'tests/dbs/in_rust_graph/mirrors.rs',
+'tests/fork.rs', 'tests/save_rerender_release.rs', 'tests/repo_sets.rs',
+'tests/forks_folder.rs', 'tests/forks_folder_by_default.rs',
+'tests/forks_meet.rs', 'tests/forkees_drawn_editable.rs',
+'tests/forkers_drawn_editable.rs', 'tests/cuts_from_forkers.rs',
+'tests/hidden_from_forks.rs', 'tests/hides_apply_to_every_fork_partner.rs',
+'tests/hide_inference_under_a_narrowing.rs',
+'tests/members_as_such_and_stale_buffers.rs', 'tests/forks_under_search_hits.rs',
+'tests/search_buffer.rs', 'tests/refresh/', 'tests/unit/heralds.rs',
+the clients' perspective and heralds tests, the AI tool's tests and
+expected views. A test pinning a name or a drawn view adapts; a test
+pinning a save's effect on the graph changes only where a behavior
+here says so, and the record lists each.
+** Docs
+'docs/glossary.org' (perspective, mirror substitution, forks folder,
+member as such, forker as such, what a member shows, hides, cut, the
+new terms); 'docs/mirrors.org'; 'docs/forks.org';
+'docs/api-and-formats.org' ("Set perspective", "Mirror substitution
+and the inPlaceOf part", "Save buffer", "Text search", the folder atoms
+and birth facts); 'docs/data-model_technical.org'; 'docs/heralds.org';
+'docs/sharing-model.org'; 'docs/COMMANDS.org', 'docs/COMMANDS-nvim.org';
+'docs/nvim-client-deviations.org'; 'docs/telescopes.org' (its "root
+authors"); the AI tool's README.
+
+* Implementation sequence
+** TODO Slice 1: the perspective is a skgrepo
+Questions: Q1. Decision D; behavior 1.
+- 'Perspective' as 'RootHomes' / 'Skgrepo (SkgrepoName)', its wire
+  names, 'perspective_skgrepo_of_tree_containing', the skgrepo list,
+  Q1's tie rule in 'mirror_shown_among' and 'first_ranked_mirrors',
+  roots substituted under both, the cycle over skgrepos, the messages,
+  every reader of the pitfall "Every reader of the perspective's
+  owner"; the search's suppression by the user's own list; the fork
+  warning for a root.
+- Clients and the AI tool as behavior 1 says, in the same commit as the
+  server's wire change if they cannot be green apart.
+- Tests: 'tests/dbs/in_rust_graph/mirrors.rs': Jeff's example ("my X,
+  my Y, your X, your Y") read as skgrepos, each perspective; a private
+  and a public fork of one note, each chosen in turn, and with neither
+  chosen the public one standing; Q1's rules one test each; a foreign
+  skgrepo declared first. 'tests/mirror_substitution.rs': a fresh view
+  shows its root under 'RootHomes'; C-c v o cycles root homes, then
+  each skgrepo home to a mirror, passing over one that draws nothing
+  differently, then back; a named "skgrepo S" not in the cycle is
+  refused; "user" and "owner of X" are refused as unknown; the tamper
+  check under a skgrepo perspective; a fork of a root under another
+  skgrepo's perspective warns. The search: two owned hits, a public and
+  a private mirror, the public one stands. The clients' and the AI
+  tool's perspective tests with the new names; the integration test
+  'perspective' in both clients.
+- End to end: an isolated 'target/debug/skg' on scratch data (a note
+  with a public and a private owned fork and a foreign original):
+  a fresh view of the original, C-c v o through each skgrepo, a save
+  under each, and a search; transcripts kept as the pitfall says.
+- Docs: glossary ("perspective", "a perspective's skgrepo list", "root
+  homes", "mirror substitution"); 'docs/mirrors.org';
+  'docs/api-and-formats.org' ("Set perspective", "Save buffer", "Mirror
+  substitution and the inPlaceOf part", "Text search"); both COMMANDS
+  docs (C-c v o); 'docs/nvim-client-deviations.org';
+  'docs/telescopes.org'; the AI tool's README.
+- This slice changes what the server writes into buffers: run
+  'bash/nextest.sh', the AI tool's tests, 'bash/integration-tests.sh',
+  then 'bash/all-tests.sh'.
+
+** TODO Slice 2: flat forks folders
+Questions: Q2. Decisions A and B; behavior 2.
+- The goal with every mirror (Q2's order), indirect members claiming
+  nothing; 'fork_partners_shown' as the folder's members, the private
+  one in 'mirrors.rs' renamed; no forks folder under a member as such
+  unasked; the hidden-by folder only under a forker; deleting an
+  indirect member hides it; a cut from one makes N fork it, with what
+  the view drew read by 'is_mirror_of'; the search's one flat folder,
+  its nesting machinery removed. Land the goal, the claims, the
+  removal and the cut in one commit: a goal drawing indirect members
+  that the save could not read would make a cut or a deletion of one
+  silently do nothing.
+- Tests: in 'tests/forks_folder.rs' (or a new 'tests/flat_forks_folders.rs'
+  in 'grouped_forks'), a chain A forks B forks C and a sibling D forks
+  B: B's folder holds A, C... in Q2's order with A and D forker-only and
+  any indirect member last; A's folder holds B (=bK=), then C and D
+  indirect (no 'b' flag), claiming nothing, and no member shows a forks
+  folder; C-c l f on a member draws one; an unchanged save writes
+  nothing; deleting D in A's view hides D in A and D stands in A's
+  hidden-outside folder; cutting a child from D in A's view makes A
+  fork D and hides the child; D's hidden-by folder is never drawn under
+  A; a hide that only D's content explains leaves the hidden-outside
+  folder; the search: an owned hit standing over a mirror two forks
+  away shows it in its one forks folder, nothing nested. Adapt
+  'forks_meet', 'forks_under_search_hits', 'search_buffer',
+  'forks_folder_by_default', 'forkers_drawn_editable',
+  'hides_apply_to_every_fork_partner', 'members_as_such_and_stale_buffers',
+  the AI tool's expected views; the integration tests 'forks-meet' and
+  'search-enrichment'.
+- End to end: on scratch data with such a chain, each view drawn and
+  saved unchanged, the deletion and the cut above, and a search.
+- Docs: glossary ("forks folder", "direct member, indirect member",
+  "member as such", "forker as such", "hides" and what explains one);
+  'docs/forks.org' (its examples, which show nested folders);
+  'docs/mirrors.org'; 'docs/api-and-formats.org' ("Text search", the
+  forks folder, birth facts); 'docs/heralds.org' (an indirect member's
+  heralds); 'docs/data-model_technical.org'; both COMMANDS docs (C-c l
+  f under a member); the AI tool's README.
+- Run the suites as slice 1 does.
+
+** TODO Slice 3: hides by integration
+Decision C; behavior 3.
+- What a member shows, through 'content_goal_gnids' (so the
+  '(unintegrated COUNT)' stat follows); the integrated-elsewhere
+  folder with every table "The compound folders' tables" names; the
+  forkee-visibility step's "drawn before" and both visibility steps'
+  and the removal inference's "no owned note contains it after the
+  save"; the hide report's line; nodeMerge. Land the folder with the
+  goal change: a member that stops showing integrated children without
+  the folder would hide them from the user in that view.
+- Tests (a new 'tests/hides_by_integration.rs' in 'grouped_forks'):
+  your x (foreign) contains a, b, c; my note M forks x; my y contains
+  a: M's view shows x with b and c, and a in the integrated-elsewhere
+  folder, first, with a containers folder holding y; moving b from x
+  to my z in that view hides nothing and b joins the folder; cutting c
+  hides c; a cut whose child the same save adds to an owned note hides
+  nothing; removing a from y in another save makes a show under x
+  again, with no hide; an existing hide of a that y contains stands in
+  the hidden-in folder, not in the integrated folder, and moving it
+  out unhides it and a stands in the integrated folder; under a
+  skgrepo narrowing that keeps out y's record of a, a shows under x;
+  the same through a forker as such and an indirect member; an
+  unchanged save of each view writes nothing. Adapt 'hidden_from_forks',
+  'forkees_drawn_editable', 'forkers_drawn_editable', 'cuts_from_forkers',
+  'forks_meet', 'hide_inference_under_a_narrowing',
+  'members_as_such_and_stale_buffers', the nodeMerge unit tests, the
+  herald pins in both clients, the AI tool's expected views.
+- End to end: the fixture above on scratch data; each gesture, saved,
+  each answer's hide report read; transcripts kept.
+- Docs: glossary ("integrated", "what a member shows", the new folder,
+  "cut", "hides"); 'docs/forks.org' (a section on integration);
+  'docs/api-and-formats.org' (the folder atom, birth facts, the save's
+  hide rules); 'docs/heralds.org' (the label); 'docs/data-model_technical.org';
+  'docs/sharing-model.org'; both COMMANDS docs; the AI tool's README.
+- Run the suites as slice 1 does.
+
+** TODO Slice 4: the sweep, and the record
+- Re-read 'docs/glossary.org', 'docs/forks.org', 'docs/mirrors.org'
+  and 'docs/sharing-model.org' whole for sentences the slices left
+  stale ("each root author's", "owner's perspective", "nested",
+  "under b's forks", "N contains or hides" where integration now
+  counts), and the code's comments in the files the slices touched.
+- 'git grep -n -i -E "root author|RootAuthors|Perspective::Owner|owner of"'
+  over 'server', 'elisp', 'nvim', 'tools/skg-for-ai', 'tests', 'shared'
+  and 'docs': each remaining hit renamed, or listed in the record with
+  why it stays.
+- End to end: plan 2's forks-meet scenario ('tests/integration/forks-meet/data/')
+  copied to scratch, driven through each behavior of this plan's
+  "Agreed behavior" once more on the final binary.
+- Run 'bash/integration-tests.sh', then 'bash/all-tests.sh'.
+
+* Verification and completion
+Each slice ends with its suites green but for failures it classifies
+as pre-existing or flaky, its end-to-end check, its docs, its record in
+'progress.org', and its headline DONE. After slice 4 the orchestrator
+runs the review of 'coding-advice/plans.org', "After each plan": one
+agent on the terms this plan's code coined or reused and any 'TODO/'
+citation in code, and one probe agent driving each behavior of "Agreed
+behavior" against an isolated server, its transcripts outside
+'tests/results/'.
+
+* Stops and deviations
+Stop only for the conditions in 'coding-advice/when-to-stop.org'. One
+stop this plan expects as possible: in slice 3, if a save of an
+unchanged view whose members as such hold integrated content writes or
+hides anything, stop and record what was written and why. Otherwise
+deviations go into 'progress.org' under the slice's record.
