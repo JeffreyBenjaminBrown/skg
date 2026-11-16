@@ -1,0 +1,23 @@
+# The team's running state: tools/team/pacer.sh keeps its files in pacer/,
+# tools/team/spending_account.py its tables in spending/, and
+# tools/team/specialist.sh each specialist's port and home note in ports.
+# Tracked: 'ports' and 'pacer/anchor'. The rest is the pacer's runtime state:
+pacer/pid
+pacer/PAUSE
+pacer/STOP
+pacer/ALLOW
+pacer/holds/
+pacer/mail_seen
+pacer/running-session
+pacer/.run.lock
+pacer/session.*.out
+pacer/run.out
+pacer/nohup.out
+pacer/restart.out
+pacer/jeff-files/
+pacer/jeff-check.log
+
+# Untracked for now: they hold session summaries that may name Jeff's notes, and Jeff decides whether those go in the code repo.
+pacer/pacer.log
+spending/account.tsv
+spending/requests.tsv

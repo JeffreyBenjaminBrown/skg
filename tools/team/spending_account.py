@@ -11,7 +11,7 @@ $CLAUDE_CONFIG_DIR, else of ~/.claude): a session is
 is 'PROJECT/SESSION_ID/subagents/agent-AGENT_ID.jsonl' beside an
 'agent-AGENT_ID.meta.json'. It writes two tab-separated tables, each
 with a header line: the account (default
-'data/claude/spending/account.tsv'), one row per session and one per
+'tools/team-processing/spending/account.tsv'), one row per session and one per
 subagent, and the requests (default 'requests.tsv' beside the
 account), one row per API request.
 
@@ -64,7 +64,7 @@ THE REQUESTS' COLUMNS
   request      Claude Code's request ID
   time         when the response began to arrive (UTC, to the second):
                its first transcript record. Compare it with the times
-               of the pacer's log lines (data/claude/pacer/pacer.log).
+               of the pacer's log lines (tools/team-processing/pacer/pacer.log).
   model, input, output, cache_write, cache_read, usd, weighted_usd
                as in the account, for this one request (dollars to
                six places)
@@ -209,7 +209,7 @@ def parse_command_line (argv):
   parser . add_argument (
     "--account",
     default = os . path . join (repository_root,
-                                "data/claude/spending/account.tsv"),
+                                "tools/team-processing/spending/account.tsv"),
     help = "the table to bring up to date (default: %(default)s)" )
   parser . add_argument (
     "--requests", default = None,

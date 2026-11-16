@@ -48,7 +48,7 @@ TRANSCRIPTS = os.path.join(
     os.environ.get("CLAUDE_CONFIG_DIR", os.path.expanduser("~/.claude")),
     "projects", ROOT.replace("/", "-"))
 DEFAULT_LOG = os.path.join(
-    os.environ.get("PACER_DIR", ROOT + "/data/claude/pacer"), "jeff-check.log")
+    os.environ.get("PACER_DIR", ROOT + "/tools/team-processing/pacer"), "jeff-check.log")
 SKIP_TOP = {".index.tantivy", "skgconfig.toml.running"}
 TOL = {"save": (-0.5, 2.0), "start": (-0.5, 15.0), "commit": (-0.5, 6.0)}
 LOG_MOST = 300  # lines to read, per window, that the log takes; a pull or a mass deletion can make thousands

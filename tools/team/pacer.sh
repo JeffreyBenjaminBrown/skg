@@ -22,7 +22,7 @@
 #
 # THE PACE. The subscription has a five-hour window and a weekly one
 # (bash/claude-usage.sh reads both). A session starts only if
-#   - neither PAUSE nor STOP exists in data/claude/pacer/,
+#   - neither PAUSE nor STOP exists in tools/team-processing/pacer/,
 #   - no other session holds 'graph' (WHO HOLDS WHAT, below),
 #   - the five-hour window is under FIVE_HOUR_CAP used, so that Jeff
 #     is never locked out when he sits down, and
@@ -30,10 +30,10 @@
 #     when this week's pacing began to (1 - RESERVE) at the weekly
 #     reset. RESERVE is left for Jeff's own use.
 # The line's starting point (the anchor) is recorded when the pacer
-# first sees a week, in data/claude/pacer/anchor.
+# first sees a week, in tools/team-processing/pacer/anchor.
 # MAIL FROM JEFF. Jeff writes to Top by adding children to his note
 # "to (Top) Claude", so MAIL_FILE changes. The pacer keeps the sha256
-# of that file as of the last session it started (data/claude/pacer/
+# of that file as of the last session it started (tools/team-processing/pacer/
 # mail_seen); if the file now differs, a session starts even when the
 # week is ahead of pace -- but never past the five-hour cap or into
 # the reserve, and never while paused. No model call is involved, and
@@ -44,7 +44,7 @@
 #
 # ONE PACER. So 'run' refuses, saying so in the log and on its output,
 # while this pacer folder's pacer lives (the pid file names it) or while
-# a session some pacer started still runs (data/claude/pacer/
+# a session some pacer started still runs (tools/team-processing/pacer/
 # running-session names it, by pid and start time). The second matters:
 # killing the pacer, or its process group, does not end its session,
 # which 'timeout' puts in a group of its own; it runs on unwatched. So
@@ -59,7 +59,7 @@
 # says what it holds with 'hold', and on waking reads 'holds'. The
 # words are free; 'graph' is Claude's graph, 'code' the working tree,
 # and a specialist's name its graph. A hold is a file in
-# data/claude/pacer/holds/ named by the pid of the Claude process that
+# tools/team-processing/pacer/holds/ named by the pid of the Claude process that
 # ran 'hold' (found by walking up from the shell), with that process's
 # start time, so it lapses when that process ends, however it ends;
 # whoever next reads the holds deletes a lapsed one. 'hold' refuses,
@@ -71,23 +71,23 @@
 # THE CHECK OF JEFF'S FILES. Jeff asked, 2026-11-14, that nothing of
 # ours change a file of his unnoticed. Before and after each session
 # it starts, the pacer lists his files (path, size, time) into
-# data/claude/pacer/jeff-files/, and then runs
+# tools/team-processing/pacer/jeff-files/, and then runs
 # tools/team/check_jeffs_files.py over the session, which appends its
-# counts and every line to read to data/claude/pacer/jeff-check.log.
+# counts and every line to read to tools/team-processing/pacer/jeff-check.log.
 # Once a UTC day it does the same over the time since the last daily
 # check, for the sessions it did not start. Listings older than a week
 # are deleted; the log keeps what they showed. If the check fails, the
 # pacer logs that and goes on. It only lists and reads his files.
 #
 # THE SPENDING ACCOUNT. After each session it starts, the pacer runs
-# tools/team/spending_account.py, so the account in data/claude/spending/
+# tools/team/spending_account.py, so the account in tools/team-processing/spending/
 # is never more than one session behind. Claude Code deletes a
 # transcript after thirty days, and a row not written by then is lost.
 # If the script fails, the pacer logs that and goes on.
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-DIR="${PACER_DIR:-$ROOT/data/claude/pacer}"
+DIR="${PACER_DIR:-$ROOT/tools/team-processing/pacer}"
 MAIL_FILE="${MAIL_FILE:-$ROOT/data/jeff/public/c6b5b3bc-5fd8-4cbe-98ab-61f703d5250d.skg}"
 MAIL_SEEN="$DIR/mail_seen"
 LOG="$DIR/pacer.log"

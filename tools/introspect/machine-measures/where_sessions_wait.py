@@ -2,7 +2,7 @@
 
 Usage, from the repo root:
   python3 -I tools/introspect/machine-measures/where_sessions_wait.py \
-    my-dot-claude/projects/-home-ubuntu-host data/claude/spending/account.tsv 2026-11-10
+    my-dot-claude/projects/-home-ubuntu-host tools/team-processing/spending/account.tsv 2026-11-10
 Env: ALLCMDS=1 lists every Bash call, not only tests and builds;
 TOP=N prints the N longest.
 

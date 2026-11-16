@@ -21,7 +21,7 @@
 # folder is 'views/'. Nothing here is specific to one specialist; to
 # see what one is, read its home note.
 #
-# Ports are assigned once, in 'data/claude/team/ports', from 1770 up.
+# Ports are assigned once, in 'tools/team-processing/ports', from 1770 up.
 # Each line there is 'NAME PORT [HOME_ID]', HOME_ID the specialist's
 # home note. 'prompt' prints everything a fresh mind is told: where the
 # tool is, its port and views folder, its home note and its mission.
@@ -35,7 +35,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 DATA="$ROOT/data"
 TEAM="$DATA/claude/team"
-PORTS="$TEAM/ports"
+PORTS="$ROOT/tools/team-processing/ports" # tracked in the code repo
 SKG="$ROOT/target/release/skg"
 READER="$ROOT/tools/skg-for-ai/skg_for_ai.py"
 MISSION_KINDS="plan reading build tending" # the same four as MISSION_KINDS in tools/team/spending_account.py
@@ -104,7 +104,7 @@ add_to_readers_configs() { # NAME: Claude and Jeff each read every specialist's 
 
 log_jeffs_config_written() { # LINES: one line in the check's log, so the check can place the write
   # tools/team/check_jeffs_files.py reads these lines; keep their form.
-  local log="${PACER_DIR:-$DATA/claude/pacer}/jeff-check.log"
+  local log="${PACER_DIR:-$ROOT/tools/team-processing/pacer}/jeff-check.log"
   mkdir -p "$(dirname "$log")"
   echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) $COMMAND: wrote $1 lines of data/jeff/skgconfig.toml" >> "$log"
 }

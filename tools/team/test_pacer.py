@@ -61,7 +61,7 @@ class PacerTest (unittest . TestCase):
     write ( os . path . join (self . root, "bash", "claude-usage.sh"),
             USAGE_STAND_IN, 0o755 )
     write ( os . path . join (self . root, "bin", "claude"), CLAUDE_STAND_IN, 0o755 )
-    self . dir = os . path . join (self . root, "data", "claude", "pacer")
+    self . dir = os . path . join (self . root, "tools", "team-processing", "pacer")
     os . makedirs (self . dir)
     write ( os . path . join (self . dir, "ALLOW"), "0.5\n" ) # so the pace says yes
     self . starts = os . path . join (self . root, "claude-starts")

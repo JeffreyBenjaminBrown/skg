@@ -265,10 +265,10 @@ class SpendingAccountTest (unittest . TestCase):
   def test_the_account_reads_the_kind_specialist_prompt_prints (self):
     root = os . path . join (self . folder, "root")
     os . makedirs ( os . path . join (root, "tools", "team") )
-    os . makedirs ( os . path . join (root, "data", "claude", "team") )
+    os . makedirs ( os . path . join (root, "tools", "team-processing") )
     script = os . path . join (root, "tools", "team", "specialist.sh")
     shutil . copy ( os . path . join (TEAM_FOLDER, "specialist.sh"), script )
-    with open ( os . path . join (root, "data", "claude", "team", "ports"),
+    with open ( os . path . join (root, "tools", "team-processing", "ports"),
                 "w", encoding = "utf-8" ) as ports_file:
       ports_file . write ( "mario 1774 " + MISSION_ID . replace ("c", "d") + "\n" )
     for kind in spending_account . MISSION_KINDS:
