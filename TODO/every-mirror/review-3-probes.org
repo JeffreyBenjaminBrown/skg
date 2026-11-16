@@ -1,0 +1,550 @@
+#+title: every-mirror plan 3: the probe pass
+#+startup: overview
+
+* How this was run
+On 2026-11-16, after slice 4 (HEAD '8e6dd9ed'), with 'target/debug/skg'
+('cargo build --bin skg', already current) and one isolated server on
+port 28001, on scratch data under
+'/tmp/claude-1000/every-mirror-probes-plan3/s1/'. No full test suite
+was running. The live servers on 1730 and 1761 were never touched. The
+scratch server was stopped by its PID and its port confirmed free; the
+scratch data has been deleted. The server was driven through
+'tools/skg-for-ai/skg_for_ai.py' used as a library ('SkgConnection',
+'save_buffer' with the view's real baseline unless a probe says
+otherwise), one connection per session, two where a probe says so.
+What stays is under '/tmp/claude-1000/every-mirror-probes-plan3/transcripts/':
+- 'fixtures/fixture_s1.py' (and 'bin/'): the script that wrote the
+  data root, and 'bin/fixture.py', its node writer.
+- 'bin/': the probe library ('probe.py', plan 2's with its root
+  changed), the start and stop scripts, and one script per probe
+  ('pN.py').
+- 'pN-.../': one folder per probe, with 'log.txt' (every request, the
+  answer's errors, warnings and hide report, the files changed, the
+  '.skg' files read back) and per step the view drawn
+  ('view_ID.full.org', 'view_ID.compact.org'), the buffer sent
+  ('sent.full.org') and the view the save drew ('saved.full.org',
+  'saved.compact.org'), or a rerender ('rerendered.*').
+- 's1-server.log': the server's log (no panic).
+
+The fixture s1: owned 'pub' and 'priv' (declared in that order, each a
+git repo with one commit, for the diff view), foreign 'theirs' and
+'other' (declared after them). Families, each in its own notes:
+- Perspective: N (theirs, contains n1) forked by Fpub (pub) and Fpriv
+  (priv); K (theirs) forked by Kpub only; N4 (other) forked by F4pub
+  and F4priv; an owned chain N5 <- C5 <- D5 (all pub); N6 (theirs) <-
+  C6 <- D6 (pub); Q7 (theirs) forked by F7 and G7 (both pub); N2 (pub)
+  forked by TN2 (theirs). C (pub) contains N, K, N4, N5, N6, Q7; T
+  (theirs) contains N, N4, N2. A chain across three skgrepos: A3
+  (theirs, contains a3c) <- B3 (priv) <- C3 (pub); R3 (other) contains
+  A3, P3 (pub) contains B3.
+- Flat forks folder: B (pub) forks [A2 (other), A1 (theirs)] in that
+  order, contains b1 and s1, hides h1; forkers R9 (pub), R1 (priv), R5
+  (theirs); indirect members I0 (pub, forks A2), I2 (pub, forks A1),
+  I3 (priv, forks R9), I1 (other, forks A1, contains i1a, s1, h1), I4
+  (pub, forks I1: three away).
+- Jeff's picture: your x (x, theirs) contains a, b, c, d; my x (M, pub)
+  forks x and hides c; my y (y, priv) contains c; my z (z, pub) empty;
+  home (pub) contains M, y, z.
+- M2 (pub) and Mp2 (priv) fork x2 (theirs: a2, b2); y2 (pub) keeps a2.
+- M3 and W3 (both pub) fork x3 (theirs: e3, f3).
+- Search: Sx "lamplighter original" (theirs) forked by Spub (pub) and
+  Spriv (priv); Sind (other) forks Spriv.
+
+* Summary
+38 behaviors probed: 37 matched, 1 did not.
+- Not matched (minor, not foreseen): a member already standing in the
+  integrated-elsewhere folder gets no containers folder when a save
+  makes another owned note its keeper; the save's redraw (and a
+  collateral rerender) leave it bare, a fresh view draws it (38).
+  Decision C says each member carries one.
+- Observations, not counted:
+  - A perspective switch that re-points a node redraws everything under
+    it: an unfolded integrated folder under a re-pointed root comes
+    back folded (the re-pointed position itself keeps its fold) (32).
+  - A member of the integrated folder that the view shows elsewhere
+    too (the keeper's own content, or the note's own) draws no
+    containers folder, so a keeper beside the view's root goes unnamed
+    (25, 36): slice 3 recorded this.
+  - The stale save of scenario 31 leaves b both as content and,
+    marked unwarranted, in the hidden-in folder until the view is
+    reopened, as hidden-in members do.
+  - The skg-for-ai tool refuses to fetch a view of a node that another
+    view on the same connection shows as its re-pointed root
+    ('SkgViewAlreadyOpen'); its message says how to switch back (33).
+
+* 1. A fresh view of my note: its perspective is my note's home skgrepo
+** Sent
+'single root content view' of C (pub) ('p1-fresh-views').
+** Received
+C's children: Fpub in N's place, Kpub in K's, F4pub in N4's, N5
+itself, D6 in N6's, F7 in Q7's, each with its '(inPlaceOf ...)'.
+** Verdict
+MATCH. Every mirror chosen is pub's, the root's home.
+
+* 2. A fresh view of a foreign note: its perspective is its owner's
+** Sent
+A view of T (theirs) ('p1-fresh-views').
+** Received
+N itself (theirs holds it), F4pub for N4 (see 4), TN2 (theirs) in
+N2's place.
+** Verdict
+MATCH.
+
+* 3. A fresh view shows its root itself
+** Sent
+Views of N (theirs, forked by an owned public and private fork), Fpriv,
+N5 ('p1-fresh-views').
+** Received
+Each root is itself, with no '(inPlaceOf ...)'; N's forks folder holds
+Fpub and Fpriv (=Kb=), Fpriv's holds N (=bK=) then Fpub (indirect).
+** Verdict
+MATCH.
+
+* 4. With no mirror in the perspective's skgrepo, the first declared decides
+** Sent
+T's view (root homes: theirs) for N4, homed in other, forked in pub and
+priv; C's view switched to 'skgrepo priv' for K, which only pub forks
+('p1-fresh-views', 'p2-perspective-cycle').
+** Received
+T shows F4pub, not F4priv: the public fork outranks the private one
+after the chosen skgrepo. Under priv, C shows Kpub for K, and N5
+itself (pub decides, and holds N5).
+** Verdict
+MATCH.
+
+* 5. C-c v o cycles skgrepos, passing over one that changes nothing
+** Sent
+'set perspective' with "next", four times, on C, T, R3 and P3
+('p2-perspective-cycle').
+** Received
+- C (root homes = pub): priv (Fpriv, F4priv), theirs (N, K, F4pub,
+  N6, Q7), other (N4), root homes again; pub is never offered.
+- T (root homes = theirs): pub, priv, other, root homes.
+- R3 (root homes = other; A3 homed in theirs): priv (B3), theirs (A3),
+  root homes (C3), priv; pub, which draws as the root homes do, is
+  passed over.
+- Each answer names it: "the perspective of priv", "the perspective of
+  each root's home skgrepo (pub)".
+** Verdict
+MATCH.
+
+* 6. A private and a public fork of one note, each chosen in turn
+** Sent
+T's cycle ('p2-perspective-cycle', 'T-01' and 'T-02').
+** Received
+Under 'skgrepo pub' Fpub stands for N, under 'skgrepo priv' Fpriv;
+N2 itself under both (pub holds it; priv holds none).
+** Verdict
+MATCH.
+
+* 7. Named perspectives, and the old names refused
+** Sent
+On C: 'skgrepo pub', 'skgrepo priv', 'skgrepo other', 'user',
+'owner of theirs', 'root authors', 'skgrepo nosuch'
+('p2-perspective-cycle', 'C-named-*').
+** Received
+'skgrepo priv' and 'skgrepo other' are shown. 'skgrepo pub' is
+refused: "The perspective of pub would show this buffer as the
+perspective of each root's home skgrepo does, so it is not one of its
+perspectives." The rest: "'perspective' must be \"next\", \"root
+homes\" or \"skgrepo SKGREPO\" (a skgrepo the config lists), not
+...", each carrying the view's unchanged perspective.
+** Verdict
+MATCH.
+
+* 8. Saves under a chosen perspective
+** Sent
+C's view switched to priv, saved unchanged naming 'skgrepo priv'; Fpriv
+retitled and saved the same way; then saved unchanged naming no
+perspective ('p3-saves-under-perspectives').
+** Received
+Unchanged: nothing written, the redraw equal to the buffer but for
+viewnode IDs, still from priv. The retitle wrote 'priv/Fpriv.skg'
+alone. With no perspective named, nothing written and the redraw is
+from the root homes (Fpub again), as the API says.
+** Verdict
+MATCH.
+
+* 9. Q1: the note itself stands where its home decides
+** Sent
+C's view under the root homes and under priv, for the owned chain N5
+<- C5 <- D5, all in pub ('p1-fresh-views', 'p2-perspective-cycle').
+** Received
+N5 itself both times (under priv, pub decides); its forks folder holds
+C5 (=Kb=) then D5 (indirect).
+** Verdict
+MATCH.
+
+* 10. Q1: the remaining ties, deterministic
+** Sent
+C's view for N6 (theirs) <- C6 <- D6 (pub), and for Q7 (theirs) forked
+by F7 and G7, both pub ('p1-fresh-views', every C view after).
+** Received
+D6 stands (the only one in pub no other there forks), C6 and N6 in its
+folder; F7 stands (least pid), G7 indirect in its folder; the same in
+every view and perspective that pub decides.
+** Verdict
+MATCH.
+
+* 11. Roots substitute under a chosen skgrepo
+** Sent
+M2's view (pub, forks x2; Mp2 in priv also forks x2), "next" three
+times ('p2-perspective-cycle', 'p12-...').
+** Received
+priv: the root becomes Mp2 ("my private x2", '(inPlaceOf M2)'), M2 in
+its folder; theirs: the root becomes x2, showing a2 and b2 as its
+content and M2 and Mp2 as forkers; root homes: M2 again.
+** Verdict
+MATCH.
+
+* 12. A flat forks folder in Q2's order
+** Sent
+A view of B ('p4-flat-forks-folder').
+** Received
+One forks folder: A2, A1 (B's list order, though other is declared
+after theirs); then the forker-only members R9 (pub), R1 (priv), R5
+(theirs), by home, not by pid; then the indirect members I0 and I2
+(pub, two away, by pid), I3 (priv, two away), I1 (other, two away),
+I4 (pub, three away). 'forksFolder' occurs once in the buffer.
+** Verdict
+MATCH.
+
+* 13. Heralds and claims of the members
+** Sent
+The same view.
+** Received
+Forkees =bK= ('(birth (forks in 2))'), forkers =Kb= ('noClaim',
+'(birth (forks out 2))'), indirect members =K1= with no 'b' and no
+birth fact, 'noClaim'. I1, indirect, draws its hidden-in folder (h1,
+which B hides) and its integrated-elsewhere folder (s1, which B
+contains); no member draws a hidden-by folder.
+** Verdict
+MATCH.
+
+* 14. No member draws a forks folder unasked; C-c l f draws one
+** Sent
+B's view saved with '(viewRequests (folder forks))' on I2's line, then
+unchanged ('p5-forks-folder-edits', 03 and 04).
+** Received
+Nothing written; I2 alone gains a forks folder, write-protected, in
+Q2's order from I2: A1 (forkee); B, I1 (two away); I4, R9, R1, R5, A2
+(three away, by home then pid); I0, I3 (four away). It stays at the
+next unchanged save, which writes nothing.
+** Verdict
+MATCH.
+
+* 15. Forkees reorder; the tails keep the graph's order
+** Sent
+B's view with A1 moved before A2 and R5 before R9
+('p5-forks-folder-edits', 02).
+** Received
+'B.skg' forks [A1, A2]; the redraw shows R9, R1, R5 again; nothing
+else written.
+** Verdict
+MATCH.
+
+* 16. An unchanged save writes nothing
+** Sent
+Fresh views of B, M, M3, C (under root homes and priv), M (under the
+restriction 'pub'), the diff view, each saved back with its baseline
+('p3', 'p4', 'p6', 'p8', 'p10', 'p13', 'p14').
+** Received
+'(changed-headlines ())', no warning, no '.skg' file changed (md5 of
+each), the redraw equal to the buffer but for viewnode IDs.
+** Verdict
+MATCH.
+
+* 17. Deleting an indirect member hides it
+** Sent
+I2's line removed from B's forks folder ('p6-indirect-members', 03).
+** Received
+"Hides 'I2 indirect, pub, forks A1' from 'B hub'."; 'B.skg' alone
+written, hides [h1, s1, I2]; 'I2.skg' untouched; I2 stands, folded, in
+B's hidden-outside folder ("b hides these, but no fork partner shown
+contains them.").
+** Verdict
+MATCH.
+
+* 18. Unhiding it puts it back in its place
+** Sent
+I2 removed from that hidden-outside folder ('p17-unhide-from-hidden-outside').
+** Received
+"Stops hiding 'I2 indirect, pub, forks A1' from 'B hub'."; I2 stands
+again among the indirect members, after I0 and before I4.
+** Verdict
+MATCH.
+
+* 19. A cut from an indirect member makes the note fork it
+** Sent
+i1a cut from under I1 in B's view ('p6-indirect-members', 04).
+** Received
+"Hides 'i1a' from 'B hub', as content of 'I1 indirect, other, forks
+A1'."; 'B.skg' forks [A1, A2, I1] and hides i1a; 'I1.skg' untouched;
+I1 now stands third, =bK1=, after the forkees; the indirect tail
+re-sorted (I0, I4, I3). An unchanged save afterwards writes nothing.
+** Verdict
+MATCH.
+
+* 20. Every member explains a hide
+** Sent
+B's view as drawn, and s1 removed from B's own content, s1 being
+content of the indirect, foreign I1 ('p4', 'p6-indirect-members', 02).
+** Received
+B hides h1, which only I1 contains: no hidden-outside folder is drawn,
+h1 stands in I1's hidden-in folder. The removal: "Hides 's1' from 'B
+hub', as content of 'I1 indirect, other, forks A1'.", s1 then in I1's
+hidden-in folder, folded.
+** Verdict
+MATCH.
+
+* 21. The search buffer's one flat forks folder
+** Sent
+'text search' for "lamplighter", "forker" and "chain" ('p7-search').
+** Received
+"lamplighter": one hit, Spub (public stands over private), its one
+forks folder, folded, holding Sx, Spriv and Sind (indirect). "forker":
+R9 (pub) stands for R1 and R5, its one folder flat in Q2's order.
+"chain": A3 and N5, each with one flat folder. Nothing nested.
+** Verdict
+MATCH.
+
+* 22. Jeff's picture: your a moved under my y records no hide
+** Sent
+In home's view, a cut from under your x (in my x's forks folder) and
+pasted under my y ('p8-integration', 02).
+** Received
+No hide line; only 'priv/y.skg' written (contains c, a); M still hides
+c alone. The redraw shows a under my y and, under your x, "☮ It
+contains these, and you keep them elsewhere." holding a, before the
+hidden-in folder.
+** Verdict
+MATCH.
+
+* 23. Your d moved under my x itself records no hide
+** Sent
+In M's view, d cut from under your x and pasted as M's own child
+('p8-integration', 04).
+** Received
+No hide line; 'M.skg' contains d, hides c alone; d joins x's
+integrated-elsewhere folder (no containers folder: M, the view's
+root, is omitted, and d also stands as M's content).
+** Verdict
+MATCH.
+
+* 24. Deleting your b from your x, keeping it nowhere, hides it
+** Sent
+b removed from under your x in M's view ('p8-integration', 05).
+** Received
+"Hides 'b' from 'my x', as content of 'your x'."; M hides [c, b]; b
+in the hidden-in folder. An unchanged save afterwards writes nothing.
+** Verdict
+MATCH.
+
+* 25. The integrated folder: first, folded members, a containers folder each
+** Sent
+A fresh view of M after 22 ('p8-integration', 03).
+** Received
+Under your x: the integrated-elsewhere folder (a, folded, with "☮ These
+also contain it." holding my y), then the hidden-in folder (c), then b
+and d. In home's own redraw (22), a in that folder had no containers
+folder: home's view shows a under my y too (slice 3's recorded
+exception).
+** Verdict
+MATCH.
+
+* 26. A redundant old hide stands in the hidden folder only
+** Sent
+The fixture's state: M hides c, y keeps c. M's view, then c moved out
+of the hidden-in folder to stand under your x ('p8-integration', 00;
+'p10-redundant-hide-and-restriction', 02).
+** Received
+c stands in the hidden-in folder only, never in the integrated one.
+Moved out: "Stops hiding 'c' from 'my x', as content of 'your x'.",
+M hides b alone, and c stands in the integrated-elsewhere folder with
+a containers folder holding my y.
+** Verdict
+MATCH.
+
+* 27. A skgrepo restriction hiding the keeper
+** Sent
+'set skgrepo restriction' to 'pub' (my y, in priv, kept out), M viewed
+and saved unchanged, then the restriction lifted
+('p10-redundant-hide-and-restriction', 03 to 07).
+** Received
+Under pub, a and c show as your x's content; d, which M keeps, stays
+in the integrated folder. Nothing written. Unrestricted, a and c are
+back in the integrated folder.
+** Verdict
+MATCH.
+
+* 28. The integrated folder is write-protected
+** Sent
+c retitled inside it; then c's line removed from it
+('p18-integrated-folder-write-protected').
+** Received
+The retitle: "NOTHING WAS SAVED ... Write-protected occurrence differs
+from the graph ... title \"c, retitled in the integrated folder\"
+differs from the graph's \"c\"". The removal: saved, nothing written,
+c drawn back in the folder.
+** Verdict
+MATCH.
+
+* 29. The hide report names the keeper of a removed child
+** Sent
+e3 put under my z (z's view), then removed from my x3's own content,
+x3 (a forkee of M3) containing it ('p16-removal-kept-elsewhere-report',
+03 to 05).
+** Received
+"Hides nothing: 'e3' left 'my x3', but 'my z' keeps it."; 'M3.skg'
+lost e3 and hides nothing.
+** Verdict
+MATCH.
+
+* 30. A stale buffer does not hide what another view un-kept
+** Sent
+Two connections. A views M (a in x's integrated folder); B removes a
+from my y in y's view; A, not redrawn, saves M retitled, with its
+baseline; then the same with a put back first and A's save sent with
+an empty baseline ('p11-stale-buffers', scenarios 1 and 3; the first
+try at scenario 3 typed a's line without its 'nodeRepo' and was
+refused as a move between skgrepos, then rerun by 'p11b.py').
+** Received
+Both: no hide line, no warning, 'M.skg' only retitled (no hide of a);
+Scenario 1's redraw shows a as your x's content.
+** Verdict
+MATCH.
+
+* 31. A stale buffer does not hide again what another view unhid
+** Sent
+A views M (b in the hidden-in folder); B, in its own view of M, moves b
+out of it ("Stops hiding 'b' ..."); A, stale, saves M retitled
+('p11-stale-buffers', scenario 2).
+** Received
+'M.skg' retitled, hides nothing; no warning. A's redraw shows b as
+content and, marked =⊥= (unwarranted), still in the hidden-in folder.
+** Verdict
+MATCH.
+
+* 32. Not foreseen: a perspective switch while an integrated folder is open
+** Sent
+M2's view with its integrated folder's members unfolded (saved so, no
+file written), then "next" (priv), an unchanged save naming 'skgrepo
+priv', "next" (theirs), "next" (root homes)
+('p12-perspective-switch-with-integrated-folder-open'); and C's view
+with Fpub and N5 folded and n1 under N unfolded, switched to priv
+('p12b-fold-state-across-a-switch').
+** Received
+Under priv the root is Mp2; x2, its forkee, shows the integrated folder
+again (a2, containers my y2), folded; the unchanged save writes
+nothing. Under theirs the root is x2 with a2 as plain content; back
+under the root homes the folder stands, folded. In C's view the
+substituted position keeps its viewnode and its fold (Fpriv folded in
+Fpub's place), N5 stays folded, and n1 under the new subtree is folded
+again.
+** Verdict
+MATCH (nothing lost or written). Observation: what stands under a
+re-pointed node is drawn afresh, so an integrated folder opened there
+closes on each switch.
+
+* 33. Not foreseen: a chain of three forks across three skgrepos
+** Sent
+A3 (theirs) <- B3 (priv) <- C3 (pub): views of R3 (other) and P3 (pub)
+cycled ('p2-perspective-cycle'), and views of A3 and B3 each cycled
+four times ('p15-chain-across-three-skgrepos').
+** Received
+- R3: root homes C3 (other holds none; pub first), priv B3, theirs A3.
+  P3: root homes C3, priv B3, theirs A3.
+- A3: itself (B3 =Kb=, C3 indirect), pub (root C3, '(inPlaceOf A3)';
+  B3 =bK1=, A3 indirect), priv (root B3; A3 =bK=, C3 =Kb=), root homes.
+  B3: itself, pub (C3), theirs (A3), root homes. Each member draws
+  its integrated folder (a3c, which the root contains) and containers
+  folder in every drawing.
+- Viewing C3 on the connection holding B3's view switched to pub was
+  refused by the tool ('SkgViewAlreadyOpen': C3 is that view's root),
+  with a message naming the way back.
+** Verdict
+MATCH.
+
+* 34. Not foreseen: keeping a child in a mirror of the forkee
+** Sent
+In M3's view (M3 forks x3; W3, also forking x3, an indirect member), e3
+moved from under x3 to under W3; then cut from under W3
+('p13-keeping-in-a-mirror-of-the-forkee').
+** Received
+The move: 'W3.skg' contains e3, nothing else written, no hide; under
+x3, e3 stands in the integrated folder (W3 keeps it), and under W3 as
+W3's content (an owned member does not keep from itself). W3's own
+view shows the same. The cut: "Hides 'e3' from 'my x3', as content of
+'your x3' and 'my other x3'."; M3 forks [x3, W3] and hides e3; e3 in
+both members' hidden-in folders. Unchanged saves write nothing.
+** Verdict
+MATCH.
+
+* 35. Not foreseen: the diff view after an integration move
+** Sent
+After 22 to 24 (and 15 to 19), the four diff-view buffers; "all
+changes" saved unchanged ('p9-diff-view-after-integration').
+** Received
+"all changes": my y "its content changed" (a, '~+'); your x as context
+with a's "its other containers changed" (my y) and b's "its hiders
+changed" (my x); my x's hides (b) and content (d). The forks folder
+there lists direct partners only, as scoped. Saved unchanged: nothing
+written, the redraw equal but for IDs. The other three buffers are
+empty.
+** Verdict
+MATCH.
+
+* 36. Not foreseen: a nodeMerge whose acquiree keeps a child
+** Sent
+In home's view, '(editRequest (merge y))' on my z, y keeping c (which
+x contains and M no longer hides) ('p14-nodeMerge-with-a-kept-child',
+02 and 03).
+** Received
+y deleted; z gains 'extra_ids: [y]' and the text preserver (pub), and
+a priv section containing c (the relationship kept its skgrepo); no
+hide written; M's fresh view still shows c in x's integrated folder,
+its containers folder now naming my z.
+** Verdict
+MATCH.
+
+* 37. Not foreseen: a nodeMerge whose acquirer hides what the acquiree keeps
+** Sent
+M3 (forks x3 and W3, hides e3) acquires W3 (contains e3, forks x3)
+('p14-nodeMerge-with-a-kept-child', 06 to 08).
+** Received
+'M3.skg': contains [preserver, e3], forks [x3] (no self-fork), hides
+nothing; W3 deleted. The save's redraw shows e3 in x3's integrated
+folder and, marked =⊥=, in the hidden-in folder; a fresh view shows it
+in the integrated folder only. Unchanged save writes nothing.
+** Verdict
+MATCH.
+
+* 38. Not foreseen: a member of the integrated folder whose keeper changes
+** Sent
+- M3's view (e3 in x3's integrated folder, kept only by M3, the view's
+  root: no containers folder); e3 put under my z elsewhere, then
+  removed from M3's content in M3's view
+  ('p16-removal-kept-elsewhere-report', 04 to 06).
+- M's view (d in x's integrated folder, kept by M only); d added
+  under C from another view on the same connection (M's view
+  rerendered as collateral), then M viewed afresh (10 to 13).
+- For comparison, e3 added under C while M3's view, whose e3 already
+  had a containers folder (my z), was open (07 to 09).
+** Received
+- The save's redraw: e3 in the integrated folder with no containers
+  folder, though my z keeps it and the hide report says so. A fresh
+  view of M3 draws "☮ These also contain it." holding my z.
+- d after the collateral rerender: no containers folder (d also
+  stands as M's content, so a fresh view draws none either, slice 3's
+  exception).
+- The comparison: the existing containers folder gains C in the
+  collateral rerender.
+** Verdict
+NOT MATCHED (minor). Decision C: each member of the integrated folder
+"carrying a containers folder showing where the user keeps it". A
+member already standing in the folder with none (its only keeper was
+an ancestor, or another occurrence in the view) gets none when a save
+makes an owned note elsewhere its keeper; an existing containers
+folder does update. The redraw adds the folder only where it draws the
+member, as plan 2's probes found for a member made editable by a
+request.

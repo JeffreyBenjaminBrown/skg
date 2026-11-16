@@ -1,0 +1,396 @@
+#+title: Review of plan 3 (every-mirror): its terms, and plan citations in code
+#+date: 2026-11-16
+
+A read-only review of 'git diff d335eeab..HEAD' (plan 3's twelve
+commits, ef1f6762 to 8e6dd9ed) and of the tree at HEAD. It follows
+'coding-advice/plans.org' ("After each plan, before the next") and
+'coding-advice/names.org'. The findings of 'review-1-terms.org' and
+'review-2-terms.org' are repeated only where one came back. Findings
+run from most to least important, and each gives file:line and a
+one-line proposed fix. Label wording is Jeff's (decision E); this
+review reports only whether each label is true of what is drawn.
+
+* The labels as they stand, and whether each is true
+The texts are in 'server/heralds.rs:455-497', pinned in
+'tests/shared/herald-rules.sexp:1' and 'tests/shared/herald-rendering-cases.txt'.
+- Forks folder, "It forks these, or these fork it." ('heralds.rs:483'):
+  *false for every indirect member* (finding 2).
+- Integrated-elsewhere folder, "☮ It contains these, and you keep them
+  elsewhere." ('heralds.rs:488'): *false wherever N is foreign* and only
+  N holds the child (finding 1).
+- Hidden-in folder, "☮ It contains these, but c hides them."
+  ('heralds.rs:460-464'): true under forkees, forkers and indirect
+  members alike.
+- Hidden-by folder, "☮ a hides these, which c contains."
+  ('heralds.rs:469-477'): true. It is now drawn only under a forker as
+  such that forks c ('note_forked_by_forker_as_such').
+- Hidden-outside folder, "b hides these, but no fork partner shown
+  contains them." ('heralds.rs:479-481'): true, but it names a smaller
+  set than the folder's rule. The rule leaves out what any member
+  contains, indirect ones included (finding 4).
+- Hidden folder, "☮ It hides these from its forks.", and hider
+  folder, "☮ These hide it from their forks." ('heralds.rs:490,492'):
+  under the glossary's "its forks" (= fork partners,
+  'docs/glossary.org:1204'), these now say less than a hide does. A hide
+  also applies to indirect members (finding 10).
+
+* Question 1: terms coined or reused
+** 1. "Kept elsewhere", "integrated by the user" and the integrated folder's label lie when N is foreign
+The goal of the integrated-elsewhere folder takes every child N
+contains. It does not ask whether N is owned:
+'contained_by_the_note' in 'server/refresh/goal.rs:465-472'. The
+glossary admits this: "N's own contains counts even where N is
+foreign" ('docs/glossary.org:749-750').
+
+Yet every name for the set says that the *user* keeps it:
+- the term "*integrated* by the user when the user *keeps it
+  elsewhere*" ('docs/glossary.org:744');
+- the label "you keep them elsewhere" ('server/heralds.rs:488',
+  'docs/heralds.org:219-221', 'docs/forks.org:284',
+  'docs/sharing-model.org:9', 'docs/COMMANDS.org:479',
+  'docs/COMMANDS-nvim.org:467');
+- the variant's doc, "Write-protected (the user keeps these in the
+  notes that contain them)" ('server/types/viewnode.rs:607-614').
+
+The lie appears in a common case: any view of a foreign note you have
+forked. Take Egg Man's =mystical= with your clone C in its forks
+folder. C is a forker as such, and C is excepted from "owned notes
+but the member". So C's integrated folder holds whatever =mystical=
+contains, and its label says that you keep those children elsewhere,
+when Egg Man keeps them.
+- Fix: either count N's contains as "kept" only when N is owned (a
+  foreign N's contains would then stand among the member's content),
+  or let the label and the glossary say what is drawn (Jeff's
+  wording, e.g. "☮ It contains these; c or a note of yours does too.").
+
+** 2. The forks folder's label is false for indirect members
+Since slice 2 the forks folder holds every mirror of N
+('forks_folder_goal', 'server/refresh/goal.rs:635'; 'docs/glossary.org:525-533').
+An indirect member neither forks N nor is forked by it. So "It forks
+these, or these fork it." is false of each one. The AI tool's
+expectations show it: under A's folder, U and B stand as 'K1' with no
+'b' flag ('tools/skg-for-ai/test_skg_for_ai.py:3218-3220').
+
+The same text stands, with the flat folder described right after it,
+in these places:
+- 'docs/forks.org:160'
+- 'docs/heralds.org:200'
+- 'docs/sharing-model.org:54'
+- 'docs/glossary.org:525-526'
+- 'tools/skg-for-ai/skg_for_ai.py:2977'
+
+The search buffer's one flat forks folder under a hit has the same
+problem ('server/serve/handlers/text_search.rs').
+- Fix (Jeff's wording): a label true of every mirror, e.g. "Its
+  mirrors: what it forks, what forks it, and the rest."
+
+** 3. "Integrated" names three different sets, and "unintegrated" is not "not integrated"
+- The glossary: a child is integrated when N or an owned note but S
+  contains it. Hides are not part of it: "S shows what is not
+  integrated and N does not hide" ('docs/glossary.org:744-753').
+- 'less_what_the_note_integrates' ('server/refresh/goal.rs:331') and
+  the glossary's "*unintegrated content*" ('docs/glossary.org:727-731')
+  subtract N's hides too. So "unintegrated" is "neither integrated nor
+  hidden".
+- The name 'less_what_the_note_integrates' also says that *the note*
+  integrates. Since slice 3, any owned note does. The record kept the
+  name knowingly ('progress.org', slice 3, "Names coined or changed").
+- The local 'integrated' sets of the save hold N's hides and N's
+  contains, but not what owned notes keep:
+  - 'server/from_text/local_fieldintent_collection/resolve_visibility.rs:137-142'
+    (forkee step, plus the buffer's set-aside children)
+  - 'resolve_visibility.rs:410-413' (forker step)
+- The AI tool's README defines it again: "has not integrated: neither
+  contains, nor hides, nor keeps in another node you own"
+  ('tools/skg-for-ai/README.org:1400-1401').
+- "Kept elsewhere" splits the same way. In the glossary it includes
+  N's contains ('docs/glossary.org:744-746'). In the code,
+  'kept_elsewhere' ('goal.rs:356-372'), 'kept_elsewhere_counts'
+  ('goal.rs:302-349') and 'kept_elsewhere_before_save'
+  ('resolve_visibility.rs:274-286') mean only "an owned note but the
+  member contains it".
+- Fix:
+  - Make the glossary say "unintegrated content: neither integrated nor
+    hidden by N".
+  - Rename 'less_what_the_note_integrates' 'what_the_member_shows'.
+  - Rename the two local sets 'hidden_or_contained_by_the_note'.
+  - Rename 'kept_elsewhere*' 'kept_in_another_owned_note*'.
+
+** 4. "Fork partner" now covers indirect members in code, but not in the glossary
+The glossary keeps "fork partner" direct: "Its *direct members* are
+N's *fork partners*" ('docs/glossary.org:529-530'). But the plan widened
+the function and left its name:
+- 'fork_partners_shown' ('server/refresh/goal.rs:736'; its doc says
+  "These are the partners that explain a hide") returns indirect
+  members too.
+- 'gnids_shown_through_fork_partners'
+  ('server/nodeMerge/nodeMergeInstructionTriple.rs:229-239') says "fork
+  partner ... or another mirror of it".
+- The hide report says "no partner shows it"
+  ('server/from_text/hide_report.rs:17').
+- 'hidden_in_fork_partner' ('goal.rs:814') and the atom
+  'hiddenInForkPartnerFolder' stand under indirect members. The plan
+  kept the atoms knowingly ("Out of scope").
+- The hidden-outside label "no fork partner shown"
+  ('server/heralds.rs:481') states a smaller set than its rule.
+  'docs/heralds.org:216-217' then has to add "(... forkee, forker or
+  indirect member ...)".
+- 'tests/hides_apply_to_every_fork_partner.rs:3-4' still says "forkees
+  and forkers alike".
+- Fix: rename the functions 'forks_folder_members_shown' and
+  'gnids_shown_through_forks_folder_members'. Put the atoms and the
+  hidden-outside label to Jeff.
+
+** 5. "Forker as such" now names notes that fork nothing of N (review 2, finding 1, widened)
+The glossary makes an indirect member a forker as such
+('docs/glossary.org:712-719'). The plan chose this knowingly
+("Vocabulary", "member as such, forker as such"). But an indirect
+member need fork nothing: in a chain A forks B forks C, C is an
+indirect member of A's folder.
+
+The code had to coin 'note_forked_by_forker_as_such'
+('server/refresh/goal.rs:517') because a "forker as such" may not
+fork the note. Messages already avoid the word, saying "member
+claiming nothing" ('resolve_visibility.rs:208-224'). The variant and
+type names still say forker:
+- 'MemberAsSuch::Forker' ('resolve_visibility.rs:208')
+- 'ForkerVisibility' and its field 'forker_as_such'
+- 'LocalContext::ForkerAsSuchPosition'
+  ('server/from_text/local_fieldintent_collection/types.rs:30', whose
+  comment still says "a forker as such")
+- 'note_of_forker_as_such' ('goal.rs:502')
+- 'resolve_forker_visibility'
+
+Fix (Jeff's call): adopt "member claiming nothing" as the term
+('MemberAsSuch::ClaimingNothing', 'ClaimlessMemberVisibility', ...),
+or keep "forker as such" and say in the glossary that it is a misnomer
+for indirect members.
+
+** 6. 'default_perspective_skgrepo' collides with "the default perspective"
+The glossary's default perspective is the root homes
+('docs/glossary.org:1290'; 'docs/mirrors.org:48'). The new
+'SkgConfig::default_perspective_skgrepo' ('server/types/misc.rs:773')
+is the first owned skgrepo. It is used two ways:
+- as the fallback for a root the graph does not know
+  ('server/dbs/in_rust_graph/mirrors.rs:315,337');
+- to rank search hits ('server/serve/handlers/text_search.rs:584-594').
+
+Neither is the default perspective. The search's list is also
+called "the user's own skgrepo list" ('text_search.rs:527,584';
+'docs/mirrors.org:77'), which no glossary entry defines.
+- Fix: rename it 'users_most_public_skgrepo' (or
+  'first_owned_else_first_declared_skgrepo'). Define "the user's own
+  skgrepo list" in the glossary, beside "a perspective's skgrepo list".
+
+** 7. One folder, three names: "integrated elsewhere", "what the user keeps elsewhere", "kept"
+The variant and atom are 'IntegratedElsewhere' /
+'integratedElsewhereFolder'. Prose calls it "the folder of what the
+user keeps elsewhere" everywhere. Slice 4's fields call it a "kept"
+folder:
+- 'in_kept_or_hidden_folder'
+  ('server/from_text/local_fieldintent_collection/types.rs:114,131')
+- 'members_of_kept_and_hidden_folders' ('traverse.rs:224,608')
+
+A test name calls it the "integrated folder":
+'a_stale_buffer_does_not_hide_what_its_integrated_folder_showed'
+('tests/members_as_such_and_stale_buffers.rs').
+- Fix: 'in_integratedElsewhere_or_hiddenIn_folder' and
+  'members_of_integratedElsewhere_and_hiddenIn_folders', after the
+  atoms, as names.org's camel-casing suggests.
+
+** 8. 'drawn_before' beside 'shown_before' for one concept
+Both mean "what the view drew under the member" in the two sibling
+steps of one function:
+- 'drawn_before', coined in slice 3 (forkee step,
+  'resolve_visibility.rs:136')
+- 'shown_before', older (forker step, 'resolve_visibility.rs:407')
+
+names.org names "drawn" versus "shown" as a pair a reader cannot
+tell apart.
+- Fix: rename 'shown_before' to 'drawn_before'.
+
+** 9. 'CompoundFolderParties' calls N the integrated folder's "hider"
+'compound_folder_parties' ('server/refresh/ancestry.rs:141-177')
+returns 'hider' = N and 'container' = the member for
+'IntegratedElsewhere'. Its doc defines them as "the note whose hides
+it shows" and "the note whose content holds what is hidden". The
+integrated folder shows no hide and holds nothing hidden.
+'folder_goal' then passes 'parties . hider' as the note
+('goal.rs:558-563').
+
+The glossary admits it: "the integrated-elsewhere folder's 'hider' is
+N, whose hides it leaves out" ('docs/glossary.org:606-609'). It also
+says that all four compound folders "join ... forking, containment,
+and hiding" ('docs/glossary.org:469').
+- Fix: drop 'IntegratedElsewhere' from 'compound_folder_parties', and
+  read its note by 'note_of_member_as_such' (its 'described_node' is
+  its viewparent anyway). Word glossary:469 "containment and, for
+  three of them, hiding".
+
+** 10. "Its forks" again means forkees, and the glossary contradicts itself on it (review 1, finding 1)
+- New prose uses "forks" for forkees beside "forkers":
+  - 'docs/data-model_technical.org:412' ("the note's visible forks,
+    forkers and indirect members")
+  - 'docs/api-and-formats.org:3012' (the same)
+  - 'docs/data-model_technical.org:656' ("with N's forks as the save
+    leaves them")
+- The glossary defines "its forks" as fork partners
+  ('docs/glossary.org:1204-1208'). Then it defines =hides= as "hides
+  from its forks" and includes indirect members
+  ('docs/glossary.org:239-242'). The hidden and hider labels
+  (see the label list above) inherit the gap.
+- "However many of its forks are there" ('docs/glossary.org:1239',
+  'docs/api-and-formats.org:2065') describes rule 2. That rule holds
+  for any mirror of N in N's skgrepo, indirect ones included.
+- Fix:
+  - Write "its forkees" (and "its forkees as the save leaves them") at
+    the three doc lines.
+  - At glossary:239-242, say "hides from every member of its forks
+    folder".
+  - Write "mirrors" for "forks" in the rule-2 sentences.
+
+** 11. "Direct member" is a coined synonym of "fork partner"
+"Direct member" is defined once ('docs/glossary.org:529') and used once
+more ('docs/data-model_technical.org:582'). It appears nowhere in code,
+the clients or the AI tool: all of them say "fork partner" (and
+'has_a_fork_partner' for the same test). names.org asks for synonyms
+to be reported.
+- Fix: drop "direct member", or use it where "fork partner" now
+  stretches to indirect members (finding 4).
+
+** 12. 'add_containers_folder_under_forks_folder_member' now also serves integrated-folder members
+Slice 3 calls it for each member of an integrated-elsewhere folder
+('carries_containers_folder', 'server/refresh/visit.rs:799-810').
+The name still says forks folder ('visit.rs:853').
+- Fix: rename it 'add_containers_folder_under_member', or
+  'add_containers_folder_under_forks_or_integratedElsewhere_member'.
+
+** 13. "Declaration order" carries the plan and is not in the glossary; "config order" is its synonym
+The perspective's skgrepo list, the forks folder's tails, the cycle
+and 'SkgConfig::declaration_rank' ('server/types/misc.rs:761') all rest
+on "declaration order". The glossary defines the privacy order and the
+fold order ('docs/glossary.org:1489-1500'), but not the declaration
+order. 'default_perspective_skgrepo' is documented as "the first owned
+skgrepo in declaration order", but it calls
+'first_owned_skgrepo_in_config_order' ('misc.rs:673'). Elsewhere the
+docs say "config order" for the same thing
+('docs/api-and-formats.org:882,1016,1185').
+- Fix: add a glossary entry, "declaration order (also config order):
+  the order the config lists every skgrepo; its owned entries are the
+  privacy order; the fold order permutes its foreign ones", and pick
+  one name.
+
+** 14. "The perspective is a skgrepo", though the default is not one
+These places say a perspective is a skgrepo, then admit the root
+homes, which is a skgrepo per tree:
+- 'docs/glossary.org:1273'
+- 'docs/mirrors.org:114'
+- 'tools/skg-for-ai/README.org:202'
+
+The type is honest: 'Perspective::RootHomes | Skgrepo'
+('server/types/views_state.rs:63-72').
+- Fix: "A view's perspective is one skgrepo, or its root homes (one
+  per tree)".
+
+** 15. "What it adds to the node" said of an indirect member
+An indirect member forks neither N nor anything N forks, yet these
+places say it shows "what it adds to the node's content":
+- 'docs/COMMANDS.org:495'
+- 'docs/COMMANDS-nvim.org:483'
+- 'tools/skg-for-ai/README.org:1412-1413'
+
+The glossary says it of forkers alone ('docs/glossary.org:735-736').
+- Fix: "showing what a member shows: its content less ...".
+
+** 16. Smaller drifts
+- "Set aside" is the slice-4 term for a child the buffer shows in a
+  member's integrated or hidden-in folder. It is defined only inline,
+  not bold, in the "cut" entry ('docs/glossary.org:821-823').
+  - Fix: bold it there.
+- "The reader keeps" ('tests/fork.rs:392') and "what f keeps elsewhere"
+  ('tests/fork.rs:499') stand for "the user keeps".
+  - Fix: write "the user keeps".
+- "The clone's own graph" ('docs/sharing-model.org:9') beside "your
+  graph" = every owned note ('docs/forks.org:276').
+  - Fix: write "the clone's own content".
+- 'mirrors_of_note_forking' ('server/dbs/in_rust_graph/mirrors.rs:179')
+  reads as "mirrors of a note that forks". It means N's mirrors were N
+  to fork 'forkees'.
+  - Fix: rename it 'mirrors_of_note_with_forkees'.
+- 'MemberAsSuch::as_the_notes' ('resolve_visibility.rs:220') reads as
+  plural "notes".
+  - Fix: rename it 'as_named_beside_the_note'.
+- 'viewnodestats.rs:40' says "a member as such keeps what the user
+  keeps elsewhere among its content": "keeps" in two senses in one
+  line.
+  - Fix: write "counts among its content".
+
+** Terms that checked out
+- "Root homes": 'Perspective::RootHomes', the wire "root homes",
+  'ROOT_HOMES_UNNAMED', and nil in both clients ('elisp/skg-buffer.el:145-170',
+  'nvim/lua/skg/buffer.lua') all agree. So do the AI tool's
+  'DEFAULT_PERSPECTIVE' and 'perspective_of_sidecar' (older names read
+  as the default). The glossary defines it once ('docs/glossary.org:1288-1293').
+- "Skgrepo NAME" on the wire: 'Perspective::wire_name' and
+  'from_wire_name', the clients, the AI tool, its README and the API
+  doc all agree. "Root authors", "user" and "owner of" are refused in
+  the tests. The sweep's grep finds none left outside those tests.
+- 'perspective_skgrepo_of_tree_containing' and
+  'SkgConfig::perspective_skgrepo_list' are true to the code. The
+  mirror rules 1-4 match between the module comment
+  ('server/dbs/in_rust_graph/mirrors.rs:13-25'), 'docs/mirrors.org:120-128'
+  and the tests that cite them.
+- 'declaration_rank': defined once, true, cited in
+  'docs/data-model_technical.org:595'.
+- "Indirect member": defined once ('docs/glossary.org:532-533').
+  It is used alike in the server ('indirect_members'), both clients'
+  relRepo refusals, the AI tool, and every user doc.
+- "Flat" of a forks folder: defined at 'docs/glossary.org:529', and
+  true. No member draws a forks folder unasked
+  ('add_default_folders', 'note_of_member_as_such').
+- 'visible_fork_relationships_of': the rename removed the second
+  'fork_partners_shown'. One name now means one thing (though see
+  finding 4 on what that thing is now called).
+- "The user's graph": the glossary ('docs/glossary.org:745-749') and
+  'owned_notes_containing' ('goal.rs:399-438') agree. The note itself
+  is excepted, records are visible ones, and homes are owned.
+- 'IntegratedElsewhere' / 'integratedElsewhereFolder': wired into
+  every table the plan listed. That includes 'shared/metadata-fields.json:80',
+  'shared/herald-styles.json:78,106', the three relRepo-unsupported
+  lists ('elisp/skg-metadata.el:256', 'nvim/lua/skg/metadata.lua:1509',
+  'tools/skg-for-ai/skg_for_ai.py:3274') and both herald pins.
+- "Member claiming nothing" in messages: the same words in the server
+  ('validate_tree.rs', 'resolve_visibility.rs'), both clients and the
+  AI tool.
+
+* Question 2: code that cites anything under 'TODO/'
+** Code
+No server, client, 'shared/', 'tools/' or test code cites a 'TODO/'
+path, a plan by number, a slice, a Q-number, a decision letter, a
+behavior number or 'progress.org'. The test citations that review 2
+listed are gone. That includes
+'tests/integration/forks-meet/test-emacs.el:61' and its
+'TODO/problems.org'.
+
+** A test citing a conversation, back (review 1's citation, rewritten)
+'tests/dbs/in_rust_graph/mirrors.rs:112': "Jeff's example ("my X, my
+Y, your X, your Y"), read as skgrepos". Review 1 flagged the older
+form of this example. Slice 1 rewrote the test
+('each_skgrepos_perspective_shows_its_own_mirror') and kept the
+citation.
+- Fix: "Four mirrors of n, one in each of four skgrepos: each
+  skgrepo's perspective shows its own."
+
+** Near-miss
+'tests/mirror_substitution.rs:806': "The plan warns that the view goes
+on showing the original." It means the save plan (its doc at ':489'
+says "the save's plan warns so"). But "The plan", bare, in a file a
+plan run wrote, reads as a citation.
+- Fix: "The save plan warns ...".
+
+** Docs
+Plan 3 added no 'TODO/' link to any doc. The older ones remain:
+- 'docs/README.org:59'
+- 'docs/api-and-formats.org:141,837'
+- 'docs/glossary.org:973'
+- 'docs/nvim-client-deviations.org:6'
