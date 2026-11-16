@@ -803,7 +803,7 @@ async fn under_a_foreign_root_a_forked_child_is_shown_as_the_original (
   assert! ( ! k_line . contains ("writeProtected"), "{}", view );
   let edited : String = view . replace (
     k_line, &k_line . replace (") K", ") K-edited") );
-  { // The plan warns that the view goes on showing the original.
+  { // The save plan warns that the view goes on showing the original.
     let graph : InRustGraph = InRustGraph::from_graphnodes (
       &read_all_skg_files_from_skgrepos (config) ? );
     let (_, _, warnings) = buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (

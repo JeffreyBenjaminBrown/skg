@@ -109,10 +109,10 @@ fn a_perspectives_skgrepo_list_is_its_skgrepo_then_declaration_order () {
   assert_eq! ( names ("your-x"), vec! [ "your-x", "my-y", "my-x", "your-y" ] );
   assert_eq! ( names ("your-y"), vec! [ "your-y", "my-y", "my-x", "your-x" ] ); }
 
-/// Jeff's example ("my X, my Y, your X, your Y"), read as skgrepos:
-/// a note n in your-x, forked by f in my-y, g in my-x and h in
-/// your-y. Each skgrepo's perspective shows its own mirror, whichever
-/// of the four is asked about.
+/// Four mirrors of n, one in each of four skgrepos: n in your-x,
+/// forked by f in my-y, g in my-x and h in your-y. Each skgrepo's
+/// perspective shows its own mirror, whichever of the four is asked
+/// about.
 #[test]
 fn each_skgrepos_perspective_shows_its_own_mirror () {
   let notes : Vec<Graphnode> = vec! [
