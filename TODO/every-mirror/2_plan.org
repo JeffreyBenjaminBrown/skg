@@ -1,12 +1,21 @@
 #+title: Plan 2 of every-mirror: fork partners shown alike in one forks folder, their chains foldered
 #+startup: overview
 
-* Status: not to be executed yet
-Jeff is still discussing this design. The open questions below come
-first because they are the live part of this document; a slice may
-launch only once plan 1 ('TODO/every-mirror/1_plan.org') is DONE, its
-preconditions below hold, and Jeff has answered or accepted the
-provisional answer of every question that slice names.
+* Status: being executed, since 2026-11-16 14:00 UTC
+Jeff said "yes to all" and "Please execute!" on 2026-11-16. Plan 1
+('TODO/every-mirror/1_plan.org') is DONE, with its review's fixes
+(its record in 'TODO/every-mirror/progress.org', "* Plan 1", gives
+every name it changed: map this plan's names through it). Every open
+question below is settled, by Jeff's answer where it says "Settled",
+and otherwise by its provisional answer.
+
+Two rules bind every slice, beyond the pitfalls. Two live servers run
+'target/release/skg' under a loop that reruns that binary when it
+exits: Jeff's on port 1730 and Claude's on 1761, each reading real
+data in the old format. So nothing in this run builds into
+'target/release', starts or stops those servers, or connects to those
+ports; the suites use 'target/debug' and their own ports. And nothing
+writes under 'data/'.
 
 * Open questions for Jeff
 Each names the slice it affects and the answer that slice will

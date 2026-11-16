@@ -2037,3 +2037,16 @@ links to 'TODO/every-mirror/2_plan.org' stay, since plan 2 runs next.
 - Whether item 2's rule should reach restricted viewnodes in content
   (Jeff's call).
 - The transition (migrating 'data/'), as before: Jeff's.
+** Orchestrator's notes after the review fixes (2026-11-16 13:10 UTC)
+Lost: the probe pass's raw transcripts and fixtures under
+'tests/results/every-mirror/probes-plan1/', wiped by the fixer's
+'bash/all-tests.sh' (orchestration.org warns of it). Probes of plan 2
+keep their transcripts outside 'tests/results/', or the record copies
+them first. For Jeff, not blocking: whether deleting a restricted
+placeholder in a note's content should, like one in the forks and
+hidden-outside folders, change nothing (today it removes the
+containment); and the search's transitive suppression, which the fix
+made reachable but did not change.
+
+* Plan 2
+Started after plan 1's review fixes; one agent per slice.
