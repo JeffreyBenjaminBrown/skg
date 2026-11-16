@@ -272,8 +272,9 @@ from this side, each mapped to its relation's wire name
 (NodeRelation::relation_name, server/dbs/in_rust_graph/
 relation_accessors.rs). The folder's viewparent owns the outbound
 relationship to each member that claims; a member of the forks
-folder claiming nothing forks the viewparent instead, recording that
-in its own file, so no relRepo is set on it from here.")
+folder claiming nothing either forks the viewparent, recording that
+in its own file, or is a mirror of it only through others, recorded
+nowhere between them, so no relRepo is set on it from here.")
 
 (defun skg--rel-at-point ()
   "Classify the relationship the headline at point represents.
@@ -318,7 +319,7 @@ an ID missing."
          ((and writable-folder
                (not (skg--claims-membership-p member-sexp)))
           (user-error
-           "This member of the %s claims nothing: it forks the view-parent and records that in its own file; attach it first to make the view-parent fork it"
+           "This member of the %s claims nothing: either it forks the view-parent and records that in its own file, or it is a mirror of the view-parent only through others; attach it first to make the view-parent fork it"
            (car writable-folder)))
          (writable-folder
           (let* ((folder-viewparent-sexp
@@ -440,7 +441,7 @@ next save will do with the relationship."
     ("mentioned" nil
      "Links are inferred from body text; they carry no false relRepo, so there is nothing to set.")
     ("forker" nil
-     "A member of the view-parent's forksFolder that claims nothing: it forks the view-parent, and the forks relationship belongs to the member (the forker), recorded in its own file. Refused from here.")
+     "A member of the view-parent's forksFolder that claims nothing: either it forks the view-parent, and the forks relationship belongs to the member (the forker), recorded in its own file, or it is a mirror of the view-parent only through others. Refused from here.")
     ("forkee" forkee
      "A member of the view-parent's forksFolder that claims: the view-parent forks it. Sets the repo of each forks relationship from the view-parent.")
     ("hider" nil
@@ -664,7 +665,8 @@ write-protected parent's contains is not collected at save, nor is
 a forkee or forker as such's, which shows its content in part, so a
 relRepo request under one would be inert); for `forkee', the viewparent must be the writable
 forksFolder with an editable viewparent, and the headline must claim
-\(a member claiming nothing forks the viewparent; its record is its own)."
+\(a member claiming nothing forks the viewparent, its record its own,
+or is a mirror of it only through others)."
   (let ((meta (skg--metadata-sexp-at-point-or-nil)))
     (and (or (and (skg--occurrence-sexp-p meta)
                   (skg--claims-membership-p meta))
@@ -696,7 +698,8 @@ not writable relationships."
   "Non-nil iff the headline at point is a member as such of a
 forksFolder: an occurrence member of one, a forkee as such if it
 claims, a forker as such if it claims nothing. Either shows its
-content in part, less what the folder's viewparent contains or hides."
+content in part, less what the folder's viewparent contains or hides
+and what the user keeps in another owned node."
   (let ((meta (skg--metadata-sexp-at-point-or-nil)))
     (and (skg--occurrence-sexp-p meta)
          (save-excursion

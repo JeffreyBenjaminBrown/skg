@@ -3262,7 +3262,8 @@ def words_with_a_subtree_form (headline):
 # 'relRepo:NAME subtree' sets from it ('skg--writable-folder-relations'
 # in 'elisp/skg-metadata.el'). The folder's viewparent records the
 # relationship to each member that claims; a member of the forks folder
-# claiming nothing forks the viewparent, recording that in its own file.
+# claiming nothing either forks the viewparent, recording that in its
+# own file, or is a mirror of it only through others.
 WRITABLE_FOLDER_RELATIONSHIP_KINDS = { "forksFolder" : "forkee" }
 # The partner folders whose members' relationships belong to the other
 # end, so that no relRepo can be set from there
@@ -3442,9 +3443,10 @@ def relRepo_problems (edited, index, headline_of_handle, ownership):
     if metadata_has_atom (
         headline_of_handle [ headline . handle ] . metadata, "noClaim" ):
       return [ f"carries '{words [0]}', but this member of the {folder} "
-               "claims nothing: it forks the view-parent and records that "
-               "in its own file; attach it first to make the view-parent "
-               "fork it." ]
+               "claims nothing: either it forks the view-parent and "
+               "records that in its own file, or it is a mirror of the "
+               "view-parent only through others; attach it first to make "
+               "the view-parent fork it." ]
     if not is_editable_node ( outline_metadata (
         edited, edited [parent] . parent, headline_of_handle )):
       return [ f"carries '{words [0]}', but the folder's viewparent is "

@@ -1513,9 +1513,10 @@ M.relRepo_unsupported_folder_atoms = {
 ---The partner folder atoms whose members' relationships are writable
 ---from this side, each with its relation's wire name. The folder's
 ---viewparent records the relationship to each member that claims; a
----member of the forks folder claiming nothing forks the viewparent
----instead, recording that in its own file, so no relRepo is set on it
----from here. Mirrors skg--writable-folder-relations.
+---member of the forks folder claiming nothing either forks the
+---viewparent, recording that in its own file, or is a mirror of it
+---only through others, recorded nowhere between them, so no relRepo is
+---set on it from here. Mirrors skg--writable-folder-relations.
 M.writable_folder_relations = {
   { atom = 'forksFolder', relation = 'forks' } }
 
@@ -1604,9 +1605,10 @@ function M.rel_at_line (line_number)
   local writable_folder = writable_folder_relation(parent_sexp)
   if writable_folder and not M.claims_membership_p(member_sexp) then
     error(string.format(
-      'This member of the %s claims nothing: it forks the view-parent'
-        .. ' and records that in its own file; attach it first to make'
-        .. ' the view-parent fork it', writable_folder.atom), 0) end
+      'This member of the %s claims nothing: either it forks the'
+        .. ' view-parent and records that in its own file, or it is a'
+        .. ' mirror of the view-parent only through others; attach it'
+        .. ' first to make the view-parent fork it', writable_folder.atom), 0) end
   if writable_folder then
     local folder_viewparent = M.parent_line(parent)
     local folder_viewparent_sexp = folder_viewparent
@@ -1736,7 +1738,7 @@ M.relationship_role_menu_prose = {
   mentioned = { kind = false, description =
     'Links are inferred from body text; they carry no false relRepo, so there is nothing to set.' },
   forker = { kind = false, description =
-    "A member of the view-parent's forksFolder that claims nothing: it forks the view-parent, and the forks relationship belongs to the member (the forker), recorded in its own file. Refused from here." },
+    "A member of the view-parent's forksFolder that claims nothing: either it forks the view-parent, and the forks relationship belongs to the member (the forker), recorded in its own file, or it is a mirror of the view-parent only through others. Refused from here." },
   forkee = { kind = 'forkee', description =
     "A member of the view-parent's forksFolder that claims: the view-parent forks it. Sets the repo of each forks relationship from the view-parent." },
   hider = { kind = false, description =
@@ -1932,8 +1934,8 @@ end
 ---For 'content', the view-parent is an editable occurrence that is no
 ---member as such of a forks folder; for 'forkee', it is the writable
 ---forksFolder with an editable viewparent, and the headline claims (a
----member claiming nothing forks the viewparent; its record is its
----own). Mirrors
+---member claiming nothing forks the viewparent, its record its own,
+---or is a mirror of it only through others). Mirrors
 ---skg--relationship-kind-matches-p.
 ---@param line_number integer
 ---@param kind string

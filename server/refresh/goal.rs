@@ -480,7 +480,8 @@ pub(crate) fn integrated_elsewhere (
 /// which claims nothing: in a view the refresh draws, a forker-only
 /// or an indirect member, which the viewparent does not fork),
 /// the note whose folder holds it, the folder's viewparent. Either
-/// shows its content less what that note contains or hides.
+/// shows its content less what that note contains or hides, and,
+/// outside the diff view, less what an owned note but it contains.
 pub(crate) fn note_of_member_as_such (
   tree   : &Tree<Viewnode>,
   treeid : NodeId,

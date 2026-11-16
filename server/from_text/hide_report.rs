@@ -10,8 +10,8 @@
 //! included), its hides as the plan leaves them against its hides on
 //! disk. That catches every source of a hide, and reports what the
 //! save will in fact write. Then each child that left an owned
-//! note with a fork partner its forks folder shows (a note it forks,
-//! or a forker it does not hide), and whose departure hid
+//! note with a member its forks folder shows (a note it forks, or a
+//! forker or an indirect member it does not hide), and whose departure hid
 //! nothing, earns a "Hides nothing:" line naming the rule that held:
 //! among them, that an owned note keeps it after the save
 //! ('owned_notes_containing'), so that no partner shows it.

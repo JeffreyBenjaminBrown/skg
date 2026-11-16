@@ -118,11 +118,12 @@ pub struct ForkeeVisibility {
 /// the visible content of 'forker_as_such', a member of the forks
 /// folder of a note claiming nothing there ('docs/glossary.org',
 /// "forker as such"). That content is shown in part (less what the
-/// note contains or hides), so it is never read as the forker's whole
-/// list: a child typed there joins it, a child the note hides shown
-/// there is unhidden, and a child cut from it makes the note fork the
-/// forker, and hide the child unless the note contains it
-/// ('resolve_forker_visibility').
+/// note contains or hides, and what an owned note but the forker
+/// contains), so it is never read as the forker's whole list: a child
+/// typed there joins it, a child the note hides shown there is
+/// unhidden, and a child cut from it makes the note fork the forker,
+/// and hide the child unless the note, or an owned note but the
+/// forker, contains it after the save ('resolve_forker_visibility').
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ForkerVisibility {
   pub forker_as_such : ID,

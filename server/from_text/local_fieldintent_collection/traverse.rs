@@ -34,9 +34,10 @@
 //! a member of a write-protected folder, where it is save-eligible for
 //! itself but invisible to the folder's recorder.) An editable member
 //! as such is not save-eligible, since it shows its content in part
-//! (less what the note whose folder holds it contains or hides): an
-//! absent child is integrated or hidden by that note, never removed
-//! from the member. But when the user owns the member, its title and
+//! (less what the note whose folder holds it contains or hides, and
+//! what an owned note but the member contains): an absent child is
+//! integrated (that note or another owned note keeps it) or hidden by
+//! that note, never removed from the member. But when the user owns the member, its title and
 //! body are saved, and a child typed under it joins its content
 //! ('resolve_visibility'). A foreign one's title and body are text
 //! claims, which must match the disk.

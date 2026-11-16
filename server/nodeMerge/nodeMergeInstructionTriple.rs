@@ -228,8 +228,9 @@ fn three_nodeMerged_graphnodes(
 
 /// The ids 'node' shows as unintegrated content of its fork
 /// partners: contained by some fork partner its forks folder shows
-/// ('fork_partners_shown': a node it forks, or one forking it that it
-/// does not hide), neither hidden by it nor among its own contents,
+/// ('fork_partners_shown': a node it forks, or one forking it, or
+/// another mirror of it, that it does not hide), neither hidden by it
+/// nor among its own contents,
 /// and contained by no owned note but that partner
 /// ('owned_notes_containing'; 'docs/glossary.org', "what a member
 /// shows"). Every record counts, since a nodeMerge is built from the

@@ -847,8 +847,9 @@ fn stands_drawn_folded (
 /// own visit entombstones it. None under a repeat
 /// ('Walk::is_a_repeat'), which shows nothing. The member was just
 /// drawn, so the folder is its only child: the folders an editable
-/// member's visit adds stand around it (the hidden-in folder first,
-/// the forks folder after it), and its content follows.
+/// member's visit adds stand around it (the integrated-elsewhere
+/// folder, the hidden-in folder and the hidden-by folder before it, a
+/// forks folder asked for after it), and its content follows.
 pub(crate) fn add_containers_folder_under_forks_folder_member (
   tree   : &mut Tree<Viewnode>,
   member : NodeId,
