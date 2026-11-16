@@ -180,6 +180,7 @@ Refused too: a save that leaves an owned note containing a note that
 forks it, or forking a note that contains it, is refused, by the same
 check as decision 7.
 ** Q8. Names (changed: one forks folder, decision 9)
+*** Settled by Jeff (2026-11-16): as provisional
 Slices 4 to 8. Decision 1 retires 'subscribesTo' and 'overrides'
 everywhere; these names would follow. Provisional, each:
 *** The relation
@@ -251,6 +252,7 @@ joins the retired keys.
   hides-from-subscriptions"), and a bare 'hides' reads as that sense.
 - Keep 'hidesFromSubs', redefined; no second key to migrate.
 ** Q11. Order within the forks folder (new)
+*** Settled by Jeff (2026-11-16): as provisional
 Slice 6. Jeff, earlier: "Forkees are listed before forkers". The
 forkee part of the folder is the note's own ordered 'forks' list (its
 order is the user's, editable, as the subscribee folder's is:
@@ -267,6 +269,17 @@ Forkee-only, then mutuals, then forker-only. The folder's order would
 then differ from the list's, and a save would rewrite the list in the
 folder's order, moving the mutuals to its end.
 ** Q12. A forker-only member deleted, detached or attached (new)
+*** Settled by Jeff (2026-11-16): deleting it hides it
+Jeff: "that should hide it". This replaces the provisional answer's
+first item. A member of the forks folder that forks the note but that
+the note does not fork, absent from the saved buffer where the
+baseline showed it, joins the note's 'hides', as an absent member of a
+forkee as such does today ('resolve_visibility'); the save reads the
+folder's forker-only members for that, though they claim nothing. A
+forker the note hides is not drawn in the forks folder. It is listed
+in the hidden-outside folder (plan 2, decision 8), whose members are
+editable: removing it there unhides it, and it is drawn in the forks
+folder again. The other items stand as provisional.
 Slice 6. What a member's claim means in the one folder is settled by
 the code (behavior 5, "What a claim means there"): a claim says "this
 note forks it". What the user can do to a member it does not fork:
@@ -284,6 +297,11 @@ note forks it". What the user can do to a member it does not fork:
   save, since its record is in its own file, as on a subscriber-folder
   member today.
 ** Q13. A mutual deleted or detached (new)
+*** Changed after Q12 was settled; still open
+Provisional now: deleting a mutual both stops the note forking it and
+hides it, so that a deleted member always leaves the folder, as Jeff's
+answer to Q12 makes a deleted forker do. Detaching it only stops the
+fork; it then stands as a forker, claiming nothing.
 Slice 6.
 *** Provisional
 The save drops it from the note's 'forks' (it claimed, and is gone or
@@ -292,6 +310,7 @@ the refresh draws it again among the forker-only members, claiming
 nothing. A deleted forkee-only member is gone after the save, as a
 subscribee-folder member is today.
 ** Q14. When the forks folder is drawn unasked (new)
+*** Settled by Jeff (2026-11-16): as provisional
 Slice 6. Today 'add_default_folders' ('server/refresh/visit.rs') draws
 the subscribee folder on an editable occurrence an editable-view
 request extends, when the node subscribes to something the skgrepo
@@ -306,6 +325,7 @@ otherwise.
 Only when the note forks something, as today; its forker-only members
 are then drawn with it.
 ** Q15. The diff view and the one folder (new)
+*** Settled by Jeff (2026-11-16): as provisional
 Slice 6. Decision 6 keeps the diff view out of scope beyond renaming,
 but its folder logic assumes one relation side per folder kind:
 'changed_partner_folder_kinds' ('server/diff_view/changes.rs') sorts

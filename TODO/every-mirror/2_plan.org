@@ -91,6 +91,13 @@ extension, or C-c s e on it) passes through the forks folder to the
 write-protected members standing there; a plain rerender leaves them
 as they are.
 ** Q9. The folder of what a fork partner hides of my node (reworded)
+*** Settled by Jeff (2026-11-16): drawn, and labelled by letters
+"yes, but refer to ancestors via their letters (b = grandparent,
+etc.)". Every label this plan adds names its viewnodes only by herald
+letters, never "my node" or "it": this folder's label is "a hides
+these, which c contains." (a its viewparent, the forker; c the note
+whose forks folder holds it). Check each new label against the letter
+rules in 'docs/heralds.org' before writing it.
 Slice 3. The plan before this one drew, under a subscriber S of N,
 the folder of S's hides in N's content (N.contains ∩ S.hidesFromSubs):
 what the forker deleted from my note. The symmetric design draws
