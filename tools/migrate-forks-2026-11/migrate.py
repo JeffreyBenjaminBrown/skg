@@ -562,7 +562,7 @@ def print_report (report, arguments):
   commit_lines = [
     "git -C {} commit -am '{}'" . format (root, COMMIT_MESSAGE)
     for root in arguments . dirs
-    if root in counts . changed_roots and is_in_a_gitrepo (root) ]
+    if root in counts . changed_roots and is_a_gitrepos_top_level (root) ]
   if commit_lines:
     print ( "{}commit each changed gitrepo at once (the diff view refuses "
             "a HEAD in the old format):" . format (
@@ -571,11 +571,16 @@ def print_report (report, arguments):
     for line in commit_lines:
       print ( "  " + line )
 
-def is_in_a_gitrepo (root):
+# Whether 'root' is the top level of a gitrepo's work tree. A
+# folder deeper inside one gets no commit line: 'git -C root commit
+# -am' would commit every tracked change of the enclosing gitrepo.
+def is_a_gitrepos_top_level (root):
   result = subprocess . run (
-    [ "git", "-C", root, "rev-parse", "--is-inside-work-tree" ],
+    [ "git", "-C", root, "rev-parse", "--show-toplevel" ],
     capture_output = True, text = True )
-  return result . returncode == 0 and result . stdout . strip () == "true"
+  return ( result . returncode == 0
+           and os . path . realpath ( result . stdout . strip () )
+               == os . path . realpath (root) )
 
 def skg_files_under (root):
   for dirpath, dirnames, filenames in os . walk (root):

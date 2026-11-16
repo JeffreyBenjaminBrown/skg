@@ -416,7 +416,7 @@ directory; returns (exit code, stdout)."""
     self . assertReports ( out, "1 files changed",
                            "'hidesFromSubs' keys renamed 'hides': 1" )
 
-  # A DIR inside a gitrepo gets the line to commit it.
+  # A DIR that is a gitrepo's top level gets the line to commit it.
   def test_a_changed_gitrepo_gets_its_commit_line (self):
     self . write ( "repo/a.skg", "pid: a\nsubscribesTo:\n- t\n" )
     subprocess . run ( [ "git", "init", "-q", os . path . join (self . tmp, "repo") ],
@@ -427,6 +427,16 @@ directory; returns (exit code, stdout)."""
       "  git -C {} commit -am 'Migrate to forks'" . format (
         os . path . join (self . tmp, "repo") ),
       out . splitlines () )
+
+  # A DIR deeper inside a gitrepo gets no commit line: committing
+  # it with '-am' would commit the enclosing gitrepo's every change.
+  def test_a_changed_folder_inside_a_gitrepo_gets_no_commit_line (self):
+    self . write ( "outer/repo/a.skg", "pid: a\nsubscribesTo:\n- t\n" )
+    subprocess . run ( [ "git", "init", "-q", os . path . join (self . tmp, "outer") ],
+                       check = True )
+    code, out = self . run_tool ("outer/repo")
+    self . assertEqual (code, 0)
+    self . assertNotIn ( "commit -am", out )
 
 def relationship_mark (relation):
   return { "leaf" : { "Relationship" : {

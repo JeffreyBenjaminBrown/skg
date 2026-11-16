@@ -24,8 +24,9 @@ for each changed skgrepo, at once, commit:
 #+begin_src sh
 git -C SKGREPO commit -am 'Migrate to forks'
 #+end_src
-The tool prints that line for each changed directory that is in a
-gitrepo. Until the commit, the diff view and stage-and-commit refuse,
+The tool prints that line for each changed directory that is a
+gitrepo's top level (not for one deeper inside a gitrepo, where '-am'
+would commit the enclosing gitrepo's every change). Until the commit, the diff view and stage-and-commit refuse,
 since HEAD is still in the old format. '-am' commits every tracked
 change in the gitrepo, so commit any unrelated work there first.
 
