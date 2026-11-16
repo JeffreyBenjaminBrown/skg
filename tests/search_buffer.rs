@@ -222,7 +222,8 @@ fn an_excluded_overPrivateText_container_leaves_no_trace (
         build_search_viewforest ("hit", &matches, &HashSet::new ());
       draw_search_buffer (
         &mut viewforest, &mut ViewnodeIdRecord::default (), &graph, &config,
-        &search_results, &restriction, include_overPrivateText_telescopes ) };
+        &search_results, &HashSet::new (), &restriction,
+        include_overPrivateText_telescopes ) };
   let excluded : String = drawn (false) ?;
   assert_eq! ( without_viewnode_ids (&excluded),
                "* (skg node (gnid hit) (skgRepos (nodeRepo public)) writeProtected (view (rels (contains (in 1))) repoBoundary)) the hit\n",

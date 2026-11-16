@@ -62,7 +62,8 @@ Search hits are raw, write-protected, non-content roots.  In the
 search enrichment, each result N gains, folded, its forks folder
 (the nodes N forks, then the nodes that fork N), drawn only when it
 has a member.  The members are
-write-protected, and show N's direct =forks= relatives only.  Node
+write-protected, and show N's direct =forks= relatives (but see the
+suppressed hits, below).  Node
 visibility and the relationship's relRepo both gate them.
 
 Search also groups hits that are mirrors of one another (see "Mirror
@@ -70,8 +71,12 @@ substitution").  Among them, the hit the user's skgrepo list ranks
 first stands, ties going as rules 1 and 2 of "Which mirror stands"
 say and then to the least pid; if it is owned, every other hit among
 them is suppressed at the top level, and one it forks or that
-forks it directly reappears in its forks folder.  A suppressed hit related to it only through other mirrors
-reappears in neither.
+forks it directly reappears in its forks folder.  A suppressed hit
+related to it only through other mirrors reappears deeper: each note
+on a shortest path of forks from the standing hit to it shows its own
+forks folder, collapsed, and the suppressed hit stands in the last.
+So every suppressed hit stands somewhere under the hit that
+suppressed it.
 A foreign hit never suppresses another top-level result, although
 visible foreign relatives can occur in the folders: a
 foreign mutual pair that both match shows both.

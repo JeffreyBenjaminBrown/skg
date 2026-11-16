@@ -64,9 +64,9 @@ fn all_tests () -> Result<(), Box<dyn Error>> {
 /// check the rendered buffer. The suppressed F is
 /// absent from the top level and reappears in U's forks folder,
 /// since U forks it, carrying its heralds -- U, two levels up, forks
-/// it. G, which F forks, is not shown:
-/// the search buffer's partner folders hold direct relatives only, and
-/// only its containers folder's members carry anything.
+/// it. The suppressed G, which F forks, reappears one step further,
+/// in F's forks folder there, collapsed: every suppressed hit stands
+/// somewhere under the hit that suppressed it.
 fn end_to_end_render_shows_a_suppressed_node_in_a_folder_with_heralds (
   graph  : &InRustGraph,
   config : &SkgConfig,
@@ -89,7 +89,7 @@ fn end_to_end_render_shows_a_suppressed_node_in_a_folder_with_heralds (
   // The refresh, which draws the enrichment.
   let buffer : String = draw_search_buffer (
     &mut viewforest, &mut ViewnodeIdRecord::default (), graph, config,
-    &search_results, restriction, false ) ?;
+    &search_results, &suppressed, restriction, false ) ?;
 
   let level_of = |needle : &str| -> usize {
     buffer . lines ()
@@ -102,8 +102,12 @@ fn end_to_end_render_shows_a_suppressed_node_in_a_folder_with_heralds (
     "U's forks folder hangs under it, folded.\n{}", buffer );
   assert_eq! ( level_of ("cooking, forked once"), 3,
     "F (suppressed) reappears in U's forks folder.\n{}", buffer );
-  assert_eq! ( level_of ("cooking, the original"), 0,
-    "G, which F forks, is not shown.\n{}", buffer );
+  assert_eq! ( level_of ("cooking, the original"), 5,
+    "G (suppressed), which F forks, reappears in F's forks folder.\n{}", buffer );
+  assert! ( buffer . lines ()
+            . find ( |l| l . contains ("cooking, the original") )
+            . is_some_and ( |l| l . contains ("folded") ),
+    "F's forks folder is collapsed.\n{}", buffer );
   let line : String = buffer . lines ()
     . find ( |l| l . contains ("cooking, forked once") )
     . unwrap_or ("") . to_string ();
@@ -178,7 +182,7 @@ fn a_hit_shows_the_nodes_it_forks_in_a_folder (
     build_search_viewforest ( "cooking", &matches, &HashSet::new () );
   draw_search_buffer (
     &mut viewforest, &mut ViewnodeIdRecord::default (), graph, config,
-    &results, restriction, false ) ?;
+    &results, &HashSet::new (), restriction, false ) ?;
   let tree : Tree<Viewnode> = viewforest . into_internal_tree ();
   let u : NodeRef<Viewnode> =
     find_result_root ( &tree, "U" ) . expect ("U is a result root");
@@ -215,7 +219,7 @@ fn a_hit_shows_the_nodes_that_fork_it_in_a_folder (
     build_search_viewforest ( "exciting", &matches, &HashSet::new () );
   draw_search_buffer (
     &mut viewforest, &mut ViewnodeIdRecord::default (), graph, config,
-    &results, restriction, false ) ?;
+    &results, &HashSet::new (), restriction, false ) ?;
   let tree : Tree<Viewnode> = viewforest . into_internal_tree ();
   let e : NodeRef<Viewnode> =
     find_result_root ( &tree, "E" ) . expect ("E is a result root");
@@ -248,7 +252,7 @@ fn a_hit_forking_an_absent_node_shows_it_in_a_folder (
     build_search_viewforest ( "dangling", &matches, &HashSet::new () );
   draw_search_buffer (
     &mut viewforest, &mut ViewnodeIdRecord::default (), graph, config,
-    &results, restriction, false ) ?;
+    &results, &HashSet::new (), restriction, false ) ?;
   let tree : Tree<Viewnode> = viewforest . into_internal_tree ();
   let d : NodeRef<Viewnode> =
     find_result_root ( &tree, "D" ) . expect ("D is a result root");

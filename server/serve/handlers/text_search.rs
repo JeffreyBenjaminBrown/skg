@@ -40,7 +40,7 @@ use crate::types::viewnode::{ Viewnode, ViewnodeKind, mk_writeProtected_viewnode
 use crate::types::viewnode::{Folder, FolderRelation, ViewRequest, Vognode, viewnode_of};
 use crate::refresh::goal::partnerFolder_members_in_graph;
 
-use ego_tree::{NodeId, NodeMut};
+use ego_tree::{NodeId, NodeMut, NodeRef};
 use sexp::{Sexp, Atom};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
@@ -92,7 +92,7 @@ pub fn search_buffer_for_skgrepo_set_for_test (
     build_search_viewforest (terms, matches_by_gnid, &HashSet::new ());
   draw_search_buffer (
     &mut viewforest, &mut ViewnodeIdRecord::default (), graph, config,
-    &search_results, restriction, false ) }
+    &search_results, &HashSet::new (), restriction, false ) }
 
 /// Answers a text search with one 'search-results' message, whose
 /// content is the search buffer: the hits, and what the enrichment
@@ -199,7 +199,7 @@ pub fn handle_text_search_request (
             draw_search_buffer (
               &mut viewforest, &mut ViewnodeIdRecord::default (),
               &runtime . graph, &runtime . config,
-              &search_results, restriction,
+              &search_results, &suppressed, restriction,
               include_overPrivateText_telescopes );
           let rendered : String = match drawn {
             Ok (rendered) => rendered,
@@ -300,8 +300,14 @@ fn filter_match_groups_to_unrestricted_skgrepos (
 /// ('stub_root_of_hit'), and, when it was found through an alias,
 /// its alias folder; the refresh fills the folders, each member of the
 /// containers folder with its containerward chain, and titles each hit
-/// from the graph. What the refresh drew under each hit is then folded
-/// ('fold_what_was_drawn_under_hit'), and,
+/// from the graph. A hit's suppressed mirrors among 'suppressed' that
+/// its forks folder does not hold are drawn deeper: along a shortest
+/// path of forks from the hit to each, every note on it shows its own
+/// forks folder, and the refresh runs again until each is drawn
+/// ('request_forks_folders_toward_suppressed_hits'). What the refresh
+/// drew under each hit is then folded
+/// ('fold_what_was_drawn_under_hit', and each nested forks folder
+/// collapsed), and,
 /// unless the search included them, the occurrences of
 /// overPrivateText nodes are entombstoned, after the refresh, so that
 /// the members it drew are covered too, and the childless tombstones
@@ -313,6 +319,7 @@ pub fn draw_search_buffer (
   graph              : &InRustGraph,
   config             : &SkgConfig,
   search_results     : &[ID],
+  suppressed         : &HashSet<ID>,
   restriction        : &SkgrepoRestriction,
   include_overPrivateText_telescopes : bool,
 ) -> Result<String, Box<dyn Error>> {
@@ -329,8 +336,16 @@ pub fn draw_search_buffer (
     viewforest, viewnode_id_record,
     &Truth { graph, config, restriction },
     Perspective::RootAuthors ) ?;
+  let mut asked : HashSet<NodeId> = HashSet::new ();
+  while request_forks_folders_toward_suppressed_hits (
+          viewforest, &hits, graph, restriction, suppressed, &mut asked ) {
+    refresh_content_viewforest (
+      viewforest, viewnode_id_record,
+      &Truth { graph, config, restriction },
+      Perspective::RootAuthors ) ?; }
   for hit in &hits {
-    fold_what_was_drawn_under_hit (viewforest, *hit); }
+    fold_what_was_drawn_under_hit (viewforest, *hit);
+    fold_nested_forks_folders (viewforest, *hit); }
   if ! include_overPrivateText_telescopes {
     exclude_overPrivateText_nodes_from_viewforest (
       viewforest . as_internal_tree_mut (), graph);
@@ -361,6 +376,132 @@ fn stub_root_of_hit (
      . is_some_and ( |members| ! members . is_empty () ) {
     viewforest . get_mut (hit) . unwrap ()
       . append ( viewnode_of ( ViewnodeKind::Folder (Folder::Forks) )); }}
+
+/// Under each hit among 'hits', each suppressed mirror of it (one of
+/// 'suppressed') not drawn under it yet is reached along a shortest
+/// path of forks, in either direction, from the hit ('fork_path_parents');
+/// each note on that path but the last stands, drawn by the refresh,
+/// in the forks folder of the note before it (or in the folder of what
+/// that note hides outside its fork partners), and is asked for its
+/// own forks folder here, unless it has one or was asked before (in
+/// 'asked_before', to which it adds). Returns whether it asked for
+/// any, so that the caller refreshes again: each refresh draws one
+/// more step of each path. No occurrence is asked twice, so this ends.
+fn request_forks_folders_toward_suppressed_hits (
+  viewforest   : &mut ViewForest,
+  hits         : &[NodeId],
+  graph        : &InRustGraph,
+  restriction  : &SkgrepoRestriction,
+  suppressed   : &HashSet<ID>,
+  asked_before : &mut HashSet<NodeId>,
+) -> bool {
+  let mut asked : bool = false;
+  for hit in hits {
+    let Some (hit_gnid) : Option<ID> =
+      viewforest . get (*hit) . and_then (
+        |node| node . value () . occurrence_gnid () . cloned () )
+      else { continue; };
+    let drawn : HashSet<ID> =
+      viewforest . get (*hit) . unwrap () . descendants ()
+      . filter_map ( |node| node . value () . occurrence_gnid ()
+                     . map ( |gnid| graph . pid_else_raw_id (gnid) ))
+      . collect ();
+    let mirrors : Mirrors = mirrors_of (graph, restriction, &hit_gnid);
+    let unreached : Vec<ID> = mirrors . pids () . into_iter ()
+      . filter ( |pid| suppressed . contains (pid) && ! drawn . contains (pid) )
+      . collect ();
+    if unreached . is_empty () { continue; }
+    let start : ID = graph . pid_else_raw_id (&hit_gnid);
+    let parents : HashMap<ID, ID> = fork_path_parents (&mirrors, &start);
+    let mut on_a_path : HashSet<ID> = HashSet::new ();
+    for target in &unreached {
+      let mut step : Option<&ID> = parents . get (target);
+      while let Some (note) = step . filter ( |note| **note != start ) {
+        on_a_path . insert (note . clone ());
+        step = parents . get (note); }}
+    let to_ask : Vec<NodeId> =
+      viewforest . get (*hit) . unwrap () . descendants ()
+      . filter ( |node| {
+        let Some (gnid) : Option<ID> = node . value () . occurrence_gnid ()
+          . map ( |gnid| graph . pid_else_raw_id (gnid) )
+          else { return false; };
+        on_a_path . contains (&gnid)
+        && fork_partner_it_stands_among (*node, graph) . as_ref ()
+           == parents . get (&gnid)
+        && ! node . children () . any ( |child| matches! (
+             child . value () . kind, ViewnodeKind::Folder (Folder::Forks) )) } )
+      . map ( |node| node . id () )
+      . collect ();
+    for treeid in to_ask {
+      if ! asked_before . insert (treeid) { continue; }
+      if let ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =
+        &mut viewforest . get_mut (treeid) . unwrap () . value () . kind
+      { asked |= occurrence . view_requests . insert (
+          ViewRequest::Folder (FolderRelation::Forks) ); }}}
+  asked }
+
+/// For each of 'mirrors' reached from 'start' by fork relationships
+/// among them, in either direction, the one before it on a shortest
+/// such path, the least pid first among equals.
+fn fork_path_parents (
+  mirrors : &Mirrors,
+  start   : &ID,
+) -> HashMap<ID, ID> {
+  let mut partners : HashMap<&ID, Vec<&ID>> = HashMap::new ();
+  for (forker, forkee) in &mirrors . forks {
+    partners . entry (forker) . or_default () . push (forkee);
+    partners . entry (forkee) . or_default () . push (forker); }
+  for list in partners . values_mut () {
+    list . sort (); }
+  let mut parents : HashMap<ID, ID> = HashMap::new ();
+  let mut seen : HashSet<&ID> = HashSet::from ([ start ]);
+  let mut frontier : Vec<&ID> = vec! [ start ];
+  while ! frontier . is_empty () {
+    let mut next : Vec<&ID> = Vec::new ();
+    for note in frontier {
+      for partner in partners . get (note) . cloned () . unwrap_or_default () {
+        if seen . insert (partner) {
+          parents . insert ( partner . clone (), note . clone () );
+          next . push (partner); }}}
+    next . sort ();
+    frontier = next; }
+  parents }
+
+/// The note among whose fork partners the occurrence 'node' stands: the
+/// viewparent of the forks folder it is a member of, directly or in
+/// that folder's folder of what the note hides outside its fork
+/// partners. None elsewhere.
+fn fork_partner_it_stands_among (
+  node  : NodeRef<Viewnode>,
+  graph : &InRustGraph,
+) -> Option<ID> {
+  let folder : NodeRef<Viewnode> = node . parent () ?;
+  let forks_folder : NodeRef<Viewnode> = match folder . value () . kind {
+    ViewnodeKind::Folder (Folder::Forks) => folder,
+    ViewnodeKind::Folder (Folder::HiddenOutsideOfForkPartners) => folder . parent () ?,
+    _ => return None, };
+  if ! matches! ( forks_folder . value () . kind, ViewnodeKind::Folder (Folder::Forks) ) {
+    return None; }
+  forks_folder . parent () ? . value () . occurrence_gnid ()
+    . map ( |gnid| graph . pid_else_raw_id (gnid) ) }
+
+/// Collapse each forks folder drawn under a member of another below
+/// the hit at 'hit' ('request_forks_folders_toward_suppressed_hits').
+fn fold_nested_forks_folders (
+  viewforest : &mut ViewForest,
+  hit        : NodeId,
+) {
+  let nested : Vec<NodeId> =
+    viewforest . get (hit) . unwrap () . descendants ()
+    . filter ( |node| node . id () != hit
+                      && node . value () . is_occurrence () )
+    . flat_map ( |node| node . children ()
+                 . filter ( |child| matches! ( child . value () . kind,
+                                               ViewnodeKind::Folder (Folder::Forks) ))
+                 . flat_map ( |folder| folder . children () . map ( |member| member . id () )) )
+    . collect ();
+  for treeid in nested {
+    viewforest . get_mut (treeid) . unwrap () . value () . foldAndFocus . folded = true; }}
 
 /// Fold what the refresh drew under the hit at 'hit', so that it
 /// shows collapsed. (In the clients' encoding, a viewnode marked

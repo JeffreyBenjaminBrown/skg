@@ -118,8 +118,12 @@ So far there are these endpoints:
       forks or that forks it reappears in its
       forks folder ('suppressed_result_gnids'); a
       suppressed hit that is its mirror only through other notes (a
-      sibling fork, say) reappears in neither. A foreign hit
-      suppresses nothing.
+      sibling fork, say) reappears deeper: each note on a shortest
+      path of forks from the standing hit to it shows its own forks
+      folder, collapsed, so that the suppressed hit stands in the last
+      ('request_forks_folders_toward_suppressed_hits'). Every
+      suppressed hit thus stands somewhere under the hit that
+      suppressed it. A foreign hit suppresses nothing.
     - The search draws the enrichment under the same
       skgrepo restriction as it searches under. The containerward
       chain stops before restricted containers.
