@@ -1414,6 +1414,21 @@ Questions: Q6, Q7.
   'bash/all-tests.sh'.
 
 ** TODO Slice 4: the override folders go
+*** Corrections carried from slice 3
+**** A foreign note never stops the server from starting
+Slice 3's startup check refuses to start when an owned note breaks
+'ForkeeContained' or 'ForkerContained' because of a foreign note's
+relation: a foreign author forking an owned note that already
+contains it would lock the owner out, and the only mend is a hand
+edit. Startup should refuse only a violation that owned records alone
+make; one that a foreign record takes part in is reported as a startup
+warning naming both notes, and the server starts. A save that leaves
+such a pair is still refused, as slice 3 built it. Test both.
+**** Setting up an owned override without the overridden folder
+Several of slice 3's tests (and its end-to-end check) make one owned
+note override another through the overridden folder, which this slice
+removes. Set those up another way (fixtures, or the subscribee folder
+until slice 6), and keep what they assert.
 - Remove 'Folder::Overridden', 'Folder::Overrider',
   'FolderRelation::Overrides' and every arm, row and table entry the
   pitfalls "Exhaustive matches" and "The herald table has pinned

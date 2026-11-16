@@ -413,3 +413,9 @@ obsolete (one per-note function now), and moved to
   it through a buffer.
 *** DONE
 The slice's headline in '1_plan.org' is DONE.
+** Orchestrator's notes after slice 3 (2026-11-16)
+Carried into slice 4: a violation a foreign record takes part in
+warns at startup rather than refusing to start. For Jeff, not
+blocking: should a nodeMerge where one note forks X and the other
+contains X drop the pair, as it drops the merged note's own IDs, rather
+than be refused? It is refused today.
