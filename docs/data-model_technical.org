@@ -79,6 +79,17 @@ rejected when any of these conditions holds:
 7. Any stored graph index differs from an independently recomputed
    one.
 
+The complete validator makes one exception to rule 6: a pair in which a
+foreign note takes part (a foreign note forking an owned note that
+contains it, or an owned note forking a foreign note that contains it)
+is a warning there, not an error, since only a hand edit of the owned
+note could otherwise mend what the foreign author did.  Startup and
+rebuild report it among the startup warnings, naming both notes and
+which is foreign ('foreign_note_taking_part' in
+'server/dbs/in_rust_graph/override_invariants.rs'), and proceed.  A save
+that leaves such a pair is still refused, so a save of the owned note
+succeeds only once it ends the pair.
+
 Any number of notes, owned or not, may fork one note, and forks may form
 cycles: mirror substitution ([[file:override.org][override.org]], "Mirror
 substitution") ranks a note's mirrors and has no cycle case.
@@ -90,7 +101,8 @@ warnings rather than hard graph-construction errors; callers surface them for
 repair while retaining readable data.
 
 The incremental proof relies on induction: startup or rebuild establishes a
-valid base, and each serialized save proves that its delta preserves validity.
+valid base (but for the warned pairs above, which a save touching their
+owned note must end), and each serialized save proves that its delta preserves validity.
 Which node carries each ID is evaluated as one simultaneous final-state overlay;
 the checks of forks, contents and hides cover the touched notes, the notes
 they contain or fork or that contain or fork them, and untouched notes whose

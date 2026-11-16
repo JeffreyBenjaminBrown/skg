@@ -1413,7 +1413,7 @@ Questions: Q6, Q7.
   (a refusal message the server writes may change), then
   'bash/all-tests.sh'.
 
-** TODO Slice 4: the override folders go
+** DONE Slice 4: the override folders go
 *** Corrections carried from slice 3
 **** A foreign note never stops the server from starting
 Slice 3's startup check refuses to start when an owned note breaks

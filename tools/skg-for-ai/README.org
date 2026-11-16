@@ -146,7 +146,6 @@ to the roots. The kinds:
 | containers    | C-c l c | the containers folder: what contains the node                                    |
 | mentioners    | C-c l m | the mentioners folder: what links to it                                          |
 | subscribesTo  | C-c l s | the subscribees folder (what it subscribes to) and the subscribers folder        |
-| overrides     | C-c l o | the overridden folder (what it overrides) and the overriders folder              |
 | hidesFromSubs | C-c l h | the hidden folder (what it hides from its subscriptions) and the hiders folder   |
 | aliases       | C-c l a | the aliases folder                                                               |
 | flags         | C-c l p | the flags folder: its true flags                                                 |
@@ -155,7 +154,11 @@ changed from there; an empty one is left out, an empty editable one
 shown as a place to add members. A fresh content view already carries
 the root's containers folder, so 'forest containers' is 'view' under
 another name; every other kind is drawn by a save, as the clients do;
-see "How 'forest' draws a folder".
+see "How 'forest' draws a folder". A view saved under the out
+directory keeps the metadata the server drew it with: once the server
+no longer knows an atom of it (a folder kind that has gone, say), a
+save of that view is refused, and
+the view must be fetched again.
 
 'contains ID' is 'forest containers ID', and 'links-here ID' is
 'forest mentioners ID', each named after itself ('contains_ID',
@@ -1147,8 +1150,8 @@ keep an ID until it is written here.
 'relRepo:NAME' records the relationship of the headline to its parent
 in the owned skgrepo NAME, as 'skg-set-relRepo' ('C-c s r') does: a
 content child's membership of its parent, or a member's relationship
-to the viewparent of a writable partner folder (its subscribee or
-overridden folder); on an alias, the alias's own. The server refuses
+to the viewparent of a writable partner folder (its subscribee
+folder); on an alias, the alias's own. The server refuses
 NAME when it is more public than the relationship's default
 ('docs/telescopes.org', "Setting a relationship's skgrepo"); the report
 refuses it on a root, under a write-protected parent, and in a
@@ -1159,8 +1162,7 @@ from then on.
 With 'subtree', as 'C-c s R', it sets every relationship of one kind
 in the subtree: written on a node, its content relationships, its
 own among them when its parent's list holds it; on a subscribee
-folder, the subscriptions in it; on an overridden folder, the
-overrides. The walk is the clients': it does not go below a
+folder, the subscriptions in it. The walk is the clients': it does not go below a
 write-protected node or a subscribee as such.
 *** 'noSearchMatching' and 'searchMatching'
 'noSearchMatching' keeps the node from matching any search, by its
@@ -1372,8 +1374,7 @@ of it."
 
 Placed in an editable folder of a 'forest' view, a node joins that
 folder's relation instead: in the subscribee folder ('forest
-subscribesTo ID') the folder's node subscribes to it, and in the
-overridden folder ('forest overrides ID') overrides it. Under a
+subscribesTo ID') the folder's node subscribes to it. Under a
 subscribee as such, the subscribed node in that folder, stand its
 children the subscriber has not integrated; removing one there hides
 it from the subscription, as in the clients.

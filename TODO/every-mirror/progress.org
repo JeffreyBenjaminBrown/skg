@@ -419,3 +419,193 @@ warns at startup rather than refusing to start. For Jeff, not
 blocking: should a nodeMerge where one note forks X and the other
 contains X drop the pair, as it drops the merged note's own IDs, rather
 than be refused? It is refused today.
+** Slice 4: the override folders go
+*** Commits
+- 580d3bb8 every-mirror plan 1 slice 4: the override folders go; a foreign note's part in a fork-rule violation warns at startup
+- (the commit carrying this record) every-mirror plan 1 slice 4: docs, record, DONE
+*** Suites
+- 'bash/nextest.sh': 1233 of 1233 pass. Its first run, with the
+  adaptations below already made, had 1 failure,
+  'override_substitution::all_tests' ('a_replaced_search_hit_stays_a_hit'):
+  first an expected fixture adaptation (a search hit now shows its
+  subscribee folder), then a new failure the change caused (switching
+  a search buffer back to the root authors' lost the hit's subscriber
+  folder), fixed in 'kinds_redrawing' (see Deviations).
+- The AI tool's tests (after 'cargo build --bin skg'): PASS. Its first
+  run failed on 'search_Fred': an expected adaptation (the hits now
+  show their subscriber folders); 'test-expected/search_Fred.compact.org'
+  rewritten, and 'forest-overrides_overridden-id.compact.org' deleted.
+- 'bash/emacs-tests.sh' 501 of 501; 'bash/nvim-tests.sh' no failure.
+- 'bash/integration-tests.sh': 38 of 38 pass (the Emacs pass).
+- 'bash/all-tests.sh': all pass: build, Emacs 501 of 501, Neovim
+  (no failure), nextest 1233 of 1233, doctests, team tools, AI
+  reader, integration 76 of 76 (both clients).
+- Also, per the '/verify' skill, an isolated 'target/debug' server on
+  port 24754 with scratch data (owned E contains foreign R, which
+  subscribes to E; owned C subscribes to and overrides foreign F): the
+  server started, logging the warning, and "server warnings" returned
+  it, naming E and R and R as foreign; a view of C showed F in its
+  subscribee folder and no override folder; a search for "cheese"
+  showed C, F suppressed and drawn in C's subscribee folder; a save
+  asking '(folder overrides)' was refused ("Invalid folder relname:
+  overrides"), and one holding an 'overriddenFolder' headline
+  ("Unknown top-level value"), NOTHING WAS SAVED; a save of E keeping R
+  was refused naming the pair, and a save of E without R saved. The
+  server was stopped by its PID, its port checked free, the scratch
+  folder deleted.
+Logs: 'tests/results/every-mirror/slice4-plan1/' (nextest-first.log,
+nextest-second.log, nextest.log, ai-tool.log, ai-tool-update.log,
+emacs.log, nvim.log, integration.log, all-tests.out,
+all-tests-ALL.org, verify/).
+*** Names, for the slices after
+- Gone: 'Folder::Overridden', 'Folder::Overrider',
+  'FolderRelation::Overrides', 'visit_overridden_folder',
+  'FieldIntent::SetOverrides', the 'overrides' slot of
+  'FieldIntentsForOneId' and of 'RequestedRelRepos', the "overrides"
+  arm of 'relation_from_client_string' ('relRepo_info.rs'),
+  'skg-show-folderOf-overrides', 'ShowFolderOfOverrides',
+  'show_folderOf_overrides', the 'overridden' relRepo kind of both
+  clients and the AI tool.
+- 'NodeSaveIntent' keeps its 'overrides' field: lowering sets it
+  'MSV::Unspecified' (disk supplementation keeps the file's), and
+  'graph_save_from_graphnode' still fills it from disk.
+- New: 'foreign_note_taking_part' and
+  'describe_violation_a_foreign_note_takes_part_in'
+  ('override_invariants.rs'); 'CompleteGraphValidation::fork_rule_warnings';
+  'validated_graph' returns a third element, the fork-rule warnings;
+  'initialize_dbs' returns a fourth, which 'main' adds to the startup
+  warnings; the rebuild adds them to its result's warnings.
+- New test helper: 'save_added_overrides' ('server/test_utils.rs'), a
+  save through 'update_graph_minus_nodeMerges' (and so the fork
+  rules) of a node with overrides added. Slice 5 can drop or rename
+  it when 'forks' replaces 'overrides'.
+- 'tests/overridden_as_such.rs' is 'tests/subscribee_as_such_extension.rs'
+  (fixtures moved with it).
+- 'kinds_redrawing' takes 'root_is_editable'.
+*** Deviations from the plan's "how"
+**** Logs under 'tests/results/every-mirror/slice4-plan1/'
+As the launch brief said.
+**** The startup correction: where the warning goes
+'validate_complete_graph' itself classifies: a violation a foreign
+note takes part in (only 'ForkerContained' can have one: its forker's
+fork and its forkee's contents are two notes' records) becomes a
+string in 'fork_rule_warnings', the rest stay errors. So every caller
+of the whole-graph check (startup, rebuild, the diff view's HEAD
+graph, stage-and-commit's candidate) admits such a pair, the first two
+reporting it. The save's incremental check is unchanged, so a save
+touching the owned note of such a pair is refused until it ends the
+pair (the warning says so); a save not touching it saves.
+**** 'tests/overridden_as_such.rs' renamed, not deleted
+Two of its three tests ('subscribee_as_such_extension_hides_and_substitutes',
+'folder_members_never_substitute') pin behavior that stays; only the
+overridden-as-such test went. The file is
+'tests/subscribee_as_such_extension.rs'; slice 7's rename list should
+take it (it names "subscribee").
+**** 'tests/extend_raw_overridden_children.rs' and the integration test 'overridden-direct-visit' kept
+Neither drives the overridden folder: the first pins the raw children
+of a raw root, the second a direct visit of an overridden note. Both
+pass unchanged.
+**** The overridden-as-such goal had no code of its own
+It fell out of the generic paths (a member of a partner folder other
+than the subscribee folder is shown raw, its children raw, and no
+subscriber's hides apply), so removing the folder removed it.
+'is_raw_where_another_mirror_would_stand' needed no change.
+**** 'kinds_redrawing' redraws both subscription folders for a write-protected root
+Not in the plan. A search hit now shows its subscriber folder; C-c v
+o re-points the hit to the user's fork, whose subscribee folder stood
+where the subscriber folder did; switching back mapped that subscribee
+folder to itself alone ("which a root shows by default"), so the
+original hit lost its subscriber folder. A write-protected root draws
+no default folder, so its subscribee folder now redraws both sides of
+the relation; an editable root's still redraws only itself. Slice 6's
+one forks folder makes this moot.
+**** The role menu keeps entries for 'overrider' and 'overridden'
+The plan says to remove the role help entries. Both clients' menu
+requires prose for every role of 'shared/relations.json', which keeps
+the 'overrides' relation until slice 5, so the two entries stay, each
+with no kind and the prose "No folder shows the overrides relation;
+only the fork operation records it". 'shared/relations.json' maps
+both roles to no folder.
+**** The explicit relRepo path for overrides goes too
+No buffer position can carry an override's '(editRequest (relRepo
+...))' any more, so 'RequestedRelRepos::overrides' and the relRepo
+info request's "overrides" went with it; the sticky-relRepo pass
+resolves an override's relRepo with no explicit request.
+**** Setting up an owned override without the overridden folder
+The slice-3 tests that saved an owned override through the folder
+('a_second_owned_overrider_saves_and_q3s_mirror_stands',
+'an_owned_mutual_pair_saves_and_q3s_mirror_stands',
+'partner_folder_matrix's second-overrider test) save it through
+'save_added_overrides', which runs the save's graph update and its
+fork rules, and keep their assertions. The self-override buffer test
+became 'buffer_save_refuses_a_self_subscription' (the fork rules read
+a subscription as a fork until slice 5), still a buffer save, still
+refused as "forks itself".
+**** The AI tool's README says to fetch stale saved views again
+The pitfall "Old buffers and saved AI views" asks for this; it is
+said once, in general terms, after the 'forest' kinds.
+*** Tests adapted (expected fixture adaptations)
+- 'tests/overrideward_view_subtree.rs': its enrichment tests use the
+  subscription folders; fixtures U, B and D subscribe to what they
+  override, as a fork does, so the suppressed F still reappears under
+  U (with '(birth (subscribesTo in 2))').
+- 'tests/override_substitution.rs': the replaced search hit shows its
+  subscribee folder; the two slice-3 save tests as above.
+- 'tests/partner_folder_matrix.rs': the overrider folder's
+  write-protected scenarios, the overridden folder's editable ones and
+  both chain cases removed; '(folder overrides)' now refused; the
+  monogamy-fixture tests as above.
+- 'tests/view_stats_sharing.rs': the gS case (an overridden-folder
+  member) removed; gO and Op kept.
+- 'tests/hidden_nodes.rs': the narrowing round trip asks only for the
+  hides folders; o, which no folder shows, is no longer asserted
+  shown.
+- 'tests/repo_sets.rs': 'restricted_save_preserves_invisible_override_targets'
+  saves a retitle under the restriction and asserts both override
+  targets kept (the folder's delete case went).
+- 'tests/delete_strips_references_from_neighbors.rs':
+  'delete_in_foreign_overridden_rerenders_as_unknown' removed (it drove
+  the folder; the subscribee and hidden-outside twins stay).
+- 'tests/new/local_fieldintent_collection/{extraction, traverse,
+  pipeline}.rs', 'tests/new/buffer_to_viewnodes/validate_tree.rs',
+  'tests/refresh/{reinstate, reorder}.rs', 'tests/extend_partner_folder_member.rs',
+  'tests/fork.rs', 'tests/unit/{viewnode, relRepo_info}.rs',
+  'tests/metadata_fields_table.rs': the folder's cases and atoms
+  removed; 'relation_from_client_string ("overrides")' now an error.
+- The herald pins: 'tests/shared/herald-rules.sexp' regenerated; one
+  rendering case retitled.
+- Elisp and Neovim: the 'overridden' walk tests removed, the kind menu
+  offers two kinds, 'C-c l o' and 'lo' unbound.
+- The AI tool: the 'overrides' forest run and its expected file
+  removed; 'search_Fred' expected file rewritten.
+*** Tests added
+- 'tests/dbs/in_rust_graph/complete_validation.rs': an owned note
+  containing its foreign forker, and an owned note forking its foreign
+  container, are warnings naming the foreign note; an owned pair is an
+  error.
+- 'tests/init_refusal.rs': 'init_warns_and_starts_when_a_foreign_note_takes_part'.
+- 'tests/partner_folder_matrix.rs':
+  'a_save_leaving_an_owned_note_containing_its_foreign_forker_is_refused'
+  (and a save ending the pair saves).
+*** Fixtures changed
+- 'tests/overrideward_view_subtree/fixtures/': U, B, D subscribe to
+  what they override.
+- 'tests/overridden_as_such/' moved to 'tests/subscribee_as_such_extension/'.
+- New: 'tests/init_refusal/fixtures-foreign-forker/',
+  'tests/partner_folder_matrix/fixtures-foreign-forker/'.
+- 'tools/skg-for-ai/test-expected/': as above.
+*** Unfinished, and notes for later slices and Jeff
+- Until slice 5 no view shows an override that no subscription pairs:
+  the heralds count it ('O'), but no folder lists it, and a search hit
+  suppressed by a mirror related to it only by an override (or through
+  other mirrors) reappears in none of the stand-in's folders. No data
+  either server reads has an override-only relationship (the plan's
+  count), and slice 5 makes every override a fork, which the
+  subscribee folder shows.
+- The diff view no longer draws a changed folder for a change of
+  overrides alone (no folder kind is left for it); a change of a
+  fork's subscription still shows. Slice 5 makes the two one relation.
+- 'docs/override.org' still documents the overrides relation at
+  length; slices 5 and 8 rename it.
+*** DONE
+The slice's headline in '1_plan.org' is DONE.

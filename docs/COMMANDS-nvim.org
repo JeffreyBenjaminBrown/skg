@@ -225,8 +225,8 @@ without a prompt and the result carries a warning.
 The hits come best first, each a write-protected headline showing
 its node's title. Under each hang, folded, its containers folder,
 whose members carry their own containers up to the roots, and,
-when there are any, a folder of the nodes that override it and one
-of the nodes it overrides. A hit found through an alias shows those
+when there are any, a folder of the nodes it subscribes to and one
+of the nodes that subscribe to it. A hit found through an alias shows those
 folders collapsed and its alias folder open, holding all of the
 node's aliases, the matching one among them. The search buffer
 arrives whole, in one answer, and is an ordinary view.
@@ -365,8 +365,7 @@ or go to the content view of it that was already open if that exists
 
 The requested node itself is always the raw root. Recursive content
 below it can still use override substitution. Override facts remain
-visible in the search buffer and through the override
-folders.
+visible in its heralds (the O token).
 
 If you're not sure whether the cursor is on something visitable
 (a link or a node's metadata),
@@ -453,10 +452,6 @@ subscribee-as-such); the heralds advertise other nonempty relations.
 The aliasFolder -- other text you could search for to find this node
 (you can always search for its title; most nodes have none). Writable:
 type an alias in and save.
-*** <localleader>lo : :SkgShowFolderOfOverrides
-The overriddenFolder (the nodes this node overrides -- editable, shown
-even when empty as an "add an override here" surface) and the
-overriderFolder (the nodes that override this one -- write-protected, ☮).
 *** <localleader>lh : :SkgShowFolderOfHidesFromSubs
 The hiderFolder and hiddenFolder -- both write-protected (☮). Hiding is edited from
 a subscribee-as-such, never from these folders. On a node that neither
@@ -692,11 +687,10 @@ node at point's own relationship to its viewparent included).
 
 It first asks, with Neovim's selection menu, which role the
 view-children should play toward their viewparents: one entry per
-role of the schema's five node-node relations. Only three roles are
-settable from the child's position -- =content= (ordinary content),
-=subscribee= (a subscribeeFolder member) and =overridden= (an
-overriddenFolder member); choosing any other role says why its
-relationship cannot be set from there.
+role of the schema's five node-node relations. Only two roles are
+settable from the child's position -- =content= (ordinary content)
+and =subscribee= (a subscribeeFolder member); choosing any other role
+says why its relationship cannot be set from there.
 
 It then prompts for a skgrepo over every skgrepo, plus the
 no-override choice, which instead removes the pending requests
@@ -833,7 +827,7 @@ Moves the cursor to the next headline with change facts after it: a headline
 whose metadata carries a '(leaves ...)' change fact, the server's count of
 the changes it names. It skips a ☮ occurrence (not a ghost) standing directly in a
 folder labelled "... (other files)" (its other containers, mentioners,
-subscribers, overriders or hiders changed): that member records the
+subscribers or hiders changed): that member records the
 relationship in its own file, and its change is drawn, and visited,
 where its node stands editable. <localleader>rnC visits those too.
 The cursor lands at the start of the headline's

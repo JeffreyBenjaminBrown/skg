@@ -97,15 +97,15 @@ So far there are these endpoints:
       from the hits ('build_search_viewforest', then
       'draw_search_buffer'), the same code every view is drawn
       with: each hit asks for its containers folder ('(folder
-      containers)'), and holds an empty overrider and overridden
+      containers)'), and holds an empty subscribee and subscriber
       folder when that folder's goal has members, and an empty
       alias folder when an alias of its node matched; the refresh
       fills the folders and draws each containers folder member's
       containerward chain.
     - Under each hit hang its containers folder, whose members carry
-      the containerward chain; its overrider folder, the visible
-      nodes that override it; and its overridden folder, the visible
-      nodes it overrides. A folder with no member is not drawn. The
+      the containerward chain; its subscribee folder, the visible
+      nodes it subscribes to; and its subscriber folder, the visible
+      nodes that subscribe to it. A folder with no member is not drawn. The
       members are write-protected. Everything under a hit is folded,
       so that the hit shows collapsed; but a hit found through an
       alias shows its folders, each collapsed except its alias
@@ -115,9 +115,10 @@ So far there are these endpoints:
       list ranks first stands, ties going as that document's rules 1
       and 2 say and then to the least pid; if it is owned, every other
       hit among them is suppressed at the top level, and one it
-      overrides or that overrides it reappears in its overridden or
-      overrider folder ('suppressed_result_gnids'). A foreign hit
-      suppresses nothing.
+      subscribes to or that subscribes to it reappears in its
+      subscribee or subscriber folder ('suppressed_result_gnids'); a
+      suppressed hit related to it only by an override reappears in
+      neither. A foreign hit suppresses nothing.
     - The search draws the enrichment under the same
       skgrepo restriction as it searches under. The containerward
       chain stops before restricted containers.
@@ -167,8 +168,7 @@ So far there are these endpoints:
     is an overridden node shown raw, its immediate children are also shown
     raw (one level); substitution resumes at the grandchildren. See
     "Override substitution" below. Override facts can be inspected in
-    search results' override folders and in explicitly requested
-    override folders.
+    the heralds (the O token).
 
 ** Close view
   - Request: =((request . "close view") (view-id . "VIEW_ID"))=. Each
@@ -831,7 +831,10 @@ keeps them as text ('TODO/problems.org').
     the first such node (ID and title), how many more there are, the
     skgrepo and the home, and saying that an owned one is shown only
     under the node and a foreign one ignored (=docs/telescopes.org=,
-    "Illegal edits"); and one per pair of one foreign owner's
+    "Illegal edits"); one per violation of the fork rules that a
+    foreign note takes part in, naming both notes and which is foreign
+    (=docs/data-model_technical.org=, "Hard validation constraints");
+    and one per pair of one foreign owner's
     skgrepos that some node spans and whose dependencies manifests
     disagree about their order, naming the node, the disagreeing
     manifests and which skgrepo this server folds first (see
@@ -1125,7 +1128,7 @@ keeps them as text ('TODO/problems.org').
 ** relRepo info
   - Request: ((request . "relRepo info") (recorder . "ID")
     (member . "ID") (relation . "contains")) — relation is one of
-    =contains=, =subscribesTo=, =overrides=: the three
+    =contains=, =subscribesTo=: the two
     relations an explicit =(editRequest (relRepo ...))= request can name.
   - Response: LP response-type "relRepo-info" with
     =((default "NAME") (current "NAME"))=. =(current ...)= is absent
@@ -1654,7 +1657,7 @@ preserved and displayed but does not alter the parent's membership on
 save. A member carries nothing, and so does a view root. The atom is
 meaningful only where the save reads the claims of the viewparent's
 children: under an editable occurrence, and under an editable folder
-(subscribee, overridden, hidden-outside, alias) of one. Under any
+(subscribee, hidden-outside, alias) of one. Under any
 other viewparent ('docs/glossary.org', "claims membership", lists
 them) no child claims, whatever it carries, and the server writes no
 =noClaim= there.
@@ -1694,9 +1697,10 @@ contents remain advertised by the node's heralds. The diff view draws
 no folder unasked but where something changed.
 
 - =(folder RELNAME)= — build both folders of the relation, populated from the
-  graph. RELNAME is =aliases=, =overrides=,
+  graph. RELNAME is =aliases=,
   =hidesFromSubs=, =subscribesTo=, =containers= or =mentioners=.
-  The editable folder (=overriddenFolder= / =subscribeeFolder= / =aliasFolder=)
+  No folder shows =overrides=: only the fork operation records it.
+  The editable folder (=subscribeeFolder= / =aliasFolder=)
   appears even when empty (its editable "add here" surface); an empty
   write-protected folder is pruned. =containers= and =mentioners= each
   build one write-protected folder (=containerFolder=,
@@ -1909,8 +1913,6 @@ child ('stands_as_member' in =server/refresh/viewnodestats.rs=).
 | ordinary content                 | =(contains in 1)=                                            |
 | subscribee-folder member         | =(subscribesTo in 2)=                                       |
 | subscriber-folder member         | =(subscribesTo out 2)=                                      |
-| overridden-folder member         | =(overrides in 2)=                                   |
-| overrider-folder member          | =(overrides out 2)=                                  |
 | hidden-folder member             | =(hidesFromSubs in 2)=                        |
 | hider-folder member              | =(hidesFromSubs out 2)=                       |
 | container-folder member          | =(contains out 2)=                            |
@@ -2019,8 +2021,7 @@ independent single-root request for F still opens raw F.
 
 Moreover, the immediate children of any node shown raw where another
 of its mirrors would stand -- a partner folder member other than a
-subscribee, a view root, or the overridden-as-such (a member of an
-overriddenFolder) -- are also shown raw
+subscribee, or a view root -- are also shown raw
 ('is_raw_where_another_mirror_would_stand'): the user is looking at
 the original, so its children are the original's, not the mirror's.
 This is one level deep -- substitution resumes at the grandchildren --
@@ -2482,7 +2483,7 @@ served by Rust (see "Herald rules" above; the table lives in
 Partner folders are represented in Rust as
 =ViewnodeKind::Folder (Folder)=, but their external metadata
 remains the established bare non-vognode atom:
-=subscribeeFolder=, =subscriberFolder=, =overriddenFolder=, =overriderFolder=,
+=subscribeeFolder=, =subscriberFolder=,
 =hiderFolder=, =hiddenFolder=, =hiddenInSubscribeeFolder=,
 =hiddenOutsideOfSubscribeeFolder=, =containerFolder=, =mentionerFolder=,
 or, in the diff view only, =acquiredByFolder= or =acquiredFolder=;

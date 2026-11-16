@@ -263,7 +263,7 @@ viewnode, a restricted viewnode, an alias or an ID;
 'docs/api-and-formats.org', "Content view"). It means something
 only where the save reads the claims of its viewparent's children:
 under an editable occurrence, and under an editable folder
-(subscribee, overridden, hidden-outside-of-subscribee, alias) of one
+(subscribee, hidden-outside-of-subscribee, alias) of one
 ('parent_reads_claims' in 'server/refresh/ancestry.rs').
 
 Every other viewparent *reads no claims*. This is the one list of
@@ -417,12 +417,15 @@ recorders that record its parent:
 | link          | not implemented[2]         | mentionerFolder         |
 | subscription  | subscribeeFolder           | subscriberFolder        |
 | hiding        | hiddenFolder               | hiderFolder             |
-| overriding    | overriddenFolder           | overriderFolder         |
+| overriding    | not implemented[3]         | not implemented[3]      |
 
 1. A contentFolder would be silly: a node's contents are already its
    ordinary viewchildren.
 2. A mentionedFolder would be silly: the links are already visible in
    the node's own text.
+3. No folder shows overriding: only the fork operation records it, and
+   a fork's subscription, which the subscription folders show, records
+   the same pair.
 
 The two compound partner folders (see "compound partner folder")
 each join three relationships -- subscription, hiding and containment:
@@ -437,7 +440,7 @@ The diff view adds two more, for nodeMerges since HEAD:
 - an *acquiredFolder* ("it acquired"), under an acquirer, holds the
   ghosts of the nodes it acquired.
 
-Membership edits in the subscribee, overridden and
+Membership edits in the subscribee and
 hidden-outside-of-subscribee folders are graph edits. The others are
 write-protected: their membership follows from the graph (see
 "write-protected set"), and they carry the ☮ herald on their folder
@@ -568,8 +571,10 @@ containerward chain. A role, unlike a relation, is directed, so a
 role tree goes one way.
 
 The adjectives containerward, contentward, mentionerward,
-overriderward, overriddenward, and so on name the role a role tree
-follows: a containerward role tree follows the container role.
+subscriberward, subscribeeward, and so on name the role a role tree
+follows: a containerward role tree follows the container role. The
+overrider and overridden roles have no partner folder, so no role
+tree.
 
 *** foldering, the containerward chain, chain node
 
@@ -581,7 +586,7 @@ and its siblings, the =C-c l= commands) draws one; a fresh content
 view draws a containers folder on each root; the search enrichment
 (what a text search draws under each hit, in the one message that
 answers it) draws a containers folder under each hit, its two
-override folders when it has such relatives, and its alias folder
+subscription folders when it has such relatives, and its alias folder
 when an alias of its node matched.
 
 The *containerward chain* is the one tree that goes on below a
@@ -690,7 +695,7 @@ occurrence of its node. Its buffer is the *search buffer*, a synonym
 the docs and the code use for the search view. The *enrichment* (the search enrichment) is
 what the search draws under each hit, with the refresh every view is
 drawn with: its containers folder, whose members carry the
-containerward chain; its overrider and overridden folders, when it
+containerward chain; its subscribee and subscriber folders, when it
 has such relatives; and, for a hit found through an alias, its alias
 folder, the one folder not folded. Under a skgrepo restriction that
 excludes overPrivateText telescopes, what the enrichment would draw
@@ -931,11 +936,6 @@ The shown substitute carries the fact '(overridesHere N)'
 collected ID is what it contributes to its parent's saved lists:
 the fact's original if present, else its own ID -- so saving a
 view that shows R in place of N keeps N in the parent's contains.
-
-An overridden-as-such is a member of an overriddenFolder --
-the position that always shows the original; its editable
-extension applies neither the recorder's hides nor substitution to
-its immediate children.
 
 A node is *shown raw* where it stands as itself, not replaced by the
 mirror shown for it. Only content substitutes, so a view root, a
@@ -1771,7 +1771,7 @@ The node that has an ID, as its PID or as an extra ID, is that ID's
 
 How a folder (see "partner folder") is built. It is the
 =ViewnodeKind::Folder= variant and the payload type =Folder=, one
-enum for the twelve partner folders and the three property folders.
+enum for the ten partner folders and the three property folders.
 “Folder” here describes an org non-vognode that groups viewnodes; it
 does not mean a filesystem directory.  “Role col”, “relation col”,
 and bare “sharing col” are retired names for the general concept.
@@ -1782,7 +1782,7 @@ refresh, the save and the heralds consult, so a new kind cannot
 acquire inconsistent treatment in different layers:
 - =is_editable=: the save reads the folder's membership, so a member
   typed or removed there edits the graph. These are
-  =subscribeeFolder=, =overriddenFolder=, =aliasFolder= and
+  =subscribeeFolder=, =aliasFolder= and
   =hiddenOutsideOfSubscribeeFolder= (whose visible member set is an
   explicit edit of that subset of the hides; the hides' relRepos stay
   derived). An absent folder means "no opinion" (its field lowers to
@@ -1793,7 +1793,7 @@ acquire inconsistent treatment in different layers:
 - =goal_is_ordered=: the viewparent's own file records the members'
   order, which the warranted members take: the editable folders and
   =hiddenFolder=. In every other folder the refresh moves no child:
-  the inbound folders =subscriberFolder=, =overriderFolder=,
+  the inbound folders =subscriberFolder=,
   =hiderFolder=, =containerFolder= and =mentionerFolder= (the folders
   of =C-c l c= and =C-c l m=; the other side of each is the node's
   content, or its links, shown without a folder),
