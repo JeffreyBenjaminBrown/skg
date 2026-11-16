@@ -2382,3 +2382,8 @@ The slice's headline in '2_plan.org' is DONE.
   is 'a_headline_typed_under_the_foreign_forkee_itself_is_refused';
   'initial_view_bfs''s 'test_budget_content_beats_forkees' is
   'test_budget_reaches_forkees_and_content_in_level_order'.
+** Orchestrator's notes after slice 2 (2026-11-16 15:08 UTC)
+For Jeff, not blocking: a node pasted (not typed) under a forkee joins
+nothing; save refusals reach the client labelled "Database error"; a
+note with many forks spends its node budget on them in level order,
+before deeper content.
