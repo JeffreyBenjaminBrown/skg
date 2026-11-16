@@ -276,8 +276,8 @@ A note that forks yours stands in your note's forks folder too, as a
 /forker as such/, claiming nothing, showing what it adds to your
 note: its content less what yours contains or hides. Cutting a child
 from it (deleting the child's headline there, whether or not you
-paste it elsewhere) makes your note fork it: "If it is cut from a
-forker-as-such, that forker becomes a forkee, too." Your note hides
+paste it elsewhere) makes your note fork it: a forker as such that a
+cut is made from becomes a forkee too. Your note hides
 the child unless it contains it after the save, as a cut from a
 forkee does. Before:
 

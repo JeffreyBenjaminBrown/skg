@@ -1714,8 +1714,8 @@ foreign one's must match the disk), and a child placed under it that
 its list does not name (typed there, or moved from elsewhere) joins
 its content when the user owns it (the save is refused under a
 foreign one). Each forker as such (a member of that =forksFolder=
-claiming nothing, which forks the occurrence's note and is not
-forked by it) is drawn the same way, showing what it adds to the
+claiming nothing; in a view the server draws, a note that forks the
+occurrence's note and is not forked by it) is drawn the same way, showing what it adds to the
 note's content; its title and body, and a child placed under it,
 are read as a forkee as such's, never its content as its whole
 list. A save that cuts one of its children makes the note fork it,

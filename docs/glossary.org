@@ -671,18 +671,26 @@ detached -- is no forkee as such but a forker as such.
 
 *** "forker as such", member as such, what a member shows
 
-A *forker as such* is an occurrence standing, warranted and claiming
-nothing, in the forks folder of a note N: a forker-only member, a
-note that forks N and that N does not fork. (A mutual claims, so it
-stands as a forkee as such.) A *member as such* is either a forkee as
-such or a forker as such: an occurrence member of a forks folder.
-*What a member shows* of its content is its content less what N
-contains or hides, by the records the skgrepo restriction shows, in
-the member's order ('less_what_the_note_integrates' in
-'server/refresh/goal.rs', whose 'note' is the forker of a forkee as
-such and the forkee of a forker as such; 'note_of_member_as_such').
-For a forker that is what it adds to N; one that adds nothing shows
-nothing but its folders.
+A *forker as such* is an occurrence member of the forks folder of a
+note N that claims nothing there. The term is defined by the claim,
+since the claim is all the save can read of a member (it reads the
+buffer alone): in a view the server draws, every member claims as the
+graph says ('docs/forks.org', "Claims in a redrawn view"), so a forker
+as such there is a forker-only member, a note that forks N and that N
+does not fork; in a buffer the user has edited, it may also be a
+forkee the user detached (a pending detachment), until the save ends
+that fork. (A mutual claims, so it stands as a forkee as such.) A
+*member as such* is either a forkee as such or a forker as such: an
+occurrence member of a forks folder. The refresh also asks that it be
+warranted ('note_of_member_as_such'); the save reads its position and
+claim alone, as it cannot know a warrant.
+*What a member shows* of its content, its *unintegrated content*, is
+its content less what N contains or hides, by the records the skgrepo
+restriction shows, in the member's order
+('less_what_the_note_integrates' in 'server/refresh/goal.rs';
+'note_of_member_as_such'); the '(unintegrated COUNT ...)' part of its
+view stats counts it. For a forker that is what it adds to N; one that
+adds nothing shows nothing but its folders.
 
 A forker as such is drawn as a forkee as such is: in a content view,
 under an editable N, editable unless it is a repeat or the budget is
@@ -2277,7 +2285,9 @@ write-protected, re-kinded or merged away releases it
 
 A *repeat* is an occurrence of a node whose editability another
 occurrence in the buffer holds ('Walk::is_a_repeat', keyed as
-'Walk::editability_key' keys it). Whether a drawn occurrence is one
+'Walk::editability_key' keys it). (It is not the containerward
+chain's 'ContainerwardRoleTree::Repeated', a container met again on
+the walk toward the roots.) Whether a drawn occurrence is one
 is judged where it is drawn, in level order, so an occurrence made
 editable later in the same refresh does not make an earlier-drawn one
 a repeat. A repeat in the forks folder shows nothing, not even its
