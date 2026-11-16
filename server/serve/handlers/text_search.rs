@@ -14,7 +14,8 @@ use crate::dbs::tantivy::background_writer::wait_for_tantivy_writes_idle;
 use crate::dbs::tantivy::search::{
   SearchOptions, has_overPrivateText_telescope, search_index};
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
+use crate::dbs::in_rust_graph::mirrors::{
+  FirstRanked, Mirror, Mirrors, first_ranked_mirrors, mirrors_of};
 use crate::types::env::SkgEnv;
 use crate::org_to_text::viewforest_to_string;
 use crate::refresh::{Truth, refresh_content_viewforest};
@@ -31,7 +32,7 @@ use crate::serve::handlers::text_release::{
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{ send_response_with_length_prefix, tag_text_response};
 use crate::types::views_state::{ViewforestId, ViewnodeIdRecord, pids_from_viewforest};
-use crate::types::misc::{TantivyIndex, SkgConfig, ID, SkgrepoName};
+use crate::types::misc::{TantivyIndex, SkgConfig, ID, SkgrepoName, SkgrepoOwner};
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
 use crate::types::tree::forest::ViewForest;
@@ -521,16 +522,20 @@ pub fn group_matches_by_gnid (
         "Error retrieving document: {}", e ); }} }
   result_acc }
 
-/// The result ids to drop from the top level because an owned
-/// result recursively overrides them; those it overrides directly
-/// reappear in its overridden folder (the API doc's "Text search"). A
-/// foreign overrider never suppresses -- so a pure-foreign mutual
-/// override shows both, and a "boring" foreign overrider does not hide
-/// the node it overrides. Reachability follows relRepo-visible
-/// outbound overrides.
-/// Only search hits ('matches_by_id' keys) are ever suppressed. A
-/// owned overrider that matched the query but ranks past the
-/// display limit could suppress its target without itself being shown
+/// The result ids to drop from the top level because another hit,
+/// owned, is a mirror of them ('server/dbs/in_rust_graph/mirrors.rs')
+/// that the user's perspective ranks first. Among the hits that are
+/// mirrors of one another, under the skgrepo restriction, the one the
+/// user's skgrepo list ranks first stands ('first_ranked_mirrors',
+/// counting only the hits; where they tie, the least pid); if it is
+/// owned, every other hit among them is suppressed. A foreign hit
+/// never suppresses -- so a pure-foreign mutual pair shows both, and a
+/// "boring" foreign fork does not hide the node it forks. A suppressed
+/// hit one fork from its suppressor reappears in one of its partner
+/// folders (the API doc's "Text search").
+/// Only search hits ('matches_by_id' keys) are ever suppressed. An
+/// owned hit that matched the query but ranks past the
+/// display limit could suppress another without itself being shown
 /// (rare; suppression frees slots, so the anchor usually fits).
 pub fn suppressed_result_gnids (
   matches_by_gnid : &MatchGroups,
@@ -538,25 +543,53 @@ pub fn suppressed_result_gnids (
   config           : &SkgConfig,
   restriction      : &SkgrepoRestriction,
 ) -> HashSet<ID> {
-  let candidates : HashSet<ID> =
+  let mut hits : Vec<ID> =
     matches_by_gnid . keys () . cloned () . collect ();
+  hits . sort ();
+  let mut grouped : HashSet<ID> = HashSet::new ();
   let mut suppressed : HashSet<ID> = HashSet::new ();
-  for owned in candidates . iter () . filter ( |gnid|
-    graph . nodes . get (*gnid)
-      . map_or ( false, |n| config . skgrepo_is_owned (&n . home_skgrepo) ) )
-  { // Walk owned's overriddenward closure; any hit in it is suppressed
-    // (it will hang under 'owned'). Cycle-guarded: foreign relationships in the
-    // chain can form cycles even though owned ones cannot.
-    let mut stack : Vec<ID> = vec![ owned . clone () ];
-    let mut seen  : HashSet<ID> = HashSet::from ([ owned . clone () ]);
-    while let Some (cur) = stack . pop () {
-      for target in graph . outbound_pids_for_relation_gated (
-        &cur, NodeRelation::Overrides, restriction ) {
-        if ! seen . insert (target . clone ()) { continue; }
-        if candidates . contains (&target) {
-          suppressed . insert (target . clone ()); }
-        stack . push (target); }} }
+  for hit in &hits {
+    if grouped . contains (hit) { continue; }
+    let hits_among_mirrors : Mirrors =
+      hits_among_mirrors_of (graph, restriction, hit, matches_by_gnid);
+    grouped . extend ( hits_among_mirrors . pids () );
+    let Some (standing) : Option<ID> = hit_standing_among (config, &hits_among_mirrors)
+      else { continue; };
+    let standing_is_owned : bool = graph . nodes . get (&standing)
+      . is_some_and ( |node| config . skgrepo_is_owned (&node . home_skgrepo) );
+    if standing_is_owned {
+      suppressed . extend ( hits_among_mirrors . pids () . into_iter ()
+                            . filter ( |pid| pid != &standing ) ); }}
   suppressed }
+
+/// The mirrors of 'hit' that are hits, with the fork relationships
+/// among them.
+fn hits_among_mirrors_of (
+  graph           : &InRustGraph,
+  restriction     : &SkgrepoRestriction,
+  hit             : &ID,
+  matches_by_gnid : &MatchGroups,
+) -> Mirrors {
+  let mirrors : Mirrors = mirrors_of (graph, restriction, hit);
+  let members : Vec<Mirror> = mirrors . members . into_iter ()
+    . filter ( |mirror| matches_by_gnid . contains_key (&mirror . pid) )
+    . collect ();
+  let is_member = |pid : &ID| -> bool { members . iter () . any ( |m| &m . pid == pid ) };
+  let forks : HashSet<(ID, ID)> = mirrors . forks . into_iter ()
+    . filter ( |(forker, forkee)| is_member (forker) && is_member (forkee) )
+    . collect ();
+  Mirrors { members, forks } }
+
+/// Which of 'hits', hits that are mirrors of one another, the user's
+/// skgrepo list ranks first, ties going to the least pid.
+fn hit_standing_among (
+  config : &SkgConfig,
+  hits   : &Mirrors,
+) -> Option<ID> {
+  match first_ranked_mirrors (config, &SkgrepoOwner::User, hits) ? {
+    FirstRanked::One (pid) => Some (pid),
+    FirstRanked::Tied (tied) =>
+      tied . into_iter () . map ( |mirror| mirror . pid ) . min (), }}
 
 /// Builds the stub of the search buffer ('draw_search_buffer'): one
 /// root per hit, best first, each a write-protected occurrence titled

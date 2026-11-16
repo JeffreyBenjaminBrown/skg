@@ -3,6 +3,7 @@ use std::collections::{HashMap, HashSet};
 use std::cell::Cell;
 
 use crate::dbs::in_rust_graph::InRustGraph;
+use crate::dbs::in_rust_graph::mirrors::mirror_pids_ignoring_restriction;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::{ID, RelPartner, RelationshipMemberKey, SkgrepoName, members_of};
 use crate::types::nodes::rust::GraphnodeInRust;
@@ -239,7 +240,7 @@ impl<'g> RelRepoLookup<'g> {
 impl InRustGraph {
   /// IDs whose rendered relationship context can change when any seed changes:
   /// the neighborhood over every relation in
-  /// 'UPDATE_RELEVANT_ORDINARY_RELATIONS' and the override walks
+  /// 'UPDATE_RELEVANT_ORDINARY_RELATIONS' and the seeds' mirrors
   /// ('update_relevant_neighborhood_over').
   pub fn update_relevant_neighborhood (
     &self,
@@ -249,9 +250,12 @@ impl InRustGraph {
       seeds, UPDATE_RELEVANT_ORDINARY_RELATIONS) }
 
   /// The seeds, every ID one hop from a seed in either direction over
-  /// each relation in 'ordinary_relations', and the override walks.
-  /// The override relation is not ordinary: it contributes complete,
-  /// independently visited walks in each direction, beginning only at
+  /// each relation in 'ordinary_relations', and every mirror of a
+  /// seed, whatever any skgrepo restriction shows
+  /// ('mirror_pids_ignoring_restriction'): a change to any
+  /// relationship among a note's mirrors can change which of them
+  /// stands where another is drawn. The mirror relation is not
+  /// ordinary: it contributes the whole closure, beginning only at
   /// the seeds, whatever 'ordinary_relations' holds.
   pub fn update_relevant_neighborhood_over (
     &self,
@@ -270,33 +274,8 @@ impl InRustGraph {
             . map (|gnid| self . pid_else_raw_id (&gnid)));
         result . extend (
           self . inbound_pids_for_relation (seed, relation)); }}
-    result . extend (self . override_walk_from_seeds (
-      &seed_gnids, BinaryRolePosition::First));
-    result . extend (self . override_walk_from_seeds (
-      &seed_gnids, BinaryRolePosition::Second));
+    result . extend (mirror_pids_ignoring_restriction (self, &seed_gnids));
     result
-  }
-
-  fn override_walk_from_seeds (
-    &self,
-    seeds         : &HashSet<ID>,
-    seed_position : BinaryRolePosition,
-  ) -> HashSet<ID> {
-    let mut visited : HashSet<ID> = seeds . clone ();
-    let mut pending : Vec<ID> = seeds . iter () . cloned () . collect ();
-    while let Some (node) = pending . pop () {
-      let next : Vec<ID> = match seed_position {
-        BinaryRolePosition::First =>
-          self . outbound_gnids_for_relation (
-            &node, NodeRelation::Overrides),
-        BinaryRolePosition::Second =>
-          self . inbound_pids_for_relation (
-            &node, NodeRelation::Overrides), };
-      for raw_gnid in next {
-        let gnid : ID = self . pid_else_raw_id (&raw_gnid);
-        if visited . insert (gnid . clone ()) {
-          pending . push (gnid); }} }
-    visited
   }
 
   /// Comparison identity for a relationship member without mutating its raw

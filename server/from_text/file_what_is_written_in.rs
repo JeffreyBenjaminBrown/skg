@@ -22,10 +22,11 @@
 //! contains, files anything, and only a member S's list names. Nothing
 //! is filed in an F the save would otherwise leave as the graph has it
 //! because it changed since the buffer was drawn, nor what F already
-//! contains or hides, or holds an overrider of. 'docs/forks.org',
+//! contains or hides, or holds a mirror of. 'docs/forks.org',
 //! "Writing in an unintegrated child integrates it".
 
 use crate::dbs::in_rust_graph::InRustGraph;
+use crate::dbs::in_rust_graph::mirrors::{Mirrors, mirrors_of};
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::dbs::node_lookup::graphnode_from_graph;
 use crate::from_text::local_fieldintent_collection::predicates::occurrence_child_counts_as_content;
@@ -177,8 +178,9 @@ fn occurrence_of<'a> (
 /// Append 'member' to the contains of the Save of 'subscriber' in
 /// 'node_instructions', adding one from the graph if there is none,
 /// unless that Save deletes the subscriber or already contains or
-/// hides the member, or contains an overrider of it (filing the
-/// member too would draw that overrider twice there). The record is
+/// hides the member, or contains a mirror of it, under the skgrepo
+/// restriction (filing the member too could draw that mirror twice
+/// there). The record is
 /// at the relRepo a new record between the two would take
 /// ('SkgConfig::default_relRepo'). Whether it appended.
 fn file_in_subscriber (
@@ -203,8 +205,10 @@ fn file_in_subscriber (
       Some (node) => node,
       None => return false, }, };
   let member : ID = graph . pid_else_raw_id (member);
+  let member_mirrors : Mirrors = mirrors_of (graph, restriction, &member);
   let stands_for_member = |gnid : &ID| -> bool {
-    stands_for (graph, restriction, gnid, &member) };
+    let pid : ID = graph . pid_else_raw_id (gnid);
+    pid == member || member_mirrors . contains (&pid) };
   if node . contains . iter () . any ( |record| stands_for_member (&record . member) )
      || node . hidesFromSubs . or_default () . iter () . any ( |record|
           graph . pid_else_raw_id (&record . member) == member )
@@ -220,22 +224,3 @@ fn file_in_subscriber (
     Some (i) => node_instructions [i] = save,
     None => node_instructions . push (save), }
   true }
-
-/// Whether 'gnid' is 'member', or overrides it, along any override
-/// records the skgrepo restriction shows (as 'member_it_stands_for' in
-/// 'resolve_visibility.rs' walks them).
-fn stands_for (
-  graph       : &InRustGraph,
-  restriction : &SkgrepoRestriction,
-  gnid        : &ID,
-  member      : &ID,
-) -> bool {
-  let start : ID = graph . pid_else_raw_id (gnid);
-  let mut seen : HashSet<ID> = HashSet::from ([ start . clone () ]);
-  let mut frontier : Vec<ID> = vec! [ start ];
-  while let Some (current) = frontier . pop () {
-    if &current == member { return true; }
-    for overridden in graph . outbound_pids_for_relation_gated (
-      &current, NodeRelation::Overrides, restriction ) {
-      if seen . insert (overridden . clone ()) { frontier . push (overridden); }}}
-  false }

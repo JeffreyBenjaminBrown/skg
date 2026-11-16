@@ -1,0 +1,15 @@
+tantivy_folder = "/tmp/placeholder"
+
+[[repos]]
+name = "main"
+path = "owned/main"
+
+[[repos]]
+name = "bob"
+path = "bob"
+foreign = true
+
+[[repos]]
+name = "alice"
+path = "alice"
+foreign = true

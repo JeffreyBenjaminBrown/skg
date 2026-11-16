@@ -49,26 +49,27 @@ pub struct ViewState {
   pub viewnode_id_record : ViewnodeIdRecord,
   pub extend_at_next_rerender_all : bool, // for a buffer of the diff view a reload named: the next "rerender all views" that rerenders it extends it ('DiffViewBufferRerender::ExtendingWhereAReloadAsked')
   pub skgrepo_restriction_at_last_render : SkgrepoRestriction, // the skgrepo restriction the view was last rendered (or registered) under. A save of the view is refused while the connection's shows another set of skgrepos ('error_unless_view_was_rendered_under_current_restriction').
-  pub overrides_followed : OverridesFollowed, // whose overrides the view's rerenders substitute: set by the "set overrides followed" request and by each save, which names it
+  pub overrides_followed : OverridesFollowed, // the perspective the view's rerenders substitute by: set by the "set overrides followed" request and by each save, which names it
 }
 
-/// Whose overrides a view follows, its perspective: where a node
-/// stands as content and an overrider of the followed owner's exists,
-/// the refresh shows the overrider ('substitute_overriders' in
-/// 'server/refresh/visit.rs'). The client holds the choice for its
+/// A view's perspective: where a node stands as content, the refresh
+/// shows the mirror of it that the perspective's owner's skgrepo list
+/// ranks first ('substitute_mirrors' in 'server/refresh/visit.rs';
+/// 'server/dbs/in_rust_graph/mirrors.rs'). The client holds the choice for its
 /// buffer and names it in each save; the connection keeps it for the
 /// rerenders it starts ('ViewState::overrides_followed'). A fresh view
 /// follows its root authors'.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub enum OverridesFollowed {
-  /// Each top-level tree follows the overrides of its root's author:
-  /// the user's under an owned root, that author's under a foreign one
-  /// ('override_follower_of_tree_containing').
+  /// Each top-level tree is drawn from its root's author's
+  /// perspective: the user's under an owned root, that author's under
+  /// a foreign one
+  /// ('perspective_owner_of_tree_containing').
   #[default]
   RootAuthors,
-  /// Every tree follows one owner's overrides, whoever wrote its root:
-  /// the user's (those of every owned skgrepo), or one foreign
-  /// owner's, as that owner, viewing, would see it.
+  /// Every tree is drawn from one owner's perspective, whoever wrote
+  /// its root: the user's (owning every owned skgrepo), or one
+  /// foreign owner's, as that owner, viewing, would see it.
   Owner (SkgrepoOwner),
 }
 

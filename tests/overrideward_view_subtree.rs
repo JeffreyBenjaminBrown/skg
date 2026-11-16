@@ -109,8 +109,11 @@ fn end_to_end_render_shows_a_suppressed_node_in_a_folder_with_heralds (
      it -- proving graphStats were fetched for it: {}", line );
   Ok (( )) }
 
-/// Only nodes recursively overridden by an owned result are
-/// suppressed. A foreign overrider suppresses nothing.
+/// Among hits that are mirrors of one another, every one but the hit
+/// the user's skgrepo list ranks first is suppressed, if that one is
+/// owned: owned U suppresses F and G, its mirrors. Where the hit
+/// ranked first is foreign, nothing is: the foreign mutual pair M1 and
+/// M2, and E with its foreign fork B, all stay.
 fn suppression_anchors_at_owned (
   graph  : &InRustGraph,
   config : &SkgConfig,
@@ -132,9 +135,9 @@ fn suppression_anchors_at_owned (
   got . sort ();
   assert_eq! (
     got, vec![ "F".to_string (), "G".to_string () ],
-    "Only F and G (recursively overridden by owned U) should be \
-     suppressed; the foreign mutual pair M1/M2 and E (overridden only \
-     by the foreign B) must survive at top level." );
+    "Only F and G (mirrors of owned U) should be suppressed; the \
+     foreign mutual pair M1/M2 and E (forked only by the foreign B) \
+     must survive at top level." );
   Ok (( )) }
 
 /// U overrides F, which overrides G, and nothing overrides U. So

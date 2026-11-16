@@ -1,7 +1,5 @@
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::dbs::in_rust_graph::override_resolution::resolve_override;
-use crate::skgrepo_sets::SkgrepoRestriction;
-use crate::types::misc::{ID, SkgConfig, SkgrepoName, SkgrepoOwner, members_of};
+use crate::types::misc::{ID, SkgConfig, SkgrepoName, members_of};
 
 use std::collections::{HashMap, HashSet};
 
@@ -77,13 +75,11 @@ pub fn validate_override_invariants (
           overriders, } ); }}
 
   { // No cycles constraint. For each owned node, walk its
-    // owned overrider relationships (the shared 'resolve_override' walk,
-    // ungated so it is repo-set-independent); a returned cycle is a
+    // owned overrider relationships ('walk_owned_overriders', ungated
+    // so it is repo-set-independent); a returned cycle is a
     // violation. Different entry points into the same cycle yield
     // rotations of one trail, so canonicalizing collapses them.
     let mut seen_cycles : HashSet<Vec<ID>> = HashSet::new ();
-    let unrestricted : SkgrepoRestriction =
-      SkgrepoRestriction::unrestricted (config);
     for (pid, node) in graph . nodes . iter () {
       let owned : bool =
         config . skgrepos . get (&node . home_skgrepo)
@@ -91,16 +87,48 @@ pub fn validate_override_invariants (
         . unwrap_or (false); // unknown skgrepo reported by the
                              // overrider-collection pass above
       if ! owned { continue; }
-      let resolution = resolve_override (
-        config, graph, &unrestricted, &SkgrepoOwner::User, pid);
-      if resolution . cycle_detected {
+      let walk : OwnedOverriderWalk =
+        walk_owned_overriders (config, graph, pid);
+      if let Some (cycle) = walk . cycle {
         let canonical : Vec<ID> =
-          canonicalize_cycle (resolution . cycle);
+          canonicalize_cycle (cycle);
         if seen_cycles . insert (canonical . clone ()) {
           violations . push (
             OverrideInvariantViolation::OwnedOverrideCycle {
               cycle : canonical } ); }}}}
   dedup_violations (violations) }
+
+/// What 'walk_owned_overriders' found.
+struct OwnedOverriderWalk {
+  /// How many overrider relationships it followed.
+  steps : usize,
+  /// The nodes of the cycle it met (the trail from the first repeat
+  /// back to it), in walk order; None when it met none.
+  cycle : Option<Vec<ID>>,
+}
+
+/// Walk from 'pid' along owned overriders, overridden to overrider,
+/// while exactly one owned node overrides the current one (a node
+/// with two is a monogamy violation, reported apart), until a node
+/// repeats.
+fn walk_owned_overriders (
+  config : &SkgConfig,
+  graph  : &InRustGraph,
+  pid    : &ID,
+) -> OwnedOverriderWalk {
+  let start : ID = graph . pid_else_raw_id (pid);
+  let mut walk : Vec<ID> = vec! [ start ];
+  loop {
+    let current : &ID = walk . last () . expect ("the walk holds its start");
+    let overriders : Vec<ID> = owned_overriders_of (config, graph, current);
+    if overriders . len () != 1 {
+      return OwnedOverriderWalk { steps : walk . len () - 1, cycle : None }; }
+    let next : ID = overriders [0] . clone ();
+    if let Some (first) = walk . iter () . position ( |seen| seen == &next ) {
+      return OwnedOverriderWalk {
+        steps : walk . len (),
+        cycle : Some ( walk . split_off (first) ) }; }
+    walk . push (next); }}
 
 /// Rotate a cycle's nodes so the minimum pid leads, preserving cycle
 /// order. The same directed cycle reached from different entry points
@@ -183,25 +211,19 @@ pub(crate) fn validate_affected_override_invariants_with_counts (
           overridden : target . clone (),
           overriders,
         }); }}
-  let unrestricted : SkgrepoRestriction =
-    SkgrepoRestriction::unrestricted (config);
   for skgrepo in &scope . skgrepos {
     let Some (node) = graph . nodes . get (skgrepo) else { continue; };
     let Some (owned) = node_is_owned (
       config, skgrepo, &node . home_skgrepo, &mut violations)
       else { continue; };
     if ! owned { continue; }
-    let resolution = resolve_override (
-      config, graph, &unrestricted, &SkgrepoOwner::User, skgrepo);
-    chain_steps += if resolution . cycle_detected {
-      resolution . cycle . len ()
-    } else {
-      resolution . path . len ()
-    };
-    if resolution . cycle_detected {
+    let walk : OwnedOverriderWalk =
+      walk_owned_overriders (config, graph, skgrepo);
+    chain_steps += walk . steps;
+    if let Some (cycle) = walk . cycle {
       violations . push (
         OverrideInvariantViolation::OwnedOverrideCycle {
-          cycle : canonicalize_cycle (resolution . cycle),
+          cycle : canonicalize_cycle (cycle),
         }); }}
   AffectedOverrideValidation {
     violations : dedup_violations (violations),

@@ -19,8 +19,8 @@
 //! which the rerender would replace.
 
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::dbs::in_rust_graph::override_resolution::{
-  override_follower_of_tree_containing, visible_overriders_with_owners_of};
+use crate::dbs::in_rust_graph::mirrors::{
+  Mirror, mirrors_of, perspective_owner_of_tree_containing};
 use crate::org_to_text::viewforest_to_string;
 use crate::rerender_pass::{
   DiffViewBufferRerender, RerenderMode, RerenderPassContext, RerenderedView,
@@ -226,13 +226,15 @@ fn view_drawn_from (
 
 /// The owners whose perspective might draw 'forest' otherwise than
 /// the root authors' do: the user, and the owner of each visible
-/// overrider of each original 'forest' draws at a position where
-/// substitution acts ('substitute_overriders' and 'substitute_roots'
-/// in 'server/refresh/visit.rs'). Every other owner would show each
-/// original raw there, as some candidate (the user, where the user
-/// overrides nothing) already does. A position drawn only beneath a
-/// node another perspective puts in place is not read, so an owner
-/// whose overrides apply only there is found from that perspective.
+/// mirror of each original 'forest' draws at a position where
+/// substitution acts ('substitute_mirrors' and 'substitute_roots'
+/// in 'server/refresh/visit.rs'). An owner with no mirror of any such
+/// original ranks each one's mirrors by declaration order alone; its
+/// perspective is not offered, since it mostly draws what a candidate
+/// does (the user's, where the user has no mirror). A position drawn only
+/// beneath a node another perspective puts in place is not read, so
+/// an owner whose mirrors stand only there is found from that
+/// perspective.
 fn candidate_owners (
   forest      : &ViewForest,
   config      : &SkgConfig,
@@ -243,8 +245,8 @@ fn candidate_owners (
   for node in forest . nodes () {
     let Some (original) : Option<ID> = original_at_substitution_position (graph, node)
       else { continue; };
-    for (_overrider, owner) in visible_overriders_with_owners_of (
-      config, graph, restriction, &original ) {
+    for Mirror { home, .. } in mirrors_of (graph, restriction, &original) . members {
+      let owner : SkgrepoOwner = config . skgrepo_owner (&home);
       if ! owners . contains (&owner) { owners . push (owner); }} }
   owners }
 
@@ -324,7 +326,7 @@ pub fn perspective_name (
     OverridesFollowed::RootAuthors => {
       let mut authors : Vec<SkgrepoOwner> = Vec::new ();
       for root in state . viewforest . roots () {
-        let author : SkgrepoOwner = override_follower_of_tree_containing (
+        let author : SkgrepoOwner = perspective_owner_of_tree_containing (
           &runtime . config, &runtime . graph,
           &OverridesFollowed::RootAuthors, root );
         if ! authors . contains (&author) { authors . push (author); }}

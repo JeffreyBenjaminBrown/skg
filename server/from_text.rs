@@ -310,7 +310,8 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
       dead_link_warnings ( graph, &node_instructions, &fork_specs ) );
     warnings . extend (
       fork::forks_the_view_will_not_show (
-        &viewforest, graph, config, &overrides_followed, &fork_specs ) );
+        &viewforest, graph, config, skgrepo_restriction, &overrides_followed,
+        &fork_specs ) );
     warnings };
   let hide_report : Vec<String> =
     hide_report::hide_report_lines (

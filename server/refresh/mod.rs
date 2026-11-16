@@ -122,12 +122,12 @@ pub(crate) struct Walk<'a> {
   /// members, since 'folded' on a headline hides it in its parent.
   pub added_compound_folders   : HashSet<NodeId>,
   /// The skgrepo restriction that keeps nothing out, of the truth's
-  /// config: what override resolution asks under when it must not
-  /// depend on the connection's ('carrier_on_override_chain_followed_by'). Built
-  /// once per walk.
+  /// config: what mirror substitution asks under when it must not
+  /// depend on the connection's ('is_raw_where_another_mirror_would_stand'
+  /// in 'visit.rs'). Built once per walk.
   pub unrestricted             : SkgrepoRestriction,
-  /// Whose overrides the view follows
-  /// ('override_follower_of_tree_containing').
+  /// The view's perspective
+  /// ('perspective_owner_of_tree_containing').
   pub overrides_followed       : OverridesFollowed,
 }
 

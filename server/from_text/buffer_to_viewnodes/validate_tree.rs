@@ -1,9 +1,8 @@
 pub mod contradictory_instructions;
 
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::dbs::in_rust_graph::override_resolution::{
-  carrier_on_override_chain_followed_by, override_follower_of_tree_containing,
-  resolve_override};
+use crate::dbs::in_rust_graph::mirrors::{
+  is_mirror_of, mirror_shown, perspective_owner_of_tree_containing};
 use crate::dbs::in_rust_graph::override_invariants::existing_owned_overrider_of;
 use crate::dbs::node_lookup::opt_graphnode_by_gnid;
 use crate::types::misc::{ID, SkgConfig, SkgrepoOwner};
@@ -178,17 +177,14 @@ fn idFolder_membership_errors (
 /// extraction collects N instead of the carrier's own ID. So a
 /// part the server would not have rendered must abort the save --
 /// otherwise hand-edited (or yanked, or stale) metadata could
-/// rewrite arbitrary contains members. The check: the carrier's ID
-/// must be on N's chain of overriders of the owner whose overrides
-/// the occurrence's top-level tree follows in a buffer that follows
-/// 'overrides_followed', as the refresh rendered
-/// it ('override_follower_of_tree_containing';
-/// 'carrier_on_override_chain_followed_by', visibility-ungated so ownership
-/// still gates but a part honest when rendered does not start
-/// failing after a switch of the skgrepo restriction). With chains the shown node can
-/// be a middle link (when a later link's mentioner is hidden), so the
-/// check accepts any honest carrier and rejects only an off-chain
-/// fact.
+/// rewrite arbitrary contains members. The check: the carrier must
+/// be a mirror of N ('is_mirror_of'), under the unrestricted skgrepo
+/// restriction, so that a part honest when rendered does not start
+/// failing after a switch of the skgrepo restriction or of the
+/// perspective. Any mirror is honest: which one the refresh shows
+/// depends on the perspective and the skgrepo restriction. A refusal
+/// names the mirror the occurrence's tree's perspective
+/// ('perspective_owner_of_tree_containing') would show.
 /// The explicit graph is required, so every present fact is checked against
 /// the same graph snapshot used by the rest of save planning.
 #[allow(non_snake_case)]
@@ -210,16 +206,12 @@ fn overridesHere_part_errors (
               ( t . gnid . clone (), original . clone () ),
             None => continue },
         _ => continue };
-    let follower : SkgrepoOwner =
-      override_follower_of_tree_containing (config, graph, &overrides_followed, node_ref);
-    let chain_ok : bool =
-      carrier_on_override_chain_followed_by (
-        config, graph, &unrestricted, &follower, &original, &carrier);
-    if ! chain_ok {
-      let effective : Option<ID> = // the chain end, for the message
-        Some (resolve_override (
-          config, graph, &unrestricted, &follower, &original)
-          . effective);
+    if ! is_mirror_of (graph, &unrestricted, &original, &carrier) {
+      let owner : SkgrepoOwner = perspective_owner_of_tree_containing (
+        config, graph, &overrides_followed, node_ref);
+      let effective : Option<ID> = // the mirror shown, for the message
+        Some ( mirror_shown (
+          config, graph, &unrestricted, &owner, &original ));
       errors . push (
         BufferValidationError::OverridesHere_Mismatch (
           Some (carrier), original, effective,

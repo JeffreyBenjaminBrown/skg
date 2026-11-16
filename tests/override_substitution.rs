@@ -107,8 +107,8 @@ fn all_tests
       s . reset ("under_a_foreign_root_a_save_roundtrips_its_authors_overrider", foreign_root) ?;
       under_a_foreign_root_a_save_roundtrips_its_authors_overrider (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("under_an_owned_root_a_foreign_authors_carrier_is_rejected", foreign_root) ?;
-      under_an_owned_root_a_foreign_authors_carrier_is_rejected (
+      s . reset ("the_tamper_check_accepts_any_mirror_and_refuses_a_non_mirror", foreign_root) ?;
+      the_tamper_check_accepts_any_mirror_and_refuses_a_non_mirror (
         &s . config ) . await ?;
       s . reset ("under_a_foreign_root_a_forked_child_is_shown_as_the_original", foreign_root) ?;
       under_a_foreign_root_a_forked_child_is_shown_as_the_original (
@@ -118,6 +118,13 @@ fn all_tests
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("a_switched_view_follows_the_users_overrides_until_switched_back", foreign_root) ?;
       a_switched_view_follows_the_users_overrides_until_switched_back (
+        &s . config, &mut s . tantivy ) ?;
+      s . reset ("a_switch_of_perspective_re_points_a_substituted_content_child", foreign_root) ?;
+      a_switch_of_perspective_re_points_a_substituted_content_child (
+        &s . config, &mut s . tantivy ) ?;
+      s . reset ("a_third_authors_mirror_stands_where_the_user_has_none",
+                 "tests/override_substitution/fixtures-third-author") ?;
+      a_third_authors_mirror_stands_where_the_user_has_none (
         &s . config, &mut s . tantivy ) ?;
       s . reset ("a_switch_to_the_users_overrides_is_refused_where_it_would_change_nothing", foreign_root) ?;
       a_switch_to_the_users_overrides_is_refused_where_it_would_change_nothing (
@@ -157,8 +164,8 @@ fn all_tests
       s . reset ("a_held_view_follows_whatever_its_save_names", foreign_root) ?;
       a_held_view_follows_whatever_its_save_names (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("the_tamper_check_follows_the_overrides_the_save_names", foreign_root) ?;
-      the_tamper_check_follows_the_overrides_the_save_names (
+      s . reset ("the_tamper_check_accepts_a_mirror_whatever_perspective_the_save_names", foreign_root) ?;
+      the_tamper_check_accepts_a_mirror_whatever_perspective_the_save_names (
         &s . config ) ?;
       s . reset ("deleting_the_users_fork_in_a_foreign_parent_leaves_the_parent_and_shows_the_original", foreign_root) ?;
       deleting_the_users_fork_in_a_foreign_parent_leaves_the_parent_and_shows_the_original (
@@ -645,25 +652,32 @@ async fn under_a_foreign_root_a_save_roundtrips_its_authors_overrider (
     "the save of an unchanged view of R is a fixpoint" );
   Ok (( )) }
 
-/// A buffer under owned P that shows A, of a foreign author, in M's
-/// place is rejected: P's tree follows the user's overrides, and A is
-/// not on M's chain of them.
-async fn under_an_owned_root_a_foreign_authors_carrier_is_rejected (
+/// The tamper check accepts any mirror of the original as its
+/// carrier, whichever the tree's perspective would show: under owned
+/// P, whose tree is drawn from the user's perspective (which shows U
+/// in M's place), A, a fork of M by M's own author, carrying
+/// '(overridesHere M)', saves. K, no mirror of M, carrying it, aborts
+/// the save, the refusal naming U, the mirror shown.
+async fn the_tamper_check_accepts_any_mirror_and_refuses_a_non_mirror (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
   graph_handle_from_config (config) ?;
-  let buffer : &str = indoc! {"
-    * (skg node (gnid P) (skgRepos (nodeRepo main))) P
-    ** (skg node (gnid A) (skgRepos (nodeRepo foreign)) (overridesHere M)) A
-  "};
-  match node_instructions_from (buffer, config) . await {
+  let carried_by = |carrier : &str| -> String { format! (
+    "* (skg node (gnid P) (skgRepos (nodeRepo main))) P\n\
+     ** (skg node (gnid {carrier}) (skgRepos (nodeRepo foreign)) (overridesHere M)) {carrier}\n" ) };
+  assert! ( node_instructions_from (&carried_by ("A"), config) . await . is_ok (),
+    "a mirror the tree's perspective would not show is still an honest carrier" );
+  match node_instructions_from (&carried_by ("K"), config) . await {
     Err (SaveError::BufferValidationErrors { errors, .. }) =>
       assert! ( errors . iter () . any ( |e| matches! (
-        e, BufferValidationError::OverridesHere_Mismatch (..) )),
-        "a carrier only on the foreign author's chain must abort; got: {:?}",
+        e, BufferValidationError::OverridesHere_Mismatch (
+             Some (carrier), original, Some (shown), _ )
+           if carrier == &ID::from ("K") && original == &ID::from ("M")
+              && shown == &ID::from ("U") )),
+        "a carrier that is no mirror of M must abort, naming U; got: {:?}",
         errors ),
     other => panic! (
-      "a carrier only on the foreign author's chain must abort the save; got: {:?}",
+      "a carrier that is no mirror of M must abort the save; got: {:?}",
       other . map ( |v| v . len () ) ), }
   Ok (( )) }
 
@@ -859,6 +873,68 @@ fn a_switched_view_follows_the_users_overrides_until_switched_back (
     "switched back, R's author's A stands in M's place again:\n{}", back );
   Ok (( )) }
 
+/// Every mirror is an honest carrier, so a content child already
+/// shown in another's place is re-pointed whenever the view's
+/// perspective ranks another mirror first: a view of owned P shows U,
+/// the user's, in M's place; switched to third's perspective, B; to
+/// M's own author's, A; back to the root authors', U again.
+fn a_switch_of_perspective_re_points_a_substituted_content_child (
+  config  : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  let (mut views_state, env, view) : (ViewsState, SkgEnv, String) =
+    connection_holding_a_view_of (config, tantivy, "P", &[ ID::from ("P") ]) ?;
+  assert! ( line_of_gnid (&view, "U") . is_some_and ( |l| l . contains ("(overridesHere M)") ),
+    "a fresh view of P shows the user's U in M's place:\n{}", view );
+  for (perspective, shown) in [ ( owner_of ("third"), "B" ),
+                                ( owner_of ("foreign"), "A" ),
+                                ( OverridesFollowed::RootAuthors, "U" ) ] {
+    let switched : String = rerendered_text ( &messages_answering (
+      &switch_request ("P", perspective . clone ()),
+      &mut views_state, &env, config, handle_set_overrides_followed_request ))
+      . ok_or_else ( || format! ("the switch to {:?} rerenders the view", perspective) ) ?;
+    let marked : Vec<&str> = marked_lines (&switched, "M");
+    assert! ( marked . len () == 1 && marked [0] . contains ( &format! ("(gnid {})", shown) ),
+      "from {:?}, {} stands in M's place, alone:\n{}", perspective, shown, switched ); }
+  Ok (( )) }
+
+/// Where the perspective's owner has no mirror of a note, the first
+/// mirror by declaration order stands, whoever wrote it: P, the
+/// user's, contains N, alice's, which bob's F forks; the config
+/// declares bob's skgrepo before alice's, so a view of P shows F in
+/// N's place, born of its forking N ('(birth (overrides out))'). From
+/// alice's perspective N shows raw there; and under Q, which contains
+/// F, N stands in F's place, born of being forked by it
+/// ('(birth (overrides in))').
+fn a_third_authors_mirror_stands_where_the_user_has_none (
+  config  : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  let (mut views_state, env, view) : (ViewsState, SkgEnv, String) =
+    connection_holding_a_view_of (config, tantivy, "P", &[ ID::from ("P") ]) ?;
+  let marked : Vec<&str> = marked_lines (&view, "N");
+  assert! ( marked . len () == 1 && marked [0] . contains ("(gnid F)")
+            && marked [0] . contains ("(birth (overrides out))"),
+    "the user has no mirror of N, so bob's F, declared first, stands:\n{}", view );
+  let alices : String = rerendered_text ( &messages_answering (
+    &switch_request ("P", owner_of ("alice")),
+    &mut views_state, &env, config, handle_set_overrides_followed_request ))
+    . ok_or ("the switch to alice's perspective rerenders the view") ?;
+  assert! ( marked_lines (&alices, "N") . is_empty ()
+            && line_of_gnid (&alices, "N") . is_some (),
+    "from alice's perspective N shows raw:\n{}", alices );
+  let (mut views_state, env, _view) : (ViewsState, SkgEnv, String) =
+    connection_holding_a_view_of (config, tantivy, "Q", &[ ID::from ("Q") ]) ?;
+  let alices_q : String = rerendered_text ( &messages_answering (
+    &switch_request ("Q", owner_of ("alice")),
+    &mut views_state, &env, config, handle_set_overrides_followed_request ))
+    . ok_or ("the switch to alice's perspective rerenders the view of Q") ?;
+  let in_fs_place : Vec<&str> = marked_lines (&alices_q, "F");
+  assert! ( in_fs_place . len () == 1 && in_fs_place [0] . contains ("(gnid N)")
+            && in_fs_place [0] . contains ("(birth (overrides in))"),
+    "from alice's perspective N, which F forks, stands in F's place:\n{}", alices_q );
+  Ok (( )) }
+
 /// A view whose every root the user owns shows the user's overrides
 /// already, so a switch to them is refused, with the reason, the
 /// unchanged perspective and an empty rerender stream; "next" skips
@@ -1015,9 +1091,9 @@ fn the_root_authors_are_named_in_the_order_of_their_first_roots (
                Some ("each root author's overrides (foreign's, yours)"), "{:?}", back );
   Ok (( )) }
 
-/// A view in which no one's overrides would show anything
-/// differently (one of A, which no one overrides and which holds
-/// nothing) has a cycle of one, so "next" is refused there. But a
+/// A view in which no one's perspective would show anything
+/// differently (one of L, which has no mirror and holds nothing) has
+/// a cycle of one, so "next" is refused there. But a
 /// view whose perspective has left its cycle, as a save can leave it
 /// (a save names its buffer's perspective, and it is kept whatever the
 /// cycle is now), goes back to the root authors' on "next".
@@ -1026,13 +1102,13 @@ async fn next_from_a_perspective_that_left_the_cycle_goes_back_to_the_root_autho
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   let (mut views_state, mut env, view) : (ViewsState, SkgEnv, String) =
-    connection_holding_a_view_of (config, tantivy, "A", &[ ID::from ("A") ]) ?;
+    connection_holding_a_view_of (config, tantivy, "L", &[ ID::from ("L") ]) ?;
   let lonely : Vec<String> = messages_answering (
-    &switch_request_naming ("A", "next"),
+    &switch_request_naming ("L", "next"),
     &mut views_state, &env, config, handle_set_overrides_followed_request );
   assert! ( refusal_of (&lonely) . is_some_and ( |reason| reason . contains ("No one's overrides") ),
     "{:?}", lonely );
-  let view_id : ViewforestId = ViewforestId::from_client_string ("A" . to_string ());
+  let view_id : ViewforestId = ViewforestId::from_client_string ("L" . to_string ());
   let (mut stream, _read_end) : (TcpStream, TcpStream) = mk_test_tcp_stream_pair ();
   let response : SaveResponse =
     update_from_and_rerender_buffer_with_approvals (
@@ -1045,7 +1121,7 @@ async fn next_from_a_perspective_that_left_the_cycle_goes_back_to_the_root_autho
   assert_eq! ( views_state . open_views . overrides_followed_by_view (&view_id),
                owner_of ("third") );
   let back : Vec<String> = messages_answering (
-    &switch_request_naming ("A", "next"),
+    &switch_request_naming ("L", "next"),
     &mut views_state, &env, config, handle_set_overrides_followed_request );
   assert! ( refusal_of (&back) . is_none ()
             && extract_string_field_from_sexp (&back [0], "overrides-followed")
@@ -1342,12 +1418,14 @@ async fn a_save_following_the_users_overrides_shows_a_new_fork_in_place (
                OverridesFollowed::user () );
   Ok (( )) }
 
-/// Under foreign R, U, the user's, carrying '(overridesHere M)' is
-/// honest in a buffer that follows the user's overrides, and a
-/// tampered carrier in one that follows R's author's; A, R's author's,
-/// the reverse. A root standing for M has M's author as its root
-/// author.
-fn the_tamper_check_follows_the_overrides_the_save_names (
+/// Under foreign R, U, the user's, and A, R's author's, each carrying
+/// '(overridesHere M)', are honest whichever perspective the save
+/// names: each is a mirror of M. K, no mirror of M, is refused under
+/// either, the refusal naming the mirror the named perspective shows.
+/// A root standing for another node has that node's author: K standing
+/// for M at the root names A, M's author's mirror, under the root
+/// authors' perspective, and U under the user's.
+fn the_tamper_check_accepts_a_mirror_whatever_perspective_the_save_names (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
   let graph : InRustGraph = InRustGraph::from_graphnodes (
@@ -1355,28 +1433,31 @@ fn the_tamper_check_follows_the_overrides_the_save_names (
   let buffer_showing = |carrier : &str, repo : &str| -> String { format! (
     "* (skg node (gnid R) (skgRepos (nodeRepo foreign))) R\n** (skg node (gnid {}) (skgRepos (nodeRepo {})) (overridesHere M)) {}\n",
     carrier, repo, carrier ) };
-  let mismatch = |buffer : &str, followed : OverridesFollowed| -> bool {
+  let mismatch_naming = |buffer : &str, followed : OverridesFollowed| -> Option<ID> {
     match buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
       buffer, &graph, config, &SkgrepoRestriction::unrestricted (config),
       &HashMap::new (), &WhatTheBaselineShows::default (), followed ) {
       Err (SaveError::BufferValidationErrors { errors, .. }) =>
-        errors . iter () . any ( |e| matches! (
-          e, BufferValidationError::OverridesHere_Mismatch (..) )),
-      _ => false, } };
-  let u : String = buffer_showing ("U", "main");
-  let a : String = buffer_showing ("A", "foreign");
-  assert! ( ! mismatch (&u, OverridesFollowed::user ()) );
-  assert! ( mismatch (&u, OverridesFollowed::RootAuthors) );
-  assert! ( ! mismatch (&a, OverridesFollowed::RootAuthors) );
-  assert! ( mismatch (&a, OverridesFollowed::user ()) );
-  { // A root standing for another node has that node's author: U
-    // standing for M at the root is the user's stand-in, honest from
-    // the user's perspective; from the root authors', whose author is
-    // M's (foreign), not U's, it is not.
-    let root_u_standing_for_m : &str =
-      "* (skg node (gnid U) (skgRepos (nodeRepo main)) (overridesHere M)) U\n";
-    assert! ( ! mismatch (root_u_standing_for_m, OverridesFollowed::user ()) );
-    assert! ( mismatch (root_u_standing_for_m, OverridesFollowed::RootAuthors) ); }
+        errors . iter () . find_map ( |e| match e {
+          BufferValidationError::OverridesHere_Mismatch (_, _, shown, _) =>
+            Some ( shown . clone () . unwrap_or ( ID::from ("none") )),
+          _ => None, } ),
+      _ => None, } };
+  for followed in [ OverridesFollowed::user (), OverridesFollowed::RootAuthors ] {
+    assert_eq! ( mismatch_naming (&buffer_showing ("U", "main"), followed . clone ()), None );
+    assert_eq! ( mismatch_naming (&buffer_showing ("A", "foreign"), followed . clone ()), None ); }
+  assert_eq! ( mismatch_naming (&buffer_showing ("K", "foreign"), OverridesFollowed::user ()),
+               Some ( ID::from ("U") ));
+  assert_eq! ( mismatch_naming (&buffer_showing ("K", "foreign"), OverridesFollowed::RootAuthors),
+               Some ( ID::from ("A") ));
+  { // At the root, K standing for M has M's author, foreign, as its
+    // root author.
+    let root_k_standing_for_m : &str =
+      "* (skg node (gnid K) (skgRepos (nodeRepo foreign)) (overridesHere M)) K\n";
+    assert_eq! ( mismatch_naming (root_k_standing_for_m, OverridesFollowed::user ()),
+                 Some ( ID::from ("U") ));
+    assert_eq! ( mismatch_naming (root_k_standing_for_m, OverridesFollowed::RootAuthors),
+                 Some ( ID::from ("A") )); }
   Ok (( )) }
 
 /// The client is the authority on whose overrides its buffer follows:
@@ -1417,7 +1498,9 @@ async fn a_held_view_follows_whatever_its_save_names (
 /// original: a view of foreign R, switched to the user's overrides,
 /// shows U in M's place, and 'delete' is written on U. The save
 /// deletes U and nothing else: it asks to fork nothing, R keeps M, and
-/// the redrawn view shows M again in U's place. (Before 2026-11-15
+/// the redrawn view shows in U's place the mirror of M that the user's
+/// perspective now ranks first: A, M's author's fork of it, in M's
+/// skgrepo, which the user's list ranks above third's. (Before 2026-11-15
 /// U's deletion dropped M from R's content, an edit of foreign R, so
 /// the save asked to fork R.)
 async fn deleting_the_users_fork_in_a_foreign_parent_leaves_the_parent_and_shows_the_original (
@@ -1456,10 +1539,10 @@ async fn deleting_the_users_fork_in_a_foreign_parent_leaves_the_parent_and_shows
     "R is as its author wrote it" );
   assert! ( overrider_on_disk (config, "R") . is_err (), "R was not forked" );
   let saved : &str = &response . saved_view;
-  assert! ( line_of_gnid (saved, "M")
+  assert! ( line_of_gnid (saved, "A")
             . is_some_and ( |l| l . starts_with ("** ")
-                                && ! l . contains ("overridesHere") ),
-    "M is shown again in U's place:\n{}", saved );
+                                && l . contains ("(overridesHere M)") ),
+    "A, M's author's fork, is shown in U's place:\n{}", saved );
   assert! ( line_of_gnid (saved, "U") . is_none (), "{}", saved );
   Ok (( )) }
 

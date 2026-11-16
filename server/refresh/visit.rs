@@ -20,8 +20,8 @@
 //!  6. reorder: where the goal has an order, the warranted children
 //!     take it, and every other child stays right after the sibling it
 //!     followed;
-//!  7. substitution: in a content view an overridden node is shown as
-//!     its overrider;
+//!  7. substitution: in a content view a node is shown as the mirror
+//!     the perspective puts in its place;
 //!  8. requests: each child's view requests are fulfilled and dropped,
 //!     but for a fork request, which stays for the save.
 //! Before them, an editable-view request on P is consumed, making P
@@ -40,9 +40,8 @@
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
-use crate::dbs::in_rust_graph::override_resolution::{
-  carrier_on_override_chain_followed_by, override_follower_of_tree_containing,
-  resolve_override};
+use crate::dbs::in_rust_graph::mirrors::{
+  mirror_shown, perspective_owner_of_tree_containing};
 use crate::refresh::editability::{
   DrawnEditability, EditabilityAndClaim, carries_editableView_request,
   consume_editableView_request,
@@ -103,7 +102,7 @@ pub(crate) fn visit_parent (
     if goal . ordered {
       reorder (tree, parent, goal) ?; }}
   keep_hidden_outside_folder_last (tree, parent) ?;
-  substitute_overriders (tree, parent, goal . as_ref (), walk) ?;
+  substitute_mirrors (tree, parent, goal . as_ref (), walk) ?;
   fulfill_view_requests (tree, parent, walk) ?;
   entombstone_if_an_empty_folder (tree, parent);
   drop_editableView_request (tree, parent);
@@ -751,23 +750,25 @@ fn keep_hidden_outside_folder_last (
 // 7. substitution
 //
 
-/// In a content view, under an editable occurrence, an overridden
-/// member is shown as its overrider, marked '(overridesHere N)' for
-/// the original N, which the save collects instead. The overriders
-/// followed are those of the author of the parent's top-level tree's
-/// root ('override_follower_of_tree_containing'): the user's under an
+/// In a content view, under an editable occurrence, each member
+/// stands as the mirror the perspective puts in its place
+/// ('server/dbs/in_rust_graph/mirrors.rs'), marked '(overridesHere N)'
+/// for the original N, which the save collects instead. The
+/// perspective is that of the author of the parent's top-level tree's
+/// root ('perspective_owner_of_tree_containing'): the user's under an
 /// owned root, that author's under a foreign one; or one owner's
 /// throughout, in a view switched to that owner's perspective. Not
-/// where the
-/// parent is itself overridden (by those same overriders) and shown
-/// raw (a root, or a member of a folder other than the subscribee
-/// folder): there its children are raw too. When the override is
-/// gone, the shown overrider loses 'overridesHere', is warranted only
-/// as itself (and so, unwarranted, vanishes), and the original is
-/// reinstated beside it. The diff view substitutes nothing. At the
-/// buffer root, the view's roots are substituted by their own rule
-/// ('substitute_roots').
-fn substitute_overriders (
+/// where the parent itself is shown raw where another mirror would
+/// stand (a root, or a member of a folder other than the subscribee
+/// folder): there its children are raw too. A member already shown in
+/// another's place is re-pointed whenever it is not the mirror shown,
+/// as after a switch of perspective. Where the mirror shown is the
+/// original itself, the member shown in its place loses
+/// 'overridesHere', is warranted only as itself (and so, unwarranted,
+/// vanishes), and the original is reinstated beside it. The diff view
+/// substitutes nothing. At the buffer root, the view's roots are
+/// substituted by their own rule ('substitute_roots').
+fn substitute_mirrors (
   tree   : &mut Tree<Viewnode>,
   parent : NodeId,
   goal   : Option<&Goal>,
@@ -781,10 +782,10 @@ fn substitute_overriders (
   if walk . is_diff_view ()
      || tree . get (parent) . unwrap () . value () . editable_gnid () . is_none ()
   { return Ok (( )); }
-  let follower : SkgrepoOwner = override_follower_of_tree_containing (
+  let owner : SkgrepoOwner = perspective_owner_of_tree_containing (
     walk . truth . config, walk . truth . graph, &walk . overrides_followed,
     tree . get (parent) . unwrap () );
-  if is_overridden_and_shown_raw (tree, parent, &follower, walk)
+  if is_raw_where_another_mirror_would_stand (tree, parent, &owner, walk)
   { return Ok (( )); }
   for child in children_of (tree, parent) {
     let (gnid, overridesHere, warrant) : (ID, Option<ID>, Warrant) =
@@ -793,30 +794,30 @@ fn substitute_overriders (
           ( occurrence . gnid . clone (), occurrence . overridesHere . clone (),
             occurrence . viewStats . warrant ),
         _ => continue, };
+    let pid : ID = walk . truth . graph . pid_else_raw_id (&gnid);
     match overridesHere {
       None => if warrant == Warrant::ByGraph {
-        let effective : ID = resolve_override (
+        let shown : ID = mirror_shown (
           walk . truth . config, walk . truth . graph, walk . truth . restriction,
-          &follower, &gnid ) . effective;
-        if effective != gnid {
-          show_overrider (tree, child, &effective, Some (gnid), walk) ?; }},
+          &owner, &gnid );
+        if shown != pid {
+          show_mirror (tree, child, &shown, Some (gnid), walk) ?; }},
       Some (original) => {
-        let effective : ID = resolve_override (
+        let shown : ID = mirror_shown (
           walk . truth . config, walk . truth . graph, walk . truth . restriction,
-          &follower, &original ) . effective;
-        if effective == original {
+          &owner, &original );
+        if shown == walk . truth . graph . pid_else_raw_id (&original) {
           stop_substituting (tree, parent, child, &original, goal, walk) ?;
-        } else if ! carrier_on_override_chain_followed_by (
-                      walk . truth . config, walk . truth . graph, &walk . unrestricted,
-                      &follower, &original, &gnid ) {
-          show_overrider (tree, child, &effective, Some (original), walk) ?; }}, }}
+        } else if shown != pid {
+          show_mirror (tree, child, &shown, Some (original), walk) ?; }}, }}
   Ok (( )) }
 
 /// Each root of the view shows what the view's perspective makes of
 /// the node it stands for (its '(overridesHere N)', else itself): the
 /// root authors' show that node raw, as every fresh view does; one
-/// owner's perspective shows that owner's overrider of it, marked
-/// '(overridesHere N)', or, where the owner has none, the node raw.
+/// owner's perspective shows the mirror it puts in that node's place
+/// ('mirror_shown'), marked '(overridesHere N)' unless it is the node
+/// itself.
 /// The occurrence is re-pointed where it stands, so it keeps its
 /// viewnode ID whichever way it switches, and its children follow
 /// from its own visit. A re-pointed root's folders are drawn afresh,
@@ -838,15 +839,15 @@ fn substitute_roots (
       . unwrap_or_else ( || walk . truth . graph . pid_else_raw_id (&gnid) );
     let shown : ID = match &walk . overrides_followed {
       OverridesFollowed::RootAuthors => original . clone (),
-      OverridesFollowed::Owner (owner) => resolve_override (
+      OverridesFollowed::Owner (owner) => mirror_shown (
         walk . truth . config, walk . truth . graph, walk . truth . restriction,
-        owner, &original ) . effective, };
+        owner, &original ), };
     let marked : Option<ID> = ( shown != original ) . then ( || original . clone () );
     let repointed : bool = walk . truth . graph . pid_else_raw_id (&gnid) != shown;
     let was_editable : bool =
       tree . get (root) . unwrap () . value () . editable_gnid () . is_some ();
     if repointed || overridesHere != marked
-    { show_overrider (tree, root, &shown, marked, walk) ?; }
+    { show_mirror (tree, root, &shown, marked, walk) ?; }
     if repointed { redraw_folders (tree, root, was_editable, walk) ?; }}
   Ok (( )) }
 
@@ -952,7 +953,7 @@ fn has_members (
 
 /// Make the occurrence at 'child' show 'shown', with 'overridesHere'
 /// as given ('point_occurrence_at').
-fn show_overrider (
+fn show_mirror (
   tree          : &mut Tree<Viewnode>,
   child         : NodeId,
   shown         : &ID,
@@ -965,7 +966,8 @@ fn show_overrider (
   { occurrence . overridesHere = overridesHere; }
   Ok (( )) }
 
-/// The override that 'child' stood for is gone: it shows itself, is
+/// The original that 'child' stood for now stands as itself: 'child'
+/// shows itself, is
 /// warranted only as itself (and so, unwarranted, vanishes, as the
 /// claims rung says), and the original is reinstated right after it,
 /// unless a sibling already stands for it.
@@ -1009,14 +1011,15 @@ fn reinstate_original_after (
     after_drawing (tree, parent, treeid, walk) ?; }
   Ok (( )) }
 
-/// Whether the occurrence at 'treeid' is overridden, by 'follower',
-/// and yet shown raw, where it stands: at a root, or as a member of a
-/// folder other than the subscribee folder.
-fn is_overridden_and_shown_raw (
-  tree     : &Tree<Viewnode>,
-  treeid   : NodeId,
-  follower : &SkgrepoOwner,
-  walk     : &Walk,
+/// Whether the occurrence at 'treeid' is shown raw where, from the
+/// perspective of 'owner', another of its mirrors would stand in its
+/// place: at a root, or as a member of a folder other than the
+/// subscribee folder.
+fn is_raw_where_another_mirror_would_stand (
+  tree   : &Tree<Viewnode>,
+  treeid : NodeId,
+  owner  : &SkgrepoOwner,
+  walk   : &Walk,
 ) -> bool {
   let node : NodeRef<Viewnode> = tree . get (treeid) . unwrap ();
   let raw_position : bool = node . parent () . is_some_and ( |parent|
@@ -1030,9 +1033,9 @@ fn is_overridden_and_shown_raw (
     &node . value () . kind else { return false; };
   raw_position
   && occurrence . overridesHere . is_none ()
-  && resolve_override ( walk . truth . config, walk . truth . graph,
-                        &walk . unrestricted, follower,
-                        &occurrence . gnid ) . effective != occurrence . gnid }
+  && mirror_shown ( walk . truth . config, walk . truth . graph,
+                    &walk . unrestricted, owner, &occurrence . gnid )
+     != walk . truth . graph . pid_else_raw_id (&occurrence . gnid) }
 
 //
 // 8. requests

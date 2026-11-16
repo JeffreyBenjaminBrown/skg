@@ -1,4 +1,5 @@
 use crate::dbs::in_rust_graph::InRustGraph;
+use crate::dbs::in_rust_graph::mirrors::{MIRROR_RELATION, side_of_mirror_shown};
 use crate::dbs::in_rust_graph::stats::mentioner_is_substantive;
 use crate::dbs::in_rust_graph::relation_accessors::{
   BinaryRolePosition, NodeRelation, RelRepoLookup, RelationRole };
@@ -151,11 +152,11 @@ fn set_herald_strings_in_viewnode (
   content_to_containers : &HashMap<ID, HashSet<ID>>,
 ) {
   let (gstats, overridesHere)
-    : (GraphnodeStats, bool) = {
+    : (GraphnodeStats, Option<ID>) = {
     let ViewnodeKind::Vognode (Vognode::Occurrence (t)) =
       & tree . get (treeid) . unwrap () . value () . kind
     else { return; };
-    ( t . graphStats . clone (), t . overridesHere . is_some () ) };
+    ( t . graphStats . clone (), t . overridesHere . clone () ) };
   let counts = match & gstats . rels {
     Some (c) => c . clone (),
     None => return, }; // no stats -> no heralds
@@ -200,8 +201,11 @@ fn set_herald_strings_in_viewnode (
             flags . contents_unintegrated_out . push (*generation); } }
         members . len () })
     } else { None };
+  let side_of_mirror : Option<Side> = // shown in another's place: which side of it
+    overridesHere . as_ref () . and_then ( |original|
+      side_of_mirror_shown (graph, restriction, node_pid, original) );
   let birth_facts : Vec<BirthFact> =
-    birth_facts (tree, &parent_kind, stands_as_member_here, &flags, overridesHere);
+    birth_facts (tree, &parent_kind, stands_as_member_here, &flags, side_of_mirror);
   let rel_heralds : RelationshipHeralds = relationship_heralds_sexp (
     &counts, gstats . aliases, gstats . extra_ids, gstats . flags,
     &flags, &birth_facts, unintegrated );
@@ -328,13 +332,15 @@ fn relationship_is_visible (
 /// names, in the direction its role implies; for a content member, its
 /// viewparent's containment; for a child standing as no member
 /// ('stands_as_member'), none. Usually a singleton; a
-/// HiddenInSubscribee member has two.
+/// HiddenInSubscribee member has two. A mirror shown in another's
+/// place leads with its fork relation, on the side
+/// 'side_of_mirror_shown' gives.
 fn birth_facts (
   tree                  : &Tree<Viewnode>,
   parent_kind           : &ParentKind,
   stands_as_member_here : bool,
   flags                 : &AncestorFlags,
-  overridesHere         : bool, // whether the node is shown in place of a node it overrides
+  side_of_mirror        : Option<Side>, // shown in another's place, reaching it by forker (out) or forkee (in) steps only
 ) -> Vec<BirthFact> {
   let mut facts : Vec<BirthFact> = {
     if ! stands_as_member_here { Vec::new ()
@@ -348,14 +354,12 @@ fn birth_facts (
         ParentKind::Folder (folder, folder_treeid) =>
           birth_facts_for_folder (tree, folder, *folder_treeid),
         ParentKind::Other => Vec::new (), }}};
-  if overridesHere
-    && ! facts . iter () . any ( |fact|
-           fact . relation == NodeRelation::Overrides ) {
-    // A shown overrider (shown in place of a node it overrides) is
-    // born of that override: it leads with the O herald, like every
-    // other birth relation. The overridden node is not an ancestor.
-    facts . insert ( 0, BirthFact::new (
-      NodeRelation::Overrides, Side::Out, None ) ); }
+  if let Some (side) = side_of_mirror {
+    if ! facts . iter () . any ( |fact| fact . relation == MIRROR_RELATION ) {
+      // A mirror shown in place of another is born of the forks
+      // between them: it leads with their herald, like every other
+      // birth relation. The original is not an ancestor.
+      facts . insert ( 0, BirthFact::new ( MIRROR_RELATION, side, None ) ); }}
   facts }
 
 /// The side of a node playing ROLE: the first role states the relationship

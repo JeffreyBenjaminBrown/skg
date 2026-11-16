@@ -238,8 +238,10 @@ fn update_relevant_neighborhood_over_relations_without_links_omits_link_partners
       "seed", "contained", "overridden", "link-dest", "link-source"]));
 }
 
+/// Every mirror of the seed: its forkees and forkers, transitively, a
+/// cycle included.
 #[test]
-fn update_relevant_neighborhood_walks_override_directions_independently () {
+fn update_relevant_neighborhood_holds_every_mirror_of_the_seed () {
   let graph : InRustGraph = InRustGraph::from_graphnodes (&[
     node_with_all_relations ("above-3", &[], &[], &[], &["above-2"], &[]),
     node_with_all_relations ("above-2", &[], &[], &[], &["seed"], &[]),
@@ -255,21 +257,40 @@ fn update_relevant_neighborhood_walks_override_directions_independently () {
     ]));
 }
 
+/// A path that leaves the mirrors by an ordinary relation, or enters
+/// them only after one, adds nothing past its first hop: the mirrors
+/// of a one-hop neighbor are not the seed's. A sibling fork, which
+/// forks what the seed forks, is a mirror of the seed.
 #[test]
-fn update_relevant_neighborhood_neither_reverses_nor_mixes_paths () {
+fn update_relevant_neighborhood_mixes_no_paths () {
   let graph : InRustGraph = InRustGraph::from_graphnodes (&[
     node_with_all_relations ("above", &[], &[], &[], &["seed"], &[]),
     node_with_all_relations ("side-of-above", &["above"], &[], &[], &[], &[]),
     node_with_all_relations ("seed", &["ordinary"], &[], &[], &["below"], &[]),
     node_with_all_relations ("ordinary", &[], &[], &[], &["mixed"], &[]),
     node_with_all_relations ("below", &[], &[], &[], &[], &[]),
-    node_with_all_relations ("reversal", &[], &[], &[], &["below"], &[]),
+    node_with_all_relations ("sibling", &[], &[], &[], &["below"], &[]),
     node_with_all_relations ("two-hop", &["ordinary"], &[], &[], &[], &[]),
     node_with_all_relations ("mixed", &[], &[], &[], &[], &[]),
   ]);
   assert_eq! (
     graph . update_relevant_neighborhood ([ID::from ("seed")]),
-    gnid_set (&["seed", "above", "ordinary", "below"]));
+    gnid_set (&["seed", "above", "ordinary", "below", "sibling"]));
+}
+
+/// A change to one fork of a note reaches a view showing another fork
+/// of it, a sibling, in either graph: which of them stands in the
+/// note's place can change.
+#[test]
+fn update_relevant_neighborhood_of_a_fork_holds_its_sibling () {
+  let graph : InRustGraph = InRustGraph::from_graphnodes (&[
+    node_with_all_relations ("original", &[], &[], &[], &[], &[]),
+    node_with_all_relations ("changed-fork", &[], &[], &[], &["original"], &[]),
+    node_with_all_relations ("shown-fork", &[], &[], &[], &["original"], &[]),
+  ]);
+  assert! (
+    graph . update_relevant_neighborhood ([ID::from ("changed-fork")])
+      . contains (&ID::from ("shown-fork")));
 }
 
 #[test]

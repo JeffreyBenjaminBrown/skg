@@ -1,10 +1,6 @@
 tantivy_folder = "/tmp/placeholder"
 
 [[repos]]
-name = "third"
-path = "third"
-
-[[repos]]
 name = "reader"
 path = "reader"
 foreign = true
@@ -13,3 +9,7 @@ foreign = true
 name = "sender"
 path = "sender"
 foreign = true
+
+[[repos]]
+name = "third"
+path = "third"

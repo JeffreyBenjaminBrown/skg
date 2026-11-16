@@ -143,7 +143,7 @@ pub enum BufferValidationError {
                                   HeadlineName), // the recorder's occurrence
   OverridesHere_Mismatch         (Option<ID>, // the carrier's own ID
                                   ID,         // the original the fact claims
-                                  Option<ID>, // who the graph says substitutes for that original; None if the graph was unavailable
+                                  Option<ID>, // the mirror the graph says stands for that original; None if the graph was unavailable
                                   HeadlineName), // the carrier
   Other                          (String),
 }
@@ -355,7 +355,7 @@ impl std::fmt::Display for BufferValidationError {
       BufferValidationError::FlagEditOnUnknownNode (gnid) =>
         write! (f, "Cannot change flags of unsaved or unknown graphnode {:?}; save the node first.", gnid),
       BufferValidationError::OverridesHere_Mismatch(carrier, original, effective, headline) =>
-        write!(f, "Node {:?} ({}) carries the fact (overridesHere {:?}), but it is not on the override chain of that original (which resolves to {:?}). The fact looks hand-edited or stale; saving it would rewrite a contains list. Re-render the view and retry.", carrier, headline, original, effective),
+        write!(f, "Node {:?} ({}) carries the fact (overridesHere {:?}), but it is not a mirror of that original (whose mirror shown here is {:?}). The fact looks hand-edited or stale; saving it would rewrite a contains list. Re-render the view and retry.", carrier, headline, original, effective),
       BufferValidationError::ChangedSinceRendered {
         gnid, change : StaleGraphnodeReport::Deleted, headlines } =>
         write!(f, "Node {:?} ({}) was deleted after this buffer was rendered. Nothing was saved; reopen a fresh view and reapply the edit.",

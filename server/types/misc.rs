@@ -740,6 +740,26 @@ impl SkgConfig {
       . filter ( |name| self . skgrepo_is_owned (name) )
       . collect () }
 
+  /// The skgrepo list of 'owner''s perspective, by which mirror
+  /// substitution ranks a note's mirrors
+  /// ('server/dbs/in_rust_graph/mirrors.rs'): the skgrepos 'owner'
+  /// owns ('skgrepo_owner'), most private first (the reverse of their
+  /// fold order, which for the user's is the privacy ladder and for a
+  /// foreign owner's is what its manifests say), then every other
+  /// skgrepo in declaration order.
+  pub fn perspective_skgrepo_list (
+    &self,
+    owner : &SkgrepoOwner,
+  ) -> Vec<SkgrepoName> {
+    let (owners, others) : (Vec<SkgrepoName>, Vec<SkgrepoName>) = (
+      self . ordered_skgrepos () . into_iter ()
+        . filter ( |name| &self . skgrepo_owner (name) == owner )
+        . rev () . collect (),
+      self . skgrepos_in_declaration_order () . into_iter ()
+        . filter ( |name| &self . skgrepo_owner (name) != owner )
+        . collect () );
+    owners . into_iter () . chain (others) . collect () }
+
   /// Record what the foreign manifests say ('ForeignManifestOrder'),
   /// and the fold order of the foreign skgrepos that follows.
   pub fn set_foreign_manifest_orders (
